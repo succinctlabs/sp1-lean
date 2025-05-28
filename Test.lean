@@ -33,9 +33,12 @@ variable [Fact (Nat.Prime p)] [NoZeroDivisors (Fin p)]
 def Word.is_u32 (w : Word (Fin p)) : Prop :=
   ∀ x ∈ w, x.val < 256
 
+def Word.toNat (w : Word (Fin p)) : ℕ :=
+  w[0].val + 256 * w[1].val + 65536 * w[2].val + 16777216 * w[3].val
+
 def Word.to_UInt32 (w : Word (Fin p)) : UInt32 :=
-  UInt32.ofNatLT (w[0].1 + 256 * w[1].1 + 65536 * w[2].1 + 16777216 * w[3].1)
-    sorry
+  UInt32.ofNat (w[0].1 + 256 * w[1].1 + 65536 * w[2].1 + 16777216 * w[3].1)
+
 
 def Word.zmod_to_UInt8 (w : Word (Fin p)) : Word UInt8 :=
   w.map fun x => x.val.toUInt8
@@ -80,9 +83,9 @@ def AddOperation.spec'
     (cols : AddOperation (Fin p))
     (a : Word (Fin p))
     (b : Word (Fin p)) : Prop :=
-  let a32 := a.to_UInt32
-  let b32 := b.to_UInt32
-  let c32 := cols.value.to_UInt32
+  let a32 := a.toNat
+  let b32 := b.toNat
+  let c32 := cols.value.toNat
   cols.value.is_u32 ∧ a32 + b32 = c32
 
 def AddOperation.constraints
@@ -141,3 +144,38 @@ theorem AddOperation.correct [Fact (Nat.Prime p)] (cols : AddOperation (Fin p))
       · sorry
     · sorry
   · sorry
+
+theorem AddOperation.correct' [Fact (Nat.Prime p)] (cols : AddOperation (Fin p))
+    (a : Word (Fin p)) (b : Word (Fin p)) :
+    cols.constraints a b → cols.spec' a b := by
+  have hp : p ≠ 1 := by sorry
+  have hp' : 256 + 256 < p := by sorry
+  induction a using Word.inductionOn with | mk a1 a2 a3 a4 =>
+  induction b using Word.inductionOn with | mk b1 b2 b3 b4 =>
+  induction cols using AddOperation.inductionOn with | mk v1 v2 v3 v4 c1 c2 c3 =>
+  unfold constraints
+  simp only [mul_eq_zero, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, sub_eq_zero]
+  rintro ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, hrange⟩
+  refine ⟨hrange.2.2, ?_⟩
+  simp [Word.is_u32] at hrange
+  simp only [Word.UInt8_to_UInt32, Word.zmod_to_UInt8, Nat.toUInt8_eq, Vector.map_mk,
+    List.map_toArray, List.map_cons, List.map_nil, Vector.getElem_mk, List.getElem_toArray,
+    List.getElem_cons_succ, List.getElem_cons_zero]
+  simp only [Word.toNat, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  cases h11 <;> cases h12 <;> cases h13
+  · subst_eqs
+    simp [hp, sub_eq_zero] at *
+    simp [← h8, ← h9, ← h10]
+    rw [Fin.val_add_eq_of_add_lt (by omega)]
+    rw [Fin.val_add_eq_of_add_lt (by omega)]
+    rw [Fin.val_add_eq_of_add_lt (by omega)]
+    refine h4.elim ?_ ?_
+    · intro h4
+      simp [← h4]
+      rw [Fin.val_add_eq_of_add_lt (by omega)]
+      omega
+    · intro h4
+      sorry
+  sorry; sorry; sorry; sorry; sorry; sorry; sorry
