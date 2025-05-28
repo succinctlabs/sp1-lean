@@ -3,10 +3,17 @@ import Mathlib
 macro "WORD_SIZE" : term => `(4)
 
 -- Random notes:
+
 -- `Fin p` probably better than `ZMod p` for simplicity. don't care about `ℤ` case
+
 -- Bitvec manipulation seems maybe like a good idea?
 --          Using numerical bitshifting has potential "injectivity" issues
+
 -- Custom induction for words seems very helpful w/ `elab_as_elim`
+
+-- Nethermind simplifies things by avoiding UInt8, instead using ℕ
+-- Definitely worth investigation
+
 
 @[simp]
 def _root_.ZMod.toUInt8 (x : ZMod p) : UInt8 := x.val.toUInt8
@@ -25,6 +32,10 @@ variable [Fact (Nat.Prime p)] [NoZeroDivisors (Fin p)]
 
 def Word.is_u32 (w : Word (Fin p)) : Prop :=
   ∀ x ∈ w, x.val < 256
+
+def Word.to_UInt32 (w : Word (Fin p)) : UInt32 :=
+  UInt32.ofNatLT (w[0].1 + 256 * w[1].1 + 65536 * w[2].1 + 16777216 * w[3].1)
+    sorry
 
 def Word.zmod_to_UInt8 (w : Word (Fin p)) : Word UInt8 :=
   w.map fun x => x.val.toUInt8
@@ -63,6 +74,15 @@ def AddOperation.spec
   let a32 := a.zmod_to_UInt8.UInt8_to_UInt32
   let b32 := b.zmod_to_UInt8.UInt8_to_UInt32
   let c32 := cols.value.zmod_to_UInt8.UInt8_to_UInt32
+  cols.value.is_u32 ∧ a32 + b32 = c32
+
+def AddOperation.spec'
+    (cols : AddOperation (Fin p))
+    (a : Word (Fin p))
+    (b : Word (Fin p)) : Prop :=
+  let a32 := a.to_UInt32
+  let b32 := b.to_UInt32
+  let c32 := cols.value.to_UInt32
   cols.value.is_u32 ∧ a32 + b32 = c32
 
 def AddOperation.constraints
