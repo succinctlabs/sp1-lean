@@ -1,9 +1,13 @@
 import Mathlib
 
+-- random math fact
+instance {p : ℕ} [Fact (Nat.Prime p)] : NoZeroDivisors (Fin p) := by
+  sorry
+
 macro "WORD_SIZE" : term => `(2)
 
-@[reducible]
-def Word (T : Type) := Vector T WORD_SIZE
+@[reducible] def Word (T : Type) := Vector T WORD_SIZE
+@[reducible] def AddOperation (T : Type) := Word T
 
 abbrev p := 2013265921
 
@@ -21,22 +25,6 @@ abbrev baseInv : Fin p := 2013235201
 @[simp] lemma base_ne_zero : base ≠ 0 := by simp [base]
 @[simp] lemma baseInv_ne_zero : baseInv ≠ 0 := by simp [baseInv]
 
-end base
-
-def Word.is_u32 (w : Word (Fin p)) : Prop :=
-  ∀ x ∈ w, x.val < base
-
-def Word.toNat (w : Word (Fin p)) : ℕ :=
-  w[0].val + base * w[1].val
-
-lemma helper (a b : Word (Fin p)) :
-    a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
-  rw [Word.toNat, Word.toNat]
-  simp
-  omega
-
-variable [Fact (Nat.Prime p)]
-
 @[simp] lemma mul_baseInv_eq_zero_iff (x : Fin p) :
     x * baseInv = 1 ↔ x = base := by
   refine ⟨fun h => ?_, fun h => ?_⟩
@@ -47,52 +35,72 @@ variable [Fact (Nat.Prime p)]
   · rw [h]
     simp only [base_mul_baseInv, Fin.isValue]
 
--- example : Field (Fin p) := by infer_instance
+end base
 
-structure AddOperation (T : Type) where
-  value : Word T
+section isUInt32
+
+def Word.isUInt32 (w : Word (Fin p)) : Prop :=
+  ∀ x ∈ w, x.val < base
+
+end isUInt32
+
+section toNat
+
+def Word.toNat (w : Word (Fin p)) : ℕ :=
+  w[0].val + base * w[1].val
+
+lemma toNat_add_toNat (a b : Word (Fin p)) :
+    a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
+  simp [Word.toNat]; omega
+
+end toNat
+
 
 @[elab_as_elim]
 def Word.inductionOn {α : Type} {C : Word α → Prop}
-    (mk : ∀ x1 x2 : α, C #v[x1, x2]) (w : Word α) : C w := sorry
+    (mk : ∀ x1 x2 : α, C #v[x1, x2]) (w : Word α) : C w := by
+  refine match w with
+  | (Vector.mk (Array.mk as) h) => by {
+    simp at h
+    sorry
+  }
 
 @[elab_as_elim]
 def AddOperation.inductionOn {α : Type} {C : AddOperation α → Prop}
-    (mk : ∀ x1 x2 : α, C ⟨#v[x1, x2]⟩)
+    (mk : ∀ x1 x2 : α, C #v[x1, x2])
     (op : AddOperation α) : C op := sorry
 
 def AddOperation.spec
     (cols : AddOperation (Fin p))
     (a : Word (Fin p)) (b : Word (Fin p)) : Prop :=
-  let a32 := a.toNat
-  let b32 := b.toNat
-  let c32 := cols.value.toNat
-  a.is_u32 → b.is_u32 →
-    a32 + b32 = if a32 + b32 < 2^32 then c32 else c32 + 2^32
-
+  a.isUInt32 → b.isUInt32 →
+    a.toNat + b.toNat = if a.toNat + b.toNat < 2^32
+      then cols.toNat else cols.toNat + 2^32
 
 def AddOperation.constraints
     (cols : AddOperation (Fin p))
     (a : Word (Fin p))
     (b : Word (Fin p)) : Prop :=
   let carry0 := 0
-  let carry1 := (a[0] + b[0] - cols.value[0] + carry0) * baseInv
-  let carry2 := (a[1] + b[1] - cols.value[1] + carry1) * baseInv
+  let carry1 := (a[0] + b[0] - cols[0] + carry0) * baseInv
+  let carry2 := (a[1] + b[1] - cols[1] + carry1) * baseInv
   carry1 * (carry1 - 1) = 0 ∧ -- isBool check
   carry2 * (carry2 - 1) = 0 ∧ -- isBool check
-  cols.value.is_u32 -- slice range checks
+  cols.isUInt32 -- slice range checks
 
 
-theorem AddOperation.correct [(NoZeroDivisors (Fin p))] (cols : AddOperation (Fin p))
+
+theorem AddOperation.correct [Fact (Nat.Prime p)]
+    (cols : AddOperation (Fin p))
     (a : Word (Fin p)) (b : Word (Fin p)) :
     cols.constraints a b → cols.spec a b := by
   induction a using Word.inductionOn with | mk a1 a2 =>
   induction b using Word.inductionOn with | mk b1 b2 =>
   induction cols using AddOperation.inductionOn with | mk v1 v2 =>
-  unfold constraints spec
-  simp_rw [helper]
 
-  simp [Word.is_u32, mul_eq_zero]
+  unfold constraints spec
+
+  simp [toNat_add_toNat, Word.isUInt32, mul_eq_zero]
   intros h1 h2 h3 h4 h5 h6 h7 h8
 
   cases a1 with | mk a1 ha1 =>
@@ -101,17 +109,15 @@ theorem AddOperation.correct [(NoZeroDivisors (Fin p))] (cols : AddOperation (Fi
   cases b2 with | mk b2 hb2 =>
   cases v1 with | mk v1 hv1 =>
   cases v2 with | mk v2 hv2 =>
-  simp only
 
   have hinv : (2013235201 : Fin p).val = 2013235201 := rfl
   have hbase : (65536 : Fin p).val = 65536 := rfl
   have hpow : (2 ^ 16 : Fin p).val = 2 ^ 16 := rfl
 
   simp only [Fin.val, hpow] at h3 h4 h5 h6 h7 h8
-  simp [two_ne_zero, sub_eq_zero] at h1 h2
+  simp only [Fin.isValue, sub_eq_zero, mul_baseInv_eq_zero_iff] at h1 h2
 
   by_cases h_overflow : a1 + b1 + 65536 * (a2 + b2) < 4294967296
-
   ·
     simp only [h_overflow, if_true, Word.toNat]
     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, val_base,
