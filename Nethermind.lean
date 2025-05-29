@@ -1,6 +1,10 @@
 import Mathlib
 import Nethermind.Specs
 
+/-!
+This file is a copy of Nethermind's PoC proof
+-/
+
 namespace Sp1
 
 def spec_ADD

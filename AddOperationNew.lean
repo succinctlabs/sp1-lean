@@ -1,13 +1,17 @@
 import Mathlib
 
+/-!
+This file contains an optimized/golfed proof of add operation correctness.
+Need more work to check how this scales to e.g. add4 or add5
+-/
+
 -- random math fact
 instance {p : ℕ} [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
   have : IsDomain (ZMod (p + 1)) := ZMod.instIsDomain (hp := ⟨hp.1⟩)
   simp [ZMod] at this
   infer_instance
 
-macro "WORD_SIZE" : term => `(2)
-
+abbrev WORD_SIZE := 2
 abbrev p := 2013265921
 
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
@@ -72,15 +76,14 @@ def AddOperation.constraints
   cols.isUInt32 -- slice range checks
 
 lemma test_constraints_equiv (cols : AddOperation (Fin p))
-    (a : Word (Fin p))
-    (b : Word (Fin p)) :
+    (a : Word (Fin p)) (b : Word (Fin p)) :
   cols.constraints a b ↔ (((((a[0] + b[0]) - cols[0]) + (0 : Fin p)) *
     (2013235201 : Fin p)) * (((((a[0] + b[0]) - cols[0]) + 0) * 2013235201) - 1)) = 0 ∧
     (((((a[1] + b[1]) - cols[1]) + ((((a[0] + b[0]) - cols[0]) + (0 : Fin p)) *
     (2013235201 : Fin p))) * (2013235201 : Fin p)) * (((((a[1] + b[1]) - cols[1]) +
     ((((a[0] + b[0]) - cols[0]) + 0) * 2013235201)) * 2013235201) - 1)) = 0 ∧
     cols.isUInt32 := by
-  simp [ AddOperation.constraints]
+  simp [AddOperation.constraints]
 
 /-- The constraints on `AddOperation` imply the expected spec. -/
 theorem AddOperation.correct [Fact (Nat.Prime p)]
@@ -88,7 +91,7 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
     (a : Word (Fin p)) (b : Word (Fin p)) :
     cols.constraints a b → cols.spec a b := by
   simp [constraints, spec, toNat_add_toNat, Word.isUInt32, sub_eq_zero]
-  intros h1 h2
+  intros h1 h2; intros
   split_ifs with h_overflow
     <;> simp [h_overflow, Word.toNat]
     <;> cases h1 with | inl h1 => ?_ | inr h1 => ?_
