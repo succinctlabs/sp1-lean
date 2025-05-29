@@ -13,3 +13,6 @@ scope = "leanprover-community"
 
 [[lean_lib]]
 name = "Sp1Lean"
+
+[[lean_lib]]
+name = "Nethermind"
