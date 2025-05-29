@@ -1,9 +1,13 @@
 import Mathlib
 
 -- random math fact
-instance {p : ℕ} [Fact (Nat.Prime p)] : NoZeroDivisors (Fin p) := sorry
+instance {p : ℕ} [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
+  have : IsDomain (ZMod (p + 1)) := ZMod.instIsDomain (hp := ⟨hp.1⟩)
+  simp [ZMod] at this
+  infer_instance
 
 macro "WORD_SIZE" : term => `(2)
+
 abbrev p := 2013265921
 
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
