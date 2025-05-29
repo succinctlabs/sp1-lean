@@ -40,10 +40,10 @@ end base
 
 -- A word represents a u32 value if both entries are u16 values
 def Word.isUInt32 (w : Word (Fin p)) : Prop :=
-  ∀ x ∈ w, x.val < base
+  w[0].val < base ∧ w[1].val < base
 
 -- Convert a word to a natural number in the natural way
-def Word.toNat (w : Word (Fin p)) : ℕ :=
+@[reducible] def Word.toNat (w : Word (Fin p)) : ℕ :=
   w[0].val + base * w[1].val
 
 lemma toNat_add_toNat (a b : Word (Fin p)) :
@@ -87,13 +87,8 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
     (cols : AddOperation (Fin p))
     (a : Word (Fin p)) (b : Word (Fin p)) :
     cols.constraints a b → cols.spec a b := by
-  induction a using Word.inductionOn with | mk a1 a2 =>
-  induction b using Word.inductionOn with | mk b1 b2 =>
-  induction cols using Word.inductionOn with | mk v1 v2 =>
-
   simp [constraints, spec, toNat_add_toNat, Word.isUInt32, sub_eq_zero]
   intros h1 h2
-
   split_ifs with h_overflow
     <;> simp [h_overflow, Word.toNat]
     <;> cases h1 with | inl h1 => ?_ | inr h1 => ?_
