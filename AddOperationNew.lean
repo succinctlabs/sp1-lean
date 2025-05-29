@@ -5,56 +5,12 @@ instance {p : ℕ} [Fact (Nat.Prime p)] : NoZeroDivisors (Fin p) := by
   sorry
 
 macro "WORD_SIZE" : term => `(2)
+abbrev p := 2013265921
 
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
 @[reducible] def AddOperation (T : Type) := Word T
 
-abbrev p := 2013265921
-
-section base
-
-abbrev base : Fin p := 65536
-abbrev baseInv : Fin p := 2013235201
-
-@[simp] lemma val_base : base.val = 65536 := rfl
-@[simp] lemma val_baseInv : baseInv.val = 2013235201 := rfl
-
-@[simp] lemma baseInv_mul_base : baseInv * base = 1 := rfl
-@[simp] lemma base_mul_baseInv : base * baseInv = 1 := rfl
-
-@[simp] lemma base_ne_zero : base ≠ 0 := by simp [base]
-@[simp] lemma baseInv_ne_zero : baseInv ≠ 0 := by simp [baseInv]
-
-@[simp] lemma mul_baseInv_eq_zero_iff (x : Fin p) :
-    x * baseInv = 1 ↔ x = base := by
-  refine ⟨fun h => ?_, fun h => ?_⟩
-  · have := congr_arg (· * base) h
-    simp at this
-    rw [mul_assoc] at this
-    simpa using this
-  · rw [h]
-    simp only [base_mul_baseInv, Fin.isValue]
-
-end base
-
-section isUInt32
-
-def Word.isUInt32 (w : Word (Fin p)) : Prop :=
-  ∀ x ∈ w, x.val < base
-
-end isUInt32
-
-section toNat
-
-def Word.toNat (w : Word (Fin p)) : ℕ :=
-  w[0].val + base * w[1].val
-
-lemma toNat_add_toNat (a b : Word (Fin p)) :
-    a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
-  simp [Word.toNat]; omega
-
-end toNat
-
+section eliminators
 
 @[elab_as_elim]
 def Word.inductionOn {α : Type} {C : Word α → Prop}
@@ -70,13 +26,59 @@ def AddOperation.inductionOn {α : Type} {C : AddOperation α → Prop}
     (mk : ∀ x1 x2 : α, C #v[x1, x2])
     (op : AddOperation α) : C op := sorry
 
-def AddOperation.spec
-    (cols : AddOperation (Fin p))
+end eliminators
+
+section base
+
+abbrev base : Fin p := 2 ^ 16
+abbrev baseInv : Fin p := 2013235201
+
+@[simp] lemma val_base : base.val = 65536 := rfl
+@[simp] lemma val_baseInv : baseInv.val = 2013235201 := rfl
+
+@[simp] lemma baseInv_mul_base : baseInv * base = 1 := rfl
+@[simp] lemma base_mul_baseInv : base * baseInv = 1 := rfl
+
+@[simp] lemma base_ne_zero : base ≠ 0 := by simp [base]; trivial
+@[simp] lemma baseInv_ne_zero : baseInv ≠ 0 := by simp [baseInv]
+
+@[simp] lemma mul_baseInv_eq_zero_iff (x : Fin p) :
+    x * baseInv = 1 ↔ x = base := by
+  refine ⟨fun h => by simpa [mul_assoc] using congr_arg (· * base) h,
+    fun h => by simp only [h, base_mul_baseInv, Fin.isValue]⟩
+
+end base
+
+section isUInt32
+
+-- A word represents a u32 value if both entries are u16 values
+def Word.isUInt32 (w : Word (Fin p)) : Prop :=
+  ∀ x ∈ w, x.val < base
+
+end isUInt32
+
+section toNat
+
+-- Convert a word to a natural number in the natural way
+def Word.toNat (w : Word (Fin p)) : ℕ :=
+  w[0].val + base * w[1].val
+
+lemma toNat_add_toNat (a b : Word (Fin p)) :
+    a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
+  simp [Word.toNat]; omega
+
+end toNat
+
+/-- `AddOperation` should either give the direct sum of the two input values,
+or the value plus `2^32` on overflow-/
+def AddOperation.spec (cols : AddOperation (Fin p))
     (a : Word (Fin p)) (b : Word (Fin p)) : Prop :=
   a.isUInt32 → b.isUInt32 →
     a.toNat + b.toNat = if a.toNat + b.toNat < 2^32
       then cols.toNat else cols.toNat + 2^32
 
+/-- Basic representation of the extracted constraints. A bit pre-processed more than will be in practice.
+Also note we ignore the `is_real` part of the constraints, but should be easy to add that later.  -/
 def AddOperation.constraints
     (cols : AddOperation (Fin p))
     (a : Word (Fin p))
@@ -88,8 +90,7 @@ def AddOperation.constraints
   carry2 * (carry2 - 1) = 0 ∧ -- isBool check
   cols.isUInt32 -- slice range checks
 
-
-
+/-- The constraints on `AddOperation` imply the expected spec. -/
 theorem AddOperation.correct [Fact (Nat.Prime p)]
     (cols : AddOperation (Fin p))
     (a : Word (Fin p)) (b : Word (Fin p)) :
