@@ -131,8 +131,8 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
         rw [h1, sub_self, zero_mul, add_zero, sub_eq_zero] at h2
         rw [Fin.add_def, Fin.ext_iff] at h1 h2
         simp at h1 h2
-
         rw [← h1, ← h2]
+
         omega
       }
       | inr h2 => {
@@ -143,7 +143,6 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
         rw [Fin.add_def, Fin.ext_iff] at h1 h2
         simp at h1
         simp [Fin.sub_def] at h2
-
         rw [← h1, ← h2]
 
         omega
@@ -154,37 +153,28 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
         rw [h1] at h2
         simp at h2
         rw [sub_eq_iff_eq_add, ← sub_eq_iff_eq_add'] at h1
-
         rw [← eq_sub_iff_add_eq, sub_eq_iff_eq_add, ← sub_eq_iff_eq_add'] at h2
         simp at h2
-
         simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff] at h1 h2
-
         rw [val_base] at h1
 
         omega
       }
       | inr h2 => {
-
         rw [h1, base_mul_baseInv] at h2
-
         rw [← eq_sub_iff_add_eq, sub_eq_iff_eq_add, ← sub_eq_iff_eq_add'] at h2
         rw [sub_eq_add_neg, neg_sub] at h2
         rw [sub_eq_iff_eq_add, ← sub_eq_iff_eq_add'] at h1
-
-
         simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff] at h1 h2
-
         rw [← h1, ← h2]
-        simp
-        simp_rw [mul_add, ← add_assoc]
+        simp [mul_add, ← add_assoc]
         simp [p] at *
+
         omega
       }
-  · simp only [h_overflow, if_true, Word.toNat]
-    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, val_base,
+  · simp only [h_overflow, if_true, Word.toNat,
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, val_base,
       List.getElem_cons_succ]
-
     cases h1 with
     | inl h1 => cases h2 with
       | inl h2 => {
@@ -192,8 +182,8 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
         rw [h1, sub_self, zero_mul, add_zero, sub_eq_zero] at h2
         rw [Fin.add_def, Fin.ext_iff] at h1 h2
         simp at h1 h2
-
         rw [← h1, ← h2]
+
         omega
       }
       | inr h2 => {
@@ -204,7 +194,6 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
         rw [Fin.add_def, Fin.ext_iff] at h1 h2
         simp at h1
         simp [Fin.sub_def] at h2
-
         rw [← h1, ← h2]
 
         omega
@@ -215,12 +204,9 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
         rw [h1] at h2
         simp at h2
         rw [sub_eq_iff_eq_add, ← sub_eq_iff_eq_add'] at h1
-
         rw [← eq_sub_iff_add_eq, sub_eq_iff_eq_add, ← sub_eq_iff_eq_add'] at h2
         simp at h2
-
         simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff] at h1 h2
-
         rw [val_base] at h1
 
         omega
@@ -233,5 +219,6 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
         simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff] at h1 h2
         rw [← h1, ← h2]
         simp [p] at *
+
         omega
       }
