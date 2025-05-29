@@ -13,6 +13,9 @@ abbrev p := 2013265921
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
 @[reducible] def AddOperation (T : Type) := Word T
 
+@[reducible] def Word.low {α : Type} (w : Word α) : α := w[0]
+@[reducible] def Word.high {α : Type} (w : Word α) : α := w[1]
+
 @[elab_as_elim] -- induction rule for words
 def Word.inductionOn {α : Type} {C : Word α → Prop}
     (mk : ∀ x1 x2 : α, C #v[x1, x2]) (w : Word α) : C w := sorry
@@ -38,17 +41,44 @@ abbrev baseInv : Fin p := 2013235201
 
 end base
 
+section toNat
+
+-- Convert a word to a natural number in the natural way
+def Word.toNat (w : Word (Fin p)) : ℕ :=
+  w.low.val + base * w.high.val
+
+lemma toNat_add_toNat (a b : Word (Fin p)) :
+    a.toNat + b.toNat = (a.low + b.low) + base * (a.high + b.high) := by
+  simp [Word.toNat]; omega
+
+end toNat
+
+section isUInt32
+
 -- A word represents a u32 value if both entries are u16 values
 def Word.isUInt32 (w : Word (Fin p)) : Prop :=
   ∀ x ∈ w, x.val < base
 
--- Convert a word to a natural number in the natural way
-def Word.toNat (w : Word (Fin p)) : ℕ :=
-  w[0].val + base * w[1].val
+lemma toNat_add_toNat_eq_toNat_iff (a b c : Word (Fin p))
+    (h1 : a.isUInt32) (h2 : b.isUInt32) :
+    (a.toNat + b.toNat) % 4294967296 = c.toNat ↔
+      a.toNat + b.toNat = if a.toNat + b.toNat < 2^32
+        then c.toNat else c.toNat + 2^32 := by
+  -- rw [toNat_add_toNat]
+  split_ifs with h
+  · simp at h
+    rw [Nat.mod_eq_of_lt h]
+  · simp at h
+    simp [Word.toNat] at *
+    simp [Word.isUInt32] at *
+    induction a using Word.inductionOn with | mk a1 a2 =>
+    induction b using Word.inductionOn with | mk b1 b2 =>
+    induction c using Word.inductionOn with | mk v1 v2 =>
+    simp at *
 
-lemma toNat_add_toNat (a b : Word (Fin p)) :
-    a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
-  simp [Word.toNat]; omega
+    omega
+
+end isUInt32
 
 /-- `AddOperation` should either give the direct sum of the two input values,
 or the value plus `2^32` on overflow-/
@@ -65,8 +95,8 @@ def AddOperation.constraints
     (a : Word (Fin p))
     (b : Word (Fin p)) : Prop :=
   let carry0 := 0
-  let carry1 := (a[0] + b[0] - cols[0] + carry0) * baseInv
-  let carry2 := (a[1] + b[1] - cols[1] + carry1) * baseInv
+  let carry1 := (a.low + b.low - cols.low + carry0) * baseInv
+  let carry2 := (a.high + b.high - cols.high + carry1) * baseInv
   carry1 * (carry1 - 1) = 0 ∧ -- isBool check
   carry2 * (carry2 - 1) = 0 ∧ -- isBool check
   cols.isUInt32 -- slice range checks
@@ -74,13 +104,13 @@ def AddOperation.constraints
 lemma test_constraints_equiv (cols : AddOperation (Fin p))
     (a : Word (Fin p))
     (b : Word (Fin p)) :
-  cols.constraints a b ↔ (((((a[0] + b[0]) - cols[0]) + (0 : Fin p)) *
-    (2013235201 : Fin p)) * (((((a[0] + b[0]) - cols[0]) + 0) * 2013235201) - 1)) = 0 ∧
-    (((((a[1] + b[1]) - cols[1]) + ((((a[0] + b[0]) - cols[0]) + (0 : Fin p)) *
-    (2013235201 : Fin p))) * (2013235201 : Fin p)) * (((((a[1] + b[1]) - cols[1]) +
-    ((((a[0] + b[0]) - cols[0]) + 0) * 2013235201)) * 2013235201) - 1)) = 0 ∧
+  cols.constraints a b ↔ (((((a.low + b.low) - cols.low) + (0 : Fin p)) *
+    (2013235201 : Fin p)) * (((((a.low + b.low) - cols.low) + 0) * 2013235201) - 1)) = 0 ∧
+    (((((a.high + b.high) - cols.high) + ((((a.low + b.low) - cols.low) + (0 : Fin p)) *
+    (2013235201 : Fin p))) * (2013235201 : Fin p)) * (((((a.high + b.high) - cols.high) +
+    ((((a.low + b.low) - cols.low) + 0) * 2013235201)) * 2013235201) - 1)) = 0 ∧
     cols.isUInt32 := by
-  simp [ AddOperation.constraints]
+  simp [AddOperation.constraints]
 
 /-- The constraints on `AddOperation` imply the expected spec. -/
 theorem AddOperation.correct [Fact (Nat.Prime p)]
@@ -91,12 +121,20 @@ theorem AddOperation.correct [Fact (Nat.Prime p)]
   induction b using Word.inductionOn with | mk b1 b2 =>
   induction cols using Word.inductionOn with | mk v1 v2 =>
 
-  simp [constraints, spec, toNat_add_toNat, Word.isUInt32, sub_eq_zero]
-  intros h1 h2
+  -- Reduce down the basic problem to arithmetic
+  simp [constraints, spec, toNat_add_toNat, Word.isUInt32, mul_eq_zero]
+  intros h1 h2 h3 h4 h5 h6 h7 h8
+
+  -- Case analysis on the two elements of the words
+  cases a1 with | mk a1 ha1 => cases a2 with | mk a2 ha2 =>
+  cases b1 with | mk b1 hb1 => cases b2 with | mk b2 hb2 =>
+  cases v1 with | mk v1 hv1 => cases v2 with | mk v2 hv2 =>
+
+  simp only [Fin.isValue, sub_eq_zero, mul_baseInv_eq_zero_iff] at h1 h2
 
   split_ifs with h_overflow
     <;> simp [h_overflow, Word.toNat]
     <;> cases h1 with | inl h1 => ?_ | inr h1 => ?_
-    <;> · rw [h1] at h2
+    <;> { rw [h1] at h2
           simp [Fin.add_def, Fin.sub_def, Fin.ext_iff, sub_eq_zero, p] at *
-          omega
+          omega }
