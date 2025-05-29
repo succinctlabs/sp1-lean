@@ -71,6 +71,17 @@ def AddOperation.constraints
   carry2 * (carry2 - 1) = 0 ∧ -- isBool check
   cols.isUInt32 -- slice range checks
 
+lemma test_constraints_equiv (cols : AddOperation (Fin p))
+    (a : Word (Fin p))
+    (b : Word (Fin p)) :
+  cols.constraints a b ↔ (((((a[0] + b[0]) - cols[0]) + (0 : Fin p)) *
+    (2013235201 : Fin p)) * (((((a[0] + b[0]) - cols[0]) + 0) * 2013235201) - 1)) = 0 ∧
+    (((((a[1] + b[1]) - cols[1]) + ((((a[0] + b[0]) - cols[0]) + (0 : Fin p)) *
+    (2013235201 : Fin p))) * (2013235201 : Fin p)) * (((((a[1] + b[1]) - cols[1]) +
+    ((((a[0] + b[0]) - cols[0]) + 0) * 2013235201)) * 2013235201) - 1)) = 0 ∧
+    cols.isUInt32 := by
+  simp [ AddOperation.constraints]
+
 /-- The constraints on `AddOperation` imply the expected spec. -/
 theorem AddOperation.correct [Fact (Nat.Prime p)]
     (cols : AddOperation (Fin p))
