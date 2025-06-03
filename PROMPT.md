@@ -1,0 +1,15 @@
+Finish the proof of X in the file F.
+
+You can run the Lean compiler using `lake lean -q <path-to-lean-file>` to get the output and error messages, including the context and goals at the error locations. Don't tail, head, or grep the stdout and stderr of the Lean compiler message because otherwise you may lose crucial information like types, goals, hints, etc. Always read the entire output of the compiler! Always run the Lean compiler on the file again to make sure that your proof actually works.
+
+Sp1Lean/NatTest directory contains some code for the verification of ZK circuits as long with some existing verifications. Verify that the `Add4Operation` circuit is not under-constrained by proving `Add4Operation.correct`. You can look at proofs of other operations such as the ones in `Add.lean`, `MSB.lean`, `IsZero.lean` (if these files exist) to get a sense of how `*.correct` is written and some common tactics, lemmas, etc. used to prove correctness of ZK circuits.
+
+For large and complicated proofs like this, it may be beneficial to
+1. Work out mathematically how the proof works before writing the Lean proof.
+2. Instead of trying to figure out the entire Lean proof in one shot, do a case work or multiple nested case works with `sorry`'s and then prove each branch separately. You may want to replace the `sorry` inside with a hole `_` and run the Lean compiler to get the full context and goal.
+3. Before writing the Lean proof, it may be beneficial to look at how `AddOperationNew.lean` and `Nethermind.lean` prove statements under `BabyBear` by simp-ing  the multiplication, subtraction, and addition (order is important), then using `Fin.lt_iff_val_lt_val` and other `Fin.*` lemmas to remove `Fin.val` for 256, 65536, or any (literal) number that is necessary, finally once we get a goal and context where it's all equations and inequalities with `Nat` instead of `BabyBear` (i.e. `BabyBear`), `omega` may be able to discharge the goals automatically. Note that `omega` is not very good at handling very complex constraints, so it's unlikely we can get away with `omega` just by applying it without any case branches for simplification. However, combining with 2. it's definitely possible to use this approach inside small branches where constraints are very simple and just blindly using this approach plus `omega` at the end may save you a lot of time and effort.
+4. Automatic tactics like `omega`, `linarith`, `aesop`, `ring`, `ring_nf` and sometimes even `rfl` can work wonders. Please keep in mind that these exist.
+
+Importantly when handling `is_real`, since `spec` assumes that `is_real = U2.one`, in your `correct` proof you can intro `is_real = U2.one` and then these `is_real = U2.one` pre-conditions in the constraints can go away immediately and you get the results. 
+
+You shouldn't need to modify the spec and constraints.
