@@ -22,6 +22,9 @@ instance Fin.noZeroDivisors_of_prime (p : ℕ)
 instance : NoZeroDivisors BabyBear := by
   apply Fin.noZeroDivisors_of_prime 2013265920 (hp := ⟨prime_BabyBearPrime⟩)
 
+lemma fin_val_simp' {n : ℕ} :
+    (@Fin.val BabyBearPrime (@OfNat.ofNat.{0} BabyBear n (@Fin.instOfNat BabyBearPrime instNeZeroNatBabyBearPrime n))) = n % BabyBearPrime := rfl
+
 lemma fin_val_simp {n : ℕ} (Hlt : n < BabyBearPrime) :
   (@Fin.val BabyBearPrime (@OfNat.ofNat.{0} BabyBear n (@Fin.instOfNat BabyBearPrime instNeZeroNatBabyBearPrime n))) = n := by
   simp [BabyBearPrime, OfNat.ofNat] at *; assumption

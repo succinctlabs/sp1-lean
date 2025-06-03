@@ -2,7 +2,7 @@ import SP1Foundations.Field
 
 section base
 
-abbrev base : BabyBear := 65536
+abbrev base : BabyBear := 65536 -- 2^16
 abbrev baseInv : BabyBear := 2013235201
 
 @[simp] lemma val_base : (base : BabyBear) = 65536 := rfl
@@ -57,11 +57,8 @@ def U16.zero : U16 := ⟨0, by simp [base]⟩
 def U16.one : U16 := ⟨1, by simp [base]⟩
 
 -- Allow writing 0 : U16 and 1 : U16 directly
-instance : OfNat U16 0 where
-  ofNat := U16.zero
-
-instance : OfNat U16 1 where
-  ofNat := U16.one
+instance : Zero U16 := ⟨U16.zero⟩
+instance : One U16 := ⟨U16.one⟩
 
 -- For converting BabyBear to U16, we can define a function that returns Option
 def BabyBear.toU16? (b : BabyBear) : Option U16 :=
@@ -97,11 +94,8 @@ def U2.zero : U2 := ⟨0, Or.inl rfl⟩
 def U2.one : U2 := ⟨1, Or.inr rfl⟩
 
 -- Allow writing 0 : U2 and 1 : U2 directly
-instance : OfNat U2 0 where
-  ofNat := U2.zero
-
-instance : OfNat U2 1 where
-  ofNat := U2.one
+instance : Zero U2 := ⟨U2.zero⟩
+instance : One U2 := ⟨U2.one⟩
 
 -- Extensionality for U2
 @[ext] theorem U2.ext {a b : U2} (h : a.val = b.val) : a = b := by
