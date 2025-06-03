@@ -51,7 +51,7 @@ theorem correct [Fact (Nat.Prime p)] (cols : SubOperation (Fin p))
   all_goals -- In both cases can now reduce down to the `omega` linear constraint solver
   · rw [h1] at h2
     simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff, p, Word.toNat, Word.isUInt32] at *
-    simp at *
-    sorry --omega
+    simp [] at *
+    omega
 
 end SubOperation

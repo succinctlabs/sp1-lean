@@ -5,8 +5,8 @@ section base
 abbrev base : BabyBear := 65536 -- 2^16
 abbrev baseInv : BabyBear := 2013235201
 
-@[simp] lemma val_base : (base : BabyBear) = 65536 := rfl
-@[simp] lemma val_baseInv : (baseInv : BabyBear) = 2013235201 := rfl
+@[simp] lemma val_base : (base : ℕ) = 65536 := rfl
+@[simp] lemma val_baseInv : (baseInv : ℕ) = 2013235201 := rfl
 
 @[simp] lemma baseInv_mul_base : (baseInv : BabyBear) * (base : BabyBear) = 1 := rfl
 @[simp] lemma base_mul_baseInv : (base : BabyBear) * (baseInv : BabyBear) = 1 := rfl
@@ -14,31 +14,11 @@ abbrev baseInv : BabyBear := 2013235201
 @[simp] lemma base_ne_zero : (base : BabyBear) ≠ 0 := by simp [base]
 @[simp] lemma baseInv_ne_zero : (baseInv : BabyBear) ≠ 0 := by simp [baseInv]
 
-@[simp] lemma val_base' : (base : Fin p) = 65536 := rfl
-@[simp] lemma val_baseInv' : (baseInv : Fin p) = 2013235201 := rfl
-
-@[simp] lemma baseInv_mul_base' : (baseInv : Fin p) * (base : Fin p) = 1 := rfl --sorry --rfl
-@[simp] lemma base_mul_baseInv' : (base : Fin p) * (baseInv : Fin p) = 1 := rfl --sorry --rfl
-
-@[simp] lemma base_ne_zero' : (base : Fin p) ≠ 0 := by simp [base]
-@[simp] lemma baseInv_ne_zero' : (baseInv : Fin p) ≠ 0 := by simp [baseInv]
-
-@[simp] lemma mul_baseInv_eq_zero_iff (x : BabyBear) :
-    x * baseInv = 1 ↔ x = base := by
+@[simp] lemma mul_baseInv_eq_zero_iff (x : BabyBear) : x * baseInv = 1 ↔ x = base := by
   refine ⟨fun h => by simpa [mul_assoc] using congr_arg (· * base) h,
     fun h => by simp only [h, base_mul_baseInv, Fin.isValue]⟩
 
-@[simp] lemma baseInv_mul_eq_zero_iff {n : ℕ} (x : Fin n) :
-    (baseInv : BabyBear) * x = 1 ↔ x = (base : BabyBear) := by
-  rw [mul_comm, mul_baseInv_eq_zero_iff]
-
-@[simp] lemma mul_baseInv_eq_zero_iff' (x : Fin p) :
-    x * (baseInv : Fin p) = 1 ↔ x = base := by
-  refine ⟨fun h => by simpa [mul_assoc] using congr_arg (· * base) h,
-    fun h => by simp only [h, base_mul_baseInv, Fin.isValue]⟩
-
-@[simp] lemma baseInv_mul_eq_zero_iff' (x : Fin p) :
-    (baseInv : Fin p) * x = 1 ↔ x = (base : BabyBear) := by
+@[simp] lemma baseInv_mul_eq_zero_iff (x : BabyBear) : baseInv * x = 1 ↔ x = base := by
   rw [mul_comm, mul_baseInv_eq_zero_iff]
 
 end base

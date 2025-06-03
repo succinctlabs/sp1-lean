@@ -69,7 +69,7 @@ theorem correct
       cases q1 with | inl qq1 => ?_ | inr qq1 => ?_
       all_goals
       · rw [qq1] at q2
-        simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff] at *
+        simp only [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff] at *
         simp [BabyBearPrime, UInt32.size] at *
         omega
 
