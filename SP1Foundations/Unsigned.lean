@@ -29,6 +29,10 @@ structure U16 where
   val : BabyBear
   in_range : val < base
 
+-- Extensionality for U2
+@[ext] theorem U16.ext {a b : U16} (h : a.val = b.val) : a = b := by
+  cases a; cases b; simp at h; simp [h]
+
 instance : Coe U16 BabyBear where
   coe u := u.val
 
@@ -39,6 +43,14 @@ def U16.one : U16 := ⟨1, by simp [base]⟩
 -- Allow writing 0 : U16 and 1 : U16 directly
 instance : Zero U16 := ⟨U16.zero⟩
 instance : One U16 := ⟨U16.one⟩
+
+@[simp]
+lemma U16_eq_zero_iff (x : U16) : x = 0 ↔ x.val = 0 := by
+  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
+
+@[simp]
+lemma U16_eq_one_iff (x : U16) : x = 1 ↔ x.val = 1 := by
+  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
 
 -- For converting BabyBear to U16, we can define a function that returns Option
 def BabyBear.toU16? (b : BabyBear) : Option U16 :=
@@ -59,6 +71,10 @@ structure U2 where
   val : BabyBear
   in_range : val = 0 ∨ val = 1
 
+-- Extensionality for U2
+@[ext] theorem U2.ext {a b : U2} (h : a.val = b.val) : a = b := by
+  cases a; cases b; simp at h; simp [h]
+
 instance : Coe U2 BabyBear where
   coe u := u.val
 
@@ -77,8 +93,12 @@ def U2.one : U2 := ⟨1, Or.inr rfl⟩
 instance : Zero U2 := ⟨U2.zero⟩
 instance : One U2 := ⟨U2.one⟩
 
--- Extensionality for U2
-@[ext] theorem U2.ext {a b : U2} (h : a.val = b.val) : a = b := by
-  cases a; cases b; simp at h; simp [h]
+@[simp]
+lemma U2.eq_zero_iff (x : U2) : x = 0 ↔ x.val = 0 := by
+  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
+
+@[simp]
+lemma U2.eq_one_iff (x : U2) : x = 1 ↔ x.val = 1 := by
+  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
 
 end U2
