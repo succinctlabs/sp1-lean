@@ -1,4 +1,4 @@
-import mathlib
+import Mathlib
 
 inductive ByteOpcode
   | AND
