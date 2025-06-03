@@ -1,7 +1,7 @@
 name = "sp1-lean"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["Sp1Lean"]
+defaultTargets = ["SP1Operations", "SP1Chips"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
@@ -12,7 +12,10 @@ name = "mathlib"
 scope = "leanprover-community"
 
 [[lean_lib]]
-name = "Sp1Lean"
+name = "SP1Foundations"
 
 [[lean_lib]]
-name = "Nethermind"
+name = "SP1Operations"
+
+[[lean_lib]]
+name = "SP1Chips"
