@@ -31,10 +31,10 @@ def toFin32_U16 (w : Word U16) : Fin (2^32) :=
     simp at *
     omega⟩
 
-@[reducible] def toNat (w : Word (Fin p)) : ℕ :=
+@[reducible] def toNat (w : Word (BabyBear)) : ℕ :=
   w[0].val + base * w[1].val
 
-lemma toNat_add_toNat (a b : Word (Fin p)) :
+lemma toNat_add_toNat (a b : Word (BabyBear)) :
     a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
   simp [Word.toNat]
   sorry
@@ -44,7 +44,7 @@ theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
   w[0].val.val + w[1].val.val * 65536 := by
   simp [toFin32_U16, base]
 
-def isUInt32 (w : Word (Fin p)) : Prop :=
+def isUInt32 (w : Word (BabyBear)) : Prop :=
   w[0].val < base ∧ w[1].val < base
 
 end Word
