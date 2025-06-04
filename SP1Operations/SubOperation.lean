@@ -15,13 +15,12 @@ Asserting expr 3: `(is_real * (is_real - 1))`
 Asserting expr 17: `(is_real * (((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201) * (((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201) - 1)))`
 Asserting expr 29: `(is_real * (((((((a[1] + 65536) - 1) - b[1]) - cols.value[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201)) * 2013235201) * (((((((a[1] + 65536) - 1) - b[1]) - cols.value[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201)) * 2013235201) - 1)))` -/
 def extractedConstraints (cols : SubOperation BabyBear)
-    (a b : Word BabyBear) (is_real : BabyBear) : Prop :=
-  is_real * (is_real - 1) = 0 ∧
-  is_real * (((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201) *
-    (((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201) - 1)) = 0 ∧
-  is_real * (((((((a[1] + 65536) - 1) - b[1]) - cols[1]) +
-    ((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201)) * 2013235201) *
-      (((((((a[1] + 65536) - 1) - b[1]) - cols[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201)) * 2013235201) - 1)) = 0
+    (a b : Word BabyBear) (is_real : BabyBear) : List SP1Constraint :=
+  [
+  .assertZero (is_real * (is_real - 1)),
+  .assertZero (is_real * (((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201) * (((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201) - 1))),
+  .assertZero (is_real * (((((((a[1] + 65536) - 1) - b[1]) - cols[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201)) * 2013235201) * (((((((a[1] + 65536) - 1) - b[1]) - cols[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols[0]) + 1) * 2013235201)) * 2013235201) - 1))),
+  ]
 
 /-- Cleaned up representation of the `SubOperation` constraints. -/
 def idealizedConstraints (cols : SubOperation BabyBear)
@@ -35,8 +34,8 @@ def idealizedConstraints (cols : SubOperation BabyBear)
 /-- The idealized constraints are logically equivalent to the extracted ones when `is_real := 1` -/
 lemma extractedConstraints_iff_idealizedConstraints
     (cols : SubOperation BabyBear) (a b : Word BabyBear) :
-    cols.extractedConstraints a b 1 ↔ cols.idealizedConstraints a b := by
-  simp [extractedConstraints, idealizedConstraints, Word.isUInt32]
+    constraintList_toProp (cols.extractedConstraints a b 1) ↔ cols.idealizedConstraints a b := by
+  simp [extractedConstraints, idealizedConstraints]
 
 /-- The extracted constraints on `SubOperation` imply the spec. -/
 theorem correct [Fact (Nat.Prime p)] (cols : SubOperation BabyBear)

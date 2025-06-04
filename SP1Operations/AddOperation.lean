@@ -13,42 +13,39 @@ def spec
     is_real = U2.one →
     a.toFin32_U16 + b.toFin32_U16 = cols.value.toFin32_U16
 
-def constraints
-    (cols : AddOperation)
-    (a : Word U16)
-    (b : Word U16)
-    (is_real : U2): Prop :=
-    (is_real * ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201) - 1)) = 0 ∧
-    (is_real * ((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) - 1)) = 0
+def constraints (cols : AddOperation)
+    (a b : Word U16) (is_real : U2) : List SP1Constraint :=
+  [
+    .assertZero (is_real * ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201) - 1)),
+    .assertZero (is_real * ((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) - 1))
+  ]
 
 def constraints'
     (cols : AddOperation)
     (a : Word U16)
     (b : Word U16)
     (is_real : U2): Prop :=
-    let carry0 : BabyBear := 0
-    let carry1 : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * (baseInv : BabyBear)
-    let carry2 : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * (baseInv : BabyBear)
-    (is_real.val * carry1 * (carry1 - 1)) = 0 ∧
-    (is_real.val * carry2 * (carry2 - 1)) = 0
+  let carry0 : BabyBear := 0
+  let carry1 : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * (baseInv : BabyBear)
+  let carry2 : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * (baseInv : BabyBear)
+  (is_real.val * carry1 * (carry1 - 1)) = 0 ∧
+  (is_real.val * carry2 * (carry2 - 1)) = 0
 
 def constraints_iff_constraints'
-  (cols : AddOperation)
-  (a : Word U16)
-  (b : Word U16)
-  (is_real : U2)
-  : AddOperation.constraints cols a b is_real ↔ AddOperation.constraints' cols a b is_real:=
-  by
-    simp [AddOperation.constraints, AddOperation.constraints']
+    (cols : AddOperation)
+    (a : Word U16)
+    (b : Word U16)
+    (is_real : U2) :
+    constraintList_toProp (cols.constraints a b is_real) ↔ cols.constraints' a b is_real:= by
+  simp [constraints, constraints']
 
 theorem correct
   (cols : AddOperation)
   (a : Word U16)
   (b : Word U16)
   (is_real : U2)
-  : cols.constraints a b is_real → cols.spec a b is_real :=
+  : cols.constraints' a b is_real → cols.spec a b is_real :=
     by
-      rw [cols.constraints_iff_constraints' a b is_real]
       intro ⟨q1, q2⟩
 
       -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints
