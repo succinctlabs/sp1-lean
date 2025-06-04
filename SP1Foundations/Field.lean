@@ -19,12 +19,21 @@ instance Fin.noZeroDivisors_of_prime (p : ℕ)
   simp [ZMod] at this
   infer_instance
 
-instance : NoZeroDivisors BabyBear := by
-  apply Fin.noZeroDivisors_of_prime 2013265920 (hp := ⟨prime_BabyBearPrime⟩)
-
 lemma fin_val_simp' {n : ℕ} :
     (@Fin.val BabyBearPrime (@OfNat.ofNat.{0} BabyBear n (@Fin.instOfNat BabyBearPrime instNeZeroNatBabyBearPrime n))) = n % BabyBearPrime := rfl
 
 lemma fin_val_simp {n : ℕ} (Hlt : n < BabyBearPrime) :
   (@Fin.val BabyBearPrime (@OfNat.ofNat.{0} BabyBear n (@Fin.instOfNat BabyBearPrime instNeZeroNatBabyBearPrime n))) = n := by
   simp [BabyBearPrime, OfNat.ofNat] at *; assumption
+
+namespace BabyBear
+
+instance : Field BabyBear := ZMod.instField BabyBearPrime
+
+section const_vals
+
+@[simp] lemma val_256 : ((256 : BabyBear) : ℕ) = 256 := rfl
+
+end const_vals
+
+end BabyBear
