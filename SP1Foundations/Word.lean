@@ -39,8 +39,7 @@ def toFin32_U16 (w : Word U16) : Fin (2^32) :=
 lemma toNat_add_toNat (a b : Word (BabyBear)) :
     a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
   simp [Word.toNat]
-  sorry
-  -- omega
+  omega
 
 theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
   w[0].val.val + w[1].val.val * 65536 := by
@@ -48,5 +47,36 @@ theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
 
 def isUInt32 (w : Word (BabyBear)) : Prop :=
   w[0].val < base ∧ w[1].val < base
+
+section Aesop
+
+-- Lemmas that are useful for `aesop` to add into context as needed
+-- marked safe so will always add them and not backtrack. Seems like they are never bad to add
+
+@[aesop safe forward]
+lemma val_fst_U2_lt (x : Word U2) : x[0].val.val = 0 ∨ x[0].val.val = 1 := by
+  convert x[0].in_range <;> simp [BabyBear.eq_one_iff_val_eq_one]
+
+@[aesop safe forward]
+lemma val_snd_U2_lt (x : Word U2) : x[1].val.val = 0 ∨ x[1].val.val = 1 := by
+  convert x[1].in_range <;> simp [BabyBear.eq_one_iff_val_eq_one]
+
+@[aesop safe forward]
+lemma val_fst_U8_lt (x : Word U8) : x[0].val.val < 256 := by
+  exact x[0].in_range
+
+@[aesop safe forward]
+lemma val_snd_U8_lt (x : Word U8) : x[1].val.val < 256 := by
+  exact x[1].in_range
+
+@[aesop safe forward]
+lemma val_fst_U16_lt (x : Word U16) : x[0].val.val < 65536 := by
+  exact x[0].in_range
+
+@[aesop safe forward]
+lemma val_snd_U16_lt (x : Word U16) : x[1].val.val < 65536 := by
+  exact x[1].in_range
+
+end Aesop
 
 end Word

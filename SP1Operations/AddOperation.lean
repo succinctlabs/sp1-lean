@@ -3,6 +3,7 @@ import SP1Foundations
 -- AddOperaton is not parameterized by a type `T` with `value` being `Word T`
 -- because AddOperation is used only under the assumption that its input and
 -- output limbs are all U16s.
+@[aesop safe cases]
 structure AddOperation where
   value : Word U16
 
@@ -53,24 +54,15 @@ theorem correct
 
       -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints
       intro h_is_real
-      have is_real_val_eq_one : is_real.val = 1 := by aesop
-      rw [is_real_val_eq_one] at q1 q2
-
+      simp [is_real.eq_one_iff.1 h_is_real, sub_eq_zero, mul_eq_zero] at q1 q2
       simp [Word.toFin32_U16]
-      let _ : a[0].val.val < 65536 := a[0].in_range
-      let _ : a[1].val.val < 65536 := a[1].in_range
-      let _ : b[0].val.val < 65536 := b[0].in_range
-      let _ : b[1].val.val < 65536 := b[1].in_range
-      let _ : cols.value[0].val.val < 65536 := cols.value[0].in_range
-      let _ : cols.value[1].val.val < 65536 := cols.value[1].in_range
 
-      -- do basic arithmetic simplification
-      simp [sub_eq_zero, mul_eq_zero] at q1 q2
+      -- Cases on whether the lower limb led to a carry or not
       cases q1 with | inl qq1 => ?_ | inr qq1 => ?_
       all_goals
       · rw [qq1] at q2
-        simp only [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff] at *
-        simp [BabyBearPrime, UInt32.size] at *
-        omega
+        simp only [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime, UInt32.size] at *
+        -- Run `aesop` with semi-safe access to the `omega` tactic
+        aesop (add 50% tactic (by omega))
 
 end AddOperation
