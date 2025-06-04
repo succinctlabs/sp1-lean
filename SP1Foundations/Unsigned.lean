@@ -15,9 +15,14 @@ abbrev baseInv : BabyBear := 2013235201
 @[simp] lemma base_ne_zero : (base : BabyBear) ≠ 0 := by simp [base]
 @[simp] lemma baseInv_ne_zero : (baseInv : BabyBear) ≠ 0 := by simp [baseInv]
 
+lemma baseInv_eq_inv_base : baseInv = base⁻¹ := by
+  rw [inv_eq_one_div, eq_div_iff] <;> simp
+
+lemma base_eq_inv_baseInv : base = baseInv⁻¹ := by
+  rw [baseInv_eq_inv_base, inv_inv]
+
 @[simp] lemma mul_baseInv_eq_zero_iff (x : BabyBear) : x * baseInv = 1 ↔ x = base := by
-  refine ⟨fun h => by simpa [mul_assoc] using congr_arg (· * base) h,
-    fun h => by simp only [h, base_mul_baseInv, Fin.isValue]⟩
+  rw [baseInv_eq_inv_base, mul_inv_eq_one₀ base_ne_zero]
 
 @[simp] lemma baseInv_mul_eq_zero_iff (x : BabyBear) : baseInv * x = 1 ↔ x = base := by
   rw [mul_comm, mul_baseInv_eq_zero_iff]
@@ -144,4 +149,3 @@ lemma U2.eq_one_iff (x : U2) : x = 1 ↔ x.val = 1 := by
   refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
 
 end U2
-

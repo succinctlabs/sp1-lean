@@ -57,6 +57,7 @@ theorem Add4Operation.correct (cols : Add4Operation)
   (is_real : U2)
   : cols.constraints a b cc d is_real → cols.spec a b cc d is_real :=
   by
+    rw [cols.constraints_iff_constraints']
     intro ⟨h1, h2⟩
     intro h_is_real
 
@@ -78,6 +79,5 @@ theorem Add4Operation.correct (cols : Add4Operation)
     have v1_bound : cols.value[1].val.val < 65536 := cols.value[1].in_range
 
     simp [Word.toFin32_U16]
-    simp [Fin.add_def, Fin.mul_def]
-
+    simp [Fin.add_def, Fin.mul_def, Fin.sub_def, add_assoc] at *
     sorry
