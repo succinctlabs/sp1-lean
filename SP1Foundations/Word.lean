@@ -1,5 +1,7 @@
 import SP1Foundations.Unsigned
 
+abbrev WORD_BYTE_SIZE := 4
+
 abbrev WORD_SIZE := 2
 
 abbrev Word (T : Type) := Vector T WORD_SIZE
