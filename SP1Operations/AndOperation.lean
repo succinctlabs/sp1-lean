@@ -42,8 +42,7 @@ lemma extractedConstraints_iff_idealizedConstraints
     (cols : AndOperation (BabyBear)) (a b : Vector (BabyBear) WORD_BYTE_SIZE) :
     constraintList_toProp (cols.extractedConstraints a b 1) ↔
       cols.idealizedConstraints a b := by
-  simp [extractedConstraints, idealizedConstraints, constraintList_toProp,
-    ByteOpcode.ofNat, ByteOpcode.constrain, SP1Constraint.toProp]
+  simp [extractedConstraints, idealizedConstraints]
   tauto
 
 /-- The extracted constraints on `AndOperation` imply the spec. -/
