@@ -1,5 +1,8 @@
 import SP1Foundations
 
+-- AddOperaton is not parameterized by a type `T` with `value` being `Word T`
+-- because AddOperation is used only under the assumption that its input and
+-- output limbs are all U16s.
 structure AddOperation where
   value : Word U16
 
