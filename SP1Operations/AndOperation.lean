@@ -1,52 +1,52 @@
 import SP1Foundations
 
-abbrev WORD_BYTE_SIZE := 4
-
-@[reducible] def AndOperation (T : Type) :=
-  Vector T WORD_BYTE_SIZE
+/-- AndOperation is only operating on `U8` because it's used solely for
+computing the and operation over four **bytes**. -/
+structure AndOperation where
+  value : Vector U8 WORD_BYTE_SIZE
 
 namespace AndOperation
 
 /-- `AndOperation` should result in and of all 4 limbs -/
-def spec (cols : AndOperation (BabyBear))
+def spec (cols : AndOperation)
     (a b : Vector (BabyBear) WORD_BYTE_SIZE)
     (is_real : BabyBear) : Prop :=
   is_real ≠ 0 → ∀ i : Fin WORD_BYTE_SIZE,
-    a[i] &&& b[i] = cols[i]
+    a[i] &&& b[i] = cols.value[i]
 
 /-- Constraints on `AndOperation` as extracted from the source code:
-Sends: AirInteraction { values: [0, cols[0], a[0], b[0]], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [0, cols[1], a[1], b[1]], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [0, cols[2], a[2], b[2]], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [0, cols[3], a[3], b[3]], multiplicity: is_real, kind: Byte } -/
-def extractedConstraints (cols : AndOperation (BabyBear))
+Sends: AirInteraction { values: [0, cols.value[0], a[0], b[0]], multiplicity: is_real, kind: Byte }
+Sends: AirInteraction { values: [0, cols.value[1], a[1], b[1]], multiplicity: is_real, kind: Byte }
+Sends: AirInteraction { values: [0, cols.value[2], a[2], b[2]], multiplicity: is_real, kind: Byte }
+Sends: AirInteraction { values: [0, cols.value[3], a[3], b[3]], multiplicity: is_real, kind: Byte } -/
+def extractedConstraints (cols : AndOperation)
     (a b : Vector (BabyBear) WORD_BYTE_SIZE) (is_real : BabyBear) :
     List (SP1Constraint) :=
   [
-  .sendAirInteraction_byte (.ofNat 0) cols[0] a[0] b[0] is_real,
-  .sendAirInteraction_byte (.ofNat 0) cols[1] a[1] b[1] is_real,
-  .sendAirInteraction_byte (.ofNat 0) cols[2] a[2] b[2] is_real,
-  .sendAirInteraction_byte (.ofNat 0) cols[3] a[3] b[3] is_real,
+  .sendAirInteraction_byte (.ofNat 0) cols.value[0] a[0] b[0] is_real,
+  .sendAirInteraction_byte (.ofNat 0) cols.value[1] a[1] b[1] is_real,
+  .sendAirInteraction_byte (.ofNat 0) cols.value[2] a[2] b[2] is_real,
+  .sendAirInteraction_byte (.ofNat 0) cols.value[3] a[3] b[3] is_real,
   ]
 
 /-- Cleaned up representation of the `AndOperation` constraints. -/
-def idealizedConstraints (cols : AndOperation (BabyBear))
+def idealizedConstraints (cols : AndOperation)
     (a b : Vector (BabyBear) WORD_BYTE_SIZE) : Prop :=
-  a[0] &&& b[0] = cols[0] ∧
-  a[1] &&& b[1] = cols[1] ∧
-  a[2] &&& b[2] = cols[2] ∧
-  a[3] &&& b[3] = cols[3]
+  a[0] &&& b[0] = cols.value[0] ∧
+  a[1] &&& b[1] = cols.value[1] ∧
+  a[2] &&& b[2] = cols.value[2] ∧
+  a[3] &&& b[3] = cols.value[3]
 
 /-- The idealized constraints are logically equivalent to the extracted ones when `is_real := 1` -/
 lemma extractedConstraints_iff_idealizedConstraints
-    (cols : AndOperation (BabyBear)) (a b : Vector (BabyBear) WORD_BYTE_SIZE) :
+    (cols : AndOperation) (a b : Vector (BabyBear) WORD_BYTE_SIZE) :
     constraintList_toProp (cols.extractedConstraints a b 1) ↔
       cols.idealizedConstraints a b := by
   simp [extractedConstraints, idealizedConstraints]
   tauto
 
 /-- The extracted constraints on `AndOperation` imply the spec. -/
-theorem correct (cols : AndOperation (BabyBear))
+theorem correct (cols : AndOperation)
     (a b : Vector (BabyBear) WORD_BYTE_SIZE) (is_real : BabyBear) :
     cols.idealizedConstraints a b → cols.spec a b is_real := by
   simp [idealizedConstraints, spec, sub_eq_zero, mul_eq_zero]

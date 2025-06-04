@@ -2,6 +2,7 @@ import SP1Foundations.Field
 
 section base
 
+-- TODO(gzgz): base should be some constant like U16.base
 abbrev base : BabyBear := 65536 -- 2^16
 abbrev baseInv : BabyBear := 2013235201
 
@@ -64,6 +65,47 @@ instance : CoeOut U16 ℕ where
 
 end U16
 
+section U8
+
+structure U8 where
+  val : BabyBear
+  in_range : val < 256 -- TODO(gzgz): 256 should be some constant like U8.base
+
+-- Extensionality for U2
+@[ext] theorem U8.ext {a b : U8} (h : a.val = b.val) : a = b := by
+  cases a; cases b; simp at h; simp [h]
+
+instance : Coe U8 BabyBear where
+  coe u := u.val
+
+-- Safe constructors for 0 and 1
+def U8.zero : U8 := ⟨0, by simp [base]⟩
+def U8.one : U8 := ⟨1, by simp [base]⟩
+
+-- Allow writing 0 : U8 and 1 : U8 directly
+instance : Zero U8 := ⟨U8.zero⟩
+instance : One U8 := ⟨U8.one⟩
+
+@[simp]
+lemma U8_eq_zero_iff (x : U8) : x = 0 ↔ x.val = 0 := by
+  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+
+@[simp]
+lemma U8_eq_one_iff (x : U8) : x = 1 ↔ x.val = 1 := by
+  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+
+-- For converting BabyBear to U8, we can define a function that returns Option
+def BabyBear.toU8? (b : BabyBear) : Option U8 :=
+  if h : b < 256 then some ⟨b, h⟩ else none
+
+instance (b : BabyBear) (h : b < 256) : CoeDep BabyBear b U8 where
+  coe := ⟨b, h⟩
+
+instance : CoeOut U8 ℕ where
+  coe u := u.val.val  -- U8 -> BabyBear -> ℕ
+
+end U8
+
 section U2
 
 -- U2 type for bits
@@ -102,3 +144,4 @@ lemma U2.eq_one_iff (x : U2) : x = 1 ↔ x.val = 1 := by
   refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
 
 end U2
+

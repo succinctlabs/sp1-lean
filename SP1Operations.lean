@@ -3,4 +3,6 @@ import SP1Operations.AddOperation
 import SP1Operations.AndOperation
 import SP1Operations.IsZeroOperation
 import SP1Operations.MSBOperation
+import SP1Operations.OrOperation
 import SP1Operations.SubOperation
+import SP1Operations.XorOperation
