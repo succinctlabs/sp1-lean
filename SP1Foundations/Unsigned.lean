@@ -58,6 +58,14 @@ lemma U16_eq_zero_iff (x : U16) : x = 0 ↔ x.val = 0 := by
 lemma U16_eq_one_iff (x : U16) : x = 1 ↔ x.val = 1 := by
   refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
 
+@[simp]
+lemma U16_eq_zero_iff' (x : U16) : x = U16.zero ↔ x.val = 0 := by
+  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
+
+@[simp]
+lemma U16_eq_one_iff' (x : U16) : x = U16.one ↔ x.val = 1 := by
+  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
+
 -- For converting BabyBear to U16, we can define a function that returns Option
 def BabyBear.toU16? (b : BabyBear) : Option U16 :=
   if h : b < base then some ⟨b, h⟩ else none
@@ -97,6 +105,14 @@ lemma U8_eq_zero_iff (x : U8) : x = 0 ↔ x.val = 0 := by
 
 @[simp]
 lemma U8_eq_one_iff (x : U8) : x = 1 ↔ x.val = 1 := by
+  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+
+@[simp]
+lemma U8_eq_zero_iff' (x : U8) : x = U8.zero ↔ x.val = 0 := by
+  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+
+@[simp]
+lemma U8_eq_one_iff' (x : U8) : x = U8.one ↔ x.val = 1 := by
   refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
 
 -- For converting BabyBear to U8, we can define a function that returns Option
@@ -146,6 +162,14 @@ lemma U2.eq_zero_iff (x : U2) : x = 0 ↔ x.val = 0 := by
 
 @[simp]
 lemma U2.eq_one_iff (x : U2) : x = 1 ↔ x.val = 1 := by
+  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
+
+@[simp]
+lemma U2.eq_zero_iff' (x : U2) : x = U2.zero ↔ x.val = 0 := by
+  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
+
+@[simp]
+lemma U2.eq_one_iff' (x : U2) : x = U2.one ↔ x.val = 1 := by
   refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
 
 end U2
