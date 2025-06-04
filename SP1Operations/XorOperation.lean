@@ -22,10 +22,12 @@ Sends: AirInteraction { values: [2, cols[3], a[3], b[3]], multiplicity: is_real,
 def extractedConstraints (cols : XorOperation (BabyBear))
     (a b : Vector (BabyBear) WORD_BYTE_SIZE) (is_real : BabyBear) :
     List (SP1Constraint) :=
-  [.sendAirInteraction_byte (.ofNat 2) cols[0] a[0] b[0] is_real,
-   .sendAirInteraction_byte (.ofNat 2) cols[1] a[1] b[1] is_real,
-   .sendAirInteraction_byte (.ofNat 2) cols[2] a[2] b[2] is_real,
-   .sendAirInteraction_byte (.ofNat 2) cols[3] a[3] b[3] is_real,]
+  [
+  .sendAirInteraction_byte (.ofNat 2) cols[0] a[0] b[0] is_real,
+  .sendAirInteraction_byte (.ofNat 2) cols[1] a[1] b[1] is_real,
+  .sendAirInteraction_byte (.ofNat 2) cols[2] a[2] b[2] is_real,
+  .sendAirInteraction_byte (.ofNat 2) cols[3] a[3] b[3] is_real,
+  ]
 
 /-- Cleaned up representation of the `XorOperation` constraints. -/
 def idealizedConstraints (cols : XorOperation (BabyBear))
@@ -40,8 +42,7 @@ lemma extractedConstraints_iff_idealizedConstraints
     (cols : XorOperation (BabyBear)) (a b : Vector (BabyBear) WORD_BYTE_SIZE) :
     constraintList_toProp (cols.extractedConstraints a b 1) ↔
       cols.idealizedConstraints a b := by
-  simp [extractedConstraints, idealizedConstraints, constraintList_toProp,
-    ByteOpcode.ofNat, ByteOpcode.constrain, SP1Constraint.toProp]
+  simp [extractedConstraints, idealizedConstraints]
   tauto
 
 /-- The extracted constraints on `XorOperation` imply the spec. -/

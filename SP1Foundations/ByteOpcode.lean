@@ -11,7 +11,7 @@ inductive ByteOpcode
 
 namespace ByteOpcode
 
-@[reducible] def ofNat : Fin 7 → ByteOpcode
+@[reducible, simp] def ofNat : Fin 7 → ByteOpcode
   | 0 => AND
   | 1 => OR
   | 2 => XOR

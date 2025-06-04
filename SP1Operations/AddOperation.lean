@@ -25,20 +25,19 @@ def constraints'
     (a : Word U16)
     (b : Word U16)
     (is_real : U2): Prop :=
-    let carry0 : BabyBear := 0
-    let carry1 : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * (baseInv : BabyBear)
-    let carry2 : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * (baseInv : BabyBear)
-    (is_real.val * carry1 * (carry1 - 1)) = 0 ∧
-    (is_real.val * carry2 * (carry2 - 1)) = 0
+  let carry0 : BabyBear := 0
+  let carry1 : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * (baseInv : BabyBear)
+  let carry2 : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * (baseInv : BabyBear)
+  (is_real.val * carry1 * (carry1 - 1)) = 0 ∧
+  (is_real.val * carry2 * (carry2 - 1)) = 0
 
 def constraints_iff_constraints'
     (cols : AddOperation)
     (a : Word U16)
     (b : Word U16)
     (is_real : U2) :
-    constraintList_toProp (AddOperation.constraints cols a b is_real) ↔ AddOperation.constraints' cols a b is_real:= by
-  simp [AddOperation.constraints, AddOperation.constraints', constraintList_toProp,
-    SP1Constraint.toProp]
+    constraintList_toProp (cols.constraints a b is_real) ↔ cols.constraints' a b is_real:= by
+  simp [constraints, constraints']
 
 theorem correct
   (cols : AddOperation)

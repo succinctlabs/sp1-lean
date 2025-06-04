@@ -22,10 +22,12 @@ Sends: AirInteraction { values: [0, cols[3], a[3], b[3]], multiplicity: is_real,
 def extractedConstraints (cols : AndOperation (BabyBear))
     (a b : Vector (BabyBear) WORD_BYTE_SIZE) (is_real : BabyBear) :
     List (SP1Constraint) :=
-  [.sendAirInteraction_byte (.ofNat 0) cols[0] a[0] b[0] is_real,
-   .sendAirInteraction_byte (.ofNat 0) cols[1] a[1] b[1] is_real,
-   .sendAirInteraction_byte (.ofNat 0) cols[2] a[2] b[2] is_real,
-   .sendAirInteraction_byte (.ofNat 0) cols[3] a[3] b[3] is_real,]
+  [
+  .sendAirInteraction_byte (.ofNat 0) cols[0] a[0] b[0] is_real,
+  .sendAirInteraction_byte (.ofNat 0) cols[1] a[1] b[1] is_real,
+  .sendAirInteraction_byte (.ofNat 0) cols[2] a[2] b[2] is_real,
+  .sendAirInteraction_byte (.ofNat 0) cols[3] a[3] b[3] is_real,
+  ]
 
 /-- Cleaned up representation of the `AndOperation` constraints. -/
 def idealizedConstraints (cols : AndOperation (BabyBear))

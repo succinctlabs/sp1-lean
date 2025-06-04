@@ -14,6 +14,7 @@ namespace SP1Constraint
 def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
   | .sendAirInteraction_byte op x y z mult =>
+      -- Is this saying enough?
       (mult ≠ 0 → ByteOpcode.constrain op x y z)
 
 @[simp] lemma toProp_assertZero (x : BabyBear) :
@@ -28,3 +29,11 @@ end SP1Constraint
 
 @[reducible] def constraintList_toProp (cs : List SP1Constraint) : Prop :=
   ∀ constraint ∈ cs, constraint.toProp
+
+@[simp] lemma constraintList_toProp_nil :
+    constraintList_toProp [] = True := by
+  simp [constraintList_toProp]
+
+@[simp] lemma constraintList_toProp_cons (c : SP1Constraint) (cs : List SP1Constraint) :
+    constraintList_toProp (c :: cs) = (c.toProp ∧ constraintList_toProp cs) := by
+  simp [constraintList_toProp]
