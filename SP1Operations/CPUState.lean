@@ -19,6 +19,6 @@ def spec
   (cols : CPUState)
   (next_pc : BabyBear)
   (clk_increment : BabyBear)
-  (is_real : U2) : Prop := by sorry
+  (is_real : U1) : Prop := by sorry
 
 end CPUState

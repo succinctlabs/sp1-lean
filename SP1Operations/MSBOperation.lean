@@ -1,13 +1,13 @@
 import SP1Foundations
 
 structure U16MSBOperation where
-  msb : U2
+  msb : U1
 
 def U16MSBOperation.spec
   (cols : U16MSBOperation)
   (a : U16)
-  (is_real : U2) : Prop :=
-    is_real = U2.one →
+  (is_real : U1) : Prop :=
+    is_real = U1.one →
     -- MSB is 1 if a >= 2^15, otherwise 0
     (a.val.val < 32768 ∧ cols.msb = 0) ∨
     (a.val.val ≥ 32768 ∧ cols.msb = 1)
@@ -15,8 +15,8 @@ def U16MSBOperation.spec
 def U16MSBOperation.constraints
   (cols : U16MSBOperation)
   (a : U16)
-  (is_real : U2) : Prop :=
-    is_real = U2.one →
+  (is_real : U1) : Prop :=
+    is_real = U1.one →
     -- (2 * a) - (cols.msb * 65536) must be within U16 range
     -- This effectively checks: 2*a - msb*2^16 < 2^16
     -- When msb=0: 2*a < 2^16 (true for a < 2^15)
@@ -25,12 +25,12 @@ def U16MSBOperation.constraints
 
 theorem U16MSBOperation.correct (cols : U16MSBOperation)
   (a : U16)
-  (is_real : U2)
+  (is_real : U1)
   : cols.constraints a is_real → cols.spec a is_real :=
   by
     intro h_constraint
     intro h_is_real
-    -- Since is_real = U2.one, extract the original constraint
+    -- Since is_real = U1.one, extract the original constraint
     have orig_constraint : ((2 : BabyBear) * a.val) - (cols.msb.val * (65536 : BabyBear)) < (base : BabyBear) := h_constraint h_is_real
     -- Show the spec holds
     show (a.val.val < 32768 ∧ cols.msb = 0) ∨ (a.val.val ≥ 32768 ∧ cols.msb = 1)
@@ -67,10 +67,10 @@ theorem U16MSBOperation.correct (cols : U16MSBOperation)
         omega
 
       · -- Show cols.msb = 0
-        -- Since cols.msb.val = 0 and cols.msb has type U2, it must equal U2.zero
-        have : cols.msb = U2.zero := by
+        -- Since cols.msb.val = 0 and cols.msb has type U1, it must equal U1.zero
+        have : cols.msb = U1.zero := by
           ext
-          simp [U2.zero]
+          simp [U1.zero]
           exact h_zero
         rw [this]
         rfl
@@ -143,26 +143,26 @@ theorem U16MSBOperation.correct (cols : U16MSBOperation)
         norm_num [BabyBearPrime] at this
 
       · -- Show cols.msb = 1
-        -- Since cols.msb.val = 1 and cols.msb has type U2, it must equal U2.one
-        have : cols.msb = U2.one := by
+        -- Since cols.msb.val = 1 and cols.msb has type U1, it must equal U1.one
+        have : cols.msb = U1.one := by
           ext
-          simp only [U2.one]
+          simp only [U1.one]
           simp [h_one]
         rw [this]
         rfl
 
--- Example demonstrating U2 usage with numeric literals
+-- Example demonstrating U1 usage with numeric literals
 example : U16MSBOperation := {
-  msb := 1  -- Can write 1 directly instead of U2.one
+  msb := 1  -- Can write 1 directly instead of U1.one
 }
 
 example : U16MSBOperation := {
-  msb := 0  -- Can write 0 directly instead of U2.zero
+  msb := 0  -- Can write 0 directly instead of U1.zero
 }
 
 -- Example showing the spec works with numeric literals
 example (a : U16) (h : a.val.val = 40000) :
-  U16MSBOperation.spec ⟨1⟩ a U2.one := by
+  U16MSBOperation.spec ⟨1⟩ a U1.one := by
   intro h_is_real
   right
   constructor
