@@ -35,7 +35,7 @@ structure U16 where
   val : BabyBear
   in_range : val < base
 
--- Extensionality for U2
+-- Extensionality for U1
 @[ext] theorem U16.ext {a b : U16} (h : a.val = b.val) : a = b := by
   cases a; cases b; simp at h; simp [h]
 
@@ -84,7 +84,7 @@ structure U8 where
   val : BabyBear
   in_range : val < 256 -- TODO(gzgz): 256 should be some constant like U8.base
 
--- Extensionality for U2
+-- Extensionality for U1
 @[ext] theorem U8.ext {a b : U8} (h : a.val = b.val) : a = b := by
   cases a; cases b; simp at h; simp [h]
 
@@ -127,49 +127,49 @@ instance : CoeOut U8 ℕ where
 
 end U8
 
-section U2
+section U1
 
--- U2 type for bits
-structure U2 where
+-- U1 type for bits
+structure U1 where
   val : BabyBear
   in_range : val = 0 ∨ val = 1
 
--- Extensionality for U2
-@[ext] theorem U2.ext {a b : U2} (h : a.val = b.val) : a = b := by
+-- Extensionality for U1
+@[ext] theorem U1.ext {a b : U1} (h : a.val = b.val) : a = b := by
   cases a; cases b; simp at h; simp [h]
 
-instance : Coe U2 BabyBear where
+instance : Coe U1 BabyBear where
   coe u := u.val
 
-instance : CoeOut U2 ℕ where
+instance : CoeOut U1 ℕ where
   coe u := u.val.val
 
--- Conversion from BabyBear to U2
-def BabyBear.toU2? (b : BabyBear) : Option U2 :=
+-- Conversion from BabyBear to U1
+def BabyBear.toU1? (b : BabyBear) : Option U1 :=
   if h : b = 0 ∨ b = 1 then some ⟨b, h⟩ else none
 
 -- Safe constructors for 0 and 1
-def U2.zero : U2 := ⟨0, Or.inl rfl⟩
-def U2.one : U2 := ⟨1, Or.inr rfl⟩
+def U1.zero : U1 := ⟨0, Or.inl rfl⟩
+def U1.one : U1 := ⟨1, Or.inr rfl⟩
 
--- Allow writing 0 : U2 and 1 : U2 directly
-instance : Zero U2 := ⟨U2.zero⟩
-instance : One U2 := ⟨U2.one⟩
-
-@[simp]
-lemma U2.eq_zero_iff (x : U2) : x = 0 ↔ x.val = 0 := by
-  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
+-- Allow writing 0 : U1 and 1 : U1 directly
+instance : Zero U1 := ⟨U1.zero⟩
+instance : One U1 := ⟨U1.one⟩
 
 @[simp]
-lemma U2.eq_one_iff (x : U2) : x = 1 ↔ x.val = 1 := by
-  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
+lemma U1.eq_zero_iff (x : U1) : x = 0 ↔ x.val = 0 := by
+  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
 
 @[simp]
-lemma U2.eq_zero_iff' (x : U2) : x = U2.zero ↔ x.val = 0 := by
-  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
+lemma U1.eq_one_iff (x : U1) : x = 1 ↔ x.val = 1 := by
+  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
 
 @[simp]
-lemma U2.eq_one_iff' (x : U2) : x = U2.one ↔ x.val = 1 := by
-  refine ⟨congr_arg U2.val, fun h => U2.ext h⟩
+lemma U1.eq_zero_iff' (x : U1) : x = U1.zero ↔ x.val = 0 := by
+  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
 
-end U2
+@[simp]
+lemma U1.eq_one_iff' (x : U1) : x = U1.one ↔ x.val = 1 := by
+  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
+
+end U1

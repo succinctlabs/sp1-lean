@@ -5,7 +5,7 @@ structure AddChip where
   state : CPUState
   adapter : RTypeReader U16
   add_operation : AddOperation
-  is_real : U2
+  is_real : U1
 
 namespace AddChip
 

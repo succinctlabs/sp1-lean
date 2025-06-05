@@ -9,8 +9,8 @@ def Add4Operation.spec
   (b : Word U16)
   (cc : Word U16)
   (d : Word U16)
-  (is_real : U2) : Prop :=
-    is_real = U2.one →
+  (is_real : U1) : Prop :=
+    is_real = U1.one →
     a.toFin32_U16 + b.toFin32_U16 + cc.toFin32_U16 + d.toFin32_U16 = cols.value.toFin32_U16
 
 def Add4Operation.constraints
@@ -19,9 +19,9 @@ def Add4Operation.constraints
     (b : Word U16)
     (cc : Word U16)
     (d : Word U16)
-    (is_real : U2): Prop :=
-    (is_real = U2.one → ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201) < 256) -- checking this is < 8 bytes
-    ∧ (is_real = U2.one → ((((((a[1].val + b[1].val) + cc[1].val) + d[1].val) - cols.value[1].val) + ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) < 256)
+    (is_real : U1): Prop :=
+    (is_real = U1.one → ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201) < 256) -- checking this is < 8 bytes
+    ∧ (is_real = U1.one → ((((((a[1].val + b[1].val) + cc[1].val) + d[1].val) - cols.value[1].val) + ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) < 256)
 
 def Add4Operation.constraints'
     (cols : Add4Operation)
@@ -29,12 +29,12 @@ def Add4Operation.constraints'
     (b : Word U16)
     (cc : Word U16)
     (d : Word U16)
-    (is_real : U2): Prop :=
+    (is_real : U1): Prop :=
     let carry0 : BabyBear := 0
     let carry1 : BabyBear := (a[0].val + b[0].val + cc[0].val + d[0].val - cols.value[0].val + carry0) * baseInv
     let carry2 : BabyBear := (a[1].val + b[1].val + cc[1].val + d[1] - cols.value[1].val + carry1) * baseInv
-    (is_real = U2.one → carry1 < 256)
-    ∧ (is_real = U2.one → carry2 < 256)
+    (is_real = U1.one → carry1 < 256)
+    ∧ (is_real = U1.one → carry2 < 256)
 
 theorem helper1 {n : Nat} {a : Nat} {ha : a < n} {x : Nat} : (Fin.mk a ha) < x → a % n < x := by sorry
 
@@ -44,7 +44,7 @@ def Add4Operation.constraints_iff_constraints'
   (b : Word U16)
   (cc : Word U16)
   (d : Word U16)
-  (is_real : U2)
+  (is_real : U1)
   : cols.constraints a b cc d is_real ↔ cols.constraints' a b cc d is_real :=
   by
     simp [constraints, constraints']
@@ -54,7 +54,7 @@ theorem Add4Operation.correct (cols : Add4Operation)
   (b : Word U16)
   (cc : Word U16)
   (d : Word U16)
-  (is_real : U2)
+  (is_real : U1)
   : cols.constraints a b cc d is_real → cols.spec a b cc d is_real :=
   by
     rw [cols.constraints_iff_constraints']

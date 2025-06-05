@@ -24,7 +24,7 @@ def spec {T : Type}
   (pc : BabyBear)
   (opcode : BabyBear)
   (op_a_write_value : Word T)
-  (is_real : U2)
+  (is_real : U1)
   : Prop := sorry
 
 end RTypeReader

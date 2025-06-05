@@ -54,11 +54,11 @@ section Aesop
 -- marked safe so will always add them and not backtrack. Seems like they are never bad to add
 
 @[aesop safe forward]
-lemma val_fst_U2_lt (x : Word U2) : x[0].val.val = 0 ∨ x[0].val.val = 1 := by
+lemma val_fst_U1_lt (x : Word U1) : x[0].val.val = 0 ∨ x[0].val.val = 1 := by
   convert x[0].in_range <;> simp [BabyBear.eq_one_iff_val_eq_one]
 
 @[aesop safe forward]
-lemma val_snd_U2_lt (x : Word U2) : x[1].val.val = 0 ∨ x[1].val.val = 1 := by
+lemma val_snd_U1_lt (x : Word U1) : x[1].val.val = 0 ∨ x[1].val.val = 1 := by
   convert x[1].in_range <;> simp [BabyBear.eq_one_iff_val_eq_one]
 
 @[aesop safe forward]
