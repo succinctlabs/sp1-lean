@@ -1,5 +1,11 @@
 import SP1Foundations
 import SP1Operations
+import LeanRV32D.RiscvInstsEnd
+import LeanRV32D.RiscvRegs
+
+open LeanRV32D.Functions
+open Sail
+open PreSail (SequentialState)
 
 structure AddChip where
   state : CPUState
@@ -54,3 +60,33 @@ Receives: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb)
 
 
 -/
+
+def sp1_add (rd rs1 rs2 : regidx) : SailM Unit := do
+    -- Model YOUR implementation's behavior
+    let rs1_val ← rX_bits rs1  -- Read register using spec's function
+    let rs2_val ← rX_bits rs2
+    let result := rs1_val + rs2_val  -- Your computation
+    wX_bits rd result  -- Write register using spec's function
+    -- Maybe your implementation does things differently?
+    -- e.g., different flag updates, checks, etc.
+    /- writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4) -/
+
+/- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
+  /- writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4) -/
+  /- let _ ← execute (.RTYPE ⟨rs2, rs1, rd, rop.ADD⟩) -/ -- `execute` is uncomputable...?
+  let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
+  pure ()
+
+def runSuccessState {α : Type} (m : SailM α) (s : SequentialState RegisterType trivialChoiceSource) :
+    Option (SequentialState RegisterType trivialChoiceSource) :=
+  match m.run s with
+  | .ok _ s' => some s'
+  | .error _ _ => none
+
+theorem my_add_implies_spec (rd rs1 rs2 : regidx) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
+  let res := (sp1_add rd rs1 rs2).run s
+  let res_spec := (spec_add rd rs1 rs2).run s
+  res = res_spec :=
+  by
+    simp [EStateM.run]
+    simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
