@@ -63,16 +63,16 @@ Receives: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb)
 
 def sp1_add (rd rs1 rs2 : regidx) : SailM Unit := do
     -- Model YOUR implementation's behavior
+    writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
     let rs1_val ← rX_bits rs1  -- Read register using spec's function
     let rs2_val ← rX_bits rs2
     let result := rs1_val + rs2_val  -- Your computation
     wX_bits rd result  -- Write register using spec's function
     -- Maybe your implementation does things differently?
     -- e.g., different flag updates, checks, etc.
-    /- writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4) -/
 
 /- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
-  /- writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4) -/
+  writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
   /- let _ ← execute (.RTYPE ⟨rs2, rs1, rd, rop.ADD⟩) -/ -- `execute` is uncomputable...?
   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
   pure ()
@@ -83,7 +83,7 @@ def runSuccessState {α : Type} (m : SailM α) (s : SequentialState RegisterType
   | .ok _ s' => some s'
   | .error _ _ => none
 
-theorem my_add_implies_spec (rd rs1 rs2 : regidx) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
+theorem sp1_add_implies_spec (rd rs1 rs2 : regidx) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
   let res := (sp1_add rd rs1 rs2).run s
   let res_spec := (spec_add rd rs1 rs2).run s
   res = res_spec :=
