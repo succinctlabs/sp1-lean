@@ -31,145 +31,48 @@ end base
 
 section U16
 
-structure U16 where
-  val : BabyBear
-  in_range : val < base
+structure U16 extends BabyBear where
+  in_u16_range : val < base.val
 
--- Extensionality for U1
-@[ext] theorem U16.ext {a b : U16} (h : a.val = b.val) : a = b := by
-  cases a; cases b; simp at h; simp [h]
+def U16.ofNat (x : Nat) : U16 := ⟨x % base, by simp; exact Nat.mod_lt (x := x % BabyBearPrime) ((by decide) : 65536 > 0)⟩
+
+@[reducible]
+def U16.zero : U16 := { (0 : BabyBear) with in_u16_range := by simp [base] }
+@[reducible]
+def U16.one : U16 := { (1 : BabyBear) with in_u16_range := by simp [base] }
 
 instance : Coe U16 BabyBear where
-  coe u := u.val
-
--- Safe constructors for 0 and 1
-def U16.zero : U16 := ⟨0, by simp [base]⟩
-def U16.one : U16 := ⟨1, by simp [base]⟩
-
--- Allow writing 0 : U16 and 1 : U16 directly
-instance : Zero U16 := ⟨U16.zero⟩
-instance : One U16 := ⟨U16.one⟩
-
-@[simp]
-lemma U16_eq_zero_iff (x : U16) : x = 0 ↔ x.val = 0 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
-
-@[simp]
-lemma U16_eq_one_iff (x : U16) : x = 1 ↔ x.val = 1 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
-
-@[simp]
-lemma U16_eq_zero_iff' (x : U16) : x = U16.zero ↔ x.val = 0 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
-
-@[simp]
-lemma U16_eq_one_iff' (x : U16) : x = U16.one ↔ x.val = 1 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
-
--- For converting BabyBear to U16, we can define a function that returns Option
-def BabyBear.toU16? (b : BabyBear) : Option U16 :=
-  if h : b < base then some ⟨b, h⟩ else none
-
-instance (b : BabyBear) (h : b < base) : CoeDep BabyBear b U16 where
-  coe := ⟨b, h⟩
-
-instance : CoeOut U16 ℕ where
-  coe u := u.val.val  -- U16 -> BabyBear -> ℕ
+  coe x := x.toFin
 
 end U16
 
 section U8
 
-structure U8 where
-  val : BabyBear
-  in_range : val < 256 -- TODO(gzgz): 256 should be some constant like U8.base
+structure U8 extends U16 where
+  in_u8_range : val < 256
 
--- Extensionality for U1
-@[ext] theorem U8.ext {a b : U8} (h : a.val = b.val) : a = b := by
-  cases a; cases b; simp at h; simp [h]
+@[reducible]
+def U8.zero : U8 := { U16.zero with in_u8_range := by simp }
+@[reducible]
+def U8.one : U8 := { U16.one with in_u8_range := by simp }
 
 instance : Coe U8 BabyBear where
-  coe u := u.val
-
--- Safe constructors for 0 and 1
-def U8.zero : U8 := ⟨0, by simp [base]⟩
-def U8.one : U8 := ⟨1, by simp [base]⟩
-
--- Allow writing 0 : U8 and 1 : U8 directly
-instance : Zero U8 := ⟨U8.zero⟩
-instance : One U8 := ⟨U8.one⟩
-
-@[simp]
-lemma U8_eq_zero_iff (x : U8) : x = 0 ↔ x.val = 0 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
-
-@[simp]
-lemma U8_eq_one_iff (x : U8) : x = 1 ↔ x.val = 1 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
-
-@[simp]
-lemma U8_eq_zero_iff' (x : U8) : x = U8.zero ↔ x.val = 0 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
-
-@[simp]
-lemma U8_eq_one_iff' (x : U8) : x = U8.one ↔ x.val = 1 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
-
--- For converting BabyBear to U8, we can define a function that returns Option
-def BabyBear.toU8? (b : BabyBear) : Option U8 :=
-  if h : b < 256 then some ⟨b, h⟩ else none
-
-instance (b : BabyBear) (h : b < 256) : CoeDep BabyBear b U8 where
-  coe := ⟨b, h⟩
-
-instance : CoeOut U8 ℕ where
-  coe u := u.val.val  -- U8 -> BabyBear -> ℕ
+  coe x := x.toFin
 
 end U8
 
 section U1
 
 -- U1 type for bits
-structure U1 where
-  val : BabyBear
-  in_range : val = 0 ∨ val = 1
+structure U1 extends U8 where
+  in_u1_range : val = 0 ∨ val = 1
 
--- Extensionality for U1
-@[ext] theorem U1.ext {a b : U1} (h : a.val = b.val) : a = b := by
-  cases a; cases b; simp at h; simp [h]
+@[reducible]
+def U1.one : U1 := { U8.one with in_u1_range := by simp }
+@[reducible]
+def U1.zero : U1 := { U8.zero with in_u1_range := by simp }
 
 instance : Coe U1 BabyBear where
-  coe u := u.val
-
-instance : CoeOut U1 ℕ where
-  coe u := u.val.val
-
--- Conversion from BabyBear to U1
-def BabyBear.toU1? (b : BabyBear) : Option U1 :=
-  if h : b = 0 ∨ b = 1 then some ⟨b, h⟩ else none
-
--- Safe constructors for 0 and 1
-def U1.zero : U1 := ⟨0, Or.inl rfl⟩
-def U1.one : U1 := ⟨1, Or.inr rfl⟩
-
--- Allow writing 0 : U1 and 1 : U1 directly
-instance : Zero U1 := ⟨U1.zero⟩
-instance : One U1 := ⟨U1.one⟩
-
-@[simp]
-lemma U1.eq_zero_iff (x : U1) : x = 0 ↔ x.val = 0 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
-
-@[simp]
-lemma U1.eq_one_iff (x : U1) : x = 1 ↔ x.val = 1 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
-
-@[simp]
-lemma U1.eq_zero_iff' (x : U1) : x = U1.zero ↔ x.val = 0 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
-
-@[simp]
-lemma U1.eq_one_iff' (x : U1) : x = U1.one ↔ x.val = 1 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
+  coe x := x.toFin
 
 end U1

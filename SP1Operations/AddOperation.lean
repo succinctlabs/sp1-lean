@@ -15,13 +15,13 @@ def spec
   (b : Word U16)
   (is_real : U1) : Prop :=
     is_real = U1.one →
-    a.toFin32_U16 + b.toFin32_U16 = cols.value.toFin32_U16
+    a.toBV32_U16 + b.toBV32_U16 = cols.value.toBV32_U16
 
 def constraints (cols : AddOperation)
     (a b : Word U16) (is_real : U1) : Finset SP1Constraint :=
   {
-    .assertZero (is_real * ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201) - 1)),
-    .assertZero (is_real * ((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) - 1))
+     .assertZero (is_real * ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201) - 1)),
+     .assertZero (is_real * ((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) - 1))
   }
 
 def constraints'
@@ -32,8 +32,8 @@ def constraints'
   let carry0 : BabyBear := 0
   let carry1 : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * (baseInv : BabyBear)
   let carry2 : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * (baseInv : BabyBear)
-  (is_real.val * carry1 * (carry1 - 1)) = 0 ∧
-  (is_real.val * carry2 * (carry2 - 1)) = 0
+  (is_real * carry1 * (carry1 - 1)) = 0 ∧
+  (is_real * carry2 * (carry2 - 1)) = 0
 
 def constraints_iff_constraints'
     (cols : AddOperation)
@@ -54,15 +54,32 @@ theorem correct
 
       -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints
       intro h_is_real
-      simp [is_real.eq_one_iff.1 h_is_real, sub_eq_zero, mul_eq_zero] at q1 q2
-      simp [Word.toFin32_U16]
+      rw [h_is_real] at q1 q2
+      simp [sub_eq_zero, mul_eq_zero] at q1 q2
+      simp [Word.toBV32_U16, BitVec.ofNatLT]
+
+      let i1 := a[0].in_u16_range
+      let i2 := a[1].in_u16_range
+      let i3 := b[0].in_u16_range
+      let i4 := b[1].in_u16_range
+      let i5 := cols.value[0].in_u16_range
+      let i6 := cols.value[1].in_u16_range
+      simp [base] at i1 i2 i3 i4 i5 i6
 
       -- Cases on whether the lower limb led to a carry or not
-      cases q1 with | inl qq1 => ?_ | inr qq1 => ?_
-      all_goals
-      · rw [qq1] at q2
-        simp only [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime, UInt32.size] at *
-        -- Run `aesop` with semi-safe access to the `omega` tactic
-        aesop (add 50% tactic (by omega))
+      cases q1 with
+      | inl qq1 =>
+          rw [qq1] at q2
+          simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+          omega
+      | inr qq1 => 
+          rw [qq1] at q2
+          simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+          omega
+      /- all_goals -/
+      /- · rw [qq1] at q2 -/
+      /-   simp only [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime, UInt32.size] at * -/
+      /-   -- Run `aesop` with semi-safe access to the `omega` tactic -/
+      /-   aesop (add 50% tactic (by omega)) -/
 
 end AddOperation

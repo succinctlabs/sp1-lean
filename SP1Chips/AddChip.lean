@@ -1,7 +1,9 @@
 import SP1Foundations
-import SP1Operations
+import SP1Operations.AddOperation
 import LeanRV32D.RiscvInstsEnd
 import LeanRV32D.RiscvRegs
+import SP1Operations.CPUState
+import SP1Operations.RTypeReader
 
 open LeanRV32D.Functions
 open Sail

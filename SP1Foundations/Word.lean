@@ -1,7 +1,12 @@
 import SP1Foundations.Unsigned
 
+@[simp]
+abbrev BIT_WIDTH := 32
+
+@[simp]
 abbrev WORD_BYTE_SIZE := 4
 
+@[simp]
 abbrev WORD_SIZE := 2
 
 abbrev Word (T : Type) := Vector T WORD_SIZE
@@ -24,14 +29,18 @@ def toFin32_BB (w : Word BabyBear) : Fin (2^32) :=
     norm_num⟩
 
 def toFin32_U16 (w : Word U16) : Fin (2^32) :=
-  ⟨w[0].val.val + w[1].val.val * 65536, by
-    let wn0 : Nat := w[0].val.val
-    let wn1 : Nat := w[1].val.val
-    show wn0 + wn1 * 65536 < 2^32
-    have wn0_in_range : wn0 < 65536 := w[0].in_range
-    have wn1_in_range : wn1 < 65536 := w[1].in_range
+  ⟨w[0].val + w[1].val * 65536, by
+    have wn0_in_range := w[0].in_u16_range
+    have wn1_in_range := w[1].in_u16_range
     simp at *
     omega⟩
+
+def toBV32_U16 (w : Word U16) : BitVec BIT_WIDTH := 
+  BitVec.ofNatLT (w[0].val + w[1].val * base) (by
+    have _ := w[0].in_u16_range
+    have _ := w[1].in_u16_range
+    simp at *
+    omega)
 
 @[reducible] def toNat (w : Word (BabyBear)) : ℕ :=
   w[0].val + base * w[1].val
@@ -42,7 +51,7 @@ lemma toNat_add_toNat (a b : Word (BabyBear)) :
   omega
 
 theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
-  w[0].val.val + w[1].val.val * 65536 := by
+  w[0].val + w[1].val * 65536 := by
   simp [toFin32_U16, base]
 
 def isUInt32 (w : Word (BabyBear)) : Prop :=
@@ -54,28 +63,28 @@ section Aesop
 -- marked safe so will always add them and not backtrack. Seems like they are never bad to add
 
 @[aesop safe forward]
-lemma val_fst_U1_lt (x : Word U1) : x[0].val.val = 0 ∨ x[0].val.val = 1 := by
-  convert x[0].in_range <;> simp [BabyBear.eq_one_iff_val_eq_one]
+lemma val_fst_U1_lt (x : Word U1) : x[0].val = 0 ∨ x[0].val = 1 := by
+  convert x[0].in_u1_range
 
 @[aesop safe forward]
-lemma val_snd_U1_lt (x : Word U1) : x[1].val.val = 0 ∨ x[1].val.val = 1 := by
-  convert x[1].in_range <;> simp [BabyBear.eq_one_iff_val_eq_one]
+lemma val_snd_U1_lt (x : Word U1) : x[1].val = 0 ∨ x[1].val = 1 := by
+  convert x[1].in_u1_range
 
 @[aesop safe forward]
-lemma val_fst_U8_lt (x : Word U8) : x[0].val.val < 256 := by
-  exact x[0].in_range
+lemma val_fst_U8_lt (x : Word U8) : x[0].val < 256 := by
+  exact x[0].in_u8_range
 
 @[aesop safe forward]
-lemma val_snd_U8_lt (x : Word U8) : x[1].val.val < 256 := by
-  exact x[1].in_range
+lemma val_snd_U8_lt (x : Word U8) : x[1].val < 256 := by
+  exact x[1].in_u8_range
 
 @[aesop safe forward]
-lemma val_fst_U16_lt (x : Word U16) : x[0].val.val < 65536 := by
-  exact x[0].in_range
+lemma val_fst_U16_lt (x : Word U16) : x[0].val < 65536 := by
+  exact x[0].in_u16_range
 
 @[aesop safe forward]
-lemma val_snd_U16_lt (x : Word U16) : x[1].val.val < 65536 := by
-  exact x[1].in_range
+lemma val_snd_U16_lt (x : Word U16) : x[1].val < 65536 := by
+  exact x[1].in_u16_range
 
 end Aesop
 
