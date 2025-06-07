@@ -1,2 +1,4 @@
 /.lake
 /.claude
+.env
+.env.fish
