@@ -1,5 +1,8 @@
 import SP1Foundations
 import SP1Operations.MemoryConsistency
+import LeanRV32D.RiscvRegs
+
+open LeanRV32D.Functions
 
 --- A Reader that only accesses values of type `T`.
 structure RTypeReader (T : Type) where
@@ -27,4 +30,18 @@ def spec {T : Type}
   (is_real : U1)
   : Prop := sorry
 
+def read_b_fun
+  (cols : RTypeReader U16)
+  (rs : regidx)
+  : Prop := rX_bits rs = pure cols.b.toBV32_U16
+
+def read_c_fun
+  (cols : RTypeReader U16)
+  (rs : regidx)
+  : Prop := rX_bits rs = pure cols.c.toBV32_U16
+
 end RTypeReader
+
+structure MemRead (x : Word U16) where
+  val : BitVec 32
+  h_val : val = x.toBV32_U16

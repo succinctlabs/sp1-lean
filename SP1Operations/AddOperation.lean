@@ -17,11 +17,18 @@ def spec
     is_real = U1.one →
     a.toBV32_U16 + b.toBV32_U16 = cols.value.toBV32_U16
 
+/- def constraints (cols : AddOperation) -/
+/-     (a b : Word U16) (is_real : U1) : List SP1Constraint := -/
+/-   [ -/
+/-     .assertZero ((is_real : BabyBear) * ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201) - 1)), -/
+/-     .assertZero ((is_real : BabyBear) * ((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201)) * 2013235201) - 1)) -/
+/-   ] -/
+
 def constraints (cols : AddOperation)
     (a b : Word U16) (is_real : U1) : Finset SP1Constraint :=
   {
-     .assertZero (is_real * ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201) - 1)),
-     .assertZero (is_real * ((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) - 1))
+     .assertZero (is_real * ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201) - 1)),
+     .assertZero (is_real * ((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201)) * 2013235201) - 1))
   }
 
 def constraints'
@@ -48,8 +55,9 @@ theorem correct
   (a : Word U16)
   (b : Word U16)
   (is_real : U1)
-  : cols.constraints' a b is_real → cols.spec a b is_real :=
+  : constraintSet_toProp (cols.constraints a b is_real) → cols.spec a b is_real :=
     by
+      rw [constraints_iff_constraints']
       intro ⟨q1, q2⟩
 
       -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints

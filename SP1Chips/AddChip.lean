@@ -22,8 +22,20 @@ def constraints
   (chip : AddChip) : Prop :=
   let ⟨state, adapter, add_operation, is_real⟩ := chip
   state.spec (state.pc + 4) 4 is_real
-  ∧ add_operation.spec adapter.b adapter.c is_real
+  ∧ constraintSet_toProp (add_operation.constraints adapter.b adapter.c is_real)
   ∧ adapter.spec state.shard state.clk state.pc 0 /- Opcode::ADD -/ add_operation.value is_real
+
+/- def read  -/
+/-   (chip : AddChip) -/
+/-   (rs1 rs2 : regidx) : SailM (BitVec 32 × BitVec 32 × (rs1_val = chip.adapter.b.toBV32_U16 ∧ rs2_val = chip.adapter.c.toBV32_U16)) := do -/
+/-     let rs1_val ← rx_bits rs1 -/
+/-     let rs2_val ← rx_bits rs2 -/
+/-     pure -/
+/-       ⟨rs1_val, -/
+/-         ⟨rs2_val, -/
+/-         sorry -/
+/-         ⟩ -/
+/-       ⟩ -/
 
 end AddChip
 
@@ -63,15 +75,20 @@ Receives: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb)
 
 -/
 
-def sp1_add (rd rs1 rs2 : regidx) : SailM Unit := do
+def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = U1.one) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) : SailM Unit := do
     -- Model YOUR implementation's behavior
     writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
-    let rs1_val ← rX_bits rs1  -- Read register using spec's function
+    /- let ⟨rs1_val, ⟨rs2_val, matching⟩⟩ ← chip.read rs1 rs2 -/
+    let rs1_val ← rX_bits rs1
     let rs2_val ← rX_bits rs2
-    let result := rs1_val + rs2_val  -- Your computation
-    wX_bits rd result  -- Write register using spec's function
-    -- Maybe your implementation does things differently?
-    -- e.g., different flag updates, checks, etc.
+    /- let ⟨rs1_val, mem_read_1⟩ ← read_b -/
+    /- let ⟨rs2_val, mem_read_2⟩ ← read_c -/
+    /- let ⟨_, ⟨h_constraints_2, _⟩⟩ := constraints -/
+    by
+      /- let h_add := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real -/
+      /- rw [←mem_read_1, ←mem_read_2] at h_add -/
+      /- let res := chip.add_operation.value.toBV32_U16 -/
+      exact wX_bits rd chip.add_operation.value.toBV32_U16
 
 /- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
@@ -85,10 +102,36 @@ def runSuccessState {α : Type} (m : SailM α) (s : SequentialState RegisterType
   | .ok _ s' => some s'
   | .error _ _ => none
 
-theorem sp1_add_implies_spec (rd rs1 rs2 : regidx) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
-  let res := (sp1_add rd rs1 rs2).run s
+
+/--
+Very close!
+
+The remaining challenge is to prove this
+```lean
+do
+  let _ ← pure chip.adapter.b.toBV32_U16
+  let _ ← pure chip.adapter.c.toBV32_U16
+  wX_bits rd (chip.adapter.b.toBV32_U16 + chip.adapter.c.toBV32_U16)
+```
+vs
+```lean
+do
+  let a ← pure chip.adapter.b.toBV32_U16
+  let a_1 ← pure chip.adapter.c.toBV32_U16
+  wX_bits rd (a + a_1)
+```
+-/
+theorem sp1_add_implies_spec (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = U1.one) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
+  let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c).run s
   let res_spec := (spec_add rd rs1 rs2).run s
   res = res_spec :=
   by
     simp [EStateM.run]
     simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
+    let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
+    simp [RTypeReader.read_b_fun] at read_b
+    rw [read_b]
+    simp [RTypeReader.read_c_fun] at read_c
+    rw [read_c]
+    rw [←add_spec]
+    sorry
