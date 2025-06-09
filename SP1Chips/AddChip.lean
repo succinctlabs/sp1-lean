@@ -102,26 +102,7 @@ def runSuccessState {α : Type} (m : SailM α) (s : SequentialState RegisterType
   | .ok _ s' => some s'
   | .error _ _ => none
 
-
-/--
-Very close!
-
-The remaining challenge is to prove this
-```lean
-do
-  let _ ← pure chip.adapter.b.toBV32_U16
-  let _ ← pure chip.adapter.c.toBV32_U16
-  wX_bits rd (chip.adapter.b.toBV32_U16 + chip.adapter.c.toBV32_U16)
-```
-vs
-```lean
-do
-  let a ← pure chip.adapter.b.toBV32_U16
-  let a_1 ← pure chip.adapter.c.toBV32_U16
-  wX_bits rd (a + a_1)
-```
--/
-theorem sp1_add_implies_spec (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = U1.one) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
+theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = U1.one) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
   let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c).run s
   let res_spec := (spec_add rd rs1 rs2).run s
   res = res_spec :=
@@ -134,4 +115,5 @@ theorem sp1_add_implies_spec (chip : AddChip) (constraints : chip.constraints) (
     simp [RTypeReader.read_c_fun] at read_c
     rw [read_c]
     rw [←add_spec]
-    sorry
+    rw [pure_bind, pure_bind]
+    rfl
