@@ -21,7 +21,7 @@ output_file=$(get_output_file "$@")
 if [[ -n "$output_file" ]] && [[ "$(basename "$output_file")" =~ ^Lean_RV32D-.*\.tar\.gz$ ]]; then
     gh release download nightly \
       --repo succinctlabs/sail-rv32d-lean \
-      --pattern "$output_basename" \
+	  --pattern "$(basename "$output_file")" \
       --output "$output_file"
 else
     # Pass through to real curl for all other commands
