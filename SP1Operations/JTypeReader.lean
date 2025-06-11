@@ -22,7 +22,11 @@ def c {T : Type} (cols : JTypeReader T) : Word T := cols.op_c_imm
 def read_jal_b_fun
   (cols : JTypeReader U16)
   (imm : BitVec 21)
-  : Prop := (· + imm) <$> (readReg Register.PC) = pure cols.b.toBV32_U16
+  /- : Prop := (· + sign_extend imm) <$> (readReg Register.PC) = pure cols.b.toBV32_U16 -/
+  : Prop := (do
+    let pc ← readReg Register.PC
+    pure (pc + sign_extend imm)
+  ) = pure cols.b.toBV32_U16
 
 def read_jal_c_fun
   (cols : JTypeReader U16)

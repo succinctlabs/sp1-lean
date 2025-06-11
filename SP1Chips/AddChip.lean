@@ -96,12 +96,6 @@ def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.
   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
   pure ()
 
-def runSuccessState {α : Type} (m : SailM α) (s : SequentialState RegisterType trivialChoiceSource) :
-    Option (SequentialState RegisterType trivialChoiceSource) :=
-  match m.run s with
-  | .ok _ s' => some s'
-  | .error _ _ => none
-
 theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = U1.one) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
   let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c).run s
   let res_spec := (spec_add rd rs1 rs2).run s
