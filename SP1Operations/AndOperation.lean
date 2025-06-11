@@ -21,18 +21,18 @@ Sends: AirInteraction { values: [0, cols.value[2], a[2], b[2]], multiplicity: is
 Sends: AirInteraction { values: [0, cols.value[3], a[3], b[3]], multiplicity: is_real, kind: Byte } -/
 def extractedConstraints (cols : AndOperation)
     (a b : Vector (BabyBear) WORD_BYTE_SIZE) (is_real : BabyBear) :
-    List (SP1Constraint) :=
-  [
+    Finset (SP1Constraint) :=
+  {
   .sendAirInteraction_byte (.ofNat 0) cols.value[0] a[0] b[0] is_real,
   .sendAirInteraction_byte (.ofNat 0) cols.value[1] a[1] b[1] is_real,
   .sendAirInteraction_byte (.ofNat 0) cols.value[2] a[2] b[2] is_real,
-  .sendAirInteraction_byte (.ofNat 0) cols.value[3] a[3] b[3] is_real,
-  ]
+  .sendAirInteraction_byte (.ofNat 0) cols.value[3] a[3] b[3] is_real
+  }
 
 /-- Cleaned up representation of the `AndOperation` constraints. -/
 def idealizedConstraints (cols : AndOperation)
     (a b : Vector (BabyBear) WORD_BYTE_SIZE) : Prop :=
-  a[0] &&& b[0] = cols.value[0] ∧
+a[0] &&& b[0] = cols.value[0] ∧
   a[1] &&& b[1] = cols.value[1] ∧
   a[2] &&& b[2] = cols.value[2] ∧
   a[3] &&& b[3] = cols.value[3]
@@ -40,9 +40,10 @@ def idealizedConstraints (cols : AndOperation)
 /-- The idealized constraints are logically equivalent to the extracted ones when `is_real := 1` -/
 lemma extractedConstraints_iff_idealizedConstraints
     (cols : AndOperation) (a b : Vector (BabyBear) WORD_BYTE_SIZE) :
-    constraintList_toProp (cols.extractedConstraints a b 1) ↔
+    constraintSet_toProp (cols.extractedConstraints a b 1) ↔
       cols.idealizedConstraints a b := by
   simp [extractedConstraints, idealizedConstraints]
+
   tauto
 
 /-- The extracted constraints on `AndOperation` imply the spec. -/
