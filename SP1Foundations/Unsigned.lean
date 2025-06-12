@@ -37,7 +37,7 @@ variable {bound : ℕ}
 
 instance : Inhabited (BoundedBabyBear bound.succ) where default := 0
 
-@[simp] lemma default_eq_zero : (default : BoundedBabyBear bound.succ) = 0 := rfl
+lemma default_eq_zero : (default : BoundedBabyBear bound.succ) = 0 := rfl
 
 section toFin
 
@@ -56,12 +56,14 @@ end toFin
 section toBabyBear
 
 /-- Convert a `BoundedBabyBear` to a `BabyBear` by forgetting the bound. -/
-def toBabyBear (x : BoundedBabyBear bound) : BabyBear where __ := x
+@[simp] alias toBabyBear := BoundedBabyBear.toFin
 
-@[simp] lemma toBabyBear_zero : (0 : BoundedBabyBear bound.succ).toBabyBear = 0 := rfl
-@[simp] lemma toBabyBear_one : (1 : BoundedBabyBear bound.succ.succ).toBabyBear = 1 := rfl
+lemma toBabyBear_def (x : BoundedBabyBear bound) : x.toBabyBear = x.toFin := rfl
 
-@[simp] lemma val_toBabyBear (x : BoundedBabyBear bound) : (x.toBabyBear : ℕ) = x.val := rfl
+lemma toBabyBear_zero : (0 : BoundedBabyBear bound.succ).toBabyBear = 0 := rfl
+lemma toBabyBear_one : (1 : BoundedBabyBear bound.succ.succ).toBabyBear = 1 := rfl
+
+lemma val_toBabyBear (x : BoundedBabyBear bound) : (x.toBabyBear : ℕ) = x.val := rfl
 
 lemma toBabyBear_inj (x y : BoundedBabyBear bound) : toBabyBear x = toBabyBear y ↔ x = y := by
   simp [toBabyBear, toFin_inj]
@@ -106,3 +108,7 @@ instance : Coe U8 U16 := BoundedBabyBear.coe_of_le <| by omega
 
 def U1.in_range' (x : U1) : x.val = 0 ∨ x.val = 1 := by
   have := x.in_range; omega
+
+def U1.in_range'' (x : U1) : x = 0 ∨ x = 1 := by
+  have := x.in_range'
+  aesop

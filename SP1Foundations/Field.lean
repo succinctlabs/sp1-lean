@@ -28,6 +28,8 @@ lemma fin_val_simp {n : ℕ} (Hlt : n < BabyBearPrime) :
 
 namespace BabyBear
 
+lemma lt_babyBearPrime (x : BabyBear) : x.val < BabyBearPrime := x.2
+
 instance : Field BabyBear := ZMod.instField BabyBearPrime
 
 section const_vals
@@ -37,6 +39,8 @@ lemma eq_one_iff_val_eq_one (x : BabyBear) : x = 1 ↔ x.val = 1 := by aesop
 lemma eq_zero_iff_val_eq_zero (x : BabyBear) : x = 0 ↔ x.val = 0 := by aesop
 
 @[simp] lemma val_256 : ((256 : BabyBear) : ℕ) = 256 := rfl
+
+@[simp] lemma val_32768 : ((32768 : BabyBear) : ℕ) = 32768 := rfl
 
 @[simp] lemma val_65536 : ((65536 : BabyBear) : ℕ) = 65536 := rfl
 

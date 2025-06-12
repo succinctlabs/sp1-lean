@@ -56,7 +56,7 @@ theorem correct
   -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints
   intro h_is_real
   simp [h_is_real, sub_eq_zero, mul_eq_zero] at q1 q2
-  simp [Word.toBV32_U16, BitVec.ofNatLT]
+  simp [Word.toBV32_U16, BitVec.ofNatLT, Fin.add_def]
 
   let i1 := a[0].in_range
   let i2 := a[1].in_range
