@@ -7,23 +7,6 @@ inductive AirInteraction.Kind where
   | PROGRAM
   | STATE
 
--- structure AirInteraction where
---   mult : ℕ
-
-structure ByteAirInteraction where
-  mk_air ::
-  op : ByteOpcode
-  x : BabyBear
-  y : BabyBear
-  z : BabyBear
-  mult : BabyBear
-
-def ByteAirInteraction.to_result : ByteAirInteraction → Unit
-  | .mk_air (op := .AND) x y z mult => ()
-  | .mk_air .OR x y z mult => ()
-  | .mk_air .XOR x y z mult => ()
-  | _ => ()
-
 inductive SP1Constraint where
   /-- Assertion that a particular value is zero. -/
   | assertZero (x : BabyBear)
