@@ -18,11 +18,11 @@ def spec
     a.toFin32_U16 + b.toFin32_U16 = cols.value.toFin32_U16
 
 def constraints (cols : AddOperation)
-    (a b : Word U16) (is_real : U1) : List SP1Constraint :=
-  [
+    (a b : Word U16) (is_real : U1) : Finset SP1Constraint :=
+  {
     .assertZero (is_real * ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201) - 1)),
     .assertZero (is_real * ((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1].val + b[1].val) - cols.value[1].val) + ((((a[0].val + b[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) - 1))
-  ]
+  }
 
 def constraints'
     (cols : AddOperation)
@@ -40,7 +40,7 @@ def constraints_iff_constraints'
     (a : Word U16)
     (b : Word U16)
     (is_real : U1) :
-    constraintList_toProp (cols.constraints a b is_real) ↔ cols.constraints' a b is_real:= by
+    constraintSet_toProp (cols.constraints a b is_real) ↔ cols.constraints' a b is_real:= by
   simp [constraints, constraints']
 
 theorem correct

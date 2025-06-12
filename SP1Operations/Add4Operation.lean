@@ -1,5 +1,6 @@
 import SP1Foundations
 
+@[aesop safe cases]
 structure Add4Operation where
   value : Word U16
 
@@ -67,17 +68,19 @@ theorem Add4Operation.correct (cols : Add4Operation)
     simp at q1 q2
 
     -- Extract bounds on values
-    have a0_bound : a[0].val.val < 65536 := a[0].in_range
-    have a1_bound : a[1].val.val < 65536 := a[1].in_range
-    have b0_bound : b[0].val.val < 65536 := b[0].in_range
-    have b1_bound : b[1].val.val < 65536 := b[1].in_range
-    have c0_bound : cc[0].val.val < 65536 := cc[0].in_range
-    have c1_bound : cc[1].val.val < 65536 := cc[1].in_range
-    have d0_bound : d[0].val.val < 65536 := d[0].in_range
-    have d1_bound : d[1].val.val < 65536 := d[1].in_range
-    have v0_bound : cols.value[0].val.val < 65536 := cols.value[0].in_range
-    have v1_bound : cols.value[1].val.val < 65536 := cols.value[1].in_range
+    -- have a0_bound : a[0].val.val < 65536 := a[0].in_range
+    -- have a1_bound : a[1].val.val < 65536 := a[1].in_range
+    -- have b0_bound : b[0].val.val < 65536 := b[0].in_range
+    -- have b1_bound : b[1].val.val < 65536 := b[1].in_range
+    -- have c0_bound : cc[0].val.val < 65536 := cc[0].in_range
+    -- have c1_bound : cc[1].val.val < 65536 := cc[1].in_range
+    -- have d0_bound : d[0].val.val < 65536 := d[0].in_range
+    -- have d1_bound : d[1].val.val < 65536 := d[1].in_range
+    -- have v0_bound : cols.value[0].val.val < 65536 := cols.value[0].in_range
+    -- have v1_bound : cols.value[1].val.val < 65536 := cols.value[1].in_range
 
     simp [Word.toFin32_U16]
     simp [Fin.add_def, Fin.mul_def, Fin.sub_def, add_assoc] at *
+    rw [Fin.lt_iff_val_lt_val] at q1 q2
+    simp [BabyBearPrime] at *
     sorry
