@@ -34,22 +34,35 @@ def idealizedConstraints (cols : SubOperation)
 lemma extractedConstraints_iff_idealizedConstraints
     (cols : SubOperation) (a b : Word U16) (is_real : U1) :
     constraintSet_toProp (cols.extractedConstraints a b is_real) ↔ cols.idealizedConstraints a b is_real := by
-  simp [extractedConstraints, idealizedConstraints, base, baseInv]
-  aesop
+
+  simp only [extractedConstraints, WORD_SIZE, Fin.isValue, Nat.cast_one,
+    constraintSet_toProp_insert, SP1Constraint.toProp_assertZero, mul_eq_zero, baseInv_ne_zero,
+    or_false, constraintSet_toProp_singleton, idealizedConstraints, base, baseInv,
+    - Fin.val_eq_zero_iff]
+  rw [Fin.add_def]
+
+  simp only [Fin.cast_val_eq_self, Fin.isValue, Fin.val_one, Fin.mk_eq_zero, Fin.val_eq_zero_iff,
+    mul_eq_zero, baseInv_ne_zero, or_false]
+  simp [sub_eq_zero, Fin.sub_def, Fin.add_def]
+
+  sorry
+  -- aesop
 
 /-- The extracted constraints on `SubOperation` imply the spec. -/
 theorem correct [Fact (Nat.Prime p)] (cols : SubOperation)
     (a b : Word U16) (is_real : U1) :
     cols.idealizedConstraints a b is_real → cols.spec a b is_real := by
   -- Unfold the definitions of constraints and spec
-  simp [idealizedConstraints, spec, sub_eq_zero, mul_eq_zero]
+  simp [idealizedConstraints, spec, sub_eq_zero, mul_eq_zero, Fin.val_mul]
   -- Introduce all of the hypothesis from the constraints
   intros h1 h2
   -- Eliminate `is_real`
   intro h_is_real
-  have is_real_val_eq_one : is_real.val = 1 := by aesop
-  rw [is_real_val_eq_one] at h1 h2
-  simp at h1 h2
+  simp [h_is_real, sub_eq_zero] at *
+  -- have is_real_val_eq_one : is_real.val = 1 := by aesop
+
+  -- rw [is_real_val_eq_one] at h1 h2
+  -- simp at h1 h2
 
   simp [Word.toFin32_U16]
 
@@ -63,6 +76,7 @@ theorem correct [Fact (Nat.Prime p)] (cols : SubOperation)
 
   -- Split on whether the lower limb addition causes a carry
   cases h1 with | inl h1 => ?_ | inr h1 => ?_
+
   all_goals -- In both cases can now reduce down to the `omega` linear constraint solver
   · rw [h1] at h2
     simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff, p, Word.toNat, Word.isUInt32] at *

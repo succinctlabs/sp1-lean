@@ -3,11 +3,13 @@ import SP1Foundations
 -- AddOperaton is not parameterized by a type `T` with `value` being `Word T`
 -- because AddOperation is used only under the assumption that its input and
 -- output limbs are all U16s.
-@[aesop safe cases]
+-- @[aesop safe cases]
 structure AddOperation where
   value : Word U16
 
 namespace AddOperation
+
+@[simp] lemma value_mk (value : Word U16) : (AddOperation.mk value).value = value := rfl
 
 def spec
   (cols : AddOperation)
@@ -16,13 +18,6 @@ def spec
   (is_real : U1) : Prop :=
     is_real = 1 →
     a.toBV32_U16 + b.toBV32_U16 = cols.value.toBV32_U16
-
-/- def constraints (cols : AddOperation) -/
-/-     (a b : Word U16) (is_real : U1) : List SP1Constraint := -/
-/-   [ -/
-/-     .assertZero ((is_real : BabyBear) * ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201) - 1)), -/
-/-     .assertZero ((is_real : BabyBear) * ((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201)) * 2013235201) - 1)) -/
-/-   ] -/
 
 def constraints (cols : AddOperation)
     (a b : Word U16) (is_real : U1) : Finset SP1Constraint :=
@@ -51,43 +46,34 @@ def constraints_iff_constraints'
   simp [constraints, constraints']
 
 theorem correct
-  (cols : AddOperation)
-  (a : Word U16)
-  (b : Word U16)
-  (is_real : U1)
-  : constraintSet_toProp (cols.constraints a b is_real) → cols.spec a b is_real :=
-    by
-      rw [constraints_iff_constraints']
-      intro ⟨q1, q2⟩
+    (cols : AddOperation)
+    (a : Word U16) (b : Word U16)
+    (is_real : U1) :
+    constraintSet_toProp (cols.constraints a b is_real) → cols.spec a b is_real := by
+  rw [constraints_iff_constraints']
+  intro ⟨q1, q2⟩
 
-      -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints
-      intro h_is_real
-      rw [h_is_real] at q1 q2
-      simp [sub_eq_zero, mul_eq_zero] at q1 q2
-      simp [Word.toBV32_U16, BitVec.ofNatLT]
+  -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints
+  intro h_is_real
+  simp [h_is_real, sub_eq_zero, mul_eq_zero] at q1 q2
+  simp [Word.toBV32_U16, BitVec.ofNatLT]
 
-      let i1 := a[0].in_range
-      let i2 := a[1].in_range
-      let i3 := b[0].in_range
-      let i4 := b[1].in_range
-      let i5 := cols.value[0].in_range
-      let i6 := cols.value[1].in_range
-      simp [base] at i1 i2 i3 i4 i5 i6
+  let i1 := a[0].in_range
+  let i2 := a[1].in_range
+  let i3 := b[0].in_range
+  let i4 := b[1].in_range
+  let i5 := cols.value[0].in_range
+  let i6 := cols.value[1].in_range
 
-      -- Cases on whether the lower limb led to a carry or not
-      cases q1 with
-      | inl qq1 =>
-          rw [qq1] at q2
-          simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
-          omega
-      | inr qq1 =>
-          rw [qq1] at q2
-          simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
-          omega
-      /- all_goals -/
-      /- · rw [qq1] at q2 -/
-      /-   simp only [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime, UInt32.size] at * -/
-      /-   -- Run `aesop` with semi-safe access to the `omega` tactic -/
-      /-   aesop (add 50% tactic (by omega)) -/
+  -- Cases on whether the lower limb led to a carry or not
+  cases q1 with
+  | inl qq1 =>
+      rw [qq1] at q2
+      simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+      omega
+  | inr qq1 =>
+      rw [qq1] at q2
+      simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+      omega
 
 end AddOperation
