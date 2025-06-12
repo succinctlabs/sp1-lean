@@ -14,8 +14,17 @@ inductive SP1Constraint where
   | sendAirInteraction_byte (op : ByteOpcode) (x y z : BabyBear) (mult : ℕ)
   -- TODO: other air interactions
 
+/-- TODO: shouldn't need to be manually synthesizing something like this. -/
 instance : DecidableEq SP1Constraint
-  | (SP1Constraint.assertZero x), (SP1Constraint.assertZero y) => sorry
+  | .assertZero _, .assertZero _ => by
+      simp
+      infer_instance
+  | .assertZero _, .sendAirInteraction_byte _ _ _ _ _ => by
+      simp
+      exact instDecidableFalse
+  | .sendAirInteraction_byte _ _ _ _ _, .assertZero _ => by
+      simp
+      exact instDecidableFalse
   | _, _ => sorry
 
 namespace SP1Constraint
