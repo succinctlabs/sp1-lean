@@ -8,7 +8,7 @@ namespace exp
 
 -- Simple experiment with StateM Int to prove consecutive reads are equivalent
 theorem simple_consecutive_reads :
-  (do let x ← StateT.get; let y ← StateT.get; pure (x, y) : StateM Int (Int × Int)) = 
+  (do let x ← StateT.get; let y ← StateT.get; pure (x, y) : StateM Int (Int × Int)) =
   (do let x ← StateT.get; pure (x, x) : StateM Int (Int × Int)) := by
   -- Work directly with function extensionality
   funext s
@@ -17,12 +17,12 @@ theorem simple_consecutive_reads :
 
 -- More general theorem about reads with no interfering operations
 theorem reads_with_pure_operations :
-  (do 
+  (do
     let x ← StateT.get
     let _ ← pure ()  -- Some pure operation that doesn't change state
     let y ← StateT.get
-    pure (x, y) : StateM Int (Int × Int)) = 
-  (do 
+    pure (x, y) : StateM Int (Int × Int)) =
+  (do
     let x ← StateT.get
     let _ ← pure ()
     pure (x, x) : StateM Int (Int × Int)) := by
@@ -31,9 +31,9 @@ theorem reads_with_pure_operations :
   rfl
 
 -- Simple working version of monadic substitution
-theorem simple_monadic_subst {α β : Type} {m : Type → Type} [Monad m] 
+theorem simple_monadic_subst {α β : Type} {m : Type → Type} [Monad m]
   (ma : m α) (f : α → β) (mb : m β)
-  (h : f <$> ma = mb) : 
+  (h : f <$> ma = mb) :
   (do let a ← ma; pure (f a)) = mb := by
   rw [← bind_pure_comp, ← map_bind, h]
 
@@ -59,7 +59,7 @@ end JalChip
 def sp1_jal
   (chip : JalChip)
   (constraints : chip.constraints)
-  (h_is_real : chip.is_real = U1.one)
+  (h_is_real : chip.is_real = 1)
   (rd : regidx)
   (imm : BitVec 21)
   (read_b : chip.adapter.read_jal_b_fun imm)
@@ -87,7 +87,7 @@ def runSuccessState {α : Type} (m : SailM α) (s : SequentialState RegisterType
 theorem sp1_jal_implies_spec_jal
   (chip : JalChip)
   (constraints : chip.constraints)
-  (h_is_real : chip.is_real = U1.one)
+  (h_is_real : chip.is_real = 1)
   (rd : regidx)
   (imm : BitVec 21)
   (read_b : chip.adapter.read_jal_b_fun imm)
@@ -109,17 +109,17 @@ theorem sp1_jal_implies_spec_jal
 
     simp [ext_control_check_pc]
     simp [get_next_pc, set_next_pc, bits_of_virtaddr]
-    
+
     -- Now use trusted_jmp to replace bit_to_bool expressions
     simp [trusted_jmp]
     -- Now a_1 should be replaced with false everywhere
-    
+
     -- -- Use read_b to substitute (a + sign_extend imm) with chip.adapter.b.toBV32_U16
     -- -- read_b tells us: (fun x ↦ x + sign_extend imm) <$> readReg Register.PC = pure chip.adapter.b.toBV32_U16
     -- -- This means: for the specific PC value `a`, we have (a + sign_extend imm) = chip.adapter.b.toBV32_U16
     -- -- Let's extract this equality and use it
     -- have h_pc_eq : (fun x ↦ x + sign_extend imm) <$> readReg Register.PC = pure chip.adapter.b.toBV32_U16 := read_b
-    -- 
+    --
     -- -- We need to show that the bind where we read PC and then add imm is equivalent to using b directly
     -- -- Let's try to use our monadic substitution lemma
     -- conv_rhs =>

@@ -8,7 +8,7 @@ namespace SubOperation
 /-- `SubOperation` should result in wrapping addition of the outputs.
 Note that we ignore `is_real` for now. -/
 def spec (cols : SubOperation) (a b : Word U16) (is_real : U1) : Prop :=
-  is_real = U1.one → a.toFin32_U16 - b.toFin32_U16 = cols.value.toFin32_U16
+  is_real = 1 → a.toFin32_U16 - b.toFin32_U16 = cols.value.toFin32_U16
 
 /-- Constraints on `SubOperation` as extracted from the source code:
 Asserting expr 3: `(is_real * (is_real - 1))`
@@ -54,12 +54,12 @@ theorem correct [Fact (Nat.Prime p)] (cols : SubOperation)
   simp [Word.toFin32_U16]
 
   -- Extract the range constraint in U16
-  let _ : a[0].val.val < 65536 := a[0].in_range
-  let _ : b[0].val.val < 65536 := b[0].in_range
-  let _ : a[1].val.val < 65536 := a[1].in_range
-  let _ : b[1].val.val < 65536 := b[1].in_range
-  let _ : cols.value[0].val.val < 65536 := cols.value[0].in_range
-  let _ : cols.value[1].val.val < 65536 := cols.value[1].in_range
+  let _ : a[0].val < 65536 := a[0].in_range
+  let _ : b[0].val < 65536 := b[0].in_range
+  let _ : a[1].val < 65536 := a[1].in_range
+  let _ : b[1].val < 65536 := b[1].in_range
+  let _ : cols.value[0].val < 65536 := cols.value[0].in_range
+  let _ : cols.value[1].val < 65536 := cols.value[1].in_range
 
   -- Split on whether the lower limb addition causes a carry
   cases h1 with | inl h1 => ?_ | inr h1 => ?_

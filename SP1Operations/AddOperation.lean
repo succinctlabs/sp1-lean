@@ -14,7 +14,7 @@ def spec
   (a : Word U16)
   (b : Word U16)
   (is_real : U1) : Prop :=
-    is_real = U1.one →
+    is_real = 1 →
     a.toBV32_U16 + b.toBV32_U16 = cols.value.toBV32_U16
 
 /- def constraints (cols : AddOperation) -/
@@ -66,12 +66,12 @@ theorem correct
       simp [sub_eq_zero, mul_eq_zero] at q1 q2
       simp [Word.toBV32_U16, BitVec.ofNatLT]
 
-      let i1 := a[0].in_u16_range
-      let i2 := a[1].in_u16_range
-      let i3 := b[0].in_u16_range
-      let i4 := b[1].in_u16_range
-      let i5 := cols.value[0].in_u16_range
-      let i6 := cols.value[1].in_u16_range
+      let i1 := a[0].in_range
+      let i2 := a[1].in_range
+      let i3 := b[0].in_range
+      let i4 := b[1].in_range
+      let i5 := cols.value[0].in_range
+      let i6 := cols.value[1].in_range
       simp [base] at i1 i2 i3 i4 i5 i6
 
       -- Cases on whether the lower limb led to a carry or not
@@ -80,7 +80,7 @@ theorem correct
           rw [qq1] at q2
           simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
           omega
-      | inr qq1 => 
+      | inr qq1 =>
           rw [qq1] at q2
           simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
           omega
