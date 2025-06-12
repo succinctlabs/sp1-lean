@@ -75,7 +75,7 @@ Receives: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb)
 
 -/
 
-def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = U1.one) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) : SailM Unit := do
+def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) : SailM Unit := do
     -- Model YOUR implementation's behavior
     writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
     /- let ⟨rs1_val, ⟨rs2_val, matching⟩⟩ ← chip.read rs1 rs2 -/
@@ -96,7 +96,7 @@ def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.
   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
   pure ()
 
-theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = U1.one) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
+theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
   let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c).run s
   let res_spec := (spec_add rd rs1 rs2).run s
   res = res_spec :=
