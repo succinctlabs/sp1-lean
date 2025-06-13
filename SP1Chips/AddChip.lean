@@ -40,39 +40,123 @@ def constraints
 end AddChip
 
 /-
+Constraints for chip Add (main):
+   Expr(0) = Main(22) - 1
+   Expr(2) = Main(22) * Expr(0)
+   Assert(Expr(2) == 0)
+   AddOperation(Word(Main(11), Main(12)), Word(Main(16), Main(17)), AddOperation { value: Word([IrVar(Main(20)), IrVar(Main(21))]) }, Main(22))
+   Expr(4) = Main(3) + 4
+   Expr(6) = 16384 * Main(1)
+   Expr(8) = Expr(6) + Main(2)
+   Expr(10) = Main(22) - 1
+   Expr(12) = Main(22) * Expr(10)
+   Assert(Expr(12) == 0)
+   Receive(multiplicity: Main(22), scope: Local, values: [Main(0), Expr(8), Main(3)])
+   Expr(14) = Expr(8) + 4
+   Send(multiplicity: Main(22), scope: Local, values: [Main(0), Expr(14), Expr(4)])
+   Send(multiplicity: Main(22), scope: Local, values: [6, Main(1), 14, 0])
+   Send(multiplicity: Main(22), scope: Local, values: [6, Main(2), 14, 0])
+   Expr(16) = 16384 * Main(1)
+   Expr(18) = Expr(16) + Main(2)
+   Expr(20) = Main(22) - 1
+   Expr(22) = Main(22) * Expr(20)
+   Assert(Expr(22) == 0)
+   Expr(24) = 0 + Main(10)
+   Expr(26) = 0 + Main(15)
+   Send(multiplicity: Main(22), scope: Local, values: [Main(3), 0, Main(4), Expr(24), 0, Expr(26), 0, Main(9), 0, 0])
+   Expr(28) = Main(20) - 0
+   Expr(30) = Main(9) * Expr(28)
+   Assert(Expr(30) == 0)
+   Expr(32) = Main(21) - 0
+   Expr(34) = Main(9) * Expr(32)
+   Assert(Expr(34) == 0)
+   Expr(36) = Expr(18) + 3
+   Expr(38) = Main(22) - 1
+   Expr(40) = Main(22) * Expr(38)
+   Assert(Expr(40) == 0)
+   Expr(42) = Expr(36) - Main(7)
+   Expr(44) = Expr(42) - 1
+   Expr(46) = Expr(44) - Main(8)
+   Expr(48) = Expr(46) * 2013143041
+   Send(multiplicity: Main(22), scope: Local, values: [6, Main(8), 14, 0])
+   Send(multiplicity: Main(22), scope: Local, values: [6, Expr(48), 14, 0])
+   Send(multiplicity: Main(22), scope: Local, values: [Main(0), Main(7), Main(4), Main(5), Main(6)])
+   Receive(multiplicity: Main(22), scope: Local, values: [Main(0), Expr(36), Main(4), Main(20), Main(21)])
+   Expr(50) = Expr(18) + 2
+   Expr(52) = Main(22) - 1
+   Expr(54) = Main(22) * Expr(52)
+   Assert(Expr(54) == 0)
+   Expr(56) = Expr(50) - Main(13)
+   Expr(58) = Expr(56) - 1
+   Expr(60) = Expr(58) - Main(14)
+   Expr(62) = Expr(60) * 2013143041
+   Send(multiplicity: Main(22), scope: Local, values: [6, Main(14), 14, 0])
+   Send(multiplicity: Main(22), scope: Local, values: [6, Expr(62), 14, 0])
+   Send(multiplicity: Main(22), scope: Local, values: [Main(0), Main(13), Main(10), Main(11), Main(12)])
+   Receive(multiplicity: Main(22), scope: Local, values: [Main(0), Expr(50), Main(10), Main(11), Main(12)])
+   Expr(64) = Expr(18) + 1
+   Expr(66) = Main(22) - 1
+   Expr(68) = Main(22) * Expr(66)
+   Assert(Expr(68) == 0)
+   Expr(70) = Expr(64) - Main(18)
+   Expr(72) = Expr(70) - 1
+   Expr(74) = Expr(72) - Main(19)
+   Expr(76) = Expr(74) * 2013143041
+   Send(multiplicity: Main(22), scope: Local, values: [6, Main(19), 14, 0])
+   Send(multiplicity: Main(22), scope: Local, values: [6, Expr(76), 14, 0])
+   Send(multiplicity: Main(22), scope: Local, values: [Main(0), Main(18), Main(15), Main(16), Main(17)])
+   Receive(multiplicity: Main(22), scope: Local, values: [Main(0), Expr(64), Main(15), Main(16), Main(17)])
 
-Asserting expr 3: `(is_real * (is_real - 1))`
-Asserting expr 3: `(is_real * (is_real - 1))`
-Asserting expr 15: `(is_real * (((((adapter.op_b_memory.prev_value[0] + adapter.op_c_memory.prev_value[0]) - add_operation.value[0]) + 0) * 2013235201) * (((((adapter.op_b_memory.prev_value[0] + adapter.op_c_memory.prev_value[0]) - add_operation.value[0]) + 0) * 2013235201) - 1)))`
-Asserting expr 25: `(is_real * (((((adapter.op_b_memory.prev_value[1] + adapter.op_c_memory.prev_value[1]) - add_operation.value[1]) + ((((adapter.op_b_memory.prev_value[0] + adapter.op_c_memory.prev_value[0]) - add_operation.value[0]) + 0) * 2013235201)) * 2013235201) * (((((adapter.op_b_memory.prev_value[1] + adapter.op_c_memory.prev_value[1]) - add_operation.value[1]) + ((((adapter.op_b_memory.prev_value[0] + adapter.op_c_memory.prev_value[0]) - add_operation.value[0]) + 0) * 2013235201)) * 2013235201) - 1)))`
-Asserting expr 3: `(is_real * (is_real - 1))`
-Asserting expr 3: `(is_real * (is_real - 1))`
-Asserting expr 46: `(adapter.op_a_0 * (add_operation.value[0] - 0))`
-Asserting expr 48: `(adapter.op_a_0 * (add_operation.value[1] - 0))`
-Asserting expr 3: `(is_real * (is_real - 1))`
-Asserting expr 3: `(is_real * (is_real - 1))`
-Asserting expr 3: `(is_real * (is_real - 1))`
-Sends: AirInteraction { values: [6, add_operation.value[0], 16, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [6, add_operation.value[1], 16, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb) + state.clk_low_limb) + 4), (state.pc + 4)], multiplicity: is_real, kind: State }
-Sends: AirInteraction { values: [6, state.clk_high_limb, 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [6, state.clk_low_limb, 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [state.pc, 0, adapter.op_a, (0 + adapter.op_b), 0, (0 + adapter.op_c), 0, adapter.op_a_0, 0, 0], multiplicity: is_real, kind: Program }
-Sends: AirInteraction { values: [6, adapter.op_a_memory.access_timestamp.diff_low_limb, 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [6, (((((((16384 * state.clk_high_limb) + state.clk_low_limb) + 3) - adapter.op_a_memory.access_timestamp.prev_clk) - 1) - adapter.op_a_memory.access_timestamp.diff_low_limb) * 2013143041), 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [state.shard, adapter.op_a_memory.access_timestamp.prev_clk, adapter.op_a, adapter.op_a_memory.prev_value[0], adapter.op_a_memory.prev_value[1]], multiplicity: is_real, kind: Memory }
-Sends: AirInteraction { values: [6, adapter.op_b_memory.access_timestamp.diff_low_limb, 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [6, (((((((16384 * state.clk_high_limb) + state.clk_low_limb) + 2) - adapter.op_b_memory.access_timestamp.prev_clk) - 1) - adapter.op_b_memory.access_timestamp.diff_low_limb) * 2013143041), 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [state.shard, adapter.op_b_memory.access_timestamp.prev_clk, adapter.op_b, adapter.op_b_memory.prev_value[0], adapter.op_b_memory.prev_value[1]], multiplicity: is_real, kind: Memory }
-Sends: AirInteraction { values: [6, adapter.op_c_memory.access_timestamp.diff_low_limb, 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [6, (((((((16384 * state.clk_high_limb) + state.clk_low_limb) + 1) - adapter.op_c_memory.access_timestamp.prev_clk) - 1) - adapter.op_c_memory.access_timestamp.diff_low_limb) * 2013143041), 14, 0], multiplicity: is_real, kind: Byte }
-Sends: AirInteraction { values: [state.shard, adapter.op_c_memory.access_timestamp.prev_clk, adapter.op_c, adapter.op_c_memory.prev_value[0], adapter.op_c_memory.prev_value[1]], multiplicity: is_real, kind: Memory }
-Receives: AirInteraction { values: [state.shard, ((16384 * state.clk_high_limb) + state.clk_low_limb), state.pc], multiplicity: is_real, kind: State }
-Receives: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb) + state.clk_low_limb) + 3), adapter.op_a, add_operation.value[0], add_operation.value[1]], multiplicity: is_real, kind: Memory }
-Receives: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb) + state.clk_low_limb) + 2), adapter.op_b, adapter.op_b_memory.prev_value[0], adapter.op_b_memory.prev_value[1]], multiplicity: is_real, kind: Memory }
-Receives: AirInteraction { values: [state.shard, (((16384 * state.clk_high_limb) + state.clk_low_limb) + 1), adapter.op_c, adapter.op_c_memory.prev_value[0], adapter.op_c_memory.prev_value[1]], multiplicity: is_real, kind: Memory }
+AddOperation
+Func(AddOperation(Word(Input(0), Input(1)), Word(Input(2), Input(3)), AddOperation { value: Word([IrVar(InputArg(4)), IrVar(InputArg(5))]) }, Input(6))
+)
+{
+    Expr(0) = Input(6) - 1
+    Expr(2) = Input(6) * Expr(0)
+    Assert(Expr(2) == 0)
+    Expr(4) = Input(0) + Input(2)
+    Expr(6) = Expr(4) - Input(4)
+    Expr(8) = Expr(6) + 0
+    Expr(10) = Expr(8) * 2013235201
+    Expr(12) = Expr(10) - 1
+    Expr(14) = Expr(10) * Expr(12)
+    Expr(16) = Input(6) * Expr(14)
+    Assert(Expr(16) == 0)
+    Expr(18) = Input(1) + Input(3)
+    Expr(20) = Expr(18) - Input(5)
+    Expr(22) = Expr(20) + Expr(10)
+    Expr(24) = Expr(22) * 2013235201
+    Expr(26) = Expr(24) - 1
+    Expr(28) = Expr(24) * Expr(26)
+    Expr(30) = Input(6) * Expr(28)
+    Assert(Expr(30) == 0)
+    Send(multiplicity: Input(6), scope: Local, values: [6, Input(4), 16, 0])
+    Send(multiplicity: Input(6), scope: Local, values: [6, Input(5), 16, 0])
+}
 
-
+{
+    let Expr(0) := Input(6) - 1
+    Expr(2) = Input(6) * Expr(0)
+    .AssertZero(Expr(2) == 0)
+    let Expr(4) := Input(0) + Input(2)
+    Expr(6) = Expr(4) - Input(4)
+    Expr(8) = Expr(6) + 0
+    Expr(10) = Expr(8) * 2013235201
+    Expr(12) = Expr(10) - 1
+    Expr(14) = Expr(10) * Expr(12)
+    Expr(16) = Input(6) * Expr(14)
+    Assert(Expr(16) == 0)
+    Expr(18) = Input(1) + Input(3)
+    Expr(20) = Expr(18) - Input(5)
+    Expr(22) = Expr(20) + Expr(10)
+    Expr(24) = Expr(22) * 2013235201
+    Expr(26) = Expr(24) - 1
+    Expr(28) = Expr(24) * Expr(26)
+    Expr(30) = Input(6) * Expr(28)
+    Assert(Expr(30) == 0)
+    Send(multiplicity: Input(6), scope: Local, values: [6, Input(4), 16, 0])
+    Send(multiplicity: Input(6), scope: Local, values: [6, Input(5), 16, 0])
+}
 -/
 
 def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) : SailM Unit := do
@@ -103,6 +187,26 @@ theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraint
   by
     simp [EStateM.run]
     simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
+    let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
+    simp [RTypeReader.read_b_fun] at read_b
+    rw [read_b]
+    simp [RTypeReader.read_c_fun] at read_c
+    rw [read_c]
+    rw [←add_spec]
+    rw [pure_bind, pure_bind]
+    rfl
+
+theorem sp1_add_implies_spec_add' (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx)
+    (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) :
+  let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c)
+  let res_spec := (spec_add rd rs1 rs2)
+  res = res_spec :=
+  by
+    refine EStateM.ext fun s => ?_
+    simp [EStateM.run]
+
+    simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
+
     let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
     simp [RTypeReader.read_b_fun] at read_b
     rw [read_b]

@@ -37,7 +37,7 @@ lemma extractedConstraints_iff_idealizedConstraints
   simp [extractedConstraints, idealizedConstraints, base, baseInv, or_assoc]
 
 /-- The extracted constraints on `SubOperation` imply the spec. -/
-theorem correct [Fact (Nat.Prime p)] (cols : SubOperation)
+theorem correct (cols : SubOperation)
     (a b : Word U16) (is_real : U1) :
     cols.idealizedConstraints a b is_real → cols.spec a b is_real := by
   -- Unfold the definitions of constraints and spec
@@ -67,7 +67,7 @@ theorem correct [Fact (Nat.Prime p)] (cols : SubOperation)
 
   all_goals -- In both cases can now reduce down to the `omega` linear constraint solver
   · rw [h1] at h2
-    simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff, p, Word.toNat, Word.isUInt32] at *
+    simp only [Fin.add_def, Fin.sub_def, Fin.ext_iff, Word.toNat, Word.isUInt32] at *
     simp [BabyBearPrime] at *
     omega
 

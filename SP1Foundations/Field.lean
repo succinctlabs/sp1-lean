@@ -1,7 +1,6 @@
 import Mathlib
 
-abbrev BabyBearPrime : ℕ := 2013265921
-abbrev p : ℕ := 2013265921 -- temp
+@[simp] abbrev BabyBearPrime : ℕ := 2013265921
 
 lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by
   -- norm_num doesn't work on OSX?
@@ -19,15 +18,9 @@ instance Fin.noZeroDivisors_of_prime (p : ℕ)
   simp [ZMod] at this
   sorry
 
-lemma fin_val_simp' {n : ℕ} :
-    (@Fin.val BabyBearPrime (@OfNat.ofNat.{0} BabyBear n (@Fin.instOfNat BabyBearPrime instNeZeroNatBabyBearPrime n))) = n % BabyBearPrime := rfl
-
-lemma fin_val_simp {n : ℕ} (Hlt : n < BabyBearPrime) :
-  (@Fin.val BabyBearPrime (@OfNat.ofNat.{0} BabyBear n (@Fin.instOfNat BabyBearPrime instNeZeroNatBabyBearPrime n))) = n := by
-  simp [BabyBearPrime, OfNat.ofNat] at *; assumption
-
 namespace BabyBear
 
+@[aesop 50% forward]
 lemma lt_babyBearPrime (x : BabyBear) : x.val < BabyBearPrime := x.2
 
 instance : Field BabyBear := ZMod.instField BabyBearPrime
@@ -38,10 +31,9 @@ lemma eq_one_iff_val_eq_one (x : BabyBear) : x = 1 ↔ x.val = 1 := by aesop
 
 lemma eq_zero_iff_val_eq_zero (x : BabyBear) : x = 0 ↔ x.val = 0 := by aesop
 
+@[simp] lemma val_16 : ((16 : BabyBear) : ℕ) = 16 := rfl
 @[simp] lemma val_256 : ((256 : BabyBear) : ℕ) = 256 := rfl
-
 @[simp] lemma val_32768 : ((32768 : BabyBear) : ℕ) = 32768 := rfl
-
 @[simp] lemma val_65536 : ((65536 : BabyBear) : ℕ) = 65536 := rfl
 
 end const_vals
