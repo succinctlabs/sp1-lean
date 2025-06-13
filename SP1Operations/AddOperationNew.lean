@@ -83,7 +83,7 @@ def AddOperationSpec
   (Input6 = 0 ∨ Input6 = 1) ∧
   (Input6 ≠ 0 → (
     (Input4.val < 65536) ∧ (Input5.val < 65536) ∧
-    (Input0.val + Input1.val * 65536 + Input2.val + Input3.val * 65536) % 4294967296 = (Input4.val + Input5.val * 65536)
+    ((Input0.val + Input1.val * 65536) + (Input2.val + Input3.val * 65536)) % 4294967296 = (Input4.val + Input5.val * 65536)
   ))
 
 theorem AddOperationSpec_of_AddOperationConstraintSet
@@ -134,7 +134,20 @@ protected lemma lt_of_constraintSet'
 
 open BitVec
 
-lemma bitvecAdd_of_addOperationConstraintSet
+/-- Version that doesn't auto-synthesize the proof (allowing reverse `rw` but being annoying forward).
+Similar issue as `ENNReal.tsum_prod` vs `ENNReal.tsum_prod'`-/
+lemma bitVecAdd_of_addOperationConstraintSet'
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) (pf : Input4.val + Input5.val * 65536 < 2^32) :
+    (BitVec.ofU16 Input0 Input1) + (BitVec.ofU16 Input2 Input3) =
+        (Input4.val + Input5.val * 65536)#'pf := by
+  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
+  simp [BitVec.ofU16]
+  rw [← BitVec.toNat_inj, BitVec.toNat_add]
+  simp [BitVec.toNat_ofNatLT]
+  exact this.2.2
+
+lemma bitVecAdd_of_addOperationConstraintSet
     (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
     (h' : Input6 ≠ 0) :
     have pf : Input4.val + Input5.val * 65536 < 2^32 := by
@@ -143,13 +156,7 @@ lemma bitvecAdd_of_addOperationConstraintSet
       omega
     (BitVec.ofU16 Input0 Input1) + (BitVec.ofU16 Input2 Input3) =
       (Input4.val + Input5.val * 65536)#'pf := by
-  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
-  simp [BitVec.ofU16]
-  rw [← BitVec.toNat_inj]
-  rw [BitVec.toNat_add]
-  rw [BitVec.toNat_ofNatLT, BitVec.toNat_ofNatLT, BitVec.toNat_ofNatLT]
-  rw [← this.2.2]
-  simp [add_assoc]
+  exact bitVecAdd_of_addOperationConstraintSet' h h' _
 
 end corollary
 
