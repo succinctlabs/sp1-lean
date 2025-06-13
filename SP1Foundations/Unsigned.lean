@@ -7,6 +7,8 @@ structure BoundedBabyBear (bound : ℕ) extends BabyBear where
 
 namespace BoundedBabyBear
 
+@[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := sorry
+
 def ofNat (bound_dec x : ℕ) : BoundedBabyBear bound_dec.succ where
   val := (x % bound_dec.succ) % BabyBearPrime
   isLt := Nat.mod_lt _ Nat.succ_pos'
@@ -32,14 +34,18 @@ def coe_of_le {bound bound' : ℕ} (h : bound ≤ bound') :
 
 variable {bound : ℕ}
 
-@[ext] lemma ext {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := by
-  sorry
+@[aesop 50% forward]
+lemma lt_babyBearPrime (x : BoundedBabyBear bound) : x.val < BabyBearPrime := Fin.is_lt _
 
 instance : Inhabited (BoundedBabyBear bound.succ) where default := 0
-
 lemma default_eq_zero : (default : BoundedBabyBear bound.succ) = 0 := rfl
 
 section toFin
+
+-- /-- Convert a `BoundedBabyBear` to a `BabyBear` by forgetting the bound. -/
+-- @[simp] alias toBabyBear := BoundedBabyBear.toFin
+
+-- lemma toBabyBear_def (x : BoundedBabyBear bound) : x.toBabyBear = x.toFin := rfl
 
 @[simp] lemma toFin_zero : (0 : BoundedBabyBear bound.succ).toFin = 0 := rfl
 @[simp] lemma toFin_one : (1 : BoundedBabyBear bound.succ.succ).toFin = 1 := rfl
@@ -48,31 +54,29 @@ lemma toFin_inj (x y : BoundedBabyBear bound) : x.toFin = y.toFin ↔ x = y := b
   refine ⟨fun h => ?_, fun h => h ▸ rfl⟩
   rwa [BoundedBabyBear.ext_iff, ← Fin.ext_iff]
 
+lemma injective_toFin : Function.Injective (BoundedBabyBear.toFin : BoundedBabyBear bound → BabyBear) :=
+  fun x y h => (toFin_inj x y).1 h
+
 lemma toFin_eq_iff (x : BoundedBabyBear bound) (y : Fin BabyBearPrime) : x.toFin = y ↔ x.val = y.val := by
   erw [Fin.ext_iff]
 
 end toFin
 
-section toBabyBear
+-- section toBabyBear
 
-/-- Convert a `BoundedBabyBear` to a `BabyBear` by forgetting the bound. -/
-@[simp] alias toBabyBear := BoundedBabyBear.toFin
+-- lemma toBabyBear_zero : (0 : BoundedBabyBear bound.succ).toBabyBear = 0 := rfl
+-- lemma toBabyBear_one : (1 : BoundedBabyBear bound.succ.succ).toBabyBear = 1 := rfl
 
-lemma toBabyBear_def (x : BoundedBabyBear bound) : x.toBabyBear = x.toFin := rfl
+-- lemma val_toBabyBear (x : BoundedBabyBear bound) : (x.toBabyBear : ℕ) = x.val := rfl
 
-lemma toBabyBear_zero : (0 : BoundedBabyBear bound.succ).toBabyBear = 0 := rfl
-lemma toBabyBear_one : (1 : BoundedBabyBear bound.succ.succ).toBabyBear = 1 := rfl
+-- lemma toBabyBear_inj (x y : BoundedBabyBear bound) : toBabyBear x = toBabyBear y ↔ x = y := by
+--   simp [toBabyBear, toFin_inj]
 
-lemma val_toBabyBear (x : BoundedBabyBear bound) : (x.toBabyBear : ℕ) = x.val := rfl
+-- lemma injective_toBabyBear :
+--     Function.Injective (toBabyBear : BoundedBabyBear bound → BabyBear) :=
+--   fun x y h => (toBabyBear_inj x y).1 h
 
-lemma toBabyBear_inj (x y : BoundedBabyBear bound) : toBabyBear x = toBabyBear y ↔ x = y := by
-  simp [toBabyBear, toFin_inj]
-
-lemma injective_toBabyBear :
-    Function.Injective (toBabyBear : BoundedBabyBear bound → BabyBear) :=
-  fun x y h => (toBabyBear_inj x y).1 h
-
-end toBabyBear
+-- end toBabyBear
 
 lemma eq_zero_iff (x : BoundedBabyBear bound.succ) : x = 0 ↔ x.val = 0 := by aesop
 
@@ -82,7 +86,7 @@ section LinearOrder
 
 /-- Lift the linear order on the underlying field to `BoundedBabyBear`. -/
 instance : LinearOrder (BoundedBabyBear bound) :=
-  LinearOrder.lift' BoundedBabyBear.toBabyBear injective_toBabyBear
+  LinearOrder.lift' BoundedBabyBear.toFin injective_toFin
 
 @[simp] lemma lt_iff_val_lt_val (x y : BoundedBabyBear bound) :
     x < y ↔ x.val < y.val := Iff.rfl
@@ -94,14 +98,13 @@ end LinearOrder
 
 end BoundedBabyBear
 
-abbrev U32 := BoundedBabyBear 4294967296
 abbrev U16 := BoundedBabyBear 65536
 abbrev U8 := BoundedBabyBear 256
 abbrev U1 := BoundedBabyBear 2
 
-instance : Coe U16 BabyBear where coe := BoundedBabyBear.toBabyBear
-instance : Coe U8 BabyBear where coe := BoundedBabyBear.toBabyBear
-instance : Coe U1 BabyBear where coe := BoundedBabyBear.toBabyBear
+instance : Coe U16 BabyBear where coe := BoundedBabyBear.toFin
+instance : Coe U8 BabyBear where coe := BoundedBabyBear.toFin
+instance : Coe U1 BabyBear where coe := BoundedBabyBear.toFin
 
 instance : Coe U1 U8 := BoundedBabyBear.coe_of_le <| by omega
 instance : Coe U8 U16 := BoundedBabyBear.coe_of_le <| by omega
@@ -112,3 +115,14 @@ def U1.in_range' (x : U1) : x.val = 0 ∨ x.val = 1 := by
 def U1.in_range'' (x : U1) : x = 0 ∨ x = 1 := by
   have := x.in_range'
   aesop
+
+@[aesop 50% forward]
+lemma U16.lt_bound (x : U16) : x.val < 65536 := x.in_range
+
+@[aesop 50% forward]
+lemma U8.lt_bound (x : U8) : x.val < 256 := x.in_range
+
+open BitVec
+
+def BitVec.ofU16 (low_limb high_limb : U16) : BitVec 32 :=
+  (low_limb.val + high_limb.val * 65536)#'(by aesop (add 50% tactic (by omega)))

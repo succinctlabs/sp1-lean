@@ -1,6 +1,9 @@
 import SP1Foundations
 
-/-- Representation of these extracted constraints:
+-- Probably good to still namespace things
+namespace AddOperation
+
+/-- Representation of extracted constraints:
 {
     Expr(0) = Input(6) - 1
     Expr(2) = Input(6) * Expr(0)
@@ -51,59 +54,100 @@ def AddOperationConstraints
     .sendAirInteraction_byte (.ofNat 6) Input5 16 0 Input6
   }
 
-/- Nicer description of the above constraints. -/
-def AddOperationConstraints'
+/- Nicer description of contraints in terms of a proposition. -/
+def AddOperationConstraintProp
     (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear) : Prop :=
   let carry0 : BabyBear := 0
   let carry1 : BabyBear := (Input0 + Input2 - Input4 + carry0) * (baseInv : BabyBear)
   let carry2 : BabyBear := (Input1 + Input3 - Input5 + carry1) * (baseInv : BabyBear)
-  (Input6 * (Input6 - 1)) = 0 ∧
-  (Input6 * carry1 * (carry1 - 1)) = 0 ∧
-  (Input6 * carry2 * (carry2 - 1)) = 0 ∧
-  (Input6 ≠ 0 → Input4 < 65536) ∧
-  (Input6 ≠ 0 → Input5 < 65536)
+  Input6 = 0 ∨ (
+    Input6 = 1 ∧
+    (carry1 = 0 ∨ carry1 = 1) ∧
+    (carry2 = 0 ∨ carry2 = 1) ∧
+    (Input4.val < 65536) ∧
+    (Input5.val < 65536)
+  )
 
-/-- Equivalence between the two versions of constraints. -/
+/-- Equivalence between the two versions of the constraints. -/
 lemma AddOperationConstraints_iff
     (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear) :
     constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6) ↔
-      AddOperationConstraints' Input0 Input1 Input2 Input3 Input4 Input5 Input6 := by
-  simp [AddOperationConstraints, AddOperationConstraints', sub_eq_zero, ByteOpcode.constrain]
-  intro h
-  cases h with
-  | inl h => simp [h]
-  | inr h => simp [h]
+      AddOperationConstraintProp Input0 Input1 Input2 Input3 Input4 Input5 Input6 := by
+  simp [AddOperationConstraints, AddOperationConstraintProp, ByteOpcode.constrain, sub_eq_zero]
+  tauto
 
-def BabyBear.U32_of_U16_of_U16 (x y : U16) : ℕ := x.val + y.val * 65536
-
-/-- Expected behavior of the add operation. -/
+/-- Expected behavior of the add operation. Note that we assume first inputs are `U16` -/
 def AddOperationSpec
     (Input0 Input1 Input2 Input3 : U16)
     (Input4 Input5 Input6 : BabyBear) : Prop :=
-  Input6 ≠ 0 → (Input0.val + Input1.val * 65536 + Input2.val + Input3.val * 65536) % 4294967296 = (Input4.val + Input5.val * 65536)
+  (Input6 = 0 ∨ Input6 = 1) ∧
+  (Input6 ≠ 0 → (
+    (Input4.val < 65536) ∧ (Input5.val < 65536) ∧
+    (Input0.val + Input1.val * 65536 + Input2.val + Input3.val * 65536) % 4294967296 = (Input4.val + Input5.val * 65536)
+  ))
 
-theorem AddOperationCorrect
-    (Input0 Input1 Input2 Input3 : U16)
-    (Input4 Input5 Input6 : BabyBear) :
-    constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6) →
-      AddOperationSpec Input0 Input1 Input2 Input3 Input4 Input5 Input6 := by
-  rw [AddOperationConstraints_iff, AddOperationConstraints']
-  intro h h_is_real
-  simp [h_is_real, sub_eq_zero] at h
+theorem AddOperationSpec_of_AddOperationConstraintSet
+    (Input0 Input1 Input2 Input3 : U16) (Input4 Input5 Input6 : BabyBear)
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6)) :
+    AddOperationSpec Input0 Input1 Input2 Input3 Input4 Input5 Input6 := by
+  rw [AddOperationConstraints_iff, AddOperationConstraintProp] at h
+  -- Handle the case that `is_real` is `0`
+  cases h with | inl h => simp [AddOperationSpec, h] | inr h => ?_
+  -- Handle the trivial proofs about bounding ranges
+  simp [sub_eq_zero] at h
   obtain ⟨h6, hcarry1, hcarry2, ⟨h4, h5⟩⟩ := h
-  rw [Fin.lt_iff_val_lt_val, BabyBear.val_65536] at h4 h5
-  have _ : Input0.val < 65536 := Input0.in_range
-  have _ : Input1.val < 65536 := Input1.in_range
-  have _ : Input2.val < 65536 := Input2.in_range
-  have _ : Input3.val < 65536 := Input3.in_range
+  refine ⟨Or.inr h6, fun h6' => ⟨h4, h5, ?_⟩⟩
+  -- Split cases depending if the lower limb addition caused a carry
   cases hcarry1 with
   | inl hcarry1 =>
+    -- Substitute the value of the carry
     rw [hcarry1] at hcarry2
-    simp [Fin.mul_def, Fin.sub_def, Fin.add_def, BabyBearPrime] at *
+    -- Simplify the definition of field arithmetic
+    simp [Fin.mul_def, Fin.sub_def, Fin.add_def] at *
+    -- Simplify the two new carry expressions
     simp [Fin.ext_iff] at hcarry1 hcarry2
-    omega
+    -- Aesop can solve now with help from omega
+    aesop (add 50% tactic (by omega))
   | inr hcarry1 =>
     rw [hcarry1] at hcarry2
     simp [Fin.mul_def, Fin.sub_def, Fin.add_def, BabyBearPrime] at *
     simp [Fin.ext_iff] at hcarry1 hcarry2
-    omega
+    aesop (add 50% tactic (by omega))
+
+section corollary
+
+variable {Input0 Input1 Input2 Input3 : U16} {Input4 Input5 Input6 : BabyBear}
+
+@[aesop unsafe forward]
+protected lemma lt_of_constraintSet
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) : Input4.val < 65536 := by
+  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
+  tauto
+
+@[aesop unsafe forward]
+protected lemma lt_of_constraintSet'
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) : Input5.val < 65536 := by
+  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
+  tauto
+
+open BitVec
+
+lemma bitvecAdd_of_addOperationConstraintSet
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) :
+    have pf : Input4.val + Input5.val * 65536 < 2^32 := by
+      have := AddOperation.lt_of_constraintSet h h'
+      have := AddOperation.lt_of_constraintSet' h h'
+      omega
+    (BitVec.ofU16 Input0 Input1) + (BitVec.ofU16 Input2 Input3) =
+      (Input4.val + Input5.val * 65536)#'pf := by
+  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
+  simp [BitVec.ofU16]
+  rw [← BitVec.toNat_inj]
+  sorry
+
+end corollary
+
+end AddOperation

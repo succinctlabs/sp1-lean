@@ -25,7 +25,7 @@ def constrain (op : ByteOpcode) (c a b : BabyBear) : Prop :=
   | AND => c = a &&& b
   | OR => c = a ||| b
   | XOR => c = a ^^^ b
-  | Range => c < 2^a.val
+  | Range => c < 2 ^ a.val -- Is this right?
   | _ => false -- TODO
 
 @[simp] lemma constrain_AND (c a b : BabyBear) :
@@ -36,5 +36,8 @@ def constrain (op : ByteOpcode) (c a b : BabyBear) : Prop :=
 
 @[simp] lemma constrain_XOR (c a b : BabyBear) :
     XOR.constrain c a b ↔ (c = a ^^^ b) := Iff.rfl
+
+@[simp] lemma constrain_Range (c a b : BabyBear) :
+    Range.constrain c a b ↔ (c < 2 ^ a.val) := Iff.rfl
 
 end ByteOpcode
