@@ -25,6 +25,7 @@ def constrain (op : ByteOpcode) (c a b : BabyBear) : Prop :=
   | AND => c = a &&& b
   | OR => c = a ||| b
   | XOR => c = a ^^^ b
+  | Range => c < 2^a.val
   | _ => false -- TODO
 
 @[simp] lemma constrain_AND (c a b : BabyBear) :
