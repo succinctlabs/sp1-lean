@@ -91,6 +91,7 @@ theorem AddOperationCorrect
   intro h h_is_real
   simp [h_is_real, sub_eq_zero] at h
   obtain ⟨h6, hcarry1, hcarry2, ⟨h4, h5⟩⟩ := h
+  rw [Fin.lt_iff_val_lt_val, BabyBear.val_65536] at h4 h5
   have _ : Input0.val < 65536 := Input0.in_range
   have _ : Input1.val < 65536 := Input1.in_range
   have _ : Input2.val < 65536 := Input2.in_range
@@ -98,15 +99,11 @@ theorem AddOperationCorrect
   cases hcarry1 with
   | inl hcarry1 =>
     rw [hcarry1] at hcarry2
-    simp at *
     simp [Fin.mul_def, Fin.sub_def, Fin.add_def, BabyBearPrime] at *
     simp [Fin.ext_iff] at hcarry1 hcarry2
-    rw [Fin.lt_iff_val_lt_val, BabyBear.val_65536] at h4 h5
     omega
   | inr hcarry1 =>
     rw [hcarry1] at hcarry2
-    simp at *
     simp [Fin.mul_def, Fin.sub_def, Fin.add_def, BabyBearPrime] at *
     simp [Fin.ext_iff] at hcarry1 hcarry2
-    rw [Fin.lt_iff_val_lt_val, BabyBear.val_65536] at h4 h5
     omega
