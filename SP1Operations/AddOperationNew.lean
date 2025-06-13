@@ -146,7 +146,10 @@ lemma bitvecAdd_of_addOperationConstraintSet
   have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
   simp [BitVec.ofU16]
   rw [← BitVec.toNat_inj]
-  sorry
+  rw [BitVec.toNat_add]
+  rw [BitVec.toNat_ofNatLT, BitVec.toNat_ofNatLT, BitVec.toNat_ofNatLT]
+  rw [← this.2.2]
+  simp [add_assoc]
 
 end corollary
 
