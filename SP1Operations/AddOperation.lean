@@ -1,79 +1,163 @@
 import SP1Foundations
 
--- AddOperaton is not parameterized by a type `T` with `value` being `Word T`
--- because AddOperation is used only under the assumption that its input and
--- output limbs are all U16s.
--- @[aesop safe cases]
-structure AddOperation where
-  value : Word U16
-
+-- Probably good to still namespace things
 namespace AddOperation
 
-@[simp] lemma value_mk (value : Word U16) : (AddOperation.mk value).value = value := rfl
-
-def spec
-  (cols : AddOperation)
-  (a : Word U16)
-  (b : Word U16)
-  (is_real : U1) : Prop :=
-    is_real = 1 →
-    a.toBV32_U16 + b.toBV32_U16 = cols.value.toBV32_U16
-
-def constraints (cols : AddOperation)
-    (a b : Word U16) (is_real : U1) : Finset SP1Constraint :=
+/-- Representation of extracted constraints:
+{
+    Expr(0) = Input(6) - 1
+    Expr(2) = Input(6) * Expr(0)
+    Expr(4) = Input(0) + Input(2)
+    Expr(6) = Expr(4) - Input(4)
+    Expr(8) = Expr(6) + 0
+    Expr(10) = Expr(8) * 2013235201
+    Expr(12) = Expr(10) - 1
+    Expr(14) = Expr(10) * Expr(12)
+    Expr(16) = Input(6) * Expr(14)
+    Expr(18) = Input(1) + Input(3)
+    Expr(20) = Expr(18) - Input(5)
+    Expr(22) = Expr(20) + Expr(10)
+    Expr(24) = Expr(22) * 2013235201
+    Expr(26) = Expr(24) - 1
+    Expr(28) = Expr(24) * Expr(26)
+    Expr(30) = Input(6) * Expr(28)
+    Assert(Expr(2) == 0)
+    Assert(Expr(16) == 0)
+    Assert(Expr(30) == 0)
+    Send(multiplicity: Input(6), scope: Local, values: [6, Input(4), 16, 0])
+    Send(multiplicity: Input(6), scope: Local, values: [6, Input(5), 16, 0])
+}
+-/
+def AddOperationConstraints
+    (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear) : Finset SP1Constraint :=
+  let Expr0 := Input6 - 1
+  let Expr2 := Input6 * Expr0
+  let Expr4 := Input0 + Input2
+  let Expr6 := Expr4 - Input4
+  let Expr8 := Expr6 + 0
+  let Expr10 := Expr8 * 2013235201
+  let Expr12 := Expr10 - 1
+  let Expr14 := Expr10 * Expr12
+  let Expr16 := Input6 * Expr14
+  let Expr18 := Input1 + Input3
+  let Expr20 := Expr18 - Input5
+  let Expr22 := Expr20 + Expr10
+  let Expr24 := Expr22 * 2013235201
+  let Expr26 := Expr24 - 1
+  let Expr28 := Expr24 * Expr26
+  let Expr30 := Input6 * Expr28
   {
-     .assertZero (is_real * ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear)) * (((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201) - 1)),
-     .assertZero (is_real * ((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + (0 : BabyBear)) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((a[1] + b[1]) - cols.value[1]) + ((((a[0] + b[0]) - cols.value[0]) + 0) * 2013235201)) * 2013235201) - 1))
+    .assertZero Expr2,
+    .assertZero Expr16,
+    .assertZero Expr30,
+    .sendAirInteraction_byte (.ofNat 6) Input4 16 0 Input6,
+    .sendAirInteraction_byte (.ofNat 6) Input5 16 0 Input6
   }
 
-def constraints'
-    (cols : AddOperation)
-    (a : Word U16)
-    (b : Word U16)
-    (is_real : U1): Prop :=
+/- Nicer description of contraints in terms of a proposition. -/
+def AddOperationConstraintProp
+    (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear) : Prop :=
   let carry0 : BabyBear := 0
-  let carry1 : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * (baseInv : BabyBear)
-  let carry2 : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * (baseInv : BabyBear)
-  (is_real * carry1 * (carry1 - 1)) = 0 ∧
-  (is_real * carry2 * (carry2 - 1)) = 0
+  let carry1 : BabyBear := (Input0 + Input2 - Input4 + carry0) * (baseInv : BabyBear)
+  let carry2 : BabyBear := (Input1 + Input3 - Input5 + carry1) * (baseInv : BabyBear)
+  Input6 = 0 ∨ (
+    Input6 = 1 ∧
+    (carry1 = 0 ∨ carry1 = 1) ∧
+    (carry2 = 0 ∨ carry2 = 1) ∧
+    (Input4.val < 65536) ∧
+    (Input5.val < 65536)
+  )
 
-def constraints_iff_constraints'
-    (cols : AddOperation)
-    (a : Word U16)
-    (b : Word U16)
-    (is_real : U1) :
-    constraintSet_toProp (cols.constraints a b is_real) ↔ cols.constraints' a b is_real:= by
-  simp [constraints, constraints']
+/-- Equivalence between the two versions of the constraints. -/
+lemma AddOperationConstraints_iff
+    (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear) :
+    constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6) ↔
+      AddOperationConstraintProp Input0 Input1 Input2 Input3 Input4 Input5 Input6 := by
+  simp [AddOperationConstraints, AddOperationConstraintProp, ByteOpcode.constrain, sub_eq_zero]
+  tauto
 
-theorem correct
-    (cols : AddOperation)
-    (a : Word U16) (b : Word U16)
-    (is_real : U1) :
-    constraintSet_toProp (cols.constraints a b is_real) → cols.spec a b is_real := by
-  rw [constraints_iff_constraints']
-  intro ⟨q1, q2⟩
+/-- Expected behavior of the add operation. Note that we assume first inputs are `U16` -/
+def AddOperationSpec
+    (Input0 Input1 Input2 Input3 : U16)
+    (Input4 Input5 Input6 : BabyBear) : Prop :=
+  (Input6 = 0 ∨ Input6 = 1) ∧
+  (Input6 ≠ 0 → (
+    (Input4.val < 65536) ∧ (Input5.val < 65536) ∧
+    ((Input0.val + Input1.val * 65536) + (Input2.val + Input3.val * 65536)) % 4294967296 = (Input4.val + Input5.val * 65536)
+  ))
 
-  -- Since is_real = 1, substitute and apply 1 * x = x to get original constraints
-  intro h_is_real
-  simp [h_is_real, sub_eq_zero, mul_eq_zero] at q1 q2
-  simp [Word.toBV32_U16, BitVec.ofNatLT, Fin.add_def]
+theorem AddOperationSpec_of_AddOperationConstraintSet
+    (Input0 Input1 Input2 Input3 : U16) (Input4 Input5 Input6 : BabyBear)
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6)) :
+    AddOperationSpec Input0 Input1 Input2 Input3 Input4 Input5 Input6 := by
+  rw [AddOperationConstraints_iff, AddOperationConstraintProp] at h
+  -- Handle the case that `is_real` is `0`
+  cases h with | inl h => simp [AddOperationSpec, h] | inr h => ?_
+  -- Handle the trivial proofs about bounding ranges
+  simp [sub_eq_zero] at h
+  obtain ⟨h6, hcarry1, hcarry2, ⟨h4, h5⟩⟩ := h
+  refine ⟨Or.inr h6, fun h6' => ⟨h4, h5, ?_⟩⟩
+  -- Split cases depending if the lower limb addition caused a carry
+  cases hcarry1 with
+  | inl hcarry1 =>
+    -- Substitute the value of the carry
+    rw [hcarry1] at hcarry2
+    -- Simplify the definition of field arithmetic
+    simp [Fin.mul_def, Fin.sub_def, Fin.add_def] at *
+    -- Simplify the two new carry expressions
+    simp [Fin.ext_iff] at hcarry1 hcarry2
+    -- Aesop can solve now with help from omega
+    aesop (add 50% tactic (by omega))
+  | inr hcarry1 =>
+    rw [hcarry1] at hcarry2
+    simp [Fin.mul_def, Fin.sub_def, Fin.add_def, BabyBearPrime] at *
+    simp [Fin.ext_iff] at hcarry1 hcarry2
+    aesop (add 50% tactic (by omega))
 
-  let i1 := a[0].in_range
-  let i2 := a[1].in_range
-  let i3 := b[0].in_range
-  let i4 := b[1].in_range
-  let i5 := cols.value[0].in_range
-  let i6 := cols.value[1].in_range
+section corollary
 
-  -- Cases on whether the lower limb led to a carry or not
-  cases q1 with
-  | inl qq1 =>
-      rw [qq1] at q2
-      simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+variable {Input0 Input1 Input2 Input3 : U16} {Input4 Input5 Input6 : BabyBear}
+
+@[aesop unsafe forward]
+protected lemma lt_of_constraintSet
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) : Input4.val < 65536 := by
+  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
+  tauto
+
+@[aesop unsafe forward]
+protected lemma lt_of_constraintSet'
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) : Input5.val < 65536 := by
+  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
+  tauto
+
+open BitVec
+
+/-- Version that doesn't auto-synthesize the proof (allowing reverse `rw` but being annoying forward).
+Similar issue as `ENNReal.tsum_prod` vs `ENNReal.tsum_prod'`-/
+lemma bitVecAdd_of_addOperationConstraintSet'
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) (pf : Input4.val + Input5.val * 65536 < 2^32) :
+    (BitVec.ofU16 Input0 Input1) + (BitVec.ofU16 Input2 Input3) =
+        (Input4.val + Input5.val * 65536)#'pf := by
+  have := (AddOperationSpec_of_AddOperationConstraintSet _ _ _ _ _ _ _ h).2 h'
+  simp [BitVec.ofU16]
+  rw [← BitVec.toNat_inj, BitVec.toNat_add]
+  simp [BitVec.toNat_ofNatLT]
+  exact this.2.2
+
+lemma bitVecAdd_of_addOperationConstraintSet
+    (h : constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+    (h' : Input6 ≠ 0) :
+    have pf : Input4.val + Input5.val * 65536 < 2^32 := by
+      have := AddOperation.lt_of_constraintSet h h'
+      have := AddOperation.lt_of_constraintSet' h h'
       omega
-  | inr qq1 =>
-      rw [qq1] at q2
-      simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
-      omega
+    (BitVec.ofU16 Input0 Input1) + (BitVec.ofU16 Input2 Input3) =
+      (Input4.val + Input5.val * 65536)#'pf := by
+  exact bitVecAdd_of_addOperationConstraintSet' h h' _
+
+end corollary
 
 end AddOperation
