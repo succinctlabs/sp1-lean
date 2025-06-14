@@ -6,6 +6,8 @@ import SP1Operations.JTypeReader
 
 namespace exp
 
+#check Subtype
+
 -- Simple experiment with StateM Int to prove consecutive reads are equivalent
 theorem simple_consecutive_reads :
   (do let x ← StateT.get; let y ← StateT.get; pure (x, y) : StateM Int (Int × Int)) =
@@ -31,11 +33,12 @@ theorem reads_with_pure_operations :
   rfl
 
 -- Simple working version of monadic substitution
-theorem simple_monadic_subst {α β : Type} {m : Type → Type} [Monad m]
-  (ma : m α) (f : α → β) (mb : m β)
-  (h : f <$> ma = mb) :
-  (do let a ← ma; pure (f a)) = mb := by
-  rw [← bind_pure_comp, ← map_bind, h]
+theorem simple_monadic_subst {α β : Type} {m : Type → Type} [Monad m] [LawfulMonad m]
+    (ma : m α) (f : α → β) (mb : m β)
+    (h : f <$> ma = mb) :
+    (do let a ← ma; pure (f a)) = mb := by
+  simpa
+  -- rw [← bind_pure_comp, ← map_bind, h]
 
 end exp
 
