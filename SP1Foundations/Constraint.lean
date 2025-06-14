@@ -7,41 +7,43 @@ inductive AirInteraction.Kind where
   | PROGRAM
   | STATE
 
+inductive AirInteraction where
+  | byte (op : ByteOpcode) (c a b : BabyBear)
+  /--
+  Represents an InteractionKind::Memory.
+  shard -> clk -> addr -> low_limb -> high_limb
+  -/
+  | memory (shard clk addr low_limb high_limb : BabyBear)
+  /--
+  Represents an InteractionKind::State
+  shard -> clk -> pc
+  -/
+  | state (shard clk pc : BabyBear)
+  deriving DecidableEq
+
 inductive SP1Constraint where
   /-- Assertion that a particular value is zero. -/
   | assertZero (x : BabyBear)
-  /-- Sending air interactions with `kind == byte` -/
-  | sendAirInteraction_byte (op : ByteOpcode) (x y z : BabyBear) (mult : ℕ)
-  -- TODO: other air interactions
-
-/-- TODO: shouldn't need to be manually synthesizing something like this. -/
-instance : DecidableEq SP1Constraint
-  | .assertZero _, .assertZero _ => by
-      simp
-      infer_instance
-  | .assertZero _, .sendAirInteraction_byte _ _ _ _ _ => by
-      simp
-      exact instDecidableFalse
-  | .sendAirInteraction_byte _ _ _ _ _, .assertZero _ => by
-      simp
-      exact instDecidableFalse
-  | _, _ => sorry
+  /-- Sending an air interaction -/
+  | send (interaction : AirInteraction) (mult : BabyBear)
+  /-- Receiving an air interaction -/
+  | receive (interaction : AirInteraction) (mult : BabyBear)
+  deriving DecidableEq
 
 namespace SP1Constraint
 
 def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
-  | .sendAirInteraction_byte op x y z mult =>
-      -- Is this saying enough?
-      (mult ≠ 0 → ByteOpcode.constrain op x y z)
+  | .send (.byte op a b c) (mult) => mult = 1 → op.constrain a b c
+  | _ => false
 
 @[simp] lemma toProp_assertZero (x : BabyBear) :
     (assertZero x).toProp ↔ x = 0 := Iff.rfl
 
 @[simp] lemma toProp_sendAirInteration_byte (op : ByteOpcode)
-    (x y z : BabyBear) (mult : ℕ) :
-    (sendAirInteraction_byte op x y z mult).toProp ↔
-      (mult ≠ 0 → ByteOpcode.constrain op x y z) := Iff.rfl
+    (x y z mult : BabyBear) :
+    (send (.byte op x y z) mult).toProp ↔
+      (mult = 1 → ByteOpcode.constrain op x y z) := Iff.rfl
 
 end SP1Constraint
 
@@ -66,7 +68,7 @@ def constraintSet_toProp (cs : Finset SP1Constraint) : Prop :=
 
 lemma toProp_of_mem_constraintSet (cs : Finset SP1Constraint) (c : SP1Constraint) :
     c ∈ cs → constraintSet_toProp cs → c.toProp := by
-  sorry
+  aesop
 
 /-- A larger set of constraints `cs'` implies a smaller set of constraints `cs`. -/
 lemma toProp_imp_of_constraintSet_subset' (cs cs' : Finset SP1Constraint)
