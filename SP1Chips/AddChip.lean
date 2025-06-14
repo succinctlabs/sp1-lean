@@ -17,13 +17,13 @@ structure AddChip where
 
 namespace AddChip
 
--- What we expect the generated constraint to look like:
-def constraints
-  (chip : AddChip) : Prop :=
-  let ⟨state, adapter, add_operation, is_real⟩ := chip
-  state.spec (state.pc + 4) 4 is_real
-  ∧ constraintSet_toProp (add_operation.constraints adapter.b adapter.c is_real)
-  ∧ adapter.spec state.shard state.clk state.pc 0 /- Opcode::ADD -/ add_operation.value is_real
+/- -- What we expect the generated constraint to look like: -/
+/- def constraints -/
+/-   (chip : AddChip) : Prop := -/
+/-   let ⟨state, adapter, add_operation, is_real⟩ := chip -/
+/-   state.spec (state.pc + 4) 4 is_real -/
+/-   ∧ constraintSet_toProp (add_operation.constraints adapter.b adapter.c is_real) -/
+/-   ∧ adapter.spec state.shard state.clk state.pc 0 /- Opcode::ADD -/ add_operation.value is_real -/
 
 /- def read  -/
 /-   (chip : AddChip) -/
@@ -36,6 +36,86 @@ def constraints
 /-         sorry -/
 /-         ⟩ -/
 /-       ⟩ -/
+
+def constraints
+  (Main : Vector BabyBear 23)
+  : Finset SP1Constraint :=
+  let E0  : BabyBear := Main[22] - 1
+  let E2  : BabyBear := Main[22] * E0
+  let E4  : BabyBear := Main[3] + 4
+  let E6  : BabyBear := 16384 * Main[1]
+  let E8  : BabyBear := E6 + Main[2]
+  let E10 : BabyBear := Main[22] - 1
+  let E12 : BabyBear := Main[22] * E10
+  let E14 : BabyBear := E8 + 4
+  let E16 : BabyBear := 16384 * Main[1]
+  let E18 : BabyBear := E16 + Main[2]
+  let E20 : BabyBear := Main[22] - 1
+  let E22 : BabyBear := Main[22] * E20
+  let E24 : BabyBear := 0 + Main[10]
+  let E26 : BabyBear := 0 + Main[15]
+  let E28 : BabyBear := Main[20] - 0
+  let E30 : BabyBear := Main[9] * E28
+  let E32 : BabyBear := Main[21] - 0
+  let E34 : BabyBear := Main[9] * E32
+  let E36 : BabyBear := E18 + 3
+  let E38 : BabyBear := Main[22] - 1
+  let E40 : BabyBear := Main[22] * E38
+  let E42 : BabyBear := E36 - Main[7]
+  let E44 : BabyBear := E42 - 1
+  let E46 : BabyBear := E44 - Main[8]
+  let E48 : BabyBear := E46 * 2013143041
+  let E50 : BabyBear := E18 + 2
+  let E52 : BabyBear := Main[22] - 1
+  let E54 : BabyBear := Main[22] * E52
+  let E56 : BabyBear := E50 - Main[13]
+  let E58 : BabyBear := E56 - 1
+  let E60 : BabyBear := E58 - Main[14]
+  let E62 : BabyBear := E60 * 2013143041
+  let E64 : BabyBear := E18 + 1
+  let E66 : BabyBear := Main[22] - 1
+  let E68 : BabyBear := Main[22] * E66
+  let E70 : BabyBear := E64 - Main[18]
+  let E72 : BabyBear := E70 - 1
+  let E74 : BabyBear := E72 - Main[19]
+  let E76 : BabyBear := E74 * 2013143041
+  {
+    .assertZero E2,
+    .assertZero E12,
+    .receive (.state Main[0] E8 Main[3]) Main[22],
+    .send (.state Main[0] E14 E4) Main[22],
+    .send (.byte (ByteOpcode.ofNat 6) Main[1] 14 0) Main[22],
+    .send (.byte (ByteOpcode.ofNat 6) Main[2] 14 0) Main[22],
+    .assertZero E22,
+    .assertZero E30,
+    .assertZero E34,
+    .assertZero E40,
+    .send (.byte (ByteOpcode.ofNat 6) Main[8] 14 0) Main[22],
+    .send (.byte (ByteOpcode.ofNat 6) E48 14 0) Main[22],
+    .send (.memory Main[0] Main[7] Main[4] Main[5] Main[6]) Main[22],
+    .receive (.memory Main[0] E36 Main[4] Main[20] Main[21]) Main[22],
+    .assertZero E54,
+    .send (.byte (ByteOpcode.ofNat 6) Main[14] 14 0) Main[22],
+    .send (.byte (ByteOpcode.ofNat 6) E62 14 0) Main[22],
+    .send (.memory Main[0] Main[13] Main[10] Main[11] Main[12]) Main[22],
+    .receive (.memory Main[0] Main[5] Main[10] Main[11] Main[12]) Main[22],
+    .assertZero E68,
+    .send (.byte (ByteOpcode.ofNat 6) Main[19] 14 0) Main[22],
+    .send (.byte (ByteOpcode.ofNat 6) E76 14 0) Main[22],
+    .send (.memory Main[0] Main[18] Main[15] Main[16] Main[17]) Main[22],
+    .receive (.memory Main[0] E64 Main[15] Main[16] Main[17]) Main[22]
+  } ∪ AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]]
+
+def spec
+  (Main : Vector BabyBear 23)
+  (cstrs : constraintSet_toProp (constraints Main))
+  (h_is_real : Main[22] = 1)
+  : SailM Unit :=
+  by
+    simp [constraints, constraintSet_toProp, h_is_real] at cstrs
+    simp [ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
+    exact do
+      pure ()
 
 end AddChip
 

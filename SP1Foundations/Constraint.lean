@@ -8,7 +8,7 @@ inductive AirInteraction.Kind where
   | STATE
 
 inductive AirInteraction where
-  | byte (op : ByteOpcode) (c a b : BabyBear)
+  | byte (op : ByteOpcode) (a b c : BabyBear)
   /--
   Represents an InteractionKind::Memory.
   shard -> clk -> addr -> low_limb -> high_limb
@@ -41,9 +41,9 @@ def toProp : SP1Constraint → Prop
     (assertZero x).toProp ↔ x = 0 := Iff.rfl
 
 @[simp] lemma toProp_sendAirInteration_byte (op : ByteOpcode)
-    (x y z mult : BabyBear) :
-    (send (.byte op x y z) mult).toProp ↔
-      (mult = 1 → ByteOpcode.constrain op x y z) := Iff.rfl
+    (a b c mult : BabyBear) :
+    (send (.byte op a b c) mult).toProp ↔
+      (mult = 1 → ByteOpcode.constrain op a b c) := Iff.rfl
 
 end SP1Constraint
 
