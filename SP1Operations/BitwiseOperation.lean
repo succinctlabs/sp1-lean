@@ -8,13 +8,15 @@ structure BitwiseOperation where
 
 namespace BitwiseOperation
 
+open ByteOpcode
+
 def constraints
   (a : Vector BabyBear WORD_BYTE_SIZE)
   (b : Vector BabyBear WORD_BYTE_SIZE)
   (cols : BitwiseOperation)
   (opcode : BabyBear)
   (is_real : BabyBear)
-  : List SP1Constraint :=
+  : SP1ConstraintList :=
   [
     .send (.byte (ByteOpcode.ofNat opcode) cols.result[0] a[0] b[0]) is_real,
     .send (.byte (ByteOpcode.ofNat opcode) cols.result[1] a[1] b[1]) is_real,
@@ -44,7 +46,7 @@ def spec (a b : Vector BabyBear WORD_BYTE_SIZE)
 lemma constraints_imp_spec (a b : Vector BabyBear WORD_BYTE_SIZE)
     (cols : BitwiseOperation) (opcode is_real : BabyBear)
     (h0 : is_real ≠ 0)
-    (h : List.Forall SP1Constraint.toProp (cols.constraints a b opcode is_real)) :
+    (h : (cols.constraints a b opcode is_real).allHold) :
     cols.spec a b opcode := by
   simp only [spec, constraints] at ⊢ h
   by_cases h1 : ByteOpcode.ofNat opcode = .AND
@@ -57,7 +59,7 @@ lemma constraints_imp_spec (a b : Vector BabyBear WORD_BYTE_SIZE)
 
 lemma eq_and_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
-    (h : List.Forall SP1Constraint.toProp (cols.constraints a b 0 1)) :
+    (h : (cols.constraints a b 0 1).allHold) :
     cols.result[i] = a[i] &&& b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this
@@ -69,7 +71,7 @@ lemma eq_and_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwi
 
 lemma eq_or_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
-    (h : List.Forall SP1Constraint.toProp (cols.constraints a b 1 1)) :
+    (h : (cols.constraints a b 1 1).allHold) :
     cols.result[i] = a[i] ||| b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this
@@ -81,7 +83,7 @@ lemma eq_or_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwis
 
 lemma eq_xor_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
-    (h : List.Forall SP1Constraint.toProp (cols.constraints a b 2 1)) :
+    (h : (cols.constraints a b 2 1).allHold) :
     cols.result[i] = a[i] ^^^ b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this

@@ -45,6 +45,16 @@ end toProp
 
 end SP1Constraint
 
+section constraintList
+
+@[reducible] def SP1ConstraintList := List SP1Constraint
+
+@[simp, always_inline]
+protected def SP1ConstraintList.allHold (xs : SP1ConstraintList) : Prop :=
+  List.Forall SP1Constraint.toProp xs
+
+end constraintList
+
 -- section constraintSet
 --
 -- -- TODO: should this exist? maybe even as `abbrev`? Also would need to use lists now

@@ -13,14 +13,9 @@ inductive ByteOpcode
 
 namespace ByteOpcode
 
-def ofBB : BabyBear → ByteOpcode
-  | 0 => .AND
-  | 1 => .OR
-  | 2 => .XOR
-  | _ => sorry
-
 section ofNat
 
+-- Deriving decidable equality also derives an `OfNat` instance
 @[simp] lemma ofNat_zero : ByteOpcode.ofNat 0 = .AND := rfl
 @[simp] lemma ofNat_one : ByteOpcode.ofNat 1 = .OR := rfl
 @[simp] lemma ofNat_two : ByteOpcode.ofNat 2 = .XOR := rfl
@@ -28,6 +23,18 @@ section ofNat
 @[simp] lemma ofNat_four : ByteOpcode.ofNat 4 = .LTU := rfl
 @[simp] lemma ofNat_five : ByteOpcode.ofNat 5 = .MSB := rfl
 @[simp] lemma ofNat_six : ByteOpcode.ofNat 6 = .Range := rfl
+
+def toBB : ByteOpcode → BabyBear
+  | AND => 0
+  | OR => 1
+  | XOR => 2
+  | U8Range => 3
+  | LTU => 4
+  | MSB => 5
+  | Range => 6
+
+@[simp] lemma ofNat_toBB (op : ByteOpcode) : ByteOpcode.ofNat (op.toBB) = op := by
+  induction op <;> rfl
 
 end ofNat
 
