@@ -13,7 +13,7 @@ def spec
 
 def constraints
   (I : Vector BabyBear 7)
-  : Finset SP1Constraint :=
+  : List SP1Constraint :=
   let E0 := I[6] - 1
   let E2 := I[6] * E0
   let E4 := I[0] + I[2]
@@ -30,12 +30,12 @@ def constraints
   let E26 := E24 - 1
   let E28 := E24 * E26
   let E30 := I[6] * E28
-  { .assertZero E2
+  [ .assertZero E2
   , .assertZero E16
   , .assertZero E30
   , .send (.byte (ByteOpcode.ofNat 6) I[4] 16 0) I[6]
   , .send (.byte (ByteOpcode.ofNat 6) I[5] 16 0) I[6]
-  }
+  ]
 
 def constraints'
   (I : Vector BabyBear 7)
@@ -53,7 +53,7 @@ def constraints'
 
 def constraints_iff_constraints'
   (I : Vector BabyBear 7)
-  : constraintSet_toProp (constraints I) ↔ constraints' I := by
+  : List.Forall SP1Constraint.toProp (constraints I) ↔ constraints' I := by
   simp [constraints, constraints']
   simp [ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain]
   simp [sub_eq_zero]
@@ -64,7 +64,7 @@ theorem correct
   (b0 b1 : U16)
   (c0 c1 : U16)
   (is_real : U1) :
-    constraintSet_toProp (constraints #v[b0, b1, c0, c1, a0, a1, is_real]) →
+    List.Forall SP1Constraint.toProp (constraints #v[b0, b1, c0, c1, a0, a1, is_real]) →
     spec a0 a1 b0 b1 c0 c1 is_real := by
   rw [constraints_iff_constraints' (#v[b0, b1, c0, c1, a0, a1, is_real])]
   simp [constraints', spec]

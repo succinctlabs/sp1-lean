@@ -9,12 +9,6 @@ open LeanRV32D.Functions
 open Sail
 open PreSail (SequentialState)
 
-structure AddChip where
-  state : CPUState
-  adapter : RTypeReader U16
-  add_operation : AddOperation
-  is_real : U1
-
 namespace AddChip
 
 /- -- What we expect the generated constraint to look like: -/
@@ -39,83 +33,110 @@ namespace AddChip
 
 def constraints
   (Main : Vector BabyBear 23)
-  : Finset SP1Constraint :=
-  let E0  : BabyBear := Main[22] - 1
-  let E2  : BabyBear := Main[22] * E0
-  let E4  : BabyBear := Main[3] + 4
-  let E6  : BabyBear := 16384 * Main[1]
-  let E8  : BabyBear := E6 + Main[2]
-  let E10 : BabyBear := Main[22] - 1
-  let E12 : BabyBear := Main[22] * E10
-  let E14 : BabyBear := E8 + 4
-  let E16 : BabyBear := 16384 * Main[1]
-  let E18 : BabyBear := E16 + Main[2]
-  let E20 : BabyBear := Main[22] - 1
-  let E22 : BabyBear := Main[22] * E20
-  let E24 : BabyBear := 0 + Main[10]
-  let E26 : BabyBear := 0 + Main[15]
-  let E28 : BabyBear := Main[20] - 0
-  let E30 : BabyBear := Main[9] * E28
-  let E32 : BabyBear := Main[21] - 0
-  let E34 : BabyBear := Main[9] * E32
-  let E36 : BabyBear := E18 + 3
-  let E38 : BabyBear := Main[22] - 1
-  let E40 : BabyBear := Main[22] * E38
-  let E42 : BabyBear := E36 - Main[7]
-  let E44 : BabyBear := E42 - 1
-  let E46 : BabyBear := E44 - Main[8]
-  let E48 : BabyBear := E46 * 2013143041
-  let E50 : BabyBear := E18 + 2
-  let E52 : BabyBear := Main[22] - 1
-  let E54 : BabyBear := Main[22] * E52
-  let E56 : BabyBear := E50 - Main[13]
-  let E58 : BabyBear := E56 - 1
-  let E60 : BabyBear := E58 - Main[14]
-  let E62 : BabyBear := E60 * 2013143041
-  let E64 : BabyBear := E18 + 1
-  let E66 : BabyBear := Main[22] - 1
-  let E68 : BabyBear := Main[22] * E66
-  let E70 : BabyBear := E64 - Main[18]
-  let E72 : BabyBear := E70 - 1
-  let E74 : BabyBear := E72 - Main[19]
-  let E76 : BabyBear := E74 * 2013143041
-  {
-    .assertZero E2,
-    .assertZero E12,
-    .receive (.state Main[0] E8 Main[3]) Main[22],
-    .send (.state Main[0] E14 E4) Main[22],
-    .send (.byte (ByteOpcode.ofNat 6) Main[1] 14 0) Main[22],
-    .send (.byte (ByteOpcode.ofNat 6) Main[2] 14 0) Main[22],
-    .assertZero E22,
-    .assertZero E30,
-    .assertZero E34,
-    .assertZero E40,
-    .send (.byte (ByteOpcode.ofNat 6) Main[8] 14 0) Main[22],
-    .send (.byte (ByteOpcode.ofNat 6) E48 14 0) Main[22],
-    .send (.memory Main[0] Main[7] Main[4] Main[5] Main[6]) Main[22],
-    .receive (.memory Main[0] E36 Main[4] Main[20] Main[21]) Main[22],
-    .assertZero E54,
-    .send (.byte (ByteOpcode.ofNat 6) Main[14] 14 0) Main[22],
-    .send (.byte (ByteOpcode.ofNat 6) E62 14 0) Main[22],
-    .send (.memory Main[0] Main[13] Main[10] Main[11] Main[12]) Main[22],
-    .receive (.memory Main[0] Main[5] Main[10] Main[11] Main[12]) Main[22],
-    .assertZero E68,
-    .send (.byte (ByteOpcode.ofNat 6) Main[19] 14 0) Main[22],
-    .send (.byte (ByteOpcode.ofNat 6) E76 14 0) Main[22],
-    .send (.memory Main[0] Main[18] Main[15] Main[16] Main[17]) Main[22],
-    .receive (.memory Main[0] E64 Main[15] Main[16] Main[17]) Main[22]
-  } ∪ AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]]
+  : List SP1Constraint :=
+  let E0 : BabyBear := Main[22] - 1
+  let E2 : BabyBear := Main[22] * E0
+  let E4 : BabyBear := Main[3] + 4
+  let E6 : BabyBear := 16384 * Main[1]
+  let E8 : BabyBear := E6 + Main[2]
+  [ .assertZero E2
+  , .funcall (AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]])
+  , .funcall (CPUState.constraints
+      { shard := Main[0]
+      , clk_high_limb := Main[1]
+      , clk_low_limb := Main[2]
+      , pc := Main[3] }
+      E4
+      4
+      Main[22])
+  , .funcall (RTypeReader.constraints
+      Main[0]
+      E8
+      Main[3]
+      0
+      #v[Main[20], Main[21]]
+      { op_a := Main[4]
+      , op_a_memory :=
+          { prev_value := #v[Main[5], Main[6]]
+          , access_timestamp :=
+              { prev_clk := Main[7]
+              , diff_low_limb := Main[8]
+              }
+          }
+      , op_a_0 := Main[9]
+      , op_b := Main[10]
+      , op_b_memory :=
+          { prev_value := #v[Main[11], Main[12]]
+          , access_timestamp :=
+              { prev_clk := Main[13]
+              , diff_low_limb := Main[14]
+              }
+          }
+      , op_c := Main[15]
+      , op_c_memory :=
+          { prev_value := #v[Main[16], Main[17]]
+          , access_timestamp :=
+              { prev_clk := Main[18]
+              , diff_low_limb := Main[19]
+              }
+          }
+      }
+      Main[22])
+  ]
 
-def spec
+def sp1_add
+  (Main : Vector BabyBear 23)
+  (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
+  (h_is_real : Main[22] = 1)
+  (rd rs1 rs2 : regidx)
+  : SailM Unit :=
+  let pf : Main[20].val + Main[21].val * 65536 < 2^32 :=
+    by
+      simp only [constraints] at cstrs
+      simp only [SP1Constraint.toProp, List.Forall] at cstrs
+      simp only [AddOperation.constraints] at cstrs
+      simp only [SP1Constraint.toProp] at cstrs
+      simp [h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
+      have h_low  : Main[20].val < 65536 := cstrs.right.right.left
+      have h_high : Main[21].val < 65536 := cstrs.right.right.right.left
+      clear cstrs
+      linarith
+  do
+    writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
+    let rs1_value ← rX_bits rs1
+    let rs2_value ← rX_bits rs2
+    wX_bits rd (BitVec.ofNatLT (Main[20].val + Main[21].val * 65536) pf)
+
+/- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
+  writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
+  /- let _ ← execute (.RTYPE ⟨rs2, rs1, rd, rop.ADD⟩) -/ -- `execute` is uncomputable...?
+  let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
+  pure ()
+
+
+theorem sp1_add_implies_spec_add
   (Main : Vector BabyBear 23)
   (cstrs : constraintSet_toProp (constraints Main))
   (h_is_real : Main[22] = 1)
-  : SailM Unit :=
+  (rd rs1 rs2 : regidx)
+  :
+  let res := (sp1_add Main cstrs h_is_real rd rs1 rs2)
+  let res_spec := (spec_add rd rs1 rs2)
+  res = res_spec :=
   by
-    simp [constraints, constraintSet_toProp, h_is_real] at cstrs
-    simp [ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
-    exact do
-      pure ()
+    simp [sp1_add, spec_add]
+
+    simp only [constraints] at cstrs
+    have add_constraints := AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]]
+    have add_cstrs : constraintSet_toProp add_constraints := by _
+    simp only [constraintSet_toProp] at cstrs
+    simp only [AddOperation.constraints] at cstrs
+    simp only [RTypeReader.constraints] at cstrs
+    simp only [SP1Constraint.toProp] at cstrs
+    simp [h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
+
+    have ayo : Main[11] < 65536 := by clear * - cstrs; aesop
+    sorry
 
 end AddChip
 
@@ -239,59 +260,59 @@ Func(AddOperation(Word(Input(0), Input(1)), Word(Input(2), Input(3)), AddOperati
 }
 -/
 
-def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) : SailM Unit := do
-    -- Model YOUR implementation's behavior
-    writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
-    /- let ⟨rs1_val, ⟨rs2_val, matching⟩⟩ ← chip.read rs1 rs2 -/
-    let rs1_val ← rX_bits rs1
-    let rs2_val ← rX_bits rs2
-    /- let ⟨rs1_val, mem_read_1⟩ ← read_b -/
-    /- let ⟨rs2_val, mem_read_2⟩ ← read_c -/
-    /- let ⟨_, ⟨h_constraints_2, _⟩⟩ := constraints -/
-    by
-      /- let h_add := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real -/
-      /- rw [←mem_read_1, ←mem_read_2] at h_add -/
-      /- let res := chip.add_operation.value.toBV32_U16 -/
-      exact wX_bits rd chip.add_operation.value.toBV32_U16
-
-/- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
-  writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
-  /- let _ ← execute (.RTYPE ⟨rs2, rs1, rd, rop.ADD⟩) -/ -- `execute` is uncomputable...?
-  let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
-  pure ()
-
-theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
-  let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c).run s
-  let res_spec := (spec_add rd rs1 rs2).run s
-  res = res_spec :=
-  by
-    simp [EStateM.run]
-    simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
-    let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
-    simp [RTypeReader.read_b_fun] at read_b
-    rw [read_b]
-    simp [RTypeReader.read_c_fun] at read_c
-    rw [read_c]
-    rw [←add_spec]
-    rw [pure_bind, pure_bind]
-    rfl
-
-theorem sp1_add_implies_spec_add' (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx)
-    (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) :
-  let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c)
-  let res_spec := (spec_add rd rs1 rs2)
-  res = res_spec :=
-  by
-    refine EStateM.ext fun s => ?_
-    simp [EStateM.run]
-
-    simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
-
-    let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
-    simp [RTypeReader.read_b_fun] at read_b
-    rw [read_b]
-    simp [RTypeReader.read_c_fun] at read_c
-    rw [read_c]
-    rw [←add_spec]
-    rw [pure_bind, pure_bind]
-    rfl
+-- def sp1_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) : SailM Unit := do
+--     -- Model YOUR implementation's behavior
+--     writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
+--     /- let ⟨rs1_val, ⟨rs2_val, matching⟩⟩ ← chip.read rs1 rs2 -/
+--     let rs1_val ← rX_bits rs1
+--     let rs2_val ← rX_bits rs2
+--     /- let ⟨rs1_val, mem_read_1⟩ ← read_b -/
+--     /- let ⟨rs2_val, mem_read_2⟩ ← read_c -/
+--     /- let ⟨_, ⟨h_constraints_2, _⟩⟩ := constraints -/
+--     by
+--       /- let h_add := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real -/
+--       /- rw [←mem_read_1, ←mem_read_2] at h_add -/
+--       /- let res := chip.add_operation.value.toBV32_U16 -/
+--       exact wX_bits rd chip.add_operation.value.toBV32_U16
+-- 
+-- /- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
+--   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
+--   /- let _ ← execute (.RTYPE ⟨rs2, rs1, rd, rop.ADD⟩) -/ -- `execute` is uncomputable...?
+--   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
+--   pure ()
+-- 
+-- theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
+--   let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c).run s
+--   let res_spec := (spec_add rd rs1 rs2).run s
+--   res = res_spec :=
+--   by
+--     simp [EStateM.run]
+--     simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
+--     let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
+--     simp [RTypeReader.read_b_fun] at read_b
+--     rw [read_b]
+--     simp [RTypeReader.read_c_fun] at read_c
+--     rw [read_c]
+--     rw [←add_spec]
+--     rw [pure_bind, pure_bind]
+--     rfl
+-- 
+-- theorem sp1_add_implies_spec_add' (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx)
+--     (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) :
+--   let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c)
+--   let res_spec := (spec_add rd rs1 rs2)
+--   res = res_spec :=
+--   by
+--     refine EStateM.ext fun s => ?_
+--     simp [EStateM.run]
+-- 
+--     simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
+-- 
+--     let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
+--     simp [RTypeReader.read_b_fun] at read_b
+--     rw [read_b]
+--     simp [RTypeReader.read_c_fun] at read_c
+--     rw [read_c]
+--     rw [←add_spec]
+--     rw [pure_bind, pure_bind]
+--     rfl
