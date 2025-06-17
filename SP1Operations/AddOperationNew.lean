@@ -1,101 +1,7 @@
 import SP1Foundations
+import LeanRV32D.RiscvInstsEnd
+import LeanRV32D.RiscvRegs
 
-<<<<<<< HEAD
-namespace AddOperation
-
-/- @[simp] lemma value_mk (value : Word U16) : (AddOperation.mk value).value = value := rfl -/
-
-def spec
-  (a0 a1 : U16)
-  (b0 b1 : U16)
-  (c0 c1 : U16)
-  (is_real : U1) : Prop :=
-    is_real = 1 → BitVec.ofU16 a0 a1 = BitVec.ofU16 b0 b1 + BitVec.ofU16 c0 c1
-
-def constraints
-  (I : Vector BabyBear 7)
-  : List SP1Constraint :=
-  let E0 := I[6] - 1
-  let E2 := I[6] * E0
-  let E4 := I[0] + I[2]
-  let E6 := E4 - I[4]
-  let E8 := E6 + 0
-  let E10 := E8 * 2013235201
-  let E12 := E10 - 1
-  let E14 := E10 * E12
-  let E16 := I[6] * E14
-  let E18 := I[1] + I[3]
-  let E20 := E18 - I[5]
-  let E22 := E20 + E10
-  let E24 := E22 * 2013235201
-  let E26 := E24 - 1
-  let E28 := E24 * E26
-  let E30 := I[6] * E28
-  [ .assertZero E2
-  , .assertZero E16
-  , .assertZero E30
-  , .send (.byte (ByteOpcode.ofNat 6) I[4] 16 0) I[6]
-  , .send (.byte (ByteOpcode.ofNat 6) I[5] 16 0) I[6]
-  ]
-
-def constraints'
-  (I : Vector BabyBear 7)
-  : Prop :=
-  let carry0  : BabyBear := 0
-  let carry1  : BabyBear := (I[0] + I[2] - I[4] + carry0) * (baseInv : BabyBear)
-  let carry2  : BabyBear := (I[1] + I[3] - I[5] + carry1) * (baseInv : BabyBear)
-  I[6] = 0 ∨ (
-    I[6] = 1 ∧
-    (carry1 = 0 ∨ carry1 = 1) ∧
-    (carry2 = 0 ∨ carry2 = 1) ∧
-    (I[4] < 65536) ∧
-    (I[5] < 65536)
-  )
-
-def constraints_iff_constraints'
-  (I : Vector BabyBear 7)
-  : List.Forall SP1Constraint.toProp (constraints I) ↔ constraints' I := by
-  simp [constraints, constraints']
-  simp [ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain]
-  simp [sub_eq_zero]
-  sorry
-
-theorem correct
-  (a0 a1 : U16)
-  (b0 b1 : U16)
-  (c0 c1 : U16)
-  (is_real : U1) :
-    List.Forall SP1Constraint.toProp (constraints #v[b0, b1, c0, c1, a0, a1, is_real]) →
-    spec a0 a1 b0 b1 c0 c1 is_real := by
-  rw [constraints_iff_constraints' (#v[b0, b1, c0, c1, a0, a1, is_real])]
-  simp [constraints', spec]
-  intro q1
-
-  intro h_is_real
-  simp [h_is_real] at q1
-
-  let ⟨qq1, ⟨qq2, ⟨qq3, aa4⟩⟩⟩ := q1
-  clear q1
-  simp [sub_eq_zero, mul_eq_zero] at qq1 qq2
-  simp [BitVec.ofU16, BitVec.ofNatLT]
-
-  let i0 := c0.in_range
-  let i1 := c1.in_range
-  let i2 := b0.in_range
-  let i3 := b1.in_range
-
-  cases qq1 with
-  | inl qqq1 =>
-      rw [qqq1] at qq2
-      simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
-      rw [Fin.lt_def] at qq3 aa4
-      aesop (add 50% tactic (by omega))
-  | inr qqq1 =>
-      rw [qqq1] at qq2
-      simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
-      rw [Fin.lt_def] at qq3 aa4
-      aesop (add 50% tactic (by omega))
-=======
 -- Probably good to still namespace things
 namespace AddOperation
 
@@ -255,6 +161,106 @@ lemma bitVecAdd_of_addOperationConstraintSet
   exact bitVecAdd_of_addOperationConstraintSet' h h' _
 
 end corollary
->>>>>>> 997c41403074de8dd357722fd646b205687876b6
 
 end AddOperation
+
+namespace Add
+
+-- Add below imports to the top of the file
+/- import LeanRV32D.RiscvInstsEnd -/
+/- import LeanRV32D.RiscvRegs -/
+
+open LeanRV32D.Functions
+open Sail
+open PreSail (SequentialState)
+
+open AddOperation
+
+def AddChipConstraints
+    (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear) : Finset SP1Constraint :=
+  AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6
+
+def sp1_add
+  -- All the columns used for `AddChip` (currently includes only those from `add_operation`)
+  (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear)
+  (constraints :
+    constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+  -- the following 4 proofs will come from the spec/constraints of `RTypeReader`
+  -- adding in manually for now
+  (read_b0_constraint : Input0.val < 65536) 
+  (read_b1_constraint : Input1.val < 65536)
+  (read_c0_constraint : Input2.val < 65536)
+  (read_c1_constraint : Input3.val < 65536)
+  -- ensures this is not a padding row (we're actually running the instruction)
+  (h' : Input6 ≠ 0)
+  -- registers to read/write
+  (rd rs1 rs2 : regidx)
+  : SailM Unit := 
+  -- the human part of the code generation is to fill out the `pf`s
+  let Input0 : U16 := ⟨Input0, read_b0_constraint⟩
+  let Input1 : U16 := ⟨Input1, read_b1_constraint⟩
+  let Input2 : U16 := ⟨Input2, read_c0_constraint⟩
+  let Input3 : U16 := ⟨Input3, read_c1_constraint⟩
+  let hh :=
+    AddOperationSpec_of_AddOperationConstraintSet Input0 Input1 Input2 Input3 _ _ _ constraints
+  let pf : Input4.val + Input5.val * 65536 < 2^32 := by
+    have ⟨hb, ⟨hc, _⟩⟩ := (hh.right h')
+    omega
+
+  -- below will be auto-generated
+  do
+    writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
+    let _ ← rX_bits rs1
+    let _ ← rX_bits rs2
+    -- at code-gen time, we don't know whether `Input4 + Input5 * 65536` will
+    -- be in `u32` range, so we leave out the placeholder for us to manually
+    -- fill in
+    wX_bits rd (BitVec.ofNatLT (Input4.val + Input5.val * 65536) pf)
+
+/- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
+  writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
+  /- let _ ← execute (.RTYPE ⟨rs2, rs1, rd, rop.ADD⟩) -/ -- `execute` is uncomputable...?
+  let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
+  pure ()
+
+theorem sp1_add_implies_spec_add
+  (Input0 Input1 Input2 Input3 Input4 Input5 Input6 : BabyBear)
+  (constraints :
+    constraintSet_toProp (AddOperationConstraints Input0 Input1 Input2 Input3 Input4 Input5 Input6))
+  -- the following 4 proofs will come from the spec/constraints of `RTypeReader`
+  -- adding in manually for now
+  (read_b0_constraint : Input0.val < 65536) 
+  (read_b1_constraint : Input1.val < 65536)
+  (read_c0_constraint : Input2.val < 65536)
+  (read_c1_constraint : Input3.val < 65536)
+  -- ensures this is not a padding row (we're actually running the instruction)
+  (h_is_real : Input6 ≠ 0)
+  (rd rs1 rs2 : regidx)
+  (read_b_fun : rX_bits rs1 = pure (BitVec.ofU16 ⟨Input0, read_b0_constraint⟩ ⟨Input1, read_b1_constraint⟩))
+  (read_c_fun : rX_bits rs2 = pure (BitVec.ofU16 ⟨Input2, read_c0_constraint⟩ ⟨Input3, read_c1_constraint⟩))
+  (s : PreSail.SequentialState RegisterType trivialChoiceSource)
+  : let res := (sp1_add _ _ _ _ _ _ _ constraints read_b0_constraint read_b1_constraint read_c0_constraint read_c1_constraint h_is_real rd rs1 rs2).run s 
+    let res_spec := (spec_add rd rs1 rs2).run s
+  res = res_spec :=
+  by
+    let Input0 : U16 := ⟨Input0, read_b0_constraint⟩
+    let Input1 : U16 := ⟨Input1, read_b1_constraint⟩
+    let Input2 : U16 := ⟨Input2, read_c0_constraint⟩
+    let Input3 : U16 := ⟨Input3, read_c1_constraint⟩
+    simp [EStateM.run]
+    simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
+    let h_bv :=
+      bitVecAdd_of_addOperationConstraintSet
+      (Input0 := Input0)
+      (Input1 := Input1)
+      (Input2 := Input2)
+      (Input3 := Input3)
+      constraints
+      h_is_real
+    rw [←h_bv]
+    rw [read_b_fun, read_c_fun]
+    clear h_bv read_b_fun read_c_fun
+    rw [pure_bind, pure_bind]
+    rfl
+
+end Add

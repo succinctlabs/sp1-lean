@@ -9,8 +9,22 @@ inductive ByteOpcode
   | LTU
   | MSB
   | Range
+  deriving DecidableEq
+
+example : ByteOpcode :=
+  ByteOpcode.ofNat (35 : BabyBear)
 
 namespace ByteOpcode
+
+def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
+  match op with
+  | AND => (a < 256 ∧ b < 256 ∧ c < 256) → a = b &&& c
+  | OR  => (a < 256 ∧ b < 256 ∧ c < 256) → a = b ||| c
+  | XOR => (a < 256 ∧ b < 256 ∧ c < 256) → a = b ^^^ c
+  | U8Range => a < 256 ∧ b < 256 ∧ c < 256
+  | LTU => (a < 256 ∧ b < 256 ∧ c < 256) → (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
+  | Range => a < 2 ^ b.val -- Is this right?
+  | MSB => (a < 256 ∧ b < 256 ∧ c < 256) → (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
 
 @[reducible, simp] def ofNat : Fin 7 → ByteOpcode
   | 0 => AND
@@ -21,25 +35,17 @@ namespace ByteOpcode
   | 5 => MSB
   | 6 => Range
 
--- TODO: should really make `c` the final argument. annoying to refactor.
-def constrain (op : ByteOpcode) (c a b : BabyBear) : Prop :=
-  match op with
-  | AND => c = a &&& b
-  | OR => c = a ||| b
-  | XOR => c = a ^^^ b
-  | U8Range => c < 256 ∧ a < 256 -- ?
-  | LTU => sorry
-  | MSB => sorry
-  | Range => c < 2 ^ a.val -- ?
-
-@[simp] lemma constrain_AND (c a b : BabyBear) :
-    AND.constrain c a b ↔ (c = a &&& b) := Iff.rfl
-
-@[simp] lemma constrain_OR (c a b : BabyBear) :
-    OR.constrain c a b ↔ (c = a ||| b) := Iff.rfl
-
-@[simp] lemma constrain_XOR (c a b : BabyBear) :
-    XOR.constrain c a b ↔ (c = a ^^^ b) := Iff.rfl
+-- @[simp] lemma constrain_AND (a b c : BabyBear) :
+--     AND.constrain a b c ↔ (a = b &&& c) := Iff.rfl
+--
+-- @[simp] lemma constrain_OR (a b c : BabyBear) :
+--     OR.constrain a b c ↔ (a = b ||| c) := Iff.rfl
+--
+-- @[simp] lemma constrain_XOR (a b c : BabyBear) :
+--     XOR.constrain a b c ↔ (a = b ^^^ c) := Iff.rfl
+--
+-- @[simp] lemma constrain_Range (a b c : BabyBear) :
+--     Range.constrain a b c ↔ (a < 2 ^ b.val) := Iff.rfl
 
 @[simp] lemma constrain_U8Range (c a b : BabyBear) :
     U8Range.constrain c a b ↔ c < 256 ∧ a < 256 := Iff.rfl

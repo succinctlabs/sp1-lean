@@ -31,12 +31,20 @@ theorem reads_with_pure_operations :
   rfl
 
 -- Simple working version of monadic substitution
+<<<<<<< HEAD
+theorem simple_monadic_subst {α β : Type} {m : Type → Type} [Monad m]
+  (ma : m α) (f : α → β) (mb : m β)
+  (h : f <$> ma = mb) :
+  (do let a ← ma; pure (f a)) = mb := by
+  rw [← bind_pure_comp, ← map_bind, h]
+=======
 theorem simple_monadic_subst {α β : Type} {m : Type → Type} [Monad m] [LawfulMonad m]
     (ma : m α) (f : α → β) (mb : m β)
     (h : f <$> ma = mb) :
     (do let a ← ma; pure (f a)) = mb := by
   simpa
   -- rw [← bind_pure_comp, ← map_bind, h]
+>>>>>>> 997c41403074de8dd357722fd646b205687876b6
 
 end exp
 
