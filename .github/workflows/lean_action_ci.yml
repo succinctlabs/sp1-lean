@@ -1,7 +1,9 @@
 name: Lean Action CI
 
 on:
+  # Run on push to `master` or any pull requests
   push:
+    branches: ["main", "ci-testing"]
   pull_request:
   workflow_dispatch:
 
@@ -11,4 +13,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      # Test that the project builds without failure
+      # Note: defaults to ignore warnings and deprecations, maybe change eventually
       - uses: leanprover/lean-action@v1
+

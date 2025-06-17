@@ -5,16 +5,16 @@ defaultTargets = ["SP1Operations", "SP1Chips"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
-autoImplicit = false
+# autoImplicit = false 
 
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
 
-[[require]]
-name = "Lean_RV32D"
-git = "https://github.com/succinctlabs/sail-rv32d-lean"
-rev = "nightly"
+# [[require]]
+# name = "Lean_RV32D"
+# git = "https://github.com/succinctlabs/sail-rv32d-lean"
+# rev = "nightly"
 
 [[lean_lib]]
 name = "SP1Foundations"
@@ -24,3 +24,10 @@ name = "SP1Operations"
 
 [[lean_lib]]
 name = "SP1Chips"
+
+[[lean_lib]]
+name = "LeanRV32D"
+
+[[lean_exe]]
+name = "run-rv32d"
+root = "LeanRV32D"
