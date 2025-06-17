@@ -40,8 +40,9 @@ def constraints
   let E6 : BabyBear := 16384 * Main[1]
   let E8 : BabyBear := E6 + Main[2]
   [ .assertZero E2
-  , .funcall (AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]])
-  , .funcall (CPUState.constraints
+  ]
+  ++ (AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]])
+  ++ (CPUState.constraints
       { shard := Main[0]
       , clk_high_limb := Main[1]
       , clk_low_limb := Main[2]
@@ -49,7 +50,7 @@ def constraints
       E4
       4
       Main[22])
-  , .funcall (RTypeReader.constraints
+    ++ (RTypeReader.constraints
       Main[0]
       E8
       Main[3]
@@ -82,7 +83,7 @@ def constraints
           }
       }
       Main[22])
-  ]
+
 
 def sp1_add
   (Main : Vector BabyBear 23)
@@ -93,13 +94,12 @@ def sp1_add
   let pf : Main[20].val + Main[21].val * 65536 < 2^32 :=
     by
       simp only [constraints] at cstrs
-      simp only [SP1Constraint.toProp, List.Forall] at cstrs
-      simp only [AddOperation.constraints] at cstrs
-      simp only [SP1Constraint.toProp] at cstrs
-      simp [h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
-      have h_low  : Main[20].val < 65536 := cstrs.right.right.left
-      have h_high : Main[21].val < 65536 := cstrs.right.right.right.left
+      simp at cstrs
+      let ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
       clear cstrs
+      simp [AddOperation.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at add_cstrs
+      have h_low  : Main[20].val < 65536 := add_cstrs.right.right.left
+      have h_high : Main[21].val < 65536 := add_cstrs.right.right.right
       linarith
   do
     writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
@@ -116,7 +116,7 @@ def sp1_add
 
 theorem sp1_add_implies_spec_add
   (Main : Vector BabyBear 23)
-  (cstrs : constraintSet_toProp (constraints Main))
+  (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
   (h_is_real : Main[22] = 1)
   (rd rs1 rs2 : regidx)
   :
@@ -126,16 +126,23 @@ theorem sp1_add_implies_spec_add
   by
     simp [sp1_add, spec_add]
 
-    simp only [constraints] at cstrs
-    have add_constraints := AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]]
-    have add_cstrs : constraintSet_toProp add_constraints := by _
-    simp only [constraintSet_toProp] at cstrs
-    simp only [AddOperation.constraints] at cstrs
-    simp only [RTypeReader.constraints] at cstrs
-    simp only [SP1Constraint.toProp] at cstrs
-    simp [h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
+    -- simp only [constraints] at cstrs
+    -- have add_constraints := AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]]
+    -- have add_cstrs : constraintSet_toProp add_constraints := by _
+    -- simp only [constraintSet_toProp] at cstrs
+    -- simp only [AddOperation.constraints] at cstrs
+    -- simp only [RTypeReader.constraints] at cstrs
+    -- simp only [SP1Constraint.toProp] at cstrs
+    -- simp [h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
 
-    have ayo : Main[11] < 65536 := by clear * - cstrs; aesop
+    simp only [constraints] at cstrs
+    simp at cstrs
+    let ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
+    clear cstrs
+
+    simp [AddOperation.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at add_cstrs
+    simp [RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
+
     sorry
 
 end AddChip

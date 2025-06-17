@@ -28,7 +28,7 @@ inductive SP1Constraint where
   | send (interaction : AirInteraction) (mult : BabyBear)
   /-- Receiving an air interaction -/
   | receive (interaction : AirInteraction) (mult : BabyBear)
-  | funcall (res : List SP1Constraint)
+  -- | funcall (res : List SP1Constraint)
   /- deriving DecidableEq -/
 
 namespace SP1Constraint
@@ -38,12 +38,12 @@ def toProp : SP1Constraint → Prop
   | .send (.byte op a b c) (mult) => mult = 1 → op.constrain a b c
   | .receive (.memory _ _ _ low_limb high_limb) (mult) =>
       mult = 1 → (low_limb < 65536 ∧ high_limb < 65536)
-  | .funcall lst => List.Forall toProp lst
+  -- | .funcall lst => List.Forall toProp lst
   | _ => 1 = 1
 
 /- @[simp] lemma toProp_assertZero (x : BabyBear) : -/
 /-     (assertZero x).toProp ↔ x = 0 := Iff.rfl -/
-/--/
+
 /- @[simp] lemma toProp_sendAirInteration_byte (op : ByteOpcode) -/
 /-     (a b c mult : BabyBear) : -/
 /-     (send (.byte op a b c) mult).toProp ↔ -/
