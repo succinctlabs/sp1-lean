@@ -91,8 +91,39 @@ def constraints
       E4
       4
       Main[22])
-    ++ readerConstraints Main
-
+    ++ (RTypeReader.constraints
+      Main[0]
+      E8
+      -- Main[3]
+      -- 0
+      #v[Main[20], Main[21]]
+      { op_a := Main[4]
+      , op_a_memory :=
+          { prev_value := #v[Main[5], Main[6]]
+          , access_timestamp :=
+              { prev_clk := Main[7]
+              , diff_low_limb := Main[8]
+              }
+          }
+      , op_a_0 := Main[9]
+      , op_b := Main[10]
+      , op_b_memory :=
+          { prev_value := #v[Main[11], Main[12]]
+          , access_timestamp :=
+              { prev_clk := Main[13]
+              , diff_low_limb := Main[14]
+              }
+          }
+      , op_c := Main[15]
+      , op_c_memory :=
+          { prev_value := #v[Main[16], Main[17]]
+          , access_timestamp :=
+              { prev_clk := Main[18]
+              , diff_low_limb := Main[19]
+              }
+          }
+      }
+      Main[22])
 
 def sp1_add
   (Main : Vector BabyBear 23)
@@ -130,20 +161,31 @@ def registerMatch (rx : regidx) (x y : BabyBear) : Prop :=
 --   ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
 --     rX_bits rx = pure (BitVec.ofNatLT (x.val + y.val * 65536) pf)
 
-lemma rTypeReader_constraints_of_constraints
-    (cstrs : List.Forall SP1Constraint.toProp (constraints Main)) :
-    List.Forall SP1Constraint.toProp (readerConstraints Main) := by
-  sorry
+-- section List
+
+-- open List
+
+-- lemma List.Forall_mono (xs ys : List α) (h : xs <+ ys)
+--     (p : α → Prop) : List.Forall p ys → List.Forall p xs := by
+--   sorry
+
+-- end List
+
+-- lemma rTypeReader_constraints_of_constraints
+--     (cstrs : List.Forall SP1Constraint.toProp (constraints Main)) :
+--     List.Forall SP1Constraint.toProp (readerConstraints Main) := by
+--   apply List.Forall_mono _ _ _ _ cstrs
+--   simp [constraints]
+--   refine List.sublist_cons_of_sublist _ ?_
+--   refine List.sublist_append_of_sublist_right ?_
+--   refine List.sublist_append_of_sublist_right ?_
+--   exact List.Sublist.refl _
 
 theorem sp1_add_implies_spec_add
   (Main : Vector BabyBear 23)
   (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
   (h_is_real : Main[22] = 1)
   (rd rs1 rs2 : regidx)
-  (read_b_old : registerMatch rs1 Main[11] Main[12])
-  -- have hread_b := rTypeReader_constraints_of_constraints cstrs
-  (read_b : RTypeReader.read_b_fun (rTypeReader_constraints_of_constraints cstrs) h_is_real rs1)
-  (read_c : registerMatch rs2 Main[16] Main[17])
   :
   let res := (sp1_add Main cstrs h_is_real rd rs1 rs2)
   let res_spec := (spec_add rd rs1 rs2)
@@ -156,13 +198,14 @@ theorem sp1_add_implies_spec_add
     let ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
     clear cstrs
 
-    simp [RTypeReader.read_b_fun] at read_b
-    -- simp [registerMatch]
-    -- rw? at read_b
+    have read_b : registerMatch rs1 Main[11] Main[12] :=
+      RTypeReader.read_b_fun _ _ adapter_cstrs
+    have read_c : registerMatch rs2 Main[16] Main[17] :=
+      RTypeReader.read_c_fun _ _ adapter_cstrs
 
     let add_cstrs_folded := add_cstrs
     simp [AddOperation.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at add_cstrs
-    simp [readerConstraints, RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
+    simp [RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
     simp [SP1Constraint.toProp, sub_eq_zero] at orig_cstrs
 
     let M11_U16 : U16 := ⟨Main[11], by aesop⟩
@@ -186,20 +229,17 @@ theorem sp1_add_implies_spec_add
 
     refine bind_congr fun _ => ?_
     refine bind_congr fun _ => ?_
-    specialize read_b_old (by
+    specialize read_b (by
       have := M11_U16.in_range
       have := M12_U16.in_range
       linarith)
     specialize read_b
-
     specialize read_c (by
       have := M16_U16.in_range
       have := M17_U16.in_range
       linarith
     )
-
-
-    simp [read_b_old, read_c]
+    simp [read_b, read_c]
     rfl
 
 end Add
