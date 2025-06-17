@@ -57,7 +57,7 @@ def constraints_iff_constraints'
   · by_cases h' : I[6] = 1 <;> simp [constraints, constraints', h, h', sub_eq_zero]
 
 theorem correct
-  (a0 a1 b0 b1  c0 c1 : U16)
+  (a0 a1 b0 b1 c0 c1 : U16)
   (is_real : U1) :
     List.Forall SP1Constraint.toProp (constraints #v[b0, b1, c0, c1, a0, a1, is_real]) →
     spec a0 a1 b0 b1 c0 c1 is_real := by

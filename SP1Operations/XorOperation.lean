@@ -54,7 +54,6 @@ theorem correct (cols : XorOperation)
   simp [idealizedConstraints, spec, sub_eq_zero, mul_eq_zero]
   intros h1 h2 h3 h4 hreal i
   match i with | 0 => ?_ | 1 => ?_ | 2 => ?_ | 3 => ?_
-  sorry
-  -- all_goals trivial
+  all_goals sorry
 
 end XorOperation

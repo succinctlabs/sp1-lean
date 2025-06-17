@@ -77,7 +77,8 @@ def sp1_add
   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
   let rs1_value ← rX_bits rs1
   let rs2_value ← rX_bits rs2
-  wX_bits rd (BitVec.ofNatLT (Main[20].val + Main[21].val * 65536) (bound_of_constraints Main cstrs h_is_real))
+  wX_bits rd (BitVec.ofNatLT (Main[20].val + Main[21].val * 65536)
+    (bound_of_constraints Main cstrs h_is_real))
 
 def spec_add
     (rd rs1 rs2 : regidx) :

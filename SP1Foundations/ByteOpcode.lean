@@ -13,6 +13,12 @@ inductive ByteOpcode
 
 namespace ByteOpcode
 
+def ofBB : BabyBear → ByteOpcode
+  | 0 => .AND
+  | 1 => .OR
+  | 2 => .XOR
+  | _ => sorry
+
 section ofNat
 
 @[simp] lemma ofNat_zero : ByteOpcode.ofNat 0 = .AND := rfl
