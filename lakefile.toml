@@ -3,6 +3,9 @@ version = "0.1.0"
 keywords = ["math"]
 defaultTargets = ["SP1Operations", "SP1Chips"]
 
+moreLeanArgs = ["--tstack=400000"]
+preferReleaseBuild = true
+
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 # autoImplicit = false 
