@@ -76,4 +76,18 @@ def constraints
     .receive (.memory shard E44 cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real
   ]
 
+def read_b_fun
+  (cols : RTypeReader U16)
+  (rs : regidx)
+  : Prop := rX_bits rs = pure cols.b.toBV32_U16
+
+def read_c_fun
+  (cols : RTypeReader U16)
+  (rs : regidx)
+  : Prop := rX_bits rs = pure cols.c.toBV32_U16
+
 end RTypeReader
+
+structure MemRead (x : Word U16) where
+  val : BitVec 32
+  h_val : val = x.toBV32_U16

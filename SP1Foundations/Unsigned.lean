@@ -7,6 +7,7 @@ structure BoundedBabyBear (bound : ℕ) extends BabyBear where
 
 namespace BoundedBabyBear
 
+<<<<<<< HEAD
 @[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := by
   cases x
   cases y
@@ -14,6 +15,9 @@ namespace BoundedBabyBear
   -- x.toFin = y.toFin
   ext
   exact h
+=======
+@[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := sorry
+>>>>>>> 997c41403074de8dd357722fd646b205687876b6
 
 def ofNat (bound_dec x : ℕ) : BoundedBabyBear bound_dec.succ where
   val := (x % bound_dec.succ) % BabyBearPrime
@@ -167,10 +171,10 @@ theorem decompose_ofU16_inverse (bv : BitVec 32) :
   simp only
   apply BitVec.eq_of_toNat_eq
   simp [BitVec.toNat_ofNat]
-  
+
   have h : bv.toNat < 2^32 := bv.isLt
   have h_prime_bound : 65536 < BabyBearPrime := by norm_num
-  
+
   -- Key insight: since both limbs are < 65536 < BabyBearPrime, mod BabyBearPrime is a no-op
   have h_low_lt : bv.toNat % 65536 < BabyBearPrime := by
     have : bv.toNat % 65536 < 65536 := Nat.mod_lt _ (by omega : 0 < 65536)
