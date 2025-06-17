@@ -7,13 +7,13 @@ open LeanRV32D.Functions
 
 --- A Reader that only accesses values of type `T`.
 structure JTypeReader (T : Type) where
-  op_a : T 
-  op_a_memory : MemoryAccessInSharedCols T
+  op_a : T
+  op_a_memory : MemoryAccessInSharedCols
   op_a_0 : T
-  op_b_imm : Word T 
-  op_c_imm : Word T 
+  op_b_imm : Word T
+  op_c_imm : Word T
 
-namespace JTypeReader 
+namespace JTypeReader
 
 def b {T : Type} (cols : JTypeReader T) : Word T := cols.op_b_imm
 

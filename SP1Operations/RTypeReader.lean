@@ -14,7 +14,7 @@ structure RTypeReader where
   op_c : BabyBear
   op_c_memory : MemoryAccessInSharedCols
 
-namespace RTypeReader 
+namespace RTypeReader
 
 /- def b {T : Type} (cols : RTypeReader T) : Word T := cols.op_b_memory.prev_value -/
 /- def c {T : Type} (cols : RTypeReader T) : Word T := cols.op_c_memory.prev_value -/
@@ -76,15 +76,17 @@ def constraints
     .receive (.memory shard E44 cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real
   ]
 
+
+
 def read_b_fun
-  (cols : RTypeReader U16)
+  (cols : RTypeReader)
   (rs : regidx)
-  : Prop := rX_bits rs = pure cols.b.toBV32_U16
+  : Prop := rX_bits rs = sorry --pure cols.b.toBV32_U16
 
 def read_c_fun
-  (cols : RTypeReader U16)
+  (cols : RTypeReader)
   (rs : regidx)
-  : Prop := rX_bits rs = pure cols.c.toBV32_U16
+  : Prop := rX_bits rs = sorry --pure cols.c.toBV32_U16
 
 end RTypeReader
 
