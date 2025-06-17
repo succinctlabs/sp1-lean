@@ -20,7 +20,7 @@ namespace RTypeReader
 /- def c {T : Type} (cols : RTypeReader T) : Word T := cols.op_c_memory.prev_value -/
 
 def constraints
-  (shard clk pc opcode: BabyBear)
+  (shard clk : BabyBear)
   (op_a_write_value : Word BabyBear)
   (cols : RTypeReader)
   (is_real : BabyBear)
@@ -76,12 +76,44 @@ def constraints
     .receive (.memory shard E44 cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real
   ]
 
-
-
 def read_b_fun
-  (cols : RTypeReader)
-  (rs : regidx)
-  : Prop := rX_bits rs = sorry --pure cols.b.toBV32_U16
+  (cstrs : List.Forall SP1Constraint.toProp (RTypeReader.constraints shard clk op_a_write_value cols is_real))
+  (h_is_real : is_real = 1)
+  (rx : regidx)
+  : Prop :=
+    by
+      simp [constraints, List.Forall, SP1Constraint.toProp] at cstrs
+      have ⟨h_low, h_high⟩ := cstrs.right.right.right.right.right.right.right.right.right.right.left h_is_real
+
+      exact rX_bits rx = pure
+        (BitVec.ofNatLT (cols.op_b_memory.prev_value[0].val + cols.op_b_memory.prev_value[1].val * 65536)
+          (by clear * - h_low h_high; simp [Fin.lt_def] at h_low h_high; simp; linarith))
+
+def read_b_fun'
+    (cols : RTypeReader) (rx : regidx)
+    (pf : cols.op_b_memory.prev_value[0].val + cols.op_b_memory.prev_value[1] * 65536 < 2^32) :
+    Prop :=
+  rX_bits rx = pure (BitVec.ofNatLT
+    (cols.op_b_memory.prev_value[0].val + cols.op_b_memory.prev_value[1].val * 65536) pf)
+
+-- def read_b_fun'
+--   (cstrs : List.Forall SP1Constraint.toProp (RTypeReader.constraints shard clk pc opcode op_a_write_value cols is_real))
+--   (h_is_real : is_real = 1)
+--   (rx : regidx)
+--   : Prop :=
+--     by
+--       simp [constraints, List.Forall, SP1Constraint.toProp] at cstrs
+--       have ⟨h_low, h_high⟩ := cstrs.right.right.right.right.right.right.right.right.right.right.left h_is_real
+
+--       exact rX_bits rx = pure
+--         (BitVec.ofNatLT (cols.op_b_memory.prev_value[0].val + cols.op_b_memory.prev_value[1].val * 65536)
+--           (by clear * - h_low h_high; simp [Fin.lt_def] at h_low h_high; simp; linarith))
+
+
+-- def read_b_fun
+--   (cols : RTypeReader)
+--   (rs : regidx)
+--   : Prop := rX_bits rs = sorry --pure cols.b.toBV32_U16
 
 def read_c_fun
   (cols : RTypeReader)

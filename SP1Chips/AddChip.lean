@@ -31,30 +31,18 @@ namespace Add
 /-         ⟩ -/
 /-       ⟩ -/
 
-def constraints
-  (Main : Vector BabyBear 23)
-  : List SP1Constraint :=
+def readerConstraints (Main : Vector BabyBear 23) :
+    List SP1Constraint :=
   let E0 : BabyBear := Main[22] - 1
   let E2 : BabyBear := Main[22] * E0
   let E4 : BabyBear := Main[3] + 4
   let E6 : BabyBear := 16384 * Main[1]
   let E8 : BabyBear := E6 + Main[2]
-  [ .assertZero E2
-  ]
-  ++ (AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]])
-  ++ (CPUState.constraints
-      { shard := Main[0]
-      , clk_high_limb := Main[1]
-      , clk_low_limb := Main[2]
-      , pc := Main[3] }
-      E4
-      4
-      Main[22])
-    ++ (RTypeReader.constraints
+  (RTypeReader.constraints
       Main[0]
       E8
-      Main[3]
-      0
+      -- Main[3]
+      -- 0
       #v[Main[20], Main[21]]
       { op_a := Main[4]
       , op_a_memory :=
@@ -83,6 +71,27 @@ def constraints
           }
       }
       Main[22])
+
+def constraints
+  (Main : Vector BabyBear 23)
+  : List SP1Constraint :=
+  let E0 : BabyBear := Main[22] - 1
+  let E2 : BabyBear := Main[22] * E0
+  let E4 : BabyBear := Main[3] + 4
+  let E6 : BabyBear := 16384 * Main[1]
+  let E8 : BabyBear := E6 + Main[2]
+  [ .assertZero E2
+  ]
+  ++ (AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]])
+  ++ (CPUState.constraints
+      { shard := Main[0]
+      , clk_high_limb := Main[1]
+      , clk_low_limb := Main[2]
+      , pc := Main[3] }
+      E4
+      4
+      Main[22])
+    ++ readerConstraints Main
 
 
 def sp1_add
@@ -121,12 +130,19 @@ def registerMatch (rx : regidx) (x y : BabyBear) : Prop :=
 --   ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
 --     rX_bits rx = pure (BitVec.ofNatLT (x.val + y.val * 65536) pf)
 
+lemma rTypeReader_constraints_of_constraints
+    (cstrs : List.Forall SP1Constraint.toProp (constraints Main)) :
+    List.Forall SP1Constraint.toProp (readerConstraints Main) := by
+  sorry
+
 theorem sp1_add_implies_spec_add
   (Main : Vector BabyBear 23)
   (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
   (h_is_real : Main[22] = 1)
   (rd rs1 rs2 : regidx)
-  (read_b : registerMatch rs1 Main[11] Main[12])
+  (read_b_old : registerMatch rs1 Main[11] Main[12])
+  -- have hread_b := rTypeReader_constraints_of_constraints cstrs
+  (read_b : RTypeReader.read_b_fun (rTypeReader_constraints_of_constraints cstrs) h_is_real rs1)
   (read_c : registerMatch rs2 Main[16] Main[17])
   :
   let res := (sp1_add Main cstrs h_is_real rd rs1 rs2)
@@ -140,12 +156,16 @@ theorem sp1_add_implies_spec_add
     let ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
     clear cstrs
 
+    simp [RTypeReader.read_b_fun] at read_b
+    -- simp [registerMatch]
+    -- rw? at read_b
+
     let add_cstrs_folded := add_cstrs
     simp [AddOperation.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at add_cstrs
-    simp [RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
+    simp [readerConstraints, RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
     simp [SP1Constraint.toProp, sub_eq_zero] at orig_cstrs
 
-    let M11_U16 : U16 := ⟨Main[11], adapter_cstrs.right.right.right.right.right.right.right.left.left⟩
+    let M11_U16 : U16 := ⟨Main[11], by aesop⟩
     let M12_U16 : U16 := ⟨Main[12], adapter_cstrs.right.right.right.right.right.right.right.left.right⟩
     let M16_U16 : U16 := ⟨Main[16], adapter_cstrs.right.right.right.right.right.right.right.right.right.right.left⟩
     let M17_U16 : U16 := ⟨Main[17], adapter_cstrs.right.right.right.right.right.right.right.right.right.right.right⟩
@@ -156,7 +176,7 @@ theorem sp1_add_implies_spec_add
     let add_spec := AddOperation.correct M20_U16 M21_U16 M11_U16 M12_U16 M16_U16 M17_U16 M22_U1 add_cstrs_folded
     simp only [AddOperation.spec] at add_spec
 
-    let res_eq_bv_add := add_spec (by clear * - h_is_real; aesop)
+    have res_eq_bv_add := add_spec (by clear * - h_is_real; aesop)
     simp [BitVec.ofU16] at res_eq_bv_add
     rw [res_eq_bv_add]
 
@@ -166,16 +186,20 @@ theorem sp1_add_implies_spec_add
 
     refine bind_congr fun _ => ?_
     refine bind_congr fun _ => ?_
-    specialize read_b (by
+    specialize read_b_old (by
       have := M11_U16.in_range
       have := M12_U16.in_range
       linarith)
+    specialize read_b
+
     specialize read_c (by
       have := M16_U16.in_range
       have := M17_U16.in_range
       linarith
     )
-    simp [read_b, read_c]
+
+
+    simp [read_b_old, read_c]
     rfl
 
 end Add
