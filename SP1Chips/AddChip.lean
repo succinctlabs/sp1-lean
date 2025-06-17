@@ -113,36 +113,69 @@ def sp1_add
   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
   pure ()
 
+def registerMatch (rx : regidx) (x y : BabyBear) : Prop :=
+  ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
+    rX_bits rx = pure (BitVec.ofNatLT (x.val + y.val * 65536) pf)
+
+-- def RTypeReader.registerMatch  : Prop :=
+--   ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
+--     rX_bits rx = pure (BitVec.ofNatLT (x.val + y.val * 65536) pf)
 
 theorem sp1_add_implies_spec_add
   (Main : Vector BabyBear 23)
   (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
   (h_is_real : Main[22] = 1)
   (rd rs1 rs2 : regidx)
+  (read_b : registerMatch rs1 Main[11] Main[12])
+  (read_c : registerMatch rs2 Main[16] Main[17])
   :
   let res := (sp1_add Main cstrs h_is_real rd rs1 rs2)
   let res_spec := (spec_add rd rs1 rs2)
+
   res = res_spec :=
   by
     simp [sp1_add, spec_add]
 
-    -- simp only [constraints] at cstrs
-    -- have add_constraints := AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]]
-    -- have add_cstrs : constraintSet_toProp add_constraints := by _
-    -- simp only [constraintSet_toProp] at cstrs
-    -- simp only [AddOperation.constraints] at cstrs
-    -- simp only [RTypeReader.constraints] at cstrs
-    -- simp only [SP1Constraint.toProp] at cstrs
-    -- simp [h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at cstrs
-
-    simp only [constraints] at cstrs
-    simp at cstrs
+    simp [constraints] at cstrs
     let ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
     clear cstrs
 
+    let add_cstrs_folded := add_cstrs
     simp [AddOperation.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at add_cstrs
     simp [RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
+    simp [SP1Constraint.toProp, sub_eq_zero] at orig_cstrs
 
-    sorry
+    let M11_U16 : U16 := ⟨Main[11], adapter_cstrs.right.right.right.right.right.right.right.left.left⟩
+    let M12_U16 : U16 := ⟨Main[12], adapter_cstrs.right.right.right.right.right.right.right.left.right⟩
+    let M16_U16 : U16 := ⟨Main[16], adapter_cstrs.right.right.right.right.right.right.right.right.right.right.left⟩
+    let M17_U16 : U16 := ⟨Main[17], adapter_cstrs.right.right.right.right.right.right.right.right.right.right.right⟩
+    let M20_U16 : U16 := ⟨Main[20], adapter_cstrs.right.right.right.right.left.left⟩
+    let M21_U16 : U16 := ⟨Main[21], adapter_cstrs.right.right.right.right.left.right⟩
+    let M22_U1  : U1  := ⟨Main[22], by clear * - orig_cstrs; aesop⟩
+
+    let add_spec := AddOperation.correct M20_U16 M21_U16 M11_U16 M12_U16 M16_U16 M17_U16 M22_U1 add_cstrs_folded
+    simp only [AddOperation.spec] at add_spec
+
+    let res_eq_bv_add := add_spec (by clear * - h_is_real; aesop)
+    simp [BitVec.ofU16] at res_eq_bv_add
+    rw [res_eq_bv_add]
+
+    clear res_eq_bv_add add_spec
+
+    simp [execute_RTYPE]
+
+    refine bind_congr fun _ => ?_
+    refine bind_congr fun _ => ?_
+    specialize read_b (by
+      have := M11_U16.in_range
+      have := M12_U16.in_range
+      linarith)
+    specialize read_c (by
+      have := M16_U16.in_range
+      have := M17_U16.in_range
+      linarith
+    )
+    simp [read_b, read_c]
+    rfl
 
 end Add
