@@ -6,8 +6,6 @@ import SP1Operations.JTypeReader
 
 namespace exp
 
-#check Subtype
-
 -- Simple experiment with StateM Int to prove consecutive reads are equivalent
 theorem simple_consecutive_reads :
   (do let x ← StateT.get; let y ← StateT.get; pure (x, y) : StateM Int (Int × Int)) =
