@@ -11,9 +11,6 @@ inductive ByteOpcode
   | Range
   deriving DecidableEq
 
-example : ByteOpcode :=
-  ByteOpcode.ofNat (35 : BabyBear)
-
 namespace ByteOpcode
 
 def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
@@ -26,14 +23,14 @@ def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
   | Range => a < 2 ^ b.val -- Is this right?
   | MSB => (a < 256 ∧ b < 256 ∧ c < 256) → (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
 
-@[reducible, simp] def ofNat : Fin 7 → ByteOpcode
-  | 0 => AND
-  | 1 => OR
-  | 2 => XOR
-  | 3 => U8Range
-  | 4 => LTU
-  | 5 => MSB
-  | 6 => Range
+-- @[reducible, simp] def ofNat : Fin 7 → ByteOpcode
+--   | 0 => AND
+--   | 1 => OR
+--   | 2 => XOR
+--   | 3 => U8Range
+--   | 4 => LTU
+--   | 5 => MSB
+--   | 6 => Range
 
 -- @[simp] lemma constrain_AND (a b c : BabyBear) :
 --     AND.constrain a b c ↔ (a = b &&& c) := Iff.rfl
