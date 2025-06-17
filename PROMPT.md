@@ -1,8 +1,4 @@
-Finish the proof of X in the file F.
-
 You can run the Lean compiler using `lake lean -q <path-to-lean-file>` to get the output and error messages, including the context and goals at the error locations. Don't tail, head, or grep the stdout and stderr of the Lean compiler message because otherwise you may lose crucial information like types, goals, hints, etc. Always read the entire output of the compiler! Always run the Lean compiler on the file again to make sure that your proof actually works.
-
-Sp1Lean/NatTest directory contains some code for the verification of ZK circuits as long with some existing verifications. Verify that the `Add4Operation` circuit is not under-constrained by proving `Add4Operation.correct`. You can look at proofs of other operations such as the ones in `Add.lean`, `MSB.lean`, `IsZero.lean` (if these files exist) to get a sense of how `*.correct` is written and some common tactics, lemmas, etc. used to prove correctness of ZK circuits.
 
 For large and complicated proofs like this, it may be beneficial to
 1. Work out mathematically how the proof works before writing the Lean proof.

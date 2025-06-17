@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Function to extract the value after -o flag
+get_output_file() {
+    local found_o=0
+    for arg in "$@"; do
+        if [[ $found_o -eq 1 ]]; then
+            echo "$arg"
+            return
+        fi
+        if [[ "$arg" == "-o" ]]; then
+            found_o=1
+        fi
+    done
+}
+
+# Get the output file from arguments
+output_file=$(get_output_file "$@")
+
+# Check if output file matches our pattern
+if [[ -n "$output_file" ]] && [[ "$(basename "$output_file")" =~ ^Lean_RV32D-.*\.tar\.gz$ ]]; then
+    gh release download nightly \
+      --repo succinctlabs/sail-rv32d-lean \
+	  --pattern "$(basename "$output_file")" \
+      --output "$output_file"
+else
+    # Pass through to real curl for all other commands
+    exec /usr/bin/curl "$@"
+fi

@@ -1,175 +1,128 @@
 import SP1Foundations.Field
 
-section base
+/-- General definition that can be used to define `U1`, `U8`, and `U16`.
+Allows writing unified lemmas for all three definitions. -/
+structure BoundedBabyBear (bound : ℕ) extends BabyBear where
+  in_range : val < bound
 
--- TODO(gzgz): base should be some constant like U16.base
-abbrev base : BabyBear := 65536 -- 2^16
-abbrev baseInv : BabyBear := 2013235201
+namespace BoundedBabyBear
 
-@[simp] lemma val_base : (base : ℕ) = 65536 := rfl
-@[simp] lemma val_baseInv : (baseInv : ℕ) = 2013235201 := rfl
+@[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := sorry
 
-@[simp] lemma baseInv_mul_base : (baseInv : BabyBear) * (base : BabyBear) = 1 := rfl
-@[simp] lemma base_mul_baseInv : (base : BabyBear) * (baseInv : BabyBear) = 1 := rfl
+def ofNat (bound_dec x : ℕ) : BoundedBabyBear bound_dec.succ where
+  val := (x % bound_dec.succ) % BabyBearPrime
+  isLt := Nat.mod_lt _ Nat.succ_pos'
+  in_range := Nat.mod_lt_of_lt (Nat.mod_lt _ Nat.succ_pos')
 
-@[simp] lemma base_ne_zero : (base : BabyBear) ≠ 0 := by simp [base]
-@[simp] lemma baseInv_ne_zero : (baseInv : BabyBear) ≠ 0 := by simp [baseInv]
+/-- If the bound is at least `1` then `boundedBabyBear` has a natural `0`. -/
+def boundedBabyBear.zero (bound_dec : ℕ) : BoundedBabyBear bound_dec.succ where
+  in_range := by simp
+  __ := (0 : BabyBear)
 
-lemma baseInv_eq_inv_base : baseInv = base⁻¹ := by
-  rw [inv_eq_one_div, eq_div_iff] <;> simp
+/-- If the bound is at least `2` then `boundedBabyBear` has a natural `1`. -/
+def boundedBabyBear.one (bound_dec_dec : ℕ) : BoundedBabyBear (bound_dec_dec.succ.succ) where
+  in_range := by simp
+  __ := (1 : BabyBear)
 
-lemma base_eq_inv_baseInv : base = baseInv⁻¹ := by
-  rw [baseInv_eq_inv_base, inv_inv]
+instance (bound_dec : ℕ) : Zero (BoundedBabyBear bound_dec.succ) := ⟨boundedBabyBear.zero _⟩
+instance (bound_dec_dec : ℕ) : One (BoundedBabyBear bound_dec_dec.succ.succ) := ⟨boundedBabyBear.one _⟩
 
-@[simp] lemma mul_baseInv_eq_zero_iff (x : BabyBear) : x * baseInv = 1 ↔ x = base := by
-  rw [baseInv_eq_inv_base, mul_inv_eq_one₀ base_ne_zero]
+/-- Should only make an actual instance for special cases. -/
+def coe_of_le {bound bound' : ℕ} (h : bound ≤ bound') :
+    Coe (BoundedBabyBear bound) (BoundedBabyBear bound') where
+  coe x := { in_range := lt_of_lt_of_le x.in_range h, __ := x }
 
-@[simp] lemma baseInv_mul_eq_zero_iff (x : BabyBear) : baseInv * x = 1 ↔ x = base := by
-  rw [mul_comm, mul_baseInv_eq_zero_iff]
+variable {bound : ℕ}
 
-end base
+@[aesop 50% forward]
+lemma lt_babyBearPrime (x : BoundedBabyBear bound) : x.val < BabyBearPrime := Fin.is_lt _
 
-section U16
+instance : Inhabited (BoundedBabyBear bound.succ) where default := 0
+lemma default_eq_zero : (default : BoundedBabyBear bound.succ) = 0 := rfl
 
-structure U16 where
-  val : BabyBear
-  in_range : val < base
+section toFin
 
--- Extensionality for U1
-@[ext] theorem U16.ext {a b : U16} (h : a.val = b.val) : a = b := by
-  cases a; cases b; simp at h; simp [h]
+-- /-- Convert a `BoundedBabyBear` to a `BabyBear` by forgetting the bound. -/
+-- @[simp] alias toBabyBear := BoundedBabyBear.toFin
 
-instance : Coe U16 BabyBear where
-  coe u := u.val
+-- lemma toBabyBear_def (x : BoundedBabyBear bound) : x.toBabyBear = x.toFin := rfl
 
--- Safe constructors for 0 and 1
-def U16.zero : U16 := ⟨0, by simp [base]⟩
-def U16.one : U16 := ⟨1, by simp [base]⟩
+@[simp] lemma toFin_zero : (0 : BoundedBabyBear bound.succ).toFin = 0 := rfl
+@[simp] lemma toFin_one : (1 : BoundedBabyBear bound.succ.succ).toFin = 1 := rfl
 
--- Allow writing 0 : U16 and 1 : U16 directly
-instance : Zero U16 := ⟨U16.zero⟩
-instance : One U16 := ⟨U16.one⟩
+lemma toFin_inj (x y : BoundedBabyBear bound) : x.toFin = y.toFin ↔ x = y := by
+  refine ⟨fun h => ?_, fun h => h ▸ rfl⟩
+  rwa [BoundedBabyBear.ext_iff, ← Fin.ext_iff]
 
-@[simp]
-lemma U16_eq_zero_iff (x : U16) : x = 0 ↔ x.val = 0 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
+lemma injective_toFin : Function.Injective (BoundedBabyBear.toFin : BoundedBabyBear bound → BabyBear) :=
+  fun x y h => (toFin_inj x y).1 h
 
-@[simp]
-lemma U16_eq_one_iff (x : U16) : x = 1 ↔ x.val = 1 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
+lemma toFin_eq_iff (x : BoundedBabyBear bound) (y : Fin BabyBearPrime) : x.toFin = y ↔ x.val = y.val := by
+  erw [Fin.ext_iff]
 
-@[simp]
-lemma U16_eq_zero_iff' (x : U16) : x = U16.zero ↔ x.val = 0 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
+end toFin
 
-@[simp]
-lemma U16_eq_one_iff' (x : U16) : x = U16.one ↔ x.val = 1 := by
-  refine ⟨congr_arg U16.val, fun h => U16.ext h⟩
+-- section toBabyBear
 
--- For converting BabyBear to U16, we can define a function that returns Option
-def BabyBear.toU16? (b : BabyBear) : Option U16 :=
-  if h : b < base then some ⟨b, h⟩ else none
+-- lemma toBabyBear_zero : (0 : BoundedBabyBear bound.succ).toBabyBear = 0 := rfl
+-- lemma toBabyBear_one : (1 : BoundedBabyBear bound.succ.succ).toBabyBear = 1 := rfl
 
-instance (b : BabyBear) (h : b < base) : CoeDep BabyBear b U16 where
-  coe := ⟨b, h⟩
+-- lemma val_toBabyBear (x : BoundedBabyBear bound) : (x.toBabyBear : ℕ) = x.val := rfl
 
-instance : CoeOut U16 ℕ where
-  coe u := u.val.val  -- U16 -> BabyBear -> ℕ
+-- lemma toBabyBear_inj (x y : BoundedBabyBear bound) : toBabyBear x = toBabyBear y ↔ x = y := by
+--   simp [toBabyBear, toFin_inj]
 
-end U16
+-- lemma injective_toBabyBear :
+--     Function.Injective (toBabyBear : BoundedBabyBear bound → BabyBear) :=
+--   fun x y h => (toBabyBear_inj x y).1 h
 
-section U8
+-- end toBabyBear
 
-structure U8 where
-  val : BabyBear
-  in_range : val < 256 -- TODO(gzgz): 256 should be some constant like U8.base
+lemma eq_zero_iff (x : BoundedBabyBear bound.succ) : x = 0 ↔ x.val = 0 := by aesop
 
--- Extensionality for U1
-@[ext] theorem U8.ext {a b : U8} (h : a.val = b.val) : a = b := by
-  cases a; cases b; simp at h; simp [h]
+lemma eq_one_iff (x : BoundedBabyBear bound.succ.succ) : x = 1 ↔ x.val = 1 := by aesop
 
-instance : Coe U8 BabyBear where
-  coe u := u.val
+section LinearOrder
 
--- Safe constructors for 0 and 1
-def U8.zero : U8 := ⟨0, by simp [base]⟩
-def U8.one : U8 := ⟨1, by simp [base]⟩
+/-- Lift the linear order on the underlying field to `BoundedBabyBear`. -/
+instance : LinearOrder (BoundedBabyBear bound) :=
+  LinearOrder.lift' BoundedBabyBear.toFin injective_toFin
 
--- Allow writing 0 : U8 and 1 : U8 directly
-instance : Zero U8 := ⟨U8.zero⟩
-instance : One U8 := ⟨U8.one⟩
+@[simp] lemma lt_iff_val_lt_val (x y : BoundedBabyBear bound) :
+    x < y ↔ x.val < y.val := Iff.rfl
 
-@[simp]
-lemma U8_eq_zero_iff (x : U8) : x = 0 ↔ x.val = 0 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+@[simp] lemma le_iff_val_le_val (x y : BoundedBabyBear bound) :
+    x ≤ y ↔ x.val ≤ y.val := Iff.rfl
 
-@[simp]
-lemma U8_eq_one_iff (x : U8) : x = 1 ↔ x.val = 1 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+end LinearOrder
 
-@[simp]
-lemma U8_eq_zero_iff' (x : U8) : x = U8.zero ↔ x.val = 0 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+end BoundedBabyBear
 
-@[simp]
-lemma U8_eq_one_iff' (x : U8) : x = U8.one ↔ x.val = 1 := by
-  refine ⟨congr_arg U8.val, fun h => U8.ext h⟩
+abbrev U16 := BoundedBabyBear 65536
+abbrev U8 := BoundedBabyBear 256
+abbrev U1 := BoundedBabyBear 2
 
--- For converting BabyBear to U8, we can define a function that returns Option
-def BabyBear.toU8? (b : BabyBear) : Option U8 :=
-  if h : b < 256 then some ⟨b, h⟩ else none
+instance : Coe U16 BabyBear where coe := BoundedBabyBear.toFin
+instance : Coe U8 BabyBear where coe := BoundedBabyBear.toFin
+instance : Coe U1 BabyBear where coe := BoundedBabyBear.toFin
 
-instance (b : BabyBear) (h : b < 256) : CoeDep BabyBear b U8 where
-  coe := ⟨b, h⟩
+instance : Coe U1 U8 := BoundedBabyBear.coe_of_le <| by omega
+instance : Coe U8 U16 := BoundedBabyBear.coe_of_le <| by omega
 
-instance : CoeOut U8 ℕ where
-  coe u := u.val.val  -- U8 -> BabyBear -> ℕ
+def U1.in_range' (x : U1) : x.val = 0 ∨ x.val = 1 := by
+  have := x.in_range; omega
 
-end U8
+def U1.in_range'' (x : U1) : x = 0 ∨ x = 1 := by
+  have := x.in_range'
+  aesop
 
-section U1
+@[aesop 50% forward]
+lemma U16.lt_bound (x : U16) : x.val < 65536 := x.in_range
 
--- U1 type for bits
-structure U1 where
-  val : BabyBear
-  in_range : val = 0 ∨ val = 1
+@[aesop 50% forward]
+lemma U8.lt_bound (x : U8) : x.val < 256 := x.in_range
 
--- Extensionality for U1
-@[ext] theorem U1.ext {a b : U1} (h : a.val = b.val) : a = b := by
-  cases a; cases b; simp at h; simp [h]
+open BitVec
 
-instance : Coe U1 BabyBear where
-  coe u := u.val
-
-instance : CoeOut U1 ℕ where
-  coe u := u.val.val
-
--- Conversion from BabyBear to U1
-def BabyBear.toU1? (b : BabyBear) : Option U1 :=
-  if h : b = 0 ∨ b = 1 then some ⟨b, h⟩ else none
-
--- Safe constructors for 0 and 1
-def U1.zero : U1 := ⟨0, Or.inl rfl⟩
-def U1.one : U1 := ⟨1, Or.inr rfl⟩
-
--- Allow writing 0 : U1 and 1 : U1 directly
-instance : Zero U1 := ⟨U1.zero⟩
-instance : One U1 := ⟨U1.one⟩
-
-@[simp]
-lemma U1.eq_zero_iff (x : U1) : x = 0 ↔ x.val = 0 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
-
-@[simp]
-lemma U1.eq_one_iff (x : U1) : x = 1 ↔ x.val = 1 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
-
-@[simp]
-lemma U1.eq_zero_iff' (x : U1) : x = U1.zero ↔ x.val = 0 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
-
-@[simp]
-lemma U1.eq_one_iff' (x : U1) : x = U1.one ↔ x.val = 1 := by
-  refine ⟨congr_arg U1.val, fun h => U1.ext h⟩
-
-end U1
+def BitVec.ofU16 (low_limb high_limb : U16) : BitVec 32 :=
+  (low_limb.val + high_limb.val * 65536)#'(by aesop (add 50% tactic (by omega)))
