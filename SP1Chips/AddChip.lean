@@ -11,7 +11,6 @@ open PreSail (SequentialState)
 
 namespace Add
 
-<<<<<<< HEAD
 /- -- What we expect the generated constraint to look like: -/
 /- def constraints -/
 /-   (chip : AddChip) : Prop := -/
@@ -145,17 +144,14 @@ theorem sp1_add_implies_spec_add
     simp [RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
 
     sorry
-=======
 -- Add below imports to the top of the file
 /- import LeanRV32D.RiscvInstsEnd -/
 /- import LeanRV32D.RiscvRegs -/
->>>>>>> 997c41403074de8dd357722fd646b205687876b6
 
 open LeanRV32D.Functions
 open Sail
 open PreSail (SequentialState)
 
-<<<<<<< HEAD
 /-
 Constraints for chip Add (main):
    Expr(0) = Main(22) - 1
@@ -290,13 +286,13 @@ Func(AddOperation(Word(Input(0), Input(1)), Word(Input(2), Input(3)), AddOperati
 --       /- rw [←mem_read_1, ←mem_read_2] at h_add -/
 --       /- let res := chip.add_operation.value.toBV32_U16 -/
 --       exact wX_bits rd chip.add_operation.value.toBV32_U16
--- 
+--
 -- /- noncomputable -/ def spec_add (rd rs1 rs2 : regidx) : SailM Unit := do
 --   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
 --   /- let _ ← execute (.RTYPE ⟨rs2, rs1, rd, rop.ADD⟩) -/ -- `execute` is uncomputable...?
 --   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
 --   pure ()
--- 
+--
 -- theorem sp1_add_implies_spec_add (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx) (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) (s : PreSail.SequentialState RegisterType trivialChoiceSource) :
 --   let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c).run s
 --   let res_spec := (spec_add rd rs1 rs2).run s
@@ -312,7 +308,7 @@ Func(AddOperation(Word(Input(0), Input(1)), Word(Input(2), Input(3)), AddOperati
 --     rw [←add_spec]
 --     rw [pure_bind, pure_bind]
 --     rfl
--- 
+--
 -- theorem sp1_add_implies_spec_add' (chip : AddChip) (constraints : chip.constraints) (h_is_real : chip.is_real = 1) (rd rs1 rs2 : regidx)
 --     (read_b : chip.adapter.read_b_fun rs1) (read_c : chip.adapter.read_c_fun rs2) :
 --   let res := (sp1_add chip constraints h_is_real rd rs1 rs2 read_b read_c)
@@ -321,9 +317,9 @@ Func(AddOperation(Word(Input(0), Input(1)), Word(Input(2), Input(3)), AddOperati
 --   by
 --     refine EStateM.ext fun s => ?_
 --     simp [EStateM.run]
--- 
+--
 --     simp [sp1_add, spec_add, /- execute, -/ execute_RTYPE]
--- 
+--
 --     let add_spec := (chip.add_operation.correct chip.adapter.b chip.adapter.c chip.is_real constraints.right.left) h_is_real
 --     simp [RTypeReader.read_b_fun] at read_b
 --     rw [read_b]
@@ -332,7 +328,6 @@ Func(AddOperation(Word(Input(0), Input(1)), Word(Input(2), Input(3)), AddOperati
 --     rw [←add_spec]
 --     rw [pure_bind, pure_bind]
 --     rfl
-=======
 open AddOperation
 
 def AddChipConstraints
@@ -423,4 +418,3 @@ theorem sp1_add_implies_spec_add
     rfl
 
 end Add
->>>>>>> 997c41403074de8dd357722fd646b205687876b6

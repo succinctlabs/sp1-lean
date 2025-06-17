@@ -7,17 +7,7 @@ structure BoundedBabyBear (bound : ℕ) extends BabyBear where
 
 namespace BoundedBabyBear
 
-<<<<<<< HEAD
-@[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := by
-  cases x
-  cases y
-  congr
-  -- x.toFin = y.toFin
-  ext
-  exact h
-=======
 @[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := sorry
->>>>>>> 997c41403074de8dd357722fd646b205687876b6
 
 def ofNat (bound_dec x : ℕ) : BoundedBabyBear bound_dec.succ where
   val := (x % bound_dec.succ) % BabyBearPrime
