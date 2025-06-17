@@ -1,23 +1,15 @@
 import SP1Foundations.Field
 import SP1Foundations.ByteOpcode
 
-inductive AirInteraction.Kind where
-  | BYTE
-  | MEMORY
-  | PROGRAM
-  | STATE
+-- inductive AirInteraction.Kind where
+--   | BYTE
+--   | MEMORY
+--   | PROGRAM
+--   | STATE
 
 inductive AirInteraction where
   | byte (op : ByteOpcode) (a b c : BabyBear)
-  /--
-  Represents an InteractionKind::Memory.
-  shard -> clk -> addr -> low_limb -> high_limb
-  -/
   | memory (shard clk addr low_limb high_limb : BabyBear)
-  /--
-  Represents an InteractionKind::State
-  shard -> clk -> pc
-  -/
   | state (shard clk pc : BabyBear)
   deriving DecidableEq
 
@@ -28,8 +20,8 @@ inductive SP1Constraint where
   | send (interaction : AirInteraction) (mult : BabyBear)
   /-- Receiving an air interaction -/
   | receive (interaction : AirInteraction) (mult : BabyBear)
-  -- | funcall (res : List SP1Constraint)
-  /- deriving DecidableEq -/
+  -- | ofList (cs : List SP1Constraint) : SP1Constraint
+  deriving DecidableEq
 
 namespace SP1Constraint
 
@@ -37,19 +29,17 @@ section toProp
 
 def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
-  | .send (.byte op a b c) (mult) => mult = 1 → op.constrain a b c
+  | .send (.byte op a b c) (mult) => mult ≠ 0 → op.constrain a b c
   | .receive (.memory _ _ _ low_limb high_limb) (mult) =>
-      mult = 1 → (low_limb < 65536 ∧ high_limb < 65536)
-  -- | .funcall lst => List.Forall toProp lst
+      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536)
   | _ => 1 = 1
 
-/- @[simp] lemma toProp_assertZero (x : BabyBear) : -/
-/-     (assertZero x).toProp ↔ x = 0 := Iff.rfl -/
+@[simp] lemma toProp_assertZero (x : BabyBear) :
+    (assertZero x).toProp ↔ x = 0 := Iff.rfl
 
-/- @[simp] lemma toProp_sendAirInteration_byte (op : ByteOpcode) -/
-/-     (a b c mult : BabyBear) : -/
-/-     (send (.byte op a b c) mult).toProp ↔ -/
-/-       (mult = 1 → ByteOpcode.constrain op a b c) := Iff.rfl -/
+@[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c mult : BabyBear) :
+    (send (AirInteraction.byte op a b c) mult).toProp ↔
+      (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 
 end toProp
 
@@ -57,7 +47,7 @@ end SP1Constraint
 
 -- section constraintSet
 --
--- -- TODO: should this exist? maybe even as `abbrev`?
+-- -- TODO: should this exist? maybe even as `abbrev`? Also would need to use lists now
 -- @[reducible] def constraintSet := Finset SP1Constraint
 --
 -- /-- Covert a set of constraints to a single proposition stating that they all hold. -/

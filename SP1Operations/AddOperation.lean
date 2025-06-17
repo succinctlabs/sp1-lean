@@ -2,8 +2,6 @@ import SP1Foundations
 
 namespace AddOperation
 
-/- @[simp] lemma value_mk (value : Word U16) : (AddOperation.mk value).value = value := rfl -/
-
 def spec
   (a0 a1 : U16)
   (b0 b1 : U16)
@@ -54,15 +52,12 @@ def constraints'
 def constraints_iff_constraints'
   (I : Vector BabyBear 7)
   : List.Forall SP1Constraint.toProp (constraints I) ↔ constraints' I := by
-  simp [constraints, constraints']
-  simp [ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain]
-  simp [sub_eq_zero]
-  sorry
+  by_cases h : I[6] = 0
+  · simp [constraints, constraints', h]
+  · by_cases h' : I[6] = 1 <;> simp [constraints, constraints', h, h', sub_eq_zero]
 
 theorem correct
-  (a0 a1 : U16)
-  (b0 b1 : U16)
-  (c0 c1 : U16)
+  (a0 a1 b0 b1  c0 c1 : U16)
   (is_real : U1) :
     List.Forall SP1Constraint.toProp (constraints #v[b0, b1, c0, c1, a0, a1, is_real]) →
     spec a0 a1 b0 b1 c0 c1 is_real := by
@@ -77,11 +72,6 @@ theorem correct
   clear q1
   simp [sub_eq_zero, mul_eq_zero] at qq1 qq2
   simp [BitVec.ofU16, BitVec.ofNatLT]
-
-  let i0 := c0.in_range
-  let i1 := c1.in_range
-  let i2 := b0.in_range
-  let i3 := b1.in_range
 
   cases qq1 with
   | inl qqq1 =>
