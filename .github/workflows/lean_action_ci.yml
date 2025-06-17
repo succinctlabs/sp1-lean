@@ -16,4 +16,9 @@ jobs:
       # Test that the project builds without failure
       # Note: defaults to ignore warnings and deprecations, maybe change eventually
       - uses: leanprover/lean-action@v1
+        with:
+          build: "true"
+          test: "false"
+          lint: "false"
+          use-github-cache: "true"
 
