@@ -7,7 +7,9 @@ structure BoundedBabyBear (bound : ℕ) extends BabyBear where
 
 namespace BoundedBabyBear
 
-@[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) : x = y := sorry
+@[ext] lemma ext {bound : ℕ} {x y : BoundedBabyBear bound} (h : x.val = y.val) :
+    x = y := match x, y with
+  | ⟨⟨x, ?_⟩, ?_⟩, ⟨⟨y, ?_⟩, ?_⟩ => by simpa
 
 def ofNat (bound_dec x : ℕ) : BoundedBabyBear bound_dec.succ where
   val := (x % bound_dec.succ) % BabyBearPrime

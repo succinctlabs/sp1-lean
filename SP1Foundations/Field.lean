@@ -2,9 +2,9 @@ import Mathlib
 
 @[simp] abbrev BabyBearPrime : ℕ := 2013265921
 
-lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by
-  -- norm_num doesn't work on OSX?
-  sorry
+axiom prime_BabyBearPrime : Nat.Prime BabyBearPrime
+-- lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by
+--   sorry -- broken on osx for now
 
 instance : Fact (Nat.Prime BabyBearPrime) := ⟨prime_BabyBearPrime⟩
 
@@ -14,9 +14,7 @@ instance : NeZero BabyBearPrime := by constructor; decide
 
 instance Fin.noZeroDivisors_of_prime (p : ℕ)
     [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
-  have : IsDomain (ZMod (p + 1)) := ZMod.instIsDomain (hp := ⟨hp.1⟩)
-  simp [ZMod] at this
-  sorry
+  refine IsDomain.to_noZeroDivisors (ZMod (p + 1))
 
 namespace BabyBear
 
