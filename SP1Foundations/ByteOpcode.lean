@@ -44,8 +44,8 @@ def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
 -- @[simp] lemma constrain_Range (a b c : BabyBear) :
 --     Range.constrain a b c ↔ (a < 2 ^ b.val) := Iff.rfl
 
-@[simp] lemma constrain_U8Range (c a b : BabyBear) :
-    U8Range.constrain c a b ↔ c < 256 ∧ a < 256 := Iff.rfl
+-- @[simp] lemma constrain_U8Range (c a b : BabyBear) :
+--     U8Range.constrain c a b ↔ c < 256 ∧ a < 256 := Iff.rfl
 
 @[simp] lemma constrain_Range (c a b : BabyBear) :
     Range.constrain c a b ↔ (c < 2 ^ a.val) := Iff.rfl
