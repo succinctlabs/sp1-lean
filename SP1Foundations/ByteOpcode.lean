@@ -38,6 +38,8 @@ def toBB : ByteOpcode → BabyBear
 
 end ofNat
 
+section constrain
+
 def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
   match op with
   | AND => (a < 256 ∧ b < 256 ∧ c < 256) → a = b &&& c
@@ -68,5 +70,43 @@ def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
 
 @[simp] lemma constrain_Range (a b c : BabyBear) :
     ByteOpcode.Range.constrain a b c ↔ (a < 2 ^ b.val) := Iff.rfl
+
+end constrain
+
+/-- Perform induction on `ByteOpcode` with all the non-bitwise operations consolidated.
+Useful when you want to ignore non-bitwise operations (or treat them as some defualt). -/
+@[elab_as_elim]
+protected def bitwise_induction (C : ByteOpcode → Sort*)
+    (and : C .AND) (or : C .OR) (xor : C .XOR)
+    (other : (op : ByteOpcode) →
+      (op ≠ .AND ∧ op ≠ .OR ∧ op ≠ .XOR) → C op)
+    (op : ByteOpcode) : C op := by
+  refine match op with
+  | .AND => and
+  | .OR => or
+  | .XOR => xor
+  | .U8Range | .LTU | .MSB | .Range => other _ (by simp)
+
+section toBitwise
+
+/-- Convert a `ByteOpcode` to a bitwise operation.
+Gives dummy outputs outside `AND`, `OR`, and `XOR` operations. -/
+def toBitwise (op : ByteOpcode) : BabyBear → BabyBear → BabyBear :=
+  by induction op using ByteOpcode.bitwise_induction with
+  | and => exact (· &&& ·)
+  | or => exact (· ||| ·)
+  | xor => exact (· ^^^ ·)
+  | other => exact fun _ _ => 0
+
+@[simp] lemma toBitwise_and (x y : BabyBear) :
+    toBitwise AND x y = x &&& y := rfl
+
+@[simp] lemma toBitwise_or (x y : BabyBear) :
+    toBitwise OR x y = x ||| y := rfl
+
+@[simp] lemma toBitwise_xor (x y : BabyBear) :
+    toBitwise XOR x y = x ^^^ y := rfl
+
+end toBitwise
 
 end ByteOpcode

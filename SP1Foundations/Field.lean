@@ -59,10 +59,19 @@ lemma baseInv_eq_inv_base : baseInv = base⁻¹ := by
 lemma base_eq_inv_baseInv : base = baseInv⁻¹ := by
   rw [baseInv_eq_inv_base, inv_inv]
 
-@[simp] lemma mul_baseInv_eq_zero_iff (x : BabyBear) : x * baseInv = 1 ↔ x = base := by
+@[simp] lemma mul_baseInv_eq_one_iff (x : BabyBear) : x * baseInv = 1 ↔ x = base := by
   rw [baseInv_eq_inv_base, mul_inv_eq_one₀ base_ne_zero]
 
-@[simp] lemma baseInv_mul_eq_zero_iff (x : BabyBear) : baseInv * x = 1 ↔ x = base := by
-  rw [mul_comm, mul_baseInv_eq_zero_iff]
+@[simp] lemma baseInv_mul_eq_one_iff (x : BabyBear) : baseInv * x = 1 ↔ x = base := by
+  rw [mul_comm, mul_baseInv_eq_one_iff]
 
 end base
+
+section u8_base
+
+@[simp] lemma u8_base_mul_u8_inv : (256 : BabyBear) * 2005401601 = 1 := rfl
+@[simp] lemma u8_inv_mul_u8_base : (2005401601 : BabyBear) * 256 = 1 := rfl
+
+-- lemma mul_u8_inv_lt_u8_base_iff (x : BabyBear) : x * 2005401601 < 256 ↔ x
+
+end u8_base
