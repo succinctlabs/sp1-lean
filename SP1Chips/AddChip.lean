@@ -7,7 +7,7 @@ namespace AddChip
 
 def constraints
   (Main : Vector BabyBear 23)
-  : List SP1Constraint :=
+  : SP1ConstraintList :=
   let E0 : BabyBear := Main[22] - 1
   let E2 : BabyBear := Main[22] * E0
   let E4 : BabyBear := Main[3] + 4
@@ -59,7 +59,7 @@ def constraints
     Main[22])
 
 lemma bound_of_constraints (Main : Vector BabyBear 23)
-    (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
+    (cstrs : (constraints Main).allHold)
     (h_is_real : Main[22] = 1) : Main[20].val + Main[21].val * 65536 < 2^32 := by
   simp [constraints] at cstrs
   let ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
@@ -88,53 +88,41 @@ def spec_add
   pure ()
 
 theorem sp1_add_implies_spec_add (Main : Vector BabyBear 23)
-    (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
+    (cstrs : (constraints Main).allHold)
     (h_is_real : Main[22] = 1) (rd rs1 rs2 : regidx) :
     sp1_add Main cstrs h_is_real rd rs1 rs2 = spec_add rd rs1 rs2 := by
   unfold sp1_add spec_add
   simp only [sp1_add, spec_add]
+
   -- Extract the various constraints from the assumption
   simp [constraints] at cstrs
-  let ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
-  clear cstrs
+  obtain ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
+  rw [h_is_real] at adapter_cstrs add_cstrs
 
-  have read_b : RTypeReader.registerMatch rs1 Main[11] Main[12] :=
-    RTypeReader.read_b_fun _ _ adapter_cstrs
-  have read_c : RTypeReader.registerMatch rs2 Main[16] Main[17] :=
-    RTypeReader.read_c_fun _ _ adapter_cstrs
+  -- The `RTypeReader` gives bounds on the size of previous memory values
+  let op_b_memory_bound := RTypeReader.op_b_memory_lt_of_constraints adapter_cstrs
+  let op_c_memory_bound := RTypeReader.op_c_memory_lt_of_constraints adapter_cstrs
 
-  simp [RTypeReader.constraints, SP1Constraint.toProp, h_is_real, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain] at adapter_cstrs
-  simp [SP1Constraint.toProp, sub_eq_zero] at orig_cstrs
+  -- Bounded representations of the input limbs
+  let M11_U16 : U16 := ⟨Main[11], op_b_memory_bound.1⟩
+  let M12_U16 : U16 := ⟨Main[12], op_b_memory_bound.2⟩
+  let M16_U16 : U16 := ⟨Main[16], op_c_memory_bound.1⟩
+  let M17_U16 : U16 := ⟨Main[17], op_c_memory_bound.2⟩
+  let M22_U1  : U1  := ⟨Main[22], by aesop⟩
+  have hb1 : Main[11].val + Main[12].val * 65536 < 2 ^ 32 := by
+    have := M11_U16.in_range; have := M12_U16.in_range; linarith
+  have hb2 : Main[16].val + Main[17].val * 65536 < 2 ^ 32 := by
+    have := M16_U16.in_range; have := M17_U16.in_range; linarith
 
-  let M11_U16 : U16 := ⟨Main[11], adapter_cstrs.right.right.right.right.right.right.right.left.left⟩
-  let M12_U16 : U16 := ⟨Main[12], adapter_cstrs.right.right.right.right.right.right.right.left.right⟩
-  let M16_U16 : U16 := ⟨Main[16], adapter_cstrs.right.right.right.right.right.right.right.right.right.right.left⟩
-  let M17_U16 : U16 := ⟨Main[17], adapter_cstrs.right.right.right.right.right.right.right.right.right.right.right⟩
-  let M20_U16 : U16 := ⟨Main[20], adapter_cstrs.right.right.right.right.left.left⟩
-  let M21_U16 : U16 := ⟨Main[21], adapter_cstrs.right.right.right.right.left.right⟩
-  let M22_U1  : U1  := ⟨Main[22], by clear * - orig_cstrs; aesop⟩
+  -- Correspondence between the original and newly written values
+  have read_b := RTypeReader.read_b_fun _ rs1 adapter_cstrs hb1
+  have read_c := RTypeReader.read_c_fun _ rs2 adapter_cstrs hb2
 
-  let add_spec := AddOperation.correct M20_U16 M21_U16 M11_U16 M12_U16 M16_U16 M17_U16 M22_U1 add_cstrs
-  simp only [AddOperation.spec] at add_spec
+  -- Substitue the semantics of the underlying add operation
+  rw [AddOperation.correct' Main[20] Main[21] M11_U16 M12_U16 M16_U16 M17_U16 add_cstrs]
 
-  have res_eq_bv_add := add_spec (by clear * - h_is_real; aesop)
-  simp [BitVec.ofU16] at res_eq_bv_add
-  rw [res_eq_bv_add]
-
-  simp only [execute_RTYPE, Nat.reducePow, Nat.reduceMul, bind_pure_comp, bind_assoc,
-    bind_map_left, map_bind, Functor.map_map, id_map']
-
-  specialize read_b (by
-    have := M11_U16.in_range
-    have := M12_U16.in_range
-    linarith)
-  specialize read_c (by
-    have := M16_U16.in_range
-    have := M17_U16.in_range
-    linarith
-  )
-  simp [read_b, read_c]
-
+  -- Simplify the final result
+  simp [read_b, read_c, execute_RTYPE]
   rfl
 
 end AddChip
