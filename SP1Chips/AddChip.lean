@@ -70,7 +70,7 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
 
 def sp1_add
     (Main : Vector BabyBear 23)
-    (cstrs : List.Forall SP1Constraint.toProp (constraints Main))
+    (cstrs : (constraints Main).allHold)
     (h_is_real : Main[22] = 1)
     (rd rs1 rs2 : regidx) :
     SailM Unit := do
@@ -92,7 +92,6 @@ theorem sp1_add_implies_spec_add (Main : Vector BabyBear 23)
     (h_is_real : Main[22] = 1) (rd rs1 rs2 : regidx) :
     sp1_add Main cstrs h_is_real rd rs1 rs2 = spec_add rd rs1 rs2 := by
   unfold sp1_add spec_add
-  simp only [sp1_add, spec_add]
 
   -- Extract the various constraints from the assumption
   simp [constraints] at cstrs

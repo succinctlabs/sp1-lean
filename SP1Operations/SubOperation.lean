@@ -10,19 +10,19 @@ Note that we ignore `is_real` for now. -/
 def spec (cols : SubOperation) (a b : Word U16) (is_real : U1) : Prop :=
   is_real = 1 → a.toFin32_U16 - b.toFin32_U16 = cols.value.toFin32_U16
 
--- /-- Constraints on `SubOperation` as extracted from the source code:
--- Asserting expr 3: `(is_real * (is_real - 1))`
--- Asserting expr 17: `(is_real * (((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201) * (((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201) - 1)))`
--- Asserting expr 29: `(is_real * (((((((a[1] + 65536) - 1) - b[1]) - cols.value[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201)) * 2013235201) * (((((((a[1] + 65536) - 1) - b[1]) - cols.value[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201)) * 2013235201) - 1)))` -/
--- def extractedConstraints (cols : SubOperation)
---     (a b : Word U16) (is_real : U1) : Finset SP1Constraint :=
---   {
---   .assertZero (is_real * (((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear)) * (((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear)) - (1 : BabyBear)))),
---   .assertZero (is_real * (((((((a[1] + (65536 : BabyBear)) - (1 : BabyBear)) - b[1]) - cols.value[1]) + ((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((((a[1] + (65536 : BabyBear)) - (1 : BabyBear)) - b[1]) - cols.value[1]) + ((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) - (1 : BabyBear))))
---   }
+/-- Constraints on `SubOperation` as extracted from the source code:
+Asserting expr 3: `(is_real * (is_real - 1))`
+Asserting expr 17: `(is_real * (((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201) * (((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201) - 1)))`
+Asserting expr 29: `(is_real * (((((((a[1] + 65536) - 1) - b[1]) - cols.value[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201)) * 2013235201) * (((((((a[1] + 65536) - 1) - b[1]) - cols.value[1]) + ((((((a[0] + 65536) - 1) - b[0]) - cols.value[0]) + 1) * 2013235201)) * 2013235201) - 1)))` -/
+def constraintList (cols : SubOperation)
+    (a b : Word U16) (is_real : U1) : SP1ConstraintList :=
+  [
+  .assertZero (is_real * (((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear)) * (((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear)) - (1 : BabyBear)))),
+  .assertZero (is_real * (((((((a[1] + (65536 : BabyBear)) - (1 : BabyBear)) - b[1]) - cols.value[1]) + ((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) * (((((((a[1] + (65536 : BabyBear)) - (1 : BabyBear)) - b[1]) - cols.value[1]) + ((((((a[0] + (65536 : BabyBear)) - (1 : BabyBear)) - b[0]) - cols.value[0]) + 1) * (2013235201 : BabyBear))) * (2013235201 : BabyBear)) - (1 : BabyBear))))
+  ]
 
 /-- Cleaned up representation of the `SubOperation` constraints. -/
-def idealizedConstraints (cols : SubOperation)
+def constraintProp (cols : SubOperation)
     (a b : Word U16) (is_real : U1) : Prop :=
   let carry0 : BabyBear := 1
   let carry1 : BabyBear := (a[0] + base - (1 : BabyBear) - b[0] - cols.value[0] + carry0) * baseInv
@@ -30,29 +30,21 @@ def idealizedConstraints (cols : SubOperation)
   (is_real * carry1 * (carry1 - 1)) = (0 : BabyBear) ∧ -- isBool check
   (is_real * carry2 * (carry2 - 1)) = (0 : BabyBear) -- isBool check
 
--- /-- The idealized constraints are logically equivalent to the extracted ones when `is_real := 1` -/
--- lemma extractedConstraints_iff_idealizedConstraints
---     (cols : SubOperation) (a b : Word U16) (is_real : U1) :
---     constraintSet_toProp (cols.extractedConstraints a b is_real) ↔ cols.idealizedConstraints a b is_real := by
---   simp [extractedConstraints, idealizedConstraints, base, baseInv, or_assoc]
+/-- The idealized constraints are logically equivalent to the extracted ones when `is_real := 1` -/
+lemma constraintList_iff_constraintProp
+    (cols : SubOperation) (a b : Word U16) (is_real : U1) :
+    (cols.constraintList a b is_real).allHold ↔ cols.constraintProp a b is_real := by
+  simp [constraintList, constraintProp, base, baseInv, or_assoc]
 
 /-- The extracted constraints on `SubOperation` imply the spec. -/
 theorem correct (cols : SubOperation)
     (a b : Word U16) (is_real : U1) :
-    cols.idealizedConstraints a b is_real → cols.spec a b is_real := by
+    cols.constraintProp a b is_real → cols.spec a b is_real := by
   -- Unfold the definitions of constraints and spec
-  simp [idealizedConstraints, spec, sub_eq_zero, mul_eq_zero, Fin.val_mul]
+  simp [constraintProp, spec, sub_eq_zero, mul_eq_zero, Fin.val_mul]
   -- Introduce all of the hypothesis from the constraints
-  intros h1 h2
-  -- Eliminate `is_real`
-  intro h_is_real
-  simp [h_is_real, sub_eq_zero] at *
-  -- have is_real_val_eq_one : is_real.val = 1 := by aesop
-
-  -- rw [is_real_val_eq_one] at h1 h2
-  -- simp at h1 h2
-
-  simp [Word.toFin32_U16]
+  intros h1 h2 h_is_real
+  simp [h_is_real, sub_eq_zero, Word.toFin32_U16] at *
 
   -- Extract the range constraint in U16
   let _ : a[0].val < 65536 := a[0].in_range

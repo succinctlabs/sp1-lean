@@ -16,9 +16,6 @@ structure RTypeReader where
 
 namespace RTypeReader
 
-/- def b {T : Type} (cols : RTypeReader T) : Word T := cols.op_b_memory.prev_value -/
-/- def c {T : Type} (cols : RTypeReader T) : Word T := cols.op_c_memory.prev_value -/
-
 def constraints
   (shard clk : BabyBear)
   (op_a_write_value : Word BabyBear)
@@ -90,7 +87,7 @@ lemma op_c_memory_lt_of_constraints {shard clk : BabyBear}
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
-lemma op_a_memory_lt_of_constraints {shard clk : BabyBear}
+lemma op_a_write_lt_of_constraints {shard clk : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : RTypeReader}
     (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
     op_a_write_value[0] < 65536 ∧ op_a_write_value[1] < 65536 := by
@@ -101,12 +98,23 @@ def registerMatch (rx : regidx) (x y : BabyBear) : Prop :=
   ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
     rX_bits rx = pure (BitVec.ofNatLT (x.val + y.val * 65536) pf)
 
+section registerMatch
+
+/-- The bits in the given register correspond-/
+def registerMatch (rx : regidx) (low_limb high_limb : BabyBear) : Prop :=
+  ∀ (pf : (low_limb.val + high_limb.val * 65536) < 2 ^ 32),
+    rX_bits rx = pure (BitVec.ofNatLT (low_limb.val + high_limb.val * 65536) pf)
+
+/-- Note: need to be very careful making this an axiom and not proving it.
+Should verify that it's at least admissable / doesn't allow for a proof of `False`. -/
 axiom read_b_fun (cols : RTypeReader) (rx : regidx)
-    (cstrs : List.Forall SP1Constraint.toProp (RTypeReader.constraints shard clk op_a_write_value cols is_real)) :
+    (cstrs : (RTypeReader.constraints shard clk op_a_write_value cols is_real).allHold) :
     registerMatch rx cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]
 
 axiom read_c_fun (cols : RTypeReader) (rx : regidx)
-    (cstrs : List.Forall SP1Constraint.toProp (RTypeReader.constraints shard clk op_a_write_value cols is_real)) :
+    (cstrs : (RTypeReader.constraints shard clk op_a_write_value cols is_real).allHold) :
     registerMatch rx cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]
+
+end registerMatch
 
 end RTypeReader
