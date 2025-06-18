@@ -94,6 +94,10 @@ lemma op_a_write_lt_of_constraints {shard clk : BabyBear}
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
+def registerMatch (rx : regidx) (x y : BabyBear) : Prop :=
+  ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
+    rX_bits rx = pure (BitVec.ofNatLT (x.val + y.val * 65536) pf)
+
 section registerMatch
 
 /-- The bits in the given register correspond-/
