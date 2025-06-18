@@ -66,7 +66,6 @@ theorem U16MSBOperation.correct (cols : U16MSBOperation)
       rw [Fin.sub_def] at orig_constraint
       rw [Fin.val_mul] at orig_constraint
       simp [BabyBearPrime] at *
-
       -- wrong :(
       rw [Nat.mod_eq_of_lt] at orig_constraint
 

@@ -24,7 +24,7 @@ def constraints
   (op_a_write_value : Word BabyBear)
   (cols : RTypeReader)
   (is_real : BabyBear)
-  : List SP1Constraint :=
+  : SP1ConstraintList :=
   let E0 : BabyBear := is_real - 1
   let E2 : BabyBear := is_real * E0
   let E4 : BabyBear := 0 + cols.op_b
@@ -75,6 +75,27 @@ def constraints
     .send (.memory shard cols.op_c_memory.access_timestamp.prev_clk cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real,
     .receive (.memory shard E44 cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real
   ]
+
+lemma op_b_memory_lt_of_constraints {shard clk : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    cols.op_b_memory.prev_value[0] < 65536 ∧ cols.op_b_memory.prev_value[1] < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
+
+lemma op_c_memory_lt_of_constraints {shard clk : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    cols.op_c_memory.prev_value[0] < 65536 ∧ cols.op_c_memory.prev_value[1] < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
+
+lemma op_a_memory_lt_of_constraints {shard clk : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    op_a_write_value[0] < 65536 ∧ op_a_write_value[1] < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
 
 def registerMatch (rx : regidx) (x y : BabyBear) : Prop :=
   ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
