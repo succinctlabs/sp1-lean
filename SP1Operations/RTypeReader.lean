@@ -79,6 +79,7 @@ lemma op_b_memory_lt_of_constraints {shard clk : BabyBear}
     cols.op_b_memory.prev_value[0] < 65536 ∧ cols.op_b_memory.prev_value[1] < 65536 := by
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
+<<<<<<< HEAD
 
 lemma op_c_memory_lt_of_constraints {shard clk : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : RTypeReader}
@@ -94,6 +95,27 @@ lemma op_a_write_lt_of_constraints {shard clk : BabyBear}
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
+=======
+
+lemma op_c_memory_lt_of_constraints {shard clk : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    cols.op_c_memory.prev_value[0] < 65536 ∧ cols.op_c_memory.prev_value[1] < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
+
+lemma op_a_write_lt_of_constraints {shard clk : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    op_a_write_value[0] < 65536 ∧ op_a_write_value[1] < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
+
+def registerMatch (rx : regidx) (x y : BabyBear) : Prop :=
+  ∀ (pf : (x.val + y.val * 65536) < 2 ^ 32),
+    rX_bits rx = pure (BitVec.ofNatLT (x.val + y.val * 65536) pf)
+
+>>>>>>> 5d5299509f7687af94b44bb93c97cc66467a2821
 section registerMatch
 
 /-- The bits in the given register correspond-/
