@@ -3,10 +3,17 @@ import LeanRV32D.RiscvRegs
 
 open LeanRV32D.Functions
 
+@[ext]
 structure BitwiseOperation where
   result : Vector BabyBear WORD_BYTE_SIZE
 
 namespace BitwiseOperation
+
+-- #check BitwiseOperation.ext
+@[simp] lemma eq_iff_result_eq (bitop bitop' : BitwiseOperation) :
+    bitop = bitop' ↔
+      ∀ i : Fin WORD_BYTE_SIZE, bitop.result[i] = bitop'.result[i] := by
+  sorry
 
 open ByteOpcode
 
@@ -63,11 +70,11 @@ lemma eq_and_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwi
     cols.result[i] = a[i] &&& b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this
-  match i with
-  | 0 => exact this.1 hc ha hb
-  | 1 => exact this.2.1 hc ha hb
-  | 2 => exact this.2.2.1 hc ha hb
-  | 3 => exact this.2.2.2 hc ha hb
+  exact match i with
+  | 0 => this.1 hc ha hb
+  | 1 => this.2.1 hc ha hb
+  | 2 => this.2.2.1 hc ha hb
+  | 3 => this.2.2.2 hc ha hb
 
 lemma eq_or_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
@@ -75,11 +82,11 @@ lemma eq_or_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwis
     cols.result[i] = a[i] ||| b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this
-  match i with
-  | 0 => exact this.1 hc ha hb
-  | 1 => exact this.2.1 hc ha hb
-  | 2 => exact this.2.2.1 hc ha hb
-  | 3 => exact this.2.2.2 hc ha hb
+  exact match i with
+  | 0 => this.1 hc ha hb
+  | 1 => this.2.1 hc ha hb
+  | 2 => this.2.2.1 hc ha hb
+  | 3 => this.2.2.2 hc ha hb
 
 lemma eq_xor_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
@@ -87,10 +94,22 @@ lemma eq_xor_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwi
     cols.result[i] = a[i] ^^^ b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this
-  match i with
-  | 0 => exact this.1 hc ha hb
-  | 1 => exact this.2.1 hc ha hb
-  | 2 => exact this.2.2.1 hc ha hb
-  | 3 => exact this.2.2.2 hc ha hb
+  exact match i with
+  | 0 => this.1 hc ha hb
+  | 1 => this.2.1 hc ha hb
+  | 2 => this.2.2.1 hc ha hb
+  | 3 => this.2.2.2 hc ha hb
+
+/-- Constraints on `BitwiseOperation` imply that the result is `op.toBitwise` applied to the inputs. -/
+lemma eq_toBitwise_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
+    (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
+    (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
+    (h : (cols.constraints a b op.toBB 1).allHold) :
+    cols.result[i] = op.toBitwise a[i] b[i] := by
+  induction op using ByteOpcode.bitwise_induction with
+  | and => exact eq_and_of_constraints _ _ _ _ ha hb hc h
+  | or => exact eq_or_of_constraints _ _ _ _ ha hb hc h
+  | xor => exact eq_xor_of_constraints _ _ _ _ ha hb hc h
+  | other h h' => aesop
 
 end BitwiseOperation
