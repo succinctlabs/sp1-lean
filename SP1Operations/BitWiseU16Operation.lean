@@ -13,7 +13,7 @@ open LeanRV32D.Functions
 
 namespace BitwiseU16Operation
 
-def constraintList
+def constraints
   (a : Word BabyBear)
   (b : Word BabyBear)
   (cols : BitwiseU16Operation)
@@ -86,7 +86,7 @@ lemma bitwiseOperation_constraints_of_constraints
     {a b : Word BabyBear}
     {cols : BitwiseU16Operation}
     {opcode is_real : BabyBear}
-    (h : (constraintList a b cols opcode is_real).2.allHold) :
+    (h : (constraints a b cols opcode is_real).2.allHold) :
     (BitwiseOperation.constraints
       (#v[cols.a_low_bytes.low_bytes[0], (a[0] - cols.a_low_bytes.low_bytes[0]) * 2005401601,
         cols.a_low_bytes.low_bytes[1], (a[1] - cols.a_low_bytes.low_bytes[1]) * 2005401601])
@@ -95,7 +95,7 @@ lemma bitwiseOperation_constraints_of_constraints
       cols.bitwise_operation
       opcode
       is_real).allHold := by
-  rw [constraintList] at h
+  rw [constraints] at h
   simp at h
   convert h.2
   rw [BitwiseOperation.ext_cases_iff]
@@ -107,7 +107,7 @@ lemma bitwiseOperation_spec_of_allHold_constraints
     (cols : BitwiseU16Operation)
     (opcode : BabyBear)
     -- (is_real : BabyBear)
-    (h : (constraintList a b cols opcode 1).2.allHold) :
+    (h : (constraints a b cols opcode 1).2.allHold) :
     BitwiseOperation.spec
       (#v[cols.a_low_bytes.low_bytes[0], (a[0] - cols.a_low_bytes.low_bytes[0]) * 2005401601,
         cols.a_low_bytes.low_bytes[1], (a[1] - cols.a_low_bytes.low_bytes[1]) * 2005401601])
@@ -125,8 +125,8 @@ lemma constraintList_imp_spec
     (cols : BitwiseU16Operation)
     (opcode : BabyBear)
     (is_real : BabyBear) :
-    (constraintList a b cols opcode is_real).2.allHold → (spec a b cols opcode is_real) := by
-  rw [constraintList, spec]
+    (constraints a b cols opcode is_real).2.allHold → (spec a b cols opcode is_real) := by
+  rw [constraints, spec]
   intro h h_is_real
   simp only [WORD_SIZE, BabyBearPrime, Fin.isValue]
   refine BitwiseOperation.constraints_imp_spec
@@ -147,7 +147,7 @@ lemma eq_and_of_constraints
     (ha : cols.a_low_bytes.low_bytes[0] < 256)
     (hb : cols.b_low_bytes.low_bytes[0] < 256)
     (hc : cols.bitwise_operation.result[0] < 256)
-    (h : (constraintList a b cols 0 1).2.allHold) :
+    (h : (constraints a b cols 0 1).2.allHold) :
     cols.bitwise_operation.result[0] =
       cols.a_low_bytes.low_bytes[0] &&& cols.b_low_bytes.low_bytes[0] := by
   have := constraintList_imp_spec _ _ _ _ _ h one_ne_zero
@@ -163,7 +163,7 @@ lemma eq_toBitwise_of_constraints₀
     (hb : cols.b_low_bytes.low_bytes[0] < 256)
     (hc : cols.bitwise_operation.result[0] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
-    (h : (constraintList a b cols opcode.toBB 1).2.allHold) :
+    (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[0] =
       ByteOpcode.toBitwise opcode cols.a_low_bytes.low_bytes[0] cols.b_low_bytes.low_bytes[0] := by
   have := bitwiseOperation_constraints_of_constraints h
@@ -179,7 +179,7 @@ lemma eq_toBitwise_of_constraints₁
     (hb : (b[0] - cols.b_low_bytes.low_bytes[0]) * 2005401601 < 256)
     (hc : cols.bitwise_operation.result[1] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
-    (h : (constraintList a b cols opcode.toBB 1).2.allHold) :
+    (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[1] =
       ByteOpcode.toBitwise opcode
         ((a[0] - cols.a_low_bytes.low_bytes[0]) * 2005401601)
@@ -197,7 +197,7 @@ lemma eq_toBitwise_of_constraints₂
     (hb : cols.b_low_bytes.low_bytes[1] < 256)
     (hc : cols.bitwise_operation.result[2] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
-    (h : (constraintList a b cols opcode.toBB 1).2.allHold) :
+    (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[2] =
       ByteOpcode.toBitwise opcode cols.a_low_bytes.low_bytes[1] cols.b_low_bytes.low_bytes[1] := by
   have := bitwiseOperation_constraints_of_constraints h
@@ -214,7 +214,7 @@ lemma eq_toBitwise_of_constraints₃
     (hb : (b[1] - cols.b_low_bytes.low_bytes[1]) * 2005401601 < 256)
     (hc : cols.bitwise_operation.result[3] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
-    (h : (constraintList a b cols opcode.toBB 1).2.allHold) :
+    (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[3] =
       ByteOpcode.toBitwise opcode
         ((a[1] - cols.a_low_bytes.low_bytes[1]) * 2005401601)
@@ -237,7 +237,7 @@ lemma eq_toBitwise_word_of_constraints
     (hb' : (b[0] - cols.b_low_bytes.low_bytes[0]) * 2005401601 < 256)
     (hc : cols.bitwise_operation.result[0] < 256)
     (hc' : cols.bitwise_operation.result[1] < 256)
-    (h : (constraintList a b cols opcode.toBB 1).2.allHold) :
+    (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     (cols.bitwise_operation.result[0] + cols.bitwise_operation.result[1] * (256 : BabyBear)) =
       (ByteOpcode.toBitwise opcode a[0] b[0]) := by
   rw [eq_toBitwise_of_constraints₀ a b cols opcode ha hb hc hop h,
