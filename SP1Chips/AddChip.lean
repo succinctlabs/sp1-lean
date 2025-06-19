@@ -17,9 +17,9 @@ def constraints
   ]
   ++ (AddOperation.constraints #v[Main[11], Main[12], Main[16], Main[17], Main[20], Main[21], Main[22]])
   ++ (CPUState.constraints
-      { shard := Main[0]
-      , clk_high_limb := Main[1]
-      , clk_low_limb := Main[2]
+      { clk_high := Main[0]
+      , clk_16_24 := Main[1]
+      , clk_0_16 := Main[2]
       , pc := Main[3] }
       E4
       4
@@ -34,7 +34,7 @@ def constraints
     , op_a_memory :=
         { prev_value := #v[Main[5], Main[6]]
         , access_timestamp :=
-            { prev_clk := Main[7]
+            { prev_low := Main[7]
             , diff_low_limb := Main[8]
             }
         }
@@ -43,7 +43,7 @@ def constraints
     , op_b_memory :=
         { prev_value := #v[Main[11], Main[12]]
         , access_timestamp :=
-            { prev_clk := Main[13]
+            { prev_low := Main[13]
             , diff_low_limb := Main[14]
             }
         }
@@ -51,7 +51,7 @@ def constraints
     , op_c_memory :=
         { prev_value := #v[Main[16], Main[17]]
         , access_timestamp :=
-            { prev_clk := Main[18]
+            { prev_low := Main[18]
             , diff_low_limb := Main[19]
             }
         }
@@ -68,17 +68,16 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
   have h_high : Main[21].val < 65536 := add_cstrs.right.right.right
   linarith
 
+-- rX_bits op_b = pure cols.op_b_memory.prev_value
+
 def sp1_add
     (Main : Vector BabyBear 23)
-    (cstrs : (constraints Main).allHold)
-    (h_is_real : Main[22] = 1)
     (rd rs1 rs2 : regidx) :
     SailM Unit := do
   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
   let rs1_value ← rX_bits rs1
   let rs2_value ← rX_bits rs2
-  wX_bits rd (BitVec.ofNatLT (Main[20].val + Main[21].val * 65536)
-    (bound_of_constraints Main cstrs h_is_real))
+  wX_bits rd (BitVec.ofNat 32 (Main[20].val + Main[21].val * 65536))
 
 def spec_add
     (rd rs1 rs2 : regidx) :
@@ -87,11 +86,12 @@ def spec_add
   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
   pure ()
 
-theorem sp1_add_implies_spec_add (Main : Vector BabyBear 23)
+theorem sp1_add_eq_spec_add (Main : Vector BabyBear 23)
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[22] = 1) (rd rs1 rs2 : regidx) :
-    sp1_add Main cstrs h_is_real rd rs1 rs2 = spec_add rd rs1 rs2 := by
+    sp1_add Main rd rs1 rs2 = spec_add rd rs1 rs2 := by
   unfold sp1_add spec_add
+  rw [← BitVec.ofNatLT_eq_ofNat (bound_of_constraints Main cstrs h_is_real)]
 
   -- Extract the various constraints from the assumption
   simp [constraints] at cstrs
@@ -119,6 +119,8 @@ theorem sp1_add_implies_spec_add (Main : Vector BabyBear 23)
 
   -- Substitue the semantics of the underlying add operation
   rw [AddOperation.correct' Main[20] Main[21] M11_U16 M12_U16 M16_U16 M17_U16 add_cstrs]
+  simp [execute_RTYPE]
+  simp only [] at read_b read_c
 
   -- Simplify the final result
   simp [read_b, read_c, execute_RTYPE]

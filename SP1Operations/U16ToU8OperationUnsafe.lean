@@ -8,7 +8,7 @@ namespace U16ToU8OperationUnsafe
 def constraints
     (u16_values : Word BabyBear)
     (cols : U16toU8Operation) :
-    Vector BabyBear WORD_BYTE_SIZE × SP1ConstraintList :=
+    ByteWord BabyBear × SP1ConstraintList :=
   let E0 : BabyBear := u16_values[0] - cols.low_bytes[0]
   let E2 : BabyBear := E0 * 2005401601
   let E4 : BabyBear := u16_values[1] - cols.low_bytes[1]

@@ -36,14 +36,14 @@ def constraints
     let E20 : BabyBear := clk + 3
     let E22 : BabyBear := is_real - 1
     let E24 : BabyBear := is_real * E22
-    let E26 : BabyBear := E20 - cols.op_a_memory.access_timestamp.prev_clk
+    let E26 : BabyBear := E20 - cols.op_a_memory.access_timestamp.prev_low
     let E28 : BabyBear := E26 - 1
     let E30 : BabyBear := E28 - cols.op_a_memory.access_timestamp.diff_low_limb
     let E32 : BabyBear := E30 * 2013143041
     let E34 : BabyBear := clk + 2
     let E36 : BabyBear := is_real - 1
     let E38 : BabyBear := is_real * E36
-    let E40 : BabyBear := E34 - cols.op_b_memory.access_timestamp.prev_clk
+    let E40 : BabyBear := E34 - cols.op_b_memory.access_timestamp.prev_low
     let E42 : BabyBear := E40 - 1
     let E44 : BabyBear := E42 - cols.op_b_memory.access_timestamp.diff_low_limb
     let E46 : BabyBear := E44 * 2013143041
@@ -51,7 +51,7 @@ def constraints
     let E50 : BabyBear := is_real - cols.imm_c
     let E52 : BabyBear := E50 - 1
     let E54 : BabyBear := E50 * E52
-    let E56 : BabyBear := E48 - cols.op_c_memory.access_timestamp.prev_clk
+    let E56 : BabyBear := E48 - cols.op_c_memory.access_timestamp.prev_low
     let E58 : BabyBear := E56 - 1
     let E60 : BabyBear := E58 - cols.op_c_memory.access_timestamp.diff_low_limb
     let E62 : BabyBear := E60 * 2013143041
@@ -68,17 +68,17 @@ def constraints
       .assertZero E24,
       .send (.byte (ByteOpcode.ofNat 6) cols.op_a_memory.access_timestamp.diff_low_limb 14 0) is_real,
       .send (.byte (ByteOpcode.ofNat 6) E32 14 0) is_real,
-      .send (.memory shard cols.op_a_memory.access_timestamp.prev_clk cols.op_a cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1]) is_real,
+      .send (.memory shard cols.op_a_memory.access_timestamp.prev_low cols.op_a cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1]) is_real,
       .receive (.memory shard E20 cols.op_a op_a_write_value[0] op_a_write_value[1]) is_real,
       .assertZero E38,
       .send (.byte (ByteOpcode.ofNat 6) cols.op_b_memory.access_timestamp.diff_low_limb 14 0) is_real,
       .send (.byte (ByteOpcode.ofNat 6) E46 14 0) is_real,
-      .send (.memory shard cols.op_b_memory.access_timestamp.prev_clk cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
+      .send (.memory shard cols.op_b_memory.access_timestamp.prev_low cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
       .receive (.memory shard E34 cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
       .assertZero E54,
       .send (.byte (ByteOpcode.ofNat 6) cols.op_c_memory.access_timestamp.diff_low_limb 14 0) E50,
       .send (.byte (ByteOpcode.ofNat 6) E62 14 0) E50,
-      .send (.memory shard cols.op_c_memory.access_timestamp.prev_clk cols.op_c[0] cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) E50,
+      .send (.memory shard cols.op_c_memory.access_timestamp.prev_low cols.op_c[0] cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) E50,
       .receive (.memory shard E48 cols.op_c[0] cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) E50,
       .assertZero E66,
       .assertZero E70
@@ -143,5 +143,23 @@ lemma imm_c_eq_zero_or_prev_value_eq_op_c
   have h1 := imm_c_eq_zero_or_prev_value_eq_op_c_of_constraints₁ h
   rw [Word.ext_cases_iff]
   aesop
+
+section registerMatch
+
+/-- The bits in the given register correspond-/
+def registerMatch (rx : regidx) (low_limb high_limb : BabyBear) : Prop :=
+  rX_bits rx = pure (BitVec.ofNat 32 (low_limb.val + high_limb.val * 65536))
+
+/-- Note: need to be very careful making this an axiom and not proving it.
+Should verify that it's at least admissable / doesn't allow for a proof of `False`. -/
+axiom read_b_fun (cols : ALUTypeReader) (rx : regidx)
+    (cstrs : (ALUTypeReader.constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    registerMatch rx cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]
+
+axiom read_c_fun (cols : ALUTypeReader) (rx : regidx)
+    (cstrs : (ALUTypeReader.constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    registerMatch rx cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]
+
+end registerMatch
 
 end ALUTypeReader
