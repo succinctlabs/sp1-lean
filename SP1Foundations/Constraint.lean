@@ -47,40 +47,23 @@ end SP1Constraint
 
 section constraintList
 
+/-- Wrapper for lists of constraints. Mainly used to namespace lemmas. -/
 @[reducible] def SP1ConstraintList := List SP1Constraint
 
-@[simp, always_inline]
-protected def SP1ConstraintList.allHold (xs : SP1ConstraintList) : Prop :=
+@[simp] protected def SP1ConstraintList.allHold (xs : SP1ConstraintList) : Prop :=
   List.Forall SP1Constraint.toProp xs
 
-end constraintList
+lemma allHold_nil : SP1ConstraintList.allHold [] := True.intro
 
--- section constraintSet
---
--- -- TODO: should this exist? maybe even as `abbrev`? Also would need to use lists now
--- @[reducible] def constraintSet := Finset SP1Constraint
---
--- /-- Covert a set of constraints to a single proposition stating that they all hold. -/
--- def constraintSet_toProp (cs : Finset SP1Constraint) : Prop :=
---   ∀ constraint ∈ cs, constraint.toProp
---
--- @[simp] lemma constraintSet_toProp_empty : constraintSet_toProp ∅ = True := by
---   simp [constraintSet_toProp]
---
--- @[simp] lemma constraintSet_toProp_singleton (c : SP1Constraint) : constraintSet_toProp {c} = c.toProp := by
---   simp [constraintSet_toProp]
---
--- @[simp] lemma constraintSet_toProp_insert (c : SP1Constraint) (cs : Finset SP1Constraint) :
---     constraintSet_toProp (insert c cs) = (c.toProp ∧ constraintSet_toProp cs) := by
---   simp [constraintSet_toProp]
---
--- lemma toProp_of_mem_constraintSet (cs : Finset SP1Constraint) (c : SP1Constraint) :
---     c ∈ cs → constraintSet_toProp cs → c.toProp := by
---   aesop
---
--- /-- A larger set of constraints `cs'` implies a smaller set of constraints `cs`. -/
--- lemma toProp_imp_of_constraintSet_subset' (cs cs' : Finset SP1Constraint)
---     (h : cs ⊆ cs') : constraintSet_toProp cs' → constraintSet_toProp cs := by
---   refine fun csp c h' => csp c (h h')
---
--- end constraintSet
+lemma allHold_singleton (c : SP1Constraint) :
+    SP1ConstraintList.allHold [c] ↔ c.toProp := Iff.rfl
+
+lemma allHold_cons (c : SP1Constraint) (cs : SP1ConstraintList) :
+    SP1ConstraintList.allHold (c :: cs) ↔ c.toProp ∧ SP1ConstraintList.allHold cs :=
+  List.forall_cons _ _ _
+
+lemma allHold_append (cs cs' : SP1ConstraintList) :
+    SP1ConstraintList.allHold (cs ++ cs') ↔ cs.allHold ∧ cs'.allHold :=
+  List.forall_append
+
+end constraintList

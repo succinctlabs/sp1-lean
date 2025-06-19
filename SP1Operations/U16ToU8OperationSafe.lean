@@ -1,6 +1,5 @@
 import SP1Foundations
 
--- Probably good to still namespace things
 namespace U16ToU8OperationSafe
 
 def constraints (I0 I1 I2 I3 I4 : BabyBear) :

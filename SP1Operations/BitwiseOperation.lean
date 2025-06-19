@@ -3,17 +3,21 @@ import LeanRV32D.RiscvRegs
 
 open LeanRV32D.Functions
 
-@[ext]
-structure BitwiseOperation where
-  result : Vector BabyBear WORD_BYTE_SIZE
+@[ext] structure BitwiseOperation where
+  result : ByteWord BabyBear
 
 namespace BitwiseOperation
 
--- #check BitwiseOperation.ext
-@[simp] lemma eq_iff_result_eq (bitop bitop' : BitwiseOperation) :
-    bitop = bitop' ↔
-      ∀ i : Fin WORD_BYTE_SIZE, bitop.result[i] = bitop'.result[i] := by
-  sorry
+@[ext] lemma ext_forall (op op' : BitwiseOperation)
+    (h : ∀ i : Fin WORD_BYTE_SIZE, op.result[i] = op'.result[i]) : op = op' := by
+  refine BitwiseOperation.ext ?_
+  exact ByteWord.ext_forall h
+
+@[ext] lemma ext_cases (op op' : BitwiseOperation)
+    (h0 : op.result[0] = op'.result[0]) (h1 : op.result[1] = op'.result[1])
+    (h2 : op.result[2] = op'.result[2]) (h3 : op.result[3] = op'.result[3]) : op = op' := by
+  refine BitwiseOperation.ext ?_
+  exact ByteWord.ext_cases h0 h1 h2 h3
 
 open ByteOpcode
 

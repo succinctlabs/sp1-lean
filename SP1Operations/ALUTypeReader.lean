@@ -18,11 +18,11 @@ structure ALUTypeReader where
 namespace ALUTypeReader
 
 def constraints
-  (shard clk pc opcode: BabyBear)
+  (shard clk _pc _opcode: BabyBear)
   (op_a_write_value : Word BabyBear)
   (cols : ALUTypeReader)
   (is_real : BabyBear)
-  : List SP1Constraint :=
+  : SP1ConstraintList :=
     let E0 : BabyBear := is_real - 1
     let E2 : BabyBear := is_real * E0
     let E4 : BabyBear := is_real - 1
@@ -83,5 +83,65 @@ def constraints
       .assertZero E66,
       .assertZero E70
     ]
+
+/-- `.assertZero E2` (also `E22`) -/
+lemma is_real_eq_of_constraints
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    is_real = 0 ∨ is_real = 1 := by
+  simp_all [constraints, sub_eq_zero]
+
+/-- `.assertZero E8` -/
+lemma is_real_eq_one_or_imm_c_eq_zero_of_constraints
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    is_real = 1 ∨ cols.imm_c = 0 := by
+  simp_all [constraints, sub_eq_zero]
+
+/-- `.assertZero E14` -/
+lemma op_a_zero_or_op_a_write_values_eq_zero_of_constraints₀
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    cols.op_a_0 = 0 ∨ op_a_write_value[0] = 0 := by
+  simp_all [constraints, sub_eq_zero]
+
+/-- `.assertZero E18` -/
+lemma op_a_zero_or_op_a_write_values_eq_zero_of_constraints₁
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    cols.op_a_0 = 0 ∨ op_a_write_value[1] = 0 := by
+  simp_all [constraints, sub_eq_zero]
+
+lemma op_a_zero_or_op_a_write_values_word_eq_zero_of_constraints
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    cols.op_a_0 = 0 ∨ Word.toFin32_BB op_a_write_value = 0 := by
+  rw [Word.toFin32_BB]
+  have h0 := op_a_zero_or_op_a_write_values_eq_zero_of_constraints₀ h
+  have h1 := op_a_zero_or_op_a_write_values_eq_zero_of_constraints₁ h
+  rw [or_iff_not_imp_left]
+  intro h
+  simp_all [h]
+
+/-- `.assertZero E54` NOTE: this one seems strange, should rephrase probably -/
+lemma is_real_sub_imm_c
+    (h : (constraints shard clk pc opcode ap_a_write_value cols is_real).allHold) :
+    is_real - cols.imm_c = 0 ∨ is_real - cols.imm_c = 1 := by
+  simp_all [constraints, sub_eq_zero]
+
+/-- `.assertZero E66` -/
+lemma imm_c_eq_zero_or_prev_value_eq_op_c_of_constraints₀
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    cols.imm_c = 0 ∨ cols.op_c_memory.prev_value[0] = cols.op_c[0] := by
+  simp_all [constraints, sub_eq_zero]
+
+/-- `.assertZero 70` -/
+lemma imm_c_eq_zero_or_prev_value_eq_op_c_of_constraints₁
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    cols.imm_c = 0 ∨ cols.op_c_memory.prev_value[1] = cols.op_c[1] := by
+  simp_all [constraints, sub_eq_zero]
+
+lemma imm_c_eq_zero_or_prev_value_eq_op_c
+    (h : (constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    cols.imm_c = 0 ∨ cols.op_c_memory.prev_value = cols.op_c := by
+  have h0 := imm_c_eq_zero_or_prev_value_eq_op_c_of_constraints₀ h
+  have h1 := imm_c_eq_zero_or_prev_value_eq_op_c_of_constraints₁ h
+  rw [Word.ext_cases_iff]
+  aesop
 
 end ALUTypeReader
