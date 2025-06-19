@@ -144,4 +144,22 @@ lemma imm_c_eq_zero_or_prev_value_eq_op_c
   rw [Word.ext_cases_iff]
   aesop
 
+section registerMatch
+
+/-- The bits in the given register correspond-/
+def registerMatch (rx : regidx) (low_limb high_limb : BabyBear) : Prop :=
+  rX_bits rx = pure (BitVec.ofNat 32 (low_limb.val + high_limb.val * 65536))
+
+/-- Note: need to be very careful making this an axiom and not proving it.
+Should verify that it's at least admissable / doesn't allow for a proof of `False`. -/
+axiom read_b_fun (cols : ALUTypeReader) (rx : regidx)
+    (cstrs : (ALUTypeReader.constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    registerMatch rx cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]
+
+axiom read_c_fun (cols : ALUTypeReader) (rx : regidx)
+    (cstrs : (ALUTypeReader.constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
+    registerMatch rx cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]
+
+end registerMatch
+
 end ALUTypeReader

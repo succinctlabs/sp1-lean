@@ -144,30 +144,24 @@ lemma eq_and_of_constraints
     (a : Word BabyBear)
     (b : Word BabyBear)
     (cols : BitwiseU16Operation)
-    (ha : cols.a_low_bytes.low_bytes[0] < 256)
-    (hb : cols.b_low_bytes.low_bytes[0] < 256)
-    (hc : cols.bitwise_operation.result[0] < 256)
     (h : (constraints a b cols 0 1).2.allHold) :
     cols.bitwise_operation.result[0] =
       cols.a_low_bytes.low_bytes[0] &&& cols.b_low_bytes.low_bytes[0] := by
   have := constraintList_imp_spec _ _ _ _ _ h one_ne_zero
   simp [BitwiseOperation.spec] at this
-  refine this.1 hc ha hb
+  aesop
 
 lemma eq_toBitwise_of_constraints₀
     (a : Word BabyBear)
     (b : Word BabyBear)
     (cols : BitwiseU16Operation)
     (opcode : ByteOpcode)
-    (ha : cols.a_low_bytes.low_bytes[0] < 256)
-    (hb : cols.b_low_bytes.low_bytes[0] < 256)
-    (hc : cols.bitwise_operation.result[0] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
     (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[0] =
       ByteOpcode.toBitwise opcode cols.a_low_bytes.low_bytes[0] cols.b_low_bytes.low_bytes[0] := by
   have := bitwiseOperation_constraints_of_constraints h
-  exact BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 0 ha hb hc _ hop this
+  exact BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 0 _ hop this
 
 -- NOTE: `ha` and `hb` would probably be better to move the inverse over, bit tedious to write the `BabyBear` proofs though
 lemma eq_toBitwise_of_constraints₁
@@ -175,9 +169,6 @@ lemma eq_toBitwise_of_constraints₁
     (b : Word BabyBear)
     (cols : BitwiseU16Operation)
     (opcode : ByteOpcode)
-    (ha : (a[0] - cols.a_low_bytes.low_bytes[0]) * 2005401601 < 256)
-    (hb : (b[0] - cols.b_low_bytes.low_bytes[0]) * 2005401601 < 256)
-    (hc : cols.bitwise_operation.result[1] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
     (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[1] =
@@ -185,7 +176,7 @@ lemma eq_toBitwise_of_constraints₁
         ((a[0] - cols.a_low_bytes.low_bytes[0]) * 2005401601)
         ((b[0] - cols.b_low_bytes.low_bytes[0]) * 2005401601) := by
   have := bitwiseOperation_constraints_of_constraints h
-  have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 1 ha hb hc _ hop this
+  have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 1 _ hop this
   exact this
 
 lemma eq_toBitwise_of_constraints₂
@@ -193,15 +184,12 @@ lemma eq_toBitwise_of_constraints₂
     (b : Word BabyBear)
     (cols : BitwiseU16Operation)
     (opcode : ByteOpcode)
-    (ha : cols.a_low_bytes.low_bytes[1] < 256)
-    (hb : cols.b_low_bytes.low_bytes[1] < 256)
-    (hc : cols.bitwise_operation.result[2] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
     (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[2] =
       ByteOpcode.toBitwise opcode cols.a_low_bytes.low_bytes[1] cols.b_low_bytes.low_bytes[1] := by
   have := bitwiseOperation_constraints_of_constraints h
-  have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 2 ha hb hc _ hop this
+  have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 2 _ hop this
   exact this
 
 -- NOTE: `ha` and `hb` would probably be better to move the inverse over, bit tedious to write the `BabyBear` proofs though
@@ -210,9 +198,6 @@ lemma eq_toBitwise_of_constraints₃
     (b : Word BabyBear)
     (cols : BitwiseU16Operation)
     (opcode : ByteOpcode)
-    (ha : (a[1] - cols.a_low_bytes.low_bytes[1]) * 2005401601 < 256)
-    (hb : (b[1] - cols.b_low_bytes.low_bytes[1]) * 2005401601 < 256)
-    (hc : cols.bitwise_operation.result[3] < 256)
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
     (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     cols.bitwise_operation.result[3] =
@@ -220,7 +205,7 @@ lemma eq_toBitwise_of_constraints₃
         ((a[1] - cols.a_low_bytes.low_bytes[1]) * 2005401601)
         ((b[1] - cols.b_low_bytes.low_bytes[1]) * 2005401601) := by
   have := bitwiseOperation_constraints_of_constraints h
-  have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 3 ha hb hc _ hop this
+  have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 3 _ hop this
   exact this
 
 -- version for (almost) actual bitvecs to use w/ sail stuff
@@ -233,15 +218,11 @@ lemma eq_toBitwise_word_of_constraints
     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
     (ha : cols.a_low_bytes.low_bytes[0] < 256)
     (hb : cols.b_low_bytes.low_bytes[0] < 256)
-    (ha' : (a[0] - cols.a_low_bytes.low_bytes[0]) * 2005401601 < 256)
-    (hb' : (b[0] - cols.b_low_bytes.low_bytes[0]) * 2005401601 < 256)
-    (hc : cols.bitwise_operation.result[0] < 256)
-    (hc' : cols.bitwise_operation.result[1] < 256)
     (h : (constraints a b cols opcode.toBB 1).2.allHold) :
     (cols.bitwise_operation.result[0] + cols.bitwise_operation.result[1] * (256 : BabyBear)) =
       (ByteOpcode.toBitwise opcode a[0] b[0]) := by
-  rw [eq_toBitwise_of_constraints₀ a b cols opcode ha hb hc hop h,
-    eq_toBitwise_of_constraints₁ a b cols opcode ha' hb' hc' hop h]
+  rw [eq_toBitwise_of_constraints₀ a b cols opcode hop h,
+    eq_toBitwise_of_constraints₁ a b cols opcode hop h]
   rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
   simp [mul_assoc]
 

@@ -138,45 +138,35 @@ theorem sp1_bitwise_eq_spec_xor
     sp1_bitwise Main rd rs1 rs2 = spec_xor rd rs1 rs2 := by
   unfold sp1_bitwise spec_xor
 
-
   have spare_cstrs : (constraints Main).allHold := cstrs
-
-  simp only [SP1ConstraintList.allHold, constraints, BabyBearPrime, Fin.isValue, mul_one, mul_zero,
-    add_zero, WORD_SIZE, List.cons_append, List.nil_append, List.append_assoc] at cstrs
-  -- rw [List.forall_cons]
-  obtain ⟨h31, h31, h32, h_add_3, hop, hreg⟩ := cstrs
-
-  simp [- SP1Constraint.toProp_send_byte] at hreg
-  obtain ⟨hxor_0, h_xor1, h_xor2, h_xor3, h_cpu, h_alu⟩ := hreg
 
   have h30_0 : Main[30] = 1 := sorry
   have h31_0 : Main[31] = 0 := sorry
   have h32_0 : Main[32] = 0 := sorry
 
+  simp only [SP1ConstraintList.allHold, constraints, BabyBearPrime, Fin.isValue, mul_one, mul_zero,
+    add_zero, WORD_SIZE, List.cons_append, List.nil_append, List.append_assoc] at cstrs
+  obtain ⟨h31, h31, h32, h_add_3, hop, hreg⟩ := cstrs
+  simp [- SP1Constraint.toProp_send_byte] at hreg
+
   simp [h30_0, h31_0, h32_0, sub_eq_zero] at *
+  obtain ⟨⟨hbd0, h_xor0⟩, ⟨hbd1, h_xor1⟩, ⟨hbd2, h_xor2⟩, ⟨hbd3, h_xor3⟩, h_cpu, h_alu⟩ := hreg
 
-  simp [main_output, BitwiseU16Operation.constraints]
+  simp [main_output, BitwiseU16Operation.constraints, execute_RTYPE]
 
-  simp [execute_RTYPE]
+  have read_b := ALUTypeReader.read_b_fun _ rs1 h_alu
+  have read_c := ALUTypeReader.read_c_fun _ rs2 h_alu
+  rw [read_b, read_c]
 
+  refine bind_congr fun _ => ?_
+  refine bind_congr fun _ => ?_
+  refine congr_arg (wX_bits rd) ?_
 
-
+  simp
+  -- simp
+  clear read_b read_c h_alu h_cpu
 
   sorry
-
--- theorem sp1_bitwise_eq_spec_or
---     (Main : Vector BabyBear 33)
---     (rd rs1 rs2 : regidx)
---     (h_is_or : Main[31] = 1) :
---     sp1_bitwise Main rd rs1 rs2 = spec_or rd rs1 rs2 := by
---   sorry
-
--- theorem sp1_bitwise_eq_spec_xor
---     (Main : Vector BabyBear 33)
---     (rd rs1 rs2 : regidx)
---     (h_is_xor : Main[32] = 1) :
---     sp1_bitwise Main rd rs1 rs2 = spec_xor rd rs1 rs2 := by
---   sorry
 
 end and
 

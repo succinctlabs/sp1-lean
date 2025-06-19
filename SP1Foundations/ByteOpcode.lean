@@ -42,31 +42,31 @@ section constrain
 
 def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
   match op with
-  | AND => (a < 256 ∧ b < 256 ∧ c < 256) → a = b &&& c
-  | OR  => (a < 256 ∧ b < 256 ∧ c < 256) → a = b ||| c
-  | XOR => (a < 256 ∧ b < 256 ∧ c < 256) → a = b ^^^ c
+  | AND => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b &&& c
+  | OR  => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ||| c
+  | XOR => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ^^^ c
   | U8Range => a < 256 ∧ b < 256 ∧ c < 256
-  | LTU => (a < 256 ∧ b < 256 ∧ c < 256) → (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
+  | LTU => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
   | Range => a < 2 ^ b.val -- Is this right?
-  | MSB => (a < 256 ∧ b < 256 ∧ c < 256) → (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
+  | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
 
 @[simp] lemma constrain_AND (a b c : BabyBear) :
-    ByteOpcode.AND.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256 → a = b &&& c) := Iff.rfl
+    ByteOpcode.AND.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b &&& c := Iff.rfl
 
 @[simp] lemma constrain_OR (a b c : BabyBear) :
-    ByteOpcode.OR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256 → a = b ||| c) := Iff.rfl
+    ByteOpcode.OR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ||| c := Iff.rfl
 
 @[simp] lemma constrain_XOR (a b c : BabyBear) :
-    ByteOpcode.XOR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256 → a = b ^^^ c) := Iff.rfl
+    ByteOpcode.XOR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ^^^ c := Iff.rfl
 
 @[simp] lemma constrain_U8Range (a b c : BabyBear) :
     ByteOpcode.U8Range.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) := Iff.rfl
 
 @[simp] lemma constrain_LTU (a b c : BabyBear) :
-    ByteOpcode.LTU.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256 → (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)) := Iff.rfl
+    ByteOpcode.LTU.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c) := Iff.rfl
 
 @[simp] lemma constrain_MSB (a b c : BabyBear) :
-    ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256 → (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)) := Iff.rfl
+    ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64) := Iff.rfl
 
 @[simp] lemma constrain_Range (a b c : BabyBear) :
     ByteOpcode.Range.constrain a b c ↔ (a < 2 ^ b.val) := Iff.rfl

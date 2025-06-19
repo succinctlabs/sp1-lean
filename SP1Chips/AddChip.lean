@@ -68,6 +68,8 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
   have h_high : Main[21].val < 65536 := add_cstrs.right.right.right
   linarith
 
+-- rX_bits op_b = pure cols.op_b_memory.prev_value
+
 def sp1_add
     (Main : Vector BabyBear 23)
     (rd rs1 rs2 : regidx) :
@@ -117,6 +119,8 @@ theorem sp1_add_eq_spec_add (Main : Vector BabyBear 23)
 
   -- Substitue the semantics of the underlying add operation
   rw [AddOperation.correct' Main[20] Main[21] M11_U16 M12_U16 M16_U16 M17_U16 add_cstrs]
+  simp [execute_RTYPE]
+  simp only [] at read_b read_c
 
   -- Simplify the final result
   simp [read_b, read_c, execute_RTYPE]
