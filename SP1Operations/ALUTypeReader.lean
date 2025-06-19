@@ -36,14 +36,14 @@ def constraints
     let E20 : BabyBear := clk + 3
     let E22 : BabyBear := is_real - 1
     let E24 : BabyBear := is_real * E22
-    let E26 : BabyBear := E20 - cols.op_a_memory.access_timestamp.prev_clk
+    let E26 : BabyBear := E20 - cols.op_a_memory.access_timestamp.prev_low
     let E28 : BabyBear := E26 - 1
     let E30 : BabyBear := E28 - cols.op_a_memory.access_timestamp.diff_low_limb
     let E32 : BabyBear := E30 * 2013143041
     let E34 : BabyBear := clk + 2
     let E36 : BabyBear := is_real - 1
     let E38 : BabyBear := is_real * E36
-    let E40 : BabyBear := E34 - cols.op_b_memory.access_timestamp.prev_clk
+    let E40 : BabyBear := E34 - cols.op_b_memory.access_timestamp.prev_low
     let E42 : BabyBear := E40 - 1
     let E44 : BabyBear := E42 - cols.op_b_memory.access_timestamp.diff_low_limb
     let E46 : BabyBear := E44 * 2013143041
@@ -51,7 +51,7 @@ def constraints
     let E50 : BabyBear := is_real - cols.imm_c
     let E52 : BabyBear := E50 - 1
     let E54 : BabyBear := E50 * E52
-    let E56 : BabyBear := E48 - cols.op_c_memory.access_timestamp.prev_clk
+    let E56 : BabyBear := E48 - cols.op_c_memory.access_timestamp.prev_low
     let E58 : BabyBear := E56 - 1
     let E60 : BabyBear := E58 - cols.op_c_memory.access_timestamp.diff_low_limb
     let E62 : BabyBear := E60 * 2013143041
@@ -68,17 +68,17 @@ def constraints
       .assertZero E24,
       .send (.byte (ByteOpcode.ofNat 6) cols.op_a_memory.access_timestamp.diff_low_limb 14 0) is_real,
       .send (.byte (ByteOpcode.ofNat 6) E32 14 0) is_real,
-      .send (.memory shard cols.op_a_memory.access_timestamp.prev_clk cols.op_a cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1]) is_real,
+      .send (.memory shard cols.op_a_memory.access_timestamp.prev_low cols.op_a cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1]) is_real,
       .receive (.memory shard E20 cols.op_a op_a_write_value[0] op_a_write_value[1]) is_real,
       .assertZero E38,
       .send (.byte (ByteOpcode.ofNat 6) cols.op_b_memory.access_timestamp.diff_low_limb 14 0) is_real,
       .send (.byte (ByteOpcode.ofNat 6) E46 14 0) is_real,
-      .send (.memory shard cols.op_b_memory.access_timestamp.prev_clk cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
+      .send (.memory shard cols.op_b_memory.access_timestamp.prev_low cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
       .receive (.memory shard E34 cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
       .assertZero E54,
       .send (.byte (ByteOpcode.ofNat 6) cols.op_c_memory.access_timestamp.diff_low_limb 14 0) E50,
       .send (.byte (ByteOpcode.ofNat 6) E62 14 0) E50,
-      .send (.memory shard cols.op_c_memory.access_timestamp.prev_clk cols.op_c[0] cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) E50,
+      .send (.memory shard cols.op_c_memory.access_timestamp.prev_low cols.op_c[0] cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) E50,
       .receive (.memory shard E48 cols.op_c[0] cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) E50,
       .assertZero E66,
       .assertZero E70

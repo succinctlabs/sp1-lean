@@ -1,7 +1,7 @@
 import SP1Foundations
 
 structure MemoryAccessInShardTimestamp where
-  prev_clk : BabyBear
+  prev_low : BabyBear
   diff_low_limb : BabyBear
 
 -- MemoryAccessInSharedCols is parameterized on type `T` because we may want to
