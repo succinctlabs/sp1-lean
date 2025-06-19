@@ -6,7 +6,7 @@ import LeanRV32D.RiscvRegs
 
 open LeanRV32D.Functions
 
-structure BitwiseU16Operation where
+@[ext] structure BitwiseU16Operation where
   a_low_bytes : U16toU8Operation
   b_low_bytes : U16toU8Operation
   bitwise_operation : BitwiseOperation
@@ -98,12 +98,8 @@ lemma bitwiseOperation_constraints_of_constraints
   rw [constraintList] at h
   simp at h
   convert h.2
-  rw [BitwiseOperation.eq_iff_result_eq]
-  refine fun i => match i with
-  | 0 => by simp
-  | 1 => by simp
-  | 2 => by simp
-  | 3 => by simp; rfl -- why is this needed?
+  rw [BitwiseOperation.ext_cases_iff]
+  simp
 
 lemma bitwiseOperation_spec_of_allHold_constraints
     (a : Word BabyBear)
@@ -227,14 +223,27 @@ lemma eq_toBitwise_of_constraints₃
   have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 3 ha hb hc _ hop this
   exact this
 
--- version for actual bitvecs to use w/ sail stuff
+-- version for (almost) actual bitvecs to use w/ sail stuff
 -- Not clear yet how bounds should work here, come back after chip
--- lemma eq_toBitwise_bitvec_of_constraints
---     (a : Word U16)
---     (b : Word U16)
---     (cols : BitwiseU16Operation)
---     (opcode : ByteOpcode)
---     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
---     (h : (constraintList a b cols opcode.toBB 1).2.allHold) :
+lemma eq_toBitwise_word_of_constraints
+    (a : Word BabyBear)
+    (b : Word BabyBear)
+    (cols : BitwiseU16Operation)
+    (opcode : ByteOpcode)
+    (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
+    (ha : cols.a_low_bytes.low_bytes[0] < 256)
+    (hb : cols.b_low_bytes.low_bytes[0] < 256)
+    (ha' : (a[0] - cols.a_low_bytes.low_bytes[0]) * 2005401601 < 256)
+    (hb' : (b[0] - cols.b_low_bytes.low_bytes[0]) * 2005401601 < 256)
+    (hc : cols.bitwise_operation.result[0] < 256)
+    (hc' : cols.bitwise_operation.result[1] < 256)
+    (h : (constraintList a b cols opcode.toBB 1).2.allHold) :
+    (cols.bitwise_operation.result[0] + cols.bitwise_operation.result[1] * (256 : BabyBear)) =
+      (ByteOpcode.toBitwise opcode a[0] b[0]) := by
+  rw [eq_toBitwise_of_constraints₀ a b cols opcode ha hb hc hop h,
+    eq_toBitwise_of_constraints₁ a b cols opcode ha' hb' hc' hop h]
+  rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
+  simp [mul_assoc]
+
 
 end BitwiseU16Operation
