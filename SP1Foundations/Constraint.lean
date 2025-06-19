@@ -1,6 +1,10 @@
 import SP1Foundations.Field
 import SP1Foundations.ByteOpcode
 
+import LeanRV32D.RiscvInstsEnd
+
+open LeanRV32D.Functions Sail
+
 -- inductive AirInteraction.Kind where
 --   | BYTE
 --   | MEMORY
@@ -29,9 +33,12 @@ section toProp
 
 def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
-  | .send (.byte op a b c) (mult) => mult ≠ 0 → op.constrain a b c
-  | .receive (.memory _ _ _ low_limb high_limb) (mult) =>
-      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536)
+  | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
+  | .send (.memory shard clk addr low_limb high_limb) mult =>
+      mult ≠ 0 → ((rX_bits (.Regidx <| BitVec.ofNat 5 addr.val) = pure (BitVec.ofNat 32 (low_limb + high_limb * 65536)))
+        ∧ (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32))
+  | .receive (.memory shard clk addr low_limb high_limb) (mult) =>
+      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
   | _ => 1 = 1
 
 @[simp] lemma toProp_assertZero (x : BabyBear) :

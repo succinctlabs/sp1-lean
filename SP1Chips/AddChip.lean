@@ -71,13 +71,10 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
 -- rX_bits op_b = pure cols.op_b_memory.prev_value
 
 def sp1_add
-    (Main : Vector BabyBear 23)
-    (rd rs1 rs2 : regidx) :
+    (Main : Vector BabyBear 23)  :
     SailM Unit := do
   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
-  let rs1_value ← rX_bits rs1
-  let rs2_value ← rX_bits rs2
-  wX_bits rd (BitVec.ofNat 32 (Main[20].val + Main[21].val * 65536))
+  wX_bits (.Regidx Main[4].1) (BitVec.ofNat 32 (Main[20].val + Main[21].val * 65536))
 
 def spec_add
     (rd rs1 rs2 : regidx) :
@@ -88,8 +85,8 @@ def spec_add
 
 theorem sp1_add_eq_spec_add (Main : Vector BabyBear 23)
     (cstrs : (constraints Main).allHold)
-    (h_is_real : Main[22] = 1) (rd rs1 rs2 : regidx) :
-    sp1_add Main rd rs1 rs2 = spec_add rd rs1 rs2 := by
+    (h_is_real : Main[22] = 1) :
+    sp1_add Main = spec_add (.Regidx Main[4].1) (.Regidx Main[10].1) (.Regidx Main[15].val) := by
   unfold sp1_add spec_add
   rw [← BitVec.ofNatLT_eq_ofNat (bound_of_constraints Main cstrs h_is_real)]
 
@@ -113,17 +110,19 @@ theorem sp1_add_eq_spec_add (Main : Vector BabyBear 23)
   have hb2 : Main[16].val + Main[17].val * 65536 < 2 ^ 32 := by
     have := M16_U16.in_range; have := M17_U16.in_range; linarith
 
-  -- Correspondence between the original and newly written values
-  have read_b := RTypeReader.read_b_fun _ rs1 adapter_cstrs hb1
-  have read_c := RTypeReader.read_c_fun _ rs2 adapter_cstrs hb2
+  -- -- Correspondence between the original and newly written values
+  -- have read_b := RTypeReader.read_b_fun _ rs1 adapter_cstrs hb1
+  -- have read_c := RTypeReader.read_c_fun _ rs2 adapter_cstrs hb2
 
   -- Substitue the semantics of the underlying add operation
   rw [AddOperation.correct' Main[20] Main[21] M11_U16 M12_U16 M16_U16 M17_U16 add_cstrs]
   simp [execute_RTYPE]
-  simp only [] at read_b read_c
+
+  sorry
+  -- simp only [] at read_b read_c
 
   -- Simplify the final result
-  simp [read_b, read_c, execute_RTYPE]
-  rfl
+  -- simp [read_b, read_c, execute_RTYPE]
+  -- rfl
 
 end AddChip
