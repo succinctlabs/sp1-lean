@@ -87,7 +87,7 @@ def spec_add
   let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
   pure ()
 
-theorem sp1_add_implies_spec_add (Main : Vector BabyBear 23)
+theorem sp1_add_eq_spec_add (Main : Vector BabyBear 23)
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[22] = 1) (rd rs1 rs2 : regidx) :
     sp1_add Main cstrs h_is_real rd rs1 rs2 = spec_add rd rs1 rs2 := by

@@ -22,8 +22,8 @@ namespace BitwiseOperation
 open ByteOpcode
 
 def constraints
-  (a : Vector BabyBear WORD_BYTE_SIZE)
-  (b : Vector BabyBear WORD_BYTE_SIZE)
+  (a : ByteWord BabyBear)
+  (b : ByteWord BabyBear)
   (cols : BitwiseOperation)
   (opcode : BabyBear)
   (is_real : BabyBear)
@@ -35,7 +35,7 @@ def constraints
     .send (.byte (ByteOpcode.ofNat opcode) cols.result[3] a[3] b[3]) is_real
   ]
 
-def spec (a b : Vector BabyBear WORD_BYTE_SIZE)
+def spec (a b : ByteWord BabyBear)
     (cols : BitwiseOperation) (opcode : BabyBear) : Prop :=
   if ByteOpcode.ofNat opcode = .AND then (
     ((cols.result[0] < 256 ∧ a[0] < 256 ∧ b[0] < 256) → cols.result[0] = a[0] &&& b[0]) ∧
@@ -54,7 +54,7 @@ def spec (a b : Vector BabyBear WORD_BYTE_SIZE)
     ((cols.result[3] < 256 ∧ a[3] < 256 ∧ b[3] < 256) → cols.result[3] = a[3] ^^^ b[3])
   ) else True
 
-lemma constraints_imp_spec (a b : Vector BabyBear WORD_BYTE_SIZE)
+lemma constraints_imp_spec (a b : ByteWord BabyBear)
     (cols : BitwiseOperation) (opcode is_real : BabyBear)
     (h0 : is_real ≠ 0)
     (h : (cols.constraints a b opcode is_real).allHold) :
@@ -68,7 +68,7 @@ lemma constraints_imp_spec (a b : Vector BabyBear WORD_BYTE_SIZE)
   · simpa [h0, h3] using h
   simp [h1, h2, h3]
 
-lemma eq_and_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
+lemma eq_and_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
     (h : (cols.constraints a b 0 1).allHold) :
     cols.result[i] = a[i] &&& b[i] := by
@@ -80,7 +80,7 @@ lemma eq_and_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwi
   | 2 => this.2.2.1 hc ha hb
   | 3 => this.2.2.2 hc ha hb
 
-lemma eq_or_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
+lemma eq_or_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
     (h : (cols.constraints a b 1 1).allHold) :
     cols.result[i] = a[i] ||| b[i] := by
@@ -92,7 +92,7 @@ lemma eq_or_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwis
   | 2 => this.2.2.1 hc ha hb
   | 3 => this.2.2.2 hc ha hb
 
-lemma eq_xor_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
+lemma eq_xor_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
     (h : (cols.constraints a b 2 1).allHold) :
     cols.result[i] = a[i] ^^^ b[i] := by
@@ -105,7 +105,7 @@ lemma eq_xor_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : Bitwi
   | 3 => this.2.2.2 hc ha hb
 
 /-- Constraints on `BitwiseOperation` imply that the result is `op.toBitwise` applied to the inputs. -/
-lemma eq_toBitwise_of_constraints (a b : Vector BabyBear WORD_BYTE_SIZE) (cols : BitwiseOperation)
+lemma eq_toBitwise_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (ha : a[i] < 256) (hb : b[i] < 256) (hc : cols.result[i] < 256)
     (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
     (h : (cols.constraints a b op.toBB 1).allHold) :
