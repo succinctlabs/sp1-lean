@@ -39,7 +39,7 @@ def toProp : SP1Constraint → Prop
         ∧ (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32))
   | .receive (.memory shard clk addr low_limb high_limb) (mult) =>
       mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
-  | _ => 1 = 1
+  | _ => True
 
 @[simp] lemma toProp_assertZero (x : BabyBear) :
     (assertZero x).toProp ↔ x = 0 := Iff.rfl
@@ -74,3 +74,12 @@ lemma allHold_append (cs cs' : SP1ConstraintList) :
   List.forall_append
 
 end constraintList
+
+def toSailM : SP1Constraint → SailM Unit
+  | .receive (.memory shard clk addr low_limb high_limb) mult => do
+      wX_bits (.Regidx <| BitVec.ofNat 5 addr.val)
+        (BitVec.ofNat 32 (low_limb + high_limb * 65536))
+  | _ => pure ()
+
+def constraints_to_SailM (cs : SP1ConstraintList) : SailM Unit :=
+  do let _ ← List.mapM toSailM cs
