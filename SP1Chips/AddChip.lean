@@ -84,30 +84,37 @@ lemma toSailM_constraints
 
 end constraints
 
-def spec_add (Main : Vector BabyBear 23) :
-    SailM Unit := do
-  -- let _ ← wX_bits (.Regidx Main[4].1)
-  --       (BitVec.ofNat 32 (Main[5] + Main[6] * 65536))
-  -- let _ ← wX_bits (.Regidx Main[10].1)
-  --   (BitVec.ofNat 32 (Main[11] + Main[12] * 65536))
+def spec_add' (Main : Vector BabyBear 23) : SailM Unit := do
+  let _ ← wX_bits (.Regidx Main[4].1)
+        (BitVec.ofNat 32 (Main[5] + Main[6] * 65536))
+  let _ ← wX_bits (.Regidx Main[10].1)
+    (BitVec.ofNat 32 (Main[11] + Main[12] * 65536))
   let _ ← execute_RTYPE (.Regidx Main[4].1)
     (.Regidx Main[10].1) (.Regidx Main[15].val) rop.ADD
 
-lemma writeFirst_eq_iff_forall_reg_map_eq (comp1 comp2 : SailM Unit)
-    (addr : ℕ) (v : BitVec 32) :
-    let reg : regidx := .Regidx (BitVec.ofNat 5 addr)
-    (do let _ ← wX_bits reg v; comp1) = (do let _ ← wX_bits reg v; comp2)
-      ↔
-    ∀ reg_map ∈ {rm | rm.mem.get! addr = v},
-        comp1.run reg_map = comp2.run reg_map := by
+def specAdd (Main : Vector BabyBear 23) : SailM Unit := do
+  let op_a := regidx.Regidx Main[4].val
+  let op_b := regidx.Regidx Main[10].val
+  let op_c := regidx.Regidx Main[15].val
+  let _ ← execute_RTYPE op_a op_b op_c rop.ADD
+
+theorem SP1Add_Correct (Main : Vector BabyBear 23)
+    (h_constraints : SP1ConstraintList.allHold (constraints Main))
+    (h_is_real : Main[22] = 1)
+    (mstate : PreSail.SequentialState RegisterType trivialChoiceSource)
+    (hmem₁ : mstate.mem[Main[4]]? = some ↑(Main[5] + Main[6] * 65536).val)
+    (hmem₂ : mstate.mem[Main[10]]? = some ↑(Main[11] + Main[12] * 65536).val) :
+
+    let sp1Add : SailM Unit := (constraints Main).toSailM
+    sp1Add.run mstate = (specAdd Main).run mstate := by
   sorry
 
 theorem sp1_add_eq_spec_add
     (Main : Vector BabyBear 23)
-    (cstrs : (constraints Main).allHold)
+    (cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_real : Main[22] = 1) :
-    (constraints Main).toSailM = spec_add Main := by
-  unfold spec_add
+    (constraints Main).toSailM = spec_add' Main := by
+  unfold spec_add'
   rw [toSailM_constraints]
 
   let spare_cstrs := cstrs

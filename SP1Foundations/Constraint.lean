@@ -102,26 +102,7 @@ end toSailM
 
 section toReg
 
--- def SP1Constraint.getClk : SP1Constraint → Option BabyBear
---   | .send (.memory shard clk addr low_limb high_limb) mult => some clk
---   | .receive (.memory shard clk addr low_limb high_limb) mult => some clk
---   | _ => none
-
--- noncomputable def SP1ConstraintList.sortClock (cs : SP1ConstraintList) : SP1ConstraintList :=
---   cs.mergeSort (fun c1 c2 => open Classical in if c1.getClk ≤ c2.getClk then true else false)
-
--- def toSailM' : SP1Constraint → SailM Unit
---   | .send (.memory shard clk addr low_limb high_limb) mult => do
---       wX_bits (.Regidx <| BitVec.ofNat 5 addr.val)
---         (BitVec.ofNat 32 (low_limb + high_limb * 65536))
---   | _ => pure ()
-
--- noncomputable def constraints_to_SailM (cs : SP1ConstraintList) : SailM Unit :=
---   do let _ ← List.mapM toSailM cs.sortClock
-
 section sailboats
-
-#check EStateM.Result
 
 lemma reg_map_ext (rmap rmap' : PreSail.SequentialState RegisterType trivialChoiceSource)
     (hreg : rmap.regs = rmap'.regs)
@@ -134,20 +115,37 @@ lemma reg_map_ext (rmap rmap' : PreSail.SequentialState RegisterType trivialChoi
   refine match rmap' with | ⟨regs', cs', mem', (), cc', so'⟩ => ?_
   simp_all
 
-lemma wX_bits_rX_bits' (rs : regidx) (v : BitVec 32) (cont : BitVec 32 → SailM α) :
-    (do let _ ← wX_bits rs v; let v' ← rX_bits rs; cont v') =
-      (do let _ ← wX_bits rs v; cont v) := by
+@[simp]
+lemma wX_bits_rX_bits' (rs : regidx) (bv : BitVec 32) (cont : BitVec 32 → SailM α) :
+    (do let _ ← wX_bits rs bv; let bv' ← rX_bits rs; cont bv') =
+      (do let _ ← wX_bits rs bv; cont bv) := by
+  -- rw [bind_pure_comp]
+  simp [wX_bits, rX_bits]
+
+  -- simp only [Nat.reducePow, Nat.reduceMul, bind_pure_comp]
   refine EStateM.ext fun reg_map => ?_
-  simp
+  -- simp
   rw [EStateM.run]
+  -- rw [EStateM.Result.map.eq_def]
+  show (EStateM.bind _ _) reg_map = (EStateM.bind _ _) reg_map
+
+  simp [EStateM.bind]
+
   sorry
 
 lemma wX_bits_rX_bits (rs : regidx) (v : BitVec 32) :
     (do let _ ← wX_bits rs v; rX_bits rs) =
       (do let _ ← wX_bits rs v; pure v) := by
+  rw [bind_pure_comp]
+  simp only [Nat.reducePow, Nat.reduceMul, bind_pure_comp]
   refine EStateM.ext fun reg_map => ?_
   simp
   rw [EStateM.run]
+  rw [EStateM.Result.map.eq_def]
+  show (EStateM.bind _ _) reg_map = _
+  rw [EStateM.bind]
+  simp [EStateM.run]
+
   sorry
 
 lemma rX_bits_rX_bits_swap (cont : BitVec 32 → BitVec 32 → SailM α)
