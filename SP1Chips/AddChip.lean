@@ -5,6 +5,8 @@ open LeanRV32D.Functions Sail
 
 namespace AddChip
 
+section constraints
+
 def constraints
   (Main : Vector BabyBear 23)
   : SP1ConstraintList :=
@@ -68,28 +70,47 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
   have h_high : Main[21].val < 65536 := add_cstrs.right.right.right
   linarith
 
--- rX_bits op_b = pure cols.op_b_memory.prev_value
+lemma toSailM_constraints
+    (Main : Vector BabyBear 23) :
+    (constraints Main).toSailM = (do
+    let _ ← wX_bits (regidx.Regidx (BitVec.ofNat 5 ↑Main[4]))
+      (BitVec.ofNat 32 (↑Main[20] + ↑Main[21] * 65536))
+    let _ ← wX_bits (regidx.Regidx (BitVec.ofNat 5 ↑Main[10]))
+      (BitVec.ofNat 32 (↑Main[11] + ↑Main[12] * 65536))
+    let _ ← wX_bits (regidx.Regidx (BitVec.ofNat 5 ↑Main[15]))
+      (BitVec.ofNat 32 (↑Main[16] + ↑Main[17] * 65536))) := by
+  simp [constraints, SP1ConstraintList.toSailM,
+    AddOperation.constraints, CPUState.constraints, RTypeReader.constraints]
 
-def sp1_add
-    (Main : Vector BabyBear 23)  :
+end constraints
+
+def spec_add (Main : Vector BabyBear 23) :
     SailM Unit := do
-  writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
-  wX_bits (.Regidx Main[4].1) (BitVec.ofNat 32 (Main[20].val + Main[21].val * 65536))
+  -- let _ ← wX_bits (.Regidx Main[4].1)
+  --       (BitVec.ofNat 32 (Main[5] + Main[6] * 65536))
+  -- let _ ← wX_bits (.Regidx Main[10].1)
+  --   (BitVec.ofNat 32 (Main[11] + Main[12] * 65536))
+  let _ ← execute_RTYPE (.Regidx Main[4].1)
+    (.Regidx Main[10].1) (.Regidx Main[15].val) rop.ADD
 
-def spec_add
-    (rd rs1 rs2 : regidx) :
-    SailM Unit := do
-  writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
-  let _ ← execute_RTYPE rs2 rs1 rd rop.ADD
-  pure ()
+lemma writeFirst_eq_iff_forall_reg_map_eq (comp1 comp2 : SailM Unit)
+    (addr : ℕ) (v : BitVec 32) :
+    let reg : regidx := .Regidx (BitVec.ofNat 5 addr)
+    (do let _ ← wX_bits reg v; comp1) = (do let _ ← wX_bits reg v; comp2)
+      ↔
+    ∀ reg_map ∈ {rm | rm.mem.get! addr = v},
+        comp1.run reg_map = comp2.run reg_map := by
+  sorry
 
-theorem sp1_add_eq_spec_add (Main : Vector BabyBear 23)
+theorem sp1_add_eq_spec_add
+    (Main : Vector BabyBear 23)
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[22] = 1) :
-    sp1_add Main = spec_add (.Regidx Main[4].1) (.Regidx Main[10].1) (.Regidx Main[15].val) := by
-  unfold sp1_add spec_add
-  rw [← BitVec.ofNatLT_eq_ofNat (bound_of_constraints Main cstrs h_is_real)]
+    (constraints Main).toSailM = spec_add Main := by
+  unfold spec_add
+  rw [toSailM_constraints]
 
+  let spare_cstrs := cstrs
   -- Extract the various constraints from the assumption
   simp [constraints] at cstrs
   obtain ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
@@ -110,19 +131,14 @@ theorem sp1_add_eq_spec_add (Main : Vector BabyBear 23)
   have hb2 : Main[16].val + Main[17].val * 65536 < 2 ^ 32 := by
     have := M16_U16.in_range; have := M17_U16.in_range; linarith
 
-  -- -- Correspondence between the original and newly written values
-  -- have read_b := RTypeReader.read_b_fun _ rs1 adapter_cstrs hb1
-  -- have read_c := RTypeReader.read_c_fun _ rs2 adapter_cstrs hb2
-
-  -- Substitue the semantics of the underlying add operation
-  rw [AddOperation.correct' Main[20] Main[21] M11_U16 M12_U16 M16_U16 M17_U16 add_cstrs]
+  simp [constraints, SP1ConstraintList.toSailM]
   simp [execute_RTYPE]
 
-  sorry
-  -- simp only [] at read_b read_c
+  have := AddOperation.correct' Main[20] Main[21] M11_U16 M12_U16 M16_U16 M17_U16 add_cstrs
 
-  -- Simplify the final result
-  -- simp [read_b, read_c, execute_RTYPE]
-  -- rfl
+  rw [← BitVec.ofNatLT_eq_ofNat (bound_of_constraints Main spare_cstrs h_is_real)]
+  rw [this]
+
+  sorry
 
 end AddChip
