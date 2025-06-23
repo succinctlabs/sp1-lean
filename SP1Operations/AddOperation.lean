@@ -102,35 +102,40 @@ theorem correct
           simp [Fin.lt_def] at qq3 aa4
           aesop (add 50% tactic (by omega))
 
--- 
--- open BitVec
--- 
--- lemma lt_of_constraintsAllHold {c0 c1 a0 a1 b0 b1 : BabyBear}
---     (h : (constraints #v[c0, c1, b0, b1, a0, a1, 1]).allHold) : a0 < 65536 := by
---   rw [constraints_iff_constraintsProp] at h
---   rw [constraintsProp] at h
---   simp at h
---   tauto
--- 
--- lemma lt_of_constraintsAllHold' {c0 c1 a0 a1 b0 b1 : BabyBear}
---     (h : (constraints #v[c0, c1, b0, b1, a0, a1, 1]).allHold) : a1 < 65536 := by
---   rw [constraints_iff_constraintsProp] at h
---   rw [constraintsProp] at h
---   simp at h
---   tauto
--- 
--- /-- Version of correctness using specific bitvecs.
--- To get good rewrites we allow arbitrary proofs on the left (should do the reverse for ← rw to work)-/
--- lemma correct' (c0 c1 : BabyBear) (a0 a1 b0 b1 : U16)
---     (h : (constraints #v[a0, a1, b0, b1, c0, c1, 1]).allHold)
---     (pf : c0.val + c1.val * 65536 < 2 ^ 32) :
---     (c0.val + c1.val * 65536)#'pf =
---       (BitVec.ofU16 a0 a1 + BitVec.ofU16 b0 b1) := by
---   let c0' : U16 := ⟨c0, lt_of_constraintsAllHold h⟩
---   let c1' : U16 := ⟨c1, lt_of_constraintsAllHold' h⟩
---   refine correct c0' c1' a0 a1 b0 b1 1 ?_ rfl
---   exact h
+open BitVec
 
+lemma lt_of_constraintsAllHold
+    (h : (constraints a b cols is_real).allHold)
+    (h_is_real : is_real = 1) : cols.value[0] < 65536 := by
+  rw [constraints_iff_constraintsProp] at h
+  rw [constraintsProp] at h
+  simp at h
+  subst h_is_real
+  tauto
 
+lemma lt_of_constraintsAllHold'
+    (h : (constraints a b cols is_real).allHold)
+    (h_is_real : is_real = 1) : cols.value[1] < 65536 := by
+  rw [constraints_iff_constraintsProp] at h
+  rw [constraintsProp] at h
+  simp at h
+  subst h_is_real
+  tauto
+
+/-- Version of correctness using specific bitvecs.
+To get good rewrites we allow arbitrary proofs on the left (should do the reverse for ← rw to work)-/
+lemma correct'
+    (a b : Word U16)
+    (cols : AddOperation BabyBear)
+    (is_real : U1)
+    (h : (constraints a b cols is_real).allHold)
+    (h_is_real : is_real = 1)
+    (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ 32) :
+    (cols.value[0].val + cols.value[1].val * 65536)#'pf =
+      (a.toBV32_U16 + b.toBV32_U16) := by
+  -- TODO(gzgz): don't use aesop
+  let c0' : U16 := ⟨cols.value[0], lt_of_constraintsAllHold h (by aesop)⟩
+  let c1' : U16 := ⟨cols.value[1], lt_of_constraintsAllHold' h (by aesop)⟩
+  refine correct a b { value := #v[c0', c1'] } is_real h h_is_real
 
 end AddOperation
