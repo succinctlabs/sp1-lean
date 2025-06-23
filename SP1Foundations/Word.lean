@@ -61,19 +61,23 @@ section val_lt
 
 variable {bound : ℕ} (x : Word (BoundedBabyBear bound))
 
-@[aesop safe forward]
+-- TODO(gzgz): This used to be `aesop safe forward`. It was definitely working
+-- at some point during the past, but right now aesop would just keep applying
+-- these two lemmas and never do anything else, so I had to change from `safe`
+-- to `50%`.
+@[aesop 50% forward]
 lemma Word.val_zero_boundedBabyBear_lt : x[0].val < bound := x[0].in_range
-@[aesop safe forward]
+@[aesop 50% forward]
 lemma Word.val_one_boundedBabyBear_lt : x[1].val < bound := x[1].in_range
 
-@[aesop safe forward]
-lemma ByteWord.val_zero_boundedBabyBear_lt : x[0].val < bound := x[0].in_range
-@[aesop safe forward]
-lemma ByteWord.val_one_boundedBabyBear_lt : x[0].val < bound := x[0].in_range
-@[aesop safe forward]
-lemma ByteWord.val_two_boundedBabyBear_lt : x[0].val < bound := x[0].in_range
-@[aesop safe forward]
-lemma ByteWord.val_three_boundedBabyBear_lt : x[0].val < bound := x[0].in_range
+/- @[aesop safe forward] -/
+/- lemma ByteWord.val_zero_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
+/- @[aesop safe forward] -/
+/- lemma ByteWord.val_one_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
+/- @[aesop safe forward] -/
+/- lemma ByteWord.val_two_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
+/- @[aesop safe forward] -/
+/- lemma ByteWord.val_three_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
 
 end val_lt
 
@@ -112,5 +116,18 @@ theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
 
 def isUInt32 (w : Word (BabyBear)) : Prop :=
   w[0].val < base ∧ w[1].val < base
+
+/-- Coerce a `Word A` to `Word B` when there's a coercion from `A` to `B`. -/
+instance coe [Coe A B] : Coe (Word A) (Word B) where
+  coe w := #v[w[0], w[1]]
+
+/-- Map a function over the elements of a Word. -/
+def map (f : A → B) (w : Word A) : Word B :=
+  #v[f w[0], f w[1]]
+
+/-- Lemma: coercing a Word is the same as mapping the coercion function. -/
+lemma coe_eq_map [Coe A B] (w : Word A) : 
+    (w : Word B) = w.map (fun x => (x : B)) := by
+  simp [map]
 
 end Word
