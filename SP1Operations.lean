@@ -10,5 +10,6 @@ import SP1Operations.MSBOperation
 import SP1Operations.MemoryConsistency
 import SP1Operations.RTypeReader
 import SP1Operations.SubOperation
+import SP1Operations.U16CompareOperation
 import SP1Operations.U16toU8OperationSafe
 import SP1Operations.U16toU8OperationUnsafe
