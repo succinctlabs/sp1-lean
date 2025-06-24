@@ -65,16 +65,20 @@ def constraints_iff_constraintsProp
   · simp [constraints, constraintsProp, h]
   · by_cases h' : is_real = 1 <;> simp [constraints, constraintsProp, h, h', sub_eq_zero]
 
--- Should we be including the bounds at this level? Instead done below seperately
+-- Note that `a`, `b` are in U16 because that's part of our assumption.
+-- `AddOperation` should only be used when `a`, `b` are U16s, which is
+-- concretized here.
+--
+-- `cols` is still in BabyBear because that's what we're trying to prove.
 def spec
   (a b : Word U16)
-  (cols : AddOperation U16)
+  (cols : AddOperation BabyBear)
   (is_real : U1) : Prop :=
-    is_real = 1 → cols.value.toBV32_U16 = a.toBV32_U16 + b.toBV32_U16
+    is_real = 1 → cols.value.toBV32 = a.toBV32_U16 + b.toBV32_U16
 
 theorem correct
   (a b : Word U16)
-  (cols : AddOperation U16)
+  (cols : AddOperation BabyBear)
   (is_real : U1) :
     (constraints a b cols is_real).allHold →
     spec a b cols is_real := by
@@ -88,7 +92,7 @@ theorem correct
       let ⟨qq1, ⟨qq2, ⟨qq3, aa4⟩⟩⟩ := q1
       clear q1
       simp [sub_eq_zero, mul_eq_zero] at qq1 qq2
-      simp [Word.toBV32_U16, BitVec.ofNatLT]
+      simp [Word.toBV32_U16, Word.toBV32, BitVec.ofNatLT, BitVec.ofNat]
 
       cases qq1 with
       | inl qqq1 =>
@@ -136,6 +140,7 @@ lemma correct'
   -- TODO(gzgz): don't use aesop
   let c0' : U16 := ⟨cols.value[0], lt_of_constraintsAllHold h (by aesop)⟩
   let c1' : U16 := ⟨cols.value[1], lt_of_constraintsAllHold' h (by aesop)⟩
+  rw [BitVec.ofNatLT_eq_ofNat pf]
   refine correct a b { value := #v[c0', c1'] } is_real h h_is_real
 
 end AddOperation
