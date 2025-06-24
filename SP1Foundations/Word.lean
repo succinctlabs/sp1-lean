@@ -95,6 +95,9 @@ def toFin32_U16 (w : Word U16) : Fin (2^32) :=
     simp at *
     omega⟩
 
+def toBV32 (w : Word BabyBear) : BitVec BIT_WIDTH :=
+  BitVec.ofNat BIT_WIDTH (w[0].val + w[1].val * base)
+
 def toBV32_U16 (w : Word U16) : BitVec BIT_WIDTH :=
   BitVec.ofNatLT (w[0].val + w[1].val * base) (by
     have _ := w[0].in_range
