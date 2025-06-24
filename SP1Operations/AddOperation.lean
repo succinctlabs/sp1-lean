@@ -1,17 +1,14 @@
 import SP1Foundations
 
-structure AddOperation (T : Type) where
-  value : Word T
-
-instance coe [Coe A B] : Coe (AddOperation A) (AddOperation B) where
-  coe w := { value := w.value }
+structure AddOperation where
+  value : Word BabyBear
 
 namespace AddOperation
 
 def constraints
   (a : Word BabyBear)
   (b : Word BabyBear)
-  (cols : AddOperation BabyBear)
+  (cols : AddOperation)
   (is_real : BabyBear)
   : SP1ConstraintList :=
   let E0 : BabyBear := is_real - 1
@@ -41,7 +38,7 @@ def constraints
 def constraintsProp
   (a : Word BabyBear)
   (b : Word BabyBear)
-  (cols : AddOperation BabyBear)
+  (cols : AddOperation)
   (is_real : BabyBear)
   : Prop :=
   let carry0  : BabyBear := 0
@@ -58,7 +55,7 @@ def constraintsProp
 def constraints_iff_constraintsProp
   (a : Word BabyBear)
   (b : Word BabyBear)
-  (cols : AddOperation BabyBear)
+  (cols : AddOperation)
   (is_real : BabyBear)
   : (constraints a b cols is_real).allHold ↔ constraintsProp a b cols is_real := by
   by_cases h : is_real = 0
@@ -72,13 +69,13 @@ def constraints_iff_constraintsProp
 -- `cols` is still in BabyBear because that's what we're trying to prove.
 def spec
   (a b : Word U16)
-  (cols : AddOperation BabyBear)
+  (cols : AddOperation)
   (is_real : U1) : Prop :=
     is_real = 1 → cols.value.toBV32 = a.toBV32_U16 + b.toBV32_U16
 
 theorem correct
   (a b : Word U16)
-  (cols : AddOperation BabyBear)
+  (cols : AddOperation)
   (is_real : U1) :
     (constraints a b cols is_real).allHold →
     spec a b cols is_real := by
@@ -130,7 +127,7 @@ lemma lt_of_constraintsAllHold'
 To get good rewrites we allow arbitrary proofs on the left (should do the reverse for ← rw to work)-/
 lemma correct'
     (a b : Word U16)
-    (cols : AddOperation BabyBear)
+    (cols : AddOperation)
     (is_real : U1)
     (h : (constraints a b cols is_real).allHold)
     (h_is_real : is_real = 1)
