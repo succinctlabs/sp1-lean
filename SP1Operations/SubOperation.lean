@@ -1,14 +1,14 @@
 import SP1Foundations
 
-structure SubOperation (T : Type) where
-  value : Word T
+structure SubOperation where
+  value : Word BabyBear
 
 namespace SubOperation
 
 def constraints
   (a : Word BabyBear)
   (b : Word BabyBear)
-  (cols : SubOperation BabyBear)
+  (cols : SubOperation)
   (is_real : BabyBear)
   : SP1ConstraintList :=
   let E0 : BabyBear := is_real - 1
@@ -41,13 +41,13 @@ def constraints
 
 def spec
   (a b : Word U16)
-  (cols : SubOperation BabyBear) 
+  (cols : SubOperation) 
   (is_real : U1) : Prop :=
     is_real = 1 → a.toBV32_U16 - b.toBV32_U16 = cols.value.toBV32
 
 theorem correct
   (a b : Word U16)
-  (cols : SubOperation BabyBear)
+  (cols : SubOperation)
   (is_real : U1)
   : (constraints a b cols is_real).allHold → spec a b cols is_real
   := by
@@ -57,7 +57,7 @@ open BitVec
 
 theorem correct'
   (a b : Word U16)
-  (cols : SubOperation BabyBear)
+  (cols : SubOperation)
   (is_real : U1)
   (h_is_real : is_real = 1)
   (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ BIT_WIDTH)
