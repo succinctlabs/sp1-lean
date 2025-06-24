@@ -17,79 +17,81 @@ structure RTypeReader where
 namespace RTypeReader
 
 def constraints
-  (shard clk : BabyBear)
+  (clk_high : BabyBear)
+  (clk_low : BabyBear)
+  (pc : BabyBear)
+  (opcode : BabyBear)
   (op_a_write_value : Word BabyBear)
   (cols : RTypeReader)
   (is_real : BabyBear)
   : SP1ConstraintList :=
   let E0 : BabyBear := is_real - 1
-  let E2 : BabyBear := is_real * E0
-  let E4 : BabyBear := 0 + cols.op_b
-  let E6 : BabyBear := 0 + cols.op_c
-  let E8 : BabyBear := op_a_write_value[0] - 0
-  let E10 : BabyBear := cols.op_a_0 * E8
-  let E12 : BabyBear := op_a_write_value[1] - 0
-  let E14 : BabyBear := cols.op_a_0 * E12
-  let E16 : BabyBear := clk + 3
-  let E18 : BabyBear := is_real - 1
-  let E20 : BabyBear := is_real * E18
-  let E22 : BabyBear := E16 - cols.op_a_memory.access_timestamp.prev_low
-  let E24 : BabyBear := E22 - 1
-  let E26 : BabyBear := E24 - cols.op_a_memory.access_timestamp.diff_low_limb
-  let E28 : BabyBear := E26 * 2013143041
-  let E30 : BabyBear := clk + 2
-  let E32 : BabyBear := is_real - 1
-  let E34 : BabyBear := is_real * E32
-  let E36 : BabyBear := E30 - cols.op_b_memory.access_timestamp.prev_low
-  let E38 : BabyBear := E36 - 1
-  let E40 : BabyBear := E38 - cols.op_b_memory.access_timestamp.diff_low_limb
-  let E42 : BabyBear := E40 * 2013143041
-  let E44 : BabyBear := clk + 1
-  let E46 : BabyBear := is_real - 1
-  let E48 : BabyBear := is_real * E46
-  let E50 : BabyBear := E44 - cols.op_c_memory.access_timestamp.prev_low
-  let E52 : BabyBear := E50 - 1
-  let E54 : BabyBear := E52 - cols.op_c_memory.access_timestamp.diff_low_limb
-  let E56 : BabyBear := E54 * 2013143041
-
+  let E1 : BabyBear := is_real * E0
+  let E2 : BabyBear := 0 + cols.op_b
+  let E3 : BabyBear := 0 + cols.op_c
+  let E4 : BabyBear := op_a_write_value[0] - 0
+  let E5 : BabyBear := cols.op_a_0 * E4
+  let E6 : BabyBear := op_a_write_value[1] - 0
+  let E7 : BabyBear := cols.op_a_0 * E6
+  let E8 : BabyBear := clk_low + 3
+  let E9 : BabyBear := is_real - 1
+  let E10 : BabyBear := is_real * E9
+  let E11 : BabyBear := E8 - cols.op_a_memory.access_timestamp.prev_low
+  let E12 : BabyBear := E11 - 1
+  let E13 : BabyBear := E12 - cols.op_a_memory.access_timestamp.diff_low_limb
+  let E14 : BabyBear := E13 * 2013235201
+  let E15 : BabyBear := clk_low + 2
+  let E16 : BabyBear := is_real - 1
+  let E17 : BabyBear := is_real * E16
+  let E18 : BabyBear := E15 - cols.op_b_memory.access_timestamp.prev_low
+  let E19 : BabyBear := E18 - 1
+  let E20 : BabyBear := E19 - cols.op_b_memory.access_timestamp.diff_low_limb
+  let E21 : BabyBear := E20 * 2013235201
+  let E22 : BabyBear := clk_low + 1
+  let E23 : BabyBear := is_real - 1
+  let E24 : BabyBear := is_real * E23
+  let E25 : BabyBear := E22 - cols.op_c_memory.access_timestamp.prev_low
+  let E26 : BabyBear := E25 - 1
+  let E27 : BabyBear := E26 - cols.op_c_memory.access_timestamp.diff_low_limb
+  let E28 : BabyBear := E27 * 2013235201
   [
-    .assertZero E2,
+    .assertZero E1,
+    .assertZero E5,
+    .assertZero E7,
     .assertZero E10,
-    .assertZero E14,
-    .assertZero E20,
-    .send (.byte ByteOpcode.Range cols.op_a_memory.access_timestamp.diff_low_limb 14 0) is_real,
-    .send (.byte ByteOpcode.Range E28 14 0) is_real,
-    .send (.memory shard cols.op_a_memory.access_timestamp.prev_low cols.op_a cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1]) is_real,
-    .receive (.memory shard E16 cols.op_a op_a_write_value[0] op_a_write_value[1]) is_real,
-    .assertZero E34,
-    .send (.byte ByteOpcode.Range cols.op_b_memory.access_timestamp.diff_low_limb 14 0) is_real,
-    .send (.byte ByteOpcode.Range E42 14 0) is_real,
-    .send (.memory shard cols.op_b_memory.access_timestamp.prev_low cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
-    .receive (.memory shard E30 cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
-    .assertZero E48,
-    .send (.byte ByteOpcode.Range cols.op_c_memory.access_timestamp.diff_low_limb 14 0) is_real,
-    .send (.byte ByteOpcode.Range E56 14 0) is_real,
-    .send (.memory shard cols.op_c_memory.access_timestamp.prev_low cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real,
-    .receive (.memory shard E44 cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real
+    .send (.byte (ByteOpcode.ofNat 6) cols.op_a_memory.access_timestamp.diff_low_limb 16 0) is_real,
+    .send (.byte (ByteOpcode.ofNat 3) 0 E14 0) is_real,
+    .send (.memory clk_high cols.op_a_memory.access_timestamp.prev_low cols.op_a cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1]) is_real,
+    .receive (.memory clk_high E8 cols.op_a op_a_write_value[0] op_a_write_value[1]) is_real,
+    .assertZero E17,
+    .send (.byte (ByteOpcode.ofNat 6) cols.op_b_memory.access_timestamp.diff_low_limb 16 0) is_real,
+    .send (.byte (ByteOpcode.ofNat 3) 0 E21 0) is_real,
+    .send (.memory clk_high cols.op_b_memory.access_timestamp.prev_low cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
+    .receive (.memory clk_high E15 cols.op_b cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]) is_real,
+    .assertZero E24,
+    .send (.byte (ByteOpcode.ofNat 6) cols.op_c_memory.access_timestamp.diff_low_limb 16 0) is_real,
+    .send (.byte (ByteOpcode.ofNat 3) 0 E28 0) is_real,
+    .send (.memory clk_high cols.op_c_memory.access_timestamp.prev_low cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real,
+    .receive (.memory clk_high E22 cols.op_c cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]) is_real
   ]
 
-lemma op_b_memory_lt_of_constraints {shard clk : BabyBear}
+lemma op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : RTypeReader}
-    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
     cols.op_b_memory.prev_value[0] < 65536 ∧ cols.op_b_memory.prev_value[1] < 65536 := by
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
-lemma op_c_memory_lt_of_constraints {shard clk : BabyBear}
+lemma op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : RTypeReader}
-    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
     cols.op_c_memory.prev_value[0] < 65536 ∧ cols.op_c_memory.prev_value[1] < 65536 := by
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
-lemma op_a_write_lt_of_constraints {shard clk : BabyBear}
+lemma op_a_write_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : RTypeReader}
-    (h : (cols.constraints shard clk op_a_write_value 1).allHold) :
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
     op_a_write_value[0] < 65536 ∧ op_a_write_value[1] < 65536 := by
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
@@ -104,11 +106,11 @@ def registerMatch (rx : regidx) (low_limb high_limb : BabyBear) : Prop :=
 /-- Note: need to be very careful making this an axiom and not proving it.
 Should verify that it's at least admissable / doesn't allow for a proof of `False`. -/
 axiom read_b_fun (cols : RTypeReader) (rx : regidx)
-    (cstrs : (RTypeReader.constraints shard clk op_a_write_value cols is_real).allHold) :
+    (cstrs : (RTypeReader.constraints clk_high clk_low pc opcode op_a_write_value cols is_real).allHold) :
     registerMatch rx cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]
 
 axiom read_c_fun (cols : RTypeReader) (rx : regidx)
-    (cstrs : (RTypeReader.constraints shard clk op_a_write_value cols is_real).allHold) :
+    (cstrs : (RTypeReader.constraints clk_high clk_low pc opcode op_a_write_value cols is_real).allHold) :
     registerMatch rx cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]
 
 end registerMatch
