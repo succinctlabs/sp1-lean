@@ -15,7 +15,7 @@ def constraints
   (next_pc : BabyBear)
   (clk_increment : BabyBear)
   (is_real : BabyBear)
-  : List SP1Constraint := []
+  : SP1ConstraintList := []
   -- let E0 : BabyBear := 16384 * cols.clk_high_limb
   -- let E2 : BabyBear := E0 + cols.clk_low_limb
   -- let E4 : BabyBear := is_real - 1

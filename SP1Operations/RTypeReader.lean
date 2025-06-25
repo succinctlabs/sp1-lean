@@ -96,23 +96,25 @@ lemma op_a_write_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
-section registerMatch
+lemma val_op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
+    cols.op_b_memory.prev_value[0].val < 65536 ∧ cols.op_b_memory.prev_value[1].val < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
 
-/-- The bits in the given register correspond-/
-def registerMatch (rx : regidx) (low_limb high_limb : BabyBear) : Prop :=
-  ∀ (pf : (low_limb.val + high_limb.val * 65536) < 2 ^ 32),
-    rX_bits rx = pure (BitVec.ofNatLT (low_limb.val + high_limb.val * 65536) pf)
+lemma val_op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
+    cols.op_c_memory.prev_value[0].val < 65536 ∧ cols.op_c_memory.prev_value[1].val < 65536 := by
+  have := op_c_memory_lt_of_constraints h
+  aesop
 
-/-- Note: need to be very careful making this an axiom and not proving it.
-Should verify that it's at least admissable / doesn't allow for a proof of `False`. -/
-axiom read_b_fun (cols : RTypeReader) (rx : regidx)
-    (cstrs : (RTypeReader.constraints clk_high clk_low pc opcode op_a_write_value cols is_real).allHold) :
-    registerMatch rx cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]
-
-axiom read_c_fun (cols : RTypeReader) (rx : regidx)
-    (cstrs : (RTypeReader.constraints clk_high clk_low pc opcode op_a_write_value cols is_real).allHold) :
-    registerMatch rx cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]
-
-end registerMatch
+lemma val_op_a_write_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : RTypeReader}
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
+    op_a_write_value[0].val < 65536 ∧ op_a_write_value[1].val < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
 
 end RTypeReader

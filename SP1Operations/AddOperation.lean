@@ -135,10 +135,24 @@ lemma correct'
     (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ 32) :
     (cols.value[0].val + cols.value[1].val * 65536)#'pf =
       (a.toBV32_U16 + b.toBV32_U16) := by
-  -- TODO(gzgz): don't use aesop
   let c0' : U16 := ⟨cols.value[0], lt_of_constraintsAllHold h (by aesop)⟩
   let c1' : U16 := ⟨cols.value[1], lt_of_constraintsAllHold' h (by aesop)⟩
   rw [BitVec.ofNatLT_eq_ofNat pf]
   refine correct a b { value := #v[c0', c1'] } is_real h h_is_real
+
+lemma correct''
+    (a b : Word U16)
+    (cols : AddOperation)
+    (is_real : BabyBear)
+    (h : (constraints a b cols is_real).allHold)
+    (h_is_real : is_real = 1)
+    (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ 32) :
+    (cols.value[0].val + cols.value[1].val * 65536)#'pf =
+      (a.toBV32_U16 + b.toBV32_U16) := by
+  -- TODO(gzgz): don't use aesop
+  let c0' : U16 := ⟨cols.value[0], lt_of_constraintsAllHold h (by aesop)⟩
+  let c1' : U16 := ⟨cols.value[1], lt_of_constraintsAllHold' h (by aesop)⟩
+  rw [BitVec.ofNatLT_eq_ofNat pf]
+  refine correct a b { value := #v[c0', c1'] } ⟨is_real, by aesop⟩ h (by aesop)
 
 end AddOperation
