@@ -3,8 +3,6 @@ import Mathlib
 @[simp] abbrev BabyBearPrime : ℕ := 2013265921
 
 axiom prime_BabyBearPrime : Nat.Prime BabyBearPrime
--- lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by
---   sorry -- broken on osx for now
 
 instance : Fact (Nat.Prime BabyBearPrime) := ⟨prime_BabyBearPrime⟩
 

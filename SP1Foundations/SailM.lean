@@ -7,7 +7,10 @@ open LeanRV32D.Functions Sail
 
 section sailboats
 
-instance : DecidableEq regidx := by sorry
+instance : DecidableEq regidx
+  | .Regidx v, .Regidx v' => by
+    simp
+    infer_instance
 
 open BitVec
 

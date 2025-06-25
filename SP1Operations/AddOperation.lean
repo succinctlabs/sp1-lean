@@ -101,8 +101,11 @@ theorem correct
           rw [qqq1] at qq2
           simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
           simp [Fin.lt_def] at qq3 aa4
-          sorry
-          -- aesop (add 50% tactic (by omega))
+          have := a[0].in_range
+          have := a[1].in_range
+          have := b[0].in_range
+          have := b[1].in_range
+          omega
 
 open BitVec
 

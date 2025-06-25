@@ -53,7 +53,7 @@ Extensionality tactics will default to using this version. -/
   convert mk w[0] w[1] w[2] w[3]
   rw [← Array.toList_inj]
   obtain ⟨⟨ws⟩, h⟩ := w
-  sorry
+  match ws with | _ :: _ :: _ :: _ :: [] => simp
 
 section val_lt
 
@@ -129,7 +129,7 @@ def map (f : A → B) (w : Word A) : Word B :=
   #v[f w[0], f w[1]]
 
 /-- Lemma: coercing a Word is the same as mapping the coercion function. -/
-lemma coe_eq_map [Coe A B] (w : Word A) : 
+lemma coe_eq_map [Coe A B] (w : Word A) :
     (w : Word B) = w.map (fun x => (x : B)) := by
   simp [map]
 

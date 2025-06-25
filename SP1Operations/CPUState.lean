@@ -8,8 +8,6 @@ structure CPUState where
 
 namespace CPUState
 
-def clk (cols : CPUState) : BabyBear := sorry --2^14 * cols.clk_high_limb + cols.clk_low_limb
-
 def constraints
   (cols : CPUState)
   (next_pc : BabyBear)
