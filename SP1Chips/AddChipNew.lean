@@ -52,6 +52,8 @@ def specAdd (Main : Vector BabyBear 23) : SailM Unit := do
   let op_c := regidx.Regidx Main[15].val
   let _ ← execute_RTYPE op_b op_c op_a rop.ADD
 
+/-- dt: unclear why this now gives a deep recursion error.
+The proof seems to work fine and all simps are bounded -/
 theorem SP1Add_Correct (Main : Vector BabyBear 23)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_real : Main[22] = 1)
@@ -122,12 +124,17 @@ theorem SP1Add_Correct (Main : Vector BabyBear 23)
 
   rw [← BitVec.ofNatLT_eq_ofNat hb1,
     ← BitVec.ofNatLT_eq_ofNat hb2,
-    ← BitVec.ofNatLT_eq_ofNat hb3, this]
+    ← BitVec.ofNatLT_eq_ofNat hb3,
+    this]
 
   simp only [rX_bits, wX_bits]
 
-  have hid₁ : (BitVec.ofNat 5 ↑Main[15]).toNat = Main[15].val := by simp [hreg₂.2]
-  have hid₂ : (BitVec.ofNat 5 ↑Main[10]).toNat = Main[10].val := by simp [hreg₁.2]
+  have hid₁ : (BitVec.ofNat 5 ↑Main[15]).toNat = Main[15].val := by
+    simp only [BabyBearPrime, BitVec.toNat_ofNat, Nat.reducePow, Nat.mod_succ_eq_iff_lt,
+      Nat.succ_eq_add_one, Nat.reduceAdd, hreg₂.2, M22_U1]
+  have hid₂ : (BitVec.ofNat 5 ↑Main[10]).toNat = Main[10].val := by
+    simp only [BabyBearPrime, BitVec.toNat_ofNat, Nat.reducePow, Nat.mod_succ_eq_iff_lt,
+      Nat.succ_eq_add_one, Nat.reduceAdd, hreg₁.2, M22_U1]
   rw [hid₁, hid₂,
     run_rX_bind_of_get_mem_eq _ _ _ _ hmem₂,
     run_rX_bind_of_get_mem_eq _ _ _ _ hmem₁]
@@ -135,10 +142,13 @@ theorem SP1Add_Correct (Main : Vector BabyBear 23)
   rw [wX_comm_of_ne', run_wX_bind_of_get_mem_eq, wX_comm_of_ne,
     run_wX_bind_of_get_mem_eq, add_comm]
   · refine congr_arg (EStateM.run · mstate) (congr_arg _ ?_)
+
     rw [← BitVec.toNat_inj, BitVec.ofNatLT_eq_ofNat hb1, BitVec.ofNatLT_eq_ofNat hb2]
   · exact hmem₂
-  · simp [hreg₂]
+  · simp only [BitVec.toNat_ofNat, Nat.reducePow, BabyBearPrime, ne_eq, regno.Regno.injEq, hreg₂,
+      not_false_eq_true, M22_U1]
   · exact hmem₁
-  · simp [hreg₁]
+  · simp only [BitVec.toNat_ofNat, Nat.reducePow, BabyBearPrime, ne_eq, regno.Regno.injEq, hreg₁,
+      not_false_eq_true, M22_U1]
 
 end AddChip
