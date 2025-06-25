@@ -86,23 +86,13 @@ def SP1ConstraintList.toSailM : SP1ConstraintList → SailM Unit
   | _ :: cs => SP1ConstraintList.toSailM cs
   | _ => pure ()
 
-example (x y : SailM Unit) : x = y := by
-  refine EStateM.ext ?_
-  sorry
-
--- def SP1ConstraintList.toRegInit : SP1ConstraintList → SailM Unit
---   | (.send (.memory _ _ addr low_limb high_limb) _) :: cs => do
---       rX_bits (.Regidx <| BitVec.ofNat 5 addr.val)
---         (BitVec.ofNat 32 (low_limb + high_limb * 65536));
---       SP1ConstraintList.toSailM cs
---   | _ :: cs => SP1ConstraintList.toSailM cs
---   | _ => pure ()
-
 end toSailM
 
 section toReg
 
 section sailboats
+
+open BitVec
 
 lemma reg_map_ext (rmap rmap' : PreSail.SequentialState RegisterType trivialChoiceSource)
     (hreg : rmap.regs = rmap'.regs)
@@ -119,18 +109,11 @@ lemma reg_map_ext (rmap rmap' : PreSail.SequentialState RegisterType trivialChoi
 lemma wX_bits_rX_bits' (rs : regidx) (bv : BitVec 32) (cont : BitVec 32 → SailM α) :
     (do let _ ← wX_bits rs bv; let bv' ← rX_bits rs; cont bv') =
       (do let _ ← wX_bits rs bv; cont bv) := by
-  -- rw [bind_pure_comp]
   simp [wX_bits, rX_bits]
-
-  -- simp only [Nat.reducePow, Nat.reduceMul, bind_pure_comp]
   refine EStateM.ext fun reg_map => ?_
-  -- simp
   rw [EStateM.run]
-  -- rw [EStateM.Result.map.eq_def]
   show (EStateM.bind _ _) reg_map = (EStateM.bind _ _) reg_map
-
   simp [EStateM.bind]
-
   sorry
 
 lemma wX_bits_rX_bits (rs : regidx) (v : BitVec 32) :
@@ -171,5 +154,34 @@ lemma wX_bits_wX_bits_swap (cont : Unit → Unit → SailM α)
     (do let u ← wX_bits rs bv; let u' ← wX_bits rs' bv'; cont u u') =
       (do let _ ← wX_bits rs' bv'; let _ ← wX_bits rs bv; cont () ()) := by
   sorry
+
+
+lemma run_rX_bind_of_get_mem_eq (id : ℕ)
+    (cont : BitVec 32 → SailM α)
+    (mstate : PreSail.SequentialState RegisterType trivialChoiceSource)
+    (v : ℕ)
+    (hmstate : mstate.mem[id]? = some ↑v) :
+    EStateM.run (rX (.Regno id) >>= cont) mstate =
+      EStateM.run (cont (BitVec.ofNat 32 v)) mstate := by
+  sorry
+
+lemma run_wX_bind_of_get_mem_eq (id : ℕ)
+    (cont : Unit → SailM α)
+    (mstate : PreSail.SequentialState RegisterType trivialChoiceSource)
+    (v : ℕ) (hv : v < 2^32)
+    (hmstate : mstate.mem[id]? = some ↑v) :
+    EStateM.run (wX (.Regno id) (v#'hv) >>= cont) mstate =
+      EStateM.run (cont ()) mstate := by
+  sorry
+
+lemma wX_comm_of_ne' (id id' : regno) (h : id ≠ id')
+    (v v' : BitVec 32) (cont : SailM α) :
+    (do wX id v; wX id' v'; cont) =
+      (do wX id' v'; wX id v; cont) := sorry
+
+lemma wX_comm_of_ne (id id' : regno) (h : id ≠ id')
+    (v v' : BitVec 32) :
+    (do wX id v; wX id' v') =
+      (do wX id' v'; wX id v) := sorry
 
 end sailboats

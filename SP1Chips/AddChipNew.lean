@@ -46,48 +46,37 @@ lemma toSailM_constraints
 
 end constraints
 
-def spec_add' (Main : Vector BabyBear 23) : SailM Unit := do
-  let _ ← wX_bits (.Regidx Main[4].1)
-        (BitVec.ofNat 32 (Main[5] + Main[6] * 65536))
-  let _ ← wX_bits (.Regidx Main[10].1)
-    (BitVec.ofNat 32 (Main[11] + Main[12] * 65536))
-  let _ ← execute_RTYPE (.Regidx Main[4].1)
-    (.Regidx Main[10].1) (.Regidx Main[15].val) rop.ADD
-
 def specAdd (Main : Vector BabyBear 23) : SailM Unit := do
   let op_a := regidx.Regidx Main[4].val
   let op_b := regidx.Regidx Main[10].val
   let op_c := regidx.Regidx Main[15].val
-  let _ ← execute_RTYPE op_a op_b op_c rop.ADD
+  let _ ← execute_RTYPE op_b op_c op_a rop.ADD
 
 theorem SP1Add_Correct (Main : Vector BabyBear 23)
-    (h_constraints : SP1ConstraintList.allHold (constraints Main))
+    (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_real : Main[22] = 1)
     (mstate : PreSail.SequentialState RegisterType trivialChoiceSource)
-    (hmem₁ : mstate.mem[Main[4]]? = some ↑(Main[5] + Main[6] * 65536).val)
-    (hmem₂ : mstate.mem[Main[10]]? = some ↑(Main[11] + Main[12] * 65536).val) :
-
+    (hmem₁ : mstate.mem[Main[10]]? = some ↑(Main[11].val + Main[12].val * 65536))
+    (hmem₂ : mstate.mem[Main[15]]? = some ↑(Main[16].val + Main[17].val * 65536))
+    (hreg₁ : Main[4].val % 32 ≠ Main[10] ∧ Main[10].val < 32)
+    (hreg₂ : Main[4].val % 32 ≠ Main[15] ∧ Main[15].val < 32) :
     let sp1Add : SailM Unit := (constraints Main).toSailM
     sp1Add.run mstate = (specAdd Main).run mstate := by
-  sorry
-
-theorem sp1_add_eq_spec_add
-    (Main : Vector BabyBear 23)
-    (cstrs : SP1ConstraintList.allHold (constraints Main))
-    (h_is_real : Main[22] = 1) :
-    (constraints Main).toSailM = spec_add' Main := by
-  unfold spec_add'
   rw [toSailM_constraints]
 
-  let spare_cstrs := cstrs
+  let spare_cstrs := h_cstrs
   -- Extract the various constraints from the assumption
-  simp [constraints] at cstrs
-  obtain ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := cstrs
+  simp only [SP1ConstraintList.allHold, constraints, BabyBearPrime, Fin.isValue, List.cons_append,
+    List.nil_append, List.append_assoc, List.forall_cons, SP1Constraint.toProp_assertZero,
+    mul_eq_zero, List.forall_append] at h_cstrs
+  obtain ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := h_cstrs
   rw [h_is_real] at adapter_cstrs add_cstrs
 
   -- The `RTypeReader` gives bounds on the size of previous memory values
-  let op_b_memory_bound := RTypeReader.op_b_memory_lt_of_constraints adapter_cstrs
-  let op_c_memory_bound := RTypeReader.op_c_memory_lt_of_constraints adapter_cstrs
+  let op_b_memory_bound : Main[11] < 65536 ∧ Main[12] < 65536 :=
+    RTypeReader.op_b_memory_lt_of_constraints adapter_cstrs
+  let op_c_memory_bound : Main[16] < 65536 ∧ Main[17] < 65536 :=
+    RTypeReader.op_c_memory_lt_of_constraints adapter_cstrs
 
   -- Bounded representations of the input limbs
   let M11_U16 : U16 := ⟨Main[11], op_b_memory_bound.1⟩
@@ -99,15 +88,57 @@ theorem sp1_add_eq_spec_add
     have := M11_U16.in_range; have := M12_U16.in_range; linarith
   have hb2 : Main[16].val + Main[17].val * 65536 < 2 ^ 32 := by
     have := M16_U16.in_range; have := M17_U16.in_range; linarith
+  have hb3 : Main[20].val + Main[21].val * 65536 < 2 ^ 32 := by
+    apply bound_of_constraints Main spare_cstrs h_is_real
 
-  simp [constraints, SP1ConstraintList.toSailM]
-  simp [execute_RTYPE]
+  have hk1 : (Main[11] + Main[12] * 65536).val = Main[11].val + Main[12].val * 65536 := sorry
+  have hk2 : (Main[16] + Main[17] * 65536).val = Main[16].val + Main[17].val * 65536 := sorry
 
-  have := AddOperation.correct' Main[20] Main[21] M11_U16 M12_U16 M16_U16 M17_U16 add_cstrs
+  simp only [BabyBearPrime, bind_pure_comp, id_map']
+  unfold specAdd
 
-  rw [← BitVec.ofNatLT_eq_ofNat (bound_of_constraints Main spare_cstrs h_is_real)]
-  rw [this]
+  simp only [execute_RTYPE, Nat.reducePow, Nat.reduceMul, BabyBearPrime, BitVec.natCast_eq_ofNat,
+    bind_pure_comp, bind_assoc, bind_map_left, map_bind, Functor.map_map, id_map']
+  have :=
+      AddOperation.correct'
+        #v[⟨Main[11], op_b_memory_bound.1⟩, ⟨Main[12], op_b_memory_bound.2⟩]
+        #v[⟨Main[16], op_c_memory_bound.1⟩, ⟨Main[17], op_c_memory_bound.2⟩]
+        { value := #v[Main[20], Main[21]] }
+        M22_U1
+        (by
+          simp_all only [BabyBearPrime, Fin.getElem?_fin, Fin.isValue, BitVec.natCast_eq_ofNat,
+            one_ne_zero, sub_self, or_true, Nat.reducePow, SP1ConstraintList.allHold, WORD_SIZE,
+            Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
+            M11_U16, M12_U16, M16_U16, M17_U16, M22_U1])
+        (by
+          simp_all only [BabyBearPrime, Fin.getElem?_fin, Fin.isValue, BitVec.natCast_eq_ofNat,
+            one_ne_zero, sub_self, or_true, Nat.reducePow, M12_U16, M17_U16, M16_U16, M22_U1,
+            M11_U16]
+          rfl)
+        hb3
+  simp only [BabyBearPrime, WORD_SIZE, Vector.getElem_mk, List.getElem_toArray,
+    List.getElem_cons_zero, List.getElem_cons_succ, BIT_WIDTH, Word.toBV32_U16,
+    Fin.coe_ofNat_eq_mod, Nat.reduceMod, M12_U16, M17_U16, M11_U16, M22_U1, M16_U16] at this
 
-  sorry
+  rw [← BitVec.ofNatLT_eq_ofNat hb1,
+    ← BitVec.ofNatLT_eq_ofNat hb2,
+    ← BitVec.ofNatLT_eq_ofNat hb3, this]
+
+  simp only [rX_bits, wX_bits]
+
+  have hid₁ : (BitVec.ofNat 5 ↑Main[15]).toNat = Main[15].val := by simp [hreg₂.2]
+  have hid₂ : (BitVec.ofNat 5 ↑Main[10]).toNat = Main[10].val := by simp [hreg₁.2]
+  rw [hid₁, hid₂,
+    run_rX_bind_of_get_mem_eq _ _ _ _ hmem₂,
+    run_rX_bind_of_get_mem_eq _ _ _ _ hmem₁]
+
+  rw [wX_comm_of_ne', run_wX_bind_of_get_mem_eq, wX_comm_of_ne,
+    run_wX_bind_of_get_mem_eq, add_comm]
+  · refine congr_arg (EStateM.run · mstate) (congr_arg _ ?_)
+    rw [← BitVec.toNat_inj, BitVec.ofNatLT_eq_ofNat hb1, BitVec.ofNatLT_eq_ofNat hb2]
+  · exact hmem₂
+  · simp [hreg₂]
+  · exact hmem₁
+  · simp [hreg₁]
 
 end AddChip
