@@ -1,6 +1,6 @@
 import SP1Operations
 
-open LeanRV32D.Functions Sail
+open BitVec
 
 namespace AddChip
 
@@ -59,29 +59,40 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
 
 end constraints
 
-def specAdd (Main : Vector BabyBear 23) : StateM (regidx → BitVec 32) Unit := do
+/-- State for arithmetic chip verification is a program counter and register assignment map. -/
+abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
+
+/-- Add `4` to the current program counter state. -/
+@[reducible] def incrementPC : StateM SP1State Unit :=
+  do modify (.map (· + (BitVec.ofNat _ 4)) id)
+
+/-- Modify the register map state -/
+@[reducible] def update_reg (idx : regidx) (v : BitVec 32) : StateM SP1State Unit :=
+  do modify (.map id (Function.update · idx v))
+
+def specAdd (Main : Vector BabyBear 23) : StateM SP1State Unit := do
+  incrementPC
   let op_a := regidx.Regidx Main[4].val
   let op_b := regidx.Regidx Main[10].val
   let op_c := regidx.Regidx Main[15].val
-  let b : BitVec 32 := (← get) op_b
-  let c : BitVec 32 := (← get) op_c
-  modify (Function.update · op_a (b + c))
+  let b : BitVec 32 := (← get).2 op_b
+  let c : BitVec 32 := (← get).2 op_c
+  update_reg op_a (b + c)
 
-def sp1Add (Main : Vector BabyBear 23) : StateM (regidx → BitVec 32) Unit := do
+def sp1Add (Main : Vector BabyBear 23) : StateM SP1State Unit := do
+  incrementPC
   let op_a := regidx.Regidx Main[4].val
-  modify (Function.update · op_a (BitVec.ofNat 32 (↑Main[20] + ↑Main[21] * 65536)))
-
-open BitVec
+  update_reg op_a (BitVec.ofNat 32 (↑Main[20] + ↑Main[21] * 65536))
 
 /-- If the constraints all hold, the column is real, and `op_b` and `op_c` are loaded
 into the proper registers, then the add chip conforms to the spec. -/
 theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_real : Main[22] = 1)
-    (reg_state : regidx → BitVec 32)
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32)
     (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
     (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) :
-    (sp1Add Main).run reg_state = (specAdd Main).run reg_state := by
+    (sp1Add Main).run (pc, reg_state) = (specAdd Main).run (pc, reg_state) := by
   unfold sp1Add specAdd
   rw [BitVec.natCast_eq_ofNat] at hmem₁ hmem₂
   have hb3 : Main[20].val + Main[21].val * 65536 < 2 ^ 32 :=
@@ -111,8 +122,8 @@ theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
       hb3
 
   simp only [BabyBearPrime, BitVec.natCast_eq_ofNat, StateT.run_modify, StateT.run_bind,
-    StateT.run_get, bind_pure_comp, map_pure]
-  refine congr_arg (fun out => pure (_, out)) (funext fun reg => ?_)
+    StateT.run_get, bind_pure_comp, map_pure, Prod.map_apply, id_eq]
+  refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
   by_cases hreg : (regidx.Regidx (BitVec.ofNat 5 ↑Main[4])) = reg
   · rw [hreg, Function.update_self, Function.update_self, hmem₁, hmem₂,
       ← BitVec.ofNatLT_eq_ofNat hb3, ← BitVec.ofNatLT_eq_ofNat hb1,
