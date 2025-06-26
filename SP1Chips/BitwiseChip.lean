@@ -27,40 +27,12 @@ def constraints (Main : Vector BabyBear 33) : SP1ConstraintList :=
   let E17 : BabyBear := E15 + E16
   let E18 : BabyBear := Main[32] * 5
   let E19 : BabyBear := E17 + E18
-  let ⟨⟨⟨[E20, E21]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints
-    #v[Main[11], Main[12]] #v[Main[17], Main[18]]
-    { a_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
-      bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] },
-      b_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
-      E14
-      E1
+  let ⟨⟨⟨[E20, E21]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints #v[Main[11], Main[12]] #v[Main[17], Main[18]] { b_low_bytes := { low_bytes := #v[Main[22], Main[23]] }, bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] }, c_low_bytes := { low_bytes := #v[Main[24], Main[25]] } } E14 E1
   let E22 : BabyBear := Main[3] + 4
-  let CS1 : List SP1Constraint := CPUState.constraints
-    { clk_0_16 := Main[2],
-      clk_16_24 := Main[1],
-      clk_high := Main[0], pc := Main[3] } E22 8 E1
+  let CS1 : List SP1Constraint := CPUState.constraints { clk_0_16 := Main[2], clk_16_24 := Main[1], clk_high := Main[0], pc := Main[3] } E22 8 E1
   let E23 : BabyBear := Main[1] * 65536
   let E24 : BabyBear := Main[2] + E23
-  let CS2 : List SP1Constraint := ALUTypeReader.constraints
-    Main[0]
-    E24
-    Main[3]
-    E19
-    #v[E20, E21]
-    { imm_c := Main[21],
-      op_a := Main[4],
-      op_a_0 := Main[9],
-      op_a_memory :=
-        { access_timestamp := { diff_low_limb := Main[8], prev_low := Main[7] },
-          prev_value := #v[Main[5], Main[6]] },
-      op_b := Main[10],
-      op_b_memory :=
-        { access_timestamp := { diff_low_limb := Main[14], prev_low := Main[13] },
-          prev_value := #v[Main[11], Main[12]] },
-      op_c := #v[Main[15], Main[16]],
-      op_c_memory :=
-        { access_timestamp := { diff_low_limb := Main[20], prev_low := Main[19] },
-          prev_value := #v[Main[17], Main[18]] } } E1
+  let CS2 : List SP1Constraint := ALUTypeReader.constraints Main[0] E24 Main[3] E19 #v[E20, E21] { imm_c := Main[21], op_a := Main[4], op_a_0 := Main[9], op_a_memory := { access_timestamp := { diff_low_limb := Main[8], prev_low := Main[7] }, prev_value := #v[Main[5], Main[6]] }, op_b := Main[10], op_b_memory := { access_timestamp := { diff_low_limb := Main[14], prev_low := Main[13] }, prev_value := #v[Main[11], Main[12]] }, op_c := #v[Main[15], Main[16]], op_c_memory := { access_timestamp := { diff_low_limb := Main[20], prev_low := Main[19] }, prev_value := #v[Main[17], Main[18]] } } E1
   [
     .assertZero E3,
     .assertZero E5,
@@ -71,9 +43,9 @@ def constraints (Main : Vector BabyBear 33) : SP1ConstraintList :=
 lemma BitWiseU16_constraints_of_constraints (Main : Vector BabyBear 33)
     (h : (constraints Main).allHold) :
     (BitwiseU16Operation.constraints #v[Main[11], Main[12]] #v[Main[17], Main[18]]
-      { a_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
+      { b_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
         bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] },
-        b_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
+        c_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
         (Main[30] * 2 + Main[31] * 1)
         (Main[30] + Main[31] + Main[32])).2.allHold := by
   simp [constraints] at h
@@ -103,9 +75,9 @@ def main_output (Main : Vector BabyBear 33) : BitVec 32 :=
   let E19 : BabyBear := E17 + E18
   let ⟨⟨⟨[E20, E21]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints
     #v[Main[11], Main[12]] #v[Main[17], Main[18]]
-    { a_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
+    { b_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
       bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] },
-      b_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
+      c_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
       E14
       E1
   BitVec.ofNat 32 (E20 + E21 * 65536)
@@ -121,6 +93,15 @@ def specXor (Main : Vector BabyBear 33) : StateM SP1State Unit := do
   let c : BitVec 32 := (← get).2 op_c
   update_reg op_a (b ^^^ c)
 
+def specAnd (Main : Vector BabyBear 33) : StateM SP1State Unit := do
+  incrementPC
+  let op_a := regidx.Regidx Main[4].val
+  let op_b := regidx.Regidx Main[10].val
+  let op_c := regidx.Regidx Main[15].val
+  let b : BitVec 32 := (← get).2 op_b
+  let c : BitVec 32 := (← get).2 op_c
+  update_reg op_a (b ^^^ c)
+
 def sp1Bitwise (Main : Vector BabyBear 33) : StateM SP1State Unit := do
   incrementPC
   let op_a := regidx.Regidx Main[4].val
@@ -128,9 +109,9 @@ def sp1Bitwise (Main : Vector BabyBear 33) : StateM SP1State Unit := do
 
 /-- If the constraints all hold, the column is real, and `op_b` and `op_c` are loaded
 into the proper registers, then the add chip conforms to the spec. -/
-theorem SP1BitwiseChip_and_correct (Main : Vector BabyBear 33)
+theorem SP1BitwiseChip_xor_correct (Main : Vector BabyBear 33)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
-    (h_is_xor : Main[30] = 1)
+    (h_is_xor : Main[30] = 1) -- Is an `xor` operation
     (pc : BitVec 32) (reg_state : regidx → BitVec 32)
     (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
     (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[17] + Main[18] * 65536)) :
