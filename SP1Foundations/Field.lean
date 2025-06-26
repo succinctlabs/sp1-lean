@@ -70,6 +70,26 @@ section u8_base
 @[simp] lemma u8_base_mul_u8_inv : (256 : BabyBear) * 2005401601 = 1 := rfl
 @[simp] lemma u8_inv_mul_u8_base : (2005401601 : BabyBear) * 256 = 1 := rfl
 
--- lemma mul_u8_inv_lt_u8_base_iff (x : BabyBear) : x * 2005401601 < 256 ↔ x
+lemma test : (2005401601 : BabyBear)⁻¹ = 256 := by
+  have : (256 : BabyBear) ≠ 0 := by simp
+  rw [inv_eq_iff_eq_inv, ← mul_left_inj' this]
+  rw [u8_inv_mul_u8_base]
+  simp only [Fin.isValue, ne_eq, Fin.reduceEq, not_false_eq_true, inv_mul_cancel₀]
+
+lemma test' : (2005401601 : BabyBear) = 256⁻¹ := by
+  rw [← test]
+  rw [inv_inv]
+
+lemma mul_u8_inv_lt_u8_base_iff (x : BabyBear) :
+    x * 2005401601 < 256 ↔ x < 65536 := by
+  refine ⟨fun h => ?_, fun h => ?_⟩
+  · rw [test'] at h
+    simp [Fin.lt_iff_val_lt_val, Fin.val_mul] at *
+    rw [← test'] at h
+    simp at *
+
+    sorry
+  ·
+    sorry
 
 end u8_base
