@@ -133,26 +133,14 @@ def decompose (x : BitVec 32) : U16 × U16 :=
   let low_val := x.toNat % 65536
   let high_val := x.toNat / 65536
   let low_limb : U16 := {
-    val := low_val % BabyBearPrime
-    isLt := Nat.mod_lt _ Nat.succ_pos'
-    in_range := by
-      have h1 : low_val < 65536 := Nat.mod_lt _ (by omega : 0 < 65536)
-      have h2 : 65536 < BabyBearPrime := by norm_num
-      calc low_val % BabyBearPrime
-        ≤ low_val := Nat.mod_le _ _
-        _ < 65536 := h1
+    val := low_val
+    isLt := by trans 65536 <;> [ omega; trivial ]
+    in_range := by omega
   }
   let high_limb : U16 := {
-    val := high_val % BabyBearPrime
-    isLt := Nat.mod_lt _ Nat.succ_pos'
-    in_range := by
-      have h1 : high_val < 65536 := by
-        have : x.toNat < 2^32 := x.isLt
-        omega
-      have h2 : 65536 < BabyBearPrime := by norm_num
-      calc high_val % BabyBearPrime
-        ≤ high_val := Nat.mod_le _ _
-        _ < 65536 := h1
+    val := high_val
+    isLt := by trans 65536 <;> [ omega; trivial ]
+    in_range := by omega
   }
   (low_limb, high_limb)
 
@@ -160,43 +148,8 @@ theorem decompose_ofU16_inverse (bv : BitVec 32) :
     let (a, b) := decompose bv
     bv = BitVec.ofU16 a b := by
   unfold decompose BitVec.ofU16
-  simp only
   apply BitVec.eq_of_toNat_eq
   simp [BitVec.toNat_ofNat]
-
-  have h : bv.toNat < 2^32 := bv.isLt
-  have h_prime_bound : 65536 < BabyBearPrime := by norm_num
-
-  -- Key insight: since both limbs are < 65536 < BabyBearPrime, mod BabyBearPrime is a no-op
-  have h_low_lt : bv.toNat % 65536 < BabyBearPrime := by
-    have : bv.toNat % 65536 < 65536 := Nat.mod_lt _ (by omega : 0 < 65536)
-    omega
-  have h_high_lt : bv.toNat / 65536 < BabyBearPrime := by
-    have : bv.toNat / 65536 < 65536 := by
-      have : bv.toNat < 2^32 := h
-      have : 2^32 = 65536 * 65536 := by norm_num
-      rw [this] at h
-      exact Nat.div_lt_iff_lt_mul (by omega : 0 < 65536) |>.mpr h
-    omega
-
-  -- Therefore the mod operations are no-ops
-  have h_low_mod : (bv.toNat % 65536) % BabyBearPrime = bv.toNat % 65536 := Nat.mod_eq_of_lt h_low_lt
-  have h_high_mod : (bv.toNat / 65536) % BabyBearPrime = bv.toNat / 65536 := Nat.mod_eq_of_lt h_high_lt
-
-  -- The goal is to show: bv.toNat = ⟨(low.val + high.val * 65536) % 2^32, _⟩.toNat
-  -- where low.val = (bv.toNat % 65536) % BabyBearPrime
-  --       high.val = (bv.toNat / 65536) % BabyBearPrime
-  -- Since low.val = bv.toNat % 65536 and high.val = bv.toNat / 65536 (by h_low_mod and h_high_mod)
-  -- we need to show: bv.toNat = ((bv.toNat % 65536) + (bv.toNat / 65536) * 65536) % 2^32
-
-  -- The goal is: bv.toNat = bv.toNat % 65536 % BabyBearPrime + bv.toNat / 65536 % BabyBearPrime * 65536
-  -- Using h_low_mod and h_high_mod, this becomes:
-  -- bv.toNat = bv.toNat % 65536 + bv.toNat / 65536 * 65536
-  rw [h_low_mod, h_high_mod]
-  -- This is exactly Nat.div_add_mod (reversed)
-  have h_div_mod : bv.toNat % 65536 + bv.toNat / 65536 * 65536 = bv.toNat := by
-    rw [Nat.add_comm, Nat.mul_comm]
-    exact Nat.div_add_mod bv.toNat 65536
-  exact h_div_mod.symm
+  omega
 
 end BitVec
