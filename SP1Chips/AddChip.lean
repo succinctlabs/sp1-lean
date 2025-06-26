@@ -59,17 +59,6 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
 
 end constraints
 
-/-- State for arithmetic chip verification is a program counter and register assignment map. -/
-abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
-
-/-- Add `4` to the current program counter state. -/
-@[reducible] def incrementPC : StateM SP1State Unit :=
-  do modify (.map (· + (BitVec.ofNat _ 4)) id)
-
-/-- Modify the register map state -/
-@[reducible] def update_reg (idx : regidx) (v : BitVec 32) : StateM SP1State Unit :=
-  do modify (.map id (Function.update · idx v))
-
 def specAdd (Main : Vector BabyBear 23) : StateM SP1State Unit := do
   incrementPC
   let op_a := regidx.Regidx Main[4].val
@@ -100,7 +89,7 @@ theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
 
   -- Extract out the individual constraints from each part
   rw [allHold_constraints_iff, h_is_real] at h_cstrs
-  obtain ⟨orig_cstrs, ⟨add_cstrs, ⟨cpu_strs, adapter_cstrs⟩⟩⟩ := h_cstrs
+  obtain ⟨orig_cstrs, add_cstrs, cpu_strs, adapter_cstrs⟩ := h_cstrs
 
   -- The `RTypeReader` gives bounds on the size of previous memory values
   let op_b_memory_bound : Main[11].1 < 65536 ∧ Main[12].1 < 65536 :=

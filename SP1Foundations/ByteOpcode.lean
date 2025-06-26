@@ -89,6 +89,13 @@ protected def bitwise_induction (C : ByteOpcode → Sort*)
 
 section toBitwise
 
+def toBitwise' (op : ByteOpcode) : BitVec n → BitVec n → BitVec n :=
+  by induction op using ByteOpcode.bitwise_induction with
+  | and => exact (· &&& ·)
+  | or => exact (· ||| ·)
+  | xor => exact (· ^^^ ·)
+  | other _ _ => exact 0
+
 /-- Convert a `ByteOpcode` to a bitwise operation.
 Gives dummy outputs outside `AND`, `OR`, and `XOR` operations. -/
 def toBitwise (op : ByteOpcode) : BabyBear → BabyBear → BabyBear :=

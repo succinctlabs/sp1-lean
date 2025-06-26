@@ -16,6 +16,7 @@ structure RTypeReader where
 
 namespace RTypeReader
 
+set_option linter.unusedVariables false in
 def constraints
   (clk_high : BabyBear)
   (clk_low : BabyBear)

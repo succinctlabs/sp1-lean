@@ -1,5 +1,6 @@
 import SP1Foundations.Field
 import SP1Foundations.ByteOpcode
+import SP1Foundations.SailM
 
 import LeanRV32D.RiscvInstsEnd
 
@@ -69,15 +70,13 @@ lemma allHold_append (cs cs' : SP1ConstraintList) :
 
 end constraintList
 
-section toSailM
+/-- State for arithmetic chip verification is a program counter and register assignment map. -/
+abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
 
-/-- Naive version of conversion to `SailM` monad without clock sorting. -/
-def SP1ConstraintList.toSailM : SP1ConstraintList → SailM Unit
-  | (.receive (.memory _ _ addr low_limb high_limb) _) :: cs => do
-      wX_bits (.Regidx <| BitVec.ofNat 5 addr.val)
-        (BitVec.ofNat 32 (low_limb + high_limb * 65536));
-      SP1ConstraintList.toSailM cs
-  | _ :: cs => SP1ConstraintList.toSailM cs
-  | _ => pure ()
+/-- Add `4` to the current program counter state. -/
+@[reducible] def incrementPC : StateM SP1State Unit :=
+  do modify (.map (· + (BitVec.ofNat _ 4)) id)
 
-end toSailM
+/-- Modify the register map state -/
+@[reducible] def update_reg (idx : regidx) (v : BitVec 32) : StateM SP1State Unit :=
+  do modify (.map id (Function.update · idx v))

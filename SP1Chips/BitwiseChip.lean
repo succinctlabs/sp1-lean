@@ -1,9 +1,10 @@
 import SP1Operations
-import LeanRV32D.RiscvInstsEnd
 
-open LeanRV32D.Functions Sail
+open BitVec
 
 namespace BitwiseChip
+
+section constraints
 
 def constraints (Main : Vector BabyBear 33) : SP1ConstraintList :=
   let E0 : BabyBear := Main[30] + Main[31]
@@ -67,107 +68,108 @@ def constraints (Main : Vector BabyBear 33) : SP1ConstraintList :=
     .assertZero E9
   ] ++ CS0 ++ CS1 ++ CS2
 
-/-- `is_real` for the op is the sum of the individual opcodes. -/
-def is_real (Main : Vector BabyBear 33) : BabyBear :=
-  Main[30] + Main[31] + Main[32]
 
--- section and
+def main_output (Main : Vector BabyBear 33) : BitVec 32 :=
+  let E0 : BabyBear := Main[30] + Main[31]
+  let E1 : BabyBear := E0 + Main[32]
+  let E2 : BabyBear := Main[30] - 1
+  let E3 : BabyBear := Main[30] * E2
+  let E4 : BabyBear := Main[31] - 1
+  let E5 : BabyBear := Main[31] * E4
+  let E6 : BabyBear := Main[32] - 1
+  let E7 : BabyBear := Main[32] * E6
+  let E8 : BabyBear := E1 - 1
+  let E9 : BabyBear := E1 * E8
+  let E10 : BabyBear := Main[30] * 2
+  let E11 : BabyBear := Main[31] * 1
+  let E12 : BabyBear := E10 + E11
+  let E13 : BabyBear := Main[32] * 0
+  let E14 : BabyBear := E12 + E13
+  let E15 : BabyBear := Main[30] * 3
+  let E16 : BabyBear := Main[31] * 4
+  let E17 : BabyBear := E15 + E16
+  let E18 : BabyBear := Main[32] * 5
+  let E19 : BabyBear := E17 + E18
+  let ⟨⟨⟨[E20, E21]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints
+    #v[Main[11], Main[12]] #v[Main[17], Main[18]]
+    { a_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
+      bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] },
+      b_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
+      E14
+      E1
+  BitVec.ofNat 32 (E20 + E21 * 65536)
 
--- def Word.bitvec_of_babybear (w : Word BabyBear) : BitVec 32 :=
---   BitVec.ofNatLT ((w[0] + w[1] * 65536) % 2^32) (by omega)
+-- lemma allHold_constraints_iff (Main : Vector BabyBear 33) :
+--     (constraints Main).allHold ↔
 
--- def main_output (Main : Vector BabyBear 33) : BitVec 32 :=
---   let E0 : BabyBear := Main[30] + Main[31]
---   let E1 : BabyBear := E0 + Main[32]
---   let E2 : BabyBear := Main[30] - 1
---   let E3 : BabyBear := Main[30] * E2
---   let E4 : BabyBear := Main[31] - 1
---   let E5 : BabyBear := Main[31] * E4
---   let E6 : BabyBear := Main[32] - 1
---   let E7 : BabyBear := Main[32] * E6
---   let E8 : BabyBear := E1 - 1
---   let E9 : BabyBear := E1 * E8
---   let E10 : BabyBear := Main[30] * 2
---   let E11 : BabyBear := Main[31] * 1
---   let E12 : BabyBear := E10 + E11
---   let E13 : BabyBear := Main[32] * 0
---   let E14 : BabyBear := E12 + E13
---   let E15 : BabyBear := Main[30] * 3
---   let E16 : BabyBear := Main[31] * 4
---   let E17 : BabyBear := E15 + E16
---   let E18 : BabyBear := Main[32] * 5
---   let E19 : BabyBear := E17 + E18
---   let ⟨⟨⟨[E20, E21]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints
---     #v[Main[11], Main[12]] #v[Main[17], Main[18]]
---     { a_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
---       bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] },
---       b_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
---       E14
---       E1
---   BitVec.ofNat 32 (E20 + E21 * 65536)
 
--- def sp1_bitwise
---     (Main : Vector BabyBear 33)
---     (rd rs1 rs2 : regidx) :
---     SailM Unit := do
---   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
---   let _rs1_value ← rX_bits rs1
---   let _rs2_value ← rX_bits rs2
---   wX_bits rd (main_output Main)
+end constraints
 
--- def spec_and (rd rs1 rs2 : regidx) : SailM Unit := do
---   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
---   let _ ← execute_RTYPE rs2 rs1 rd rop.AND
---   pure ()
+def specXor (Main : Vector BabyBear 33) : StateM SP1State Unit := do
+  incrementPC
+  let op_a := regidx.Regidx Main[4].val
+  let op_b := regidx.Regidx Main[10].val
+  let op_c := regidx.Regidx Main[15].val
+  let b : BitVec 32 := (← get).2 op_b
+  let c : BitVec 32 := (← get).2 op_c
+  update_reg op_a (b ^^^ c)
 
--- def spec_or (rd rs1 rs2 : regidx) : SailM Unit := do
---   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
---   let _ ← execute_RTYPE rs2 rs1 rd rop.OR
---   pure ()
+def sp1Bitwise (Main : Vector BabyBear 33) : StateM SP1State Unit := do
+  incrementPC
+  let op_a := regidx.Regidx Main[4].val
+  update_reg op_a (main_output Main)
 
--- def spec_xor (rd rs1 rs2 : regidx) : SailM Unit := do
---   writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
---   let _ ← execute_RTYPE rs2 rs1 rd rop.XOR
---   pure ()
+/-- If the constraints all hold, the column is real, and `op_b` and `op_c` are loaded
+into the proper registers, then the add chip conforms to the spec. -/
+theorem SP1AddChip_Correct (Main : Vector BabyBear 33)
+    (h_cstrs : SP1ConstraintList.allHold (constraints Main))
+    (opcode : ByteOpcode) (h : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
+    (h_is_xor : Main[30] = 1)
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32)
+    (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
+    (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) :
+    (sp1Bitwise Main).run (pc, reg_state) = (specXor Main).run (pc, reg_state) := by
+  unfold sp1Bitwise specXor
+  rw [BitVec.natCast_eq_ofNat] at hmem₁ hmem₂
+  have h31 : Main[31] = 0 := sorry
+  have h32 : Main[32] = 0 := sorry
+  simp [constraints, BitwiseU16Operation.constraints] at h_cstrs
 
--- theorem sp1_bitwise_eq_spec_xor
---     (Main : Vector BabyBear 33)
---     (cstrs : (constraints Main).allHold)
---     (rd rs1 rs2 : regidx)
---     (h_is_and : Main[30] = 1) :
---     sp1_bitwise Main rd rs1 rs2 = spec_xor rd rs1 rs2 := by
---   unfold sp1_bitwise spec_xor
+  obtain ⟨h1, h2, h3, h4, bw_cstrs, cpu_strs, adapter_cstrs⟩ := h_cstrs
 
---   have spare_cstrs : (constraints Main).allHold := cstrs
+  simp [h_is_xor, h31, h32] at *
 
---   have h30_0 : Main[30] = 1 := sorry
---   have h31_0 : Main[31] = 0 := sorry
---   have h32_0 : Main[32] = 0 := sorry
+  -- The `RTypeReader` gives bounds on the size of previous memory values
+  let op_b_memory_bound : Main[11].1 < 65536 ∧ Main[12].1 < 65536 :=
+    ALUTypeReader.val_op_b_memory_lt_of_constraints adapter_cstrs
+  let op_c_memory_bound : Main[17].1 < 65536 ∧ Main[18].1 < 65536 :=
+    ALUTypeReader.val_op_c_memory_lt_of_constraints adapter_cstrs
+  have hb1 : Main[11].val + Main[12].val * 65536 < 2 ^ 32 := by omega
+  have hb2 : Main[17].val + Main[18].val * 65536 < 2 ^ 32 := by omega
 
---   simp only [SP1ConstraintList.allHold, constraints, BabyBearPrime, Fin.isValue, mul_one, mul_zero,
---     add_zero, WORD_SIZE, List.cons_append, List.nil_append, List.append_assoc] at cstrs
---   obtain ⟨h31, h31, h32, h_add_3, hop, hreg⟩ := cstrs
---   simp [- SP1Constraint.toProp_send_byte] at hreg
+  have h_add_op : (Main[20] + Main[21] * 65536 : ℕ)#'sorry =
+      (Main[11] + Main[12] * 65536 : ℕ)#'hb1 ^^^ (Main[17] + Main[18] * 65536)#'hb2 := by
+    sorry
+    -- simpa using BitwiseOperation.eq_xor_of_constraints
+    --   #v[⟨Main[11], op_b_memory_bound.1⟩, ⟨Main[12], op_b_memory_bound.2⟩]
+    --   #v[⟨Main[16], op_c_memory_bound.1⟩, ⟨Main[17], op_c_memory_bound.2⟩]
+    --   { value := #v[Main[20], Main[21]] }
+    --   ⟨Main[22], by aesop⟩
+    --   (by simp_all)
+    --   (by simp [h_is_real])
+    --   hb3
 
---   simp [h30_0, h31_0, h32_0, sub_eq_zero] at *
---   obtain ⟨⟨hbd0, h_xor0⟩, ⟨hbd1, h_xor1⟩, ⟨hbd2, h_xor2⟩, ⟨hbd3, h_xor3⟩, h_cpu, h_alu⟩ := hreg
+  -- simp [BabyBearPrime, BitVec.natCast_eq_ofNat, StateT.run_modify, StateT.run_bind,
+  --   StateT.run_get, bind_pure_comp, map_pure, Prod.map_apply, id_eq]
+  refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
+  by_cases hreg : (regidx.Regidx (BitVec.ofNat 5 ↑Main[4])) = reg
+  · rw [hreg, Function.update_self, Function.update_self, hmem₁, hmem₂,]
+    rw [main_output]
+    simp [BitwiseU16Operation.constraints]
 
---   simp [main_output, BitwiseU16Operation.constraints, execute_RTYPE]
-
---   have read_b := ALUTypeReader.read_b_fun _ rs1 h_alu
---   have read_c := ALUTypeReader.read_c_fun _ rs2 h_alu
---   rw [read_b, read_c]
-
---   refine bind_congr fun _ => ?_
---   refine bind_congr fun _ => ?_
---   refine congr_arg (wX_bits rd) ?_
-
---   simp
---   -- simp
---   clear read_b read_c h_alu h_cpu
-
---   sorry
-
--- end and
+    sorry
+      -- ← BitVec.ofNatLT_eq_ofNat hb3, ← BitVec.ofNatLT_eq_ofNat hb1,
+      -- ← BitVec.ofNatLT_eq_ofNat hb2, h_add_op]
+  · rw [Function.update_of_ne (Ne.symm hreg), Function.update_of_ne (Ne.symm hreg)]
 
 end BitwiseChip
