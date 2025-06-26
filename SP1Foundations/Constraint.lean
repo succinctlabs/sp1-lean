@@ -30,8 +30,7 @@ def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
   | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
   | .send (.memory shard clk addr low_limb high_limb) mult =>
-      mult ≠ 0 → ((rX_bits (.Regidx <| BitVec.ofNat 5 addr.val) = pure (BitVec.ofNat 32 (low_limb + high_limb * 65536)))
-        ∧ (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32))
+      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
   | .receive (.memory shard clk addr low_limb high_limb) (mult) =>
       mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
   | _ => True
@@ -76,6 +75,9 @@ abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
 /-- Add `4` to the current program counter state. -/
 @[reducible] def incrementPC : StateM SP1State Unit :=
   do modify (.map (· + (BitVec.ofNat _ 4)) id)
+
+@[reducible] def set_pc (new_pc : BitVec 32) : StateM SP1State Unit :=
+  do modify (.map (fun _old_pc => new_pc) id)
 
 /-- Modify the register map state -/
 @[reducible] def update_reg (idx : regidx) (v : BitVec 32) : StateM SP1State Unit :=

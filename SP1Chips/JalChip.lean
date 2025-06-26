@@ -4,7 +4,7 @@ namespace Jal
 
 section constraints
 
-def constraints (Main : Vector BabyBear 15) : List SP1Constraint :=
+def constraints (Main : Vector BabyBear 15) : SP1ConstraintList :=
   let E0 : BabyBear := Main[14] - 1
   let E1 : BabyBear := Main[14] * E0
   let E2 : BabyBear := 1 * Main[10]
@@ -51,5 +51,35 @@ def constraints (Main : Vector BabyBear 15) : List SP1Constraint :=
   ]
 
 end constraints
+
+def specJal (rd : regidx) (imm : BitVec 21) : StateM SP1State Unit := do
+  let old_pc := (← get).1
+  incrementPC
+  update_reg rd (old_pc + 4#32)
+  set_pc (old_pc + imm)
+
+def sp1Jal (Main : Vector BabyBear 15) : StateM SP1State Unit := do
+  let rd := regidx.Regidx Main[4].val
+  let new_pc := BitVec.ofNat 32 (Main[10] + Main[11] * 65536)
+  let old_pc := BitVec.ofNat 32 (Main[12] + Main[13] * 65536)
+  if Main[14] = 1 then set_pc new_pc
+  if Main[14] = 1 then update_reg rd old_pc
+
+theorem SP1JAL_correct (Main : Vector BabyBear 15)
+    (_h_cstrs : (constraints Main).allHold) -- note these are unused here
+    (h_is_real : Main[14] = 1) -- Is a real column
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32) (imm : BitVec 21)
+    -- The inputs are preprocessed correctly
+    (hmem₁ : .ofNat 32 (Main[12] + Main[13] * 65536) = pc + 4#32)
+    (hmem₂ : .ofNat 32 (Main[10] + Main[11] * 65536) = pc + imm) :
+    (sp1Jal Main).run (pc, reg_state) =
+      (specJal (regidx.Regidx Main[4].val) imm).run (pc, reg_state) := by
+  simp only [sp1Jal, h_is_real, Fin.isValue, ↓reduceIte, BabyBearPrime, BitVec.natCast_eq_ofNat,
+    StateT.run_bind, StateT.run_modify, Prod.map_apply, id_eq, bind_pure_comp, map_pure, specJal,
+    StateT.run_get]
+  refine congr_arg (fun out => pure (_, out)) (Prod.eq_iff_fst_eq_snd_eq.2 ⟨?_, ?_⟩)
+  · simpa using hmem₂
+  · refine funext fun reg => ?_
+    simp [Function.update, hmem₁]
 
 end Jal

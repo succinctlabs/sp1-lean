@@ -100,7 +100,16 @@ def specAnd (Main : Vector BabyBear 33) : StateM SP1State Unit := do
   let op_c := regidx.Regidx Main[15].val
   let b : BitVec 32 := (← get).2 op_b
   let c : BitVec 32 := (← get).2 op_c
-  update_reg op_a (b ^^^ c)
+  update_reg op_a (b &&& c)
+
+def specOr (Main : Vector BabyBear 33) : StateM SP1State Unit := do
+  incrementPC
+  let op_a := regidx.Regidx Main[4].val
+  let op_b := regidx.Regidx Main[10].val
+  let op_c := regidx.Regidx Main[15].val
+  let b : BitVec 32 := (← get).2 op_b
+  let c : BitVec 32 := (← get).2 op_c
+  update_reg op_a (b ||| c)
 
 def sp1Bitwise (Main : Vector BabyBear 33) : StateM SP1State Unit := do
   incrementPC
@@ -235,5 +244,27 @@ theorem SP1BitwiseChip_xor_correct (Main : Vector BabyBear 33)
       refine lt_of_lt_of_le this ?_
       omega
   · rw [Function.update_of_ne (Ne.symm hreg), Function.update_of_ne (Ne.symm hreg)]
+
+#print axioms SP1BitwiseChip_xor_correct
+
+-- dt: Essentially the same proof but should cleanup the above first
+
+theorem SP1BitwiseChip_and_correct (Main : Vector BabyBear 33)
+    (h_cstrs : SP1ConstraintList.allHold (constraints Main))
+    (h_is_xor : Main[31] = 1) -- Is an `and` operation
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32)
+    (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
+    (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[17] + Main[18] * 65536)) :
+    (sp1Bitwise Main).run (pc, reg_state) = (specAnd Main).run (pc, reg_state) := by
+  sorry
+
+theorem SP1BitwiseChip_or_correct (Main : Vector BabyBear 33)
+    (h_cstrs : SP1ConstraintList.allHold (constraints Main))
+    (h_is_xor : Main[32] = 1) -- Is an `xor` operation
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32)
+    (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
+    (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[17] + Main[18] * 65536)) :
+    (sp1Bitwise Main).run (pc, reg_state) = (specOr Main).run (pc, reg_state) := by
+  sorry
 
 end BitwiseChip
