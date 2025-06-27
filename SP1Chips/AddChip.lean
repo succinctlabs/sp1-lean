@@ -119,4 +119,4 @@ theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
       ← BitVec.ofNatLT_eq_ofNat hb2, h_add_op]
   · rw [Function.update_of_ne (Ne.symm hreg), Function.update_of_ne (Ne.symm hreg)]
 
-#print axioms SP1AddChip_Correct
+-- #print axioms SP1AddChip_Correct

@@ -80,16 +80,4 @@ lemma test' : (2005401601 : BabyBear) = 256⁻¹ := by
   rw [← test]
   rw [inv_inv]
 
-lemma mul_u8_inv_lt_u8_base_iff (x : BabyBear) :
-    x * 2005401601 < 256 ↔ x < 65536 := by
-  refine ⟨fun h => ?_, fun h => ?_⟩
-  · rw [test'] at h
-    simp [Fin.lt_iff_val_lt_val, Fin.val_mul] at *
-    rw [← test'] at h
-    simp at *
-
-    sorry
-  ·
-    sorry
-
 end u8_base

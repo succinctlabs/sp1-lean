@@ -118,33 +118,14 @@ lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_hig
     (hx : x_low < 256) (hy : y_low < 256) :
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 256 =
       op.toBitwise (x_low + x_high * 256) (y_low + y_high * 256) := by
-  induction op using ByteOpcode.bitwise_induction with
-  | and =>
-      simp
-      sorry
-  | _ => sorry
-
+  sorry
 
 lemma toBitwise_add_toBitwise_mul_u16 (op : ByteOpcode) (x_low x_high y_low y_high : BabyBear)
     (hx : x_low < 65536) (hy : y_low < 65536) :
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 65536 =
       op.toBitwise (x_low + x_high * 65536) (y_low + y_high * 65536) := by
-  induction op using ByteOpcode.bitwise_induction with
-  | and =>
-      simp
-      sorry
-  | _ => sorry
+  sorry
 
 end toBitwise
-
-@[simp] lemma BitVec.twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
-
-lemma bitVec_helper (a b c d : ℕ)
-    (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
-    let bv_a := BitVec.ofNat 32 a; let bv_b := BitVec.ofNat 32 b
-    let bv_c := BitVec.ofNat 32 c; let bv_d := BitVec.ofNat 32 d
-    (bv_a + bv_b <<< 16) ^^^ (bv_c + bv_d <<< 16) =
-      (bv_a ^^^ bv_c) + (bv_b ^^^ bv_d) <<< 16 := by
-  sorry
 
 end ByteOpcode

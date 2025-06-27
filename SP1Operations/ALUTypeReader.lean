@@ -154,11 +154,13 @@ lemma op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
 
 lemma op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
-    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold)
+    (himm : cols.imm_c = 0) :
     cols.op_c_memory.prev_value[0] < 65536 ∧ cols.op_c_memory.prev_value[1] < 65536 := by
-  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
-  sorry
-  -- tauto
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp,
+    sub_eq_zero] at h
+  simp [himm] at h
+  tauto
 
 lemma val_op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
@@ -169,9 +171,10 @@ lemma val_op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
 
 lemma val_op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
     {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
-    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold)
+    (himm : cols.imm_c = 0) :
     cols.op_c_memory.prev_value[0].val < 65536 ∧ cols.op_c_memory.prev_value[1].val < 65536 := by
-  have := op_c_memory_lt_of_constraints h
+  have := op_c_memory_lt_of_constraints h himm
   aesop
 
 end ALUTypeReader
