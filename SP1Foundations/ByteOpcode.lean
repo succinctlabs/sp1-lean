@@ -120,12 +120,6 @@ lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_hig
       op.toBitwise (x_low + x_high * 256) (y_low + y_high * 256) := by
   sorry
 
-lemma toBitwise_add_toBitwise_mul_u16 (op : ByteOpcode) (x_low x_high y_low y_high : BabyBear)
-    (hx : x_low < 65536) (hy : y_low < 65536) :
-    (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 65536 =
-      op.toBitwise (x_low + x_high * 65536) (y_low + y_high * 65536) := by
-  sorry
-
 end toBitwise
 
 end ByteOpcode

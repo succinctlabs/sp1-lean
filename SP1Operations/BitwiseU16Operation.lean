@@ -214,39 +214,39 @@ lemma eq_toBitwise_of_constraints₃
   have := BitwiseOperation.eq_toBitwise_of_constraints _ _ _ 3 _ hop this
   exact this
 
--- version for (almost) actual bitvecs to use w/ sail stuff
--- Not clear yet how bounds should work here, come back after chip
-lemma eq_toBitwise_word_of_constraints
-    (a : Word BabyBear)
-    (b : Word BabyBear)
-    (cols : BitwiseU16Operation)
-    (opcode : ByteOpcode)
-    (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
-    (ha : cols.b_low_bytes.low_bytes[0] < 256)
-    (hb : cols.c_low_bytes.low_bytes[0] < 256)
-    (h : (constraints a b cols opcode.toBB 1).2.allHold) :
-    (cols.bitwise_operation.result[0] + cols.bitwise_operation.result[1] * (256 : BabyBear)) =
-      (ByteOpcode.toBitwise opcode a[0] b[0]) := by
-  rw [eq_toBitwise_of_constraints₀ a b cols opcode hop h,
-    eq_toBitwise_of_constraints₁ a b cols opcode hop h]
-  rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
-  simp [mul_assoc]
+-- -- version for (almost) actual bitvecs to use w/ sail stuff
+-- -- Not clear yet how bounds should work here, come back after chip
+-- lemma eq_toBitwise_word_of_constraints
+--     (a : Word BabyBear)
+--     (b : Word BabyBear)
+--     (cols : BitwiseU16Operation)
+--     (opcode : ByteOpcode)
+--     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
+--     (ha : cols.b_low_bytes.low_bytes[0] < 256)
+--     (hb : cols.c_low_bytes.low_bytes[0] < 256)
+--     (h : (constraints a b cols opcode.toBB 1).2.allHold) :
+--     (cols.bitwise_operation.result[0] + cols.bitwise_operation.result[1] * (256 : BabyBear)) =
+--       (ByteOpcode.toBitwise opcode a[0] b[0]) := by
+--   rw [eq_toBitwise_of_constraints₀ a b cols opcode hop h,
+--     eq_toBitwise_of_constraints₁ a b cols opcode hop h]
+--   rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
+--   simp [mul_assoc]
 
-lemma eq_toBitwise_word_of_constraints'
-    (a : Word BabyBear)
-    (b : Word BabyBear)
-    (cols : BitwiseU16Operation)
-    (opcode : ByteOpcode)
-    (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
-    (ha : cols.b_low_bytes.low_bytes[1] < 256)
-    (hb : cols.c_low_bytes.low_bytes[1] < 256)
-    (h : (constraints a b cols opcode.toBB 1).2.allHold) :
-    (cols.bitwise_operation.result[2] + cols.bitwise_operation.result[3] * (256 : BabyBear)) =
-      (ByteOpcode.toBitwise opcode a[1] b[1]) := by
-  rw [eq_toBitwise_of_constraints₂ a b cols opcode hop h,
-    eq_toBitwise_of_constraints₃ a b cols opcode hop h]
-  rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
-  simp [mul_assoc]
+-- lemma eq_toBitwise_word_of_constraints'
+--     (a : Word BabyBear)
+--     (b : Word BabyBear)
+--     (cols : BitwiseU16Operation)
+--     (opcode : ByteOpcode)
+--     (hop : opcode = .AND ∨ opcode = .OR ∨ opcode = .XOR)
+--     (ha : cols.b_low_bytes.low_bytes[1] < 256)
+--     (hb : cols.c_low_bytes.low_bytes[1] < 256)
+--     (h : (constraints a b cols opcode.toBB 1).2.allHold) :
+--     (cols.bitwise_operation.result[2] + cols.bitwise_operation.result[3] * (256 : BabyBear)) =
+--       (ByteOpcode.toBitwise opcode a[1] b[1]) := by
+--   rw [eq_toBitwise_of_constraints₂ a b cols opcode hop h,
+--     eq_toBitwise_of_constraints₃ a b cols opcode hop h]
+--   rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
+--   simp [mul_assoc]
 
 section xor
 
