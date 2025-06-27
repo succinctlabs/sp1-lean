@@ -41,29 +41,29 @@ def constraints
 
 def spec
   (a b : Word U16)
-  (cols : SubOperation) 
+  (cols : SubOperation)
   (is_real : U1) : Prop :=
     is_real = 1 → a.toBV32_U16 - b.toBV32_U16 = cols.value.toBV32
 
-theorem correct
-  (a b : Word U16)
-  (cols : SubOperation)
-  (is_real : U1)
-  : (constraints a b cols is_real).allHold → spec a b cols is_real
-  := by
-    sorry
+-- theorem correct
+--   (a b : Word U16)
+--   (cols : SubOperation)
+--   (is_real : U1)
+--   : (constraints a b cols is_real).allHold → spec a b cols is_real
+--   := by
+--     sorry
 
-open BitVec
+-- open BitVec
 
-theorem correct'
-  (a b : Word U16)
-  (cols : SubOperation)
-  (is_real : U1)
-  (h_is_real : is_real = 1)
-  (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ BIT_WIDTH)
-  : (cols.value[0].val + cols.value[1].val * 65536)#'pf
-    = (a.toBV32_U16 - b.toBV32_U16)
-  := by
-      sorry
+-- theorem correct'
+--   (a b : Word U16)
+--   (cols : SubOperation)
+--   (is_real : U1)
+--   (h_is_real : is_real = 1)
+--   (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ BIT_WIDTH)
+--   : (cols.value[0].val + cols.value[1].val * 65536)#'pf
+--     = (a.toBV32_U16 - b.toBV32_U16)
+--   := by
+--       sorry
 
 end SubOperation

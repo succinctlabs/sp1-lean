@@ -1,133 +1,85 @@
-import SP1Foundations
-import LeanRV32D.RiscvInstsEnd
-import LeanRV32D.RiscvRegs
-import SP1Operations.CPUState
-import SP1Operations.JTypeReader
+import SP1Operations
 
-namespace exp
+namespace Jal
 
--- Simple experiment with StateM Int to prove consecutive reads are equivalent
-theorem simple_consecutive_reads :
-  (do let x ← StateT.get; let y ← StateT.get; pure (x, y) : StateM Int (Int × Int)) =
-  (do let x ← StateT.get; pure (x, x) : StateM Int (Int × Int)) := by
-  -- Work directly with function extensionality
-  funext s
-  -- Both get operations read the state s, so they return the same value
-  rfl
+section constraints
 
--- More general theorem about reads with no interfering operations
-theorem reads_with_pure_operations :
-  (do
-    let x ← StateT.get
-    let _ ← pure ()  -- Some pure operation that doesn't change state
-    let y ← StateT.get
-    pure (x, y) : StateM Int (Int × Int)) =
-  (do
-    let x ← StateT.get
-    let _ ← pure ()
-    pure (x, x) : StateM Int (Int × Int)) := by
-  funext s
-  simp [StateT.get, pure]
-  rfl
+def constraints (Main : Vector BabyBear 15) : SP1ConstraintList :=
+  let E0 : BabyBear := Main[14] - 1
+  let E1 : BabyBear := Main[14] * E0
+  let E2 : BabyBear := 1 * Main[10]
+  let E3 : BabyBear := 0 + E2
+  let E4 : BabyBear := 65536 * Main[11]
+  let E5 : BabyBear := E3 + E4
+  let E6 : BabyBear := Main[1] * 65536
+  let E7 : BabyBear := Main[2] + E6
+  let E8 : BabyBear := Main[14] - 1
+  let E9 : BabyBear := Main[14] * E8
+  let E10 : BabyBear := E7 + 8
+  let E11 : BabyBear := Main[2] - 1
+  let E12 : BabyBear := E11 * 1761607681
+  let E13 : BabyBear := Main[1] * 65536
+  let E14 : BabyBear := Main[2] + E13
+  let E15 : BabyBear := Main[14] - 1
+  let E16 : BabyBear := Main[14] * E15
+  let E17 : BabyBear := Main[12] - 0
+  let E18 : BabyBear := Main[9] * E17
+  let E19 : BabyBear := Main[13] - 0
+  let E20 : BabyBear := Main[9] * E19
+  let E21 : BabyBear := E14 + 3
+  let E22 : BabyBear := Main[14] - 1
+  let E23 : BabyBear := Main[14] * E22
+  let E24 : BabyBear := E21 - Main[7]
+  let E25 : BabyBear := E24 - 1
+  let E26 : BabyBear := E25 - Main[8]
+  let E27 : BabyBear := E26 * 2013235201
+  [
+    .assertZero E1,
+    .assertZero E9,
+    .receive (.state Main[0] E7 Main[3]) Main[14],
+    .send (.state Main[0] E10 E5) Main[14],
+    .send (.byte (ByteOpcode.ofNat 6) E12 13 0) Main[14],
+    .send (.byte (ByteOpcode.ofNat 3) 0 Main[1] 0) Main[14],
+    .assertZero E16,
+    .assertZero E18,
+    .assertZero E20,
+    .assertZero E23,
+    .send (.byte (ByteOpcode.ofNat 6) Main[8] 16 0) Main[14],
+    .send (.byte (ByteOpcode.ofNat 3) 0 E27 0) Main[14],
+    .send (.memory Main[0] Main[7] Main[4] Main[5] Main[6]) Main[14],
+    .receive (.memory Main[0] E21 Main[4] Main[12] Main[13]) Main[14]
+  ]
 
--- Simple working version of monadic substitution
-theorem simple_monadic_subst {α β : Type} {m : Type → Type} [Monad m] [LawfulMonad m]
-  (ma : m α) (f : α → β) (mb : m β)
-  (h : f <$> ma = mb) :
-  (do let a ← ma; pure (f a)) = mb := by
-  sorry
-  -- rw [ ← map_bind, h]
+end constraints
 
-end exp
+def specJal (rd : regidx) (imm : BitVec 21) : StateM SP1State Unit := do
+  let old_pc := (← get).1
+  incrementPC
+  update_reg rd (old_pc + 4#32)
+  set_pc (old_pc + imm)
 
-open LeanRV32D.Functions
-open Sail
-open PreSail (SequentialState)
+def sp1Jal (Main : Vector BabyBear 15) : StateM SP1State Unit := do
+  let rd := regidx.Regidx Main[4].val
+  let new_pc := BitVec.ofNat 32 (Main[10] + Main[11] * 65536)
+  let old_pc := BitVec.ofNat 32 (Main[12] + Main[13] * 65536)
+  if Main[14] = 1 then set_pc new_pc
+  if Main[14] = 1 then update_reg rd old_pc
 
-structure JalChip where
-  state : CPUState
-  adapter : JTypeReader U16
-  is_real : U1
+theorem SP1JAL_correct (Main : Vector BabyBear 15)
+    (_h_cstrs : (constraints Main).allHold) -- note these are unused here
+    (h_is_real : Main[14] = 1) -- Is a real column
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32) (imm : BitVec 21)
+    -- The inputs are preprocessed correctly
+    (hmem₁ : .ofNat 32 (Main[12] + Main[13] * 65536) = pc + 4#32)
+    (hmem₂ : .ofNat 32 (Main[10] + Main[11] * 65536) = pc + imm) :
+    (sp1Jal Main).run (pc, reg_state) =
+      (specJal (regidx.Regidx Main[4].val) imm).run (pc, reg_state) := by
+  simp only [sp1Jal, h_is_real, Fin.isValue, ↓reduceIte, BabyBearPrime, BitVec.natCast_eq_ofNat,
+    StateT.run_bind, StateT.run_modify, Prod.map_apply, id_eq, bind_pure_comp, map_pure, specJal,
+    StateT.run_get]
+  refine congr_arg (fun out => pure (_, out)) (Prod.eq_iff_fst_eq_snd_eq.2 ⟨?_, ?_⟩)
+  · simpa using hmem₂
+  · refine funext fun reg => ?_
+    simp [Function.update, hmem₁]
 
-namespace JalChip
-
-def constraints (chip : JalChip) : Prop := sorry
-
-def trust_jmp : Prop := sorry
-
-end JalChip
-
-def sp1_jal
-  (chip : JalChip)
-  (constraints : chip.constraints)
-  (h_is_real : chip.is_real = 1)
-  (rd : regidx)
-  (imm : BitVec 21)
-  (read_b : chip.adapter.read_jal_b_fun imm)
-  (read_c : chip.adapter.read_jal_c_fun)
-  : SailM Unit :=
-  do
-    -- When we generate memory reads/writes,
-    -- the order of the statements is based on `clk`
-    wX_bits rd chip.adapter.c.toBV32_U16
-    -- The order of PC write doesn't really matter to us, so for convention
-    -- let's place them at the start
-    writeReg (Register.nextPC) chip.adapter.b.toBV32_U16
-
-def spec_jal (rd : regidx) (imm : BitVec 21) : SailM Unit := do
-  writeReg Register.nextPC (BitVec.addInt (← readReg Register.PC) 4)
-  let _ ← execute_JAL imm rd
-  pure ()
-
-def runSuccessState {α : Type} (m : SailM α) (s : SequentialState RegisterType trivialChoiceSource) :
-    Option (SequentialState RegisterType trivialChoiceSource) :=
-  match m.run s with
-  | .ok _ s' => some s'
-  | .error _ _ => none
-
-theorem sp1_jal_implies_spec_jal
-  (chip : JalChip)
-  (constraints : chip.constraints)
-  (h_is_real : chip.is_real = 1)
-  (rd : regidx)
-  (imm : BitVec 21)
-  (read_b : chip.adapter.read_jal_b_fun imm)
-  (read_c : chip.adapter.read_jal_c_fun)
-  -- note: this is horrendously wrong, `trusted_jmp` should not be trusted.
-  -- the equality should only hold when `pc ← readReg Register.PC`
-  -- claude messed this one up
-  (trusted_jmp : ∀ (pc : BitVec 32),
-    bit_to_bool (BitVec.access (pc + sign_extend imm) 1) = pure false)
-  (s : PreSail.SequentialState RegisterType trivialChoiceSource)
-  : let res := (sp1_jal chip constraints h_is_real rd imm read_b read_c).run s
-    let res_spec := (spec_jal rd imm).run s
-    res = res_spec
-  :=
-  by
-    simp [EStateM.run, sp1_jal, spec_jal, execute_JAL]
-    simp only [JTypeReader.read_jal_b_fun] at read_b
-    simp only [JTypeReader.read_jal_c_fun] at read_c
-
-    simp [ext_control_check_pc]
-    simp [get_next_pc, set_next_pc, bits_of_virtaddr]
-
-    -- Now use trusted_jmp to replace bit_to_bool expressions
-    simp [trusted_jmp]
-    -- Now a_1 should be replaced with false everywhere
-
-    -- -- Use read_b to substitute (a + sign_extend imm) with chip.adapter.b.toBV32_U16
-    -- -- read_b tells us: (fun x ↦ x + sign_extend imm) <$> readReg Register.PC = pure chip.adapter.b.toBV32_U16
-    -- -- This means: for the specific PC value `a`, we have (a + sign_extend imm) = chip.adapter.b.toBV32_U16
-    -- -- Let's extract this equality and use it
-    -- have h_pc_eq : (fun x ↦ x + sign_extend imm) <$> readReg Register.PC = pure chip.adapter.b.toBV32_U16 := read_b
-    --
-    -- -- We need to show that the bind where we read PC and then add imm is equivalent to using b directly
-    -- -- Let's try to use our monadic substitution lemma
-    -- conv_rhs =>
-    --   -- Navigate to the final writeReg that uses (a + sign_extend imm)
-    --   simp only [bind_assoc]
-
-    /- simp [wX_bits] -/
-    /- simp [PreSail.readReg, PreSail.writeReg] -/
-
-    sorry
+end Jal

@@ -100,6 +100,12 @@ lemma eq_toBitwise_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOpera
   | xor => exact eq_xor_of_constraints _ _ _ _ h
   | other h h' => aesop
 
--- lemma lt_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
+lemma lt_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
+    (i : Fin WORD_BYTE_SIZE) (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
+    (h : (cols.constraints a b op.toBB 1).allHold) :
+    cols.result[i] < 256 ∧ a[i] < 256 ∧ b[i] < 256 := by
+  have := constraints_imp_spec a b cols _ _ one_ne_zero h
+  rw [spec] at this
+  match i with | 0 => aesop | 1 => aesop | 2 => aesop | 3 => aesop
 
 end BitwiseOperation

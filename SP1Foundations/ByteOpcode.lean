@@ -89,6 +89,13 @@ protected def bitwise_induction (C : ByteOpcode → Sort*)
 
 section toBitwise
 
+def toBitwise' (op : ByteOpcode) : BitVec n → BitVec n → BitVec n :=
+  by induction op using ByteOpcode.bitwise_induction with
+  | and => exact (· &&& ·)
+  | or => exact (· ||| ·)
+  | xor => exact (· ^^^ ·)
+  | other _ _ => exact 0
+
 /-- Convert a `ByteOpcode` to a bitwise operation.
 Gives dummy outputs outside `AND`, `OR`, and `XOR` operations. -/
 def toBitwise (op : ByteOpcode) : BabyBear → BabyBear → BabyBear :=
@@ -111,22 +118,13 @@ lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_hig
     (hx : x_low < 256) (hy : y_low < 256) :
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 256 =
       op.toBitwise (x_low + x_high * 256) (y_low + y_high * 256) := by
-  induction op using ByteOpcode.bitwise_induction with
-  | and =>
-      simp
-      sorry
-  | _ => sorry
-
+  sorry
 
 lemma toBitwise_add_toBitwise_mul_u16 (op : ByteOpcode) (x_low x_high y_low y_high : BabyBear)
     (hx : x_low < 65536) (hy : y_low < 65536) :
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 65536 =
       op.toBitwise (x_low + x_high * 65536) (y_low + y_high * 65536) := by
-  induction op using ByteOpcode.bitwise_induction with
-  | and =>
-      simp
-      sorry
-  | _ => sorry
+  sorry
 
 end toBitwise
 

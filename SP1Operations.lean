@@ -1,8 +1,8 @@
 import SP1Operations.ALUTypeReader
 import SP1Operations.Add4Operation
 import SP1Operations.AddOperation
-import SP1Operations.BitwiseU16Operation
 import SP1Operations.BitwiseOperation
+import SP1Operations.BitwiseU16Operation
 import SP1Operations.CPUState
 import SP1Operations.IsZeroOperation
 import SP1Operations.JTypeReader

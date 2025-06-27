@@ -144,22 +144,37 @@ lemma imm_c_eq_zero_or_prev_value_eq_op_c
   rw [Word.ext_cases_iff]
   aesop
 
-section registerMatch
 
-/-- The bits in the given register correspond-/
-def registerMatch (rx : regidx) (low_limb high_limb : BabyBear) : Prop :=
-  rX_bits rx = pure (BitVec.ofNat 32 (low_limb.val + high_limb.val * 65536))
+lemma op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
+    cols.op_b_memory.prev_value[0] < 65536 ∧ cols.op_b_memory.prev_value[1] < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
 
-/-- Note: need to be very careful making this an axiom and not proving it.
-Should verify that it's at least admissable / doesn't allow for a proof of `False`. -/
-axiom read_b_fun (cols : ALUTypeReader) (rx : regidx)
-    (cstrs : (ALUTypeReader.constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
-    registerMatch rx cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1]
+lemma op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold)
+    (himm : cols.imm_c = 0) :
+    cols.op_c_memory.prev_value[0] < 65536 ∧ cols.op_c_memory.prev_value[1] < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp,
+    sub_eq_zero] at h
+  simp [himm] at h
+  tauto
 
-axiom read_c_fun (cols : ALUTypeReader) (rx : regidx)
-    (cstrs : (ALUTypeReader.constraints shard clk pc opcode op_a_write_value cols is_real).allHold) :
-    registerMatch rx cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1]
+lemma val_op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
+    cols.op_b_memory.prev_value[0].val < 65536 ∧ cols.op_b_memory.prev_value[1].val < 65536 := by
+  simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
+  tauto
 
-end registerMatch
+lemma val_op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
+    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+    (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold)
+    (himm : cols.imm_c = 0) :
+    cols.op_c_memory.prev_value[0].val < 65536 ∧ cols.op_c_memory.prev_value[1].val < 65536 := by
+  have := op_c_memory_lt_of_constraints h himm
+  aesop
 
 end ALUTypeReader
