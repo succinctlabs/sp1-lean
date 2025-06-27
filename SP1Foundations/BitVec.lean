@@ -1,4 +1,4 @@
-import mathlib
+import Mathlib
 
 @[simp] lemma BitVec.twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
 
