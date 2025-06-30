@@ -59,15 +59,20 @@ lemma bound_of_constraints (Main : Vector BabyBear 23)
 
 end constraints
 
-def specAdd (Main : Vector BabyBear 23) : StateM SP1State Unit := do
-  incrementPC
-  let op_a := regidx.Regidx Main[4].val
-  let op_b := regidx.Regidx Main[10].val
-  let op_c := regidx.Regidx Main[15].val
-  let b : BitVec 32 := (← get).2 op_b
-  let c : BitVec 32 := (← get).2 op_c
-  update_reg op_a (b + c)
+/--
+This is just the `ADD` branch of `execute_RTYPE` in LeanRV32D, except that all
+monadic acionts are happening in our `StateM` instead of `SailM`.
 
+We should be able to either:
+- Modify the Sail compiler so that `SailM` uses functions instead of
+  `Std.ExtDHashMaps` underneath.
+- OR prove the equivalence between our `StateM` and `SailM`.
+-/
+def specAdd (rs2 rs1 rd : regidx) : StateM SP1State Unit := do
+  incrementPC -- this is from run_hart_active
+  update_reg rd ((← get).2 rs1 + (← get).2 rs2)
+
+-- TODO(gzgz): this should be auto-generate-able from our constraints.
 def sp1Add (Main : Vector BabyBear 23) : StateM SP1State Unit := do
   incrementPC
   let op_a := regidx.Regidx Main[4].val
@@ -81,7 +86,7 @@ theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
     (pc : BitVec 32) (reg_state : regidx → BitVec 32)
     (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
     (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) :
-    (sp1Add Main).run (pc, reg_state) = (specAdd Main).run (pc, reg_state) := by
+    (sp1Add Main).run (pc, reg_state) = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run (pc, reg_state) := by
   unfold sp1Add specAdd
   rw [BitVec.natCast_eq_ofNat] at hmem₁ hmem₂
   have hb3 : Main[20].val + Main[21].val * 65536 < 2 ^ 32 :=

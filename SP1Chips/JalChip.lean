@@ -52,12 +52,16 @@ def constraints (Main : Vector BabyBear 15) : SP1ConstraintList :=
 
 end constraints
 
+/--
+This is essentially `execute_JAL` from LeanRV32D.
+-/
 def specJal (rd : regidx) (imm : BitVec 21) : StateM SP1State Unit := do
   let old_pc := (← get).1
   incrementPC
   update_reg rd (old_pc + 4#32)
   set_pc (old_pc + imm)
 
+-- TODO(gzgz): this should be auto-generate-able from our constraints.
 def sp1Jal (Main : Vector BabyBear 15) : StateM SP1State Unit := do
   let rd := regidx.Regidx Main[4].val
   let new_pc := BitVec.ofNat 32 (Main[10] + Main[11] * 65536)
