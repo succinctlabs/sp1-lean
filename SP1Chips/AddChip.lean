@@ -74,7 +74,7 @@ def specAdd (rs2 rs1 rd : regidx) : StateM SP1State Unit := do
 
 -- TODO(gzgz): this should be auto-generate-able from our constraints.
 def sp1Add (Main : Vector BabyBear 23) : StateM SP1State Unit := do
-  incrementPC
+  set_pc (Main[3].val + 4) -- dt: This should actually be coming from `CPUState.constraints` send
   let op_a := regidx.Regidx Main[4].val
   update_reg op_a (BitVec.ofNat 32 (↑Main[20] + ↑Main[21] * 65536))
 
@@ -83,7 +83,8 @@ into the proper registers, then the add chip conforms to the spec. -/
 theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_real : Main[22] = 1)
-    (pc : BitVec 32) (reg_state : regidx → BitVec 32)
+    (pc : BitVec 32) (hpc : pc = Main[3].val)
+    (reg_state : regidx → BitVec 32)
     (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
     (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) :
     (sp1Add Main).run (pc, reg_state) = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run (pc, reg_state) := by
@@ -117,6 +118,7 @@ theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
 
   simp only [BabyBearPrime, BitVec.natCast_eq_ofNat, StateT.run_modify, StateT.run_bind,
     StateT.run_get, bind_pure_comp, map_pure, Prod.map_apply, id_eq]
+  simp [hpc]
   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
   by_cases hreg : (regidx.Regidx (BitVec.ofNat 5 ↑Main[4])) = reg
   · rw [hreg, Function.update_self, Function.update_self, hmem₁, hmem₂,
