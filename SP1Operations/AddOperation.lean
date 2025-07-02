@@ -88,15 +88,19 @@ theorem correct
 
       let ⟨qq1, ⟨qq2, ⟨qq3, aa4⟩⟩⟩ := q1
       clear q1
-      simp [sub_eq_zero, mul_eq_zero] at qq1 qq2
+      simp [sub_eq_zero] at qq1 qq2
       simp [Word.toBV32_U16, Word.toBV32, BitVec.ofNatLT, BitVec.ofNat]
 
       cases qq1 with
       | inl qqq1 =>
           rw [qqq1] at qq2
-          simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+          simp [Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
           simp [Fin.lt_def] at qq3 aa4
-          aesop (add 50% tactic (by omega))
+          have := a[0].in_range
+          have := a[1].in_range
+          have := b[0].in_range
+          have := b[1].in_range
+          omega
       | inr qqq1 =>
           rw [qqq1] at qq2
           simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *

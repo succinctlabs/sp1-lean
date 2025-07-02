@@ -33,9 +33,76 @@ lemma eq_zero_iff_val_eq_zero (x : BabyBear) : x = 0 ↔ x.val = 0 := by aesop
 @[simp] lemma val_32768 : ((32768 : BabyBear) : ℕ) = 32768 := rfl
 @[simp] lemma val_65536 : ((65536 : BabyBear) : ℕ) = 65536 := rfl
 
+@[simp] lemma ne_zero_2 : (2 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_4 : (4 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_8 : (8 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_16 : (16 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_32 : (32 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_64 : (64 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_128 : (128 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_256 : (256 : BabyBear) ≠ 0 := by simp
+@[simp] lemma ne_zero_65536 : (65536 : BabyBear) ≠ 0 := by simp
+
 end const_vals
 
 end BabyBear
+
+
+-- dt: if we commit to `BabyBear` fully we should have `isTwoPow` class maybe
+
+@[simp] lemma shiftl_1BB_eq_one : (1006632961 : BabyBear) <<< 1 = 1 := rfl
+@[simp] lemma shiftl_2BB_eq_one : (1509949441 : BabyBear) <<< 2 = 1 := rfl
+@[simp] lemma shiftl_3BB_eq_one : (1761607681 : BabyBear) <<< 3 = 1 := rfl
+@[simp] lemma shiftl_8BB_eq_one : (2005401601 : BabyBear) <<< 8 = 1 := rfl
+@[simp] lemma shiftl_16BB_eq_one : (2013235201 : BabyBear) <<< 16 = 1 := rfl
+
+lemma inv_1BB_eq : (1006632961 : BabyBear)⁻¹ = 2 := by native_decide
+lemma inv_2BB_eq : (1509949441 : BabyBear)⁻¹ = 4 := by native_decide
+lemma inv_3BB_eq : (1761607681 : BabyBear)⁻¹ = 8 := by native_decide
+lemma inv_8BB_eq : (2005401601 : BabyBear)⁻¹ = 256 := by native_decide
+lemma inv_16BB_eq : (2013235201 : BabyBear)⁻¹ = 65536 := by native_decide
+
+lemma inv_1BB_eq' : (1006632961 : BabyBear) = 2⁻¹ := by native_decide
+lemma inv_2BB_eq' : (1509949441 : BabyBear) = 4⁻¹ := by native_decide
+lemma inv_3BB_eq' : (1761607681 : BabyBear) = 8⁻¹ := by native_decide
+lemma inv_8BB_eq' : (2005401601 : BabyBear) = 256⁻¹ := by native_decide
+lemma inv_16BB_eq' : (2013235201 : BabyBear) = 65536⁻¹ := by native_decide
+
+@[simp] lemma inv_mul_1BB_eq_one : (1006632961 : BabyBear) * 2 = 1 := by rfl
+@[simp] lemma inv_mul_2BB_eq_one : (1509949441 : BabyBear) * 4 = 1 := by rfl
+@[simp] lemma inv_mul_3BB_eq_one : (1761607681 : BabyBear) * 8 = 1 := by rfl
+@[simp] lemma inv_mul_8BB_eq_one : (2005401601 : BabyBear) * 256 = 1 := by rfl
+@[simp] lemma inv_mul_16BB_eq_one : (2013235201 : BabyBear) * 65536 = 1 := by rfl
+
+@[simp] lemma mul_inv_1BB_eq_one : 2 * (1006632961 : BabyBear) = 1 := by rfl
+@[simp] lemma mul_inv_2BB_eq_one : 4 * (1509949441 : BabyBear) = 1 := by rfl
+@[simp] lemma mul_inv_3BB_eq_one : 8 * (1761607681 : BabyBear) = 1 := by rfl
+@[simp] lemma mul_inv_8BB_eq_one : 256 * (2005401601 : BabyBear) = 1 := by rfl
+@[simp] lemma mul_inv_16BB_eq_one : 65536 * (2013235201 : BabyBear) = 1 := by rfl
+
+@[simp] lemma inv_mul_1BB_eq_iff : (1006632961 : BabyBear) * x = 1 ↔ x = 2 := by
+  rw [inv_1BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_2, eq_comm]
+@[simp] lemma inv_mul_2BB_eq_iff : (1509949441 : BabyBear) * x = 1 ↔ x = 4 := by
+  rw [inv_2BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_4, eq_comm]
+@[simp] lemma inv_mul_3BB_eq_iff : (1761607681 : BabyBear) * x = 1 ↔ x = 8 := by
+  rw [inv_3BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_8, eq_comm]
+@[simp] lemma inv_mul_8BB_eq_iff : (2005401601 : BabyBear) * x = 1 ↔ x = 256 := by
+  rw [inv_8BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_256, eq_comm]
+@[simp] lemma inv_mul_16BB_eq_iff : (2013235201 : BabyBear) * x = 1 ↔ x = 65536 := by
+  rw [inv_16BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_65536, eq_comm]
+
+@[simp] lemma inv_mul_1BB_eq_iff' : x * (1006632961 : BabyBear) = 1 ↔ x = 2 := by
+  rw [mul_comm, inv_mul_1BB_eq_iff]
+@[simp] lemma inv_mul_2BB_eq_iff' : x * (1509949441 : BabyBear) = 1 ↔ x = 4 := by
+  rw [mul_comm, inv_mul_2BB_eq_iff]
+@[simp] lemma inv_mul_3BB_eq_iff' : x * (1761607681 : BabyBear) = 1 ↔ x = 8 := by
+  rw [mul_comm, inv_mul_3BB_eq_iff]
+@[simp] lemma inv_mul_8BB_eq_iff' : x * (2005401601 : BabyBear) = 1 ↔ x = 256 := by
+  rw [mul_comm, inv_mul_8BB_eq_iff]
+@[simp] lemma inv_mul_16BB_eq_iff' : x * (2013235201 : BabyBear) = 1 ↔ x = 65536 := by
+  rw [mul_comm, inv_mul_16BB_eq_iff]
+
+-- dt: below should be handled more systematically like above
 
 section base
 
@@ -65,41 +132,6 @@ lemma base_eq_inv_baseInv : base = baseInv⁻¹ := by
   rw [mul_comm, mul_baseInv_eq_one_iff]
 
 end base
-
--- dt: if we commit to `BabyBear` fully we should have `isTwoPow` class probably
--- these numbers occur quite often in our constraints.
-
-@[simp] lemma shiftl_1BB_eq_one : (1006632961 : BabyBear) <<< 1 = 1 := rfl
-@[simp] lemma shiftl_2BB_eq_one : (1509949441 : BabyBear) <<< 2 = 1 := rfl
-@[simp] lemma shiftl_3BB_eq_one : (1761607681 : BabyBear) <<< 3 = 1 := rfl
-@[simp] lemma shiftl_8BB_eq_one : (2005401601 : BabyBear) <<< 8 = 1 := rfl
-@[simp] lemma shiftl_16BB_eq_one : (2013235201 : BabyBear) <<< 16 = 1 := rfl
-
-lemma inv_1BB_eq : (1006632961 : BabyBear)⁻¹ = 2 := by native_decide
-lemma inv_2BB_eq : (1509949441 : BabyBear)⁻¹ = 4 := by native_decide
-lemma inv_3BB_eq : (1761607681 : BabyBear)⁻¹ = 8 := by native_decide
-lemma inv_8BB_eq : (2005401601 : BabyBear)⁻¹ = 256 := by native_decide
-lemma inv_16BB_eq : (2013235201 : BabyBear)⁻¹ = 65536 := by native_decide
-
-lemma inv_1BB_eq_one' : (1006632961 : BabyBear) = 2⁻¹ := by native_decide
-lemma inv_2BB_eq_one' : (1509949441 : BabyBear) = 4⁻¹ := by native_decide
-lemma inv_3BB_eq_one' : (1761607681 : BabyBear) = 8⁻¹ := by native_decide
-lemma inv_8BB_eq_one' : (2005401601 : BabyBear) = 256⁻¹ := by native_decide
-lemma inv_16BB_eq_one : (2013235201 : BabyBear) = 65536⁻¹ := by native_decide
-
-@[simp] lemma inv_mul_1BB_eq_one : (1006632961 : BabyBear) * 2 = 1 := by rfl
-@[simp] lemma inv_mul_2BB_eq_one : (1509949441 : BabyBear) * 4 = 1 := by rfl
-@[simp] lemma inv_mul_3BB_eq_one : (1761607681 : BabyBear) * 8 = 1 := by rfl
-@[simp] lemma inv_mul_8BB_eq_one : (2005401601 : BabyBear) * 256 = 1 := by rfl
-@[simp] lemma inv_mul_16BB_eq_one : (2013235201 : BabyBear) * 65536 = 1 := by rfl
-
-@[simp] lemma mul_inv_1BB_eq_one : 2 * (1006632961 : BabyBear) = 1 := by rfl
-@[simp] lemma mul_inv_2BB_eq_one : 4 * (1509949441 : BabyBear) = 1 := by rfl
-@[simp] lemma mul_inv_3BB_eq_one : 8 * (1761607681 : BabyBear) = 1 := by rfl
-@[simp] lemma mul_inv_8BB_eq_one : 256 * (2005401601 : BabyBear) = 1 := by rfl
-@[simp] lemma mul_inv_16BB_eq_one : 65536 * (2013235201 : BabyBear) = 1 := by rfl
-
--- dt: below should be handled more systematically like above
 
 section u3_base
 

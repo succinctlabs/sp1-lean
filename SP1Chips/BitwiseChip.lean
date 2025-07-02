@@ -196,13 +196,10 @@ theorem SP1BitwiseChip_xor_correct (Main : Vector BabyBear 33)
 
   -- Suffices to show the new register map with cases on it being destination register
   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
-  by_cases hreg : regidx.Regidx (BitVec.ofNat 5 Main[4].val) = reg
-  · simp [hreg, hmem₁, hmem₂, hxor0, hxor1, hxor2, hxor3, h27, h29,
-      Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
-      bitVec_helper_xor _ _ _ _ h11 h12 h17 h18,
-      Fin.xor_val, ofNat_add, ofNat_mul, ofNat_xor]
-  · rw [Function.update_of_ne (Ne.symm hreg), Function.update_of_ne (Ne.symm hreg)]
-
+  simp [hmem₁, hmem₂, hxor0, hxor1, hxor2, hxor3, h27, h29,
+    Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
+    bitVec_helper_xor _ _ _ _ h11 h12 h17 h18,
+    Fin.xor_val, ofNat_add, ofNat_mul, ofNat_xor]
 
 /-- If the constraints all hold, `is_or` is set to true, and `op_b` and `op_c` are loaded
 into the proper registers, then the bitwise chip conforms to the or spec. -/
@@ -261,14 +258,11 @@ theorem SP1BitwiseChip_or_correct (Main : Vector BabyBear 33)
   rw [hxor0, hxor1] at h27
   rw [hxor2, hxor3] at h29
 
-  -- Suffices to show the new register map with cases on it being destination register
   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
-  by_cases hreg : regidx.Regidx (BitVec.ofNat 5 Main[4].val) = reg
-  · simp [hreg, hmem₁, hmem₂, hxor0, hxor1, hxor2, hxor3, h27, h29,
-      Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
-      bitVec_helper_or _ _ _ _ h11 h12 h17 h18,
-      Fin.or_val, ofNat_add, ofNat_mul, ofNat_or]
-  · rw [Function.update_of_ne (Ne.symm hreg), Function.update_of_ne (Ne.symm hreg)]
+  simp [hmem₁, hmem₂, hxor0, hxor1, hxor2, hxor3, h27, h29,
+    Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
+    bitVec_helper_or _ _ _ _ h11 h12 h17 h18,
+    Fin.or_val, ofNat_add, ofNat_mul, ofNat_or]
 
 -- dt: could just hardcode "and" also, would be nice to avoid that
 

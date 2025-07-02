@@ -116,7 +116,7 @@ lemma op_a_zero_or_op_a_write_values_word_eq_zero_of_constraints
   have h1 := op_a_zero_or_op_a_write_values_eq_zero_of_constraints₁ h
   rw [or_iff_not_imp_left]
   intro h
-  simp_all [h]
+  simp_all
 
 /-- `.assertZero E54` NOTE: this one seems strange, should rephrase probably -/
 lemma is_real_sub_imm_c

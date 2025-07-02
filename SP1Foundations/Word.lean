@@ -115,7 +115,7 @@ lemma toNat_add_toNat (a b : Word (BabyBear)) :
 
 theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
   w[0].val + w[1].val * 65536 := by
-  simp [toFin32_U16, base]
+  simp [toFin32_U16]
 
 def isUInt32 (w : Word (BabyBear)) : Prop :=
   w[0].val < base ∧ w[1].val < base
