@@ -149,7 +149,7 @@ theorem decompose_ofU16_inverse (bv : BitVec 32) :
     bv = BitVec.ofU16 a b := by
   unfold decompose BitVec.ofU16
   apply BitVec.eq_of_toNat_eq
-  simp [BitVec.toNat_ofNat]
+  simp only [toNat_ofNatLT]
   omega
 
 end BitVec

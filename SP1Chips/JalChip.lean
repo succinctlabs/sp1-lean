@@ -59,14 +59,14 @@ def specJal (rd : regidx) (imm : BitVec 21) : StateM SP1State Unit := do
   let old_pc := (← get).1
   incrementPC
   update_reg rd (old_pc + 4#32)
-  set_pc (old_pc + imm)
+  setPC (old_pc + imm)
 
 -- TODO(gzgz): this should be auto-generate-able from our constraints.
 def sp1Jal (Main : Vector BabyBear 15) : StateM SP1State Unit := do
   let rd := regidx.Regidx Main[4].val
   let new_pc := BitVec.ofNat 32 (Main[10] + Main[11] * 65536)
   let old_pc := BitVec.ofNat 32 (Main[12] + Main[13] * 65536)
-  if Main[14] = 1 then set_pc new_pc
+  if Main[14] = 1 then setPC new_pc
   if Main[14] = 1 then update_reg rd old_pc
 
 theorem SP1JAL_correct (Main : Vector BabyBear 15)

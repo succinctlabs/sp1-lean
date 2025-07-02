@@ -256,7 +256,7 @@ def physaddrbits_zero_extend (xs : (BitVec 34)) : (BitVec 64) :=
   (zero_extend (m := 64) xs)
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
-def write_ram (wk : write_kind) (app_1 : physaddr) (width : Nat) (data : (BitVec (8 * width))) (meta : Unit) : SailM Bool := do
+def write_ram (wk : write_kind) (app_1 : physaddr) (width : Nat) (data : (BitVec (8 * width))) (meta_ : Unit) : SailM Bool := do
   let .Physaddr addr := app_1
   let request : (Mem_write_request width 64 physaddrbits Unit RISCV_strong_access) :=
     { access_kind := match wk with
@@ -286,7 +286,7 @@ def write_ram (wk : write_kind) (app_1 : physaddr) (width : Nat) (data : (BitVec
       tag := none }
   match (← (sail_mem_write request)) with
   | .Ok _ =>
-    (let _ : Unit := (__WriteRAM_Meta addr width meta)
+    (let _ : Unit := (__WriteRAM_Meta addr width meta_)
     (pure true))
   | .Err () => (pure false)
 
@@ -298,7 +298,7 @@ def write_ram_ea (wk : write_kind) (app_1 : physaddr) (width : Nat) : Unit :=
 /-- Type quantifiers: k_ex370025# : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def read_ram (rk : read_kind) (app_1 : physaddr) (width : Nat) (read_meta : Bool) : SailM ((BitVec (8 * width)) × Unit) := do
   let .Physaddr addr := app_1
-  let meta :=
+  let meta_ :=
     bif read_meta
     then (__ReadRAM_Meta addr width)
     else default_meta
@@ -329,6 +329,5 @@ def read_ram (rk : read_kind) (app_1 : physaddr) (width : Nat) (read_meta : Bool
       size := width
       tag := false }
   match (← (sail_mem_read request)) with
-  | .Ok (value, _) => (pure (value, meta))
+  | .Ok (value, _) => (pure (value, meta_))
   | .Err () => throw Error.Exit
-

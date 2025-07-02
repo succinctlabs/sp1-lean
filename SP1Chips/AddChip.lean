@@ -74,7 +74,7 @@ def specAdd (rs2 rs1 rd : regidx) : StateM SP1State Unit := do
 
 -- TODO(gzgz): this should be auto-generate-able from our constraints.
 def sp1Add (Main : Vector BabyBear 23) : StateM SP1State Unit := do
-  set_pc (Main[3].val + 4) -- dt: This should actually be coming from `CPUState.constraints` send
+  setPC (Main[3].val + 4) -- dt: This should actually be coming from `CPUState.constraints` send
   let op_a := regidx.Regidx Main[4].val
   update_reg op_a (BitVec.ofNat 32 (↑Main[20] + ↑Main[21] * 65536))
 

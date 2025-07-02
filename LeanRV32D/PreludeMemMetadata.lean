@@ -171,10 +171,9 @@ open AccessType
 def default_meta : mem_meta := ()
 
 /-- Type quantifiers: width : Nat, 1 ≤ width ∧ width ≤ 4096 -/
-def __WriteRAM_Meta (addr : (BitVec 34)) (width : Nat) (meta : Unit) : Unit :=
+def __WriteRAM_Meta (addr : (BitVec 34)) (width : Nat) (meta_ : Unit) : Unit :=
   ()
 
 /-- Type quantifiers: width : Nat, 1 ≤ width ∧ width ≤ 4096 -/
 def __ReadRAM_Meta (addr : (BitVec 34)) (width : Nat) : Unit :=
   default_meta
-
