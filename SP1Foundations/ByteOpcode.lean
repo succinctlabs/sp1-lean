@@ -114,10 +114,18 @@ def toBitwise (op : ByteOpcode) : BabyBear → BabyBear → BabyBear :=
 @[simp] lemma toBitwise_xor (x y : BabyBear) :
     toBitwise XOR x y = x ^^^ y := rfl
 
+lemma and_add_and_mul (x_low x_high y_low y_high : BabyBear)
+    (hx : x_low < 256) (hy : y_low < 256) :
+    (x_low &&& y_low) + (x_high &&& y_high) * 256 =
+      (x_low + x_high * 256) &&& (y_low + y_high * 256) := by
+  sorry
+  -- simp
+
 lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_high : BabyBear)
     (hx : x_low < 256) (hy : y_low < 256) :
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 256 =
       op.toBitwise (x_low + x_high * 256) (y_low + y_high * 256) := by
+
   sorry
 
 end toBitwise

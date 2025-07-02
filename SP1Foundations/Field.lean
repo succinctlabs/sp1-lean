@@ -104,34 +104,34 @@ lemma inv_16BB_eq' : (2013235201 : BabyBear) = 65536⁻¹ := by native_decide
 
 -- dt: below should be handled more systematically like above
 
-section base
+-- section base
 
--- TODO(gzgz): base should be some constant
-abbrev base : BabyBear := 65536 -- 2^16
-abbrev baseInv : BabyBear := 2013235201 -- 2^-16
+-- -- TODO(gzgz): base should be some constant
+-- abbrev base : BabyBear := 65536 -- 2^16
+-- abbrev baseInv : BabyBear := 2013235201 -- 2^-16
 
-@[simp] lemma val_base : (base : ℕ) = 65536 := rfl
-@[simp] lemma val_baseInv : (baseInv : ℕ) = 2013235201 := rfl
+-- @[simp] lemma val_base : (base : ℕ) = 65536 := rfl
+-- @[simp] lemma val_baseInv : (baseInv : ℕ) = 2013235201 := rfl
 
-@[simp] lemma baseInv_mul_base : (baseInv : BabyBear) * (base : BabyBear) = 1 := rfl
-@[simp] lemma base_mul_baseInv : (base : BabyBear) * (baseInv : BabyBear) = 1 := rfl
+-- @[simp] lemma baseInv_mul_base : (baseInv : BabyBear) * (base : BabyBear) = 1 := rfl
+-- @[simp] lemma base_mul_baseInv : (base : BabyBear) * (baseInv : BabyBear) = 1 := rfl
 
-@[simp] lemma base_ne_zero : (base : BabyBear) ≠ 0 := by simp [base]
-@[simp] lemma baseInv_ne_zero : (baseInv : BabyBear) ≠ 0 := by simp [baseInv]
+-- @[simp] lemma base_ne_zero : (base : BabyBear) ≠ 0 := by simp [base]
+-- @[simp] lemma baseInv_ne_zero : (baseInv : BabyBear) ≠ 0 := by simp [baseInv]
 
-lemma baseInv_eq_inv_base : baseInv = base⁻¹ := by
-  rw [inv_eq_one_div, eq_div_iff] <;> simp
+-- lemma baseInv_eq_inv_base : baseInv = base⁻¹ := by
+--   rw [inv_eq_one_div, eq_div_iff] <;> simp
 
-lemma base_eq_inv_baseInv : base = baseInv⁻¹ := by
-  rw [baseInv_eq_inv_base, inv_inv]
+-- lemma base_eq_inv_baseInv : base = baseInv⁻¹ := by
+--   rw [baseInv_eq_inv_base, inv_inv]
 
-@[simp] lemma mul_baseInv_eq_one_iff (x : BabyBear) : x * baseInv = 1 ↔ x = base := by
-  rw [baseInv_eq_inv_base, mul_inv_eq_one₀ base_ne_zero]
+-- @[simp] lemma mul_baseInv_eq_one_iff (x : BabyBear) : x * baseInv = 1 ↔ x = base := by
+--   rw [baseInv_eq_inv_base, mul_inv_eq_one₀ base_ne_zero]
 
-@[simp] lemma baseInv_mul_eq_one_iff (x : BabyBear) : baseInv * x = 1 ↔ x = base := by
-  rw [mul_comm, mul_baseInv_eq_one_iff]
+-- @[simp] lemma baseInv_mul_eq_one_iff (x : BabyBear) : baseInv * x = 1 ↔ x = base := by
+--   rw [mul_comm, mul_baseInv_eq_one_iff]
 
-end base
+-- end base
 
 section u3_base
 

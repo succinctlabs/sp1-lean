@@ -42,8 +42,8 @@ def constraintsProp
   (is_real : BabyBear)
   : Prop :=
   let carry0  : BabyBear := 0
-  let carry1  : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * (baseInv : BabyBear)
-  let carry2  : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * (baseInv : BabyBear)
+  let carry1  : BabyBear := (a[0] + b[0] - cols.value[0] + carry0) * 65536⁻¹
+  let carry2  : BabyBear := (a[1] + b[1] - cols.value[1] + carry1) * 65536⁻¹
   is_real = 0 ∨ (
     is_real = 1 ∧
     (carry1 = 0 ∨ carry1 = 1) ∧
@@ -60,7 +60,8 @@ def constraints_iff_constraintsProp
   : (constraints a b cols is_real).allHold ↔ constraintsProp a b cols is_real := by
   by_cases h : is_real = 0
   · simp [constraints, constraintsProp, h]
-  · by_cases h' : is_real = 1 <;> simp [constraints, constraintsProp, h, h', sub_eq_zero]
+  · by_cases h' : is_real = 1 <;>
+      simp [constraints, constraintsProp, h, h', sub_eq_zero, ← inv_16BB_eq']
 
 -- Note that `a`, `b` are in U16 because that's part of our assumption.
 -- `AddOperation` should only be used when `a`, `b` are U16s, which is
@@ -80,7 +81,7 @@ theorem correct
     (constraints a b cols is_real).allHold →
     spec a b cols is_real := by
       rw [constraints_iff_constraintsProp a b cols is_real]
-      simp [constraintsProp, spec]
+      simp [constraintsProp, spec, ← inv_16BB_eq']
       intro q1
 
       intro h_is_real

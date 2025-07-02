@@ -96,20 +96,20 @@ def toFin32_U16 (w : Word U16) : Fin (2^32) :=
     omega⟩
 
 def toBV32 (w : Word BabyBear) : BitVec BIT_WIDTH :=
-  BitVec.ofNat BIT_WIDTH (w[0].val + w[1].val * base)
+  BitVec.ofNat BIT_WIDTH (w[0].val + w[1].val * 65536)
 
 def toBV32_U16 (w : Word U16) : BitVec BIT_WIDTH :=
-  BitVec.ofNatLT (w[0].val + w[1].val * base) (by
+  BitVec.ofNatLT (w[0].val + w[1].val * 65536) (by
     have _ := w[0].in_range
     have _ := w[1].in_range
     simp at *
     omega)
 
 @[reducible] def toNat (w : Word (BabyBear)) : ℕ :=
-  w[0].val + base * w[1].val
+  w[0].val + 65536 * w[1].val
 
 lemma toNat_add_toNat (a b : Word (BabyBear)) :
-    a.toNat + b.toNat = (a[0] + b[0]) + base * (a[1] + b[1]) := by
+    a.toNat + b.toNat = (a[0] + b[0]) + 65536 * (a[1] + b[1]) := by
   simp [Word.toNat]
   omega
 
@@ -118,7 +118,7 @@ theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
   simp [toFin32_U16]
 
 def isUInt32 (w : Word (BabyBear)) : Prop :=
-  w[0].val < base ∧ w[1].val < base
+  w[0].val < 65536 ∧ w[1].val < 65536
 
 /-- Coerce a `Word A` to `Word B` when there's a coercion from `A` to `B`. -/
 instance coe [Coe A B] : Coe (Word A) (Word B) where

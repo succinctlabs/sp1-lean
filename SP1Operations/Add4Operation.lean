@@ -32,8 +32,8 @@ def Add4Operation.constraints'
     (d : Word U16)
     (is_real : U1): Prop :=
     let carry0 : BabyBear := 0
-    let carry1 : BabyBear := (a[0].val + b[0].val + cc[0].val + d[0].val - cols.value[0].val + carry0) * baseInv
-    let carry2 : BabyBear := (a[1].val + b[1].val + cc[1].val + d[1] - cols.value[1].val + carry1) * baseInv
+    let carry1 : BabyBear := (a[0].val + b[0].val + cc[0].val + d[0].val - cols.value[0].val + carry0) * 65536⁻¹
+    let carry2 : BabyBear := (a[1].val + b[1].val + cc[1].val + d[1] - cols.value[1].val + carry1) * 65536⁻¹
     (is_real = 1 → carry1 < 256)
     ∧ (is_real = 1 → carry2 < 256)
 
