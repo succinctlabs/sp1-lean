@@ -1,3 +1,17 @@
+import LeanRV32D.Prelude
+import LeanRV32D.Common
+import LeanRV32D.RiscvTypes
+import LeanRV32D.RiscvPcAccess
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvExtRegs
+import LeanRV32D.RiscvAddrChecks
+import LeanRV32D.RiscvSysExceptions
+import LeanRV32D.RiscvSysControl
+import LeanRV32D.RiscvPlatform
+import LeanRV32D.RiscvInstsEnd
+import LeanRV32D.RiscvStepCommon
+import LeanRV32D.RiscvStepExt
+import LeanRV32D.RiscvDecodeExt
 import LeanRV32D.RiscvFetch
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +25,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +38,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +66,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +168,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,7 +181,7 @@ open ExceptionType
 open Architecture
 open AccessType
 
-/-- Type quantifiers: k_ex435126# : Bool, step_no : Int -/
+/-- Type quantifiers: k_ex433711# : Bool, step_no : Int -/
 def run_hart_waiting (step_no : Int) (wr : WaitReason) (instbits : (BitVec 32)) (exit_wait : Bool) : SailM Step := do
   bif (← (shouldWakeForInterrupt ()))
   then
@@ -317,7 +330,7 @@ def wait_is_nop (wr : WaitReason) : Bool :=
   | WAIT_WRS_STO => false
   | WAIT_WRS_NTO => false
 
-/-- Type quantifiers: k_ex435163# : Bool, step_no : Nat, 0 ≤ step_no -/
+/-- Type quantifiers: k_ex433748# : Bool, step_no : Nat, 0 ≤ step_no -/
 def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
   let _ : Unit := (ext_pre_step_hook ())
   writeReg minstret_increment (← (should_inc_minstret (← readReg cur_privilege)))
@@ -361,7 +374,7 @@ def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
   | .Step_Execute (.Ext_DataAddr_Check_Failure e, _) => (pure (ext_handle_data_check_error e))
   | .Step_Execute (.Ext_XRET_Priv_Failure (), _) => (pure (ext_fail_xret_priv ()))
   match (← readReg hart_state) with
-  | .HART_WAITING _ => (pure false)
+  | .HART_WAITING _ => (pure true)
   | .HART_ACTIVE () =>
     (do
       (tick_pc ())
@@ -382,7 +395,7 @@ def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
           (zero_extend (m := 64) (← (get_arch_pc ()))))
       else (pure ())
       let _ : Unit := (ext_post_step_hook ())
-      (pure true))
+      (pure false))
 
 def loop (_ : Unit) : SailM Unit := do
   let i : Nat := 0
@@ -427,14 +440,4 @@ def loop (_ : Unit) : SailM Unit := do
         (pure (i, step_no))
     (pure loop_vars) ) : SailM (Nat × Nat) )
   (pure ())
-
-def reset (_ : Unit) : SailM Unit := do
-  (reset_sys ())
-  (reset_vmem ())
-  (pure (ext_reset ()))
-
-def init_model (_ : Unit) : SailM Unit := do
-  writeReg hart_state (HART_ACTIVE ())
-  (init_platform ())
-  (reset ())
 

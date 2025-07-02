@@ -1,3 +1,11 @@
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvFlen
+import LeanRV32D.RiscvVextRegs
+import LeanRV32D.RiscvSoftfloatInterface
+import LeanRV32D.RiscvFdextRegs
+import LeanRV32D.RiscvInstsFext
+import LeanRV32D.RiscvInstsDext
+import LeanRV32D.RiscvInstsZfh
 import LeanRV32D.RiscvInstsVextUtils
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +19,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +32,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +60,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +162,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -204,84 +211,84 @@ def illegal_fp_reduction_widen (SEW : Nat) (rm_3b : (BitVec 3)) (SEW_widen : Int
   (pure ((not (← (valid_vtype ()))) || ((not (← (assert_vstart 0))) || ((not
             (valid_fp_op SEW rm_3b)) || (not (valid_eew_emul SEW_widen LMUL_pow_widen))))))
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_neg_inf (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_neg_inf_H xf)
   | 32 => (f_is_neg_inf_S xf)
   | _ => (f_is_neg_inf_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_neg_norm (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_neg_norm_H xf)
   | 32 => (f_is_neg_norm_S xf)
   | _ => (f_is_neg_norm_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_neg_subnorm (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_neg_subnorm_H xf)
   | 32 => (f_is_neg_subnorm_S xf)
   | _ => (f_is_neg_subnorm_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_neg_zero (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_neg_zero_H xf)
   | 32 => (f_is_neg_zero_S xf)
   | _ => (f_is_neg_zero_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_pos_zero (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_pos_zero_H xf)
   | 32 => (f_is_pos_zero_S xf)
   | _ => (f_is_pos_zero_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_pos_subnorm (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_pos_subnorm_H xf)
   | 32 => (f_is_pos_subnorm_S xf)
   | _ => (f_is_pos_subnorm_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_pos_norm (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_pos_norm_H xf)
   | 32 => (f_is_pos_norm_S xf)
   | _ => (f_is_pos_norm_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_pos_inf (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_pos_inf_H xf)
   | 32 => (f_is_pos_inf_S xf)
   | _ => (f_is_pos_inf_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_SNaN (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_SNaN_H xf)
   | 32 => (f_is_SNaN_S xf)
   | _ => (f_is_SNaN_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_QNaN (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_QNaN_H xf)
   | 32 => (f_is_QNaN_S xf)
   | _ => (f_is_QNaN_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def f_is_NaN (xf : (BitVec k_m)) : Bool :=
   match (Sail.BitVec.length xf) with
   | 16 => (f_is_NaN_H xf)
   | 32 => (f_is_NaN_S xf)
   | _ => (f_is_NaN_D xf)
 
-/-- Type quantifiers: SEW : Nat, SEW ∈ {16, 32, 64} -/
+/-- Type quantifiers: SEW : Nat, SEW ≥ 0, SEW ∈ {16, 32, 64} -/
 def get_scalar_fp (rs1 : fregidx) (SEW : Nat) : SailM (BitVec SEW) := do
   assert (flen ≥b SEW) "invalid vector floating-point type width: FLEN < SEW"
   match SEW with
@@ -292,14 +299,14 @@ def get_scalar_fp (rs1 : fregidx) (SEW : Nat) : SailM (BitVec SEW) := do
 def get_fp_rounding_mode (_ : Unit) : SailM rounding_mode := do
   (encdec_rounding_mode_backwards (_get_Fcsr_FRM (← readReg fcsr)))
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def negate_fp (xf : (BitVec k_m)) : (BitVec k_m) :=
   match (Sail.BitVec.length xf) with
   | 16 => (negate_H xf)
   | 32 => (negate_S xf)
   | _ => (negate_D xf)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_add (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -309,7 +316,7 @@ def fp_add (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : Sail
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_sub (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -319,7 +326,7 @@ def fp_sub (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : Sail
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_min (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   let (fflags, op1_lt_op2) ← (( do
     match (Sail.BitVec.length op2) with
@@ -348,7 +355,7 @@ def fp_min (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_max (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   let (fflags, op1_lt_op2) ← (( do
     match (Sail.BitVec.length op2) with
@@ -377,7 +384,7 @@ def fp_max (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_eq (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -387,7 +394,7 @@ def fp_eq (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_gt (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   let (fflags, temp_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -401,7 +408,7 @@ def fp_gt (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_ge (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   let (fflags, temp_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -415,7 +422,7 @@ def fp_ge (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_lt (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -425,7 +432,7 @@ def fp_lt (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_le (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -435,7 +442,7 @@ def fp_le (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM Bool := do
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_mul (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -445,7 +452,7 @@ def fp_mul (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : Sail
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_div (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : SailM (BitVec k_m) := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length op2) with
@@ -455,7 +462,7 @@ def fp_div (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) : Sail
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_muladd (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (opadd : (BitVec k_m)) : SailM (BitVec k_m) := do
   let (fflags, result_val) ← (( do
     match (Sail.BitVec.length opadd) with
@@ -465,7 +472,7 @@ def fp_muladd (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (op
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_nmuladd (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (opadd : (BitVec k_m)) : SailM (BitVec k_m) := do
   let op1 := (negate_fp op1)
   let (fflags, result_val) ← (( do
@@ -476,7 +483,7 @@ def fp_nmuladd (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (o
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_mulsub (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (opsub : (BitVec k_m)) : SailM (BitVec k_m) := do
   let opsub := (negate_fp opsub)
   let (fflags, result_val) ← (( do
@@ -487,7 +494,7 @@ def fp_mulsub (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (op
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_nmulsub (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (opsub : (BitVec k_m)) : SailM (BitVec k_m) := do
   let opsub := (negate_fp opsub)
   let op1 := (negate_fp op1)
@@ -499,7 +506,7 @@ def fp_nmulsub (rm_3b : (BitVec 3)) (op1 : (BitVec k_m)) (op2 : (BitVec k_m)) (o
   (accrue_fflags fflags)
   (pure result_val)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def fp_class (xf : (BitVec k_m)) : (BitVec k_m) :=
   let result_val_10b : (BitVec 10) :=
     bif (f_is_neg_inf xf)
@@ -534,7 +541,7 @@ def fp_class (xf : (BitVec k_m)) : (BitVec k_m) :=
                       else (zeros (n := 10)))))))))))
   (zero_extend (m := (Sail.BitVec.length xf)) result_val_10b)
 
-/-- Type quantifiers: k_m : Nat, k_m ∈ {16, 32} -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32} -/
 def fp_widen (nval : (BitVec k_m)) : SailM (BitVec (k_m * 2)) := do
   let rm_3b ← do (pure (_get_Fcsr_FRM (← readReg fcsr)))
   let (fflags, wval) ← (( do
@@ -545,53 +552,53 @@ def fp_widen (nval : (BitVec k_m)) : SailM (BitVec (k_m * 2)) := do
   (pure wval)
 
 def riscv_f16ToI16 (rm : (BitVec 3)) (v : (BitVec 16)) : SailM ((BitVec 5) × (BitVec 16)) := do
-  let (_, sig32) ← do (riscv_f16ToI32 rm v)
+  let (flag, sig32) ← do (riscv_f16ToI32 rm v)
   bif ((BitVec.toInt sig32) >b (BitVec.toInt ((0b0 : (BitVec 1)) ++ (ones (n := 15)))))
   then (pure ((nvFlag ()), ((0b0 : (BitVec 1)) ++ (ones (n := 15)))))
   else
     (bif ((BitVec.toInt sig32) <b (BitVec.toInt ((0b1 : (BitVec 1)) ++ (zeros (n := 15)))))
     then (pure ((nvFlag ()), ((0b1 : (BitVec 1)) ++ (zeros (n := 15)))))
-    else (pure ((zeros (n := 5)), (Sail.BitVec.extractLsb sig32 15 0))))
+    else (pure (flag, (Sail.BitVec.extractLsb sig32 15 0))))
 
 def riscv_f16ToI8 (rm : (BitVec 3)) (v : (BitVec 16)) : SailM ((BitVec 5) × (BitVec 8)) := do
-  let (_, sig32) ← do (riscv_f16ToI32 rm v)
+  let (flag, sig32) ← do (riscv_f16ToI32 rm v)
   bif ((BitVec.toInt sig32) >b (BitVec.toInt ((0b0 : (BitVec 1)) ++ (ones (n := 7)))))
   then (pure ((nvFlag ()), ((0b0 : (BitVec 1)) ++ (ones (n := 7)))))
   else
     (bif ((BitVec.toInt sig32) <b (BitVec.toInt ((0b1 : (BitVec 1)) ++ (zeros (n := 7)))))
     then (pure ((nvFlag ()), ((0b1 : (BitVec 1)) ++ (zeros (n := 7)))))
-    else (pure ((zeros (n := 5)), (Sail.BitVec.extractLsb sig32 7 0))))
+    else (pure (flag, (Sail.BitVec.extractLsb sig32 7 0))))
 
 def riscv_f32ToI16 (rm : (BitVec 3)) (v : (BitVec 32)) : SailM ((BitVec 5) × (BitVec 16)) := do
-  let (_, sig32) ← do (riscv_f32ToI32 rm v)
+  let (flag, sig32) ← do (riscv_f32ToI32 rm v)
   bif ((BitVec.toInt sig32) >b (BitVec.toInt ((0b0 : (BitVec 1)) ++ (ones (n := 15)))))
   then (pure ((nvFlag ()), ((0b0 : (BitVec 1)) ++ (ones (n := 15)))))
   else
     (bif ((BitVec.toInt sig32) <b (BitVec.toInt ((0b1 : (BitVec 1)) ++ (zeros (n := 15)))))
     then (pure ((nvFlag ()), ((0b1 : (BitVec 1)) ++ (zeros (n := 15)))))
-    else (pure ((zeros (n := 5)), (Sail.BitVec.extractLsb sig32 15 0))))
+    else (pure (flag, (Sail.BitVec.extractLsb sig32 15 0))))
 
 def riscv_f16ToUi16 (rm : (BitVec 3)) (v : (BitVec 16)) : SailM ((BitVec 5) × (BitVec 16)) := do
-  let (_, sig32) ← do (riscv_f16ToUi32 rm v)
+  let (flag, sig32) ← do (riscv_f16ToUi32 rm v)
   bif ((BitVec.toNat sig32) >b (BitVec.toNat (ones (n := 16))))
   then (pure ((nvFlag ()), (ones (n := 16))))
-  else (pure ((zeros (n := 5)), (Sail.BitVec.extractLsb sig32 15 0)))
+  else (pure (flag, (Sail.BitVec.extractLsb sig32 15 0)))
 
 def riscv_f16ToUi8 (rm : (BitVec 3)) (v : (BitVec 16)) : SailM ((BitVec 5) × (BitVec 8)) := do
-  let (_, sig32) ← do (riscv_f16ToUi32 rm v)
+  let (flag, sig32) ← do (riscv_f16ToUi32 rm v)
   bif ((BitVec.toNat sig32) >b (BitVec.toNat (ones (n := 8))))
   then (pure ((nvFlag ()), (ones (n := 8))))
-  else (pure ((zeros (n := 5)), (Sail.BitVec.extractLsb sig32 7 0)))
+  else (pure (flag, (Sail.BitVec.extractLsb sig32 7 0)))
 
 def riscv_f32ToUi16 (rm : (BitVec 3)) (v : (BitVec 32)) : SailM ((BitVec 5) × (BitVec 16)) := do
-  let (_, sig32) ← do (riscv_f32ToUi32 rm v)
+  let (flag, sig32) ← do (riscv_f32ToUi32 rm v)
   bif ((BitVec.toNat sig32) >b (BitVec.toNat (ones (n := 16))))
   then (pure ((nvFlag ()), (ones (n := 16))))
-  else (pure ((zeros (n := 5)), (Sail.BitVec.extractLsb sig32 15 0)))
+  else (pure (flag, (Sail.BitVec.extractLsb sig32 15 0)))
 
-/-- Type quantifiers: k_ex380735# : Bool, k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_ex379989# : Bool, k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def rsqrt7 (v : (BitVec k_m)) (sub : Bool) : SailM (BitVec 64) := do
-  let (sig, exp, sign, e, s) : ((BitVec 64) × (BitVec 64) × (BitVec 1) × Nat × Nat) :=
+  let (sig, exp, sign, e, s) : ((BitVec 64) × (BitVec 64) × (BitVec 1) × Int × Int) :=
     match (Sail.BitVec.length v) with
     | 16 =>
       ((zero_extend (m := 64) (Sail.BitVec.extractLsb v 9 0)), (zero_extend (m := 64)
@@ -602,7 +609,6 @@ def rsqrt7 (v : (BitVec k_m)) (sub : Bool) : SailM (BitVec 64) := do
     | _ =>
       ((zero_extend (m := 64) (Sail.BitVec.extractLsb v 51 0)), (zero_extend (m := 64)
         (Sail.BitVec.extractLsb v 62 52)), (BitVec.join1 [(BitVec.access v 63)]), 11, 52)
-  assert (((s == 10) && (e == 5)) || (((s == 23) && (e == 8)) || ((s == 52) && (e == 11)))) "riscv_insts_vext_fp_utils.sail:458.64-458.65"
   let table : (Vector Int 128) :=
     #v[53, 54, 55, 56, 56, 57, 58, 59, 59, 60, 61, 62, 63, 63, 64, 65, 66, 67, 68, 69, 70, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 82, 83, 84, 85, 86, 87, 88, 90, 91, 92, 93, 95, 96, 97, 99, 100, 102, 103, 105, 106, 108, 109, 111, 113, 114, 116, 118, 119, 121, 123, 125, 127, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 7, 8, 9, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 16, 16, 17, 18, 19, 19, 20, 21, 22, 23, 23, 24, 25, 26, 27, 28, 29, 30, 30, 31, 32, 33, 34, 35, 36, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 50, 51, 52]
   let (normalized_exp, normalized_sig) ← do
@@ -610,7 +616,7 @@ def rsqrt7 (v : (BitVec k_m)) (sub : Bool) : SailM (BitVec 64) := do
     then
       (do
         let nr_leadingzeros := (BitVec.countLeadingZeros (Sail.BitVec.extractLsb sig (s -i 1) 0))
-        assert (nr_leadingzeros ≥b 0) "riscv_insts_vext_fp_utils.sail:480.35-480.36"
+        assert (nr_leadingzeros ≥b 0) "riscv_insts_vext_fp_utils.sail:479.35-479.36"
         (pure ((to_bits_unsafe (l := 64) (0 -i nr_leadingzeros)), (zero_extend (m := 64)
             (shiftl (Sail.BitVec.extractLsb sig (s -i 1) 0) (1 +i nr_leadingzeros))))))
     else (pure (exp, sig))
@@ -628,7 +634,7 @@ def rsqrt7 (v : (BitVec k_m)) (sub : Bool) : SailM (BitVec 64) := do
       (BitVec.toNat
         ((BitVec.join1 [(BitVec.access normalized_exp 0)]) ++ (Sail.BitVec.extractLsb normalized_sig
             51 46)))
-  assert ((idx ≥b 0) && (idx <b 128)) "riscv_insts_vext_fp_utils.sail:491.29-491.30"
+  assert ((idx ≥b 0) && (idx <b 128)) "riscv_insts_vext_fp_utils.sail:490.29-490.30"
   let out_sig := (shiftl (to_bits_unsafe (l := s) (GetElem?.getElem! table (127 -i idx))) (s -i 7))
   let out_exp :=
     (to_bits_unsafe (l := e)
@@ -761,7 +767,7 @@ def riscv_f64Rsqrte7 (rm : (BitVec 3)) (v : (BitVec 64)) : SailM ((BitVec 5) × 
                                     (pure ((zeros (n := 5)), (Sail.BitVec.extractLsb
                                         (← (rsqrt7 v false)) 63 0)))))))))))
 
-/-- Type quantifiers: k_ex380971# : Bool, k_m : Nat, k_m ∈ {16, 32, 64} -/
+/-- Type quantifiers: k_ex380225# : Bool, k_m : Nat, k_m ≥ 0, k_m ∈ {16, 32, 64} -/
 def recip7 (v : (BitVec k_m)) (rm_3b : (BitVec 3)) (sub : Bool) : SailM (Bool × (BitVec 64)) := do
   let (sig, exp, sign, e, s) : ((BitVec 64) × (BitVec 64) × (BitVec 1) × Int × Int) :=
     match (Sail.BitVec.length v) with
@@ -777,7 +783,7 @@ def recip7 (v : (BitVec k_m)) (rm_3b : (BitVec 3)) (sub : Bool) : SailM (Bool ×
   let table : (Vector Int 128) :=
     #v[0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 9, 10, 11, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 17, 18, 19, 19, 20, 21, 21, 22, 23, 23, 24, 25, 25, 26, 27, 28, 28, 29, 30, 31, 31, 32, 33, 34, 35, 35, 36, 37, 38, 39, 40, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 68, 69, 70, 71, 72, 74, 75, 76, 77, 79, 80, 81, 83, 84, 85, 87, 88, 90, 91, 93, 94, 96, 97, 99, 100, 102, 104, 105, 107, 109, 110, 112, 114, 116, 117, 119, 121, 123, 125, 127]
   let nr_leadingzeros := (BitVec.countLeadingZeros (Sail.BitVec.extractLsb sig (s -i 1) 0))
-  assert (nr_leadingzeros ≥b 0) "riscv_insts_vext_fp_utils.sail:571.29-571.30"
+  assert (nr_leadingzeros ≥b 0) "riscv_insts_vext_fp_utils.sail:570.29-570.30"
   let (normalized_exp, normalized_sig) :=
     bif sub
     then
@@ -789,7 +795,7 @@ def recip7 (v : (BitVec k_m)) (rm_3b : (BitVec 3)) (sub : Bool) : SailM (Bool ×
     | 16 => (BitVec.toNat (Sail.BitVec.extractLsb normalized_sig 9 3))
     | 32 => (BitVec.toNat (Sail.BitVec.extractLsb normalized_sig 22 16))
     | _ => (BitVec.toNat (Sail.BitVec.extractLsb normalized_sig 51 45))
-  assert ((idx ≥b 0) && (idx <b 128)) "riscv_insts_vext_fp_utils.sail:584.29-584.30"
+  assert ((idx ≥b 0) && (idx <b 128)) "riscv_insts_vext_fp_utils.sail:583.29-583.30"
   let mid_exp :=
     (to_bits_unsafe (l := e) (((2 *i ((2 ^i (e -i 1)) -i 1)) -i 1) -i (BitVec.toInt normalized_exp)))
   let mid_sig := (shiftl (to_bits_unsafe (l := s) (GetElem?.getElem! table (127 -i idx))) (s -i 7))

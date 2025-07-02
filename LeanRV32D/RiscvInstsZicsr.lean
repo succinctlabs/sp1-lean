@@ -1,4 +1,22 @@
-import LeanRV32D.RiscvInstsMext
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvErrors
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvTypes
+import LeanRV32D.RiscvCallbacks
+import LeanRV32D.RiscvRegs
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvPmpRegs
+import LeanRV32D.RiscvExtRegs
+import LeanRV32D.RiscvVextRegs
+import LeanRV32D.RiscvVextControl
+import LeanRV32D.RiscvSysExceptions
+import LeanRV32D.RiscvZihpm
+import LeanRV32D.RiscvSscofpmf
+import LeanRV32D.RiscvZkrControl
+import LeanRV32D.RiscvFdextRegs
+import LeanRV32D.RiscvSmcntrpmf
+import LeanRV32D.RiscvSysControl
+import LeanRV32D.RiscvInstRetire
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +29,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +42,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +70,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +172,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -209,7 +226,7 @@ def encdec_csrop_backwards_matches (arg_ : (BitVec 2)) : Bool :=
       then true
       else false))
 
-def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
+def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec 32) := do
   bif (b__0 == (0x301 : (BitVec 12)))
   then readReg misa
   else
@@ -222,186 +239,164 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
           then (pure (Sail.BitVec.extractLsb (← readReg mstatus) 63 32))
           else
             (do
-              bif (b__0 == (0x30A : (BitVec 12)))
-              then (pure (Sail.BitVec.extractLsb (← readReg menvcfg) (xlen -i 1) 0))
+              bif (b__0 == (0x747 : (BitVec 12)))
+              then (pure (Sail.BitVec.extractLsb (← readReg mseccfg) (xlen -i 1) 0))
               else
                 (do
-                  bif ((b__0 == (0x31A : (BitVec 12))) && (xlen == 32))
-                  then (pure (Sail.BitVec.extractLsb (← readReg menvcfg) 63 32))
+                  bif ((b__0 == (0x757 : (BitVec 12))) && (xlen == 32))
+                  then (pure (Sail.BitVec.extractLsb (← readReg mseccfg) 63 32))
                   else
                     (do
-                      bif (b__0 == (0x10A : (BitVec 12)))
-                      then (pure (Sail.BitVec.extractLsb (← readReg senvcfg) (xlen -i 1) 0))
+                      bif (b__0 == (0x30A : (BitVec 12)))
+                      then (pure (Sail.BitVec.extractLsb (← readReg menvcfg) (xlen -i 1) 0))
                       else
                         (do
-                          bif (b__0 == (0x304 : (BitVec 12)))
-                          then readReg mie
+                          bif ((b__0 == (0x31A : (BitVec 12))) && (xlen == 32))
+                          then (pure (Sail.BitVec.extractLsb (← readReg menvcfg) 63 32))
                           else
                             (do
-                              bif (b__0 == (0x344 : (BitVec 12)))
-                              then readReg mip
+                              bif (b__0 == (0x10A : (BitVec 12)))
+                              then
+                                (pure (Sail.BitVec.extractLsb (← readReg senvcfg) (xlen -i 1) 0))
                               else
                                 (do
-                                  bif (b__0 == (0x302 : (BitVec 12)))
-                                  then
-                                    (pure (Sail.BitVec.extractLsb (← readReg medeleg) (xlen -i 1)
-                                        0))
+                                  bif (b__0 == (0x304 : (BitVec 12)))
+                                  then readReg mie
                                   else
                                     (do
-                                      bif ((b__0 == (0x312 : (BitVec 12))) && (xlen == 32))
-                                      then
-                                        (pure (Sail.BitVec.extractLsb (← readReg medeleg) 63 32))
+                                      bif (b__0 == (0x344 : (BitVec 12)))
+                                      then readReg mip
                                       else
                                         (do
-                                          bif (b__0 == (0x303 : (BitVec 12)))
-                                          then readReg mideleg
+                                          bif (b__0 == (0x302 : (BitVec 12)))
+                                          then
+                                            (pure (Sail.BitVec.extractLsb (← readReg medeleg)
+                                                (xlen -i 1) 0))
                                           else
                                             (do
-                                              bif (b__0 == (0x342 : (BitVec 12)))
-                                              then readReg mcause
+                                              bif ((b__0 == (0x312 : (BitVec 12))) && (xlen == 32))
+                                              then
+                                                (pure (Sail.BitVec.extractLsb (← readReg medeleg)
+                                                    63 32))
                                               else
                                                 (do
-                                                  bif (b__0 == (0x343 : (BitVec 12)))
-                                                  then readReg mtval
+                                                  bif (b__0 == (0x303 : (BitVec 12)))
+                                                  then readReg mideleg
                                                   else
                                                     (do
-                                                      bif (b__0 == (0x340 : (BitVec 12)))
-                                                      then readReg mscratch
+                                                      bif (b__0 == (0x342 : (BitVec 12)))
+                                                      then readReg mcause
                                                       else
                                                         (do
-                                                          bif (b__0 == (0x106 : (BitVec 12)))
-                                                          then
-                                                            (pure (zero_extend
-                                                                (m := ((2 ^i 2) *i 8))
-                                                                (← readReg scounteren)))
+                                                          bif (b__0 == (0x343 : (BitVec 12)))
+                                                          then readReg mtval
                                                           else
                                                             (do
-                                                              bif (b__0 == (0x306 : (BitVec 12)))
-                                                              then
-                                                                (pure (zero_extend
-                                                                    (m := ((2 ^i 2) *i 8))
-                                                                    (← readReg mcounteren)))
+                                                              bif (b__0 == (0x340 : (BitVec 12)))
+                                                              then readReg mscratch
                                                               else
                                                                 (do
-                                                                  bif (b__0 == (0x320 : (BitVec 12)))
+                                                                  bif (b__0 == (0x106 : (BitVec 12)))
                                                                   then
-                                                                    (pure (zero_extend
-                                                                        (m := ((2 ^i 2) *i 8))
-                                                                        (← readReg mcountinhibit)))
+                                                                    (pure (zero_extend (m := 32)
+                                                                        (← readReg scounteren)))
                                                                   else
                                                                     (do
-                                                                      bif (b__0 == (0xF11 : (BitVec 12)))
+                                                                      bif (b__0 == (0x306 : (BitVec 12)))
                                                                       then
-                                                                        (pure (zero_extend
-                                                                            (m := ((2 ^i 2) *i 8))
-                                                                            (← readReg mvendorid)))
+                                                                        (pure (zero_extend (m := 32)
+                                                                            (← readReg mcounteren)))
                                                                       else
                                                                         (do
-                                                                          bif (b__0 == (0xF12 : (BitVec 12)))
-                                                                          then readReg marchid
+                                                                          bif (b__0 == (0x320 : (BitVec 12)))
+                                                                          then
+                                                                            (pure (zero_extend
+                                                                                (m := 32)
+                                                                                (← readReg mcountinhibit)))
                                                                           else
                                                                             (do
-                                                                              bif (b__0 == (0xF13 : (BitVec 12)))
-                                                                              then readReg mimpid
+                                                                              bif (b__0 == (0xF11 : (BitVec 12)))
+                                                                              then
+                                                                                (pure (zero_extend
+                                                                                    (m := 32)
+                                                                                    (← readReg mvendorid)))
                                                                               else
                                                                                 (do
-                                                                                  bif (b__0 == (0xF14 : (BitVec 12)))
+                                                                                  bif (b__0 == (0xF12 : (BitVec 12)))
                                                                                   then
-                                                                                    readReg mhartid
+                                                                                    readReg marchid
                                                                                   else
                                                                                     (do
-                                                                                      bif (b__0 == (0xF15 : (BitVec 12)))
+                                                                                      bif (b__0 == (0xF13 : (BitVec 12)))
                                                                                       then
-                                                                                        readReg mconfigptr
+                                                                                        readReg mimpid
                                                                                       else
                                                                                         (do
-                                                                                          bif (b__0 == (0x100 : (BitVec 12)))
+                                                                                          bif (b__0 == (0xF14 : (BitVec 12)))
                                                                                           then
-                                                                                            (pure (Sail.BitVec.extractLsb
-                                                                                                (lower_mstatus
-                                                                                                  (← readReg mstatus))
-                                                                                                (xlen -i 1)
-                                                                                                0))
+                                                                                            readReg mhartid
                                                                                           else
                                                                                             (do
-                                                                                              bif (b__0 == (0x144 : (BitVec 12)))
+                                                                                              bif (b__0 == (0xF15 : (BitVec 12)))
                                                                                               then
-                                                                                                (pure (lower_mip
-                                                                                                    (← readReg mip)
-                                                                                                    (← readReg mideleg)))
+                                                                                                readReg mconfigptr
                                                                                               else
                                                                                                 (do
-                                                                                                  bif (b__0 == (0x104 : (BitVec 12)))
+                                                                                                  bif (b__0 == (0x100 : (BitVec 12)))
                                                                                                   then
-                                                                                                    (pure (lower_mie
-                                                                                                        (← readReg mie)
-                                                                                                        (← readReg mideleg)))
+                                                                                                    (pure (Sail.BitVec.extractLsb
+                                                                                                        (lower_mstatus
+                                                                                                          (← readReg mstatus))
+                                                                                                        (xlen -i 1)
+                                                                                                        0))
                                                                                                   else
                                                                                                     (do
-                                                                                                      bif (b__0 == (0x140 : (BitVec 12)))
+                                                                                                      bif (b__0 == (0x144 : (BitVec 12)))
                                                                                                       then
-                                                                                                        readReg sscratch
+                                                                                                        (pure (lower_mip
+                                                                                                            (← readReg mip)
+                                                                                                            (← readReg mideleg)))
                                                                                                       else
                                                                                                         (do
-                                                                                                          bif (b__0 == (0x142 : (BitVec 12)))
+                                                                                                          bif (b__0 == (0x104 : (BitVec 12)))
                                                                                                           then
-                                                                                                            readReg scause
+                                                                                                            (pure (lower_mie
+                                                                                                                (← readReg mie)
+                                                                                                                (← readReg mideleg)))
                                                                                                           else
                                                                                                             (do
-                                                                                                              bif (b__0 == (0x143 : (BitVec 12)))
+                                                                                                              bif (b__0 == (0x140 : (BitVec 12)))
                                                                                                               then
-                                                                                                                readReg stval
+                                                                                                                readReg sscratch
                                                                                                               else
                                                                                                                 (do
-                                                                                                                  bif (b__0 == (0x7A0 : (BitVec 12)))
+                                                                                                                  bif (b__0 == (0x142 : (BitVec 12)))
                                                                                                                   then
-                                                                                                                    (pure (Complement.complement
-                                                                                                                        (← readReg tselect)))
+                                                                                                                    readReg scause
                                                                                                                   else
                                                                                                                     (do
-                                                                                                                      bif (((Sail.BitVec.extractLsb
-                                                                                                                               b__0
-                                                                                                                               11
-                                                                                                                               4) == (0x3A : (BitVec 8))) && (let idx : (BitVec 4) :=
-                                                                                                                             (Sail.BitVec.extractLsb
-                                                                                                                               b__0
-                                                                                                                               3
-                                                                                                                               0)
-                                                                                                                           (((BitVec.access
-                                                                                                                                 idx
-                                                                                                                                 0) == 0#1) || (xlen == 32))))
+                                                                                                                      bif (b__0 == (0x143 : (BitVec 12)))
                                                                                                                       then
-                                                                                                                        (do
-                                                                                                                          let idx : (BitVec 4) :=
-                                                                                                                            (Sail.BitVec.extractLsb
-                                                                                                                              b__0
-                                                                                                                              3
-                                                                                                                              0)
-                                                                                                                          (pmpReadCfgReg
-                                                                                                                            (BitVec.toNat
-                                                                                                                              idx)))
+                                                                                                                        readReg stval
                                                                                                                       else
                                                                                                                         (do
-                                                                                                                          bif ((Sail.BitVec.extractLsb
-                                                                                                                                 b__0
-                                                                                                                                 11
-                                                                                                                                 4) == (0x3B : (BitVec 8)))
+                                                                                                                          bif (b__0 == (0x7A0 : (BitVec 12)))
                                                                                                                           then
-                                                                                                                            (do
-                                                                                                                              let idx : (BitVec 4) :=
-                                                                                                                                (Sail.BitVec.extractLsb
-                                                                                                                                  b__0
-                                                                                                                                  3
-                                                                                                                                  0)
-                                                                                                                              (pmpReadAddrReg
-                                                                                                                                (BitVec.toNat
-                                                                                                                                  ((0b00 : (BitVec 2)) ++ idx))))
+                                                                                                                            (pure (Complement.complement
+                                                                                                                                (← readReg tselect)))
                                                                                                                           else
                                                                                                                             (do
-                                                                                                                              bif ((Sail.BitVec.extractLsb
-                                                                                                                                     b__0
-                                                                                                                                     11
-                                                                                                                                     4) == (0x3C : (BitVec 8)))
+                                                                                                                              bif (((Sail.BitVec.extractLsb
+                                                                                                                                       b__0
+                                                                                                                                       11
+                                                                                                                                       4) == (0x3A : (BitVec 8))) && (let idx : (BitVec 4) :=
+                                                                                                                                     (Sail.BitVec.extractLsb
+                                                                                                                                       b__0
+                                                                                                                                       3
+                                                                                                                                       0)
+                                                                                                                                   (((BitVec.access
+                                                                                                                                         idx
+                                                                                                                                         0) == 0#1) || (xlen == 32))))
                                                                                                                               then
                                                                                                                                 (do
                                                                                                                                   let idx : (BitVec 4) :=
@@ -409,15 +404,15 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                       b__0
                                                                                                                                       3
                                                                                                                                       0)
-                                                                                                                                  (pmpReadAddrReg
+                                                                                                                                  (pmpReadCfgReg
                                                                                                                                     (BitVec.toNat
-                                                                                                                                      ((0b01 : (BitVec 2)) ++ idx))))
+                                                                                                                                      idx)))
                                                                                                                               else
                                                                                                                                 (do
                                                                                                                                   bif ((Sail.BitVec.extractLsb
                                                                                                                                          b__0
                                                                                                                                          11
-                                                                                                                                         4) == (0x3D : (BitVec 8)))
+                                                                                                                                         4) == (0x3B : (BitVec 8)))
                                                                                                                                   then
                                                                                                                                     (do
                                                                                                                                       let idx : (BitVec 4) :=
@@ -427,13 +422,13 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                           0)
                                                                                                                                       (pmpReadAddrReg
                                                                                                                                         (BitVec.toNat
-                                                                                                                                          ((0b10 : (BitVec 2)) ++ idx))))
+                                                                                                                                          ((0b00 : (BitVec 2)) ++ idx))))
                                                                                                                                   else
                                                                                                                                     (do
                                                                                                                                       bif ((Sail.BitVec.extractLsb
                                                                                                                                              b__0
                                                                                                                                              11
-                                                                                                                                             4) == (0x3E : (BitVec 8)))
+                                                                                                                                             4) == (0x3C : (BitVec 8)))
                                                                                                                                       then
                                                                                                                                         (do
                                                                                                                                           let idx : (BitVec 4) :=
@@ -443,132 +438,118 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                               0)
                                                                                                                                           (pmpReadAddrReg
                                                                                                                                             (BitVec.toNat
-                                                                                                                                              ((0b11 : (BitVec 2)) ++ idx))))
+                                                                                                                                              ((0b01 : (BitVec 2)) ++ idx))))
                                                                                                                                       else
                                                                                                                                         (do
-                                                                                                                                          bif (b__0 == (0x008 : (BitVec 12)))
+                                                                                                                                          bif ((Sail.BitVec.extractLsb
+                                                                                                                                                 b__0
+                                                                                                                                                 11
+                                                                                                                                                 4) == (0x3D : (BitVec 8)))
                                                                                                                                           then
-                                                                                                                                            (pure (zero_extend
-                                                                                                                                                (m := ((2 ^i 2) *i 8))
-                                                                                                                                                (← readReg vstart)))
+                                                                                                                                            (do
+                                                                                                                                              let idx : (BitVec 4) :=
+                                                                                                                                                (Sail.BitVec.extractLsb
+                                                                                                                                                  b__0
+                                                                                                                                                  3
+                                                                                                                                                  0)
+                                                                                                                                              (pmpReadAddrReg
+                                                                                                                                                (BitVec.toNat
+                                                                                                                                                  ((0b10 : (BitVec 2)) ++ idx))))
                                                                                                                                           else
                                                                                                                                             (do
-                                                                                                                                              bif (b__0 == (0x009 : (BitVec 12)))
+                                                                                                                                              bif ((Sail.BitVec.extractLsb
+                                                                                                                                                     b__0
+                                                                                                                                                     11
+                                                                                                                                                     4) == (0x3E : (BitVec 8)))
                                                                                                                                               then
-                                                                                                                                                (pure (zero_extend
-                                                                                                                                                    (m := ((2 ^i 2) *i 8))
-                                                                                                                                                    (_get_Vcsr_vxsat
-                                                                                                                                                      (← readReg vcsr))))
+                                                                                                                                                (do
+                                                                                                                                                  let idx : (BitVec 4) :=
+                                                                                                                                                    (Sail.BitVec.extractLsb
+                                                                                                                                                      b__0
+                                                                                                                                                      3
+                                                                                                                                                      0)
+                                                                                                                                                  (pmpReadAddrReg
+                                                                                                                                                    (BitVec.toNat
+                                                                                                                                                      ((0b11 : (BitVec 2)) ++ idx))))
                                                                                                                                               else
                                                                                                                                                 (do
-                                                                                                                                                  bif (b__0 == (0x00A : (BitVec 12)))
+                                                                                                                                                  bif (b__0 == (0x008 : (BitVec 12)))
                                                                                                                                                   then
-                                                                                                                                                    (pure (zero_extend
-                                                                                                                                                        (m := ((2 ^i 2) *i 8))
-                                                                                                                                                        (_get_Vcsr_vxrm
-                                                                                                                                                          (← readReg vcsr))))
+                                                                                                                                                    readReg vstart
                                                                                                                                                   else
                                                                                                                                                     (do
-                                                                                                                                                      bif (b__0 == (0x00F : (BitVec 12)))
+                                                                                                                                                      bif (b__0 == (0x009 : (BitVec 12)))
                                                                                                                                                       then
                                                                                                                                                         (pure (zero_extend
-                                                                                                                                                            (m := ((2 ^i 2) *i 8))
-                                                                                                                                                            (← readReg vcsr)))
+                                                                                                                                                            (m := 32)
+                                                                                                                                                            (_get_Vcsr_vxsat
+                                                                                                                                                              (← readReg vcsr))))
                                                                                                                                                       else
                                                                                                                                                         (do
-                                                                                                                                                          bif (b__0 == (0xC20 : (BitVec 12)))
+                                                                                                                                                          bif (b__0 == (0x00A : (BitVec 12)))
                                                                                                                                                           then
-                                                                                                                                                            readReg vl
+                                                                                                                                                            (pure (zero_extend
+                                                                                                                                                                (m := 32)
+                                                                                                                                                                (_get_Vcsr_vxrm
+                                                                                                                                                                  (← readReg vcsr))))
                                                                                                                                                           else
                                                                                                                                                             (do
-                                                                                                                                                              bif (b__0 == (0xC21 : (BitVec 12)))
+                                                                                                                                                              bif (b__0 == (0x00F : (BitVec 12)))
                                                                                                                                                               then
-                                                                                                                                                                readReg vtype
+                                                                                                                                                                (pure (zero_extend
+                                                                                                                                                                    (m := 32)
+                                                                                                                                                                    (← readReg vcsr)))
                                                                                                                                                               else
                                                                                                                                                                 (do
-                                                                                                                                                                  bif (b__0 == (0xC22 : (BitVec 12)))
+                                                                                                                                                                  bif (b__0 == (0xC20 : (BitVec 12)))
                                                                                                                                                                   then
-                                                                                                                                                                    (pure VLENB)
+                                                                                                                                                                    readReg vl
                                                                                                                                                                   else
                                                                                                                                                                     (do
-                                                                                                                                                                      bif (b__0 == (0x105 : (BitVec 12)))
+                                                                                                                                                                      bif (b__0 == (0xC21 : (BitVec 12)))
                                                                                                                                                                       then
-                                                                                                                                                                        (get_stvec
-                                                                                                                                                                          ())
+                                                                                                                                                                        readReg vtype
                                                                                                                                                                       else
                                                                                                                                                                         (do
-                                                                                                                                                                          bif (b__0 == (0x141 : (BitVec 12)))
+                                                                                                                                                                          bif (b__0 == (0xC22 : (BitVec 12)))
                                                                                                                                                                           then
-                                                                                                                                                                            (get_xepc
-                                                                                                                                                                              Supervisor)
+                                                                                                                                                                            (pure VLENB)
                                                                                                                                                                           else
                                                                                                                                                                             (do
-                                                                                                                                                                              bif (b__0 == (0x305 : (BitVec 12)))
+                                                                                                                                                                              bif (b__0 == (0x105 : (BitVec 12)))
                                                                                                                                                                               then
-                                                                                                                                                                                (get_mtvec
+                                                                                                                                                                                (get_stvec
                                                                                                                                                                                   ())
                                                                                                                                                                               else
                                                                                                                                                                                 (do
-                                                                                                                                                                                  bif (b__0 == (0x341 : (BitVec 12)))
+                                                                                                                                                                                  bif (b__0 == (0x141 : (BitVec 12)))
                                                                                                                                                                                   then
                                                                                                                                                                                     (get_xepc
-                                                                                                                                                                                      Machine)
+                                                                                                                                                                                      Supervisor)
                                                                                                                                                                                   else
                                                                                                                                                                                     (do
-                                                                                                                                                                                      bif (((Sail.BitVec.extractLsb
-                                                                                                                                                                                               b__0
-                                                                                                                                                                                               11
-                                                                                                                                                                                               5) == (0b0011001 : (BitVec 7))) && (let index : (BitVec 5) :=
-                                                                                                                                                                                             (Sail.BitVec.extractLsb
-                                                                                                                                                                                               b__0
-                                                                                                                                                                                               4
-                                                                                                                                                                                               0)
-                                                                                                                                                                                           ((BitVec.toNat
-                                                                                                                                                                                               index) ≥b 3) : Bool))
+                                                                                                                                                                                      bif (b__0 == (0x305 : (BitVec 12)))
                                                                                                                                                                                       then
-                                                                                                                                                                                        (do
-                                                                                                                                                                                          let index : (BitVec 5) :=
-                                                                                                                                                                                            (Sail.BitVec.extractLsb
-                                                                                                                                                                                              b__0
-                                                                                                                                                                                              4
-                                                                                                                                                                                              0)
-                                                                                                                                                                                          (read_mhpmevent
-                                                                                                                                                                                            (← (hpmidx_from_bits
-                                                                                                                                                                                                index))))
+                                                                                                                                                                                        (get_mtvec
+                                                                                                                                                                                          ())
                                                                                                                                                                                       else
                                                                                                                                                                                         (do
-                                                                                                                                                                                          bif (((Sail.BitVec.extractLsb
-                                                                                                                                                                                                   b__0
-                                                                                                                                                                                                   11
-                                                                                                                                                                                                   5) == (0b1011000 : (BitVec 7))) && (let index : (BitVec 5) :=
-                                                                                                                                                                                                 (Sail.BitVec.extractLsb
-                                                                                                                                                                                                   b__0
-                                                                                                                                                                                                   4
-                                                                                                                                                                                                   0)
-                                                                                                                                                                                               ((BitVec.toNat
-                                                                                                                                                                                                   index) ≥b 3) : Bool))
+                                                                                                                                                                                          bif (b__0 == (0x341 : (BitVec 12)))
                                                                                                                                                                                           then
-                                                                                                                                                                                            (do
-                                                                                                                                                                                              let index : (BitVec 5) :=
-                                                                                                                                                                                                (Sail.BitVec.extractLsb
-                                                                                                                                                                                                  b__0
-                                                                                                                                                                                                  4
-                                                                                                                                                                                                  0)
-                                                                                                                                                                                              (read_mhpmcounter
-                                                                                                                                                                                                (← (hpmidx_from_bits
-                                                                                                                                                                                                    index))))
+                                                                                                                                                                                            (get_xepc
+                                                                                                                                                                                              Machine)
                                                                                                                                                                                           else
                                                                                                                                                                                             (do
                                                                                                                                                                                               bif (((Sail.BitVec.extractLsb
                                                                                                                                                                                                        b__0
                                                                                                                                                                                                        11
-                                                                                                                                                                                                       5) == (0b1011100 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                                       5) == (0b0011001 : (BitVec 7))) && (let index : (BitVec 5) :=
                                                                                                                                                                                                      (Sail.BitVec.extractLsb
                                                                                                                                                                                                        b__0
                                                                                                                                                                                                        4
                                                                                                                                                                                                        0)
-                                                                                                                                                                                                   ((xlen == 32) && (((BitVec.toNat
-                                                                                                                                                                                                         index) ≥b 3) : Bool))))
+                                                                                                                                                                                                   ((BitVec.toNat
+                                                                                                                                                                                                       index) ≥b 3) : Bool))
                                                                                                                                                                                               then
                                                                                                                                                                                                 (do
                                                                                                                                                                                                   let index : (BitVec 5) :=
@@ -576,7 +557,7 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                                                                                       b__0
                                                                                                                                                                                                       4
                                                                                                                                                                                                       0)
-                                                                                                                                                                                                  (read_mhpmcounterh
+                                                                                                                                                                                                  (read_mhpmevent
                                                                                                                                                                                                     (← (hpmidx_from_bits
                                                                                                                                                                                                         index))))
                                                                                                                                                                                               else
@@ -584,7 +565,7 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                                                                                   bif (((Sail.BitVec.extractLsb
                                                                                                                                                                                                            b__0
                                                                                                                                                                                                            11
-                                                                                                                                                                                                           5) == (0b1100000 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                                           5) == (0b1011000 : (BitVec 7))) && (let index : (BitVec 5) :=
                                                                                                                                                                                                          (Sail.BitVec.extractLsb
                                                                                                                                                                                                            b__0
                                                                                                                                                                                                            4
@@ -606,7 +587,7 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                                                                                       bif (((Sail.BitVec.extractLsb
                                                                                                                                                                                                                b__0
                                                                                                                                                                                                                11
-                                                                                                                                                                                                               5) == (0b1100100 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                                               5) == (0b1011100 : (BitVec 7))) && (let index : (BitVec 5) :=
                                                                                                                                                                                                              (Sail.BitVec.extractLsb
                                                                                                                                                                                                                b__0
                                                                                                                                                                                                                4
@@ -628,13 +609,13 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                                                                                           bif (((Sail.BitVec.extractLsb
                                                                                                                                                                                                                    b__0
                                                                                                                                                                                                                    11
-                                                                                                                                                                                                                   5) == (0b0111001 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                                                   5) == (0b1100000 : (BitVec 7))) && (let index : (BitVec 5) :=
                                                                                                                                                                                                                  (Sail.BitVec.extractLsb
                                                                                                                                                                                                                    b__0
                                                                                                                                                                                                                    4
                                                                                                                                                                                                                    0)
-                                                                                                                                                                                                               ((xlen == 32) && (((BitVec.toNat
-                                                                                                                                                                                                                     index) ≥b 3) : Bool))))
+                                                                                                                                                                                                               ((BitVec.toNat
+                                                                                                                                                                                                                   index) ≥b 3) : Bool))
                                                                                                                                                                                                           then
                                                                                                                                                                                                             (do
                                                                                                                                                                                                               let index : (BitVec 5) :=
@@ -642,189 +623,233 @@ def read_CSR (b__0 : (BitVec 12)) : SailM (BitVec (2 ^ 2 * 8)) := do
                                                                                                                                                                                                                   b__0
                                                                                                                                                                                                                   4
                                                                                                                                                                                                                   0)
-                                                                                                                                                                                                              (read_mhpmeventh
+                                                                                                                                                                                                              (read_mhpmcounter
                                                                                                                                                                                                                 (← (hpmidx_from_bits
                                                                                                                                                                                                                     index))))
                                                                                                                                                                                                           else
                                                                                                                                                                                                             (do
-                                                                                                                                                                                                              bif (b__0 == (0xDA0 : (BitVec 12)))
+                                                                                                                                                                                                              bif (((Sail.BitVec.extractLsb
+                                                                                                                                                                                                                       b__0
+                                                                                                                                                                                                                       11
+                                                                                                                                                                                                                       5) == (0b1100100 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                                                     (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                       b__0
+                                                                                                                                                                                                                       4
+                                                                                                                                                                                                                       0)
+                                                                                                                                                                                                                   ((xlen == 32) && (((BitVec.toNat
+                                                                                                                                                                                                                         index) ≥b 3) : Bool))))
                                                                                                                                                                                                               then
-                                                                                                                                                                                                                (pure (zero_extend
-                                                                                                                                                                                                                    (m := ((2 ^i 2) *i 8))
-                                                                                                                                                                                                                    (← (get_scountovf
-                                                                                                                                                                                                                        (← readReg cur_privilege)))))
+                                                                                                                                                                                                                (do
+                                                                                                                                                                                                                  let index : (BitVec 5) :=
+                                                                                                                                                                                                                    (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                      b__0
+                                                                                                                                                                                                                      4
+                                                                                                                                                                                                                      0)
+                                                                                                                                                                                                                  (read_mhpmcounterh
+                                                                                                                                                                                                                    (← (hpmidx_from_bits
+                                                                                                                                                                                                                        index))))
                                                                                                                                                                                                               else
                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                  bif (b__0 == (0x015 : (BitVec 12)))
+                                                                                                                                                                                                                  bif (((Sail.BitVec.extractLsb
+                                                                                                                                                                                                                           b__0
+                                                                                                                                                                                                                           11
+                                                                                                                                                                                                                           5) == (0b0111001 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                                                         (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                           b__0
+                                                                                                                                                                                                                           4
+                                                                                                                                                                                                                           0)
+                                                                                                                                                                                                                       ((xlen == 32) && (((BitVec.toNat
+                                                                                                                                                                                                                             index) ≥b 3) : Bool))))
                                                                                                                                                                                                                   then
-                                                                                                                                                                                                                    (read_seed_csr
-                                                                                                                                                                                                                      ())
+                                                                                                                                                                                                                    (do
+                                                                                                                                                                                                                      let index : (BitVec 5) :=
+                                                                                                                                                                                                                        (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                          b__0
+                                                                                                                                                                                                                          4
+                                                                                                                                                                                                                          0)
+                                                                                                                                                                                                                      (read_mhpmeventh
+                                                                                                                                                                                                                        (← (hpmidx_from_bits
+                                                                                                                                                                                                                            index))))
                                                                                                                                                                                                                   else
                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                      bif (b__0 == (0xC00 : (BitVec 12)))
+                                                                                                                                                                                                                      bif (b__0 == (0xDA0 : (BitVec 12)))
                                                                                                                                                                                                                       then
-                                                                                                                                                                                                                        (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                            (← readReg mcycle)
-                                                                                                                                                                                                                            (xlen -i 1)
-                                                                                                                                                                                                                            0))
+                                                                                                                                                                                                                        (pure (zero_extend
+                                                                                                                                                                                                                            (m := 32)
+                                                                                                                                                                                                                            (← (get_scountovf
+                                                                                                                                                                                                                                (← readReg cur_privilege)))))
                                                                                                                                                                                                                       else
                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                          bif (b__0 == (0xC01 : (BitVec 12)))
+                                                                                                                                                                                                                          bif (b__0 == (0x015 : (BitVec 12)))
                                                                                                                                                                                                                           then
-                                                                                                                                                                                                                            (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                (← readReg mtime)
-                                                                                                                                                                                                                                (xlen -i 1)
-                                                                                                                                                                                                                                0))
+                                                                                                                                                                                                                            (read_seed_csr
+                                                                                                                                                                                                                              ())
                                                                                                                                                                                                                           else
                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                              bif (b__0 == (0xC02 : (BitVec 12)))
+                                                                                                                                                                                                                              bif (b__0 == (0xC00 : (BitVec 12)))
                                                                                                                                                                                                                               then
                                                                                                                                                                                                                                 (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                    (← readReg minstret)
+                                                                                                                                                                                                                                    (← readReg mcycle)
                                                                                                                                                                                                                                     (xlen -i 1)
                                                                                                                                                                                                                                     0))
                                                                                                                                                                                                                               else
                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                  bif ((b__0 == (0xC80 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                  bif (b__0 == (0xC01 : (BitVec 12)))
                                                                                                                                                                                                                                   then
                                                                                                                                                                                                                                     (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                        (← readReg mcycle)
-                                                                                                                                                                                                                                        63
-                                                                                                                                                                                                                                        32))
+                                                                                                                                                                                                                                        (← readReg mtime)
+                                                                                                                                                                                                                                        (xlen -i 1)
+                                                                                                                                                                                                                                        0))
                                                                                                                                                                                                                                   else
                                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                                      bif ((b__0 == (0xC81 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                      bif (b__0 == (0xC02 : (BitVec 12)))
                                                                                                                                                                                                                                       then
                                                                                                                                                                                                                                         (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                            (← readReg mtime)
-                                                                                                                                                                                                                                            63
-                                                                                                                                                                                                                                            32))
+                                                                                                                                                                                                                                            (← readReg minstret)
+                                                                                                                                                                                                                                            (xlen -i 1)
+                                                                                                                                                                                                                                            0))
                                                                                                                                                                                                                                       else
                                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                                          bif ((b__0 == (0xC82 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                          bif ((b__0 == (0xC80 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                           then
                                                                                                                                                                                                                                             (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                (← readReg minstret)
+                                                                                                                                                                                                                                                (← readReg mcycle)
                                                                                                                                                                                                                                                 63
                                                                                                                                                                                                                                                 32))
                                                                                                                                                                                                                                           else
                                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                                              bif (b__0 == (0xB00 : (BitVec 12)))
+                                                                                                                                                                                                                                              bif ((b__0 == (0xC81 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                               then
                                                                                                                                                                                                                                                 (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                    (← readReg mcycle)
-                                                                                                                                                                                                                                                    (xlen -i 1)
-                                                                                                                                                                                                                                                    0))
+                                                                                                                                                                                                                                                    (← readReg mtime)
+                                                                                                                                                                                                                                                    63
+                                                                                                                                                                                                                                                    32))
                                                                                                                                                                                                                                               else
                                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                                  bif (b__0 == (0xB02 : (BitVec 12)))
+                                                                                                                                                                                                                                                  bif ((b__0 == (0xC82 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                                   then
                                                                                                                                                                                                                                                     (pure (Sail.BitVec.extractLsb
                                                                                                                                                                                                                                                         (← readReg minstret)
-                                                                                                                                                                                                                                                        (xlen -i 1)
-                                                                                                                                                                                                                                                        0))
+                                                                                                                                                                                                                                                        63
+                                                                                                                                                                                                                                                        32))
                                                                                                                                                                                                                                                   else
                                                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                                                      bif ((b__0 == (0xB80 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                                      bif (b__0 == (0xB00 : (BitVec 12)))
                                                                                                                                                                                                                                                       then
                                                                                                                                                                                                                                                         (pure (Sail.BitVec.extractLsb
                                                                                                                                                                                                                                                             (← readReg mcycle)
-                                                                                                                                                                                                                                                            63
-                                                                                                                                                                                                                                                            32))
+                                                                                                                                                                                                                                                            (xlen -i 1)
+                                                                                                                                                                                                                                                            0))
                                                                                                                                                                                                                                                       else
                                                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                                                          bif ((b__0 == (0xB82 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                                          bif (b__0 == (0xB02 : (BitVec 12)))
                                                                                                                                                                                                                                                           then
                                                                                                                                                                                                                                                             (pure (Sail.BitVec.extractLsb
                                                                                                                                                                                                                                                                 (← readReg minstret)
-                                                                                                                                                                                                                                                                63
-                                                                                                                                                                                                                                                                32))
+                                                                                                                                                                                                                                                                (xlen -i 1)
+                                                                                                                                                                                                                                                                0))
                                                                                                                                                                                                                                                           else
                                                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                                                              bif (b__0 == (0x001 : (BitVec 12)))
+                                                                                                                                                                                                                                                              bif ((b__0 == (0xB80 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                                               then
-                                                                                                                                                                                                                                                                (pure (zero_extend
-                                                                                                                                                                                                                                                                    (m := ((2 ^i 2) *i 8))
-                                                                                                                                                                                                                                                                    (_get_Fcsr_FFLAGS
-                                                                                                                                                                                                                                                                      (← readReg fcsr))))
+                                                                                                                                                                                                                                                                (pure (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                                    (← readReg mcycle)
+                                                                                                                                                                                                                                                                    63
+                                                                                                                                                                                                                                                                    32))
                                                                                                                                                                                                                                                               else
                                                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                                                  bif (b__0 == (0x002 : (BitVec 12)))
+                                                                                                                                                                                                                                                                  bif ((b__0 == (0xB82 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                                                   then
-                                                                                                                                                                                                                                                                    (pure (zero_extend
-                                                                                                                                                                                                                                                                        (m := ((2 ^i 2) *i 8))
-                                                                                                                                                                                                                                                                        (_get_Fcsr_FRM
-                                                                                                                                                                                                                                                                          (← readReg fcsr))))
+                                                                                                                                                                                                                                                                    (pure (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                                        (← readReg minstret)
+                                                                                                                                                                                                                                                                        63
+                                                                                                                                                                                                                                                                        32))
                                                                                                                                                                                                                                                                   else
                                                                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                                                                      bif (b__0 == (0x003 : (BitVec 12)))
+                                                                                                                                                                                                                                                                      bif (b__0 == (0x001 : (BitVec 12)))
                                                                                                                                                                                                                                                                       then
                                                                                                                                                                                                                                                                         (pure (zero_extend
-                                                                                                                                                                                                                                                                            (m := ((2 ^i 2) *i 8))
-                                                                                                                                                                                                                                                                            (← readReg fcsr)))
+                                                                                                                                                                                                                                                                            (m := 32)
+                                                                                                                                                                                                                                                                            (_get_Fcsr_FFLAGS
+                                                                                                                                                                                                                                                                              (← readReg fcsr))))
                                                                                                                                                                                                                                                                       else
                                                                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                                                                          bif (b__0 == (0x321 : (BitVec 12)))
+                                                                                                                                                                                                                                                                          bif (b__0 == (0x002 : (BitVec 12)))
                                                                                                                                                                                                                                                                           then
-                                                                                                                                                                                                                                                                            (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                                                (← readReg mcyclecfg)
-                                                                                                                                                                                                                                                                                (xlen -i 1)
-                                                                                                                                                                                                                                                                                0))
+                                                                                                                                                                                                                                                                            (pure (zero_extend
+                                                                                                                                                                                                                                                                                (m := 32)
+                                                                                                                                                                                                                                                                                (_get_Fcsr_FRM
+                                                                                                                                                                                                                                                                                  (← readReg fcsr))))
                                                                                                                                                                                                                                                                           else
                                                                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                                                                              bif ((b__0 == (0x721 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                                                              bif (b__0 == (0x003 : (BitVec 12)))
                                                                                                                                                                                                                                                                               then
-                                                                                                                                                                                                                                                                                (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                                                    (← readReg mcyclecfg)
-                                                                                                                                                                                                                                                                                    63
-                                                                                                                                                                                                                                                                                    32))
+                                                                                                                                                                                                                                                                                (pure (zero_extend
+                                                                                                                                                                                                                                                                                    (m := 32)
+                                                                                                                                                                                                                                                                                    (← readReg fcsr)))
                                                                                                                                                                                                                                                                               else
                                                                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                                                                  bif (b__0 == (0x322 : (BitVec 12)))
+                                                                                                                                                                                                                                                                                  bif (b__0 == (0x321 : (BitVec 12)))
                                                                                                                                                                                                                                                                                   then
                                                                                                                                                                                                                                                                                     (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                                                        (← readReg minstretcfg)
+                                                                                                                                                                                                                                                                                        (← readReg mcyclecfg)
                                                                                                                                                                                                                                                                                         (xlen -i 1)
                                                                                                                                                                                                                                                                                         0))
                                                                                                                                                                                                                                                                                   else
                                                                                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                                                                                      bif ((b__0 == (0x722 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                                                                      bif ((b__0 == (0x721 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                                                                       then
                                                                                                                                                                                                                                                                                         (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                                                            (← readReg minstretcfg)
+                                                                                                                                                                                                                                                                                            (← readReg mcyclecfg)
                                                                                                                                                                                                                                                                                             63
                                                                                                                                                                                                                                                                                             32))
                                                                                                                                                                                                                                                                                       else
                                                                                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                                                                                          bif (b__0 == (0x14D : (BitVec 12)))
+                                                                                                                                                                                                                                                                                          bif (b__0 == (0x322 : (BitVec 12)))
                                                                                                                                                                                                                                                                                           then
                                                                                                                                                                                                                                                                                             (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                                                                (← readReg stimecmp)
+                                                                                                                                                                                                                                                                                                (← readReg minstretcfg)
                                                                                                                                                                                                                                                                                                 (xlen -i 1)
                                                                                                                                                                                                                                                                                                 0))
                                                                                                                                                                                                                                                                                           else
                                                                                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                                                                                              bif ((b__0 == (0x15D : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                                                                              bif ((b__0 == (0x722 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                                                                               then
                                                                                                                                                                                                                                                                                                 (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                                                                    (← readReg stimecmp)
+                                                                                                                                                                                                                                                                                                    (← readReg minstretcfg)
                                                                                                                                                                                                                                                                                                     63
                                                                                                                                                                                                                                                                                                     32))
                                                                                                                                                                                                                                                                                               else
                                                                                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                                                                                  bif (b__0 == (0x180 : (BitVec 12)))
+                                                                                                                                                                                                                                                                                                  bif (b__0 == (0x14D : (BitVec 12)))
                                                                                                                                                                                                                                                                                                   then
-                                                                                                                                                                                                                                                                                                    readReg satp
+                                                                                                                                                                                                                                                                                                    (pure (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                                                                        (← readReg stimecmp)
+                                                                                                                                                                                                                                                                                                        (xlen -i 1)
+                                                                                                                                                                                                                                                                                                        0))
                                                                                                                                                                                                                                                                                                   else
-                                                                                                                                                                                                                                                                                                    (internal_error
-                                                                                                                                                                                                                                                                                                      "riscv_csr_end.sail"
-                                                                                                                                                                                                                                                                                                      17
-                                                                                                                                                                                                                                                                                                      (HAppend.hAppend
-                                                                                                                                                                                                                                                                                                        "Read from CSR that does not exist: "
-                                                                                                                                                                                                                                                                                                        (BitVec.toFormatted
-                                                                                                                                                                                                                                                                                                          b__0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                                                                                                                                                                                                                                                                    (do
+                                                                                                                                                                                                                                                                                                      bif ((b__0 == (0x15D : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                                                                                      then
+                                                                                                                                                                                                                                                                                                        (pure (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                                                                            (← readReg stimecmp)
+                                                                                                                                                                                                                                                                                                            63
+                                                                                                                                                                                                                                                                                                            32))
+                                                                                                                                                                                                                                                                                                      else
+                                                                                                                                                                                                                                                                                                        (do
+                                                                                                                                                                                                                                                                                                          bif (b__0 == (0x180 : (BitVec 12)))
+                                                                                                                                                                                                                                                                                                          then
+                                                                                                                                                                                                                                                                                                            readReg satp
+                                                                                                                                                                                                                                                                                                          else
+                                                                                                                                                                                                                                                                                                            (internal_error
+                                                                                                                                                                                                                                                                                                              "riscv_csr_end.sail"
+                                                                                                                                                                                                                                                                                                              17
+                                                                                                                                                                                                                                                                                                              (HAppend.hAppend
+                                                                                                                                                                                                                                                                                                                "Read from CSR that does not exist: "
+                                                                                                                                                                                                                                                                                                                (BitVec.toFormatted
+                                                                                                                                                                                                                                                                                                                  b__0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
 
-def write_CSR (b__0 : (BitVec 12)) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVec (2 ^ 2 * 8)) := do
+def write_CSR (b__0 : (BitVec 12)) (value : (BitVec 32)) : SailM (BitVec 32) := do
   bif (b__0 == (0x301 : (BitVec 12)))
   then
     (do
@@ -855,277 +880,249 @@ def write_CSR (b__0 : (BitVec 12)) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVe
                   (pure (Sail.BitVec.extractLsb (← readReg mstatus) 63 32)))
               else
                 (do
-                  bif ((b__0 == (0x30A : (BitVec 12))) && (xlen == 32))
+                  bif ((b__0 == (0x747 : (BitVec 12))) && (xlen == 32))
                   then
                     (do
-                      writeReg menvcfg (← (legalize_menvcfg (← readReg menvcfg)
-                          ((Sail.BitVec.extractLsb (← readReg menvcfg) 63 32) ++ value)))
-                      (pure (Sail.BitVec.extractLsb (← readReg menvcfg) 31 0)))
+                      writeReg mseccfg (← (legalize_mseccfg (← readReg mseccfg)
+                          ((Sail.BitVec.extractLsb (← readReg mseccfg) 63 32) ++ value)))
+                      (pure (Sail.BitVec.extractLsb (← readReg mseccfg) 31 0)))
                   else
                     (do
-                      bif ((b__0 == (0x30A : (BitVec 12))) && (xlen == 64))
+                      bif ((b__0 == (0x747 : (BitVec 12))) && (xlen == 64))
                       then
                         (do
-                          writeReg menvcfg (← (legalize_menvcfg (← readReg menvcfg) value))
-                          readReg menvcfg)
+                          writeReg mseccfg (← (legalize_mseccfg (← readReg mseccfg) value))
+                          readReg mseccfg)
                       else
                         (do
-                          bif ((b__0 == (0x31A : (BitVec 12))) && (xlen == 32))
+                          bif ((b__0 == (0x757 : (BitVec 12))) && (xlen == 32))
                           then
                             (do
-                              writeReg menvcfg (← (legalize_menvcfg (← readReg menvcfg)
-                                  (value ++ (Sail.BitVec.extractLsb (← readReg menvcfg) 31 0))))
-                              (pure (Sail.BitVec.extractLsb (← readReg menvcfg) 63 32)))
+                              writeReg mseccfg (← (legalize_mseccfg (← readReg mseccfg)
+                                  (value ++ (Sail.BitVec.extractLsb (← readReg mseccfg) 31 0))))
+                              (pure (Sail.BitVec.extractLsb (← readReg mseccfg) 63 32)))
                           else
                             (do
-                              bif (b__0 == (0x10A : (BitVec 12)))
+                              bif ((b__0 == (0x30A : (BitVec 12))) && (xlen == 32))
                               then
                                 (do
-                                  writeReg senvcfg (← (legalize_senvcfg (← readReg senvcfg)
-                                      (zero_extend (m := ((2 ^i 2) *i 8)) value)))
-                                  (pure (Sail.BitVec.extractLsb (← readReg senvcfg) (xlen -i 1) 0)))
+                                  writeReg menvcfg (← (legalize_menvcfg (← readReg menvcfg)
+                                      ((Sail.BitVec.extractLsb (← readReg menvcfg) 63 32) ++ value)))
+                                  (pure (Sail.BitVec.extractLsb (← readReg menvcfg) 31 0)))
                               else
                                 (do
-                                  bif (b__0 == (0x304 : (BitVec 12)))
+                                  bif ((b__0 == (0x30A : (BitVec 12))) && (xlen == 64))
                                   then
                                     (do
-                                      writeReg mie (← (legalize_mie (← readReg mie) value))
-                                      readReg mie)
+                                      writeReg menvcfg (← (legalize_menvcfg (← readReg menvcfg)
+                                          value))
+                                      readReg menvcfg)
                                   else
                                     (do
-                                      bif (b__0 == (0x344 : (BitVec 12)))
+                                      bif ((b__0 == (0x31A : (BitVec 12))) && (xlen == 32))
                                       then
                                         (do
-                                          writeReg mip (← (legalize_mip (← readReg mip) value))
-                                          readReg mip)
+                                          writeReg menvcfg (← (legalize_menvcfg
+                                              (← readReg menvcfg)
+                                              (value ++ (Sail.BitVec.extractLsb
+                                                  (← readReg menvcfg) 31 0))))
+                                          (pure (Sail.BitVec.extractLsb (← readReg menvcfg) 63 32)))
                                       else
                                         (do
-                                          bif ((b__0 == (0x302 : (BitVec 12))) && (xlen == 64))
+                                          bif (b__0 == (0x10A : (BitVec 12)))
                                           then
                                             (do
-                                              writeReg medeleg (legalize_medeleg
-                                                (← readReg medeleg) value)
-                                              readReg medeleg)
+                                              writeReg senvcfg (← (legalize_senvcfg
+                                                  (← readReg senvcfg)
+                                                  (zero_extend (m := 32) value)))
+                                              (pure (Sail.BitVec.extractLsb (← readReg senvcfg)
+                                                  (xlen -i 1) 0)))
                                           else
                                             (do
-                                              bif ((b__0 == (0x302 : (BitVec 12))) && (xlen == 32))
+                                              bif (b__0 == (0x304 : (BitVec 12)))
                                               then
                                                 (do
-                                                  writeReg medeleg (legalize_medeleg
-                                                    (← readReg medeleg)
-                                                    ((Sail.BitVec.extractLsb (← readReg medeleg)
-                                                        63 32) ++ value))
-                                                  (pure (Sail.BitVec.extractLsb
-                                                      (← readReg medeleg) 31 0)))
+                                                  writeReg mie (← (legalize_mie (← readReg mie)
+                                                      value))
+                                                  readReg mie)
                                               else
                                                 (do
-                                                  bif ((b__0 == (0x312 : (BitVec 12))) && (xlen == 32))
+                                                  bif (b__0 == (0x344 : (BitVec 12)))
                                                   then
                                                     (do
-                                                      writeReg medeleg (legalize_medeleg
-                                                        (← readReg medeleg)
-                                                        (value ++ (Sail.BitVec.extractLsb
-                                                            (← readReg medeleg) 31 0)))
-                                                      (pure (Sail.BitVec.extractLsb
-                                                          (← readReg medeleg) 63 32)))
+                                                      writeReg mip (← (legalize_mip
+                                                          (← readReg mip) value))
+                                                      readReg mip)
                                                   else
                                                     (do
-                                                      bif (b__0 == (0x303 : (BitVec 12)))
+                                                      bif ((b__0 == (0x302 : (BitVec 12))) && (xlen == 64))
                                                       then
                                                         (do
-                                                          writeReg mideleg (legalize_mideleg
-                                                            (← readReg mideleg) value)
-                                                          readReg mideleg)
+                                                          writeReg medeleg (legalize_medeleg
+                                                            (← readReg medeleg) value)
+                                                          readReg medeleg)
                                                       else
                                                         (do
-                                                          bif (b__0 == (0x342 : (BitVec 12)))
+                                                          bif ((b__0 == (0x302 : (BitVec 12))) && (xlen == 32))
                                                           then
                                                             (do
-                                                              writeReg mcause value
-                                                              readReg mcause)
+                                                              writeReg medeleg (legalize_medeleg
+                                                                (← readReg medeleg)
+                                                                ((Sail.BitVec.extractLsb
+                                                                    (← readReg medeleg) 63 32) ++ value))
+                                                              (pure (Sail.BitVec.extractLsb
+                                                                  (← readReg medeleg) 31 0)))
                                                           else
                                                             (do
-                                                              bif (b__0 == (0x343 : (BitVec 12)))
+                                                              bif ((b__0 == (0x312 : (BitVec 12))) && (xlen == 32))
                                                               then
                                                                 (do
-                                                                  writeReg mtval value
-                                                                  readReg mtval)
+                                                                  writeReg medeleg (legalize_medeleg
+                                                                    (← readReg medeleg)
+                                                                    (value ++ (Sail.BitVec.extractLsb
+                                                                        (← readReg medeleg) 31 0)))
+                                                                  (pure (Sail.BitVec.extractLsb
+                                                                      (← readReg medeleg) 63 32)))
                                                               else
                                                                 (do
-                                                                  bif (b__0 == (0x340 : (BitVec 12)))
+                                                                  bif (b__0 == (0x303 : (BitVec 12)))
                                                                   then
                                                                     (do
-                                                                      writeReg mscratch value
-                                                                      readReg mscratch)
+                                                                      writeReg mideleg (legalize_mideleg
+                                                                        (← readReg mideleg) value)
+                                                                      readReg mideleg)
                                                                   else
                                                                     (do
-                                                                      bif (b__0 == (0x106 : (BitVec 12)))
+                                                                      bif (b__0 == (0x342 : (BitVec 12)))
                                                                       then
                                                                         (do
-                                                                          writeReg scounteren (legalize_scounteren
-                                                                            (← readReg scounteren)
-                                                                            value)
-                                                                          (pure (zero_extend
-                                                                              (m := ((2 ^i 2) *i 8))
-                                                                              (← readReg scounteren))))
+                                                                          writeReg mcause value
+                                                                          readReg mcause)
                                                                       else
                                                                         (do
-                                                                          bif (b__0 == (0x306 : (BitVec 12)))
+                                                                          bif (b__0 == (0x343 : (BitVec 12)))
                                                                           then
                                                                             (do
-                                                                              writeReg mcounteren (legalize_mcounteren
-                                                                                (← readReg mcounteren)
-                                                                                value)
-                                                                              (pure (zero_extend
-                                                                                  (m := ((2 ^i 2) *i 8))
-                                                                                  (← readReg mcounteren))))
+                                                                              writeReg mtval value
+                                                                              readReg mtval)
                                                                           else
                                                                             (do
-                                                                              bif (b__0 == (0x320 : (BitVec 12)))
+                                                                              bif (b__0 == (0x340 : (BitVec 12)))
                                                                               then
                                                                                 (do
-                                                                                  writeReg mcountinhibit (legalize_mcountinhibit
-                                                                                    (← readReg mcountinhibit)
-                                                                                    value)
-                                                                                  (pure (zero_extend
-                                                                                      (m := ((2 ^i 2) *i 8))
-                                                                                      (← readReg mcountinhibit))))
+                                                                                  writeReg mscratch value
+                                                                                  readReg mscratch)
                                                                               else
                                                                                 (do
-                                                                                  bif (b__0 == (0x100 : (BitVec 12)))
+                                                                                  bif (b__0 == (0x106 : (BitVec 12)))
                                                                                   then
                                                                                     (do
-                                                                                      writeReg mstatus (← (legalize_sstatus
-                                                                                          (← readReg mstatus)
-                                                                                          value))
-                                                                                      (pure (Sail.BitVec.extractLsb
-                                                                                          (← readReg mstatus)
-                                                                                          (xlen -i 1)
-                                                                                          0)))
+                                                                                      writeReg scounteren (legalize_scounteren
+                                                                                        (← readReg scounteren)
+                                                                                        value)
+                                                                                      (pure (zero_extend
+                                                                                          (m := 32)
+                                                                                          (← readReg scounteren))))
                                                                                   else
                                                                                     (do
-                                                                                      bif (b__0 == (0x144 : (BitVec 12)))
+                                                                                      bif (b__0 == (0x306 : (BitVec 12)))
                                                                                       then
                                                                                         (do
-                                                                                          writeReg mip (legalize_sip
-                                                                                            (← readReg mip)
-                                                                                            (← readReg mideleg)
+                                                                                          writeReg mcounteren (legalize_mcounteren
+                                                                                            (← readReg mcounteren)
                                                                                             value)
-                                                                                          readReg mip)
+                                                                                          (pure (zero_extend
+                                                                                              (m := 32)
+                                                                                              (← readReg mcounteren))))
                                                                                       else
                                                                                         (do
-                                                                                          bif (b__0 == (0x104 : (BitVec 12)))
+                                                                                          bif (b__0 == (0x320 : (BitVec 12)))
                                                                                           then
                                                                                             (do
-                                                                                              writeReg mie (legalize_sie
-                                                                                                (← readReg mie)
-                                                                                                (← readReg mideleg)
+                                                                                              writeReg mcountinhibit (legalize_mcountinhibit
+                                                                                                (← readReg mcountinhibit)
                                                                                                 value)
-                                                                                              readReg mie)
+                                                                                              (pure (zero_extend
+                                                                                                  (m := 32)
+                                                                                                  (← readReg mcountinhibit))))
                                                                                           else
                                                                                             (do
-                                                                                              bif (b__0 == (0x140 : (BitVec 12)))
+                                                                                              bif (b__0 == (0x100 : (BitVec 12)))
                                                                                               then
                                                                                                 (do
-                                                                                                  writeReg sscratch value
-                                                                                                  readReg sscratch)
+                                                                                                  writeReg mstatus (← (legalize_sstatus
+                                                                                                      (← readReg mstatus)
+                                                                                                      value))
+                                                                                                  (pure (Sail.BitVec.extractLsb
+                                                                                                      (lower_mstatus
+                                                                                                        (← readReg mstatus))
+                                                                                                      (xlen -i 1)
+                                                                                                      0)))
                                                                                               else
                                                                                                 (do
-                                                                                                  bif (b__0 == (0x142 : (BitVec 12)))
+                                                                                                  bif (b__0 == (0x144 : (BitVec 12)))
                                                                                                   then
                                                                                                     (do
-                                                                                                      writeReg scause value
-                                                                                                      readReg scause)
+                                                                                                      writeReg mip (legalize_sip
+                                                                                                        (← readReg mip)
+                                                                                                        (← readReg mideleg)
+                                                                                                        value)
+                                                                                                      (pure (lower_mip
+                                                                                                          (← readReg mip)
+                                                                                                          (← readReg mideleg))))
                                                                                                   else
                                                                                                     (do
-                                                                                                      bif (b__0 == (0x143 : (BitVec 12)))
+                                                                                                      bif (b__0 == (0x104 : (BitVec 12)))
                                                                                                       then
                                                                                                         (do
-                                                                                                          writeReg stval value
-                                                                                                          readReg stval)
+                                                                                                          writeReg mie (legalize_sie
+                                                                                                            (← readReg mie)
+                                                                                                            (← readReg mideleg)
+                                                                                                            value)
+                                                                                                          (pure (lower_mie
+                                                                                                              (← readReg mie)
+                                                                                                              (← readReg mideleg))))
                                                                                                       else
                                                                                                         (do
-                                                                                                          bif (b__0 == (0x7A0 : (BitVec 12)))
+                                                                                                          bif (b__0 == (0x140 : (BitVec 12)))
                                                                                                           then
                                                                                                             (do
-                                                                                                              writeReg tselect value
-                                                                                                              readReg tselect)
+                                                                                                              writeReg sscratch value
+                                                                                                              readReg sscratch)
                                                                                                           else
                                                                                                             (do
-                                                                                                              bif (((Sail.BitVec.extractLsb
-                                                                                                                       b__0
-                                                                                                                       11
-                                                                                                                       4) == (0x3A : (BitVec 8))) && (let idx : (BitVec 4) :=
-                                                                                                                     (Sail.BitVec.extractLsb
-                                                                                                                       b__0
-                                                                                                                       3
-                                                                                                                       0)
-                                                                                                                   (((BitVec.access
-                                                                                                                         idx
-                                                                                                                         0) == 0#1) || (xlen == 32))))
+                                                                                                              bif (b__0 == (0x142 : (BitVec 12)))
                                                                                                               then
                                                                                                                 (do
-                                                                                                                  let idx : (BitVec 4) :=
-                                                                                                                    (Sail.BitVec.extractLsb
-                                                                                                                      b__0
-                                                                                                                      3
-                                                                                                                      0)
-                                                                                                                  let idx :=
-                                                                                                                    (BitVec.toNat
-                                                                                                                      idx)
-                                                                                                                  (pmpWriteCfgReg
-                                                                                                                    idx
-                                                                                                                    value)
-                                                                                                                  (pmpReadCfgReg
-                                                                                                                    idx))
+                                                                                                                  writeReg scause value
+                                                                                                                  readReg scause)
                                                                                                               else
                                                                                                                 (do
-                                                                                                                  bif ((Sail.BitVec.extractLsb
-                                                                                                                         b__0
-                                                                                                                         11
-                                                                                                                         4) == (0x3B : (BitVec 8)))
+                                                                                                                  bif (b__0 == (0x143 : (BitVec 12)))
                                                                                                                   then
                                                                                                                     (do
-                                                                                                                      let idx : (BitVec 4) :=
-                                                                                                                        (Sail.BitVec.extractLsb
-                                                                                                                          b__0
-                                                                                                                          3
-                                                                                                                          0)
-                                                                                                                      let idx :=
-                                                                                                                        (BitVec.toNat
-                                                                                                                          ((0b00 : (BitVec 2)) ++ idx))
-                                                                                                                      (pmpWriteAddrReg
-                                                                                                                        idx
-                                                                                                                        value)
-                                                                                                                      (pmpReadAddrReg
-                                                                                                                        idx))
+                                                                                                                      writeReg stval value
+                                                                                                                      readReg stval)
                                                                                                                   else
                                                                                                                     (do
-                                                                                                                      bif ((Sail.BitVec.extractLsb
-                                                                                                                             b__0
-                                                                                                                             11
-                                                                                                                             4) == (0x3C : (BitVec 8)))
+                                                                                                                      bif (b__0 == (0x7A0 : (BitVec 12)))
                                                                                                                       then
                                                                                                                         (do
-                                                                                                                          let idx : (BitVec 4) :=
-                                                                                                                            (Sail.BitVec.extractLsb
-                                                                                                                              b__0
-                                                                                                                              3
-                                                                                                                              0)
-                                                                                                                          let idx :=
-                                                                                                                            (BitVec.toNat
-                                                                                                                              ((0b01 : (BitVec 2)) ++ idx))
-                                                                                                                          (pmpWriteAddrReg
-                                                                                                                            idx
-                                                                                                                            value)
-                                                                                                                          (pmpReadAddrReg
-                                                                                                                            idx))
+                                                                                                                          writeReg tselect value
+                                                                                                                          readReg tselect)
                                                                                                                       else
                                                                                                                         (do
-                                                                                                                          bif ((Sail.BitVec.extractLsb
-                                                                                                                                 b__0
-                                                                                                                                 11
-                                                                                                                                 4) == (0x3D : (BitVec 8)))
+                                                                                                                          bif (((Sail.BitVec.extractLsb
+                                                                                                                                   b__0
+                                                                                                                                   11
+                                                                                                                                   4) == (0x3A : (BitVec 8))) && (let idx : (BitVec 4) :=
+                                                                                                                                 (Sail.BitVec.extractLsb
+                                                                                                                                   b__0
+                                                                                                                                   3
+                                                                                                                                   0)
+                                                                                                                               (((BitVec.access
+                                                                                                                                     idx
+                                                                                                                                     0) == 0#1) || (xlen == 32))))
                                                                                                                           then
                                                                                                                             (do
                                                                                                                               let idx : (BitVec 4) :=
@@ -1135,18 +1132,18 @@ def write_CSR (b__0 : (BitVec 12)) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVe
                                                                                                                                   0)
                                                                                                                               let idx :=
                                                                                                                                 (BitVec.toNat
-                                                                                                                                  ((0b10 : (BitVec 2)) ++ idx))
-                                                                                                                              (pmpWriteAddrReg
+                                                                                                                                  idx)
+                                                                                                                              (pmpWriteCfgReg
                                                                                                                                 idx
                                                                                                                                 value)
-                                                                                                                              (pmpReadAddrReg
+                                                                                                                              (pmpReadCfgReg
                                                                                                                                 idx))
                                                                                                                           else
                                                                                                                             (do
                                                                                                                               bif ((Sail.BitVec.extractLsb
                                                                                                                                      b__0
                                                                                                                                      11
-                                                                                                                                     4) == (0x3E : (BitVec 8)))
+                                                                                                                                     4) == (0x3B : (BitVec 8)))
                                                                                                                               then
                                                                                                                                 (do
                                                                                                                                   let idx : (BitVec 4) :=
@@ -1156,7 +1153,7 @@ def write_CSR (b__0 : (BitVec 12)) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVe
                                                                                                                                       0)
                                                                                                                                   let idx :=
                                                                                                                                     (BitVec.toNat
-                                                                                                                                      ((0b11 : (BitVec 2)) ++ idx))
+                                                                                                                                      ((0b00 : (BitVec 2)) ++ idx))
                                                                                                                                   (pmpWriteAddrReg
                                                                                                                                     idx
                                                                                                                                     value)
@@ -1164,185 +1161,165 @@ def write_CSR (b__0 : (BitVec 12)) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVe
                                                                                                                                     idx))
                                                                                                                               else
                                                                                                                                 (do
-                                                                                                                                  bif (b__0 == (0x008 : (BitVec 12)))
+                                                                                                                                  bif ((Sail.BitVec.extractLsb
+                                                                                                                                         b__0
+                                                                                                                                         11
+                                                                                                                                         4) == (0x3C : (BitVec 8)))
                                                                                                                                   then
                                                                                                                                     (do
-                                                                                                                                      (set_vstart
+                                                                                                                                      let idx : (BitVec 4) :=
                                                                                                                                         (Sail.BitVec.extractLsb
-                                                                                                                                          value
-                                                                                                                                          15
-                                                                                                                                          0))
-                                                                                                                                      (pure (zero_extend
-                                                                                                                                          (m := ((2 ^i 2) *i 8))
-                                                                                                                                          (← readReg vstart))))
+                                                                                                                                          b__0
+                                                                                                                                          3
+                                                                                                                                          0)
+                                                                                                                                      let idx :=
+                                                                                                                                        (BitVec.toNat
+                                                                                                                                          ((0b01 : (BitVec 2)) ++ idx))
+                                                                                                                                      (pmpWriteAddrReg
+                                                                                                                                        idx
+                                                                                                                                        value)
+                                                                                                                                      (pmpReadAddrReg
+                                                                                                                                        idx))
                                                                                                                                   else
                                                                                                                                     (do
-                                                                                                                                      bif (b__0 == (0x009 : (BitVec 12)))
+                                                                                                                                      bif ((Sail.BitVec.extractLsb
+                                                                                                                                             b__0
+                                                                                                                                             11
+                                                                                                                                             4) == (0x3D : (BitVec 8)))
                                                                                                                                       then
                                                                                                                                         (do
-                                                                                                                                          (ext_write_vcsr
-                                                                                                                                            (_get_Vcsr_vxrm
-                                                                                                                                              (← readReg vcsr))
+                                                                                                                                          let idx : (BitVec 4) :=
                                                                                                                                             (Sail.BitVec.extractLsb
-                                                                                                                                              value
-                                                                                                                                              0
-                                                                                                                                              0))
-                                                                                                                                          (pure (zero_extend
-                                                                                                                                              (m := ((2 ^i 2) *i 8))
-                                                                                                                                              (_get_Vcsr_vxsat
-                                                                                                                                                (← readReg vcsr)))))
+                                                                                                                                              b__0
+                                                                                                                                              3
+                                                                                                                                              0)
+                                                                                                                                          let idx :=
+                                                                                                                                            (BitVec.toNat
+                                                                                                                                              ((0b10 : (BitVec 2)) ++ idx))
+                                                                                                                                          (pmpWriteAddrReg
+                                                                                                                                            idx
+                                                                                                                                            value)
+                                                                                                                                          (pmpReadAddrReg
+                                                                                                                                            idx))
                                                                                                                                       else
                                                                                                                                         (do
-                                                                                                                                          bif (b__0 == (0x00A : (BitVec 12)))
+                                                                                                                                          bif ((Sail.BitVec.extractLsb
+                                                                                                                                                 b__0
+                                                                                                                                                 11
+                                                                                                                                                 4) == (0x3E : (BitVec 8)))
                                                                                                                                           then
                                                                                                                                             (do
-                                                                                                                                              (ext_write_vcsr
+                                                                                                                                              let idx : (BitVec 4) :=
                                                                                                                                                 (Sail.BitVec.extractLsb
-                                                                                                                                                  value
-                                                                                                                                                  1
+                                                                                                                                                  b__0
+                                                                                                                                                  3
                                                                                                                                                   0)
-                                                                                                                                                (_get_Vcsr_vxsat
-                                                                                                                                                  (← readReg vcsr)))
-                                                                                                                                              (pure (zero_extend
-                                                                                                                                                  (m := ((2 ^i 2) *i 8))
-                                                                                                                                                  (_get_Vcsr_vxrm
-                                                                                                                                                    (← readReg vcsr)))))
+                                                                                                                                              let idx :=
+                                                                                                                                                (BitVec.toNat
+                                                                                                                                                  ((0b11 : (BitVec 2)) ++ idx))
+                                                                                                                                              (pmpWriteAddrReg
+                                                                                                                                                idx
+                                                                                                                                                value)
+                                                                                                                                              (pmpReadAddrReg
+                                                                                                                                                idx))
                                                                                                                                           else
                                                                                                                                             (do
-                                                                                                                                              bif (b__0 == (0x00F : (BitVec 12)))
+                                                                                                                                              bif (b__0 == (0x008 : (BitVec 12)))
                                                                                                                                               then
                                                                                                                                                 (do
-                                                                                                                                                  (ext_write_vcsr
+                                                                                                                                                  (set_vstart
                                                                                                                                                     (Sail.BitVec.extractLsb
                                                                                                                                                       value
-                                                                                                                                                      2
-                                                                                                                                                      1)
-                                                                                                                                                    (Sail.BitVec.extractLsb
-                                                                                                                                                      value
-                                                                                                                                                      0
+                                                                                                                                                      15
                                                                                                                                                       0))
-                                                                                                                                                  (pure (zero_extend
-                                                                                                                                                      (m := ((2 ^i 2) *i 8))
-                                                                                                                                                      (← readReg vcsr))))
+                                                                                                                                                  readReg vstart)
                                                                                                                                               else
                                                                                                                                                 (do
-                                                                                                                                                  bif (b__0 == (0x105 : (BitVec 12)))
+                                                                                                                                                  bif (b__0 == (0x009 : (BitVec 12)))
                                                                                                                                                   then
-                                                                                                                                                    (set_stvec
-                                                                                                                                                      value)
+                                                                                                                                                    (do
+                                                                                                                                                      (ext_write_vcsr
+                                                                                                                                                        (_get_Vcsr_vxrm
+                                                                                                                                                          (← readReg vcsr))
+                                                                                                                                                        (Sail.BitVec.extractLsb
+                                                                                                                                                          value
+                                                                                                                                                          0
+                                                                                                                                                          0))
+                                                                                                                                                      (pure (zero_extend
+                                                                                                                                                          (m := 32)
+                                                                                                                                                          (_get_Vcsr_vxsat
+                                                                                                                                                            (← readReg vcsr)))))
                                                                                                                                                   else
                                                                                                                                                     (do
-                                                                                                                                                      bif (b__0 == (0x141 : (BitVec 12)))
+                                                                                                                                                      bif (b__0 == (0x00A : (BitVec 12)))
                                                                                                                                                       then
-                                                                                                                                                        (set_xepc
-                                                                                                                                                          Supervisor
-                                                                                                                                                          value)
+                                                                                                                                                        (do
+                                                                                                                                                          (ext_write_vcsr
+                                                                                                                                                            (Sail.BitVec.extractLsb
+                                                                                                                                                              value
+                                                                                                                                                              1
+                                                                                                                                                              0)
+                                                                                                                                                            (_get_Vcsr_vxsat
+                                                                                                                                                              (← readReg vcsr)))
+                                                                                                                                                          (pure (zero_extend
+                                                                                                                                                              (m := 32)
+                                                                                                                                                              (_get_Vcsr_vxrm
+                                                                                                                                                                (← readReg vcsr)))))
                                                                                                                                                       else
                                                                                                                                                         (do
-                                                                                                                                                          bif (b__0 == (0x305 : (BitVec 12)))
+                                                                                                                                                          bif (b__0 == (0x00F : (BitVec 12)))
                                                                                                                                                           then
-                                                                                                                                                            (set_mtvec
-                                                                                                                                                              value)
+                                                                                                                                                            (do
+                                                                                                                                                              (ext_write_vcsr
+                                                                                                                                                                (Sail.BitVec.extractLsb
+                                                                                                                                                                  value
+                                                                                                                                                                  2
+                                                                                                                                                                  1)
+                                                                                                                                                                (Sail.BitVec.extractLsb
+                                                                                                                                                                  value
+                                                                                                                                                                  0
+                                                                                                                                                                  0))
+                                                                                                                                                              (pure (zero_extend
+                                                                                                                                                                  (m := 32)
+                                                                                                                                                                  (← readReg vcsr))))
                                                                                                                                                           else
                                                                                                                                                             (do
-                                                                                                                                                              bif (b__0 == (0x341 : (BitVec 12)))
+                                                                                                                                                              bif (b__0 == (0x105 : (BitVec 12)))
                                                                                                                                                               then
-                                                                                                                                                                (set_xepc
-                                                                                                                                                                  Machine
+                                                                                                                                                                (set_stvec
                                                                                                                                                                   value)
                                                                                                                                                               else
                                                                                                                                                                 (do
-                                                                                                                                                                  bif (((Sail.BitVec.extractLsb
-                                                                                                                                                                           b__0
-                                                                                                                                                                           11
-                                                                                                                                                                           5) == (0b0011001 : (BitVec 7))) && (let index : (BitVec 5) :=
-                                                                                                                                                                         (Sail.BitVec.extractLsb
-                                                                                                                                                                           b__0
-                                                                                                                                                                           4
-                                                                                                                                                                           0)
-                                                                                                                                                                       ((BitVec.toNat
-                                                                                                                                                                           index) ≥b 3) : Bool))
+                                                                                                                                                                  bif (b__0 == (0x141 : (BitVec 12)))
                                                                                                                                                                   then
-                                                                                                                                                                    (do
-                                                                                                                                                                      let index : (BitVec 5) :=
-                                                                                                                                                                        (Sail.BitVec.extractLsb
-                                                                                                                                                                          b__0
-                                                                                                                                                                          4
-                                                                                                                                                                          0)
-                                                                                                                                                                      let index ← do
-                                                                                                                                                                        (hpmidx_from_bits
-                                                                                                                                                                          index)
-                                                                                                                                                                      (write_mhpmevent
-                                                                                                                                                                        index
-                                                                                                                                                                        value)
-                                                                                                                                                                      (read_mhpmevent
-                                                                                                                                                                        index))
+                                                                                                                                                                    (set_xepc
+                                                                                                                                                                      Supervisor
+                                                                                                                                                                      value)
                                                                                                                                                                   else
                                                                                                                                                                     (do
-                                                                                                                                                                      bif (((Sail.BitVec.extractLsb
-                                                                                                                                                                               b__0
-                                                                                                                                                                               11
-                                                                                                                                                                               5) == (0b1011000 : (BitVec 7))) && (let index : (BitVec 5) :=
-                                                                                                                                                                             (Sail.BitVec.extractLsb
-                                                                                                                                                                               b__0
-                                                                                                                                                                               4
-                                                                                                                                                                               0)
-                                                                                                                                                                           ((BitVec.toNat
-                                                                                                                                                                               index) ≥b 3) : Bool))
+                                                                                                                                                                      bif (b__0 == (0x305 : (BitVec 12)))
                                                                                                                                                                       then
-                                                                                                                                                                        (do
-                                                                                                                                                                          let index : (BitVec 5) :=
-                                                                                                                                                                            (Sail.BitVec.extractLsb
-                                                                                                                                                                              b__0
-                                                                                                                                                                              4
-                                                                                                                                                                              0)
-                                                                                                                                                                          let index ← do
-                                                                                                                                                                            (hpmidx_from_bits
-                                                                                                                                                                              index)
-                                                                                                                                                                          (write_mhpmcounter
-                                                                                                                                                                            index
-                                                                                                                                                                            value)
-                                                                                                                                                                          (read_mhpmcounter
-                                                                                                                                                                            index))
+                                                                                                                                                                        (set_mtvec
+                                                                                                                                                                          value)
                                                                                                                                                                       else
                                                                                                                                                                         (do
-                                                                                                                                                                          bif (((Sail.BitVec.extractLsb
-                                                                                                                                                                                   b__0
-                                                                                                                                                                                   11
-                                                                                                                                                                                   5) == (0b1011100 : (BitVec 7))) && (let index : (BitVec 5) :=
-                                                                                                                                                                                 (Sail.BitVec.extractLsb
-                                                                                                                                                                                   b__0
-                                                                                                                                                                                   4
-                                                                                                                                                                                   0)
-                                                                                                                                                                               ((xlen == 32) && (((BitVec.toNat
-                                                                                                                                                                                     index) ≥b 3) : Bool))))
+                                                                                                                                                                          bif (b__0 == (0x341 : (BitVec 12)))
                                                                                                                                                                           then
-                                                                                                                                                                            (do
-                                                                                                                                                                              let index : (BitVec 5) :=
-                                                                                                                                                                                (Sail.BitVec.extractLsb
-                                                                                                                                                                                  b__0
-                                                                                                                                                                                  4
-                                                                                                                                                                                  0)
-                                                                                                                                                                              let index ← do
-                                                                                                                                                                                (hpmidx_from_bits
-                                                                                                                                                                                  index)
-                                                                                                                                                                              (write_mhpmcounterh
-                                                                                                                                                                                index
-                                                                                                                                                                                value)
-                                                                                                                                                                              (read_mhpmcounterh
-                                                                                                                                                                                index))
+                                                                                                                                                                            (set_xepc
+                                                                                                                                                                              Machine
+                                                                                                                                                                              value)
                                                                                                                                                                           else
                                                                                                                                                                             (do
                                                                                                                                                                               bif (((Sail.BitVec.extractLsb
                                                                                                                                                                                        b__0
                                                                                                                                                                                        11
-                                                                                                                                                                                       5) == (0b0111001 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                       5) == (0b0011001 : (BitVec 7))) && (let index : (BitVec 5) :=
                                                                                                                                                                                      (Sail.BitVec.extractLsb
                                                                                                                                                                                        b__0
                                                                                                                                                                                        4
                                                                                                                                                                                        0)
-                                                                                                                                                                                   ((xlen == 32) && (((BitVec.toNat
-                                                                                                                                                                                         index) ≥b 3) : Bool))))
+                                                                                                                                                                                   ((BitVec.toNat
+                                                                                                                                                                                       index) ≥b 3) : Bool))
                                                                                                                                                                               then
                                                                                                                                                                                 (do
                                                                                                                                                                                   let index : (BitVec 5) :=
@@ -1353,243 +1330,324 @@ def write_CSR (b__0 : (BitVec 12)) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVe
                                                                                                                                                                                   let index ← do
                                                                                                                                                                                     (hpmidx_from_bits
                                                                                                                                                                                       index)
-                                                                                                                                                                                  (write_mhpmeventh
+                                                                                                                                                                                  (write_mhpmevent
                                                                                                                                                                                     index
                                                                                                                                                                                     value)
-                                                                                                                                                                                  (read_mhpmeventh
+                                                                                                                                                                                  (read_mhpmevent
                                                                                                                                                                                     index))
                                                                                                                                                                               else
                                                                                                                                                                                 (do
-                                                                                                                                                                                  bif (b__0 == (0x015 : (BitVec 12)))
+                                                                                                                                                                                  bif (((Sail.BitVec.extractLsb
+                                                                                                                                                                                           b__0
+                                                                                                                                                                                           11
+                                                                                                                                                                                           5) == (0b1011000 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                         (Sail.BitVec.extractLsb
+                                                                                                                                                                                           b__0
+                                                                                                                                                                                           4
+                                                                                                                                                                                           0)
+                                                                                                                                                                                       ((BitVec.toNat
+                                                                                                                                                                                           index) ≥b 3) : Bool))
                                                                                                                                                                                   then
-                                                                                                                                                                                    (pure (write_seed_csr
-                                                                                                                                                                                        ()))
+                                                                                                                                                                                    (do
+                                                                                                                                                                                      let index : (BitVec 5) :=
+                                                                                                                                                                                        (Sail.BitVec.extractLsb
+                                                                                                                                                                                          b__0
+                                                                                                                                                                                          4
+                                                                                                                                                                                          0)
+                                                                                                                                                                                      let index ← do
+                                                                                                                                                                                        (hpmidx_from_bits
+                                                                                                                                                                                          index)
+                                                                                                                                                                                      (write_mhpmcounter
+                                                                                                                                                                                        index
+                                                                                                                                                                                        value)
+                                                                                                                                                                                      (read_mhpmcounter
+                                                                                                                                                                                        index))
                                                                                                                                                                                   else
                                                                                                                                                                                     (do
-                                                                                                                                                                                      bif (b__0 == (0xB00 : (BitVec 12)))
+                                                                                                                                                                                      bif (((Sail.BitVec.extractLsb
+                                                                                                                                                                                               b__0
+                                                                                                                                                                                               11
+                                                                                                                                                                                               5) == (0b1011100 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                             (Sail.BitVec.extractLsb
+                                                                                                                                                                                               b__0
+                                                                                                                                                                                               4
+                                                                                                                                                                                               0)
+                                                                                                                                                                                           ((xlen == 32) && (((BitVec.toNat
+                                                                                                                                                                                                 index) ≥b 3) : Bool))))
                                                                                                                                                                                       then
                                                                                                                                                                                         (do
-                                                                                                                                                                                          writeReg mcycle (Sail.BitVec.updateSubrange
-                                                                                                                                                                                            (← readReg mcycle)
-                                                                                                                                                                                            (xlen -i 1)
-                                                                                                                                                                                            0
+                                                                                                                                                                                          let index : (BitVec 5) :=
+                                                                                                                                                                                            (Sail.BitVec.extractLsb
+                                                                                                                                                                                              b__0
+                                                                                                                                                                                              4
+                                                                                                                                                                                              0)
+                                                                                                                                                                                          let index ← do
+                                                                                                                                                                                            (hpmidx_from_bits
+                                                                                                                                                                                              index)
+                                                                                                                                                                                          (write_mhpmcounterh
+                                                                                                                                                                                            index
                                                                                                                                                                                             value)
-                                                                                                                                                                                          (pure value))
+                                                                                                                                                                                          (read_mhpmcounterh
+                                                                                                                                                                                            index))
                                                                                                                                                                                       else
                                                                                                                                                                                         (do
-                                                                                                                                                                                          bif (b__0 == (0xB02 : (BitVec 12)))
+                                                                                                                                                                                          bif (((Sail.BitVec.extractLsb
+                                                                                                                                                                                                   b__0
+                                                                                                                                                                                                   11
+                                                                                                                                                                                                   5) == (0b0111001 : (BitVec 7))) && (let index : (BitVec 5) :=
+                                                                                                                                                                                                 (Sail.BitVec.extractLsb
+                                                                                                                                                                                                   b__0
+                                                                                                                                                                                                   4
+                                                                                                                                                                                                   0)
+                                                                                                                                                                                               ((xlen == 32) && (((BitVec.toNat
+                                                                                                                                                                                                     index) ≥b 3) : Bool))))
                                                                                                                                                                                           then
                                                                                                                                                                                             (do
-                                                                                                                                                                                              writeReg minstret (Sail.BitVec.updateSubrange
-                                                                                                                                                                                                (← readReg minstret)
-                                                                                                                                                                                                (xlen -i 1)
-                                                                                                                                                                                                0
+                                                                                                                                                                                              let index : (BitVec 5) :=
+                                                                                                                                                                                                (Sail.BitVec.extractLsb
+                                                                                                                                                                                                  b__0
+                                                                                                                                                                                                  4
+                                                                                                                                                                                                  0)
+                                                                                                                                                                                              let index ← do
+                                                                                                                                                                                                (hpmidx_from_bits
+                                                                                                                                                                                                  index)
+                                                                                                                                                                                              (write_mhpmeventh
+                                                                                                                                                                                                index
                                                                                                                                                                                                 value)
-                                                                                                                                                                                              writeReg minstret_increment false
-                                                                                                                                                                                              (pure value))
+                                                                                                                                                                                              (read_mhpmeventh
+                                                                                                                                                                                                index))
                                                                                                                                                                                           else
                                                                                                                                                                                             (do
-                                                                                                                                                                                              bif ((b__0 == (0xB80 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                              bif (b__0 == (0x015 : (BitVec 12)))
                                                                                                                                                                                               then
-                                                                                                                                                                                                (do
-                                                                                                                                                                                                  writeReg mcycle (Sail.BitVec.updateSubrange
-                                                                                                                                                                                                    (← readReg mcycle)
-                                                                                                                                                                                                    63
-                                                                                                                                                                                                    32
-                                                                                                                                                                                                    value)
-                                                                                                                                                                                                  (pure value))
+                                                                                                                                                                                                (pure (write_seed_csr
+                                                                                                                                                                                                    ()))
                                                                                                                                                                                               else
                                                                                                                                                                                                 (do
-                                                                                                                                                                                                  bif ((b__0 == (0xB82 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                  bif (b__0 == (0xB00 : (BitVec 12)))
                                                                                                                                                                                                   then
                                                                                                                                                                                                     (do
-                                                                                                                                                                                                      writeReg minstret (Sail.BitVec.updateSubrange
-                                                                                                                                                                                                        (← readReg minstret)
-                                                                                                                                                                                                        63
-                                                                                                                                                                                                        32
+                                                                                                                                                                                                      writeReg mcycle (Sail.BitVec.updateSubrange
+                                                                                                                                                                                                        (← readReg mcycle)
+                                                                                                                                                                                                        (xlen -i 1)
+                                                                                                                                                                                                        0
                                                                                                                                                                                                         value)
-                                                                                                                                                                                                      writeReg minstret_increment false
                                                                                                                                                                                                       (pure value))
                                                                                                                                                                                                   else
                                                                                                                                                                                                     (do
-                                                                                                                                                                                                      bif (b__0 == (0x001 : (BitVec 12)))
+                                                                                                                                                                                                      bif (b__0 == (0xB02 : (BitVec 12)))
                                                                                                                                                                                                       then
                                                                                                                                                                                                         (do
-                                                                                                                                                                                                          (write_fcsr
-                                                                                                                                                                                                            (_get_Fcsr_FRM
-                                                                                                                                                                                                              (← readReg fcsr))
-                                                                                                                                                                                                            (Sail.BitVec.extractLsb
-                                                                                                                                                                                                              value
-                                                                                                                                                                                                              4
-                                                                                                                                                                                                              0))
-                                                                                                                                                                                                          (pure (zero_extend
-                                                                                                                                                                                                              (m := ((2 ^i 2) *i 8))
-                                                                                                                                                                                                              (_get_Fcsr_FFLAGS
-                                                                                                                                                                                                                (← readReg fcsr)))))
+                                                                                                                                                                                                          writeReg minstret (Sail.BitVec.updateSubrange
+                                                                                                                                                                                                            (← readReg minstret)
+                                                                                                                                                                                                            (xlen -i 1)
+                                                                                                                                                                                                            0
+                                                                                                                                                                                                            value)
+                                                                                                                                                                                                          writeReg minstret_increment false
+                                                                                                                                                                                                          (pure value))
                                                                                                                                                                                                       else
                                                                                                                                                                                                         (do
-                                                                                                                                                                                                          bif (b__0 == (0x002 : (BitVec 12)))
+                                                                                                                                                                                                          bif ((b__0 == (0xB80 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                           then
                                                                                                                                                                                                             (do
-                                                                                                                                                                                                              (write_fcsr
-                                                                                                                                                                                                                (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                  value
-                                                                                                                                                                                                                  2
-                                                                                                                                                                                                                  0)
-                                                                                                                                                                                                                (_get_Fcsr_FFLAGS
-                                                                                                                                                                                                                  (← readReg fcsr)))
-                                                                                                                                                                                                              (pure (zero_extend
-                                                                                                                                                                                                                  (m := ((2 ^i 2) *i 8))
-                                                                                                                                                                                                                  (_get_Fcsr_FRM
-                                                                                                                                                                                                                    (← readReg fcsr)))))
+                                                                                                                                                                                                              writeReg mcycle (Sail.BitVec.updateSubrange
+                                                                                                                                                                                                                (← readReg mcycle)
+                                                                                                                                                                                                                63
+                                                                                                                                                                                                                32
+                                                                                                                                                                                                                value)
+                                                                                                                                                                                                              (pure value))
                                                                                                                                                                                                           else
                                                                                                                                                                                                             (do
-                                                                                                                                                                                                              bif (b__0 == (0x003 : (BitVec 12)))
+                                                                                                                                                                                                              bif ((b__0 == (0xB82 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                               then
                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                  (write_fcsr
-                                                                                                                                                                                                                    (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                      value
-                                                                                                                                                                                                                      7
-                                                                                                                                                                                                                      5)
-                                                                                                                                                                                                                    (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                      value
-                                                                                                                                                                                                                      4
-                                                                                                                                                                                                                      0))
-                                                                                                                                                                                                                  (pure (zero_extend
-                                                                                                                                                                                                                      (m := ((2 ^i 2) *i 8))
-                                                                                                                                                                                                                      (← readReg fcsr))))
+                                                                                                                                                                                                                  writeReg minstret (Sail.BitVec.updateSubrange
+                                                                                                                                                                                                                    (← readReg minstret)
+                                                                                                                                                                                                                    63
+                                                                                                                                                                                                                    32
+                                                                                                                                                                                                                    value)
+                                                                                                                                                                                                                  writeReg minstret_increment false
+                                                                                                                                                                                                                  (pure value))
                                                                                                                                                                                                               else
                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                  bif ((b__0 == (0x321 : (BitVec 12))) && (xlen == 64))
+                                                                                                                                                                                                                  bif (b__0 == (0x001 : (BitVec 12)))
                                                                                                                                                                                                                   then
                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                      writeReg mcyclecfg (← (legalize_smcntrpmf
-                                                                                                                                                                                                                          (← readReg mcyclecfg)
-                                                                                                                                                                                                                          value))
-                                                                                                                                                                                                                      readReg mcyclecfg)
+                                                                                                                                                                                                                      (write_fcsr
+                                                                                                                                                                                                                        (_get_Fcsr_FRM
+                                                                                                                                                                                                                          (← readReg fcsr))
+                                                                                                                                                                                                                        (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                          value
+                                                                                                                                                                                                                          4
+                                                                                                                                                                                                                          0))
+                                                                                                                                                                                                                      (pure (zero_extend
+                                                                                                                                                                                                                          (m := 32)
+                                                                                                                                                                                                                          (_get_Fcsr_FFLAGS
+                                                                                                                                                                                                                            (← readReg fcsr)))))
                                                                                                                                                                                                                   else
                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                      bif ((b__0 == (0x321 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                      bif (b__0 == (0x002 : (BitVec 12)))
                                                                                                                                                                                                                       then
                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                          writeReg mcyclecfg (← (legalize_smcntrpmf
-                                                                                                                                                                                                                              (← readReg mcyclecfg)
-                                                                                                                                                                                                                              ((Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                  (← readReg mcyclecfg)
-                                                                                                                                                                                                                                  63
-                                                                                                                                                                                                                                  32) ++ value)))
-                                                                                                                                                                                                                          (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                              (← readReg mcyclecfg)
-                                                                                                                                                                                                                              (xlen -i 1)
-                                                                                                                                                                                                                              0)))
+                                                                                                                                                                                                                          (write_fcsr
+                                                                                                                                                                                                                            (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                              value
+                                                                                                                                                                                                                              2
+                                                                                                                                                                                                                              0)
+                                                                                                                                                                                                                            (_get_Fcsr_FFLAGS
+                                                                                                                                                                                                                              (← readReg fcsr)))
+                                                                                                                                                                                                                          (pure (zero_extend
+                                                                                                                                                                                                                              (m := 32)
+                                                                                                                                                                                                                              (_get_Fcsr_FRM
+                                                                                                                                                                                                                                (← readReg fcsr)))))
                                                                                                                                                                                                                       else
                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                          bif ((b__0 == (0x721 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                          bif (b__0 == (0x003 : (BitVec 12)))
                                                                                                                                                                                                                           then
                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                              writeReg mcyclecfg (← (legalize_smcntrpmf
-                                                                                                                                                                                                                                  (← readReg mcyclecfg)
-                                                                                                                                                                                                                                  (value ++ (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                      (← readReg mcyclecfg)
-                                                                                                                                                                                                                                      31
-                                                                                                                                                                                                                                      0))))
-                                                                                                                                                                                                                              (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                  (← readReg mcyclecfg)
-                                                                                                                                                                                                                                  63
-                                                                                                                                                                                                                                  32)))
+                                                                                                                                                                                                                              (write_fcsr
+                                                                                                                                                                                                                                (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                  value
+                                                                                                                                                                                                                                  7
+                                                                                                                                                                                                                                  5)
+                                                                                                                                                                                                                                (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                  value
+                                                                                                                                                                                                                                  4
+                                                                                                                                                                                                                                  0))
+                                                                                                                                                                                                                              (pure (zero_extend
+                                                                                                                                                                                                                                  (m := 32)
+                                                                                                                                                                                                                                  (← readReg fcsr))))
                                                                                                                                                                                                                           else
                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                              bif ((b__0 == (0x322 : (BitVec 12))) && (xlen == 64))
+                                                                                                                                                                                                                              bif ((b__0 == (0x321 : (BitVec 12))) && (xlen == 64))
                                                                                                                                                                                                                               then
                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                  writeReg minstretcfg (← (legalize_smcntrpmf
-                                                                                                                                                                                                                                      (← readReg minstretcfg)
+                                                                                                                                                                                                                                  writeReg mcyclecfg (← (legalize_smcntrpmf
+                                                                                                                                                                                                                                      (← readReg mcyclecfg)
                                                                                                                                                                                                                                       value))
-                                                                                                                                                                                                                                  (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                      (← readReg minstretcfg)
-                                                                                                                                                                                                                                      (xlen -i 1)
-                                                                                                                                                                                                                                      0)))
+                                                                                                                                                                                                                                  readReg mcyclecfg)
                                                                                                                                                                                                                               else
                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                  bif ((b__0 == (0x322 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                  bif ((b__0 == (0x321 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                   then
                                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                                      writeReg minstretcfg (← (legalize_smcntrpmf
-                                                                                                                                                                                                                                          (← readReg minstretcfg)
+                                                                                                                                                                                                                                      writeReg mcyclecfg (← (legalize_smcntrpmf
+                                                                                                                                                                                                                                          (← readReg mcyclecfg)
                                                                                                                                                                                                                                           ((Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                              (← readReg minstretcfg)
+                                                                                                                                                                                                                                              (← readReg mcyclecfg)
                                                                                                                                                                                                                                               63
                                                                                                                                                                                                                                               32) ++ value)))
                                                                                                                                                                                                                                       (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                          (← readReg minstretcfg)
+                                                                                                                                                                                                                                          (← readReg mcyclecfg)
                                                                                                                                                                                                                                           (xlen -i 1)
                                                                                                                                                                                                                                           0)))
                                                                                                                                                                                                                                   else
                                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                                      bif ((b__0 == (0x722 : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                      bif ((b__0 == (0x721 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                       then
                                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                                          writeReg minstretcfg (← (legalize_smcntrpmf
-                                                                                                                                                                                                                                              (← readReg minstretcfg)
+                                                                                                                                                                                                                                          writeReg mcyclecfg (← (legalize_smcntrpmf
+                                                                                                                                                                                                                                              (← readReg mcyclecfg)
                                                                                                                                                                                                                                               (value ++ (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                  (← readReg minstretcfg)
+                                                                                                                                                                                                                                                  (← readReg mcyclecfg)
                                                                                                                                                                                                                                                   31
                                                                                                                                                                                                                                                   0))))
                                                                                                                                                                                                                                           (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                              (← readReg minstretcfg)
+                                                                                                                                                                                                                                              (← readReg mcyclecfg)
                                                                                                                                                                                                                                               63
                                                                                                                                                                                                                                               32)))
                                                                                                                                                                                                                                       else
                                                                                                                                                                                                                                         (do
-                                                                                                                                                                                                                                          bif (b__0 == (0x14D : (BitVec 12)))
+                                                                                                                                                                                                                                          bif ((b__0 == (0x322 : (BitVec 12))) && (xlen == 64))
                                                                                                                                                                                                                                           then
                                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                                              writeReg stimecmp (Sail.BitVec.updateSubrange
-                                                                                                                                                                                                                                                (← readReg stimecmp)
-                                                                                                                                                                                                                                                (xlen -i 1)
-                                                                                                                                                                                                                                                0
-                                                                                                                                                                                                                                                value)
+                                                                                                                                                                                                                                              writeReg minstretcfg (← (legalize_smcntrpmf
+                                                                                                                                                                                                                                                  (← readReg minstretcfg)
+                                                                                                                                                                                                                                                  value))
                                                                                                                                                                                                                                               (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                  (← readReg stimecmp)
+                                                                                                                                                                                                                                                  (← readReg minstretcfg)
                                                                                                                                                                                                                                                   (xlen -i 1)
                                                                                                                                                                                                                                                   0)))
                                                                                                                                                                                                                                           else
                                                                                                                                                                                                                                             (do
-                                                                                                                                                                                                                                              bif ((b__0 == (0x15D : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                              bif ((b__0 == (0x322 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                               then
                                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                                  writeReg stimecmp (Sail.BitVec.updateSubrange
-                                                                                                                                                                                                                                                    (← readReg stimecmp)
-                                                                                                                                                                                                                                                    63
-                                                                                                                                                                                                                                                    32
-                                                                                                                                                                                                                                                    value)
+                                                                                                                                                                                                                                                  writeReg minstretcfg (← (legalize_smcntrpmf
+                                                                                                                                                                                                                                                      (← readReg minstretcfg)
+                                                                                                                                                                                                                                                      ((Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                          (← readReg minstretcfg)
+                                                                                                                                                                                                                                                          63
+                                                                                                                                                                                                                                                          32) ++ value)))
                                                                                                                                                                                                                                                   (pure (Sail.BitVec.extractLsb
-                                                                                                                                                                                                                                                      (← readReg stimecmp)
-                                                                                                                                                                                                                                                      63
-                                                                                                                                                                                                                                                      32)))
+                                                                                                                                                                                                                                                      (← readReg minstretcfg)
+                                                                                                                                                                                                                                                      (xlen -i 1)
+                                                                                                                                                                                                                                                      0)))
                                                                                                                                                                                                                                               else
                                                                                                                                                                                                                                                 (do
-                                                                                                                                                                                                                                                  bif (b__0 == (0x180 : (BitVec 12)))
+                                                                                                                                                                                                                                                  bif ((b__0 == (0x722 : (BitVec 12))) && (xlen == 32))
                                                                                                                                                                                                                                                   then
                                                                                                                                                                                                                                                     (do
-                                                                                                                                                                                                                                                      writeReg satp (← (legalize_satp
-                                                                                                                                                                                                                                                          (← (cur_architecture
-                                                                                                                                                                                                                                                              ()))
-                                                                                                                                                                                                                                                          (← readReg satp)
-                                                                                                                                                                                                                                                          value))
-                                                                                                                                                                                                                                                      readReg satp)
+                                                                                                                                                                                                                                                      writeReg minstretcfg (← (legalize_smcntrpmf
+                                                                                                                                                                                                                                                          (← readReg minstretcfg)
+                                                                                                                                                                                                                                                          (value ++ (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                              (← readReg minstretcfg)
+                                                                                                                                                                                                                                                              31
+                                                                                                                                                                                                                                                              0))))
+                                                                                                                                                                                                                                                      (pure (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                          (← readReg minstretcfg)
+                                                                                                                                                                                                                                                          63
+                                                                                                                                                                                                                                                          32)))
                                                                                                                                                                                                                                                   else
-                                                                                                                                                                                                                                                    (internal_error
-                                                                                                                                                                                                                                                      "riscv_csr_end.sail"
-                                                                                                                                                                                                                                                      23
-                                                                                                                                                                                                                                                      (HAppend.hAppend
-                                                                                                                                                                                                                                                        "Write to CSR that does not exist: "
-                                                                                                                                                                                                                                                        (BitVec.toFormatted
-                                                                                                                                                                                                                                                          b__0)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                                                                                                                                                                                                                    (do
+                                                                                                                                                                                                                                                      bif (b__0 == (0x14D : (BitVec 12)))
+                                                                                                                                                                                                                                                      then
+                                                                                                                                                                                                                                                        (do
+                                                                                                                                                                                                                                                          writeReg stimecmp (Sail.BitVec.updateSubrange
+                                                                                                                                                                                                                                                            (← readReg stimecmp)
+                                                                                                                                                                                                                                                            (xlen -i 1)
+                                                                                                                                                                                                                                                            0
+                                                                                                                                                                                                                                                            value)
+                                                                                                                                                                                                                                                          (pure (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                              (← readReg stimecmp)
+                                                                                                                                                                                                                                                              (xlen -i 1)
+                                                                                                                                                                                                                                                              0)))
+                                                                                                                                                                                                                                                      else
+                                                                                                                                                                                                                                                        (do
+                                                                                                                                                                                                                                                          bif ((b__0 == (0x15D : (BitVec 12))) && (xlen == 32))
+                                                                                                                                                                                                                                                          then
+                                                                                                                                                                                                                                                            (do
+                                                                                                                                                                                                                                                              writeReg stimecmp (Sail.BitVec.updateSubrange
+                                                                                                                                                                                                                                                                (← readReg stimecmp)
+                                                                                                                                                                                                                                                                63
+                                                                                                                                                                                                                                                                32
+                                                                                                                                                                                                                                                                value)
+                                                                                                                                                                                                                                                              (pure (Sail.BitVec.extractLsb
+                                                                                                                                                                                                                                                                  (← readReg stimecmp)
+                                                                                                                                                                                                                                                                  63
+                                                                                                                                                                                                                                                                  32)))
+                                                                                                                                                                                                                                                          else
+                                                                                                                                                                                                                                                            (do
+                                                                                                                                                                                                                                                              bif (b__0 == (0x180 : (BitVec 12)))
+                                                                                                                                                                                                                                                              then
+                                                                                                                                                                                                                                                                (do
+                                                                                                                                                                                                                                                                  writeReg satp (← (legalize_satp
+                                                                                                                                                                                                                                                                      (← (cur_architecture
+                                                                                                                                                                                                                                                                          ()))
+                                                                                                                                                                                                                                                                      (← readReg satp)
+                                                                                                                                                                                                                                                                      value))
+                                                                                                                                                                                                                                                                  readReg satp)
+                                                                                                                                                                                                                                                              else
+                                                                                                                                                                                                                                                                (internal_error
+                                                                                                                                                                                                                                                                  "riscv_csr_end.sail"
+                                                                                                                                                                                                                                                                  23
+                                                                                                                                                                                                                                                                  (HAppend.hAppend
+                                                                                                                                                                                                                                                                    "Write to CSR that does not exist: "
+                                                                                                                                                                                                                                                                    (BitVec.toFormatted
+                                                                                                                                                                                                                                                                      b__0))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
 
-/-- Type quantifiers: k_ex378304# : Bool -/
-def doCSR (csr : (BitVec 12)) (rs1_val : (BitVec (2 ^ 2 * 8))) (rd : regidx) (op : csrop) (is_CSR_Write : Bool) : SailM ExecutionResult := do
+/-- Type quantifiers: k_ex377529# : Bool -/
+def doCSR (csr : (BitVec 12)) (rs1_val : (BitVec 32)) (rd : regidx) (op : csrop) (is_CSR_Write : Bool) : SailM ExecutionResult := do
   bif (not (← (check_CSR csr (← readReg cur_privilege) is_CSR_Write)))
   then (pure (Illegal_Instruction ()))
   else
@@ -1602,7 +1660,7 @@ def doCSR (csr : (BitVec 12)) (rs1_val : (BitVec (2 ^ 2 * 8))) (rd : regidx) (op
           let csr_val ← (( do
             bif is_CSR_Read
             then (read_CSR csr)
-            else (pure (zeros (n := ((2 ^i 2) *i 8)))) ) : SailM xlenbits )
+            else (pure (zeros (n := 32))) ) : SailM xlenbits )
           bif is_CSR_Write
           then
             (do

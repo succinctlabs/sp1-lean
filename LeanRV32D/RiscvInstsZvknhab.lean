@@ -1,4 +1,10 @@
-import LeanRV32D.RiscvInstsZvkned
+import LeanRV32D.Sail.Sail
+import LeanRV32D.Sail.BitVec
+import LeanRV32D.Sail.IntRange
+import LeanRV32D.Defs
+import LeanRV32D.Specialization
+import LeanRV32D.FakeReal
+import LeanRV32D.RiscvExtras
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +17,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +30,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +58,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +160,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,30 +173,30 @@ open ExceptionType
 open Architecture
 open AccessType
 
-def encdec_zvkfunct6_forwards (arg_ : zvkfunct6) : (BitVec 6) :=
+def encdec_vsha2_forwards (arg_ : zvk_vsha2_funct6) : (BitVec 6) :=
   match arg_ with
-  | ZVK_VSHA2CH => (0b101110 : (BitVec 6))
-  | ZVK_VSHA2CL => (0b101111 : (BitVec 6))
+  | ZVK_VSHA2CH_VV => (0b101110 : (BitVec 6))
+  | ZVK_VSHA2CL_VV => (0b101111 : (BitVec 6))
 
-def encdec_zvkfunct6_backwards (arg_ : (BitVec 6)) : SailM zvkfunct6 := do
+def encdec_vsha2_backwards (arg_ : (BitVec 6)) : SailM zvk_vsha2_funct6 := do
   let b__0 := arg_
   bif (b__0 == (0b101110 : (BitVec 6)))
-  then (pure ZVK_VSHA2CH)
+  then (pure ZVK_VSHA2CH_VV)
   else
     (do
       bif (b__0 == (0b101111 : (BitVec 6)))
-      then (pure ZVK_VSHA2CL)
+      then (pure ZVK_VSHA2CL_VV)
       else
         (do
           assert false "Pattern match failure at unknown location"
           throw Error.Exit))
 
-def encdec_zvkfunct6_forwards_matches (arg_ : zvkfunct6) : Bool :=
+def encdec_vsha2_forwards_matches (arg_ : zvk_vsha2_funct6) : Bool :=
   match arg_ with
-  | ZVK_VSHA2CH => true
-  | ZVK_VSHA2CL => true
+  | ZVK_VSHA2CH_VV => true
+  | ZVK_VSHA2CL_VV => true
 
-def encdec_zvkfunct6_backwards_matches (arg_ : (BitVec 6)) : Bool :=
+def encdec_vsha2_backwards_matches (arg_ : (BitVec 6)) : Bool :=
   let b__0 := arg_
   bif (b__0 == (0b101110 : (BitVec 6)))
   then true
@@ -200,21 +205,21 @@ def encdec_zvkfunct6_backwards_matches (arg_ : (BitVec 6)) : Bool :=
     then true
     else false)
 
-def vsha2c_mnemonic_backwards (arg_ : String) : SailM zvkfunct6 := do
+def vsha2_mnemonic_backwards (arg_ : String) : SailM zvk_vsha2_funct6 := do
   match arg_ with
-  | "vsha2ch.vv" => (pure ZVK_VSHA2CH)
-  | "vsha2cl.vv" => (pure ZVK_VSHA2CL)
+  | "vsha2ch.vv" => (pure ZVK_VSHA2CH_VV)
+  | "vsha2cl.vv" => (pure ZVK_VSHA2CL_VV)
   | _ =>
     (do
       assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
-def vsha2c_mnemonic_forwards_matches (arg_ : zvkfunct6) : Bool :=
+def vsha2_mnemonic_forwards_matches (arg_ : zvk_vsha2_funct6) : Bool :=
   match arg_ with
-  | ZVK_VSHA2CH => true
-  | ZVK_VSHA2CL => true
+  | ZVK_VSHA2CH_VV => true
+  | ZVK_VSHA2CL_VV => true
 
-def vsha2c_mnemonic_backwards_matches (arg_ : String) : Bool :=
+def vsha2_mnemonic_backwards_matches (arg_ : String) : Bool :=
   match arg_ with
   | "vsha2ch.vv" => true
   | "vsha2cl.vv" => true

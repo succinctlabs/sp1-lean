@@ -1,4 +1,8 @@
-import LeanRV32D.RiscvTermination
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvExtensions
+import LeanRV32D.RiscvPlatform
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +15,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +28,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +56,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +158,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,8 +171,57 @@ open ExceptionType
 open Architecture
 open AccessType
 
+def mmu_type (_ : Unit) : String :=
+  bif (hartSupports Ext_Sv32)
+  then "sv32"
+  else "none"
+
+def generate_isa_base (_ : Unit) : String :=
+  (HAppend.hAppend "rv" (HAppend.hAppend (Int.repr xlen) "i"))
+
+def undefined_ISA_Format (_ : Unit) : SailM ISA_Format := do
+  (internal_pick [Canonical_Lowercase, DeviceTree_ISA_Extensions])
+
+/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 1 -/
+def ISA_Format_of_num (arg_ : Nat) : ISA_Format :=
+  match arg_ with
+  | 0 => Canonical_Lowercase
+  | _ => DeviceTree_ISA_Extensions
+
+def num_of_ISA_Format (arg_ : ISA_Format) : Int :=
+  match arg_ with
+  | Canonical_Lowercase => 0
+  | DeviceTree_ISA_Extensions => 1
+
+def ext_wrap (ext : extension) (fmt : ISA_Format) : String :=
+  bif (not (hartSupports ext))
+  then ""
+  else
+    (let s := (extensionName_forwards ext)
+    match fmt with
+    | Canonical_Lowercase =>
+      (bif ((String.length s) == 1)
+      then s
+      else (HAppend.hAppend "_" s))
+    | DeviceTree_ISA_Extensions => (HAppend.hAppend ", \"" (HAppend.hAppend s "\"")))
+
+def generate_isa_string (fmt : ISA_Format) : String := Id.run do
+  let isa_string : String :=
+    match fmt with
+    | Canonical_Lowercase => (HAppend.hAppend "rv" (HAppend.hAppend (Int.repr xlen) "i"))
+    | DeviceTree_ISA_Extensions => "\"i\""
+  let loop_i_lower := 0
+  let loop_i_upper := ((Vector.length extensions_ordered_for_isa_string) -i 1)
+  let mut loop_vars := isa_string
+  for i in [loop_i_upper:loop_i_lower:-1]i do
+    let isa_string := loop_vars
+    loop_vars :=
+      (HAppend.hAppend isa_string
+        (ext_wrap (GetElem?.getElem! extensions_ordered_for_isa_string i) fmt))
+  (pure loop_vars)
+
 def generate_dts (_ : Unit) : SailM String := do
-  let clock_freq : Int := 1000000000
+  let clock_freq : Nat := 1000000000
   let ram_base_hi ← do (pure (BitVec.toNat (shiftr (← readReg plat_ram_base) 32)))
   let ram_base_lo ← do
     (pure (BitVec.toNat (Sail.BitVec.extractLsb (← readReg plat_ram_base) 31 0)))
@@ -182,7 +234,6 @@ def generate_dts (_ : Unit) : SailM String := do
   let clint_size_hi ← do (pure (BitVec.toNat (shiftr (← readReg plat_clint_size) 32)))
   let clint_size_lo ← do
     (pure (BitVec.toNat (Sail.BitVec.extractLsb (← readReg plat_clint_size) 31 0)))
-  let isa_string : String := "imafdc_zicntr_zihpm"
   (pure (HAppend.hAppend "/dts-v1/;
 "
       (HAppend.hAppend "
@@ -217,151 +268,169 @@ def generate_dts (_ : Unit) : SailM String := do
 "
                                       (HAppend.hAppend "      compatible = \"riscv\";
 "
-                                        (HAppend.hAppend "      riscv,isa = \""
-                                          (HAppend.hAppend "rv"
-                                            (HAppend.hAppend (Int.repr xlen)
-                                              (HAppend.hAppend isa_string
-                                                (HAppend.hAppend "\";
+                                        (HAppend.hAppend "      riscv,isa-base = \""
+                                          (HAppend.hAppend (generate_isa_base ())
+                                            (HAppend.hAppend "\";
 "
-                                                  (HAppend.hAppend "      mmu-type = \"riscv,"
-                                                    (HAppend.hAppend "sv32"
-                                                      (HAppend.hAppend "\";
+                                              (HAppend.hAppend "      riscv,isa = \""
+                                                (HAppend.hAppend
+                                                  (generate_isa_string Canonical_Lowercase)
+                                                  (HAppend.hAppend "\";
 "
-                                                        (HAppend.hAppend "      clock-frequency = <"
-                                                          (HAppend.hAppend (Int.repr clock_freq)
-                                                            (HAppend.hAppend ">;
+                                                    (HAppend.hAppend "      riscv,isa-extensions = "
+                                                      (HAppend.hAppend
+                                                        (generate_isa_string
+                                                          DeviceTree_ISA_Extensions)
+                                                        (HAppend.hAppend ";
 "
-                                                              (HAppend.hAppend
-                                                                "      CPU0_intc: interrupt-controller {
+                                                          (HAppend.hAppend
+                                                            "      mmu-type = \"riscv,"
+                                                            (HAppend.hAppend (mmu_type ())
+                                                              (HAppend.hAppend "\";
 "
                                                                 (HAppend.hAppend
-                                                                  "        #address-cells = <2>;
-"
+                                                                  "      clock-frequency = <"
                                                                   (HAppend.hAppend
-                                                                    "        #interrupt-cells = <1>;
-"
-                                                                    (HAppend.hAppend
-                                                                      "        interrupt-controller;
+                                                                    (Int.repr clock_freq)
+                                                                    (HAppend.hAppend ">;
 "
                                                                       (HAppend.hAppend
-                                                                        "        compatible = \"riscv,cpu-intc\";
+                                                                        "      CPU0_intc: interrupt-controller {
 "
-                                                                        (HAppend.hAppend "      };
+                                                                        (HAppend.hAppend
+                                                                          "        #address-cells = <2>;
 "
-                                                                          (HAppend.hAppend "    };
+                                                                          (HAppend.hAppend
+                                                                            "        #interrupt-cells = <1>;
 "
-                                                                            (HAppend.hAppend "  };
+                                                                            (HAppend.hAppend
+                                                                              "        interrupt-controller;
 "
                                                                               (HAppend.hAppend
-                                                                                "  memory@"
+                                                                                "        compatible = \"riscv,cpu-intc\";
+"
                                                                                 (HAppend.hAppend
-                                                                                  (String.drop
-                                                                                    (Int.toHex
-                                                                                      (BitVec.toNat
-                                                                                        (← readReg plat_ram_base)))
-                                                                                    2)
+                                                                                  "      };
+"
                                                                                   (HAppend.hAppend
-                                                                                    " {
+                                                                                    "    };
 "
                                                                                     (HAppend.hAppend
-                                                                                      "    device_type = \"memory\";
+                                                                                      "  };
 "
                                                                                       (HAppend.hAppend
-                                                                                        "    reg = <"
+                                                                                        "  memory@"
                                                                                         (HAppend.hAppend
-                                                                                          (Int.toHex
-                                                                                            ram_base_hi)
+                                                                                          (String.drop
+                                                                                            (Int.toHex
+                                                                                              (BitVec.toNat
+                                                                                                (← readReg plat_ram_base)))
+                                                                                            2)
                                                                                           (HAppend.hAppend
-                                                                                            " "
+                                                                                            " {
+"
                                                                                             (HAppend.hAppend
-                                                                                              (Int.toHex
-                                                                                                ram_base_lo)
+                                                                                              "    device_type = \"memory\";
+"
                                                                                               (HAppend.hAppend
-                                                                                                " "
+                                                                                                "    reg = <"
                                                                                                 (HAppend.hAppend
                                                                                                   (Int.toHex
-                                                                                                    ram_size_hi)
+                                                                                                    ram_base_hi)
                                                                                                   (HAppend.hAppend
                                                                                                     " "
                                                                                                     (HAppend.hAppend
                                                                                                       (Int.toHex
-                                                                                                        ram_size_lo)
+                                                                                                        ram_base_lo)
                                                                                                       (HAppend.hAppend
-                                                                                                        ">;
-"
+                                                                                                        " "
                                                                                                         (HAppend.hAppend
-                                                                                                          "  };
-"
+                                                                                                          (Int.toHex
+                                                                                                            ram_size_hi)
                                                                                                           (HAppend.hAppend
-                                                                                                            "  soc {
-"
+                                                                                                            " "
                                                                                                             (HAppend.hAppend
-                                                                                                              "    #address-cells = <2>;
-"
+                                                                                                              (Int.toHex
+                                                                                                                ram_size_lo)
                                                                                                               (HAppend.hAppend
-                                                                                                                "    #size-cells = <2>;
+                                                                                                                ">;
 "
                                                                                                                 (HAppend.hAppend
-                                                                                                                  "    compatible = \"ucbbar,spike-bare-soc\", \"simple-bus\";
+                                                                                                                  "  };
 "
                                                                                                                   (HAppend.hAppend
-                                                                                                                    "    ranges;
+                                                                                                                    "  soc {
 "
                                                                                                                     (HAppend.hAppend
-                                                                                                                      "    clint@"
+                                                                                                                      "    #address-cells = <2>;
+"
                                                                                                                       (HAppend.hAppend
-                                                                                                                        (String.drop
-                                                                                                                          (Int.toHex
-                                                                                                                            (BitVec.toNat
-                                                                                                                              (← readReg plat_clint_base)))
-                                                                                                                          2)
+                                                                                                                        "    #size-cells = <2>;
+"
                                                                                                                         (HAppend.hAppend
-                                                                                                                          " {
+                                                                                                                          "    compatible = \"ucbbar,spike-bare-soc\", \"simple-bus\";
 "
                                                                                                                           (HAppend.hAppend
-                                                                                                                            "      compatible = \"riscv,clint0\";
+                                                                                                                            "    ranges;
 "
                                                                                                                             (HAppend.hAppend
-                                                                                                                              "      interrupts-extended = <&CPU0_intc 3 &CPU0_intc 7>;
-"
+                                                                                                                              "    clint@"
                                                                                                                               (HAppend.hAppend
-                                                                                                                                "      reg = <"
-                                                                                                                                (HAppend.hAppend
+                                                                                                                                (String.drop
                                                                                                                                   (Int.toHex
-                                                                                                                                    clint_base_hi)
+                                                                                                                                    (BitVec.toNat
+                                                                                                                                      (← readReg plat_clint_base)))
+                                                                                                                                  2)
+                                                                                                                                (HAppend.hAppend
+                                                                                                                                  " {
+"
                                                                                                                                   (HAppend.hAppend
-                                                                                                                                    " "
+                                                                                                                                    "      compatible = \"riscv,clint0\";
+"
                                                                                                                                     (HAppend.hAppend
-                                                                                                                                      (Int.toHex
-                                                                                                                                        clint_base_lo)
+                                                                                                                                      "      interrupts-extended = <&CPU0_intc 3 &CPU0_intc 7>;
+"
                                                                                                                                       (HAppend.hAppend
-                                                                                                                                        " "
+                                                                                                                                        "      reg = <"
                                                                                                                                         (HAppend.hAppend
                                                                                                                                           (Int.toHex
-                                                                                                                                            clint_size_hi)
+                                                                                                                                            clint_base_hi)
                                                                                                                                           (HAppend.hAppend
                                                                                                                                             " "
                                                                                                                                             (HAppend.hAppend
                                                                                                                                               (Int.toHex
-                                                                                                                                                clint_size_lo)
+                                                                                                                                                clint_base_lo)
                                                                                                                                               (HAppend.hAppend
-                                                                                                                                                ">;
-"
+                                                                                                                                                " "
                                                                                                                                                 (HAppend.hAppend
-                                                                                                                                                  "    };
-"
+                                                                                                                                                  (Int.toHex
+                                                                                                                                                    clint_size_hi)
                                                                                                                                                   (HAppend.hAppend
-                                                                                                                                                    "  };
-"
+                                                                                                                                                    " "
                                                                                                                                                     (HAppend.hAppend
-                                                                                                                                                      "  htif {
-"
+                                                                                                                                                      (Int.toHex
+                                                                                                                                                        clint_size_lo)
                                                                                                                                                       (HAppend.hAppend
-                                                                                                                                                        "    compatible = \"ucb,htif0\";
+                                                                                                                                                        ">;
 "
                                                                                                                                                         (HAppend.hAppend
-                                                                                                                                                          "  };
+                                                                                                                                                          "    };
 "
-                                                                                                                                                          "};
-"))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                                                                                                                          (HAppend.hAppend
+                                                                                                                                                            "  };
+"
+                                                                                                                                                            (HAppend.hAppend
+                                                                                                                                                              "  htif {
+"
+                                                                                                                                                              (HAppend.hAppend
+                                                                                                                                                                "    compatible = \"ucb,htif0\";
+"
+                                                                                                                                                                (HAppend.hAppend
+                                                                                                                                                                  "  };
+"
+                                                                                                                                                                  "};
+"))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+def generate_canonical_isa_string (_ : Unit) : String :=
+  (generate_isa_string Canonical_Lowercase)
 

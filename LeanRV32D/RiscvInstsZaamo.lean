@@ -1,4 +1,5 @@
-import LeanRV32D.RiscvInstsBase
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvSysRegs
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +12,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +25,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +53,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +155,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,12 +168,13 @@ open ExceptionType
 open Architecture
 open AccessType
 
-def amo_width_valid (size : word_width) : SailM Bool := do
+/-- Type quantifiers: size : Nat, size ∈ {1, 2, 4, 8} -/
+def amo_width_valid (size : Nat) : SailM Bool := do
   match size with
-  | BYTE => (currentlyEnabled Ext_Zabha)
-  | HALF => (currentlyEnabled Ext_Zabha)
-  | WORD => (pure true)
-  | DOUBLE => (pure (xlen ≥b 64))
+  | 1 => (currentlyEnabled Ext_Zabha)
+  | 2 => (currentlyEnabled Ext_Zabha)
+  | 4 => (pure true)
+  | _ => (pure (xlen ≥b 64))
 
 def encdec_amoop_forwards (arg_ : amoop) : (BitVec 5) :=
   match arg_ with
@@ -309,5 +310,31 @@ def amo_mnemonic_backwards_matches (arg_ : String) : Bool :=
   | "amomax" => true
   | "amominu" => true
   | "amomaxu" => true
+  | _ => false
+
+def maybe_aqrl_backwards (arg_ : String) : SailM (Bool × Bool) := do
+  match arg_ with
+  | ".aqrl" => (pure (true, true))
+  | ".aq" => (pure (true, false))
+  | ".rl" => (pure (false, true))
+  | "" => (pure (false, false))
+  | _ =>
+    (do
+      assert false "Pattern match failure at unknown location"
+      throw Error.Exit)
+
+def maybe_aqrl_forwards_matches (arg_ : (Bool × Bool)) : Bool :=
+  match arg_ with
+  | (true, true) => true
+  | (true, false) => true
+  | (false, true) => true
+  | (false, false) => true
+
+def maybe_aqrl_backwards_matches (arg_ : String) : Bool :=
+  match arg_ with
+  | ".aqrl" => true
+  | ".aq" => true
+  | ".rl" => true
+  | "" => true
   | _ => false
 

@@ -1,3 +1,6 @@
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvVlen
+import LeanRV32D.RiscvCallbacks
 import LeanRV32D.RiscvVextRegs
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +14,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +27,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +55,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +157,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -170,6 +172,6 @@ open AccessType
 
 def set_vstart (value : (BitVec 16)) : SailM Unit := do
   (dirty_v_context ())
-  writeReg vstart (zero_extend (m := 16) (Sail.BitVec.extractLsb value (VLEN_pow -i 1) 0))
-  (csr_name_write_callback "vstart" (zero_extend (m := ((2 ^i 2) *i 8)) (← readReg vstart)))
+  writeReg vstart (zero_extend (m := 32) (Sail.BitVec.extractLsb value (VLEN_pow -i 1) 0))
+  (csr_name_write_callback "vstart" (← readReg vstart))
 

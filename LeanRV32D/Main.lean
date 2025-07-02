@@ -1,4 +1,6 @@
-import LeanRV32D.RiscvDeviceTree
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvStep
+import LeanRV32D.RiscvModel
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +13,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +26,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +54,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +156,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,14 +169,14 @@ open ExceptionType
 open Architecture
 open AccessType
 
-def get_entry_point (_ : Unit) : (BitVec (2 ^ 2 * 8)) :=
-  (zero_extend (m := ((2 ^i 2) *i 8)) (0x1000 : (BitVec 16)))
+def get_entry_point (_ : Unit) : (BitVec 32) :=
+  (zero_extend (m := 32) (0x1000 : (BitVec 16)))
 
 def sail_main (_ : Unit) : SailM Unit := do
   writeReg PC (get_entry_point ())
   (pure (print_bits "PC = " (← readReg PC)))
   sailTryCatch ((do
-      (init_model ())
+      (init_model "")
       (cycle_count ())
       (loop ()))) (fun the_exception => 
     match the_exception with

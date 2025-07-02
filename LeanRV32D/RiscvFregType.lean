@@ -1,4 +1,4 @@
-import LeanRV32D.RiscvRegType
+import LeanRV32D.Prelude
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +11,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +24,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +52,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +154,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -170,13 +169,13 @@ open AccessType
 
 def zero_freg : fregtype := (zeros (n := (8 *i 8)))
 
-def FRegStr (r : (BitVec (8 * 8))) : String :=
+def FRegStr (r : (BitVec (bif true then 8 else 4 * 8))) : String :=
   (BitVec.toFormatted r)
 
-def fregval_from_freg (r : (BitVec (8 * 8))) : (BitVec (8 * 8)) :=
+def fregval_from_freg (r : (BitVec (bif true then 8 else 4 * 8))) : (BitVec (bif true then 8 else 4 * 8)) :=
   r
 
-def fregval_into_freg (v : (BitVec (8 * 8))) : (BitVec (8 * 8)) :=
+def fregval_into_freg (v : (BitVec (bif true then 8 else 4 * 8))) : (BitVec (bif true then 8 else 4 * 8)) :=
   v
 
 def undefined_f_madd_op_H (_ : Unit) : SailM f_madd_op_H := do

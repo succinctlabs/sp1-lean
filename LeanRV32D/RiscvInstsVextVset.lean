@@ -1,4 +1,7 @@
-import LeanRV32D.RiscvInstsVextFpUtils
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvCallbacks
+import LeanRV32D.RiscvVextControl
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +14,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +27,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +55,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +157,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -270,14 +272,15 @@ def ma_flag_backwards_matches (arg_ : (BitVec 1)) : Bool :=
 
 def handle_illegal_vtype (_ : Unit) : SailM Unit := do
   writeReg vtype ((0b1 : (BitVec 1)) ++ (zeros (n := (xlen -i 1))))
-  writeReg vl (zeros (n := ((2 ^i 2) *i 8)))
+  writeReg vl (zeros (n := 32))
   (csr_name_write_callback "vtype" (← readReg vtype))
   (csr_name_write_callback "vl" (← readReg vl))
+  (set_vstart (zeros (n := 16)))
 
 def vl_use_ceil : Bool := false
 
 /-- Type quantifiers: VLMAX : Int, AVL : Int -/
-def calculate_new_vl (AVL : Int) (VLMAX : Int) : (BitVec (2 ^ 2 * 8)) :=
+def calculate_new_vl (AVL : Int) (VLMAX : Int) : (BitVec 32) :=
   let new_vl :=
     bif (AVL ≤b VLMAX)
     then AVL

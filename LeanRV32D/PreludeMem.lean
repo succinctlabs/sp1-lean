@@ -1,3 +1,5 @@
+import LeanRV32D.Prelude
+import LeanRV32D.PreludeMemMetadata
 import LeanRV32D.ReadWriteV1
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +13,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +26,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +54,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +156,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -252,11 +253,11 @@ def num_of_barrier_kind (arg_ : barrier_kind) : Int :=
 def undefined_RISCV_strong_access (_ : Unit) : SailM RISCV_strong_access := do
   (pure { variety := (← (undefined_Access_variety ())) })
 
-def physaddrbits_zero_extend (xs : (BitVec 34)) : (BitVec 64) :=
+def physaddrbits_zero_extend (xs : (BitVec (bif 32 = 32 then 34 else 64))) : (BitVec 64) :=
   (zero_extend (m := 64) xs)
 
-/-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
-def write_ram (wk : write_kind) (app_1 : physaddr) (width : Nat) (data : (BitVec (8 * width))) (meta_ : Unit) : SailM Bool := do
+/-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ max_mem_access -/
+def write_ram (wk : write_kind) (app_1 : physaddr) (width : Nat) (data : (BitVec (8 * width))) (meta' : Unit) : SailM Bool := do
   let .Physaddr addr := app_1
   let request : (Mem_write_request width 64 physaddrbits Unit RISCV_strong_access) :=
     { access_kind := match wk with
@@ -286,7 +287,7 @@ def write_ram (wk : write_kind) (app_1 : physaddr) (width : Nat) (data : (BitVec
       tag := none }
   match (← (sail_mem_write request)) with
   | .Ok _ =>
-    (let _ : Unit := (__WriteRAM_Meta addr width meta_)
+    (let _ : Unit := (__WriteRAM_Meta addr width meta')
     (pure true))
   | .Err () => (pure false)
 
@@ -295,10 +296,11 @@ def write_ram_ea (wk : write_kind) (app_1 : physaddr) (width : Nat) : Unit :=
   let .Physaddr addr := app_1
   ()
 
-/-- Type quantifiers: k_ex370025# : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
+/-- Type quantifiers: k_ex369080# : Bool, width : Nat, width ≥ 0, 0 < width ∧
+  width ≤ max_mem_access -/
 def read_ram (rk : read_kind) (app_1 : physaddr) (width : Nat) (read_meta : Bool) : SailM ((BitVec (8 * width)) × Unit) := do
   let .Physaddr addr := app_1
-  let meta_ :=
+  let meta' :=
     bif read_meta
     then (__ReadRAM_Meta addr width)
     else default_meta
@@ -329,5 +331,6 @@ def read_ram (rk : read_kind) (app_1 : physaddr) (width : Nat) (read_meta : Bool
       size := width
       tag := false }
   match (← (sail_mem_read request)) with
-  | .Ok (value, _) => (pure (value, meta_))
+  | .Ok (value, _) => (pure (value, meta'))
   | .Err () => throw Error.Exit
+

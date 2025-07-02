@@ -1,4 +1,5 @@
-import LeanRV32D.PreludeMem
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +12,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +25,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +53,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +155,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,7 +168,7 @@ open ExceptionType
 open Architecture
 open AccessType
 
-/-- Type quantifiers: k_m : Nat, k_m ≥ 0 ∧ (k_m % 8) = 0 -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ≥ 0 ∧ (k_m % 8) = 0 -/
 def brev8 (input : (BitVec k_m)) : (BitVec k_m) := Id.run do
   let output : (BitVec k_m) := (zeros (n := (Sail.BitVec.length input)))
   let loop_i_lower := 0
@@ -181,7 +181,7 @@ def brev8 (input : (BitVec k_m)) : (BitVec k_m) := Id.run do
         (reverse_bits (Sail.BitVec.extractLsb input (i +i 7) i)))
   (pure loop_vars)
 
-/-- Type quantifiers: k_n : Nat, k_n > 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n > 0 -/
 def carryless_mul (a : (BitVec k_n)) (b : (BitVec k_n)) : (BitVec (2 * k_n)) := Id.run do
   let result : (BitVec (2 * k_n)) := (zeros (n := (2 *i (Sail.BitVec.length b))))
   let loop_i_lower := 0
@@ -195,7 +195,7 @@ def carryless_mul (a : (BitVec k_n)) (b : (BitVec k_n)) : (BitVec (2 * k_n)) := 
       else result
   (pure loop_vars)
 
-/-- Type quantifiers: k_n : Nat, k_n > 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n > 0 -/
 def carryless_mulr (a : (BitVec k_n)) (b : (BitVec k_n)) : (BitVec k_n) := Id.run do
   let result : (BitVec k_n) := (zeros (n := (Sail.BitVec.length b)))
   let loop_i_lower := 0
@@ -209,7 +209,7 @@ def carryless_mulr (a : (BitVec k_n)) (b : (BitVec k_n)) : (BitVec k_n) := Id.ru
       else result
   (pure loop_vars)
 
-/-- Type quantifiers: k_n : Nat, k_n > 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n > 0 -/
 def carryless_mul_reversed (a : (BitVec k_n)) (b : (BitVec k_n)) : (BitVec k_n) :=
   let prod := (carryless_mul (reverse_bits a) (reverse_bits b))
   (reverse_bits (Sail.BitVec.extractLsb prod ((Sail.BitVec.length b) -i 1) 0))
@@ -217,7 +217,7 @@ def carryless_mul_reversed (a : (BitVec k_n)) (b : (BitVec k_n)) : (BitVec k_n) 
 def cmulr_equivalence (a : (BitVec 16)) (b : (BitVec 16)) : Bool :=
   ((carryless_mul_reversed a b) == (carryless_mulr a b))
 
-/-- Type quantifiers: k_m : Nat, k_m ≥ 0 ∧ (k_m % 8) = 0 -/
+/-- Type quantifiers: k_m : Nat, k_m ≥ 0, k_m ≥ 0 ∧ (k_m % 8) = 0 -/
 def rev8 (input : (BitVec k_m)) : (BitVec k_m) := Id.run do
   let output : (BitVec k_m) := (zeros (n := (Sail.BitVec.length input)))
   let loop_i_lower := 0
@@ -231,7 +231,7 @@ def rev8 (input : (BitVec k_m)) : (BitVec k_m) := Id.run do
           (((Sail.BitVec.length output) -i i) -i 8)))
   (pure loop_vars)
 
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ≥ 0 -/
 def count_ones (x : (BitVec k_n)) : SailM Nat := do
   let count : Nat := 0
   let loop_i_lower := 0

@@ -1,4 +1,4 @@
-import LeanRV32D.Mapping
+import LeanRV32D.Flow
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +11,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +24,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +52,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +154,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,17 +167,17 @@ open ExceptionType
 open Architecture
 open AccessType
 
-/-- Type quantifiers: len : Nat, k_v : Nat, len ≥ 0 ∧ k_v ≥ 0 -/
+/-- Type quantifiers: len : Nat, len ≥ 0, k_v : Nat, k_v ≥ 0, len ≥ 0 ∧ k_v ≥ 0 -/
 def sail_mask (len : Nat) (v : (BitVec k_v)) : (BitVec len) :=
   bif (len ≤b (Sail.BitVec.length v))
   then (Sail.BitVec.truncate v len)
   else (Sail.BitVec.zeroExtend v len)
 
-/-- Type quantifiers: n : Nat, n ≥ 0 -/
+/-- Type quantifiers: n : Nat, n ≥ 0, n ≥ 0 -/
 def sail_ones (n : Nat) : (BitVec n) :=
   (Complement.complement (BitVec.zero n))
 
-/-- Type quantifiers: l : Int, i : Int, n : Nat, n ≥ 0 -/
+/-- Type quantifiers: l : Int, i : Int, n : Nat, n ≥ 0, n ≥ 0 -/
 def slice_mask {n : _} (i : Int) (l : Int) : (BitVec n) :=
   bif (l ≥b n)
   then ((sail_ones n) <<< i)
@@ -186,7 +185,7 @@ def slice_mask {n : _} (i : Int) (l : Int) : (BitVec n) :=
     (let one : (BitVec n) := (sail_mask n (0b1 : (BitVec 1)))
     (((one <<< l) - one) <<< i))
 
-/-- Type quantifiers: n : Nat, n > 0 -/
+/-- Type quantifiers: n : Nat, n ≥ 0, n > 0 -/
 def to_bytes_le {n : _} (b : (BitVec (8 * n))) : (Vector (BitVec 8) n) := Id.run do
   let res := (vectorInit (BitVec.zero 8))
   let loop_i_lower := 0
@@ -197,7 +196,7 @@ def to_bytes_le {n : _} (b : (BitVec (8 * n))) : (Vector (BitVec 8) n) := Id.run
     loop_vars := (vectorUpdate res i (Sail.BitVec.extractLsb b ((8 *i i) +i 7) (8 *i i)))
   (pure loop_vars)
 
-/-- Type quantifiers: n : Nat, n > 0 -/
+/-- Type quantifiers: n : Nat, n ≥ 0, n > 0 -/
 def from_bytes_le {n : _} (v : (Vector (BitVec 8) n)) : (BitVec (8 * n)) := Id.run do
   let res := (BitVec.zero (8 *i n))
   let loop_i_lower := 0

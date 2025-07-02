@@ -1,4 +1,4 @@
-import LeanRV32D.RiscvZkrControl
+import LeanRV32D.Prelude
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +11,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +24,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +52,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +154,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -465,19 +464,19 @@ def riscv_f64Eq (v1 : (BitVec 64)) (v2 : (BitVec 64)) : SailM ((BitVec 5) × Boo
   (pure ((Sail.BitVec.extractLsb (← readReg float_fflags) 4 0), (← (bit_to_bool
         (BitVec.access (← readReg float_result) 0)))))
 
-/-- Type quantifiers: k_ex373718# : Bool -/
+/-- Type quantifiers: k_ex372883# : Bool -/
 def riscv_f16roundToInt (rm : (BitVec 3)) (v : (BitVec 16)) (exact : Bool) : SailM ((BitVec 5) × (BitVec 16)) := do
   let _ : Unit := (extern_f16roundToInt rm v exact)
   (pure ((Sail.BitVec.extractLsb (← readReg float_fflags) 4 0), (Sail.BitVec.extractLsb
       (← readReg float_result) 15 0)))
 
-/-- Type quantifiers: k_ex373722# : Bool -/
+/-- Type quantifiers: k_ex372887# : Bool -/
 def riscv_f32roundToInt (rm : (BitVec 3)) (v : (BitVec 32)) (exact : Bool) : SailM ((BitVec 5) × (BitVec 32)) := do
   let _ : Unit := (extern_f32roundToInt rm v exact)
   (pure ((Sail.BitVec.extractLsb (← readReg float_fflags) 4 0), (Sail.BitVec.extractLsb
       (← readReg float_result) 31 0)))
 
-/-- Type quantifiers: k_ex373726# : Bool -/
+/-- Type quantifiers: k_ex372891# : Bool -/
 def riscv_f64roundToInt (rm : (BitVec 3)) (v : (BitVec 64)) (exact : Bool) : SailM ((BitVec 5) × (BitVec 64)) := do
   let _ : Unit := (extern_f64roundToInt rm v exact)
   (pure ((Sail.BitVec.extractLsb (← readReg float_fflags) 4 0), (← readReg float_result)))
