@@ -7,7 +7,7 @@ abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
 @[reducible] def incrementPC : StateM SP1State Unit :=
   do modify (.map (· + (BitVec.ofNat _ 4)) id)
 
-@[reducible] def set_pc (new_pc : BitVec 32) : StateM SP1State Unit :=
+@[reducible] def setPC (new_pc : BitVec 32) : StateM SP1State Unit :=
   do modify (.map (fun _old_pc => new_pc) id)
 
 /-- Modify the register map state -/
@@ -16,3 +16,39 @@ abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
 
 @[reducible] def get_reg (idx : regidx) : StateM SP1State (BitVec 32) :=
   do return (← get).2 idx
+
+-- dt: below isn't enough to handle read and write both
+-- we could maybe make something like this work assuming unique state constraints
+
+-- section ControlFlowState
+
+-- structure SP1ControlFlowState where
+--   pc : BabyBear
+--   shard : BabyBear
+--   clk : BabyBear
+
+-- @[reducible] def increment_pc (c : BabyBear) : StateM SP1ControlFlowState Unit :=
+--   do modify fun st => { pc := st.pc + c, __ := st }
+
+-- @[reducible] def increment_shard (c : BabyBear) : StateM SP1ControlFlowState Unit :=
+--   do modify fun st => { shard := st.shard + c, __ := st }
+
+-- @[reducible] def increment_clk (c : BabyBear) : StateM SP1ControlFlowState Unit :=
+--   do modify fun st => { clk := st.clk + c, __ := st }
+
+-- @[reducible] def set_pc (new_pc : BabyBear) : StateM SP1ControlFlowState Unit :=
+--   do modify fun st => { pc := new_pc, __ := st }
+
+-- @[reducible] def set_shard (new_shard : BabyBear) : StateM SP1ControlFlowState Unit :=
+--   do modify fun st => { shard := new_shard, __ := st }
+
+-- @[reducible] def set_clk (new_clk : BabyBear) : StateM SP1ControlFlowState Unit :=
+--   do modify fun st => { clk := new_clk, __ := st }
+
+-- def SP1ConstraintList.toControlFlowM : SP1ConstraintList → StateM SP1ControlFlowState Unit
+--   | .send _ mult :: cs => sorry
+--   | .receive _ mult :: cs => sorry
+--   | _ :: cs => toControlFlowM cs
+--   | [] => return ()
+
+-- end ControlFlowState

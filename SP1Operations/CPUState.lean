@@ -29,4 +29,16 @@ def constraints
     .send (.byte (ByteOpcode.ofNat 3) 0 cols.clk_16_24 0) is_real
   ]
 
+lemma is_real_is_bool_of_constraints
+    (h : (constraints cols next_pc clk_increment is_real).allHold) :
+    is_real = 0 ∨ is_real = 1 := by
+  simp [constraints, sub_eq_zero] at h
+  tauto
+
+lemma limb_bounds_of_constraints
+    (hir : is_real ≠ 0) (h : (constraints cols next_pc clk_increment is_real).allHold) :
+    (cols.clk_0_16 - 1) * 1761607681 < 8192 ∧ cols.clk_16_24 < 256 := by
+  simp [constraints, sub_eq_zero, hir] at h
+  tauto
+
 end CPUState
