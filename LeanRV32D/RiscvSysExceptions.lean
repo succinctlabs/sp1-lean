@@ -1,4 +1,5 @@
-import LeanRV32D.RiscvVextControl
+import LeanRV32D.RiscvErrors
+import LeanRV32D.RiscvSysRegs
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +12,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +25,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +53,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +155,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -174,10 +174,10 @@ def ext_check_xret_priv (p : Privilege) : Bool :=
 def ext_fail_xret_priv (_ : Unit) : Unit :=
   ()
 
-def handle_trap_extension (p : Privilege) (pc : (BitVec (2 ^ 2 * 8))) (u : (Option Unit)) : Unit :=
+def handle_trap_extension (p : Privilege) (pc : (BitVec 32)) (u : (Option Unit)) : Unit :=
   ()
 
-def prepare_trap_vector (p : Privilege) (cause : (BitVec (2 ^ 2 * 8))) : SailM (BitVec (2 ^ 2 * 8)) := do
+def prepare_trap_vector (p : Privilege) (cause : (BitVec 32)) : SailM (BitVec 32) := do
   let tvec ← (( do
     match p with
     | Machine => readReg mtvec
@@ -188,13 +188,13 @@ def prepare_trap_vector (p : Privilege) (cause : (BitVec (2 ^ 2 * 8))) : SailM (
   | .some epc => (pure epc)
   | none => (internal_error "riscv_sys_exceptions.sail" 29 "Invalid tvec mode")
 
-def get_xepc (p : Privilege) : SailM (BitVec (2 ^ 2 * 8)) := do
+def get_xepc (p : Privilege) : SailM (BitVec 32) := do
   match p with
   | Machine => (align_pc (← readReg mepc))
   | Supervisor => (align_pc (← readReg sepc))
   | User => (internal_error "riscv_sys_exceptions.sail" 45 "Invalid privilege level")
 
-def set_xepc (p : Privilege) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVec (2 ^ 2 * 8)) := do
+def set_xepc (p : Privilege) (value : (BitVec 32)) : SailM (BitVec 32) := do
   let target := (legalize_xepc value)
   match p with
   | Machine => writeReg mepc target
@@ -202,20 +202,20 @@ def set_xepc (p : Privilege) (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVec (2 ^
   | User => (internal_error "riscv_sys_exceptions.sail" 54 "Invalid privilege level")
   (pure target)
 
-def prepare_xret_target (p : Privilege) : SailM (BitVec (2 ^ 2 * 8)) := do
+def prepare_xret_target (p : Privilege) : SailM (BitVec 32) := do
   (get_xepc p)
 
-def get_mtvec (_ : Unit) : SailM (BitVec (2 ^ 2 * 8)) := do
+def get_mtvec (_ : Unit) : SailM (BitVec 32) := do
   readReg mtvec
 
-def get_stvec (_ : Unit) : SailM (BitVec (2 ^ 2 * 8)) := do
+def get_stvec (_ : Unit) : SailM (BitVec 32) := do
   readReg stvec
 
-def set_mtvec (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVec (2 ^ 2 * 8)) := do
+def set_mtvec (value : (BitVec 32)) : SailM (BitVec 32) := do
   writeReg mtvec (legalize_tvec (← readReg mtvec) value)
   readReg mtvec
 
-def set_stvec (value : (BitVec (2 ^ 2 * 8))) : SailM (BitVec (2 ^ 2 * 8)) := do
+def set_stvec (value : (BitVec 32)) : SailM (BitVec 32) := do
   writeReg stvec (legalize_tvec (← readReg stvec) value)
   readReg stvec
 

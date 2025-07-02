@@ -1,4 +1,5 @@
-import LeanRV32D.RiscvZvkUtils
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvXlen
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +12,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +25,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +53,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +155,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -528,41 +528,15 @@ def rtype_mnemonic_backwards_matches (arg_ : String) : Bool :=
   | "sra" => true
   | _ => false
 
-/-- Type quantifiers: k_ex377187# : Bool -/
-def valid_load_encdec (width : word_width) (is_unsigned : Bool) : Bool :=
-  (((size_bytes_forwards width) <b xlen_bytes) || ((not is_unsigned) && (((size_bytes_forwards width) ≤b xlen_bytes) : Bool)))
+/-- Type quantifiers: k_ex376426# : Bool, width : Nat, width ∈ {1, 2, 4, 8} -/
+def valid_load_encdec (width : Nat) (is_unsigned : Bool) : Bool :=
+  ((width <b xlen_bytes) || ((not is_unsigned) && (width ≤b xlen_bytes)))
 
-/-- Type quantifiers: k_ex377223# : Bool, k_n : Nat, 0 < k_n ∧ k_n ≤ xlen -/
-def extend_value (is_unsigned : Bool) (value : (BitVec k_n)) : (BitVec (2 ^ 2 * 8)) :=
+/-- Type quantifiers: k_ex376429# : Bool, k_n : Nat, k_n ≥ 0, 0 < k_n ∧ k_n ≤ xlen -/
+def extend_value (is_unsigned : Bool) (value : (BitVec k_n)) : (BitVec 32) :=
   bif is_unsigned
-  then (zero_extend (m := ((2 ^i 2) *i 8)) value)
-  else (sign_extend (m := ((2 ^i 2) *i 8)) value)
-
-def maybe_aqrl_backwards (arg_ : String) : SailM (Bool × Bool) := do
-  match arg_ with
-  | ".aqrl" => (pure (true, true))
-  | ".aq" => (pure (true, false))
-  | ".rl" => (pure (false, true))
-  | "" => (pure (false, false))
-  | _ =>
-    (do
-      assert false "Pattern match failure at unknown location"
-      throw Error.Exit)
-
-def maybe_aqrl_forwards_matches (arg_ : (Bool × Bool)) : Bool :=
-  match arg_ with
-  | (true, true) => true
-  | (true, false) => true
-  | (false, true) => true
-  | (false, false) => true
-
-def maybe_aqrl_backwards_matches (arg_ : String) : Bool :=
-  match arg_ with
-  | ".aqrl" => true
-  | ".aq" => true
-  | ".rl" => true
-  | "" => true
-  | _ => false
+  then (zero_extend (m := 32) value)
+  else (sign_extend (m := 32) value)
 
 def maybe_u_backwards (arg_ : String) : SailM Bool := do
   match arg_ with
@@ -573,7 +547,7 @@ def maybe_u_backwards (arg_ : String) : SailM Bool := do
       assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
-/-- Type quantifiers: k_ex377232# : Bool -/
+/-- Type quantifiers: k_ex376430# : Bool -/
 def maybe_u_forwards_matches (arg_ : Bool) : Bool :=
   match arg_ with
   | true => true
@@ -637,7 +611,7 @@ def shiftiwop_mnemonic_backwards_matches (arg_ : String) : Bool :=
   | "sraiw" => true
   | _ => false
 
-/-- Type quantifiers: k_ex377233# : Bool -/
+/-- Type quantifiers: k_ex376431# : Bool -/
 def effective_fence_set (set : (BitVec 4)) (fiom : Bool) : (BitVec 4) :=
   bif fiom
   then
@@ -743,13 +717,17 @@ def bit_maybe_o_backwards_matches (arg_ : String) : Bool :=
 
 def fence_bits_backwards (arg_ : String) : SailM (BitVec 4) := do
   match arg_ with
+  | "0" => (pure (0x0 : (BitVec 4)))
   | _ => throw Error.Exit
 
 def fence_bits_forwards_matches (arg_ : (BitVec 4)) : Bool :=
-  match arg_ with
-  | v__1 => true
+  let b__0 := arg_
+  bif (b__0 == (0x0 : (BitVec 4)))
+  then true
+  else true
 
 def fence_bits_backwards_matches (arg_ : String) : SailM Bool := do
   match arg_ with
+  | "0" => (pure true)
   | _ => throw Error.Exit
 

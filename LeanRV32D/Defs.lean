@@ -18,11 +18,17 @@ inductive option (k_a : Type) where
 
 abbrev bits k_n := (BitVec k_n)
 
-abbrev xlenbits := (BitVec (2 ^ 2 * 8))
+inductive regidx where
+  | Regidx (_ : (BitVec 5))
+  deriving Inhabited, BEq, Repr
+
+abbrev xlenbits := (BitVec 32)
 
 inductive virtaddr where
   | Virtaddr (_ : xlenbits)
   deriving Inhabited, BEq, Repr
+
+abbrev nat1 := Int
 
 abbrev max_mem_access : Int := 4096
 
@@ -33,29 +39,29 @@ inductive exception where
   | Error_internal_error (_ : Unit)
   deriving Inhabited, BEq, Repr
 
-abbrev log2_xlen_bytes : Int := 2
+abbrev xlen : Int := 32
 
-abbrev physaddrbits_len : Int := 34
+abbrev log2_xlen : Int := (bif xlen = 32 then 5 else 6)
 
-abbrev asidlen : Int := 9
+abbrev xlen_bytes : Int := (bif xlen = 32 then 4 else 8)
 
-abbrev log2_xlen : Int := (2 + 3)
+abbrev physaddrbits_len : Int := (bif xlen = 32 then 34 else 64)
 
-abbrev xlen_bytes : Int := (2 ^ 2)
+abbrev asidlen : Int := (bif xlen = 32 then 9 else 16)
 
-abbrev xlen : Int := (2 ^ 2 * 8)
+abbrev asidbits := (BitVec (bif 32 = 32 then 9 else 16))
 
-abbrev asidbits := (BitVec 9)
+abbrev ext_d_supported : Bool := true
 
-abbrev flen_bytes : Int := 8
+abbrev flen_bytes : Int := (bif ext_d_supported then 8 else 4)
 
-abbrev flen : Int := (8 * 8)
+abbrev flen : Int := (bif true then 8 else 4 * 8)
 
-abbrev flenbits := (BitVec (8 * 8))
+abbrev flenbits := (BitVec (bif true then 8 else 4 * 8))
 
 abbrev vlenmax : Int := 65536
 
-abbrev physaddrbits := (BitVec 34)
+abbrev physaddrbits := (BitVec (bif 32 = 32 then 34 else 64))
 
 inductive physaddr where
   | Physaddr (_ : physaddrbits)
@@ -78,8 +84,6 @@ structure RISCV_strong_access where
 
 abbrev RVFI_DII_Instruction_Packet := (BitVec 64)
 
-abbrev RVFI_DII_Execution_Packet_V1 := (BitVec 704)
-
 abbrev RVFI_DII_Execution_Packet_InstMetaData := (BitVec 192)
 
 abbrev RVFI_DII_Execution_Packet_PC := (BitVec 128)
@@ -88,9 +92,11 @@ abbrev RVFI_DII_Execution_Packet_Ext_Integer := (BitVec 320)
 
 abbrev RVFI_DII_Execution_Packet_Ext_MemAccess := (BitVec 704)
 
+abbrev RVFI_DII_Execution_Packet_V1 := (BitVec 704)
+
 abbrev RVFI_DII_Execution_PacketV2 := (BitVec 512)
 
-inductive extension where | Ext_M | Ext_A | Ext_F | Ext_D | Ext_B | Ext_V | Ext_S | Ext_U | Ext_Zicbom | Ext_Zicboz | Ext_Zicntr | Ext_Zicond | Ext_Zicsr | Ext_Zifencei | Ext_Zihpm | Ext_Zimop | Ext_Zmmul | Ext_Zaamo | Ext_Zabha | Ext_Zalrsc | Ext_Zawrs | Ext_Zfa | Ext_Zfh | Ext_Zfhmin | Ext_Zfinx | Ext_Zdinx | Ext_Zca | Ext_Zcb | Ext_Zcd | Ext_Zcf | Ext_Zcmop | Ext_C | Ext_Zba | Ext_Zbb | Ext_Zbc | Ext_Zbkb | Ext_Zbkc | Ext_Zbkx | Ext_Zbs | Ext_Zknd | Ext_Zkne | Ext_Zknh | Ext_Zkr | Ext_Zksed | Ext_Zksh | Ext_Zhinx | Ext_Zhinxmin | Ext_Zvbb | Ext_Zvkb | Ext_Zvbc | Ext_Zvkg | Ext_Zvkned | Ext_Zvknha | Ext_Zvknhb | Ext_Zvksh | Ext_Sscofpmf | Ext_Sstc | Ext_Svinval | Ext_Svnapot | Ext_Svpbmt | Ext_Svbare | Ext_Sv32 | Ext_Sv39 | Ext_Sv48 | Ext_Sv57 | Ext_Smcntrpmf
+inductive extension where | Ext_M | Ext_A | Ext_F | Ext_D | Ext_B | Ext_V | Ext_S | Ext_U | Ext_H | Ext_Zicbom | Ext_Zicboz | Ext_Zicntr | Ext_Zicond | Ext_Zicsr | Ext_Zifencei | Ext_Zihpm | Ext_Zimop | Ext_Zmmul | Ext_Zaamo | Ext_Zabha | Ext_Zalrsc | Ext_Zawrs | Ext_Zfa | Ext_Zfh | Ext_Zfhmin | Ext_Zfinx | Ext_Zdinx | Ext_Zca | Ext_Zcb | Ext_Zcd | Ext_Zcf | Ext_Zcmop | Ext_C | Ext_Zba | Ext_Zbb | Ext_Zbc | Ext_Zbkb | Ext_Zbkc | Ext_Zbkx | Ext_Zbs | Ext_Zknd | Ext_Zkne | Ext_Zknh | Ext_Zkr | Ext_Zksed | Ext_Zksh | Ext_Zkt | Ext_Zhinx | Ext_Zhinxmin | Ext_Zvbb | Ext_Zvbc | Ext_Zvkb | Ext_Zvkg | Ext_Zvkned | Ext_Zvknha | Ext_Zvknhb | Ext_Zvksed | Ext_Zvksh | Ext_Zvkt | Ext_Sscofpmf | Ext_Sstc | Ext_Svinval | Ext_Svnapot | Ext_Svpbmt | Ext_Svbare | Ext_Sv32 | Ext_Sv39 | Ext_Sv48 | Ext_Sv57 | Ext_Smcntrpmf
   deriving BEq, Inhabited, Repr
 
 abbrev exc_code := (BitVec 8)
@@ -110,10 +116,6 @@ abbrev word := (BitVec 32)
 abbrev instbits := (BitVec 32)
 
 abbrev pagesize_bits : Int := 12
-
-inductive regidx where
-  | Regidx (_ : (BitVec 5))
-  deriving Inhabited, BEq, Repr
 
 inductive cregidx where
   | Cregidx (_ : (BitVec 3))
@@ -171,6 +173,10 @@ inductive bop where | BEQ | BNE | BLT | BGE | BLTU | BGEU
 
 inductive cbop_zicbom where | CBO_CLEAN | CBO_FLUSH | CBO_INVAL
   deriving BEq, Inhabited, Repr
+
+inductive fregidx where
+  | Fregidx (_ : (BitVec 5))
+  deriving Inhabited, BEq, Repr
 
 inductive csrop where | CSRRW | CSRRS | CSRRC
   deriving BEq, Inhabited, Repr
@@ -252,10 +258,6 @@ inductive f_un_x_op_D where | FCLASS_D | FMV_X_D
 
 inductive f_un_x_op_H where | FCLASS_H | FMV_X_H
   deriving BEq, Inhabited, Repr
-
-inductive fregidx where
-  | Fregidx (_ : (BitVec 5))
-  deriving Inhabited, BEq, Repr
 
 inductive rounding_mode where | RM_RNE | RM_RTZ | RM_RDN | RM_RUP | RM_RMM | RM_DYN
   deriving BEq, Inhabited, Repr
@@ -359,9 +361,6 @@ inductive sop where | SLLI | SRLI | SRAI
 inductive sopw where | SLLIW | SRLIW | SRAIW
   deriving BEq, Inhabited, Repr
 
-inductive word_width where | BYTE | HALF | WORD | DOUBLE
-  deriving BEq, Inhabited, Repr
-
 inductive uop where | LUI | AUIPC
   deriving BEq, Inhabited, Repr
 
@@ -377,13 +376,7 @@ inductive zvk_vaesef_funct6 where | ZVK_VAESEF_VV | ZVK_VAESEF_VS
 inductive zvk_vaesem_funct6 where | ZVK_VAESEM_VV | ZVK_VAESEM_VS
   deriving BEq, Inhabited, Repr
 
-inductive vext2funct6 where | VEXT2_ZVF2 | VEXT2_SVF2
-  deriving BEq, Inhabited, Repr
-
-inductive vext4funct6 where | VEXT4_ZVF4 | VEXT4_SVF4
-  deriving BEq, Inhabited, Repr
-
-inductive vext8funct6 where | VEXT8_ZVF8 | VEXT8_SVF8
+inductive vextfunct6 where | VEXT2_ZVF2 | VEXT2_SVF2 | VEXT4_ZVF4 | VEXT4_SVF4 | VEXT8_ZVF8 | VEXT8_SVF8
   deriving BEq, Inhabited, Repr
 
 inductive vfnunary0 where | FNV_CVT_XU_F | FNV_CVT_X_F | FNV_CVT_F_XU | FNV_CVT_F_X | FNV_CVT_F_F | FNV_CVT_ROD_F_F | FNV_CVT_RTZ_XU_F | FNV_CVT_RTZ_X_F
@@ -426,7 +419,10 @@ inductive vregidx where
   | Vregidx (_ : (BitVec 5))
   deriving Inhabited, BEq, Repr
 
-inductive zvkfunct6 where | ZVK_VSHA2CH | ZVK_VSHA2CL
+inductive zvk_vsha2_funct6 where | ZVK_VSHA2CH_VV | ZVK_VSHA2CL_VV
+  deriving BEq, Inhabited, Repr
+
+inductive zvk_vsm4r_funct6 where | ZVK_VSM4R_VV | ZVK_VSM4R_VS
   deriving BEq, Inhabited, Repr
 
 inductive vvcmpfunct6 where | VVCMP_VMSEQ | VVCMP_VMSNE | VVCMP_VMSLTU | VVCMP_VMSLT | VVCMP_VMSLEU | VVCMP_VMSLE
@@ -510,6 +506,8 @@ inductive zicondop where | CZERO_EQZ | CZERO_NEZ
 inductive f_un_rm_ff_op_S where | FSQRT_S
   deriving BEq, Inhabited, Repr
 
+abbrev word_width := Int
+
 inductive wrsop where | WRS_STO | WRS_NTO
   deriving BEq, Inhabited, Repr
 
@@ -523,8 +521,8 @@ inductive ast where
   | ITYPE (_ : ((BitVec 12) × regidx × regidx × iop))
   | SHIFTIOP (_ : ((BitVec 6) × regidx × regidx × sop))
   | RTYPE (_ : (regidx × regidx × regidx × rop))
-  | LOAD (_ : ((BitVec 12) × regidx × regidx × Bool × word_width × Bool × Bool))
-  | STORE (_ : ((BitVec 12) × regidx × regidx × word_width × Bool × Bool))
+  | LOAD (_ : ((BitVec 12) × regidx × regidx × Bool × word_width))
+  | STORE (_ : ((BitVec 12) × regidx × regidx × word_width))
   | ADDIW (_ : ((BitVec 12) × regidx × regidx))
   | RTYPEW (_ : (regidx × regidx × regidx × ropw))
   | SHIFTIWOP (_ : ((BitVec 5) × regidx × regidx × sopw))
@@ -540,7 +538,7 @@ inductive ast where
   | AMO (_ : (amoop × Bool × Bool × regidx × regidx × word_width × regidx))
   | LOADRES (_ : (Bool × Bool × regidx × word_width × regidx))
   | STORECON (_ : (Bool × Bool × regidx × regidx × word_width × regidx))
-  | C_NOP (_ : Unit)
+  | C_NOP (_ : (BitVec 6))
   | C_ADDI4SPN (_ : (cregidx × (BitVec 8)))
   | C_LW (_ : ((BitVec 5) × cregidx × cregidx))
   | C_LD (_ : ((BitVec 5) × cregidx × cregidx))
@@ -582,15 +580,6 @@ inductive ast where
   | REMW (_ : (regidx × regidx × regidx × Bool))
   | CSRReg (_ : (csreg × regidx × regidx × csrop))
   | CSRImm (_ : (csreg × (BitVec 5) × regidx × csrop))
-  | C_NOP_HINT (_ : (BitVec 6))
-  | C_ADDI_HINT (_ : regidx)
-  | C_LI_HINT (_ : (BitVec 6))
-  | C_LUI_HINT (_ : (BitVec 6))
-  | C_MV_HINT (_ : regidx)
-  | C_ADD_HINT (_ : regidx)
-  | C_SLLI_HINT (_ : ((BitVec 6) × regidx))
-  | C_SRLI_HINT (_ : cregidx)
-  | C_SRAI_HINT (_ : cregidx)
   | FENCE_RESERVED (_ : ((BitVec 4) × (BitVec 4) × (BitVec 4) × regidx × regidx))
   | FENCEI_RESERVED (_ : ((BitVec 12) × regidx × regidx))
   | LOAD_FP (_ : ((BitVec 12) × regidx × fregidx × word_width))
@@ -747,15 +736,13 @@ inductive ast where
   | VISG (_ : (visgfunct6 × (BitVec 1) × vregidx × (BitVec 5) × vregidx))
   | MASKTYPEI (_ : (vregidx × (BitVec 5) × vregidx))
   | MOVETYPEI (_ : (vregidx × (BitVec 5)))
-  | VMVRTYPE (_ : (vregidx × (BitVec 5) × vregidx))
+  | VMVRTYPE (_ : (vregidx × Int × vregidx))
   | MVVTYPE (_ : (mvvfunct6 × (BitVec 1) × vregidx × vregidx × vregidx))
   | MVVMATYPE (_ : (mvvmafunct6 × (BitVec 1) × vregidx × vregidx × vregidx))
   | WVVTYPE (_ : (wvvfunct6 × (BitVec 1) × vregidx × vregidx × vregidx))
   | WVTYPE (_ : (wvfunct6 × (BitVec 1) × vregidx × vregidx × vregidx))
   | WMVVTYPE (_ : (wmvvfunct6 × (BitVec 1) × vregidx × vregidx × vregidx))
-  | VEXT2TYPE (_ : (vext2funct6 × (BitVec 1) × vregidx × vregidx))
-  | VEXT4TYPE (_ : (vext4funct6 × (BitVec 1) × vregidx × vregidx))
-  | VEXT8TYPE (_ : (vext8funct6 × (BitVec 1) × vregidx × vregidx))
+  | VEXTTYPE (_ : (vextfunct6 × (BitVec 1) × vregidx × vregidx))
   | VMVXS (_ : (vregidx × regidx))
   | MVVCOMPRESS (_ : (vregidx × vregidx × vregidx))
   | MVXTYPE (_ : (mvxfunct6 × (BitVec 1) × vregidx × regidx × vregidx))
@@ -834,7 +821,7 @@ inductive ast where
   | VROL_VX (_ : ((BitVec 1) × vregidx × regidx × vregidx))
   | VROR_VV (_ : ((BitVec 1) × vregidx × vregidx × vregidx))
   | VROR_VX (_ : ((BitVec 1) × vregidx × regidx × vregidx))
-  | VROR_VI (_ : ((BitVec 1) × vregidx × (BitVec 5) × vregidx))
+  | VROR_VI (_ : ((BitVec 1) × vregidx × (BitVec 6) × vregidx))
   | VWSLL_VV (_ : ((BitVec 1) × vregidx × vregidx × vregidx))
   | VWSLL_VX (_ : ((BitVec 1) × vregidx × regidx × vregidx))
   | VWSLL_VI (_ : ((BitVec 1) × vregidx × (BitVec 5) × vregidx))
@@ -852,7 +839,9 @@ inductive ast where
   | VAESKF2_VI (_ : (vregidx × (BitVec 5) × vregidx))
   | VAESZ_VS (_ : (vregidx × vregidx))
   | VSHA2MS_VV (_ : (vregidx × vregidx × vregidx))
-  | ZVKSHA2TYPE (_ : (zvkfunct6 × vregidx × vregidx × vregidx))
+  | ZVKSHA2TYPE (_ : (zvk_vsha2_funct6 × vregidx × vregidx × vregidx))
+  | VSM4K_VI (_ : (vregidx × (BitVec 5) × vregidx))
+  | ZVKSM4RTYPE (_ : (zvk_vsm4r_funct6 × vregidx × vregidx))
   | VSM3ME_VV (_ : (vregidx × vregidx × vregidx))
   | VSM3C_VI (_ : (vregidx × (BitVec 5) × vregidx))
   | ZIMOP_MOP_R (_ : ((BitVec 5) × regidx × regidx))
@@ -911,21 +900,23 @@ abbrev regtype := xlenbits
 
 abbrev fregtype := flenbits
 
-abbrev Misa := (BitVec (2 ^ 2 * 8))
+abbrev Misa := (BitVec 32)
 
 abbrev Mstatus := (BitVec 64)
 
+abbrev Seccfg := (BitVec 64)
+
 abbrev MEnvcfg := (BitVec 64)
 
-abbrev SEnvcfg := (BitVec (2 ^ 2 * 8))
+abbrev SEnvcfg := (BitVec 32)
 
-abbrev Minterrupts := (BitVec (2 ^ 2 * 8))
+abbrev Minterrupts := (BitVec 32)
 
 abbrev Medeleg := (BitVec 64)
 
-abbrev Mtvec := (BitVec (2 ^ 2 * 8))
+abbrev Mtvec := (BitVec 32)
 
-abbrev Mcause := (BitVec (2 ^ 2 * 8))
+abbrev Mcause := (BitVec 32)
 
 abbrev Counteren := (BitVec 32)
 
@@ -933,13 +924,21 @@ abbrev Counterin := (BitVec 32)
 
 abbrev Sstatus := (BitVec 64)
 
-abbrev Sinterrupts := (BitVec (2 ^ 2 * 8))
+abbrev Sinterrupts := (BitVec 32)
 
 abbrev Satp64 := (BitVec 64)
 
 abbrev Satp32 := (BitVec 32)
 
-abbrev Vtype := (BitVec (2 ^ 2 * 8))
+abbrev Vtype := (BitVec 32)
+
+abbrev SEW_pow := Nat
+
+abbrev LMUL_pow := Int
+
+abbrev sew_bitsize := Int
+
+
 
 inductive agtype where | UNDISTURBED | AGNOSTIC
   deriving BEq, Inhabited, Repr
@@ -1135,6 +1134,9 @@ inductive Step where
   | Step_Waiting (_ : WaitReason)
   deriving Inhabited, BEq, Repr
 
+inductive ISA_Format where | Canonical_Lowercase | DeviceTree_ISA_Extensions
+  deriving BEq, Inhabited, Repr
+
 inductive Register : Type where
   | hart_state
   | satp
@@ -1258,6 +1260,7 @@ inductive Register : Type where
   | mie
   | senvcfg
   | menvcfg
+  | mseccfg
   | mstatus
   | misa
   | cur_inst
@@ -1307,7 +1310,7 @@ open Register
 
 abbrev RegisterType : Register → Type
   | .hart_state => HartState
-  | .satp => (BitVec (2 ^ 2 * 8))
+  | .satp => (BitVec 32)
   | .tlb => (Vector (Option TLB_Entry) 64)
   | .htif_payload_writes => (BitVec 4)
   | .htif_cmd_write => (BitVec 1)
@@ -1316,47 +1319,47 @@ abbrev RegisterType : Register → Type
   | .htif_tohost => (BitVec 64)
   | .stimecmp => (BitVec 64)
   | .mtimecmp => (BitVec 64)
-  | .plat_clint_size => (BitVec 34)
-  | .plat_clint_base => (BitVec 34)
-  | .plat_rom_size => (BitVec 34)
-  | .plat_rom_base => (BitVec 34)
-  | .plat_ram_size => (BitVec 34)
-  | .plat_ram_base => (BitVec 34)
+  | .plat_clint_size => (BitVec (bif 32 = 32 then 34 else 64))
+  | .plat_clint_base => (BitVec (bif 32 = 32 then 34 else 64))
+  | .plat_rom_size => (BitVec (bif 32 = 32 then 34 else 64))
+  | .plat_rom_base => (BitVec (bif 32 = 32 then 34 else 64))
+  | .plat_ram_size => (BitVec (bif 32 = 32 then 34 else 64))
+  | .plat_ram_base => (BitVec (bif 32 = 32 then 34 else 64))
   | .minstretcfg => (BitVec 64)
   | .mcyclecfg => (BitVec 64)
   | .fcsr => (BitVec 32)
-  | .f31 => (BitVec (8 * 8))
-  | .f30 => (BitVec (8 * 8))
-  | .f29 => (BitVec (8 * 8))
-  | .f28 => (BitVec (8 * 8))
-  | .f27 => (BitVec (8 * 8))
-  | .f26 => (BitVec (8 * 8))
-  | .f25 => (BitVec (8 * 8))
-  | .f24 => (BitVec (8 * 8))
-  | .f23 => (BitVec (8 * 8))
-  | .f22 => (BitVec (8 * 8))
-  | .f21 => (BitVec (8 * 8))
-  | .f20 => (BitVec (8 * 8))
-  | .f19 => (BitVec (8 * 8))
-  | .f18 => (BitVec (8 * 8))
-  | .f17 => (BitVec (8 * 8))
-  | .f16 => (BitVec (8 * 8))
-  | .f15 => (BitVec (8 * 8))
-  | .f14 => (BitVec (8 * 8))
-  | .f13 => (BitVec (8 * 8))
-  | .f12 => (BitVec (8 * 8))
-  | .f11 => (BitVec (8 * 8))
-  | .f10 => (BitVec (8 * 8))
-  | .f9 => (BitVec (8 * 8))
-  | .f8 => (BitVec (8 * 8))
-  | .f7 => (BitVec (8 * 8))
-  | .f6 => (BitVec (8 * 8))
-  | .f5 => (BitVec (8 * 8))
-  | .f4 => (BitVec (8 * 8))
-  | .f3 => (BitVec (8 * 8))
-  | .f2 => (BitVec (8 * 8))
-  | .f1 => (BitVec (8 * 8))
-  | .f0 => (BitVec (8 * 8))
+  | .f31 => (BitVec (bif true then 8 else 4 * 8))
+  | .f30 => (BitVec (bif true then 8 else 4 * 8))
+  | .f29 => (BitVec (bif true then 8 else 4 * 8))
+  | .f28 => (BitVec (bif true then 8 else 4 * 8))
+  | .f27 => (BitVec (bif true then 8 else 4 * 8))
+  | .f26 => (BitVec (bif true then 8 else 4 * 8))
+  | .f25 => (BitVec (bif true then 8 else 4 * 8))
+  | .f24 => (BitVec (bif true then 8 else 4 * 8))
+  | .f23 => (BitVec (bif true then 8 else 4 * 8))
+  | .f22 => (BitVec (bif true then 8 else 4 * 8))
+  | .f21 => (BitVec (bif true then 8 else 4 * 8))
+  | .f20 => (BitVec (bif true then 8 else 4 * 8))
+  | .f19 => (BitVec (bif true then 8 else 4 * 8))
+  | .f18 => (BitVec (bif true then 8 else 4 * 8))
+  | .f17 => (BitVec (bif true then 8 else 4 * 8))
+  | .f16 => (BitVec (bif true then 8 else 4 * 8))
+  | .f15 => (BitVec (bif true then 8 else 4 * 8))
+  | .f14 => (BitVec (bif true then 8 else 4 * 8))
+  | .f13 => (BitVec (bif true then 8 else 4 * 8))
+  | .f12 => (BitVec (bif true then 8 else 4 * 8))
+  | .f11 => (BitVec (bif true then 8 else 4 * 8))
+  | .f10 => (BitVec (bif true then 8 else 4 * 8))
+  | .f9 => (BitVec (bif true then 8 else 4 * 8))
+  | .f8 => (BitVec (bif true then 8 else 4 * 8))
+  | .f7 => (BitVec (bif true then 8 else 4 * 8))
+  | .f6 => (BitVec (bif true then 8 else 4 * 8))
+  | .f5 => (BitVec (bif true then 8 else 4 * 8))
+  | .f4 => (BitVec (bif true then 8 else 4 * 8))
+  | .f3 => (BitVec (bif true then 8 else 4 * 8))
+  | .f2 => (BitVec (bif true then 8 else 4 * 8))
+  | .f1 => (BitVec (bif true then 8 else 4 * 8))
+  | .f0 => (BitVec (bif true then 8 else 4 * 8))
   | .float_fflags => (BitVec 64)
   | .float_result => (BitVec 64)
   | .mhpmcounter => (Vector (BitVec 64) 32)
@@ -1394,21 +1397,21 @@ abbrev RegisterType : Register → Type
   | .vr2 => (BitVec 65536)
   | .vr1 => (BitVec 65536)
   | .vr0 => (BitVec 65536)
-  | .pmpaddr_n => (Vector (BitVec (2 ^ 2 * 8)) 64)
+  | .pmpaddr_n => (Vector (BitVec 32) 64)
   | .pmpcfg_n => (Vector (BitVec 8) 64)
-  | .vtype => (BitVec (2 ^ 2 * 8))
-  | .vl => (BitVec (2 ^ 2 * 8))
-  | .vstart => (BitVec 16)
-  | .tselect => (BitVec (2 ^ 2 * 8))
-  | .stval => (BitVec (2 ^ 2 * 8))
-  | .scause => (BitVec (2 ^ 2 * 8))
-  | .sepc => (BitVec (2 ^ 2 * 8))
-  | .sscratch => (BitVec (2 ^ 2 * 8))
-  | .stvec => (BitVec (2 ^ 2 * 8))
-  | .mconfigptr => (BitVec (2 ^ 2 * 8))
-  | .mhartid => (BitVec (2 ^ 2 * 8))
-  | .marchid => (BitVec (2 ^ 2 * 8))
-  | .mimpid => (BitVec (2 ^ 2 * 8))
+  | .vtype => (BitVec 32)
+  | .vl => (BitVec 32)
+  | .vstart => (BitVec 32)
+  | .tselect => (BitVec 32)
+  | .stval => (BitVec 32)
+  | .scause => (BitVec 32)
+  | .sepc => (BitVec 32)
+  | .sscratch => (BitVec 32)
+  | .stvec => (BitVec 32)
+  | .mconfigptr => (BitVec 32)
+  | .mhartid => (BitVec 32)
+  | .marchid => (BitVec 32)
+  | .mimpid => (BitVec 32)
   | .mvendorid => (BitVec 32)
   | .minstret_increment => Bool
   | .minstret => (BitVec 64)
@@ -1417,54 +1420,55 @@ abbrev RegisterType : Register → Type
   | .mcountinhibit => (BitVec 32)
   | .mcounteren => (BitVec 32)
   | .scounteren => (BitVec 32)
-  | .mscratch => (BitVec (2 ^ 2 * 8))
-  | .mtval => (BitVec (2 ^ 2 * 8))
-  | .mepc => (BitVec (2 ^ 2 * 8))
-  | .mcause => (BitVec (2 ^ 2 * 8))
-  | .mtvec => (BitVec (2 ^ 2 * 8))
-  | .mideleg => (BitVec (2 ^ 2 * 8))
+  | .mscratch => (BitVec 32)
+  | .mtval => (BitVec 32)
+  | .mepc => (BitVec 32)
+  | .mcause => (BitVec 32)
+  | .mtvec => (BitVec 32)
+  | .mideleg => (BitVec 32)
   | .medeleg => (BitVec 64)
-  | .mip => (BitVec (2 ^ 2 * 8))
-  | .mie => (BitVec (2 ^ 2 * 8))
-  | .senvcfg => (BitVec (2 ^ 2 * 8))
+  | .mip => (BitVec 32)
+  | .mie => (BitVec 32)
+  | .senvcfg => (BitVec 32)
   | .menvcfg => (BitVec 64)
+  | .mseccfg => (BitVec 64)
   | .mstatus => (BitVec 64)
-  | .misa => (BitVec (2 ^ 2 * 8))
-  | .cur_inst => (BitVec (2 ^ 2 * 8))
+  | .misa => (BitVec 32)
+  | .cur_inst => (BitVec 32)
   | .cur_privilege => Privilege
-  | .x31 => (BitVec (2 ^ 2 * 8))
-  | .x30 => (BitVec (2 ^ 2 * 8))
-  | .x29 => (BitVec (2 ^ 2 * 8))
-  | .x28 => (BitVec (2 ^ 2 * 8))
-  | .x27 => (BitVec (2 ^ 2 * 8))
-  | .x26 => (BitVec (2 ^ 2 * 8))
-  | .x25 => (BitVec (2 ^ 2 * 8))
-  | .x24 => (BitVec (2 ^ 2 * 8))
-  | .x23 => (BitVec (2 ^ 2 * 8))
-  | .x22 => (BitVec (2 ^ 2 * 8))
-  | .x21 => (BitVec (2 ^ 2 * 8))
-  | .x20 => (BitVec (2 ^ 2 * 8))
-  | .x19 => (BitVec (2 ^ 2 * 8))
-  | .x18 => (BitVec (2 ^ 2 * 8))
-  | .x17 => (BitVec (2 ^ 2 * 8))
-  | .x16 => (BitVec (2 ^ 2 * 8))
-  | .x15 => (BitVec (2 ^ 2 * 8))
-  | .x14 => (BitVec (2 ^ 2 * 8))
-  | .x13 => (BitVec (2 ^ 2 * 8))
-  | .x12 => (BitVec (2 ^ 2 * 8))
-  | .x11 => (BitVec (2 ^ 2 * 8))
-  | .x10 => (BitVec (2 ^ 2 * 8))
-  | .x9 => (BitVec (2 ^ 2 * 8))
-  | .x8 => (BitVec (2 ^ 2 * 8))
-  | .x7 => (BitVec (2 ^ 2 * 8))
-  | .x6 => (BitVec (2 ^ 2 * 8))
-  | .x5 => (BitVec (2 ^ 2 * 8))
-  | .x4 => (BitVec (2 ^ 2 * 8))
-  | .x3 => (BitVec (2 ^ 2 * 8))
-  | .x2 => (BitVec (2 ^ 2 * 8))
-  | .x1 => (BitVec (2 ^ 2 * 8))
-  | .nextPC => (BitVec (2 ^ 2 * 8))
-  | .PC => (BitVec (2 ^ 2 * 8))
+  | .x31 => (BitVec 32)
+  | .x30 => (BitVec 32)
+  | .x29 => (BitVec 32)
+  | .x28 => (BitVec 32)
+  | .x27 => (BitVec 32)
+  | .x26 => (BitVec 32)
+  | .x25 => (BitVec 32)
+  | .x24 => (BitVec 32)
+  | .x23 => (BitVec 32)
+  | .x22 => (BitVec 32)
+  | .x21 => (BitVec 32)
+  | .x20 => (BitVec 32)
+  | .x19 => (BitVec 32)
+  | .x18 => (BitVec 32)
+  | .x17 => (BitVec 32)
+  | .x16 => (BitVec 32)
+  | .x15 => (BitVec 32)
+  | .x14 => (BitVec 32)
+  | .x13 => (BitVec 32)
+  | .x12 => (BitVec 32)
+  | .x11 => (BitVec 32)
+  | .x10 => (BitVec 32)
+  | .x9 => (BitVec 32)
+  | .x8 => (BitVec 32)
+  | .x7 => (BitVec 32)
+  | .x6 => (BitVec 32)
+  | .x5 => (BitVec 32)
+  | .x4 => (BitVec 32)
+  | .x3 => (BitVec 32)
+  | .x2 => (BitVec 32)
+  | .x1 => (BitVec 32)
+  | .nextPC => (BitVec 32)
+  | .PC => (BitVec 32)
   | .rvfi_mem_data_present => Bool
   | .rvfi_mem_data => (BitVec 704)
   | .rvfi_int_data_present => Bool
@@ -1481,17 +1485,15 @@ instance : Inhabited (RegisterRef RegisterType (BitVec 1)) where
   default := .Reg htif_cmd_write
 instance : Inhabited (RegisterRef RegisterType (BitVec 128)) where
   default := .Reg rvfi_pc_data
-instance : Inhabited (RegisterRef RegisterType (BitVec 16)) where
-  default := .Reg vstart
 instance : Inhabited (RegisterRef RegisterType (BitVec 192)) where
   default := .Reg rvfi_inst_data
 instance : Inhabited (RegisterRef RegisterType (BitVec 3)) where
   default := .Reg vcsr
-instance : Inhabited (RegisterRef RegisterType (BitVec (2 ^ 2 * 8))) where
+instance : Inhabited (RegisterRef RegisterType (BitVec 32)) where
   default := .Reg PC
 instance : Inhabited (RegisterRef RegisterType (BitVec 320)) where
   default := .Reg rvfi_int_data
-instance : Inhabited (RegisterRef RegisterType (BitVec 34)) where
+instance : Inhabited (RegisterRef RegisterType (BitVec (bif 32 = 32 then 34 else 64))) where
   default := .Reg plat_ram_base
 instance : Inhabited (RegisterRef RegisterType (BitVec 4)) where
   default := .Reg htif_payload_writes
@@ -1505,7 +1507,7 @@ instance : Inhabited (RegisterRef RegisterType Bool) where
   default := .Reg rvfi_int_data_present
 instance : Inhabited (RegisterRef RegisterType (Vector (BitVec 64) 32)) where
   default := .Reg mhpmevent
-instance : Inhabited (RegisterRef RegisterType (Vector (BitVec (2 ^ 2 * 8)) 64)) where
+instance : Inhabited (RegisterRef RegisterType (Vector (BitVec 32) 64)) where
   default := .Reg pmpaddr_n
 instance : Inhabited (RegisterRef RegisterType (Vector (BitVec 8) 64)) where
   default := .Reg pmpcfg_n
@@ -1515,7 +1517,7 @@ abbrev SailM := PreSailM RegisterType trivialChoiceSource exception
 
 instance : Arch where
   va_size := 64
-  pa := (BitVec 34)
+  pa := (BitVec (bif 32 = 32 then 34 else 64))
   abort := Unit
   translation := Unit
   trans_start := Unit

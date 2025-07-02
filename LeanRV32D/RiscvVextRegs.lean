@@ -1,4 +1,9 @@
-import LeanRV32D.RiscvVregType
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvVlen
+import LeanRV32D.RiscvExtensions
+import LeanRV32D.RiscvTypes
+import LeanRV32D.RiscvCallbacks
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +16,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +29,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +57,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +159,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -417,8 +421,8 @@ def vreg_name_backwards_matches (arg_ : String) : SailM Bool := do
 def dirty_v_context (_ : Unit) : SailM Unit := do
   assert (hartSupports Ext_V) "riscv_vext_regs.sail:95.28-95.29"
   writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) 10 9 (extStatus_to_bits Dirty))
-  writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) (((2 ^i 2) *i 8) -i 1)
-    (((2 ^i 2) *i 8) -i 1) (0b1 : (BitVec 1)))
+  writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) (32 -i 1) (32 -i 1)
+    (0b1 : (BitVec 1)))
   (long_csr_write_callback "mstatus" "mstatush" (← readReg mstatus))
 
 def rV (app_0 : vregno) : SailM (BitVec 65536) := do
@@ -568,8 +572,8 @@ def ext_write_vcsr (vxrm_val : (BitVec 2)) (vxsat_val : (BitVec 1)) : SailM Unit
   writeReg vcsr (Sail.BitVec.updateSubrange (← readReg vcsr) 0 0 vxsat_val)
   (dirty_v_context ())
 
-/-- Type quantifiers: SEW : Int, LMUL_pow : Int -/
-def get_num_elem (LMUL_pow : Int) (SEW : Int) : SailM Int := do
+/-- Type quantifiers: SEW : Nat, LMUL_pow : Int, SEW ∈ {8, 16, 32, 64} -/
+def get_num_elem (LMUL_pow : Int) (SEW : Nat) : SailM Int := do
   let LMUL_pow_reg :=
     bif (LMUL_pow <b 0)
     then 0
@@ -578,11 +582,11 @@ def get_num_elem (LMUL_pow : Int) (SEW : Int) : SailM Int := do
   assert (num_elem >b 0) "riscv_vext_regs.sail:246.21-246.22"
   (pure num_elem)
 
-/-- Type quantifiers: num_elem : Nat, SEW : Nat, num_elem ≥ 0 ∧ SEW ≥ 0 -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, SEW : Nat, SEW ≥ 0, num_elem ≥ 0 ∧
+  is_sew_bitsize(SEW) -/
 def read_single_vreg (num_elem : Nat) (SEW : Nat) (vrid : vregidx) : SailM (Vector (BitVec SEW) num_elem) := do
   let bv ← (( do (rV_bits vrid) ) : SailM vregtype )
   let result : (Vector (BitVec SEW) num_elem) := (vectorInit (zeros (n := SEW)))
-  assert ((8 ≤b SEW) && (SEW ≤b 64)) "riscv_vext_regs.sail:256.29-256.30"
   let loop_i_lower := 0
   let loop_i_upper := (num_elem -i 1)
   let mut loop_vars := result
@@ -593,10 +597,10 @@ def read_single_vreg (num_elem : Nat) (SEW : Nat) (vrid : vregidx) : SailM (Vect
       (vectorUpdate result i (BitVec.slice bv start_index SEW))
   (pure loop_vars)
 
-/-- Type quantifiers: num_elem : Nat, SEW : Int, num_elem ≥ 0 -/
-def write_single_vreg (num_elem : Nat) (SEW : Int) (vrid : vregidx) (v : (Vector (BitVec SEW) num_elem)) : SailM Unit := do
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, SEW : Nat, SEW ≥ 0, num_elem ≥ 0 ∧
+  is_sew_bitsize(SEW) -/
+def write_single_vreg (num_elem : Nat) (SEW : Nat) (vrid : vregidx) (v : (Vector (BitVec SEW) num_elem)) : SailM Unit := do
   let r : vregtype := (zeros (n := 65536))
-  assert ((8 ≤b SEW) && (SEW ≤b 64)) "riscv_vext_regs.sail:270.29-270.30"
   let r ← (( do
     let loop_i_lower := 0
     let loop_i_upper := (num_elem -i 1)
@@ -609,7 +613,8 @@ def write_single_vreg (num_elem : Nat) (SEW : Int) (vrid : vregidx) (v : (Vector
     (pure loop_vars) ) : SailM (BitVec 65536) )
   (wV_bits vrid r)
 
-/-- Type quantifiers: num_elem : Nat, SEW : Nat, LMUL_pow : Int, num_elem ≥ 0 ∧ SEW ≥ 0 -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, SEW : Nat, SEW ≥ 0, LMUL_pow : Int, num_elem
+  ≥ 0 ∧ is_sew_bitsize(SEW) -/
 def read_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) : SailM (Vector (BitVec SEW) num_elem) := do
   let vrid_val := (BitVec.toNat (vregidx_bits vrid))
   let result : (Vector (BitVec SEW) num_elem) := (vectorInit (zeros (n := SEW)))
@@ -624,7 +629,7 @@ def read_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) : S
       throw Error.Exit)
   else
     (do
-      bif ((Int.emod vrid_val (2 ^i LMUL_pow_reg)) != 0)
+      bif ((Int.tmod vrid_val (2 ^i LMUL_pow_reg)) != 0)
       then
         (do
           assert false "invalid register group: vrid is not a multiple of EMUL"
@@ -637,8 +642,8 @@ def read_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) : S
               (read_single_vreg (Vector.length result) SEW vrid))
           else
             (do
-              let num_elem_single : Int := (Int.tdiv VLEN SEW)
-              assert (num_elem_single ≥b 0) "riscv_vext_regs.sail:298.34-298.35"
+              let num_elem_single := (Int.tdiv VLEN SEW)
+              assert (num_elem_single ≥b 0) "riscv_vext_regs.sail:296.34-296.35"
               let loop_i_lmul_lower := 0
               let loop_i_lmul_upper := ((2 ^i LMUL_pow_reg) -i 1)
               let mut loop_vars := result
@@ -657,33 +662,34 @@ def read_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) : S
                     let result := loop_vars_1
                     loop_vars_1 ← do
                       let s_i : Int := (r_i -i r_start_i)
-                      assert ((0 ≤b r_i) && (r_i <b num_elem)) "riscv_vext_regs.sail:306.42-306.43"
-                      assert ((0 ≤b s_i) && (s_i <b num_elem_single)) "riscv_vext_regs.sail:307.50-307.51"
+                      assert ((0 ≤b r_i) && (r_i <b num_elem)) "riscv_vext_regs.sail:304.42-304.43"
+                      assert ((0 ≤b s_i) && (s_i <b num_elem_single)) "riscv_vext_regs.sail:305.50-305.51"
                       (pure (vectorUpdate result r_i (GetElem?.getElem! single_result s_i)))
                   (pure loop_vars_1)
               (pure loop_vars))))
 
-/-- Type quantifiers: EEW : Nat, index : Int, 8 ≤ EEW ∧ EEW ≤ 128 -/
-def read_single_element (EEW : Nat) (index : Int) (vrid : vregidx) : SailM (BitVec EEW) := do
-  assert (VLEN ≥b EEW) "riscv_vext_regs.sail:320.20-320.21"
-  let elem_per_reg : Int := (Int.tdiv VLEN EEW)
-  assert (elem_per_reg ≥b 0) "riscv_vext_regs.sail:322.27-322.28"
+/-- Type quantifiers: index : Nat, EEW : Nat, EEW ≥ 0, is_sew_bitsize(EEW), 0 ≤ index -/
+def read_single_element (EEW : Nat) (index : Nat) (vrid : vregidx) : SailM (BitVec EEW) := do
+  assert (VLEN ≥b EEW) "riscv_vext_regs.sail:318.20-318.21"
+  let elem_per_reg := (Int.tdiv VLEN EEW)
+  assert (elem_per_reg >b 0) "riscv_vext_regs.sail:320.26-320.27"
   let real_vrid : vregidx :=
     (vregidx_offset vrid (to_bits_unsafe (l := 5) (Int.tdiv index elem_per_reg)))
-  let real_index : Int := (Int.emod index elem_per_reg)
+  let real_index : Int := (Int.tmod index elem_per_reg)
   let vrid_val ← (( do (read_single_vreg elem_per_reg EEW real_vrid) ) : SailM
     (Vector (BitVec EEW) elem_per_reg) )
-  assert ((0 ≤b real_index) && (real_index <b elem_per_reg)) "riscv_vext_regs.sail:326.53-326.54"
+  assert ((0 ≤b real_index) && (real_index <b elem_per_reg)) "riscv_vext_regs.sail:324.53-324.54"
   (pure (GetElem?.getElem! vrid_val real_index))
 
-/-- Type quantifiers: num_elem : Nat, SEW : Nat, LMUL_pow : Int, num_elem ≥ 0 ∧ SEW ≥ 0 -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, SEW : Nat, SEW ≥ 0, LMUL_pow : Int, num_elem
+  ≥ 0 ∧ is_sew_bitsize(SEW) -/
 def write_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) (vec : (Vector (BitVec SEW) num_elem)) : SailM Unit := do
   let LMUL_pow_reg :=
     bif (LMUL_pow <b 0)
     then 0
     else LMUL_pow
   let num_elem_single : Int := (Int.tdiv VLEN SEW)
-  assert (num_elem_single ≥b 0) "riscv_vext_regs.sail:336.30-336.31"
+  assert (num_elem_single ≥b 0) "riscv_vext_regs.sail:334.30-334.31"
   let loop_i_lmul_lower := 0
   let loop_i_lmul_upper := ((2 ^i LMUL_pow_reg) -i 1)
   let mut loop_vars := ()
@@ -702,20 +708,20 @@ def write_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) (v
           let single_vec := loop_vars_1
           loop_vars_1 ← do
             let s_i : Int := (r_i -i r_start_i)
-            assert ((0 ≤b r_i) && (r_i <b num_elem)) "riscv_vext_regs.sail:344.38-344.39"
-            assert ((0 ≤b s_i) && (s_i <b num_elem_single)) "riscv_vext_regs.sail:345.46-345.47"
+            assert ((0 ≤b r_i) && (r_i <b num_elem)) "riscv_vext_regs.sail:342.38-342.39"
+            assert ((0 ≤b s_i) && (s_i <b num_elem_single)) "riscv_vext_regs.sail:343.46-343.47"
             (pure (vectorUpdate single_vec s_i (GetElem?.getElem! vec r_i)))
         (pure loop_vars_1) ) : SailM (Vector (BitVec SEW) num_elem_single) )
       (write_single_vreg num_elem_single SEW vrid_lmul single_vec)
   (pure loop_vars)
 
-/-- Type quantifiers: EEW : Nat, index : Int, 8 ≤ EEW ∧ EEW ≤ 128 -/
-def write_single_element (EEW : Nat) (index : Int) (vrid : vregidx) (value : (BitVec EEW)) : SailM Unit := do
-  let elem_per_reg : Int := (Int.tdiv VLEN EEW)
-  assert (elem_per_reg ≥b 0) "riscv_vext_regs.sail:356.27-356.28"
+/-- Type quantifiers: index : Nat, EEW : Nat, EEW ≥ 0, is_sew_bitsize(EEW), 0 ≤ index -/
+def write_single_element (EEW : Nat) (index : Nat) (vrid : vregidx) (value : (BitVec EEW)) : SailM Unit := do
+  let elem_per_reg := (Int.tdiv VLEN EEW)
+  assert (elem_per_reg >b 0) "riscv_vext_regs.sail:354.26-354.27"
   let real_vrid : vregidx :=
     (vregidx_offset vrid (to_bits_unsafe (l := 5) (Int.tdiv index elem_per_reg)))
-  let real_index : Int := (Int.emod index elem_per_reg)
+  let real_index : Int := (Int.tmod index elem_per_reg)
   let vrid_val ← (( do (read_single_vreg elem_per_reg EEW real_vrid) ) : SailM
     (Vector (BitVec EEW) elem_per_reg) )
   let r : vregtype := (zeros (n := 65536))
@@ -733,9 +739,9 @@ def write_single_element (EEW : Nat) (index : Int) (vrid : vregidx) (value : (Bi
     (pure loop_vars) ) : SailM (BitVec 65536) )
   (wV_bits real_vrid r)
 
-/-- Type quantifiers: num_elem : Nat, num_elem > 0 -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, num_elem > 0 -/
 def read_vmask (num_elem : Nat) (vm : (BitVec 1)) (vrid : vregidx) : SailM (BitVec num_elem) := do
-  assert (num_elem ≤b 65536) "riscv_vext_regs.sail:376.36-376.37"
+  assert (num_elem ≤b 65536) "riscv_vext_regs.sail:374.36-374.37"
   let vreg_val ← (( do (rV_bits vrid) ) : SailM vregtype )
   let result : (BitVec num_elem) := (ones (n := num_elem))
   bif (vm == (0b1 : (BitVec 1)))
@@ -750,9 +756,9 @@ def read_vmask (num_elem : Nat) (vm : (BitVec 1)) (vrid : vregidx) : SailM (BitV
         loop_vars := (BitVec.update result i (BitVec.access vreg_val i))
       (pure loop_vars))
 
-/-- Type quantifiers: num_elem : Nat, num_elem > 0 -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, num_elem > 0 -/
 def read_vmask_carry (num_elem : Nat) (vm : (BitVec 1)) (vrid : vregidx) : SailM (BitVec num_elem) := do
-  assert (num_elem ≤b 65536) "riscv_vext_regs.sail:394.36-394.37"
+  assert (num_elem ≤b 65536) "riscv_vext_regs.sail:392.36-392.37"
   let vreg_val ← (( do (rV_bits vrid) ) : SailM vregtype )
   let result : (BitVec num_elem) := (zeros (n := num_elem))
   bif (vm == (0b1 : (BitVec 1)))
@@ -767,10 +773,10 @@ def read_vmask_carry (num_elem : Nat) (vm : (BitVec 1)) (vrid : vregidx) : SailM
         loop_vars := (BitVec.update result i (BitVec.access vreg_val i))
       (pure loop_vars))
 
-/-- Type quantifiers: num_elem : Nat, num_elem > 0 -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, num_elem > 0 -/
 def write_vmask (num_elem : Nat) (vrid : vregidx) (v : (BitVec num_elem)) : SailM Unit := do
-  assert ((0 <b VLEN) && (VLEN ≤b 65536)) "riscv_vext_regs.sail:412.43-412.44"
-  assert ((0 <b num_elem) && (num_elem ≤b VLEN)) "riscv_vext_regs.sail:413.40-413.41"
+  assert ((0 <b VLEN) && (VLEN ≤b 65536)) "riscv_vext_regs.sail:410.43-410.44"
+  assert ((0 <b num_elem) && (num_elem ≤b VLEN)) "riscv_vext_regs.sail:411.40-411.41"
   let vreg_val ← (( do (rV_bits vrid) ) : SailM vregtype )
   let result ← (( do (undefined_bitvector 65536) ) : SailM vregtype )
   let result ← (( do

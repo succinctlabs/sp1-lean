@@ -1,4 +1,10 @@
-import LeanRV32D.PreludeMemAddrtype
+import LeanRV32D.Sail.Sail
+import LeanRV32D.Sail.BitVec
+import LeanRV32D.Sail.IntRange
+import LeanRV32D.Defs
+import LeanRV32D.Specialization
+import LeanRV32D.FakeReal
+import LeanRV32D.RiscvExtras
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +17,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +30,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +58,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +160,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -171,9 +176,10 @@ open AccessType
 def default_meta : mem_meta := ()
 
 /-- Type quantifiers: width : Nat, 1 ≤ width ∧ width ≤ 4096 -/
-def __WriteRAM_Meta (addr : (BitVec 34)) (width : Nat) (meta_ : Unit) : Unit :=
+def __WriteRAM_Meta (addr : (BitVec (bif 32 = 32 then 34 else 64))) (width : Nat) (meta' : Unit) : Unit :=
   ()
 
 /-- Type quantifiers: width : Nat, 1 ≤ width ∧ width ≤ 4096 -/
-def __ReadRAM_Meta (addr : (BitVec 34)) (width : Nat) : Unit :=
+def __ReadRAM_Meta (addr : (BitVec (bif 32 = 32 then 34 else 64))) (width : Nat) : Unit :=
   default_meta
+

@@ -1,4 +1,4 @@
-import LeanRV32D.RiscvCallbacks
+import LeanRV32D.Prelude
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +11,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +24,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +52,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +154,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,14 +167,14 @@ open ExceptionType
 open Architecture
 open AccessType
 
-def zero_reg : regtype := (zeros (n := ((2 ^i 2) *i 8)))
+def zero_reg : regtype := (zeros (n := 32))
 
-def RegStr (r : (BitVec (2 ^ 2 * 8))) : String :=
+def RegStr (r : (BitVec 32)) : String :=
   (BitVec.toFormatted r)
 
-def regval_from_reg (r : (BitVec (2 ^ 2 * 8))) : (BitVec (2 ^ 2 * 8)) :=
+def regval_from_reg (r : (BitVec 32)) : (BitVec 32) :=
   r
 
-def regval_into_reg (v : (BitVec (2 ^ 2 * 8))) : (BitVec (2 ^ 2 * 8)) :=
+def regval_into_reg (v : (BitVec 32)) : (BitVec 32) :=
   v
 

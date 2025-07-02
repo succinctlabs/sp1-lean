@@ -1,3 +1,9 @@
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvPcAccess
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvSmcntrpmf
 import LeanRV32D.RiscvSysControl
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +17,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +30,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +58,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +160,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -176,8 +181,8 @@ def plat_enable_misaligned_access : Bool := true
 
 def plat_mtval_has_illegal_inst_bits : Bool := false
 
-def plat_htif_tohost (_ : Unit) : (BitVec 34) :=
-  (zeros (n := 34))
+def htif_tohost_base (_ : Unit) : (BitVec (bif 32 = 32 then 34 else 64)) :=
+  (trunc (m := 34) (plat_htif_tohost ()))
 
 /-- Type quantifiers: width : Int, width ≤ max_mem_access -/
 def within_phys_mem (typ_0 : physaddr) (width : Int) : SailM Bool := do
@@ -220,16 +225,16 @@ def within_clint (typ_0 : physaddr) (width : Nat) : SailM Bool := do
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def within_htif_writable (typ_0 : physaddr) (width : Nat) : Bool :=
   let .Physaddr addr : physaddr := typ_0
-  ((plat_enable_htif ()) && (((plat_htif_tohost ()) == addr) || (((BitVec.addInt
-            (plat_htif_tohost ()) 4) == addr) && (width == 4))))
+  ((plat_enable_htif ()) && (((htif_tohost_base ()) == addr) || (((BitVec.addInt
+            (htif_tohost_base ()) 4) == addr) && (width == 4))))
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def within_htif_readable (typ_0 : physaddr) (width : Nat) : Bool :=
   let .Physaddr addr : physaddr := typ_0
-  ((plat_enable_htif ()) && (((plat_htif_tohost ()) == addr) || (((BitVec.addInt
-            (plat_htif_tohost ()) 4) == addr) && (width == 4))))
+  ((plat_enable_htif ()) && (((htif_tohost_base ()) == addr) || (((BitVec.addInt
+            (htif_tohost_base ()) 4) == addr) && (width == 4))))
 
-def plat_insns_per_tick : Int := 2
+def plat_insns_per_tick : nat1 := 2
 
 def MSIP_BASE : physaddrbits := (zero_extend (m := 34) (0x00000 : (BitVec 20)))
 
@@ -241,7 +246,7 @@ def MTIME_BASE : physaddrbits := (zero_extend (m := 34) (0x0BFF8 : (BitVec 20)))
 
 def MTIME_BASE_HI : physaddrbits := (zero_extend (m := 34) (0x0BFFC : (BitVec 20)))
 
-/-- Type quantifiers: width : Nat, width > 0 -/
+/-- Type quantifiers: width : Nat, width ≥ 0, width > 0 -/
 def clint_load (t : (AccessType Unit)) (app_1 : physaddr) (width : Nat) : SailM (Result (BitVec (8 * width)) ExceptionType) := do
   let .Physaddr addr := app_1
   let addr ← do (pure (addr - (← readReg plat_clint_base)))
@@ -360,7 +365,7 @@ def clint_load (t : (AccessType Unit)) (app_1 : physaddr) (width : Nat) : SailM 
 def clint_dispatch (_ : Unit) : SailM Unit := do
   writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 7 7
     (bool_to_bits (zopz0zIzJ_u (← readReg mtimecmp) (← readReg mtime))))
-  bif (← (currentlyEnabled Ext_Sstc))
+  bif ((← (currentlyEnabled Ext_Sstc)) && ((_get_MEnvcfg_STCE (← readReg menvcfg)) == (0b1 : (BitVec 1))))
   then
     writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 5 5
       (bool_to_bits (zopz0zIzJ_u (← readReg stimecmp) (← readReg mtime))))
@@ -381,7 +386,7 @@ def clint_dispatch (_ : Unit) : SailM Unit := do
                     else (pure "")) ")")))))))
   else (pure ())
 
-/-- Type quantifiers: width : Nat, width > 0 -/
+/-- Type quantifiers: width : Nat, width ≥ 0, width > 0 -/
 def clint_store (app_0 : physaddr) (width : Nat) (data : (BitVec (8 * width))) : SailM (Result Bool ExceptionType) := do
   let .Physaddr addr := app_0
   let addr ← do (pure (addr - (← readReg plat_clint_base)))
@@ -519,6 +524,14 @@ def clint_store (app_0 : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                               else ()
                             (pure (Err (E_SAMO_Access_Fault ()))))))))))
 
+def should_inc_mcycle (priv : Privilege) : SailM Bool := do
+  (pure (((_get_Counterin_CY (← readReg mcountinhibit)) == (0b0 : (BitVec 1))) && ((counter_priv_filter_bit
+          (← readReg mcyclecfg) priv) == (0b0 : (BitVec 1)))))
+
+def should_inc_minstret (priv : Privilege) : SailM Bool := do
+  (pure (((_get_Counterin_IR (← readReg mcountinhibit)) == (0b0 : (BitVec 1))) && ((counter_priv_filter_bit
+          (← readReg minstretcfg) priv) == (0b0 : (BitVec 1)))))
+
 def tick_clock (_ : Unit) : SailM Unit := do
   bif (← (should_inc_mcycle (← readReg cur_privilege)))
   then writeReg mcycle (BitVec.addInt (← readReg mcycle) 1)
@@ -567,7 +580,7 @@ def reset_htif (_ : Unit) : SailM Unit := do
   writeReg htif_payload_writes (0x0 : (BitVec 4))
   writeReg htif_tohost (zeros (n := 64))
 
-/-- Type quantifiers: width : Nat, width > 0 -/
+/-- Type quantifiers: width : Nat, width ≥ 0, width > 0 -/
 def htif_load (t : (AccessType Unit)) (app_1 : physaddr) (width : Nat) : SailM (Result (BitVec (8 * width)) ExceptionType) := do
   let .Physaddr paddr := app_1
   bif (get_config_print_platform ())
@@ -577,16 +590,16 @@ def htif_load (t : (AccessType Unit)) (app_1 : physaddr) (width : Nat) : SailM (
           (HAppend.hAppend (hex_bits_str paddr)
             (HAppend.hAppend "] -> " (BitVec.toFormatted (← readReg htif_tohost)))))))
   else (pure ())
-  bif ((width == 8) && (paddr == (plat_htif_tohost ())))
+  bif ((width == 8) && (paddr == (htif_tohost_base ())))
   then (pure (Ok (zero_extend (m := 64) (← readReg htif_tohost))))
   else
     (do
-      bif ((width == 4) && (paddr == (plat_htif_tohost ())))
+      bif ((width == 4) && (paddr == (htif_tohost_base ())))
       then
         (pure (Ok (zero_extend (m := 32) (Sail.BitVec.extractLsb (← readReg htif_tohost) 31 0))))
       else
         (do
-          bif ((width == 4) && (paddr == (BitVec.addInt (plat_htif_tohost ()) 4)))
+          bif ((width == 4) && (paddr == (BitVec.addInt (htif_tohost_base ()) 4)))
           then
             (pure (Ok
                 (zero_extend (m := 32) (Sail.BitVec.extractLsb (← readReg htif_tohost) 63 32))))
@@ -596,7 +609,7 @@ def htif_load (t : (AccessType Unit)) (app_1 : physaddr) (width : Nat) : SailM (
             | .Read Data => (pure (Err (E_Load_Access_Fault ())))
             | _ => (pure (Err (E_SAMO_Access_Fault ()))))))
 
-/-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ 8 -/
+/-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ 8 -/
 def htif_store (app_0 : physaddr) (width : Nat) (data : (BitVec (8 * width))) : SailM (Result Bool ExceptionType) := do
   let .Physaddr paddr := app_0
   let _ : Unit :=
@@ -614,7 +627,7 @@ def htif_store (app_0 : physaddr) (width : Nat) (data : (BitVec (8 * width))) : 
       writeReg htif_tohost (zero_extend (m := 64) data))
   else
     (do
-      bif ((width == 4) && (paddr == (plat_htif_tohost ())))
+      bif ((width == 4) && (paddr == (htif_tohost_base ())))
       then
         (do
           bif (data == (Sail.BitVec.extractLsb (← readReg htif_tohost) 31 0))
@@ -623,7 +636,7 @@ def htif_store (app_0 : physaddr) (width : Nat) (data : (BitVec (8 * width))) : 
           writeReg htif_tohost (Sail.BitVec.updateSubrange (← readReg htif_tohost) 31 0 data))
       else
         (do
-          bif ((width == 4) && (paddr == (BitVec.addInt (plat_htif_tohost ()) 4)))
+          bif ((width == 4) && (paddr == (BitVec.addInt (htif_tohost_base ()) 4)))
           then
             (do
               bif ((Sail.BitVec.extractLsb data 15 0) == (Sail.BitVec.extractLsb
@@ -696,7 +709,7 @@ def within_mmio_writable (addr : physaddr) (width : Nat) : SailM Bool := do
   else
     (pure ((← (within_clint addr width)) || ((within_htif_writable addr width) && (width ≤b 8))))
 
-/-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
+/-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ max_mem_access -/
 def mmio_read (t : (AccessType Unit)) (paddr : physaddr) (width : Nat) : SailM (Result (BitVec (8 * width)) ExceptionType) := do
   bif (← (within_clint paddr width))
   then (clint_load t paddr width)
@@ -710,7 +723,7 @@ def mmio_read (t : (AccessType Unit)) (paddr : physaddr) (width : Nat) : SailM (
         | .Read Data => (pure (Err (E_Load_Access_Fault ())))
         | _ => (pure (Err (E_SAMO_Access_Fault ())))))
 
-/-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
+/-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ max_mem_access -/
 def mmio_write (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) : SailM (Result Bool ExceptionType) := do
   bif (← (within_clint paddr width))
   then (clint_store paddr width data)

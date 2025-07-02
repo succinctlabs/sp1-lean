@@ -1,4 +1,15 @@
-import LeanRV32D.RiscvInstsVextFp
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvErrors
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvVmemTypes
+import LeanRV32D.RiscvCallbacks
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvVextRegs
+import LeanRV32D.RiscvVextControl
+import LeanRV32D.RiscvInstRetire
+import LeanRV32D.RiscvVmemUtils
+import LeanRV32D.RiscvInstsVextUtils
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +22,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +35,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +63,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +165,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -296,6 +306,40 @@ def nfields_string_backwards_matches (arg_ : String) : Bool :=
   | "seg6" => true
   | "seg7" => true
   | "seg8" => true
+  | _ => false
+
+def nfields_int_string_backwards (arg_ : String) : SailM (BitVec 3) := do
+  match arg_ with
+  | "1" => (pure (0b000 : (BitVec 3)))
+  | "2" => (pure (0b001 : (BitVec 3)))
+  | "4" => (pure (0b011 : (BitVec 3)))
+  | "8" => (pure (0b111 : (BitVec 3)))
+  | _ =>
+    (do
+      assert false "Pattern match failure at unknown location"
+      throw Error.Exit)
+
+def nfields_int_string_forwards_matches (arg_ : (BitVec 3)) : Bool :=
+  let b__0 := arg_
+  bif (b__0 == (0b000 : (BitVec 3)))
+  then true
+  else
+    (bif (b__0 == (0b001 : (BitVec 3)))
+    then true
+    else
+      (bif (b__0 == (0b011 : (BitVec 3)))
+      then true
+      else
+        (bif (b__0 == (0b111 : (BitVec 3)))
+        then true
+        else false)))
+
+def nfields_int_string_backwards_matches (arg_ : String) : Bool :=
+  match arg_ with
+  | "1" => true
+  | "2" => true
+  | "4" => true
+  | "8" => true
   | _ => false
 
 def vlewidth_bitsnumberstr_backwards (arg_ : String) : SailM vlewidth := do
@@ -443,13 +487,12 @@ def process_vlseg (nf : Nat) (vm : (BitVec 1)) (vd : vregidx) (load_width_bytes 
     bif (EMUL_pow ≤b 0)
     then 1
     else (2 ^i EMUL_pow)
-  let width_type : word_width := (size_bytes_backwards load_width_bytes)
   let vm_val ← (( do (read_vmask num_elem vm zvreg) ) : SailME ExecutionResult (BitVec num_elem) )
   let vd_seg ← (( do (read_vreg_seg num_elem (load_width_bytes *i 8) EMUL_pow nf vd) ) : SailME
     ExecutionResult (Vector (BitVec (nf * load_width_bytes * 8)) num_elem) )
   let m := ((nf *i load_width_bytes) *i 8)
   let (result, mask) ← (( do
-    match (← (init_masked_result num_elem ((nf *i load_width_bytes) *i 8) EMUL_pow vd_seg vm_val)) with
+    match (← (init_masked_result num_elem m EMUL_pow vd_seg vm_val)) with
     | .Ok v => (pure v)
     | .Err () => SailME.throw ((Illegal_Instruction ()) : ExecutionResult) ) : SailME
     ExecutionResult ((Vector (BitVec m) num_elem) × (BitVec num_elem)) )
@@ -503,7 +546,6 @@ def process_vlsegff (nf : Nat) (vm : (BitVec 1)) (vd : vregidx) (load_width_byte
     bif (EMUL_pow ≤b 0)
     then 1
     else (2 ^i EMUL_pow)
-  let width_type : word_width := (size_bytes_backwards load_width_bytes)
   let vm_val ← (( do (read_vmask num_elem vm zvreg) ) : SailME ExecutionResult (BitVec num_elem) )
   let vd_seg ← (( do (read_vreg_seg num_elem (load_width_bytes *i 8) EMUL_pow nf vd) ) : SailME
     ExecutionResult (Vector (BitVec (nf * load_width_bytes * 8)) num_elem) )
@@ -599,7 +641,6 @@ def process_vsseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (load_width_bytes
     bif (EMUL_pow ≤b 0)
     then 1
     else (2 ^i EMUL_pow)
-  let width_type : word_width := (size_bytes_backwards load_width_bytes)
   let vm_val ← (( do (read_vmask num_elem vm zvreg) ) : SailME ExecutionResult (BitVec num_elem) )
   let vs3_seg ← (( do (read_vreg_seg num_elem (load_width_bytes *i 8) EMUL_pow nf vs3) ) : SailME
     ExecutionResult (Vector (BitVec (nf * load_width_bytes * 8)) num_elem) )
@@ -631,7 +672,7 @@ def process_vsseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (load_width_bytes
                   data (Write Data) false false false)) with
               | .Ok true => (pure ())
               | .Ok false =>
-                (internal_error "riscv_insts_vext_mem.sail" 234 "store got false from vmem_write")
+                (internal_error "riscv_insts_vext_mem.sail" 238 "store got false from vmem_write")
               | .Err e => SailME.throw (e : ExecutionResult)
           (pure loop_vars_1))
       else (pure ())
@@ -646,7 +687,6 @@ def process_vlsseg (nf : Nat) (vm : (BitVec 1)) (vd : vregidx) (load_width_bytes
     bif (EMUL_pow ≤b 0)
     then 1
     else (2 ^i EMUL_pow)
-  let width_type : word_width := (size_bytes_backwards load_width_bytes)
   let vm_val ← (( do (read_vmask num_elem vm zvreg) ) : SailME ExecutionResult (BitVec num_elem) )
   let vd_seg ← (( do (read_vreg_seg num_elem (load_width_bytes *i 8) EMUL_pow nf vd) ) : SailME
     ExecutionResult (Vector (BitVec (nf * load_width_bytes * 8)) num_elem) )
@@ -708,7 +748,6 @@ def process_vssseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (load_width_byte
     bif (EMUL_pow ≤b 0)
     then 1
     else (2 ^i EMUL_pow)
-  let width_type : word_width := (size_bytes_backwards load_width_bytes)
   let vm_val ← (( do (read_vmask num_elem vm zvreg) ) : SailME ExecutionResult (BitVec num_elem) )
   let vs3_seg ← (( do (read_vreg_seg num_elem (load_width_bytes *i 8) EMUL_pow nf vs3) ) : SailME
     ExecutionResult (Vector (BitVec (nf * load_width_bytes * 8)) num_elem) )
@@ -742,7 +781,7 @@ def process_vssseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (load_width_byte
                   data (Write Data) false false false)) with
               | .Ok true => (pure ())
               | .Ok false =>
-                (internal_error "riscv_insts_vext_mem.sail" 357 "store got false from vmem_write")
+                (internal_error "riscv_insts_vext_mem.sail" 359 "store got false from vmem_write")
               | .Err e => SailME.throw (e : ExecutionResult)
           (pure loop_vars_1))
       else (pure ())
@@ -758,7 +797,6 @@ def process_vlxseg (nf : Nat) (vm : (BitVec 1)) (vd : vregidx) (EEW_index_bytes 
     bif (EMUL_data_pow ≤b 0)
     then 1
     else (2 ^i EMUL_data_pow)
-  let width_type : word_width := (size_bytes_backwards EEW_data_bytes)
   let vm_val ← (( do (read_vmask num_elem vm zvreg) ) : SailME ExecutionResult (BitVec num_elem) )
   let vd_seg ← (( do (read_vreg_seg num_elem (EEW_data_bytes *i 8) EMUL_data_pow nf vd) ) : SailME
     ExecutionResult (Vector (BitVec (nf * EEW_data_bytes * 8)) num_elem) )
@@ -823,7 +861,6 @@ def process_vsxseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (EEW_index_bytes
     bif (EMUL_data_pow ≤b 0)
     then 1
     else (2 ^i EMUL_data_pow)
-  let width_type : word_width := (size_bytes_backwards EEW_data_bytes)
   let vm_val ← (( do (read_vmask num_elem vm zvreg) ) : SailME ExecutionResult (BitVec num_elem) )
   let vs3_seg ← (( do (read_vreg_seg num_elem (EEW_data_bytes *i 8) EMUL_data_pow nf vs3) ) :
     SailME ExecutionResult (Vector (BitVec (nf * EEW_data_bytes * 8)) num_elem) )
@@ -869,7 +906,6 @@ def process_vsxseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (EEW_index_bytes
 /-- Type quantifiers: nf : Nat, load_width_bytes : Nat, elem_per_reg : Nat, nfields_range_pow2(nf)
   ∧ is_mem_width(load_width_bytes) ∧ elem_per_reg ≥ 0 -/
 def process_vlre (nf : Nat) (vd : vregidx) (load_width_bytes : Nat) (rs1 : regidx) (elem_per_reg : Nat) : SailM ExecutionResult := SailME.run do
-  let width_type : word_width := (size_bytes_backwards load_width_bytes)
   let start_element ← (( do
     match (← (get_start_element ())) with
     | .Ok v => (pure v)
@@ -879,7 +915,7 @@ def process_vlre (nf : Nat) (vd : vregidx) (load_width_bytes : Nat) (rs1 : regid
   then (pure RETIRE_SUCCESS)
   else
     (do
-      let elem_to_align : Int := (Int.emod start_element elem_per_reg)
+      let elem_to_align : Int := (Int.tmod start_element elem_per_reg)
       let cur_field : Int := (Int.tdiv start_element elem_per_reg)
       let cur_elem : Int := start_element
       let (cur_elem, cur_field) ← (( do
@@ -936,7 +972,6 @@ def process_vlre (nf : Nat) (vd : vregidx) (load_width_bytes : Nat) (rs1 : regid
 /-- Type quantifiers: nf : Nat, load_width_bytes : Nat, elem_per_reg : Nat, nfields_range_pow2(nf)
   ∧ is_mem_width(load_width_bytes) ∧ elem_per_reg ≥ 0 -/
 def process_vsre (nf : Nat) (load_width_bytes : Nat) (rs1 : regidx) (vs3 : vregidx) (elem_per_reg : Nat) : SailM ExecutionResult := SailME.run do
-  let width_type : word_width := BYTE
   let start_element ← (( do
     match (← (get_start_element ())) with
     | .Ok v => (pure v)
@@ -946,7 +981,7 @@ def process_vsre (nf : Nat) (load_width_bytes : Nat) (rs1 : regidx) (vs3 : vregi
   then (pure RETIRE_SUCCESS)
   else
     (do
-      let elem_to_align : Int := (Int.emod start_element elem_per_reg)
+      let elem_to_align : Int := (Int.tmod start_element elem_per_reg)
       let cur_field : Int := (Int.tdiv start_element elem_per_reg)
       let cur_elem : Int := start_element
       let (cur_elem, cur_field) ← (( do
@@ -968,7 +1003,7 @@ def process_vsre (nf : Nat) (load_width_bytes : Nat) (rs1 : regidx) (vs3 : vregi
                       load_width_bytes data (Write Data) false false false)) with
                   | .Ok true => (pure ())
                   | .Ok false =>
-                    (internal_error "riscv_insts_vext_mem.sail" 661
+                    (internal_error "riscv_insts_vext_mem.sail" 659
                       "store got false from vmem_write")
                   | .Err e => SailME.throw (e : ExecutionResult)
                   (pure (cur_elem +i 1))
@@ -999,7 +1034,7 @@ def process_vsre (nf : Nat) (load_width_bytes : Nat) (rs1 : regidx) (vs3 : vregi
                     (GetElem?.getElem! vs3_val i) (Write Data) false false false)) with
                 | .Ok true => (pure ())
                 | .Ok false =>
-                  (internal_error "riscv_insts_vext_mem.sail" 676 "store got false from vmem_write")
+                  (internal_error "riscv_insts_vext_mem.sail" 674 "store got false from vmem_write")
                 | .Err e => SailME.throw (e : ExecutionResult)
                 (pure (cur_elem +i 1))
             (pure loop_vars_2)
@@ -1041,7 +1076,6 @@ def encdec_lsop_backwards_matches (arg_ : (BitVec 7)) : Bool :=
 
 /-- Type quantifiers: num_elem : Nat, evl : Nat, num_elem ≥ 0 ∧ evl ≥ 0 -/
 def process_vm (vd_or_vs3 : vregidx) (rs1 : regidx) (num_elem : Nat) (evl : Nat) (op : vmlsop) : SailM ExecutionResult := SailME.run do
-  let width_type : word_width := BYTE
   let start_element ← (( do
     match (← (get_start_element ())) with
     | .Ok v => (pure v)
@@ -1075,7 +1109,7 @@ def process_vm (vd_or_vs3 : vregidx) (rs1 : regidx) (num_elem : Nat) (evl : Nat)
                       (GetElem?.getElem! vd_or_vs3_val i) (Write Data) false false false)) with
                   | .Ok true => (pure ())
                   | .Ok false =>
-                    (internal_error "riscv_insts_vext_mem.sail" 734
+                    (internal_error "riscv_insts_vext_mem.sail" 731
                       "store got false from vmem_write")
                   | .Err e => SailME.throw (e : ExecutionResult))
               else (pure ())))

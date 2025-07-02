@@ -1,4 +1,4 @@
-import LeanRV32D.RiscvSscofpmf
+import LeanRV32D.Prelude
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +11,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +24,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +52,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +154,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -227,13 +226,13 @@ def opst_code_backwards_matches (arg_ : (BitVec 2)) : Bool :=
         then true
         else false)))
 
-def read_seed_csr (_ : Unit) : SailM (BitVec (2 ^ 2 * 8)) := do
+def read_seed_csr (_ : Unit) : SailM (BitVec 32) := do
   let reserved_bits : (BitVec 6) := (0b000000 : (BitVec 6))
   let custom_bits : (BitVec 8) := (0x00 : (BitVec 8))
   let seed ← (( do (get_16_random_bits ()) ) : SailM (BitVec 16) )
-  (pure (zero_extend (m := ((2 ^i 2) *i 8))
+  (pure (zero_extend (m := 32)
       ((opst_code_forwards ES16) ++ (reserved_bits ++ (custom_bits ++ seed)))))
 
-def write_seed_csr (_ : Unit) : (BitVec (2 ^ 2 * 8)) :=
-  (zeros (n := ((2 ^i 2) *i 8)))
+def write_seed_csr (_ : Unit) : (BitVec 32) :=
+  (zeros (n := 32))
 

@@ -1,3 +1,6 @@
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvSysRegs
 import LeanRV32D.RiscvPmpRegs
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +14,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +27,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +55,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +157,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -202,11 +204,11 @@ def pmpRangeMatch (begin : Nat) (end_ : Nat) (addr : Nat) (width : Nat) : pmpAdd
     then PMP_Match
     else PMP_PartialMatch)
 
-def pmpMatchAddr (typ_0 : physaddr) (width : (BitVec (2 ^ 2 * 8))) (ent : (BitVec 8)) (pmpaddr : (BitVec (2 ^ 2 * 8))) (prev_pmpaddr : (BitVec (2 ^ 2 * 8))) : SailM pmpAddrMatch := do
+def pmpMatchAddr (typ_0 : physaddr) (width : (BitVec 32)) (ent : (BitVec 8)) (pmpaddr : (BitVec 32)) (prev_pmpaddr : (BitVec 32)) : SailM pmpAddrMatch := do
   let .Physaddr addr : physaddr := typ_0
   let addr := (BitVec.toNat addr)
   let width := (BitVec.toNat width)
-  match (pmpAddrMatchType_of_bits (_get_Pmpcfg_ent_A ent)) with
+  match (pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent)) with
   | OFF => (pure PMP_NoMatch)
   | TOR =>
     (bif (zopz0zKzJ_u prev_pmpaddr pmpaddr)
@@ -234,7 +236,7 @@ def accessToFault (acc : (AccessType Unit)) : ExceptionType :=
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def pmpCheck (addr : physaddr) (width : Nat) (acc : (AccessType Unit)) (priv : Privilege) : SailM (Option ExceptionType) := SailME.run do
-  let width : xlenbits := (to_bits (l := ((2 ^i 2) *i 8)) width)
+  let width : xlenbits := (to_bits (l := 32) width)
   let loop_i_lower := 0
   let loop_i_upper := 63
   let mut loop_vars := ()
@@ -244,7 +246,7 @@ def pmpCheck (addr : physaddr) (width : Nat) (acc : (AccessType Unit)) (priv : P
       let prev_pmpaddr ← do
         bif (i >b 0)
         then (pmpReadAddrReg (i -i 1))
-        else (pure (zeros (n := ((2 ^i 2) *i 8))))
+        else (pure (zeros (n := 32)))
       let cfg ← do (pure (GetElem?.getElem! (← readReg pmpcfg_n) i))
       match (← (pmpMatchAddr addr width cfg (← (pmpReadAddrReg i)) prev_pmpaddr)) with
       | PMP_NoMatch => (pure ())
@@ -268,6 +270,6 @@ def reset_pmp (_ : Unit) : SailM Unit := do
       writeReg pmpcfg_n (vectorUpdate (← readReg pmpcfg_n) i
         (_update_Pmpcfg_ent_L
           (_update_Pmpcfg_ent_A (GetElem?.getElem! (← readReg pmpcfg_n) i)
-            (pmpAddrMatchType_to_bits OFF)) (0b0 : (BitVec 1))))
+            (pmpAddrMatchType_encdec_forwards OFF)) (0b0 : (BitVec 1))))
   (pure loop_vars)
 

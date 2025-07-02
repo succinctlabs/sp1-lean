@@ -1,4 +1,10 @@
-import LeanRV32D.Flow
+import LeanRV32D.Sail.Sail
+import LeanRV32D.Sail.BitVec
+import LeanRV32D.Sail.IntRange
+import LeanRV32D.Defs
+import LeanRV32D.Specialization
+import LeanRV32D.FakeReal
+import LeanRV32D.RiscvExtras
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +17,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +30,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +58,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +160,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -168,7 +173,16 @@ open ExceptionType
 open Architecture
 open AccessType
 
-def sub_virtaddr_xlenbits (typ_0 : virtaddr) (offset : (BitVec (2 ^ 2 * 8))) : virtaddr :=
+def regidx_offset (typ_0 : regidx) (o : (BitVec 5)) : regidx :=
+  let .Regidx r : regidx := typ_0
+  (Regidx (r + o))
+
+/-- Type quantifiers: o : Nat, 0 ≤ o ∧ o ≤ 31 -/
+def regidx_offset_range (typ_0 : regidx) (o : Nat) : regidx :=
+  let .Regidx r : regidx := typ_0
+  (Regidx (BitVec.addInt r o))
+
+def sub_virtaddr_xlenbits (typ_0 : virtaddr) (offset : (BitVec 32)) : virtaddr :=
   let .Virtaddr addr : virtaddr := typ_0
   (Virtaddr (addr - offset))
 

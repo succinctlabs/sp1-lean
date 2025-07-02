@@ -1,4 +1,11 @@
-import LeanRV32D.RiscvInstsZicond
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvVlen
+import LeanRV32D.Arithmetic
+import LeanRV32D.RiscvRegs
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvVextRegs
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +18,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +31,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +59,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +161,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -272,21 +278,21 @@ def illegal_indexed_store (nf : Nat) (EEW_index : Int) (EMUL_pow_index : Int) (E
   (pure ((not (← (valid_vtype ()))) || ((not (valid_eew_emul EEW_index EMUL_pow_index)) || (not
           (valid_segment nf EMUL_pow_data)))))
 
-/-- Type quantifiers: SEW : Nat, SEW ≥ 8 -/
+/-- Type quantifiers: SEW : Nat, SEW ≥ 0, SEW ≥ 8 -/
 def get_scalar (rs1 : regidx) (SEW : Nat) : SailM (BitVec SEW) := do
   bif (SEW ≤b xlen)
   then (pure (Sail.BitVec.extractLsb (← (rX_bits rs1)) (SEW -i 1) 0))
   else (pure (sign_extend (m := SEW) (← (rX_bits rs1))))
 
-/-- Type quantifiers: k_n : Nat, k_m : Nat, i : Nat, k_n > 0 ∧
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_m : Nat, k_m ≥ 0, i : Nat, k_n > 0 ∧
   k_m > 0 ∧ i ≥ 0 ∧ (4 * i + 3) < k_n -/
 def get_velem_quad (v : (Vector (BitVec k_m) k_n)) (i : Nat) : (BitVec (4 * k_m)) :=
   ((GetElem?.getElem! v ((4 *i i) +i 3)) ++ ((GetElem?.getElem! v ((4 *i i) +i 2)) ++ ((GetElem?.getElem!
           v ((4 *i i) +i 1)) ++ (GetElem?.getElem! v (4 *i i)))))
 
-/-- Type quantifiers: i : Nat, SEW : Nat, k_m : Nat, 8 ≤ SEW ∧ SEW ≤ 64 ∧
-  k_m > 0 ∧ i ≥ 0 -/
-def write_velem_quad (vd : vregidx) (SEW : Nat) (input : (BitVec k_m)) (i : Nat) : SailM Unit := do
+/-- Type quantifiers: i : Nat, SEW : Nat, k_n : Nat, k_n ≥ 0, k_n > 0, SEW ∈ {8, 16, 32, 64}, 0
+  ≤ i -/
+def write_velem_quad (vd : vregidx) (SEW : Nat) (input : (BitVec k_n)) (i : Nat) : SailM Unit := do
   let loop_j_lower := 0
   let loop_j_upper := 3
   let mut loop_vars := ()
@@ -296,7 +302,7 @@ def write_velem_quad (vd : vregidx) (SEW : Nat) (input : (BitVec k_m)) (i : Nat)
       (write_single_element SEW ((4 *i i) +i j) vd (BitVec.slice input (j *i SEW) SEW))
   (pure loop_vars)
 
-/-- Type quantifiers: n : Nat, k_m : Nat, i : Nat, n > 0 ∧
+/-- Type quantifiers: n : Nat, n ≥ 0, k_m : Nat, k_m ≥ 0, i : Nat, n > 0 ∧
   8 ≤ k_m ∧ k_m ≤ 64 ∧ i ≥ 0 ∧ (8 * i + 7) < n -/
 def get_velem_oct_vec {n : _} (v : (Vector (BitVec k_m) n)) (i : Nat) : (Vector (BitVec k_m) 8) :=
   #v[(GetElem?.getElem! v (8 *i i)), (GetElem?.getElem! v ((8 *i i) +i 1)), (GetElem?.getElem! v
@@ -304,7 +310,7 @@ def get_velem_oct_vec {n : _} (v : (Vector (BitVec k_m) n)) (i : Nat) : (Vector 
       v ((8 *i i) +i 5)), (GetElem?.getElem! v ((8 *i i) +i 6)), (GetElem?.getElem! v
       ((8 *i i) +i 7))]
 
-/-- Type quantifiers: i : Nat, SEW : Nat, 8 ≤ SEW ∧ SEW ≤ 64 ∧ i ≥ 0 -/
+/-- Type quantifiers: i : Nat, SEW : Nat, SEW ≥ 0, is_sew_bitsize(SEW), 0 ≤ i -/
 def write_velem_oct_vec (vd : vregidx) (SEW : Nat) (input : (Vector (BitVec SEW) 8)) (i : Nat) : SailM Unit := do
   let loop_j_lower := 0
   let loop_j_upper := 7
@@ -314,13 +320,13 @@ def write_velem_oct_vec (vd : vregidx) (SEW : Nat) (input : (Vector (BitVec SEW)
     loop_vars ← do (write_single_element SEW ((8 *i i) +i j) vd (GetElem?.getElem! input j))
   (pure loop_vars)
 
-/-- Type quantifiers: k_n : Nat, k_m : Nat, i : Nat, k_n > 0 ∧
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_m : Nat, k_m ≥ 0, i : Nat, k_n > 0 ∧
   8 ≤ k_m ∧ k_m ≤ 64 ∧ i ≥ 0 ∧ (4 * i + 3) < k_n -/
 def get_velem_quad_vec (v : (Vector (BitVec k_m) k_n)) (i : Nat) : (Vector (BitVec k_m) 4) :=
   #v[(GetElem?.getElem! v (4 *i i)), (GetElem?.getElem! v ((4 *i i) +i 1)), (GetElem?.getElem! v
       ((4 *i i) +i 2)), (GetElem?.getElem! v ((4 *i i) +i 3))]
 
-/-- Type quantifiers: i : Nat, SEW : Nat, 8 ≤ SEW ∧ SEW ≤ 64 ∧ i ≥ 0 -/
+/-- Type quantifiers: i : Nat, SEW : Nat, SEW ≥ 0, is_sew_bitsize(SEW) ∧ i ≥ 0 -/
 def write_velem_quad_vec (vd : vregidx) (SEW : Nat) (input : (Vector (BitVec SEW) 4)) (i : Nat) : SailM Unit := do
   let loop_j_lower := 0
   let loop_j_upper := 3
@@ -340,25 +346,26 @@ def get_start_element (_ : Unit) : SailM (Result Nat Unit) := do
 def get_end_element (_ : Unit) : SailM Int := do
   (pure ((BitVec.toNat (← readReg vl)) -i 1))
 
-/-- Type quantifiers: num_elem : Nat, SEW : Nat, LMUL_pow : Int, num_elem ≥ 0 ∧ SEW ≥ 0 -/
-def init_masked_result (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vd_val : (Vector (BitVec SEW) num_elem)) (vm_val : (BitVec num_elem)) : SailM (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit) := SailME.run do
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, EEW : Nat, EEW ≥ 0, LMUL_pow : Int, num_elem
+  ≥ 0 -/
+def init_masked_result (num_elem : Nat) (EEW : Nat) (LMUL_pow : Int) (vd_val : (Vector (BitVec EEW) num_elem)) (vm_val : (BitVec num_elem)) : SailM (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit) := SailME.run do
   let start_element ← (( do
     match (← (get_start_element ())) with
     | .Ok v => (pure v)
     | .Err () =>
-      SailME.throw ((Err ()) : (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit))
-    ) : SailME (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit) Nat )
+      SailME.throw ((Err ()) : (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit))
+    ) : SailME (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit) Nat )
   let end_element ← do (get_end_element ())
   let tail_ag ← (( do (get_vtype_vta ()) ) : SailME
-    (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit) agtype )
+    (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit) agtype )
   let mask_ag ← (( do (get_vtype_vma ()) ) : SailME
-    (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit) agtype )
+    (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit) agtype )
   let mask ← (( do (undefined_bitvector (Sail.BitVec.length vm_val)) ) : SailME
-    (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit) (BitVec num_elem) )
+    (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit) (BitVec num_elem) )
   let result ← (( do
-    (undefined_vector (Sail.BitVec.length vm_val) (← (undefined_bitvector SEW))) ) : SailME
-    (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit)
-    (Vector (BitVec SEW) num_elem) )
+    (undefined_vector (Sail.BitVec.length vm_val) (← (undefined_bitvector EEW))) ) : SailME
+    (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit)
+    (Vector (BitVec EEW) num_elem) )
   let real_num_elem :=
     bif (LMUL_pow ≥b 0)
     then num_elem
@@ -371,18 +378,18 @@ def init_masked_result (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vd_val : (
     for i in [loop_i_lower:loop_i_upper:1]i do
       let (mask, result) := loop_vars
       loop_vars :=
-        let (mask, result) : ((BitVec num_elem) × (Vector (BitVec SEW) num_elem)) :=
+        let (mask, result) : ((BitVec num_elem) × (Vector (BitVec EEW) num_elem)) :=
           bif (i <b start_element)
           then
-            (let result : (Vector (BitVec SEW) num_elem) :=
+            (let result : (Vector (BitVec EEW) num_elem) :=
               (vectorUpdate result i (GetElem?.getElem! vd_val i))
             let mask : (BitVec num_elem) := (BitVec.update mask i 0#1)
             (mask, result))
           else
-            (let (mask, result) : ((BitVec num_elem) × (Vector (BitVec SEW) num_elem)) :=
+            (let (mask, result) : ((BitVec num_elem) × (Vector (BitVec EEW) num_elem)) :=
               bif (i >b end_element)
               then
-                (let result : (Vector (BitVec SEW) num_elem) :=
+                (let result : (Vector (BitVec EEW) num_elem) :=
                   (vectorUpdate result i
                     (match tail_ag with
                     | UNDISTURBED => (GetElem?.getElem! vd_val i)
@@ -390,10 +397,10 @@ def init_masked_result (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vd_val : (
                 let mask : (BitVec num_elem) := (BitVec.update mask i 0#1)
                 (mask, result))
               else
-                (let (mask, result) : ((BitVec num_elem) × (Vector (BitVec SEW) num_elem)) :=
+                (let (mask, result) : ((BitVec num_elem) × (Vector (BitVec EEW) num_elem)) :=
                   bif (i ≥b real_num_elem)
                   then
-                    (let result : (Vector (BitVec SEW) num_elem) :=
+                    (let result : (Vector (BitVec EEW) num_elem) :=
                       (vectorUpdate result i
                         (match tail_ag with
                         | UNDISTURBED => (GetElem?.getElem! vd_val i)
@@ -401,10 +408,10 @@ def init_masked_result (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vd_val : (
                     let mask : (BitVec num_elem) := (BitVec.update mask i 0#1)
                     (mask, result))
                   else
-                    (let (mask, result) : ((BitVec num_elem) × (Vector (BitVec SEW) num_elem)) :=
+                    (let (mask, result) : ((BitVec num_elem) × (Vector (BitVec EEW) num_elem)) :=
                       bif ((BitVec.access vm_val i) == 0#1)
                       then
-                        (let result : (Vector (BitVec SEW) num_elem) :=
+                        (let result : (Vector (BitVec EEW) num_elem) :=
                           (vectorUpdate result i
                             (match mask_ag with
                             | UNDISTURBED => (GetElem?.getElem! vd_val i)
@@ -418,11 +425,11 @@ def init_masked_result (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vd_val : (
                 (mask, result))
             (mask, result))
         (mask, result)
-    (pure loop_vars) ) : SailME (Result ((Vector (BitVec SEW) num_elem) × (BitVec num_elem)) Unit)
-    ((BitVec num_elem) × (Vector (BitVec SEW) num_elem)) )
+    (pure loop_vars) ) : SailME (Result ((Vector (BitVec EEW) num_elem) × (BitVec num_elem)) Unit)
+    ((BitVec num_elem) × (Vector (BitVec EEW) num_elem)) )
   (pure (Ok (result, mask)))
 
-/-- Type quantifiers: num_elem : Nat, LMUL_pow : Int, num_elem > 0 -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, LMUL_pow : Int, num_elem > 0 -/
 def init_masked_source (num_elem : Nat) (LMUL_pow : Int) (vm_val : (BitVec num_elem)) : SailM (Result (BitVec num_elem) Unit) := SailME.run do
   let start_element ← (( do
     match (← (get_start_element ())) with
@@ -459,8 +466,9 @@ def init_masked_source (num_elem : Nat) (LMUL_pow : Int) (vm_val : (BitVec num_e
     (pure loop_vars) ) : SailME (Result (BitVec num_elem) Unit) (BitVec num_elem) )
   (pure (Ok mask))
 
-/-- Type quantifiers: num_elem : Nat, SEW : Int, LMUL_pow : Int, num_elem ≥ 0 -/
-def init_masked_result_carry (num_elem : Nat) (SEW : Int) (LMUL_pow : Int) (vd_val : (BitVec num_elem)) : SailM (Result ((BitVec num_elem) × (BitVec num_elem)) Unit) := SailME.run do
+/-- Type quantifiers: LMUL_pow : Int, EEW : Nat, num_elem : Nat, num_elem ≥ 0, num_elem ≥ 0, EEW
+  ∈ {8, 16, 32, 64} -/
+def init_masked_result_carry (num_elem : Nat) (EEW : Nat) (LMUL_pow : Int) (vd_val : (BitVec num_elem)) : SailM (Result ((BitVec num_elem) × (BitVec num_elem)) Unit) := SailME.run do
   let start_element ← (( do
     match (← (get_start_element ())) with
     | .Ok v => (pure v)
@@ -514,8 +522,9 @@ def init_masked_result_carry (num_elem : Nat) (SEW : Int) (LMUL_pow : Int) (vd_v
     ((BitVec num_elem) × (BitVec num_elem)) )
   (pure (Ok (result, mask)))
 
-/-- Type quantifiers: num_elem : Nat, SEW : Int, LMUL_pow : Int, num_elem ≥ 0 -/
-def init_masked_result_cmp (num_elem : Nat) (SEW : Int) (LMUL_pow : Int) (vd_val : (BitVec num_elem)) (vm_val : (BitVec num_elem)) : SailM (Result ((BitVec num_elem) × (BitVec num_elem)) Unit) := SailME.run do
+/-- Type quantifiers: LMUL_pow : Int, EEW : Nat, num_elem : Nat, num_elem ≥ 0, num_elem ≥ 0, EEW
+  ∈ {8, 16, 32, 64} -/
+def init_masked_result_cmp (num_elem : Nat) (EEW : Nat) (LMUL_pow : Int) (vd_val : (BitVec num_elem)) (vm_val : (BitVec num_elem)) : SailM (Result ((BitVec num_elem) × (BitVec num_elem)) Unit) := SailME.run do
   let start_element ← (( do
     match (← (get_start_element ())) with
     | .Ok v => (pure v)
@@ -583,8 +592,8 @@ def init_masked_result_cmp (num_elem : Nat) (SEW : Int) (LMUL_pow : Int) (vd_val
     ((BitVec num_elem) × (BitVec num_elem)) )
   (pure (Ok (result, mask)))
 
-/-- Type quantifiers: num_elem : Nat, SEW : Nat, LMUL_pow : Int, nf : Nat, num_elem ≥ 0 ∧
-  SEW ≥ 0 ∧ nfields_range(nf) -/
+/-- Type quantifiers: num_elem : Nat, num_elem ≥ 0, SEW : Nat, LMUL_pow : Int, nf : Nat, num_elem
+  ≥ 0 ∧ is_sew_bitsize(SEW) ∧ nfields_range(nf) -/
 def read_vreg_seg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (nf : Nat) (vrid : vregidx) : SailM (Vector (BitVec (nf * SEW)) num_elem) := do
   let LMUL_reg : Int :=
     bif (LMUL_pow ≤b 0)
@@ -626,7 +635,7 @@ def read_vreg_seg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (nf : Nat) (vrid
       (pure loop_vars_2)
   (pure loop_vars_1)
 
-/-- Type quantifiers: k_n : Nat, SEW : Nat, 0 ≤ k_n ∧ SEW ∈ {8, 16, 32, 64} -/
+/-- Type quantifiers: SEW : Nat, k_n : Nat, k_n ≥ 0, 0 ≤ k_n, SEW ∈ {8, 16, 32, 64} -/
 def get_shift_amount (bit_val : (BitVec k_n)) (SEW : Nat) : SailM Nat := do
   let lowlog2bits := (log2 SEW)
   assert ((0 <b lowlog2bits) && (lowlog2bits <b (Sail.BitVec.length bit_val))) "riscv_insts_vext_utils.sail:449.43-449.44"
@@ -682,7 +691,7 @@ def signed_saturation (len : Nat) (elem : (BitVec k_n)) : SailM (BitVec len) := 
           (pure ((0b1 : (BitVec 1)) ++ (zeros (n := (len -i 1))))))
       else (pure (Sail.BitVec.extractLsb elem (len -i 1) 0)))
 
-/-- Type quantifiers: k_n : Nat, m : Nat, k_n ≥ 0 ∧ m ≥ 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, m : Nat, m ≥ 0, k_n ≥ 0 ∧ m ≥ 0 -/
 def vrev8 {m : _} (input : (Vector (BitVec (m * 8)) k_n)) : (Vector (BitVec (m * 8)) k_n) := Id.run do
   let output : (Vector (BitVec (m * 8)) k_n) := input
   let loop_i_lower := 0

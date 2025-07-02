@@ -1,4 +1,7 @@
-import LeanRV32D.RiscvSysExceptions
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvErrors
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvSysRegs
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +14,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +27,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +55,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +157,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -326,7 +328,7 @@ def legalize_hpmevent (v : (BitVec 64)) : SailM (BitVec 64) := do
       (_get_HpmEvent_event v)))
 
 /-- Type quantifiers: index : Nat, 3 ≤ index ∧ index ≤ 31 -/
-def read_mhpmcounter (index : Nat) : SailM (BitVec (2 ^ 2 * 8)) := do
+def read_mhpmcounter (index : Nat) : SailM (BitVec 32) := do
   (pure (Sail.BitVec.extractLsb (GetElem?.getElem! (← readReg mhpmcounter) index) (xlen -i 1) 0))
 
 /-- Type quantifiers: index : Nat, 3 ≤ index ∧ index ≤ 31 -/
@@ -334,11 +336,11 @@ def read_mhpmcounterh (index : Nat) : SailM (BitVec 32) := do
   (pure (Sail.BitVec.extractLsb (GetElem?.getElem! (← readReg mhpmcounter) index) 63 32))
 
 /-- Type quantifiers: index : Nat, 3 ≤ index ∧ index ≤ 31 -/
-def read_mhpmevent (index : Nat) : SailM (BitVec (2 ^ 2 * 8)) := do
+def read_mhpmevent (index : Nat) : SailM (BitVec 32) := do
   (pure (Sail.BitVec.extractLsb (GetElem?.getElem! (← readReg mhpmevent) index) (xlen -i 1) 0))
 
 /-- Type quantifiers: index : Nat, 3 ≤ index ∧ index ≤ 31 -/
-def write_mhpmcounter (index : Nat) (value : (BitVec (2 ^ 2 * 8))) : SailM Unit := do
+def write_mhpmcounter (index : Nat) (value : (BitVec 32)) : SailM Unit := do
   bif ((BitVec.access sys_writable_hpm_counters index) == 1#1)
   then
     writeReg mhpmcounter (vectorUpdate (← readReg mhpmcounter) index
@@ -355,7 +357,7 @@ def write_mhpmcounterh (index : Nat) (value : (BitVec 32)) : SailM Unit := do
   else (pure ())
 
 /-- Type quantifiers: index : Nat, 3 ≤ index ∧ index ≤ 31 -/
-def write_mhpmevent (index : Nat) (value : (BitVec (2 ^ 2 * 8))) : SailM Unit := do
+def write_mhpmevent (index : Nat) (value : (BitVec 32)) : SailM Unit := do
   bif ((BitVec.access sys_writable_hpm_counters index) == 1#1)
   then
     writeReg mhpmevent (vectorUpdate (← readReg mhpmevent) index

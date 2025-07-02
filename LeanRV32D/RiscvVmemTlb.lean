@@ -1,4 +1,6 @@
-import LeanRV32D.RiscvVmemPtw
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvTypes
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +13,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +26,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +54,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +156,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -172,11 +173,11 @@ def tlb_vpn_bits := (57 -i 12)
 
 def tlb_ppn_bits := 44
 
-/-- Type quantifiers: pte_width : Nat, pte_width ∈ {4, 8} -/
+/-- Type quantifiers: pte_width : Nat, pte_width ≥ 0, pte_width ∈ {4, 8} -/
 def tlb_get_pte (pte_width : Nat) (ent : TLB_Entry) : (BitVec (pte_width * 8)) :=
   (Sail.BitVec.extractLsb ent.pte ((pte_width *i 8) -i 1) 0)
 
-/-- Type quantifiers: k_n : Nat, k_n ∈ {4, 8} -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ∈ {4, 8} -/
 def tlb_set_pte (ent : TLB_Entry) (pte : (BitVec (k_n * 8))) : TLB_Entry :=
   { ent with pte := (zero_extend (m := 64) pte) }
 
@@ -202,10 +203,10 @@ def reset_TLB (_ : Unit) : SailM Unit := do
 def write_TLB (index : Nat) (entry : TLB_Entry) : SailM Unit := do
   writeReg tlb (vectorUpdate (← readReg tlb) index (some entry))
 
-def match_TLB_Entry (ent : TLB_Entry) (asid : (BitVec 9)) (vpn : (BitVec (57 - 12))) : Bool :=
+def match_TLB_Entry (ent : TLB_Entry) (asid : (BitVec (bif 32 = 32 then 9 else 16))) (vpn : (BitVec (57 - 12))) : Bool :=
   ((ent.global || (ent.asid == asid)) && (ent.vpn == (vpn &&& (Complement.complement ent.levelMask))))
 
-def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec 9))) (vaddr : (Option (BitVec (2 ^ 2 * 8)))) : Bool :=
+def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec (bif 32 = 32 then 9 else 16)))) (vaddr : (Option (BitVec 32))) : Bool :=
   let asid_matches : Bool :=
     match asid with
     | .some asid => ((ent.asid == asid) && (not ent.global))
@@ -220,7 +221,7 @@ def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec 9))) (vaddr : (Opt
   (asid_matches && addr_matches)
 
 /-- Type quantifiers: sv_width : Nat, is_sv_mode(sv_width) -/
-def lookup_TLB (sv_width : Nat) (asid : (BitVec 9)) (vpn : (BitVec (sv_width - 12))) : SailM (Option (Nat × TLB_Entry)) := do
+def lookup_TLB (sv_width : Nat) (asid : (BitVec (bif 32 = 32 then 9 else 16))) (vpn : (BitVec (sv_width - 12))) : SailM (Option (Nat × TLB_Entry)) := do
   let index := (tlb_hash sv_width vpn)
   match (GetElem?.getElem! (← readReg tlb) index) with
   | none => (pure none)
@@ -229,11 +230,11 @@ def lookup_TLB (sv_width : Nat) (asid : (BitVec 9)) (vpn : (BitVec (sv_width - 1
     then (pure (some (index, entry)))
     else (pure none))
 
-/-- Type quantifiers: k_ex376049# : Bool, level : Nat, sv_width : Nat, is_sv_mode(sv_width), 0 ≤
+/-- Type quantifiers: k_ex375277# : Bool, level : Nat, sv_width : Nat, is_sv_mode(sv_width), 0 ≤
   level ∧
   level ≤
   (bif sv_width = 32 then 1 else (bif sv_width = 39 then 2 else (bif sv_width = 48 then 3 else 4))) -/
-def add_to_TLB (sv_width : Nat) (asid : (BitVec 9)) (vpn : (BitVec (sv_width - 12))) (ppn : (BitVec (bif sv_width
+def add_to_TLB (sv_width : Nat) (asid : (BitVec (bif 32 = 32 then 9 else 16))) (vpn : (BitVec (sv_width - 12))) (ppn : (BitVec (bif sv_width
   = 32 then 22 else 44))) (pte : (BitVec (bif sv_width = 32 then 32 else 64))) (pteAddr : physaddr) (level : Nat) (global : Bool) : SailM Unit := do
   let shift :=
     (level *i (bif (sv_width == 32)
@@ -258,7 +259,7 @@ def add_to_TLB (sv_width : Nat) (asid : (BitVec 9)) (vpn : (BitVec (sv_width - 1
   let index := (tlb_hash sv_width vpn)
   writeReg tlb (vectorUpdate (← readReg tlb) index (some entry))
 
-def flush_TLB (asid : (Option (BitVec 9))) (addr : (Option (BitVec (2 ^ 2 * 8)))) : SailM Unit := do
+def flush_TLB (asid : (Option (BitVec (bif 32 = 32 then 9 else 16)))) (addr : (Option (BitVec 32))) : SailM Unit := do
   let loop_i_lower := 0
   let loop_i_upper ← do (pure ((Vector.length (← readReg tlb)) -i 1))
   let mut loop_vars := ()

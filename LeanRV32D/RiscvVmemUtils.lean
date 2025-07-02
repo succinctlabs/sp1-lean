@@ -1,3 +1,8 @@
+import LeanRV32D.Prelude
+import LeanRV32D.PreludeMemAddrtype
+import LeanRV32D.RiscvAddrChecks
+import LeanRV32D.RiscvPlatform
+import LeanRV32D.RiscvMem
 import LeanRV32D.RiscvVmem
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +16,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +29,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +57,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +159,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -174,8 +178,9 @@ def sys_misaligned_byte_by_byte : Bool := false
 
 def sys_misaligned_allowed_within_exp : Nat := 0
 
-/-- Type quantifiers: k_width : Nat, bytes : Nat, region_width_exp : Nat, 0 ≤ region_width_exp ∧
-  region_width_exp ≤ k_width ∧ 1 ≤ bytes ∧ bytes ≤ (2 ^ region_width_exp) -/
+/-- Type quantifiers: k_width : Nat, k_width ≥ 0, bytes : Nat, region_width_exp : Nat, 0 ≤
+  region_width_exp ∧ region_width_exp ≤ k_width ∧
+  1 ≤ bytes ∧ bytes ≤ (2 ^ region_width_exp) -/
 def access_within (addr : (BitVec k_width)) (bytes : Nat) (region_width_exp : Nat) : Bool :=
   let mask : (BitVec k_width) :=
     (Complement.complement
@@ -185,13 +190,13 @@ def access_within (addr : (BitVec k_width)) (bytes : Nat) (region_width_exp : Na
 def prop_access_within_is_aligned (addr : (BitVec 32)) (region_width_exp : (BitVec 4)) : Bool :=
   let region_width_exp := (BitVec.toNat region_width_exp)
   let bytes := (2 ^i region_width_exp)
-  ((access_within addr bytes region_width_exp) == ((Int.emod (BitVec.toNat addr) bytes) == 0))
+  ((access_within addr bytes region_width_exp) == ((Int.tmod (BitVec.toNat addr) bytes) == 0))
 
 def prop_access_within_single (addr : (BitVec 32)) : Bool :=
   (access_within addr 1 0)
 
 /-- Type quantifiers: width : Nat, width > 0 -/
-def allowed_misaligned (vaddr : (BitVec (2 ^ 2 * 8))) (width : Nat) : Bool :=
+def allowed_misaligned (vaddr : (BitVec 32)) (width : Nat) : Bool :=
   let region_width_exp := sys_misaligned_allowed_within_exp
   let region_width := (2 ^i region_width_exp)
   bif (width >b region_width)
@@ -220,7 +225,8 @@ def misaligned_order (n : Int) : (Int × Int × Int) :=
   then ((n -i 1), 0, (-1))
   else (0, (n -i 1), 1)
 
-/-- Type quantifiers: k_ex376317# : Bool, k_ex376316# : Bool, k_ex376315# : Bool, width : Nat, is_mem_width(width) -/
+/-- Type quantifiers: k_ex375545# : Bool, k_ex375544# : Bool, k_ex375543# : Bool, width : Nat, width
+  ≥ 0, is_mem_width(width) -/
 def vmem_write_addr (vaddr : virtaddr) (width : Nat) (data : (BitVec (8 * width))) (acc : (AccessType Unit)) (aq : Bool) (rl : Bool) (res : Bool) : SailM (Result Bool ExecutionResult) := SailME.run do
   let (n, bytes) ← do (split_misaligned vaddr width)
   let (first, last, step) := (misaligned_order n)
@@ -271,13 +277,15 @@ def vmem_write_addr (vaddr : virtaddr) (width : Nat) (data : (BitVec (8 * width)
     (pure loop_vars) ) : SailME (Result Bool ExecutionResult) (Bool × Nat × Bool) )
   (pure (Ok write_success))
 
-def check_misaligned (vaddr : virtaddr) (width : word_width) : Bool :=
+/-- Type quantifiers: width : Nat, width ∈ {1, 2, 4, 8} -/
+def check_misaligned (vaddr : virtaddr) (width : Nat) : Bool :=
   bif plat_enable_misaligned_access
   then false
-  else (not (is_aligned_vaddr vaddr (size_bytes_forwards width)))
+  else (not (is_aligned_vaddr vaddr width))
 
-/-- Type quantifiers: k_ex376367# : Bool, k_ex376366# : Bool, k_ex376365# : Bool, width : Nat, is_mem_width(width) -/
-def vmem_read (rs : regidx) (offset : (BitVec (2 ^ 2 * 8))) (width : Nat) (acc : (AccessType Unit)) (aq : Bool) (rl : Bool) (res : Bool) : SailM (Result (BitVec (8 * width)) ExecutionResult) := SailME.run do
+/-- Type quantifiers: k_ex375596# : Bool, k_ex375595# : Bool, k_ex375594# : Bool, width : Nat, width
+  ≥ 0, is_mem_width(width) -/
+def vmem_read (rs : regidx) (offset : (BitVec 32)) (width : Nat) (acc : (AccessType Unit)) (aq : Bool) (rl : Bool) (res : Bool) : SailM (Result (BitVec (8 * width)) ExecutionResult) := SailME.run do
   let vaddr ← (( do
     match (← (ext_data_get_addr rs offset acc width)) with
     | .Ext_DataAddr_OK vaddr => (pure vaddr)
@@ -293,7 +301,7 @@ def vmem_read (rs : regidx) (offset : (BitVec (2 ^ 2 * 8))) (width : Nat) (acc :
       else (pure ()))
   else
     (do
-      bif (check_misaligned vaddr (size_bytes_backwards width))
+      bif (check_misaligned vaddr width)
       then
         SailME.throw ((Err (Memory_Exception (vaddr, (E_Load_Addr_Align ())))) : (Result (BitVec (8 * width)) ExecutionResult))
       else (pure ()))
@@ -341,15 +349,16 @@ def vmem_read (rs : regidx) (offset : (BitVec (2 ^ 2 * 8))) (width : Nat) (acc :
     ((BitVec (8 * n * bytes)) × Bool × Nat) )
   (pure (Ok data))
 
-/-- Type quantifiers: k_ex376402# : Bool, k_ex376401# : Bool, k_ex376400# : Bool, width : Nat, is_mem_width(width) -/
-def vmem_write (rs_addr : regidx) (offset : (BitVec (2 ^ 2 * 8))) (width : Nat) (data : (BitVec (8 * width))) (acc : (AccessType Unit)) (aq : Bool) (rl : Bool) (res : Bool) : SailM (Result Bool ExecutionResult) := SailME.run do
+/-- Type quantifiers: k_ex375631# : Bool, k_ex375630# : Bool, k_ex375629# : Bool, width : Nat, width
+  ≥ 0, is_mem_width(width) -/
+def vmem_write (rs_addr : regidx) (offset : (BitVec 32)) (width : Nat) (data : (BitVec (8 * width))) (acc : (AccessType Unit)) (aq : Bool) (rl : Bool) (res : Bool) : SailM (Result Bool ExecutionResult) := SailME.run do
   let vaddr ← (( do
     match (← (ext_data_get_addr rs_addr offset acc width)) with
     | .Ext_DataAddr_OK vaddr => (pure vaddr)
     | .Ext_DataAddr_Error e =>
       SailME.throw ((Err (Ext_DataAddr_Check_Failure e)) : (Result Bool ExecutionResult)) ) : SailME
     (Result Bool ExecutionResult) virtaddr )
-  bif (check_misaligned vaddr (size_bytes_backwards width))
+  bif (check_misaligned vaddr width)
   then (pure (Err (Memory_Exception (vaddr, (E_SAMO_Addr_Align ())))))
   else (vmem_write_addr vaddr width data acc aq rl res)
 

@@ -1,4 +1,12 @@
-import LeanRV32D.RiscvInstsVextRed
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvErrors
+import LeanRV32D.RiscvVextRegs
+import LeanRV32D.RiscvVextControl
+import LeanRV32D.RiscvFdextRegs
+import LeanRV32D.RiscvInstRetire
+import LeanRV32D.RiscvInstsVextUtils
+import LeanRV32D.RiscvInstsVextFpUtils
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +19,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +32,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +60,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +162,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -236,8 +243,8 @@ def encdec_rfvvfunct6_backwards_matches (arg_ : (BitVec 6)) : Bool :=
             then true
             else false)))))
 
-/-- Type quantifiers: num_elem_vs : Nat, SEW : Nat, LMUL_pow : Int, num_elem_vs > 0 ∧
-  SEW ∈ {8, 16, 32, 64} -/
+/-- Type quantifiers: LMUL_pow : Int, SEW : Nat, num_elem_vs : Nat, num_elem_vs > 0, SEW ∈
+  {8, 16, 32, 64}, (-3) ≤ LMUL_pow ∧ LMUL_pow ≤ 3 -/
 def process_rfvv_single (funct6 : rfvvfunct6) (vm : (BitVec 1)) (vs2 : vregidx) (vs1 : vregidx) (vd : vregidx) (num_elem_vs : Nat) (SEW : Nat) (LMUL_pow : Int) : SailM ExecutionResult := SailME.run do
   let rm_3b ← do (pure (_get_Fcsr_FRM (← readReg fcsr)))
   let num_elem_vd ← do (get_num_elem 0 SEW)
@@ -288,18 +295,18 @@ def process_rfvv_single (funct6 : rfvvfunct6) (vm : (BitVec 1)) (vs2 : vregidx) 
           (set_vstart (zeros (n := 16)))
           (pure RETIRE_SUCCESS)))
 
-/-- Type quantifiers: num_elem_vs : Nat, SEW : Nat, LMUL_pow : Int, num_elem_vs > 0 ∧
-  SEW ∈ {8, 16, 32, 64} -/
+/-- Type quantifiers: LMUL_pow : Int, SEW : Nat, num_elem_vs : Nat, num_elem_vs > 0, SEW ∈
+  {8, 16, 32, 64}, (-3) ≤ LMUL_pow ∧ LMUL_pow ≤ 3 -/
 def process_rfvv_widen (funct6 : rfvvfunct6) (vm : (BitVec 1)) (vs2 : vregidx) (vs1 : vregidx) (vd : vregidx) (num_elem_vs : Nat) (SEW : Nat) (LMUL_pow : Int) : SailM ExecutionResult := SailME.run do
   let rm_3b ← do (pure (_get_Fcsr_FRM (← readReg fcsr)))
   let SEW_widen := (SEW *i 2)
   let LMUL_pow_widen := (LMUL_pow +i 1)
-  let num_elem_vd ← do (get_num_elem 0 SEW_widen)
   bif (← (illegal_fp_reduction_widen SEW rm_3b SEW_widen LMUL_pow_widen))
   then (pure (Illegal_Instruction ()))
   else
     (do
-      assert ((SEW ≥b 16) && (SEW_widen ≤b 64)) "riscv_insts_vext_fp_red.sail:81.36-81.37"
+      assert ((SEW ≥b 16) && (SEW_widen ≤b 64)) "riscv_insts_vext_fp_red.sail:80.36-80.37"
+      let num_elem_vd ← do (get_num_elem 0 SEW_widen)
       bif ((BitVec.toNat (← readReg vl)) == 0)
       then (pure RETIRE_SUCCESS)
       else

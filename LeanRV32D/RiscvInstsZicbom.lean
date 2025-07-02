@@ -1,4 +1,15 @@
-import LeanRV32D.RiscvInstsVextFpRed
+import LeanRV32D.Arith
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvErrors
+import LeanRV32D.RiscvVmemTypes
+import LeanRV32D.RiscvRegs
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvAddrChecks
+import LeanRV32D.RiscvSysControl
+import LeanRV32D.RiscvPlatform
+import LeanRV32D.RiscvMem
+import LeanRV32D.RiscvInstRetire
+import LeanRV32D.RiscvVmem
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +22,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +35,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +63,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +165,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -331,7 +341,7 @@ def process_clean_inval (rs1 : regidx) (cbop : cbop_zicbom) : SailM ExecutionRes
   let cache_block_size := (2 ^i plat_cache_block_size_exp)
   let negative_offset :=
     ((rs1_val &&& (Complement.complement
-          (zero_extend (m := ((2 ^i 2) *i 8)) (ones (n := plat_cache_block_size_exp))))) - rs1_val)
+          (zero_extend (m := 32) (ones (n := plat_cache_block_size_exp))))) - rs1_val)
   match (← (ext_data_get_addr rs1 negative_offset (Read Data) cache_block_size)) with
   | .Ext_DataAddr_Error e => (pure (Ext_DataAddr_Check_Failure e))
   | .Ext_DataAddr_OK vaddr =>

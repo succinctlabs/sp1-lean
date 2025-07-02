@@ -1,4 +1,5 @@
-import LeanRV32D.RiscvFdextRegs
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvZihpm
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,7 +12,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +25,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +53,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +155,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -192,12 +192,4 @@ def counter_priv_filter_bit (reg : (BitVec 64)) (priv : Privilege) : (BitVec 1) 
   | Machine => (_get_CountSmcntrpmf_MINH reg)
   | Supervisor => (_get_CountSmcntrpmf_SINH reg)
   | User => (_get_CountSmcntrpmf_UINH reg)
-
-def should_inc_mcycle (priv : Privilege) : SailM Bool := do
-  (pure (((_get_Counterin_CY (← readReg mcountinhibit)) == (0b0 : (BitVec 1))) && ((counter_priv_filter_bit
-          (← readReg mcyclecfg) priv) == (0b0 : (BitVec 1)))))
-
-def should_inc_minstret (priv : Privilege) : SailM Bool := do
-  (pure (((_get_Counterin_IR (← readReg mcountinhibit)) == (0b0 : (BitVec 1))) && ((counter_priv_filter_bit
-          (← readReg minstretcfg) priv) == (0b0 : (BitVec 1)))))
 

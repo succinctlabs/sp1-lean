@@ -1,3 +1,8 @@
+import LeanRV32D.Flow
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvXlen
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvFdextRegs
 import LeanRV32D.RiscvInstsFext
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +16,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +29,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +57,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +159,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -239,7 +243,7 @@ def feq_quiet_D (v1 : (BitVec 64)) (v2 : (BitVec 64)) : (Bool × (BitVec 5)) :=
     else (zeros (n := 5))
   (result, fflags)
 
-/-- Type quantifiers: k_ex378690# : Bool -/
+/-- Type quantifiers: k_ex377915# : Bool -/
 def flt_D (v1 : (BitVec 64)) (v2 : (BitVec 64)) (is_quiet : Bool) : (Bool × (BitVec 5)) :=
   let (s1, e1, m1) := (fsplit_D v1)
   let (s2, e2, m2) := (fsplit_D v2)
@@ -271,7 +275,7 @@ def flt_D (v1 : (BitVec 64)) (v2 : (BitVec 64)) (is_quiet : Bool) : (Bool × (Bi
       else (zeros (n := 5)))
   (result, fflags)
 
-/-- Type quantifiers: k_ex378758# : Bool -/
+/-- Type quantifiers: k_ex377983# : Bool -/
 def fle_D (v1 : (BitVec 64)) (v2 : (BitVec 64)) (is_quiet : Bool) : (Bool × (BitVec 5)) :=
   let (s1, e1, m1) := (fsplit_D v1)
   let (s2, e2, m2) := (fsplit_D v2)
@@ -308,7 +312,7 @@ def fle_D (v1 : (BitVec 64)) (v2 : (BitVec 64)) (is_quiet : Bool) : (Bool × (Bi
 def haveDoubleFPU (_ : Unit) : SailM Bool := do
   (pure ((← (currentlyEnabled Ext_D)) || (← (currentlyEnabled Ext_Zdinx))))
 
-/-- Type quantifiers: n : Nat, n > 0 -/
+/-- Type quantifiers: n : Nat, n ≥ 0, n > 0 -/
 def validDoubleRegs {n : _} (regs : (Vector fregidx n)) : SailM Bool := SailME.run do
   bif ((← (currentlyEnabled Ext_Zdinx)) && (xlen == 32))
   then

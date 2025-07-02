@@ -1,3 +1,7 @@
+import LeanRV32D.Prelude
+import LeanRV32D.RiscvVlen
+import LeanRV32D.RiscvSysRegs
+import LeanRV32D.RiscvVextRegs
 import LeanRV32D.RiscvTypesKext
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,7 +15,8 @@ noncomputable section
 
 namespace LeanRV32D.Functions
 
-open zvkfunct6
+open zvk_vsm4r_funct6
+open zvk_vsha2_funct6
 open zvk_vaesem_funct6
 open zvk_vaesef_funct6
 open zvk_vaesdm_funct6
@@ -23,7 +28,6 @@ open wvvfunct6
 open wvfunct6
 open wrsop
 open write_kind
-open word_width
 open wmvxfunct6
 open wmvvfunct6
 open vxsgfunct6
@@ -52,9 +56,7 @@ open vfwunary0
 open vfunary1
 open vfunary0
 open vfnunary0
-open vext8funct6
-open vext4funct6
-open vext2funct6
+open vextfunct6
 open uop
 open sopw
 open sop
@@ -156,6 +158,7 @@ open PmpAddrMatchType
 open PTW_Error
 open PTE_Check
 open InterruptType
+open ISA_Format
 open HartState
 open FetchResult
 open Ext_PhysAddr_Check
@@ -178,25 +181,25 @@ def zvk_valid_reg_overlap (rs : vregidx) (rd : vregidx) (emul_pow : Int) : Bool 
   let rd_int := (BitVec.toNat (vregidx_bits rd))
   (((rs_int +i reg_group_size) ≤b rd_int) || ((rd_int +i reg_group_size) ≤b rs_int))
 
-/-- Type quantifiers: EGS : Int, EGW : Int -/
-def zvk_check_encdec (EGW : Int) (EGS : Int) : SailM Bool := do
-  (pure (((Int.emod (BitVec.toNat (← readReg vl)) EGS) == 0) && (← do
-        (pure (((Int.emod (BitVec.toNat (← readReg vstart)) EGS) == 0) && (← do
+/-- Type quantifiers: EGS : Nat, EGW : Nat, 0 ≤ EGW, EGS > 0 -/
+def zvk_check_encdec (EGW : Nat) (EGS : Nat) : SailM Bool := do
+  (pure (((Int.tmod (BitVec.toNat (← readReg vl)) EGS) == 0) && (← do
+        (pure (((Int.tmod (BitVec.toNat (← readReg vstart)) EGS) == 0) && (← do
               (pure (((2 ^i (← (get_lmul_pow ()))) *i VLEN) ≥b EGW))))))))
 
-def undefined_zvkfunct6 (_ : Unit) : SailM zvkfunct6 := do
-  (internal_pick [ZVK_VSHA2CH, ZVK_VSHA2CL])
+def undefined_zvk_vsha2_funct6 (_ : Unit) : SailM zvk_vsha2_funct6 := do
+  (internal_pick [ZVK_VSHA2CH_VV, ZVK_VSHA2CL_VV])
 
 /-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 1 -/
-def zvkfunct6_of_num (arg_ : Nat) : zvkfunct6 :=
+def zvk_vsha2_funct6_of_num (arg_ : Nat) : zvk_vsha2_funct6 :=
   match arg_ with
-  | 0 => ZVK_VSHA2CH
-  | _ => ZVK_VSHA2CL
+  | 0 => ZVK_VSHA2CH_VV
+  | _ => ZVK_VSHA2CL_VV
 
-def num_of_zvkfunct6 (arg_ : zvkfunct6) : Int :=
+def num_of_zvk_vsha2_funct6 (arg_ : zvk_vsha2_funct6) : Int :=
   match arg_ with
-  | ZVK_VSHA2CH => 0
-  | ZVK_VSHA2CL => 1
+  | ZVK_VSHA2CH_VV => 0
+  | ZVK_VSHA2CL_VV => 1
 
 def zvknhab_check_encdec (vs2 : vregidx) (vs1 : vregidx) (vd : vregidx) : SailM Bool := do
   let SEW ← do (get_sew ())
@@ -204,37 +207,70 @@ def zvknhab_check_encdec (vs2 : vregidx) (vs1 : vregidx) (vd : vregidx) : SailM 
   (pure ((← (zvk_check_encdec SEW 4)) && ((zvk_valid_reg_overlap vs1 vd LMUL_pow) && (zvk_valid_reg_overlap
           vs2 vd LMUL_pow))))
 
-/-- Type quantifiers: SEW : Nat, SEW ∈ {32, 64} -/
+/-- Type quantifiers: SEW : Nat, SEW ≥ 0, SEW ∈ {32, 64} -/
 def zvk_sig0 (x : (BitVec k_n)) (SEW : Nat) : (BitVec SEW) :=
   match SEW with
   | 32 => ((rotater x 7) ^^^ ((rotater x 18) ^^^ (shiftr x 3)))
   | _ => ((rotater x 1) ^^^ ((rotater x 8) ^^^ (shiftr x 7)))
 
-/-- Type quantifiers: SEW : Nat, SEW ∈ {32, 64} -/
+/-- Type quantifiers: SEW : Nat, SEW ≥ 0, SEW ∈ {32, 64} -/
 def zvk_sig1 (x : (BitVec k_n)) (SEW : Nat) : (BitVec SEW) :=
   match SEW with
   | 32 => ((rotater x 17) ^^^ ((rotater x 19) ^^^ (shiftr x 10)))
   | _ => ((rotater x 19) ^^^ ((rotater x 61) ^^^ (shiftr x 6)))
 
-/-- Type quantifiers: SEW : Nat, SEW ∈ {32, 64} -/
+/-- Type quantifiers: SEW : Nat, SEW ≥ 0, SEW ∈ {32, 64} -/
 def zvk_sum0 (x : (BitVec k_n)) (SEW : Nat) : (BitVec SEW) :=
   match SEW with
   | 32 => ((rotater x 2) ^^^ ((rotater x 13) ^^^ (rotater x 22)))
   | _ => ((rotater x 28) ^^^ ((rotater x 34) ^^^ (rotater x 39)))
 
-/-- Type quantifiers: SEW : Nat, SEW ∈ {32, 64} -/
+/-- Type quantifiers: SEW : Nat, SEW ≥ 0, SEW ∈ {32, 64} -/
 def zvk_sum1 (x : (BitVec k_n)) (SEW : Nat) : (BitVec SEW) :=
   match SEW with
   | 32 => ((rotater x 6) ^^^ ((rotater x 11) ^^^ (rotater x 25)))
   | _ => ((rotater x 14) ^^^ ((rotater x 18) ^^^ (rotater x 41)))
 
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ≥ 0 -/
 def zvk_ch (x : (BitVec k_n)) (y : (BitVec k_n)) (z : (BitVec k_n)) : (BitVec k_n) :=
   ((x &&& y) ^^^ ((Complement.complement x) &&& z))
 
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ≥ 0 -/
 def zvk_maj (x : (BitVec k_n)) (y : (BitVec k_n)) (z : (BitVec k_n)) : (BitVec k_n) :=
   ((x &&& y) ^^^ ((x &&& z) ^^^ (y &&& z)))
+
+def undefined_zvk_vsm4r_funct6 (_ : Unit) : SailM zvk_vsm4r_funct6 := do
+  (internal_pick [ZVK_VSM4R_VV, ZVK_VSM4R_VS])
+
+/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 1 -/
+def zvk_vsm4r_funct6_of_num (arg_ : Nat) : zvk_vsm4r_funct6 :=
+  match arg_ with
+  | 0 => ZVK_VSM4R_VV
+  | _ => ZVK_VSM4R_VS
+
+def num_of_zvk_vsm4r_funct6 (arg_ : zvk_vsm4r_funct6) : Int :=
+  match arg_ with
+  | ZVK_VSM4R_VV => 0
+  | ZVK_VSM4R_VS => 1
+
+def zvk_round_key (X : (BitVec 32)) (S : (BitVec 32)) : (BitVec 32) :=
+  (X ^^^ (S ^^^ ((rotatel S 13) ^^^ (rotatel S 23))))
+
+def zvk_sm4_round (X : (BitVec 32)) (S : (BitVec 32)) : (BitVec 32) :=
+  (X ^^^ (S ^^^ ((rotatel S 2) ^^^ ((rotatel S 10) ^^^ ((rotatel S 18) ^^^ (rotatel S 24))))))
+
+def zvksed_ck : (Vector (BitVec 32) 32) :=
+  #v[(0x646B7279 : (BitVec 32)), (0x484F565D : (BitVec 32)), (0x2C333A41 : (BitVec 32)), (0x10171E25 : (BitVec 32)), (0xF4FB0209 : (BitVec 32)), (0xD8DFE6ED : (BitVec 32)), (0xBCC3CAD1 : (BitVec 32)), (0xA0A7AEB5 : (BitVec 32)), (0x848B9299 : (BitVec 32)), (0x686F767D : (BitVec 32)), (0x4C535A61 : (BitVec 32)), (0x30373E45 : (BitVec 32)), (0x141B2229 : (BitVec 32)), (0xF8FF060D : (BitVec 32)), (0xDCE3EAF1 : (BitVec 32)), (0xC0C7CED5 : (BitVec 32)), (0xA4ABB2B9 : (BitVec 32)), (0x888F969D : (BitVec 32)), (0x6C737A81 : (BitVec 32)), (0x50575E65 : (BitVec 32)), (0x343B4249 : (BitVec 32)), (0x181F262D : (BitVec 32)), (0xFC030A11 : (BitVec 32)), (0xE0E7EEF5 : (BitVec 32)), (0xC4CBD2D9 : (BitVec 32)), (0xA8AFB6BD : (BitVec 32)), (0x8C939AA1 : (BitVec 32)), (0x70777E85 : (BitVec 32)), (0x545B6269 : (BitVec 32)), (0x383F464D : (BitVec 32)), (0x1C232A31 : (BitVec 32)), (0x00070E15 : (BitVec 32))]
+
+def zvksed_box_lookup (x : (BitVec 5)) (table : (Vector (BitVec 32) 32)) : (BitVec 32) :=
+  (GetElem?.getElem! table (31 -i (BitVec.toNat x)))
+
+def zvk_sm4_sbox (x : (BitVec 5)) : (BitVec 32) :=
+  (zvksed_box_lookup x zvksed_ck)
+
+def zvk_sm4_subword (x : (BitVec 32)) : (BitVec 32) :=
+  ((sm4_sbox (Sail.BitVec.extractLsb x 31 24)) ++ ((sm4_sbox (Sail.BitVec.extractLsb x 23 16)) ++ ((sm4_sbox
+          (Sail.BitVec.extractLsb x 15 8)) ++ (sm4_sbox (Sail.BitVec.extractLsb x 7 0)))))
 
 def zvk_p0 (X : (BitVec 32)) : (BitVec 32) :=
   (X ^^^ ((rotatel X 9) ^^^ (rotatel X 17)))
@@ -251,8 +287,8 @@ def zvk_ff1 (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) : (BitVec 32) 
 def zvk_ff2 (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) : (BitVec 32) :=
   ((X &&& Y) ||| ((X &&& Z) ||| (Y &&& Z)))
 
-/-- Type quantifiers: J : Int -/
-def zvk_ff_j (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) (J : Int) : (BitVec 32) :=
+/-- Type quantifiers: J : Nat, 0 ≤ J -/
+def zvk_ff_j (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) (J : Nat) : (BitVec 32) :=
   bif (J ≤b 15)
   then (zvk_ff1 X Y Z)
   else (zvk_ff2 X Y Z)
@@ -263,21 +299,21 @@ def zvk_gg1 (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) : (BitVec 32) 
 def zvk_gg2 (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) : (BitVec 32) :=
   ((X &&& Y) ||| ((Complement.complement X) &&& Z))
 
-/-- Type quantifiers: J : Int -/
-def zvk_gg_j (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) (J : Int) : (BitVec 32) :=
+/-- Type quantifiers: J : Nat, 0 ≤ J -/
+def zvk_gg_j (X : (BitVec 32)) (Y : (BitVec 32)) (Z : (BitVec 32)) (J : Nat) : (BitVec 32) :=
   bif (J ≤b 15)
   then (zvk_gg1 X Y Z)
   else (zvk_gg2 X Y Z)
 
-/-- Type quantifiers: J : Int -/
-def zvk_t_j (J : Int) : (BitVec 32) :=
+/-- Type quantifiers: J : Nat, 0 ≤ J -/
+def zvk_t_j (J : Nat) : (BitVec 32) :=
   bif (J ≤b 15)
   then (0x79CC4519 : (BitVec 32))
   else (0x7A879D8A : (BitVec 32))
 
-/-- Type quantifiers: j : Int -/
-def zvk_sm3_round (A_H : (Vector (BitVec 32) 8)) (w : (BitVec 32)) (x : (BitVec 32)) (j : Int) : (Vector (BitVec 32) 8) :=
-  let t_j := (rotatel (zvk_t_j j) (Int.emod j 32))
+/-- Type quantifiers: j : Nat, 0 ≤ j -/
+def zvk_sm3_round (A_H : (Vector (BitVec 32) 8)) (w : (BitVec 32)) (x : (BitVec 32)) (j : Nat) : (Vector (BitVec 32) 8) :=
+  let t_j := (rotatel (zvk_t_j j) (Int.tmod j 32))
   let ss1 :=
     (rotatel (((rotatel (GetElem?.getElem! A_H 0) 12) + (GetElem?.getElem! A_H 4)) + t_j) 7)
   let ss2 := (ss1 ^^^ (rotatel (GetElem?.getElem! A_H 0) 12))
