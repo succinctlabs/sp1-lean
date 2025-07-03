@@ -1,8 +1,11 @@
 import SP1Foundations.Field
 
 /-- General definition that can be used to define `U1`, `U8`, and `U16`.
-Allows writing unified lemmas for all three definitions. -/
-structure BoundedBabyBear (bound : ℕ) extends BabyBear where
+Allows writing unified lemmas for all three definitions.
+
+dt: it's not clear to me how useful this is in most cases.
+Often you have to restructure the bounds yourselves anyways -/
+structure BoundedBabyBear (bound : ℕ) extends Fin BB where
   in_range : val < bound
 
 namespace BoundedBabyBear
@@ -19,12 +22,12 @@ def ofNat (bound_dec x : ℕ) : BoundedBabyBear bound_dec.succ where
 /-- If the bound is at least `1` then `boundedBabyBear` has a natural `0`. -/
 def boundedBabyBear.zero (bound_dec : ℕ) : BoundedBabyBear bound_dec.succ where
   in_range := by simp
-  __ := (0 : BabyBear)
+  __ := (0 : Fin BB)
 
 /-- If the bound is at least `2` then `boundedBabyBear` has a natural `1`. -/
 def boundedBabyBear.one (bound_dec_dec : ℕ) : BoundedBabyBear (bound_dec_dec.succ.succ) where
   in_range := by simp
-  __ := (1 : BabyBear)
+  __ := (1 : Fin BB)
 
 instance (bound_dec : ℕ) : Zero (BoundedBabyBear bound_dec.succ) := ⟨boundedBabyBear.zero _⟩
 instance (bound_dec_dec : ℕ) : One (BoundedBabyBear bound_dec_dec.succ.succ) := ⟨boundedBabyBear.one _⟩
@@ -44,7 +47,7 @@ lemma default_eq_zero : (default : BoundedBabyBear bound.succ) = 0 := rfl
 
 section toFin
 
--- /-- Convert a `BoundedBabyBear` to a `BabyBear` by forgetting the bound. -/
+-- /-- Convert a `BoundedBabyBear` to a `Fin BB` by forgetting the bound. -/
 -- @[simp] alias toBabyBear := BoundedBabyBear.toFin
 
 -- lemma toBabyBear_def (x : BoundedBabyBear bound) : x.toBabyBear = x.toFin := rfl
@@ -56,7 +59,7 @@ lemma toFin_inj (x y : BoundedBabyBear bound) : x.toFin = y.toFin ↔ x = y := b
   refine ⟨fun h => ?_, fun h => h ▸ rfl⟩
   rwa [BoundedBabyBear.ext_iff, ← Fin.ext_iff]
 
-lemma injective_toFin : Function.Injective (BoundedBabyBear.toFin : BoundedBabyBear bound → BabyBear) :=
+lemma injective_toFin : Function.Injective (BoundedBabyBear.toFin : BoundedBabyBear bound → Fin BB) :=
   fun x y h => (toFin_inj x y).1 h
 
 lemma toFin_eq_iff (x : BoundedBabyBear bound) (y : Fin BabyBearPrime) : x.toFin = y ↔ x.val = y.val := by
@@ -75,7 +78,7 @@ end toFin
 --   simp [toBabyBear, toFin_inj]
 
 -- lemma injective_toBabyBear :
---     Function.Injective (toBabyBear : BoundedBabyBear bound → BabyBear) :=
+--     Function.Injective (toBabyBear : BoundedBabyBear bound → Fin BB) :=
 --   fun x y h => (toBabyBear_inj x y).1 h
 
 -- end toBabyBear
@@ -104,9 +107,9 @@ abbrev U16 := BoundedBabyBear 65536
 abbrev U8 := BoundedBabyBear 256
 abbrev U1 := BoundedBabyBear 2
 
-instance : Coe U16 BabyBear where coe := BoundedBabyBear.toFin
-instance : Coe U8 BabyBear where coe := BoundedBabyBear.toFin
-instance : Coe U1 BabyBear where coe := BoundedBabyBear.toFin
+instance : Coe U16 (Fin BB) where coe := BoundedBabyBear.toFin
+instance : Coe U8 (Fin BB) where coe := BoundedBabyBear.toFin
+instance : Coe U1 (Fin BB) where coe := BoundedBabyBear.toFin
 
 instance : Coe U1 U8 := BoundedBabyBear.coe_of_le <| by omega
 instance : Coe U8 U16 := BoundedBabyBear.coe_of_le <| by omega

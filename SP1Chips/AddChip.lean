@@ -6,20 +6,20 @@ namespace AddChip
 
 section constraints
 
-def constraints (Main : Vector BabyBear 23) : SP1ConstraintList :=
-  let E0 : BabyBear := Main[22] - 1
-  let E1 : BabyBear := Main[22] * E0
+def constraints (Main : Vector (Fin BB) 23) : SP1ConstraintList :=
+  let E0 : Fin BB := Main[22] - 1
+  let E1 : Fin BB := Main[22] * E0
   let CS0 : List SP1Constraint := AddOperation.constraints #v[Main[11], Main[12]] #v[Main[16], Main[17]] { value := #v[Main[20], Main[21]] } Main[22]
-  let E2 : BabyBear := Main[3] + 4
+  let E2 : Fin BB := Main[3] + 4
   let CS1 : List SP1Constraint := CPUState.constraints { clk_0_16 := Main[2], clk_16_24 := Main[1], clk_high := Main[0], pc := Main[3] } E2 8 Main[22]
-  let E3 : BabyBear := Main[1] * 65536
-  let E4 : BabyBear := Main[2] + E3
+  let E3 : Fin BB := Main[1] * 65536
+  let E4 : Fin BB := Main[2] + E3
   let CS2 : List SP1Constraint := RTypeReader.constraints Main[0] E4 Main[3] 0 #v[Main[20], Main[21]] { op_a := Main[4], op_a_0 := Main[9], op_a_memory := { access_timestamp := { diff_low_limb := Main[8], prev_low := Main[7] }, prev_value := #v[Main[5], Main[6]] }, op_b := Main[10], op_b_memory := { access_timestamp := { diff_low_limb := Main[14], prev_low := Main[13] }, prev_value := #v[Main[11], Main[12]] }, op_c := Main[15], op_c_memory := { access_timestamp := { diff_low_limb := Main[19], prev_low := Main[18] }, prev_value := #v[Main[16], Main[17]] } } Main[22]
   [
     .assertZero E1
   ] ++ CS0 ++ CS1 ++ CS2
 
-lemma allHold_constraints_iff (Main : Vector BabyBear 23) :
+lemma allHold_constraints_iff (Main : Vector (Fin BB) 23) :
     (constraints Main).allHold ↔
       (Main[22] = 0 ∨ Main[22] - 1 = 0) ∧
       (AddOperation.constraints
@@ -46,7 +46,7 @@ lemma allHold_constraints_iff (Main : Vector BabyBear 23) :
         Main[22]).allHold := by
   simp [constraints]
 
-lemma bound_of_constraints (Main : Vector BabyBear 23)
+lemma bound_of_constraints (Main : Vector (Fin BB) 23)
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[22] = 1) : Main[20].val + Main[21].val * 65536 < 2^32 := by
   rw [allHold_constraints_iff] at cstrs
@@ -73,14 +73,14 @@ def specAdd (rs2 rs1 rd : regidx) : StateM SP1State Unit := do
   update_reg rd ((← get).2 rs1 + (← get).2 rs2)
 
 -- TODO(gzgz): this should be auto-generate-able from our constraints.
-def sp1Add (Main : Vector BabyBear 23) : StateM SP1State Unit := do
+def sp1Add (Main : Vector (Fin BB) 23) : StateM SP1State Unit := do
   setPC (Main[3].val + 4) -- dt: This should actually be coming from `CPUState.constraints` send
   let op_a := regidx.Regidx Main[4].val
   update_reg op_a (BitVec.ofNat 32 (↑Main[20] + ↑Main[21] * 65536))
 
 /-- If the constraints all hold, the column is real, and `op_b` and `op_c` are loaded
 into the proper registers, then the add chip conforms to the spec. -/
-theorem SP1AddChip_Correct (Main : Vector BabyBear 23)
+theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_real : Main[22] = 1)
     (pc : BitVec 32) (hpc : pc = Main[3].val)

@@ -26,7 +26,7 @@ section ofNat
 @[simp] lemma ofNat_five : ByteOpcode.ofNat 5 = .MSB := rfl
 @[simp] lemma ofNat_six : ByteOpcode.ofNat 6 = .Range := rfl
 
-def toBB : ByteOpcode → BabyBear
+def toBB : ByteOpcode → Fin BB
   | AND => 0
   | OR => 1
   | XOR => 2
@@ -42,7 +42,7 @@ end ofNat
 
 section constrain
 
-def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
+def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   match op with
   | AND => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b &&& c
   | OR  => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ||| c
@@ -52,25 +52,25 @@ def constrain (op : ByteOpcode) (a b c : BabyBear) : Prop :=
   | Range => a < 2 ^ b.val -- Is this right?
   | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
 
-@[simp] lemma constrain_AND (a b c : BabyBear) :
+@[simp] lemma constrain_AND (a b c : Fin BB) :
     ByteOpcode.AND.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b &&& c := Iff.rfl
 
-@[simp] lemma constrain_OR (a b c : BabyBear) :
+@[simp] lemma constrain_OR (a b c : Fin BB) :
     ByteOpcode.OR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ||| c := Iff.rfl
 
-@[simp] lemma constrain_XOR (a b c : BabyBear) :
+@[simp] lemma constrain_XOR (a b c : Fin BB) :
     ByteOpcode.XOR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ^^^ c := Iff.rfl
 
-@[simp] lemma constrain_U8Range (a b c : BabyBear) :
+@[simp] lemma constrain_U8Range (a b c : Fin BB) :
     ByteOpcode.U8Range.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) := Iff.rfl
 
-@[simp] lemma constrain_LTU (a b c : BabyBear) :
+@[simp] lemma constrain_LTU (a b c : Fin BB) :
     ByteOpcode.LTU.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c) := Iff.rfl
 
-@[simp] lemma constrain_MSB (a b c : BabyBear) :
+@[simp] lemma constrain_MSB (a b c : Fin BB) :
     ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64) := Iff.rfl
 
-@[simp] lemma constrain_Range (a b c : BabyBear) :
+@[simp] lemma constrain_Range (a b c : Fin BB) :
     ByteOpcode.Range.constrain a b c ↔ (a < 2 ^ b.val) := Iff.rfl
 
 end constrain
@@ -100,29 +100,29 @@ def toBitwise' (op : ByteOpcode) : BitVec n → BitVec n → BitVec n :=
 
 /-- Convert a `ByteOpcode` to a bitwise operation.
 Gives dummy outputs outside `AND`, `OR`, and `XOR` operations. -/
-def toBitwise (op : ByteOpcode) : BabyBear → BabyBear → BabyBear :=
+def toBitwise (op : ByteOpcode) : Fin BB → Fin BB → Fin BB :=
   by induction op using ByteOpcode.bitwise_induction with
   | and => exact (· &&& ·)
   | or => exact (· ||| ·)
   | xor => exact (· ^^^ ·)
   | other _ _ => exact 0
 
-@[simp] lemma toBitwise_and (x y : BabyBear) :
+@[simp] lemma toBitwise_and (x y : Fin BB) :
     toBitwise AND x y = x &&& y := rfl
 
-@[simp] lemma toBitwise_or (x y : BabyBear) :
+@[simp] lemma toBitwise_or (x y : Fin BB) :
     toBitwise OR x y = x ||| y := rfl
 
-@[simp] lemma toBitwise_xor (x y : BabyBear) :
+@[simp] lemma toBitwise_xor (x y : Fin BB) :
     toBitwise XOR x y = x ^^^ y := rfl
 
-lemma toBitwise_of_ne (x y : BabyBear) (op : ByteOpcode) (h : op ≠ AND ∧ op ≠ OR ∧ op ≠ XOR) :
+lemma toBitwise_of_ne (x y : Fin BB) (op : ByteOpcode) (h : op ≠ AND ∧ op ≠ OR ∧ op ≠ XOR) :
     toBitwise op x y = 0 := by
   match op with
   | .AND | .OR | XOR => simp at h
   | U8Range | LTU | MSB | Range => rfl
 
-lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_high : BabyBear)
+lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_high : Fin BB)
     (hx : x_low < 256) (hy : y_low < 256)
     (hx' : x_high < 256) (hy' : y_high < 256) :
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 256 =

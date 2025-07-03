@@ -4,7 +4,7 @@ import LeanRV32D.RiscvRegs
 open LeanRV32D.Functions
 
 @[ext] structure BitwiseOperation where
-  result : ByteWord BabyBear
+  result : ByteWord (Fin BB)
 
 namespace BitwiseOperation
 
@@ -22,11 +22,11 @@ namespace BitwiseOperation
 open ByteOpcode
 
 def constraints
-  (a : ByteWord BabyBear)
-  (b : ByteWord BabyBear)
+  (a : ByteWord (Fin BB))
+  (b : ByteWord (Fin BB))
   (cols : BitwiseOperation)
-  (opcode : BabyBear)
-  (is_real : BabyBear)
+  (opcode : Fin BB)
+  (is_real : Fin BB)
   : SP1ConstraintList :=
   [
     .send (.byte (ByteOpcode.ofNat opcode) cols.result[0] a[0] b[0]) is_real,
@@ -35,8 +35,8 @@ def constraints
     .send (.byte (ByteOpcode.ofNat opcode) cols.result[3] a[3] b[3]) is_real
   ]
 
-def spec (a b : ByteWord BabyBear)
-    (cols : BitwiseOperation) (opcode : BabyBear) : Prop :=
+def spec (a b : ByteWord (Fin BB))
+    (cols : BitwiseOperation) (opcode : Fin BB) : Prop :=
   if ByteOpcode.ofNat opcode = .AND then (
     ((cols.result[0] < 256 ∧ a[0] < 256 ∧ b[0] < 256) ∧ cols.result[0] = a[0] &&& b[0]) ∧
     ((cols.result[1] < 256 ∧ a[1] < 256 ∧ b[1] < 256) ∧ cols.result[1] = a[1] &&& b[1]) ∧
@@ -54,8 +54,8 @@ def spec (a b : ByteWord BabyBear)
     ((cols.result[3] < 256 ∧ a[3] < 256 ∧ b[3] < 256) ∧ cols.result[3] = a[3] ^^^ b[3])
   ) else True
 
-lemma constraints_imp_spec (a b : ByteWord BabyBear)
-    (cols : BitwiseOperation) (opcode is_real : BabyBear)
+lemma constraints_imp_spec (a b : ByteWord (Fin BB))
+    (cols : BitwiseOperation) (opcode is_real : Fin BB)
     (h0 : is_real ≠ 0)
     (h : (cols.constraints a b opcode is_real).allHold) :
     cols.spec a b opcode := by
@@ -68,21 +68,21 @@ lemma constraints_imp_spec (a b : ByteWord BabyBear)
   · simpa [h0, h3] using h
   simp [h1, h2, h3]
 
-lemma eq_and_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
+lemma eq_and_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (h : (cols.constraints a b 0 1).allHold) :
     cols.result[i] = a[i] &&& b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this
   match i with | 0 => aesop | 1 => aesop | 2 => aesop | 3 => aesop
 
-lemma eq_or_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
+lemma eq_or_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (h : (cols.constraints a b 1 1).allHold) :
     cols.result[i] = a[i] ||| b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
   simp [spec] at this
   match i with | 0 => aesop | 1 => aesop | 2 => aesop | 3 => aesop
 
-lemma eq_xor_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
+lemma eq_xor_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (h : (cols.constraints a b 2 1).allHold) :
     cols.result[i] = a[i] ^^^ b[i] := by
   have := constraints_imp_spec a b cols _ _ one_ne_zero h
@@ -90,7 +90,7 @@ lemma eq_xor_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
   match i with | 0 => aesop | 1 => aesop | 2 => aesop | 3 => aesop
 
 /-- Constraints on `BitwiseOperation` imply that the result is `op.toBitwise` applied to the inputs. -/
-lemma eq_toBitwise_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
+lemma eq_toBitwise_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
     (h : (cols.constraints a b op.toBB 1).allHold) :
     cols.result[i] = op.toBitwise a[i] b[i] := by
@@ -100,7 +100,7 @@ lemma eq_toBitwise_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOpera
   | xor => exact eq_xor_of_constraints _ _ _ _ h
   | other h h' => aesop
 
-lemma lt_of_constraints (a b : ByteWord BabyBear) (cols : BitwiseOperation)
+lemma lt_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
     (i : Fin WORD_BYTE_SIZE) (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
     (h : (cols.constraints a b op.toBB 1).allHold) :
     cols.result[i] < 256 ∧ a[i] < 256 ∧ b[i] < 256 := by

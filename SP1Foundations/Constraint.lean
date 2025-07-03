@@ -7,18 +7,18 @@ import LeanRV32D.RiscvInstsEnd
 open LeanRV32D.Functions Sail
 
 inductive AirInteraction where
-  | byte (op : ByteOpcode) (a b c : BabyBear)
-  | memory (shard clk addr low_limb high_limb : BabyBear)
-  | state (shard clk pc : BabyBear)
+  | byte (op : ByteOpcode) (a b c : Fin BB)
+  | memory (shard clk addr low_limb high_limb : Fin BB)
+  | state (shard clk pc : Fin BB)
   deriving DecidableEq
 
 inductive SP1Constraint where
   /-- Assertion that a particular value is zero. -/
-  | assertZero (x : BabyBear)
+  | assertZero (x : Fin BB)
   /-- Sending an air interaction -/
-  | send (interaction : AirInteraction) (mult : BabyBear)
+  | send (interaction : AirInteraction) (mult : Fin BB)
   /-- Receiving an air interaction -/
-  | receive (interaction : AirInteraction) (mult : BabyBear)
+  | receive (interaction : AirInteraction) (mult : Fin BB)
   -- | ofList (cs : List SP1Constraint) : SP1Constraint
   deriving DecidableEq
 
@@ -35,10 +35,10 @@ def toProp : SP1Constraint → Prop
       mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
   | _ => True
 
-@[simp] lemma toProp_assertZero (x : BabyBear) :
+@[simp] lemma toProp_assertZero (x : Fin BB) :
     (assertZero x).toProp ↔ x = 0 := Iff.rfl
 
-@[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c mult : BabyBear) :
+@[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c mult : Fin BB) :
     (send (AirInteraction.byte op a b c) mult).toProp ↔
       (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 

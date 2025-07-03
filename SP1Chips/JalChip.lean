@@ -4,35 +4,35 @@ namespace Jal
 
 section constraints
 
-def constraints (Main : Vector BabyBear 15) : SP1ConstraintList :=
-  let E0 : BabyBear := Main[14] - 1
-  let E1 : BabyBear := Main[14] * E0
-  let E2 : BabyBear := 1 * Main[10]
-  let E3 : BabyBear := 0 + E2
-  let E4 : BabyBear := 65536 * Main[11]
-  let E5 : BabyBear := E3 + E4
-  let E6 : BabyBear := Main[1] * 65536
-  let E7 : BabyBear := Main[2] + E6
-  let E8 : BabyBear := Main[14] - 1
-  let E9 : BabyBear := Main[14] * E8
-  let E10 : BabyBear := E7 + 8
-  let E11 : BabyBear := Main[2] - 1
-  let E12 : BabyBear := E11 * 1761607681
-  let E13 : BabyBear := Main[1] * 65536
-  let E14 : BabyBear := Main[2] + E13
-  let E15 : BabyBear := Main[14] - 1
-  let E16 : BabyBear := Main[14] * E15
-  let E17 : BabyBear := Main[12] - 0
-  let E18 : BabyBear := Main[9] * E17
-  let E19 : BabyBear := Main[13] - 0
-  let E20 : BabyBear := Main[9] * E19
-  let E21 : BabyBear := E14 + 3
-  let E22 : BabyBear := Main[14] - 1
-  let E23 : BabyBear := Main[14] * E22
-  let E24 : BabyBear := E21 - Main[7]
-  let E25 : BabyBear := E24 - 1
-  let E26 : BabyBear := E25 - Main[8]
-  let E27 : BabyBear := E26 * 2013235201
+def constraints (Main : Vector (Fin BB) 15) : SP1ConstraintList :=
+  let E0 : Fin BB := Main[14] - 1
+  let E1 : Fin BB := Main[14] * E0
+  let E2 : Fin BB := 1 * Main[10]
+  let E3 : Fin BB := 0 + E2
+  let E4 : Fin BB := 65536 * Main[11]
+  let E5 : Fin BB := E3 + E4
+  let E6 : Fin BB := Main[1] * 65536
+  let E7 : Fin BB := Main[2] + E6
+  let E8 : Fin BB := Main[14] - 1
+  let E9 : Fin BB := Main[14] * E8
+  let E10 : Fin BB := E7 + 8
+  let E11 : Fin BB := Main[2] - 1
+  let E12 : Fin BB := E11 * 1761607681
+  let E13 : Fin BB := Main[1] * 65536
+  let E14 : Fin BB := Main[2] + E13
+  let E15 : Fin BB := Main[14] - 1
+  let E16 : Fin BB := Main[14] * E15
+  let E17 : Fin BB := Main[12] - 0
+  let E18 : Fin BB := Main[9] * E17
+  let E19 : Fin BB := Main[13] - 0
+  let E20 : Fin BB := Main[9] * E19
+  let E21 : Fin BB := E14 + 3
+  let E22 : Fin BB := Main[14] - 1
+  let E23 : Fin BB := Main[14] * E22
+  let E24 : Fin BB := E21 - Main[7]
+  let E25 : Fin BB := E24 - 1
+  let E26 : Fin BB := E25 - Main[8]
+  let E27 : Fin BB := E26 * 2013235201
   [
     .assertZero E1,
     .assertZero E9,
@@ -62,14 +62,14 @@ def specJal (rd : regidx) (imm : BitVec 21) : StateM SP1State Unit := do
   setPC (old_pc + imm)
 
 -- TODO(gzgz): this should be auto-generate-able from our constraints.
-def sp1Jal (Main : Vector BabyBear 15) : StateM SP1State Unit := do
+def sp1Jal (Main : Vector (Fin BB) 15) : StateM SP1State Unit := do
   let rd := regidx.Regidx Main[4].val
   let new_pc := BitVec.ofNat 32 (Main[10] + Main[11] * 65536)
   let old_pc := BitVec.ofNat 32 (Main[12] + Main[13] * 65536)
   if Main[14] = 1 then setPC new_pc
   if Main[14] = 1 then update_reg rd old_pc
 
-theorem SP1JAL_correct (Main : Vector BabyBear 15)
+theorem SP1JAL_correct (Main : Vector (Fin BB) 15)
     (_h_cstrs : (constraints Main).allHold) -- note these are unused here
     (h_is_real : Main[14] = 1) -- Is a real column
     (pc : BitVec 32) (reg_state : regidx → BitVec 32) (imm : BitVec 21)

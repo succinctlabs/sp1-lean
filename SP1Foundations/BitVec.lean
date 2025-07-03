@@ -71,11 +71,11 @@ lemma xor_add_xor_mul_bv (x_low x_high y_low y_high : BitVec 32)
 
 namespace BabyBear
 
--- lemma eq_of_bitVec_ofNat_val_eq' (x y : BabyBear) --(n : ℕ)
+-- lemma eq_of_bitVec_ofNat_val_eq' (x y : Fin BB) --(n : ℕ)
 --     (h : x.val % 4294967296 = y.val % 4294967296) : x = y := by
 --   sorry
 
--- lemma eq_of_bitVec_ofNat_val_eq (x y : BabyBear) (n : ℕ)
+-- lemma eq_of_bitVec_ofNat_val_eq (x y : Fin BB) (n : ℕ)
 --     (h : BitVec.ofNat n x.val = BitVec.ofNat n y.val) : x = y := by
 --   sorry
 
@@ -86,22 +86,22 @@ lemma eq_of_bitVec_ofNat32_val_eq' (x y : Fin BabyBearPrime)
   -- rw [← Fin.val_inj]
   omega
 
-lemma eq_of_bitVec_ofNat32_val_eq (x y : BabyBear)
+lemma eq_of_bitVec_ofNat32_val_eq (x y : Fin BabyBearPrime)
     (h : BitVec.ofNat 32 x.val = BitVec.ofNat 32 y.val) : x = y := by
   rw [← BitVec.toNat_inj] at h
   simp only [BabyBearPrime, BitVec.toNat_ofNat, Nat.reducePow] at h
-  rw [← Fin.val_inj]
+  -- rw [← Fin.val_inj]
   omega
 
-lemma val_add_mul_256 (x y : BabyBear)
+lemma val_add_mul_256 (x y : Fin BB)
     (hx : x.val < 256) (hy : y.val < 256) :
     (x + y * 256).val = x.val + y.val * 256 := by
   rw [Fin.val_add, Fin.val_mul]
   simp
-  simp [Fin.lt_iff_val_lt_val] at hx hy
+  -- simp [Fin.lt_iff_val_lt_val] at hx hy
   omega
 
-lemma and_add_and_mul (x_low x_high y_low y_high : BabyBear)
+lemma and_add_and_mul (x_low x_high y_low y_high : Fin BB)
     (hx : x_low < 256) (hy : y_low < 256)
     (hx' : x_high < 256) (hy' : y_high < 256) :
     (x_low &&& y_low) + (x_high &&& y_high) * 256 =
@@ -124,7 +124,7 @@ lemma and_add_and_mul (x_low x_high y_low y_high : BabyBear)
     refine Nat.and_lt_two_pow (n := 8) ?_ ?_
     omega
 
-lemma or_add_or_mul (x_low x_high y_low y_high : BabyBear)
+lemma or_add_or_mul (x_low x_high y_low y_high : Fin BB)
     (hx : x_low < 256) (hy : y_low < 256)
     (hx' : x_high < 256) (hy' : y_high < 256) :
     (x_low ||| y_low) + (x_high ||| y_high) * 256 =
@@ -167,7 +167,7 @@ lemma or_add_or_mul (x_low x_high y_low y_high : BabyBear)
     have := Nat.or_lt_two_pow (n := 8) hx' hy'
     omega
 
-lemma xor_add_xor_mul (x_low x_high y_low y_high : BabyBear)
+lemma xor_add_xor_mul (x_low x_high y_low y_high : Fin BB)
     (hx : x_low < 256) (hy : y_low < 256)
     (hx' : x_high < 256) (hy' : y_high < 256) :
     (x_low ^^^ y_low) + (x_high ^^^ y_high) * 256 =

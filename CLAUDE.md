@@ -26,8 +26,8 @@ lake build SP1Chips
 The codebase is organized into three layered libraries:
 
 ### 1. SP1Foundations - Core Mathematical Abstractions
-- **Field.lean**: BabyBear finite field (prime 2013265921) with arithmetic operations
-- **Unsigned.lean**: Constrained unsigned types (U1, U8, U16) wrapping BabyBear elements
+- **Field.lean**: Fin BB finite field (prime 2013265921) with arithmetic operations
+- **Unsigned.lean**: Constrained unsigned types (U1, U8, U16) wrapping Fin BB elements
 - **Word.lean**: 32-bit words as pairs of limbs with conversion functions
 - **Constraint.lean**: SP1Constraint system with `assertZero` and `sendAirInteraction_byte`
 - **Interaction.lean**: Air interaction datatypes for lookup arguments
@@ -70,7 +70,7 @@ Byte-level operations use algebraic intermediate representation (AIR) with looku
 Based on PROMPT.md, follow these practices:
 - Use structured case analysis with `sorry` placeholders for complex proofs
 - Apply automated tactics: `omega`, `aesop`, `linarith`, `ring` for arithmetic
-- Convert BabyBear operations to natural numbers before automation
+- Convert Fin BB operations to natural numbers before automation
 - Prove constraint equivalence to idealized mathematical properties
 
 ## Key Dependencies
@@ -82,8 +82,8 @@ Based on PROMPT.md, follow these practices:
 
 ## Working with Field Elements
 
-BabyBear field elements require careful handling:
+Fin BB field elements require careful handling:
 - Prime: 2013265921
 - Use `.val` to extract underlying natural number
 - Apply field simplification lemmas before automated tactics
-- Unsigned types (U1, U8, U16) wrap BabyBear with range constraints
+- Unsigned types (U1, U8, U16) wrap Fin BB with range constraints
