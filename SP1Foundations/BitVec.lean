@@ -71,10 +71,25 @@ lemma xor_add_xor_mul_bv (x_low x_high y_low y_high : BitVec 32)
 
 namespace BabyBear
 
-lemma helper_test (x y : BabyBear)
+-- lemma eq_of_bitVec_ofNat_val_eq' (x y : BabyBear) --(n : ℕ)
+--     (h : x.val % 4294967296 = y.val % 4294967296) : x = y := by
+--   sorry
+
+-- lemma eq_of_bitVec_ofNat_val_eq (x y : BabyBear) (n : ℕ)
+--     (h : BitVec.ofNat n x.val = BitVec.ofNat n y.val) : x = y := by
+--   sorry
+
+lemma eq_of_bitVec_ofNat32_val_eq' (x y : Fin BabyBearPrime)
     (h : BitVec.ofNat 32 x.val = BitVec.ofNat 32 y.val) : x = y := by
   rw [← BitVec.toNat_inj] at h
-  simp at h
+  simp only [BabyBearPrime, BitVec.toNat_ofNat, Nat.reducePow] at h
+  -- rw [← Fin.val_inj]
+  omega
+
+lemma eq_of_bitVec_ofNat32_val_eq (x y : BabyBear)
+    (h : BitVec.ofNat 32 x.val = BitVec.ofNat 32 y.val) : x = y := by
+  rw [← BitVec.toNat_inj] at h
+  simp only [BabyBearPrime, BitVec.toNat_ofNat, Nat.reducePow] at h
   rw [← Fin.val_inj]
   omega
 
@@ -91,7 +106,7 @@ lemma and_add_and_mul (x_low x_high y_low y_high : BabyBear)
     (hx' : x_high < 256) (hy' : y_high < 256) :
     (x_low &&& y_low) + (x_high &&& y_high) * 256 =
       (x_low + x_high * 256) &&& (y_low + y_high * 256) := by
-  apply helper_test
+  apply eq_of_bitVec_ofNat32_val_eq
   rw [val_add_mul_256]
   simp [Fin.lt_iff_val_lt_val] at hx hy
   rw [BitVec.ofNat_add]
@@ -114,7 +129,7 @@ lemma or_add_or_mul (x_low x_high y_low y_high : BabyBear)
     (hx' : x_high < 256) (hy' : y_high < 256) :
     (x_low ||| y_low) + (x_high ||| y_high) * 256 =
       (x_low + x_high * 256) ||| (y_low + y_high * 256) := by
-  apply helper_test
+  apply eq_of_bitVec_ofNat32_val_eq
   rw [val_add_mul_256]
   simp [Fin.lt_iff_val_lt_val] at hx hy hx' hy'
   have hxs : x_low.val + x_high.val * 256 < 65536 := by omega
@@ -157,7 +172,7 @@ lemma xor_add_xor_mul (x_low x_high y_low y_high : BabyBear)
     (hx' : x_high < 256) (hy' : y_high < 256) :
     (x_low ^^^ y_low) + (x_high ^^^ y_high) * 256 =
       (x_low + x_high * 256) ^^^ (y_low + y_high * 256) := by
-  apply helper_test
+  apply eq_of_bitVec_ofNat32_val_eq
   rw [val_add_mul_256]
   simp [Fin.lt_iff_val_lt_val] at hx hy hx' hy'
   have hxs : x_low.val + x_high.val * 256 < 65536 := by omega

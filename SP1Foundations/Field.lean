@@ -2,6 +2,8 @@ import Mathlib
 
 @[simp] abbrev BabyBearPrime : ℕ := 2013265921
 
+alias BB := BabyBearPrime
+
 -- dt: Need `#eval` strength to make this work on all OS
 lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by native_decide
 
