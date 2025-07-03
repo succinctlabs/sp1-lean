@@ -263,6 +263,11 @@ lemma eq_xor_word_of_constraints
     eq_toBitwise_of_constraints₁ a b cols .XOR (Or.inr (Or.inr rfl)) h]
   rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
   simp [mul_assoc]
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
+
 
 lemma eq_xor_word_of_constraints'
     (a : Word BabyBear)
@@ -277,6 +282,10 @@ lemma eq_xor_word_of_constraints'
     eq_toBitwise_of_constraints₃ a b cols .XOR (Or.inr (Or.inr rfl)) h]
   rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
   simp [mul_assoc]
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
 
 lemma eq_xor_word_sub_of_constraints
     (a : Word BabyBear)
@@ -319,6 +328,10 @@ lemma eq_or_word_of_constraints
     eq_toBitwise_of_constraints₁ a b cols .OR (Or.inr (Or.inl rfl)) h]
   rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
   simp [mul_assoc]
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
 
 lemma eq_or_word_of_constraints'
     (a : Word BabyBear)
@@ -333,6 +346,10 @@ lemma eq_or_word_of_constraints'
     eq_toBitwise_of_constraints₃ a b cols .OR (Or.inr (Or.inl rfl)) h]
   rw [ByteOpcode.toBitwise_add_toBitwise_mul_u8 _ _ _ _ _ ha hb]
   simp [mul_assoc]
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
+  · simp [constraints, BitwiseOperation.constraints] at h
+    aesop
 
 lemma eq_or_word_sub_of_constraints
     (a : Word BabyBear)

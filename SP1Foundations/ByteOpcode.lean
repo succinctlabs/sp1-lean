@@ -1,6 +1,8 @@
-import SP1Foundations.Field
+import SP1Foundations.BitVec
 
-/-- Operations that are handled axiomatically by byte tables. -/
+/-- Operations that are handled axiomatically by byte tables.
+
+dt: I think a lot would work better if and/or/xor had their own sub-inductive type -/
 inductive ByteOpcode
   | AND
   | OR
@@ -114,19 +116,23 @@ def toBitwise (op : ByteOpcode) : BabyBear → BabyBear → BabyBear :=
 @[simp] lemma toBitwise_xor (x y : BabyBear) :
     toBitwise XOR x y = x ^^^ y := rfl
 
-lemma and_add_and_mul (x_low x_high y_low y_high : BabyBear)
-    (hx : x_low < 256) (hy : y_low < 256) :
-    (x_low &&& y_low) + (x_high &&& y_high) * 256 =
-      (x_low + x_high * 256) &&& (y_low + y_high * 256) := by
-  sorry
-  -- simp
+lemma toBitwise_of_ne (x y : BabyBear) (op : ByteOpcode) (h : op ≠ AND ∧ op ≠ OR ∧ op ≠ XOR) :
+    toBitwise op x y = 0 := by
+  match op with
+  | .AND | .OR | XOR => simp at h
+  | U8Range | LTU | MSB | Range => rfl
 
 lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_high : BabyBear)
-    (hx : x_low < 256) (hy : y_low < 256) :
+    (hx : x_low < 256) (hy : y_low < 256)
+    (hx' : x_high < 256) (hy' : y_high < 256) :
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 256 =
       op.toBitwise (x_low + x_high * 256) (y_low + y_high * 256) := by
-
-  sorry
+  induction op using ByteOpcode.bitwise_induction with
+  | and => exact BabyBear.and_add_and_mul _ _ _ _ hx hy hx' hy'
+  | or => exact BabyBear.or_add_or_mul _ _ _ _ hx hy hx' hy'
+  | xor => exact BabyBear.xor_add_xor_mul _ _ _ _ hx hy hx' hy'
+  | other op hop =>
+    simp [toBitwise_of_ne _ _ op hop]
 
 end toBitwise
 

@@ -8,11 +8,13 @@ preferReleaseBuild = true
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+linter.unusedSimpArgs = false
 # autoImplicit = false 
 
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
+rev = "v4.22.0-rc2"
 
 # [[require]]
 # name = "Lean_RV32D"
