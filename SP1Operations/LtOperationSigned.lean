@@ -11,77 +11,77 @@ structure LtOperationSigned where
 namespace LtOperationSigned
 
 def constraints
-  (b : Word BabyBear)
-  (cc : Word BabyBear)
+  (b : Word (Fin BB))
+  (cc : Word (Fin BB))
   (cols : LtOperationSigned)
-  (is_signed : BabyBear)
-  (is_real : BabyBear)
+  (is_signed : Fin BB)
+  (is_real : Fin BB)
   : SP1ConstraintList :=
-  let E0 : BabyBear := is_signed - 1
-  let E1 : BabyBear := is_signed * E0
-  let E2 : BabyBear := is_real - 1
-  let E3 : BabyBear := is_real * E2
-  let E4 : BabyBear := is_real - 1
-  let E5 : BabyBear := E4 * is_signed
-  let E6 : BabyBear := is_signed - 1
-  let E7 : BabyBear := is_signed * E6
-  let E8 : BabyBear := cols.b_msb.msb - 1
-  let E9 : BabyBear := cols.b_msb.msb * E8
-  let E10 : BabyBear := 2 * b[1]
-  let E11 : BabyBear := cols.b_msb.msb * 65536
-  let E12 : BabyBear := E10 - E11
-  let E13 : BabyBear := is_signed - 1
-  let E14 : BabyBear := is_signed * E13
-  let E15 : BabyBear := cols.c_msb.msb - 1
-  let E16 : BabyBear := cols.c_msb.msb * E15
-  let E17 : BabyBear := 2 * cc[1]
-  let E18 : BabyBear := cols.c_msb.msb * 65536
-  let E19 : BabyBear := E17 - E18
-  let E20 : BabyBear := is_signed - 1
-  let E21 : BabyBear := E20 * cols.b_msb.msb
-  let E22 : BabyBear := is_signed - 1
-  let E23 : BabyBear := E22 * cols.c_msb.msb
-  let E24 : BabyBear := is_signed * 32768
-  let E25 : BabyBear := b[1] + E24
-  let E26 : BabyBear := 65536 * cols.b_msb.msb
-  let E27 : BabyBear := E25 - E26
-  let E28 : BabyBear := is_signed * 32768
-  let E29 : BabyBear := cc[1] + E28
-  let E30 : BabyBear := 65536 * cols.c_msb.msb
-  let E31 : BabyBear := E29 - E30
-  let E32 : BabyBear := is_real - 1
-  let E33 : BabyBear := is_real * E32
-  let E34 : BabyBear := cols.result.u16_flags[0] + cols.result.u16_flags[1]
-  let E35 : BabyBear := cols.result.u16_flags[0] - 1
-  let E36 : BabyBear := cols.result.u16_flags[0] * E35
-  let E37 : BabyBear := cols.result.u16_flags[1] - 1
-  let E38 : BabyBear := cols.result.u16_flags[1] * E37
-  let E39 : BabyBear := E34 - 1
-  let E40 : BabyBear := E34 * E39
-  let E41 : BabyBear := 1 - E34
-  let E42 : BabyBear := 0 + cols.result.u16_flags[1]
-  let E43 : BabyBear := is_real - E42
-  let E44 : BabyBear := E27 - E31
-  let E45 : BabyBear := E43 * E44
-  let E46 : BabyBear := E27 * cols.result.u16_flags[1]
-  let E47 : BabyBear := 0 + E46
-  let E48 : BabyBear := E31 * cols.result.u16_flags[1]
-  let E49 : BabyBear := 0 + E48
-  let E50 : BabyBear := E42 + cols.result.u16_flags[0]
-  let E51 : BabyBear := is_real - E50
-  let E52 : BabyBear := b[0] - cc[0]
-  let E53 : BabyBear := E51 * E52
-  let E54 : BabyBear := b[0] * cols.result.u16_flags[0]
-  let E55 : BabyBear := E47 + E54
-  let E56 : BabyBear := cc[0] * cols.result.u16_flags[0]
-  let E57 : BabyBear := E49 + E56
-  let E58 : BabyBear := E55 - cols.result.comparison_limbs[0]
-  let E59 : BabyBear := E57 - cols.result.comparison_limbs[1]
-  let E60 : BabyBear := E41 - 1
-  let E61 : BabyBear := cols.result.comparison_limbs[0] - cols.result.comparison_limbs[1]
-  let E62 : BabyBear := cols.result.not_eq_inv * E61
-  let E63 : BabyBear := E62 - is_real
-  let E64 : BabyBear := E60 * E63
+  let E0 : Fin BB := is_signed - 1
+  let E1 : Fin BB := is_signed * E0
+  let E2 : Fin BB := is_real - 1
+  let E3 : Fin BB := is_real * E2
+  let E4 : Fin BB := is_real - 1
+  let E5 : Fin BB := E4 * is_signed
+  let E6 : Fin BB := is_signed - 1
+  let E7 : Fin BB := is_signed * E6
+  let E8 : Fin BB := cols.b_msb.msb - 1
+  let E9 : Fin BB := cols.b_msb.msb * E8
+  let E10 : Fin BB := 2 * b[1]
+  let E11 : Fin BB := cols.b_msb.msb * 65536
+  let E12 : Fin BB := E10 - E11
+  let E13 : Fin BB := is_signed - 1
+  let E14 : Fin BB := is_signed * E13
+  let E15 : Fin BB := cols.c_msb.msb - 1
+  let E16 : Fin BB := cols.c_msb.msb * E15
+  let E17 : Fin BB := 2 * cc[1]
+  let E18 : Fin BB := cols.c_msb.msb * 65536
+  let E19 : Fin BB := E17 - E18
+  let E20 : Fin BB := is_signed - 1
+  let E21 : Fin BB := E20 * cols.b_msb.msb
+  let E22 : Fin BB := is_signed - 1
+  let E23 : Fin BB := E22 * cols.c_msb.msb
+  let E24 : Fin BB := is_signed * 32768
+  let E25 : Fin BB := b[1] + E24
+  let E26 : Fin BB := 65536 * cols.b_msb.msb
+  let E27 : Fin BB := E25 - E26
+  let E28 : Fin BB := is_signed * 32768
+  let E29 : Fin BB := cc[1] + E28
+  let E30 : Fin BB := 65536 * cols.c_msb.msb
+  let E31 : Fin BB := E29 - E30
+  let E32 : Fin BB := is_real - 1
+  let E33 : Fin BB := is_real * E32
+  let E34 : Fin BB := cols.result.u16_flags[0] + cols.result.u16_flags[1]
+  let E35 : Fin BB := cols.result.u16_flags[0] - 1
+  let E36 : Fin BB := cols.result.u16_flags[0] * E35
+  let E37 : Fin BB := cols.result.u16_flags[1] - 1
+  let E38 : Fin BB := cols.result.u16_flags[1] * E37
+  let E39 : Fin BB := E34 - 1
+  let E40 : Fin BB := E34 * E39
+  let E41 : Fin BB := 1 - E34
+  let E42 : Fin BB := 0 + cols.result.u16_flags[1]
+  let E43 : Fin BB := is_real - E42
+  let E44 : Fin BB := E27 - E31
+  let E45 : Fin BB := E43 * E44
+  let E46 : Fin BB := E27 * cols.result.u16_flags[1]
+  let E47 : Fin BB := 0 + E46
+  let E48 : Fin BB := E31 * cols.result.u16_flags[1]
+  let E49 : Fin BB := 0 + E48
+  let E50 : Fin BB := E42 + cols.result.u16_flags[0]
+  let E51 : Fin BB := is_real - E50
+  let E52 : Fin BB := b[0] - cc[0]
+  let E53 : Fin BB := E51 * E52
+  let E54 : Fin BB := b[0] * cols.result.u16_flags[0]
+  let E55 : Fin BB := E47 + E54
+  let E56 : Fin BB := cc[0] * cols.result.u16_flags[0]
+  let E57 : Fin BB := E49 + E56
+  let E58 : Fin BB := E55 - cols.result.comparison_limbs[0]
+  let E59 : Fin BB := E57 - cols.result.comparison_limbs[1]
+  let E60 : Fin BB := E41 - 1
+  let E61 : Fin BB := cols.result.comparison_limbs[0] - cols.result.comparison_limbs[1]
+  let E62 : Fin BB := cols.result.not_eq_inv * E61
+  let E63 : Fin BB := E62 - is_real
+  let E64 : Fin BB := E60 * E63
   let CS0 : SP1ConstraintList := U16CompareOperation.constraints cols.result.comparison_limbs[0] cols.result.comparison_limbs[1] { bit := cols.result.u16_compare_operation.bit } is_real
   [
     .assertZero E1,

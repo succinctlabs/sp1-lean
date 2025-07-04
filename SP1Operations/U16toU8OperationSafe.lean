@@ -2,8 +2,8 @@ import SP1Foundations
 
 namespace U16ToU8OperationSafe
 
-def constraints (I0 I1 I2 I3 I4 : BabyBear) :
-    Vector BabyBear 4 × SP1ConstraintList :=
+def constraints (I0 I1 I2 I3 I4 : Fin BB) :
+    Vector (Fin BB) 4 × SP1ConstraintList :=
   let E0 := I0 - I2
   let E2 := E0 * 2005401601
   let E4 := I1 - I3
@@ -14,20 +14,20 @@ def constraints (I0 I1 I2 I3 I4 : BabyBear) :
       .send (.byte ByteOpcode.U8Range I3 E6 0) I4
     ]⟩
 
-@[simp] lemma outputVector_eq (I0 I1 I2 I3 I4 : BabyBear) :
+@[simp] lemma outputVector_eq (I0 I1 I2 I3 I4 : Fin BB) :
     (constraints I0 I1 I2 I3 I4).1 = #v[I2, (I0 - I2) * 2005401601, I3, (I1 - I3) * 2005401601] := rfl
 
-lemma outputVector_spec (I0 I1 I2 I3 I4 : BabyBear) :
+lemma outputVector_spec (I0 I1 I2 I3 I4 : Fin BB) :
     let v := (constraints I0 I1 I2 I3 I4).1
     (v[0] + v[1] * 256 = I0) ∧ (v[2] + v[3] * 256 = I1) := by
   simp [mul_assoc]
 
-def constraintProp (I0 I1 I2 I3 _I4 : BabyBear) : Prop :=
+def constraintProp (I0 I1 I2 I3 _I4 : Fin BB) : Prop :=
   I2 < 256 ∧ (I0 - I2) * 2005401601 < 256 ∧
     I3 < 256 ∧ (I1 - I3) * 2005401601 < 256
 
 lemma constraints_iff_constraintProp
-    (I0 I1 I2 I3 I4 : BabyBear) :
+    (I0 I1 I2 I3 I4 : Fin BB) :
     (constraints I0 I1 I2 I3 I4).2.allHold ↔
       (I4 = 0 ∨ constraintProp I0 I1 I2 I3 I4) := by
   simp [constraintProp, constraints]
@@ -35,12 +35,12 @@ lemma constraints_iff_constraintProp
   · simp [hi4]
   · simp [hi4, and_assoc]
 
-def Spec (I0 I1 I2 I3 I4 : BabyBear) : Prop :=
+def Spec (I0 I1 I2 I3 I4 : Fin BB) : Prop :=
   I4 ≠ 0 → (I2 < 256 ∧ (I0 - I2) * 2005401601 < 256 ∧
     I3 < 256 ∧ (I1 - I3) * 2005401601 < 256)
 
 theorem spec_of_constraintSet
-    (I0 I1 I2 I3 I4 : BabyBear)
+    (I0 I1 I2 I3 I4 : Fin BB)
     (h : (constraints I0 I1 I2 I3 I4).2.allHold) :
     Spec I0 I1 I2 I3 I4 := by
   rw [constraints_iff_constraintProp, constraintProp, or_iff_not_imp_left] at h
@@ -48,7 +48,7 @@ theorem spec_of_constraintSet
 
 section corrollary
 
-variable {I0 I1 I2 I3 I4 : BabyBear}
+variable {I0 I1 I2 I3 I4 : Fin BB}
 
 lemma outputVector_bound (hi4 : I4 ≠ 0)
     (h : (constraints I0 I1 I2 I3 I4).2.allHold) :

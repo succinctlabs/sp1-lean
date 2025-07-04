@@ -6,59 +6,59 @@ open LeanRV32D.Functions
 
 --- A Reader that only accesses values of type `T`.
 structure ALUTypeReader where
-  op_a : BabyBear
+  op_a : Fin BB
   op_a_memory : MemoryAccessInSharedCols
-  op_a_0 : BabyBear
-  op_b : BabyBear
+  op_a_0 : Fin BB
+  op_b : Fin BB
   op_b_memory : MemoryAccessInSharedCols
-  op_c : Word BabyBear
+  op_c : Word (Fin BB)
   op_c_memory : MemoryAccessInSharedCols
-  imm_c : BabyBear
+  imm_c : Fin BB
 
 namespace ALUTypeReader
 
 def constraints
-  (shard clk _pc _opcode: BabyBear)
-  (op_a_write_value : Word BabyBear)
+  (shard clk _pc _opcode: Fin BB)
+  (op_a_write_value : Word (Fin BB))
   (cols : ALUTypeReader)
-  (is_real : BabyBear)
+  (is_real : Fin BB)
   : SP1ConstraintList :=
-    let E0 : BabyBear := is_real - 1
-    let E2 : BabyBear := is_real * E0
-    let E4 : BabyBear := is_real - 1
-    let E6 : BabyBear := cols.imm_c - 0
-    let E8 : BabyBear := E4 * E6
-    let E10 : BabyBear := 0 + cols.op_b
-    let E12 : BabyBear := op_a_write_value[0] - 0
-    let E14 : BabyBear := cols.op_a_0 * E12
-    let E16 : BabyBear := op_a_write_value[1] - 0
-    let E18 : BabyBear := cols.op_a_0 * E16
-    let E20 : BabyBear := clk + 3
-    let E22 : BabyBear := is_real - 1
-    let E24 : BabyBear := is_real * E22
-    let E26 : BabyBear := E20 - cols.op_a_memory.access_timestamp.prev_low
-    let E28 : BabyBear := E26 - 1
-    let E30 : BabyBear := E28 - cols.op_a_memory.access_timestamp.diff_low_limb
-    let E32 : BabyBear := E30 * 2013143041
-    let E34 : BabyBear := clk + 2
-    let E36 : BabyBear := is_real - 1
-    let E38 : BabyBear := is_real * E36
-    let E40 : BabyBear := E34 - cols.op_b_memory.access_timestamp.prev_low
-    let E42 : BabyBear := E40 - 1
-    let E44 : BabyBear := E42 - cols.op_b_memory.access_timestamp.diff_low_limb
-    let E46 : BabyBear := E44 * 2013143041
-    let E48 : BabyBear := clk + 1
-    let E50 : BabyBear := is_real - cols.imm_c
-    let E52 : BabyBear := E50 - 1
-    let E54 : BabyBear := E50 * E52
-    let E56 : BabyBear := E48 - cols.op_c_memory.access_timestamp.prev_low
-    let E58 : BabyBear := E56 - 1
-    let E60 : BabyBear := E58 - cols.op_c_memory.access_timestamp.diff_low_limb
-    let E62 : BabyBear := E60 * 2013143041
-    let E64 : BabyBear := cols.op_c_memory.prev_value[0] - cols.op_c[0]
-    let E66 : BabyBear := cols.imm_c * E64
-    let E68 : BabyBear := cols.op_c_memory.prev_value[1] - cols.op_c[1]
-    let E70 : BabyBear := cols.imm_c * E68
+    let E0 : Fin BB := is_real - 1
+    let E2 : Fin BB := is_real * E0
+    let E4 : Fin BB := is_real - 1
+    let E6 : Fin BB := cols.imm_c - 0
+    let E8 : Fin BB := E4 * E6
+    let E10 : Fin BB := 0 + cols.op_b
+    let E12 : Fin BB := op_a_write_value[0] - 0
+    let E14 : Fin BB := cols.op_a_0 * E12
+    let E16 : Fin BB := op_a_write_value[1] - 0
+    let E18 : Fin BB := cols.op_a_0 * E16
+    let E20 : Fin BB := clk + 3
+    let E22 : Fin BB := is_real - 1
+    let E24 : Fin BB := is_real * E22
+    let E26 : Fin BB := E20 - cols.op_a_memory.access_timestamp.prev_low
+    let E28 : Fin BB := E26 - 1
+    let E30 : Fin BB := E28 - cols.op_a_memory.access_timestamp.diff_low_limb
+    let E32 : Fin BB := E30 * 2013143041
+    let E34 : Fin BB := clk + 2
+    let E36 : Fin BB := is_real - 1
+    let E38 : Fin BB := is_real * E36
+    let E40 : Fin BB := E34 - cols.op_b_memory.access_timestamp.prev_low
+    let E42 : Fin BB := E40 - 1
+    let E44 : Fin BB := E42 - cols.op_b_memory.access_timestamp.diff_low_limb
+    let E46 : Fin BB := E44 * 2013143041
+    let E48 : Fin BB := clk + 1
+    let E50 : Fin BB := is_real - cols.imm_c
+    let E52 : Fin BB := E50 - 1
+    let E54 : Fin BB := E50 * E52
+    let E56 : Fin BB := E48 - cols.op_c_memory.access_timestamp.prev_low
+    let E58 : Fin BB := E56 - 1
+    let E60 : Fin BB := E58 - cols.op_c_memory.access_timestamp.diff_low_limb
+    let E62 : Fin BB := E60 * 2013143041
+    let E64 : Fin BB := cols.op_c_memory.prev_value[0] - cols.op_c[0]
+    let E66 : Fin BB := cols.imm_c * E64
+    let E68 : Fin BB := cols.op_c_memory.prev_value[1] - cols.op_c[1]
+    let E70 : Fin BB := cols.imm_c * E68
 
     [
       .assertZero E2,
@@ -145,15 +145,15 @@ lemma imm_c_eq_zero_or_prev_value_eq_op_c
   aesop
 
 
-lemma op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
-    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+lemma op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : Fin BB}
+    {op_a_write_value : Word (Fin BB)} {cols : ALUTypeReader}
     (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
     cols.op_b_memory.prev_value[0] < 65536 ∧ cols.op_b_memory.prev_value[1] < 65536 := by
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
-lemma op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
-    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+lemma op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : Fin BB}
+    {op_a_write_value : Word (Fin BB)} {cols : ALUTypeReader}
     (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold)
     (himm : cols.imm_c = 0) :
     cols.op_c_memory.prev_value[0] < 65536 ∧ cols.op_c_memory.prev_value[1] < 65536 := by
@@ -162,15 +162,15 @@ lemma op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
   simp [himm] at h
   tauto
 
-lemma val_op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
-    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+lemma val_op_b_memory_lt_of_constraints {clk_high clk_low pc opcode : Fin BB}
+    {op_a_write_value : Word (Fin BB)} {cols : ALUTypeReader}
     (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold) :
     cols.op_b_memory.prev_value[0].val < 65536 ∧ cols.op_b_memory.prev_value[1].val < 65536 := by
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
-lemma val_op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : BabyBear}
-    {op_a_write_value : Word BabyBear} {cols : ALUTypeReader}
+lemma val_op_c_memory_lt_of_constraints {clk_high clk_low pc opcode : Fin BB}
+    {op_a_write_value : Word (Fin BB)} {cols : ALUTypeReader}
     (h : (cols.constraints clk_high clk_low pc opcode op_a_write_value 1).allHold)
     (himm : cols.imm_c = 0) :
     cols.op_c_memory.prev_value[0].val < 65536 ∧ cols.op_c_memory.prev_value[1].val < 65536 := by
