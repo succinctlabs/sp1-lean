@@ -1,15 +1,19 @@
 import Mathlib
 
-@[simp] abbrev BabyBearPrime : ℕ := 2013265921
+abbrev BabyBearPrime : ℕ := 2013265921
+abbrev BB : ℕ := 2013265921
 
-@[simp] abbrev BB : ℕ := 2013265921
+-- @[simp] lemma BabyBearPrime_eq : BabyBearPrime = 2013265921 := rfl
+@[simp] lemma BB_eq : BB = 2013265921 := rfl
 
 -- dt: Need `#eval` strength to make this work on all OS
-lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by native_decide
+-- lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by native_decide
+lemma prime_BabyBearPrime : Nat.Prime BB := by native_decide
 
-instance Fact_BBPrime : Fact (Nat.Prime BabyBearPrime) := ⟨prime_BabyBearPrime⟩
+instance Fact_BBPrime : Fact (Nat.Prime BB) := ⟨prime_BabyBearPrime⟩
 
-instance : NeZero BabyBearPrime := by constructor; decide
+instance : NeZero BB := by constructor; decide
+-- instance : NeZero BabyBearPrime := by constructor; decide
 
 instance Fin.noZeroDivisors_of_prime (p : ℕ)
     [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
@@ -17,17 +21,10 @@ instance Fin.noZeroDivisors_of_prime (p : ℕ)
 
 namespace BabyBear
 
-@[aesop 50% forward]
-lemma lt_babyBearPrime (x : Fin BB) : x.val < BabyBearPrime := x.2
-
-instance : Field (Fin BB) := ZMod.instField BabyBearPrime
+instance : Field (Fin BB) := ZMod.instField BB
 instance : NoZeroDivisors (Fin 2013265921) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
 
 section const_vals
-
-lemma eq_one_iff_val_eq_one (x : Fin BB) : x = 1 ↔ x.val = 1 := by aesop
-
-lemma eq_zero_iff_val_eq_zero (x : Fin BB) : x = 0 ↔ x.val = 0 := by aesop
 
 @[simp] lemma val_16 : ((16 : Fin BB) : ℕ) = 16 := rfl
 @[simp] lemma val_256 : ((256 : Fin BB) : ℕ) = 256 := rfl
@@ -69,12 +66,6 @@ lemma inv_3BB_eq' : (1761607681 : Fin BB) = 8⁻¹ := by native_decide
 lemma inv_8BB_eq' : (2005401601 : Fin BB) = 256⁻¹ := by native_decide
 lemma inv_16BB_eq' : (2013235201 : Fin BB) = 65536⁻¹ := by native_decide
 
-lemma inv_1BB_eq'' : (1006632961 : Fin BB) = 2⁻¹ := by native_decide
-lemma inv_2BB_eq'' : (1509949441 : Fin BB) = 4⁻¹ := by native_decide
-lemma inv_3BB_eq'' : (1761607681 : Fin BB) = 8⁻¹ := by native_decide
-lemma inv_8BB_eq'' : (2005401601 : Fin BB) = 256⁻¹ := by native_decide
-lemma inv_16BB_eq'' : (2013235201 : Fin BB) = (65536 : Fin BB)⁻¹ := by native_decide
-
 @[simp] lemma inv_mul_1BB_eq_one : (1006632961 : Fin BB) * 2 = 1 := by rfl
 @[simp] lemma inv_mul_2BB_eq_one : (1509949441 : Fin BB) * 4 = 1 := by rfl
 @[simp] lemma inv_mul_3BB_eq_one : (1761607681 : Fin BB) * 8 = 1 := by rfl
@@ -109,36 +100,7 @@ lemma inv_16BB_eq'' : (2013235201 : Fin BB) = (65536 : Fin BB)⁻¹ := by native
 @[simp] lemma inv_mul_16BB_eq_iff' : x * (2013235201 : Fin BB) = 1 ↔ x = 65536 := by
   rw [mul_comm, inv_mul_16BB_eq_iff]
 
--- dt: below should be handled more systematically like above
-
--- section base
-
--- -- TODO(gzgz): base should be some constant
--- abbrev base : Fin BB := 65536 -- 2^16
--- abbrev baseInv : Fin BB := 2013235201 -- 2^-16
-
--- @[simp] lemma val_base : (base : ℕ) = 65536 := rfl
--- @[simp] lemma val_baseInv : (baseInv : ℕ) = 2013235201 := rfl
-
--- @[simp] lemma baseInv_mul_base : (baseInv : Fin BB) * (base : Fin BB) = 1 := rfl
--- @[simp] lemma base_mul_baseInv : (base : Fin BB) * (baseInv : Fin BB) = 1 := rfl
-
--- @[simp] lemma base_ne_zero : (base : Fin BB) ≠ 0 := by simp [base]
--- @[simp] lemma baseInv_ne_zero : (baseInv : Fin BB) ≠ 0 := by simp [baseInv]
-
--- lemma baseInv_eq_inv_base : baseInv = base⁻¹ := by
---   rw [inv_eq_one_div, eq_div_iff] <;> simp
-
--- lemma base_eq_inv_baseInv : base = baseInv⁻¹ := by
---   rw [baseInv_eq_inv_base, inv_inv]
-
--- @[simp] lemma mul_baseInv_eq_one_iff (x : Fin BB) : x * baseInv = 1 ↔ x = base := by
---   rw [baseInv_eq_inv_base, mul_inv_eq_one₀ base_ne_zero]
-
--- @[simp] lemma baseInv_mul_eq_one_iff (x : Fin BB) : baseInv * x = 1 ↔ x = base := by
---   rw [mul_comm, mul_baseInv_eq_one_iff]
-
--- end base
+-- dt: things below should be folded into the above
 
 section u3_base
 
