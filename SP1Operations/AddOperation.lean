@@ -95,7 +95,7 @@ theorem correct
       cases qq1 with
       | inl qqq1 =>
           rw [qqq1] at qq2
-          simp [Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+          simp [Fin.sub_def, Fin.add_def, Fin.ext_iff, BB] at *
           simp [Fin.lt_def] at qq3 aa4
           have := a[0].in_range
           have := a[1].in_range
@@ -104,7 +104,7 @@ theorem correct
           omega
       | inr qqq1 =>
           rw [qqq1] at qq2
-          simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BabyBearPrime] at *
+          simp [Fin.mul_def, Fin.sub_def, Fin.add_def, Fin.ext_iff, BB] at *
           simp [Fin.lt_def] at qq3 aa4
           have := a[0].in_range
           have := a[1].in_range

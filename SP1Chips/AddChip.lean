@@ -116,7 +116,7 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
       (by simp [h_is_real])
       hb3
 
-  simp only [BabyBearPrime, BitVec.natCast_eq_ofNat, StateT.run_modify, StateT.run_bind,
+  simp only [BB, BitVec.natCast_eq_ofNat, StateT.run_modify, StateT.run_bind,
     StateT.run_get, bind_pure_comp, map_pure, Prod.map_apply, id_eq]
   simp [hpc]
   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)

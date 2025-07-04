@@ -128,9 +128,9 @@ lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_hig
     (op.toBitwise x_low y_low) + (op.toBitwise x_high y_high) * 256 =
       op.toBitwise (x_low + x_high * 256) (y_low + y_high * 256) := by
   induction op using ByteOpcode.bitwise_induction with
-  | and => exact BabyBear.and_add_and_mul _ _ _ _ hx hy hx' hy'
-  | or => exact BabyBear.or_add_or_mul _ _ _ _ hx hy hx' hy'
-  | xor => exact BabyBear.xor_add_xor_mul _ _ _ _ hx hy hx' hy'
+  | and => exact BabyBear.and_add_and_mul256 hx hy hx' hy'
+  | or => exact BabyBear.or_add_or_mul256 hx hy hx' hy'
+  | xor => exact BabyBear.xor_add_xor_mul256 hx hy hx' hy'
   | other op hop => simp [toBitwise_of_ne _ _ op hop]
 
 end toBitwise

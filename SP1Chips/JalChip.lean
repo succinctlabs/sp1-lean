@@ -78,7 +78,7 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 15)
     (hmem₂ : .ofNat 32 (Main[10] + Main[11] * 65536) = pc + imm) :
     (sp1Jal Main).run (pc, reg_state) =
       (specJal (regidx.Regidx Main[4].val) imm).run (pc, reg_state) := by
-  simp only [sp1Jal, h_is_real, Fin.isValue, ↓reduceIte, BabyBearPrime, BitVec.natCast_eq_ofNat,
+  simp only [sp1Jal, h_is_real, Fin.isValue, ↓reduceIte, BB, BitVec.natCast_eq_ofNat,
     StateT.run_bind, StateT.run_modify, Prod.map_apply, id_eq, bind_pure_comp, map_pure, specJal,
     StateT.run_get]
   refine congr_arg (fun out => pure (_, out)) (Prod.eq_iff_fst_eq_snd_eq.2 ⟨?_, ?_⟩)

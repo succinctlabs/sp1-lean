@@ -81,5 +81,5 @@ def Add4Operation.constraints'
 --     -- simp [Word.toFin32_U16]
 --     -- simp [Fin.add_def, Fin.mul_def, Fin.sub_def, add_assoc] at *
 --     -- rw [Fin.lt_iff_val_lt_val] at q1 q2
---     -- simp [BabyBearPrime] at *
+--     -- simp [BB] at *
 --     sorry

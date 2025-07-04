@@ -1,26 +1,19 @@
-import Mathlib
+import SP1Foundations.Misc
 
-abbrev BabyBearPrime : ℕ := 2013265921
 abbrev BB : ℕ := 2013265921
-
--- @[simp] lemma BabyBearPrime_eq : BabyBearPrime = 2013265921 := rfl
 @[simp] lemma BB_eq : BB = 2013265921 := rfl
 
--- dt: Need `#eval` strength to make this work on all OS
--- lemma prime_BabyBearPrime : Nat.Prime BabyBearPrime := by native_decide
-lemma prime_BabyBearPrime : Nat.Prime BB := by native_decide
-
-instance Fact_BBPrime : Fact (Nat.Prime BB) := ⟨prime_BabyBearPrime⟩
-
-instance : NeZero BB := by constructor; decide
--- instance : NeZero BabyBearPrime := by constructor; decide
-
-instance Fin.noZeroDivisors_of_prime (p : ℕ)
-    [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
-  refine IsDomain.to_noZeroDivisors (ZMod (p + 1))
+alias BabyBearPrime := BB
 
 namespace BabyBear
 
+-- dt: Need `#eval`-level `native_decide` strength to make this work on all OS
+lemma prime_BabyBearPrime : Nat.Prime BB := by native_decide
+
+instance Fact_BBPrime : Fact (Nat.Prime BB) := ⟨prime_BabyBearPrime⟩
+instance : NeZero BB := by constructor; decide
+
+-- dt: Wouldn't need this if `ZMod` was the fundamental object for us.
 instance : Field (Fin BB) := ZMod.instField BB
 instance : NoZeroDivisors (Fin 2013265921) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
 
@@ -44,9 +37,6 @@ section const_vals
 end const_vals
 
 end BabyBear
-
-
--- dt: if we commit to `Fin BB` fully we should have `isTwoPow` class maybe
 
 @[simp] lemma shiftl_1BB_eq_one : (1006632961 : Fin BB) <<< 1 = 1 := rfl
 @[simp] lemma shiftl_2BB_eq_one : (1509949441 : Fin BB) <<< 2 = 1 := rfl

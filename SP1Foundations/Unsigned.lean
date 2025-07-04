@@ -15,7 +15,7 @@ namespace BoundedBabyBear
   | ⟨⟨x, ?_⟩, ?_⟩, ⟨⟨y, ?_⟩, ?_⟩ => by simpa
 
 def ofNat (bound_dec x : ℕ) : BoundedBabyBear bound_dec.succ where
-  val := (x % bound_dec.succ) % BabyBearPrime
+  val := (x % bound_dec.succ) % BB
   isLt := Nat.mod_lt _ Nat.succ_pos'
   in_range := Nat.mod_lt_of_lt (Nat.mod_lt _ Nat.succ_pos')
 
@@ -40,7 +40,7 @@ def coe_of_le {bound bound' : ℕ} (h : bound ≤ bound') :
 variable {bound : ℕ}
 
 @[aesop 50% forward]
-lemma lt_babyBearPrime (x : BoundedBabyBear bound) : x.val < BabyBearPrime := Fin.is_lt _
+lemma lt_babyBearPrime (x : BoundedBabyBear bound) : x.val < BB := Fin.is_lt _
 
 instance : Inhabited (BoundedBabyBear bound.succ) where default := 0
 lemma default_eq_zero : (default : BoundedBabyBear bound.succ) = 0 := rfl
@@ -62,7 +62,7 @@ lemma toFin_inj (x y : BoundedBabyBear bound) : x.toFin = y.toFin ↔ x = y := b
 lemma injective_toFin : Function.Injective (BoundedBabyBear.toFin : BoundedBabyBear bound → Fin BB) :=
   fun x y h => (toFin_inj x y).1 h
 
-lemma toFin_eq_iff (x : BoundedBabyBear bound) (y : Fin BabyBearPrime) : x.toFin = y ↔ x.val = y.val := by
+lemma toFin_eq_iff (x : BoundedBabyBear bound) (y : Fin BB) : x.toFin = y ↔ x.val = y.val := by
   erw [Fin.ext_iff]
 
 end toFin

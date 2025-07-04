@@ -134,7 +134,7 @@ lemma constraintList_imp_spec
     (constraints a b cols opcode is_real).2.allHold → (spec a b cols opcode is_real) := by
   rw [constraints, spec]
   intro h h_is_real
-  simp only [WORD_SIZE, BabyBearPrime, Fin.isValue]
+  simp only [WORD_SIZE, BB, Fin.isValue]
   refine BitwiseOperation.constraints_imp_spec
     (#v[cols.b_low_bytes.low_bytes[0], (a[0] - cols.b_low_bytes.low_bytes[0]) * 2005401601,
         cols.b_low_bytes.low_bytes[1], (a[1] - cols.b_low_bytes.low_bytes[1]) * 2005401601])
