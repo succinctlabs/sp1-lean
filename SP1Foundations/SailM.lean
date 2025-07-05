@@ -1,8 +1,8 @@
 import SP1Foundations.Field
 import SP1Foundations.ByteOpcode
 
-import LeanRV32D.RiscvInstsEnd
-open LeanRV32D.Functions Sail
+import LeanRV32IM.RiscvInstsEnd
+open LeanRV32IM.Functions Sail
 
 section sailboats
 

@@ -2,9 +2,9 @@ import SP1Foundations
 import SP1Operations.MemoryConsistency
 import SP1Operations.U16toU8OperationUnsafe
 import SP1Operations.BitwiseOperation
-import LeanRV32D.RiscvRegs
+import LeanRV32IM.RiscvRegs
 
-open LeanRV32D.Functions
+open LeanRV32IM.Functions
 
 @[ext] structure BitwiseU16Operation where
   b_low_bytes : U16toU8Operation

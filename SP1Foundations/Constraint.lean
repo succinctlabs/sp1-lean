@@ -2,9 +2,9 @@ import SP1Foundations.Field
 import SP1Foundations.ByteOpcode
 import SP1Foundations.SailM
 
-import LeanRV32D.RiscvInstsEnd
+import LeanRV32IM.RiscvInstsEnd
 
-open LeanRV32D.Functions Sail
+open LeanRV32IM.Functions Sail
 
 inductive AirInteraction where
   | byte (op : ByteOpcode) (a b c : Fin BB)

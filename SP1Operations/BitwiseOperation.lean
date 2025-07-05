@@ -1,7 +1,7 @@
 import SP1Foundations
-import LeanRV32D.RiscvRegs
+import LeanRV32IM.RiscvRegs
 
-open LeanRV32D.Functions
+open LeanRV32IM.Functions
 
 @[ext] structure BitwiseOperation where
   result : ByteWord (Fin BB)

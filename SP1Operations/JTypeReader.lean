@@ -1,9 +1,9 @@
 import SP1Foundations
 import SP1Operations.MemoryConsistency
-import LeanRV32D.RiscvRegs
+import LeanRV32IM.RiscvRegs
 
 open Sail
-open LeanRV32D.Functions
+open LeanRV32IM.Functions
 
 --- A Reader that only accesses values of type `T`.
 structure JTypeReader (T : Type) where
