@@ -36,3 +36,6 @@ name = "LeanRV32D"
 [[lean_exe]]
 name = "run-rv32d"
 root = "LeanRV32D"
+
+[[lean_lib]]
+name = "LeanRV32IM"
