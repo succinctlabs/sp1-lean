@@ -1,6 +1,5 @@
 import Std.Data.ExtDHashMap
 import Std.Data.HashMap
-import Mathlib.Logic.Function.Basic
 
 namespace Sail
 
