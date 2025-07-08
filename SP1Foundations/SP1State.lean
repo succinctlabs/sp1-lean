@@ -7,17 +7,18 @@ import SP1Foundations.SailM
 structure SP1State where
   pc : BitVec 32
   regs : regidx → BitVec 32
+  mem : Nat → BitVec 8
 
 /-- Add `4` to the current program counter state. -/
 @[reducible] def incrementPC : StateM SP1State Unit :=
-  do modify fun st => { pc := st.pc + (BitVec.ofNat _ 4), regs := st.regs }
+  do modify fun st => { st with pc := st.pc + (BitVec.ofNat _ 4) }
 
 @[reducible] def setPC (new_pc : BitVec 32) : StateM SP1State Unit :=
-  do modify fun st => { pc := new_pc, regs := st.regs }
+  do modify fun st => { st with pc := new_pc }
 
 /-- Modify the register map state -/
 @[reducible] def update_reg (idx : regidx) (v : BitVec 32) : StateM SP1State Unit :=
-  do modify fun st => { pc := st.pc, regs := Function.update st.regs idx v }
+  do modify fun st => { st with regs := Function.update st.regs idx v }
 
 @[reducible] def get_reg (idx : regidx) : StateM SP1State (BitVec 32) :=
   do return (← get).regs idx

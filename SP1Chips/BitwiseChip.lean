@@ -143,13 +143,13 @@ theorem SP1BitwiseChip_xor_correct (Main : Vector (Fin BB) 33)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_xor : Main[30] = 1) -- Is an `xor` operation
     (h_imm : Main[21] = 0) -- Not an immediate operation
-    (pc : BitVec 32) (reg_state : regidx → BitVec 32) :
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32) (mem_state : Nat → BitVec 8) :
     let op_a := regidx.Regidx Main[4].val
     let op_b := regidx.Regidx Main[10].val
     let op_c := regidx.Regidx Main[15].val
     (reg_state op_b = .ofNat 32 (Main[11] + Main[12] * 65536)) →
     (reg_state op_c = .ofNat 32 (Main[17] + Main[18] * 65536)) →
-      ((sp1Bitwise Main).run { pc := pc, regs := reg_state } = (specXor op_a op_b op_c).run { pc := pc, regs := reg_state }) := by
+      ((sp1Bitwise Main).run { pc := pc, regs := reg_state, mem := mem_state } = (specXor op_a op_b op_c).run { pc := pc, regs := reg_state, mem := mem_state }) := by
   simp only []
   intro hmem₁ hmem₂
   unfold sp1Bitwise specXor
@@ -197,7 +197,7 @@ theorem SP1BitwiseChip_xor_correct (Main : Vector (Fin BB) 33)
   -- Suffices to show the new register map with cases on it being destination register
   refine congr_arg (fun st => pure ((), st)) ?_
   simp only [SP1State.mk.injEq]
-  constructor
+  refine ⟨?_, ?_, ?_⟩
   · -- pc fields are equal
     simp [BitVec.ofNat]
   · -- regs fields
@@ -206,6 +206,8 @@ theorem SP1BitwiseChip_xor_correct (Main : Vector (Fin BB) 33)
       Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
       bitVec_helper_xor _ _ _ _ h11 h12 h17 h18,
       Fin.xor_val, ofNat_add, ofNat_mul, ofNat_xor]
+  · -- mem fields are equal (unchanged)
+    trivial
 
 /-- If the constraints all hold, `is_or` is set to true, and `op_b` and `op_c` are loaded
 into the proper registers, then the bitwise chip conforms to the or spec. -/
@@ -213,13 +215,13 @@ theorem SP1BitwiseChip_or_correct (Main : Vector (Fin BB) 33)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_or : Main[31] = 1) -- Is an `or` operation
     (h_imm : Main[21] = 0) -- Is not an immediate operation
-    (pc : BitVec 32) (reg_state : regidx → BitVec 32) :
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32) (mem_state : Nat → BitVec 8) :
     let op_a := regidx.Regidx Main[4].val
     let op_b := regidx.Regidx Main[10].val
     let op_c := regidx.Regidx Main[15].val
     (reg_state op_b = .ofNat 32 (Main[11] + Main[12] * 65536)) →
     (reg_state op_c = .ofNat 32 (Main[17] + Main[18] * 65536)) →
-      ((sp1Bitwise Main).run { pc := pc, regs := reg_state } = (specOr op_a op_b op_c).run { pc := pc, regs := reg_state }) := by
+      ((sp1Bitwise Main).run { pc := pc, regs := reg_state, mem := mem_state } = (specOr op_a op_b op_c).run { pc := pc, regs := reg_state, mem := mem_state }) := by
   simp only []
   intro hmem₁ hmem₂
   unfold sp1Bitwise specOr
@@ -266,7 +268,7 @@ theorem SP1BitwiseChip_or_correct (Main : Vector (Fin BB) 33)
 
   refine congr_arg (fun st => pure ((), st)) ?_
   simp only [SP1State.mk.injEq]
-  constructor
+  refine ⟨?_, ?_, ?_⟩
   · -- pc fields are equal
     simp [BitVec.ofNat]
   · -- regs fields
@@ -275,6 +277,8 @@ theorem SP1BitwiseChip_or_correct (Main : Vector (Fin BB) 33)
       Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
       bitVec_helper_or _ _ _ _ h11 h12 h17 h18,
       Fin.or_val, ofNat_add, ofNat_mul, ofNat_or]
+  · -- mem fields are equal (unchanged)
+    trivial
 
 -- dt: could just hardcode "and" also, would be nice to avoid that
 

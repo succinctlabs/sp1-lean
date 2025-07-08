@@ -72,20 +72,21 @@ def sp1Jal (Main : Vector (Fin BB) 15) : StateM SP1State Unit := do
 theorem SP1JAL_correct (Main : Vector (Fin BB) 15)
     (_h_cstrs : (constraints Main).allHold) -- note these are unused here
     (h_is_real : Main[14] = 1) -- Is a real column
-    (pc : BitVec 32) (reg_state : regidx → BitVec 32) (imm : BitVec 21)
+    (pc : BitVec 32) (reg_state : regidx → BitVec 32) (mem_state : Nat → BitVec 8) (imm : BitVec 21)
     -- The inputs are preprocessed correctly
     (hmem₁ : .ofNat 32 (Main[12] + Main[13] * 65536) = pc + 4#32)
     (hmem₂ : .ofNat 32 (Main[10] + Main[11] * 65536) = pc + imm) :
-    (sp1Jal Main).run { pc := pc, regs := reg_state } =
-      (specJal (regidx.Regidx Main[4].val) imm).run { pc := pc, regs := reg_state } := by
+    (sp1Jal Main).run { pc := pc, regs := reg_state, mem := mem_state } =
+      (specJal (regidx.Regidx Main[4].val) imm).run { pc := pc, regs := reg_state, mem := mem_state } := by
   simp only [sp1Jal, h_is_real, Fin.isValue, ↓reduceIte, BB, BitVec.natCast_eq_ofNat,
     StateT.run_bind, StateT.run_modify, Prod.map_apply, id_eq, bind_pure_comp, map_pure, specJal,
     StateT.run_get]
   refine congr_arg (fun st => pure ((), st)) ?_
   simp only [SP1State.mk.injEq]
-  constructor
+  refine ⟨?_, ?_, ?_⟩
   · simpa using hmem₂
   · refine funext fun reg => ?_
     simp [Function.update, hmem₁]
+  · trivial
 
 end Jal

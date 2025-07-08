@@ -97,12 +97,13 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
     (h_is_real : Main[22] = 1)
     (pc : BitVec 32)
     (reg_state : regidx → BitVec 32)
-    (h_state_cstrs : SP1ConstraintList.initialState (constraints Main) { pc := pc, regs := reg_state })
+    (mem_state : Nat → BitVec 8)
+    (h_state_cstrs : SP1ConstraintList.initialState (constraints Main) { pc := pc, regs := reg_state, mem := mem_state })
     /- (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536)) -/
     /- (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) -/
-    : (sp1Add Main).run { pc := pc, regs := reg_state } = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run { pc := pc, regs := reg_state } := by
+    : (sp1Add Main).run { pc := pc, regs := reg_state, mem := mem_state } = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run { pc := pc, regs := reg_state, mem := mem_state } := by
   unfold sp1Add specAdd
-  obtain ⟨hmem₁, ⟨hmem₂, hpc⟩⟩ := state_constraints Main { pc := pc, regs := reg_state } h_state_cstrs h_is_real
+  obtain ⟨hmem₁, ⟨hmem₂, hpc⟩⟩ := state_constraints Main { pc := pc, regs := reg_state, mem := mem_state } h_state_cstrs h_is_real
   rw [BitVec.natCast_eq_ofNat] at hmem₁ hmem₂
   simp at hmem₁ hmem₂ hpc
   have hb3 : Main[20].val + Main[21].val * 65536 < 2 ^ 32 :=
@@ -138,7 +139,7 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
   refine congr_arg (fun st => pure ((), st)) ?_
   -- Now we need to prove the SP1State structures are equal
   simp only [SP1State.mk.injEq]
-  constructor
+  refine ⟨?_, ?_, ?_⟩
   · -- pc fields are equal
     simp [BitVec.ofNat]
   · -- regs fields are equal
@@ -152,5 +153,7 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
           ← BitVec.ofNatLT_eq_ofNat hb2, h_add_op]
     · -- Case: we're looking at a different register
       rw [Function.update_of_ne (Ne.symm hreg), Function.update_of_ne (Ne.symm hreg)]
+  · -- mem fields are equal (unchanged)
+    trivial
 
 -- #print axioms SP1AddChip_Correct
