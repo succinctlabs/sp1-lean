@@ -57,6 +57,17 @@ lemma bound_of_constraints (Main : Vector (Fin BB) 23)
   have h_high : Main[21].val < 65536 := add_cstrs.right.right.right
   omega
 
+def state_constraints
+  (Main : Vector (Fin BB) 23)
+  (state : BitVec 32 × (regidx → BitVec 32))
+  (cstrs : (constraints Main).initialState state)
+  (h_is_real : Main[22] = 1)
+  : state.snd (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536)
+    ∧ state.snd (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536) :=
+  by
+    simp [constraints, List.Forall, AddOperation.constraints, RTypeReader.constraints, CPUState.constraints, SP1Constraint.toStateProp, h_is_real] at cstrs
+    tauto
+
 end constraints
 
 /--
@@ -85,11 +96,14 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
     (h_is_real : Main[22] = 1)
     (pc : BitVec 32) (hpc : pc = Main[3].val)
     (reg_state : regidx → BitVec 32)
-    (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536))
-    (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) :
-    (sp1Add Main).run (pc, reg_state) = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run (pc, reg_state) := by
+    (h_state_cstrs : SP1ConstraintList.initialState (constraints Main) (pc, reg_state))
+    /- (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536)) -/
+    /- (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) -/
+    : (sp1Add Main).run (pc, reg_state) = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run (pc, reg_state) := by
   unfold sp1Add specAdd
+  obtain ⟨hmem₁, hmem₂⟩ := state_constraints Main (pc, reg_state) h_state_cstrs h_is_real
   rw [BitVec.natCast_eq_ofNat] at hmem₁ hmem₂
+  simp at hmem₁ hmem₂
   have hb3 : Main[20].val + Main[21].val * 65536 < 2 ^ 32 :=
     bound_of_constraints Main h_cstrs h_is_real
 

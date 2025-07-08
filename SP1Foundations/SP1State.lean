@@ -1,4 +1,7 @@
-import SP1Foundations.Constraint
+import Mathlib
+import LeanRV32IM.Defs
+
+import SP1Foundations.SailM
 
 /-- State for arithmetic chip verification is a program counter and register assignment map. -/
 abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
