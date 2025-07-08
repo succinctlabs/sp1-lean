@@ -63,7 +63,8 @@ def state_constraints
   (cstrs : (constraints Main).initialState state)
   (h_is_real : Main[22] = 1)
   : state.snd (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536)
-    ∧ state.snd (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536) :=
+    ∧ state.snd (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)
+    ∧ state.fst = Main[3].val :=
   by
     simp [constraints, List.Forall, AddOperation.constraints, RTypeReader.constraints, CPUState.constraints, SP1Constraint.toStateProp, h_is_real] at cstrs
     tauto
@@ -94,16 +95,16 @@ into the proper registers, then the add chip conforms to the spec. -/
 theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
     (h_is_real : Main[22] = 1)
-    (pc : BitVec 32) (hpc : pc = Main[3].val)
+    (pc : BitVec 32)
     (reg_state : regidx → BitVec 32)
     (h_state_cstrs : SP1ConstraintList.initialState (constraints Main) (pc, reg_state))
     /- (hmem₁ : reg_state (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536)) -/
     /- (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) -/
     : (sp1Add Main).run (pc, reg_state) = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run (pc, reg_state) := by
   unfold sp1Add specAdd
-  obtain ⟨hmem₁, hmem₂⟩ := state_constraints Main (pc, reg_state) h_state_cstrs h_is_real
+  obtain ⟨hmem₁, ⟨hmem₂, hpc⟩⟩ := state_constraints Main (pc, reg_state) h_state_cstrs h_is_real
   rw [BitVec.natCast_eq_ofNat] at hmem₁ hmem₂
-  simp at hmem₁ hmem₂
+  simp at hmem₁ hmem₂ hpc
   have hb3 : Main[20].val + Main[21].val * 65536 < 2 ^ 32 :=
     bound_of_constraints Main h_cstrs h_is_real
 
@@ -132,7 +133,7 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
 
   simp only [BB, BitVec.natCast_eq_ofNat, StateT.run_modify, StateT.run_bind,
     StateT.run_get, bind_pure_comp, map_pure, Prod.map_apply, id_eq]
-  simp [hpc]
+  simp only [hpc]
   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
   by_cases hreg : (regidx.Regidx (BitVec.ofNat 5 ↑Main[4])) = reg
   · rw [hreg, Function.update_self, Function.update_self, hmem₁, hmem₂,

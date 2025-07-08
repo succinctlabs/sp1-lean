@@ -53,6 +53,9 @@ def toStateProp (cstr : SP1Constraint) (s : SP1State) : Prop :=
   | (.send (.memory _shard _clk addr low_limb high_limb) mult) =>
       mult ≠ 0
       → s.snd (.Regidx addr.val) = BitVec.ofNat 32 (low_limb + high_limb * 65536)
+  | (.receive (.state _shard _clk pc) mult) =>
+      mult ≠ 0
+      → s.fst = pc.val -- BitVec.ofNatLT pc.val (by have := pc.isLt; linarith)
   | _ => True
 
 end toStateProp
