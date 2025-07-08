@@ -8,8 +8,7 @@ preferReleaseBuild = true
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
-linter.unusedSimpArgs = false
-# autoImplicit = false -- Might be good to consider this, given the amount of coercions we use
+autoImplicit = false
 
 [[require]]
 name = "mathlib"
@@ -33,9 +32,21 @@ name = "SP1Chips"
 [[lean_lib]]
 name = "LeanRV32D"
 
+[lean_lib.leanOptions]
+linter.unusedSimpArgs = false
+autoImplicit = true
+
 [[lean_exe]]
 name = "run-rv32d"
 root = "LeanRV32D"
 
+[lean_exe.leanOptions]
+linter.unusedSimpArgs = false
+autoImplicit = true
+
 [[lean_lib]]
 name = "LeanRV32IM"
+
+[lean_lib.leanOptions]
+linter.unusedSimpArgs = false
+autoImplicit = true
