@@ -56,7 +56,7 @@ end constraints
 This is essentially `execute_JAL` from LeanRV32D.
 -/
 def specJal (rd : regidx) (imm : BitVec 21) : StateM SP1State Unit := do
-  let old_pc := (← get).1
+  let old_pc := (← get).pc
   incrementPC
   update_reg rd (old_pc + 4#32)
   setPC (old_pc + imm)
@@ -76,12 +76,14 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 15)
     -- The inputs are preprocessed correctly
     (hmem₁ : .ofNat 32 (Main[12] + Main[13] * 65536) = pc + 4#32)
     (hmem₂ : .ofNat 32 (Main[10] + Main[11] * 65536) = pc + imm) :
-    (sp1Jal Main).run (pc, reg_state) =
-      (specJal (regidx.Regidx Main[4].val) imm).run (pc, reg_state) := by
+    (sp1Jal Main).run { pc := pc, regs := reg_state } =
+      (specJal (regidx.Regidx Main[4].val) imm).run { pc := pc, regs := reg_state } := by
   simp only [sp1Jal, h_is_real, Fin.isValue, ↓reduceIte, BB, BitVec.natCast_eq_ofNat,
     StateT.run_bind, StateT.run_modify, Prod.map_apply, id_eq, bind_pure_comp, map_pure, specJal,
     StateT.run_get]
-  refine congr_arg (fun out => pure (_, out)) (Prod.eq_iff_fst_eq_snd_eq.2 ⟨?_, ?_⟩)
+  refine congr_arg (fun st => pure ((), st)) ?_
+  simp only [SP1State.mk.injEq]
+  constructor
   · simpa using hmem₂
   · refine funext fun reg => ?_
     simp [Function.update, hmem₁]

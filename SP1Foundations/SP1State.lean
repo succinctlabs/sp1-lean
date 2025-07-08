@@ -4,21 +4,23 @@ import LeanRV32IM.Defs
 import SP1Foundations.SailM
 
 /-- State for arithmetic chip verification is a program counter and register assignment map. -/
-abbrev SP1State := BitVec 32 × (regidx → BitVec 32)
+structure SP1State where
+  pc : BitVec 32
+  regs : regidx → BitVec 32
 
 /-- Add `4` to the current program counter state. -/
 @[reducible] def incrementPC : StateM SP1State Unit :=
-  do modify (.map (· + (BitVec.ofNat _ 4)) id)
+  do modify fun st => { pc := st.pc + (BitVec.ofNat _ 4), regs := st.regs }
 
 @[reducible] def setPC (new_pc : BitVec 32) : StateM SP1State Unit :=
-  do modify (.map (fun _old_pc => new_pc) id)
+  do modify fun st => { pc := new_pc, regs := st.regs }
 
 /-- Modify the register map state -/
 @[reducible] def update_reg (idx : regidx) (v : BitVec 32) : StateM SP1State Unit :=
-  do modify (.map id (Function.update · idx v))
+  do modify fun st => { pc := st.pc, regs := Function.update st.regs idx v }
 
 @[reducible] def get_reg (idx : regidx) : StateM SP1State (BitVec 32) :=
-  do return (← get).2 idx
+  do return (← get).regs idx
 
 -- dt: below isn't enough to handle read and write both
 -- we could maybe make something like this work assuming unique state constraints
