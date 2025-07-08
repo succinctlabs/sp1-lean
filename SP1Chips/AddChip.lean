@@ -60,14 +60,34 @@ lemma bound_of_constraints (Main : Vector (Fin BB) 23)
 def state_constraints
   (Main : Vector (Fin BB) 23)
   (state : SP1State)
-  (cstrs : (constraints Main).initialState state)
+  (cstrs : (constraints Main).allHold)
+  (state_cstrs : (constraints Main).initialState state)
   (h_is_real : Main[22] = 1)
   : state.regs (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536)
     ∧ state.regs (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)
-    ∧ state.pc = Main[3].val :=
+    ∧ state.pc = Main[3].val
+    :=
   by
-    simp [constraints, List.Forall, AddOperation.constraints, RTypeReader.constraints, CPUState.constraints, SP1Constraint.toStateProp, h_is_real] at cstrs
-    tauto
+    simp [constraints, List.Forall] at cstrs
+    obtain ⟨_, ⟨_, ⟨_, reader_cstrs⟩⟩⟩ := cstrs
+    simp [constraints, List.Forall, AddOperation.constraints, RTypeReader.constraints, CPUState.constraints, SP1Constraint.toStateProp, h_is_real] at state_cstrs
+    obtain h_b_reg : (Main[10].val < 32 → state.regs (regidx.Regidx Main[10].val) = .ofNat 32 (Main[11] + Main[12] * 65536)) :=
+      by
+        clear *- state_cstrs
+        aesop
+    obtain h_c_reg : (Main[15].val < 32 → state.regs (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) :=
+      by
+        clear *- state_cstrs
+        aesop
+
+    obtain ⟨a_is_reg, ⟨b_is_reg, c_is_reg⟩⟩ := RTypeReader.preprocessed reader_cstrs
+    simp at a_is_reg b_is_reg c_is_reg
+
+    constructor
+    · exact h_b_reg b_is_reg
+    constructor
+    · exact h_c_reg c_is_reg
+    · tauto
 
 end constraints
 
@@ -103,7 +123,7 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 23)
     /- (hmem₂ : reg_state (regidx.Regidx Main[15].val) = .ofNat 32 (Main[16] + Main[17] * 65536)) -/
     : (sp1Add Main).run { pc := pc, regs := reg_state, mem := mem_state } = (specAdd (.Regidx Main[15].val) (.Regidx Main[10].val) (.Regidx Main[4].val)).run { pc := pc, regs := reg_state, mem := mem_state } := by
   unfold sp1Add specAdd
-  obtain ⟨hmem₁, ⟨hmem₂, hpc⟩⟩ := state_constraints Main { pc := pc, regs := reg_state, mem := mem_state } h_state_cstrs h_is_real
+  obtain ⟨hmem₁, ⟨hmem₂, hpc⟩⟩ := state_constraints Main { pc := pc, regs := reg_state, mem := mem_state } h_cstrs h_state_cstrs h_is_real
   rw [BitVec.natCast_eq_ofNat] at hmem₁ hmem₂
   simp at hmem₁ hmem₂ hpc
   have hb3 : Main[20].val + Main[21].val * 65536 < 2 ^ 32 :=

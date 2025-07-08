@@ -118,4 +118,17 @@ lemma val_op_a_write_lt_of_constraints {clk_high clk_low pc opcode : Fin BB}
   simp [constraints, ByteOpcode.ofNat, Nat.ble, Nat.beq, ByteOpcode.constrain, SP1Constraint.toProp] at h
   tauto
 
+axiom preprocessed
+  {clk_high : Fin BB}
+  {clk_low : Fin BB}
+  {pc : Fin BB}
+  {opcode : Fin BB}
+  {op_a_write_value : Word (Fin BB)}
+  {cols : RTypeReader}
+  {is_real : Fin BB}
+  (cstrs : (RTypeReader.constraints clk_high clk_low pc opcode op_a_write_value cols is_real).allHold)
+  : cols.op_a.val < 32
+    ∧ cols.op_b.val < 32
+    ∧ cols.op_c.val < 32
+
 end RTypeReader

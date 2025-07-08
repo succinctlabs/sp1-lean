@@ -32,9 +32,9 @@ def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
   | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
   | .send (.memory _shard _clk addr low_limb high_limb) mult =>
-      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
+      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536)
   | .receive (.memory _shard _clk addr low_limb high_limb) (mult) =>
-      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
+      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536)
   | _ => True
 
 @[simp] lemma toProp_assertZero (x : Fin BB) :
@@ -52,7 +52,11 @@ def toStateProp (cstr : SP1Constraint) (s : SP1State) : Prop :=
   match cstr with
   | (.send (.memory _shard _clk addr low_limb high_limb) mult) =>
       mult ≠ 0
-      → s.regs (.Regidx addr.val) = BitVec.ofNat 32 (low_limb + high_limb * 65536)
+      → if addr.val < 32 then
+          s.regs (.Regidx addr.val) = BitVec.ofNat 32 (low_limb + high_limb * 65536)
+        else
+          s.mem addr.val + s.mem (addr.val + 1) <<< 8 = BitVec.ofNat 8 low_limb.val ∧
+          s.mem (addr.val + 2) + s.mem (addr.val + 3) <<< 8 = BitVec.ofNat 8 high_limb.val
   | (.receive (.state _shard _clk pc) mult) =>
       mult ≠ 0
       → s.pc = pc.val -- BitVec.ofNatLT pc.val (by have := pc.isLt; linarith)
