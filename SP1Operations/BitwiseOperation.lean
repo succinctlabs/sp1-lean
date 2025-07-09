@@ -1,10 +1,35 @@
+import SP1Foundations
+
+@[ext] structure BitwiseOperation where
+  result : ByteWord (Fin BB)
+
+namespace BitwiseOperation
+
+def constraints
+  (a : (Vector (Fin BB) 8))
+  (b : (Vector (Fin BB) 8))
+  (cols : BitwiseOperation)
+  (opcode : (Fin BB))
+  (is_real : (Fin BB))
+  : SP1ConstraintList :=
+  [
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[0] a[0] b[0]) is_real),
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[1] a[1] b[1]) is_real),
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[2] a[2] b[2]) is_real),
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[3] a[3] b[3]) is_real),
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[4] a[4] b[4]) is_real),
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[5] a[5] b[5]) is_real),
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[6] a[6] b[6]) is_real),
+    (.send (.byte (ByteOpcode.ofNat opcode) cols.result[7] a[7] b[7]) is_real),
+  ]
+
+end BitwiseOperation
+
 -- import SP1Foundations
 -- import LeanRV32IM.RiscvRegs
 
 -- open LeanRV32IM.Functions
 
--- @[ext] structure BitwiseOperation where
---   result : ByteWord (Fin BB)
 
 -- namespace BitwiseOperation
 

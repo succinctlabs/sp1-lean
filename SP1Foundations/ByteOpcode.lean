@@ -10,6 +10,7 @@ inductive ByteOpcode
   | U8Range
   | LTU
   | MSB
+  | SR
   | Range
   deriving DecidableEq
 
@@ -24,7 +25,8 @@ section ofNat
 @[simp] lemma ofNat_three : ByteOpcode.ofNat 3 = .U8Range := rfl
 @[simp] lemma ofNat_four : ByteOpcode.ofNat 4 = .LTU := rfl
 @[simp] lemma ofNat_five : ByteOpcode.ofNat 5 = .MSB := rfl
-@[simp] lemma ofNat_six : ByteOpcode.ofNat 6 = .Range := rfl
+@[simp] lemma ofNat_six : ByteOpcode.ofNat 6 = .SR := rfl
+@[simp] lemma ofNat_seven : ByteOpcode.ofNat 7 = .Range := rfl
 
 def toBB : ByteOpcode → Fin BB
   | AND => 0
@@ -33,7 +35,8 @@ def toBB : ByteOpcode → Fin BB
   | U8Range => 3
   | LTU => 4
   | MSB => 5
-  | Range => 6
+  | SR => 6
+  | Range => 7
 
 @[simp] lemma ofNat_toBB (op : ByteOpcode) : ByteOpcode.ofNat (op.toBB) = op := by
   induction op <;> rfl
@@ -49,6 +52,7 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   | XOR => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ^^^ c
   | U8Range => a < 256 ∧ b < 256 ∧ c < 256
   | LTU => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
+  | SR => True
   | Range => a < 2 ^ b.val -- Is this right?
   | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
 
@@ -87,7 +91,7 @@ protected def bitwise_induction (C : ByteOpcode → Sort*)
   | .AND => and
   | .OR => or
   | .XOR => xor
-  | .U8Range | .LTU | .MSB | .Range => other _ (by simp)
+  | .U8Range | .LTU | .MSB | .SR | .Range => other _ (by simp)
 
 section toBitwise
 
@@ -120,7 +124,7 @@ lemma toBitwise_of_ne (x y : Fin BB) (op : ByteOpcode) (h : op ≠ AND ∧ op �
     toBitwise op x y = 0 := by
   match op with
   | .AND | .OR | XOR => simp at h
-  | U8Range | LTU | MSB | Range => rfl
+  | U8Range | LTU | MSB | SR | Range => rfl
 
 lemma toBitwise_add_toBitwise_mul_u8 (op : ByteOpcode) (x_low x_high y_low y_high : Fin BB)
     (hx : x_low < 256) (hy : y_low < 256)

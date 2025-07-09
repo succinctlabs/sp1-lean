@@ -55,11 +55,6 @@ section conversions
 /-- Convert a word to a `Nat` by shifting and adding limbs. -/
 def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
 
-/-- Convert a word to a `BitVec 64` by shifting and adding the limbs. -/
-def toBitVec64 (w : Word (Fin BB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
-
-def toFin64 (w : Word (Fin BB)) : Fin (2^64) := BitVec.toFin w.toBitVec64
-
 lemma toNat_lt_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) : w.toNat < 2^64 := by
   unfold toNat
   aesop (add 50% tactic (by omega))
@@ -73,7 +68,10 @@ lemma toNat_lt_of_forall_lt (w : Word (Fin BB))
     (h : ∀ i : Fin WORD_SIZE, w[i] < 2^16) : w.toNat < 2^64 := by
   refine toNat_lt_of_cases_lt w (h 0) (h 1) (h 2) (h 3)
 
-lemma toNat_toBitVec (w : Word (Fin BB))
+/-- Convert a word to a `BitVec 64` by shifting and adding the limbs. -/
+def toBitVec64 (w : Word (Fin BB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
+
+lemma toNat_toBitVec64 (w : Word (Fin BB))
     (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
     (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16) :
     w.toBitVec64.toNat = w.toNat := by
@@ -81,11 +79,39 @@ lemma toNat_toBitVec (w : Word (Fin BB))
     Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
   omega
 
-lemma toNat_toBitVec' (w : Word (Fin BB))
+lemma toNat_toBitVec64' (w : Word (Fin BB))
     (h : ∀ i : Fin WORD_SIZE, w[i] < 2^16) :
     w.toBitVec64.toNat = w.toNat := by
-  refine toNat_toBitVec w (h 0) (h 1) (h 2) (h 3)
+  refine toNat_toBitVec64 w (h 0) (h 1) (h 2) (h 3)
+
+/-- Convert a word to a `Fin 2^64` by shifting and adding the limbs. -/
+def toFin64 (w : Word (Fin BB)) : Fin (2^64) := BitVec.toFin w.toBitVec64
 
 end conversions
+
+section add
+
+lemma toNat_add_toNat (w v : Word (Fin BB)) :
+    w.toNat + v.toNat =
+      ((w[0].val + v[0].val) + (w[1].val + v[1].val) * 2^16 +
+        (w[2].val + v[2].val) * 2^32 + (w[3].val + v[3].val) * 2^48) := by
+  simp only [toNat, BB_eq, WORD_SIZE, Nat.reducePow]
+  omega
+
+lemma toBitVec64_add_toBitVec64 (w v : Word (Fin BB)) :
+    w.toBitVec64 + v.toBitVec64 = BitVec.ofNat 64
+      ((w[0].val + v[0].val) + (w[1].val + v[1].val) * 2^16 +
+        (w[2].val + v[2].val) * 2^32 + (w[3].val + v[3].val) * 2^48) := by
+  simp only [toBitVec64, ← BitVec.ofNat_add, toNat_add_toNat, BB_eq, WORD_SIZE, Nat.reducePow]
+
+lemma toFin64_add_toFin64 (w v : Word (Fin BB)) :
+    w.toFin64 + v.toFin64 = Fin.ofNat (2^64)
+      ((w[0].val + v[0].val) + (w[1].val + v[1].val) * 2^16 +
+        (w[2].val + v[2].val) * 2^32 + (w[3].val + v[3].val) * 2^48) := by
+  simp only [Nat.reducePow, toFin64, BB_eq, WORD_SIZE, Fin.ofNat_eq_cast]
+  rw [← BitVec.toFin_add w.toBitVec64, toBitVec64_add_toBitVec64]
+  rfl
+
+end add
 
 end Word

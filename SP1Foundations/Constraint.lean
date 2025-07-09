@@ -28,16 +28,16 @@ section toProp
 
 def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
-  -- dt: the send/recv interactions should also imply bounds
+  | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
+  -- dt: the other send/recv interactions should also imply bounds
   -- should be based on only running "trusted" programs and what that entails.
   | _ => True
 
 @[simp] lemma toProp_assertZero (x : Fin BB) :
     (assertZero x).toProp ↔ x = 0 := Iff.rfl
 
--- dt: change this back once airs work
-@[simp] lemma toProp_send (air : AirInteraction) (mult : Fin BB) :
-    (send air mult).toProp ↔ True := Iff.rfl
+@[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c : Fin BB) (mult : Fin BB) :
+    (send (.byte op a b c) mult).toProp ↔ (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 
 -- dt: change this back once airs work
 @[simp] lemma toProp_recv (air : AirInteraction) (mult : Fin BB) :
