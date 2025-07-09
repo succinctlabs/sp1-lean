@@ -62,9 +62,7 @@ import LeanRV32D.RiscvInstsZicond
 import LeanRV32D.RiscvInstsZicsr
 import LeanRV32D.RiscvInstsZvkned
 import LeanRV32D.RiscvInstsZvknhab
-import LeanRV32D.RiscvInstsZvksed
 import LeanRV32D.RiscvMem
-import LeanRV32D.RiscvModel
 import LeanRV32D.RiscvPcAccess
 import LeanRV32D.RiscvPlatform
 import LeanRV32D.RiscvPmpControl
@@ -84,7 +82,6 @@ import LeanRV32D.RiscvTermination
 import LeanRV32D.RiscvTypes
 import LeanRV32D.RiscvTypesExt
 import LeanRV32D.RiscvTypesKext
-import LeanRV32D.RiscvValidateConfig
 import LeanRV32D.RiscvVextControl
 import LeanRV32D.RiscvVextRegs
 import LeanRV32D.RiscvVlen
@@ -100,8 +97,6 @@ import LeanRV32D.RiscvZihpm
 import LeanRV32D.RiscvZkrControl
 import LeanRV32D.RiscvZvkUtils
 import LeanRV32D.RvfiDii
-import LeanRV32D.RvfiDiiV1
-import LeanRV32D.RvfiDiiV2
 import LeanRV32D.Sail.BitVec
 import LeanRV32D.Sail.IntRange
 import LeanRV32D.Sail.Sail
