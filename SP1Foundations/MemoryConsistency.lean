@@ -1,4 +1,4 @@
-import SP1Foundations
+import SP1Foundations.Word
 
 structure MemoryAccessInShardTimestamp where
   prev_low : Fin BB

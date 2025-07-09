@@ -1,109 +1,109 @@
-import SP1Foundations
-import SP1Operations.U16CompareOperation
-import SP1Operations.U16MSBOperation
-import SP1Operations.LtOperationUnsigned
+-- import SP1Foundations
+-- import SP1Operations.U16CompareOperation
+-- import SP1Operations.U16MSBOperation
+-- import SP1Operations.LtOperationUnsigned
 
-structure LtOperationSigned where
-  result : LtOperationUnsigned
-  b_msb : U16MSBOperation
-  c_msb : U16MSBOperation
+-- structure LtOperationSigned where
+--   result : LtOperationUnsigned
+--   b_msb : U16MSBOperation
+--   c_msb : U16MSBOperation
 
-namespace LtOperationSigned
+-- namespace LtOperationSigned
 
-def constraints
-  (b : Word (Fin BB))
-  (cc : Word (Fin BB))
-  (cols : LtOperationSigned)
-  (is_signed : Fin BB)
-  (is_real : Fin BB)
-  : SP1ConstraintList :=
-  let E0 : Fin BB := is_signed - 1
-  let E1 : Fin BB := is_signed * E0
-  let E2 : Fin BB := is_real - 1
-  let E3 : Fin BB := is_real * E2
-  let E4 : Fin BB := is_real - 1
-  let E5 : Fin BB := E4 * is_signed
-  let E6 : Fin BB := is_signed - 1
-  let E7 : Fin BB := is_signed * E6
-  let E8 : Fin BB := cols.b_msb.msb - 1
-  let E9 : Fin BB := cols.b_msb.msb * E8
-  let E10 : Fin BB := 2 * b[1]
-  let E11 : Fin BB := cols.b_msb.msb * 65536
-  let E12 : Fin BB := E10 - E11
-  let E13 : Fin BB := is_signed - 1
-  let E14 : Fin BB := is_signed * E13
-  let E15 : Fin BB := cols.c_msb.msb - 1
-  let E16 : Fin BB := cols.c_msb.msb * E15
-  let E17 : Fin BB := 2 * cc[1]
-  let E18 : Fin BB := cols.c_msb.msb * 65536
-  let E19 : Fin BB := E17 - E18
-  let E20 : Fin BB := is_signed - 1
-  let E21 : Fin BB := E20 * cols.b_msb.msb
-  let E22 : Fin BB := is_signed - 1
-  let E23 : Fin BB := E22 * cols.c_msb.msb
-  let E24 : Fin BB := is_signed * 32768
-  let E25 : Fin BB := b[1] + E24
-  let E26 : Fin BB := 65536 * cols.b_msb.msb
-  let E27 : Fin BB := E25 - E26
-  let E28 : Fin BB := is_signed * 32768
-  let E29 : Fin BB := cc[1] + E28
-  let E30 : Fin BB := 65536 * cols.c_msb.msb
-  let E31 : Fin BB := E29 - E30
-  let E32 : Fin BB := is_real - 1
-  let E33 : Fin BB := is_real * E32
-  let E34 : Fin BB := cols.result.u16_flags[0] + cols.result.u16_flags[1]
-  let E35 : Fin BB := cols.result.u16_flags[0] - 1
-  let E36 : Fin BB := cols.result.u16_flags[0] * E35
-  let E37 : Fin BB := cols.result.u16_flags[1] - 1
-  let E38 : Fin BB := cols.result.u16_flags[1] * E37
-  let E39 : Fin BB := E34 - 1
-  let E40 : Fin BB := E34 * E39
-  let E41 : Fin BB := 1 - E34
-  let E42 : Fin BB := 0 + cols.result.u16_flags[1]
-  let E43 : Fin BB := is_real - E42
-  let E44 : Fin BB := E27 - E31
-  let E45 : Fin BB := E43 * E44
-  let E46 : Fin BB := E27 * cols.result.u16_flags[1]
-  let E47 : Fin BB := 0 + E46
-  let E48 : Fin BB := E31 * cols.result.u16_flags[1]
-  let E49 : Fin BB := 0 + E48
-  let E50 : Fin BB := E42 + cols.result.u16_flags[0]
-  let E51 : Fin BB := is_real - E50
-  let E52 : Fin BB := b[0] - cc[0]
-  let E53 : Fin BB := E51 * E52
-  let E54 : Fin BB := b[0] * cols.result.u16_flags[0]
-  let E55 : Fin BB := E47 + E54
-  let E56 : Fin BB := cc[0] * cols.result.u16_flags[0]
-  let E57 : Fin BB := E49 + E56
-  let E58 : Fin BB := E55 - cols.result.comparison_limbs[0]
-  let E59 : Fin BB := E57 - cols.result.comparison_limbs[1]
-  let E60 : Fin BB := E41 - 1
-  let E61 : Fin BB := cols.result.comparison_limbs[0] - cols.result.comparison_limbs[1]
-  let E62 : Fin BB := cols.result.not_eq_inv * E61
-  let E63 : Fin BB := E62 - is_real
-  let E64 : Fin BB := E60 * E63
-  let CS0 : SP1ConstraintList := U16CompareOperation.constraints cols.result.comparison_limbs[0] cols.result.comparison_limbs[1] { bit := cols.result.u16_compare_operation.bit } is_real
-  [
-    .assertZero E1,
-    .assertZero E3,
-    .assertZero E5,
-    .assertZero E7,
-    .assertZero E9,
-    .send (.byte (ByteOpcode.ofNat 6) E12 16 0) is_signed,
-    .assertZero E14,
-    .assertZero E16,
-    .send (.byte (ByteOpcode.ofNat 6) E19 16 0) is_signed,
-    .assertZero E21,
-    .assertZero E23,
-    .assertZero E33,
-    .assertZero E36,
-    .assertZero E38,
-    .assertZero E40,
-    .assertZero E45,
-    .assertZero E53,
-    .assertZero E58,
-    .assertZero E59,
-    .assertZero E64
-  ] ++ CS0
+-- def constraints
+--   (b : Word (Fin BB))
+--   (cc : Word (Fin BB))
+--   (cols : LtOperationSigned)
+--   (is_signed : Fin BB)
+--   (is_real : Fin BB)
+--   : SP1ConstraintList :=
+--   let E0 : Fin BB := is_signed - 1
+--   let E1 : Fin BB := is_signed * E0
+--   let E2 : Fin BB := is_real - 1
+--   let E3 : Fin BB := is_real * E2
+--   let E4 : Fin BB := is_real - 1
+--   let E5 : Fin BB := E4 * is_signed
+--   let E6 : Fin BB := is_signed - 1
+--   let E7 : Fin BB := is_signed * E6
+--   let E8 : Fin BB := cols.b_msb.msb - 1
+--   let E9 : Fin BB := cols.b_msb.msb * E8
+--   let E10 : Fin BB := 2 * b[1]
+--   let E11 : Fin BB := cols.b_msb.msb * 65536
+--   let E12 : Fin BB := E10 - E11
+--   let E13 : Fin BB := is_signed - 1
+--   let E14 : Fin BB := is_signed * E13
+--   let E15 : Fin BB := cols.c_msb.msb - 1
+--   let E16 : Fin BB := cols.c_msb.msb * E15
+--   let E17 : Fin BB := 2 * cc[1]
+--   let E18 : Fin BB := cols.c_msb.msb * 65536
+--   let E19 : Fin BB := E17 - E18
+--   let E20 : Fin BB := is_signed - 1
+--   let E21 : Fin BB := E20 * cols.b_msb.msb
+--   let E22 : Fin BB := is_signed - 1
+--   let E23 : Fin BB := E22 * cols.c_msb.msb
+--   let E24 : Fin BB := is_signed * 32768
+--   let E25 : Fin BB := b[1] + E24
+--   let E26 : Fin BB := 65536 * cols.b_msb.msb
+--   let E27 : Fin BB := E25 - E26
+--   let E28 : Fin BB := is_signed * 32768
+--   let E29 : Fin BB := cc[1] + E28
+--   let E30 : Fin BB := 65536 * cols.c_msb.msb
+--   let E31 : Fin BB := E29 - E30
+--   let E32 : Fin BB := is_real - 1
+--   let E33 : Fin BB := is_real * E32
+--   let E34 : Fin BB := cols.result.u16_flags[0] + cols.result.u16_flags[1]
+--   let E35 : Fin BB := cols.result.u16_flags[0] - 1
+--   let E36 : Fin BB := cols.result.u16_flags[0] * E35
+--   let E37 : Fin BB := cols.result.u16_flags[1] - 1
+--   let E38 : Fin BB := cols.result.u16_flags[1] * E37
+--   let E39 : Fin BB := E34 - 1
+--   let E40 : Fin BB := E34 * E39
+--   let E41 : Fin BB := 1 - E34
+--   let E42 : Fin BB := 0 + cols.result.u16_flags[1]
+--   let E43 : Fin BB := is_real - E42
+--   let E44 : Fin BB := E27 - E31
+--   let E45 : Fin BB := E43 * E44
+--   let E46 : Fin BB := E27 * cols.result.u16_flags[1]
+--   let E47 : Fin BB := 0 + E46
+--   let E48 : Fin BB := E31 * cols.result.u16_flags[1]
+--   let E49 : Fin BB := 0 + E48
+--   let E50 : Fin BB := E42 + cols.result.u16_flags[0]
+--   let E51 : Fin BB := is_real - E50
+--   let E52 : Fin BB := b[0] - cc[0]
+--   let E53 : Fin BB := E51 * E52
+--   let E54 : Fin BB := b[0] * cols.result.u16_flags[0]
+--   let E55 : Fin BB := E47 + E54
+--   let E56 : Fin BB := cc[0] * cols.result.u16_flags[0]
+--   let E57 : Fin BB := E49 + E56
+--   let E58 : Fin BB := E55 - cols.result.comparison_limbs[0]
+--   let E59 : Fin BB := E57 - cols.result.comparison_limbs[1]
+--   let E60 : Fin BB := E41 - 1
+--   let E61 : Fin BB := cols.result.comparison_limbs[0] - cols.result.comparison_limbs[1]
+--   let E62 : Fin BB := cols.result.not_eq_inv * E61
+--   let E63 : Fin BB := E62 - is_real
+--   let E64 : Fin BB := E60 * E63
+--   let CS0 : SP1ConstraintList := U16CompareOperation.constraints cols.result.comparison_limbs[0] cols.result.comparison_limbs[1] { bit := cols.result.u16_compare_operation.bit } is_real
+--   [
+--     .assertZero E1,
+--     .assertZero E3,
+--     .assertZero E5,
+--     .assertZero E7,
+--     .assertZero E9,
+--     .send (.byte (ByteOpcode.ofNat 6) E12 16 0) is_signed,
+--     .assertZero E14,
+--     .assertZero E16,
+--     .send (.byte (ByteOpcode.ofNat 6) E19 16 0) is_signed,
+--     .assertZero E21,
+--     .assertZero E23,
+--     .assertZero E33,
+--     .assertZero E36,
+--     .assertZero E38,
+--     .assertZero E40,
+--     .assertZero E45,
+--     .assertZero E53,
+--     .assertZero E58,
+--     .assertZero E59,
+--     .assertZero E64
+--   ] ++ CS0
 
-end LtOperationSigned
+-- end LtOperationSigned

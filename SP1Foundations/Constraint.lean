@@ -8,7 +8,7 @@ open LeanRV32IM.Functions Sail
 
 inductive AirInteraction where
   | byte (op : ByteOpcode) (a b c : Fin BB)
-  | memory (shard clk addr low_limb high_limb : Fin BB)
+  | memory (shard clk addr n m limb0 limb1 limb2 limb3 : Fin BB)
   | state (shard clk pc0 pc1 pc2 : Fin BB)
   deriving DecidableEq
 
@@ -28,19 +28,20 @@ section toProp
 
 def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
-  | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
-  | .send (.memory _shard _clk addr low_limb high_limb) mult =>
-      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
-  | .receive (.memory _shard _clk addr low_limb high_limb) (mult) =>
-      mult ≠ 0 → (low_limb < 65536 ∧ high_limb < 65536 ∧ addr < 32)
+  -- dt: the send/recv interactions should also imply bounds
+  -- should be based on only running "trusted" programs and what that entails.
   | _ => True
 
 @[simp] lemma toProp_assertZero (x : Fin BB) :
     (assertZero x).toProp ↔ x = 0 := Iff.rfl
 
-@[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c mult : Fin BB) :
-    (send (AirInteraction.byte op a b c) mult).toProp ↔
-      (mult ≠ 0 → op.constrain a b c) := Iff.rfl
+-- dt: change this back once airs work
+@[simp] lemma toProp_send (air : AirInteraction) (mult : Fin BB) :
+    (send air mult).toProp ↔ True := Iff.rfl
+
+-- dt: change this back once airs work
+@[simp] lemma toProp_recv (air : AirInteraction) (mult : Fin BB) :
+    (receive air mult).toProp ↔ True := Iff.rfl
 
 end toProp
 

@@ -15,8 +15,8 @@ namespace RTypeReader
 def constraints
   (clk_high : (Fin BB))
   (clk_low : (Fin BB))
-  (pc : (Vector (Fin BB) 3))
-  (opcode : (Fin BB))
+  (_pc : (Vector (Fin BB) 3))
+  (_opcode : (Fin BB))
   (op_a_write_value : (Word (Fin BB)))
   (cols : RTypeReader)
   (is_real : (Fin BB))

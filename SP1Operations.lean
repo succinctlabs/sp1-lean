@@ -8,7 +8,6 @@ import SP1Operations.IsZeroOperation
 import SP1Operations.JTypeReader
 import SP1Operations.LtOperationSigned
 import SP1Operations.LtOperationUnsigned
-import SP1Operations.MemoryConsistency
 import SP1Operations.RTypeReader
 import SP1Operations.SubOperation
 import SP1Operations.U16CompareOperation
