@@ -7,5 +7,6 @@ import SP1Operations.IsZeroOperation
 import SP1Operations.JTypeReader
 import SP1Operations.MulOperation
 import SP1Operations.RTypeReader
+import SP1Operations.U16MSBOperation
 import SP1Operations.U16toU8OperationSafe
 import SP1Operations.U16toU8OperationUnsafe
