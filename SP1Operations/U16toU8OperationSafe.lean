@@ -1,6 +1,6 @@
 import SP1Foundations
 
-namespace U16ToU8OperationSafe
+namespace U16toU8OperationSafe
 
 def constraints (I0 I1 I2 I3 I4 : Fin BB) :
     Vector (Fin BB) 4 × SP1ConstraintList :=
@@ -62,4 +62,4 @@ lemma outputVector_bound' (hi4 : I4 ≠ 0)
 
 end corrollary
 
-end U16ToU8OperationSafe
+end U16toU8OperationSafe
