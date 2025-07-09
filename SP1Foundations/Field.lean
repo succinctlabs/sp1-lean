@@ -34,6 +34,15 @@ section const_vals
 @[simp] lemma ne_zero_256 : (256 : Fin BB) ≠ 0 := by simp
 @[simp] lemma ne_zero_65536 : (65536 : Fin BB) ≠ 0 := by simp
 
+@[ext]
+structure test where
+  A : ℕ
+  B : ℕ
+
+example (n : test) : n = { A := 5, B := 10 } := by
+  eta_struct at ⊢
+  sorry
+
 end const_vals
 
 end BabyBear

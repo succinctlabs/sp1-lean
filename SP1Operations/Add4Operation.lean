@@ -1,41 +1,41 @@
-import SP1Foundations
+-- import SP1Foundations
 
-@[aesop safe cases]
-structure Add4Operation where
-  value : Word U16
+-- @[aesop safe cases]
+-- structure Add4Operation where
+--   value : Word U16
 
-def Add4Operation.spec
-  (cols : Add4Operation)
-  (a : Word U16)
-  (b : Word U16)
-  (cc : Word U16)
-  (d : Word U16)
-  (is_real : U1) : Prop :=
-    is_real = 1 →
-    a.toFin32_U16 + b.toFin32_U16 + cc.toFin32_U16 + d.toFin32_U16 = cols.value.toFin32_U16
+-- def Add4Operation.spec
+--   (cols : Add4Operation)
+--   (a : Word U16)
+--   (b : Word U16)
+--   (cc : Word U16)
+--   (d : Word U16)
+--   (is_real : U1) : Prop :=
+--     is_real = 1 →
+--     a.toFin32_U16 + b.toFin32_U16 + cc.toFin32_U16 + d.toFin32_U16 = cols.value.toFin32_U16
 
-def Add4Operation.constraints
-    (cols : Add4Operation)
-    (a : Word U16)
-    (b : Word U16)
-    (cc : Word U16)
-    (d : Word U16)
-    (is_real : U1): Prop :=
-    (is_real = 1 → ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201) < 256) -- checking this is < 8 bytes
-    ∧ (is_real = 1 → ((((((a[1].val + b[1].val) + cc[1].val) + d[1].val) - cols.value[1].val) + ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) < 256)
+-- def Add4Operation.constraints
+--     (cols : Add4Operation)
+--     (a : Word U16)
+--     (b : Word U16)
+--     (cc : Word U16)
+--     (d : Word U16)
+--     (is_real : U1): Prop :=
+--     (is_real = 1 → ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201) < 256) -- checking this is < 8 bytes
+--     ∧ (is_real = 1 → ((((((a[1].val + b[1].val) + cc[1].val) + d[1].val) - cols.value[1].val) + ((((((a[0].val + b[0].val) + cc[0].val) + d[0].val) - cols.value[0].val) + 0) * 2013235201)) * 2013235201) < 256)
 
-def Add4Operation.constraints'
-    (cols : Add4Operation)
-    (a : Word U16)
-    (b : Word U16)
-    (cc : Word U16)
-    (d : Word U16)
-    (is_real : U1): Prop :=
-    let carry0 : Fin BB := 0
-    let carry1 : Fin BB := (a[0].val + b[0].val + cc[0].val + d[0].val - cols.value[0].val + carry0) * 65536⁻¹
-    let carry2 : Fin BB := (a[1].val + b[1].val + cc[1].val + d[1] - cols.value[1].val + carry1) * 65536⁻¹
-    (is_real = 1 → carry1 < 256)
-    ∧ (is_real = 1 → carry2 < 256)
+-- def Add4Operation.constraints'
+--     (cols : Add4Operation)
+--     (a : Word U16)
+--     (b : Word U16)
+--     (cc : Word U16)
+--     (d : Word U16)
+--     (is_real : U1): Prop :=
+--     let carry0 : Fin BB := 0
+--     let carry1 : Fin BB := (a[0].val + b[0].val + cc[0].val + d[0].val - cols.value[0].val + carry0) * 65536⁻¹
+--     let carry2 : Fin BB := (a[1].val + b[1].val + cc[1].val + d[1] - cols.value[1].val + carry1) * 65536⁻¹
+--     (is_real = 1 → carry1 < 256)
+--     ∧ (is_real = 1 → carry2 < 256)
 
 -- def Add4Operation.constraints_iff_constraints'
 --   (cols : Add4Operation)

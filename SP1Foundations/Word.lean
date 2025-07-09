@@ -1,136 +1,91 @@
 import SP1Foundations.Unsigned
 
 @[simp] abbrev BIT_WIDTH := 32
-@[simp] abbrev WORD_BYTE_SIZE := 4
-@[simp] abbrev WORD_SIZE := 2
+@[simp] abbrev WORD_BYTE_SIZE := 8
+@[simp] abbrev WORD_SIZE := 4
 
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
 @[reducible] def ByteWord (T : Type) := Vector T WORD_BYTE_SIZE
 
-variable {T : Type}
-
-/-- Prove two `Word`s equal by considering all bounded indices. -/
-@[ext] lemma Word.ext_forall {w w' : Word T}
-    (h : ∀ i : Fin WORD_SIZE, w[i] = w'[i]) : w = w' :=
-  Vector.ext fun i n => h ⟨i, n⟩
+namespace Word
 
 /-- Prove two `Word`s equal by considering each index individually.
 Extensionality tactics will default to using this version. -/
-@[ext] lemma Word.ext_cases {w w' : Word T}
-    (h0 : w[0] = w'[0]) (h1 : w[1] = w'[1]) : w = w' :=
-  Vector.ext fun
-  | 0, _ => h0 | 1, _ => h1
-  | n + 2, h => by simp at h
-
-/-- Prove two `ByteWord`s equal by considering all bounded indices. -/
-@[ext] lemma ByteWord.ext_forall {w w' : ByteWord T}
-    (h : ∀ i : Fin WORD_BYTE_SIZE, w[i] = w'[i]) : w = w' :=
-  Vector.ext fun i n => h ⟨i, n⟩
-
-/-- Prove two `ByteWord`s equal by considering each index individually.
-Extensionality tactics will default to using this version. -/
-@[ext] lemma ByteWord.ext_cases {w w' : ByteWord T}
+@[ext] lemma ext_cases {w w' : Word T}
     (h0 : w[0] = w'[0]) (h1 : w[1] = w'[1])
     (h2 : w[2] = w'[2]) (h3 : w[3] = w'[3]) : w = w' :=
   Vector.ext fun
-  | 0, _ => h0 | 1, _ => h1
-  | 2, _ => h2 | 3, _ => h3
-  | n + 4, h => by simp at h
+  | 0, _ => h0 | 1, _ => h1 | 2, _ => h2 | 3, _ => h3
+  | n + 4, h => by simp only [WORD_SIZE, add_lt_iff_neg_right, not_lt_zero'] at h
+
+/-- Prove two `Word`s equal by considering all bounded indices. -/
+@[ext] lemma ext_forall {w w' : Word T}
+    (h : ∀ i : Fin WORD_SIZE, w[i] = w'[i]) : w = w' :=
+  Vector.ext fun i n => h ⟨i, n⟩
+
+lemma eq_mk_getElem (w : Word T) : w = #v[w[0], w[1], w[2], w[3]] := ext_cases rfl rfl rfl rfl
 
 /-- Prove something about arbitrary `Word`s by showing it for any two choices of limbs. -/
-@[elab_as_elim] def Word.inductionOn {C : Word T → Prop}
-    (mk : ∀ x1 x2 : T, C #v[x1, x2]) (w : Word T) : C w := by
-  convert mk w[0] w[1]
-  rw [← Array.toList_inj]
-  obtain ⟨⟨ws⟩, h⟩ := w
-  simp [WORD_SIZE, List.length_eq_two] at h
-  obtain ⟨w1, w2, h⟩ := h
-  simp [h]
+@[elab_as_elim] protected def inductionOn {C : Word T → Prop}
+    (mk : ∀ x1 x2 x3 x4 : T, C #v[x1, x2, x3, x4]) (w : Word T) : C w := by
+  rw [eq_mk_getElem w]; apply mk
 
-/-- Prove something about arbitrary `Word`s by showing it for any two choices of limbs. -/
-@[elab_as_elim] def ByteWord.inductionOn {C : ByteWord T → Prop}
-    (mk : ∀ x1 x2 x3 x4 : T, C #v[x1, x2, x3, x4]) (w : ByteWord T) : C w := by
-  convert mk w[0] w[1] w[2] w[3]
-  rw [← Array.toList_inj]
-  obtain ⟨⟨ws⟩, h⟩ := w
-  match ws with | _ :: _ :: _ :: _ :: [] => simp
+section isU64
 
-section val_lt
+/-- `isU64 w` means that each limb of the word is properly bounded. -/
+def isU64 (w : Word (Fin BB)) : Prop := ∀ i : Fin WORD_SIZE, w[i].val < 2^16
 
--- Various lemmas about bounds that `aesop` should pull into context.
+@[aesop unsafe apply]
+lemma isU64_of_cases (w : Word (Fin BB))
+    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
+    (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16) : w.isU64
+  | 0 => h0 | 1 => h1 | 2 => h2 | 3 => h3
 
-variable {bound : ℕ} (x : Word (BoundedBabyBear bound))
+/-- Pull in bounds on a word's limbs given a `isU64` proof.
+Used to automate  -/
+@[aesop unsafe forward]
+lemma lt_cases_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) :
+    w[0].val < 2^16 ∧ w[1].val < 2^16 ∧ w[2].val < 2^16 ∧ w[3].val < 2^16 :=
+  ⟨hw 0, hw 1, hw 2, hw 3⟩
 
--- TODO(gzgz): This used to be `aesop safe forward`. It was definitely working
--- at some point during the past, but right now aesop would just keep applying
--- these two lemmas and never do anything else, so I had to change from `safe`
--- to `50%`.
-@[aesop 50% forward]
-lemma Word.val_zero_boundedBabyBear_lt : x[0].val < bound := x[0].in_range
-@[aesop 50% forward]
-lemma Word.val_one_boundedBabyBear_lt : x[1].val < bound := x[1].in_range
+end isU64
 
-/- @[aesop safe forward] -/
-/- lemma ByteWord.val_zero_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
-/- @[aesop safe forward] -/
-/- lemma ByteWord.val_one_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
-/- @[aesop safe forward] -/
-/- lemma ByteWord.val_two_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
-/- @[aesop safe forward] -/
-/- lemma ByteWord.val_three_boundedBabyBear_lt : x[0].val < bound := x[0].in_range -/
+section conversions
 
-end val_lt
+/-- Convert a word to a `Nat` by shifting and adding limbs. -/
+def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
 
-namespace Word
+/-- Convert a word to a `BitVec 64` by shifting and adding the limbs. -/
+def toBitVec64 (w : Word (Fin BB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
 
-def toFin32_BB (w : Word (Fin BB)) : Fin (2^32) :=
-  ⟨(w[0].val + w[1].val * 65536) % (2^32), by
-    apply Nat.mod_lt
-    norm_num⟩
+def toFin64 (w : Word (Fin BB)) : Fin (2^64) := BitVec.toFin w.toBitVec64
 
-def toFin32_U16 (w : Word U16) : Fin (2^32) :=
-  ⟨w[0].val + w[1].val * 65536, by
-    have wn0_in_range := w[0].in_range
-    have wn1_in_range := w[1].in_range
-    simp at *
-    omega⟩
+lemma toNat_lt_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) : w.toNat < 2^64 := by
+  unfold toNat
+  aesop (add 50% tactic (by omega))
 
-def toBV32 (w : Word (Fin BB)) : BitVec BIT_WIDTH :=
-  BitVec.ofNat BIT_WIDTH (w[0].val + w[1].val * 65536)
+lemma toNat_lt_of_cases_lt (w : Word (Fin BB))
+    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
+    (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16) : w.toNat < 2^64 := by
+  unfold toNat; omega
 
-def toBV32_U16 (w : Word U16) : BitVec BIT_WIDTH :=
-  BitVec.ofNatLT (w[0].val + w[1].val * 65536) (by
-    have _ := w[0].in_range
-    have _ := w[1].in_range
-    simp at *
-    omega)
+lemma toNat_lt_of_forall_lt (w : Word (Fin BB))
+    (h : ∀ i : Fin WORD_SIZE, w[i] < 2^16) : w.toNat < 2^64 := by
+  refine toNat_lt_of_cases_lt w (h 0) (h 1) (h 2) (h 3)
 
-@[reducible] def toNat (w : Word (Fin BB)) : ℕ :=
-  w[0].val + 65536 * w[1].val
-
-lemma toNat_add_toNat (a b : Word (Fin BB)) :
-    a.toNat + b.toNat = (a[0] + b[0]) + 65536 * (a[1] + b[1]) := by
-  simp [Word.toNat]
+lemma toNat_toBitVec (w : Word (Fin BB))
+    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
+    (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16) :
+    w.toBitVec64.toNat = w.toNat := by
+  simp only [toBitVec64, toNat, BB_eq, WORD_SIZE, Nat.reducePow, BitVec.toNat_ofNat,
+    Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
   omega
 
-theorem toFin32_U16_val {w : Word U16} : (w.toFin32_U16).val =
-  w[0].val + w[1].val * 65536 := by
-  simp [toFin32_U16]
+lemma toNat_toBitVec' (w : Word (Fin BB))
+    (h : ∀ i : Fin WORD_SIZE, w[i] < 2^16) :
+    w.toBitVec64.toNat = w.toNat := by
+  refine toNat_toBitVec w (h 0) (h 1) (h 2) (h 3)
 
-def isUInt32 (w : Word (Fin BB)) : Prop :=
-  w[0].val < 65536 ∧ w[1].val < 65536
-
-/-- Coerce a `Word A` to `Word B` when there's a coercion from `A` to `B`. -/
-instance coe [Coe A B] : Coe (Word A) (Word B) where
-  coe w := #v[w[0], w[1]]
-
-/-- Map a function over the elements of a Word. -/
-def map (f : A → B) (w : Word A) : Word B :=
-  #v[f w[0], f w[1]]
-
-/-- Lemma: coercing a Word is the same as mapping the coercion function. -/
-lemma coe_eq_map [Coe A B] (w : Word A) :
-    (w : Word B) = w.map (fun x => (x : B)) := by
-  simp [map]
+end conversions
 
 end Word

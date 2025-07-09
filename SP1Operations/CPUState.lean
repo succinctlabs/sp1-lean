@@ -4,15 +4,15 @@ structure CPUState where
   clk_high: Fin BB
   clk_16_24: Fin BB
   clk_0_16: Fin BB
-  pc: Fin BB
+  pc: Vector (Fin BB) 3
 
 namespace CPUState
 
 def constraints
   (cols : CPUState)
-  (next_pc : Fin BB)
-  (clk_increment : Fin BB)
-  (is_real : Fin BB)
+  (next_pc : (Vector (Fin BB) 3))
+  (clk_increment : (Fin BB))
+  (is_real : (Fin BB))
   : SP1ConstraintList :=
   let E0 : Fin BB := cols.clk_16_24 * 65536
   let E1 : Fin BB := cols.clk_0_16 + E0
@@ -22,23 +22,17 @@ def constraints
   let E5 : Fin BB := cols.clk_0_16 - 1
   let E6 : Fin BB := E5 * 1761607681
   [
-    .assertZero E3,
-    .receive (.state cols.clk_high E1 cols.pc) is_real,
-    .send (.state cols.clk_high E4 next_pc) is_real,
-    .send (.byte (ByteOpcode.ofNat 6) E6 13 0) is_real,
-    .send (.byte (ByteOpcode.ofNat 3) 0 cols.clk_16_24 0) is_real
+    (.assertZero E3),
+    (.receive (.state cols.clk_high E1 cols.pc[0] cols.pc[1] cols.pc[2]) is_real),
+    (.send (.state cols.clk_high E4 next_pc[0] next_pc[1] next_pc[2]) is_real),
+    (.send (.byte (ByteOpcode.ofNat 7) E6 13 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 cols.clk_16_24 0) is_real),
   ]
 
 lemma is_real_is_bool_of_constraints
     (h : (constraints cols next_pc clk_increment is_real).allHold) :
     is_real = 0 ∨ is_real = 1 := by
   simp [constraints, sub_eq_zero] at h
-  tauto
-
-lemma limb_bounds_of_constraints
-    (hir : is_real ≠ 0) (h : (constraints cols next_pc clk_increment is_real).allHold) :
-    (cols.clk_0_16 - 1) * 1761607681 < 8192 ∧ cols.clk_16_24 < 256 := by
-  simp [constraints, sub_eq_zero, hir] at h
   tauto
 
 end CPUState

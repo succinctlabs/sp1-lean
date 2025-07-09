@@ -9,7 +9,7 @@ open LeanRV32IM.Functions Sail
 inductive AirInteraction where
   | byte (op : ByteOpcode) (a b c : Fin BB)
   | memory (shard clk addr low_limb high_limb : Fin BB)
-  | state (shard clk pc : Fin BB)
+  | state (shard clk pc0 pc1 pc2 : Fin BB)
   deriving DecidableEq
 
 inductive SP1Constraint where
