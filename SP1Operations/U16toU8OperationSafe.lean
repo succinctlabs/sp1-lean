@@ -1,18 +1,28 @@
--- import SP1Foundations
+import SP1Operations.U16toU8OperationUnsafe
 
--- namespace U16toU8OperationSafe
+namespace U16toU8OperationSafe
 
--- def constraints (I0 I1 I2 I3 I4 : Fin BB) :
---     Vector (Fin BB) 4 × SP1ConstraintList :=
---   let E0 := I0 - I2
---   let E2 := E0 * 2005401601
---   let E4 := I1 - I3
---   let E6 := E4 * 2005401601
---   ⟨#v[I2, E2, I3, E6],
---     [
---       .send (.byte ByteOpcode.U8Range I2 E2 0) I4,
---       .send (.byte ByteOpcode.U8Range I3 E6 0) I4
---     ]⟩
+def constraints
+  (u16_values : (Vector (Fin BB) 4))
+  (cols : U16toU8Operation)
+  (is_real : (Fin BB))
+  : (Vector (Fin BB) 8) × SP1ConstraintList :=
+  let E0 : Fin BB := u16_values[0] - cols.low_bytes[0]
+  let E1 : Fin BB := E0 * 2005401601
+  let E2 : Fin BB := u16_values[1] - cols.low_bytes[1]
+  let E3 : Fin BB := E2 * 2005401601
+  let E4 : Fin BB := u16_values[2] - cols.low_bytes[2]
+  let E5 : Fin BB := E4 * 2005401601
+  let E6 : Fin BB := u16_values[3] - cols.low_bytes[3]
+  let E7 : Fin BB := E6 * 2005401601
+  ⟨#v[cols.low_bytes[0], E1, cols.low_bytes[1], E3, cols.low_bytes[2], E5, cols.low_bytes[3], E7], [
+    (.send (.byte (ByteOpcode.ofNat 3) 0 cols.low_bytes[0] E1) is_real),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 cols.low_bytes[1] E3) is_real),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 cols.low_bytes[2] E5) is_real),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 cols.low_bytes[3] E7) is_real),
+  ]⟩
+
+end U16toU8OperationSafe
 
 -- @[simp] lemma outputVector_eq (I0 I1 I2 I3 I4 : Fin BB) :
 --     (constraints I0 I1 I2 I3 I4).1 = #v[I2, (I0 - I2) * 2005401601, I3, (I1 - I3) * 2005401601] := rfl
