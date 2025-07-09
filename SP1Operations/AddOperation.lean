@@ -84,6 +84,22 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
       (cols.value[3] < 65536) := by
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
+lemma allHold_constraints_iff' (a b : Word (Fin BB)) (cols : AddOperation) :
+    (constraints a b cols 1).allHold ↔
+      let carry0 : Fin BB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
+      let carry1 : Fin BB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
+      let carry2 : Fin BB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
+      let carry3 : Fin BB := (a[3] + b[3] - cols.value[3] + carry2) * 65536⁻¹
+      (carry0 = 0 ∨ carry0 = 1) ∧
+      (carry1 = 0 ∨ carry1 = 1) ∧
+      (carry2 = 0 ∨ carry2 = 1) ∧
+      (carry3 = 0 ∨ carry3 = 1) ∧
+      (cols.value[0] < 65536) ∧
+      (cols.value[1] < 65536) ∧
+      (cols.value[2] < 65536) ∧
+      (cols.value[3] < 65536) := by
+  simp [constraints, sub_eq_zero, inv_16BB_eq']
+
 def spec (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
   cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
@@ -95,14 +111,26 @@ theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
   rw [allHold_constraints_iff] at h_cstrs
   obtain ⟨h0, h1, h2, h3, hbds⟩ := h_cstrs
   unfold spec
-  sorry
-  -- rw [Word.toBitVec64_add_toBitVec64 a b]
-  -- match h0, h1, h2, h3 with
-  -- | .inl h0, .inl h1, .inl h2, .inl h3 => {
-  --   -- simp [h0] at h1 h2 h3
-  --   sorry
-  -- }
-  -- | _, _, _, _ => sorry
+  have := Word.toBitVec64_add_toBitVec64 a b
+  cases h0 with
+  | inl h0 =>
+    simp [h0] at h1 h2 h3
+    cases h1 with
+    | inl h1 =>
+      simp [h1] at h2 h3
+      cases h2 with
+      | inl h2 =>
+        simp [h2] at h3
+        cases h3 with
+        | inl h3 =>
+          simp [sub_eq_zero] at h0 h1 h2 h3
+          simp [Word.toBitVec64, Word.toNat, ← h0, ← h1, ← h2, ← h3]
+          sorry
+        | inr h3 => sorry
+      | inr h2 => sorry
+    | inr h2 => sorry
+  | inr h2 => sorry
+
 
 
 -- lemma lt_of_constraintsAllHold
