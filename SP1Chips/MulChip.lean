@@ -1,0 +1,256 @@
+import SP1Operations
+
+namespace MulChip
+
+def constraints (Main : Vector (Fin BB) 53) :
+    SP1ConstraintList :=
+  let ⟨⟨⟨[E0, E1, E2, E3]⟩, _⟩, CS0⟩ := U16toU8OperationSafe.constraints Main[11] Main[12] Main[40] Main[41] Main[48]
+  let ⟨⟨⟨[E4, E5, E6, E7]⟩, _⟩, CS1⟩ := U16toU8OperationSafe.constraints Main[17] Main[18] Main[42] Main[43] Main[48]
+  let E8 : Fin BB := Main[50] + Main[52]
+  let E9 : Fin BB := E8 * Main[44]
+  let E10 : Fin BB := Main[46] - E9
+  let E11 : Fin BB := Main[50] * Main[45]
+  let E12 : Fin BB := Main[47] - E11
+  let E13 : Fin BB := Main[46] * 255
+  let E14 : Fin BB := Main[47] * 255
+  let E15 : Fin BB := Main[46] * 255
+  let E16 : Fin BB := Main[47] * 255
+  let E17 : Fin BB := Main[46] * 255
+  let E18 : Fin BB := Main[47] * 255
+  let E19 : Fin BB := Main[46] * 255
+  let E20 : Fin BB := Main[47] * 255
+  let E21 : Fin BB := E0 * E4
+  let E22 : Fin BB := 0 + E21
+  let E23 : Fin BB := E0 * E5
+  let E24 : Fin BB := 0 + E23
+  let E25 : Fin BB := E0 * E6
+  let E26 : Fin BB := 0 + E25
+  let E27 : Fin BB := E0 * E7
+  let E28 : Fin BB := 0 + E27
+  let E29 : Fin BB := E0 * E14
+  let E30 : Fin BB := 0 + E29
+  let E31 : Fin BB := E0 * E16
+  let E32 : Fin BB := 0 + E31
+  let E33 : Fin BB := E0 * E18
+  let E34 : Fin BB := 0 + E33
+  let E35 : Fin BB := E0 * E20
+  let E36 : Fin BB := 0 + E35
+  let E37 : Fin BB := E1 * E4
+  let E38 : Fin BB := E24 + E37
+  let E39 : Fin BB := E1 * E5
+  let E40 : Fin BB := E26 + E39
+  let E41 : Fin BB := E1 * E6
+  let E42 : Fin BB := E28 + E41
+  let E43 : Fin BB := E1 * E7
+  let E44 : Fin BB := E30 + E43
+  let E45 : Fin BB := E1 * E14
+  let E46 : Fin BB := E32 + E45
+  let E47 : Fin BB := E1 * E16
+  let E48 : Fin BB := E34 + E47
+  let E49 : Fin BB := E1 * E18
+  let E50 : Fin BB := E36 + E49
+  let E51 : Fin BB := E2 * E4
+  let E52 : Fin BB := E40 + E51
+  let E53 : Fin BB := E2 * E5
+  let E54 : Fin BB := E42 + E53
+  let E55 : Fin BB := E2 * E6
+  let E56 : Fin BB := E44 + E55
+  let E57 : Fin BB := E2 * E7
+  let E58 : Fin BB := E46 + E57
+  let E59 : Fin BB := E2 * E14
+  let E60 : Fin BB := E48 + E59
+  let E61 : Fin BB := E2 * E16
+  let E62 : Fin BB := E50 + E61
+  let E63 : Fin BB := E3 * E4
+  let E64 : Fin BB := E54 + E63
+  let E65 : Fin BB := E3 * E5
+  let E66 : Fin BB := E56 + E65
+  let E67 : Fin BB := E3 * E6
+  let E68 : Fin BB := E58 + E67
+  let E69 : Fin BB := E3 * E7
+  let E70 : Fin BB := E60 + E69
+  let E71 : Fin BB := E3 * E14
+  let E72 : Fin BB := E62 + E71
+  let E73 : Fin BB := E13 * E4
+  let E74 : Fin BB := E66 + E73
+  let E75 : Fin BB := E13 * E5
+  let E76 : Fin BB := E68 + E75
+  let E77 : Fin BB := E13 * E6
+  let E78 : Fin BB := E70 + E77
+  let E79 : Fin BB := E13 * E7
+  let E80 : Fin BB := E72 + E79
+  let E81 : Fin BB := E15 * E4
+  let E82 : Fin BB := E76 + E81
+  let E83 : Fin BB := E15 * E5
+  let E84 : Fin BB := E78 + E83
+  let E85 : Fin BB := E15 * E6
+  let E86 : Fin BB := E80 + E85
+  let E87 : Fin BB := E17 * E4
+  let E88 : Fin BB := E84 + E87
+  let E89 : Fin BB := E17 * E5
+  let E90 : Fin BB := E86 + E89
+  let E91 : Fin BB := E19 * E4
+  let E92 : Fin BB := E90 + E91
+  let E93 : Fin BB := Main[24] * 256
+  let E94 : Fin BB := E22 - E93
+  let E95 : Fin BB := Main[32] - E94
+  let E96 : Fin BB := E38 + Main[24]
+  let E97 : Fin BB := Main[25] * 256
+  let E98 : Fin BB := E96 - E97
+  let E99 : Fin BB := Main[33] - E98
+  let E100 : Fin BB := E52 + Main[25]
+  let E101 : Fin BB := Main[26] * 256
+  let E102 : Fin BB := E100 - E101
+  let E103 : Fin BB := Main[34] - E102
+  let E104 : Fin BB := E64 + Main[26]
+  let E105 : Fin BB := Main[27] * 256
+  let E106 : Fin BB := E104 - E105
+  let E107 : Fin BB := Main[35] - E106
+  let E108 : Fin BB := E74 + Main[27]
+  let E109 : Fin BB := Main[28] * 256
+  let E110 : Fin BB := E108 - E109
+  let E111 : Fin BB := Main[36] - E110
+  let E112 : Fin BB := E82 + Main[28]
+  let E113 : Fin BB := Main[29] * 256
+  let E114 : Fin BB := E112 - E113
+  let E115 : Fin BB := Main[37] - E114
+  let E116 : Fin BB := E88 + Main[29]
+  let E117 : Fin BB := Main[30] * 256
+  let E118 : Fin BB := E116 - E117
+  let E119 : Fin BB := Main[38] - E118
+  let E120 : Fin BB := E92 + Main[30]
+  let E121 : Fin BB := Main[31] * 256
+  let E122 : Fin BB := E120 - E121
+  let E123 : Fin BB := Main[39] - E122
+  let E124 : Fin BB := Main[50] + Main[51]
+  let E125 : Fin BB := E124 + Main[52]
+  let E126 : Fin BB := Main[33] * 256
+  let E127 : Fin BB := Main[32] + E126
+  let E128 : Fin BB := E127 - Main[22]
+  let E129 : Fin BB := Main[49] * E128
+  let E130 : Fin BB := Main[37] * 256
+  let E131 : Fin BB := Main[36] + E130
+  let E132 : Fin BB := E131 - Main[22]
+  let E133 : Fin BB := E125 * E132
+  let E134 : Fin BB := Main[35] * 256
+  let E135 : Fin BB := Main[34] + E134
+  let E136 : Fin BB := E135 - Main[23]
+  let E137 : Fin BB := Main[49] * E136
+  let E138 : Fin BB := Main[39] * 256
+  let E139 : Fin BB := Main[38] + E138
+  let E140 : Fin BB := E139 - Main[23]
+  let E141 : Fin BB := E125 * E140
+  let E142 : Fin BB := Main[49] + Main[50]
+  let E143 : Fin BB := E142 + Main[51]
+  let E144 : Fin BB := E143 + Main[52]
+  let E145 : Fin BB := Main[44] - 1
+  let E146 : Fin BB := Main[44] * E145
+  let E147 : Fin BB := Main[45] - 1
+  let E148 : Fin BB := Main[45] * E147
+  let E149 : Fin BB := Main[46] - 1
+  let E150 : Fin BB := Main[46] * E149
+  let E151 : Fin BB := Main[47] - 1
+  let E152 : Fin BB := Main[47] * E151
+  let E153 : Fin BB := Main[49] - 1
+  let E154 : Fin BB := Main[49] * E153
+  let E155 : Fin BB := Main[50] - 1
+  let E156 : Fin BB := Main[50] * E155
+  let E157 : Fin BB := Main[51] - 1
+  let E158 : Fin BB := Main[51] * E157
+  let E159 : Fin BB := Main[52] - 1
+  let E160 : Fin BB := Main[52] * E159
+  let E161 : Fin BB := E144 - 1
+  let E162 : Fin BB := E144 * E161
+  let E163 : Fin BB := Main[48] - 1
+  let E164 : Fin BB := Main[48] * E163
+  let E165 : Fin BB := Main[44] - 1
+  let E166 : Fin BB := Main[46] * E165
+  let E167 : Fin BB := Main[45] - 1
+  let E168 : Fin BB := Main[47] * E167
+  let E169 : Fin BB := Main[49] + Main[50]
+  let E170 : Fin BB := E169 + Main[51]
+  let E171 : Fin BB := E170 + Main[52]
+  let E172 : Fin BB := Main[48] - E171
+  let E173 : Fin BB := Main[49] - 1
+  let E174 : Fin BB := Main[49] * E173
+  let E175 : Fin BB := Main[50] - 1
+  let E176 : Fin BB := Main[50] * E175
+  let E177 : Fin BB := Main[51] - 1
+  let E178 : Fin BB := Main[51] * E177
+  let E179 : Fin BB := Main[52] - 1
+  let E180 : Fin BB := Main[52] * E179
+  let E181 : Fin BB := Main[48] - 1
+  let E182 : Fin BB := Main[48] * E181
+  let E183 : Fin BB := Main[49] * 11
+  let E184 : Fin BB := Main[50] * 12
+  let E185 : Fin BB := E183 + E184
+  let E186 : Fin BB := Main[51] * 13
+  let E187 : Fin BB := E185 + E186
+  let E188 : Fin BB := Main[52] * 14
+  let E189 : Fin BB := E187 + E188
+  let E190 : Fin BB := Main[3] + 4
+  let E191 : Fin BB := Main[1] * 65536
+  let E192 : Fin BB := Main[2] + E191
+  let E193 : Fin BB := Main[48] - 1
+  let E194 : Fin BB := Main[48] * E193
+  let E195 : Fin BB := E192 + 8
+  let E196 : Fin BB := Main[2] - 1
+  let E197 : Fin BB := E196 * 1761607681
+  let E198 : Fin BB := Main[1] * 65536
+  let E199 : Fin BB := Main[2] + E198
+  let CS2 : SP1ConstraintList := ALUTypeReader.constraints Main[0] E199 Main[3] E189 #v[Main[22], Main[23]] { op_a := Main[4], op_a_memory := { prev_value := #v[Main[5], Main[6]], access_timestamp := { prev_low := Main[7], diff_low_limb := Main[8] } }, op_a_0 := Main[9], op_b := Main[10], op_b_memory := { prev_value := #v[Main[11], Main[12]], access_timestamp := { prev_low := Main[13], diff_low_limb := Main[14] } }, op_c := #v[Main[15], Main[16]], op_c_memory := { prev_value := #v[Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, imm_c := Main[21] } Main[48]
+  [
+    (.send (.byte (ByteOpcode.ofNat 5) Main[44] E3 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 5) Main[45] E7 0) 1),
+    SP1Constraint.assertZero E10,
+    SP1Constraint.assertZero E12,
+    SP1Constraint.assertZero E95,
+    SP1Constraint.assertZero E99,
+    SP1Constraint.assertZero E103,
+    SP1Constraint.assertZero E107,
+    SP1Constraint.assertZero E111,
+    SP1Constraint.assertZero E115,
+    SP1Constraint.assertZero E119,
+    SP1Constraint.assertZero E123,
+    SP1Constraint.assertZero E129,
+    SP1Constraint.assertZero E133,
+    SP1Constraint.assertZero E137,
+    SP1Constraint.assertZero E141,
+    SP1Constraint.assertZero E146,
+    SP1Constraint.assertZero E148,
+    SP1Constraint.assertZero E150,
+    SP1Constraint.assertZero E152,
+    SP1Constraint.assertZero E154,
+    SP1Constraint.assertZero E156,
+    SP1Constraint.assertZero E158,
+    SP1Constraint.assertZero E160,
+    SP1Constraint.assertZero E162,
+    SP1Constraint.assertZero E164,
+    SP1Constraint.assertZero E166,
+    SP1Constraint.assertZero E168,
+    (.send (.byte (ByteOpcode.ofNat 6) Main[24] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[25] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[26] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[27] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[28] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[29] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[30] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[31] 16 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 Main[32] Main[33]) 1),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 Main[34] Main[35]) 1),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 Main[36] Main[37]) 1),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 Main[38] Main[39]) 1),
+    SP1Constraint.assertZero E172,
+    SP1Constraint.assertZero E174,
+    SP1Constraint.assertZero E176,
+    SP1Constraint.assertZero E178,
+    SP1Constraint.assertZero E180,
+    SP1Constraint.assertZero E182,
+    SP1Constraint.assertZero E194,
+    (.receive (.state Main[0] E192 Main[3]) 1),
+    (.send (.state Main[0] E195 E190) 1),
+    (.send (.byte (ByteOpcode.ofNat 6) E197 13 0) 1),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 Main[1] 0) 1),
+  ] ++ CS0 ++ CS1 ++ CS2
+
+end MulChip
