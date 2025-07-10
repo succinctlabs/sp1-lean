@@ -1,4 +1,5 @@
 import SP1Operations.AddOperation
+import SP1Operations.AddwOperation
 import SP1Operations.BitwiseOperation
 import SP1Operations.BitwiseU16Operation
 import SP1Operations.Compare.IsEqualWordOperation
