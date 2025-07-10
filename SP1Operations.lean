@@ -15,6 +15,7 @@ import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.JTypeReader
 import SP1Operations.Reader.RTypeReader
 import SP1Operations.SubOperation
+import SP1Operations.SubwOperation
 import SP1Operations.U16MSBOperation
 import SP1Operations.U16toU8OperationSafe
 import SP1Operations.U16toU8OperationUnsafe
