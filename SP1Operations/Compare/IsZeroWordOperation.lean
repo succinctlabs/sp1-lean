@@ -1,4 +1,4 @@
-import SP1Operations.IsZeroOperation
+import SP1Operations.Compare.IsZeroOperation
 
 structure IsZeroWordOperation where
   is_zero_limb : Vector IsZeroOperation 4

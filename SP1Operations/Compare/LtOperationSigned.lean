@@ -1,5 +1,5 @@
 import SP1Operations.U16MSBOperation
-import SP1Operations.LtOperationUnsigned
+import SP1Operations.Compare.LtOperationUnsigned
 
 structure LtOperationSigned where
   result : LtOperationUnsigned

@@ -1,10 +1,11 @@
-import SP1Foundations.Field
-import SP1Foundations.ByteOpcode
-
-import LeanRV32IM.RiscvInstsEnd
-open LeanRV32IM.Functions Sail
+-- These imports currently cause major usability to with bitvec recursion, due to bad instances.
+-- import LeanRV32IM.Sail.Sail
 
 section sailboats
+
+inductive regidx where
+  | Regidx (_ : (BitVec 5))
+  deriving Inhabited, BEq, Repr
 
 instance : DecidableEq regidx | .Regidx v, .Regidx v' => by simp; infer_instance
 

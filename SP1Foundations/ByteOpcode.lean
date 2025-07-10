@@ -45,6 +45,7 @@ end ofNat
 
 section constrain
 
+-- dt: it might make sense to add `Fin.val` calls in more places here.
 def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   match op with
   | AND => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b &&& c
@@ -53,7 +54,7 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   | U8Range => a < 256 ∧ b < 256 ∧ c < 256
   | LTU => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
   | SR => True
-  | Range => a < 2 ^ b.val -- Is this right?
+  | Range => a.val < 2 ^ b.val -- Is this right?
   | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
 
 @[simp] lemma constrain_AND (a b c : Fin BB) :
@@ -75,7 +76,7 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
     ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64) := Iff.rfl
 
 @[simp] lemma constrain_Range (a b c : Fin BB) :
-    ByteOpcode.Range.constrain a b c ↔ (a < 2 ^ b.val) := Iff.rfl
+    ByteOpcode.Range.constrain a b c ↔ (a.val < 2 ^ b.val) := Iff.rfl
 
 end constrain
 

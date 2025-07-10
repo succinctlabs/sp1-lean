@@ -71,21 +71,23 @@ lemma toNat_lt_of_forall_lt (w : Word (Fin BB))
 /-- Convert a word to a `BitVec 64` by shifting and adding the limbs. -/
 def toBitVec64 (w : Word (Fin BB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
 
-lemma toNat_toBitVec64 (w : Word (Fin BB))
-    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
-    (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16) :
+lemma toBitVec64_eq_add (w : Word (Fin BB)) : w.toBitVec64 =
+    BitVec.ofNat 64 w[0] + BitVec.ofNat 64 (w[1] * 2^16) +
+      BitVec.ofNat 64 (w[2] * 2^32) + BitVec.ofNat 64 (w[3] * 2^48) := by
+  simp [toBitVec64, toNat, BitVec.ofNat_add]
+
+lemma toNat_toBitVec64 (w : Word (Fin BB)) (hw : w.isU64) :
     w.toBitVec64.toNat = w.toNat := by
   simp only [toBitVec64, toNat, BB_eq, WORD_SIZE, Nat.reducePow, BitVec.toNat_ofNat,
     Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
+  have := lt_cases_of_isU64 hw
   omega
-
-lemma toNat_toBitVec64' (w : Word (Fin BB))
-    (h : ∀ i : Fin WORD_SIZE, w[i] < 2^16) :
-    w.toBitVec64.toNat = w.toNat := by
-  refine toNat_toBitVec64 w (h 0) (h 1) (h 2) (h 3)
 
 /-- Convert a word to a `Fin 2^64` by shifting and adding the limbs. -/
 def toFin64 (w : Word (Fin BB)) : Fin (2^64) := BitVec.toFin w.toBitVec64
+
+lemma toFin_toBitVec64 (w : Word (Fin BB)) :
+    w.toBitVec64.toFin = w.toFin64 := rfl
 
 end conversions
 
@@ -111,6 +113,12 @@ lemma toFin64_add_toFin64 (w v : Word (Fin BB)) :
   simp only [Nat.reducePow, toFin64, BB_eq, WORD_SIZE, Fin.ofNat_eq_cast]
   rw [← BitVec.toFin_add w.toBitVec64, toBitVec64_add_toBitVec64]
   rfl
+
+lemma val_add_of_isU64 {w v : Word (Fin BB)} (hw : w.isU64) (hv : v.isU64)
+    (i : Fin WORD_SIZE) : (w[i] + v[i]).val = w[i].val + v[i].val := by
+  have := hw i; have := hv i
+  simp [Fin.val_add] at *
+  omega
 
 end add
 

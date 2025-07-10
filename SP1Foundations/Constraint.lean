@@ -2,10 +2,6 @@ import SP1Foundations.Field
 import SP1Foundations.ByteOpcode
 import SP1Foundations.SailM
 
-import LeanRV32IM.RiscvInstsEnd
-
-open LeanRV32IM.Functions Sail
-
 inductive AirInteraction where
   | byte (op : ByteOpcode) (a b c : Fin BB)
   | memory (shard clk addr n m limb0 limb1 limb2 limb3 : Fin BB)
