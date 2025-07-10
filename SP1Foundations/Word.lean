@@ -7,6 +7,8 @@ import SP1Foundations.Unsigned
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
 @[reducible] def ByteWord (T : Type) := Vector T WORD_BYTE_SIZE
 
+open BitVec
+
 namespace Word
 
 /-- Prove two `Word`s equal by considering each index individually.

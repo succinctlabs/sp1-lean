@@ -53,18 +53,7 @@ def constraints
     (.send (.byte (ByteOpcode.ofNat 7) cols.value[3] 16 0) is_real),
   ]
 
--- def constraintsProp (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
---   let carry0  : Fin BB := 0
---   let carry1  : Fin BB := (a[0] + b[0] - cols.value[0] + carry0) * 65536⁻¹
---   let carry2  : Fin BB := (a[1] + b[1] - cols.value[1] + carry1) * 65536⁻¹
---   let carry3  : Fin BB := (a[2] + b[2] - cols.value[2] + carry2) * 65536⁻¹
---   (carry1 = 0 ∨ carry1 = 1) ∧
---   (carry2 = 0 ∨ carry2 = 1) ∧
---   (carry3 = 0 ∨ carry3 = 1) ∧
---   (cols.value[0] < 65536) ∧
---   (cols.value[1] < 65536) ∧
---   (cols.value[2] < 65536) ∧
---   (cols.value[3] < 65536)
+#eval 65535#16 + 65535#16
 
 /-- Equivalent formulation of constraints given that `is_real = 1`.
 dt: could extract this as above but doesn't seem especially useful -/
@@ -84,8 +73,16 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
       (cols.value[3].val < 65536) := by
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
+lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddOperation)
+    (h : (constraints a b cols 1).allHold) : cols.value.isU64 := by
+  rw [allHold_constraints_iff] at h
+  refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_ <;> tauto
+
 def spec (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
   a.isU64 → b.isU64 → cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
+
+#eval 2013200385 + 65535 + 65535
+#eval 2013265921 - 2013200385
 
 /-- If the operation is real and the input words have correctly bounded limbs,
 then the constraints imply the spec. -/
@@ -97,6 +94,8 @@ theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
   rw [allHold_constraints_iff] at h_cstrs
   obtain ⟨h0, h1, h2, h3, hbds⟩ := h_cstrs
   intro ha hb
+  have ha' := Word.lt_cases_of_isU64 ha
+  have hb' := Word.lt_cases_of_isU64 hb
   -- replace ha := Word.lt_cases_of_isU64 ha
   -- replace hb := Word.lt_cases_of_isU64 hb
   have hab0 : (a[0] + b[0]).val = a[0].val + b[0].val := by
@@ -120,14 +119,37 @@ theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
         simp [h2] at h3
         cases h3 with
         | inl h3 =>
+        · simp [sub_eq_zero] at h0 h1 h2 h3
+          simp [BitVec.ofNat_add, ← h0, ← h1, ← h2, ← h3, hab0, hab1, hab2, hab3]
+        | inr h3 =>
+        · rw [mul_inv_eq_one₀ (by trivial)] at h3
           simp [sub_eq_zero] at h0 h1 h2 h3
-          rw [← Fin.val_inj] at h0 h1 h2 h3
-          rw [hab0] at h0
-          rw [hab1] at h1
-          rw [hab2] at h2
-          rw [hab3] at h3
-          simp [BitVec.ofNat_add, ← h0, ← h1, ← h2, ← h3]
-        | inr h3 => sorry
+
+          rw [sub_eq_iff_eq_add, ← sub_eq_iff_eq_add'] at h3
+
+          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
+          refine congr_arg (BitVec.ofNat 64) ?_
+
+          simp [BitVec.ofNat_add, ← h0, ← h1, ← h2, ← h3, hab0, hab1, hab2, hab3]
+
+
+
+          rw [Fin.sub_eq_add_neg, Fin.val_add, Nat.mod_eq_of_lt]
+          · simp [BitVec.ofNat_add, add_mul, hab3]
+
+            have := hbds.2.2.2
+            rw [← h3] at this
+            simp [Fin.val_add, Fin.sub_eq_add_neg, Fin.val_neg] at this
+            have ha3 := ha 3
+            have hb3 := hb 3
+            simp at ha3 hb3
+            rw [Nat.mod_eq_of_lt] at this
+            · omega
+
+            -- 2013331455
+            sorry
+          ·
+            sorry
       | inr h2 => sorry
     | inr h1 => sorry
   | inr h0 =>
@@ -142,61 +164,17 @@ theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
         cases h3 with
         | inl h3 =>
           simp [sub_eq_zero] at h0 h1 h2 h3
-          sorry
+          have h0' : cols.value[0] = a[0] + b[0] - 65536 := by
+            simp [Fin.ext_iff, Fin.add_def, Fin.sub_def]; omega
+          have h1' : cols.value[1] = a[1] + b[1] + 1 := by
+            simp [Fin.ext_iff, Fin.add_def, Fin.sub_def]; omega
+          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
+          refine congr_arg (BitVec.ofNat 64) ?_
+          simp [h0', h1', ← h2, ← h3, Fin.add_def, Fin.sub_def, Fin.ext_iff]
+          omega
         | inr h3 => sorry
       | inr h2 => sorry
     | inr h1 => sorry
 
-
-
-
--- lemma lt_of_constraintsAllHold
---     (h : (constraints a b cols is_real).allHold)
---     (h_is_real : is_real = 1) : cols.value[0] < 65536 := by
---   rw [constraints_iff_constraintsProp] at h
---   rw [constraintsProp] at h
---   simp at h
---   subst h_is_real
---   tauto
-
--- lemma lt_of_constraintsAllHold'
---     (h : (constraints a b cols is_real).allHold)
---     (h_is_real : is_real = 1) : cols.value[1] < 65536 := by
---   rw [constraints_iff_constraintsProp] at h
---   rw [constraintsProp] at h
---   simp at h
---   subst h_is_real
---   tauto
-
--- /-- Version of correctness using specific bitvecs.
--- To get good rewrites we allow arbitrary proofs on the left (should do the reverse for ← rw to work)-/
--- lemma correct'
---     (a b : Word U16)
---     (cols : AddOperation)
---     (is_real : U1)
---     (h : (constraints a b cols is_real).allHold)
---     (h_is_real : is_real = 1)
---     (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ 32) :
---     (cols.value[0].val + cols.value[1].val * 65536)#'pf =
---       (a.toBV32_U16 + b.toBV32_U16) := by
---   let c0' : U16 := ⟨cols.value[0], lt_of_constraintsAllHold h (by aesop)⟩
---   let c1' : U16 := ⟨cols.value[1], lt_of_constraintsAllHold' h (by aesop)⟩
---   rw [BitVec.ofNatLT_eq_ofNat pf]
---   refine correct a b { value := #v[c0', c1'] } is_real h h_is_real
-
--- lemma correct''
---     (a b : Word U16)
---     (cols : AddOperation)
---     (is_real : Fin BB)
---     (h : (constraints a b cols is_real).allHold)
---     (h_is_real : is_real = 1)
---     (pf : cols.value[0].val + cols.value[1].val * 65536 < 2 ^ 32) :
---     (cols.value[0].val + cols.value[1].val * 65536)#'pf =
---       (a.toBV32_U16 + b.toBV32_U16) := by
---   -- TODO(gzgz): don't use aesop
---   let c0' : U16 := ⟨cols.value[0], lt_of_constraintsAllHold h (by aesop)⟩
---   let c1' : U16 := ⟨cols.value[1], lt_of_constraintsAllHold' h (by aesop)⟩
---   rw [BitVec.ofNatLT_eq_ofNat pf]
---   refine correct a b { value := #v[c0', c1'] } ⟨is_real, by aesop⟩ h (by aesop)
 
 end AddOperation
