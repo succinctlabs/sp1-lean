@@ -10,6 +10,7 @@ import SP1Operations.Compare.U16CompareOperation
 import SP1Operations.MulOperation
 import SP1Operations.Reader.ALUTypeReader
 import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.JTypeReader
 import SP1Operations.Reader.RTypeReader
 import SP1Operations.U16MSBOperation
