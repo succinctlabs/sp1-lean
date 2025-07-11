@@ -39,3 +39,6 @@ root = "LeanRV32D"
 
 [[lean_lib]]
 name = "LeanRV32IM"
+
+[[lean_lib]]
+name = "LeanRV64IM"
