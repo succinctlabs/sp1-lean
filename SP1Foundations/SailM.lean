@@ -1,11 +1,12 @@
--- These imports currently cause major usability to with bitvec recursion, due to bad instances.
--- import LeanRV32IM.Sail.Sail
+import LeanRV64IM.Defs
 
 section sailboats
 
-inductive regidx where
-  | Regidx (_ : (BitVec 5))
-  deriving Inhabited, BEq, Repr
+open PreSail
+
+-- inductive regidx where
+--   | Regidx (_ : (BitVec 5))
+--   deriving Inhabited, BEq, Repr
 
 instance : DecidableEq regidx | .Regidx v, .Regidx v' => by simp; infer_instance
 
