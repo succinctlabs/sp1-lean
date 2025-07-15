@@ -1,12 +1,10 @@
 import SP1Foundations
-import SP1Operations.U16MSBOperation
+import SP1Operations.Operation.SubwOperation.Operation
+import SP1Operations.Operation.U16MSBOperation
 
-structure SubwOperation where
-  value : Vector (Fin BB) 2
-  msb : U16MSBOperation
-
--- Generated Lean code for operation SubwOperation (from chip Subw)
 namespace SubwOperation
+
+section constraints
 
 def constraints
   (a : (Word (Fin BB)))
@@ -39,9 +37,8 @@ def constraints
     (.assertZero E1),
     (.assertZero E10),
     (.assertZero E19),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.value[0] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.value[1] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.value[0] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.value[1] 16 0) is_real),
   ] ++ CS0
 
-end SubwOperation
-
+end constraints

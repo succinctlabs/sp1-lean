@@ -1,21 +1,13 @@
-import SP1Operations.U16toU8OperationSafe
-import SP1Operations.U16MSBOperation
-
-@[ext] structure MulOperation where
-    carry : Vector (Fin BB) 16
-    product : Vector (Fin BB) 16
-    b_lower_byte: U16toU8Operation
-    c_lower_byte: U16toU8Operation
-    b_msb : Fin BB
-    c_msb : Fin BB
-    product_msb : U16MSBOperation
-    b_sign_extend : Fin BB
-    c_sign_extend : Fin BB
-    is_mulw : Fin BB
+import SP1Foundations
+import SP1Operations.Operation.MulOperation.Operation
+import SP1Operations.Operation.U16toU8OperationSafe
+import SP1Operations.Operation.U16MSBOperation
 
 namespace MulOperation
 
-set_option maxHeartbeats 500000 in
+set_option maxHeartbeats 500000
+section constraints
+
 def constraints
   (a_word : (Word (Fin BB)))
   (b_word : (Word (Fin BB)))
@@ -527,22 +519,22 @@ def constraints
     (.assertZero E461),
     (.assertZero E463),
     (.assertZero E465),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[0] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[1] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[2] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[3] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[4] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[5] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[6] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[7] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[8] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[9] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[10] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[11] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[12] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[13] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[14] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.carry[15] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[0] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[1] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[2] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[3] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[4] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[5] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[6] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[7] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[8] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[9] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[10] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[11] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[12] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[13] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[14] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.carry[15] 16 0) is_real),
     (.send (.byte (ByteOpcode.ofNat 3) 0 cols.product[0] cols.product[1]) is_real),
     (.send (.byte (ByteOpcode.ofNat 3) 0 cols.product[2] cols.product[3]) is_real),
     (.send (.byte (ByteOpcode.ofNat 3) 0 cols.product[4] cols.product[5]) is_real),
@@ -553,4 +545,4 @@ def constraints
     (.send (.byte (ByteOpcode.ofNat 3) 0 cols.product[14] cols.product[15]) is_real),
   ] ++ CS0 ++ CS1 ++ CS2
 
-end MulOperation
+end constraints

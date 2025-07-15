@@ -1,9 +1,9 @@
 import SP1Foundations
-
-structure SubOperation where
-  value : Word (Fin BB)
+import SP1Operations.Operation.SubOperation.Operation
 
 namespace SubOperation
+
+section constraints
 
 def constraints
   (a : (Word (Fin BB)))
@@ -55,10 +55,10 @@ def constraints
     (.assertZero E19),
     (.assertZero E28),
     (.assertZero E37),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.value[0] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.value[1] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.value[2] 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 7) cols.value[3] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.value[0] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.value[1] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.value[2] 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.value[3] 16 0) is_real),
   ]
 
-end SubOperation
+end constraints

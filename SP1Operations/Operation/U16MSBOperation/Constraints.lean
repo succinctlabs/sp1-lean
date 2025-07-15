@@ -1,9 +1,9 @@
 import SP1Foundations
-
-@[ext] structure U16MSBOperation where
-  msb : Fin BB
+import SP1Operations.Operation.U16MSBOperation.Operation
 
 namespace U16MSBOperation
+
+section constraints
 
 def constraints
   (a : (Fin BB))
@@ -20,7 +20,7 @@ def constraints
   [
     (.assertZero E1),
     (.assertZero E3),
-    (.send (.byte (ByteOpcode.ofNat 7) E6 16 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 6) E6 16 0) is_real),
   ]
 
-end U16MSBOperation
+end constraints

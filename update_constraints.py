@@ -10,7 +10,16 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     # Add your chips and operations here
     # Example entries:
     ("Add", None, ""),  # Chip-level constraints
-    ("Add", "AddOperation", ""),  # Operation-level constraints
+    ("Add", "AddOperation", "Operation"),  # Operation-level constraints
+    ("Addw", "AddwOperation", "Operation"),  # Operation-level constraints
+    ("Bitwise", "BitwiseOperation", "Operation"),
+    ("Bitwise", "BitwiseU16Operation", "Operation"),
+    ("Mul", "MulOperation", "Operation"),
+    ("Sub", "SubOperation", "Operation"),
+    ("Subw", "SubwOperation", "Operation"),
+    ("Mul", "U16MSBOperation", "Operation"),
+    ("Mul", "U16toU8OperationSafe", "Operation"),
+    ("Bitwise", "U16toU8OperationUnsafe", "Operation"),
     # ("SomeChip", "SomeOperation", "SomePrefix"),  # With prefix
 ]
 
