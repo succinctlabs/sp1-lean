@@ -61,92 +61,72 @@ def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
     (.receive (.memory Main[0] E25 Main[6] 0 0 Main[26] Main[27] Main[28] Main[29]) Main[30]),
   ] ++ CS0 ++ CS1
 
+open LeanRV64IM.Functions
+
+def specJal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
+  let _ ← execute_JAL imm rd
+
+def sp1Jal (Main : Vector (Fin BB) 31) : SailM Unit := do
+  let rd := regidx.Regidx Main[6].val
+  let init_pc := BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)
+  let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
+  let new_pc := BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48)
+  let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
+  wX_bits rd link
+  set_next_pc new_pc
+
+theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
+    (h_cstrs : (constraints Main).allHold)
+    (h_is_real : Main[30] = 1) -- Is a real column
+    (h_access : ∀ virtaddr, Sail.BitVec.access (bits_of_virtaddr virtaddr) 1 = 0#1)
+    (h_ext_zca : currentlyEnabled extension.Ext_Zca = return false)
+    (h_pc_temp : Sail.readReg Register.PC =
+      return BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32))
+    (h_pc_temp' : Sail.readReg Register.nextPC =
+      return BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4) :
+    let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
+    sp1Jal Main =
+      specJal
+        imm
+        (regidx.Regidx Main[6].val) := by
+
+  let init_pc := BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)
+  let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
+  let new_pc := BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48)
+  let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
+
+  unfold sp1Jal specJal
+  simp [map_eq_bind_pure_comp, execute_JAL, h_is_real]
+
+  have h25 : Main[25] = 0 :=
+    sorry
+
+  have h_link : BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
+      BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 :=
+    sorry
+
+  have h_imm :
+      BitVec.ofNat 64 (Main[22] + Main[23] * 65536 + Main[24] * 4294967296) =
+        BitVec.ofNat 64 (Main[3] + Main[4] * 65536 + ↑Main[5] * 4294967296) +
+          BitVec.ofNat 64 (Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656) :=
+    sorry
+
+  have h_of_int : let imm_nat : ℕ := Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656
+      BitVec.ofInt 64 (BitVec.ofNat 21 (imm_nat)).toInt = (BitVec.ofNat 64 (imm_nat)) :=
+    sorry
+
+  erw [h_link]
+  simp_rw [h_access]
+
+  simp [h25, h_ext_zca, h_link, h_pc_temp, h_pc_temp',
+    LeanRV64IM.Functions.not, get_next_pc, bit_to_bool, bool_bit_backwards,
+    bits_of_virtaddr, ext_control_check_pc,
+    sign_extend, Sail.BitVec.signExtend, BitVec.signExtend]
+
+  refine bind_congr fun () => congr_arg set_next_pc ?_
+
+  rw [h_of_int, h_imm]
+
 end JalChip
-
--- namespace Jal
-
--- section constraints
-
--- def constraints (Main : Vector (Fin BB) 15) : SP1ConstraintList :=
---   let E0 : Fin BB := Main[14] - 1
---   let E1 : Fin BB := Main[14] * E0
---   let E2 : Fin BB := 1 * Main[10]
---   let E3 : Fin BB := 0 + E2
---   let E4 : Fin BB := 65536 * Main[11]
---   let E5 : Fin BB := E3 + E4
---   let E6 : Fin BB := Main[1] * 65536
---   let E7 : Fin BB := Main[2] + E6
---   let E8 : Fin BB := Main[14] - 1
---   let E9 : Fin BB := Main[14] * E8
---   let E10 : Fin BB := E7 + 8
---   let E11 : Fin BB := Main[2] - 1
---   let E12 : Fin BB := E11 * 1761607681
---   let E13 : Fin BB := Main[1] * 65536
---   let E14 : Fin BB := Main[2] + E13
---   let E15 : Fin BB := Main[14] - 1
---   let E16 : Fin BB := Main[14] * E15
---   let E17 : Fin BB := Main[12] - 0
---   let E18 : Fin BB := Main[9] * E17
---   let E19 : Fin BB := Main[13] - 0
---   let E20 : Fin BB := Main[9] * E19
---   let E21 : Fin BB := E14 + 3
---   let E22 : Fin BB := Main[14] - 1
---   let E23 : Fin BB := Main[14] * E22
---   let E24 : Fin BB := E21 - Main[7]
---   let E25 : Fin BB := E24 - 1
---   let E26 : Fin BB := E25 - Main[8]
---   let E27 : Fin BB := E26 * 2013235201
---   [
---     .assertZero E1,
---     .assertZero E9,
---     .receive (.state Main[0] E7 Main[3]) Main[14],
---     .send (.state Main[0] E10 E5) Main[14],
---     .send (.byte (ByteOpcode.ofNat 6) E12 13 0) Main[14],
---     .send (.byte (ByteOpcode.ofNat 3) 0 Main[1] 0) Main[14],
---     .assertZero E16,
---     .assertZero E18,
---     .assertZero E20,
---     .assertZero E23,
---     .send (.byte (ByteOpcode.ofNat 6) Main[8] 16 0) Main[14],
---     .send (.byte (ByteOpcode.ofNat 3) 0 E27 0) Main[14],
---     .send (.memory Main[0] Main[7] Main[4] Main[5] Main[6]) Main[14],
---     .receive (.memory Main[0] E21 Main[4] Main[12] Main[13]) Main[14]
---   ]
-
--- end constraints
-
--- /--
--- This is essentially `execute_JAL` from LeanRV32D.
--- -/
--- def specJal (rd : regidx) (imm : BitVec 21) : StateM SP1State Unit := do
---   let old_pc := (← get).1
---   incrementPC
---   update_reg rd (old_pc + 4#32)
---   setPC (old_pc + imm)
-
--- -- TODO(gzgz): this should be auto-generate-able from our constraints.
--- def sp1Jal (Main : Vector (Fin BB) 15) : StateM SP1State Unit := do
---   let rd := regidx.Regidx Main[4].val
---   let new_pc := BitVec.ofNat 32 (Main[10] + Main[11] * 65536)
---   let old_pc := BitVec.ofNat 32 (Main[12] + Main[13] * 65536)
---   if Main[14] = 1 then setPC new_pc
---   if Main[14] = 1 then update_reg rd old_pc
-
--- theorem SP1JAL_correct (Main : Vector (Fin BB) 15)
---     (_h_cstrs : (constraints Main).allHold) -- note these are unused here
---     (h_is_real : Main[14] = 1) -- Is a real column
---     (pc : BitVec 32) (reg_state : regidx → BitVec 32) (imm : BitVec 21)
---     -- The inputs are preprocessed correctly
---     (hmem₁ : .ofNat 32 (Main[12] + Main[13] * 65536) = pc + 4#32)
---     (hmem₂ : .ofNat 32 (Main[10] + Main[11] * 65536) = pc + imm) :
---     (sp1Jal Main).run (pc, reg_state) =
---       (specJal (regidx.Regidx Main[4].val) imm).run (pc, reg_state) := by
---   simp only [sp1Jal, h_is_real, Fin.isValue, ↓reduceIte, BB, BitVec.natCast_eq_ofNat,
---     StateT.run_bind, StateT.run_modify, Prod.map_apply, id_eq, bind_pure_comp, map_pure, specJal,
---     StateT.run_get]
---   refine congr_arg (fun out => pure (_, out)) (Prod.eq_iff_fst_eq_snd_eq.2 ⟨?_, ?_⟩)
---   · simpa using hmem₂
---   · refine funext fun reg => ?_
---     simp [Function.update, hmem₁]
 
 -- end Jal

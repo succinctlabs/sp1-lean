@@ -1,4 +1,4 @@
-import LeanRV64IM.Defs
+import LeanRV64IM.RiscvInstsEnd
 
 section sailboats
 

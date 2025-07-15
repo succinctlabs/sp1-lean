@@ -68,6 +68,9 @@ lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
       (x_low + x_high * 256) ^^^ (y_low + y_high * 256) := by
   bv_decide
 
+def BitVec64_of_limbs (x y z w : Fin BB) : BitVec 64 :=
+  BitVec.ofNat 64 (x + y * 2^16 + z * 2^32 + w * 2^48)
+
 namespace BabyBear
 
 lemma eq_of_bitVec_ofNat16_val_eq (x y : Fin BB)
