@@ -63,7 +63,24 @@ def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
 
 open LeanRV64IM.Functions
 
+/-- Reading a just written value looks like just using the written value. -/
+@[simp]
+lemma writeReg_readReg_bind {α : Type} (reg : Register) (v : RegisterType reg)
+    (mx : RegisterType reg → SailM α) :
+    (do Sail.writeReg reg v; let w ← Sail.readReg reg; mx w) =
+      (do Sail.writeReg reg v; mx v) := sorry
+
+/-- Writing a value overwrites the previous write.
+dt: might need `typ_0` condition when proving this. -/
+@[simp]
+lemma writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
+    (v' : RegisterType reg)
+    (typ_0 : regidx) (data : BitVec 64) :
+    (do Sail.writeReg reg v; wX_bits typ_0 data; Sail.writeReg reg v') =
+      (do wX_bits typ_0 data; Sail.writeReg reg v') := sorry
+
 def specJal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
+  set_next_pc (Sail.BitVec.addInt (← Sail.readReg Register.PC) 4)
   let _ ← execute_JAL imm rd
 
 def sp1Jal (Main : Vector (Fin BB) 31) : SailM Unit := do
@@ -78,17 +95,14 @@ def sp1Jal (Main : Vector (Fin BB) 31) : SailM Unit := do
 theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
     (h_cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1) -- Is a real column
+    -- dt: this is a hack until `Sail.BitVec.access` plays nicely
     (h_access : ∀ virtaddr, Sail.BitVec.access (bits_of_virtaddr virtaddr) 1 = 0#1)
     (h_ext_zca : currentlyEnabled extension.Ext_Zca = return false)
-    (h_pc_temp : Sail.readReg Register.PC =
-      return BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32))
-    (h_pc_temp' : Sail.readReg Register.nextPC =
-      return BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4) :
+    -- dt: this is sort of cheating, could actually write this in the spec instead.
+    (h_pc : Sail.readReg Register.PC =
+      return BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)) :
     let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
-    sp1Jal Main =
-      specJal
-        imm
-        (regidx.Regidx Main[6].val) := by
+    sp1Jal Main = specJal imm (regidx.Regidx Main[6].val) := by
 
   let init_pc := BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)
   let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
@@ -96,6 +110,7 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
   let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
 
   unfold sp1Jal specJal
+
   simp [map_eq_bind_pure_comp, execute_JAL, h_is_real]
 
   have h25 : Main[25] = 0 :=
@@ -118,9 +133,9 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
   erw [h_link]
   simp_rw [h_access]
 
-  simp [h25, h_ext_zca, h_link, h_pc_temp, h_pc_temp',
+  simp [h25, h_ext_zca, h_link, h_pc,
     LeanRV64IM.Functions.not, get_next_pc, bit_to_bool, bool_bit_backwards,
-    bits_of_virtaddr, ext_control_check_pc,
+    bits_of_virtaddr, ext_control_check_pc, set_next_pc,
     sign_extend, Sail.BitVec.signExtend, BitVec.signExtend]
 
   refine bind_congr fun () => congr_arg set_next_pc ?_
