@@ -63,21 +63,41 @@ def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
 
 open LeanRV64IM.Functions
 
-/-- Reading a just written value looks like just using the written value. -/
-@[simp]
-lemma writeReg_readReg_bind {α : Type} (reg : Register) (v : RegisterType reg)
-    (mx : RegisterType reg → SailM α) :
-    (do Sail.writeReg reg v; let w ← Sail.readReg reg; mx w) =
-      (do Sail.writeReg reg v; mx v) := sorry
+lemma eq_zero_of_constraints (Main : Vector (Fin BB) 31)
+    (h_cstrs : (constraints Main).allHold) : Main[25] = 0 := by
+  simp [constraints] at h_cstrs
+  aesop
 
-/-- Writing a value overwrites the previous write.
-dt: might need `typ_0` condition when proving this. -/
-@[simp]
-lemma writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
-    (v' : RegisterType reg)
-    (typ_0 : regidx) (data : BitVec 64) :
-    (do Sail.writeReg reg v; wX_bits typ_0 data; Sail.writeReg reg v') =
-      (do wX_bits typ_0 data; Sail.writeReg reg v') := sorry
+lemma link_eq_of_constraints (Main : Vector (Fin BB) 31)
+    (h_cstrs : (constraints Main).allHold)
+    (h_is_real : Main[30] = 1) :
+    BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
+      BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
+  simp [constraints] at h_cstrs
+  have : (AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0]
+      { value := #v[Main[26], Main[27], Main[28], Main[29]] } (Main[30] - Main[13])).allHold := by
+    sorry
+
+  sorry
+
+lemma add_imm_eq_of_constarints (Main : Vector (Fin BB) 31)
+    (h_cstrs : (constraints Main).allHold)
+    (h_is_real : Main[30] = 1) :
+    BitVec.ofNat 64 (Main[22] + Main[23] * 65536 + Main[24] * 4294967296) =
+        BitVec.ofNat 64 (Main[3] + Main[4] * 65536 + ↑Main[5] * 4294967296) +
+          BitVec.ofNat 64 (Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656) := by
+  simp [constraints] at h_cstrs
+  have : (AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]]
+      { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]).allHold := by
+    sorry
+  sorry
+
+lemma ofInt_ofNat_of_constraints (Main : Vector (Fin BB) 31)
+    (h_cstrs : (constraints Main).allHold)
+    (h_is_real : Main[30] = 1) :
+    let imm_nat : ℕ := Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656
+    BitVec.ofInt 64 (BitVec.ofNat 21 (imm_nat)).toInt = (BitVec.ofNat 64 (imm_nat)) := by
+  sorry
 
 def specJal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   set_next_pc (Sail.BitVec.addInt (← Sail.readReg Register.PC) 4)
@@ -113,22 +133,22 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
 
   simp [map_eq_bind_pure_comp, execute_JAL, h_is_real]
 
-  have h25 : Main[25] = 0 :=
-    sorry
+  have h25 : Main[25] = 0 := by
+    refine eq_zero_of_constraints Main h_cstrs
 
   have h_link : BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
-      BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 :=
-    sorry
+      BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
+    refine link_eq_of_constraints Main h_cstrs h_is_real
 
   have h_imm :
       BitVec.ofNat 64 (Main[22] + Main[23] * 65536 + Main[24] * 4294967296) =
         BitVec.ofNat 64 (Main[3] + Main[4] * 65536 + ↑Main[5] * 4294967296) +
-          BitVec.ofNat 64 (Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656) :=
-    sorry
+          BitVec.ofNat 64 (Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656) := by
+    refine add_imm_eq_of_constarints Main h_cstrs h_is_real
 
   have h_of_int : let imm_nat : ℕ := Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656
       BitVec.ofInt 64 (BitVec.ofNat 21 (imm_nat)).toInt = (BitVec.ofNat 64 (imm_nat)) :=
-    sorry
+    ofInt_ofNat_of_constraints Main h_cstrs h_is_real
 
   erw [h_link]
   simp_rw [h_access]
@@ -143,5 +163,3 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
   rw [h_of_int, h_imm]
 
 end JalChip
-
--- end Jal

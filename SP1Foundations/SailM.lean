@@ -4,11 +4,31 @@ section sailboats
 
 open PreSail
 
+open LeanRV64IM.Functions
+
+
 -- inductive regidx where
 --   | Regidx (_ : (BitVec 5))
 --   deriving Inhabited, BEq, Repr
 
 instance : DecidableEq regidx | .Regidx v, .Regidx v' => by simp; infer_instance
+
+
+/-- Reading a just written value looks like just using the written value. -/
+@[simp]
+theorem writeReg_readReg_bind {α : Type} (reg : Register) (v : RegisterType reg)
+    (mx : RegisterType reg → SailM α) :
+    (do Sail.writeReg reg v; let w ← Sail.readReg reg; mx w) =
+      (do Sail.writeReg reg v; mx v) := sorry
+
+/-- Writing a value overwrites the previous write.
+dt: might need `typ_0` condition when proving this. -/
+@[simp]
+theorem writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
+    (v' : RegisterType reg)
+    (typ_0 : regidx) (data : BitVec 64) :
+    (do Sail.writeReg reg v; wX_bits typ_0 data; Sail.writeReg reg v') =
+      (do wX_bits typ_0 data; Sail.writeReg reg v') := sorry
 
 -- lemma reg_map_ext (rmap rmap' : PreSail.SequentialState RegisterType trivialChoiceSource)
 --     (hreg : rmap.regs = rmap'.regs)
