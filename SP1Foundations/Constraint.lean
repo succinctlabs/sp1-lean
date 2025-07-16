@@ -1,12 +1,24 @@
 import SP1Foundations.Field
 import SP1Foundations.ByteOpcode
 import SP1Foundations.SailM
+import SP1Foundations.Opcode
+
 import LeanRV64IM.Defs
 
 inductive AirInteraction where
   | byte (op : ByteOpcode) (a b c : Fin BB)
-  | memory (shard clk addr n m limb0 limb1 limb2 limb3 : Fin BB)
-  | state (shard clk pc0 pc1 pc2 : Fin BB)
+  | memory (clk_high clk_low addr0 addr1 addr2 limb0 limb1 limb2 limb3: Fin BB)
+  | state (clk_high clk_low pc0 pc1 pc2: Fin BB)
+  | program
+      (pc0 pc1 pc2 : Fin BB)
+      (opcode : Opcode)
+      (op_a
+      op_b_0 op_b_1 op_b_2 op_b_3 
+      op_c_0 op_c_1 op_c_2 op_c_3
+      op_a_0
+      imm_b
+      imm_c 
+      instr_const0 instr_const1 instr_const2 : Fin BB)
   deriving DecidableEq
 
 inductive SP1Constraint where
@@ -28,6 +40,33 @@ def toProp : SP1Constraint → Prop
   | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
   -- dt: the other send/recv interactions should also imply bounds
   -- should be based on only running "trusted" programs and what that entails.
+  | .send
+      (.program
+      pc0 _pc1 _pc2
+      opcode
+      op_a
+      op_b_0 op_b_1 op_b_2 op_b_3 
+      op_c_0 op_c_1 op_c_2 op_c_3
+      op_a_0
+      imm_b
+      imm_c 
+      _instr_const0 _instr_const1 _instr_const2)
+      mult =>
+        mult ≠ 0
+        -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3
+           ∧ op_a < 32 
+           ∧ op_b_0 < 65536
+           ∧ op_b_1 < 65536
+           ∧ op_b_2 < 65536
+           ∧ op_b_3 < 65536
+           ∧ op_c_0 < 65536
+           ∧ op_c_1 < 65536
+           ∧ op_c_2 < 65536
+           ∧ op_c_3 < 65536
+           ∧ (op_a_0 = 0 ∨ op_a_0 = 1)
+           ∧ (imm_b = 0 ∨ imm_b = 1)
+           ∧ (imm_c = 0 ∨ imm_c = 1)
+           ∧ (pc0 % 4 = 0)
   | _ => True
 
 @[simp] lemma toProp_assertZero (x : Fin BB) :
