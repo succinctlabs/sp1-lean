@@ -30,6 +30,12 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Lt", "LtOperationSigned", "Compare"),
     ("Lt", "LtOperationUnsigned", "Compare"),
     ("Lt", "U16CompareOperation", "Compare"),
+
+    # Adapters/readers
+    ("Add", "RTypeReader", "Reader"),
+    ("Add", "CPUState", "Reader"),
+    ("Addi", "ITypeReader", "Reader"),
+    ("Bitwise", "ALUTypeReader", "Reader"),
 ]
 
 def run_constraint_compiler(sp1_dir: str, chip: str, operation: Optional[str] = None) -> str:
