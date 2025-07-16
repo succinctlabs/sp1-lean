@@ -10,8 +10,10 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     # Add your chips and operations here
     # Example entries:
     ("Add", None, ""),  # Chip-level constraints
-    ("Add", "AddOperation", "Operation"),  # Operation-level constraints
-    ("Addw", "AddwOperation", "Operation"),  # Operation-level constraints
+
+    # Operations
+    ("Add", "AddOperation", "Operation"),
+    ("Addw", "AddwOperation", "Operation"),
     ("Bitwise", "BitwiseOperation", "Operation"),
     ("Bitwise", "BitwiseU16Operation", "Operation"),
     ("Mul", "MulOperation", "Operation"),
@@ -20,7 +22,14 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Mul", "U16MSBOperation", "Operation"),
     ("Mul", "U16toU8OperationSafe", "Operation"),
     ("Bitwise", "U16toU8OperationUnsafe", "Operation"),
-    # ("SomeChip", "SomeOperation", "SomePrefix"),  # With prefix
+    
+    # Compare operations
+    ("DivRem", "IsEqualWordOperation", "Compare"),
+    ("DivRem", "IsZeroWordOperation", "Compare"),
+    ("DivRem", "IsZeroOperation", "Compare"),
+    ("Lt", "LtOperationSigned", "Compare"),
+    ("Lt", "LtOperationUnsigned", "Compare"),
+    ("Lt", "U16CompareOperation", "Compare"),
 ]
 
 def run_constraint_compiler(sp1_dir: str, chip: str, operation: Optional[str] = None) -> str:
