@@ -1,4 +1,6 @@
+import Mathlib
 import LeanRV64IM.RiscvInstsEnd
+import LeanRV64IM.Defs
 
 section sailboats
 
@@ -119,5 +121,32 @@ theorem writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
 --     (v v' : BitVec 32) :
 --     (do wX id v; wX id' v') =
 --       (do wX id' v'; wX id v) := sorry
+
+open Sail (trivialChoiceSource)
+
+@[simp]
+abbrev SailState := SequentialState RegisterType trivialChoiceSource
+
+def reg_idx_to_Register (idx : BitVec 5) : Register :=
+  match idx with
+  | 1 => Register.x1
+  | 2 => Register.x2
+  | 3 => Register.x3
+  | 4 => Register.x4
+  | 5 => Register.x5
+  | _ => Register.x31
+
+theorem reg_idx_must_64
+  (idx : BitVec 5)
+  : RegisterType (reg_idx_to_Register idx) = BitVec 64 :=
+  by
+    simp [reg_idx_to_Register]
+    split <;> rfl
+
+def SailState.get_reg? (s : SailState) (idx : BitVec 5) : Option (BitVec 64) :=
+  by
+    let reg : Register := reg_idx_to_Register idx
+    rw [←reg_idx_must_64 idx]
+    refine s.regs.get? reg
 
 end sailboats
