@@ -64,6 +64,7 @@ def constraints
   [
     (.assertZero E1),
     (.assertZero E4),
+    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E5 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] cols.op_a_0 0 cols.imm_c instr_field_consts[0] instr_field_consts[1] instr_field_consts[2]) is_real),
     (.assertZero E7),
     (.assertZero E9),
     (.assertZero E11),

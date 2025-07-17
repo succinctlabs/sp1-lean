@@ -43,6 +43,7 @@ def constraints
   let E24 : Fin BB := E23 * 2013235201
   [
     (.assertZero E1),
+    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E2 0 0 0 cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] cols.op_a_0 0 1 instr_field_consts[0] instr_field_consts[1] instr_field_consts[2]) is_real),
     (.assertZero E4),
     (.assertZero E6),
     (.assertZero E8),
