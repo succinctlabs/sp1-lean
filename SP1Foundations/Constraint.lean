@@ -1,4 +1,5 @@
 import SP1Foundations.Field
+import SP1Foundations.Word
 import SP1Foundations.ByteOpcode
 import SP1Foundations.SailM
 import SP1Foundations.Opcode
@@ -40,6 +41,8 @@ def toProp : SP1Constraint → Prop
   | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
   -- dt: the other send/recv interactions should also imply bounds
   -- should be based on only running "trusted" programs and what that entails.
+  | (.send (.memory _clk_high _clk_low _addr0 _addr1 _addr2 limb0 limb1 limb2 limb3) mult) =>
+      mult ≠ 0 → Word.isU64 #v[limb0, limb1, limb2, limb3]
   | .send
       (.program
       pc0 _pc1 _pc2
@@ -91,7 +94,7 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
       mult ≠ 0
       → if h_addrs : addr0 < 32 ∧ addr1 = 0 ∧ addr2 = 0 then
           s.get_reg? (BitVec.ofNatLT addr0.val h_addrs.left)
-            = some 114514
+            = some (Word.toBitVec64 #v[limb0, limb1, limb2, limb3])
         else
           True -- TODO(gzgz): this is reading from memory
   | (.receive (.state _clk_high _clk_low pc0 pc1 pc2) mult) =>

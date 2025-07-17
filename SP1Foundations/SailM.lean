@@ -122,7 +122,7 @@ theorem writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
 --     (do wX id v; wX id' v') =
 --       (do wX id' v'; wX id v) := sorry
 
-open Sail (trivialChoiceSource)
+open Sail (trivialChoiceSource Error)
 
 @[simp]
 abbrev SailState := SequentialState RegisterType trivialChoiceSource
@@ -148,5 +148,34 @@ def SailState.get_reg? (s : SailState) (idx : BitVec 5) : Option (BitVec 64) :=
     let reg : Register := reg_idx_to_Register idx
     rw [←reg_idx_must_64 idx]
     refine s.regs.get? reg
+
+def SailState.write_reg (s : SailState) (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
+  do
+    let reg : Register := reg_idx_to_Register idx
+    modify fun s =>
+      { s with regs := s.regs.insert reg (by rw [reg_idx_must_64 idx]; exact val) }
+
+def Option.toSailM {α} (o : Option α) : SailM α :=
+  o.elim (throw (by exact Error.Exit)) pure
+
+theorem SailState.get_reg?_is_rX {s : SailState}
+  (idx : BitVec 5)
+  : (rX_bits (regidx.Regidx idx)) s = (s.get_reg? idx).toSailM s :=
+  by
+    sorry
+
+theorem SailState.write_reg_is_wX {s : SailState}
+  (idx : BitVec 5)
+  (val : BitVec 64)
+  : (wX_bits (regidx.Regidx idx) val) s = (s.write_reg idx val) s :=
+  by
+    sorry
+
+theorem SailState.reg_idx_never_nextPC
+  {idx : BitVec 5}
+  : (Register.nextPC == reg_idx_to_Register idx) = false :=
+  by
+    simp [reg_idx_to_Register]
+    split <;> trivial
 
 end sailboats

@@ -85,6 +85,20 @@ lemma toNat_toBitVec64 (w : Word (Fin BB)) (hw : w.isU64) :
   have := lt_cases_of_isU64 hw
   omega
 
+lemma toBitVec64_LT_eq_toNat {w : Word (Fin BB)} (hw : w.isU64)
+  : w.toBitVec64 = BitVec.ofNatLT w.toNat
+      (by 
+        simp [Word.toNat]
+        have := hw 0
+        have := hw 1
+        have := hw 2
+        have := hw 3
+        simp at *
+        linarith)
+  := by
+    simp [Word.toBitVec64]
+    rw [BitVec.ofNatLT_eq_ofNat]
+
 /-- Convert a word to a `Fin 2^64` by shifting and adding the limbs. -/
 def toFin64 (w : Word (Fin BB)) : Fin (2^64) := BitVec.toFin w.toBitVec64
 
