@@ -10,6 +10,7 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     # Add your chips and operations here
     # Example entries:
     ("Add", None, ""),  # Chip-level constraints
+    ("Jalr", None, ""),
 
     # Operations
     ("Add", "AddOperation", "Operation"),
