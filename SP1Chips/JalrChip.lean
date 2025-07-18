@@ -126,10 +126,16 @@ theorem correct
     let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
 
     have imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
-      sorry
+      refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] ?_ ?_ ?_ ?_
+      · simp
+        clear * - h_c_0
+        omega
+      · simp [h_c_1]
+      · simp [h_c_2]
+      · simp [h_c_3]
 
     have pc_is_u64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
-      sorry
+      exact Word.isU64_of_cases #v[Main[3], Main[4], Main[5], 0] h_pc_0 h_pc_1 h_pc_2 (by simp)
 
     have ⟨res_is_u64, h_res⟩ := (AddOperation.correct #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[30], Main[31], Main[32], Main[33]] } Main[29] h_is_real res_cstrs) b_is_u64 imm_is_u64
     rw [Word.toBitVec64_LT_eq_toNat res_is_u64, Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toBitVec64_LT_eq_toNat imm_is_u64] at h_res
