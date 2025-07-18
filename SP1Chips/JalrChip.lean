@@ -39,10 +39,6 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   _ ← execute_JALR imm rs1 rd
   pure ()
 
-def sp1_jalr : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  pure ()
-
 def sp1_imm : BitVec 12 :=
   by
     refine BitVec.ofNatLT
@@ -95,6 +91,11 @@ def sp1_op_a : BitVec 5 :=
 
     itauto
 
+def sp1_jalr : SailM Unit := do
+  let op_a := sp1_op_a Main cstrs h_is_real
+  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], 0])
+
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure
 
 theorem correct 
@@ -102,7 +103,7 @@ theorem correct
   let imm := sp1_imm Main cstrs h_is_real
   let op_b := sp1_op_b Main cstrs h_is_real
   let op_a := sp1_op_a Main cstrs h_is_real
-  (spec_jalr imm (.Regidx op_b) (.Regidx op_a)).run s = sp1_jalr.run s
+  (spec_jalr imm (.Regidx op_b) (.Regidx op_a)).run s = (sp1_jalr Main cstrs h_is_real).run s
   :=
   by
     extract_lets imm op_b op_a
@@ -256,6 +257,10 @@ theorem correct
 
     rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
     simp [Word.toNat]
+
+    rw [SailState.write_reg_is_wX]
+    simp [SailState.write_reg]
+    simpM
 
     sorry
 
