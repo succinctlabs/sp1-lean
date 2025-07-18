@@ -98,6 +98,7 @@ def sp1_jalr : SailM Unit := do
 
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure
 
+set_option maxHeartbeats 500000 in
 theorem correct 
   (state_cstrs : (constraints Main).initialState s) :
   let imm := sp1_imm Main cstrs h_is_real
@@ -190,6 +191,7 @@ theorem correct
       simp [Word.toNat]
       rfl
 
+    -- should come from bv_decide
     have trusted_jmp : (bit_to_bool (Sail.BitVec.access (Sail.BitVec.update (b_bv64 + sign_extend imm) 0 0#1) 1)) = pure false :=
       by
         sorry
@@ -214,6 +216,7 @@ theorem correct
       unfold EStateM.bind
       simp
 
+    -- per RISC-V spec. very safe axiom to have
     have always_misa : ∀s : SailState, s.regs.get? Register.misa = some 0 := by sorry
 
     -- try to reduce currentlyEnabled
@@ -281,20 +284,40 @@ theorem correct
 
     cases op_a_0_is_bool with
     | inl op_a_not_0 =>
-        -- have ⟨next_pc_is_u64, next_pc_res⟩ :=
-        --   AddOperation.correct
-        --   #v[Main[3], Main[4], Main[5], 0]
-        --   #v[4, 0, 0, 0]
-        --   { value := #v[Main[34], Main[35], Main[36], Main[37]] }
-        --   (Main[29] - Main[13])
-        --   sorry
-        --   inc_pc_cstrs
-        --   pc_is_u64
-        --   (by simp [Word.isU64]; clear * - h_pc_0 h_pc_1 h_pc_2; trivial)
-        -- rw [Word.toBitVec64_LT_eq_toNat res_is_u64, Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toBitVec64_LT_eq_toNat pc_is_u64] at h_res
-        -- simp [Word.toNat, h_c_1, h_c_2, h_c_3] at h_res
-        sorry
+        obtain ⟨a_write_is_u64, h_a_write⟩ :=
+          AddOperation.correct
+          #v[Main[3], Main[4], Main[5], 0]
+          #v[4, 0, 0, 0]
+          { value := #v[Main[34], Main[35], Main[36], Main[37]] }
+          (Main[29] - Main[13])
+          (by simp [h_is_real, op_a_not_0])
+          inc_pc_cstrs
+          pc_is_u64
+          (by simp [Word.isU64]; clear * - h_pc_0 h_pc_1 h_pc_2; trivial)
+        rw [Word.toBitVec64_LT_eq_toNat a_write_is_u64, Word.toBitVec64_LT_eq_toNat pc_is_u64] at h_a_write
+        conv at h_a_write =>
+          rhs
+          simp [Word.toBitVec64, Word.toNat]
+          rfl
 
+        rw [Word.toBitVec64_LT_eq_toNat a_write_is_u64]
+        simp
+        rw [h_a_write]
+
+        apply Std.ExtDHashMap.ext_get?
+
+        intro idx
+        by_cases h_nextPC : Register.nextPC = idx
+        · rw [Std.ExtDHashMap.get?_insert]
+          simp [h_nextPC]
+          rw [Std.ExtDHashMap.get?_insert]
+          simp [h_nextPC]
+          sorry -- try bv_decide
+        by_cases h_op_a : (reg_idx_to_Register op_a) = idx
+        · simp [op_a, sp1_op_a] at h_op_a
+          repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
+        simp [op_a, sp1_op_a] at h_op_a
+        repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
     | inr op_a_is_0 =>
         sorry
 
