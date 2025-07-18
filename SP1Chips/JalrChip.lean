@@ -269,9 +269,9 @@ theorem correct
         clear * - h_pc_0 h_pc_1 h_pc_2
         simp at *
         omega
-    have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
+    -- have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
     -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
-    rw [←pc_ofNat_eq_pc_ofNatLT]
+    rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
 
     simp [sign_extend]
     rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
@@ -289,14 +289,14 @@ theorem correct
     clear h_res
 
     cases op_a_0_is_bool with
-    | inl op_a_not_0 =>
+    | inl op_a_not_x0 =>
         obtain ⟨a_write_is_u64, h_a_write⟩ :=
           AddOperation.correct
           #v[Main[3], Main[4], Main[5], 0]
           #v[4, 0, 0, 0]
           { value := #v[Main[34], Main[35], Main[36], Main[37]] }
           (Main[29] - Main[13])
-          (by simp [h_is_real, op_a_not_0])
+          (by simp [h_is_real, op_a_not_x0])
           inc_pc_cstrs
           pc_is_u64
           (by simp [Word.isU64]; clear * - h_pc_0 h_pc_1 h_pc_2; trivial)
@@ -324,7 +324,7 @@ theorem correct
           repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
         simp [op_a, sp1_op_a] at h_op_a
         repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
-    | inr op_a_is_0 =>
+    | inr op_a_is_x0 =>
         sorry
 
 end Jalr
