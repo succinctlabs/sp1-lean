@@ -114,7 +114,8 @@ theorem correct
     obtain ⟨res_cstrs, ⟨pc_cstrs, ⟨reader_cstrs, ⟨inc_pc_cstrs, chip_cstrs⟩⟩⟩⟩ := cstrs
 
     simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-    obtain ⟨⟨h_op_b, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, h_c_mul4⟩⟩, _⟩ := reader_cstrs.1
+    obtain ⟨⟨h_op_b, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, h_c_mul4⟩⟩, 
+      ⟨h_op_a, ⟨_, ⟨_, ⟨_, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
     let read_op_b' := read_op_b h_op_b
     
     -- have h_res := AddOperation.correct #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[30], Main[31], Main[32], Main[33]] } Main[29] h_is_real res_cstrs
@@ -242,8 +243,22 @@ theorem correct
     simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
     simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet]
 
-    simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
-    _
+    have pc_sum_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 :=
+      by
+        clear * - h_pc_0 h_pc_1 h_pc_2
+        simp at *
+        omega
+    have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
+    -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
+    rw [←pc_ofNat_eq_pc_ofNatLT]
+
+    simp [sign_extend]
+    rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
+
+    rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
+    simp [Word.toNat]
+
+    sorry
 
 end Jalr
 

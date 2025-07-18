@@ -1,4 +1,5 @@
 import SP1Foundations.Field
+import LeanRV64IM.Sail.Sail
 
 @[simp] lemma BitVec.twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
 
@@ -70,6 +71,17 @@ lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
 
 def BitVec64_of_limbs (x y z w : Fin BB) : BitVec 64 :=
   BitVec.ofNat 64 (x + y * 2^16 + z * 2^32 + w * 2^48)
+
+namespace Sail
+
+theorem sign_extend_no_change {x : Fin BB} {n m : ℕ}
+  (hx : x.val < 2^n)
+  (hmn : n <= m)
+  : Sail.BitVec.signExtend (w := n) (BitVec.ofNatLT x.val hx) m = BitVec.ofNatLT (w := m) x.val (by sorry)
+  := by
+    sorry
+
+end Sail
 
 namespace BabyBear
 

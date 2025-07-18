@@ -45,7 +45,7 @@ def toProp : SP1Constraint → Prop
       mult ≠ 0 → Word.isU64 #v[limb0, limb1, limb2, limb3]
   | .send
       (.program
-      pc0 _pc1 _pc2
+      pc0 pc1 pc2
       opcode
       op_a
       op_b_0 op_b_1 op_b_2 op_b_3 
@@ -58,18 +58,12 @@ def toProp : SP1Constraint → Prop
         mult ≠ 0
         -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3
            ∧ op_a < 32 
-           ∧ op_b_0 < 65536
-           ∧ op_b_1 < 65536
-           ∧ op_b_2 < 65536
-           ∧ op_b_3 < 65536
-           ∧ op_c_0 < 65536
-           ∧ op_c_1 < 65536
-           ∧ op_c_2 < 65536
-           ∧ op_c_3 < 65536
+           ∧ (op_b_0 < 65536 ∧ op_b_1 < 65536 ∧ op_b_2 < 65536 ∧ op_b_3 < 65536)
+           ∧ (op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ op_c_2 < 65536 ∧ op_c_3 < 65536)
            ∧ (op_a_0 = 0 ∨ op_a_0 = 1)
            ∧ (imm_b = 0 ∨ imm_b = 1)
            ∧ (imm_c = 0 ∨ imm_c = 1)
-           ∧ (pc0 % 4 = 0)
+           ∧ (pc0 % 4 = 0 ∧ (pc0 < 65536 ∧ pc1 < 65536 ∧ pc2 < 65536))
   | _ => True
 
 @[simp] lemma toProp_assertZero (x : Fin BB) :
