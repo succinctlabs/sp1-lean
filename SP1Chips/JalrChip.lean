@@ -94,7 +94,7 @@ def sp1_op_a : BitVec 5 :=
 def sp1_jalr : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], 0])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
 
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure
 
@@ -118,15 +118,25 @@ theorem correct
 
     simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
     obtain ⟨⟨h_op_b, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, h_c_mul4⟩⟩, 
-      ⟨h_op_a, ⟨_, ⟨_, ⟨_, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
+      ⟨h_op_a, ⟨_, ⟨_, ⟨op_a_0_is_bool, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
     let read_op_b' := read_op_b h_op_b
     
     have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
     let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
 
-    -- have h_res := AddOperation.correct #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[30], Main[31], Main[32], Main[33]] } Main[29] h_is_real res_cstrs
+    have imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+      sorry
+
+    have pc_is_u64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
+      sorry
+
+    have ⟨res_is_u64, h_res⟩ := (AddOperation.correct #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[30], Main[31], Main[32], Main[33]] } Main[29] h_is_real res_cstrs) b_is_u64 imm_is_u64
+    rw [Word.toBitVec64_LT_eq_toNat res_is_u64, Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toBitVec64_LT_eq_toNat imm_is_u64] at h_res
+    simp [Word.toNat, h_c_1, h_c_2, h_c_3] at h_res
+
     -- simp [AddOperation.spec, Word.toBitVec64, Word.toNat] at h_res
-    clear res_cstrs reader_cstrs pc_cstrs inc_pc_cstrs chip_cstrs
+
+    clear res_cstrs reader_cstrs pc_cstrs chip_cstrs
 
     simp [spec_jalr, sp1_jalr, EStateM.run, execute_JALR]
     simp [op_a, op_b, imm, sp1_op_a, sp1_op_b, sp1_imm]
@@ -185,6 +195,7 @@ theorem correct
         sorry
     simp [b_bv64, imm, Word.toBitVec64LT, Word.toNat, sp1_imm, h_c_1, h_c_2, h_c_3] at trusted_jmp
     rw [trusted_jmp]
+    clear trusted_jmp
 
     simpM
 
@@ -215,6 +226,7 @@ theorem correct
       arg 2
       intro s'
       simp [always_misa]
+    clear always_misa
 
     -- Now simplify the mapped pure computation  
     conv =>
@@ -262,7 +274,29 @@ theorem correct
     simp [SailState.write_reg]
     simpM
 
-    sorry
+    rw [Word.toBitVec64_LT_eq_toNat res_is_u64]
+    simp [Word.toNat]
+    rw [h_res]
+    clear h_res
+
+    cases op_a_0_is_bool with
+    | inl op_a_not_0 =>
+        -- have ⟨next_pc_is_u64, next_pc_res⟩ :=
+        --   AddOperation.correct
+        --   #v[Main[3], Main[4], Main[5], 0]
+        --   #v[4, 0, 0, 0]
+        --   { value := #v[Main[34], Main[35], Main[36], Main[37]] }
+        --   (Main[29] - Main[13])
+        --   sorry
+        --   inc_pc_cstrs
+        --   pc_is_u64
+        --   (by simp [Word.isU64]; clear * - h_pc_0 h_pc_1 h_pc_2; trivial)
+        -- rw [Word.toBitVec64_LT_eq_toNat res_is_u64, Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toBitVec64_LT_eq_toNat pc_is_u64] at h_res
+        -- simp [Word.toNat, h_c_1, h_c_2, h_c_3] at h_res
+        sorry
+
+    | inr op_a_is_0 =>
+        sorry
 
 end Jalr
 

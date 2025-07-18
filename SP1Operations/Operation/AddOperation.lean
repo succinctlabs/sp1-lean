@@ -28,7 +28,7 @@ lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddOperation)
   refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_ <;> tauto
 
 def spec (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
-  a.isU64 → b.isU64 → cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
+  a.isU64 → b.isU64 → cols.value.isU64 ∧ cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
 set_option maxHeartbeats 1000000
 /-- If the operation is real and the input words have correctly bounded limbs,
@@ -44,6 +44,10 @@ theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
   have ha' := Word.lt_cases_of_isU64 ha
   have hb' := Word.lt_cases_of_isU64 hb
   simp at ha' hb'
+
+  apply And.intro
+  · clear *- hbds
+    aesop
 
   have hab0 : (a[0] + b[0]).val = a[0].val + b[0].val := by
     refine Word.val_add_of_isU64 ha hb 0
