@@ -143,7 +143,7 @@ theorem correct
 
     -- simp [AddOperation.spec, Word.toBitVec64, Word.toNat] at h_res
 
-    clear res_cstrs reader_cstrs pc_cstrs chip_cstrs
+    clear res_cstrs reader_cstrs pc_cstrs
 
     simp [spec_jalr, sp1_jalr, EStateM.run, execute_JALR]
     simp [op_a, op_b, imm, sp1_op_a, sp1_op_b, sp1_imm]
@@ -325,7 +325,26 @@ theorem correct
         simp [op_a, sp1_op_a] at h_op_a
         repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
     | inr op_a_is_x0 =>
-        sorry
+        clear read_op_a read_op_b read_pc inc_pc_cstrs
+        simp [op_a_is_x0] at chip_cstrs
+        obtain ⟨_, ⟨op_a_is_0, ⟨_, ⟨res_3_is_0, ⟨res_0_is_0, ⟨res_1_is_0, res_2_is_0⟩⟩⟩⟩⟩⟩ := chip_cstrs
+        simp [res_0_is_0, res_1_is_0, res_2_is_0, res_3_is_0, Word.toBitVec64, Word.toNat]
+
+        apply Std.ExtDHashMap.ext_get?
+
+        intro idx
+        by_cases h_nextPC : Register.nextPC = idx
+        · rw [Std.ExtDHashMap.get?_insert]
+          simp [h_nextPC]
+          rw [Std.ExtDHashMap.get?_insert]
+          simp [h_nextPC]
+          sorry -- try bv_decide
+        by_cases h_op_a : (reg_idx_to_Register op_a) = idx
+        · simp [op_a, sp1_op_a] at h_op_a
+          repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
+          sorry
+        simp [op_a, sp1_op_a] at h_op_a
+        repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
 
 end Jalr
 
