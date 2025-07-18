@@ -120,14 +120,12 @@ theorem correct
       ⟨h_op_a, ⟨_, ⟨_, ⟨_, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
     let read_op_b' := read_op_b h_op_b
     
+    have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
+    let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
+
     -- have h_res := AddOperation.correct #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[30], Main[31], Main[32], Main[33]] } Main[29] h_is_real res_cstrs
     -- simp [AddOperation.spec, Word.toBitVec64, Word.toNat] at h_res
     clear res_cstrs reader_cstrs pc_cstrs inc_pc_cstrs chip_cstrs
-
-    have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := 
-      by
-        sorry
-    let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
 
     simp [spec_jalr, sp1_jalr, EStateM.run, execute_JALR]
     simp [op_a, op_b, imm, sp1_op_a, sp1_op_b, sp1_imm]
