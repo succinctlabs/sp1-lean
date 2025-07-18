@@ -19,6 +19,8 @@ end Word
 
 section
 
+macro "simpM" : tactic => `(tactic| simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet])
+
 set_option autoImplicit false
 
 namespace Jalr
@@ -130,16 +132,16 @@ theorem correct
     simp [spec_jalr, sp1_jalr, EStateM.run, execute_JALR]
     simp [op_a, op_b, imm, sp1_op_a, sp1_op_b, sp1_imm]
     simp [Sail.readReg, Sail.writeReg, PreSail.readReg, PreSail.writeReg]
-    simp [bind,StateT.bind,EStateM.bind,get,getThe,MonadStateOf.get,StateT.get,EStateM.get,modify,modifyGet,MonadStateOf.modifyGet,StateT.modifyGet,EStateM.modifyGet,pure,EStateM.pure]
+    simpM
     rw [read_pc]
-    simp [bind,StateT.bind,EStateM.bind,get,getThe,MonadStateOf.get,StateT.get,EStateM.get,modify,modifyGet,MonadStateOf.modifyGet,StateT.modifyGet,EStateM.modifyGet,pure,EStateM.pure]
+    simpM
 
     rw [SailState.get_reg?_is_rX]
     simp [SailState.get_reg?, SequentialState.regs]
     rw [Std.ExtDHashMap.get?_insert]
     simp [SailState.reg_idx_never_nextPC, Option.toSailM]
     simp [SailState.get_reg?] at read_op_b'
-    simp [bind,StateT.bind,EStateM.bind,get,getThe,MonadStateOf.get,StateT.get,EStateM.get,modify,modifyGet,MonadStateOf.modifyGet,StateT.modifyGet,EStateM.modifyGet,pure,EStateM.pure]
+    simpM
     rw [read_op_b']
     simp
     /- conv => -/
@@ -148,8 +150,7 @@ theorem correct
     /-   simp only [Option.elim_some, EStateM.pure] -/
     clear read_op_b'
 
-    
-    simp [bind,StateT.bind,EStateM.bind,get,getThe,MonadStateOf.get,StateT.get,EStateM.get,modify,modifyGet,MonadStateOf.modifyGet,StateT.modifyGet,EStateM.modifyGet,pure,EStateM.pure]
+    simpM
     simp [h_c_1, h_c_2, h_c_3]
     -- conv =>
     --   lhs
@@ -186,7 +187,7 @@ theorem correct
     simp [b_bv64, imm, Word.toBitVec64LT, Word.toNat, sp1_imm, h_c_1, h_c_2, h_c_3] at trusted_jmp
     rw [trusted_jmp]
   
-    simp [bind,StateT.bind,EStateM.bind,get,getThe,MonadStateOf.get,StateT.get,EStateM.get,modify,modifyGet,MonadStateOf.modifyGet,StateT.modifyGet,EStateM.modifyGet,pure,StateT.pure,EStateM.pure, pure_bind]
+    simpM
 
     -- Simplify the pure false bind by unfolding definitions
     conv =>
@@ -208,7 +209,7 @@ theorem correct
     -- try to reduce currentlyEnabled
     simp only [currentlyEnabled, hartSupports]
     simp [Sail.readReg, PreSail.readReg]
-    simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure]
+    simpM
     
     conv =>
       lhs
@@ -228,20 +229,20 @@ theorem correct
       simp
     
     simp [get_next_pc, Sail.readReg, PreSail.readReg]
-    simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map]
+    simpM
     
     -- Simplify the register lookup using get?_insert
     -- The state s' has regs = s.regs.insert Register.nextPC ...
     -- and we're looking up Register.nextPC, so we should get the inserted value
     
     simp [← bind_pure_comp] 
-    simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map]
+    simpM
     rw [SailState.write_reg_is_wX]
     simp [SailState.write_reg]
-    simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet]
+    simpM
 
     simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
-    simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet]
+    simpM
 
     have pc_sum_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 :=
       by
