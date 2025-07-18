@@ -2,6 +2,8 @@ import Mathlib
 import LeanRV64IM.RiscvInstsEnd
 import LeanRV64IM.Defs
 
+macro "simpM" : tactic => `(tactic| simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet])
+
 section sailboats
 
 open PreSail
@@ -121,6 +123,12 @@ theorem writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
 --     (v v' : BitVec 32) :
 --     (do wX id v; wX id' v') =
 --       (do wX id' v'; wX id v) := sorry
+
+instance : Fintype (BitVec n) where
+  elems := Finset.image (BitVec.ofFin) Finset.univ
+  complete := by
+    intro x
+    simp [Finset.mem_image]
 
 open Sail (trivialChoiceSource Error)
 
