@@ -184,7 +184,7 @@ theorem correct
         sorry
     simp [b_bv64, imm, Word.toBitVec64LT, Word.toNat, sp1_imm, h_c_1, h_c_2, h_c_3] at trusted_jmp
     rw [trusted_jmp]
-  
+
     simpM
 
     -- Simplify the pure false bind by unfolding definitions
@@ -194,7 +194,7 @@ theorem correct
       arg 1
       unfold EStateM.pure EStateM.bind
       simp
-    
+
     -- Now unfold the bind to substitute false
     conv =>
       lhs
@@ -203,18 +203,18 @@ theorem correct
       simp
 
     have always_misa : ∀s : SailState, s.regs.get? Register.misa = some 0 := by sorry
-    
+
     -- try to reduce currentlyEnabled
     simp only [currentlyEnabled, hartSupports]
     simp [Sail.readReg, PreSail.readReg]
     simpM
-    
+
     conv =>
       lhs
       arg 2
       intro s'
       simp [always_misa]
-    
+
     -- Now simplify the mapped pure computation  
     conv =>
       lhs
@@ -225,14 +225,14 @@ theorem correct
         | EStateM.Result.ok a s => _
         | EStateM.Result.error e s => EStateM.Result.error e s
       simp
-    
+
     simp [get_next_pc, Sail.readReg, PreSail.readReg]
     simpM
-    
+
     -- Simplify the register lookup using get?_insert
     -- The state s' has regs = s.regs.insert Register.nextPC ...
     -- and we're looking up Register.nextPC, so we should get the inserted value
-    
+
     simp [← bind_pure_comp] 
     simpM
     rw [SailState.write_reg_is_wX]
