@@ -134,6 +134,31 @@ def reg_idx_to_Register (idx : BitVec 5) : Register :=
   | 3 => Register.x3
   | 4 => Register.x4
   | 5 => Register.x5
+  | 6 => Register.x6
+  | 7 => Register.x7
+  | 8 => Register.x8
+  | 9 => Register.x9
+  | 10 => Register.x10
+  | 11 => Register.x11
+  | 12 => Register.x12
+  | 13 => Register.x13
+  | 14 => Register.x14
+  | 15 => Register.x15
+  | 16 => Register.x16
+  | 17 => Register.x17
+  | 18 => Register.x18
+  | 19 => Register.x19
+  | 20 => Register.x20
+  | 21 => Register.x21
+  | 22 => Register.x22
+  | 23 => Register.x23
+  | 24 => Register.x24
+  | 25 => Register.x25
+  | 26 => Register.x26
+  | 27 => Register.x27
+  | 28 => Register.x28
+  | 29 => Register.x29
+  | 30 => Register.x30
   | _ => Register.x31
 
 theorem reg_idx_must_64
@@ -144,10 +169,13 @@ theorem reg_idx_must_64
     split <;> rfl
 
 def SailState.get_reg? (s : SailState) (idx : BitVec 5) : Option (BitVec 64) :=
-  by
-    let reg : Register := reg_idx_to_Register idx
-    rw [←reg_idx_must_64 idx]
-    refine s.regs.get? reg
+  if idx = 0
+  then some 0
+  else
+    by
+      let reg : Register := reg_idx_to_Register idx
+      rw [←reg_idx_must_64 idx]
+      exact s.regs.get? reg
 
 def SailState.write_reg (s : SailState) (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
   do
@@ -156,7 +184,7 @@ def SailState.write_reg (s : SailState) (idx : BitVec 5) (val : BitVec 64) : Sai
       { s with regs := s.regs.insert reg (by rw [reg_idx_must_64 idx]; exact val) }
 
 def Option.toSailM {α} (o : Option α) : SailM α :=
-  o.elim (throw (by exact Error.Exit)) pure
+  o.elim (throw (by exact Error.Unreachable)) pure
 
 theorem SailState.get_reg?_is_rX {s : SailState}
   (idx : BitVec 5)
