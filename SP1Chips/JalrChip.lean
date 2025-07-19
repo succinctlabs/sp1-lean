@@ -363,9 +363,8 @@ theorem correct
 
         conv =>
           rhs
-
-        -- simp [SailState.write_reg]
-        stop
+          arg 2
+          simp [SailState.write_reg]
         simp [op_a_0_is_1] at chip_cstrs
         obtain ⟨_, ⟨_, ⟨_, ⟨op_a3_is_0, ⟨op_a0_is_0, ⟨op_a1_is_0, op_a2_is_0⟩⟩⟩⟩⟩⟩ := chip_cstrs
         simp [op_a0_is_0, op_a3_is_0, op_a1_is_0, op_a2_is_0]
