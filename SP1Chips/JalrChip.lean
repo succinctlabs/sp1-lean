@@ -117,7 +117,7 @@ theorem correct
 
     simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
     obtain ⟨⟨h_op_b, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, h_c_mul4⟩⟩, 
-      ⟨h_op_a, ⟨_, ⟨_, ⟨op_a_0_is_bool, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
+      ⟨h_op_a, ⟨_, ⟨_, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
     let read_op_b' := read_op_b h_op_b
     
     have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
@@ -253,41 +253,52 @@ theorem correct
     -- The state s' has regs = s.regs.insert Register.nextPC ...
     -- and we're looking up Register.nextPC, so we should get the inserted value
 
-    simp [← bind_pure_comp] 
-    simpM
-    rw [SailState.write_reg_is_wX]
-    simp [SailState.write_reg]
-    simpM
-
-    simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
-    simpM
-
-    have pc_sum_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 :=
-      by
-        clear * - h_pc_0 h_pc_1 h_pc_2
-        simp at *
-        omega
-    -- have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
-    -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
-    rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
-
-    simp [sign_extend]
-    rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
-
-    rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
-    simp [Word.toNat]
-
-    rw [SailState.write_reg_is_wX]
-    simp [SailState.write_reg]
-    simpM
-
-    rw [Word.toBitVec64_LT_eq_toNat res_is_u64]
-    simp [Word.toNat]
-    rw [h_res]
-    clear h_res
-
     cases op_a_0_is_bool with
     | inl op_a_not_x0 =>
+        -- TODO(gzgz): god this is awful
+        have op_a_not_0 : op_a ≠ 0 := by
+          simp only [op_a, sp1_op_a, BitVec.ofNatLT, ne_eq]
+          intro h
+          simp [op_a_not_x0] at op_a_0_iff_op_a_is_0
+          apply op_a_0_iff_op_a_is_0
+          have := congrArg (·.toFin.val) h
+          simp at this
+          exact this
+        simp [op_a, sp1_op_a] at op_a_not_0
+
+        simp [← bind_pure_comp] 
+        simpM
+        rw [SailState.write_reg_is_wX]
+        simp [SailState.write_reg, op_a_not_0]
+        simpM
+
+        simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
+        simpM
+
+        have pc_sum_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 :=
+          by
+            clear * - h_pc_0 h_pc_1 h_pc_2
+            simp at *
+            omega
+        -- have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
+        -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
+        rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
+
+        simp [sign_extend]
+        rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
+
+        rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
+        simp [Word.toNat]
+
+        rw [SailState.write_reg_is_wX]
+        simp [SailState.write_reg, op_a_not_0]
+        simpM
+
+        rw [Word.toBitVec64_LT_eq_toNat res_is_u64]
+        simp [Word.toNat]
+        rw [h_res]
+        clear h_res
+
         obtain ⟨a_write_is_u64, h_a_write⟩ :=
           AddOperation.correct
           #v[Main[3], Main[4], Main[5], 0]
@@ -323,6 +334,7 @@ theorem correct
         simp [op_a, sp1_op_a] at h_op_a
         repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
     | inr op_a_is_x0 =>
+        stop
         clear read_op_a read_op_b read_pc inc_pc_cstrs
         simp [op_a_is_x0] at chip_cstrs
         obtain ⟨_, ⟨op_a_is_0, ⟨_, ⟨res_3_is_0, ⟨res_0_is_0, ⟨res_1_is_0, res_2_is_0⟩⟩⟩⟩⟩⟩ := chip_cstrs

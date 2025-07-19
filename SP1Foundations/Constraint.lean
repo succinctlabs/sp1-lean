@@ -61,6 +61,7 @@ def toProp : SP1Constraint → Prop
            ∧ (op_b_0 < 65536 ∧ op_b_1 < 65536 ∧ op_b_2 < 65536 ∧ op_b_3 < 65536)
            ∧ (op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ op_c_2 < 65536 ∧ op_c_3 < 65536)
            ∧ (op_a_0 = 0 ∨ op_a_0 = 1)
+           ∧ (op_a_0 = 1 ↔ op_a = 0)
            ∧ (imm_b = 0 ∨ imm_b = 1)
            ∧ (imm_c = 0 ∨ imm_c = 1)
            ∧ (pc0 % 4 = 0 ∧ (pc0 < 65536 ∧ pc1 < 65536 ∧ pc2 < 65536))

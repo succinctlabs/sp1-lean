@@ -185,11 +185,14 @@ def SailState.get_reg? (s : SailState) (idx : BitVec 5) : Option (BitVec 64) :=
       rw [←reg_idx_must_64 idx]
       exact s.regs.get? reg
 
-def SailState.write_reg (s : SailState) (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
+def SailState.write_reg (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
   do
     let reg : Register := reg_idx_to_Register idx
-    modify fun s =>
-      { s with regs := s.regs.insert reg (by rw [reg_idx_must_64 idx]; exact val) }
+    if idx != 0 then
+      modify fun s =>
+        { s with regs := s.regs.insert reg (by rw [reg_idx_must_64 idx]; exact val) }
+    else if val ≠ 0 then
+      throw Error.Unreachable
 
 def Option.toSailM {α} (o : Option α) : SailM α :=
   o.elim (throw (by exact Error.Unreachable)) pure
@@ -213,7 +216,7 @@ theorem SailState.get_reg?_is_rX {s : SailState}
 theorem SailState.write_reg_is_wX {s : SailState}
   (idx : BitVec 5)
   (val : BitVec 64)
-  : (wX_bits (regidx.Regidx idx) val) s = (s.write_reg idx val) s :=
+  : (wX_bits (regidx.Regidx idx) val) s = (write_reg idx val) s :=
   by
     sorry
 
