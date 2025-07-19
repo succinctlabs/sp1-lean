@@ -198,7 +198,17 @@ theorem SailState.get_reg?_is_rX {s : SailState}
   (idx : BitVec 5)
   : (rX_bits (regidx.Regidx idx)) s = (s.get_reg? idx).toSailM s :=
   by
-    sorry
+    fin_cases idx
+    · simp
+      congr
+    · simp [Option.toSailM, SailState.get_reg?] at *
+      simp [reg_idx_to_Register, Option.elim]
+      simp [rX_bits, rX, Sail.readReg, PreSail.readReg, regval_from_reg]
+      simpM
+      match s.regs.get? _ with
+      | none => rfl
+      | some _ => rfl
+    all_goals sorry
 
 theorem SailState.write_reg_is_wX {s : SailState}
   (idx : BitVec 5)
