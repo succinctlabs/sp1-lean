@@ -231,36 +231,32 @@ theorem SailState.get_reg?_is_rX {s : SailState}
 --   by
 --     sorry
 
+lemma case_31 {val : BitVec 64} {s : SailState}
+  : s.regs.insert (reg_idx_to_Register 31#5) val = s.regs.insert Register.x31 val :=
+  by
+    apply congrArg
+    rfl
+
 theorem SailState.wX_bits_is_regidx_write (idx : BitVec 5) (val : BitVec 64)
   : SailState.regidx_write idx val = wX_bits (.Regidx idx) val
   :=
   by
     simp [SailState.regidx_write, wX_bits]
-    by_cases hx : idx = 31#5
-    · rw [hx]
+    by_cases x_is_31 : idx = 31#5
+    · rw [x_is_31]
       simp
       conv =>
         lhs
         arg 1
         intro s
         arg 1
-        -- rw [reg_idx_31_is_x31]
-        
-      sorry
-    sorry
-    -- fin_cases idx
-    -- · simp [wX]
-    -- all_goals
-    --   simp [wX, Sail.writeReg, PreSail.writeReg, xreg_write_callback, xreg_full_write_callback, reg_name_forwards, get_config_use_abi_names, LeanRV64IM.Functions.not, regval_into_reg]
-    --   try rw [reg_idx_31_is_x31]
-    --   sorry
-    -- conv =>
-    --   lhs
-    --   arg 1
-    --   intro s
-    --   arg 1
-    --   simp
-    -- sorry
+        rw [case_31]
+      simp [wX, Sail.writeReg, PreSail.writeReg, xreg_write_callback, xreg_full_write_callback, reg_name_forwards, get_config_use_abi_names, LeanRV64IM.Functions.not, regval_into_reg]
+    fin_cases idx
+    · simp [wX]
+    all_goals
+      simp [wX, Sail.writeReg, PreSail.writeReg, xreg_write_callback, xreg_full_write_callback, reg_name_forwards, get_config_use_abi_names, LeanRV64IM.Functions.not, regval_into_reg, reg_idx_to_Register]
+    simp at x_is_31
 
 theorem SailState.reg_idx_never_nextPC
   {idx : BitVec 5}
