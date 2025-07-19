@@ -169,6 +169,10 @@ def reg_idx_to_Register (idx : BitVec 5) : Register :=
   | 30 => Register.x30
   | _ => Register.x31
 
+theorem reg_idx_31_is_x31 : reg_idx_to_Register 31#5 = Register.x31 :=
+  by
+    aesop
+
 theorem reg_idx_must_64
   (idx : BitVec 5)
   : RegisterType (reg_idx_to_Register idx) = BitVec 64 :=
@@ -194,6 +198,13 @@ def SailState.write_reg (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
     else if val ≠ 0 then
       throw Error.Unreachable
 
+def SailState.regidx_write (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
+  do
+    let reg : Register := reg_idx_to_Register idx
+    if idx != 0 then
+      modify fun s =>
+        { s with regs := s.regs.insert reg (by rw [reg_idx_must_64 idx]; exact val) }
+
 def Option.toSailM {α} (o : Option α) : SailM α :=
   o.elim (throw (by exact Error.Unreachable)) pure
 
@@ -213,12 +224,43 @@ theorem SailState.get_reg?_is_rX {s : SailState}
       | none => rfl
       | some _ => rfl
 
-theorem SailState.write_reg_is_wX {s : SailState}
-  (idx : BitVec 5)
-  (val : BitVec 64)
-  : (wX_bits (regidx.Regidx idx) val) s = (write_reg idx val) s :=
+-- theorem SailState.write_reg_is_wX {s : SailState}
+--   (idx : BitVec 5)
+--   (val : BitVec 64)
+--   : (wX_bits (regidx.Regidx idx) val) s = (write_reg idx val) s :=
+--   by
+--     sorry
+
+theorem SailState.wX_bits_is_regidx_write (idx : BitVec 5) (val : BitVec 64)
+  : SailState.regidx_write idx val = wX_bits (.Regidx idx) val
+  :=
   by
+    simp [SailState.regidx_write, wX_bits]
+    by_cases hx : idx = 31#5
+    · rw [hx]
+      simp
+      conv =>
+        lhs
+        arg 1
+        intro s
+        arg 1
+        -- rw [reg_idx_31_is_x31]
+        
+      sorry
     sorry
+    -- fin_cases idx
+    -- · simp [wX]
+    -- all_goals
+    --   simp [wX, Sail.writeReg, PreSail.writeReg, xreg_write_callback, xreg_full_write_callback, reg_name_forwards, get_config_use_abi_names, LeanRV64IM.Functions.not, regval_into_reg]
+    --   try rw [reg_idx_31_is_x31]
+    --   sorry
+    -- conv =>
+    --   lhs
+    --   arg 1
+    --   intro s
+    --   arg 1
+    --   simp
+    -- sorry
 
 theorem SailState.reg_idx_never_nextPC
   {idx : BitVec 5}

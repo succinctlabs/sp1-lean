@@ -91,7 +91,7 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_jalr : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
+  SailState.write_reg op_a (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
 
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure
@@ -254,24 +254,26 @@ theorem correct
     -- and we're looking up Register.nextPC, so we should get the inserted value
 
     cases op_a_0_is_bool with
-    | inl op_a_not_x0 =>
+    | inl op_a_0_is_0 =>
         -- TODO(gzgz): god this is awful
-        have op_a_not_0 : op_a ≠ 0 := by
+        have op_a_not_x0 : op_a ≠ 0 := by
           simp only [op_a, sp1_op_a, BitVec.ofNatLT, ne_eq]
           intro h
-          simp [op_a_not_x0] at op_a_0_iff_op_a_is_0
+          simp [op_a_0_is_0] at op_a_0_iff_op_a_is_0
           apply op_a_0_iff_op_a_is_0
           have := congrArg (·.toFin.val) h
           simp at this
           exact this
-        simp [op_a, sp1_op_a] at op_a_not_0
+        simp [op_a, sp1_op_a] at op_a_not_x0
 
+        stop
         simp [← bind_pure_comp] 
         simpM
         rw [SailState.write_reg_is_wX]
-        simp [SailState.write_reg, op_a_not_0]
+        simp [SailState.write_reg, op_a_not_x0]
         simpM
 
+        stop
         simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
         simpM
 
@@ -290,9 +292,9 @@ theorem correct
         rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
         simp [Word.toNat]
 
-        rw [SailState.write_reg_is_wX]
-        simp [SailState.write_reg, op_a_not_0]
-        simpM
+        -- rw [SailState.write_reg_is_wX]
+        -- simp [SailState.write_reg, op_a_not_x0]
+        -- simpM
 
         rw [Word.toBitVec64_LT_eq_toNat res_is_u64]
         simp [Word.toNat]
@@ -305,7 +307,7 @@ theorem correct
           #v[4, 0, 0, 0]
           { value := #v[Main[34], Main[35], Main[36], Main[37]] }
           (Main[29] - Main[13])
-          (by simp [h_is_real, op_a_not_x0])
+          (by simp [h_is_real, op_a_0_is_0])
           inc_pc_cstrs
           pc_is_u64
           (by simp [Word.isU64]; clear * - h_pc_0 h_pc_1 h_pc_2; trivial)
@@ -333,12 +335,51 @@ theorem correct
           repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
         simp [op_a, sp1_op_a] at h_op_a
         repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
-    | inr op_a_is_x0 =>
+    | inr op_a_0_is_1 =>
+        have op_a_is_x0 : op_a = 0 := by sorry
+        simp [op_a, sp1_op_a] at op_a_is_x0
+
+        simp [← bind_pure_comp] 
+        simpM
+        simp [wX_bits, wX, op_a_is_x0]
+        simpM
+        simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
+        simpM
+        
+        have pc_sum_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 :=
+          by
+            clear * - h_pc_0 h_pc_1 h_pc_2
+            simp at *
+            omega
+        -- have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
+        -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
+        rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
+
+        simp [sign_extend]
+        rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
+
+        rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
+        simp [Word.toNat]
+
+        conv =>
+          rhs
+
+        -- simp [SailState.write_reg]
         stop
-        clear read_op_a read_op_b read_pc inc_pc_cstrs
-        simp [op_a_is_x0] at chip_cstrs
-        obtain ⟨_, ⟨op_a_is_0, ⟨_, ⟨res_3_is_0, ⟨res_0_is_0, ⟨res_1_is_0, res_2_is_0⟩⟩⟩⟩⟩⟩ := chip_cstrs
-        simp [res_0_is_0, res_1_is_0, res_2_is_0, res_3_is_0, Word.toBitVec64, Word.toNat]
+        simp [op_a_0_is_1] at chip_cstrs
+        obtain ⟨_, ⟨_, ⟨_, ⟨op_a3_is_0, ⟨op_a0_is_0, ⟨op_a1_is_0, op_a2_is_0⟩⟩⟩⟩⟩⟩ := chip_cstrs
+        simp [op_a0_is_0, op_a3_is_0, op_a1_is_0, op_a2_is_0]
+        conv =>
+          rhs
+          arg 2
+          simp [Word.toBitVec64, Word.toNat]
+        simpM
+        -- move this block above before the `simp` and you can simp fine...
+
+        rw [Word.toBitVec64_LT_eq_toNat res_is_u64]
+        simp [Word.toNat]
+        rw [h_res]
+        clear h_res
 
         apply Std.ExtDHashMap.ext_get?
 
@@ -349,12 +390,7 @@ theorem correct
           rw [Std.ExtDHashMap.get?_insert]
           simp [h_nextPC]
           sorry -- try bv_decide
-        by_cases h_op_a : (reg_idx_to_Register op_a) = idx
-        · simp [op_a, sp1_op_a] at h_op_a
-          repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
-          sorry
-        simp [op_a, sp1_op_a] at h_op_a
-        repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
+        repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC])
 
 end Jalr
 
