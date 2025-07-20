@@ -266,14 +266,13 @@ theorem correct
           exact this
         simp [op_a, sp1_op_a] at op_a_not_x0
 
-        stop
         simp [← bind_pure_comp] 
         simpM
-        rw [SailState.write_reg_is_wX]
-        simp [SailState.write_reg, op_a_not_x0]
+        rw [←SailState.wX_bits_is_regidx_write]
+        simp [SailState.regidx_write]
+        simp [op_a_not_x0]
         simpM
 
-        stop
         simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
         simpM
 
@@ -320,6 +319,9 @@ theorem correct
         rw [Word.toBitVec64_LT_eq_toNat a_write_is_u64]
         simp
         rw [h_a_write]
+
+        simp [SailState.write_reg, op_a_not_x0]
+        simpM
 
         apply Std.ExtDHashMap.ext_get?
 
