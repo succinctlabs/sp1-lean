@@ -338,7 +338,10 @@ theorem correct
         simp [op_a, sp1_op_a] at h_op_a
         repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
     | inr op_a_0_is_1 =>
-        have op_a_is_x0 : op_a = 0 := by sorry
+        have op_a_is_x0 : op_a = 0 := by
+          clear * - op_a_0_iff_op_a_is_0 op_a_0_is_1
+          simp [op_a, sp1_op_a]
+          simp_all only [Fin.isValue, true_iff, Fin.coe_ofNat_eq_mod, Nat.zero_mod, BitVec.ofNatLT_zero]
         simp [op_a, sp1_op_a] at op_a_is_x0
 
         simp [← bind_pure_comp] 
