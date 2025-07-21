@@ -1,4 +1,6 @@
 import SP1Foundations.Field
+import SP1Foundations.SailM
+import SP1Foundations.Word
 
 inductive Opcode where
   | ADD
@@ -74,6 +76,18 @@ def trusted_instr
       -- 2^12 = 4096
       ∧ (op_c_0 < 2^12 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0)
       ∧ op_c_0 % 4 == 0
+  | _ => True
+
+@[simp]
+def trusted_instr_state
+  (s : SailState)
+  (opcode : Opcode)
+  (_op_a op_b_0 _op_b_1 _op_b_2 _op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 : Fin BB)
+  : Prop :=
+  match opcode with
+  | JALR =>
+      let new_pc : BitVec 64 := (s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + BitVec.signExtend 64 (BitVec.ofNat 12 (Word.toNat #v[op_c_0, op_c_1, op_c_2, op_c_3]))
+      new_pc[1] = 0
   | _ => True
 
 end Opcode
