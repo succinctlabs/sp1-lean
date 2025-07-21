@@ -37,11 +37,44 @@ theorem mul4_add_is_mul4 {a b : BitVec 64}
   by
     bv_decide
 
-theorem BB_mod_eq {x : Fin BB} {q m : ℕ}
-  : (x % q = m) ↔ (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith) % q = m)
+theorem FinBB_mul4_is_BV_mul4 {x : Fin BB}
+  : x % 4 = 0 → (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith)) % 4 = 0
   :=
   by
-    sorry
+    intro h
+    have h' : x.val % 4 = 0 := by simp [Fin.mod_def] at h; exact h
+    simp [BitVec.umod_def, BitVec.toNat_ofNatLT, h']
+
+theorem mod4_means_0_1_are_0 {x : BitVec 64}
+  (hx : x % 4 = 0)
+  : x[0] = false ∧ x[1] = false
+  := by
+    have hx' : x.toNat % 4 = 0 := by bv_omega
+    apply And.intro
+    · have hzero : x[0] = x[(0 : Fin 64)] := by
+        aesop
+      rw [hzero]
+      rw [←BitVec.getLsb_eq_getElem x 0]
+      clear hzero
+      simp [BitVec.getLsb]
+      omega
+    · have hzero : x[1] = x[(1 : Fin 64)] := by
+        aesop
+      rw [hzero]
+      rw [←BitVec.getLsb_eq_getElem x 1]
+      clear hzero
+      simp [BitVec.getLsb, Nat.testBit]
+      omega
+
+theorem FinBB_mul4_means_LS2B_0
+  (x : Fin BB)
+  : let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith))
+  x % 4 = 0 → vx[0] = false ∧ vx[1] = false
+  := by
+    extract_lets vx
+    intro hx
+    simp [vx]
+    exact mod4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
 
 end BitVec
 
