@@ -86,8 +86,9 @@ def trusted_instr_state
   : Prop :=
   match opcode with
   | JALR =>
-      let new_pc : BitVec 64 := (s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + BitVec.signExtend 64 (BitVec.ofNat 12 (Word.toNat #v[op_c_0, op_c_1, op_c_2, op_c_3]))
-      new_pc[1] = 0
+      -- let new_pc : BitVec 64 := (s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + BitVec.signExtend 64 (BitVec.ofNat 12 (Word.toNat #v[op_c_0, op_c_1, op_c_2, op_c_3]))
+      -- new_pc[1] = 0
+      ((s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
   | _ => True
 
 end Opcode

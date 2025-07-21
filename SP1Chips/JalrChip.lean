@@ -45,7 +45,7 @@ theorem FinBB_mul4_is_BV_mul4 {x : Fin BB}
     have h' : x.val % 4 = 0 := by simp [Fin.mod_def] at h; exact h
     simp [BitVec.umod_def, BitVec.toNat_ofNatLT, h']
 
-theorem mod4_means_0_1_are_0 {x : BitVec 64}
+theorem mul4_means_0_1_are_0 {x : BitVec 64}
   (hx : x % 4 = 0)
   : x[0] = false ∧ x[1] = false
   := by
@@ -74,7 +74,7 @@ theorem FinBB_mul4_means_LS2B_0
     extract_lets vx
     intro hx
     simp [vx]
-    exact mod4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
+    exact mul4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
 
 end BitVec
 
@@ -261,17 +261,27 @@ theorem correct
     rw [read_op_b h_op_b] at op_b_val_plus_imm_mul4
     simp [Option.get!] at op_b_val_plus_imm_mul4
     simp [Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toNat] at op_b_val_plus_imm_mul4
-    simp [h_c_1, h_c_2, h_c_3, Word.toNat] at op_b_val_plus_imm_mul4
-    simp [←BitVec.ofNatLT_eq_ofNat (w := 12) (n := Main[21].val) (by exact h_c_0)] at op_b_val_plus_imm_mul4
+    simp [h_c_1, h_c_2, h_c_3, Word.toBitVec64, Word.toNat] at op_b_val_plus_imm_mul4
+    rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val) (by sorry)] at op_b_val_plus_imm_mul4
+    have op_b_val_plus_signExtend_imm_mul4 : (b_bv64 + sign_extend imm) % 4 = 0 := by
+      simp [sign_extend, Sail.BitVec.signExtend]
+      simp [imm, sp1_imm, Word.toBitVec64LT, Word.toNat, h_c_1, h_c_2, h_c_3]
+      let hello := BitVec.useless_signExtend_add (y := b_bv64) (x := Main[21]) (hx := h_c_0)
+      simp [b_bv64, Word.toBitVec64LT, Word.toNat] at hello
+      rw [op_b_val_plus_imm_mul4] at hello
+      exact hello.symm
+    simp [b_bv64, Word.toBitVec64LT, Word.toNat, imm, sp1_imm, h_c_1, h_c_2, h_c_3, sign_extend, Sail.BitVec.signExtend] at op_b_val_plus_signExtend_imm_mul4
+    obtain ⟨op_b_plus_val_signExtend_imm_0, op_b_plus_val_signExtend_imm_1⟩ := BitVec.mul4_means_0_1_are_0 op_b_val_plus_signExtend_imm_mul4
+    -- rw [BitVec.useless_signExtend_add (x := Main[21])] at op_b_val_plus_imm_mul4
+    -- simp [←BitVec.ofNatLT_eq_ofNat (w := 12) (n := Main[21].val) (by exact h_c_0)] at op_b_val_plus_imm_mul4
     conv =>
       lhs
       arg 2
       arg 1
       simp [Sail.BitVec.update, Sail.BitVec.updateSubrange', Sail.BitVec.access]
       simp [sign_extend, Sail.BitVec.signExtend]
-      simp [bit_to_bool]
-      rw [op_b_val_plus_imm_mul4]
-      simp [bool_bit_backwards, BitVec.ofBool, cond]
+      rw [op_b_plus_val_signExtend_imm_1]
+      simp [bit_to_bool, bool_bit_backwards, BitVec.ofBool, cond]
     simpM
 
     -- Simplify the pure false bind by unfolding definitions
@@ -407,24 +417,25 @@ theorem correct
           -- have b_limbs := Word.lt_cases_of_isU64 b_is_u64
           -- simp at [b_limbs]
 
-          have h_b_0_mul4 : Main[15].val % 4 = 0 := by sorry
-          have h_b_0 : Main[15].val < 65536 := by exact b_is_u64 0
-          have h_b_1 : Main[16].val < 65536 := by exact b_is_u64 1
-          have h_b_2 : Main[17].val < 65536 := by exact b_is_u64 2
-          have h_b_3 : Main[18].val < 65536 := by exact b_is_u64 3
-          have h_sum_nat_mul4 : (Main[15].val + Main[16].val * 65536 + Main[17].val * 4294967296 + Main[18].val * 281474976710656) % 4 = 0 :=
-            by
-              omega
-            -- simp [BitVec.umod_def]
-          refine BitVec.mul4_add_is_mul4 ?_ ?_
-          · simp [BitVec.umod_def]
-            apply congrArg
-            exact h_sum_nat_mul4
-          · simp [BitVec.umod_def]
-            -- rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val % 4) sorry]
-            apply congrArg
-            simp [Fin.mod_def] at h_c_mul4
-            exact h_c_mul4
+          -- have h_b_0_mul4 : Main[15].val % 4 = 0 := by sorry
+          -- have h_b_0 : Main[15].val < 65536 := by exact b_is_u64 0
+          -- have h_b_1 : Main[16].val < 65536 := by exact b_is_u64 1
+          -- have h_b_2 : Main[17].val < 65536 := by exact b_is_u64 2
+          -- have h_b_3 : Main[18].val < 65536 := by exact b_is_u64 3
+          -- have h_sum_nat_mul4 : (Main[15].val + Main[16].val * 65536 + Main[17].val * 4294967296 + Main[18].val * 281474976710656) % 4 = 0 :=
+          --   by
+          --     omega
+          --   -- simp [BitVec.umod_def]
+          -- refine BitVec.mul4_add_is_mul4 ?_ ?_
+          -- · simp [BitVec.umod_def]
+          --   apply congrArg
+          --   exact h_sum_nat_mul4
+          -- · simp [BitVec.umod_def]
+          --   -- rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val % 4) sorry]
+          --   apply congrArg
+          --   simp [Fin.mod_def] at h_c_mul4
+          --   exact h_c_mul4
+          sorry
         by_cases h_op_a : (reg_idx_to_Register op_a) = idx
         · simp [op_a, sp1_op_a] at h_op_a
           repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
@@ -451,7 +462,7 @@ theorem correct
             omega
         -- have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
         -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
-        rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
+        -- rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
 
         simp [sign_extend]
         rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
