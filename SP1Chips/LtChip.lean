@@ -19,7 +19,7 @@ def constraints (Main : Vector (Fin BB) 44) : SP1ConstraintList :=
   let E11 : Fin BB := Main[1] * 65536
   let E12 : Fin BB := Main[2] + E11
   let E13 : Fin BB := 0 + Main[34]
-  let CS2 : SP1ConstraintList := ALUTypeReader.constraints Main[0] E12 #v[Main[3], Main[4], Main[5]] E10 #v[E13, 0, 0, 0] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E0
+  let CS2 : SP1ConstraintList := ALUTypeReader.constraints Main[0] E12 #v[Main[3], Main[4], Main[5]] E10 #v[51, 0, 0] #v[E13, 0, 0, 0] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E0
   [
     (.assertZero E2),
     (.assertZero E4),

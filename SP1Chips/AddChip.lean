@@ -14,7 +14,7 @@ def constraints (Main : Vector (Fin BB) 33) : SP1ConstraintList :=
   let CS1 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E2, Main[4], Main[5]] 8 Main[32]
   let E3 : Fin BB := Main[1] * 65536
   let E4 : Fin BB := Main[2] + E3
-  let CS2 : SP1ConstraintList := RTypeReader.constraints Main[0] E4 #v[Main[3], Main[4], Main[5]] 0 #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[32]
+  let CS2 : SP1ConstraintList := RTypeReader.constraints Main[0] E4 #v[Main[3], Main[4], Main[5]] 0 #v[51, 0, 0] #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[32]
   [
     (.assertZero E1),
   ] ++ CS0 ++ CS1 ++ CS2
@@ -27,7 +27,7 @@ lemma allHold_constraints_iff (Main : Vector (Fin BB) 33) :
       (CPUState.constraints
         { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
           #v[Main[3] + 4, Main[4], Main[5]] 8 Main[32]).allHold ∧
-      (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 0 #v[Main[28], Main[29], Main[30], Main[31]]
+      (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 0 #v[51, 0, 0] #v[Main[28], Main[29], Main[30], Main[31]]
         { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13],
           op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
           op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[32]).allHold := by
@@ -99,11 +99,11 @@ theorem SP1AddChip_Correct (Main : Vector (Fin BB) 33)
   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
   by_cases hreg : (regidx.Regidx (BitVec.ofNat 5 ↑Main[4])) = reg
   · rw [hreg, Function.update_self, Function.update_self, hmem₁, hmem₂]
-    refine AddOperation.correct
+    refine (AddOperation.correct
       #v[Main[15], Main[16], Main[17], Main[18]]
       #v[Main[22], Main[23], Main[24], Main[25]]
       { value := #v[Main[28], Main[29], Main[30], Main[31]] }
-      1 rfl add_cstrs ?_ ?_
+      1 rfl add_cstrs ?_ ?_).2
     · refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_ <;> tauto
     · refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_ <;> tauto
 
