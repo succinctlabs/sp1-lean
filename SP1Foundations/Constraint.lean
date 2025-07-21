@@ -14,11 +14,11 @@ inductive AirInteraction where
       (pc0 pc1 pc2 : Fin BB)
       (opcode : Opcode)
       (op_a
-      op_b_0 op_b_1 op_b_2 op_b_3 
+      op_b_0 op_b_1 op_b_2 op_b_3
       op_c_0 op_c_1 op_c_2 op_c_3
       op_a_0
       imm_b
-      imm_c 
+      imm_c
       instr_const0 instr_const1 instr_const2 : Fin BB)
   deriving DecidableEq
 
@@ -48,16 +48,16 @@ def toProp : SP1Constraint → Prop
       pc0 pc1 pc2
       opcode
       op_a
-      op_b_0 op_b_1 op_b_2 op_b_3 
+      op_b_0 op_b_1 op_b_2 op_b_3
       op_c_0 op_c_1 op_c_2 op_c_3
       op_a_0
       imm_b
-      imm_c 
+      imm_c
       _instr_const0 _instr_const1 _instr_const2)
       mult =>
         mult ≠ 0
         -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3
-           ∧ op_a < 32 
+           ∧ op_a < 32
            ∧ (op_b_0 < 65536 ∧ op_b_1 < 65536 ∧ op_b_2 < 65536 ∧ op_b_3 < 65536)
            ∧ (op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ op_c_2 < 65536 ∧ op_c_3 < 65536)
            ∧ (op_a_0 = 0 ∨ op_a_0 = 1)
@@ -73,9 +73,9 @@ def toProp : SP1Constraint → Prop
 @[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c : Fin BB) (mult : Fin BB) :
     (send (.byte op a b c) mult).toProp ↔ (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 
--- dt: change this back once airs work
-@[simp] lemma toProp_recv (air : AirInteraction) (mult : Fin BB) :
-    (receive air mult).toProp ↔ True := Iff.rfl
+-- -- dt: change this back once airs work
+-- @[simp] lemma toProp_recv (air : AirInteraction) (mult : Fin BB) :
+--     (receive air mult).toProp ↔ True := Iff.rfl
 
 end toProp
 
@@ -83,7 +83,7 @@ section toStateProp
 
 open PreSail
 
-def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop := 
+def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
   match cstr with
   | (.send (.memory _clk_high _clk_low addr0 addr1 addr2 limb0 limb1 limb2 limb3) mult) =>
       mult ≠ 0
@@ -101,11 +101,11 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
       _pc0 _pc1 _pc2
       opcode
       op_a
-      op_b_0 op_b_1 op_b_2 op_b_3 
+      op_b_0 op_b_1 op_b_2 op_b_3
       op_c_0 op_c_1 op_c_2 op_c_3
       _op_a_0
       _imm_b
-      _imm_c 
+      _imm_c
       _instr_const0 _instr_const1 _instr_const2)
       mult =>
         mult ≠ 0
@@ -160,4 +160,3 @@ lemma initialState_append (cs cs' : SP1ConstraintList) :
 end initialState
 
 end constraintList
-
