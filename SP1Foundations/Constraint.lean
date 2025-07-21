@@ -96,6 +96,20 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
       mult ≠ 0
       → s.regs.get? Register.PC
         = some (BitVec.ofNat 64 (pc0.val + pc1.val * 65536 + pc2.val * 4294967296))
+  | .send
+      (.program
+      _pc0 _pc1 _pc2
+      opcode
+      op_a
+      op_b_0 op_b_1 op_b_2 op_b_3 
+      op_c_0 op_c_1 op_c_2 op_c_3
+      _op_a_0
+      _imm_b
+      _imm_c 
+      _instr_const0 _instr_const1 _instr_const2)
+      mult =>
+        mult ≠ 0
+        -> opcode.trusted_instr_state s op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3
   | _ => True
 
 end toStateProp

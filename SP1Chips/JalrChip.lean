@@ -137,7 +137,7 @@ theorem correct
 
     -- pull out state constraints about the contents of register and pc reads
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddOperation.constraints, ITypeReader.constraints, CPUState.constraints, h_is_real] at state_cstrs
-    obtain ⟨read_pc, ⟨read_op_a, read_op_b⟩⟩ := state_cstrs
+    obtain ⟨read_pc, ⟨op_b_val_plus_imm_mul4, ⟨read_op_a, read_op_b⟩⟩⟩ := state_cstrs
 
     -- pull out constraints
     simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
@@ -190,7 +190,7 @@ theorem correct
     /-   lhs -/
     /-   arg 2 -/
     /-   simp only [Option.elim_some, EStateM.pure] -/
-    clear read_op_b'
+    -- clear read_op_b'
 
     simpM
     simp [h_c_1, h_c_2, h_c_3]
@@ -223,14 +223,22 @@ theorem correct
       simp [Word.toNat]
       rfl
 
-    -- should come from bv_decide
-    have trusted_jmp : (bit_to_bool (Sail.BitVec.access (Sail.BitVec.update (b_bv64 + sign_extend imm) 0 0#1) 1)) = pure false :=
-      by
-        sorry
-    simp [b_bv64, imm, Word.toBitVec64LT, Word.toNat, sp1_imm, h_c_1, h_c_2, h_c_3] at trusted_jmp
-    rw [trusted_jmp]
-    clear trusted_jmp
-
+    simp [Opcode.ofNat, Nat.ble, Nat.beq] at op_b_val_plus_imm_mul4
+    rw [←BitVec.ofNatLT_eq_ofNat (w := 5) (n := Main[14].val) h_op_b] at op_b_val_plus_imm_mul4
+    rw [read_op_b h_op_b] at op_b_val_plus_imm_mul4
+    simp [Option.get!] at op_b_val_plus_imm_mul4
+    simp [Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toNat] at op_b_val_plus_imm_mul4
+    simp [h_c_1, h_c_2, h_c_3, Word.toNat] at op_b_val_plus_imm_mul4
+    simp [←BitVec.ofNatLT_eq_ofNat (w := 12) (n := Main[21].val) (by exact h_c_0)] at op_b_val_plus_imm_mul4
+    conv =>
+      lhs
+      arg 2
+      arg 1
+      simp [Sail.BitVec.update, Sail.BitVec.updateSubrange', Sail.BitVec.access]
+      simp [sign_extend, Sail.BitVec.signExtend]
+      simp [bit_to_bool]
+      rw [op_b_val_plus_imm_mul4]
+      simp [bool_bit_backwards, BitVec.ofBool, cond]
     simpM
 
     -- Simplify the pure false bind by unfolding definitions
