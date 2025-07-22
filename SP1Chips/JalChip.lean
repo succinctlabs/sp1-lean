@@ -236,30 +236,6 @@ lemma execute_JAL_eq_of (imm : BitVec 21) (rd : regidx)
     have := BitVec.mul4_means_0_1_are_0 h
     exact this.2
 
-lemma EStateM.bind_def (x : EStateM ε σ α) (f : α → EStateM ε σ β) :
-  x >>= f = (fun s =>
-  match x s with
-  | .ok a s    => f a s
-  | .error e s => .error e s) := rfl
-
-lemma EStateM.run_bind (x : EStateM ε σ α) (f : α → EStateM ε σ β) :
-  (x >>= f).run s =
-  match x.run s with
-  | .ok a s    => (f a).run s
-  | .error e s => .error e s := rfl
-
-@[simp] lemma EStateM.run_get :
-    (get : EStateM ε σ σ).run s = EStateM.Result.ok s s := rfl
-
-@[simp] lemma EStateM.run_pure (x : α) :
-    (pure x : EStateM ε σ α).run s = EStateM.Result.ok x s := rfl
-
-@[simp] lemma EStateM.run_throw (e : ε) :
-    (throw e : EStateM ε σ α).run s = EStateM.Result.error e s := rfl
-
-@[simp] lemma ESTateM.run_modify (f : σ → σ) :
-    (modify f : EStateM ε σ PUnit).run s = EStateM.Result.ok PUnit.unit (f s) := rfl
-
 lemma specJal_eq_of_mod (imm : BitVec 21) (rd : regidx)
     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
     (pc : RegisterType Register.PC)

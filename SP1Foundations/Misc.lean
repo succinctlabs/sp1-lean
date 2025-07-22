@@ -260,4 +260,159 @@ instance {m σ ρ} [Monad m] [LawfulMonad m] [MonadStateOf σ m] [LawfulMonadSta
 
 end ReaderT
 
+namespace EStateM
+
+open Backtrackable
+
+variable {ε σ α β : Type _}
+
+@[simp] lemma run_pure (x : α) :
+    (pure x : EStateM ε σ α).run s = EStateM.Result.ok x s := rfl
+
+@[simp] lemma run'_pure (x : α) :
+    (pure x : EStateM ε σ α).run' s = some x := rfl
+
+@[simp] lemma run_bind (x : EStateM ε σ α) (f : α → EStateM ε σ β) :
+    (x >>= f).run s = match x.run s with
+    | .ok a s => (f a).run s
+    | .error e s => .error e s := rfl
+
+@[simp] lemma run'_bind (x : EStateM ε σ α) (f : α → EStateM ε σ β) :
+    (x >>= f).run' s = match x.run s with
+    | .ok a s => (f a).run' s
+    | .error _ _ => none := by
+  rw [run', run_bind]
+  match x.run s with | .ok _ _ => rfl | .error _ _ => rfl
+
+-- run_map already exists
+
+@[simp] lemma run'_map (f : α → β) (x : EStateM ε σ α) :
+    (f <$> x).run' s = Option.map f (x.run' s) := by
+  rw [run', run', run_map]
+  match x.run s with | .ok _ _ => rfl | .error _ _ => rfl
+
+@[simp] lemma run_seq (f : EStateM ε σ (α → β)) (x : EStateM ε σ α) :
+    (f <*> x).run s = match f.run s with
+    | .ok g s => EStateM.Result.map g (x.run s)
+    | .error e s => .error e s := by
+  simp only [seq_eq_bind, run_bind, run_map]
+  match f.run s with | .ok _ _ => rfl | .error _ _ => rfl
+
+@[simp] lemma run'_seq (f : EStateM ε σ (α → β)) (x : EStateM ε σ α) :
+    (f <*> x).run' s = match f.run s with
+    | .ok g s => Option.map g (x.run' s)
+    | .error _ _ => none := by
+  simp only [seq_eq_bind, run'_bind, run'_map]
+  match f.run s with | .ok _ _ => rfl | .error _ _ => rfl
+
+@[simp] lemma run_seqLeft (x : EStateM ε σ α) (y : EStateM ε σ β) :
+    (x <* y).run s = match x.run s with
+    | .ok v s => Result.map (fun _ => v) (y.run s)
+    | .error e s => .error e s := by
+  simp [seqLeft_eq_bind]
+
+@[simp] lemma run'_seqLeft (x : EStateM ε σ α) (y : EStateM ε σ β) :
+    (x <* y).run' s = match x.run s with
+    | .ok v s => Option.map (fun _ => v) (y.run' s)
+    | .error _ _ => none := by
+  simp [seqLeft_eq_bind]
+
+@[simp] lemma run_seqRight (x : EStateM ε σ α) (y : EStateM ε σ β) :
+    (x *> y).run s = match x.run s with
+    | .ok _ s => y.run s
+    | .error e s => .error e s := rfl
+
+@[simp] lemma run'_seqRight (x : EStateM ε σ α) (y : EStateM ε σ β) :
+    (x *> y).run' s = match x.run s with
+    | .ok _ s => y.run' s
+    | .error _ _ => none := by
+  rw [run', run_seqRight]
+  match x.run s with | .ok _ _ => rfl | .error _ _ => rfl
+
+@[simp] lemma run_get :
+    (get : EStateM ε σ σ).run s = EStateM.Result.ok s s := rfl
+
+@[simp] lemma run'_get :
+    (get : EStateM ε σ σ).run' s = some s := rfl
+
+@[simp] lemma run_set (v : σ) :
+    (set v : EStateM ε σ PUnit).run s = EStateM.Result.ok PUnit.unit v := rfl
+
+@[simp] lemma run'_set (v : σ) :
+    (set v : EStateM ε σ PUnit).run' s = some PUnit.unit := rfl
+
+@[simp] lemma run_modify (f : σ → σ) :
+    (modify f : EStateM ε σ PUnit).run s = EStateM.Result.ok PUnit.unit (f s) := rfl
+
+@[simp] lemma run'_modify (f : σ → σ) :
+    (modify f : EStateM ε σ PUnit).run' s = some PUnit.unit := rfl
+
+@[simp] lemma run_modifyGet (f : σ → α × σ) :
+    (modifyGet f : EStateM ε σ α).run s = EStateM.Result.ok (f s).1 (f s).2 := rfl
+
+@[simp] lemma run'_modifyGet (f : σ → α × σ) :
+    (modifyGet f : EStateM ε σ α).run' s = some (f s).1 := rfl
+
+@[simp] lemma run_getModify (f : σ → σ) :
+    (getModify f : EStateM ε σ σ).run s = EStateM.Result.ok s (f s) := rfl
+
+@[simp] lemma run'_getModify (f : σ → σ) :
+    (getModify f : EStateM ε σ σ).run' s = some s := rfl
+
+@[simp] lemma run_throw (e : ε) :
+    (throw e : EStateM ε σ α).run s = EStateM.Result.error e s := rfl
+
+@[simp] lemma run'_throw (e : ε) :
+    (throw e : EStateM ε σ α).run' s = none := rfl
+
+@[simp] lemma run_orElse {δ} [h : Backtrackable δ σ] (x₁ x₂ : EStateM ε σ α) :
+    (x₁ <|> x₂).run s = match x₁.run s with
+    | .ok x s => .ok x s
+    | .error _ s' => x₂.run (restore s' (save s)) := by
+  show (EStateM.orElse _ _).run _ = _
+  unfold EStateM.orElse
+  simp only [EStateM.run]
+  match x₁ s with | .ok _ _ => rfl | .error _ _ => simp
+
+@[simp] lemma run'_orElse {δ} [h : Backtrackable δ σ] (x₁ x₂ : EStateM ε σ α) :
+    (x₁ <|> x₂).run' s = match x₁.run s with
+    | .ok x _ => some x
+    | .error _ s' => x₂.run' (restore s' (save s)) := by
+  rw [run', run_orElse]
+  match x₁.run s with | .ok _ _ =>  rfl | .error _ s' => rfl
+
+@[simp] lemma run_tryCatch {δ} [h : Backtrackable δ σ]
+    (body : EStateM ε σ α) (handler : ε → EStateM ε σ α) :
+    (tryCatch body handler).run s = match body.run s with
+    | .ok x s => .ok x s
+    | .error e s' => (handler e).run (restore s' (save s)) := by
+  show (EStateM.tryCatch _ _).run _ = _
+  unfold EStateM.tryCatch
+  simp only [EStateM.run]
+  match body s with | .ok _ _ => rfl | .error _ _ => rfl
+
+@[simp] lemma run'_tryCatch {δ} [h : Backtrackable δ σ]
+    (body : EStateM ε σ α) (handler : ε → EStateM ε σ α) :
+    (tryCatch body handler).run' s = match body.run s with
+    | .ok x _ => some x
+    | .error e s' => (handler e).run' (restore s' (save s)) := by
+  rw [run', run_tryCatch]
+  match body.run s with | .ok _ _ =>  rfl | .error _ s' => rfl
+
+@[simp] lemma run_adaptExcept (f : ε → ε) (x : EStateM ε σ α) :
+    (adaptExcept f x).run s = match x.run s with
+    | .ok x s => .ok x s
+    | .error e s => .error (f e) s := by
+  show (EStateM.adaptExcept _ _).run _ = _
+  unfold EStateM.adaptExcept
+  simp only [EStateM.run]
+  match x s with | .ok _ _ => rfl | .error _ _ => rfl
+
+@[simp] lemma run'_adaptExcept (f : ε → ε) (x : EStateM ε σ α) :
+    (adaptExcept f x).run' s = x.run' s := by
+  rw [run', run', run_adaptExcept]
+  match x.run s with | .ok v s => rfl | .error _ _ => rfl
+
+end EStateM
+
 end toBatteries
