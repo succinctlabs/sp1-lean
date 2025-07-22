@@ -267,34 +267,6 @@ lemma specJal_eq_of_mod (imm : BitVec 21) (rd : regidx)
   simp
 
 @[simp]
-lemma run_readReg_bind (reg : Register) (mx : RegisterType reg → SailM α) :
-    (Sail.readReg reg >>= mx).run s = match s.regs.get? reg with
-    | some v => (mx v).run s
-    | none => (throw Sail.Error.Unreachable : SailM _).run s := by
-  simp [EStateM.run_bind, Sail.readReg, PreSail.readReg]
-  cases s.regs.get? reg with
-  | some v => simp
-  | none => simp
-
-@[simp]
-lemma run_writeReg_bind (reg : Register) (v : RegisterType reg) (mx : Unit → SailM α) :
-    (Sail.writeReg reg v >>= mx).run s =
-      (mx ()).run {s with regs := s.regs.insert reg v} := rfl
-
-@[simp]
-lemma run_set_next_pc_bind (pc : BitVec 64) (mx : Unit → SailM α) :
-    (set_next_pc pc >>= mx).run s =
-      (mx ()).run {s with regs := s.regs.insert Register.nextPC pc} := rfl
-
-@[simp]
-lemma run_set_next_pc (pc : BitVec 64) :
-    (set_next_pc pc).run s =
-      EStateM.Result.ok () {s with regs := s.regs.insert Register.nextPC pc} := rfl
-
-@[simp]
-lemma pc_ne_next_pc : Register.nextPC != Register.PC := by exact rfl
-
-@[simp]
 lemma insert_insert_insert_cancel {α : Type _} {β : α → Type _}
   [BEq α] [LawfulBEq α] [Hashable α] (m : Std.ExtDHashMap α β)
     (a₁ a₂ : α) {v v' : β a₁} (w : β a₂) :

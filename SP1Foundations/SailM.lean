@@ -22,6 +22,75 @@ example (s : SailState) : False := by
   · simp at this
   simp [s'] at this
 
+def reg_idx_to_Register (idx : BitVec 5) : Register :=
+  match idx with
+  | 1 => Register.x1
+  | 2 => Register.x2
+  | 3 => Register.x3
+  | 4 => Register.x4
+  | 5 => Register.x5
+  | 6 => Register.x6
+  | 7 => Register.x7
+  | 8 => Register.x8
+  | 9 => Register.x9
+  | 10 => Register.x10
+  | 11 => Register.x11
+  | 12 => Register.x12
+  | 13 => Register.x13
+  | 14 => Register.x14
+  | 15 => Register.x15
+  | 16 => Register.x16
+  | 17 => Register.x17
+  | 18 => Register.x18
+  | 19 => Register.x19
+  | 20 => Register.x20
+  | 21 => Register.x21
+  | 22 => Register.x22
+  | 23 => Register.x23
+  | 24 => Register.x24
+  | 25 => Register.x25
+  | 26 => Register.x26
+  | 27 => Register.x27
+  | 28 => Register.x28
+  | 29 => Register.x29
+  | 30 => Register.x30
+  | _ => Register.x31
+
+def regno_to_Register (regno : regno) : Register :=
+  let .Regno n := regno
+  match n with
+  | 1 => Register.x1
+  | 2 => Register.x2
+  | 3 => Register.x3
+  | 4 => Register.x4
+  | 5 => Register.x5
+  | 6 => Register.x6
+  | 7 => Register.x7
+  | 8 => Register.x8
+  | 9 => Register.x9
+  | 10 => Register.x10
+  | 11 => Register.x11
+  | 12 => Register.x12
+  | 13 => Register.x13
+  | 14 => Register.x14
+  | 15 => Register.x15
+  | 16 => Register.x16
+  | 17 => Register.x17
+  | 18 => Register.x18
+  | 19 => Register.x19
+  | 20 => Register.x20
+  | 21 => Register.x21
+  | 22 => Register.x22
+  | 23 => Register.x23
+  | 24 => Register.x24
+  | 25 => Register.x25
+  | 26 => Register.x26
+  | 27 => Register.x27
+  | 28 => Register.x28
+  | 29 => Register.x29
+  | 30 => Register.x30
+  | _ => Register.x31
+
 instance : DecidableEq regidx | .Regidx v, .Regidx v' => by simp; infer_instance
 
 @[simp] lemma set_next_pc_def (pc : BitVec 64) :
@@ -57,7 +126,14 @@ lemma run_readReg_bind (reg : Register) (mx : RegisterType reg → SailM α) :
   simp
   cases s.regs.get? reg with | some v => rfl | none => rfl
 
+-- @[simp]
+-- lemma run_rX (n : ℕ) :
+--     (rX (.Regno n)).run s =
+
 end EStateM_run
+
+
+-----------
 
 /-- Reading a just written value looks like just using the written value. -/
 @[simp]
@@ -95,39 +171,6 @@ instance : Fintype (BitVec n) where
 
 open Sail (trivialChoiceSource Error)
 
-def reg_idx_to_Register (idx : BitVec 5) : Register :=
-  match idx with
-  | 1 => Register.x1
-  | 2 => Register.x2
-  | 3 => Register.x3
-  | 4 => Register.x4
-  | 5 => Register.x5
-  | 6 => Register.x6
-  | 7 => Register.x7
-  | 8 => Register.x8
-  | 9 => Register.x9
-  | 10 => Register.x10
-  | 11 => Register.x11
-  | 12 => Register.x12
-  | 13 => Register.x13
-  | 14 => Register.x14
-  | 15 => Register.x15
-  | 16 => Register.x16
-  | 17 => Register.x17
-  | 18 => Register.x18
-  | 19 => Register.x19
-  | 20 => Register.x20
-  | 21 => Register.x21
-  | 22 => Register.x22
-  | 23 => Register.x23
-  | 24 => Register.x24
-  | 25 => Register.x25
-  | 26 => Register.x26
-  | 27 => Register.x27
-  | 28 => Register.x28
-  | 29 => Register.x29
-  | 30 => Register.x30
-  | _ => Register.x31
 
 theorem reg_idx_31_is_x31 : reg_idx_to_Register 31#5 = Register.x31 :=
   by
@@ -183,6 +226,17 @@ theorem SailState.get_reg?_is_rX {s : SailState}
       match s.regs.get? _ with
       | none => rfl
       | some _ => rfl
+
+lemma run_rX_bits (idx : BitVec 5) :
+    (rX_bits (regidx.Regidx idx)).run s =
+    match SailState.get_reg? s idx with
+    | some v => .ok v s
+    | none => .error Sail.Error.Unreachable s := by
+  refine (SailState.get_reg?_is_rX idx).trans ?_
+  simp [Option.toSailM, Option.elim]
+  cases SailState.get_reg? s idx with
+  | some v => rfl
+  | none => rfl
 
 -- theorem SailState.write_reg_is_wX {s : SailState}
 --   (idx : BitVec 5)
