@@ -185,19 +185,82 @@ def sp1Jal (Main : Vector (Fin BB) 31) : SailM Unit := do
   wX_bits rd link
   set_next_pc new_pc
 
-lemma execute_JAL_eq_of (imm : BitVec 21) (rd : regidx) :
-    execute_JAL imm rd = (do
+lemma readReg_bind_bind_duplicate (reg : Register)
+    (mx : RegisterType reg → SailM α) (my : RegisterType reg → α → SailM β) :
+    (do let v ← Sail.readReg reg; let x ← mx v; my v x) =
+      (do let v ← Sail.readReg reg; let v' ← Sail.readReg reg; let x ← mx v; my v' x) := by
+  sorry
+
+lemma run_readReg_bind_of_forall (reg : Register)
+    (f : RegisterType reg → β)
+    (mx : β → SailM α) (y : β)
+    (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+    (hs : ∀ v, s.regs.get? reg = some v → f v = y)
+     :
+    (do let v ← Sail.readReg reg; mx (f v)).run s =
+      (mx y).run s
+    := by
+  sorry
+
+@[simp] lemma readReg_bind_const (reg : Register) (mx : SailM α) :
+    (do let _ ← Sail.readReg reg; mx) = mx := by
+  sorry
+
+lemma execute_JAL_eq_of (imm : BitVec 21) (rd : regidx)
+    (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+    (pc : RegisterType Register.PC) (h : pc + imm % 4 = 0)
+    (hs : s.regs.get? Register.PC = pc) :
+    (execute_JAL imm rd).run s = (do
       let target ← pure ((← Sail.readReg Register.PC) + (sign_extend (m := 64) imm))
-      -- let target_bits := (bits_of_virtaddr target)
       wX_bits rd (← (get_next_pc ()))
       (set_next_pc target)
-      (pure RETIRE_SUCCESS)) := by
+      (pure RETIRE_SUCCESS)).run s := by
   rw [execute_JAL]
   simp [ext_control_check_pc, bit_to_bool]
   simp [Sail.BitVec.access, bits_of_virtaddr]
   simp [bool_bit_backwards, BitVec.ofBool]
+  rw [readReg_bind_bind_duplicate]
 
-  sorry
+  have := run_readReg_bind_of_forall
+    (reg := Register.PC)
+    (f := fun v => (v + sign_extend imm)[1])
+    (y := false)
+    (mx := fun b : Bool => do
+      let v' ← Sail.readReg Register.PC
+      let x ←
+        (match bif b then 1#1 else 0#1 with
+          | 1#1 => pure true
+          | 0#1 => pure false
+          | x => do
+            Sail.assert false "Pattern match failure at unknown location"
+            throw Sail.Error.Exit)
+      let __do_lift ← currentlyEnabled extension.Ext_Zca
+      bif x && LeanRV64IM.Functions.not __do_lift then
+          pure
+            (ExecutionResult.Memory_Exception
+              (virtaddr.Virtaddr (v' + sign_extend imm), ExceptionType.E_Fetch_Addr_Align ()))
+        else do
+          let __do_lift ← get_next_pc ()
+          wX_bits rd __do_lift
+          (fun a ↦ RETIRE_SUCCESS) <$> set_next_pc (v' + sign_extend imm))
+
+  erw [this]
+
+  · simp
+    simp [currentlyEnabled]
+    refine congr_arg (EStateM.run · s) ?_
+    refine bind_congr fun v => ?_
+
+    exact readReg_bind_const Register.misa (do
+      let __do_lift ← get_next_pc ()
+      wX_bits rd __do_lift
+      (fun a ↦ RETIRE_SUCCESS) <$> set_next_pc (v + sign_extend imm))
+
+  · intro v
+    simp [hs]
+    rintro rfl
+
+    sorry
 
 set_option maxHeartbeats 300000 in
 theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
