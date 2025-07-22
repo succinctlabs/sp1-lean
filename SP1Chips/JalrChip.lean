@@ -3,9 +3,6 @@ import LeanRV64IM.RiscvInstsEnd
 
 import SP1Chips.Jalr.Constraints
 
-instance : Lean.Grind.NoNatZeroDivisors (Fin 2013265921) where
-  no_nat_zero_divisors := sorry
-
 namespace Word
 
 def toBitVec64LT (w : Word (Fin BB)) (h_w : w.isU64) : BitVec 64 :=
@@ -262,7 +259,7 @@ theorem correct
     simp [Option.get!] at op_b_val_plus_imm_mul4
     simp [Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toNat] at op_b_val_plus_imm_mul4
     simp [h_c_1, h_c_2, h_c_3, Word.toBitVec64, Word.toNat] at op_b_val_plus_imm_mul4
-    rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val) (by sorry)] at op_b_val_plus_imm_mul4
+    rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val) (by clear * - h_c_0; simp at *; omega)] at op_b_val_plus_imm_mul4
     have op_b_val_plus_signExtend_imm_mul4 : (b_bv64 + sign_extend imm) % 4 = 0 := by
       simp [sign_extend, Sail.BitVec.signExtend]
       simp [imm, sp1_imm, Word.toBitVec64LT, Word.toNat, h_c_1, h_c_2, h_c_3]
@@ -413,7 +410,8 @@ theorem correct
 
           simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
           apply BitVec.helper
-          clear * - b_is_u64 h_c_mul4 h_c_0
+          exact op_b_val_plus_imm_mul4
+          -- clear * - b_is_u64 h_c_mul4 h_c_0
           -- have b_limbs := Word.lt_cases_of_isU64 b_is_u64
           -- simp at [b_limbs]
 
@@ -435,7 +433,7 @@ theorem correct
           --   apply congrArg
           --   simp [Fin.mod_def] at h_c_mul4
           --   exact h_c_mul4
-          sorry
+          -- sorry
         by_cases h_op_a : (reg_idx_to_Register op_a) = idx
         · simp [op_a, sp1_op_a] at h_op_a
           repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
@@ -500,28 +498,29 @@ theorem correct
 
           simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
           apply BitVec.helper
-          clear * - b_is_u64 h_c_mul4 h_c_0
-          -- have b_limbs := Word.lt_cases_of_isU64 b_is_u64
-          -- simp at [b_limbs]
+          exact op_b_val_plus_imm_mul4
+          -- clear * - b_is_u64 h_c_mul4 h_c_0
+          -- -- have b_limbs := Word.lt_cases_of_isU64 b_is_u64
+          -- -- simp at [b_limbs]
 
-          have h_b_0_mul4 : Main[15].val % 4 = 0 := by sorry
-          have h_b_0 : Main[15].val < 65536 := by exact b_is_u64 0
-          have h_b_1 : Main[16].val < 65536 := by exact b_is_u64 1
-          have h_b_2 : Main[17].val < 65536 := by exact b_is_u64 2
-          have h_b_3 : Main[18].val < 65536 := by exact b_is_u64 3
-          have h_sum_nat_mul4 : (Main[15].val + Main[16].val * 65536 + Main[17].val * 4294967296 + Main[18].val * 281474976710656) % 4 = 0 :=
-            by
-              omega
-            -- simp [BitVec.umod_def]
-          refine BitVec.mul4_add_is_mul4 ?_ ?_
-          · simp [BitVec.umod_def]
-            apply congrArg
-            exact h_sum_nat_mul4
-          · simp [BitVec.umod_def]
-            -- rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val % 4) sorry]
-            apply congrArg
-            simp [Fin.mod_def] at h_c_mul4
-            exact h_c_mul4
+          -- have h_b_0_mul4 : Main[15].val % 4 = 0 := by sorry
+          -- have h_b_0 : Main[15].val < 65536 := by exact b_is_u64 0
+          -- have h_b_1 : Main[16].val < 65536 := by exact b_is_u64 1
+          -- have h_b_2 : Main[17].val < 65536 := by exact b_is_u64 2
+          -- have h_b_3 : Main[18].val < 65536 := by exact b_is_u64 3
+          -- have h_sum_nat_mul4 : (Main[15].val + Main[16].val * 65536 + Main[17].val * 4294967296 + Main[18].val * 281474976710656) % 4 = 0 :=
+          --   by
+          --     omega
+          --   -- simp [BitVec.umod_def]
+          -- refine BitVec.mul4_add_is_mul4 ?_ ?_
+          -- · simp [BitVec.umod_def]
+          --   apply congrArg
+          --   exact h_sum_nat_mul4
+          -- · simp [BitVec.umod_def]
+          --   -- rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val % 4) sorry]
+          --   apply congrArg
+          --   simp [Fin.mod_def] at h_c_mul4
+          --   exact h_c_mul4
         repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC])
 
 /-
