@@ -223,7 +223,17 @@ lemma readReg_bind_bind_duplicate (reg : Register)
     (mx : RegisterType reg → SailM α) (my : RegisterType reg → α → SailM β) :
     (do let v ← Sail.readReg reg; let x ← mx v; my v x) =
       (do let v ← Sail.readReg reg; let v' ← Sail.readReg reg; let x ← mx v; my v' x) := by
-  sorry
+  simpM
+  refine EStateM.ext ?_
+  unfold EStateM.bind EStateM.run
+  simp; intro s
+  rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
+  suffices : s = s'
+  . simp_all
+  . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
+    split at h_eq <;> [ subst_eqs; trivial ]
+    rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
+    obtain ⟨ _, _ ⟩ := h_eq; rfl
 
 lemma run_readReg_bind_of_forall (reg : Register)
     (f : RegisterType reg → β)
@@ -234,11 +244,31 @@ lemma run_readReg_bind_of_forall (reg : Register)
     (do let v ← Sail.readReg reg; mx (f v)).run s =
       (mx y).run s
     := by
-  sorry
+  simpM
+  unfold EStateM.bind EStateM.run
+  rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
+  . congr; apply hs
+    . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
+      split at h_eq <;> [ subst_eqs; trivial ]
+      rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
+      obtain ⟨ _, _ ⟩ := h_eq; rfl
+    . sorry
+  . sorry
 
-@[simp] lemma readReg_bind_const (reg : Register) (mx : SailM α) :
+lemma readReg_bind_const (reg : Register) (mx : SailM α) :
     (do let _ ← Sail.readReg reg; mx) = mx := by
-  sorry
+  simpM
+  refine EStateM.ext ?_
+  unfold EStateM.bind EStateM.run
+  simp; intro s
+  rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
+  . suffices : s = s'
+    . simp_all
+    . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
+      split at h_eq <;> [ subst_eqs; trivial ]
+      rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
+      obtain ⟨ _, _ ⟩ := h_eq; rfl
+  . sorry
 
 -- @[simp]
 -- lemma wX_bits_rX_bits' (rs : regidx) (bv : BitVec 32) (cont : BitVec 32 → SailM α) :

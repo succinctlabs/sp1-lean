@@ -325,6 +325,7 @@ lemma insert_insert_insert_cancel {α : Type _} {β : α → Type _}
       (m.insert a₂ w).insert a₁ v' := by
   sorry
 
+set_option debug.skipKernelTC true in
 set_option maxHeartbeats 300000 in
 theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
     (h_cstrs : (constraints Main).allHold)

@@ -97,7 +97,7 @@ def sp1_jalr : SailM Unit := do
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure
 
 set_option maxHeartbeats 0 in
-theorem correct 
+theorem correct
   (state_cstrs : (constraints Main).initialState s) :
   let imm := sp1_imm Main -- cstrs h_is_real
   let op_b := sp1_op_b Main cstrs h_is_real
@@ -180,13 +180,8 @@ theorem correct
     --   simp only [bits_of_virtaddr]
 
     simp [ext_control_check_addr, bits_of_virtaddr]
-    conv =>
-      lhs
-      arg 2
-      arg 1
-      rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
-      simp [Word.toNat]
-      rfl
+    rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
+    simp [Word.toNat]
 
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at op_b_val_plus_imm_mul4
     rw [←BitVec.ofNatLT_eq_ofNat (w := 5) (n := Main[14].val) h_op_b] at op_b_val_plus_imm_mul4
@@ -220,31 +215,18 @@ theorem correct
       simp [bit_to_bool, bool_bit_backwards, BitVec.ofBool, cond]
     simpM
 
-    -- Simplify the pure false bind by unfolding definitions
-    conv =>
-      lhs
-      arg 2
-      arg 1
-      unfold EStateM.pure EStateM.bind
-      simp
-
     -- Now unfold the bind to substitute false
     conv =>
       lhs
       arg 2
-      unfold EStateM.bind
-      simp
+      simp [EStateM.bind]
 
     -- try to reduce currentlyEnabled
     simp only [currentlyEnabled, hartSupports]
     simp [Sail.readReg, PreSail.readReg]
     simpM
 
-    conv =>
-      lhs
-      arg 2
-      intro s'
-      simp [SailState.sp1_no_misa]
+    simp [SailState.sp1_no_misa]
 
     -- Now simplify the mapped pure computation
     conv =>
@@ -257,7 +239,7 @@ theorem correct
         | EStateM.Result.error e s => EStateM.Result.error e s
       simp
 
-    simp [get_next_pc, Sail.readReg, PreSail.readReg]
+    rw [get_next_pc, Sail.readReg, PreSail.readReg]
     simpM
 
     -- Simplify the register lookup using get?_insert
@@ -299,9 +281,6 @@ theorem correct
 
         -- simp [sign_extend]
         -- rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
-
-        rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
-        simp [Word.toNat]
 
         -- rw [SailState.write_reg_is_wX]
         -- simp [SailState.write_reg, op_a_not_x0]
@@ -405,9 +384,6 @@ theorem correct
 
         -- simp [sign_extend]
         -- rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
-
-        rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
-        simp [Word.toNat]
 
         conv =>
           rhs
