@@ -238,9 +238,6 @@ theorem correct
       unfold EStateM.bind
       simp
 
-    -- per RISC-V spec. very safe axiom to have
-    have always_misa : ∀s : SailState, s.regs.get? Register.misa = some 0 := by sorry
-
     -- try to reduce currentlyEnabled
     simp only [currentlyEnabled, hartSupports]
     simp [Sail.readReg, PreSail.readReg]
@@ -250,8 +247,7 @@ theorem correct
       lhs
       arg 2
       intro s'
-      simp [always_misa]
-    clear always_misa
+      simp [SailState.sp1_no_misa]
 
     -- Now simplify the mapped pure computation
     conv =>
