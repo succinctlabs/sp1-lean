@@ -53,6 +53,8 @@ open Sail (trivialChoiceSource Error)
 @[simp]
 abbrev SailState := SequentialState RegisterType trivialChoiceSource
 
+axiom SailState.sp1_no_misa : ∀s : SailState, s.regs.get? Register.misa = some 0
+
 def reg_idx_to_Register (idx : BitVec 5) : Register :=
   match idx with
   | 1 => Register.x1
