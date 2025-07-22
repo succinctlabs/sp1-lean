@@ -268,34 +268,88 @@ theorem useless_signExtend_add {x : Fin BB} {hx : x.val < 2^12} {y : BitVec 64}
     -- Use the fact that we've already proven bx64 % 4 = signExtend(...) % 4
     have h_base := useless_signExtend (x := x) (hx := hx)
     simp [bx64] at h_base
-    
+
     -- The key insight: if a % 4 = b % 4, then (y + a) % 4 = (y + b) % 4
     -- Since h_base tells us bx64 % 4 = signExtend(...) % 4, we can substitute
-    
+
     -- Let's define the sign-extended value for clarity
     let sx := BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x.val hx)
-    
+
     -- We know from h_base that bx64 % 4 = sx % 4
     -- We want to show (y + bx64) % 4 = (y + sx) % 4
-    
-    -- We'll prove that if two bitvectors are congruent mod 4, 
+
+    -- We'll prove that if two bitvectors are congruent mod 4,
     -- then adding them to any third bitvector preserves congruence mod 4
-    
+
     -- First, let me state what we need to prove more explicitly
     suffices h_suff : ∀ (a b c : BitVec 64), a % 4 = b % 4 → (c + a) % 4 = (c + b) % 4 by
       exact h_suff bx64 sx y h_base
-    
+
     -- Now prove the general fact
     intro a b c h_ab
     -- Since a % 4 = b % 4, we know a and b differ by a multiple of 4
     -- So (c + a) and (c + b) also differ by a multiple of 4
     -- Therefore (c + a) % 4 = (c + b) % 4
-    
+
     -- Let's prove this step by step
     -- We know: a ≡ b (mod 4)
     -- Want: c + a ≡ c + b (mod 4)
-    
+
     -- Hmm, let me just try bv_decide since this is a concrete property about 64-bit vectors
     bv_decide
+
+theorem helper {a b : BitVec 64}
+  (h : (a + b) % 4 = 0)
+  : 18446744073709551614#64 &&& (a + b) = a + b
+  :=
+  by
+    bv_decide
+
+theorem mul4_add_is_mul4 {a b : BitVec 64}
+  (ha : a % 4 = 0)
+  (hb : b % 4 = 0)
+  : (a + b) % 4 = 0
+  :=
+  by
+    bv_decide
+
+theorem FinBB_mul4_is_BV_mul4 {x : Fin BB}
+  : x % 4 = 0 → (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith)) % 4 = 0
+  :=
+  by
+    intro h
+    have h' : x.val % 4 = 0 := by simp [Fin.mod_def] at h; exact h
+    simp [BitVec.umod_def, BitVec.toNat_ofNatLT, h']
+
+theorem mul4_means_0_1_are_0 {x : BitVec 64}
+  (hx : x % 4 = 0)
+  : x[0] = false ∧ x[1] = false
+  := by
+    have hx' : x.toNat % 4 = 0 := by bv_omega
+    apply And.intro
+    · have hzero : x[0] = x[(0 : Fin 64)] := by
+        aesop
+      rw [hzero]
+      rw [←BitVec.getLsb_eq_getElem x 0]
+      clear hzero
+      simp [BitVec.getLsb]
+      omega
+    · have hzero : x[1] = x[(1 : Fin 64)] := by
+        aesop
+      rw [hzero]
+      rw [←BitVec.getLsb_eq_getElem x 1]
+      clear hzero
+      simp [BitVec.getLsb, Nat.testBit]
+      omega
+
+theorem FinBB_mul4_means_LS2B_0
+  (x : Fin BB)
+  : let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith))
+  x % 4 = 0 → vx[0] = false ∧ vx[1] = false
+  := by
+    extract_lets vx
+    intro hx
+    simp [vx]
+    exact mul4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
 
 end BitVec

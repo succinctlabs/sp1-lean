@@ -217,6 +217,27 @@ theorem writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
       simp
     · simp [h]
 
+lemma readReg_bind_bind_duplicate (reg : Register)
+    (mx : RegisterType reg → SailM α) (my : RegisterType reg → α → SailM β) :
+    (do let v ← Sail.readReg reg; let x ← mx v; my v x) =
+      (do let v ← Sail.readReg reg; let v' ← Sail.readReg reg; let x ← mx v; my v' x) := by
+  sorry
+
+lemma run_readReg_bind_of_forall (reg : Register)
+    (f : RegisterType reg → β)
+    (mx : β → SailM α) (y : β)
+    (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+    (hs : ∀ v, s.regs.get? reg = some v → f v = y)
+     :
+    (do let v ← Sail.readReg reg; mx (f v)).run s =
+      (mx y).run s
+    := by
+  sorry
+
+@[simp] lemma readReg_bind_const (reg : Register) (mx : SailM α) :
+    (do let _ ← Sail.readReg reg; mx) = mx := by
+  sorry
+
 -- @[simp]
 -- lemma wX_bits_rX_bits' (rs : regidx) (bv : BitVec 32) (cont : BitVec 32 → SailM α) :
 --     (do let _ ← wX_bits rs bv; let bv' ← rX_bits rs; cont bv') =

@@ -17,64 +17,6 @@ def toBitVec64LT (w : Word (Fin BB)) (h_w : w.isU64) : BitVec 64 :=
 
 end Word
 
-namespace BitVec
-
-theorem helper {a b : BitVec 64}
-  (h : (a + b) % 4 = 0)
-  : 18446744073709551614#64 &&& (a + b) = a + b
-  :=
-  by
-    bv_decide
-
-theorem mul4_add_is_mul4 {a b : BitVec 64}
-  (ha : a % 4 = 0)
-  (hb : b % 4 = 0)
-  : (a + b) % 4 = 0
-  :=
-  by
-    bv_decide
-
-theorem FinBB_mul4_is_BV_mul4 {x : Fin BB}
-  : x % 4 = 0 → (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith)) % 4 = 0
-  :=
-  by
-    intro h
-    have h' : x.val % 4 = 0 := by simp [Fin.mod_def] at h; exact h
-    simp [BitVec.umod_def, BitVec.toNat_ofNatLT, h']
-
-theorem mul4_means_0_1_are_0 {x : BitVec 64}
-  (hx : x % 4 = 0)
-  : x[0] = false ∧ x[1] = false
-  := by
-    have hx' : x.toNat % 4 = 0 := by bv_omega
-    apply And.intro
-    · have hzero : x[0] = x[(0 : Fin 64)] := by
-        aesop
-      rw [hzero]
-      rw [←BitVec.getLsb_eq_getElem x 0]
-      clear hzero
-      simp [BitVec.getLsb]
-      omega
-    · have hzero : x[1] = x[(1 : Fin 64)] := by
-        aesop
-      rw [hzero]
-      rw [←BitVec.getLsb_eq_getElem x 1]
-      clear hzero
-      simp [BitVec.getLsb, Nat.testBit]
-      omega
-
-theorem FinBB_mul4_means_LS2B_0
-  (x : Fin BB)
-  : let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith))
-  x % 4 = 0 → vx[0] = false ∧ vx[1] = false
-  := by
-    extract_lets vx
-    intro hx
-    simp [vx]
-    exact mul4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
-
-end BitVec
-
 section
 
 set_option autoImplicit false
@@ -155,7 +97,7 @@ def sp1_jalr : SailM Unit := do
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure
 
 set_option maxHeartbeats 500000 in
-theorem correct 
+theorem correct
   (state_cstrs : (constraints Main).initialState s) :
   let imm := sp1_imm Main cstrs h_is_real
   let op_b := sp1_op_b Main cstrs h_is_real
@@ -174,10 +116,10 @@ theorem correct
     obtain ⟨res_cstrs, ⟨pc_cstrs, ⟨reader_cstrs, ⟨inc_pc_cstrs, chip_cstrs⟩⟩⟩⟩ := cstrs
 
     simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-    obtain ⟨⟨h_op_b, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, h_c_mul4⟩⟩, 
+    obtain ⟨⟨h_op_b, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, h_c_mul4⟩⟩,
       ⟨h_op_a, ⟨_, ⟨_, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
     let read_op_b' := read_op_b h_op_b
-    
+
     have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
     let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
 
@@ -240,7 +182,7 @@ theorem correct
     --   -- simp [BitVec.add_def]
     --   -- rfl
     -- conv =>
-    --   lhs 
+    --   lhs
     --   arg 2
     --   simp only [bits_of_virtaddr]
 
@@ -311,7 +253,7 @@ theorem correct
       simp [always_misa]
     clear always_misa
 
-    -- Now simplify the mapped pure computation  
+    -- Now simplify the mapped pure computation
     conv =>
       lhs
       arg 2
@@ -342,7 +284,7 @@ theorem correct
           exact this
         simp [op_a, sp1_op_a] at op_a_not_x0
 
-        simp [← bind_pure_comp] 
+        simp [← bind_pure_comp]
         simpM
         rw [←SailState.wX_bits_is_regidx_write]
         simp [SailState.regidx_write]
@@ -446,13 +388,13 @@ theorem correct
           simp_all only [Fin.isValue, true_iff, Fin.coe_ofNat_eq_mod, Nat.zero_mod, BitVec.ofNatLT_zero]
         simp [op_a, sp1_op_a] at op_a_is_x0
 
-        simp [← bind_pure_comp] 
+        simp [← bind_pure_comp]
         simpM
         simp [wX_bits, wX, op_a_is_x0]
         simpM
         simp [set_next_pc, Sail.writeReg, PreSail.writeReg]
         simpM
-        
+
         have pc_sum_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 :=
           by
             clear * - h_pc_0 h_pc_1 h_pc_2
