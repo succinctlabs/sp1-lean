@@ -394,6 +394,7 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
 
   by_cases h6 : Main[6] = 0
   · simp [h6]
+
     sorry
 
   have h6' : BitVec.ofNat 5 Main[6] = 0#5 := sorry
@@ -430,12 +431,13 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
       have h6 : Main[6] = 0 := by
         simp [SP1Constraint.toProp] at h_cstrs
         simp_all only [BB_eq, Fin.isValue, Nat.reducePow]
-      simp [h25, h26, h27, h28, h29, h6]
-      rw [h_imm]
-      simp only [set_next_pc, BB_eq, h_pc, Nat.reducePow, get_next_pc, sign_extend,
-        Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
-        writeReg_wX_bits_writeReg]
-      rw [h_of_int]
+      simp_all
+      -- simp [h25, h26, h27, h28, h29, h6]
+      -- rw [h_imm]
+      -- simp only [set_next_pc, BB_eq, h_pc, Nat.reducePow, get_next_pc, sign_extend,
+      --   Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
+      --   writeReg_wX_bits_writeReg]
+      -- rw [h_of_int]
       -- congr 3
 
       -- sorry
@@ -449,7 +451,7 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
         BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
       refine link_eq_of_constraints Main h_cstrs h_is_real op_a_is_zero
 
-    erw [h_link]
+    -- erw [h_link]
     simp only [BB_eq, Nat.reducePow, BitVec.ofNat_eq_ofNat, set_next_pc, h25, Fin.isValue,
       Fin.coe_ofNat_eq_mod, Nat.zero_mod, zero_mul, add_zero, h_pc, get_next_pc, sign_extend,
       Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
