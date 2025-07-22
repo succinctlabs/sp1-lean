@@ -37,23 +37,23 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   _ ← execute_JALR imm rs1 rd
   pure ()
 
-def sp1_imm : BitVec 12 :=
-  by
-    refine BitVec.ofNatLT
-      (Main[21].val + Main[22].val * 2^16 + Main[23].val * 2^32 + Main[24].val * 2^48)
-      ?_
+def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[21].val
+  -- by
+  --   refine BitVec.ofNatLT
+  --     (Main[21].val + Main[22].val * 2^16 + Main[23].val * 2^32 + Main[24].val * 2^48)
+  --     ?_
 
-    have reader_cstrs := by
-      simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
-      exact cstrs.2.2.1
+  --   have reader_cstrs := by
+  --     simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
+  --     exact cstrs.2.2.1
 
-    clear cstrs
-    simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
+  --   clear cstrs
+  --   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
 
-    have trusted_instr_cstrs := reader_cstrs.1
-    clear reader_cstrs
+  --   have trusted_instr_cstrs := reader_cstrs.1
+  --   clear reader_cstrs
 
-    aesop
+  --   aesop
 
 def sp1_op_b : BitVec 5 :=
   by
@@ -96,10 +96,10 @@ def sp1_jalr : SailM Unit := do
 
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure
 
-set_option maxHeartbeats 500000 in
-theorem correct
+set_option maxHeartbeats 0 in
+theorem correct 
   (state_cstrs : (constraints Main).initialState s) :
-  let imm := sp1_imm Main cstrs h_is_real
+  let imm := sp1_imm Main -- cstrs h_is_real
   let op_b := sp1_op_b Main cstrs h_is_real
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_jalr imm (.Regidx op_b) (.Regidx op_a)).run s = (sp1_jalr Main cstrs h_is_real).run s
@@ -116,21 +116,14 @@ theorem correct
     obtain ⟨res_cstrs, ⟨pc_cstrs, ⟨reader_cstrs, ⟨inc_pc_cstrs, chip_cstrs⟩⟩⟩⟩ := cstrs
 
     simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-    obtain ⟨⟨h_op_b, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, h_c_mul4⟩⟩,
-      ⟨h_op_a, ⟨_, ⟨_, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
+    obtain ⟨⟨h_op_b, h_c_sign_extend⟩, ⟨h_op_a, ⟨_, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
     let read_op_b' := read_op_b h_op_b
 
     have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
     let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
 
     have imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
-      refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] ?_ ?_ ?_ ?_
-      · simp
-        clear * - h_c_0
-        omega
-      · simp [h_c_1]
-      · simp [h_c_2]
-      · simp [h_c_3]
+      refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] h_c_0 h_c_1 h_c_2 h_c_3
 
     have pc_is_u64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
       exact Word.isU64_of_cases #v[Main[3], Main[4], Main[5], 0] h_pc_0 h_pc_1 h_pc_2 (by simp)
@@ -165,7 +158,7 @@ theorem correct
     -- clear read_op_b'
 
     simpM
-    simp [h_c_1, h_c_2, h_c_3]
+    -- simp [h_c_1, h_c_2, h_c_3]
     -- conv =>
     --   lhs
     --   arg 2
@@ -200,17 +193,21 @@ theorem correct
     rw [read_op_b h_op_b] at op_b_val_plus_imm_mul4
     simp [Option.get!] at op_b_val_plus_imm_mul4
     simp [Word.toBitVec64_LT_eq_toNat b_is_u64, Word.toNat] at op_b_val_plus_imm_mul4
-    simp [h_c_1, h_c_2, h_c_3, Word.toBitVec64, Word.toNat] at op_b_val_plus_imm_mul4
-    rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val) (by clear * - h_c_0; simp at *; omega)] at op_b_val_plus_imm_mul4
-    have op_b_val_plus_signExtend_imm_mul4 : (b_bv64 + sign_extend imm) % 4 = 0 := by
-      simp [sign_extend, Sail.BitVec.signExtend]
-      simp [imm, sp1_imm, Word.toBitVec64LT, Word.toNat, h_c_1, h_c_2, h_c_3]
-      let hello := BitVec.useless_signExtend_add (y := b_bv64) (x := Main[21]) (hx := h_c_0)
-      simp [b_bv64, Word.toBitVec64LT, Word.toNat] at hello
-      rw [op_b_val_plus_imm_mul4] at hello
-      exact hello.symm
-    simp [b_bv64, Word.toBitVec64LT, Word.toNat, imm, sp1_imm, h_c_1, h_c_2, h_c_3, sign_extend, Sail.BitVec.signExtend] at op_b_val_plus_signExtend_imm_mul4
-    obtain ⟨op_b_plus_val_signExtend_imm_0, op_b_plus_val_signExtend_imm_1⟩ := BitVec.mul4_means_0_1_are_0 op_b_val_plus_signExtend_imm_mul4
+    simp [Word.toBitVec64_LT_eq_toNat imm_is_u64, Word.toNat] at op_b_val_plus_imm_mul4
+    simp [sign_extend, Sail.BitVec.signExtend]
+    rw [←h_c_sign_extend]
+    simp [Word.toBitVec64_LT_eq_toNat imm_is_u64, Word.toNat]
+    -- simp [h_c_1, h_c_2, h_c_3, Word.toBitVec64, Word.toNat] at op_b_val_plus_imm_mul4
+    -- rw [←BitVec.ofNatLT_eq_ofNat (w := 64) (n := Main[21].val) (by clear * - h_c_0; simp at *; omega)] at op_b_val_plus_imm_mul4
+    -- have op_b_val_plus_signExtend_imm_mul4 : (b_bv64 + sign_extend imm) % 4 = 0 := by
+    --   simp [sign_extend, Sail.BitVec.signExtend]
+    --   simp [imm, sp1_imm, Word.toBitVec64LT, Word.toNat, h_c_1, h_c_2, h_c_3]
+    --   let hello := BitVec.useless_signExtend_add (y := b_bv64) (x := Main[21]) (hx := h_c_0)
+    --   simp [b_bv64, Word.toBitVec64LT, Word.toNat] at hello
+    --   rw [op_b_val_plus_imm_mul4] at hello
+    --   exact hello.symm
+    -- simp [b_bv64, Word.toBitVec64LT, Word.toNat, imm, sp1_imm, h_c_1, h_c_2, h_c_3, sign_extend, Sail.BitVec.signExtend] at op_b_val_plus_signExtend_imm_mul4
+    obtain ⟨op_b_plus_val_signExtend_imm_0, op_b_plus_val_signExtend_imm_1⟩ := BitVec.mul4_means_0_1_are_0 op_b_val_plus_imm_mul4
     -- rw [BitVec.useless_signExtend_add (x := Main[21])] at op_b_val_plus_imm_mul4
     -- simp [←BitVec.ofNatLT_eq_ofNat (w := 12) (n := Main[21].val) (by exact h_c_0)] at op_b_val_plus_imm_mul4
     conv =>
@@ -298,9 +295,10 @@ theorem correct
         -- have pc_ofNat_eq_pc_ofNatLT := BitVec.ofNatLT_eq_ofNat pc_sum_u64
         -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
         rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
+        simpM
 
-        simp [sign_extend]
-        rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
+        -- simp [sign_extend]
+        -- rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
 
         rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
         simp [Word.toNat]
@@ -374,6 +372,11 @@ theorem correct
           -- sorry
         by_cases h_op_a : (reg_idx_to_Register op_a) = idx
         · simp [op_a, sp1_op_a] at h_op_a
+          -- rw [Std.ExtDHashMap.get?_insert]
+          -- simp [h_nextPC]
+          -- rw [Std.ExtDHashMap.get?_insert]
+          -- simp [h_op_a]
+          -- sorry
           repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
         simp [op_a, sp1_op_a] at h_op_a
         repeat (rw [Std.ExtDHashMap.get?_insert]; simp [h_nextPC, h_op_a])
@@ -400,8 +403,8 @@ theorem correct
         -- simp [Sail.BitVec.update, Sail.BitVec.updateSubrange']
         -- rw [←(BitVec.ofNatLT_eq_ofNat pc_sum_u64)]
 
-        simp [sign_extend]
-        rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
+        -- simp [sign_extend]
+        -- rw [Sail.sign_extend_no_change (x := Main[21]) (by clear * - h_c_0; omega) (by simp)]
 
         rw [Word.toBitVec64_LT_eq_toNat b_is_u64]
         simp [Word.toNat]
@@ -468,5 +471,8 @@ theorem correct
 -/
 
 end Jalr
+
+#print axioms Jalr.correct
+
 
 end
