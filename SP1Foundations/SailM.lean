@@ -3,16 +3,61 @@ import LeanRV64IM.RiscvInstsEnd
 import LeanRV64IM.Defs
 import SP1Foundations.Misc
 
+open LeanRV64IM.Functions
+
 macro "simpM" : tactic => `(tactic| simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet])
 
 section sailboats
 
-open PreSail
+@[simp] abbrev SailState := PreSail.SequentialState RegisterType Sail.trivialChoiceSource
 
-open LeanRV64IM.Functions
+/-- Axiom that the `misa` register is always zero. -/
+axiom SailState.sp1_no_misa : ∀s : SailState, s.regs.get? Register.misa = some 0
 
+-- dt: would be safer if we made this a hypothesis about specific states.
+example (s : SailState) : False := by
+  let s' := {s with regs := s.regs.insert Register.misa 1}
+  have := SailState.sp1_no_misa s'
+  suffices : (0 : RegisterType Register.misa) = 1
+  · simp at this
+  simp [s'] at this
 
 instance : DecidableEq regidx | .Regidx v, .Regidx v' => by simp; infer_instance
+
+@[simp] lemma set_next_pc_def (pc : BitVec 64) :
+    set_next_pc pc = Sail.writeReg Register.nextPC pc := rfl
+
+@[simp] lemma get_next_pc_def (u : Unit) :
+    get_next_pc u = Sail.readReg Register.nextPC := rfl
+
+section EStateM_run
+
+@[simp] lemma run_writeReg (reg : Register) (v : RegisterType reg) :
+    (Sail.writeReg reg v).run s =
+      .ok PUnit.unit { s with regs := s.regs.insert reg v} := rfl
+
+lemma run_writeReg_bind (reg : Register) (v : RegisterType reg) (mx : Unit → SailM α) :
+    (Sail.writeReg reg v >>= mx).run s =
+      (mx ()).run {s with regs := s.regs.insert reg v} := by simp
+
+@[simp] lemma run_readReg (reg : Register) :
+    (Sail.readReg reg).run s = match s.regs.get? reg with
+    | some v => .ok v s
+    | none => .error Sail.Error.Unreachable s := by
+  simp [Sail.readReg, PreSail.readReg]
+  cases s.regs.get? reg with
+  | some v => rfl
+  | none => rfl
+
+@[simp high] -- Prefer this over reducing on bind
+lemma run_readReg_bind (reg : Register) (mx : RegisterType reg → SailM α) :
+    (Sail.readReg reg >>= mx).run s = match s.regs.get? reg with
+    | some v => (mx v).run s
+    | none => (throw Sail.Error.Unreachable : SailM _).run s := by
+  simp
+  cases s.regs.get? reg with | some v => rfl | none => rfl
+
+end EStateM_run
 
 /-- Reading a just written value looks like just using the written value. -/
 @[simp]
@@ -20,9 +65,9 @@ theorem writeReg_readReg_bind {α : Type} (reg : Register) (v : RegisterType reg
     (mx : RegisterType reg → SailM α) :
     (do Sail.writeReg reg v; let w ← Sail.readReg reg; mx w) =
       (do Sail.writeReg reg v; mx v) := by
-  simp [Sail.writeReg, writeReg, Sail.readReg, readReg]
+  simp [Sail.writeReg, PreSail.writeReg, Sail.readReg, PreSail.readReg]
   have := LawfulMonadStateOf.modify_bind_get_bind_of_forall_eq
-    (f := fun s : SequentialState RegisterType Sail.trivialChoiceSource =>
+    (f := fun s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource =>
         { regs := s.regs.insert reg v, choiceState := s.choiceState, mem := s.mem, tags := s.tags,
           cycleCount := s.cycleCount, sailOutput := s.sailOutput })
     (g := fun x => x.regs.get? reg)
@@ -49,11 +94,6 @@ instance : Fintype (BitVec n) where
     simp [Finset.mem_image]
 
 open Sail (trivialChoiceSource Error)
-
-@[simp]
-abbrev SailState := SequentialState RegisterType trivialChoiceSource
-
-axiom SailState.sp1_no_misa : ∀s : SailState, s.regs.get? Register.misa = some 0
 
 def reg_idx_to_Register (idx : BitVec 5) : Register :=
   match idx with
@@ -188,7 +228,7 @@ theorem SailState.reg_idx_never_nextPC
 @[simp]
 theorem writeReg_writeReg (reg : Register) (v v' : RegisterType reg) :
     (do Sail.writeReg reg v; Sail.writeReg reg v') = Sail.writeReg reg v' := by
-  simp [writeReg]
+  simp [PreSail.writeReg]
   refine congr_arg modify ?_
   ext s
   cases s
@@ -208,7 +248,7 @@ theorem writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
   by_cases hi : i = 0#5
   · cases hi
     simp
-  · simp [hi, Sail.writeReg, writeReg]
+  · simp [hi, Sail.writeReg, PreSail.writeReg]
     refine congr_arg modify ?_
     ext s
     simp
@@ -230,45 +270,45 @@ lemma readReg_bind_bind_duplicate (reg : Register)
   rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
   suffices : s = s'
   . simp_all
-  . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
+  . simp [Sail.readReg, PreSail.readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
     split at h_eq <;> [ subst_eqs; trivial ]
     rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
     obtain ⟨ _, _ ⟩ := h_eq; rfl
 
-lemma run_readReg_bind_of_forall (reg : Register)
-    (f : RegisterType reg → β)
-    (mx : β → SailM α) (y : β)
-    (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
-    (hs : ∀ v, s.regs.get? reg = some v → f v = y)
-     :
-    (do let v ← Sail.readReg reg; mx (f v)).run s =
-      (mx y).run s
-    := by
-  simpM
-  unfold EStateM.bind EStateM.run
-  rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
-  . congr; apply hs
-    . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
-      split at h_eq <;> [ subst_eqs; trivial ]
-      rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
-      obtain ⟨ _, _ ⟩ := h_eq; rfl
-    . sorry
-  . sorry
+-- lemma run_readReg_bind_of_forall (reg : Register)
+--     (f : RegisterType reg → β)
+--     (mx : β → SailM α) (y : β)
+--     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+--     (hs : ∀ v, s.regs.get? reg = some v → f v = y)
+--      :
+--     (do let v ← Sail.readReg reg; mx (f v)).run s =
+--       (mx y).run s
+--     := by
+--   simpM
+--   unfold EStateM.bind EStateM.run
+--   rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
+--   . congr; apply hs
+--     . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
+--       split at h_eq <;> [ subst_eqs; trivial ]
+--       rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
+--       obtain ⟨ _, _ ⟩ := h_eq; rfl
+--     . sorry
+--   . sorry
 
-lemma readReg_bind_const (reg : Register) (mx : SailM α) :
-    (do let _ ← Sail.readReg reg; mx) = mx := by
-  simpM
-  refine EStateM.ext ?_
-  unfold EStateM.bind EStateM.run
-  simp; intro s
-  rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
-  . suffices : s = s'
-    . simp_all
-    . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
-      split at h_eq <;> [ subst_eqs; trivial ]
-      rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
-      obtain ⟨ _, _ ⟩ := h_eq; rfl
-  . sorry
+-- lemma readReg_bind_const (reg : Register) (mx : SailM α) :
+--     (do let _ ← Sail.readReg reg; mx) = mx := by
+--   simpM
+--   refine EStateM.ext ?_
+--   unfold EStateM.bind EStateM.run
+--   simp; intro s
+--   rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
+--   . suffices : s = s'
+--     . simp_all
+--     . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
+--       split at h_eq <;> [ subst_eqs; trivial ]
+--       rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
+--       obtain ⟨ _, _ ⟩ := h_eq; rfl
+--   . sorry
 
 -- @[simp]
 -- lemma wX_bits_rX_bits' (rs : regidx) (bv : BitVec 32) (cont : BitVec 32 → SailM α) :
