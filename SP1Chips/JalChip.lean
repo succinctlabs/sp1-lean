@@ -172,6 +172,8 @@ lemma ofInt_ofNat_of_constraints (Main : Vector (Fin BB) 31)
   simp_all only [Fin.isValue]
   rfl
 
+--------------------------
+
 def specJal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   set_next_pc (Sail.BitVec.addInt (← Sail.readReg Register.PC) 4)
   let _ ← execute_JAL imm rd
@@ -240,18 +242,87 @@ lemma EStateM.bind_def (x : EStateM ε σ α) (f : α → EStateM ε σ β) :
   | .ok a s    => f a s
   | .error e s => .error e s) := rfl
 
+lemma EStateM.run_bind (x : EStateM ε σ α) (f : α → EStateM ε σ β) :
+  (x >>= f).run s =
+  match x.run s with
+  | .ok a s    => (f a).run s
+  | .error e s => .error e s := rfl
+
+@[simp] lemma EStateM.run_get :
+    (get : EStateM ε σ σ).run s = EStateM.Result.ok s s := rfl
+
+@[simp] lemma EStateM.run_pure (x : α) :
+    (pure x : EStateM ε σ α).run s = EStateM.Result.ok x s := rfl
+
+@[simp] lemma EStateM.run_throw (e : ε) :
+    (throw e : EStateM ε σ α).run s = EStateM.Result.error e s := rfl
+
+@[simp] lemma ESTateM.run_modify (f : σ → σ) :
+    (modify f : EStateM ε σ PUnit).run s = EStateM.Result.ok PUnit.unit (f s) := rfl
+
 lemma specJal_eq_of_mod (imm : BitVec 21) (rd : regidx)
     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
-    (pc : RegisterType Register.PC) (h : (pc + sign_extend imm) % 4 = 0)
+    (pc : RegisterType Register.PC)
+    (h : (pc + sign_extend imm) % 4 = 0)
     (hs : s.regs.get? Register.PC = pc) :
+
     (specJal imm rd).run s = (do
-      set_next_pc (Sail.BitVec.addInt (← Sail.readReg Register.PC) 4)
-      let target ← pure ((← Sail.readReg Register.PC) + (sign_extend (m := 64) imm))
+      set_next_pc (Sail.BitVec.addInt pc 4)
+      let target ← pure (pc + (sign_extend (m := 64) imm))
       wX_bits rd (← (get_next_pc ()))
       (set_next_pc target)).run s := by
   rw [specJal]
-  simp [EStateM.bind_def]
+  simp [EStateM.run_bind]
+  stop
+  have : Sail.readReg Register.PC s = EStateM.Result.ok pc s := sorry
+  simp [this]
+  cases set_next_pc (Sail.BitVec.addInt pc 4) s
+  ·
+    simp
+    simp [EStateM.Result.map]
+    rw [execute_JAL_eq_of imm rd _ pc h]
 
+    · simp [EStateM.run_bind]
+
+      sorry
+    ·
+      sorry
+  simp
+
+@[simp]
+lemma run_readReg_bind (reg : Register) (mx : RegisterType reg → SailM α) :
+    (Sail.readReg reg >>= mx).run s = match s.regs.get? reg with
+    | some v => (mx v).run s
+    | none => (throw Sail.Error.Unreachable : SailM _).run s := by
+  simp [EStateM.run_bind, Sail.readReg, PreSail.readReg]
+  cases s.regs.get? reg with
+  | some v => simp
+  | none => simp
+
+@[simp]
+lemma run_writeReg_bind (reg : Register) (v : RegisterType reg) (mx : Unit → SailM α) :
+    (Sail.writeReg reg v >>= mx).run s =
+      (mx ()).run {s with regs := s.regs.insert reg v} := rfl
+
+@[simp]
+lemma run_set_next_pc_bind (pc : BitVec 64) (mx : Unit → SailM α) :
+    (set_next_pc pc >>= mx).run s =
+      (mx ()).run {s with regs := s.regs.insert Register.nextPC pc} := rfl
+
+@[simp]
+lemma run_set_next_pc (pc : BitVec 64) :
+    (set_next_pc pc).run s =
+      EStateM.Result.ok () {s with regs := s.regs.insert Register.nextPC pc} := rfl
+
+@[simp]
+lemma pc_ne_next_pc : Register.nextPC != Register.PC := by exact rfl
+
+@[simp]
+lemma insert_insert_insert_cancel {α : Type _} {β : α → Type _}
+  [BEq α] [LawfulBEq α] [Hashable α] (m : Std.ExtDHashMap α β)
+    (a₁ a₂ : α) {v v' : β a₁} (w : β a₂) :
+    ((m.insert a₁ v).insert a₂ w).insert a₁ v' =
+      (m.insert a₂ w).insert a₁ v' := by
   sorry
 
 set_option maxHeartbeats 300000 in
@@ -259,8 +330,11 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
     (h_cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1) -- Is a real column
     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+    -- dt: get this from constraints
     (h_pc : s.regs.get? Register.PC =
-      some (BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32))) :
+      some (BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)))
+    (h_misa : s.regs.get? Register.misa = some 2)
+    :
     let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
     (sp1Jal Main).run s = (specJal imm (regidx.Regidx Main[6].val)).run s := by
 
@@ -269,17 +343,62 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
   let new_pc := BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48)
   let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
 
+  unfold sp1Jal
 
-  unfold sp1Jal --specJal
 
-  -- rw [specJal_eq_of_ ((BitVec.setWidth 21 imm)) (regidx.Regidx (Main[6].val : BitVec 5)) s]
+  -- refine _root_.trans ?_ (specJal_eq_of_mod _ _ _ init_pc (by
+  --   simp
 
-  refine _root_.trans ?_ (specJal_eq_of_mod _ _ _ init_pc (by
-    simp
+  --   sorry
+  -- ) (h_pc)).symm
+  -- refine congr_arg (fun mx => EStateM.run mx s) ?_
+  unfold specJal
+  unfold execute_JAL
+
+  simp only [BB_eq, BitVec.natCast_eq_ofNat, Nat.reducePow, Nat.reduceLeDiff,
+    BitVec.setWidth_ofNat_of_le, pure_bind]
+
+  rw [run_readReg_bind, h_pc]
+  simp
+  rw [run_readReg_bind]
+  simp
+
+  rw [Std.ExtDHashMap.get?_insert]
+  simp [h_pc]
+
+  simp [ext_control_check_pc]
+
+  simp [bit_to_bool, bool_bit_backwards, Sail.BitVec.access, bits_of_virtaddr]
+
+  have : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
+            sign_extend (BitVec.ofNat 21 (↑Main[14] + ↑Main[15] * 65536 + ↑Main[16] * 4294967296 + ↑Main[17] * 281474976710656)))[1] = false := sorry
+
+  simp [this, currentlyEnabled]
+  rw [run_readReg_bind]
+  simp
+
+  -- have := ext_control_check_pc
+  --         (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
+  --           sign_extend
+  --             (BitVec.ofNat 21
+  --               (↑Main[14] + ↑Main[15] * 65536 + ↑Main[16] * 4294967296 + ↑Main[17] * 281474976710656)))
+
+  simp [Std.ExtDHashMap.get?_insert, h_misa]
+  simp [get_next_pc]
+  rw [run_readReg_bind]
+
+  simp [LeanRV64IM.Functions.not, hartSupports]
+
+  simp [← SailState.wX_bits_is_regidx_write,
+    SailState.regidx_write]
+
+  by_cases h6 : Main[6] = 0
+  · simp [h6]
     sorry
-  ) (h_pc)).symm
-  refine congr_arg (fun mx => EStateM.run mx s) ?_
-  simp only []
+
+  have h6' : BitVec.ofNat 5 Main[6] = 0#5 := sorry
+  simp [h6', EStateM.run_bind]
+
 
 
   have h25 : Main[25] = 0 := by
@@ -294,6 +413,8 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
   have h_of_int : let imm_nat : ℕ := Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656
       BitVec.ofInt 64 (BitVec.ofNat 21 (imm_nat)).toInt = (BitVec.ofNat 64 (imm_nat)) :=
     ofInt_ofNat_of_constraints Main h_cstrs h_is_real
+
+  simp [h25]
 
   have op_a_is_bool : Main[13] = 0 ∨ Main[13] = 1 := by
     simp [constraints, h_is_real, SP1Constraint.toProp, Opcode.ofNat, Nat.ble] at h_cstrs
@@ -315,28 +436,28 @@ theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
         Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
         writeReg_wX_bits_writeReg]
       rw [h_of_int]
-      unfold wX_bits
-      simp only [wX, BitVec.toNat_ofNat, Nat.reducePow, Nat.zero_mod, bne_self_eq_false, cond_false,
-        bind_pure_comp, map_pure, pure_bind, BB_eq]
+      -- congr 3
+
+      -- sorry
+      -- unfold wX_bits
+      -- simp only [wX, BitVec.toNat_ofNat, Nat.reducePow, Nat.zero_mod, bne_self_eq_false, cond_false,
+      --   bind_pure_comp, map_pure, pure_bind, BB_eq]
+      -- rfl
   | inr op_a_is_zero =>
 
-  have h_link : BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
-      BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
-    refine link_eq_of_constraints Main h_cstrs h_is_real op_a_is_zero
+    have h_link : BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
+        BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
+      refine link_eq_of_constraints Main h_cstrs h_is_real op_a_is_zero
 
-  simp only [BB_eq, BitVec.natCast_eq_ofNat, Nat.reducePow, execute_JAL, Nat.reduceLeDiff,
-    BitVec.setWidth_ofNat_of_le, bind_pure_comp, map_eq_bind_pure_comp, pure_bind, bind_assoc]
+    erw [h_link]
+    simp only [BB_eq, Nat.reducePow, BitVec.ofNat_eq_ofNat, set_next_pc, h25, Fin.isValue,
+      Fin.coe_ofNat_eq_mod, Nat.zero_mod, zero_mul, add_zero, h_pc, get_next_pc, sign_extend,
+      Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
+      writeReg_wX_bits_writeReg]
+    congr 1
 
-  erw [h_link]
+    simp [h_imm, h_of_int]
 
-  simp only [BB_eq, Nat.reducePow, BitVec.ofNat_eq_ofNat, set_next_pc, h25, Fin.isValue,
-    Fin.coe_ofNat_eq_mod, Nat.zero_mod, zero_mul, add_zero, h_pc, get_next_pc, sign_extend,
-    Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
-    writeReg_wX_bits_writeReg]
-
-  refine bind_congr fun () => congr_arg set_next_pc ?_
-
-  rw [h_of_int, h_imm]
 
 #print axioms SP1JAL_correct
 

@@ -72,8 +72,7 @@ def trusted_instr
   | JAL =>
       (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
       -- 2^12 = 4096
-      ∧ (op_c_0 < 2^12 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0)
-      ∧ op_c_0 % 4 == 0
+      ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0)
   | JALR =>
       (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
       -- 2^12 = 4096
