@@ -14,8 +14,8 @@ def constraints (Main : Vector (Fin BB) 33) : SP1ConstraintList :=
   let E3 : Fin BB := Main[1] * 65536
   let E4 : Fin BB := Main[2] + E3
   let CS2 : SP1ConstraintList := RTypeReader.constraints Main[0] E4 #v[Main[3], Main[4], Main[5]] 0 #v[51, 0, 0] #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[32]
-  [
+  CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E1),
-  ] ++ CS0 ++ CS1 ++ CS2
+  ]
 
 end constraints
