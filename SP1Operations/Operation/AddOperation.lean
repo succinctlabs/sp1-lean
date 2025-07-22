@@ -19,8 +19,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
       (cols.value[1].val < 65536) ∧
       (cols.value[2].val < 65536) ∧
       (cols.value[3].val < 65536) := by
-  simp only [constraints, sub_eq_zero, inv_16BB_eq']
-  sorry
+  simp [constraints, sub_eq_zero, inv_16BB_eq']
 
 lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddOperation)
     (h : (constraints a b cols 1).allHold) : cols.value.isU64 := by
