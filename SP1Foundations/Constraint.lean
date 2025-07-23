@@ -114,6 +114,28 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
 
 end toStateProp
 
+section toU16CompProp
+
+def toU16CompProp (cstr : SP1Constraint) : Prop :=
+  match cstr with
+  | (.receive (.memory _clk_high _clk_low addr0 addr1 addr2 limb0 limb1 limb2 limb3) mult) =>
+      mult ≠ 0
+      → (limb0 < 65536 ∧ limb1 < 65536 ∧ limb2 < 65536 ∧ limb3 < 65536)
+        ∧ (addr0 < 65536 ∧ addr1 < 65536 ∧ addr2 < 65536)
+  | (.send (.state _clk_high _clk_low pc0 pc1 pc2) mult) =>
+      mult ≠ 0
+      -- Note: pc0 can overflow u16 limb.
+      -- When this happens, StateBumpChip is used to receive the state
+      -- interaction with the incorrect pc0 and send another state interaction
+      -- with the corrected pc0.
+      --
+      -- StateBumpChip is called at runtime so right now we don't have too good
+      -- of a mechanism to do the correction...
+      → pc0 <= 65536 ∧ pc1 < 65536 ∧ pc2 < 65536 
+  | _ => True
+
+end toU16CompProp
+
 end SP1Constraint
 
 section constraintList
@@ -158,5 +180,13 @@ lemma initialState_append (cs cs' : SP1ConstraintList) :
   List.forall_append
 
 end initialState
+
+section u16_composition
+
+@[simp]
+protected def SP1ConstraintList.U16CompProp (xs : SP1ConstraintList) : Prop :=
+  List.Forall SP1Constraint.toU16CompProp xs
+
+end u16_composition
 
 end constraintList
