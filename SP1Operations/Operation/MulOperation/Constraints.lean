@@ -473,7 +473,7 @@ def constraints
   let E463 : Fin BB := cols.b_sign_extend * E462
   let E464 : Fin BB := cols.c_msb - 1
   let E465 : Fin BB := cols.c_sign_extend * E464
-  [
+  CS0 ++ CS1 ++ CS2 ++ [
     (.send (.byte (ByteOpcode.ofNat 5) cols.b_msb E7 0) is_real),
     (.send (.byte (ByteOpcode.ofNat 5) cols.c_msb E15 0) is_real),
     (.assertZero E18),
@@ -543,6 +543,6 @@ def constraints
     (.send (.byte (ByteOpcode.ofNat 3) 0 cols.product[10] cols.product[11]) is_real),
     (.send (.byte (ByteOpcode.ofNat 3) 0 cols.product[12] cols.product[13]) is_real),
     (.send (.byte (ByteOpcode.ofNat 3) 0 cols.product[14] cols.product[15]) is_real),
-  ] ++ CS0 ++ CS1 ++ CS2
+  ]
 
 end constraints

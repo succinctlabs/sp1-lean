@@ -67,7 +67,7 @@ def constraints
   let E53 : Fin BB := E52 - is_real
   let E54 : Fin BB := E50 * E53
   let CS0 : SP1ConstraintList := U16CompareOperation.constraints cols.comparison_limbs[0] cols.comparison_limbs[1] { bit := cols.u16_compare_operation.bit } is_real
-  [
+  CS0 ++ [
     (.assertZero E1),
     (.assertZero E6),
     (.assertZero E8),
@@ -81,7 +81,7 @@ def constraints
     (.assertZero E48),
     (.assertZero E49),
     (.assertZero E54),
-  ] ++ CS0
+  ]
 
 end constraints
 

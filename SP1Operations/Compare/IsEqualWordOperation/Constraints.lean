@@ -18,9 +18,9 @@ def constraints
   let E4 : Fin BB := a[2] - b[2]
   let E5 : Fin BB := a[3] - b[3]
   let CS0 : SP1ConstraintList := IsZeroWordOperation.constraints #v[E2, E3, E4, E5] { is_zero_limb := #v[{ inverse := cols.is_diff_zero.is_zero_limb[0].inverse, result := cols.is_diff_zero.is_zero_limb[0].result }, { inverse := cols.is_diff_zero.is_zero_limb[1].inverse, result := cols.is_diff_zero.is_zero_limb[1].result }, { inverse := cols.is_diff_zero.is_zero_limb[2].inverse, result := cols.is_diff_zero.is_zero_limb[2].result }, { inverse := cols.is_diff_zero.is_zero_limb[3].inverse, result := cols.is_diff_zero.is_zero_limb[3].result }], is_zero_first_half := cols.is_diff_zero.is_zero_first_half, is_zero_second_half := cols.is_diff_zero.is_zero_second_half, result := cols.is_diff_zero.result } is_real
-  [
+  CS0 ++ [
     (.assertZero E1),
-  ] ++ CS0
+  ]
 
 end constraints
 
