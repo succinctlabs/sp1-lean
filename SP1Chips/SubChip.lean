@@ -1,21 +1,19 @@
 import SP1Foundations
-import SP1Operations.SubOperation
-import SP1Operations.CPUState
-import SP1Operations.RTypeReader
+import SP1Operations
 
 namespace SubChip
 
-def constraints (Main : Vector (Fin BB) 23) : SP1ConstraintList :=
-  let E0 : Fin BB := Main[22] - 1
-  let E1 : Fin BB := Main[22] * E0
-  let CS0 : SP1ConstraintList := SubOperation.constraints #v[Main[11], Main[12]] #v[Main[16], Main[17]] { value := #v[Main[20], Main[21]] } Main[22]
+def constraints (Main : Vector (Fin BB) 33) : SP1ConstraintList :=
+  let E0 : Fin BB := Main[32] - 1
+  let E1 : Fin BB := Main[32] * E0
+  let CS0 : SP1ConstraintList := SubOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[22], Main[23], Main[24], Main[25]] { value := #v[Main[28], Main[29], Main[30], Main[31]] } Main[32]
   let E2 : Fin BB := Main[3] + 4
-  let CS1 : SP1ConstraintList := CPUState.constraints { clk_0_16 := Main[2], clk_16_24 := Main[1], clk_high := Main[0], pc := Main[3] } E2 8 Main[22]
+  let CS1 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E2, Main[4], Main[5]] 8 Main[32]
   let E3 : Fin BB := Main[1] * 65536
   let E4 : Fin BB := Main[2] + E3
-  let CS2 : SP1ConstraintList := RTypeReader.constraints Main[0] E4 Main[3] 2 #v[Main[20], Main[21]] { op_a := Main[4], op_a_0 := Main[9], op_a_memory := { access_timestamp := { diff_low_limb := Main[8], prev_low := Main[7] }, prev_value := #v[Main[5], Main[6]] }, op_b := Main[10], op_b_memory := { access_timestamp := { diff_low_limb := Main[14], prev_low := Main[13] }, prev_value := #v[Main[11], Main[12]] }, op_c := Main[15], op_c_memory := { access_timestamp := { diff_low_limb := Main[19], prev_low := Main[18] }, prev_value := #v[Main[16], Main[17]] } } Main[22]
+  let CS2 : SP1ConstraintList := RTypeReader.constraints Main[0] E4 #v[Main[3], Main[4], Main[5]] 2 #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[32]
   [
-    .assertZero E1
+    (.assertZero E1),
   ] ++ CS0 ++ CS1 ++ CS2
 
 end SubChip

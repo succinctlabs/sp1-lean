@@ -1,0 +1,6 @@
+import SP1Operations.Compare.IsEqualWordOperation.Operation
+import SP1Operations.Compare.IsEqualWordOperation.Constraints
+
+namespace IsEqualWordOperation
+
+end IsEqualWordOperation

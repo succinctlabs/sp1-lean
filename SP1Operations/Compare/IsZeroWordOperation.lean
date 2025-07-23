@@ -1,0 +1,6 @@
+import SP1Operations.Compare.IsZeroWordOperation.Operation
+import SP1Operations.Compare.IsZeroWordOperation.Constraints
+
+namespace IsZeroWordOperation
+
+end IsZeroWordOperation

@@ -1,0 +1,6 @@
+import SP1Operations.Compare.U16CompareOperation.Operation
+import SP1Operations.Compare.U16CompareOperation.Constraints
+
+namespace U16CompareOperation
+
+end U16CompareOperation

@@ -2,7 +2,9 @@ import SP1Foundations.BitVec
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Constraint
 import SP1Foundations.Field
+import SP1Foundations.MemoryConsistency
 import SP1Foundations.Misc
+import SP1Foundations.Opcode
 import SP1Foundations.SP1State
 import SP1Foundations.SailM
 import SP1Foundations.Unsigned

@@ -24,7 +24,7 @@ section ofNat
 @[simp] lemma ofNat_three : ByteOpcode.ofNat 3 = .U8Range := rfl
 @[simp] lemma ofNat_four : ByteOpcode.ofNat 4 = .LTU := rfl
 @[simp] lemma ofNat_five : ByteOpcode.ofNat 5 = .MSB := rfl
-@[simp] lemma ofNat_six : ByteOpcode.ofNat 6 = .Range := rfl
+@[simp] lemma ofNat_seven : ByteOpcode.ofNat 6 = .Range := rfl
 
 def toBB : ByteOpcode → Fin BB
   | AND => 0
@@ -42,6 +42,7 @@ end ofNat
 
 section constrain
 
+-- dt: it might make sense to add `Fin.val` calls in more places here.
 def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   match op with
   | AND => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b &&& c
@@ -49,7 +50,7 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   | XOR => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a = b ^^^ c
   | U8Range => a < 256 ∧ b < 256 ∧ c < 256
   | LTU => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
-  | Range => a < 2 ^ b.val -- Is this right?
+  | Range => a.val < 2 ^ b.val -- Is this right?
   | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
 
 @[simp] lemma constrain_AND (a b c : Fin BB) :
@@ -71,7 +72,7 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
     ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64) := Iff.rfl
 
 @[simp] lemma constrain_Range (a b c : Fin BB) :
-    ByteOpcode.Range.constrain a b c ↔ (a < 2 ^ b.val) := Iff.rfl
+    ByteOpcode.Range.constrain a b c ↔ (a.val < 2 ^ b.val) := Iff.rfl
 
 end constrain
 
