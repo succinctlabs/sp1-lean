@@ -176,7 +176,15 @@ theorem modify_bind_get_bind_of_forall_eq (f : σ → σ)
       (do modify f; mx x) := by
   simp [modify_eq, h]
 
-
+@[simp]
+lemma insert_insert_insert_cancel {α : Type _} {β : α → Type _}
+  [BEq α] [LawfulBEq α] [Hashable α] (m : Std.ExtDHashMap α β)
+    (a₁ a₂ : α) {v v' : β a₁} (w : β a₂) :
+    ((m.insert a₁ v).insert a₂ w).insert a₁ v' =
+      (m.insert a₂ w).insert a₁ v' := by
+  refine Std.ExtDHashMap.ext_get? ?_
+  intro k
+  aesop (add safe (by rw [Std.ExtDHashMap.get?_insert]))
 
 end back
 
