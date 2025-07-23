@@ -1,4 +1,5 @@
 import SP1Chips.Add.Constraints
+import SP1Chips.Add.U16Composition
 import SP1Chips.AddChip
 import SP1Chips.Addi.Constraints
 import SP1Chips.AddiChip
