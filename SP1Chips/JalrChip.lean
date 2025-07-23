@@ -1,3 +1,4 @@
+import SP1Foundations
 import SP1Operations
 import LeanRV64IM.RiscvInstsEnd
 
@@ -457,7 +458,6 @@ theorem correct_cleanup
 
 end Jalr
 
--- #print axioms Jalr.correct
-
+#print axioms Jalr.correct_cleanup
 
 end

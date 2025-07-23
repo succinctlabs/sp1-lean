@@ -6,7 +6,7 @@ namespace AddOperation
 
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
 lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
-    (constraints a b cols 1).allHold ↔
+    List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
       let carry0 : Fin BB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
       let carry1 : Fin BB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
       let carry2 : Fin BB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
@@ -23,13 +23,13 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
 
 lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddOperation)
     (h : (constraints a b cols 1).allHold) : cols.value.isU64 := by
-  rw [allHold_constraints_iff] at h
+  simp [allHold_constraints_iff] at h
   refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_ <;> tauto
 
 def spec (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
   a.isU64 → b.isU64 → cols.value.isU64 ∧ cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
-set_option maxHeartbeats 1000000
+set_option maxHeartbeats 1000000 in
 /-- If the operation is real and the input words have correctly bounded limbs,
 then the constraints imply the spec. -/
 theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
@@ -37,149 +37,21 @@ theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
     (h_cstrs : (constraints a b cols is_real).allHold) :
     spec a b cols := by
   cases h_is_real
-  rw [allHold_constraints_iff] at h_cstrs
+  simp [allHold_constraints_iff] at h_cstrs
   obtain ⟨h0, h1, h2, h3, hbds⟩ := h_cstrs
   intro ha hb
   have ha' := Word.lt_cases_of_isU64 ha
   have hb' := Word.lt_cases_of_isU64 hb
-  simp at ha' hb'
 
-  apply And.intro
+  constructor
   · clear *- hbds
     aesop
 
-  have hab0 : (a[0] + b[0]).val = a[0].val + b[0].val := by
-    refine Word.val_add_of_isU64 ha hb 0
-  have hab1 : (a[1] + b[1]).val = a[1].val + b[1].val := by
-    refine Word.val_add_of_isU64 ha hb 1
-  have hab2 : (a[2] + b[2]).val = a[2].val + b[2].val := by
-    refine Word.val_add_of_isU64 ha hb 2
-  have hab3 : (a[3] + b[3]).val = a[3].val + b[3].val := by
-    refine Word.val_add_of_isU64 ha hb 3
-  rw [Word.toBitVec64_add_toBitVec64, Word.toBitVec64_eq_add]
-
-  cases h0 with
-  | inl h0 =>
-    simp [h0] at h1 h2 h3
-    cases h1 with
-    | inl h1 =>
-      simp [h1] at h2 h3
-      cases h2 with
-      | inl h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-      | inr h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-    | inr h1 =>
-      simp [h1] at h2 h3
-      cases h2 with
-      | inl h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-      | inr h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-  | inr h0 =>
-    simp [h0] at h1 h2 h3
-    cases h1 with
-    | inl h1 =>
-      simp [h1] at h2 h3
-      cases h2 with
-      | inl h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-      | inr h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-    | inr h1 =>
-      simp [h1] at h2 h3
-      cases h2 with
-      | inl h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-      | inr h2 =>
-        simp [h2] at h3
-        cases h3 with
-        | inl h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
-        | inr h3 =>
-        · simp [sub_eq_zero] at h0 h1 h2 h3
-          simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-          simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
-          omega
+  . rw [Word.toBitVec64_add_toBitVec64, Word.toBitVec64_eq_add]
+    simp [← inv_16BB_eq'] at *
+    simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
+    simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
+    rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>
+    simp_all <;> omega
 
 end AddOperation

@@ -242,8 +242,7 @@ def SailState.write_reg (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
         else .ok () { s with regs := s.regs.insert reg (by
           rw [reg_idx_must_64 idx]
           exact val) } := by
-
-  sorry
+  aesop (add safe (by dsimp [SailState.write_reg]))
 
 def SailState.regidx_write (idx : BitVec 5) (val : BitVec 64) : SailM Unit :=
   do
