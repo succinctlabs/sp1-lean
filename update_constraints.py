@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Use gzgz/rv64-operationize branch for sp1-wip!
+
 import os
 import subprocess
 import re
@@ -90,7 +92,7 @@ def main():
     # Get SP1_DIR from environment
     sp1_dir = os.environ.get('SP1_DIR')
     if not sp1_dir:
-        raise ValueError("SP1_DIR environment variable not set")
+        raise ValueError("SP1_DIR environment variable not set. Also make sure sp1-wip is gzgz/rv64-operationize")
 
     for chip, operation, prefix in CONSTRAINTS_LIST:
         print(f"Processing {chip}" + (f" - {operation}" if operation else ""))

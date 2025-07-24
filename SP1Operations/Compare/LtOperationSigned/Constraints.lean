@@ -34,13 +34,13 @@ def constraints
   let E16 : Fin BB := 65536 * cols.c_msb.msb
   let E17 : Fin BB := E15 - E16
   let CS2 : SP1ConstraintList := LtOperationUnsigned.constraints #v[b[0], b[1], b[2], E13] #v[cc[0], cc[1], cc[2], E17] { u16_compare_operation := { bit := cols.result.u16_compare_operation.bit }, u16_flags := #v[cols.result.u16_flags[0], cols.result.u16_flags[1], cols.result.u16_flags[2], cols.result.u16_flags[3]], not_eq_inv := cols.result.not_eq_inv, comparison_limbs := #v[cols.result.comparison_limbs[0], cols.result.comparison_limbs[1]] } is_real
-  [
+  CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E1),
     (.assertZero E3),
     (.assertZero E5),
     (.assertZero E7),
     (.assertZero E9),
-  ] ++ CS0 ++ CS1 ++ CS2
+  ]
 
 end constraints
 

@@ -26,8 +26,8 @@ def constraints
   let E23 : Fin BB := cols.bitwise_operation.result[4] + E22
   let E24 : Fin BB := cols.bitwise_operation.result[7] * 256
   let E25 : Fin BB := cols.bitwise_operation.result[6] + E24
-  ⟨#v[E19, E21, E23, E25], [
+  ⟨#v[E19, E21, E23, E25], CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E1),
-  ] ++ CS0 ++ CS1 ++ CS2⟩
+  ]⟩
 
 end constraints

@@ -25,13 +25,13 @@ def constraints
   let E8 : Fin BB := cols.is_zero_first_half * cols.is_zero_second_half
   let E9 : Fin BB := cols.result - E8
   let E10 : Fin BB := is_real * E9
-  [
+  CS0 ++ CS1 ++ CS2 ++ CS3 ++ [
     (.assertZero E1),
     (.assertZero E3),
     (.assertZero E5),
     (.assertZero E7),
     (.assertZero E10),
-  ] ++ CS0 ++ CS1 ++ CS2 ++ CS3
+  ]
 
 end constraints
 

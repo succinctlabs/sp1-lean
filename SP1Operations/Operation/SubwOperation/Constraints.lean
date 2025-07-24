@@ -33,12 +33,12 @@ def constraints
   let E18 : Fin BB := E16 * E17
   let E19 : Fin BB := is_real * E18
   let CS0 : SP1ConstraintList := U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } is_real
-  [
+  CS0 ++ [
     (.assertZero E1),
     (.assertZero E10),
     (.assertZero E19),
     (.send (.byte (ByteOpcode.ofNat 6) cols.value[0] 16 0) is_real),
     (.send (.byte (ByteOpcode.ofNat 6) cols.value[1] 16 0) is_real),
-  ] ++ CS0
+  ]
 
 end constraints
