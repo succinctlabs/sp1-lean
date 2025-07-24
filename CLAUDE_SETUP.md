@@ -30,3 +30,14 @@ For commands past 1. you should run them at the root of the `sp1-lean` repo.
 Occasionally the tool may hover in the middle or after a `sorry`, causing it not
 being able to get the context and goal. When this happens, just tell it to
 "hover at the 's' of sorry to see the context and goal at the `sorry`".
+
+Remember to run `lake build` or `lake lean <the-file-to-work-on>` for the Lean
+LSP MCP server to work, including when you see the message like
+"X has been changed,
+please reopen/rebuild" in VSCode. In other words, this MCP
+server doesn't support the usecase where you
+change a dependency of a file and pretend nothing has been changed by not
+closing/reopening the file.
+Note that the build doesn't have to succeed. For more info see [its
+docs](https://github.com/oOo0oOo/lean-lsp-mcp?tab=readme-ov-file#2-run-lake-build).
+
