@@ -11,4 +11,3 @@ import SP1Operations.Operation.U16MSBOperation
     product_msb : U16MSBOperation
     b_sign_extend : Fin BB
     c_sign_extend : Fin BB
-    is_mulw : Fin BB
