@@ -5,6 +5,7 @@ import SP1Chips.Addi.Constraints
 import SP1Chips.Addi.U16Composition
 import SP1Chips.AddiChip
 import SP1Chips.Addw.Constraints
+import SP1Chips.Addw.U16Composition
 import SP1Chips.AddwChip
 import SP1Chips.Bitwise.Constraints
 import SP1Chips.BitwiseChip
