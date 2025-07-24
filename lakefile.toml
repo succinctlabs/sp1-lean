@@ -14,7 +14,7 @@ linter.unusedSimpArgs = false
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-rev = "v4.22.0-rc2"
+rev = "v4.22.0-rc3"
 
 # [[require]]
 # name = "Lean_RV32D"
