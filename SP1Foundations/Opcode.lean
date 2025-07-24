@@ -61,14 +61,21 @@ inductive Opcode where
 namespace Opcode
 
 @[simp]
+def itype_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 : Fin BB) : Prop :=
+  op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0
+  ∧ op_c_0 < 2^12 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
+
+@[simp]
 def trusted_instr
   (opcode : Opcode)
-  (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 : Fin BB)
+  (op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 : Fin BB)
   : Prop :=
   match opcode with
   | ADD =>
       op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0
       ∧ op_c_0 < 32 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
+  | ADDI =>
+      itype_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3
   | JAL =>
       (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
       -- 2^12 = 4096
