@@ -1,6 +1,13 @@
 import SP1Chips.AddChip
+import SP1Chips.AddiChip
+import SP1Chips.AddwChip
 import SP1Chips.BitwiseChip
-import SP1Chips.DivRem
+import SP1Chips.DivRemChip
 import SP1Chips.JalChip
+import SP1Chips.JalrChip
 import SP1Chips.LtChip
 import SP1Chips.MulChip
+import SP1Chips.ShiftLeftChip
+import SP1Chips.ShiftRightChip
+import SP1Chips.SubChip
+import SP1Chips.SubwChip
