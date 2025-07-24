@@ -26,6 +26,14 @@ lemma Nat.mod_eq_zero_iff_of_lt (x y : ℕ) (h : x < y) : x % y = 0 ↔ x = 0 :=
     simp
   · simp [h]
 
+macro "simpM" : tactic => `(tactic| simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet])
+
+instance : Fintype (BitVec n) where
+  elems := Finset.image (BitVec.ofFin) Finset.univ
+  complete := by
+    intro x
+    simp [Finset.mem_image]
+
 section toBatteries
 
 /-- The namespaced `MonadStateOf.get` is equal to the `MonadState` provided `get`. -/

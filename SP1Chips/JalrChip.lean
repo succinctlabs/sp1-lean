@@ -4,28 +4,10 @@ import LeanRV64IM.RiscvInstsEnd
 
 import SP1Chips.Jalr.Constraints
 
-namespace Word
-
-def toBitVec64LT (w : Word (Fin BB)) (h_w : w.isU64) : BitVec 64 :=
-  BitVec.ofNatLT w.toNat (by
-    simp [Word.toNat]
-    have := h_w 0
-    have := h_w 1
-    have := h_w 2
-    have := h_w 3
-    simp at *
-    linarith)
-
-end Word
-
-section
-
-set_option autoImplicit false
-
 namespace Jalr
 
 open PreSail (SequentialState)
-open LeanRV64IM.Functions
+open BitVec LeanRV64IM.Functions
 
 variable
   (Main : Vector (Fin BB) 38)
@@ -38,57 +20,37 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   _ ← execute_JALR imm rs1 rd
   pure ()
 
+lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
+    (h_is_real : Main[29] = 1) : Main[6].val < 2^5 := by
+  simp only [BB_eq, Nat.reducePow]
+  have reader_cstrs := by
+    simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
+    exact h.2.2.1
+  clear h
+  simp [ITypeReader.constraints, h_is_real, Opcode.ofNat,
+    Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
+  have trusted_instr_cstrs := reader_cstrs.1
+  clear reader_cstrs
+  itauto
+
+lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
+    (h_is_real : Main[29] = 1) : Main[14].val < 2^5 := by
+  simp only [BB_eq, Nat.reducePow]
+  have reader_cstrs := by
+    simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
+    exact h.2.2.1
+  clear h
+  simp [ITypeReader.constraints, h_is_real, Opcode.ofNat,
+    Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
+  have trusted_instr_cstrs := reader_cstrs.1
+  clear reader_cstrs
+  itauto
+
 def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[21].val
-  -- by
-  --   refine BitVec.ofNatLT
-  --     (Main[21].val + Main[22].val * 2^16 + Main[23].val * 2^32 + Main[24].val * 2^48)
-  --     ?_
 
-  --   have reader_cstrs := by
-  --     simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
-  --     exact cstrs.2.2.1
+def sp1_op_a : BitVec 5 := Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
 
-  --   clear cstrs
-  --   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-
-  --   have trusted_instr_cstrs := reader_cstrs.1
-  --   clear reader_cstrs
-
-  --   aesop
-
-def sp1_op_b : BitVec 5 :=
-  by
-    refine BitVec.ofNatLT Main[14] ?_
-    simp
-
-    have reader_cstrs := by
-      simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
-      exact cstrs.2.2.1
-
-    clear cstrs
-    simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-
-    have trusted_instr_cstrs := reader_cstrs.1
-    clear reader_cstrs
-
-    itauto
-
-def sp1_op_a : BitVec 5 :=
-  by
-    refine BitVec.ofNatLT Main[6] ?_
-    simp
-
-    have reader_cstrs := by
-      simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
-      exact cstrs.2.2.1
-
-    clear cstrs
-    simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-
-    have trusted_instr_cstrs := reader_cstrs.1
-    clear reader_cstrs
-
-    itauto
+def sp1_op_b : BitVec 5 := (Main[14].val)#'(op_b_lt32_of_constraints cstrs h_is_real)
 
 def sp1_jalr : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
@@ -454,10 +416,6 @@ theorem correct_cleanup
     exact hmod2
   }
 
-#eval BitVec.allOnes 64
-
-end Jalr
-
 #print axioms Jalr.correct_cleanup
 
-end
+end Jalr
