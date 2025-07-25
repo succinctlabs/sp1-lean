@@ -100,7 +100,8 @@ def trusted_instr
       r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
   | ADDI | JALR =>
       i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | AND | OR | XOR | SLT | SLTU =>
+  | AND | OR | XOR | SLT | SLTU 
+  | ADDW =>
       -- We can actually just do `r_type_constraints ∨ i_type_constraints` to
       -- save the duplicate `imm_c = (0|1)` constraints, but for simplicity of
       -- proving (i.e. casing) and readability, let's be redundant.
@@ -123,11 +124,6 @@ def trusted_instr
       i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
   | SB | SH | SW | SD =>
       i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | ADDW =>
-      -- ADDW
-      (imm_c = 0 → r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-      -- ADDIW
-      ∧ (imm_c = 1 → op_c_0 < 2^12 ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0))
   | SLLW | SRLW | SRAW =>
       (imm_c = 0 → r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
       ∧ (imm_c = 1 → w_shift_i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
