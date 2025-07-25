@@ -185,20 +185,20 @@ def sp1Jal (Main : Vector (Fin BB) 31) : SailM Unit := do
   wX_bits rd link
   set_next_pc new_pc
 
-lemma execute_JAL_eq_of (imm : BitVec 21) (rd : regidx)
-    (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
-    (pc : RegisterType Register.PC) (h : (pc + sign_extend imm) % 4 = 0)
-    (hs : s.regs.get? Register.PC = pc) :
-    (execute_JAL imm rd).run s = (do
-      let target ← pure ((← Sail.readReg Register.PC) + (sign_extend (m := 64) imm))
-      wX_bits rd (← (get_next_pc ()))
-      (set_next_pc target)
-      (pure RETIRE_SUCCESS)).run s := by
-  rw [execute_JAL]
-  simp [ext_control_check_pc, bit_to_bool]
-  simp [Sail.BitVec.access, bits_of_virtaddr]
-  simp [bool_bit_backwards, BitVec.ofBool]
-  sorry
+-- lemma execute_JAL_eq_of (imm : BitVec 21) (rd : regidx)
+--     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+--     (pc : RegisterType Register.PC) (h : (pc + sign_extend imm) % 4 = 0)
+--     (hs : s.regs.get? Register.PC = pc) :
+--     (execute_JAL imm rd).run s = (do
+--       let target ← pure ((← Sail.readReg Register.PC) + (sign_extend (m := 64) imm))
+--       wX_bits rd (← (get_next_pc ()))
+--       (set_next_pc target)
+--       (pure RETIRE_SUCCESS)).run s := by
+--   rw [execute_JAL]
+--   simp [ext_control_check_pc, bit_to_bool]
+--   simp [Sail.BitVec.access, bits_of_virtaddr]
+--   simp [bool_bit_backwards, BitVec.ofBool]
+--   sorry
   -- rw [readReg_bind_bind_duplicate]
   -- have := run_readReg_bind_of_forall
   --   (reg := Register.PC)
@@ -237,34 +237,34 @@ lemma execute_JAL_eq_of (imm : BitVec 21) (rd : regidx)
   --   have := BitVec.mul4_means_0_1_are_0 h
   --   exact this.2
 
-lemma specJal_eq_of_mod (imm : BitVec 21) (rd : regidx)
-    (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
-    (pc : RegisterType Register.PC)
-    (h : (pc + sign_extend imm) % 4 = 0)
-    (hs : s.regs.get? Register.PC = pc) :
+-- lemma specJal_eq_of_mod (imm : BitVec 21) (rd : regidx)
+--     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+--     (pc : RegisterType Register.PC)
+--     (h : (pc + sign_extend imm) % 4 = 0)
+--     (hs : s.regs.get? Register.PC = pc) :
 
-    (specJal imm rd).run s = (do
-      set_next_pc (Sail.BitVec.addInt pc 4)
-      let target ← pure (pc + (sign_extend (m := 64) imm))
-      wX_bits rd (← (get_next_pc ()))
-      (set_next_pc target)).run s := by
-  rw [specJal]
-  simp [EStateM.run_bind]
-  stop
-  have : Sail.readReg Register.PC s = EStateM.Result.ok pc s := sorry
-  simp [this]
-  cases set_next_pc (Sail.BitVec.addInt pc 4) s
-  ·
-    simp
-    simp [EStateM.Result.map]
-    rw [execute_JAL_eq_of imm rd _ pc h]
+--     (specJal imm rd).run s = (do
+--       set_next_pc (Sail.BitVec.addInt pc 4)
+--       let target ← pure (pc + (sign_extend (m := 64) imm))
+--       wX_bits rd (← (get_next_pc ()))
+--       (set_next_pc target)).run s := by
+--   rw [specJal]
+--   simp [EStateM.run_bind]
+--   stop
+--   have : Sail.readReg Register.PC s = EStateM.Result.ok pc s := sorry
+--   simp [this]
+--   cases set_next_pc (Sail.BitVec.addInt pc 4) s
+--   ·
+--     simp
+--     simp [EStateM.Result.map]
+--     rw [execute_JAL_eq_of imm rd _ pc h]
 
-    · simp [EStateM.run_bind]
+--     · simp [EStateM.run_bind]
 
-      sorry
-    ·
-      sorry
-  simp
+--       sorry
+--     ·
+--       sorry
+--   simp
 
 -- set_option debug.skipKernelTC true in
 -- set_option maxHeartbeats 300000 in
