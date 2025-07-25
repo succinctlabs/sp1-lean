@@ -1,4 +1,4 @@
-import SP1Operations
+import SP1Operations.Operation.AddOperation
 
 namespace JalChip
 

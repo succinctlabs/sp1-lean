@@ -1,4 +1,6 @@
-import SP1Operations
+import SP1Operations.Operation.AddwOperation
+import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.ALUTypeReader
 
 namespace Addw
 
