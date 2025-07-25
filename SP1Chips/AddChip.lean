@@ -1,5 +1,7 @@
 import SP1Foundations
-import SP1Operations
+import SP1Operations.Operation.AddOperation
+import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.RTypeReader
 import LeanRV64IM.RiscvInstsEnd
 
 import SP1Chips.Add.Constraints
