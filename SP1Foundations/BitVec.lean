@@ -1,5 +1,8 @@
 import SP1Foundations.Field
+import SP1Foundations.Word
 import LeanRV64IM.Sail.Sail
+
+open BitVec
 
 @[simp] lemma BitVec.twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
 
@@ -71,6 +74,15 @@ lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
 
 def BitVec64_of_limbs (x y z w : Fin BB) : BitVec 64 :=
   BitVec.ofNat 64 (x + y * 2^16 + z * 2^32 + w * 2^48)
+
+lemma ofNat64_mod_4_eq_zero_iff (n : ℕ) :
+    (BitVec.ofNat 64 n) % 4#64 = 0#64 ↔ n % 4 = 0 := by
+  rw [BitVec.ofNat]
+  rw [← BitVec.toFin_inj]
+  simp
+  rw [Fin.mod_def]
+  rw [← Fin.val_inj]
+  simp
 
 namespace BabyBear
 
@@ -186,6 +198,24 @@ end BabyBear
 
 namespace BitVec
 
+lemma ofNat64_mod_4_eq_zero (n : ℕ) :
+    (BitVec.ofNat 64 n) % 4 = n % 4 := rfl
+
+theorem helper {a b : BitVec 64}
+  (h : (a + b) % 4 = 0)
+  : 18446744073709551614#64 &&& (a + b) = a + b
+  :=
+  by
+    bv_decide
+
+theorem mul4_add_is_mul4 {a b : BitVec 64}
+  (ha : a % 4 = 0)
+  (hb : b % 4 = 0)
+  : (a + b) % 4 = 0
+  :=
+  by
+    bv_decide
+
 theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
   : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
   bx64 % 4 = (BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4
@@ -249,6 +279,7 @@ theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
     have : bx12 = BitVec.ofNatLT (w := 12) x.val hx := rfl
     rw [← this, ← h_sign_ext]
 
+
 theorem useless_signExtend_add {x : Fin BB} {hx : x.val < 2^12} {y : BitVec 64}
   : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
   (y + bx64) % 4 = (y + BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4
@@ -287,21 +318,6 @@ theorem useless_signExtend_add {x : Fin BB} {hx : x.val < 2^12} {y : BitVec 64}
     -- Hmm, let me just try bv_decide since this is a concrete property about 64-bit vectors
     bv_decide
 
-theorem helper {a b : BitVec 64}
-  (h : (a + b) % 4 = 0)
-  : 18446744073709551614#64 &&& (a + b) = a + b
-  :=
-  by
-    bv_decide
-
-theorem mul4_add_is_mul4 {a b : BitVec 64}
-  (ha : a % 4 = 0)
-  (hb : b % 4 = 0)
-  : (a + b) % 4 = 0
-  :=
-  by
-    bv_decide
-
 theorem FinBB_mul4_is_BV_mul4 {x : Fin BB}
   : x % 4 = 0 → (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith)) % 4 = 0
   :=
@@ -331,7 +347,7 @@ theorem mul4_means_0_1_are_0 {x : BitVec 64}
       simp [BitVec.getLsb, Nat.testBit]
       omega
 
-theorem FinBB_mul4_means_LS2B_0
+lemma FinBB_mul4_means_LS2B_0
   (x : Fin BB)
   : let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith))
   x % 4 = 0 → vx[0] = false ∧ vx[1] = false
@@ -342,3 +358,31 @@ theorem FinBB_mul4_means_LS2B_0
     exact mul4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
 
 end BitVec
+
+namespace Word
+
+@[simp] lemma toBitVec64_mod_4 (w : Word (Fin BB)) :
+    (Word.toBitVec64 w) % 4#64 = (BitVec.ofNat 64 w[0]) % 4#64 := by
+  simp [toBitVec64, toNat]
+  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
+  let k := BitVec.ofNat 64 w[0]
+  show (k + _ + _ + _) % 4 = k % 4
+  bv_decide
+
+lemma toBitVec64_add_mod_4 (w : Word (Fin BB)) (x : BitVec 64) :
+    (Word.toBitVec64 w + x) % 4#64 = (BitVec.ofNat 64 w[0] + x) % 4#64 := by
+  simp [toBitVec64, Word.toNat]
+  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
+  let k := BitVec.ofNat 64 w[0]
+  show (k + _ + _ + _ + _) % 4 = (k + _) % 4
+  bv_decide
+
+lemma add_toBitVec64_mod_4 (w : Word (Fin BB)) (x : BitVec 64) :
+    (x + Word.toBitVec64 w) % 4#64 = (x + BitVec.ofNat 64 w[0]) % 4#64 := by
+  simp [toBitVec64, Word.toNat]
+  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
+  let k := BitVec.ofNat 64 w[0]
+  show (_ + (k + _ + _ + _)) % 4 = (_ + k) % 4
+  bv_decide
+
+end Word

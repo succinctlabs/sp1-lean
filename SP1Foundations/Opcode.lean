@@ -60,6 +60,10 @@ inductive Opcode where
 
 namespace Opcode
 
+@[simp] lemma ofNat_33 : Opcode.ofNat 33 = Opcode.JAL := rfl
+
+@[simp] lemma ofNat_34 : Opcode.ofNat 34 = Opcode.JALR := rfl
+
 @[simp]
 def i_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin BB) : Prop :=
   (imm_b = 0 ∧ imm_c = 1)
@@ -100,7 +104,7 @@ def trusted_instr
       r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
   | ADDI | JALR =>
       i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | AND | OR | XOR | SLT | SLTU 
+  | AND | OR | XOR | SLT | SLTU
   | ADDW =>
       -- We can actually just do `r_type_constraints ∨ i_type_constraints` to
       -- save the duplicate `imm_c = (0|1)` constraints, but for simplicity of
@@ -118,9 +122,11 @@ def trusted_instr
       ∧ op_b_0 >= 2^12
       ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
   | JAL =>
-      -- j_type
-      (imm_b = 1 ∧ imm_c = 1)
-      ∧ Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val * 65536))
+      (imm_b = 1 ∧ imm_c = 1) ∧
+      -- `op_b` properly initiallized to a sign extended value
+      Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val * 65536)) ∧
+      -- `op_b` is a multiple of `4`
+      (Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]) % 4#64 = 0
   | LB | LH | LW | LD | LBU | LHU | LWU =>
       i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
   | SB | SH | SW | SD =>
@@ -140,8 +146,6 @@ def trusted_instr_state
   : Prop :=
   match opcode with
   | JALR =>
-      -- let new_pc : BitVec 64 := (s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + BitVec.signExtend 64 (BitVec.ofNat 12 (Word.toNat #v[op_c_0, op_c_1, op_c_2, op_c_3]))
-      -- new_pc[1] = 0
       ((s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
   | _ => True
 
