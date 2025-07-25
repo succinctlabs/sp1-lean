@@ -120,7 +120,7 @@ def trusted_instr
   | ADDW =>
       imm_b = 0 
       ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-      ∧ (imm_c = 0 → op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 32 (op_c_0.val + op_c_1.val * 65536)))
+      ∧ (imm_c = 0 → Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 32 (op_c_0.val + op_c_1.val * 65536)))
       ∧ (imm_c = 1 → op_c_0 < 2^12 ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0))
   | UNIMP => True
   | _ => True
