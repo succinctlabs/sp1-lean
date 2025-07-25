@@ -54,7 +54,7 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
      (Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
       Word.isU64 #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]] ∧
       Word.isU64 #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1], cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]])) ∧
-    (cols.op_a_0 ≠ 0 →
+    (¬cols.op_a_0 = 0 →
       op_a_write_value[0] = 0 ∧
       op_a_write_value[1] = 0 ∧
       op_a_write_value[2] = 0 ∧

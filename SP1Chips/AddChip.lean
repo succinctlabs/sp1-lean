@@ -17,7 +17,7 @@ variable
 
 def spec_add (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute_RTYPE rs2 rs1 rd rop.ADD
+  _ ← execute (.RTYPE (rs2, rs1, rd, rop.ADD))
   pure ()
 
 def sp1_op_a : BitVec 5 :=
@@ -72,7 +72,7 @@ def sp1_add : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
   SailState.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
-theorem correct
+theorem correct_add
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main cstrs h_is_real
   let op_b := sp1_op_b Main cstrs h_is_real
@@ -94,11 +94,10 @@ theorem correct
     simp at *
 
     -- Now the monadic manipulation
-    simp [spec_add, sp1_add, execute_RTYPE]
-    rw [run_readReg, read_pc]; simp
-    simp [run_rX_bits, sp1_op_b, read_op_b (by omega)]
-    simp [run_rX_bits, sp1_op_c, read_op_c (by omega)]
-    simp [run_wX_bits, sp1_op_a]
+    simp [spec_add, sp1_add, execute, execute_RTYPE']
+    rw [run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b (by omega), read_op_c (by omega)]
+    rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . rw [← is_add]

@@ -1,14 +1,74 @@
 import SP1Foundations.Field
 import LeanRV64IM.Sail.Sail
 
-@[simp] lemma BitVec.twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
+open Lean Elab Parser Tactic in
+/--
+  `bv_amicus_kerneli` is kernel-friendly normalisation of `w`-wide `BitVec`s.
+
+  - `bv_amicus_kerneli at loc` targets a particular hypothesis / conclusion
+  - `bv_amicus_kerneli w <k>` specifies the width explicitly (default := 64)
+-/
+syntax "bv_amicus_kerneli" (ppSpace &"w" ws num)? ppSpace (location)? : tactic
+
+macro_rules
+  | `(tactic| bv_amicus_kerneli $(l)?) =>
+    `(tactic| (
+                -- Equational statements.
+                repeat first | rewrite [@BitVec.toFin_mul 64] $(l)?
+                             | rewrite [@BitVec.toFin_umod 64] $(l)?
+                             | rewrite [@BitVec.toFin_sub 64] $(l)?
+                             | rewrite [@BitVec.add_ofFin 64] $(l)?
+                             | rewrite [@BitVec.toFin_ofNat 64] $(l)?
+                             | rewrite [@BitVec.toNat_ofFin 64] $(l)?
+                             | rewrite [@BitVec.ofNat_eq_ofNat 64] $(l)?
+                             | rewrite [@BitVec.toNat_add 64] $(l)?
+                             | rewrite [@BitVec.toNat_sub 64] $(l)?
+                             | rewrite [@BitVec.toNat_mul 64] $(l)?
+                             | rewrite [@BitVec.toNat_umod 64] $(l)?
+                -- Definitional reduction (last resort). NOTE: Could be a separate second phase maybe.
+                -- Do not constrain these to a particular size.
+                             | rewrite [BitVec.mul_def] $(l)?
+                             | rewrite [BitVec.umod_def] $(l)?
+              ))
+  | `(tactic| bv_amicus_kerneli w $n $(l)?) =>
+    `(tactic| (
+                -- Equational statements.
+                repeat first | rewrite [@BitVec.toFin_mul $n] $(l)?
+                             | rewrite [@BitVec.toFin_umod $n] $(l)?
+                             | rewrite [@BitVec.toFin_sub $n] $(l)?
+                             | rewrite [@BitVec.add_ofFin $n] $(l)?
+                             | rewrite [@BitVec.toFin_ofNat $n] $(l)?
+                             | rewrite [@BitVec.toNat_ofFin $n] $(l)?
+                             | rewrite [@BitVec.ofNat_eq_ofNat $n] $(l)?
+                             | rewrite [@BitVec.toNat_add $n] $(l)?
+                             | rewrite [@BitVec.toNat_sub $n] $(l)?
+                             | rewrite [@BitVec.toNat_mul $n] $(l)?
+                             | rewrite [@BitVec.toNat_umod $n] $(l)?
+                -- Definitional reduction (last resort). NOTE: Could be a separate second phase maybe.
+                -- Do not constrain these to a particular size.
+                             | rewrite [BitVec.mul_def] $(l)?
+                             | rewrite [BitVec.umod_def] $(l)?
+              ))
+
+lemma bitVec_ofNat_toNat {w n : ℕ} : (BitVec.ofNat w n).toNat = n % 2 ^ w := by rfl
+
+lemma bitVec_sshiftright_eq (bv : BitVec w) (shift : ℕ) :
+  bv.sshiftRight shift =
+    BitVec.setWidth w
+      (BitVec.extractLsb ((w - 1) + shift) shift (BitVec.signExtend (w + shift) bv))
+    := by grind
+
+lemma bitVec_extractLsb_to_setWidth {w : ℕ} (x : BitVec w) (v : ℕ) (hv : 0 < v):
+  (Sail.BitVec.extractLsb x (v - 1) 0) = (BitVec.setWidth v x) := by
+  rw [BitVec.setWidth_setWidth (by omega)]
+  simp [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
 
 lemma bitVec_helper_xor' (a b c d : BitVec 32)
     (ha : a < 65536) (hb : b < 65536)
     (hc : c < 65536) (hd : d < 65536) :
     (a + b <<< 16) ^^^ (c + d <<< 16) =
       (a ^^^ c) + (b ^^^ d) <<< 16 := by
-  bv_check "BitVec.lean-bitVec_helper_xor'-10-2.lrat"
+  bv_decide
 
 lemma bitVec_helper_xor (a b c d : ℕ)
     (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
@@ -24,7 +84,7 @@ lemma bitVec_helper_or' (a b c d : BitVec 32)
     (hc : c < 65536) (hd : d < 65536) :
     (a + b <<< 16) ||| (c + d <<< 16) =
       (a ||| c) + (b ||| d) <<< 16 := by
-  bv_check "BitVec.lean-bitVec_helper_or'-26-2.lrat"
+  bv_decide
 
 lemma bitVec_helper_or (a b c d : ℕ)
     (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
@@ -40,7 +100,7 @@ lemma bitVec_helper_and' (a b c d : BitVec 32)
     (hc : c < 65536) (hd : d < 65536) :
     (a + b <<< 16) &&& (c + d <<< 16) =
       (a &&& c) + (b &&& d) <<< 16 := by
-  bv_check "BitVec.lean-bitVec_helper_and'-42-2.lrat"
+  bv_decide
 
 lemma bitVec_helper_and (a b c d : ℕ)
     (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
@@ -76,10 +136,10 @@ namespace BabyBear
 
 lemma eq_of_bitVec_ofNat16_val_eq (x y : Fin BB)
     (h : BitVec.ofNat 64 x.val = BitVec.ofNat 64 y.val) : x = y := by
-  simp [← BitVec.toNat_inj, BB, BitVec.toNat_ofNat, Nat.reducePow] at h; omega
+  simp [← BitVec.toNat_inj, BitVec.toNat_ofNat, Nat.reducePow] at h; omega
 lemma eq_of_bitVec_ofNat32_val_eq (x y : Fin BB)
     (h : BitVec.ofNat 32 x.val = BitVec.ofNat 32 y.val) : x = y := by
-  simp [← BitVec.toNat_inj, BB, BitVec.toNat_ofNat, Nat.reducePow] at h; omega
+  simp [← BitVec.toNat_inj, BitVec.toNat_ofNat, Nat.reducePow] at h; omega
 
 lemma val_add_mul_256 {x y : Fin BB} (hx : x.val < 2^8) (hy : y.val < 2^8) :
     (x + y * 256).val = x.val + y.val * 256 := by
@@ -196,7 +256,7 @@ theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
 
     -- First, let's use the fact that x.val < 2^12
     have hx_bb : x.val < BB := x.isLt
-    have hx_64 : x.val < 2^64 := by simp [BB] at hx_bb; omega
+    have hx_64 : x.val < 2^64 := by omega
 
     -- Now prove using bit representation
     apply BitVec.eq_of_toNat_eq

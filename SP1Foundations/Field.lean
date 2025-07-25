@@ -1,9 +1,7 @@
 import SP1Foundations.Misc
 
-abbrev BB : ℕ := 2013265921
+notation "BB" => 2013265921
 @[simp] lemma BB_eq : BB = 2013265921 := rfl
-
-alias BabyBearPrime := BB
 
 namespace BabyBear
 

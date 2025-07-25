@@ -21,11 +21,6 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
       (cols.value[3].val < 65536) := by
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
-lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddOperation)
-    (h : (constraints a b cols 1).allHold) : cols.value.isU64 := by
-  simp [allHold_constraints_iff] at h
-  refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_ <;> tauto
-
 def spec (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
   a.isU64 → b.isU64 → cols.value.isU64 ∧ cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
 

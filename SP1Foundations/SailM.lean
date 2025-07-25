@@ -1,6 +1,8 @@
 import Mathlib
 import LeanRV64IM.RiscvInstsEnd
 import LeanRV64IM.Defs
+import SP1Foundations.BitVec
+import SP1Foundations.Word
 import SP1Foundations.Misc
 
 open LeanRV64IM.Functions
@@ -62,13 +64,8 @@ def reg_idx_to_Register (idx : BitVec 5) : Register :=
   | 30 => Register.x30
   | _ => Register.x31
 
-theorem reg_idx_31_is_x31 : reg_idx_to_Register 31#5 = Register.x31 :=
-  by
-    aesop
-
 theorem reg_idx_must_64
-  (idx : BitVec 5)
-  : RegisterType (reg_idx_to_Register idx) = BitVec 64 :=
+  (idx : BitVec 5) : RegisterType (reg_idx_to_Register idx) = BitVec 64 :=
   by
     simp [reg_idx_to_Register]
     split <;> rfl
@@ -153,7 +150,7 @@ lemma run_readReg_bind (reg : Register) (mx : RegisterType reg → SailM α) :
   simp
   cases s.regs.get? reg with | some v => rfl | none => rfl
 
--- @[simp]
+@[simp]
 lemma run_wX_bits (reg : regidx) (data : BitVec 64) :
     (wX_bits reg data).run s =
       let .Regidx idx := reg
@@ -177,7 +174,6 @@ lemma run_wX_bits (reg : regidx) (data : BitVec 64) :
   fin_cases b <;> rfl
 
 end EStateM_run
-
 
 -----------
 
@@ -209,12 +205,7 @@ theorem writeReg_readReg_bind {α : Type} (reg : Register) (v : RegisterType reg
     rfl
     rfl
 
-
-
 open Sail (trivialChoiceSource Error)
-
-
-
 
 def SailState.get_reg? (s : SailState) (idx : BitVec 5) : Option (BitVec 64) :=
   if idx = 0
@@ -270,6 +261,7 @@ theorem SailState.get_reg?_is_rX {s : SailState}
       | none => rfl
       | some _ => rfl
 
+@[simp]
 lemma run_rX_bits (idx : BitVec 5) :
     (rX_bits (regidx.Regidx idx)).run s =
     match SailState.get_reg? s idx with
@@ -330,13 +322,6 @@ theorem SailState.reg_idx_never_nextPC
   rw [get_reg?_insert_of_ne]
   simp [reg_idx_to_Register]
   split <;> trivial
-
--- theorem SailState.write_reg_is_wX {s : SailState}
---   (idx : BitVec 5)
---   (val : BitVec 64)
---   : (wX_bits (regidx.Regidx idx) val) s = (write_reg idx val) s :=
---   by
---     sorry
 
 lemma case_31 {val : BitVec 64} {s : SailState}
   : s.regs.insert (reg_idx_to_Register 31#5) val = s.regs.insert Register.x31 val :=
@@ -413,117 +398,236 @@ lemma readReg_bind_bind_duplicate (reg : Register)
     rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
     obtain ⟨ _, _ ⟩ := h_eq; rfl
 
--- lemma run_readReg_bind_of_forall (reg : Register)
---     (f : RegisterType reg → β)
---     (mx : β → SailM α) (y : β)
---     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
---     (hs : ∀ v, s.regs.get? reg = some v → f v = y)
---      :
---     (do let v ← Sail.readReg reg; mx (f v)).run s =
---       (mx y).run s
---     := by
---   simpM
---   unfold EStateM.bind EStateM.run
---   rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
---   . congr; apply hs
---     . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
---       split at h_eq <;> [ subst_eqs; trivial ]
---       rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
---       obtain ⟨ _, _ ⟩ := h_eq; rfl
---     . sorry
---   . sorry
-
--- lemma readReg_bind_const (reg : Register) (mx : SailM α) :
---     (do let _ ← Sail.readReg reg; mx) = mx := by
---   simpM
---   refine EStateM.ext ?_
---   unfold EStateM.bind EStateM.run
---   simp; intro s
---   rcases h_eq : (Sail.readReg reg s) with ⟨ mx', s' ⟩ <;> simp_all
---   . suffices : s = s'
---     . simp_all
---     . simp [Sail.readReg, readReg, bind, EStateM.instMonad, EStateM.bind] at h_eq
---       split at h_eq <;> [ subst_eqs; trivial ]
---       rcases h_hmap_get : (s.regs.get?) reg <;> simp_all <;> [ trivial; skip ]
---       obtain ⟨ _, _ ⟩ := h_eq; rfl
---   . sorry
-
--- @[simp]
--- lemma wX_bits_rX_bits' (rs : regidx) (bv : BitVec 32) (cont : BitVec 32 → SailM α) :
---     (do let _ ← wX_bits rs bv; let bv' ← rX_bits rs; cont bv') =
---       (do let _ ← wX_bits rs bv; cont bv) := by
---   simp [wX_bits, rX_bits]
---   refine EStateM.ext fun reg_map => ?_
---   rw [EStateM.run]
---   show (EStateM.bind _ _) reg_map = (EStateM.bind _ _) reg_map
---   simp [EStateM.bind]
---   sorry
-
--- lemma wX_bits_rX_bits (rs : regidx) (v : BitVec 32) :
---     (do let _ ← wX_bits rs v; rX_bits rs) =
---       (do let _ ← wX_bits rs v; pure v) := by
---   rw [bind_pure_comp]
---   simp only [Nat.reducePow, Nat.reduceMul, bind_pure_comp]
---   refine EStateM.ext fun reg_map => ?_
---   simp
---   rw [EStateM.run]
---   rw [EStateM.Result.map.eq_def]
---   show (EStateM.bind _ _) reg_map = _
---   rw [EStateM.bind]
---   simp [EStateM.run]
-
---   sorry
-
--- lemma rX_bits_rX_bits_swap (cont : BitVec 32 → BitVec 32 → SailM α)
---     {rs rs' : regidx} (h : rs ≠ rs') :
---     (do let bv ← rX_bits rs; let bv' ← rX_bits rs'; cont bv bv') =
---       (do let bv' ← rX_bits rs'; let bv ← rX_bits rs; cont bv bv') := by
---   sorry
-
--- lemma wX_bits_rX_bits_swap (cont : Unit → BitVec 32 → SailM α)
---     {rs rs' : regidx} (h : rs ≠ rs') (bv : BitVec 32) :
---     (do let u ← wX_bits rs bv; let bv' ← rX_bits rs'; cont u bv') =
---       (do let bv' ← rX_bits rs'; let _ ← wX_bits rs bv; cont () bv') := by
---   sorry
-
--- lemma rX_bits_wX_bits_swap (cont : BitVec 32 → Unit → SailM α)
---     {rs rs' : regidx} (h : rs ≠ rs') (bv : BitVec 32) :
---     (do let bv ← rX_bits rs; let u ← wX_bits rs' bv; cont bv u) =
---       (do let _ ← wX_bits rs' bv; let bv ← rX_bits rs; cont bv ()) := by
---   sorry
-
--- lemma wX_bits_wX_bits_swap (cont : Unit → Unit → SailM α)
---     {rs rs' : regidx} (h : rs ≠ rs') (bv bv' : BitVec 32) :
---     (do let u ← wX_bits rs bv; let u' ← wX_bits rs' bv'; cont u u') =
---       (do let _ ← wX_bits rs' bv'; let _ ← wX_bits rs bv; cont () ()) := by
---   sorry
-
--- lemma run_rX_bind_of_get_mem_eq (id : ℕ)
---     (cont : BitVec 32 → SailM α)
---     (mstate : PreSail.SequentialState RegisterType trivialChoiceSource)
---     (v : ℕ)
---     (hmstate : mstate.mem[id]? = some ↑v) :
---     EStateM.run (rX (.Regno id) >>= cont) mstate =
---       EStateM.run (cont (BitVec.ofNat 32 v)) mstate := by
---   sorry
-
--- lemma run_wX_bind_of_get_mem_eq (id : ℕ)
---     (cont : Unit → SailM α)
---     (mstate : PreSail.SequentialState RegisterType trivialChoiceSource)
---     (v : ℕ) (hv : v < 2^32)
---     (hmstate : mstate.mem[id]? = some ↑v) :
---     EStateM.run (wX (.Regno id) (v#'hv) >>= cont) mstate =
---       EStateM.run (cont ()) mstate := by
---   sorry
-
--- lemma wX_comm_of_ne' (id id' : regno) (h : id ≠ id')
---     (v v' : BitVec 32) (cont : SailM α) :
---     (do wX id v; wX id' v'; cont) =
---       (do wX id' v'; wX id v; cont) := sorry
-
--- lemma wX_comm_of_ne (id id' : regno) (h : id ≠ id')
---     (v v' : BitVec 32) :
---     (do wX id v; wX id' v') =
---       (do wX id' v'; wX id v) := sorry
-
 end sailboats
+
+section execution
+
+open PreSail
+open LeanRV64IM.Functions
+
+@[simp]
+lemma bool_bits_forwards_to_if (b : Bool) : bool_bits_forwards b = if b then 1#1 else 0#1 := by aesop
+
+section RTYPE
+
+/-- `execute_RTYPE` pure part -/
+def execute_RTYPE_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : rop) :=
+  match op with
+  | .ADD => op1 + op2
+  | .SLT => zero_extend (m := 64) (bool_to_bits (zopz0zI_s op1 op2))
+  | .SLTU => zero_extend (m := 64) (bool_to_bits (zopz0zI_u op1 op2))
+  | .AND => op1 &&& op2
+  | .OR => op1 ||| op2
+  | .XOR => op1 ^^^ op2
+  | .SLL => Sail.shift_bits_left op1 (Sail.BitVec.extractLsb op2 (LeanRV64IM.Functions.log2_xlen -i 1) 0)
+  | .SRL => Sail.shift_bits_right op1 (Sail.BitVec.extractLsb op2 (LeanRV64IM.Functions.log2_xlen -i 1) 0)
+  | .SUB => op1 - op2
+  | .SRA => shift_bits_right_arith op1 (Sail.BitVec.extractLsb op2 (LeanRV64IM.Functions.log2_xlen -i 1) 0)
+
+/-- `execute_RTYPE` pure part for `Word` arguments -/
+def execute_RTYPE_pure_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : rop) :=
+match op with
+  | .ADD => op1.toBitVec64 + op2.toBitVec64
+  | .SLT => if op1.toInt < op2.toInt then 1#64 else 0#64
+  | .SLTU => if op1.toNat < op2.toNat then 1#64 else 0#64
+  | .AND => op1.toBitVec64 &&& op2.toBitVec64
+  | .OR => op1.toBitVec64 ||| op2.toBitVec64
+  | .XOR => op1.toBitVec64 ^^^ op2.toBitVec64
+  | .SLL => op1.toBitVec64 <<< (BitVec.setWidth 6 op2.toBitVec64)
+  | .SRL => op1.toBitVec64 >>> (BitVec.setWidth 6 op2.toBitVec64)
+  | .SUB => op1.toBitVec64 - op2.toBitVec64
+  | .SRA => op1.toBitVec64.sshiftRight (BitVec.setWidth 6 op2.toBitVec64).toNat
+
+/-- `execute_RTYPE` pure part for `ByteWord` arguments -/
+def execute_RTYPE_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : rop) :=
+match op with
+  | .ADD => op1.toBitVec64 + op2.toBitVec64
+  | .SLT => if op1.toInt < op2.toInt then 1#64 else 0#64
+  | .SLTU => if op1.toNat < op2.toNat then 1#64 else 0#64
+  | .AND => op1.toBitVec64 &&& op2.toBitVec64
+  | .OR => op1.toBitVec64 ||| op2.toBitVec64
+  | .XOR => op1.toBitVec64 ^^^ op2.toBitVec64
+  | .SLL => op1.toBitVec64 <<< (BitVec.setWidth 6 op2.toBitVec64)
+  | .SRL => op1.toBitVec64 >>> (BitVec.setWidth 6 op2.toBitVec64)
+  | .SUB => op1.toBitVec64 - op2.toBitVec64
+  | .SRA => op1.toBitVec64.sshiftRight (BitVec.setWidth 6 op2.toBitVec64).toNat
+
+lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : rop) :
+  op1.isU64 → op2.isU64 →
+  execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_w op1 op2 op := by
+  intro h_op1_isU64 h_op2_isU64
+  cases op <;> simp [execute_RTYPE_pure_w, execute_RTYPE_pure, LeanRV64IM.Functions.log2_xlen]
+  . rw [Sail.shift_bits_left, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
+    simp [Word.toNat_toBitVec64 _ h_op2_isU64]
+  . simp [zopz0zI_s, bool_to_bits]
+    repeat rw [Word.toInt_toBitVec64 _ (by assumption)]
+    aesop
+  . simp [zopz0zI_u, bool_to_bits]
+    repeat rw [Word.toNat_toBitVec64 _ (by assumption)]
+    aesop
+  . rw [Sail.shift_bits_right, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
+    simp [Word.toNat_toBitVec64 _ h_op2_isU64]
+  . have mod_lt_63 : (63 + (op2.toNat : ℤ) % 64).toNat = 63 + op2.toNat % 64 := by omega
+    have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
+    rw [shift_bits_right_arith, shift_right_arith, sign_extend]
+    rw [Sail.BitVec.extractLsb, Sail.BitVec.signExtend]
+    rw [BitVec.extractLsb_toNat]
+    simp
+    rw [Word.toNat_toBitVec64 _ (by assumption)]
+    rw [mod_lt_63, mod_lt_64]
+    symm; apply bitVec_sshiftright_eq
+
+lemma exec_RTYPE_pure_bv_to_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : rop) :
+  op1.isU64 → op2.isU64 →
+  execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_bw op1 op2 op := by
+  intro h_op1_isU64 h_op2_isU64
+  cases op <;> simp [execute_RTYPE_pure_bw, execute_RTYPE_pure, LeanRV64IM.Functions.log2_xlen]
+  . rw [Sail.shift_bits_left, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
+    simp [ByteWord.toNat_toBitVec64 _ h_op2_isU64]
+  . simp [zopz0zI_s, bool_to_bits]
+    repeat rw [ByteWord.toInt_toBitVec64 _ (by assumption)]
+    aesop
+  . simp [zopz0zI_u, bool_to_bits]
+    repeat rw [ByteWord.toNat_toBitVec64 _ (by assumption)]
+    aesop
+  . rw [Sail.shift_bits_right, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
+    simp [ByteWord.toNat_toBitVec64 _ h_op2_isU64]
+  . have mod_lt_63 : (63 + (op2.toNat : ℤ) % 64).toNat = 63 + op2.toNat % 64 := by omega
+    have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
+    simp [shift_bits_right_arith, shift_right_arith, sign_extend]
+    rw [Sail.BitVec.extractLsb, Sail.BitVec.signExtend]
+    rw [BitVec.extractLsb_toNat]
+    simp
+    rw [ByteWord.toNat_toBitVec64 _ (by assumption)]
+    rw [mod_lt_63, mod_lt_64]
+    symm; apply bitVec_sshiftright_eq
+
+/-- `execute_RTYPE` with isolated pure part -/
+def execute_RTYPE' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  let rs2_bits ← do (rX_bits rs2)
+  (wX_bits rd (execute_RTYPE_pure rs1_bits rs2_bits op))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_RTYPE_eq_execute_RTYPE' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) :
+  execute_RTYPE rs2 rs1 rd op = execute_RTYPE' rs2 rs1 rd op
+  := by cases op <;> simp_all [execute_RTYPE', execute_RTYPE, execute_RTYPE_pure, LeanRV64IM.Functions.xlen]
+
+end RTYPE
+
+section RTYPEW
+
+/-- `execute_RTYPEW` pure part -/
+def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
+  let op1 := BitVec.setWidth 32 op1
+  let op2 := BitVec.setWidth 32 op2
+  match op with
+  | .ADDW => sign_extend (m := 64) (op1 + op2)
+  | .SUBW => sign_extend (m := 64) (op1 - op2)
+  | .SLLW => sign_extend (m := 64) (Sail.shift_bits_left op1 (Sail.BitVec.extractLsb op2 4 0))
+  | .SRLW => sign_extend (m := 64) (Sail.shift_bits_right op1 (Sail.BitVec.extractLsb op2 4 0))
+  | .SRAW => sign_extend (m := 64) (shift_bits_right_arith op1 (Sail.BitVec.extractLsb op2 4 0))
+
+/-- `execute_RTYPEW` pure part for `Word arguments -/
+def execute_RTYPEW_pure_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : ropw) :=
+let op1 := op1.low32
+let op2 := op2.low32
+match op with
+  | .ADDW => sign_extend (m := 64) (op1.toBitVec32 + op2.toBitVec32)
+  | .SUBW => sign_extend (m := 64) (op1.toBitVec32 - op2.toBitVec32)
+  | .SLLW => sign_extend (m := 64) (op1.toBitVec32 <<< (BitVec.setWidth 5 op2.toBitVec32))
+  | .SRLW => sign_extend (m := 64) (op1.toBitVec32 >>> (BitVec.setWidth 5 op2.toBitVec32))
+  | .SRAW => sign_extend (m := 64) (op1.toBitVec32.sshiftRight (BitVec.setWidth 5 op2.toBitVec32).toNat)
+
+lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : ropw) :
+  op1.isU64 → op2.isU64 →
+  execute_RTYPEW_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPEW_pure_w op1 op2 op := by
+  intro h_op1_isU64 h_op2_isU64
+  have ha' := Word.lt_cases_of_isU64 h_op1_isU64
+  have hb' := Word.lt_cases_of_isU64 h_op2_isU64
+  cases op <;> simp [execute_RTYPEW_pure_w, execute_RTYPEW_pure] <;> congr
+  . apply Word.setWidth_eq_low32 op1 h_op1_isU64
+  . apply Word.setWidth_eq_low32 op2 h_op2_isU64
+  . apply Word.setWidth_eq_low32 op1 h_op1_isU64
+  . apply Word.setWidth_eq_low32 op2 h_op2_isU64
+  . rw [Sail.shift_bits_left, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
+    simp [Word.toNat_toBitVec64 _ h_op2_isU64]
+    rw [Word.setWidth_eq_low32 op1 h_op1_isU64]
+    congr 1
+    simp [Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]
+    omega
+  . rw [Sail.shift_bits_right, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
+    simp [Word.toNat_toBitVec64 _ h_op2_isU64]
+    rw [Word.setWidth_eq_low32 op1 h_op1_isU64]
+    congr 1
+    simp [Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]
+    omega
+  . have mod_lt_31: forall x : ℕ, (31 + (x : ℤ) % 32).toNat = 31 + x % 32 := by omega
+    have mod_lt_32 : forall x : ℕ, (32 + (x : ℤ) % 32).toNat = 32 + x % 32 := by omega
+    rw [Word.setWidth_eq_low32 _ h_op1_isU64, Word.setWidth_eq_low32 _ h_op2_isU64]
+    set op1 := op1.low32.toBitVec32
+    set op2 := op2.low32.toBitVec32
+    rw [bitVec_sshiftright_eq]
+    rw [shift_bits_right_arith, shift_right_arith, sign_extend]
+    rw [Sail.BitVec.signExtend]
+    simp_all [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
+    have : ↑(BitVec.ofNat 5 op2.toNat).toNat = op2.toNat % 32 := by simp
+    rw [this]; rfl
+
+/-- `execute_RTYPEW` with isolated pure part -/
+def execute_RTYPEW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : ropw) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  let rs2_bits ← do (rX_bits rs2)
+  (wX_bits rd (execute_RTYPEW_pure rs1_bits rs2_bits op))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_RTYPEW_eq_execute_RTYPEW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : ropw) :
+  execute_RTYPEW rs2 rs1 rd op = execute_RTYPEW' rs2 rs1 rd op
+  := by
+    simp_all [execute_RTYPEW', execute_RTYPEW, execute_RTYPEW_pure]
+    refine bind_congr ?_; intro r1
+    refine bind_congr ?_; intro r2
+    simpM; ext s
+    simp [run_wX_bits]
+    split_ifs <;> [ rfl; congr ]
+    cases op <;> simp_all [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
+
+end RTYPEW
+
+section MUL
+
+/-- Multiplication opcodes -/
+inductive mop where | MUL | MULH | MULHU | MULHSU
+  deriving BEq, DecidableEq, Inhabited, Repr
+
+def mul_op_of_mop (m : mop) : mul_op :=
+  match m with
+  | .MUL => { high := false, signed_rs1 := false, signed_rs2 := false }
+  | .MULH => { high := true, signed_rs1 := true, signed_rs2 := true }
+  | .MULHU => { high := true, signed_rs1 := false, signed_rs2 := false }
+  | .MULHSU => { high := true, signed_rs1 := true, signed_rs2 := false }
+
+/-- execute_MUL pure part -/
+def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (m : mop) : BitVec 64 :=
+  let rs1_int := if (m = .MULH ∨ m = .MULHSU ) then (BitVec.toInt op1) else (BitVec.toNat op1)
+  let rs2_int := if (m = .MULH) then (BitVec.toInt op2) else (BitVec.toNat op2)
+  let result_wide := (to_bits_truncate (l := (2 *i LeanRV64IM.Functions.xlen)) (rs1_int *i rs2_int))
+  (if (m = .MUL)
+    then (Sail.BitVec.extractLsb result_wide (LeanRV64IM.Functions.xlen -i 1) 0)
+    else (Sail.BitVec.extractLsb result_wide ((2 *i LeanRV64IM.Functions.xlen) -i 1) LeanRV64IM.Functions.xlen))
+
+def execute_MUL' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  let rs2_bits ← do (rX_bits rs2)
+  (wX_bits rd (execute_MUL_pure rs1_bits rs2_bits m))
+  (pure RETIRE_SUCCESS)
+
+lemma execute_MUL'_eq_execute_MUL (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) :
+  execute_MUL' rs2 rs1 rd m = execute_MUL rs2 rs1 rd (mul_op_of_mop m)
+  := by cases m <;> simp_all [execute_MUL', execute_MUL, execute_MUL_pure, mul_op_of_mop, LeanRV64IM.Functions.xlen]
+
+end MUL
+
+end execution

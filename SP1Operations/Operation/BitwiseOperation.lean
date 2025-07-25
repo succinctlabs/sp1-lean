@@ -11,7 +11,7 @@ import SP1Operations.Operation.BitwiseOperation.Constraints
 -- namespace BitwiseOperation
 
 -- @[ext] lemma ext_forall (op op' : BitwiseOperation)
---     (h : ∀ i : Fin WORD_BYTE_SIZE, op.result[i] = op'.result[i]) : op = op' := by
+--     (h : ∀ i : Fin BYTE_WORD_SIZE, op.result[i] = op'.result[i]) : op = op' := by
 --   refine BitwiseOperation.ext ?_
 --   exact ByteWord.ext_forall h
 
@@ -71,21 +71,21 @@ import SP1Operations.Operation.BitwiseOperation.Constraints
 --   simp [h1, h2, h3]
 
 -- lemma eq_and_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
---     (i : Fin WORD_BYTE_SIZE) (h : (cols.constraints a b 0 1).allHold) :
+--     (i : Fin BYTE_WORD_SIZE) (h : (cols.constraints a b 0 1).allHold) :
 --     cols.result[i] = a[i] &&& b[i] := by
 --   have := constraints_imp_spec a b cols _ _ one_ne_zero h
 --   simp [spec] at this
 --   match i with | 0 => aesop | 1 => aesop | 2 => aesop | 3 => aesop
 
 -- lemma eq_or_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
---     (i : Fin WORD_BYTE_SIZE) (h : (cols.constraints a b 1 1).allHold) :
+--     (i : Fin BYTE_WORD_SIZE) (h : (cols.constraints a b 1 1).allHold) :
 --     cols.result[i] = a[i] ||| b[i] := by
 --   have := constraints_imp_spec a b cols _ _ one_ne_zero h
 --   simp [spec] at this
 --   match i with | 0 => aesop | 1 => aesop | 2 => aesop | 3 => aesop
 
 -- lemma eq_xor_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
---     (i : Fin WORD_BYTE_SIZE) (h : (cols.constraints a b 2 1).allHold) :
+--     (i : Fin BYTE_WORD_SIZE) (h : (cols.constraints a b 2 1).allHold) :
 --     cols.result[i] = a[i] ^^^ b[i] := by
 --   have := constraints_imp_spec a b cols _ _ one_ne_zero h
 --   simp [spec] at this
@@ -93,7 +93,7 @@ import SP1Operations.Operation.BitwiseOperation.Constraints
 
 -- /-- Constraints on `BitwiseOperation` imply that the result is `op.toBitwise` applied to the inputs. -/
 -- lemma eq_toBitwise_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
---     (i : Fin WORD_BYTE_SIZE) (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
+--     (i : Fin BYTE_WORD_SIZE) (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
 --     (h : (cols.constraints a b op.toBB 1).allHold) :
 --     cols.result[i] = op.toBitwise a[i] b[i] := by
 --   induction op using ByteOpcode.bitwise_induction with
@@ -103,7 +103,7 @@ import SP1Operations.Operation.BitwiseOperation.Constraints
 --   | other h h' => aesop
 
 -- lemma lt_of_constraints (a b : ByteWord (Fin BB)) (cols : BitwiseOperation)
---     (i : Fin WORD_BYTE_SIZE) (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
+--     (i : Fin BYTE_WORD_SIZE) (op : ByteOpcode) (hop : op = AND ∨ op = OR ∨ op = XOR)
 --     (h : (cols.constraints a b op.toBB 1).allHold) :
 --     cols.result[i] < 256 ∧ a[i] < 256 ∧ b[i] < 256 := by
 --   have := constraints_imp_spec a b cols _ _ one_ne_zero h
