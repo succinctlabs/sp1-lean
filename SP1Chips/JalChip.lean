@@ -71,113 +71,6 @@ def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
 
 open LeanRV64IM.Functions
 
--- lemma eq_zero_of_constraints (Main : Vector (Fin BB) 31)
---     (h_cstrs : (constraints Main).allHold) : Main[25] = 0 := by
---   simp [constraints] at h_cstrs
---   aesop
-
--- lemma isU64_of_constraints (Main : Vector (Fin BB) 31)
---     (h_cstrs : (constraints Main).allHold)
---     (h_is_real : Main[30] = 1) :
---     Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
---   simp [constraints, h_is_real, SP1Constraint.toProp] at h_cstrs
---   refine Word.isU64_of_cases ?_ ?_ ?_ ?_ ?_
---   · aesop
---   · aesop
---   · aesop
---   · aesop
-
--- lemma isU64_of_constraints' (Main : Vector (Fin BB) 31)
---     (h_cstrs : (constraints Main).allHold)
---     (h_is_real : Main[30] = 1) :
---     Word.isU64 #v[Main[14], Main[15], Main[16], Main[17]] := by
---   simp [constraints, h_is_real, SP1Constraint.toProp] at h_cstrs
---   refine Word.isU64_of_cases ?_ ?_ ?_ ?_ ?_
---   · aesop
---   · aesop
---   · aesop
---   · aesop
-
--- lemma program_constraints_allHold (Main : Vector (Fin BB) 31)
---     (h_cstrs : (constraints Main).allHold) :
---     SP1Constraint.toProp (.send (.program Main[3] Main[4] Main[5] (Opcode.ofNat 33)
---       Main[6] Main[14] Main[15] Main[16] Main[17] Main[18] Main[19]
---       Main[20] Main[21] Main[13] 1 1 111 0 0) Main[30]) := by
---   simp [constraints] at h_cstrs
---   aesop
-
--- lemma link_eq_of_constraints (Main : Vector (Fin BB) 31)
---     (h_cstrs : (constraints Main).allHold)
---     (h_is_real : Main[30] = 1) (h_op_a : Main[13] = 0) :
---     BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
---       BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
---   have h345 := isU64_of_constraints Main h_cstrs h_is_real
---   simp [constraints] at h_cstrs
---   have : (AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0]
---       { value := #v[Main[26], Main[27], Main[28], Main[29]] } (Main[30] - Main[13])).allHold := by
---     aesop
---   have := AddOperation.correct _ _ _ _ ?_ this h345 ?_
---   simp [Word.toBitVec64] at this
---   have := this.2
---   refine this.trans ?_
---   simp [Word.toNat]
---   · simp [h_op_a, h_is_real]
---   · apply Word.isU64_of_cases <;> simp
-
--- lemma add_imm_eq_of_constarints (Main : Vector (Fin BB) 31)
---     (h_cstrs : (constraints Main).allHold)
---     (h_is_real : Main[30] = 1) :
---     BitVec.ofNat 64 (Main[22] + Main[23] * 65536 + Main[24] * 4294967296) =
---         BitVec.ofNat 64 (Main[3] + Main[4] * 65536 + ↑Main[5] * 4294967296) +
---           BitVec.ofNat 64 (Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656) := by
---   have h345 := isU64_of_constraints Main h_cstrs h_is_real
---   have h1415 := isU64_of_constraints' Main h_cstrs h_is_real
---   simp [constraints] at h_cstrs
---   have : (AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]]
---       { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]).allHold := by
---     aesop
---   have := AddOperation.correct _ _ _ _ h_is_real this h345 h1415
---   simp [Word.toBitVec64] at this
---   have := this.2
---   have h25 : Main[25] = 0 := h_cstrs.2.1
---   simp [Word.toNat, h25] at this
---   exact this
-
--- /-- dt: should extract this out and clean up more -/
--- lemma ofInt_ofNat_of_constraints (Main : Vector (Fin BB) 31)
---     (h_cstrs : (constraints Main).allHold)
---     (h_is_real : Main[30] = 1) :
---     let imm_nat : ℕ := Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656
---     BitVec.ofInt 64 (BitVec.ofNat 21 (imm_nat)).toInt = (BitVec.ofNat 64 (imm_nat)) := by
---   have := program_constraints_allHold Main h_cstrs
---   simp [SP1Constraint.toProp, h_is_real, Opcode.ofNat, Nat.ble] at this
-
---   obtain ⟨⟨h14, h15, h16, h17⟩, _⟩ := this.1
---   simp [h15, h16, h17]
---   simp [BitVec.ofInt, BitVec.toInt]
---   simp [Int.toNat]
-
---   have h14' : Main[14].val % 2097152 = Main[14].val
---   · rw [Nat.mod_eq_of_lt]
---     omega
---   have h14'' : (Main[14].val : ℤ) % (2097152 : ℤ) = Main[14].val
---   · exact
---     Eq.symm
---       ((fun {a b} ↦ Int.neg_inj.mp) (congrArg Neg.neg (congrArg Nat.cast (id (Eq.symm h14')))))
---   simp [h14', h14'']
---   have h14''' : 2 * Main[14].val < 2097152 := by omega
---   simp [h14''']
---   rename_i right
---   simp_all only [SP1ConstraintList.allHold, BB_eq, Fin.isValue, and_self, Fin.reduceLT, and_true, true_and]
---   obtain ⟨left, right_1⟩ := this
---   obtain ⟨left_2, right_1⟩ := right_1
---   obtain ⟨left_3, right_1⟩ := right_1
---   obtain ⟨left_5, right_1⟩ := right_1
---   simp_all only [Fin.isValue]
---   rfl
-
---------------------------
-
 lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 31}
     (h_cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1) : Main[6].val < 32 := by
@@ -191,9 +84,10 @@ variable (Main : Vector (Fin BB) 31)
   (s : SailState) (cstrs : (constraints Main).allHold)
   (h_is_real : Main[30] = 1)
 
-def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[14].val
-
 def sp1_op_a : BitVec 5 := Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
+
+-- dt: could instead put `Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]` here...
+def sp1_op_b : BitVec 21 := BitVec.ofNat 21 (Main[14].val + Main[15].val * 65536)
 
 def sp1_jal (Main : Vector (Fin BB) 31) : SailM Unit := do
   let rd := regidx.Regidx Main[6].val
@@ -206,20 +100,23 @@ def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let _ ← execute_JAL imm rd
 
---   let init_pc := BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)
---   let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
---   let new_pc := BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48)
---   let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
+section move
+
+@[simp] -- common enough to want a lemma
+lemma Word.four_isU64 : Word.isU64 #v[4, 0, 0, 0] :=
+  Word.isU64_of_cases _ (by trivial) (by trivial) (by trivial) (by trivial)
+
+end move
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 0 in
 theorem SP1JAL_correct
     (state_cstrs : (constraints Main).initialState s)
     (h_misa : Register.misa ∈ s.regs) :
-    let imm := sp1_imm Main
     let op_a := sp1_op_a Main cstrs h_is_real
-    (spec_jal imm (.Regidx op_a)).run s = (sp1_jal Main).run s := by
-  extract_lets imm op_a
+    let op_b := sp1_op_b Main
+    (spec_jal op_b (.Regidx op_a)).run s = (sp1_jal Main).run s := by
+  extract_lets op_a op_b
 
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddOperation.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, h⟩ := state_cstrs
@@ -230,52 +127,107 @@ theorem SP1JAL_correct
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp, sub_eq_zero,
     h_is_real] at cstrs
 
-  have h_misa' : ∃ v_misa, s.regs.get? Register.misa = some v_misa := by
-
-    sorry
+  have h_sign_extend : Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]] =
+      BitVec.signExtend 64 (BitVec.ofNat 21 (↑Main[14] + ↑Main[15] * 65536)) := by
+    have := cstrs.2.2.2.2.2.2.2.1.1.1
+    exact this
 
   have hmod : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
-                sign_extend (setWidth 21 (BitVec.ofNat 12 Main[14].val)))[1] = false := by
-    sorry
+      Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]])[1] = false := by
+    refine (mul4_means_0_1_are_0 ?_).2
+    have hpc : BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) =
+      Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] := by simp [Word.toBitVec64, Word.toNat]
+    rw [hpc]
+    simp [Word.toBitVec64_add_mod_4, Word.add_toBitVec64_mod_4]
+    refine mul4_add_is_mul4 ?_ ?_
+    · simp
+      rw [ofNat64_mod_4_eq_zero_iff]
+      have : Main[3] % 4 = 0 := by aesop
+      clear cstrs
+      rw [Fin.mod_def] at this
+      rw [← Fin.val_inj] at this
+      simp at this
+      exact this
+    · simp
+      aesop
 
-  simp [spec_jal, sp1_jal, execute_JAL, op_a, imm, sp1_imm, sp1_op_a]
+  simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]
 
-
-  have h13_is_bool : Main[13] = 0 ∨ Main[13] = 1 := by
+  have h_add_imm : List.Forall SP1Constraint.toProp (AddOperation.constraints
+      #v[Main[3], Main[4], Main[5], 0]
+      #v[Main[14], Main[15], Main[16], Main[17]]
+      {value := #v[Main[22], Main[23], Main[24], Main[25]]} 1) := by
     aesop
 
-  simp [run_rX_bits, get_reg?_insert_nextPC, ext_control_check_addr, ext_control_check_pc,
-    Sail.BitVec.access, bit_to_bool, Sail.BitVec.update, Sail.BitVec.updateSubrange',
-    bits_of_virtaddr, BitVec.reduceAllOnes, BitVec.truncate_eq_setWidth, BitVec.reduceSetWidth,
-    BitVec.shiftLeft_zero, BitVec.reduceNot, BitVec.setWidth_zero, BitVec.or_zero,
-    Nat.one_lt_ofNat, getElem!_pos, BitVec.getElem_and, BitVec.reduceGetElem, Bool.true_and,
-    BitVec.ofBool, BitVec.ofNat_eq_ofNat, cond_false, EStateM.run_bind,
-    run_bool_bit_backwards, Bool.false_and, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
-    currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or, Bool.and_self,
-    BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map]
+  have pc_isU64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
+    refine Word.isU64_of_cases _ ?_ ?_ ?_ (by simp)
+    · simp
+      aesop
+    · simp
+      aesop
+    · simp
+      aesop
 
-  have h_add : BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
-      sign_extend (setWidth 21 (BitVec.ofNat 12 Main[14].val)) =
-      (BitVec.ofNat 64 (↑Main[22] + ↑Main[23] * 65536 + ↑Main[24] * 4294967296 + ↑Main[25] * 281474976710656)) := by
+  have imm_isU64 : Word.isU64 #v[Main[14], Main[15], Main[16], Main[17]] := by
+    refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_
+    · simp
+      aesop
+    · simp
+      aesop
+    · simp
+      aesop
+    · simp
+      aesop
 
-    sorry
+  have := AddOperation.correct _ _ _  _ rfl h_add_imm
+  have h_add' := (this pc_isU64 imm_isU64).2
+  simp [Word.toBitVec64, Word.toNat] at h_add'
+
+  simp only [ext_control_check_pc, bit_to_bool, access, ofBool, bits_of_virtaddr, Nat.one_lt_ofNat,
+    getElem!_pos, ofNat_eq_ofNat, currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or,
+    Bool.and_self, bind_pure_comp, Functor.map_map, bind_map_left, EStateM.run_bind,
+    run_bool_bit_backwards,
+    sign_extend, Sail.BitVec.signExtend, ← h_sign_extend]
+
+  have h13_is_bool : Main[13] = 0 ∨ Main[13] = 1 := by aesop
+
+  have h6_lt : Main[6].val < 2^5 := by aesop
 
   cases h13_is_bool with
   | inl h13_is_0 =>
       simp [h13_is_0] at cstrs
       have h6 : Main[6] ≠ 0 := by aesop
-      have h6_bv : BitVec.ofNat 5 ↑Main[6] = 0#5 := sorry
+      have h6' : ∀ p : ↑Main[6] < 2 ^ 5, (BitVec.ofNatLT Main[6].val p : BitVec 5) ≠ 0#5 := by
+        refine fun p h => h6 ?_
+        simp [← BitVec.toFin_inj] at h
+        rw [← Fin.val_inj] at h
+        simpa using h
+
       rw [run_readReg, read_pc]
       simp [h6]
       rw [run_readReg]
-      simp [Std.ExtDHashMap.get?_insert, read_pc, hmod]
-
+      simp [Std.ExtDHashMap.get?_insert, read_pc]
+      simp [hmod]
       rw [run_readReg]
       simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
       rw [run_readReg]
-      simp [BitVec.ofNatLT_eq_ofNat, h6_bv]
 
-      simp [h_add]
+      simp [h6']
+      have h6'' := h6' h6_lt
+      rw [BitVec.ofNatLT_eq_ofNat] at h6''
+      simp [h6'']
+      rw [h_add']
+      simp [Word.toBitVec64, Word.toNat]
+      have h_add_pc : List.Forall SP1Constraint.toProp (AddOperation.constraints
+          #v[Main[3], Main[4], Main[5], 0]
+          #v[4, 0, 0, 0]
+          {value := #v[Main[26], Main[27], Main[28], Main[29]]} 1) := by
+        aesop
+      have := AddOperation.correct _ _ _  _ rfl h_add_pc
+      have h_add_pc' := (this pc_isU64 Word.four_isU64).2
+      simp [Word.toBitVec64, Word.toNat] at h_add_pc'
+      rw [h_add_pc']
+      rw [BitVec.ofNatLT_eq_ofNat]
 
   | inr h13_is_1 =>
       simp [h13_is_1] at cstrs
@@ -289,8 +241,9 @@ theorem SP1JAL_correct
       rw [run_readReg]
       simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
       rw [run_readReg]
-      simp [h_add]
-
-
+      simp [h_add']
+      simp [Word.toBitVec64, Word.toNat]
 
 end JalChip
+
+#print axioms JalChip.SP1JAL_correct

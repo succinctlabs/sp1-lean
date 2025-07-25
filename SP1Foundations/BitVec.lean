@@ -75,6 +75,15 @@ lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
 def BitVec64_of_limbs (x y z w : Fin BB) : BitVec 64 :=
   BitVec.ofNat 64 (x + y * 2^16 + z * 2^32 + w * 2^48)
 
+lemma ofNat64_mod_4_eq_zero_iff (n : ℕ) :
+    (BitVec.ofNat 64 n) % 4#64 = 0#64 ↔ n % 4 = 0 := by
+  rw [BitVec.ofNat]
+  rw [← BitVec.toFin_inj]
+  simp
+  rw [Fin.mod_def]
+  rw [← Fin.val_inj]
+  simp
+
 namespace BabyBear
 
 lemma eq_of_bitVec_ofNat16_val_eq (x y : Fin BB)
@@ -188,6 +197,9 @@ lemma xor_add_xor_mul256 {x_low x_high y_low y_high : Fin BB}
 end BabyBear
 
 namespace BitVec
+
+lemma ofNat64_mod_4_eq_zero (n : ℕ) :
+    (BitVec.ofNat 64 n) % 4 = n % 4 := rfl
 
 theorem helper {a b : BitVec 64}
   (h : (a + b) % 4 = 0)
@@ -356,6 +368,14 @@ lemma FinBB_mul4_means_LS2B_0
 end BitVec
 
 namespace Word
+
+@[simp] lemma toBitVec64_mod_4 (w : Word (Fin BB)) :
+    (Word.toBitVec64 w) % 4#64 = (BitVec.ofNat 64 w[0]) % 4#64 := by
+  simp [toBitVec64, toNat]
+  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
+  let k := BitVec.ofNat 64 w[0]
+  show (k + _ + _ + _) % 4 = k % 4
+  bv_decide
 
 lemma toBitVec64_add_mod_4 (w : Word (Fin BB)) (x : BitVec 64) :
     (Word.toBitVec64 w + x) % 4#64 = (BitVec.ofNat 64 w[0] + x) % 4#64 := by
