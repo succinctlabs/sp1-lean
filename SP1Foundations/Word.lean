@@ -87,7 +87,7 @@ lemma toNat_toBitVec64 (w : Word (Fin BB)) (hw : w.isU64) :
 
 lemma toBitVec64_LT_eq_toNat {w : Word (Fin BB)} (hw : w.isU64)
   : w.toBitVec64 = BitVec.ofNatLT w.toNat
-      (by 
+      (by
         simp [Word.toNat]
         have := hw 0
         have := hw 1
@@ -137,5 +137,15 @@ lemma val_add_of_isU64 {w v : Word (Fin BB)} (hw : w.isU64) (hv : v.isU64)
   omega
 
 end add
+
+def toBitVec64LT (w : Word (Fin BB)) (h_w : w.isU64) : BitVec 64 :=
+  BitVec.ofNatLT w.toNat (by
+    simp [Word.toNat]
+    have := h_w 0
+    have := h_w 1
+    have := h_w 2
+    have := h_w 3
+    simp at *
+    linarith)
 
 end Word
