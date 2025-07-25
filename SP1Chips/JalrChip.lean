@@ -6,8 +6,7 @@ import SP1Chips.Jalr.Constraints
 
 namespace Jalr
 
-open PreSail (SequentialState)
-open BitVec LeanRV64IM.Functions
+open Sail SailState BitVec LeanRV64IM.Functions
 
 variable
   (Main : Vector (Fin BB) 38)
@@ -54,7 +53,7 @@ def sp1_op_b : BitVec 5 := (Main[14].val)#'(op_b_lt32_of_constraints cstrs h_is_
 
 def sp1_jalr : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  SailState.write_reg op_a (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
+  write_reg op_a (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
 
 -- attribute [simp] bind StateT.bind EStateM.bind get getThe MonadStateOf.get StateT.get EStateM.get modify modifyGet MonadStateOf.modifyGet StateT.modifyGet EStateM.modifyGet pure EStateM.pure

@@ -53,32 +53,51 @@ lemma reg_idx_must_64 (idx : BitVec 5) :
   simp [reg_idx_to_Register]
   split <;> rfl
 
+/-- Interpret a value in a register type as a bitvector. -/
+def regidxValToBitVec (idx : BitVec 5) (val : RegisterType (reg_idx_to_Register idx)) :
+    BitVec 64 := cast (reg_idx_must_64 idx) val
+
+/-- Interpret a bitvec into a register type for some vector index. -/
+def bitVecToRegidxVal (idx : BitVec 5) (val : BitVec 64) :
+    RegisterType (reg_idx_to_Register idx) := reg_idx_must_64 idx ▸ val
+
 lemma case_31 {val : BitVec 64} {s : SailState} :
     s.regs.insert (reg_idx_to_Register 31#5) val = s.regs.insert Register.x31 val := rfl
 
-@[simp] lemma reg_idx_toRegister_ne_nextPC (idx : BitVec 5) :
-    reg_idx_to_Register idx ≠ Register.nextPC := by
+section no_confusion
+-- dt: having these in non-iff versions as `simp` lemmas causes unexpected simp paths
+
+-- @[simp]
+lemma reg_idx_toRegister_ne_nextPC (idx : BitVec 5) :
+    reg_idx_to_Register idx = Register.nextPC ↔ False := by
   unfold reg_idx_to_Register; split <;> trivial
 
-@[simp] lemma nextPC_ne_reg_idx_toRegister (idx : BitVec 5) :
-    Register.nextPC ≠ reg_idx_to_Register idx := by
+-- @[simp]
+lemma nextPC_ne_reg_idx_toRegister (idx : BitVec 5) :
+    Register.nextPC = reg_idx_to_Register idx ↔ False := by
   unfold reg_idx_to_Register; split <;> trivial
 
-@[simp] lemma reg_idx_toRegister_ne_PC (idx : BitVec 5) :
-    reg_idx_to_Register idx ≠ Register.PC := by
+-- @[simp]
+lemma reg_idx_toRegister_ne_PC (idx : BitVec 5) :
+    reg_idx_to_Register idx = Register.PC ↔ False := by
   unfold reg_idx_to_Register; split <;> trivial
 
-@[simp] lemma PC_ne_reg_idx_toRegister (idx : BitVec 5) :
-    Register.PC ≠ reg_idx_to_Register idx := by
+-- @[simp]
+lemma PC_ne_reg_idx_toRegister (idx : BitVec 5) :
+    Register.PC = reg_idx_to_Register idx ↔ False := by
   unfold reg_idx_to_Register; split <;> trivial
 
-@[simp] lemma reg_idx_toRegister_ne_misa (idx : BitVec 5) :
-    reg_idx_to_Register idx ≠ Register.misa := by
+@[simp]
+lemma reg_idx_toRegister_ne_misa (idx : BitVec 5) :
+    reg_idx_to_Register idx = Register.misa ↔ False := by
   unfold reg_idx_to_Register; split <;> trivial
 
-@[simp] lemma misa_ne_reg_idx_toRegister (idx : BitVec 5) :
-    Register.misa ≠ reg_idx_to_Register idx := by
+@[simp]
+lemma misa_ne_reg_idx_toRegister (idx : BitVec 5) :
+    Register.misa = reg_idx_to_Register idx ↔ False := by
   unfold reg_idx_to_Register; split <;> trivial
+
+end no_confusion
 
 @[simp] lemma regidxToRegister_eq_x1_iff (idx : BitVec 5) :
 reg_idx_to_Register idx = .x1 ↔ idx = 1#5 := by fin_cases idx <;> trivial
@@ -239,7 +258,8 @@ reg_idx_to_Register idx = .x31 ↔ idx = 31#5 ∨ idx = 0#5 := by fin_cases idx 
 @[simp] lemma regidxToRegister_ofNat_30 : reg_idx_to_Register 30#5 = .x30 := rfl
 @[simp] lemma regidxToRegister_ofNat_31 : reg_idx_to_Register 31#5 = .x31 := rfl
 
-@[simp] lemma regidxToRegister_inj (idx idx' : BitVec 5) :
+-- @[simp]
+lemma regidxToRegister_inj (idx idx' : BitVec 5) :
     reg_idx_to_Register idx = reg_idx_to_Register idx' ↔
       idx = idx' ∨ (idx = 0#5 ∧ idx' = 31#5) ∨ (idx = 31#5 ∧ idx' = 0#5) := by
   fin_cases idx
