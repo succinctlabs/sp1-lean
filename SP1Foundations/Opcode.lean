@@ -60,6 +60,10 @@ inductive Opcode where
 
 namespace Opcode
 
+@[simp] lemma ofNat_33 : Opcode.ofNat 33 = Opcode.JAL := rfl
+
+@[simp] lemma ofNat_34 : Opcode.ofNat 34 = Opcode.JALR := rfl
+
 @[simp]
 def trusted_instr
   (opcode : Opcode)

@@ -10,12 +10,6 @@ namespace Jalr
 
 open Sail SailState BitVec LeanRV64IM.Functions
 
-variable
-  (Main : Vector (Fin BB) 38)
-  (s : SailState)
-  (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[29] = 1)
-
 lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
     (h_is_real : Main[29] = 1) : Main[6].val < 2^5 := by
   simp only [BB_eq, Nat.reducePow]
@@ -42,11 +36,15 @@ lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Mai
   clear reader_cstrs
   itauto
 
+variable (Main : Vector (Fin BB) 38)
+  (s : SailState) (cstrs : (constraints Main).allHold)
+  (h_is_real : Main[29] = 1)
+
 def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_op_a : BitVec 5 := Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
 
-def sp1_op_b : BitVec 5 := (Main[14].val)#'(op_b_lt32_of_constraints cstrs h_is_real)
+def sp1_op_b : BitVec 5 := Main[14].val#'(op_b_lt32_of_constraints cstrs h_is_real)
 
 def sp1_jalr : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
@@ -62,10 +60,10 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 0 in
-theorem correct_cleanup
+theorem JALR_correct
     (state_cstrs : (constraints Main).initialState s)
     (h_misa : Register.misa ∈ s.regs) :
-    let imm := sp1_imm Main -- cstrs h_is_real
+    let imm := sp1_imm Main
     let op_b := sp1_op_b Main cstrs h_is_real
     let op_a := sp1_op_a Main cstrs h_is_real
     (spec_jalr imm (.Regidx op_b) (.Regidx op_a)).run s = (sp1_jalr Main cstrs h_is_real).run s := by
@@ -173,6 +171,6 @@ theorem correct_cleanup
     rw [h_res, BitVec.helper hmod]
   }
 
-#print axioms Jalr.correct_cleanup
+#print axioms Jalr.JALR_correct
 
 end Jalr
