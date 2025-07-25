@@ -124,9 +124,9 @@ def trusted_instr
   | SB | SH | SW | SD =>
       i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
   | ADDW =>
-      imm_b = 0 
-      ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-      ∧ (imm_c = 0 → Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 32 (op_c_0.val + op_c_1.val * 65536)))
+      -- ADDW
+      (imm_c = 0 → r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
+      -- ADDIW
       ∧ (imm_c = 1 → op_c_0 < 2^12 ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0))
   | SLLW | SRLW | SRAW =>
       imm_b = 0
