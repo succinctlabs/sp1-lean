@@ -279,14 +279,6 @@ theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
     have : bx12 = BitVec.ofNatLT (w := 12) x.val hx := rfl
     rw [← this, ← h_sign_ext]
 
-theorem useless_signExtend_add' {x : Fin BB} {y : BitVec 64} :
-    (y + BitVec.signExtend 64 (BitVec.ofNat 12 x.val)) % 4 = (y + BitVec.ofNat 64 x.val) % 4 := by
-  have h1 : (BitVec.signExtend 64 (BitVec.ofNat 12 x.val)) % 4 = (BitVec.ofNat 64 x.val) % 4 := by
-    simp [BitVec.signExtend]
-    sorry
-  have h2 : y % 4 = y % 4 := rfl
-  bv_decide
-
 
 theorem useless_signExtend_add {x : Fin BB} {hx : x.val < 2^12} {y : BitVec 64}
   : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)

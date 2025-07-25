@@ -106,14 +106,13 @@ theorem JALR_correct
     exact op_b_val_plus_imm_mul4
 
   have hmod4 : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
-                sign_extend (BitVec.ofNat 12 Main[21].val))[1] = false := by
+                Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]])[1] = false := by
     refine (mul4_means_0_1_are_0 ?_).2
-    rw [sign_extend, Sail.BitVec.signExtend]
-    rw [useless_signExtend_add']
     simp at hmod
     simp [Word.add_toBitVec64_mod_4, Word.toBitVec64_add_mod_4] at hmod
-    simp [Word.toBitVec64_add_mod_4]
+    simp [Word.toBitVec64_add_mod_4, Word.add_toBitVec64_mod_4]
     exact hmod
+
 
   have hmod2 : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]])[0] = 0 := by
@@ -133,12 +132,13 @@ theorem JALR_correct
     BitVec.ofBool, BitVec.ofNat_eq_ofNat, cond_false, EStateM.run_bind,
     run_bool_bit_backwards, Bool.false_and, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
     currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or, Bool.and_self,
-    BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map]
+    BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map,
+    sign_extend,
+    Sail.BitVec.signExtend, ← h_c_sign_extend]
   rw [map_const_run_readReg _ _ (by simp [h_misa])]
   simp only
   rw [run_readReg]
-  simp only [Std.ExtDHashMap.get?_insert_self, run_wX_bits, BitVec.ofNat_eq_ofNat, sign_extend,
-    Sail.BitVec.signExtend, ← h_c_sign_extend, EStateM.Result.map_ok]
+  simp only [Std.ExtDHashMap.get?_insert_self, run_wX_bits, BitVec.ofNat_eq_ofNat, EStateM.Result.map_ok]
 
   -- stop
   cases op_a_0_is_bool with
@@ -171,6 +171,6 @@ theorem JALR_correct
     rw [h_res, BitVec.helper hmod]
   }
 
-#print axioms Jalr.JALR_correct
+-- #print axioms Jalr.JALR_correct
 
 end Jalr
