@@ -132,7 +132,7 @@ def trusted_instr
       imm_b = 0
       ∧ (imm_c = 0 → r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
       ∧ (imm_c = 1 → w_shift_i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-  | UNIMP => True
+  | UNIMP | ECALL | EBREAK => True
   | _ => True
 
 @[simp]
