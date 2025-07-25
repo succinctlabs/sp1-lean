@@ -191,7 +191,7 @@ variable (Main : Vector (Fin BB) 31)
   (s : SailState) (cstrs : (constraints Main).allHold)
   (h_is_real : Main[30] = 1)
 
-def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[21].val
+def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[14].val
 
 def sp1_op_a : BitVec 5 := Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
 
@@ -235,7 +235,7 @@ theorem SP1JAL_correct
     sorry
 
   have hmod : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
-                sign_extend (setWidth 21 (BitVec.ofNat 12 ↑Main[21])))[1] = false := by
+                sign_extend (setWidth 21 (BitVec.ofNat 12 Main[14].val)))[1] = false := by
     sorry
 
   simp [spec_jal, sp1_jal, execute_JAL, op_a, imm, sp1_imm, sp1_op_a]
@@ -255,7 +255,7 @@ theorem SP1JAL_correct
     BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map]
 
   have h_add : BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
-      sign_extend (setWidth 21 (BitVec.ofNat 12 ↑Main[21])) =
+      sign_extend (setWidth 21 (BitVec.ofNat 12 Main[14].val)) =
       (BitVec.ofNat 64 (↑Main[22] + ↑Main[23] * 65536 + ↑Main[24] * 4294967296 + ↑Main[25] * 281474976710656)) := by
 
     sorry
@@ -269,10 +269,12 @@ theorem SP1JAL_correct
       simp [h6]
       rw [run_readReg]
       simp [Std.ExtDHashMap.get?_insert, read_pc, hmod]
+
       rw [run_readReg]
       simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
       rw [run_readReg]
       simp [BitVec.ofNatLT_eq_ofNat, h6_bv]
+
       simp [h_add]
 
   | inr h13_is_1 =>
