@@ -1,2 +1,9 @@
-import SP1Operations
+import SP1Operations.Operation.MulOperation
+import SP1Operations.Operation.AddOperation
+import SP1Operations.Compare.IsEqualWordOperation
+import SP1Operations.Compare.IsZeroWordOperation
+import SP1Operations.Compare.LtOperationUnsigned
+import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.ALUTypeReader
 import SP1Chips.DivRem.Constraints
