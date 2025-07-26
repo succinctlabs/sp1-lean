@@ -55,7 +55,9 @@ def u16_composition
       refine ⟨⟨by aesop, by aesop, ?_⟩, ?_⟩
       -- Prove Main[34] * 65535 < 65536
       · -- Main[34] is boolean (0 or 1) from MSB constraint
-        sorry
+        repeat (rw [sub_eq_zero] at addw_op_cstrs)
+        have h_msb_is_bool : Main[34] = 0 ∨ Main[34] = 1 := by extract_from_and addw_op_cstrs
+        cases h_msb_is_bool <;> rename_i h <;> simp [h]
       -- Prove Main[6] < 65536
       · clear * - h_is_real reader_cstrs
         simp [ALUTypeReader.constraints, SP1Constraint.toProp, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
