@@ -50,6 +50,10 @@ lemma lt_cases_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) :
     w[0].val < 2^16 ∧ w[1].val < 2^16 ∧ w[2].val < 2^16 ∧ w[3].val < 2^16 :=
   ⟨hw 0, hw 1, hw 2, hw 3⟩
 
+@[simp] -- common enough to want a lemma
+lemma four_isU64 : Word.isU64 #v[4, 0, 0, 0] :=
+  Word.isU64_of_cases _ (by trivial) (by trivial) (by trivial) (by trivial)
+
 end isU64
 
 section conversions
