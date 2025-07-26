@@ -43,7 +43,7 @@ theorem correct (a b : Word (Fin BB)) (cols : AddwOperation) (is_real : Fin BB)
     aesop
 
   . constructor
-    . rw [HalfWord.toBitVec32_add_toBitVec32, HalfWord.toBitVec32_eq_add]
+    . rw [HalfWord.toBitVec32_add_toBitVec32, HalfWord.toBitVec32_as_sum]
       simp [← inv_16BB_eq'] at *
       simp [Word.low32, ← BitVec.ofNat_add, ← BitVec.ofNat_mul]
       simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]

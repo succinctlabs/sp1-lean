@@ -34,6 +34,10 @@ section const_vals
 
 end const_vals
 
+lemma val_mod4_eq_zero (x : Fin BB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
+  rw [← Fin.val_inj]
+  simp only [BB_eq, Fin.isValue, Fin.mod_val, Fin.coe_ofNat_eq_mod, Nat.reduceMod, Nat.zero_mod]
+
 end BabyBear
 
 @[simp] lemma shiftl_1BB_eq_one : (1006632961 : Fin BB) <<< 1 = 1 := rfl
@@ -87,7 +91,6 @@ lemma inv_16BB_eq' : (2013235201 : Fin BB) = 65536⁻¹ := by native_decide
   rw [mul_comm, inv_mul_8BB_eq_iff]
 @[simp] lemma inv_mul_16BB_eq_iff' : x * (2013235201 : Fin BB) = 1 ↔ x = 65536 := by
   rw [mul_comm, inv_mul_16BB_eq_iff]
-
 
 -- dt: remaining versions of these
 @[simp] lemma mul_inv_16BB_eq_one_iff : x * (65536 : Fin BB)⁻¹ = 1 ↔ x = 65536 := by
