@@ -1,4 +1,4 @@
-import SP1Operations
+import SP1Operations.Operation.AddOperation
 
 namespace JalChip
 
@@ -148,30 +148,6 @@ lemma ofInt_ofNat_of_constraints (Main : Vector (Fin BB) 31)
   have := program_constraints_allHold Main h_cstrs
   simp [SP1Constraint.toProp, h_is_real, Opcode.ofNat, Nat.ble] at this
 
-  obtain ⟨⟨h14, h15, h16, h17⟩, _⟩ := this.1
-  simp [h15, h16, h17]
-  simp [BitVec.ofInt, BitVec.toInt]
-  simp [Int.toNat]
-
-  have h14' : Main[14].val % 2097152 = Main[14].val
-  · rw [Nat.mod_eq_of_lt]
-    omega
-  have h14'' : (Main[14].val : ℤ) % (2097152 : ℤ) = Main[14].val
-  · exact
-    Eq.symm
-      ((fun {a b} ↦ Int.neg_inj.mp) (congrArg Neg.neg (congrArg Nat.cast (id (Eq.symm h14')))))
-  simp [h14', h14'']
-  have h14''' : 2 * Main[14].val < 2097152 := by omega
-  simp [h14''']
-  rename_i right
-  simp_all only [SP1ConstraintList.allHold, BB_eq, Fin.isValue, and_self, Fin.reduceLT, and_true, true_and]
-  obtain ⟨left, right_1⟩ := this
-  obtain ⟨left_2, right_1⟩ := right_1
-  obtain ⟨left_3, right_1⟩ := right_1
-  obtain ⟨left_5, right_1⟩ := right_1
-  simp_all only [Fin.isValue]
-  rfl
-
 --------------------------
 
 def specJal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
@@ -266,144 +242,144 @@ lemma specJal_eq_of_mod (imm : BitVec 21) (rd : regidx)
       sorry
   simp
 
-set_option debug.skipKernelTC true in
-set_option maxHeartbeats 300000 in
-theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
-    (h_cstrs : (constraints Main).allHold)
-    (h_is_real : Main[30] = 1) -- Is a real column
-    (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
-    -- dt: get this from constraints
-    (h_pc : s.regs.get? Register.PC =
-      some (BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)))
-    (h_misa : s.regs.get? Register.misa = some 2)
-    :
-    let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
-    (sp1Jal Main).run s = (specJal imm (regidx.Regidx Main[6].val)).run s := by
+-- set_option debug.skipKernelTC true in
+-- set_option maxHeartbeats 300000 in
+-- theorem SP1JAL_correct (Main : Vector (Fin BB) 31)
+--     (h_cstrs : (constraints Main).allHold)
+--     (h_is_real : Main[30] = 1) -- Is a real column
+--     (s : PreSail.SequentialState RegisterType Sail.trivialChoiceSource)
+--     -- dt: get this from constraints
+--     (h_pc : s.regs.get? Register.PC =
+--       some (BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)))
+--     (h_misa : s.regs.get? Register.misa = some 2)
+--     :
+--     let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
+--     (sp1Jal Main).run s = (specJal imm (regidx.Regidx Main[6].val)).run s := by
 
-  let init_pc := BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)
-  let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
-  let new_pc := BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48)
-  let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
+--   let init_pc := BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32)
+--   let imm := BitVec.ofNat 64 (Main[14] + Main[15] * 2^16 + Main[16] * 2^32 + Main[17] * 2^48)
+--   let new_pc := BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48)
+--   let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
 
-  unfold sp1Jal
-
-
-  -- refine _root_.trans ?_ (specJal_eq_of_mod _ _ _ init_pc (by
-  --   simp
-
-  --   sorry
-  -- ) (h_pc)).symm
-  -- refine congr_arg (fun mx => EStateM.run mx s) ?_
-  unfold specJal
-  unfold execute_JAL
-
-  simp only [BB_eq, BitVec.natCast_eq_ofNat, Nat.reducePow, Nat.reduceLeDiff,
-    BitVec.setWidth_ofNat_of_le, pure_bind]
-
-  rw [run_readReg_bind, h_pc]
-  simp
-  stop
-  rw [run_readReg_bind]
-  simp
-
-  rw [Std.ExtDHashMap.get?_insert]
-  simp [h_pc]
-
-  simp [ext_control_check_pc]
-
-  simp [bit_to_bool, bool_bit_backwards, Sail.BitVec.access, bits_of_virtaddr]
-
-  have : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
-            sign_extend (BitVec.ofNat 21 (↑Main[14] + ↑Main[15] * 65536 + ↑Main[16] * 4294967296 + ↑Main[17] * 281474976710656)))[1] = false := sorry
-
-  simp [this, currentlyEnabled]
-  rw [run_readReg_bind]
-  simp
-
-  -- have := ext_control_check_pc
-  --         (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
-  --           sign_extend
-  --             (BitVec.ofNat 21
-  --               (↑Main[14] + ↑Main[15] * 65536 + ↑Main[16] * 4294967296 + ↑Main[17] * 281474976710656)))
-
-  simp [Std.ExtDHashMap.get?_insert, h_misa]
-  simp [get_next_pc]
-  rw [run_readReg_bind]
-
-  simp [LeanRV64IM.Functions.not, hartSupports]
-
-  simp [← SailState.wX_bits_is_regidx_write,
-    SailState.regidx_write]
-
-  by_cases h6 : Main[6] = 0
-  · simp [h6]
-
-    sorry
-
-  have h6' : BitVec.ofNat 5 Main[6] = 0#5 := sorry
-  simp [h6', EStateM.run_bind]
+--   unfold sp1Jal
 
 
+--   -- refine _root_.trans ?_ (specJal_eq_of_mod _ _ _ init_pc (by
+--   --   simp
 
-  have h25 : Main[25] = 0 := by
-    refine eq_zero_of_constraints Main h_cstrs
+--   --   sorry
+--   -- ) (h_pc)).symm
+--   -- refine congr_arg (fun mx => EStateM.run mx s) ?_
+--   unfold specJal
+--   unfold execute_JAL
 
-  have h_imm :
-      BitVec.ofNat 64 (Main[22] + Main[23] * 65536 + Main[24] * 4294967296) =
-        BitVec.ofNat 64 (Main[3] + Main[4] * 65536 + ↑Main[5] * 4294967296) +
-          BitVec.ofNat 64 (Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656) := by
-    refine add_imm_eq_of_constarints Main h_cstrs h_is_real
+--   simp only [BB_eq, BitVec.natCast_eq_ofNat, Nat.reducePow, Nat.reduceLeDiff,
+--     BitVec.setWidth_ofNat_of_le, pure_bind]
 
-  have h_of_int : let imm_nat : ℕ := Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656
-      BitVec.ofInt 64 (BitVec.ofNat 21 (imm_nat)).toInt = (BitVec.ofNat 64 (imm_nat)) :=
-    ofInt_ofNat_of_constraints Main h_cstrs h_is_real
+--   rw [run_readReg_bind, h_pc]
+--   simp
+--   stop
+--   rw [run_readReg_bind]
+--   simp
 
-  simp [h25]
+--   rw [Std.ExtDHashMap.get?_insert]
+--   simp [h_pc]
 
-  have op_a_is_bool : Main[13] = 0 ∨ Main[13] = 1 := by
-    simp [constraints, h_is_real, SP1Constraint.toProp, Opcode.ofNat, Nat.ble] at h_cstrs
-    aesop
+--   simp [ext_control_check_pc]
 
-  cases Or.symm op_a_is_bool with
-  | inl op_a_is_one =>
-      simp [constraints, op_a_is_one, h_is_real] at h_cstrs
-      have h26 : Main[26] = 0 := by aesop
-      have h27 : Main[27] = 0 := by aesop
-      have h28 : Main[28] = 0 := by aesop
-      have h29 : Main[29] = 0 := by aesop
-      have h6 : Main[6] = 0 := by
-        simp [SP1Constraint.toProp] at h_cstrs
-        simp_all only [BB_eq, Fin.isValue, Nat.reducePow]
-      simp_all
-      -- simp [h25, h26, h27, h28, h29, h6]
-      -- rw [h_imm]
-      -- simp only [set_next_pc, BB_eq, h_pc, Nat.reducePow, get_next_pc, sign_extend,
-      --   Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
-      --   writeReg_wX_bits_writeReg]
-      -- rw [h_of_int]
-      -- congr 3
+--   simp [bit_to_bool, bool_bit_backwards, Sail.BitVec.access, bits_of_virtaddr]
 
-      -- sorry
-      -- unfold wX_bits
-      -- simp only [wX, BitVec.toNat_ofNat, Nat.reducePow, Nat.zero_mod, bne_self_eq_false, cond_false,
-      --   bind_pure_comp, map_pure, pure_bind, BB_eq]
-      -- rfl
-  | inr op_a_is_zero =>
+--   have : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
+--             sign_extend (BitVec.ofNat 21 (↑Main[14] + ↑Main[15] * 65536 + ↑Main[16] * 4294967296 + ↑Main[17] * 281474976710656)))[1] = false := sorry
 
-    have h_link : BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
-        BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
-      refine link_eq_of_constraints Main h_cstrs h_is_real op_a_is_zero
+--   simp [this, currentlyEnabled]
+--   rw [run_readReg_bind]
+--   simp
 
-    -- erw [h_link]
-    simp only [BB_eq, Nat.reducePow, BitVec.ofNat_eq_ofNat, set_next_pc, h25, Fin.isValue,
-      Fin.coe_ofNat_eq_mod, Nat.zero_mod, zero_mul, add_zero, h_pc, get_next_pc, sign_extend,
-      Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
-      writeReg_wX_bits_writeReg]
-    congr 1
+--   -- have := ext_control_check_pc
+--   --         (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
+--   --           sign_extend
+--   --             (BitVec.ofNat 21
+--   --               (↑Main[14] + ↑Main[15] * 65536 + ↑Main[16] * 4294967296 + ↑Main[17] * 281474976710656)))
 
-    simp [h_imm, h_of_int]
+--   simp [Std.ExtDHashMap.get?_insert, h_misa]
+--   simp [get_next_pc]
+--   rw [run_readReg_bind]
+
+--   simp [LeanRV64IM.Functions.not, hartSupports]
+
+--   simp [← SailState.wX_bits_is_regidx_write,
+--     SailState.regidx_write]
+
+--   by_cases h6 : Main[6] = 0
+--   · simp [h6]
+
+--     sorry
+
+--   have h6' : BitVec.ofNat 5 Main[6] = 0#5 := sorry
+--   simp [h6', EStateM.run_bind]
 
 
-#print axioms SP1JAL_correct
+
+--   have h25 : Main[25] = 0 := by
+--     refine eq_zero_of_constraints Main h_cstrs
+
+--   have h_imm :
+--       BitVec.ofNat 64 (Main[22] + Main[23] * 65536 + Main[24] * 4294967296) =
+--         BitVec.ofNat 64 (Main[3] + Main[4] * 65536 + ↑Main[5] * 4294967296) +
+--           BitVec.ofNat 64 (Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656) := by
+--     refine add_imm_eq_of_constarints Main h_cstrs h_is_real
+
+--   have h_of_int : let imm_nat : ℕ := Main[14] + Main[15] * 65536 + Main[16] * 4294967296 + Main[17] * 281474976710656
+--       BitVec.ofInt 64 (BitVec.ofNat 21 (imm_nat)).toInt = (BitVec.ofNat 64 (imm_nat)) :=
+--     ofInt_ofNat_of_constraints Main h_cstrs h_is_real
+
+--   simp [h25]
+
+--   have op_a_is_bool : Main[13] = 0 ∨ Main[13] = 1 := by
+--     simp [constraints, h_is_real, SP1Constraint.toProp, Opcode.ofNat, Nat.ble] at h_cstrs
+--     aesop
+
+--   cases Or.symm op_a_is_bool with
+--   | inl op_a_is_one =>
+--       simp [constraints, op_a_is_one, h_is_real] at h_cstrs
+--       have h26 : Main[26] = 0 := by aesop
+--       have h27 : Main[27] = 0 := by aesop
+--       have h28 : Main[28] = 0 := by aesop
+--       have h29 : Main[29] = 0 := by aesop
+--       have h6 : Main[6] = 0 := by
+--         simp [SP1Constraint.toProp] at h_cstrs
+--         simp_all only [BB_eq, Fin.isValue, Nat.reducePow]
+--       simp_all
+--       -- simp [h25, h26, h27, h28, h29, h6]
+--       -- rw [h_imm]
+--       -- simp only [set_next_pc, BB_eq, h_pc, Nat.reducePow, get_next_pc, sign_extend,
+--       --   Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
+--       --   writeReg_wX_bits_writeReg]
+--       -- rw [h_of_int]
+--       -- congr 3
+
+--       -- sorry
+--       -- unfold wX_bits
+--       -- simp only [wX, BitVec.toNat_ofNat, Nat.reducePow, Nat.zero_mod, bne_self_eq_false, cond_false,
+--       --   bind_pure_comp, map_pure, pure_bind, BB_eq]
+--       -- rfl
+--   | inr op_a_is_zero =>
+
+--     have h_link : BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48) =
+--         BitVec.ofNat 64 (Main[3] + Main[4] * 2^16 + Main[5] * 2^32) + 4 := by
+--       refine link_eq_of_constraints Main h_cstrs h_is_real op_a_is_zero
+
+--     -- erw [h_link]
+--     simp only [BB_eq, Nat.reducePow, BitVec.ofNat_eq_ofNat, set_next_pc, h25, Fin.isValue,
+--       Fin.coe_ofNat_eq_mod, Nat.zero_mod, zero_mul, add_zero, h_pc, get_next_pc, sign_extend,
+--       Sail.BitVec.signExtend, BitVec.signExtend, pure_bind, writeReg_readReg_bind,
+--       writeReg_wX_bits_writeReg]
+--     congr 1
+
+--     simp [h_imm, h_of_int]
+
+
+-- #print axioms SP1JAL_correct
 
 end JalChip

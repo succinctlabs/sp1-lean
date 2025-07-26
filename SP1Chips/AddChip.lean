@@ -1,11 +1,12 @@
 import SP1Foundations
-import SP1Operations
+import SP1Operations.Operation.AddOperation
+import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.RTypeReader
 import LeanRV64IM.RiscvInstsEnd
 
 import SP1Chips.Add.Constraints
 
-open LeanRV64IM.Functions
-open BitVec
+open LeanRV64IM.Functions BitVec
 
 namespace Add
 
@@ -67,10 +68,10 @@ def sp1_op_c : BitVec 5 :=
 
 def sp1_add : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  SailState.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
+
+open Sail
 
 theorem correct_add
   (state_cstrs : (constraints Main).initialState s) :
@@ -96,7 +97,9 @@ theorem correct_add
     -- Now the monadic manipulation
     simp [spec_add, sp1_add, execute, execute_RTYPE']
     rw [run_readReg, read_pc]
-    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b (by omega), read_op_c (by omega)]
+    simp [sp1_op_b, read_op_b (by omega)]
+    simp [sp1_op_c, read_op_c (by omega)]
+    simp [sp1_op_a]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all

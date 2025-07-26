@@ -8,7 +8,7 @@ lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (¬is_real = 0 →
-      Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 ∧
+      Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
       cols.op_a < 32 ∧
       cols.op_b < 65536 ∧
       cols.op_c < 65536 ∧
@@ -37,7 +37,7 @@ lemma allHold_constraints_iff :
 
 lemma allHold_constraints_iff_is_real (h : is_real = 1) :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
-    Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 ∧
+    Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
     cols.op_a < 32 ∧
     cols.op_b < 65536 ∧
     cols.op_c < 65536 ∧

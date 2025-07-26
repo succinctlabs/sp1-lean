@@ -256,6 +256,20 @@ lemma isNegative_msb
   simp [isNegative, Word.toBitVec64, Word.toNat, BitVec.msb_eq_decide]
   omega
 
+lemma toBitVec64_LT_eq_toNat {w : Word (Fin BB)} (hw : w.isU64)
+  : w.toBitVec64 = BitVec.ofNatLT w.toNat
+      (by
+        simp [Word.toNat]
+        have := hw 0
+        have := hw 1
+        have := hw 2
+        have := hw 3
+        simp at *
+        linarith)
+  := by
+    simp [Word.toBitVec64]
+    rw [BitVec.ofNatLT_eq_ofNat]
+
 lemma toInt_toBitVec64 (w : Word (Fin BB)) (h_w_isU64 : w.isU64) :
     w.toBitVec64.toInt = w.toInt
   := by
@@ -311,6 +325,16 @@ lemma val_add_of_isU64 {w v : Word (Fin BB)} (hw : w.isU64) (hv : v.isU64)
   omega
 
 end add
+
+def toBitVec64LT (w : Word (Fin BB)) (h_w : w.isU64) : BitVec 64 :=
+  BitVec.ofNatLT w.toNat (by
+    simp [Word.toNat]
+    have := h_w 0
+    have := h_w 1
+    have := h_w 2
+    have := h_w 3
+    simp at *
+    linarith)
 
 end Word
 

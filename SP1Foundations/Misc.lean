@@ -15,8 +15,7 @@ lemma Nat.mod_eq_zero_iff_of_lt (x y : ℕ) (h : x < y) : x % y = 0 ↔ x = 0 :=
   have : x / y = 0 := by aesop
   rw [Nat.mod_def, this, mul_zero, Nat.sub_zero]
 
-@[simp] theorem Std.ExtDHashMap.insert_insert [BEq α] [Hashable α]
-    [LawfulBEq α]
+@[simp] theorem Std.ExtDHashMap.insert_insert [BEq α] [Hashable α] [LawfulBEq α]
     {m : Std.ExtDHashMap α β} (a : α) (b b' : β a) :
     (m.insert a b).insert a b' = m.insert a b' := by
   refine Std.ExtDHashMap.ext_get? fun a' => ?_
@@ -25,6 +24,26 @@ lemma Nat.mod_eq_zero_iff_of_lt (x y : ℕ) (h : x < y) : x % y = 0 ↔ x = 0 :=
   · induction h
     simp
   · simp [h]
+
+@[simp] theorem Std.ExtDHashMap.insert_insert_comm [BEq α] [Hashable α] [LawfulBEq α]
+    (m : Std.ExtDHashMap α β) (a a' : α) (b : β a) (b' : β a') (h : a ≠ a') :
+    (m.insert a b).insert a' b' = (m.insert a' b').insert a b := by
+  refine Std.ExtDHashMap.ext_get? fun x => ?_
+  simp [get?_insert]
+  split_ifs
+  · refine (h ?_).elim
+    aesop
+  · aesop
+  · aesop
+  · aesop
+
+macro "simpM" : tactic => `(tactic| simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet])
+
+instance : Fintype (BitVec n) where
+  elems := Finset.image (BitVec.ofFin) Finset.univ
+  complete := by
+    intro x
+    simp [Finset.mem_image]
 
 section toBatteries
 

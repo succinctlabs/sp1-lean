@@ -4,13 +4,13 @@ import SP1Operations.Reader.ALUTypeReader.Constraints
 
 namespace ALUTypeReader
 
-set_option maxHeartbeats 1000000 in
+set_option maxHeartbeats 2000000 in
 lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (is_real = 0 → cols.imm_c = 0) ∧
     (¬is_real = 0 →
-      Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] ∧
+      Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
       cols.op_a < 32 ∧
       cols.op_b < 65536 ∧
       (cols.op_c[0] < 65536 ∧ cols.op_c[1] < 65536 ∧ cols.op_c[2] < 65536 ∧ cols.op_c[3] < 65536) ∧
@@ -41,14 +41,14 @@ lemma allHold_constraints_iff :
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
    := by
-    simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_iff_val_lt_val]
+    simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_iff_val_lt_val, -Opcode.trusted_instr]
     intro h_is_real; rcases h_is_real <;> by_cases cols.op_a_0 = 0 <;>
-    by_cases cols.imm_c = 0 <;> simp_all [and_assoc] <;> try aesop
+    by_cases cols.imm_c = 0 <;> simp_all [-Opcode.trusted_instr, and_assoc] <;> aesop
 
 set_option maxHeartbeats 1000000 in
 lemma allHold_constraints_iff_is_real (h : is_real = 1) :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
-    Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] ∧
+    Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
     cols.op_a < 32 ∧
     cols.op_b < 65536 ∧
     (cols.op_c[0] < 65536 ∧ cols.op_c[1] < 65536 ∧ cols.op_c[2] < 65536 ∧ cols.op_c[3] < 65536) ∧
@@ -77,6 +77,6 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
       cols.op_c_memory.prev_value[1] = cols.op_c[1] ∧
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
-   := by aesop (add safe (by simp [allHold_constraints_iff]))
+   := by  aesop (add safe (by simp [-Opcode.trusted_instr, allHold_constraints_iff]))
 
 end ALUTypeReader

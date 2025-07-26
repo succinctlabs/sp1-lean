@@ -1,7 +1,6 @@
-import SP1Foundations
-import SP1Operations
-import LeanRV64IM.RiscvInstsEnd
-
+import SP1Operations.Operation.AddwOperation
+import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.ALUTypeReader
 import SP1Chips.Addw.Constraints
 
 open LeanRV64IM.Functions
@@ -46,11 +45,14 @@ def sp1_op_b : BitVec 5 :=
       exact cstrs.2.2.1
 
     clear cstrs
-    simp [ALUTypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at alu_cstrs
+    have : (Main[31] = 0 ∨ Main[31] = 1) := by
+      simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
+      aesop
 
-    exact alu_cstrs.1.1.1
+    simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
+    rcases this <;> simp_all
 
-def sp1_op_c : BitVec 5 :=
+def sp1_op_c (h : Main[31] = 0): BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[21] ?_
     simp
@@ -61,21 +63,21 @@ def sp1_op_c : BitVec 5 :=
       exact cstrs.2.2.1
 
     clear cstrs
-    simp [ALUTypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at alu_cstrs
+    simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble, h] at alu_cstrs
 
-    exact alu_cstrs.1.1.2.1
+    exact alu_cstrs.1.2.1
 
 def sp1_addw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  SailState.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
 
 theorem correct_addw
   (state_cstrs : (constraints Main).initialState s)
   (h_is_addw : Main[31] = 0) : -- PM: WHY DO I NEED THIS?
-  let op_c := sp1_op_c Main cstrs h_is_real
+  let op_c := sp1_op_c Main cstrs h_is_real h_is_addw
   let op_b := sp1_op_b Main cstrs h_is_real
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_addw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addw Main cstrs h_is_real).run s
@@ -98,7 +100,7 @@ theorem correct_addw
 
     -- Now the monadic manipulation
     simp [spec_addw, sp1_addw, execute, execute_RTYPEW']
-    rw [run_readReg, read_pc]
+    rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
