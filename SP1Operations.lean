@@ -56,6 +56,8 @@ import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.ITypeReader.Constraints
 import SP1Operations.Reader.ITypeReader.Operation
 import SP1Operations.Reader.JTypeReader
+import SP1Operations.Reader.JTypeReader.Constraints
+import SP1Operations.Reader.JTypeReader.Operation
 import SP1Operations.Reader.RTypeReader
 import SP1Operations.Reader.RTypeReader.Constraints
 import SP1Operations.Reader.RTypeReader.Operation
