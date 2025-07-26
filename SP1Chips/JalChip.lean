@@ -25,26 +25,18 @@ def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1) : B
 def sp1_op_b : BitVec 21 := BitVec.ofNat 21 (Main[14].val + Main[15].val * 65536)
 
 def sp1_jal (Main : Vector (Fin BB) 31) : SailM Unit := do
-  let rd := regidx.Regidx Main[6].val
-  let new_pc := BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48)
-  let link := BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48)
-  wX_bits rd link
-  set_next_pc new_pc
+  let op_a := regidx.Regidx Main[6].val
+  wX_bits op_a (BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48))
+  set_next_pc (BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48))
 
 def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let _ ← execute_JAL imm rd
 
-section move
-
-lemma BabyBear.val_mod4_eq_zero (x : Fin BB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
-  rw [← Fin.val_inj]
-  simp only [BB_eq, Fin.isValue, Fin.mod_val, Fin.coe_ofNat_eq_mod, Nat.reduceMod, Nat.zero_mod]
-
-end move
-
 set_option debug.skipKernelTC true in
-theorem SP1JAL_correct (cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1)
+theorem SP1JAL_correct
+    (cstrs : (constraints Main).allHold)
+    (h_is_real : Main[30] = 1)
     (state_cstrs : (constraints Main).initialState s)
     (h_misa : Register.misa ∈ s.regs) :
     let op_a := sp1_op_a Main cstrs h_is_real

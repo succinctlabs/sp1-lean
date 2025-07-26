@@ -41,20 +41,22 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_jalr  (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  write_reg op_a (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
+  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
+  writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
 
 def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
-  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
 
 set_option debug.skipKernelTC true in
-theorem JALR_correct (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1)
+theorem JALR_correct
+    (cstrs : (constraints Main).allHold)
+    (h_is_real : Main[29] = 1)
     (state_cstrs : (constraints Main).initialState s)
     (h_misa : Register.misa ∈ s.regs) :
-    let op_c := sp1_op_c Main
     let op_b := sp1_op_b Main cstrs h_is_real
     let op_a := sp1_op_a Main cstrs h_is_real
+    let op_c := sp1_op_c Main
     (spec_jalr op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_jalr Main cstrs h_is_real).run s := by
   extract_lets op_c op_b op_a
 
@@ -132,7 +134,6 @@ theorem JALR_correct (cstrs : (constraints Main).allHold) (h_is_real : Main[29] 
     have := AddOperation.correct _ _ _ _ htemp inc_pc_cstrs
     rw [(this pc_is_u64 h_4_is_u64).2]
     simp [BitVec.ofNat, Word.toBitVec64, Word.toNat]
-    rfl
   | inr op_a_0_is_1 =>
     have h6 : Main[6] = 0 := by simp_all
     have hl : Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]] = 0#64 := by
