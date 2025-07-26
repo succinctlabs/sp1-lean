@@ -23,6 +23,7 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Mul", None, ""),
     ("Sub", None, ""),
     ("Subw", None, ""),
+    ("UType", None, ""),
 
     # Operations
     ("Add", "AddOperation", "Operation"),
@@ -49,6 +50,7 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Add", "CPUState", "Reader"),
     ("Addi", "ITypeReader", "Reader"),
     ("Bitwise", "ALUTypeReader", "Reader"),
+    ("UType", "JTypeReader", "Reader"),
 ]
 
 def run_constraint_compiler(sp1_dir: str, chip: str, operation: Optional[str] = None) -> str:
