@@ -501,22 +501,22 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : 
   intro h_op1_isU64 h_op2_isU64
   cases op <;> simp [execute_RTYPE_pure_w, execute_RTYPE_pure, LeanRV64IM.Functions.log2_xlen]
   . rw [Sail.shift_bits_left, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
-    simp [Word.toBitVec64_toNat _ h_op2_isU64]
+    simp [Word.toBitVec64_toNat h_op2_isU64]
   . simp [zopz0zI_s, bool_to_bits]
-    repeat rw [Word.toBitVec64_toInt _ (by assumption)]
+    repeat rw [Word.toBitVec64_toInt (by assumption)]
     aesop
   . simp [zopz0zI_u, bool_to_bits]
-    repeat rw [Word.toBitVec64_toNat _ (by assumption)]
+    repeat rw [Word.toBitVec64_toNat (by assumption)]
     aesop
   . rw [Sail.shift_bits_right, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
-    simp [Word.toBitVec64_toNat _ h_op2_isU64]
+    simp [Word.toBitVec64_toNat h_op2_isU64]
   . have mod_lt_63 : (63 + (op2.toNat : ℤ) % 64).toNat = 63 + op2.toNat % 64 := by omega
     have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
     rw [shift_bits_right_arith, shift_right_arith, sign_extend]
     rw [Sail.BitVec.extractLsb, Sail.BitVec.signExtend]
     rw [BitVec.extractLsb_toNat]
     simp
-    rw [Word.toBitVec64_toNat _ (by assumption)]
+    rw [Word.toBitVec64_toNat (by assumption)]
     rw [mod_lt_63, mod_lt_64]
     symm; apply bitVec_sshiftright_eq
 
@@ -526,22 +526,22 @@ lemma exec_RTYPE_pure_bv_to_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB
   intro h_op1_isU64 h_op2_isU64
   cases op <;> simp [execute_RTYPE_pure_bw, execute_RTYPE_pure, LeanRV64IM.Functions.log2_xlen]
   . rw [Sail.shift_bits_left, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
-    simp [ByteWord.toBitVec64_toNat _ h_op2_isU64]
+    simp [ByteWord.toBitVec64_toNat h_op2_isU64]
   . simp [zopz0zI_s, bool_to_bits]
-    repeat rw [ByteWord.toBitVec64_toInt _ (by assumption)]
+    repeat rw [ByteWord.toBitVec64_toInt (by assumption)]
     aesop
   . simp [zopz0zI_u, bool_to_bits]
-    repeat rw [ByteWord.toBitVec64_toNat _ (by assumption)]
+    repeat rw [ByteWord.toBitVec64_toNat (by assumption)]
     aesop
   . rw [Sail.shift_bits_right, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
-    simp [ByteWord.toBitVec64_toNat _ h_op2_isU64]
+    simp [ByteWord.toBitVec64_toNat h_op2_isU64]
   . have mod_lt_63 : (63 + (op2.toNat : ℤ) % 64).toNat = 63 + op2.toNat % 64 := by omega
     have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
     simp [shift_bits_right_arith, shift_right_arith, sign_extend]
     rw [Sail.BitVec.extractLsb, Sail.BitVec.signExtend]
     rw [BitVec.extractLsb_toNat]
     simp
-    rw [ByteWord.toBitVec64_toNat _ (by assumption)]
+    rw [ByteWord.toBitVec64_toNat (by assumption)]
     rw [mod_lt_63, mod_lt_64]
     symm; apply bitVec_sshiftright_eq
 
@@ -595,13 +595,13 @@ lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op :
   . apply Word.setWidth_eq_low32 op1 h_op1_isU64
   . apply Word.setWidth_eq_low32 op2 h_op2_isU64
   . rw [Sail.shift_bits_left, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
-    simp [Word.toBitVec64_toNat _ h_op2_isU64]
+    simp [Word.toBitVec64_toNat h_op2_isU64]
     rw [Word.setWidth_eq_low32 op1 h_op1_isU64]
     congr 1
     simp [Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]
     omega
   . rw [Sail.shift_bits_right, Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb', Nat.shiftRight_zero]
-    simp [Word.toBitVec64_toNat _ h_op2_isU64]
+    simp [Word.toBitVec64_toNat h_op2_isU64]
     rw [Word.setWidth_eq_low32 op1 h_op1_isU64]
     congr 1
     simp [Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]

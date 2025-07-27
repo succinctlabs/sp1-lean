@@ -13,6 +13,7 @@ variable
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[35] = 1)
+  (h_is_addw : Main[31] = 0)
 
 def spec_addw (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
@@ -52,7 +53,7 @@ def sp1_op_b : BitVec 5 :=
     simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
     rcases this <;> simp_all
 
-def sp1_op_c (h : Main[31] = 0): BitVec 5 :=
+def sp1_op_c : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[21] ?_
     simp
@@ -63,7 +64,7 @@ def sp1_op_c (h : Main[31] = 0): BitVec 5 :=
       exact cstrs.2.2.1
 
     clear cstrs
-    simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble, h] at alu_cstrs
+    simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble, h_is_addw] at alu_cstrs
 
     exact alu_cstrs.1.2.1
 
@@ -76,9 +77,9 @@ def sp1_addw : SailM Unit := do
 
 theorem correct_addw
   (state_cstrs : (constraints Main).initialState s)
-  (h_is_addw : Main[31] = 0) : -- PM: WHY DO I NEED THIS?
+  (h_is_addw : Main[31] = 0) :
   let op_c := sp1_op_c Main cstrs h_is_real h_is_addw
-  let op_b := sp1_op_b Main cstrs h_is_real
+  let op_b := sp1_op_b Main cstrs h_is_real h_is_addw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_addw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addw Main cstrs h_is_real).run s
   := by
@@ -117,3 +118,122 @@ theorem correct_addw
       simp [Word.toBitVec64, Word.toNat]
 
 end Addw
+
+namespace Addiw
+
+variable
+  (Main : Vector (Fin BB) 37)
+  (s : SailState)
+  (cstrs : (Addw.constraints Main).allHold)
+  (h_is_real : Main[35] = 1)
+  (h_is_addiw : Main[31] = 1)
+
+def spec_addiw (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_ADDIW imm rs1 rd
+  pure ()
+
+def sp1_op_a : BitVec 5 :=
+  by
+    refine BitVec.ofNatLT Main[6] ?_
+    simp
+    show Main[6] < 32
+
+    have alu_cstrs := by
+      simp [SP1ConstraintList.allHold, Addw.constraints, SP1Constraint.toProp] at cstrs
+      exact cstrs.2.2.1
+
+    clear cstrs
+    simp [ALUTypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at alu_cstrs
+
+    exact alu_cstrs.1.2.1
+
+def sp1_op_b : BitVec 5 :=
+  by
+    refine BitVec.ofNatLT Main[14] ?_
+    simp
+    show Main[14] < 32
+
+    have alu_cstrs := by
+      simp [SP1ConstraintList.allHold, Addw.constraints, SP1Constraint.toProp] at cstrs
+      exact cstrs.2.2.1
+
+    clear cstrs
+    have : (Main[31] = 0 ∨ Main[31] = 1) := by
+      simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
+      aesop
+
+    simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
+    rcases this <;> simp_all
+
+def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
+
+def sp1_addiw : SailM Unit := do
+  let op_a := sp1_op_a Main cstrs h_is_real
+  -- TODO(gzgz): we can obtain this from the constraint compiler
+  -- This comes from the Interaction.state in CPUState
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
+
+set_option maxHeartbeats 1000000 in
+theorem correct_addw
+  (state_cstrs : (Addw.constraints Main).initialState s) :
+  let op_c := sp1_op_c Main
+  let op_b := sp1_op_b Main cstrs h_is_real h_is_addiw
+  let op_a := sp1_op_a Main cstrs h_is_real
+  (spec_addiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addiw Main cstrs h_is_real).run s
+  := by
+    -- Obtain and simplify state and pure constraints
+    simp [SP1ConstraintList.initialState, Addw.constraints, SP1Constraint.toStateProp, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs
+    obtain ⟨read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    simp [Addw.constraints] at cstrs
+    obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _, _⟩ := cstrs
+    apply AddwOperation.correct (h_is_real := h_is_real) at addw_op_cstrs
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
+    obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, _, _, _ ⟩ := alu_cstrs
+    simp [Opcode.ofNat, Nat.ble] at *
+    simp_all
+    have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
+      := by apply Word.isU64_of_cases _ c0 c1 c2 c3
+    specialize addw_op_cstrs is_U64_b is_U64_c
+    obtain ⟨ is_U32_val, is_addw, is_msb ⟩ := addw_op_cstrs
+    simp_all
+    obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
+    simp [h_is_addiw] at h_f h_imm_c
+    obtain ⟨ h_c, h_is_imm_c ⟩ := h_imm_c
+    have := @Word.sign_extend_imm_toBitVec64 Main[21] Main[22] Main[23] Main[24] _ c0 is_U64_c h_is_imm_c
+
+    -- Now the monadic manipulation
+    simp [spec_addiw, sp1_addiw, execute, execute_ADDIW]
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [← is_addw] at is_msb
+
+    by_cases h_is_op_a_0 : Main[6] = 0
+    . clear this h_is_imm_c; simp_all
+      simp [Word.toBitVec64, Word.toNat]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      simp [Word.toBitVec64, Word.toNat]
+      congr
+      unfold sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
+      rw [← h_is_imm_c]
+      trans signExtend 64 (HalfWord.toBitVec32 (#v[Main[32], Main[33]]))
+      . congr
+        simp [is_addw, Word.low32, Word.toBitVec64, Word.toNat]
+        simp [HalfWord.toBitVec32, HalfWord.toNat]
+        rw [extractLsb, extractLsb', Nat.shiftRight_zero]
+        rw [toNat_add, toNat_ofNat]
+        rw [← BitVec.toNat_inj]
+        rw [toNat_ofNat, toNat_ofNat]
+        simp only [Nat.reducePow, Nat.sub_zero, Nat.reduceAdd]
+        rw [Nat.add_mod_mod, Nat.mod_add_mod, Nat.mod_mod_of_dvd]
+        . rw [toNat_add, toNat_ofNat]; simp
+          omega
+        . simp
+      . rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
+        simp [Word.toBitVec64, Word.toNat]
+        rw [is_msb]; simp
+
+end Addiw
