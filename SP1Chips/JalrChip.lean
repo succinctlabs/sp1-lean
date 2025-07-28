@@ -141,7 +141,7 @@ theorem JALR_correct
       obtain ⟨_, _, ⟨ha, hb, hc, hd⟩⟩ := chip_cstrs
       simp [ha, hb, hc, hd, Word.toBitVec64, ← BitVec.toFin_inj, Word.toNat]
     simp [h6, hl]
-    rw [h_res, BitVec.twoPow64_and_eq_self hmod]
+    simp [h_res, BitVec.twoPow64_and_eq_self hmod]
 
 -- #print axioms Jalr.JALR_correct
 

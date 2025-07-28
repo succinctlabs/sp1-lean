@@ -22,7 +22,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
 def spec (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
-  a.isU64 → b.isU64 → cols.value.isU64 ∧ cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
+  a.isU64 → b.isU64 → cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD
 
 set_option maxHeartbeats 1000000 in
 /-- If the operation is real and the input words have correctly bounded limbs,
@@ -42,7 +42,7 @@ theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
   · clear *- hbds
     aesop
 
-  . rw [Word.toBitVec64_add_toBitVec64, Word.toBitVec64_eq_add]
+  . simp [Word.toBitVec64_add_toBitVec64, Word.toBitVec64_eq_add]
     simp [← inv_16BB_eq'] at *
     simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
     simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]

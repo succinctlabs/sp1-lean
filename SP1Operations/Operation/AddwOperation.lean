@@ -21,7 +21,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddwOperation) :
 def spec (a b : Word (Fin BB)) (cols : AddwOperation) : Prop :=
   a.isU64 → b.isU64 →
     HalfWord.isU32 (cols.value) ∧
-    HalfWord.toBitVec32 (cols.value) = a.low32.toBitVec32 + b.low32.toBitVec32 ∧
+    HalfWord.toBitVec32 (cols.value) = execute_RTYPEW_pure_32_w a b .ADDW ∧
     cols.msb.msb = if (HalfWord.toBitVec32 cols.value).msb then 1 else 0
 
 set_option maxHeartbeats 1000000 in
@@ -43,7 +43,8 @@ theorem correct (a b : Word (Fin BB)) (cols : AddwOperation) (is_real : Fin BB)
     aesop
 
   . constructor
-    . rw [HalfWord.toBitVec32_add_toBitVec32, HalfWord.toBitVec32_as_sum]
+    . simp
+      rw [HalfWord.toBitVec32_add_toBitVec32, HalfWord.toBitVec32_as_sum]
       simp [← inv_16BB_eq'] at *
       simp [Word.low32, ← BitVec.ofNat_add, ← BitVec.ofNat_mul]
       simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
