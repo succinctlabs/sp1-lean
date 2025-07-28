@@ -3,6 +3,8 @@ import SP1Operations.Reader.CPUState
 import SP1Operations.Compare.LtOperationSigned
 import SP1Operations.Reader.ITypeReaderImmutable
 
+namespace Branch
+
 section constraints
 
 -- Generated Lean code for chip BranchChip
@@ -180,3 +182,5 @@ def constraints (Main : Vector (Fin BB) 45) : SP1ConstraintList :=
   ]
 
 end constraints
+
+end Branch
