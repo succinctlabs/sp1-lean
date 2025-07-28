@@ -117,31 +117,12 @@ theorem JALR_correct
   rw [run_readReg]
   simp only [Std.ExtDHashMap.get?_insert_self, run_wX_bits, BitVec.ofNat_eq_ofNat, EStateM.Result.map_ok]
 
-  cases op_a_0_is_bool with
-  | inl op_a_0_is_0 =>
-    have h6 : Main[6] ≠ 0 := by simp_all
-    have h6' : ∀ p : ↑Main[6] < 2 ^ 5, (BitVec.ofNatLT Main[6].val p : BitVec 5) ≠ 0#5 := by
-      refine fun p h => h6 ?_
-      simp [← BitVec.toFin_inj] at h
-      rw [← Fin.val_inj] at h
-      simpa using h
-    simp only [h6', ↓reduceIte, LawfulMonadStateOf.insert_insert_insert_cancel,
-      EStateM.Result.ok.injEq, _root_.and_self, and_true, true_and]
-    rw [BitVec.twoPow64_and_eq_self hmod, h_res]
-    simp
-    refine congr_fun ?_ _
-    have htemp : Main[29] - Main[13] = 1 := by simp [op_a_0_is_0, h_is_real]
-    have := AddOperation.correct _ _ _ _ htemp inc_pc_cstrs
-    rw [(this pc_is_u64 h_4_is_u64).2]
-    simp [BitVec.ofNat, Word.toBitVec64, Word.toNat]
-  | inr op_a_0_is_1 =>
-    have h6 : Main[6] = 0 := by simp_all
-    have hl : Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]] = 0#64 := by
-      simp [op_a_0_is_1, sub_eq_zero] at chip_cstrs
-      obtain ⟨_, _, ⟨ha, hb, hc, hd⟩⟩ := chip_cstrs
-      simp [ha, hb, hc, hd, Word.toBitVec64, ← BitVec.toFin_inj, Word.toNat]
-    simp [h6, hl]
-    simp [h_res, BitVec.twoPow64_and_eq_self hmod]
+  split_ifs <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
+  refine congr_fun ?_ _
+  have htemp : Main[29] - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
+  have ⟨ _, h_add ⟩ := AddOperation.correct _ _ _ _ htemp inc_pc_cstrs pc_is_u64 h_4_is_u64
+  rw [h_add]
+  simp [Word.toBitVec64]
 
 -- #print axioms Jalr.JALR_correct
 
