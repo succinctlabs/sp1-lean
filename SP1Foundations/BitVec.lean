@@ -1,5 +1,6 @@
 import SP1Foundations.Field
 import SP1Foundations.Word
+import LeanRV64IM.Prelude
 import LeanRV64IM.Sail.Sail
 
 open BitVec
@@ -12,12 +13,10 @@ lemma bitVec_sshiftright_eq (bv : BitVec w) (shift : ℕ) :
       (BitVec.extractLsb ((w - 1) + shift) shift (BitVec.signExtend (w + shift) bv))
     := by grind
 
-lemma bitVec_extractLsb_to_setWidth {w : ℕ} (x : BitVec w) (v : ℕ) (hv : 0 < v):
-  (Sail.BitVec.extractLsb x (v - 1) 0) = (BitVec.setWidth v x) := by
-  rw [BitVec.setWidth_setWidth (by omega)]
-  simp [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
-
 namespace BitVec
+
+attribute [simp] LeanRV64IM.Functions.sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
+attribute [simp] extractLsb extractLsb'
 
 @[simp] lemma twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
 

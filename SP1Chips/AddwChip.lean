@@ -106,16 +106,15 @@ theorem correct_addw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
-    simp [sign_extend, Sail.BitVec.signExtend]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    . simp [Word.toBitVec64]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64]
       rw [← is_addw]; congr
       rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64]
 
 end Addw
 
@@ -202,7 +201,6 @@ theorem correct_addw
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
     simp [h_is_addiw] at h_f h_imm_c
     obtain ⟨ h_c, h_is_imm_c ⟩ := h_imm_c
-    have := @Word.sign_extend_imm_toBitVec64 Main[21] Main[22] Main[23] Main[24] _ c0 is_U64_c h_is_imm_c
 
     -- Now the monadic manipulation
     simp [spec_addiw, sp1_addiw, execute, execute_ADDIW]
@@ -211,29 +209,23 @@ theorem correct_addw
     rw [← is_addw] at is_msb
 
     by_cases h_is_op_a_0 : Main[6] = 0
-    . clear this h_is_imm_c; simp_all
-      simp [Word.toBitVec64, Word.toNat]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    . simp_all [Word.toBitVec64]
+    . rw [← h_is_imm_c]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      simp [Word.toBitVec64, Word.toNat]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      simp [Word.toBitVec64]
+
       congr
-      unfold sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
-      rw [← h_is_imm_c]
       trans signExtend 64 (HalfWord.toBitVec32 (#v[Main[32], Main[33]]))
       . congr
-        simp [is_addw, Word.low32, Word.toBitVec64, Word.toNat]
-        simp [HalfWord.toBitVec32, HalfWord.toNat]
-        rw [extractLsb, extractLsb', Nat.shiftRight_zero]
-        rw [toNat_add, toNat_ofNat]
+        simp [is_addw, Word.low32, Word.toBitVec64]
+        simp [HalfWord.toBitVec32]
+        simp only [setWidth, Nat.reduceLeDiff, ↓reduceDIte, Nat.reducePow]
         rw [← BitVec.toNat_inj]
-        rw [toNat_ofNat, toNat_ofNat]
-        simp only [Nat.reducePow, Nat.sub_zero, Nat.reduceAdd]
-        rw [Nat.add_mod_mod, Nat.mod_add_mod, Nat.mod_mod_of_dvd]
-        . rw [toNat_add, toNat_ofNat]; simp
-          omega
-        . simp
+        repeat rw [toNat_add]
+        repeat rw [toNat_ofNat]
+        simp; omega
       . rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-        simp [Word.toBitVec64, Word.toNat]
-        rw [is_msb]; simp
+        simp [Word.toBitVec64, Word.toNat, is_msb]
 
 end Addiw

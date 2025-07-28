@@ -58,7 +58,7 @@ end U32
 section conversions
 
 /-- Convert a halfword to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : HalfWord (Fin BB)) : ℕ := w[0] + w[1] * 2^16
+@[simp] def toNat (w : HalfWord (Fin BB)) : ℕ := w[0] + w[1] * 2^16
 
 lemma toNat_lt_of_isU32 {w : HalfWord (Fin BB)} (hw : w.isU32) : w.toNat < 2^32 := by
   unfold toNat
@@ -196,7 +196,7 @@ end U64
 section conversions
 
 /-- Convert a word to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+@[simp] def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
 
 lemma toNat_lt_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) : w.toNat < 2^64 := by
   unfold toNat
@@ -357,7 +357,7 @@ def toWord (w : ByteWord (Fin BB)) : Word (Fin BB) :=
   #v[w[0]! + 256 * w[1], w[2]! + 256 * w[3], w[4]! + 256 * w[5], w[6]! + 256 * w[7]]
 
 /-- Convert a byteword to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : ByteWord (Fin BB)) : ℕ := w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24 + w[4] * 2^32 + w[5] * 2^40 + w[6] * 2^48 + w[7] * 2^56
+@[simp] def toNat (w : ByteWord (Fin BB)) : ℕ := w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24 + w[4] * 2^32 + w[5] * 2^40 + w[6] * 2^48 + w[7] * 2^56
 
 lemma toNat_lt_of_isU64 {w : ByteWord (Fin BB)} (hw : w.isU64) : w.toNat < 2^64 := by
   unfold toNat
@@ -426,7 +426,7 @@ lemma toInt_toWord
   have := w.lt_cases_of_isU64 h_w_isU64
   simp [toWord, toInt, Word.toInt, isNegative, Word.isNegative]
   simp [Fin.le_def, Fin.add_def, Fin.mul_def]
-  split_ifs <;> simp [toNat, Word.toNat] <;> omega
+  omega
 
 lemma toBitVec64_toInt {w : ByteWord (Fin BB)} (h_w_isU64 : w.isU64) :
     w.toBitVec64.toInt = w.toInt
@@ -525,7 +525,7 @@ lemma toInt_toByteWord
     w.toInt = ByteWord.toInt (w.toByteWord) := by
   have := w.lt_cases_of_isU64 h_w_isU64
   simp [toByteWord, toInt, ByteWord.toInt, isNegative, ByteWord.isNegative, Fin.le_def]
-  split_ifs <;> simp [toNat, ByteWord.toNat] <;> omega
+  omega
 
 lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
   let imm_x := BitVec.ofNat 12 x
