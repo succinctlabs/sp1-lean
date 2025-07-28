@@ -54,6 +54,8 @@ import SP1Operations.Reader.CPUState.Constraints
 import SP1Operations.Reader.CPUState.Operation
 import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.ITypeReader.Constraints
+import SP1Operations.Reader.ITypeReaderImmutable
+import SP1Operations.Reader.ITypeReaderImmutable.Constraints
 import SP1Operations.Reader.ITypeReader.Operation
 import SP1Operations.Reader.JTypeReader
 import SP1Operations.Reader.JTypeReader.Constraints
