@@ -203,29 +203,21 @@ theorem correct_addw
     obtain ⟨ h_c, h_is_imm_c ⟩ := h_imm_c
 
     -- Now the monadic manipulation
-    simp [spec_addiw, sp1_addiw, execute, execute_ADDIW]
+    simp [spec_addiw, sp1_addiw, execute, execute_ADDIW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [← h_is_imm_c]
+    rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
+    simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
 
-    by_cases h_is_op_a_0 : Main[6] = 0
-    . simp_all [Word.toBitVec64]
-    . rw [← h_is_imm_c]
-      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    . simp [Word.toBitVec64]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [Word.toBitVec64]
-
-      congr
-      trans signExtend 64 (HalfWord.toBitVec32 (#v[Main[32], Main[33]]))
-      . congr
-        simp [is_addw, Word.low32, Word.toBitVec64]
-        simp [HalfWord.toBitVec32]
-        simp only [setWidth, Nat.reduceLeDiff, ↓reduceDIte, Nat.reducePow]
-        rw [← BitVec.toNat_inj]
-        repeat rw [toNat_add]
-        repeat rw [toNat_ofNat]
-        simp; omega
-      . rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-        simp [Word.toBitVec64, Word.toNat, is_msb]
+      rw [← is_addw]; congr
+      rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
+      simp [Word.toBitVec64]
 
 end Addiw

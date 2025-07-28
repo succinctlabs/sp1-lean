@@ -100,7 +100,6 @@ theorem correct_add
     simp [sp1_op_b, read_op_b (by omega)]
     simp [sp1_op_c, read_op_c (by omega)]
     simp [sp1_op_a]
-    rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . rw [← is_add]

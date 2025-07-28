@@ -3,6 +3,8 @@ import SP1Operations.Reader.RTypeReader.Constraints
 
 namespace RTypeReader
 
+attribute [-simp] Opcode.trusted_instr
+
 set_option maxHeartbeats 1000000 in
 lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔

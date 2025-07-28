@@ -549,7 +549,7 @@ def execute_RTYPE' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) : Sail
   (pure RETIRE_SUCCESS)
 
 @[simp]
-lemma execute_RTYPE_eq_execute_RTYPE' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) :
+lemma execute_RTYPE_eq_execute_RTYPE' :
   execute_RTYPE rs2 rs1 rd op = execute_RTYPE' rs2 rs1 rd op
   := by cases op <;> simp_all [execute_RTYPE', execute_RTYPE, execute_RTYPE_pure, LeanRV64IM.Functions.xlen]
 
@@ -625,7 +625,7 @@ def execute_RTYPEW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : ropw) : Sa
   (pure RETIRE_SUCCESS)
 
 @[simp]
-lemma execute_RTYPEW_eq_execute_RTYPEW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : ropw) :
+lemma execute_RTYPEW_eq_execute_RTYPEW' :
   execute_RTYPEW rs2 rs1 rd op = execute_RTYPEW' rs2 rs1 rd op
   := by
     simp_all [execute_RTYPEW', execute_RTYPEW, execute_RTYPEW_pure]
@@ -637,6 +637,58 @@ lemma execute_RTYPEW_eq_execute_RTYPEW' (rs2 : regidx) (rs1 : regidx) (rd : regi
     cases op <;> simp_all <;> congr <;> simp [← BitVec.toNat_inj]
 
 end RTYPEW
+
+section ITYPE
+
+@[simp]
+def rop_of_iop (op : iop) : rop :=
+  match op with
+  | .ADDI => .ADD
+  | .SLTI => .SLT
+  | .SLTIU => .SLTU
+  | .ANDI => .AND
+  | .ORI => .OR
+  | .XORI => .XOR
+
+/-- `execute_ITYPE` pure part -/
+def execute_ITYPE_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : iop) :=
+  execute_RTYPE_pure op1 op2 (rop_of_iop op)
+
+/-- `execute_ITYPE` pure part for `Word` arguments -/
+def execute_ITYPE_pure_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : iop) :=
+  execute_RTYPE_pure_w op1 op2 (rop_of_iop op)
+
+/-- `execute_ITYPE` pure part for `ByteWord` arguments -/
+def execute_ITYPE_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : iop) :=
+  execute_RTYPE_pure_bw op1 op2 (rop_of_iop op)
+
+lemma exec_ITYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : iop) :
+  op1.isU64 → op2.isU64 →
+  execute_ITYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_ITYPE_pure_w op1 op2 op := by
+  intro h_op1_isU64 h_op2_isU64
+  simp [execute_ITYPE_pure_w, execute_ITYPE_pure]
+  cases op <;> simp <;> exact exec_RTYPE_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64
+
+lemma exec_ITYPE_pure_bv_to_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : iop) :
+  op1.isU64 → op2.isU64 →
+  execute_ITYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_ITYPE_pure_bw op1 op2 op := by
+  intro h_op1_isU64 h_op2_isU64
+  simp [execute_ITYPE_pure_bw, execute_ITYPE_pure]
+  cases op <;> simp <;> exact exec_RTYPE_pure_bv_to_bw _ _ _ h_op1_isU64 h_op2_isU64
+
+/-- `execute_RTYPE` with isolated pure part -/
+def execute_ITYPE' (imm : BitVec 12) (rs1 : regidx) (rd : regidx) (op : iop) : SailM ExecutionResult := do
+  let immext := sign_extend (m := 64) imm
+  let rs1_bits ← do (rX_bits rs1)
+  (wX_bits rd (execute_ITYPE_pure rs1_bits immext op))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_ITYPE_eq_execute_ITYPE' :
+  execute_ITYPE imm rs1 rd op = execute_ITYPE' imm rs1 rd op
+  := by cases op <;> simp_all [execute_ITYPE', execute_ITYPE, execute_ITYPE_pure, execute_RTYPE_pure, LeanRV64IM.Functions.xlen]
+
+end ITYPE
 
 section MUL
 
@@ -666,10 +718,30 @@ def execute_MUL' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) : SailM E
   (wX_bits rd (execute_MUL_pure rs1_bits rs2_bits m))
   (pure RETIRE_SUCCESS)
 
-lemma execute_MUL'_eq_execute_MUL (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) :
-  execute_MUL' rs2 rs1 rd m = execute_MUL rs2 rs1 rd (mul_op_of_mop m)
+@[simp]
+lemma execute_MUL'_eq_execute_MUL :
+  execute_MUL rs2 rs1 rd (mul_op_of_mop m) = execute_MUL' rs2 rs1 rd m
   := by cases m <;> simp_all [execute_MUL', execute_MUL, execute_MUL_pure, mul_op_of_mop, LeanRV64IM.Functions.xlen]
 
 end MUL
+
+section ADDIW
+
+def execute_ADDIW' (imm : (BitVec 12)) (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  (wX_bits rd (execute_RTYPEW_pure rs1_bits (sign_extend (m := 64) imm) .ADDW))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_ADDIW'_eq_execute_ADDIW' :
+  execute_ADDIW imm rs1 rd = execute_ADDIW' imm rs1 rd
+  := by
+    simp_all [execute_ADDIW, execute_ADDIW', execute_RTYPEW_pure]
+    refine bind_congr ?_; intro r1
+    simpM; ext s
+    simp [Sail.run_wX_bits]
+    split_ifs <;> [ rfl; (congr; bv_decide) ]
+
+end ADDIW
 
 end execution

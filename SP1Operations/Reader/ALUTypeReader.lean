@@ -4,6 +4,8 @@ import SP1Operations.Reader.ALUTypeReader.Constraints
 
 namespace ALUTypeReader
 
+attribute [-simp] Opcode.trusted_instr
+
 set_option maxHeartbeats 2000000 in
 lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
@@ -77,6 +79,6 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
       cols.op_c_memory.prev_value[1] = cols.op_c[1] ∧
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
-   := by  aesop (add safe (by simp [-Opcode.trusted_instr, allHold_constraints_iff]))
+   := by  aesop (add safe (by simp [allHold_constraints_iff]))
 
 end ALUTypeReader
