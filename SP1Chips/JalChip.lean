@@ -99,49 +99,25 @@ theorem SP1JAL_correct
     Bool.and_self, bind_pure_comp, Functor.map_map, bind_map_left, EStateM.run_bind,
     run_bool_bit_backwards, sign_extend, Sail.BitVec.signExtend, ← h_sign_extend]
 
-  have h13_is_bool : Main[13] = 0 ∨ Main[13] = 1 := by aesop
-  have h6_lt : Main[6].val < 2^5 := by aesop
-
-  cases h13_is_bool with
-  | inl h13_is_0 =>
-      simp [h13_is_0] at cstrs
-      have h6 : Main[6] ≠ 0 := by aesop
-      have h6' : ∀ p : ↑Main[6] < 2 ^ 5, (BitVec.ofNatLT Main[6].val p : BitVec 5) ≠ 0#5 := by
-        refine fun p h => h6 ?_
-        simp [← BitVec.toFin_inj] at h
-        rw [← Fin.val_inj] at h
-        simpa using h
-      specialize h6' h6_lt
-      rw [BitVec.ofNatLT_eq_ofNat] at h6'
-      rw [run_readReg]
-      simp [h6, read_pc]
-      rw [run_readReg]
-      simp [Std.ExtDHashMap.get?_insert, read_pc]
-      simp [hmod]
-      rw [run_readReg]
-      simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
-      rw [run_readReg]
-      simp [BitVec.ofNatLT_eq_ofNat, h6', h_add']
-      simp [Word.toBitVec64, Word.toNat]
-      have h_add_pc : List.Forall SP1Constraint.toProp (AddOperation.constraints
-          #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0]
-          {value := #v[Main[26], Main[27], Main[28], Main[29]]} 1) := by aesop
-      have h_add_pc' := (AddOperation.correct _ _ _  _ rfl h_add_pc pc_isU64 Word.four_isU64).2
-      simp [Word.toBitVec64, Word.toNat] at h_add_pc'
-      rw [h_add_pc', BitVec.ofNatLT_eq_ofNat]
-
-  | inr h13_is_1 =>
-      simp [h13_is_1] at cstrs
-      have h6 : Main[6] = 0 := by aesop
-      simp [h6]
-      rw [run_readReg]
-      simp [read_pc]
-      rw [run_readReg]
-      simp [Std.ExtDHashMap.get?_insert, read_pc, hmod]
-      rw [run_readReg]
-      simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
-      rw [run_readReg]
-      simp [h_add', Word.toBitVec64, Word.toNat]
+  split_ifs with m6 m6b m6b <;>
+  simp [← BitVec.toNat_inj] at m6 m6b <;>
+  [ skip; omega; omega; skip ] <;>
+  rw [run_readReg] <;>
+  simp [read_pc] <;>
+  rw [run_readReg] <;>
+  simp [Std.ExtDHashMap.get?_insert, read_pc, hmod] <;>
+  rw [run_readReg] <;>
+  simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa] <;>
+  rw [run_readReg]
+  . simp [h_add', Word.toBitVec64]
+  . simp [BitVec.ofNatLT_eq_ofNat, h_add']
+    simp [Word.toBitVec64, Word.toNat]
+    have h_add_pc : List.Forall SP1Constraint.toProp (AddOperation.constraints
+        #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0]
+        {value := #v[Main[26], Main[27], Main[28], Main[29]]} 1) := by aesop
+    have h_add_pc' := (AddOperation.correct _ _ _  _ rfl h_add_pc pc_isU64 Word.four_isU64).2
+    simp [Word.toBitVec64] at h_add_pc'
+    rw [h_add_pc', BitVec.ofNatLT_eq_ofNat]
 
 end JalChip
 
