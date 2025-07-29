@@ -81,7 +81,7 @@ def sp1_beq : SailM ExecutionResult := do
   pure RETIRE_SUCCESS
 
 set_option debug.skipKernelTC true in
-set_option maxHeartbeats 0 in
+set_option maxHeartbeats 2000000 in
 theorem correct
   (Main : Vector (Fin BB) 45)
   (s : SailState)
@@ -117,15 +117,16 @@ theorem correct
     simpM
     simp [Sail.readReg, PreSail.readReg]
     rw [h_pc_read]
-    simpM'
+    simp [EStateM.run]
+    simpM
 
     simp [op_a, sp1_op_a]
     rw [h_op_a_read']
-    simpM'
+    simpM
 
     simp [op_b, sp1_op_b]
     rw [h_op_b_read']
-    simpM'
+    simpM
     simp [ext_control_check_pc]
 
     simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
@@ -141,29 +142,30 @@ theorem correct
 
     by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
     · simp [h_eq]
-      simpM'
+      simpM
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
       simp
       rw [h_pc_read]
-      conv =>
-        lhs
-        arg 2
-        simp only
-        rfl
-      conv =>
-        lhs
-        arg 2
-        simp [EStateM.pure]
-        rfl
-      -- deep kernel recursion????
-      simp only
+      simp only [EStateM.pure]
+      -- conv =>
+      --   lhs
+      --   arg 2
+      --   simp only
+      --   rfl
+      -- conv =>
+      --   lhs
+      --   arg 2
+      --   simp [EStateM.pure]
+      --   rfl
+      -- -- deep kernel recursion????
+      -- simp only
 
       have h_next_pc_is_mul4 : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) + sign_extend imm) % 4 = 0 := by sorry
       obtain ⟨h_next_pc_b0, h_next_pc_b1⟩ := mul4_means_0_1_are_0 h_next_pc_is_mul4
       simp [Sail.BitVec.access]
       rw [h_next_pc_b1]
-      simpM'
+      simpM
 
       -- simp [currentlyEnabled, hartSupports]
       -- have h_all_misa : readReg Register.misa = 0#64 := by sorry
@@ -172,7 +174,7 @@ theorem correct
 
       have h_no_zca : currentlyEnabled extension.Ext_Zca = pure false := by sorry
       rw [h_no_zca]
-      simpM'
+      simpM
 
       -- THIS IS SO CURSED! WHY DO I NEED THIS WRAPPER?!
       -- simp [writeReg, PreSail.writeReg]
@@ -180,20 +182,20 @@ theorem correct
       -- rw [map_pure (fun a ↦ RETIRE_SUCCESS)]
       rw [helper]
 
-      simpM'
+      simpM
       simp [writeReg, PreSail.writeReg]
-      simpM'
+      simpM
       apply congrArg
 
       -- This should come from the spec of LtOperationSigned
-      have h_not_branching : Main[36] + Main[37] + Main[38] + Main[39] = 1 := by sorry
+      have h_not_branching : Main[36] + Main[37] + Main[38] + Main[39] = 0 := by sorry
 
       simp [h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
       rw [h_not_branching] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
-      have h_is_branching : Main[34] = 0 := by simp_all only
+      have h_is_branching : Main[34] = 1 := by simp_all only
       simp [h_is_branching] at chip_cstrs
-      
+
       obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
       have h_pc_0 : Main[3].val < 65536 := by show Main[3] < 65536; simp_all only
@@ -215,10 +217,39 @@ theorem correct
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
-      stop
       have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
+      have h_imm_1 : Main[22].val < 65536 := by show Main[22] < 65536; simp_all only
+      have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; simp_all only
+      have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
+      have h_imm_is_u64 : Main[21].val + Main[22].val * 65536 + ↑Main[23] * 4294967296 + ↑Main[24] * 281474976710656 < 2^64 := by omega
+      -- have h_imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
+      --   by
+      --     refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] ?_ ?_ ?_ ?_
+      --     · exact h_imm_0
+      --     · exact h_imm_1
+      --     · exact h_imm_2
+      --     · exact h_imm_3
+      -- have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
+      -- have h_imm_1 : Main[22].val < 65536 := by show Main[22] < 65536; simp_all only
+      -- have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; simp_all only
+      -- have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
+      simp [Word.toBitVec64, Word.toNat]
+      rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
+
+      simp [BitVec.add_def]
+
+      have trusted_add :
+        (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + (Main[21].val + Main[22].val * 65536 + Main[23].val * 4294967296 + Main[24].val * 281474976710656) < 2^48 := by sorry
+      have h_added_is_u64 : (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + (Main[21].val + Main[22].val * 65536 + Main[23].val * 4294967296 + Main[24].val * 281474976710656) < 2^64 := by
+        clear * - trusted_add
+        simp_all
+        omega
+
+      rw [←BitVec.ofNatLT_eq_ofNat h_added_is_u64]
       simp [BitVec.ofNatLT]
-      clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
+      clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 trusted_add h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
+
+      omega
     · simp [not_beq_of_ne h_eq]
       simpM'
       apply congrArg
@@ -251,15 +282,7 @@ theorem correct
       simp [BitVec.ofNatLT]
       clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
-      stop
-      cases h_limb0
-      <;> rename_i h_limb0
-      <;> rw [h_limb0] at h_limb1 h_limb2 h_limb3
-      <;> simp at h_limb1 h_limb2 h_limb3
-      <;> cases h_limb1 <;> rename_i h_limb1
-      <;> rw [h_limb1] at h_limb2 h_limb3
-      <;> simp at h_limb2 h_limb3
-      <;> omega
+      omega
 
 end beq
 
