@@ -122,7 +122,7 @@ theorem JALR_correct
   have htemp : Main[29] - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
   have ⟨ _, h_add ⟩ := AddOperation.correct _ _ _ _ htemp inc_pc_cstrs pc_is_u64 h_4_is_u64
   rw [h_add]
-  simp [Word.toBitVec64]
+  simp [Word.toBitVec64, Word.toNat]
 
 -- #print axioms Jalr.JALR_correct
 

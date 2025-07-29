@@ -58,32 +58,34 @@ lemma spec
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d):
   (constraints b d cols is_real).allHold →
-    (is_real ≠ 0 → (cols.u16_compare_operation.bit = if b.toNat < d.toNat then 1 else 0))
+    (is_real ≠ 0 → BitVec.ofNat 64 cols.u16_compare_operation.bit = execute_RTYPE_pure_w b d .SLTU)
   := by
     intro cstrs h_is_real
-    have ⟨ _, _ ⟩ := cl_are_U16 b d cols is_real h_b_isU64 h_d_isU64 cstrs h_is_real
-    rw [allHold_constraints_iff] at cstrs
-    rcases cstrs with ⟨ h_comp_limbs, ⟨ h_is_real_bool, h_flag_0_bool, h_flag_1_bool, h_flag_2_bool, h_flag_3_bool, cstrs ⟩ ⟩
-    apply U16CompareOperation.spec at h_comp_limbs <;> try assumption
-    apply Word.lt_cases_of_isU64 at h_b_isU64
-    apply Word.lt_cases_of_isU64 at h_d_isU64
-    unfold Word.toNat
-    rcases h_is_real_bool <;> simp_all
-    rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
-    rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
-    simp_all <;> clear h_comp_limbs
-    . omega
-    . rcases cstrs with ⟨ h_cl0, h_cl1, h_cl_diff ⟩
-      simp [← h_cl0, ← h_cl1] at *
-      have h_neq : b[3] ≠ d[3] := by by_contra!; rw [this] at h_cl_diff; simp_all
-      split_ifs <;> omega
-    . rcases cstrs with ⟨ h_eq_3, h_cl0, h_cl1, h_cl_diff ⟩
-      simp [← h_cl0, ← h_cl1] at *
-      have h_neq : b[2] ≠ d[2] := by by_contra!; rw [this] at h_cl_diff; simp_all
-      split_ifs <;> omega
-    . rcases cstrs with ⟨ h_eq_3, h_eq_2, h_cl0, h_cl1, h_cl_diff ⟩
-      simp [← h_cl0, ← h_cl1] at *
-      have h_neq : b[1] ≠ d[1] := by by_contra!; rw [this] at h_cl_diff; simp_all
-      split_ifs <;> omega
+    suffices : cols.u16_compare_operation.bit = if b.toNat < d.toNat then 1 else 0
+    . aesop
+    . have ⟨ _, _ ⟩ := cl_are_U16 b d cols is_real h_b_isU64 h_d_isU64 cstrs h_is_real
+      rw [allHold_constraints_iff] at cstrs
+      rcases cstrs with ⟨ h_comp_limbs, ⟨ h_is_real_bool, h_flag_0_bool, h_flag_1_bool, h_flag_2_bool, h_flag_3_bool, cstrs ⟩ ⟩
+      apply U16CompareOperation.spec at h_comp_limbs <;> try assumption
+      apply Word.lt_cases_of_isU64 at h_b_isU64
+      apply Word.lt_cases_of_isU64 at h_d_isU64
+      unfold Word.toNat
+      rcases h_is_real_bool <;> simp_all
+      rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
+      rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
+      simp_all <;> clear h_comp_limbs
+      . omega
+      . rcases cstrs with ⟨ h_cl0, h_cl1, h_cl_diff ⟩
+        simp [← h_cl0, ← h_cl1] at *
+        have h_neq : b[3] ≠ d[3] := by by_contra!; rw [this] at h_cl_diff; simp_all
+        split_ifs <;> omega
+      . rcases cstrs with ⟨ h_eq_3, h_cl0, h_cl1, h_cl_diff ⟩
+        simp [← h_cl0, ← h_cl1] at *
+        have h_neq : b[2] ≠ d[2] := by by_contra!; rw [this] at h_cl_diff; simp_all
+        split_ifs <;> omega
+      . rcases cstrs with ⟨ h_eq_3, h_eq_2, h_cl0, h_cl1, h_cl_diff ⟩
+        simp [← h_cl0, ← h_cl1] at *
+        have h_neq : b[1] ≠ d[1] := by by_contra!; rw [this] at h_cl_diff; simp_all
+        split_ifs <;> omega
 
 end LtOperationUnsigned

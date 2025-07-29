@@ -9,7 +9,7 @@ lemma allHold_constraints_iff
   (cols : LtOperationSigned)
   (is_signed : Fin BB)
   (is_real : Fin BB) :
-  (constraints b d cols is_signed is_real).allHold ↔
+  List.Forall SP1Constraint.toProp (constraints b d cols is_signed is_real) ↔
     (U16MSBOperation.constraints b[3] cols.b_msb is_signed).allHold ∧
     (U16MSBOperation.constraints d[3] cols.c_msb is_signed).allHold ∧
     (LtOperationUnsigned.constraints
@@ -37,8 +37,8 @@ lemma spec.unsigned
   (is_real : Fin BB)
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d):
-  (constraints b d cols is_signed is_real).allHold →
-    (is_real ≠ 0 → is_signed = 0 → cols.result.u16_compare_operation.bit = if b.toNat < d.toNat then 1 else 0)
+  List.Forall SP1Constraint.toProp (constraints b d cols is_signed is_real) →
+    (is_real ≠ 0 → is_signed = 0 → BitVec.ofNat 64 cols.result.u16_compare_operation.bit = execute_RTYPE_pure_w b d .SLTU)
   := by
     intro cstrs h_is_real h_is_signed
     rw [allHold_constraints_iff] at cstrs
@@ -48,7 +48,7 @@ lemma spec.unsigned
     apply Word.lt_cases_of_isU64 at h_b_isU64
     apply Word.lt_cases_of_isU64 at h_d_isU64
     apply LtOperationUnsigned.spec at h_lt
-    . unfold Word.toNat at *; simp_all
+    . simp_all [execute_RTYPE_pure_w, Word.toNat]
     . apply Word.isU64_of_cases <;> simp_all
     . apply Word.isU64_of_cases <;> simp_all
 
@@ -61,8 +61,8 @@ lemma spec.signed
   (is_real : Fin BB)
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d):
-  (constraints b d cols is_signed is_real).allHold →
-    (is_real ≠ 0 → is_signed = 1 → cols.result.u16_compare_operation.bit = if b.toInt < d.toInt then 1 else 0)
+  List.Forall SP1Constraint.toProp (constraints b d cols is_signed is_real) →
+    (is_real ≠ 0 → is_signed = 1 → BitVec.ofNat 64 cols.result.u16_compare_operation.bit = execute_RTYPE_pure_w b d .SLT)
   := by
     intro cstrs h_is_real h_is_signed
     rw [allHold_constraints_iff] at cstrs
@@ -87,11 +87,9 @@ lemma spec.signed
       . apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> simp_all
         rw [if_neg] <;> omega
     apply LtOperationUnsigned.spec (h_b_isU64 := h_sb_isU64) (h_d_isU64 := h_sd_isU64) at h_lt
-    unfold Word.toNat at h_lt; repeat rw [Vector.getElem_mk] at h_lt
-    unfold Word.toInt Word.toNat
-    by_cases h_b_neg : b.isNegative <;>
-    by_cases h_b_neg : d.isNegative <;>
-    simp_all <;> unfold Word.isNegative at * <;>
-    split_ifs <;> omega
+    simp [Word.toNat] at h_lt
+    rw [h_lt (by trivial), h_b_msb, h_c_msb]
+    unfold Word.toInt Word.toNat Word.isNegative
+    split_ifs <;> simp <;> omega
 
 end LtOperationSigned

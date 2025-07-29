@@ -108,22 +108,24 @@ theorem correct_addw
     rw [← is_addw] at is_msb
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64]
+    . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      simp [Word.toBitVec64]
+      simp [Word.toBitVec64, Word.toNat]
       rw [← is_addw]; congr
       rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-      simp [Word.toBitVec64]
+      simp [Word.toBitVec64, Word.toNat]
 
 end Addw
 
 namespace Addiw
 
+open Addw
+
 variable
   (Main : Vector (Fin BB) 37)
   (s : SailState)
-  (cstrs : (Addw.constraints Main).allHold)
+  (cstrs : (constraints Main).allHold)
   (h_is_real : Main[35] = 1)
   (h_is_addiw : Main[31] = 1)
 
@@ -139,7 +141,7 @@ def sp1_op_a : BitVec 5 :=
     show Main[6] < 32
 
     have alu_cstrs := by
-      simp [SP1ConstraintList.allHold, Addw.constraints, SP1Constraint.toProp] at cstrs
+      simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
       exact cstrs.2.2.1
 
     clear cstrs
@@ -154,7 +156,7 @@ def sp1_op_b : BitVec 5 :=
     show Main[14] < 32
 
     have alu_cstrs := by
-      simp [SP1ConstraintList.allHold, Addw.constraints, SP1Constraint.toProp] at cstrs
+      simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
       exact cstrs.2.2.1
 
     clear cstrs
@@ -176,16 +178,16 @@ def sp1_addiw : SailM Unit := do
 
 set_option maxHeartbeats 1000000 in
 theorem correct_addw
-  (state_cstrs : (Addw.constraints Main).initialState s) :
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main cstrs h_is_real h_is_addiw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_addiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addiw Main cstrs h_is_real).run s
   := by
     -- Obtain and simplify state and pure constraints
-    simp [SP1ConstraintList.initialState, Addw.constraints, SP1Constraint.toStateProp, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs
     obtain ⟨read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    simp [Addw.constraints] at cstrs
+    simp [constraints] at cstrs
     obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _, _⟩ := cstrs
     apply AddwOperation.correct (h_is_real := h_is_real) at addw_op_cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
@@ -212,12 +214,12 @@ theorem correct_addw
     rw [← is_addw] at is_msb
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64]
+    . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      simp [Word.toBitVec64]
+      simp [Word.toBitVec64, Word.toNat]
       rw [← is_addw]; congr
       rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-      simp [Word.toBitVec64]
+      simp [Word.toBitVec64, Word.toNat]
 
 end Addiw

@@ -514,7 +514,7 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : 
     have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
     simp [shift_bits_right_arith, shift_right_arith]
     rw [BitVec.toNat_setWidth, Word.toBitVec64_toNat (by assumption)]
-    simp [-Word.toNat]
+    simp
     rw [mod_lt_63, mod_lt_64]
     symm; apply bitVec_sshiftright_eq
 
@@ -537,7 +537,7 @@ lemma exec_RTYPE_pure_bv_to_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB
     have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
     simp [shift_bits_right_arith, shift_right_arith]
     rw [BitVec.toNat_setWidth, ByteWord.toBitVec64_toNat (by assumption)]
-    simp [-ByteWord.toNat]
+    simp
     rw [mod_lt_63, mod_lt_64]
     symm; apply bitVec_sshiftright_eq
 
@@ -621,7 +621,7 @@ lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op :
     have : (op2.toBitVec64.toNat : ℤ) % 4294967296 % 32 = op2.toBitVec64.toNat % 32 := by omega
     rw [this, mod_lt_31, mod_lt_32]; simp
     have : op2.toBitVec64.toNat % 32 = op2.low32.toBitVec32.toNat % 32 := by
-      simp [Word.toBitVec64, Word.low32, HalfWord.toBitVec32]
+      simp [Word.toBitVec64, Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]
       omega
     rw [this]
 

@@ -109,14 +109,14 @@ theorem SP1JAL_correct
   rw [run_readReg] <;>
   simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa] <;>
   rw [run_readReg]
-  . simp [h_add', Word.toBitVec64]
+  . simp [h_add', Word.toBitVec64, Word.toNat]
   . simp [BitVec.ofNatLT_eq_ofNat, h_add']
     simp [Word.toBitVec64, Word.toNat]
     have h_add_pc : List.Forall SP1Constraint.toProp (AddOperation.constraints
         #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0]
         {value := #v[Main[26], Main[27], Main[28], Main[29]]} 1) := by aesop
     have h_add_pc' := (AddOperation.correct _ _ _  _ rfl h_add_pc pc_isU64 Word.four_isU64).2
-    simp [Word.toBitVec64] at h_add_pc'
+    simp [Word.toBitVec64, Word.toNat] at h_add_pc'
     rw [h_add_pc', BitVec.ofNatLT_eq_ofNat]
 
 end JalChip

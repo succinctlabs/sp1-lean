@@ -96,57 +96,5 @@ lemma inv_16BB_eq' : (2013235201 : Fin BB) = 65536⁻¹ := by native_decide
 @[simp] lemma mul_inv_16BB_eq_one_iff : x * (65536 : Fin BB)⁻¹ = 1 ↔ x = 65536 := by
   rw [mul_inv_eq_one₀ (by trivial)]
 
--- dt: things below should be folded into the above
-
--- section u3_base
-
--- @[simp] lemma u3_base_mul_u3_inv : (8 : Fin BB) * 1761607681 = 1 := rfl
--- @[simp] lemma u3_inv_mul_u3_base : (1761607681 : Fin BB) * 8 = 1 := rfl
-
--- lemma U3BB_inv : (1761607681 : Fin BB)⁻¹ = 8 := by
---   have : (8 : Fin BB) ≠ 0 := by simp
---   rw [inv_eq_iff_eq_inv, ← mul_left_inj' this, u3_inv_mul_u3_base]
---   simp only [Fin.isValue, ne_eq, Fin.reduceEq, not_false_eq_true, inv_mul_cancel₀]
-
--- lemma U3BB_eq_inv : (1761607681 : Fin BB) = 8⁻¹ := by
---   rw [← U3BB_inv, inv_inv]
-
--- @[simp] lemma shiftl_U3BB : (1761607681 : Fin BB) <<< 3 = 1 := rfl
-
--- end u3_base
-
--- section u8_base
-
--- @[simp] lemma u8_base_mul_u8_inv : (256 : Fin BB) * 2005401601 = 1 := rfl
--- @[simp] lemma u8_inv_mul_u8_base : (2005401601 : Fin BB) * 256 = 1 := rfl
-
--- lemma U8BB_inv : (2005401601 : Fin BB)⁻¹ = 256 := by
---   have : (256 : Fin BB) ≠ 0 := by simp
---   rw [inv_eq_iff_eq_inv, ← mul_left_inj' this, u8_inv_mul_u8_base]
---   simp only [Fin.isValue, ne_eq, Fin.reduceEq, not_false_eq_true, inv_mul_cancel₀]
-
--- lemma U8BB_eq_inv : (2005401601 : Fin BB) = 256⁻¹ := by
---   rw [← U8BB_inv, inv_inv]
-
--- @[simp] lemma shiftl_U8BB : (2005401601 : Fin BB) <<< 8 = 1 := rfl
-
--- end u8_base
-
--- section u16_base
-
--- @[simp] lemma u16_base_mul_u16_inv : (65536 : Fin BB) * 2013235201 = 1 := rfl
--- @[simp] lemma u16_inv_mul_u16_base : (2013235201 : Fin BB) * 65536 = 1 := rfl
-
--- lemma U16BB_inv : (2013235201 : Fin BB)⁻¹ = 65536 := by
---   have : (65536 : Fin BB) ≠ 0 := by simp
---   rw [inv_eq_iff_eq_inv, ← mul_left_inj' this]
---   rw [u16_inv_mul_u16_base]
---   simp only [Fin.isValue, ne_eq, Fin.reduceEq, not_false_eq_true, inv_mul_cancel₀]
-
--- lemma U16BB_eq_inv : (2013235201 : Fin BB) = 65536⁻¹ := by
---   rw [← U16BB_inv]
---   rw [inv_inv]
-
--- @[simp] lemma shiftl_U16BB : (2013235201 : Fin BB) <<< 16 = 1 := rfl
-
--- end u16_base
+@[simp] lemma inv_16BB_zero_or_one {x : Fin BB} : x * 65536⁻¹ = 0 ∨ x * 65536⁻¹ = 1 ↔ x = 0 ∨ x = 65536
+  := by aesop
