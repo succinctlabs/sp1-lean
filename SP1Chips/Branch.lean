@@ -38,12 +38,17 @@ theorem h_Main28_is_beq
   -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
   : Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0 := by
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
-  obtain ⟨_, _, _, ⟨h_28, h_29, h_30, h_31, h_32, h_33, _⟩⟩ := cstrs
-  clear * - h_28 h_29 h_30 h_31 h_32 h_33
-  stop
+  obtain ⟨_, _, _, ⟨h_28, h_29, h_30, h_31, h_32, h_33, h_all_add, _⟩⟩ := cstrs
+  clear * - h_is_beq h_29 h_30 h_31 h_32 h_33 h_all_add
+  rw [sub_eq_zero] at *
   split_ands
-  · sorry
-  all_goals sorry
+  <;> cases h_29 <;> rename_i h_29
+  <;> cases h_30 <;> rename_i h_30
+  <;> cases h_31 <;> rename_i h_31
+  <;> cases h_32 <;> rename_i h_32
+  <;> cases h_33 <;> rename_i h_33
+  <;> rw [h_is_beq, h_29, h_30, h_31, h_32, h_33] at h_all_add
+  <;> trivial
 
 -- TODO(gzgz): not being able to get away with `ExecutionResult`?
 -- I guess that makes sense...
@@ -192,10 +197,6 @@ theorem correct
       rw [h_next_pc_b1]
       simpM
 
-      -- simp [currentlyEnabled, hartSupports]
-      -- have h_all_misa : readReg Register.misa = 0#64 := by sorry
-      -- stop
-      -- simpM'
       have : ∀ v, ((fun _ => false) <$> readReg Register.misa).run
           {s with regs := s.regs.insert Register.nextPC v} =
           .ok false {s with regs := s.regs.insert Register.nextPC v} := by
