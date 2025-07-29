@@ -265,17 +265,11 @@ theorem correct
 
       simp [BitVec.add_def]
 
-      have trusted_add :
-        (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + (Main[21].val + Main[22].val * 65536 + Main[23].val * 4294967296 + Main[24].val * 281474976710656) < 2^48 := by sorry
-      have h_added_is_u64 : (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + (Main[21].val + Main[22].val * 65536 + Main[23].val * 4294967296 + Main[24].val * 281474976710656) < 2^64 := by
-        -- clear * - trusted_add
-        simp_all
-        omega
+      apply BitVec.eq_of_toNat_eq 
+      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
+      simp
 
-      rw [←BitVec.ofNatLT_eq_ofNat h_added_is_u64]
-      simp [BitVec.ofNatLT]
-      clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 trusted_add h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-
+      clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
       omega
     · simp [not_beq_of_ne h_eq]
       simpM'
