@@ -23,7 +23,7 @@ section beq
 variable
   (h_is_beq : Main[28] = 1)
 
-theorem helper {x : BitVec 64}
+private theorem helper {x : BitVec 64}
   : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
     (do
       writeReg Register.nextPC x
@@ -32,7 +32,7 @@ theorem helper {x : BitVec 64}
   by
     simp [writeReg, PreSail.writeReg]
 
-theorem h_Main28_is_beq
+private theorem h_Main28_is_beq
   (cstrs : (constraints Main).allHold)
   (h_is_beq : Main[28] = 1)
   -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
@@ -280,13 +280,13 @@ theorem correct
       -- repeat (rw [sub_eq_zero] at chip_cstrs)
 
       -- This should come from the spec of LtOperationSigned
-      have h_not_branching : (1 : Fin BB) - (Main[36] + Main[37] + Main[38] + Main[39]) = 0 := by sorry
-      rw [h_not_branching, sub_eq_zero, sub_eq_zero] at chip_cstrs
+      have h_not_branching : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 := by sorry
+      rw [h_not_branching] at chip_cstrs
+      simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 0 := by simp_all only
       simp [h_is_branching] at chip_cstrs
 
       obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-      simp [sub_eq_zero] at h_limb0 h_limb1 h_limb2 h_limb3
 
       have h_pc_0 : Main[3].val < 65536 := by show Main[3] < 65536; simp_all only
       have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
