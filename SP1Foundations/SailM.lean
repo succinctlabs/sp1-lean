@@ -420,6 +420,9 @@ lemma writeReg_wX_bits_writeReg (reg : Register) (v : RegisterType reg)
 
 section pc
 
+@[simp] lemma get_arch_pc_eq (u : Unit) :
+    get_arch_pc u = Sail.readReg Register.PC := rfl
+
 @[simp] lemma set_next_pc_eq (pc : BitVec 64) :
     set_next_pc pc = Sail.writeReg Register.nextPC pc := rfl
 
