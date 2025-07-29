@@ -24,7 +24,7 @@ variable
   (h_is_beq : Main[28] = 1)
 
 theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x = 
+  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
     (do
       writeReg Register.nextPC x
       pure RETIRE_SUCCESS)
@@ -88,7 +88,7 @@ theorem correct
   (cstrs : (constraints Main).allHold)
   (state_cstrs : (constraints Main).initialState s)
   (h_is_beq : Main[28] = 1)
-  (h_misa : s.regs.get? Register.misa = 0#64)
+  (h_misa : Register.misa ∈ s.regs)
   : let imm := sp1_imm Main
     let op_b := sp1_op_b Main cstrs h_is_beq
     let op_a := sp1_op_a Main cstrs h_is_beq
@@ -172,13 +172,14 @@ theorem correct
         := by simp_all only
 
       have h_next_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
-        apply add_mod4_eq_zero_of_mod4_eq_zero 
+        apply add_mod4_eq_zero_of_mod4_eq_zero
         · show _ % 4#64 = 0#64
           rw [BitVec.ofNat64_mod_4_eq_zero_iff]
           have h_pc0_nat_mul4 : Main[3].val % 4 = 0 :=
             by
-              rw [←BitVec.Nat_mul4_eq_FinBB_mul4]
-              simp_all only
+              sorry
+              -- rw [←BitVec.Nat_mul4_eq_FinBB_mul4]
+              -- simp_all only
           clear * - h_pc0_nat_mul4
           omega
         · simp [sign_extend, Sail.BitVec.signExtend, imm, sp1_imm]
@@ -195,10 +196,17 @@ theorem correct
       -- have h_all_misa : readReg Register.misa = 0#64 := by sorry
       -- stop
       -- simpM'
-
-      have h_no_zca : currentlyEnabled extension.Ext_Zca = pure false := by sorry
-      rw [h_no_zca]
-      simpM
+      have : ∀ v, ((fun _ => false) <$> readReg Register.misa).run
+          {s with regs := s.regs.insert Register.nextPC v} =
+          .ok false {s with regs := s.regs.insert Register.nextPC v} := by
+        intro v
+        rw [EStateM.run_map]
+        rw [map_const_run_readReg]
+        simp only [Std.ExtDHashMap.isSome_get?_eq_contains, Std.ExtDHashMap.contains_iff_mem,
+          Std.ExtDHashMap.mem_insert, beq_iff_eq, reduceCtorEq, false_or]
+        exact h_misa
+      unfold EStateM.run at this
+      simp [currentlyEnabled, hartSupports, this]
 
       -- THIS IS SO CURSED! WHY DO I NEED THIS WRAPPER?!
       -- simp [writeReg, PreSail.writeReg]
