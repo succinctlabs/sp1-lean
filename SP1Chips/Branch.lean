@@ -109,7 +109,7 @@ theorem correct
     have h_op_a_is_reg : Main[6] < 32 := by sorry
     have h_op_b_is_reg : Main[14] < 32 := by sorry
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_beq, h_29, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
-    obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
+    obtain ⟨h_pc_read, h_pc_add, h_op_a_read, h_op_b_read⟩ := state_cstrs
     have h_op_a_read' := h_op_a_read h_op_a_is_reg
     have h_op_b_read' := h_op_b_read h_op_b_is_reg
 
@@ -141,6 +141,7 @@ theorem correct
 
     by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
     · simp [h_eq]
+      stop
       simpM'
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -211,18 +212,14 @@ theorem correct
       have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
       rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
 
-
       have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by simp_all only
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
       have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
-      stop
       simp [BitVec.ofNatLT]
       clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
-
-      sorry
     · simp [not_beq_of_ne h_eq]
       simpM'
       apply congrArg
@@ -255,55 +252,15 @@ theorem correct
       simp [BitVec.ofNatLT]
       clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
-      cases h_limb0 <;> rename_i h_limb0
-      · rw [h_limb0] at h_limb1 h_limb2 h_limb3
-        simp at h_limb1 h_limb2 h_limb3
-        cases h_limb1 <;> rename_i h_limb1
-        · rw [h_limb1] at h_limb2 h_limb3
-          simp at h_limb2 h_limb3
-          cases h_limb2 <;> rename_i h_limb2
-          · rw [h_limb2] at h_limb3
-            simp at h_limb3
-            omega
-          · rw [h_limb2] at h_limb3
-            simp at h_limb3
-            omega
-        · simp at h_limb1
-          rw [h_limb1] at h_limb2 h_limb3
-          cases h_limb2 <;> rename_i h_limb2
-          · cases h_limb3 <;> rename_i h_limb3
-            · simp only [mul_inv_16BB_eq_one] at h_limb2  
-              clear h_limb3
-              have h_26 : Main[26].val < 65536 := by simp_all only
-              sorry
-            sorry
-          sorry
-      sorry
-
-      -- cases h_limb0
-      -- · rename_i h_limb0
-      --   simp [h_limb0] at h_limb1
-      --   cases h_limb1
-      --   · rename_i h_limb1
-      --     simp [h_limb0, h_limb1] at h_limb2
-      --     cases h_limb2
-      --     · rename_i h_limb2
-      --       simp [h_limb0, h_limb1, h_limb2] at h_limb3
-      --       aesop (add 50% tactic (by omega))
-      --     · rename_i h_limb2
-      --       cases h_limb3
-      --       · rename_i h_limb3
-      --         simp [h_limb0, h_limb1, h_limb2] at h_limb3
-      --         omega
-      --       · rename_i h_limb3
-      --         rw [h_limb0, h_limb1] at h_limb3
-      --         simp at h_limb3
-      --         rw [h_limb2] at h_limb3
-      --         contradiction
-      --   · rename_i h_limb1
-      --     rw [h_limb1] at *
-      --     sorry
-      -- sorry
+      stop
+      cases h_limb0
+      <;> rename_i h_limb0
+      <;> rw [h_limb0] at h_limb1 h_limb2 h_limb3
+      <;> simp at h_limb1 h_limb2 h_limb3
+      <;> cases h_limb1 <;> rename_i h_limb1
+      <;> rw [h_limb1] at h_limb2 h_limb3
+      <;> simp at h_limb2 h_limb3
+      <;> omega
 
 end beq
 
