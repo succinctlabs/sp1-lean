@@ -141,7 +141,6 @@ theorem correct
 
     by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
     · simp [h_eq]
-      stop
       simpM'
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -186,17 +185,16 @@ theorem correct
       simpM'
       apply congrArg
 
-      stop
       -- This should come from the spec of LtOperationSigned
-      have h_not_branching : (1 : Fin BB) - (Main[36] + Main[37] + Main[38] + Main[39]) = 1 := by sorry
+      have h_not_branching : Main[36] + Main[37] + Main[38] + Main[39] = 1 := by sorry
 
       simp [h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
-      rw [h_not_branching, sub_eq_zero, sub_eq_zero] at chip_cstrs
-      have h_is_branching : Main[34] = 1 := by simp_all only
+      rw [h_not_branching] at chip_cstrs
+      simp [sub_eq_zero] at chip_cstrs
+      have h_is_branching : Main[34] = 0 := by simp_all only
       simp [h_is_branching] at chip_cstrs
-
+      
       obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-      simp [sub_eq_zero] at h_limb0 h_limb1 h_limb2 h_limb3
 
       have h_pc_0 : Main[3].val < 65536 := by show Main[3] < 65536; simp_all only
       have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
@@ -217,6 +215,7 @@ theorem correct
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
+      stop
       have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
       simp [BitVec.ofNatLT]
       clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
