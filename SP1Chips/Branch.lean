@@ -177,9 +177,9 @@ theorem correct
           rw [BitVec.ofNat64_mod_4_eq_zero_iff]
           have h_pc0_nat_mul4 : Main[3].val % 4 = 0 :=
             by
-              sorry
-              -- rw [←BitVec.Nat_mul4_eq_FinBB_mul4]
-              -- simp_all only
+              have : Main[3] % 4 = 0 := by simp_all only
+              rw [Fin.mod_def, ← Fin.val_inj] at this
+              exact this
           clear * - h_pc0_nat_mul4
           omega
         · simp [sign_extend, Sail.BitVec.signExtend, imm, sp1_imm]
