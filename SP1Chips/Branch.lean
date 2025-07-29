@@ -106,10 +106,26 @@ theorem correct
       by
         aesop
 
-    have h_op_a_is_reg : Main[6] < 32 := by sorry
-    have h_op_b_is_reg : Main[14] < 32 := by sorry
+    simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
+    obtain ⟨cpu_cstrs, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
+    clear cpu_cstrs lt_cstrs
+    simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+
+    let op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
+    let op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
+    let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
+    let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
+    have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
+    have h_imm_1 : Main[22].val < 65536 := by show Main[22] < 65536; simp_all only
+    have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; simp_all only
+    have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
+    have h_imm_is_u64 : Main[21].val + Main[22].val * 65536 + ↑Main[23] * 4294967296 + ↑Main[24] * 281474976710656 < 2^64 := by omega
+    -- repeat (rw [Word.toBitVec64_LT_eq_toNat])
+
+    have h_op_a_is_reg : Main[6] < 32 := by simp_all only
+    have h_op_b_is_reg : Main[14] < 32 := by simp_all only
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_beq, h_29, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
-    obtain ⟨h_pc_read, h_pc_add, h_op_a_read, h_op_b_read⟩ := state_cstrs
+    obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
     have h_op_a_read' := h_op_a_read h_op_a_is_reg
     have h_op_b_read' := h_op_b_read h_op_b_is_reg
 
@@ -128,17 +144,6 @@ theorem correct
     rw [h_op_b_read']
     simpM
     simp [ext_control_check_pc]
-
-    simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
-    obtain ⟨cpu_cstrs, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-    clear cpu_cstrs lt_cstrs
-    simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-
-    let op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
-    let op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
-    let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
-    let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
-    -- repeat (rw [Word.toBitVec64_LT_eq_toNat])
 
     by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
     · simp [h_eq]
@@ -161,7 +166,26 @@ theorem correct
       -- -- deep kernel recursion????
       -- simp only
 
-      have h_next_pc_is_mul4 : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) + sign_extend imm) % 4 = 0 := by sorry
+      have h_trusted_signExtend :
+        Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
+        = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])
+        := by simp_all only
+
+      have h_next_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
+        apply add_mod4_eq_zero_of_mod4_eq_zero 
+        · show _ % 4#64 = 0#64
+          rw [BitVec.ofNat64_mod_4_eq_zero_iff]
+          have h_pc0_nat_mul4 : Main[3].val % 4 = 0 :=
+            by
+              rw [←BitVec.Nat_mul4_eq_FinBB_mul4]
+              simp_all only
+          clear * - h_pc0_nat_mul4
+          omega
+        · simp [sign_extend, Sail.BitVec.signExtend, imm, sp1_imm]
+          rw [←h_trusted_signExtend]
+          simp [Word.toBitVec64, Word.toNat]
+          have h_pc0_mul4 : Main[21].val % 4 = 0 := by simp_all only
+          omega
       obtain ⟨h_next_pc_b0, h_next_pc_b1⟩ := mul4_means_0_1_are_0 h_next_pc_is_mul4
       simp [Sail.BitVec.access]
       rw [h_next_pc_b1]
@@ -217,11 +241,6 @@ theorem correct
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
-      have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
-      have h_imm_1 : Main[22].val < 65536 := by show Main[22] < 65536; simp_all only
-      have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; simp_all only
-      have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
-      have h_imm_is_u64 : Main[21].val + Main[22].val * 65536 + ↑Main[23] * 4294967296 + ↑Main[24] * 281474976710656 < 2^64 := by omega
       -- have h_imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
       --   by
       --     refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] ?_ ?_ ?_ ?_
@@ -241,7 +260,7 @@ theorem correct
       have trusted_add :
         (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + (Main[21].val + Main[22].val * 65536 + Main[23].val * 4294967296 + Main[24].val * 281474976710656) < 2^48 := by sorry
       have h_added_is_u64 : (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + (Main[21].val + Main[22].val * 65536 + Main[23].val * 4294967296 + Main[24].val * 281474976710656) < 2^64 := by
-        clear * - trusted_add
+        -- clear * - trusted_add
         simp_all
         omega
 
