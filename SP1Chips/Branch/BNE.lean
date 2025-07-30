@@ -12,9 +12,6 @@ variable
   (Main : Vector (Fin BB) 45)
   (cstrs : (constraints Main).allHold)
   (s : SailState)
-  -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
-
--- include Main cstrs s h_is_real
 
 private theorem helper {x : BitVec 64}
   : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
@@ -33,7 +30,6 @@ variable
 private theorem h_Main29_is_bne
   (cstrs : (constraints Main).allHold)
   (h_is_bne : Main[29] = 1)
-  -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
   : Main[28] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0 := by
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, _, _, ⟨h_28, h_29, h_30, h_31, h_32, h_33, h_all_add, _⟩⟩ := cstrs
@@ -62,7 +58,6 @@ def sp1_op_a : BitVec 5 :=
     simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
     obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
     simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    -- extract_from_and reader_cstrs
     simp_all only
 
 def sp1_op_b : BitVec 5 :=
@@ -73,7 +68,6 @@ def sp1_op_b : BitVec 5 :=
     simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
     obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
     simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    -- extract_from_and reader_cstrs
     simp_all only
 
 -- TODO(gzgz): check that I don't have to Main[21] <<< 1 first.
@@ -139,8 +133,6 @@ theorem correct_bne
         op_b_is_u64
     simp [LtOperationSigned.spec_for_branch] at spec_lt
     clear lt_cstrs
-    -- simp [Word.toBitVec64_LT_eq_toNat op_a_is_u64, Word.toBitVec64_LT_eq_toNat op_b_is_u64, Word.toNat] at spec_lt
-    -- repeat (rw [Word.toBitVec64_LT_eq_toNat])
 
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
@@ -175,19 +167,8 @@ theorem correct_bne
       rw [Std.ExtDHashMap.get?_insert]
       simp
       rw [h_pc_read]
+      -- deep kernel recursion????
       simp only [EStateM.pure]
-      -- conv =>
-      --   lhs
-      --   arg 2
-      --   simp only
-      --   rfl
-      -- conv =>
-      --   lhs
-      --   arg 2
-      --   simp [EStateM.pure]
-      --   rfl
-      -- -- deep kernel recursion????
-      -- simp only
 
       have h_trusted_signExtend :
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
@@ -259,9 +240,6 @@ theorem correct_bne
 
       have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
       rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-      -- simp [BitVec.add_def]
-      -- have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-      -- rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
 
       simp [Word.toBitVec64, Word.toNat]
       have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
@@ -272,17 +250,6 @@ theorem correct_bne
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
-      -- have h_imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
-      --   by
-      --     refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] ?_ ?_ ?_ ?_
-      --     · exact h_imm_0
-      --     · exact h_imm_1
-      --     · exact h_imm_2
-      --     · exact h_imm_3
-      -- have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
-      -- have h_imm_1 : Main[22].val < 65536 := by show Main[22] < 65536; simp_all only
-      -- have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; simp_all only
-      -- have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
       simp [Word.toBitVec64, Word.toNat]
       rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
 
@@ -294,6 +261,7 @@ theorem correct_bne
 
       clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
       omega
+
     · rename_i h_eq
       simp [op_a_val, op_b_val] at h_eq
       simp [bne_eq_false_iff_eq.mpr h_eq]
@@ -301,7 +269,6 @@ theorem correct_bne
       apply congrArg
 
       simp [h_is_bne, h_28, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
-      -- repeat (rw [sub_eq_zero] at chip_cstrs)
 
       -- This should come from the spec of LtOperationSigned
       have h_not_branching : (Main[36] + Main[37] + Main[38] + Main[39]) = 0 :=

@@ -191,13 +191,13 @@ theorem correct_bge
 
       -- This should come from the spec of LtOperationSigned
       simp [h_neq, BitVec.slt, h_lts, h_actual_lts, h_is_bge, h_30, h_32, h_33] at spec_lt
-      have h_is_eq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
+      have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
         by
           clear * - spec_lt
           aesop
       have h_is_lt : Main[35] = 1 := by clear * - spec_lt; simp_all only
 
-      simp [h_is_eq, h_is_lt, sub_eq_zero] at chip_cstrs
+      simp [h_is_neq, h_is_lt, sub_eq_zero] at chip_cstrs
       have h_no_branching : Main[34] = 0 := by simp_all only
       simp [h_no_branching] at chip_cstrs
 
@@ -287,9 +287,9 @@ theorem correct_bge
         by
           clear * - spec_lt
           aesop
-      have h_is_lt : Main[35] = 0 := by clear * - spec_lt; simp_all only
+      have h_is_ge : Main[35] = 0 := by clear * - spec_lt; simp_all only
 
-      simp [h_is_bge, h_eq, h_is_lt, h_is_eq, h_28, h_29, h_30, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
+      simp [h_is_bge, h_eq, h_is_ge, h_is_eq, h_28, h_29, h_30, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 1 := by simp_all only
       simp [h_is_branching] at chip_cstrs
@@ -389,13 +389,13 @@ theorem correct_bge
 
     -- This should come from the spec of LtOperationSigned
     simp [h_neq, BitVec.slt, h_ges, h_30, h_is_bge] at spec_lt
-    have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 1 :=
+    have h_is_neq : Main[36] + Main[37] + Main[38] + Main[39] = 1 :=
       by
         clear * - spec_lt
         aesop
-    have h_is_lt : Main[35] = 0 := by clear * - spec_lt; simp_all only
+    have h_is_ge : Main[35] = 0 := by clear * - spec_lt; simp_all only
 
-    simp [h_is_bge, h_neq, h_is_lt, h_is_eq, h_28, h_29, h_30, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
+    simp [h_is_bge, h_neq, h_is_ge, h_is_neq, h_28, h_29, h_30, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
     simp [sub_eq_zero] at chip_cstrs
     have h_is_branching : Main[34] = 1 := by simp_all only
     simp [h_is_branching] at chip_cstrs

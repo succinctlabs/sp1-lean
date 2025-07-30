@@ -4,6 +4,13 @@ import LeanRV64IM.RiscvInstsEnd
 
 set_option autoImplicit false
 
+/-
+All the other branch instruction proofs essentially mirrors BEQ's approach.
+Therefore, most of the comments in this file are preserved so that if something
+breaks we might still recover by peaking at the history of how we arrived at the
+original proof.
+-/
+
 namespace Branch
 
 open Sail SailState BitVec LeanRV64IM.Functions
@@ -236,14 +243,14 @@ theorem correct_beq
       apply congrArg
 
       -- This should come from the spec of LtOperationSigned
-      have h_is_branching : Main[36] + Main[37] + Main[38] + Main[39] = 0 :=
+      have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 :=
         by
           simp [h_eq, h_30, h_31] at spec_lt
           clear * - spec_lt
           aesop
 
       simp [h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
-      rw [h_is_branching] at chip_cstrs
+      rw [h_is_eq] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 1 := by simp_all only
       simp [h_is_branching] at chip_cstrs
@@ -299,12 +306,12 @@ theorem correct_beq
       -- repeat (rw [sub_eq_zero] at chip_cstrs)
 
       -- This should come from the spec of LtOperationSigned
-      have h_not_branching : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
+      have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
         by
           simp [h_eq, h_30, h_31] at spec_lt
           clear * - spec_lt
           aesop
-      rw [h_not_branching] at chip_cstrs
+      rw [h_is_neq] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 0 := by simp_all only
       simp [h_is_branching] at chip_cstrs

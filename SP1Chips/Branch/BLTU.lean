@@ -12,9 +12,6 @@ variable
   (Main : Vector (Fin BB) 45)
   (cstrs : (constraints Main).allHold)
   (s : SailState)
-  -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
-
--- include Main cstrs s h_is_real
 
 private theorem helper {x : BitVec 64}
   : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
@@ -33,7 +30,6 @@ variable
 private theorem h_Main32_is_bltu
   (cstrs : (constraints Main).allHold)
   (h_is_bltu : Main[32] = 1)
-  -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
   : Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[33] = 0 := by
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, _, _, ⟨h_28, h_29, h_30, h_31, h_32, h_33, h_all_add, _⟩⟩ := cstrs
@@ -62,7 +58,6 @@ def sp1_op_a : BitVec 5 :=
     simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
     obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
     simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bltu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    -- extract_from_and reader_cstrs
     simp_all only
 
 def sp1_op_b : BitVec 5 :=
@@ -73,7 +68,6 @@ def sp1_op_b : BitVec 5 :=
     simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
     obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
     simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bltu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    -- extract_from_and reader_cstrs
     simp_all only
 
 -- TODO(gzgz): check that I don't have to Main[21] <<< 1 first.
@@ -139,8 +133,6 @@ theorem correct_bltu
         op_b_is_u64
     simp [LtOperationSigned.spec_for_branch] at spec_lt
     clear lt_cstrs
-    -- simp [Word.toBitVec64_LT_eq_toNat op_a_is_u64, Word.toBitVec64_LT_eq_toNat op_b_is_u64, Word.toNat] at spec_lt
-    -- repeat (rw [Word.toBitVec64_LT_eq_toNat])
 
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
@@ -235,13 +227,13 @@ theorem correct_bltu
 
       -- This should come from the spec of LtOperationSigned
       simp [h_neq, BitVec.ult, h_ltu, h_30, h_31] at spec_lt
-      have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 1 :=
+      have h_is_neq : Main[36] + Main[37] + Main[38] + Main[39] = 1 :=
         by
           clear * - spec_lt
           aesop
       have h_is_lt : Main[35] = 1 := by clear * - spec_lt; simp_all only
 
-      simp [h_is_bltu, h_neq, h_is_lt, h_is_eq, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
+      simp [h_is_bltu, h_neq, h_is_lt, h_is_neq, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 1 := by simp_all only
       simp [h_is_branching] at chip_cstrs
@@ -285,7 +277,6 @@ theorem correct_bltu
       apply congrArg
 
       simp [h_eq, BitVec.ult, h_geu, h_is_bltu, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
-      -- repeat (rw [sub_eq_zero] at chip_cstrs)
 
       -- This should come from the spec of LtOperationSigned
       simp [h_eq, BitVec.ult, h_geu, h_30, h_31] at spec_lt
@@ -293,7 +284,7 @@ theorem correct_bltu
         by
           clear * - spec_lt
           aesop
-      have h_is_lt : Main[35] = 0 := by clear * - spec_lt; simp_all only
+      have h_is_ge : Main[35] = 0 := by clear * - spec_lt; simp_all only
 
       simp [h_is_eq, sub_eq_zero] at chip_cstrs
       have h_no_branching : Main[34] = 0 := by simp_all only
@@ -327,17 +318,16 @@ theorem correct_bltu
     apply congrArg
 
     simp [h_eq, BitVec.ult, h_geu, h_is_bltu, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
-    -- repeat (rw [sub_eq_zero] at chip_cstrs)
 
     -- This should come from the spec of LtOperationSigned
     simp [h_eq, BitVec.ult, h_geu, h_30, h_31] at spec_lt
-    have h_is_eq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
+    have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
       by
         clear * - spec_lt
         aesop
-    have h_is_lt : Main[35] = 0 := by clear * - spec_lt; simp_all only
+    have h_is_ge : Main[35] = 0 := by clear * - spec_lt; simp_all only
 
-    simp [h_is_eq, sub_eq_zero] at chip_cstrs
+    simp [h_is_neq, sub_eq_zero] at chip_cstrs
     have h_no_branching : Main[34] = 0 := by simp_all only
     simp [h_no_branching] at chip_cstrs
 
