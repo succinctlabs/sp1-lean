@@ -64,6 +64,10 @@ namespace Opcode
 
 @[simp] lemma ofNat_34 : Opcode.ofNat 34 = Opcode.JALR := rfl
 
+@[simp] lemma ofNat_35 : Opcode.ofNat 35 = Opcode.AUIPC := rfl
+
+@[simp] lemma ofNat_36 : Opcode.ofNat 36 = Opcode.LUI := rfl
+
 @[simp]
 def i_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin BB) : Prop :=
   (imm_b = 0 ∧ imm_c = 1)

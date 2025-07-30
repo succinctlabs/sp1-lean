@@ -97,6 +97,10 @@ lemma inv_16BB_eq' : (2013235201 : Fin BB) = 65536⁻¹ := by native_decide
 -- dt: remaining versions of these
 @[simp] lemma mul_inv_16BB_eq_one_iff : x * (65536 : Fin BB)⁻¹ = 1 ↔ x = 65536 := by
   rw [mul_inv_eq_one₀ (by trivial)]
+-- -- -- dt: remaining versions of these
+-- @[simp] lemma mul_inv_16BB_lt_iff : x * (65536 : Fin BB)⁻¹ < y ↔ x < y * 65536 := by
+--   sorry
+
 
 -- dt: things below should be folded into the above
 
