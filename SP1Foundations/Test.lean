@@ -27,8 +27,8 @@ example (n : Fin _) (s : Unit) :
         | true => pure ()
         | false => pure () : EStateM Unit Unit Unit)
       return ()) s = EStateM.Result.ok () s := by
-  rw [EStateM.run_bind] -- (kernel) deep recursion detected
-  -- rw [EStateM.run_bind'] -- no errors
+  -- rw [EStateM.run_bind] -- (kernel) deep recursion detected
+  rw [EStateM.run_bind'] -- no errors
   -- simp [EStateM.run_bind] -- no errors
 
   cases (BitVec.ofNat 1 (n * _).val)[0]

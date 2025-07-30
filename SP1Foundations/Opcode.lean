@@ -97,6 +97,7 @@ def b_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 o
   (imm_b = 0 ∧ imm_c = 1)
   ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
   ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 13 op_c_0)
+  ∧ (Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] % 4#64 = 0)
 
 @[simp]
 def trusted_instr
@@ -151,6 +152,8 @@ def trusted_instr_state
   match opcode with
   | JALR =>
       ((s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
+  -- | BEQ | BNE | BLT | BGE | BLTU | BGEU =>
+  --     (s.regs.get! Register.PC + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
   | _ => True
 
 end Opcode
