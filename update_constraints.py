@@ -15,6 +15,7 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Addi", None, ""),
     ("Addw", None, ""),
     ("Bitwise", None, ""),
+    ("Branch", None, ""),
     ("Jalr", None, ""),
     ("ShiftLeft", None, ""),
     ("ShiftRight", None, ""),
@@ -49,6 +50,7 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Add", "RTypeReader", "Reader"),
     ("Add", "CPUState", "Reader"),
     ("Addi", "ITypeReader", "Reader"),
+    ("Branch", "ITypeReaderImmutable", "Reader"),
     ("Bitwise", "ALUTypeReader", "Reader"),
     ("UType", "JTypeReader", "Reader"),
 ]

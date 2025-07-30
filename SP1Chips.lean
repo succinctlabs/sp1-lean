@@ -6,6 +6,8 @@ import SP1Chips.Addw.Constraints
 import SP1Chips.AddwChip
 import SP1Chips.Bitwise.Constraints
 import SP1Chips.BitwiseChip
+import SP1Chips.Branch.Constraints
+import SP1Chips.BranchChip
 import SP1Chips.DivRem.Constraints
 import SP1Chips.DivRemChip
 import SP1Chips.JalChip
