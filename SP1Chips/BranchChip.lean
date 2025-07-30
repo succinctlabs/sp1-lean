@@ -87,7 +87,7 @@ def sp1_beq : SailM ExecutionResult := do
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
-theorem correct
+theorem correct_beq
   (Main : Vector (Fin BB) 45)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
@@ -113,7 +113,7 @@ theorem correct
 
     simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
     obtain ⟨cpu_cstrs, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-    clear cpu_cstrs lt_cstrs
+    clear cpu_cstrs
     simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
 
     let op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
@@ -125,6 +125,23 @@ theorem correct
     have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; simp_all only
     have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
     have h_imm_is_u64 : Main[21].val + Main[22].val * 65536 + ↑Main[23] * 4294967296 + ↑Main[24] * 281474976710656 < 2^64 := by omega
+    have op_c_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
+      by exact Word.isU64_of_cases _ h_imm_0 h_imm_1 h_imm_2 h_imm_3
+
+    have spec_lt :=
+      LtOperationSigned.correct_for_branch
+        #v[Main[7], Main[8], Main[9], Main[10]]
+        #v[Main[15], Main[16], Main[17], Main[18]]
+        _ 
+        _
+        _
+        lt_cstrs
+        h_is_real
+        op_a_is_u64
+        op_b_is_u64
+    simp [LtOperationSigned.spec_for_branch] at spec_lt
+    clear lt_cstrs
+    -- simp [Word.toBitVec64_LT_eq_toNat op_a_is_u64, Word.toBitVec64_LT_eq_toNat op_b_is_u64, Word.toNat] at spec_lt
     -- repeat (rw [Word.toBitVec64_LT_eq_toNat])
 
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
@@ -221,10 +238,14 @@ theorem correct
       apply congrArg
 
       -- This should come from the spec of LtOperationSigned
-      have h_not_branching : Main[36] + Main[37] + Main[38] + Main[39] = 0 := by sorry
+      have h_is_branching : Main[36] + Main[37] + Main[38] + Main[39] = 0 :=
+        by
+          simp [h_eq, h_30, h_31] at spec_lt
+          clear * - spec_lt
+          aesop
 
       simp [h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
-      rw [h_not_branching] at chip_cstrs
+      rw [h_is_branching] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 1 := by simp_all only
       simp [h_is_branching] at chip_cstrs
@@ -280,7 +301,11 @@ theorem correct
       -- repeat (rw [sub_eq_zero] at chip_cstrs)
 
       -- This should come from the spec of LtOperationSigned
-      have h_not_branching : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 := by sorry
+      have h_not_branching : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
+        by
+          simp [h_eq, h_30, h_31] at spec_lt
+          clear * - spec_lt
+          aesop
       rw [h_not_branching] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 0 := by simp_all only
@@ -307,5 +332,7 @@ theorem correct
       omega
 
 end beq
+
+#print axioms correct_beq
 
 end Branch
