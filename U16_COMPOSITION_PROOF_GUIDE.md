@@ -65,6 +65,49 @@ For each conjunct in the goal:
 3. Extract facts using `extract_from_and`
 4. Apply appropriate proof tactics
 
+## Special Case: Handling Multiple Operation Types
+
+### Bitwise Operations Pattern
+Some chips (like Bitwise) support multiple operations selected by selector bits. The proof requires:
+
+1. **Prove the selector constraint**:
+```lean
+-- First establish that the sum of selectors equals 1
+have h_sum_eq_one : Main[48] + Main[49] + Main[50] = 1 := by
+  cases what_is_this with
+  | inl h => 
+    -- Case when sum = 0 means no operation selected
+    -- This leads to Main[31] = 0 and simplified constraints
+    simp [h] at *
+    -- The goal becomes trivial when no operation is selected
+  | inr h => exact h
+```
+
+2. **Case analysis on exactly one selector**:
+```lean
+-- Prove exactly one selector is 1
+have h_exactly_one : (Main[48] = 1 ∧ Main[49] = 0 ∧ Main[50] = 0) ∨ 
+                     (Main[48] = 0 ∧ Main[49] = 1 ∧ Main[50] = 0) ∨ 
+                     (Main[48] = 0 ∧ Main[49] = 0 ∧ Main[50] = 1) := by
+  cases h_is_xor_is_bool <;> rename_i h48
+  <;> cases h_is_or_is_bool <;> rename_i h49
+  <;> cases h_is_and_is_bool <;> rename_i h50
+  <;> simp [h48, h49, h50] at h_sum_eq_one
+  <;> aesop
+```
+
+3. **Unified proof for all cases**:
+```lean
+-- Use rcases with same name for all branches
+rcases h_exactly_one with h_everything | (h_everything | h_everything)
+
+all_goals {
+  obtain ⟨h_48, h_49, h_50⟩ := h_everything
+  simp [h_48, h_49, h_50, ByteOpcode.ofNat, ...] at constraints
+  -- Rest of proof is identical for all cases
+}
+```
+
 ## Common Proof Patterns
 
 ### Pattern 1: PC Bounds (Program Counter)
@@ -141,20 +184,61 @@ For each conjunct in the goal:
 2. **Missing imports**: Ensure all necessary tactics and definitions are imported
 3. **Incomplete simplification**: Some definitions need explicit unfolding with `simp`
 4. **Arithmetic overflow**: Always prove no overflow before using Fin arithmetic lemmas
+5. **Forgetting the is_real = 0 case**: Some proofs split on whether the operation is real or padding
+6. **Incorrect selector handling**: For multi-operation chips, must prove exactly one selector is active
+7. **Not using `simp_all only`**: Sometimes `simp_all` with explicit `only` is needed instead of listing hypotheses
 
 ## Example Chips and Their Patterns
 
-- **Add/Sub chips**: Use RTypeReader, have 33 Main elements
+- **Add/Sub chips**: Use RTypeReader, have 33 Main elements, straightforward single operation
 - **Addi chip**: Uses ITypeReader, has 30 Main elements, includes immediate values
-- **And/Or/Xor chips**: Similar to Add but with bitwise operations
+- **Bitwise chip**: 
+  - Has 52 Main elements
+  - Supports XOR/OR/AND operations via selectors Main[48], Main[49], Main[50]
+  - Requires proving sum of selectors = 1
+  - Uses `all_goals` tactic for unified proof across all operations
+  - Handles both real operations and padding (is_real = 0 case)
 - **Jalr chip**: More complex PC manipulation, requires careful overflow checking
+
+## Advanced Techniques
+
+### Handling is_real = 0 Case
+When the operation is not real (padding), constraints simplify significantly:
+```lean
+cases this  -- where this : is_real = 0 ∨ is_real = 1
+· rename_i h_not_real 
+  simp [h_not_real] at *
+  -- Many constraints become True or have ¬True conditions
+  -- The proof often becomes trivial
+```
+
+### Word Bounds with Conditional Logic
+For operations with conditional immediate values:
+```lean
+· intro h_imm_c
+  simp [h_imm_c] at alu_cstrs
+  clear * - h_imm_c alu_cstrs
+  refine ⟨?_, by simp_all only⟩
+  have h_op_c_is_u64 : Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] := by simp_all only
+  exact Word.lt_cases_of_isU64 h_op_c_is_u64
+```
+
+### Simplification Strategy
+Use multiple rounds of simplification:
+1. First `simp` to expand `toU16CompProp`
+2. Second `simp` on `cstrs` to prepare for decomposition
+3. After obtaining components, `simp` each with `SP1Constraint.toProp`
+4. Use operation-specific simplifications (e.g., `ByteOpcode.ofNat`)
 
 ## Workflow Summary
 
 1. Read the constraints file to understand the chip structure
 2. Start with `simp` to expand all definitions
-3. Use `lean_goal` to see the proof obligations
-4. Decompose the constraints hypothesis
-5. Prove each conjunct using the appropriate pattern
-6. Use `extract_from_and` liberally to extract facts
-7. Build and verify with `lake build`
+3. Check if the chip has multiple operations (look for selector constraints)
+4. Handle the `is_real = 0` case if it appears
+5. For multi-operation chips, prove selector constraints first
+6. Use `lean_goal` to see the proof obligations
+7. Decompose the constraints hypothesis
+8. Prove each conjunct using the appropriate pattern
+9. Use `extract_from_and` liberally to extract facts
+10. Build and verify with `lake build`
