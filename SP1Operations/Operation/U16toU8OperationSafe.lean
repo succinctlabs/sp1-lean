@@ -18,7 +18,7 @@ lemma allHold_constraints_iff
 
 lemma u16_to_u8_decomposition_bv64_bv64 (a b : BitVec 64) :
   a < BB → b < 256 → ((BB - b + a) * 2005401601) % BB < 256 → a < 65536 ∧ b = a % 256 ∧ ((a - b) * 2005401601) % 2013265921 = a / 256
-  := by bv_decide
+  := by bv_check "U16toU8OperationSafe.u16_to_u8_decomposition_bv64_bv64-21-8.lrat"
 
 lemma u16_to_u8_decomposition_fin64 {a b : Fin (2 ^ 64)} :
   a < BB →

@@ -698,6 +698,117 @@ lemma execute_ITYPE_eq_execute_ITYPE' :
 
 end ITYPE
 
+section ADDIW
+
+def execute_ADDIW' (imm : BitVec 12) (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  (wX_bits rd (execute_RTYPEW_pure rs1_bits (sign_extend (m := 64) imm) .ADDW))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_ADDIW'_eq_execute_ADDIW' :
+  execute_ADDIW imm rs1 rd = execute_ADDIW' imm rs1 rd
+  := by
+    simp_all [execute_ADDIW, execute_ADDIW', execute_RTYPEW_pure]
+    refine bind_congr ?_; intro r1
+    simpM; ext s
+    simp [Sail.run_wX_bits]
+    split_ifs <;> [ rfl; (congr; bv_decide) ]
+
+end ADDIW
+
+section SHIFTIOP
+
+@[simp]
+def rop_of_sop (op : sop) : rop :=
+  match op with
+  | .SLLI => .SLL
+  | .SRLI => .SRL
+  | .SRAI => .SRA
+
+@[simp] def execute_SHIFTIOP_pure_w (op1 : Word (Fin BB)) (shamt : BitVec 6) (op : sop) :=
+  let shamtBB : Fin BB := ⟨ shamt.toNat, by omega ⟩
+  execute_RTYPE_pure_w op1 #v[shamtBB, 0, 0, 0] (rop_of_sop op)
+
+def execute_SHIFTIOP_pure (op1 : BitVec 64) (shamt : BitVec 6) (op : sop) :=
+  let shamt64 : BitVec 64 := shamt
+  execute_RTYPE_pure op1 shamt64 (rop_of_sop op)
+
+lemma exec_SHIFTIOP_pure_bv_to_w (op1 : Word (Fin BB)) (shamt : BitVec 6) (op : sop) :
+  op1.isU64 →
+  execute_SHIFTIOP_pure op1.toBitVec64 shamt op = execute_SHIFTIOP_pure_w op1 shamt op := by
+  intro h_op1_isU64
+  have h_op2_isU64 : Word.isU64 #v[ ⟨ shamt.toNat, by omega ⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
+  simp only [execute_SHIFTIOP_pure_w, execute_SHIFTIOP_pure]
+  rw [← exec_RTYPE_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
+  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨ shamt.toNat, by omega ⟩, 0, 0, 0]
+  . rw [this]
+  . rw [← BitVec.toNat_inj]
+    rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
+    simp; omega
+
+def execute_SHIFTIOP' (shamt : BitVec 6) (rs1 : regidx) (rd : regidx) (op : sop) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  (wX_bits rd (execute_SHIFTIOP_pure rs1_bits shamt op))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_SHIFTIOP_eq_execute_SHIFTIOP' :
+  execute_SHIFTIOP shamt rs1 rd op = execute_SHIFTIOP' shamt rs1 rd op
+  := by
+    have h_eq_shamt : BitVec.ofNat 6 (shamt.toNat % 18446744073709551616) = shamt := by
+      rw [Nat.mod_eq_of_lt (by omega)]; simp
+    simp [execute_SHIFTIOP, execute_SHIFTIOP', execute_SHIFTIOP_pure, execute_RTYPE_pure, LeanRV64IM.Functions.log2_xlen]
+    aesop
+
+end SHIFTIOP
+
+section SHIFTIWOP
+
+@[simp]
+def ropw_of_sopw (op : sopw) : ropw :=
+  match op with
+  | .SLLIW => .SLLW
+  | .SRLIW => .SRLW
+  | .SRAIW => .SRAW
+
+@[simp] def execute_SHIFTIWOP_pure_w (op1 : Word (Fin BB)) (shamt : BitVec 5) (op : sopw) :=
+  let shamtBB : Fin BB := ⟨ shamt.toNat, by omega ⟩
+  execute_RTYPEW_pure_w op1 #v[shamtBB, 0, 0, 0] (ropw_of_sopw op)
+
+def execute_SHIFTIWOP_pure (op1 : BitVec 64) (shamt : BitVec 5) (op : sopw) :=
+  let shamt64 : BitVec 64 := shamt
+  execute_RTYPEW_pure op1 shamt64 (ropw_of_sopw op)
+
+lemma exec_SHIFTIWOP_pure_bv_to_w (op1 : Word (Fin BB)) (shamt : BitVec 5) (op : sopw) :
+  op1.isU64 →
+  execute_SHIFTIWOP_pure op1.toBitVec64 shamt op = execute_SHIFTIWOP_pure_w op1 shamt op := by
+  intro h_op1_isU64
+  have h_op2_isU64 : Word.isU64 #v[ ⟨ shamt.toNat, by omega ⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
+  simp only [execute_SHIFTIWOP_pure_w, execute_SHIFTIWOP_pure]
+  rw [← exec_RTYPEW_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
+  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨ shamt.toNat, by omega ⟩, 0, 0, 0]
+  . rw [this]
+  . rw [← BitVec.toNat_inj]
+    rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
+    simp; omega
+
+def execute_SHIFTIWOP' (shamt : BitVec 5) (rs1 : regidx) (rd : regidx) (op : sopw) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  (wX_bits rd (execute_SHIFTIWOP_pure rs1_bits shamt op))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_SHIFTIWOP_eq_execute_SHIFTIWOP' :
+  execute_SHIFTIWOP shamt rs1 rd op = execute_SHIFTIWOP' shamt rs1 rd op
+  := by
+    have h_eq_shamt : BitVec.ofNat 5 (shamt.toNat % 4294967296) = shamt := by
+      rw [Nat.mod_eq_of_lt (by omega)]; simp
+    simp [execute_SHIFTIWOP, execute_SHIFTIWOP', execute_SHIFTIWOP_pure, execute_RTYPEW_pure, LeanRV64IM.Functions.log2_xlen]
+    aesop
+
+end SHIFTIWOP
+
 section MUL
 
 /-- Multiplication opcodes -/
@@ -732,24 +843,5 @@ lemma execute_MUL'_eq_execute_MUL :
   := by cases m <;> simp_all [execute_MUL', execute_MUL, execute_MUL_pure, mul_op_of_mop, LeanRV64IM.Functions.xlen]
 
 end MUL
-
-section ADDIW
-
-def execute_ADDIW' (imm : (BitVec 12)) (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do
-  let rs1_bits ← do (rX_bits rs1)
-  (wX_bits rd (execute_RTYPEW_pure rs1_bits (sign_extend (m := 64) imm) .ADDW))
-  (pure RETIRE_SUCCESS)
-
-@[simp]
-lemma execute_ADDIW'_eq_execute_ADDIW' :
-  execute_ADDIW imm rs1 rd = execute_ADDIW' imm rs1 rd
-  := by
-    simp_all [execute_ADDIW, execute_ADDIW', execute_RTYPEW_pure]
-    refine bind_congr ?_; intro r1
-    simpM; ext s
-    simp [Sail.run_wX_bits]
-    split_ifs <;> [ rfl; (congr; bv_decide) ]
-
-end ADDIW
 
 end execution
