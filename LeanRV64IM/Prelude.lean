@@ -158,7 +158,7 @@ def get_config_print_platform (_ : Unit) : Bool :=
   false
 
 def get_config_rvfi (_ : Unit) : Bool :=
-  false
+  true
 
 def get_config_use_abi_names (_ : Unit) : Bool :=
   false
