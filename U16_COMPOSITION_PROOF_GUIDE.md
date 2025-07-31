@@ -6,6 +6,12 @@ This guide helps future Claude Code instances complete U16 composition proofs in
 
 U16 composition proofs verify that all field elements used in SP1 chip constraints respect 16-bit bounds (< 65536) when `is_real` is true. These proofs are crucial for ensuring the soundness of the zero-knowledge virtual machine implementation.
 
+The follow examples will help you understand how to prove.
+- @SP1Chips/Add/U16Composition.lean
+- @SP1Chips/Bitwise/U16Composition.lean
+- @SP1Chips/Branch/U16Composition.lean
+- @SP1Chips/Jal/U16Composition.lean
+
 ## Key Concepts
 
 ### 1. U16CompProp Definition
@@ -29,7 +35,7 @@ def u16_composition : (constraints Main).U16CompProp := by
         AddOperation.constraints, CPUState.constraints, ITypeReader.constraints]
   
   -- 2. Decompose constraints hypothesis
-  simp [constraints] at cstrs
+  simp [constraints, SP1Constraint.toProp, List.Forall] at cstrs
   obtain ⟨op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
   
   -- 3. Prove each conjunct
