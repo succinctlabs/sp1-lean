@@ -1,7 +1,7 @@
 import SP1Operations.Operation.AddOperation
 import SP1Chips.Jal.Constraints
 
-namespace JalChip
+namespace Jal
 
 open BitVec
 
@@ -120,6 +120,6 @@ theorem SP1JAL_correct
     simp [Word.toBitVec64, Word.toNat] at h_add_pc'
     rw [h_add_pc', BitVec.ofNatLT_eq_ofNat]
 
-end JalChip
+end Jal
 
 -- #print axioms JalChip.SP1JAL_correct
