@@ -18,6 +18,7 @@ import SP1Chips.DivRemChip
 import SP1Chips.Jal.U16Composition
 import SP1Chips.JalChip
 import SP1Chips.Jalr.Constraints
+import SP1Chips.Jalr.U16Composition
 import SP1Chips.JalrChip
 import SP1Chips.Lt.Constraints
 import SP1Chips.LtChip
