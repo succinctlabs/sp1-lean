@@ -8,6 +8,7 @@ import SP1Chips.Addw.Constraints
 import SP1Chips.Addw.U16Composition
 import SP1Chips.AddwChip
 import SP1Chips.Bitwise.Constraints
+import SP1Chips.Bitwise.U16Composition
 import SP1Chips.BitwiseChip
 import SP1Chips.Branch.Constraints
 import SP1Chips.BranchChip
