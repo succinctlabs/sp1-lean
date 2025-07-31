@@ -1,7 +1,7 @@
 import SP1Operations.Operation.AddOperation
 import SP1Chips.Jal.Constraints
 
-namespace JalChip
+namespace Jal
 
 section u16_composition
 
@@ -77,4 +77,4 @@ theorem u16_composition
 
 end u16_composition
 
-end JalChip
+end Jal

@@ -11,6 +11,7 @@ The follow examples will help you understand how to prove.
 - @SP1Chips/Bitwise/U16Composition.lean
 - @SP1Chips/Branch/U16Composition.lean
 - @SP1Chips/Jal/U16Composition.lean
+- @SP1Chips/Jalr/U16Composition.lean
 
 ## Key Concepts
 
@@ -215,7 +216,17 @@ all_goals {
   - Uses ITypeReaderImmutable with complex match expression on opcode
   - Sum of selectors represents is_real
   - PC bounds are at the end of chip_cstrs
-- **Jalr chip**: More complex PC manipulation, requires careful overflow checking
+- **Jal chip**:
+  - Has 31 Main elements
+  - Uses JTypeReader, simpler than Jalr
+  - is_real at Main[30]
+  - Two AddOperations: one for PC+imm, one for PC+4 (conditional on Main[13])
+- **Jalr chip**:
+  - Has 38 Main elements  
+  - Uses ITypeReader with is_real at Main[29]
+  - Two AddOperations: one for rs1+imm (jump target), one for PC+4 (conditional on Main[13])
+  - Similar structure to Jal but with register-based jump target
+  - Requires case analysis on Main[13] for conditional PC increment
 
 ## Advanced Techniques
 
@@ -249,19 +260,96 @@ Use multiple rounds of simplification:
 3. After obtaining components, `simp` each with `SP1Constraint.toProp`
 4. Use operation-specific simplifications (e.g., `ByteOpcode.ofNat`)
 
+## Recommended Approach for New U16 Composition Proofs
+
+### Don't Try to One-Shot the Proof
+While it may be tempting to write out the entire proof structure at once (especially by copying from similar chips), this approach often fails because:
+- Each chip has different Main vector indices
+- The constraint structure varies between chips
+- The number and types of operations differ
+
+### Use an Exploratory Approach Instead
+
+1. **Start with exploration, not implementation**:
+   ```lean
+   theorem u16_composition 
+     (Main : Vector (Fin BB) 38)  -- Note: size varies by chip!
+     (cstrs : (constraints Main).allHold)
+     : (constraints Main).U16CompProp
+     := by
+       -- First, just expand and see what we're dealing with
+       simp [SP1Constraint.toU16CompProp, constraints, List.Forall, 
+             AddOperation.constraints, CPUState.constraints, ITypeReader.constraints]
+       
+       -- Use sorry to see the goal structure
+       sorry
+   ```
+
+2. **Use `lean_goal` to understand the proof obligations**:
+   - Check what bounds need to be proven
+   - Identify the `is_real` index (often Main[29] or Main[30])
+   - See how many conjuncts you need to prove
+
+3. **Use the `sorry` technique for incremental development**:
+   ```lean
+   -- After understanding the structure, build incrementally
+   cases h_main29
+   · rename_i h_not_real
+     simp [h_not_real]  -- Handle is_real = 0 case first
+   
+   rename_i h_is_real
+   simp [h_is_real] at *
+   
+   -- Extract constraints
+   obtain ⟨add_cstrs, cpu_cstrs, reader_cstrs, ...⟩ := cstrs
+   
+   -- Now prove each part with sorry placeholders
+   refine ⟨?_, ?_, ?_⟩
+   · sorry  -- First conjunct
+   · sorry  -- Second conjunct  
+   · sorry  -- Third conjunct
+   ```
+
+4. **Fill in one `sorry` at a time**:
+   - Focus on one proof obligation
+   - Use `simp` on the relevant constraints
+   - Apply the appropriate pattern (Word bounds, register bounds, etc.)
+   - Test that it compiles before moving to the next
+
+5. **Verify compilation frequently**:
+   - Use `lean_diagnostic_messages` after each major change
+   - Don't rely on `lean_build` unless the file is imported in `SP1Chips.lean`
+
+### Example: Jalr Chip Development Process
+
+1. **Initial exploration showed**:
+   - Main has 38 elements (not 31 like Jal)
+   - is_real is at Main[29]
+   - Three main proof obligations for different bounds
+
+2. **Incremental development**:
+   - First proved the is_real = 0 case
+   - Then handled Main[30-32] bounds using AddOperation.isU64_of_allHold_constraints
+   - Added case analysis for Main[13] to handle conditional PC increment
+   - Finally proved register and memory bounds one at a time
+
+3. **Key insight**: The proof structure was similar to Jal, but indices and some details differed. Starting fresh with exploration was more effective than trying to copy-paste and modify.
+
 ## Workflow Summary
 
 1. Read the constraints file to understand the chip structure
 2. Start with `simp` to expand all definitions until no more `*.constraints` remain
-3. Check if the chip has multiple operations (look for selector constraints)
-4. Handle the `sum = 0` case first if there are selectors (where sum is the selector sum)
-5. For multi-operation chips, prove selector constraints first
-6. Use `lean_goal` to see the proof obligations
-7. Decompose the constraints hypothesis with `obtain`
-8. Prove each conjunct using the appropriate pattern
-9. Prefer `simp_all only` over `extract_from_and` when possible
-10. For complex constraints with match expressions, may need manual decomposition
-11. Increase `maxHeartbeats` if timeouts occur (e.g., to 800000)
+3. **Use `sorry` to see the goal structure before writing any proof**
+4. Check if the chip has multiple operations (look for selector constraints)
+5. Handle the `sum = 0` case first if there are selectors (where sum is the selector sum)
+6. For multi-operation chips, prove selector constraints first
+7. **Use `lean_goal` frequently to understand proof obligations**
+8. Decompose the constraints hypothesis with `obtain`
+9. **Prove each conjunct incrementally using `sorry` placeholders**
+10. Prefer `simp_all only` over `extract_from_and` when possible
+11. For complex constraints with match expressions, may need manual decomposition
+12. Increase `maxHeartbeats` if timeouts occur (e.g., to 800000)
+13. **Always verify with `lean_diagnostic_messages` before assuming the proof is complete**
 
 ## Specific Patterns for Common Goals
 
