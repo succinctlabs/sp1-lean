@@ -16,6 +16,7 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Addw", None, ""),
     ("Bitwise", None, ""),
     ("Branch", None, ""),
+    ("Jal", None, ""),
     ("Jalr", None, ""),
     ("ShiftLeft", None, ""),
     ("ShiftRight", None, ""),
