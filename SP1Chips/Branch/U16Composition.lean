@@ -49,19 +49,36 @@ theorem u16_composition
       
       -- Now the bounds should be simpler to extract
       simp [h_sum_one] at chip_cstrs
-      sorry
+      -- Extract the bounds from chip_cstrs
+      split_ands
+      · show Main[25].val ≤ 65536
+        have : Main[25].val < 65536 := by simp_all only
+        clear * - this
+        linarith
+      · show Main[26].val < 65536
+        simp_all only
+      · show Main[27].val < 65536
+        simp_all only
       
     -- Second goal: op_a bounds
     · intro h_is_real
       simp [h_sum_one] at h_is_real
       simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_sum_one] at reader_cstrs
-      sorry
+      refine ⟨?_, ?_⟩
+      · have h_op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
+        exact Word.lt_cases_of_isU64 h_op_a_is_u64
+      · calc Main[6] < 32 := by simp_all only
+               _ < 65536 := by trivial
         
     -- Third goal: op_b bounds  
     · intro h_is_real
       simp [h_sum_one] at h_is_real
       simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_sum_one] at reader_cstrs
-      sorry
+      refine ⟨?_, ?_⟩
+      · have h_op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
+        exact Word.lt_cases_of_isU64 h_op_b_is_u64
+      · have h_reg_bound : Main[14] < 65536 := by simp_all only
+        exact h_reg_bound
 
 #print axioms u16_composition
 

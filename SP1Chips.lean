@@ -11,6 +11,7 @@ import SP1Chips.Bitwise.Constraints
 import SP1Chips.Bitwise.U16Composition
 import SP1Chips.BitwiseChip
 import SP1Chips.Branch.Constraints
+import SP1Chips.Branch.U16Composition
 import SP1Chips.BranchChip
 import SP1Chips.DivRem.Constraints
 import SP1Chips.DivRemChip
