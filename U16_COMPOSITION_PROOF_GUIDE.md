@@ -182,11 +182,12 @@ all_goals {
 
 ## Debugging Tips
 
-1. **Use lean_goal frequently**: Check the goal after each `simp` to understand what needs to be proven
-2. **Check diagnostic messages**: Use `lean_diagnostic_messages` to catch type errors early
-3. **Examine constraint structure**: Use `Read` tool to understand the constraint definitions
-4. **Follow existing examples**: Look at completed proofs (e.g., Add/U16Composition.lean) as templates
-5. **Set maxHeartbeats**: Use `set_option maxHeartbeats 400000` for complex proofs
+1. **Use lean_diagnostic_messages instead of lean_build**: To check if your proof compiles, use `lean_diagnostic_messages` on the specific file rather than running `lean_build` on the entire project. This is much faster and provides immediate feedback. Only run `lean_build` when explicitly requested.
+2. **Use lean_goal frequently**: Check the goal after each `simp` to understand what needs to be proven
+3. **Check diagnostic messages**: Use `lean_diagnostic_messages` to catch type errors early
+4. **Examine constraint structure**: Use `Read` tool to understand the constraint definitions
+5. **Follow existing examples**: Look at completed proofs (e.g., Add/U16Composition.lean) as templates
+6. **Set maxHeartbeats**: Use `set_option maxHeartbeats 400000` for complex proofs
 
 ## Common Pitfalls
 
