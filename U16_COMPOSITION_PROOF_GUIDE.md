@@ -149,10 +149,12 @@ all_goals {
 · intro h_is_real
   simp [ITypeReader.constraints, SP1Constraint.toProp, h_is_real, ...] at reader_cstrs
   have h_is_u64 : Word.isU64 #v[Main[a], Main[b], Main[c], Main[d]] := by
-    extract_from_and reader_cstrs
-  refine ⟨⟨h_is_u64 0, h_is_u64 1, h_is_u64 2, h_is_u64 3⟩, ?_⟩
-  extract_from_and reader_cstrs
+    simp_all only
+  -- Use Word.lt_cases_of_isU64 to extract individual bounds
+  exact Word.lt_cases_of_isU64 h_is_u64
 ```
+
+**Important**: Always use the `#v[...]` notation for Word vectors, and apply `Word.lt_cases_of_isU64` to convert from `Word.isU64` to individual element bounds.
 
 ## Key Tactics and Lemmas
 
@@ -169,6 +171,7 @@ all_goals {
 - `Fin.le_iff_val_le_val`: Converts Fin inequalities to Nat
 - `Fin.val_add_eq_of_add_lt`: Addition in Fin when no overflow
 - `Word.isU64`: Proves all components of a word are < 65536
+- `Word.lt_cases_of_isU64`: Converts `Word.isU64` to individual element bounds
 
 ## Debugging Tips
 
@@ -187,6 +190,8 @@ all_goals {
 5. **Forgetting the is_real = 0 case**: Some proofs split on whether the operation is real or padding
 6. **Incorrect selector handling**: For multi-operation chips, must prove exactly one selector is active
 7. **Not using `simp_all only`**: Sometimes `simp_all` with explicit `only` is needed instead of listing hypotheses
+8. **Using let-bound variables for is_real**: Avoid `let is_real := ...` as it makes `simp` harder to work with
+9. **Using `extract_from_and` when `simp_all only` works**: Prefer `simp_all only` for performance and reliability
 
 ## Example Chips and Their Patterns
 
@@ -198,6 +203,12 @@ all_goals {
   - Requires proving sum of selectors = 1
   - Uses `all_goals` tactic for unified proof across all operations
   - Handles both real operations and padding (is_real = 0 case)
+- **Branch chip**:
+  - Has 45 Main elements
+  - Supports 6 branch operations (BEQ, BNE, BLT, BGE, BLTU, BGEU) via selectors Main[28] through Main[33]
+  - Uses ITypeReaderImmutable with complex match expression on opcode
+  - Sum of selectors represents is_real
+  - PC bounds are at the end of chip_cstrs
 - **Jalr chip**: More complex PC manipulation, requires careful overflow checking
 
 ## Advanced Techniques
@@ -205,12 +216,14 @@ all_goals {
 ### Handling is_real = 0 Case
 When the operation is not real (padding), constraints simplify significantly:
 ```lean
-cases this  -- where this : is_real = 0 ∨ is_real = 1
+cases this  -- where this : sum = 0 ∨ sum = 1
 · rename_i h_not_real 
   simp [h_not_real] at *
   -- Many constraints become True or have ¬True conditions
   -- The proof often becomes trivial
 ```
+
+**Important**: Don't use `let is_real := Main[a] + Main[b] + ...`. Instead, work directly with the sum to avoid issues with `simp` not unfolding the definition.
 
 ### Word Bounds with Conditional Logic
 For operations with conditional immediate values:
@@ -233,12 +246,41 @@ Use multiple rounds of simplification:
 ## Workflow Summary
 
 1. Read the constraints file to understand the chip structure
-2. Start with `simp` to expand all definitions
+2. Start with `simp` to expand all definitions until no more `*.constraints` remain
 3. Check if the chip has multiple operations (look for selector constraints)
-4. Handle the `is_real = 0` case if it appears
+4. Handle the `sum = 0` case first if there are selectors (where sum is the selector sum)
 5. For multi-operation chips, prove selector constraints first
 6. Use `lean_goal` to see the proof obligations
-7. Decompose the constraints hypothesis
+7. Decompose the constraints hypothesis with `obtain`
 8. Prove each conjunct using the appropriate pattern
-9. Use `extract_from_and` liberally to extract facts
-10. Build and verify with `lake build`
+9. Prefer `simp_all only` over `extract_from_and` when possible
+10. For complex constraints with match expressions, may need manual decomposition
+11. Increase `maxHeartbeats` if timeouts occur (e.g., to 800000)
+
+## Specific Patterns for Common Goals
+
+### Proving Word Bounds (op_a, op_b)
+When the goal asks for bounds on a 4-element word (e.g., `Main[7], Main[8], Main[9], Main[10]`):
+```lean
+refine ⟨?_, ?_⟩
+· have h_op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
+  exact Word.lt_cases_of_isU64 h_op_a_is_u64
+```
+
+### Proving Register Bounds
+When the goal asks for register bounds (typically < 32 which implies < 65536):
+```lean
+· calc Main[6] < 32 := by simp_all only
+       _ < 65536 := by trivial
+```
+
+### Structured Proof for Multiple Bounds
+When proving multiple bounds together:
+```lean
+refine ⟨?_, ?_⟩  -- Split the conjunction
+· -- First part (word bounds)
+  have h_word_is_u64 : Word.isU64 #v[Main[a], Main[b], Main[c], Main[d]] := by simp_all only
+  exact Word.lt_cases_of_isU64 h_word_is_u64
+· -- Second part (register or other bounds)
+  -- Use calc, simp_all only, or direct extraction
+```
