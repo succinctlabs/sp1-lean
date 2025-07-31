@@ -8,12 +8,10 @@ namespace Addw
 
 section u16_composition
 
-variable
+set_option maxHeartbeats 800000 in
+theorem u16_composition 
   (Main : Vector (Fin BB) 37)
   (cstrs : (constraints Main).allHold)
-
-set_option maxHeartbeats 800000 in
-def u16_composition 
   : (constraints Main).U16CompProp
   := by
     simp [SP1Constraint.toU16CompProp, constraints, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints]
@@ -114,6 +112,8 @@ def u16_composition
         have h_main35_ne_0 : ¬Main[35] = 0 := by rw [h_main35_eq_1]; simp
         simp [h_main35_ne_0] at reader_cstrs
         extract_from_and reader_cstrs
+
+#print axioms u16_composition
 
 end u16_composition
 

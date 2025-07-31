@@ -7,12 +7,10 @@ namespace Addi
 
 section u16_composition
 
-variable
+set_option maxHeartbeats 400000 in
+theorem u16_composition 
   (Main : Vector (Fin BB) 30)
   (cstrs : (constraints Main).allHold)
-
-set_option maxHeartbeats 400000 in
-def u16_composition 
   : (constraints Main).U16CompProp
   := by
     simp [SP1Constraint.toU16CompProp, constraints, List.Forall, AddOperation.constraints, CPUState.constraints, ITypeReader.constraints]
@@ -58,6 +56,8 @@ def u16_composition
         extract_from_and reader_cstrs
       refine ⟨⟨h_is_u64 0, h_is_u64 1, h_is_u64 2, h_is_u64 3⟩, ?_⟩
       extract_from_and reader_cstrs
+
+#print axioms u16_composition
 
 end u16_composition
 
