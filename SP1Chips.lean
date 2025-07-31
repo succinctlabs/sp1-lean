@@ -34,6 +34,7 @@ import SP1Chips.Sub.Constraints
 import SP1Chips.Sub.U16Composition
 import SP1Chips.SubChip
 import SP1Chips.Subw.Constraints
+import SP1Chips.Subw.U16Composition
 import SP1Chips.SubwChip
 import SP1Chips.Load.LoadByte.Constraints
 import SP1Chips.Load.LoadHalf.Constraints
