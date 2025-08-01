@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-# Use gzgz/rv64-operationize branch for sp1-wip!
-
 import os
 import subprocess
 import re
@@ -26,6 +24,15 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Sub", None, ""),
     ("Subw", None, ""),
     ("UType", None, ""),
+    ("LoadByte", None, "Load"),
+    ("LoadHalf", None, "Load"),
+    ("LoadWord", None, "Load"),
+    ("LoadDouble", None, "Load"),
+    ("LoadX0", None, "Load"),
+    ("StoreByte", None, "Store"),
+    ("StoreHalf", None, "Store"),
+    ("StoreWord", None, "Store"),
+    ("StoreDouble", None, "Store"),
 
     # Operations
     ("Add", "AddOperation", "Operation"),
@@ -38,6 +45,8 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Mul", "U16MSBOperation", "Operation"),
     ("Mul", "U16toU8OperationSafe", "Operation"),
     ("Bitwise", "U16toU8OperationUnsafe", "Operation"),
+    ("LoadByte", "AddrAddOperation", "Operation"),
+    ("LoadByte", "AddressOperation", "Operation"),
     
     # Compare operations
     ("DivRem", "IsEqualWordOperation", "Compare"),
@@ -119,7 +128,8 @@ def main():
             # Determine the output file path
             if operation is None:
                 # Chip-level constraints
-                file_path = f"SP1Chips/{chip}/Constraints.lean"
+                # file_path = f"SP1Chips/{chip}/{prefix}/Constraints.lean"
+                file_path = os.path.join("SP1Chips", prefix, chip, "Constraints.lean")
             else:
                 # Operation-level constraints
                 if prefix:
