@@ -26,6 +26,7 @@ import SP1Chips.LtChip
 import SP1Chips.Mul.Constraints
 import SP1Chips.MulChip
 import SP1Chips.UType.Constraints
+import SP1Chips.UType.U16Composition
 import SP1Chips.UTypeChip
 import SP1Chips.ShiftLeft.Constraints
 import SP1Chips.ShiftLeftChip
