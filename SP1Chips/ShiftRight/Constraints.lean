@@ -4,12 +4,15 @@ import SP1Operations.Reader.ALUTypeReader
 
 namespace ShiftRight
 
-set_option maxHeartbeats 4000000
+set_option maxHeartbeats 100000000
+
+variable (Main : Vector (Fin BB) 69)
+def is_real : Prop := Main[64] = 1 ∨ Main[65] = 1 ∨ Main[66] = 1 ∨ Main[67] = 1
 
 section constraints
 
 -- Generated Lean code for chip ShiftRightChip
-def constraints (Main : Vector (Fin BB) 69) : SP1ConstraintList :=
+def constraints : SP1ConstraintList :=
   let E0 : Fin BB := Main[64] + Main[65]
   let E1 : Fin BB := E0 + Main[66]
   let E2 : Fin BB := E1 + Main[67]
@@ -374,6 +377,945 @@ def constraints (Main : Vector (Fin BB) 69) : SP1ConstraintList :=
     (.assertZero E285),
   ]
 
+lemma allHold_constraints_iff :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    let b0 := Main[15]
+    let b1 := Main[16]
+    let b2 := Main[17]
+    let b3 := Main[18]
+    let c0 := Main[25]
+    let c1 := Main[26]
+    let c2 := Main[27]
+    let c3 := Main[28]
+    let imm := Main[31]
+    let a0 := Main[32]
+    let a1 := Main[33]
+    let a2 := Main[34]
+    let a3 := Main[35]
+    let msb_b := Main[36]
+    let msb_srw := Main[37]
+    let cb0 := Main[38]
+    let cb1 := Main[39]
+    let cb2 := Main[40]
+    let cb3 := Main[41]
+    let cb4 := Main[42]
+    let cb5 := Main[43]
+    let smv := Main[44]
+    let v0123 := Main[45]
+    let v012 := Main[46]
+    let v01 := Main[47]
+    let ll0 := Main[48]
+    let ll1 := Main[49]
+    let ll2 := Main[50]
+    let ll3 := Main[51]
+    let hl0 := Main[52]
+    let hl1 := Main[53]
+    let hl2 := Main[54]
+    let hl3 := Main[55]
+    let lr0 := Main[56]
+    let lr1 := Main[57]
+    let lr2 := Main[58]
+    let lr3 := Main[59]
+    let su160 := Main[60]
+    let su161 := Main[61]
+    let su162 := Main[62]
+    let su163 := Main[63]
+    let srl := Main[64]
+    let sra := Main[65]
+    let srlw := Main[66]
+    let sraw := Main[67]
+    let bop := Main[68]
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints b3 { msb := msb_b } sra) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints b1 { msb := msb_b } sraw) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints a1 { msb := msb_srw } (srlw + sraw)) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (srl + sra + srlw + sraw)) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (srl * 7 + sra * 8 + srlw * 42 + sraw * 43) #v[bop, (srl * 5 + sra * 5 + srlw * 5 + sraw * 5), (sra * 32 + sraw * 32)] #v[a0, a1, a2, a3] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[c0, c1, c2, c3], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := imm } (srl + sra + srlw + sraw)) ∧
+    (srl = 0 ∨ srl = 1) ∧
+    (sra = 0 ∨ sra = 1) ∧
+    (srlw = 0 ∨ srlw = 1) ∧
+    (sraw = 0 ∨ sraw = 1) ∧
+    (srl + sra + srlw + sraw = 0 ∨ srl + sra + srlw + sraw = 1) ∧
+    (srl + sra + srlw + sraw = 0 ∨ bop = imm * (srl * 19 + sra * 19 + srlw * 27 + sraw * 27) + (1 - imm) * (srl * 51 + sra * 51 + srlw * 59 + sraw * 59)) ∧
+    (cb0 = 0 ∨ cb0 = 1) ∧
+    (cb1 = 0 ∨ cb1 = 1) ∧
+    (cb2 = 0 ∨ cb2 = 1) ∧
+    (cb3 = 0 ∨ cb3 = 1) ∧
+    (cb4 = 0 ∨ cb4 = 1) ∧
+    (cb5 = 0 ∨ cb5 = 1) ∧
+    (¬srl + sra + srlw + sraw = 0 → ((Main[25] - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)) * 1981808641).val < 1024) ∧
+    (su160 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 0) ∧
+    (su160 = 0 ∨ su160 = 1) ∧
+    (su161 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 1) ∧
+    (su161 = 0 ∨ su161 = 1) ∧
+    (su162 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 2) ∧
+    (su162 = 0 ∨ su162 = 1) ∧
+    (su163 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 3) ∧
+    (su163 = 0 ∨ su163 = 1) ∧
+    (srl + sra + srlw + sraw = 0 ∨ su160 + su161 + su162 + su163 = 1) ∧
+    (v01 = (1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1)) ∧
+    (v012 = v01 * ((1 - cb2) * 15 + 1)) ∧
+    (v0123 = v012 * ((1 - cb3) * 255 + 1)) ∧
+    (¬srl + sra + srlw + sraw = 0 → ll0.val < 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8).val) ∧
+    (¬srl + sra + srlw + sraw = 0 → hl0.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val) ∧
+    (b0 * v0123 = hl0 * 65536 + ll0 * v0123) ∧
+    (¬srl + sra + srlw + sraw = 0 → ll1.val < 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8).val) ∧
+    (¬srl + sra + srlw + sraw = 0 → hl1.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val) ∧
+    (b1 * v0123 = hl1 * 65536 + ll1 * v0123) ∧
+    (¬srl + sra + srlw + sraw = 0 → ll2.val < 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8).val) ∧
+    (¬srl + sra + srlw + sraw = 0 → hl2.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val) ∧
+    (b2 * v0123 * (srl + sra) = hl2 * 65536 + ll2 * v0123) ∧
+    (¬srl + sra + srlw + sraw = 0 → ll3.val < 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8).val) ∧
+    (¬srl + sra + srlw + sraw = 0 → hl3.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val) ∧
+    (b3 * v0123 * (srl + sra) = hl3 * 65536 + ll3 * v0123) ∧
+    (lr0 = hl0 + ll1 * v0123) ∧
+    (lr1 = hl1 + ll2 * v0123) ∧
+    (lr2 = hl2 + ll3 * v0123) ∧
+    (lr3 = hl3) ∧
+    (srl + srlw = 0 ∨ msb_b = 0) ∧
+    (smv = msb_b * v0123) ∧
+    (srlw + sraw = 1 ∨ msb_srw = 0) ∧
+    (srl + sra = 0 ∨ su160 = 0 ∨ a0 = lr0) ∧
+    (srl + sra = 0 ∨ su160 = 0 ∨ a1 = lr1) ∧
+    (srl + sra = 0 ∨ su160 = 0 ∨ a2 = lr2) ∧
+    (srl + sra = 0 ∨ su160 = 0 ∨ a3 = lr3 + (msb_b * 65536 - smv)) ∧
+    (srl + sra = 0 ∨ su161 = 0 ∨ a0 = lr1) ∧
+    (srl + sra = 0 ∨ su161 = 0 ∨ a1 = lr2) ∧
+    (srl + sra = 0 ∨ su161 = 0 ∨ a2 = lr3 + (msb_b * 65536 - smv)) ∧
+    (srl + sra = 0 ∨ su161 = 0 ∨ a3 = msb_b * 65535) ∧
+    (srl + sra = 0 ∨ su162 = 0 ∨ a0 = lr2) ∧
+    (srl + sra = 0 ∨ su162 = 0 ∨ a1 = lr3 + (msb_b * 65536 - smv)) ∧
+    (srl + sra = 0 ∨ su162 = 0 ∨ a2 = msb_b * 65535) ∧
+    (srl + sra = 0 ∨ su162 = 0 ∨ a3 = msb_b * 65535) ∧
+    (srl + sra = 0 ∨ su163 = 0 ∨ a0 = lr3 + (msb_b * 65536 - smv)) ∧
+    (srl + sra = 0 ∨ su163 = 0 ∨ a1 = msb_b * 65535) ∧
+    (srl + sra = 0 ∨ su163 = 0 ∨ a2 = msb_b * 65535) ∧
+    (srl + sra = 0 ∨ su163 = 0 ∨ a3 = msb_b * 65535) ∧
+    (srlw + sraw = 0 ∨ su160 = 0 ∨ a0 = lr0) ∧
+    (srlw + sraw = 0 ∨ su160 = 0 ∨ a1 = lr1 + (msb_b * 65536 - smv)) ∧
+    (srlw + sraw = 0 ∨ su161 = 0 ∨ a0 = lr1 + (msb_b * 65536 - smv)) ∧
+    (srlw + sraw = 0 ∨ su161 = 0 ∨ a1 = msb_b * 65535) ∧
+    (srlw + sraw = 0 ∨ a2 = msb_srw * 65535) ∧
+    (srlw + sraw = 0 ∨ a3 = msb_srw * 65535)
+  := by
+    simp [constraints, sub_eq_zero]
+
 end constraints
 
-end ShiftRight
+section field_arithmetic
+
+lemma cancel_mul_65536_v1 { a b c x : Fin BB } (h_dvd : (x : ℕ) ∣ 65536) : a * x = b * 65536 + c * x → a = b * ((65536 : ℕ) / (x : ℕ)) + c
+  := by
+  obtain ⟨ z, h_eq ⟩ := h_dvd; rw [h_eq]
+  have x_pos : 0 < (x : ℕ) := by nlinarith
+  have xz_BB : (x : ℕ) * z < 2013265921 := by nlinarith
+  have h_eq_BB : 65536 = x * z := by simp [Fin.ext_iff, Fin.mul_def]; omega
+  rw [h_eq_BB]
+  rw [mul_comm x z, ← mul_assoc, ← right_distrib]
+  intro eq; apply mul_right_cancel₀ (by omega) at eq; rw [eq]
+  congr
+  rw [Fin.ext_iff]; simp [Fin.mul_def]
+  rw [Nat.mod_eq_of_lt (by nlinarith)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  aesop
+
+lemma cancel_mul_65536_v2 { b c x : Fin BB } (h_dvd : (x : ℕ) ∣ 65536) : b * 65536 + c * x = 0 → b * ((65536 : ℕ) / (x : ℕ)) + c = 0
+  := by intro h_eq; symm; apply cancel_mul_65536_v1 <;> aesop
+
+lemma is_mod_64 {c0 m : Fin BB} : m < 64 → c0 < 65536 → ((c0 - m) * 1981808641).val < 1024 → c0.val % 64 = m := by
+  simp [Fin.sub_def, Fin.mul_def, Fin.lt_def]; ring_nf
+  intro hm hc hdiff
+  suffices : (BitVec.ofNat 64 c0.val) % 64#64 = BitVec.ofNat 64 m.val
+  . simp [BitVec.toNat_eq] at this
+    repeat rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)] at this
+    assumption
+  . suffices : ((2013265921 - BitVec.ofNat 64 ↑m) * BitVec.ofNat 64 1981808641 + BitVec.ofNat 64 ↑c0 * 1981808641#64) % 2013265921#64 < 1024#64
+    . clear hdiff
+      have : BitVec.ofNat 64 c0.val < 65536 := by simp; omega
+      have : BitVec.ofNat 64 m.val < 64 := by simp; omega
+      clear hm
+      trans (BitVec.ofNat 64 ↑c0) &&& 63#64
+      . bv_decide
+      . bv_decide
+    . rw [← BitVec.ult_iff_lt]
+      rw [BitVec.ult_eq_decide, decide_eq_true_eq, BitVec.toNat_umod, BitVec.toNat_add, BitVec.toNat_mul, BitVec.toNat_mul]
+      simp [-BitVec.toNat_sub]
+      rw [BitVec.toNat_sub_of_le] <;> simp
+      . repeat rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)]
+        assumption
+      . omega
+
+end field_arithmetic
+
+section opcodes
+
+@[simp] def is_srl := Main[64] = 1 ∧ Main[31] = 0
+@[simp] def is_sra := Main[65] = 1 ∧ Main[31] = 0
+@[simp] def is_srlw := Main[66] = 1 ∧ Main[31] = 0
+@[simp] def is_sraw := Main[67] = 1 ∧ Main[31] = 0
+@[simp] def is_srli := Main[64] = 1 ∧ Main[31] = 1
+@[simp] def is_srai := Main[65] = 1 ∧ Main[31] = 1
+@[simp] def is_srliw := Main[66] = 1 ∧ Main[31] = 1
+@[simp] def is_sraiw := Main[67] = 1 ∧ Main[31] = 1
+
+lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
+  (Main[64] = 1 → Main[65] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0) ∧
+  (Main[65] = 1 → Main[64] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0) ∧
+  (Main[66] = 1 → Main[64] = 0 ∧ Main[65] = 0 ∧ Main[67] = 0) ∧
+  (Main[67] = 1 → Main[64] = 0 ∧ Main[65] = 0 ∧ Main[66] = 0)
+   := by
+
+  intro cstrs
+  simp [allHold_constraints_iff] at cstrs
+  obtain ⟨ h_msb_b3, h_msb_b1, h_msb_a1, cpu, alu,
+            b_srl, b_sra, b_srlw, b_sraw, one_of_ops, rest ⟩ := cstrs
+  clear *- b_srl b_sra b_srlw b_sraw one_of_ops
+  aesop
+
+end opcodes
+
+section is_real
+
+lemma srl_real : Main[64] = 1 → is_real Main := by simp [is_real]; aesop
+lemma sra_real : Main[65] = 1 → is_real Main := by simp [is_real]; aesop
+lemma srlw_real : Main[66] = 1 → is_real Main := by simp [is_real]; aesop
+lemma sraw_real : Main[67] = 1 → is_real Main := by simp [is_real]; aesop
+
+end is_real
+
+section bounds
+
+lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
+  let imm := Main[31]
+  Main[6] < 32 ∧ Main[14] < 32 ∧ (imm = 0 → Main[21] < 32) ∧
+  Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
+  Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] ∧
+  (imm = 1 →
+    (Main[21] = Main[25] ∧ Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
+      ((Main[64] = 1 ∨ Main[65] = 1 → Main[25] < 64) ∧
+       (Main[66] = 1 ∨ Main[67] = 1 → Main[25] < 32)))) ∧
+  (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0)
+  := by
+  intro cstrs real
+  simp [allHold_constraints_iff] at cstrs
+  obtain ⟨ h0, h1, h2, h3, alu,
+            b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4 ⟩ := cstrs
+  clear h0 h1 h2 h3 h4
+  simp [is_real] at real
+  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
+  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu; simp_all
+    by_cases srl : Main[64] = 0
+    . by_cases sra : Main[65] = 0
+      . by_cases srlw : Main[66] = 0
+        . by_cases sraw : Main[67] = 0
+          . clear *- real srl sra srlw sraw; aesop
+          . simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
+            split_ands
+            . rcases b_imm <;> simp_all
+            . rcases b_imm <;> simp_all
+              apply Word.isU64_of_cases <;> simp; omega
+            . aesop
+        . have : Main[67] = 0 := by
+            clear *- real b_srl b_sra b_srlw b_sraw srl sra srlw one_of_ops
+            aesop
+          simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
+          split_ands
+          . rcases b_imm <;> simp_all
+          . rcases b_imm <;> simp_all
+            apply Word.isU64_of_cases <;> simp; omega
+          . aesop
+      . have : Main[66] = 0 ∧ Main[67] = 0 := by
+          clear *- real b_srl b_sra b_srlw b_sraw srl sra one_of_ops
+          aesop
+        simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
+        split_ands
+        . rcases b_imm <;> simp_all
+        . rcases b_imm <;> simp_all
+          apply Word.isU64_of_cases <;> simp; omega
+        . aesop
+    . have : Main[65] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0 := by
+        clear *- real b_srl b_sra b_srlw b_sraw srl one_of_ops
+        aesop
+      simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
+      split_ands
+      . rcases b_imm <;> simp_all
+      . rcases b_imm <;> simp_all
+        apply Word.isU64_of_cases <;> simp; omega
+      . aesop
+  . clear alu; aesop
+
+end bounds
+
+section operands
+
+@[simp]
+def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
+  intro cstrs real
+  refine BitVec.ofNatLT Main[6] ?_
+  show Main[6] < 32
+  have := bounds Main cstrs real
+  tauto
+
+@[simp]
+def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
+  intro cstrs real
+  refine BitVec.ofNatLT Main[14] ?_
+  show Main[14] < 32
+  have := bounds Main cstrs real
+  tauto
+
+@[simp]
+def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 0 → BitVec 5 := by
+  intro cstrs real imm
+  refine BitVec.ofNatLT Main[21] ?_
+  show Main[21] < 32
+  have := bounds Main cstrs real
+  tauto
+
+@[simp]
+def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[64] = 1 ∨ Main[65] = 1 → BitVec 6 := by
+  intro cstrs real imm nw
+  refine BitVec.ofNatLT Main[21] ?_
+  have ⟨ _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
+  simp_all
+  have ⟨ _, _, _, _, _ ⟩ := h_imm
+  tauto
+
+@[simp]
+def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[66] = 1 ∨ Main[67] = 1 → BitVec 5 := by
+  intro cstrs real imm nw
+  refine BitVec.ofNatLT Main[21] ?_
+  have ⟨ _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
+  simp_all
+  have ⟨ _, _, _, _, _ ⟩ := h_imm
+  tauto
+
+end operands
+
+section srl
+
+lemma spec.srl (h : is_srl Main ) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRL
+  := by sorry
+    -- intro cstrs
+    -- obtain ⟨ eq_srl, eq_imm ⟩ := h
+    -- have ⟨ h0, h1, h2, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (srl_real Main eq_srl)
+    -- clear h0 h1 h2 h3 h4
+    -- obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
+    -- obtain ⟨ c0_16, c1_16, c2_16, c3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_c
+    -- obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
+
+    -- simp [allHold_constraints_iff] at cstrs
+
+    -- set b0 := Main[15]
+    -- set b1 := Main[16]
+    -- set b2 := Main[17]
+    -- set b3 := Main[18]
+    -- set c0 := Main[25]
+    -- set c1 := Main[26]
+    -- set c2 := Main[27]
+    -- set c3 := Main[28]
+    -- set imm := Main[31]
+    -- set a0 := Main[32]
+    -- set a1 := Main[33]
+    -- set a2 := Main[34]
+    -- set a3 := Main[35]
+    -- set msb_b := Main[36]
+    -- set msb_srw := Main[37]
+    -- set cb0 := Main[38]
+    -- set cb1 := Main[39]
+    -- set cb2 := Main[40]
+    -- set cb3 := Main[41]
+    -- set cb4 := Main[42]
+    -- set cb5 := Main[43]
+    -- set smv := Main[44]
+    -- set v0123 := Main[45]
+    -- set v012 := Main[46]
+    -- set v01 := Main[47]
+    -- set ll0 := Main[48]
+    -- set ll1 := Main[49]
+    -- set ll2 := Main[50]
+    -- set ll3 := Main[51]
+    -- set hl0 := Main[52]
+    -- set hl1 := Main[53]
+    -- set hl2 := Main[54]
+    -- set hl3 := Main[55]
+    -- set lr0 := Main[56]
+    -- set lr1 := Main[57]
+    -- set lr2 := Main[58]
+    -- set lr3 := Main[59]
+    -- set su160 := Main[60]
+    -- set su161 := Main[61]
+    -- set su162 := Main[62]
+    -- set su163 := Main[63]
+    -- set srl := Main[64]
+    -- set sra := Main[65]
+    -- set srlw := Main[66]
+    -- set sraw := Main[67]
+    -- set bop := Main[68]
+
+    -- obtain ⟨ h_msb_b3, h_msb_b1, h_msb_a1, cpu, alu,
+    --          b_srl, b_sra, b_srlw, b_sraw, one_of_ops, eq_bop,
+    --          b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
+    --          h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, one_of_su16s,
+    --          eq_v01, eq_v012, eq_v0123,
+    --          lt_ll0, lt_hl0, h_b0_dec, lt_ll1, lt_hl1, h_b1_dec,
+    --          lt_ll2, lt_hl2, h_b2_dec, lt_ll3, lt_hl3, h_b3_dec,
+    --          eq_lr0, eq_lr1, eq_lr2, eq_lr3,
+    --          w_msb_b, eq_smv, w_msb_srv,
+    --          nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
+    --          w_00, w_01, w_02, w_03, w_04, w_05 ⟩ := cstrs
+    -- clear h_msb_b3 h_msb_b1 h_msb_a1 cpu alu
+
+    -- simp_all
+
+    -- rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
+
+    -- have : ((Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 64) = c0.val % 64 := by
+    --   rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
+    --   omega
+    -- rw [this]; clear this
+    -- have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
+    --   rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . omega
+    --   . exact diff
+    -- clear diff
+
+    -- rw [this]; clear this
+    -- rw [Word.toBitVec64_toNat (w := #v[b0, b1, b2, b3]) (by apply Word.isU64_of_cases <;> simp <;> assumption)]
+    -- simp [Word.toNat]
+
+    -- -- 64-way case split
+    -- rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
+    -- rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
+    -- simp_all <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b0_dec) <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec) <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b2_dec) <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b3_dec) <;>
+    -- simp_all
+
+    -- all_goals {
+    --   rw [Word.toBitVec64_toNat]
+    --   . simp [Word.toNat]
+    --     try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
+    --     repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+    --     try omega
+    --   . apply Word.isU64_of_cases <;> simp [Fin.val_add, Fin.val_mul] <;>
+    --     (repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]) <;>
+    --     omega
+    -- }
+
+end srl
+
+section srli
+
+lemma spec.srli (h : is_srli Main ) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRL
+  := by sorry
+    -- intro cstrs
+    -- obtain ⟨ eq_srl, eq_imm ⟩ := h
+    -- have ⟨ h0, h1, h2, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (srl_real Main eq_srl)
+    -- clear h0 h1 h2 h3
+    -- rw [eq_imm] at imm_zeros; simp_all
+    -- obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
+    -- obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := imm_zeros
+    -- obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
+
+    -- simp [allHold_constraints_iff] at cstrs
+
+    -- set b0 := Main[15]
+    -- set b1 := Main[16]
+    -- set b2 := Main[17]
+    -- set b3 := Main[18]
+    -- set c0 := Main[25]
+    -- set c1 := Main[26]
+    -- set c2 := Main[27]
+    -- set c3 := Main[28]
+    -- set imm := Main[31]
+    -- set a0 := Main[32]
+    -- set a1 := Main[33]
+    -- set a2 := Main[34]
+    -- set a3 := Main[35]
+    -- set msb_b := Main[36]
+    -- set msb_srw := Main[37]
+    -- set cb0 := Main[38]
+    -- set cb1 := Main[39]
+    -- set cb2 := Main[40]
+    -- set cb3 := Main[41]
+    -- set cb4 := Main[42]
+    -- set cb5 := Main[43]
+    -- set smv := Main[44]
+    -- set v0123 := Main[45]
+    -- set v012 := Main[46]
+    -- set v01 := Main[47]
+    -- set ll0 := Main[48]
+    -- set ll1 := Main[49]
+    -- set ll2 := Main[50]
+    -- set ll3 := Main[51]
+    -- set hl0 := Main[52]
+    -- set hl1 := Main[53]
+    -- set hl2 := Main[54]
+    -- set hl3 := Main[55]
+    -- set lr0 := Main[56]
+    -- set lr1 := Main[57]
+    -- set lr2 := Main[58]
+    -- set lr3 := Main[59]
+    -- set su160 := Main[60]
+    -- set su161 := Main[61]
+    -- set su162 := Main[62]
+    -- set su163 := Main[63]
+    -- set srl := Main[64]
+    -- set sra := Main[65]
+    -- set srlw := Main[66]
+    -- set sraw := Main[67]
+    -- set bop := Main[68]
+
+    -- obtain ⟨ h_msb_b3, h_msb_b1, h_msb_a1, cpu, alu,
+    --          b_srl, b_sra, b_srlw, b_sraw, one_of_ops, eq_bop,
+    --          b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
+    --          h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, one_of_su16s,
+    --          eq_v01, eq_v012, eq_v0123,
+    --          lt_ll0, lt_hl0, h_b0_dec, lt_ll1, lt_hl1, h_b1_dec,
+    --          lt_ll2, lt_hl2, h_b2_dec, lt_ll3, lt_hl3, h_b3_dec,
+    --          eq_lr0, eq_lr1, eq_lr2, eq_lr3,
+    --          w_msb_b, eq_smv, w_msb_srv,
+    --          nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
+    --          w_00, w_01, w_02, w_03, w_04, w_05 ⟩ := cstrs
+    -- clear h_msb_b3 h_msb_b1 h_msb_a1 cpu alu
+
+    -- simp_all
+
+    -- rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
+
+    -- have : ((Word.toBitVec64 #v[c0, 0, 0, 0]).toNat % 64) = c0.val % 64 := by
+    --   rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
+    -- rw [this]; clear this
+    -- have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
+    --   rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . omega
+    --   . exact diff
+
+    -- rw [this]; clear this
+    -- rw [Word.toBitVec64_toNat (w := #v[b0, b1, b2, b3]) (by apply Word.isU64_of_cases <;> simp <;> assumption)]
+    -- simp [Word.toNat]
+
+    -- -- 64-way case split
+    -- rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
+    -- rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
+    -- simp_all <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b0_dec) <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec) <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b2_dec) <;>
+    -- (try apply cancel_mul_65536_v1 (by simp) at h_b3_dec) <;>
+    -- simp_all
+
+    -- all_goals {
+    --   rw [Word.toBitVec64_toNat]
+    --   . simp [Word.toNat]
+    --     try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
+    --     repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+    --     try omega
+    --   . apply Word.isU64_of_cases <;> simp [Fin.val_add, Fin.val_mul] <;>
+    --     (repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]) <;>
+    --     omega
+    -- }
+
+end srli
+
+section srlw
+
+lemma spec.srlw (h : is_srlw Main) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRLW
+  := by sorry
+    -- intro cstrs
+    -- obtain ⟨ eq_srlw, eq_imm ⟩ := h
+    -- have ⟨ h0, h1, h2, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (srlw_real Main eq_srlw)
+    -- clear h0 h1 h2 h3 h4
+    -- obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
+    -- obtain ⟨ c0_16, c1_16, c2_16, c3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_c
+    -- obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
+
+    -- simp [allHold_constraints_iff] at cstrs
+
+    -- set b0 := Main[15]
+    -- set b1 := Main[16]
+    -- set b2 := Main[17]
+    -- set b3 := Main[18]
+    -- set c0 := Main[25]
+    -- set c1 := Main[26]
+    -- set c2 := Main[27]
+    -- set c3 := Main[28]
+    -- set imm := Main[31]
+    -- set a0 := Main[32]
+    -- set a1 := Main[33]
+    -- set a2 := Main[34]
+    -- set a3 := Main[35]
+    -- set msb_b := Main[36]
+    -- set msb_srw := Main[37]
+    -- set cb0 := Main[38]
+    -- set cb1 := Main[39]
+    -- set cb2 := Main[40]
+    -- set cb3 := Main[41]
+    -- set cb4 := Main[42]
+    -- set cb5 := Main[43]
+    -- set smv := Main[44]
+    -- set v0123 := Main[45]
+    -- set v012 := Main[46]
+    -- set v01 := Main[47]
+    -- set ll0 := Main[48]
+    -- set ll1 := Main[49]
+    -- set ll2 := Main[50]
+    -- set ll3 := Main[51]
+    -- set hl0 := Main[52]
+    -- set hl1 := Main[53]
+    -- set hl2 := Main[54]
+    -- set hl3 := Main[55]
+    -- set lr0 := Main[56]
+    -- set lr1 := Main[57]
+    -- set lr2 := Main[58]
+    -- set lr3 := Main[59]
+    -- set su160 := Main[60]
+    -- set su161 := Main[61]
+    -- set su162 := Main[62]
+    -- set su163 := Main[63]
+    -- set srl := Main[64]
+    -- set sra := Main[65]
+    -- set srlw := Main[66]
+    -- set sraw := Main[67]
+    -- set bop := Main[68]
+
+    -- obtain ⟨ h_msb_b3, h_msb_b1, h_msb_a1, cpu, alu,
+    --          b_srl, b_sra, b_srlw, b_sraw, one_of_ops, eq_bop,
+    --          b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
+    --          h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, one_of_su16s,
+    --          eq_v01, eq_v012, eq_v0123,
+    --          lt_ll0, lt_hl0, h_b0_dec, lt_ll1, lt_hl1, h_b1_dec,
+    --          lt_ll2, lt_hl2, h_b2_dec, lt_ll3, lt_hl3, h_b3_dec,
+    --          eq_lr0, eq_lr1, eq_lr2, eq_lr3,
+    --          w_msb_b, eq_smv, w_msb_srv,
+    --          nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
+    --          w_00, w_01, w_02, w_03, w_04, w_05 ⟩ := cstrs
+    -- clear h_msb_b3 h_msb_b1 cpu alu
+
+    -- symm at h_b2_dec h_b3_dec
+    -- simp_all
+
+    -- have is_U32_b : HalfWord.isU32 #v[ b0, b1 ] := by apply HalfWord.isU32_of_cases <;> assumption
+    -- have is_U32_c : HalfWord.isU32 #v[ c0, c1 ] := by apply HalfWord.isU32_of_cases <;> assumption
+
+    -- have ⟨ eq_hl2, eq_ll2 ⟩ : hl2 = 0 ∧ ll2 = 0 := by
+    --   clear *- lt_hl2 lt_ll2 b_cb0 b_cb1 b_cb2 b_cb3 h_b2_dec
+    --   rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> simp_all <;>
+    --   apply (cancel_mul_65536_v2 (by simp)) at h_b2_dec <;>
+    --   simp [Fin.ext_iff, Fin.add_def, Fin.mul_def] at h_b2_dec <;>
+    --   rw [Nat.mod_eq_of_lt (by omega)] at h_b2_dec <;>
+    --   split_ands <;> omega
+
+    -- have ⟨ eq_hl3, eq_ll3 ⟩ : hl3 = 0 ∧ ll3 = 0 := by
+    --   clear *- lt_hl3 lt_ll3 b_cb0 b_cb1 b_cb2 b_cb3 h_b3_dec
+    --   rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> simp_all <;>
+    --   apply (cancel_mul_65536_v2 (by simp)) at h_b3_dec <;>
+    --   simp [Fin.ext_iff, Fin.add_def, Fin.mul_def] at h_b3_dec <;>
+    --   rw [Nat.mod_eq_of_lt (by omega)] at h_b3_dec <;>
+    --   split_ands <;> omega
+
+    -- simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
+    -- simp_all
+
+    -- have : ((Word.low32 #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
+    --   simp [Word.low32, HalfWord.toBitVec32_toNat is_U32_c, HalfWord.toNat];
+    --   omega
+    -- rw [this]; clear this
+    -- simp [Word.low32]
+
+    -- have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
+    --   rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . omega
+    --   . exact diff
+    -- clear diff
+
+    -- have : c0.val % 32 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 := by
+    --   trans (c0.val % 64) % 32
+    --   . omega
+    --   . rw [c0_mod_64]
+    --     clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    -- clear c0_mod_64
+
+    -- have h_isU32_a : HalfWord.isU32 #v[ a0, a1 ] := by
+    --   clear this
+    --   have : hl1.val < 65536 := by
+    --     rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;>
+    --     simp_all <;> clear *- lt_hl1 <;> omega
+    --   rcases b_cb4 <;> apply HalfWord.isU32_of_cases <;> simp_all
+    --   rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;>
+    --   simp_all
+
+    --   all_goals {
+    --     clear *- lt_hl0 lt_ll1 h_b0_dec h_b1_dec b0_16 b1_16
+    --     apply cancel_mul_65536_v1 (by simp) at h_b0_dec
+    --     apply cancel_mul_65536_v1 (by simp) at h_b1_dec
+    --     simp [Fin.add_def, Fin.mul_def]
+    --     rw [Nat.mod_eq_of_lt (by omega)]
+    --     omega
+    --   }
+
+    -- have ⟨ _, _ ⟩ := HalfWord.lt_cases_of_isU32 h_isU32_a
+
+    -- have h_a3 : a3 = if (HalfWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
+    --   simp_all
+    --   have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
+    --   simp at h_msb; rw [h_msb]
+    --   trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
+    --   . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
+    --   . congr; rw [HalfWord.isNegative_msb _ h_isU32_a]
+
+    -- . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = (HalfWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
+    --   . rw [← hw_shift]
+    --     rw [HalfWord.sign_extend_32_to_64_msb]
+    --     simp_all; congr
+    --   . rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
+    --     rw [HalfWord.toBitVec32_toNat h_isU32_a, HalfWord.toBitVec32_toNat is_U32_b]
+    --     rw [this]; clear this h_a3
+
+    --     cases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
+    --     rcases b_cb3 <;> rcases b_cb4 <;> simp_all
+
+    --     all_goals {
+    --       (try apply cancel_mul_65536_v1 (by simp) at h_b0_dec)
+    --       (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec)
+    --       simp_all [HalfWord.toNat]
+    --       try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
+    --       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+    --       omega
+    --     }
+
+end srlw
+
+section srliw
+
+lemma spec.srliw (h : is_srliw Main ) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRLW
+  := by sorry
+    -- intro cstrs
+    -- obtain ⟨ eq_srlw, eq_imm ⟩ := h
+    -- have ⟨ h0, h1, h2, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (srlw_real Main eq_srlw)
+    -- clear h0 h1 h2 h3
+    -- rw [eq_imm] at imm_zeros; simp_all
+    -- obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
+    -- obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := imm_zeros
+    -- obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
+
+    -- simp [allHold_constraints_iff] at cstrs
+
+    -- set b0 := Main[15]
+    -- set b1 := Main[16]
+    -- set b2 := Main[17]
+    -- set b3 := Main[18]
+    -- set c0 := Main[25]
+    -- set c1 := Main[26]
+    -- set c2 := Main[27]
+    -- set c3 := Main[28]
+    -- set imm := Main[31]
+    -- set a0 := Main[32]
+    -- set a1 := Main[33]
+    -- set a2 := Main[34]
+    -- set a3 := Main[35]
+    -- set msb_b := Main[36]
+    -- set msb_srw := Main[37]
+    -- set cb0 := Main[38]
+    -- set cb1 := Main[39]
+    -- set cb2 := Main[40]
+    -- set cb3 := Main[41]
+    -- set cb4 := Main[42]
+    -- set cb5 := Main[43]
+    -- set smv := Main[44]
+    -- set v0123 := Main[45]
+    -- set v012 := Main[46]
+    -- set v01 := Main[47]
+    -- set ll0 := Main[48]
+    -- set ll1 := Main[49]
+    -- set ll2 := Main[50]
+    -- set ll3 := Main[51]
+    -- set hl0 := Main[52]
+    -- set hl1 := Main[53]
+    -- set hl2 := Main[54]
+    -- set hl3 := Main[55]
+    -- set lr0 := Main[56]
+    -- set lr1 := Main[57]
+    -- set lr2 := Main[58]
+    -- set lr3 := Main[59]
+    -- set su160 := Main[60]
+    -- set su161 := Main[61]
+    -- set su162 := Main[62]
+    -- set su163 := Main[63]
+    -- set srl := Main[64]
+    -- set sra := Main[65]
+    -- set srlw := Main[66]
+    -- set sraw := Main[67]
+    -- set bop := Main[68]
+
+    -- obtain ⟨ h_msb_b3, h_msb_b1, h_msb_a1, cpu, alu,
+    --          b_srl, b_sra, b_srlw, b_sraw, one_of_ops, eq_bop,
+    --          b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
+    --          h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, one_of_su16s,
+    --          eq_v01, eq_v012, eq_v0123,
+    --          lt_ll0, lt_hl0, h_b0_dec, lt_ll1, lt_hl1, h_b1_dec,
+    --          lt_ll2, lt_hl2, h_b2_dec, lt_ll3, lt_hl3, h_b3_dec,
+    --          eq_lr0, eq_lr1, eq_lr2, eq_lr3,
+    --          w_msb_b, eq_smv, w_msb_srv,
+    --          nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
+    --          w_00, w_01, w_02, w_03, w_04, w_05 ⟩ := cstrs
+    -- clear h_msb_b3 h_msb_b1 cpu alu
+
+    -- symm at h_b2_dec h_b3_dec
+    -- simp_all
+
+    -- have is_U32_b : HalfWord.isU32 #v[ b0, b1 ] := by apply HalfWord.isU32_of_cases <;> assumption
+    -- have is_U32_c : HalfWord.isU32 #v[ c0, 0 ] := by apply HalfWord.isU32_of_cases <;> simp; omega
+
+    -- have ⟨ eq_hl2, eq_ll2 ⟩ : hl2 = 0 ∧ ll2 = 0 := by
+    --   clear *- lt_hl2 lt_ll2 b_cb0 b_cb1 b_cb2 b_cb3 h_b2_dec
+    --   rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> simp_all <;>
+    --   apply (cancel_mul_65536_v2 (by simp)) at h_b2_dec <;>
+    --   simp [Fin.ext_iff, Fin.add_def, Fin.mul_def] at h_b2_dec <;>
+    --   rw [Nat.mod_eq_of_lt (by omega)] at h_b2_dec <;>
+    --   split_ands <;> omega
+
+    -- have ⟨ eq_hl3, eq_ll3 ⟩ : hl3 = 0 ∧ ll3 = 0 := by
+    --   clear *- lt_hl3 lt_ll3 b_cb0 b_cb1 b_cb2 b_cb3 h_b3_dec
+    --   rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> simp_all <;>
+    --   apply (cancel_mul_65536_v2 (by simp)) at h_b3_dec <;>
+    --   simp [Fin.ext_iff, Fin.add_def, Fin.mul_def] at h_b3_dec <;>
+    --   rw [Nat.mod_eq_of_lt (by omega)] at h_b3_dec <;>
+    --   split_ands <;> omega
+
+    -- simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
+    -- simp_all
+
+    -- have : ((Word.low32 #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
+    --   simp [Word.low32, HalfWord.toBitVec32_toNat is_U32_c, HalfWord.toNat]
+    -- rw [this]; clear this
+    -- simp [Word.low32]
+
+    -- have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
+    --   rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    --   . omega
+    --   . exact diff
+    -- clear diff
+
+    -- have : c0.val % 32 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 := by
+    --   trans (c0.val % 64) % 32
+    --   . omega
+    --   . rw [c0_mod_64]
+    --     clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    --     omega
+    -- clear c0_mod_64
+
+    -- have h_isU32_a : HalfWord.isU32 #v[ a0, a1 ] := by
+    --   clear this
+    --   have : hl1.val < 65536 := by
+    --     rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;>
+    --     simp_all <;> clear *- lt_hl1 <;> omega
+    --   rcases b_cb4 <;> apply HalfWord.isU32_of_cases <;> simp_all
+    --   rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;>
+    --   simp_all
+
+    --   all_goals {
+    --     clear *- lt_hl0 lt_ll1 h_b0_dec h_b1_dec b0_16 b1_16
+    --     apply cancel_mul_65536_v1 (by simp) at h_b0_dec
+    --     apply cancel_mul_65536_v1 (by simp) at h_b1_dec
+    --     simp [Fin.add_def, Fin.mul_def]
+    --     rw [Nat.mod_eq_of_lt (by omega)]
+    --     omega
+    --   }
+
+    -- have ⟨ _, _ ⟩ := HalfWord.lt_cases_of_isU32 h_isU32_a
+
+    -- have h_a3 : a3 = if (HalfWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
+    --   simp_all
+    --   have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
+    --   simp at h_msb; rw [h_msb]
+    --   trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
+    --   . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
+    --   . congr; rw [HalfWord.isNegative_msb _ h_isU32_a]
+
+    -- . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = (HalfWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
+    --   . rw [← hw_shift]
+    --     rw [HalfWord.sign_extend_32_to_64_msb]
+    --     simp_all; congr
+    --   . rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
+    --     rw [HalfWord.toBitVec32_toNat h_isU32_a, HalfWord.toBitVec32_toNat is_U32_b]
+    --     rw [this]; clear this h_a3
+
+    --     cases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
+    --     rcases b_cb3 <;> rcases b_cb4 <;> simp_all
+
+    --     all_goals {
+    --       (try apply cancel_mul_65536_v1 (by simp) at h_b0_dec)
+    --       (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec)
+    --       simp_all [HalfWord.toNat]
+    --       try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
+    --       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+    --       omega
+    --     }
+
+end srliw
+
+section sra
+
+lemma spec.sra (h : is_sra Main ) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRA
+  := by sorry
+
+end sra
+
+section srai
+
+lemma spec.srai (h : is_srai Main ) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRA
+  := by sorry
+
+end srai
+
+section sraw
+
+lemma spec.sraw (h : is_sraw Main) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRAW
+  := by sorry
+
+end sraw
+
+section sraiw
+
+lemma spec.sraiw (h : is_sraiw Main ) :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SRAW
+  := by sorry
+
+end sraiw
+
+  end ShiftRight
