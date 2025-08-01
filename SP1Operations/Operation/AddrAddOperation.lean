@@ -24,8 +24,11 @@ lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddrAddOperatio
     (h : (constraints a b cols 1).allHold) : 
     cols.value[0] < 65536 ∧ cols.value[1] < 65536 ∧ cols.value[2] < 65536 := by
   simp [allHold_constraints_iff] at h
-  obtain ⟨_, _, _, _, h0, h1, h2⟩ := h
-  exact ⟨h0, h1, h2⟩
+  exact ⟨
+    by show cols.value[0].val < 65536; simp_all only,
+    by show cols.value[1].val < 65536; simp_all only,
+    by show cols.value[2].val < 65536; simp_all only,
+  ⟩
 
 /-- The specification for AddrAddOperation: it computes a 3-limb addition (address addition).
     The result is stored in the lower 3 limbs, with the 4th limb being 0. -/

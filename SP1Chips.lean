@@ -42,6 +42,7 @@ import SP1Chips.Load.LoadByte.Constraints
 import SP1Chips.Load.LoadHalf.Constraints
 import SP1Chips.Load.LoadWord.Constraints
 import SP1Chips.Load.LoadDouble.Constraints
+import SP1Chips.Load.LoadDouble.U16Composition
 import SP1Chips.Load.LoadX0.Constraints
 import SP1Chips.Store.StoreByte.Constraints
 import SP1Chips.Store.StoreHalf.Constraints
