@@ -12,7 +12,9 @@
         "--backend",
         "local"
       ],
-      "env": {}
+      "env": {
+        "UV_CONSTRAINT": "requirements.txt"
+      }
     },
     "lean-lsp": {
       "type": "stdio",
@@ -20,7 +22,9 @@
       "args": [
         "lean-lsp-mcp"
       ],
-      "env": {}
+      "env": {
+        "UV_CONSTRAINT": "requirements.txt"
+      }
     }
   }
 }
