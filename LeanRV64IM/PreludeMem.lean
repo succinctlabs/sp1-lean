@@ -258,7 +258,7 @@ def write_ram_ea (wk : write_kind) (app_1 : physaddr) (width : Nat) : Unit :=
   let .Physaddr addr := app_1
   ()
 
-/-- Type quantifiers: k_ex62561# : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
+/-- Type quantifiers: k_ex62571# : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def read_ram (rk : read_kind) (app_1 : physaddr) (width : Nat) (read_meta : Bool) : SailM ((BitVec (8 * width)) × Unit) := do
   let .Physaddr addr := app_1
   let meta' :=

@@ -1,6 +1,7 @@
 import LeanRV64IM.Flow
 import LeanRV64IM.Prelude
 import LeanRV64IM.RiscvXlen
+import LeanRV64IM.RiscvRegs
 import LeanRV64IM.RiscvPcAccess
 import LeanRV64IM.RiscvSysRegs
 import LeanRV64IM.RiscvSmcntrpmf
@@ -144,7 +145,7 @@ def plat_enable_misaligned_access : Bool := false
 def plat_mtval_has_illegal_inst_bits : Bool := false
 
 def htif_tohost_base (_ : Unit) : (BitVec (bif 64 = 32 then 34 else 64)) :=
-  ((plat_htif_tohost ()))
+  (plat_htif_tohost ())
 
 /-- Type quantifiers: width : Int, width ≤ max_mem_access -/
 def within_phys_mem (typ_0 : physaddr) (width : Int) : SailM Bool := do

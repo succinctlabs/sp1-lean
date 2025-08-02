@@ -490,11 +490,11 @@ def rtype_mnemonic_backwards_matches (arg_ : String) : Bool :=
   | "sra" => true
   | _ => false
 
-/-- Type quantifiers: k_ex69468# : Bool, width : Nat, width ∈ {1, 2, 4, 8} -/
+/-- Type quantifiers: k_ex69478# : Bool, width : Nat, width ∈ {1, 2, 4, 8} -/
 def valid_load_encdec (width : Nat) (is_unsigned : Bool) : Bool :=
   ((width <b xlen_bytes) || ((not is_unsigned) && (width ≤b xlen_bytes)))
 
-/-- Type quantifiers: k_ex69471# : Bool, k_n : Nat, 0 < k_n ∧ k_n ≤ xlen -/
+/-- Type quantifiers: k_ex69481# : Bool, k_n : Nat, 0 < k_n ∧ k_n ≤ xlen -/
 def extend_value (is_unsigned : Bool) (value : (BitVec k_n)) : (BitVec 64) :=
   bif is_unsigned
   then (zero_extend (m := 64) value)
@@ -509,7 +509,7 @@ def maybe_u_backwards (arg_ : String) : SailM Bool := do
       assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
-/-- Type quantifiers: k_ex69472# : Bool -/
+/-- Type quantifiers: k_ex69482# : Bool -/
 def maybe_u_forwards_matches (arg_ : Bool) : Bool :=
   match arg_ with
   | true => true
@@ -521,7 +521,7 @@ def maybe_u_backwards_matches (arg_ : String) : Bool :=
   | "" => true
   | _ => false
 
-/-- Type quantifiers: k_ex69473# : Bool -/
+/-- Type quantifiers: k_ex69483# : Bool -/
 def effective_fence_set (set : (BitVec 4)) (fiom : Bool) : (BitVec 4) :=
   bif fiom
   then
