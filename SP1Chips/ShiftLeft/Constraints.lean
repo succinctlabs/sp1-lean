@@ -630,7 +630,7 @@ lemma spec.slli (h : is_slli Main) :
     Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLL
   := by
     intro cstrs
-    obtain ⟨ eq_srl, eq_imm ⟩ := h
+    obtain ⟨ eq_sll, eq_imm ⟩ := h
     have ⟨ h0, h1, h2, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sll_real Main eq_sll)
     clear h0 h1 h2 h3
     rw [eq_imm] at imm_zeros; simp_all
@@ -745,7 +745,7 @@ lemma spec.sllw (h : is_sllw Main) :
     Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
   := by
     intro cstrs
-    obtain ⟨ eq_srlw, eq_imm ⟩ := h
+    obtain ⟨ eq_sllw, eq_imm ⟩ := h
     have ⟨ h0, h1, h2, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
     clear h0 h1 h2 h3 h4
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
@@ -887,7 +887,7 @@ lemma spec.slliw (h : is_slliw Main) :
     Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
   := by
     intro cstrs
-    obtain ⟨ eq_srlw, eq_imm ⟩ := h
+    obtain ⟨ eq_sllw, eq_imm ⟩ := h
     have ⟨ h0, h1, h2, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
     clear h0 h1 h2 h3
     rw [eq_imm] at imm_zeros; simp_all
