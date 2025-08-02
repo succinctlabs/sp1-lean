@@ -895,6 +895,8 @@ lemma spec.slliw (h : is_slliw Main) :
     obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := imm_zeros
     obtain ⟨ sop_1, sop_2 ⟩ := single_op Main cstrs
 
+    rw [allHold_constraints_iff] at cstrs
+
     set b0 := Main[15]
     set b1 := Main[16]
     set b2 := Main[17]
