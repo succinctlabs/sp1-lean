@@ -11,10 +11,10 @@ set_option maxHeartbeats 10000000
 
 namespace Sll
 
-open ShiftRight
+open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin BB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sll : is_sll Main)
@@ -43,12 +43,12 @@ theorem correct_sll
   := by
     let ⟨ sll, imm ⟩ := h_is_sll
     have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sll_real Main sll)
-    have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
+    have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 trusted_instr_state; simp_all
+    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr trusted_instr_state; simp_all
 
     simp [spec_sll, sp1_sll, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
@@ -66,10 +66,10 @@ end Sll
 
 namespace Slli
 
-open ShiftRight
+open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin BB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slli : is_slli Main)
@@ -98,12 +98,12 @@ theorem correct_slli
   := by
     let ⟨ sll, imm ⟩ := h_is_slli
     have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sll_real Main sll)
-    have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
+    have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 trusted_instr_state; simp_all
+    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr trusted_instr_state; simp_all
 
     simp [spec_slli, sp1_slli, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
@@ -121,10 +121,10 @@ end Slli
 
 namespace Sllw
 
-open ShiftRight
+open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin BB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sllw : is_sllw Main)
@@ -153,12 +153,12 @@ theorem correct_sllw
   := by
     let ⟨ sllw, imm ⟩ := h_is_sllw
     have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sllw_real Main sllw)
-    have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
+    have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 trusted_instr_state; simp_all
+    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr trusted_instr_state; simp_all
 
     simp [spec_sllw, sp1_sllw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
@@ -176,10 +176,10 @@ end Sllw
 
 namespace Slliw
 
-open ShiftRight
+open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin BB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slliw : is_slliw Main)
@@ -208,12 +208,12 @@ theorem correct_slliw
   := by
     let ⟨ sllw, imm ⟩ := h_is_slliw
     have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sllw_real Main sllw)
-    have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
+    have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 trusted_instr_state; simp_all
+    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr trusted_instr_state; simp_all
 
     simp [spec_slliw, sp1_slliw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
