@@ -286,6 +286,20 @@ lemma rX_bits_eq_get_reg? {s : SailState} (idx : BitVec 5) :
       | none => rfl
       | some _ => rfl
 
+lemma rX_bits_eq_get_reg?_no_run {s : SailState} (idx : BitVec 5) :
+    (rX_bits (regidx.Regidx idx)) s = ((s.get_reg? idx).toSailM) s := by
+    fin_cases idx
+    · simp
+      congr
+    all_goals
+      simp [Option.toSailM, SailState.get_reg?] at *
+      simp [reg_idx_to_Register, Option.elim]
+      simp [rX_bits, rX, Sail.readReg, PreSail.readReg, regval_from_reg]
+      simpM
+      match s.regs.get? _ with
+      | none => rfl
+      | some _ => rfl
+
 @[simp]
 lemma run_rX_bits (idx : BitVec 5) :
     (rX_bits (.Regidx idx)).run s =
