@@ -17,3 +17,12 @@ macro_rules
      | extract_from_and h_left
      | extract_from_and h_right)
 )
+
+/-- Simplify monadic operations. Use `simpM +run` to also simplify `EStateM.run`. -/
+syntax "simpM" "+run" : tactic
+
+macro "simpM" : tactic => 
+  `(tactic| simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet])
+
+macro "simpM" "+run" : tactic => 
+  `(tactic| simp [bind, StateT.bind, EStateM.bind, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, StateT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet, EStateM.run])

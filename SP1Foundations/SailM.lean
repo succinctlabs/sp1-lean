@@ -1,4 +1,5 @@
 import SP1Foundations.Register
+import SP1Foundations.Tactics
 
 open LeanRV64IM.Functions
 
