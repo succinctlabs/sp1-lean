@@ -1,5 +1,6 @@
 import SP1Foundations
 import SP1Chips.Branch.Constraints
+import LeanRV64IM.Specialization
 import LeanRV64IM.RiscvInstsEnd
 
 set_option autoImplicit false
@@ -22,15 +23,6 @@ variable
   -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
 
 -- include Main cstrs s h_is_real
-
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
 
 namespace BEQ
 
@@ -231,13 +223,6 @@ theorem correct_beq
       unfold EStateM.run at this
       simp [currentlyEnabled, hartSupports, this]
 
-      -- THIS IS SO CURSED! WHY DO I NEED THIS WRAPPER?!
-      -- simp [writeReg, PreSail.writeReg]
-      -- simpM
-      -- rw [map_pure (fun a ↦ RETIRE_SUCCESS)]
-      rw [helper]
-
-      simpM
       simp [writeReg, PreSail.writeReg]
       simpM
       apply congrArg

@@ -16,15 +16,6 @@ variable
 
 -- include Main cstrs s h_is_real
 
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
-
 namespace BGE
 
 variable
@@ -274,9 +265,6 @@ theorem correct_bge
       simp [currentlyEnabled, hartSupports, this]
       clear this
 
-      rw [helper]
-
-      simpM
       simp [writeReg, PreSail.writeReg]
       simpM
       apply congrArg
@@ -380,9 +368,6 @@ theorem correct_bge
     simp [currentlyEnabled, hartSupports, this]
     clear this
 
-    rw [helper]
-
-    simpM
     simp [writeReg, PreSail.writeReg]
     simpM
     apply congrArg
