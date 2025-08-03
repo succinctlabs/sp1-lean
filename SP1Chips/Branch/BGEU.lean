@@ -165,14 +165,14 @@ theorem correct_bgeu
           have h_ult_prop : op_a_val < op_b_val := BitVec.ult_iff_lt.mp h_ltu
           clear * - h_ult_prop
           aesop
-      have h_actual_ltu : (op_b_val.toNat ≤b op_a_val.toNat) = false :=
+      have h_actual_ltu : (op_b_val.toNat ≤ op_a_val.toNat) = false :=
         by
           clear * - h_ltu
           simp [BitVec.ult] at *
           trivial
       simp only [op_a_val, op_b_val] at h_ltu h_neq h_actual_ltu
       simp [h_actual_ltu]
-      simpM
+      simpM +run
       apply congrArg
 
       simp [BitVec.ult] at h_ltu
@@ -216,7 +216,7 @@ theorem correct_bgeu
       simp [zopz0zKzJ_u]
       simp only [op_a_val, op_b_val, BitVec.ult] at h_eq h_geu
       simp [h_eq]
-      simpM
+      simpM +run
 
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -322,7 +322,7 @@ theorem correct_bgeu
     simp only [op_a_val, op_b_val, BitVec.ult] at h_neq h_geu
     simp [op_a_val, op_b_val] at h_actual_geu
     simp [h_actual_geu]
-    simpM
+    simpM +run
 
     simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
     rw [Std.ExtDHashMap.get?_insert]

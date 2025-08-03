@@ -157,7 +157,7 @@ def dec_bits_1_forwards (arg_ : (BitVec 1)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (1, s) => (some s)
@@ -177,7 +177,7 @@ def dec_bits_1_forwards_matches (arg_ : (BitVec 1)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (1, s) => (some true)
@@ -196,7 +196,7 @@ def dec_bits_2_forwards (arg_ : (BitVec 2)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (2, s) => (some s)
@@ -216,7 +216,7 @@ def dec_bits_2_forwards_matches (arg_ : (BitVec 2)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (2, s) => (some true)
@@ -235,7 +235,7 @@ def dec_bits_3_forwards (arg_ : (BitVec 3)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (3, s) => (some s)
@@ -255,7 +255,7 @@ def dec_bits_3_forwards_matches (arg_ : (BitVec 3)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (3, s) => (some true)
@@ -274,7 +274,7 @@ def dec_bits_4_forwards (arg_ : (BitVec 4)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (4, s) => (some s)
@@ -294,7 +294,7 @@ def dec_bits_4_forwards_matches (arg_ : (BitVec 4)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (4, s) => (some true)
@@ -313,7 +313,7 @@ def dec_bits_5_forwards (arg_ : (BitVec 5)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (5, s) => (some s)
@@ -333,7 +333,7 @@ def dec_bits_5_forwards_matches (arg_ : (BitVec 5)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (5, s) => (some true)
@@ -352,7 +352,7 @@ def dec_bits_6_forwards (arg_ : (BitVec 6)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (6, s) => (some s)
@@ -372,7 +372,7 @@ def dec_bits_6_forwards_matches (arg_ : (BitVec 6)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (6, s) => (some true)
@@ -391,7 +391,7 @@ def dec_bits_7_forwards (arg_ : (BitVec 7)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (7, s) => (some s)
@@ -411,7 +411,7 @@ def dec_bits_7_forwards_matches (arg_ : (BitVec 7)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (7, s) => (some true)
@@ -430,7 +430,7 @@ def dec_bits_8_forwards (arg_ : (BitVec 8)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (8, s) => (some s)
@@ -450,7 +450,7 @@ def dec_bits_8_forwards_matches (arg_ : (BitVec 8)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (8, s) => (some true)
@@ -469,7 +469,7 @@ def dec_bits_9_forwards (arg_ : (BitVec 9)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (9, s) => (some s)
@@ -489,7 +489,7 @@ def dec_bits_9_forwards_matches (arg_ : (BitVec 9)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (9, s) => (some true)
@@ -508,7 +508,7 @@ def dec_bits_10_forwards (arg_ : (BitVec 10)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (10, s) => (some s)
@@ -528,7 +528,7 @@ def dec_bits_10_forwards_matches (arg_ : (BitVec 10)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (10, s) => (some true)
@@ -547,7 +547,7 @@ def dec_bits_32_forwards (arg_ : (BitVec 32)) : SailM String := do
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (32, s) => (some s)
@@ -567,7 +567,7 @@ def dec_bits_32_forwards_matches (arg_ : (BitVec 32)) : Bool :=
   let head_exp_ := arg_
   match (match head_exp_ with
   | mapping0_ =>
-    (bif (dec_bits_forwards_matches mapping0_)
+    (if (dec_bits_forwards_matches mapping0_)
     then
       (match (dec_bits_forwards mapping0_) with
       | (32, s) => (some true)

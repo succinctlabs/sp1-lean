@@ -138,10 +138,10 @@ open AccessType
 def default_meta : mem_meta := ()
 
 /-- Type quantifiers: width : Nat, 1 ≤ width ∧ width ≤ 4096 -/
-def __WriteRAM_Meta (addr : (BitVec (bif 64 = 32 then 34 else 64))) (width : Nat) (meta' : Unit) : Unit :=
+def __WriteRAM_Meta (addr : (BitVec (if 64 = 32 then 34 else 64))) (width : Nat) (meta' : Unit) : Unit :=
   ()
 
 /-- Type quantifiers: width : Nat, 1 ≤ width ∧ width ≤ 4096 -/
-def __ReadRAM_Meta (addr : (BitVec (bif 64 = 32 then 34 else 64))) (width : Nat) : Unit :=
+def __ReadRAM_Meta (addr : (BitVec (if 64 = 32 then 34 else 64))) (width : Nat) : Unit :=
   default_meta
 

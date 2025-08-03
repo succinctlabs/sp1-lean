@@ -642,7 +642,7 @@ macro_rules | `(tactic| decreasing_trivial) => `(tactic|
   | grind
   | decide)
 
--- This lemma replaces `bif` by `if` in functions when Lean is trying to prove
+-- This lemma replaces `if` by `if` in functions when Lean is trying to prove
 -- termination.
 @[wf_preprocess]
 theorem cond_eq_ite (b : Bool) (x y : α) : cond b x y = ite b x y := by cases b <;> rfl

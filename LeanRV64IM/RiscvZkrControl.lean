@@ -156,13 +156,13 @@ def opst_code_forwards (arg_ : seed_opst) : (BitVec 2) :=
 
 def opst_code_backwards (arg_ : (BitVec 2)) : seed_opst :=
   let b__0 := arg_
-  bif (b__0 == (0b00 : (BitVec 2)))
+  if (b__0 == (0b00 : (BitVec 2)))
   then BIST
   else
-    (bif (b__0 == (0b01 : (BitVec 2)))
+    (if (b__0 == (0b01 : (BitVec 2)))
     then WAIT
     else
-      (bif (b__0 == (0b10 : (BitVec 2)))
+      (if (b__0 == (0b10 : (BitVec 2)))
       then ES16
       else DEAD))
 
@@ -175,16 +175,16 @@ def opst_code_forwards_matches (arg_ : seed_opst) : Bool :=
 
 def opst_code_backwards_matches (arg_ : (BitVec 2)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b00 : (BitVec 2)))
+  if (b__0 == (0b00 : (BitVec 2)))
   then true
   else
-    (bif (b__0 == (0b01 : (BitVec 2)))
+    (if (b__0 == (0b01 : (BitVec 2)))
     then true
     else
-      (bif (b__0 == (0b10 : (BitVec 2)))
+      (if (b__0 == (0b10 : (BitVec 2)))
       then true
       else
-        (bif (b__0 == (0b11 : (BitVec 2)))
+        (if (b__0 == (0b11 : (BitVec 2)))
         then true
         else false)))
 

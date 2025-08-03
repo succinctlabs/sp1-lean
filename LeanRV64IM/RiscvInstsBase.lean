@@ -137,11 +137,11 @@ def encdec_uop_forwards (arg_ : uop) : (BitVec 7) :=
 
 def encdec_uop_backwards (arg_ : (BitVec 7)) : SailM uop := do
   let b__0 := arg_
-  bif (b__0 == (0b0110111 : (BitVec 7)))
+  if (b__0 == (0b0110111 : (BitVec 7)))
   then (pure LUI)
   else
     (do
-      bif (b__0 == (0b0010111 : (BitVec 7)))
+      if (b__0 == (0b0010111 : (BitVec 7)))
       then (pure AUIPC)
       else
         (do
@@ -155,10 +155,10 @@ def encdec_uop_forwards_matches (arg_ : uop) : Bool :=
 
 def encdec_uop_backwards_matches (arg_ : (BitVec 7)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b0110111 : (BitVec 7)))
+  if (b__0 == (0b0110111 : (BitVec 7)))
   then true
   else
-    (bif (b__0 == (0b0010111 : (BitVec 7)))
+    (if (b__0 == (0b0010111 : (BitVec 7)))
     then true
     else false)
 
@@ -193,27 +193,27 @@ def encdec_bop_forwards (arg_ : bop) : (BitVec 3) :=
 
 def encdec_bop_backwards (arg_ : (BitVec 3)) : SailM bop := do
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if (b__0 == (0b000 : (BitVec 3)))
   then (pure BEQ)
   else
     (do
-      bif (b__0 == (0b001 : (BitVec 3)))
+      if (b__0 == (0b001 : (BitVec 3)))
       then (pure BNE)
       else
         (do
-          bif (b__0 == (0b100 : (BitVec 3)))
+          if (b__0 == (0b100 : (BitVec 3)))
           then (pure BLT)
           else
             (do
-              bif (b__0 == (0b101 : (BitVec 3)))
+              if (b__0 == (0b101 : (BitVec 3)))
               then (pure BGE)
               else
                 (do
-                  bif (b__0 == (0b110 : (BitVec 3)))
+                  if (b__0 == (0b110 : (BitVec 3)))
                   then (pure BLTU)
                   else
                     (do
-                      bif (b__0 == (0b111 : (BitVec 3)))
+                      if (b__0 == (0b111 : (BitVec 3)))
                       then (pure BGEU)
                       else
                         (do
@@ -231,22 +231,22 @@ def encdec_bop_forwards_matches (arg_ : bop) : Bool :=
 
 def encdec_bop_backwards_matches (arg_ : (BitVec 3)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if (b__0 == (0b000 : (BitVec 3)))
   then true
   else
-    (bif (b__0 == (0b001 : (BitVec 3)))
+    (if (b__0 == (0b001 : (BitVec 3)))
     then true
     else
-      (bif (b__0 == (0b100 : (BitVec 3)))
+      (if (b__0 == (0b100 : (BitVec 3)))
       then true
       else
-        (bif (b__0 == (0b101 : (BitVec 3)))
+        (if (b__0 == (0b101 : (BitVec 3)))
         then true
         else
-          (bif (b__0 == (0b110 : (BitVec 3)))
+          (if (b__0 == (0b110 : (BitVec 3)))
           then true
           else
-            (bif (b__0 == (0b111 : (BitVec 3)))
+            (if (b__0 == (0b111 : (BitVec 3)))
             then true
             else false)))))
 
@@ -293,27 +293,27 @@ def encdec_iop_forwards (arg_ : iop) : (BitVec 3) :=
 
 def encdec_iop_backwards (arg_ : (BitVec 3)) : SailM iop := do
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if (b__0 == (0b000 : (BitVec 3)))
   then (pure ADDI)
   else
     (do
-      bif (b__0 == (0b010 : (BitVec 3)))
+      if (b__0 == (0b010 : (BitVec 3)))
       then (pure SLTI)
       else
         (do
-          bif (b__0 == (0b011 : (BitVec 3)))
+          if (b__0 == (0b011 : (BitVec 3)))
           then (pure SLTIU)
           else
             (do
-              bif (b__0 == (0b111 : (BitVec 3)))
+              if (b__0 == (0b111 : (BitVec 3)))
               then (pure ANDI)
               else
                 (do
-                  bif (b__0 == (0b110 : (BitVec 3)))
+                  if (b__0 == (0b110 : (BitVec 3)))
                   then (pure ORI)
                   else
                     (do
-                      bif (b__0 == (0b100 : (BitVec 3)))
+                      if (b__0 == (0b100 : (BitVec 3)))
                       then (pure XORI)
                       else
                         (do
@@ -331,22 +331,22 @@ def encdec_iop_forwards_matches (arg_ : iop) : Bool :=
 
 def encdec_iop_backwards_matches (arg_ : (BitVec 3)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if (b__0 == (0b000 : (BitVec 3)))
   then true
   else
-    (bif (b__0 == (0b010 : (BitVec 3)))
+    (if (b__0 == (0b010 : (BitVec 3)))
     then true
     else
-      (bif (b__0 == (0b011 : (BitVec 3)))
+      (if (b__0 == (0b011 : (BitVec 3)))
       then true
       else
-        (bif (b__0 == (0b111 : (BitVec 3)))
+        (if (b__0 == (0b111 : (BitVec 3)))
         then true
         else
-          (bif (b__0 == (0b110 : (BitVec 3)))
+          (if (b__0 == (0b110 : (BitVec 3)))
           then true
           else
-            (bif (b__0 == (0b100 : (BitVec 3)))
+            (if (b__0 == (0b100 : (BitVec 3)))
             then true
             else false)))))
 
@@ -390,15 +390,15 @@ def encdec_sop_forwards (arg_ : sop) : (BitVec 3) :=
 
 def encdec_sop_backwards (arg_ : (BitVec 3)) : SailM sop := do
   let b__0 := arg_
-  bif (b__0 == (0b001 : (BitVec 3)))
+  if (b__0 == (0b001 : (BitVec 3)))
   then (pure SLLI)
   else
     (do
-      bif (b__0 == (0b101 : (BitVec 3)))
+      if (b__0 == (0b101 : (BitVec 3)))
       then (pure SRLI)
       else
         (do
-          bif (b__0 == (0b101 : (BitVec 3)))
+          if (b__0 == (0b101 : (BitVec 3)))
           then (pure SRAI)
           else
             (do
@@ -413,13 +413,13 @@ def encdec_sop_forwards_matches (arg_ : sop) : Bool :=
 
 def encdec_sop_backwards_matches (arg_ : (BitVec 3)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b001 : (BitVec 3)))
+  if (b__0 == (0b001 : (BitVec 3)))
   then true
   else
-    (bif (b__0 == (0b101 : (BitVec 3)))
+    (if (b__0 == (0b101 : (BitVec 3)))
     then true
     else
-      (bif (b__0 == (0b101 : (BitVec 3)))
+      (if (b__0 == (0b101 : (BitVec 3)))
       then true
       else false))
 
@@ -496,7 +496,7 @@ def valid_load_encdec (width : Nat) (is_unsigned : Bool) : Bool :=
 
 /-- Type quantifiers: k_ex69481# : Bool, k_n : Nat, 0 < k_n ∧ k_n ≤ xlen -/
 def extend_value (is_unsigned : Bool) (value : (BitVec k_n)) : (BitVec 64) :=
-  bif is_unsigned
+  if is_unsigned
   then (zero_extend (m := 64) value)
   else (sign_extend (m := 64) value)
 
@@ -523,7 +523,7 @@ def maybe_u_backwards_matches (arg_ : String) : Bool :=
 
 /-- Type quantifiers: k_ex69483# : Bool -/
 def effective_fence_set (set : (BitVec 4)) (fiom : Bool) : (BitVec 4) :=
-  bif fiom
+  if fiom
   then
     ((Sail.BitVec.extractLsb set 3 2) ++ ((Sail.BitVec.extractLsb set 1 0) ||| (Sail.BitVec.extractLsb
           set 3 2)))
@@ -540,10 +540,10 @@ def bit_maybe_r_backwards (arg_ : String) : SailM (BitVec 1) := do
 
 def bit_maybe_r_forwards_matches (arg_ : (BitVec 1)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b1 : (BitVec 1)))
+  if (b__0 == (0b1 : (BitVec 1)))
   then true
   else
-    (bif (b__0 == (0b0 : (BitVec 1)))
+    (if (b__0 == (0b0 : (BitVec 1)))
     then true
     else false)
 
@@ -564,10 +564,10 @@ def bit_maybe_w_backwards (arg_ : String) : SailM (BitVec 1) := do
 
 def bit_maybe_w_forwards_matches (arg_ : (BitVec 1)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b1 : (BitVec 1)))
+  if (b__0 == (0b1 : (BitVec 1)))
   then true
   else
-    (bif (b__0 == (0b0 : (BitVec 1)))
+    (if (b__0 == (0b0 : (BitVec 1)))
     then true
     else false)
 
@@ -588,10 +588,10 @@ def bit_maybe_i_backwards (arg_ : String) : SailM (BitVec 1) := do
 
 def bit_maybe_i_forwards_matches (arg_ : (BitVec 1)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b1 : (BitVec 1)))
+  if (b__0 == (0b1 : (BitVec 1)))
   then true
   else
-    (bif (b__0 == (0b0 : (BitVec 1)))
+    (if (b__0 == (0b0 : (BitVec 1)))
     then true
     else false)
 
@@ -612,10 +612,10 @@ def bit_maybe_o_backwards (arg_ : String) : SailM (BitVec 1) := do
 
 def bit_maybe_o_forwards_matches (arg_ : (BitVec 1)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b1 : (BitVec 1)))
+  if (b__0 == (0b1 : (BitVec 1)))
   then true
   else
-    (bif (b__0 == (0b0 : (BitVec 1)))
+    (if (b__0 == (0b0 : (BitVec 1)))
     then true
     else false)
 
@@ -632,7 +632,7 @@ def fence_bits_backwards (arg_ : String) : SailM (BitVec 4) := do
 
 def fence_bits_forwards_matches (arg_ : (BitVec 4)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0x0 : (BitVec 4)))
+  if (b__0 == (0x0 : (BitVec 4)))
   then true
   else true
 

@@ -144,13 +144,13 @@ def tlb_set_pte (ent : TLB_Entry) (pte : (BitVec (k_n * 8))) : TLB_Entry :=
   { ent with pte := (zero_extend (m := 64) pte) }
 
 /-- Type quantifiers: sv_width : Nat, is_sv_mode(sv_width) -/
-def tlb_get_ppn (sv_width : Nat) (ent : TLB_Entry) (vpn : (BitVec (sv_width - 12))) : (BitVec (bif sv_width
+def tlb_get_ppn (sv_width : Nat) (ent : TLB_Entry) (vpn : (BitVec (sv_width - 12))) : (BitVec (if sv_width
   = 32 then 22 else 44)) :=
   let vpn : (BitVec 64) := (sign_extend (m := 64) vpn)
   let levelMask : (BitVec 64) := (zero_extend (m := 64) ent.levelMask)
   let ppn : (BitVec 64) := (zero_extend (m := 64) ent.ppn)
   (trunc
-    (m := (bif (sv_width == 32)
+    (m := (if (sv_width == 32)
     then 22
     else 44)) (ppn ||| (vpn &&& levelMask)))
 
@@ -165,10 +165,10 @@ def reset_TLB (_ : Unit) : SailM Unit := do
 def write_TLB (index : Nat) (entry : TLB_Entry) : SailM Unit := do
   writeReg tlb (vectorUpdate (← readReg tlb) index (some entry))
 
-def match_TLB_Entry (ent : TLB_Entry) (asid : (BitVec (bif 64 = 32 then 9 else 16))) (vpn : (BitVec (57 - 12))) : Bool :=
+def match_TLB_Entry (ent : TLB_Entry) (asid : (BitVec (if 64 = 32 then 9 else 16))) (vpn : (BitVec (57 - 12))) : Bool :=
   ((ent.global || (ent.asid == asid)) && (ent.vpn == (vpn &&& (Complement.complement ent.levelMask))))
 
-def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec (bif 64 = 32 then 9 else 16)))) (vaddr : (Option (BitVec 64))) : Bool :=
+def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec (if 64 = 32 then 9 else 16)))) (vaddr : (Option (BitVec 64))) : Bool :=
   let asid_matches : Bool :=
     match asid with
     | .some asid => ((ent.asid == asid) && (not ent.global))
@@ -183,23 +183,23 @@ def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec (bif 64 = 32 then 
   (asid_matches && addr_matches)
 
 /-- Type quantifiers: sv_width : Nat, is_sv_mode(sv_width) -/
-def lookup_TLB (sv_width : Nat) (asid : (BitVec (bif 64 = 32 then 9 else 16))) (vpn : (BitVec (sv_width - 12))) : SailM (Option (Nat × TLB_Entry)) := do
+def lookup_TLB (sv_width : Nat) (asid : (BitVec (if 64 = 32 then 9 else 16))) (vpn : (BitVec (sv_width - 12))) : SailM (Option (Nat × TLB_Entry)) := do
   let index := (tlb_hash sv_width vpn)
   match (GetElem?.getElem! (← readReg tlb) index) with
   | none => (pure none)
   | .some entry =>
-    (bif (match_TLB_Entry entry asid (sign_extend (m := (57 -i 12)) vpn))
+    (if (match_TLB_Entry entry asid (sign_extend (m := (57 -i 12)) vpn))
     then (pure (some (index, entry)))
     else (pure none))
 
 /-- Type quantifiers: k_ex67777# : Bool, level : Nat, sv_width : Nat, is_sv_mode(sv_width), 0 ≤
   level ∧
   level ≤
-  (bif sv_width = 32 then 1 else (bif sv_width = 39 then 2 else (bif sv_width = 48 then 3 else 4))) -/
-def add_to_TLB (sv_width : Nat) (asid : (BitVec (bif 64 = 32 then 9 else 16))) (vpn : (BitVec (sv_width - 12))) (ppn : (BitVec (bif sv_width
-  = 32 then 22 else 44))) (pte : (BitVec (bif sv_width = 32 then 32 else 64))) (pteAddr : physaddr) (level : Nat) (global : Bool) : SailM Unit := do
+  (if sv_width = 32 then 1 else (if sv_width = 39 then 2 else (if sv_width = 48 then 3 else 4))) -/
+def add_to_TLB (sv_width : Nat) (asid : (BitVec (if 64 = 32 then 9 else 16))) (vpn : (BitVec (sv_width - 12))) (ppn : (BitVec (if sv_width
+  = 32 then 22 else 44))) (pte : (BitVec (if sv_width = 32 then 32 else 64))) (pteAddr : physaddr) (level : Nat) (global : Bool) : SailM Unit := do
   let shift :=
-    (level *i (bif (sv_width == 32)
+    (level *i (if (sv_width == 32)
       then 10
       else 9))
   let levelMask := (ones (n := shift))
@@ -207,7 +207,7 @@ def add_to_TLB (sv_width : Nat) (asid : (BitVec (bif 64 = 32 then 9 else 16))) (
   let ppn :=
     (ppn &&& (Complement.complement
         (zero_extend
-          (m := (bif (sv_width == 32)
+          (m := (if (sv_width == 32)
           then 22
           else 44)) levelMask)))
   let entry : TLB_Entry :=
@@ -221,7 +221,7 @@ def add_to_TLB (sv_width : Nat) (asid : (BitVec (bif 64 = 32 then 9 else 16))) (
   let index := (tlb_hash sv_width vpn)
   writeReg tlb (vectorUpdate (← readReg tlb) index (some entry))
 
-def flush_TLB (asid : (Option (BitVec (bif 64 = 32 then 9 else 16)))) (addr : (Option (BitVec 64))) : SailM Unit := do
+def flush_TLB (asid : (Option (BitVec (if 64 = 32 then 9 else 16)))) (addr : (Option (BitVec 64))) : SailM Unit := do
   let loop_i_lower := 0
   let loop_i_upper ← do (pure ((Vector.length (← readReg tlb)) -i 1))
   let mut loop_vars := ()
@@ -232,7 +232,7 @@ def flush_TLB (asid : (Option (BitVec (bif 64 = 32 then 9 else 16)))) (addr : (O
       | none => (pure ())
       | .some entry =>
         (do
-          bif (flush_TLB_Entry entry asid addr)
+          if (flush_TLB_Entry entry asid addr)
           then writeReg tlb (vectorUpdate (← readReg tlb) i none)
           else (pure ()))
   (pure loop_vars)

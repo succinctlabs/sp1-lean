@@ -137,7 +137,7 @@ open AccessType
 
 def physaddrbits_len := 64
 
-def bits_of_physaddr (app_0 : physaddr) : (BitVec (bif 64 = 32 then 34 else 64)) :=
+def bits_of_physaddr (app_0 : physaddr) : (BitVec (if 64 = 32 then 34 else 64)) :=
   let .Physaddr paddr := app_0
   paddr
 

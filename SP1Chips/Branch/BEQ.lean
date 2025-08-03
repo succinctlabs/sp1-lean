@@ -174,8 +174,8 @@ theorem correct_beq
 
     by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
     · simp [h_eq]
-      simpM
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
+      simpM +run
       rw [Std.ExtDHashMap.get?_insert]
       simp
       rw [h_pc_read]
@@ -298,8 +298,8 @@ theorem correct_beq
 
       clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
       omega
-    · simp [not_beq_of_ne h_eq]
-      simpM
+    · simp [h_eq]
+      simpM +run
       apply congrArg
 
       simp [h_is_beq, h_29, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs

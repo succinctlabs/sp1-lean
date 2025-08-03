@@ -175,14 +175,14 @@ theorem correct_bge
           clear * - h_lts
           simp [BitVec.slt] at *
           aesop
-      have h_actual_lts : (op_b_val.toInt ≤b op_a_val.toInt) = false :=
+      have h_actual_lts : (op_b_val.toInt ≤ op_a_val.toInt) = false :=
         by
           clear * - h_lts
           simp [BitVec.slt] at *
           trivial
       simp only [op_a_val, op_b_val] at h_lts h_neq h_actual_lts
       simp [h_actual_lts]
-      simpM
+      simpM +run
       apply congrArg
 
       simp [BitVec.slt] at h_lts
@@ -227,7 +227,7 @@ theorem correct_bge
       simp [zopz0zKzJ_s]
       simp only [op_a_val, op_b_val, BitVec.slt] at h_eq h_ges
       simp [h_eq]
-      simpM
+      simpM +run
 
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -333,7 +333,7 @@ theorem correct_bge
     simp only [op_a_val, op_b_val, BitVec.slt] at h_neq h_ges
     simp [op_a_val, op_b_val] at h_actual_ges
     simp [h_actual_ges]
-    simpM
+    simpM +run
 
     simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
     rw [Std.ExtDHashMap.get?_insert]

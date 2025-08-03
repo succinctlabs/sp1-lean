@@ -167,7 +167,7 @@ theorem correct_bltu
           aesop
       simp [op_a_val, op_b_val, BitVec.ult] at h_ltu h_neq
       simp [h_ltu]
-      simpM
+      simpM +run
 
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -271,9 +271,9 @@ theorem correct_bltu
     by_cases op_a_val = op_b_val
     · rename_i h_eq
       simp [zopz0zI_u]
-      simp only [op_a_val, op_b_val, BitVec.ult] at h_eq h_geu
-      simp [h_geu]
-      simpM
+      simp [op_a_val, op_b_val, BitVec.ult] at h_eq h_geu
+      simp [not_lt_of_ge h_geu]
+      simpM +run
       apply congrArg
 
       simp [h_eq, BitVec.ult, h_geu, h_is_bltu, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
@@ -312,15 +312,15 @@ theorem correct_bltu
 
     rename_i h_eq
     simp [zopz0zI_u]
-    simp only [op_a_val, op_b_val, BitVec.ult] at h_eq h_geu
-    simp [h_geu]
-    simpM
+    simp [op_a_val, op_b_val, BitVec.ult] at h_eq h_geu
+    simp [not_lt_of_ge h_geu]
+    simpM +run
     apply congrArg
 
     simp [h_eq, BitVec.ult, h_geu, h_is_bltu, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
 
     -- This should come from the spec of LtOperationSigned
-    simp [h_eq, BitVec.ult, h_geu, h_30, h_31] at spec_lt
+    simp [h_eq, BitVec.ult, not_lt_of_ge h_geu, h_30, h_31] at spec_lt
     have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
       by
         clear * - spec_lt

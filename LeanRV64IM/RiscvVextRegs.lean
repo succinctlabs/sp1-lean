@@ -174,97 +174,97 @@ def zvreg : vregidx := (Vregidx (0b00000 : (BitVec 5)))
 
 def vreg_name_raw_forwards (arg_ : (BitVec 5)) : String :=
   let b__0 := arg_
-  bif (b__0 == (0b00000 : (BitVec 5)))
+  if (b__0 == (0b00000 : (BitVec 5)))
   then "v0"
   else
-    (bif (b__0 == (0b00001 : (BitVec 5)))
+    (if (b__0 == (0b00001 : (BitVec 5)))
     then "v1"
     else
-      (bif (b__0 == (0b00010 : (BitVec 5)))
+      (if (b__0 == (0b00010 : (BitVec 5)))
       then "v2"
       else
-        (bif (b__0 == (0b00011 : (BitVec 5)))
+        (if (b__0 == (0b00011 : (BitVec 5)))
         then "v3"
         else
-          (bif (b__0 == (0b00100 : (BitVec 5)))
+          (if (b__0 == (0b00100 : (BitVec 5)))
           then "v4"
           else
-            (bif (b__0 == (0b00101 : (BitVec 5)))
+            (if (b__0 == (0b00101 : (BitVec 5)))
             then "v5"
             else
-              (bif (b__0 == (0b00110 : (BitVec 5)))
+              (if (b__0 == (0b00110 : (BitVec 5)))
               then "v6"
               else
-                (bif (b__0 == (0b00111 : (BitVec 5)))
+                (if (b__0 == (0b00111 : (BitVec 5)))
                 then "v7"
                 else
-                  (bif (b__0 == (0b01000 : (BitVec 5)))
+                  (if (b__0 == (0b01000 : (BitVec 5)))
                   then "v8"
                   else
-                    (bif (b__0 == (0b01001 : (BitVec 5)))
+                    (if (b__0 == (0b01001 : (BitVec 5)))
                     then "v9"
                     else
-                      (bif (b__0 == (0b01010 : (BitVec 5)))
+                      (if (b__0 == (0b01010 : (BitVec 5)))
                       then "v10"
                       else
-                        (bif (b__0 == (0b01011 : (BitVec 5)))
+                        (if (b__0 == (0b01011 : (BitVec 5)))
                         then "v11"
                         else
-                          (bif (b__0 == (0b01100 : (BitVec 5)))
+                          (if (b__0 == (0b01100 : (BitVec 5)))
                           then "v12"
                           else
-                            (bif (b__0 == (0b01101 : (BitVec 5)))
+                            (if (b__0 == (0b01101 : (BitVec 5)))
                             then "v13"
                             else
-                              (bif (b__0 == (0b01110 : (BitVec 5)))
+                              (if (b__0 == (0b01110 : (BitVec 5)))
                               then "v14"
                               else
-                                (bif (b__0 == (0b01111 : (BitVec 5)))
+                                (if (b__0 == (0b01111 : (BitVec 5)))
                                 then "v15"
                                 else
-                                  (bif (b__0 == (0b10000 : (BitVec 5)))
+                                  (if (b__0 == (0b10000 : (BitVec 5)))
                                   then "v16"
                                   else
-                                    (bif (b__0 == (0b10001 : (BitVec 5)))
+                                    (if (b__0 == (0b10001 : (BitVec 5)))
                                     then "v17"
                                     else
-                                      (bif (b__0 == (0b10010 : (BitVec 5)))
+                                      (if (b__0 == (0b10010 : (BitVec 5)))
                                       then "v18"
                                       else
-                                        (bif (b__0 == (0b10011 : (BitVec 5)))
+                                        (if (b__0 == (0b10011 : (BitVec 5)))
                                         then "v19"
                                         else
-                                          (bif (b__0 == (0b10100 : (BitVec 5)))
+                                          (if (b__0 == (0b10100 : (BitVec 5)))
                                           then "v20"
                                           else
-                                            (bif (b__0 == (0b10101 : (BitVec 5)))
+                                            (if (b__0 == (0b10101 : (BitVec 5)))
                                             then "v21"
                                             else
-                                              (bif (b__0 == (0b10110 : (BitVec 5)))
+                                              (if (b__0 == (0b10110 : (BitVec 5)))
                                               then "v22"
                                               else
-                                                (bif (b__0 == (0b10111 : (BitVec 5)))
+                                                (if (b__0 == (0b10111 : (BitVec 5)))
                                                 then "v23"
                                                 else
-                                                  (bif (b__0 == (0b11000 : (BitVec 5)))
+                                                  (if (b__0 == (0b11000 : (BitVec 5)))
                                                   then "v24"
                                                   else
-                                                    (bif (b__0 == (0b11001 : (BitVec 5)))
+                                                    (if (b__0 == (0b11001 : (BitVec 5)))
                                                     then "v25"
                                                     else
-                                                      (bif (b__0 == (0b11010 : (BitVec 5)))
+                                                      (if (b__0 == (0b11010 : (BitVec 5)))
                                                       then "v26"
                                                       else
-                                                        (bif (b__0 == (0b11011 : (BitVec 5)))
+                                                        (if (b__0 == (0b11011 : (BitVec 5)))
                                                         then "v27"
                                                         else
-                                                          (bif (b__0 == (0b11100 : (BitVec 5)))
+                                                          (if (b__0 == (0b11100 : (BitVec 5)))
                                                           then "v28"
                                                           else
-                                                            (bif (b__0 == (0b11101 : (BitVec 5)))
+                                                            (if (b__0 == (0b11101 : (BitVec 5)))
                                                             then "v29"
                                                             else
-                                                              (bif (b__0 == (0b11110 : (BitVec 5)))
+                                                              (if (b__0 == (0b11110 : (BitVec 5)))
                                                               then "v30"
                                                               else "v31"))))))))))))))))))))))))))))))
 
@@ -309,100 +309,100 @@ def vreg_name_raw_backwards (arg_ : String) : SailM (BitVec 5) := do
 
 def vreg_name_raw_forwards_matches (arg_ : (BitVec 5)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b00000 : (BitVec 5)))
+  if (b__0 == (0b00000 : (BitVec 5)))
   then true
   else
-    (bif (b__0 == (0b00001 : (BitVec 5)))
+    (if (b__0 == (0b00001 : (BitVec 5)))
     then true
     else
-      (bif (b__0 == (0b00010 : (BitVec 5)))
+      (if (b__0 == (0b00010 : (BitVec 5)))
       then true
       else
-        (bif (b__0 == (0b00011 : (BitVec 5)))
+        (if (b__0 == (0b00011 : (BitVec 5)))
         then true
         else
-          (bif (b__0 == (0b00100 : (BitVec 5)))
+          (if (b__0 == (0b00100 : (BitVec 5)))
           then true
           else
-            (bif (b__0 == (0b00101 : (BitVec 5)))
+            (if (b__0 == (0b00101 : (BitVec 5)))
             then true
             else
-              (bif (b__0 == (0b00110 : (BitVec 5)))
+              (if (b__0 == (0b00110 : (BitVec 5)))
               then true
               else
-                (bif (b__0 == (0b00111 : (BitVec 5)))
+                (if (b__0 == (0b00111 : (BitVec 5)))
                 then true
                 else
-                  (bif (b__0 == (0b01000 : (BitVec 5)))
+                  (if (b__0 == (0b01000 : (BitVec 5)))
                   then true
                   else
-                    (bif (b__0 == (0b01001 : (BitVec 5)))
+                    (if (b__0 == (0b01001 : (BitVec 5)))
                     then true
                     else
-                      (bif (b__0 == (0b01010 : (BitVec 5)))
+                      (if (b__0 == (0b01010 : (BitVec 5)))
                       then true
                       else
-                        (bif (b__0 == (0b01011 : (BitVec 5)))
+                        (if (b__0 == (0b01011 : (BitVec 5)))
                         then true
                         else
-                          (bif (b__0 == (0b01100 : (BitVec 5)))
+                          (if (b__0 == (0b01100 : (BitVec 5)))
                           then true
                           else
-                            (bif (b__0 == (0b01101 : (BitVec 5)))
+                            (if (b__0 == (0b01101 : (BitVec 5)))
                             then true
                             else
-                              (bif (b__0 == (0b01110 : (BitVec 5)))
+                              (if (b__0 == (0b01110 : (BitVec 5)))
                               then true
                               else
-                                (bif (b__0 == (0b01111 : (BitVec 5)))
+                                (if (b__0 == (0b01111 : (BitVec 5)))
                                 then true
                                 else
-                                  (bif (b__0 == (0b10000 : (BitVec 5)))
+                                  (if (b__0 == (0b10000 : (BitVec 5)))
                                   then true
                                   else
-                                    (bif (b__0 == (0b10001 : (BitVec 5)))
+                                    (if (b__0 == (0b10001 : (BitVec 5)))
                                     then true
                                     else
-                                      (bif (b__0 == (0b10010 : (BitVec 5)))
+                                      (if (b__0 == (0b10010 : (BitVec 5)))
                                       then true
                                       else
-                                        (bif (b__0 == (0b10011 : (BitVec 5)))
+                                        (if (b__0 == (0b10011 : (BitVec 5)))
                                         then true
                                         else
-                                          (bif (b__0 == (0b10100 : (BitVec 5)))
+                                          (if (b__0 == (0b10100 : (BitVec 5)))
                                           then true
                                           else
-                                            (bif (b__0 == (0b10101 : (BitVec 5)))
+                                            (if (b__0 == (0b10101 : (BitVec 5)))
                                             then true
                                             else
-                                              (bif (b__0 == (0b10110 : (BitVec 5)))
+                                              (if (b__0 == (0b10110 : (BitVec 5)))
                                               then true
                                               else
-                                                (bif (b__0 == (0b10111 : (BitVec 5)))
+                                                (if (b__0 == (0b10111 : (BitVec 5)))
                                                 then true
                                                 else
-                                                  (bif (b__0 == (0b11000 : (BitVec 5)))
+                                                  (if (b__0 == (0b11000 : (BitVec 5)))
                                                   then true
                                                   else
-                                                    (bif (b__0 == (0b11001 : (BitVec 5)))
+                                                    (if (b__0 == (0b11001 : (BitVec 5)))
                                                     then true
                                                     else
-                                                      (bif (b__0 == (0b11010 : (BitVec 5)))
+                                                      (if (b__0 == (0b11010 : (BitVec 5)))
                                                       then true
                                                       else
-                                                        (bif (b__0 == (0b11011 : (BitVec 5)))
+                                                        (if (b__0 == (0b11011 : (BitVec 5)))
                                                         then true
                                                         else
-                                                          (bif (b__0 == (0b11100 : (BitVec 5)))
+                                                          (if (b__0 == (0b11100 : (BitVec 5)))
                                                           then true
                                                           else
-                                                            (bif (b__0 == (0b11101 : (BitVec 5)))
+                                                            (if (b__0 == (0b11101 : (BitVec 5)))
                                                             then true
                                                             else
-                                                              (bif (b__0 == (0b11110 : (BitVec 5)))
+                                                              (if (b__0 == (0b11110 : (BitVec 5)))
                                                               then true
                                                               else
-                                                                (bif (b__0 == (0b11111 : (BitVec 5)))
+                                                                (if (b__0 == (0b11111 : (BitVec 5)))
                                                                 then true
                                                                 else false)))))))))))))))))))))))))))))))
 
@@ -450,7 +450,7 @@ def vreg_name_backwards (arg_ : String) : SailM vregidx := do
   let head_exp_ := arg_
   match (← do
     let mapping0_ := head_exp_
-    bif (vreg_name_raw_backwards_matches mapping0_)
+    if (vreg_name_raw_backwards_matches mapping0_)
     then
       (do
         match (← (vreg_name_raw_backwards mapping0_)) with
@@ -470,7 +470,7 @@ def vreg_name_backwards_matches (arg_ : String) : SailM Bool := do
   let head_exp_ := arg_
   match (← do
     let mapping0_ := head_exp_
-    bif (vreg_name_raw_backwards_matches mapping0_)
+    if (vreg_name_raw_backwards_matches mapping0_)
     then
       (do
         match (← (vreg_name_raw_backwards mapping0_)) with
@@ -638,7 +638,7 @@ def ext_write_vcsr (vxrm_val : (BitVec 2)) (vxsat_val : (BitVec 1)) : SailM Unit
 /-- Type quantifiers: SEW : Nat, LMUL_pow : Int, SEW ∈ {8, 16, 32, 64} -/
 def get_num_elem (LMUL_pow : Int) (SEW : Nat) : SailM Int := do
   let LMUL_pow_reg :=
-    bif (LMUL_pow <b 0)
+    if (LMUL_pow <b 0)
     then 0
     else LMUL_pow
   let num_elem := (Int.tdiv ((2 ^i LMUL_pow_reg) *i VLEN) SEW)
@@ -680,24 +680,24 @@ def read_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) : S
   let vrid_val := (BitVec.toNat (vregidx_bits vrid))
   let result : (Vector (BitVec SEW) num_elem) := (vectorInit (zeros (n := SEW)))
   let LMUL_pow_reg :=
-    bif (LMUL_pow <b 0)
+    if (LMUL_pow <b 0)
     then 0
     else LMUL_pow
-  bif ((vrid_val +i (2 ^i LMUL_pow_reg)) >b 32)
+  if ((vrid_val +i (2 ^i LMUL_pow_reg)) >b 32)
   then
     (do
       assert false "invalid register group: vrid overflow the largest number"
       throw Error.Exit)
   else
     (do
-      bif ((Int.tmod vrid_val (2 ^i LMUL_pow_reg)) != 0)
+      if ((Int.tmod vrid_val (2 ^i LMUL_pow_reg)) != 0)
       then
         (do
           assert false "invalid register group: vrid is not a multiple of EMUL"
           throw Error.Exit)
       else
         (do
-          bif (LMUL_pow <b 0)
+          if (LMUL_pow <b 0)
           then
             (do
               (read_single_vreg (Vector.length result) SEW vrid))
@@ -746,7 +746,7 @@ def read_single_element (EEW : Nat) (index : Nat) (vrid : vregidx) : SailM (BitV
   is_sew_bitsize(SEW) -/
 def write_vreg (num_elem : Nat) (SEW : Nat) (LMUL_pow : Int) (vrid : vregidx) (vec : (Vector (BitVec SEW) num_elem)) : SailM Unit := do
   let LMUL_pow_reg :=
-    bif (LMUL_pow <b 0)
+    if (LMUL_pow <b 0)
     then 0
     else LMUL_pow
   let num_elem_single : Int := (Int.tdiv VLEN SEW)
@@ -794,7 +794,7 @@ def write_single_element (EEW : Nat) (index : Nat) (vrid : vregidx) (value : (Bi
       let r := loop_vars
       loop_vars :=
         let r : vregtype := (shiftl r EEW)
-        bif (i == real_index)
+        if (i == real_index)
         then (r ||| (zero_extend (m := 65536) value))
         else (r ||| (zero_extend (m := 65536) (GetElem?.getElem! vrid_val i)))
     (pure loop_vars) ) : SailM (BitVec 65536) )
@@ -805,7 +805,7 @@ def read_vmask (num_elem : Nat) (vm : (BitVec 1)) (vrid : vregidx) : SailM (BitV
   assert (num_elem ≤b 65536) "model/riscv_vext_regs.sail:374.36-374.37"
   let vreg_val ← (( do (rV_bits vrid) ) : SailM vregtype )
   let result : (BitVec num_elem) := (ones (n := num_elem))
-  bif (vm == (0b1 : (BitVec 1)))
+  if (vm == (0b1 : (BitVec 1)))
   then (pure result)
   else
     (do
@@ -822,7 +822,7 @@ def read_vmask_carry (num_elem : Nat) (vm : (BitVec 1)) (vrid : vregidx) : SailM
   assert (num_elem ≤b 65536) "model/riscv_vext_regs.sail:392.36-392.37"
   let vreg_val ← (( do (rV_bits vrid) ) : SailM vregtype )
   let result : (BitVec num_elem) := (zeros (n := num_elem))
-  bif (vm == (0b1 : (BitVec 1)))
+  if (vm == (0b1 : (BitVec 1)))
   then (pure result)
   else
     (do

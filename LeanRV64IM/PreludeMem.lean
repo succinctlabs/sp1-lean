@@ -215,7 +215,7 @@ def num_of_barrier_kind (arg_ : barrier_kind) : Int :=
 def undefined_RISCV_strong_access (_ : Unit) : SailM RISCV_strong_access := do
   (pure { variety := (← (undefined_Access_variety ())) })
 
-def physaddrbits_zero_extend (xs : (BitVec (bif 64 = 32 then 34 else 64))) : (BitVec 64) :=
+def physaddrbits_zero_extend (xs : (BitVec (if 64 = 32 then 34 else 64))) : (BitVec 64) :=
   (zero_extend (m := 64) xs)
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
@@ -262,7 +262,7 @@ def write_ram_ea (wk : write_kind) (app_1 : physaddr) (width : Nat) : Unit :=
 def read_ram (rk : read_kind) (app_1 : physaddr) (width : Nat) (read_meta : Bool) : SailM ((BitVec (8 * width)) × Unit) := do
   let .Physaddr addr := app_1
   let meta' :=
-    bif read_meta
+    if read_meta
     then (__ReadRAM_Meta addr width)
     else default_meta
   let request : (Mem_read_request width 64 physaddrbits Unit RISCV_strong_access) :=
