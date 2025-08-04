@@ -15,7 +15,7 @@ def constraints (Main : Vector (Fin BB) 50) : SP1ConstraintList :=
   let E1 : Fin BB := Main[2] + E0
   let E2 : Fin BB := Main[49] - 1
   let E3 : Fin BB := Main[49] * E2
-  let ⟨⟨⟨[E4, E5, E6]⟩, _⟩, CS0⟩ := AddressOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] Main[38] Main[39] Main[40] Main[49] { addr_word_operation := { value := #v[Main[25], Main[26], Main[27]] }, top_two_limb_inv := Main[28] }
+  let ⟨⟨⟨[E4, E5, E6]⟩, _⟩, CS0⟩ := AddressOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] Main[38] Main[39] Main[40] Main[49] { addr_operation := { value := #v[Main[25], Main[26], Main[27]] }, top_two_limb_inv := Main[28] }
   let E7 : Fin BB := Main[49] - 1
   let E8 : Fin BB := Main[49] * E7
   let E9 : Fin BB := Main[35] - 1
