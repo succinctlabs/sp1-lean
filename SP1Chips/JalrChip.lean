@@ -48,7 +48,6 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
 
-set_option debug.skipKernelTC true in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[29] = 1)

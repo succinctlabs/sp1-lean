@@ -143,10 +143,10 @@ def bit_str (b : (BitVec 1)) : SailM String := do
   match b with
   | 0#1 => (pure "0b0")
   | 1#1 => (pure "0b1")
-  | _ =>
-    (do
-      assert false "Pattern match failure at model/prelude.sail:36.2-39.3"
-      throw Error.Exit)
+  -- | _ =>
+  --   (do
+  --     assert false "Pattern match failure at model/prelude.sail:36.2-39.3"
+  --     throw Error.Exit)
 
 def print_step (_ : Unit) : Unit :=
   ()
@@ -193,10 +193,10 @@ def bool_bit_backwards (arg_ : (BitVec 1)) : SailM Bool := do
   match arg_ with
   | 1#1 => (pure true)
   | 0#1 => (pure false)
-  | _ =>
-    (do
-      assert false "Pattern match failure at unknown location"
-      throw Error.Exit)
+  -- | _ =>
+  --   (do
+  --     assert false "Pattern match failure at unknown location"
+  --     throw Error.Exit)
 
 /-- Type quantifiers: k_ex62401# : Bool -/
 def bool_bit_forwards_matches (arg_ : Bool) : Bool :=
@@ -208,7 +208,7 @@ def bool_bit_backwards_matches (arg_ : (BitVec 1)) : Bool :=
   match arg_ with
   | 1#1 => true
   | 0#1 => true
-  | g__1 => false
+  -- | g__1 => false
 
 /-- Type quantifiers: k_ex62402# : Bool -/
 def bool_bits_forwards (arg_ : Bool) : (BitVec 1) :=
@@ -355,4 +355,3 @@ def hex_bits_str (x : (BitVec k_n)) : String :=
   (BitVec.toFormatted
     (zero_extend
       (m := ((3 -i (Int.tmod ((Sail.BitVec.length x) +i 3) 4)) +i (Sail.BitVec.length x))) x))
-

@@ -4,6 +4,135 @@ import LeanRV64IM.Sail.Sail
 
 open BitVec
 
+namespace HideConstants
+
+open Lean
+
+/-- Definition of `hide` and `hide_eq` -/
+opaque hide_def : { hide : α → α // hide = id } := ⟨id, rfl⟩
+
+/--
+`hide` is an opaque version of the identity function.
+By making it opaque, we prevent the kernel from trying to reduce the argument.
+-/
+def hide : α → α := hide_def.1
+
+/-- A proof that `hide` is the identity. Note that this is deliberately *not*
+a def-eq, since we made `hide` opaque. -/
+theorem hide_eq {a : α} : hide a = a := by
+  rw [hide, hide_def.2]; rfl
+
+/-- Symmetric version of `hide_eq`. -/
+theorem eq_hide {a : α} : a = hide a := by
+  symm; exact hide_eq
+
+def simpHide (e : Expr) : Meta.SimpM Meta.Simp.Step := do
+  let ctx ← Meta.Simp.getContext
+  if let some parent := ctx.parent? then
+    if parent.isAppOf ``hide then
+      trace[LeanMLIR.Elab] "{Lean.crossEmoji}: parent ({parent}) is an application of `hide`"
+      return .continue
+
+  let expr ← Meta.mkAppM ``hide #[e]
+  let proof ← Meta.mkAppOptM ``eq_hide #[none, e]
+  return .done {
+    expr := expr
+    proof? := some proof
+  }
+
+protected partial def isConstant (e : Expr) : Bool :=
+  match_expr e with
+  | Neg.neg _α _self x => HideConstants.isConstant x
+  | OfNat.ofNat _α x _self => HideConstants.isConstant x
+  | _ => e.isRawNatLit
+open HideConstants (isConstant)
+
+protected partial def isFinVal (e : Expr) : Bool :=
+  match_expr e with
+  | Fin.val _α _x => true
+  | _ => false
+open HideConstants (isFinVal)
+
+simproc_decl BitVec.hideOfIntConstants (BitVec.ofInt _ _) := fun e => do
+  let_expr BitVec.ofInt _w x := e | return .continue
+  withTraceNode `LeanMLIR.Elab (fun _ => pure m!"Hiding: {e}") <| do
+    if !isConstant x then
+      trace[Meta.Tactic.simp] "{Lean.crossEmoji}: {x} is not a constant"
+      return .continue
+    simpHide e
+
+simproc_decl BitVec.hideOfNatConstants (BitVec.ofNat _ _) := fun e => do
+  let_expr BitVec.ofNat _w x := e | return .continue
+  withTraceNode `LeanMLIR.Elab (fun _ => pure m!"Hiding: {e}") <| do
+    if !isConstant x then
+      trace[Meta.Tactic.simp] "{Lean.crossEmoji}: {x} is not a constant"
+      return .continue
+    simpHide e
+
+simproc_decl BitVec.hideOfNatFin (BitVec.ofNat _ _) := fun e => do
+  let_expr BitVec.ofNat _w x := e | return .continue
+  withTraceNode `LeanMLIR.Elab (fun _ => pure m!"Hiding: {e}") <| do
+    if !isFinVal x then
+      trace[Meta.Tactic.simp] "{Lean.crossEmoji}: {x} is not a constant"
+      return .continue
+    simpHide e
+
+simproc_decl BitVec.hideOfNat (BitVec.ofNat _ _) := fun e => do
+  let_expr BitVec.ofNat _w _x := e | return .continue
+  withTraceNode `LeanMLIR.Elab (fun _ => pure m!"Hiding: {e}") <| do
+    -- if !isFinVal x then
+    --   trace[Meta.Tactic.simp] "{Lean.crossEmoji}: {x} is not a constant"
+    --   return .continue
+    simpHide e
+
+-- NOTE: we have to disable the memoize option, since the simprocs
+-- inspect the parent expressions, which are disregarded by the cache
+
+macro "hide_constants" : tactic => `(tactic|
+  simp -failIfUnchanged -memoize only [
+    BitVec.hideOfIntConstants,
+    BitVec.hideOfNatConstants]
+)
+
+macro "hide_fin_vals" : tactic => `(tactic|
+  simp -failIfUnchanged -memoize only [
+    BitVec.hideOfNatFin]
+)
+
+macro "hide_ofNat" : tactic => `(tactic|
+  simp -failIfUnchanged -memoize only [
+    BitVec.hideOfNat]
+)
+
+macro "unhide" : tactic => `(tactic|
+  all_goals simp -failIfUnchanged only [hide_eq]
+)
+
+example : BitVec.ofNat 64 10 = BitVec.ofInt 64 10 := by
+  hide_constants
+  unhide
+  rfl
+
+example (n : Fin _) (s : Unit) :
+    EStateM.run (do
+      let _ ←
+        (match
+          (match ((BitVec.ofNat 1 (n * 10000 : Fin 2013265921)))[0]'Nat.one_pos with
+          | true => true
+          | false => true) with
+        | true => pure ()
+        | false => pure () : EStateM Unit Unit Unit)
+      return ()) s = EStateM.Result.ok () s := by
+  hide_fin_vals
+  stop
+  rw [EStateM.run_bind]
+  unhide
+  cases (BitVec.ofNat 1 (n * _).val)[0]
+  · simp only [EStateM.run_pure]
+  · simp only [EStateM.run_pure]
+
+end HideConstants
+
 namespace BitVec
 
 @[simp] lemma twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
@@ -69,7 +198,7 @@ theorem add_mod4_eq_zero_of_mod4_eq_zero {a b : BitVec 64}
     (ha : a % 4 = 0) (hb : b % 4 = 0) : (a + b) % 4 = 0 := by bv_decide
 
 theorem FinBB_mul4_is_BV_mul4 {x : Fin BB} : x % 4 = 0 →
-    (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith)) % 4 = 0 := by
+    (BitVec.ofNatLT (w := 64) x (by have := x.isLt; simp only [BB_eq] at this; linarith)) % 4 = 0 := by
   intro h
   have h' : x.val % 4 = 0 := by simp [Fin.mod_def] at h; exact h
   simp [BitVec.umod_def, BitVec.toNat_ofNatLT, h']
@@ -93,7 +222,7 @@ theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧
     omega
 
 lemma FinBB_mul4_means_LS2B_0 (x : Fin BB) :
-    let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith))
+    let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; simp only [BB_eq] at this; linarith))
     x % 4 = 0 → vx[0] = false ∧ vx[1] = false := by
   extract_lets vx
   intro hx

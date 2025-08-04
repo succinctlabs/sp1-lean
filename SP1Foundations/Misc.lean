@@ -7,6 +7,8 @@ File for random lemmas that don't fit anywhere else (e.g. lemmas about nat).
 Would be good to eventually contribute these back to mathlib.
 -/
 
+
+
 instance Fin.noZeroDivisors_of_prime (p : ℕ)
     [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
   refine IsDomain.to_noZeroDivisors (ZMod (p + 1))
@@ -443,3 +445,82 @@ variable {ε σ α β : Type _}
 end EStateM
 
 end toBatteries
+
+-- namespace HideConstants
+
+-- open Lean
+
+-- /-- Definition of `hide` and `hide_eq` -/
+-- opaque hide_def : { hide : α → α // hide = id } := ⟨id, rfl⟩
+
+-- /--
+-- `hide` is an opaque version of the identity function.
+-- By making it opaque, we prevent the kernel from trying to reduce the argument.
+-- -/
+-- def hide : α → α := hide_def.1
+
+-- /-- A proof that `hide` is the identity. Note that this is deliberately *not*
+-- a def-eq, since we made `hide` opaque. -/
+-- theorem hide_eq {a : α} : hide a = a := by
+--   rw [hide, hide_def.2]; rfl
+
+-- /-- Symmetric version of `hide_eq`. -/
+-- theorem eq_hide {a : α} : a = hide a := by
+--   symm; exact hide_eq
+
+-- def simpHide (e : Expr) : Meta.SimpM Meta.Simp.Step := do
+--   let ctx ← Meta.Simp.getContext
+--   if let some parent := ctx.parent? then
+--     if parent.isAppOf ``hide then
+--       trace[LeanMLIR.Elab] "{Lean.crossEmoji}: parent ({parent}) is an application of `hide`"
+--       return .continue
+--   let expr ← Meta.mkAppM ``hide #[e]
+--   let proof ← Meta.mkAppOptM ``eq_hide #[none, e]
+--   return .done {
+--     expr := expr
+--     proof? := some proof
+--   }
+
+-- protected partial def isConstant (e : Expr) : Bool :=
+--   match_expr e with
+--   | Neg.neg _α _self x => HideConstants.isConstant x
+--   | OfNat.ofNat _α x _self => HideConstants.isConstant x
+--   | Fin.val _α _x => true -- Also try to hide Fin values
+--   | _ => e.isRawNatLit
+-- open HideConstants (isConstant)
+
+-- simproc_decl BitVec.hideOfNatConstants (BitVec.ofNat _ _) := fun e => do
+--   let_expr BitVec.ofNat _w x := e | return .continue
+--   withTraceNode `LeanMLIR.Elab (fun _ => pure m!"Hiding: {e}") <| do
+--     if !isConstant x then
+--       trace[Meta.Tactic.simp] "{Lean.crossEmoji}: {x} is not a constant"
+--       return .continue
+--     simpHide e
+
+-- macro "hide_constants" : tactic => `(tactic|
+--   simp -failIfUnchanged -memoize only [BitVec.hideOfNatConstants]
+-- )
+
+-- macro "unhide_constants" : tactic => `(tactic|
+--   all_goals simp -failIfUnchanged only [hide_eq]
+-- )
+
+-- example {n : Fin _} (s : Unit) :
+--     EStateM.run (do
+--       let _ ←
+--         (match
+--           (match ((BitVec.ofNat 1 (n * 100000 : Fin 1000000)))[0]'Nat.one_pos with
+--           | true => true
+--           | false => true) with
+--         | true => pure ()
+--         | false => pure () : EStateM Unit Unit Unit)
+--       return ()) s = EStateM.Result.ok () s := by
+--   -- hide_constants
+--   -- stop -- deep recursion is already caused by just calling `hide_constants`
+--   rw [EStateM.run_bind]
+--   -- unhide_constants
+--   cases (BitVec.ofNat 1 (n * _).val)[0]
+--   · simp only [EStateM.run_pure]
+--   · simp only [EStateM.run_pure]
+
+-- end HideConstants

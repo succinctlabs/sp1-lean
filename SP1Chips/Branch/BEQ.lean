@@ -90,7 +90,7 @@ def sp1_beq : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
-set_option debug.skipKernelTC true in
+-- set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 theorem correct_beq
   (Main : Vector (Fin BB) 45)
@@ -106,7 +106,7 @@ theorem correct_beq
   := by
     extract_lets
     rename_i imm op_b op_a
-
+    stop
     obtain ⟨h_29, h_30, h_31, h_32, h_33⟩ := h_Main28_is_beq Main cstrs h_is_beq
     have h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1 :=
       by
@@ -137,7 +137,7 @@ theorem correct_beq
       LtOperationSigned.correct_for_branch
         #v[Main[7], Main[8], Main[9], Main[10]]
         #v[Main[15], Main[16], Main[17], Main[18]]
-        _ 
+        _
         _
         _
         lt_cstrs
@@ -178,20 +178,17 @@ theorem correct_beq
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
       simp
+
       rw [h_pc_read]
-      simp only [EStateM.pure]
-      -- conv =>
-      --   lhs
-      --   arg 2
-      --   simp only
-      --   rfl
-      -- conv =>
-      --   lhs
-      --   arg 2
-      --   simp [EStateM.pure]
-      --   rfl
-      -- -- deep kernel recursion????
-      -- simp only
+
+      simp only []
+      rw [EStateM.pure]
+      conv =>
+        lhs
+        arg 3
+        simp
+
+      -- stop
 
       have h_trusted_signExtend :
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
@@ -215,8 +212,16 @@ theorem correct_beq
           have h_pc0_mul4 : Main[21].val % 4 = 0 := by simp_all only
           omega
       obtain ⟨h_next_pc_b0, h_next_pc_b1⟩ := mul4_means_0_1_are_0 h_next_pc_is_mul4
-      simp [Sail.BitVec.access]
+      -- stop
+      conv =>
+        lhs
+        arg 2
+        simp only [access, Nat.one_lt_ofNat, getElem!_pos]
+
+      stop
       rw [h_next_pc_b1]
+
+
       simpM
 
       have : ∀ v, ((fun _ => false) <$> readReg Register.misa).run
@@ -263,9 +268,7 @@ theorem correct_beq
 
       have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
       rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-      -- simp [BitVec.add_def]
-      -- have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-      -- rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
+
 
       simp [Word.toBitVec64, Word.toNat]
       have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
@@ -276,23 +279,12 @@ theorem correct_beq
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
-      -- have h_imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
-      --   by
-      --     refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] ?_ ?_ ?_ ?_
-      --     · exact h_imm_0
-      --     · exact h_imm_1
-      --     · exact h_imm_2
-      --     · exact h_imm_3
-      -- have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; simp_all only
-      -- have h_imm_1 : Main[22].val < 65536 := by show Main[22] < 65536; simp_all only
-      -- have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; simp_all only
-      -- have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
       simp [Word.toBitVec64, Word.toNat]
       rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
 
       simp [BitVec.add_def]
 
-      apply BitVec.eq_of_toNat_eq 
+      apply BitVec.eq_of_toNat_eq
       rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
       simp
 

@@ -124,8 +124,13 @@ def trusted_instr
   | LUI | AUIPC =>
       -- u_type
       (imm_b = 1 ∧ imm_c = 1)
-      ∧ op_b_0 >= 2^12
-      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
+      -- dt: we should actually get the last three of these from the final constraint
+      ∧ op_b_0 >= 2^12 ∧ op_b_2 = 0 ∧ op_b_3 = 0
+      ∧ (op_b_0.val + op_b_1.val * 65536) < 2^20
+      -- `op_b` should be a sign-extended length `32` bitvector with `12` bits of `0` padding at the end.
+      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val) >>> 12 ++ 0#12) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
+      ∧ BitVec.signExtend 64 (BitVec.ofNat 20 (op_b_0.val + op_b_1.val * 65536) ++ 0#12) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
+      -- ∧ BitVec.signExtend 52 (BitVec.ofNat 20 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
   | JAL =>
       (imm_b = 1 ∧ imm_c = 1) ∧
       -- `op_b` properly initiallized to a sign extended value

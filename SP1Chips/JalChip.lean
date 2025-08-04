@@ -71,8 +71,6 @@ theorem SP1JAL_correct
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [BB_eq, Fin.isValue, true_and]
 
-  simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]
-
   have h_add_imm : List.Forall SP1Constraint.toProp (AddOperation.constraints
       #v[Main[3], Main[4], Main[5], 0]
       #v[Main[14], Main[15], Main[16], Main[17]]
@@ -94,6 +92,44 @@ theorem SP1JAL_correct
 
   have h_add' := (AddOperation.correct _ _ _  _ rfl h_add_imm pc_isU64 imm_isU64).2
   simp [Word.toBitVec64, Word.toNat] at h_add'
+
+
+  simp only [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]
+
+  rw [EStateM.run_bind, run_readReg, read_pc]
+  simp only
+  rw [EStateM.run_bind, run_writeReg]
+  simp only
+  rw [EStateM.run_bind, EStateM.run_bind, run_readReg, Std.ExtDHashMap.get?_insert]
+
+  simp only [beq_iff_eq, reduceCtorEq, ↓reduceDIte, BB_eq, get_next_pc_eq, wX_bits_eq_writeReg,
+    set_next_pc_eq, bind_pure_comp, pure_bind, EStateM.run_pure, natCast_eq_ofNat, Nat.reducePow]
+  rw [read_pc]
+  conv =>
+    lhs
+    arg 2
+    simp only
+  rw [EStateM.run_bind]
+
+  rw [ext_control_check_pc]
+  conv =>
+    lhs
+    arg 2
+    simp only
+  rw [bit_to_bool, bool_bit_backwards.eq_def, access, ofBool, bits_of_virtaddr,
+    sign_extend, Sail.BitVec.signExtend]
+  rw [run_ite]
+  conv =>
+    lhs
+    arg 2
+    rw [← h_sign_extend]
+
+  hide_constants
+
+  stop
+  simp only [BB_eq, get_next_pc_eq, wX_bits_eq_writeReg, set_next_pc_eq, bind_pure_comp, pure_bind,
+    map_bind, EStateM.run_bind, run_writeReg, EStateM.run_map, natCast_eq_ofNat, Nat.reducePow,
+    run_ite]
 
   simp only [ext_control_check_pc, bit_to_bool, access, ofBool, bits_of_virtaddr, Nat.one_lt_ofNat,
     getElem!_pos, ofNat_eq_ofNat, currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or,
