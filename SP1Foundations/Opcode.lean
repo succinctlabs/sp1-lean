@@ -150,6 +150,8 @@ def trusted_instr_state
       ((s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
   -- | BEQ | BNE | BLT | BGE | BLTU | BGEU =>
   --     (s.regs.get! Register.PC + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
+  | LW | LWU =>
+      ((s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
   | _ => True
 
 end Opcode
