@@ -42,7 +42,10 @@ theorem correct_srl
   (spec_srl (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srl Main cstrs h_is_srl).run s
   := by
     let ⟨ srl, imm ⟩ := h_is_srl
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (srl_real Main srl)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srl_real Main srl)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
+    have h_imm := immediate_bounds Main cstrs (srl_real Main srl)
+    have h_a0 := op_a_is_0 Main cstrs (srl_real Main srl)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 
@@ -97,7 +100,10 @@ theorem correct_srli
   (spec_srli op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srli Main cstrs h_is_srli).run s
   := by
     let ⟨ srl, imm ⟩ := h_is_srli
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (srl_real Main srl)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srl_real Main srl)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
+    have h_imm := immediate_bounds Main cstrs (srl_real Main srl)
+    have h_a0 := op_a_is_0 Main cstrs (srl_real Main srl)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 
@@ -152,7 +158,10 @@ theorem correct_srlw
   (spec_srlw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srlw Main cstrs h_is_srlw).run s
   := by
     let ⟨ srlw, imm ⟩ := h_is_srlw
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (srlw_real Main srlw)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
+    have h_imm := immediate_bounds Main cstrs (srlw_real Main srlw)
+    have h_a0 := op_a_is_0 Main cstrs (srlw_real Main srlw)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 
@@ -207,7 +216,10 @@ theorem correct_srliw
   (spec_srliw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srliw Main cstrs h_is_srliw).run s
   := by
     let ⟨ srlw, imm ⟩ := h_is_srliw
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (srlw_real Main srlw)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
+    have h_imm := immediate_bounds Main cstrs (srlw_real Main srlw)
+    have h_a0 := op_a_is_0 Main cstrs (srlw_real Main srlw)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 
@@ -262,7 +274,10 @@ theorem correct_sra
   (spec_sra (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sra Main cstrs h_is_sra).run s
   := by
     let ⟨ sra, imm ⟩ := h_is_sra
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sra_real Main sra)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sra_real Main sra)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
+    have h_imm := immediate_bounds Main cstrs (sra_real Main sra)
+    have h_a0 := op_a_is_0 Main cstrs (sra_real Main sra)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 
@@ -317,7 +332,10 @@ theorem correct_srai
   (spec_srai op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srai Main cstrs h_is_srai).run s
   := by
     let ⟨ sra, imm ⟩ := h_is_srai
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sra_real Main sra)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sra_real Main sra)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
+    have h_imm := immediate_bounds Main cstrs (sra_real Main sra)
+    have h_a0 := op_a_is_0 Main cstrs (sra_real Main sra)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 
@@ -372,7 +390,10 @@ theorem correct_sraw
   (spec_sraw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraw Main cstrs h_is_sraw).run s
   := by
     let ⟨ sraw, imm ⟩ := h_is_sraw
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sraw_real Main sraw)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)
+    have h_imm := immediate_bounds Main cstrs (sraw_real Main sraw)
+    have h_a0 := op_a_is_0 Main cstrs (sraw_real Main sraw)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 
@@ -427,7 +448,10 @@ theorem correct_sraiw
   (spec_sraiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraiw Main cstrs h_is_sraiw).run s
   := by
     let ⟨ sraw, imm ⟩ := h_is_sraiw
-    have ⟨ ha, hb, hc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sraw_real Main sraw)
+    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)
+    have h_imm := immediate_bounds Main cstrs (sraw_real Main sraw)
+    have h_a0 := op_a_is_0 Main cstrs (sraw_real Main sraw)
     have ⟨ sop1, sop2, sop3, sop4 ⟩ := single_op Main cstrs
     simp_all
 

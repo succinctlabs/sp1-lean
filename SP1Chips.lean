@@ -6,6 +6,8 @@ import SP1Chips.Addw.Constraints
 import SP1Chips.AddwChip
 import SP1Chips.Bitwise.Constraints
 import SP1Chips.BitwiseChip
+import SP1Chips.Branch.Constraints
+import SP1Chips.BranchChip
 import SP1Chips.DivRem.Constraints
 import SP1Chips.DivRemChip
 import SP1Chips.JalChip
@@ -25,3 +27,12 @@ import SP1Chips.Sub.Constraints
 import SP1Chips.SubChip
 import SP1Chips.Subw.Constraints
 import SP1Chips.SubwChip
+import SP1Chips.Load.LoadByte.Constraints
+import SP1Chips.Load.LoadHalf.Constraints
+import SP1Chips.Load.LoadWord.Constraints
+import SP1Chips.Load.LoadDouble.Constraints
+import SP1Chips.Load.LoadX0.Constraints
+import SP1Chips.Store.StoreByte.Constraints
+import SP1Chips.Store.StoreHalf.Constraints
+import SP1Chips.Store.StoreWord.Constraints
+import SP1Chips.Store.StoreDouble.Constraints

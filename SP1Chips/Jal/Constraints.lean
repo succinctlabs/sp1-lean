@@ -1,9 +1,10 @@
 import SP1Operations.Operation.AddOperation
 
-namespace JalChip
+namespace Jal
 
 section constraints
 
+-- Generated Lean code for chip JalChip
 def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
   let E0 : Fin BB := Main[30] - 1
   let E1 : Fin BB := Main[30] * E0
@@ -41,7 +42,7 @@ def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
   let E31 : Fin BB := E30 - 1
   let E32 : Fin BB := E31 - Main[12]
   let E33 : Fin BB := E32 * 2013235201
-  [
+  CS0 ++ CS1 ++ [
     (.assertZero E1),
     (.assertZero Main[25]),
     (.assertZero E5),
@@ -65,6 +66,6 @@ def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
     (.send (.byte (ByteOpcode.ofNat 3) 0 E33 0) Main[30]),
     (.send (.memory Main[0] Main[11] Main[6] 0 0 Main[7] Main[8] Main[9] Main[10]) Main[30]),
     (.receive (.memory Main[0] E27 Main[6] 0 0 Main[26] Main[27] Main[28] Main[29]) Main[30]),
-  ] ++ CS0 ++ CS1
+  ]
 
 end constraints
