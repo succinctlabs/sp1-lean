@@ -83,8 +83,7 @@ def sp1_bge : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
-set_option debug.skipKernelTC true in
-set_option maxHeartbeats 20000000 in
+set_option maxHeartbeats 2000000 in
 theorem correct_bge
   (Main : Vector (Fin BB) 45)
   (s : SailState)
