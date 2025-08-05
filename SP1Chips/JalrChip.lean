@@ -48,7 +48,6 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
 
-set_option debug.skipKernelTC true in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[29] = 1)
@@ -111,19 +110,22 @@ theorem JALR_correct
     run_bool_bit_backwards, Bool.false_and, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
     currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or, Bool.and_self,
     BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map,
-    sign_extend, Sail.BitVec.signExtend, ← h_c_sign_extend]
+    sign_extend, Sail.BitVec.signExtend, ← h_c_sign_extend, Nat.shiftLeft_eq]
   rw [map_const_run_readReg _ _ (by simp [h_misa])]
   simp only
   rw [run_readReg]
   simp only [Std.ExtDHashMap.get?_insert_self, run_wX_bits, BitVec.ofNat_eq_ofNat, EStateM.Result.map_ok]
 
-  split_ifs <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
+  split_ifs with h6 <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
   refine congr_fun ?_ _
-  have htemp : Main[29] - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
+  have htemp : Main[29] - Main[13] = 1 := by
+    simp [h_is_real] at chip_cstrs
+    simp [← BitVec.toNat_inj] at h6
+    simp [h6] at op_a_0_iff_op_a_is_0
+    simp [op_a_0_iff_op_a_is_0] at op_a_0_is_bool
+    simp [op_a_0_is_bool, h_is_real]
   have ⟨ _, h_add ⟩ := AddOperation.correct _ _ _ _ htemp inc_pc_cstrs pc_is_u64 h_4_is_u64
   rw [h_add]
-  simp [Word.toBitVec64, Word.toNat]
-
--- #print axioms Jalr.JALR_correct
+  simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
 
 end Jalr

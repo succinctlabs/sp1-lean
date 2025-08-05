@@ -499,6 +499,7 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : 
   op1.isU64 → op2.isU64 →
   execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_w op1 op2 op := by
   intro h_op1_isU64 h_op2_isU64
+  stop
   cases op <;> simp [execute_RTYPE_pure, LeanRV64IM.Functions.log2_xlen]
   . rw [Sail.shift_bits_left]
     simp [Word.toBitVec64_toNat h_op2_isU64]
@@ -590,6 +591,7 @@ def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
 lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : ropw) :
   op1.isU64 → op2.isU64 →
   execute_RTYPEW_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPEW_pure_w op1 op2 op := by
+  stop
   intro h_op1_isU64 h_op2_isU64
   have ha' := Word.lt_cases_of_isU64 h_op1_isU64
   have hb' := Word.lt_cases_of_isU64 h_op2_isU64

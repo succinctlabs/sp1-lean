@@ -175,7 +175,8 @@ theorem correct_bne
         = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])
         := by simp_all only
 
-      have h_next_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
+      have h_next_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + sign_extend imm) % 4 = 0 := by
+        simp [Word.toBitVec64, Word.toNat]
         apply add_mod4_eq_zero_of_mod4_eq_zero
         · show _ % 4#64 = 0#64
           rw [BitVec.ofNat64_mod_4_eq_zero_iff]
@@ -238,26 +239,15 @@ theorem correct_bne
       have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
       have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; simp_all only
 
-      have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-
-      simp [Word.toBitVec64, Word.toNat]
-      have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
-
       have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by simp_all only
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
-      simp [Word.toBitVec64, Word.toNat]
-      rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
-
       simp [BitVec.add_def]
 
       apply BitVec.eq_of_toNat_eq
-      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
-      simp
+      simp [Word.toBitVec64, Word.toNat]
 
       clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
       omega
@@ -282,7 +272,7 @@ theorem correct_bne
       simp [h_is_branching] at chip_cstrs
 
       obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-
+      simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
       have h_pc_0 : Main[3].val < 65536 := by show Main[3] < 65536; simp_all only
       have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
       have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; simp_all only
@@ -292,7 +282,6 @@ theorem correct_bne
       have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
       rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
 
-      simp [Word.toBitVec64, Word.toNat]
       have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
       rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
 

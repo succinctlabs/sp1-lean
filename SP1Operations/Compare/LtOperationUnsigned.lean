@@ -62,7 +62,8 @@ lemma spec
   := by
     intro cstrs h_is_real
     suffices : cols.u16_compare_operation.bit = if b.toNat < d.toNat then 1 else 0
-    . aesop
+    . simp [Word.toNat, Nat.shiftLeft_eq] at *
+      aesop
     . have ⟨ _, _ ⟩ := cl_are_U16 b d cols is_real h_b_isU64 h_d_isU64 cstrs h_is_real
       rw [allHold_constraints_iff] at cstrs
       rcases cstrs with ⟨ h_comp_limbs, ⟨ h_is_real_bool, h_flag_0_bool, h_flag_1_bool, h_flag_2_bool, h_flag_3_bool, cstrs ⟩ ⟩
@@ -70,6 +71,7 @@ lemma spec
       apply Word.lt_cases_of_isU64 at h_b_isU64
       apply Word.lt_cases_of_isU64 at h_d_isU64
       unfold Word.toNat
+      simp [Nat.shiftLeft_eq]
       rcases h_is_real_bool <;> simp_all
       rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
       rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>

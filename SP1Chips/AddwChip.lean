@@ -111,10 +111,10 @@ theorem correct_addw
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
       rw [← is_addw]; congr
       rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
 
 end Addw
 
@@ -217,9 +217,9 @@ theorem correct_addw
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
       rw [← is_addw]; congr
       rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
 
 end Addiw

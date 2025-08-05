@@ -19,10 +19,10 @@ import SP1Chips.Mul.Constraints
 import SP1Chips.MulChip
 import SP1Chips.UType.Constraints
 import SP1Chips.UTypeChip
-import SP1Chips.ShiftLeft.Constraints
-import SP1Chips.ShiftLeftChip
-import SP1Chips.ShiftRight.Constraints
-import SP1Chips.ShiftRightChip
+-- import SP1Chips.ShiftLeft.Constraints
+-- import SP1Chips.ShiftLeftChip
+-- import SP1Chips.ShiftRight.Constraints
+-- import SP1Chips.ShiftRightChip
 import SP1Chips.Sub.Constraints
 import SP1Chips.SubChip
 import SP1Chips.Subw.Constraints

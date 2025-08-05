@@ -196,10 +196,11 @@ end U64
 section conversions
 
 /-- Convert a word to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1].val <<< 16 + w[2].val <<< 32 + w[3].val <<< 48
 
 lemma toNat_lt_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) : w.toNat < 2^64 := by
   unfold toNat
+  simp [Nat.shiftLeft_eq]
   aesop (add 50% tactic (by omega))
 
 lemma toNat_lt_of_cases_lt (w : Word (Fin BB))
@@ -229,7 +230,7 @@ def toBitVec64LT (w : Word (Fin BB)) (h_w : w.isU64) : BitVec 64 :=
     have := h_w 1
     have := h_w 2
     have := h_w 3
-    simp at *
+    simp [Nat.shiftLeft_eq] at *
     linarith)
 
 /-- A 64-bit integer is negative if its msb equals one -/
@@ -254,10 +255,10 @@ lemma toBitVec64_toInt {w : Word (Fin BB)} (h_w_isU64 : w.isU64) :
     have := lt_cases_of_isU64 h_w_isU64
     have := toNat_lt_of_isU64 h_w_isU64
     unfold toBitVec64 toInt BitVec.toInt
-    simp_all only [Nat.reducePow, Int.reducePow, toNat_ofNat, Nat.cast_ofNat]
+    simp_all only [Nat.reducePow, Int.reducePow, toNat_ofNat, Nat.cast_ofNat, Nat.shiftLeft_eq]
     rw [Nat.mod_eq_of_lt this]
     by_cases h_neg : w.isNegative <;> unfold isNegative at * <;>
-    unfold toNat <;> simp_all <;> omega
+    unfold toNat <;> simp_all [Nat.shiftLeft_eq] <;> omega
 
 /-- Obtain the low 32 bits of a `Word` -/
 def low32 (w : Word (Fin BB)) : HalfWord (Fin BB) := #v[w[0], w[1]]
@@ -280,7 +281,7 @@ section add
 lemma toBitVec64_eq_add (w : Word (Fin BB)) : w.toBitVec64 =
     BitVec.ofNat 64 w[0] + BitVec.ofNat 64 (w[1] * 2^16) +
       BitVec.ofNat 64 (w[2] * 2^32) + BitVec.ofNat 64 (w[3] * 2^48) := by
-  simp [toBitVec64, toNat, BitVec.ofNat_add]
+  simp [toBitVec64, toNat, BitVec.ofNat_add, Nat.shiftLeft_eq]
 
 lemma toNat_add_toNat (w v : Word (Fin BB)) :
     w.toNat + v.toNat =
@@ -424,7 +425,8 @@ lemma toInt_toWord
   (h_w_isU64 : w.isU64) :
     w.toInt = Word.toInt (w.toWord) := by
   have := w.lt_cases_of_isU64 h_w_isU64
-  simp [toWord, toInt, toNat, Word.toInt, Word.toNat, isNegative, Word.isNegative]
+  simp [toWord, toInt, toNat, Word.toInt, Word.toNat, isNegative, Word.isNegative,
+    Nat.shiftLeft_eq]
   simp [Fin.le_def, Fin.add_def, Fin.mul_def]
   omega
 
@@ -490,10 +492,10 @@ lemma sign_extend_32_to_64_msb (x y : Fin BB) :
     simp [← BitVec.toInt_inj]
     rw [BitVec.ofNat, BitVec.toInt]
     rw [if_pos] <;> bv_amicus_kerneli
-    . simp
+    . simp [Nat.shiftLeft_eq]
       rw [Int.emod_eq_of_lt (by omega) (by omega)]
       rw [Int.bmod_eq_of_le (by omega) (by omega)]
-    . simp; omega
+    . simp [Nat.shiftLeft_eq]; omega
 
 end HalfWord
 
@@ -524,7 +526,7 @@ lemma toInt_toByteWord
   (h_w_isU64 : w.isU64) :
     w.toInt = ByteWord.toInt (w.toByteWord) := by
   have := w.lt_cases_of_isU64 h_w_isU64
-  simp [toByteWord, toInt, toNat, ByteWord.toInt, ByteWord.toNat, isNegative, ByteWord.isNegative, Fin.le_def]
+  simp [Nat.shiftLeft_eq, toByteWord, toInt, toNat, ByteWord.toInt, ByteWord.toNat, isNegative, ByteWord.isNegative, Fin.le_def]
   omega
 
 lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
@@ -540,10 +542,11 @@ lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
     have := lt_cases_of_isU64 h_64
     rw [signExtend, BitVec.toInt] at *
     rw [BitVec.msb_eq_decide] at *
-    split_ifs at * <;> simp_all <;> [ omega; skip; skip; omega ]
+    split_ifs at * <;> simp_all [Nat.shiftLeft_eq] <;> [ omega; skip; skip; omega ]
     . rw [← BitVec.toNat_inj, BitVec.toNat_setWidth, toBitVec64_toNat h_64 ] at h_eq
       simp_all [BitVec.toNat_ofNat, toNat]
       omega
+    stop
     . rw [← BitVec.toInt_inj, toBitVec64_toInt h_64, toInt] at h_eq
       split_ifs at h_eq with h_neg <;>
       rw [isNegative_msb, BitVec.msb_eq_decide, toBitVec64_toNat h_64] at h_neg <;>

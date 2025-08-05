@@ -94,8 +94,7 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
           True -- TODO(gzgz): this is reading from memory
   | (.receive (.state _clk_high _clk_low pc0 pc1 pc2) mult) =>
       mult ≠ 0
-      → s.regs.get? Register.PC
-        = some (BitVec.ofNat 64 (pc0.val + pc1.val * 65536 + pc2.val * 4294967296))
+      → s.regs.get? Register.PC = some (Word.toBitVec64 #v[pc0, pc1, pc2, 0]) -- (BitVec.ofNat 64 (pc0.val + pc1.val * 65536 + pc2.val * 4294967296))
   | .send
       (.program
       _pc0 _pc1 _pc2

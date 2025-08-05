@@ -101,13 +101,15 @@ theorem correct_addw
     simp [execute_RTYPEW_pure_w]
     rw [← is_subw] at is_msb
 
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    . simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
       rw [← is_subw]; congr
       rw [HalfWord.sign_extend_32_to_64_msb _ _ is_U32_val]
-      simp [Word.toBitVec64, Word.toNat]
+      simp [Word.toBitVec64, Word.toNat, Nat.shiftLeft_eq]
+
 
 end Subw

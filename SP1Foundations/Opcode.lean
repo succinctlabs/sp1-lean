@@ -121,11 +121,11 @@ def trusted_instr
       -- u_type
       (imm_b = 1 ∧ imm_c = 1)
       ∧ op_b_0 >= 2^12
-      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
+      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val <<< 16)) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
   | JAL =>
       (imm_b = 1 ∧ imm_c = 1) ∧
       -- `op_b` properly initiallized to a sign extended value
-      Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val * 65536)) ∧
+      Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val <<< 16)) ∧
       -- `op_b` is a multiple of `4`
       (Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]) % 4#64 = 0
   | LB | LH | LW | LD | LBU | LHU | LWU =>

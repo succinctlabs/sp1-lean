@@ -154,9 +154,12 @@ lemma spec.branch
   rcases h_lt with ⟨ h_comp_limbs, ⟨ h_is_real_bool, h_flag_0_bool, h_flag_1_bool, h_flag_2_bool, h_flag_3_bool, lt_00, lt_01, lt_02, lt_03, lt_04, lt_05, lt_06, lt_07 ⟩ ⟩
   rw [U16CompareOperation.allHold_constraints_iff] at h_comp_limbs
   rcases h_comp_limbs with ⟨ cmp_00, cmp_01, cmp_02 ⟩
+  simp only [Nat.shiftLeft_eq] at *
   simp_all
-
+  stop
   constructor <;> intro sgn <;> (repeat rw [this]) <;> clear this <;> simp_all
+
+
   . rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
     simp_all <;> split_ands
