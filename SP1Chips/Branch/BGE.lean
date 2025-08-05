@@ -84,7 +84,7 @@ def sp1_bge : SailM ExecutionResult := do
   pure RETIRE_SUCCESS
 
 set_option debug.skipKernelTC true in
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 20000000 in
 theorem correct_bge
   (Main : Vector (Fin BB) 45)
   (s : SailState)
@@ -176,12 +176,12 @@ theorem correct_bge
           clear * - h_lts
           simp [BitVec.slt] at *
           aesop
-      stop
+
       have h_actual_lts : (op_b_val.toInt ≤b op_a_val.toInt) = false :=
         by
           clear * - h_lts
           simp [BitVec.slt] at *
-          trivial
+          exact h_lts
       simp only [op_a_val, op_b_val] at h_lts h_neq h_actual_lts
       simp [h_actual_lts]
       simpM
@@ -189,7 +189,6 @@ theorem correct_bge
 
       simp [BitVec.slt] at h_lts
       simp [h_neq, BitVec.slt, h_lts, h_is_bge, h_28, h_29, h_30, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
-      -- repeat (rw [sub_eq_zero] at chip_cstrs)
 
       -- This should come from the spec of LtOperationSigned
       simp [h_neq, BitVec.slt, h_lts, h_actual_lts, h_is_bge, h_30, h_32, h_33] at spec_lt
@@ -209,18 +208,14 @@ theorem correct_bge
       have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; clear * - reader_cstrs; simp_all only
       have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; clear * - reader_cstrs; simp_all only
       have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
       simp [BitVec.add_def]
       have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
 
       simp [Word.toBitVec64, Word.toNat]
       have h_ltsxtpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_ltsxtpc_is_u64]
-
-      simp [BitVec.ofNatLT]
       clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
-
+      simp [Nat.shiftLeft_eq, BitVec.ofNat]
+      refine congr_arg _ ?_
       omega
 
     rename_i h_ges
@@ -319,14 +314,12 @@ theorem correct_bge
 
     rename_i h_neq
     simp [zopz0zKzJ_s]
-    stop
+
     have h_actual_ges : (op_b_val.toInt ≤b op_a_val.toInt) = true :=
       by
-
         clear * - h_ges h_neq
         simp [BitVec.slt] at *
-        trivial
-
+        exact h_ges
     simp only [op_a_val, op_b_val, BitVec.slt] at h_neq h_ges
     simp [op_a_val, op_b_val] at h_actual_ges
     simp [h_actual_ges]
@@ -343,9 +336,10 @@ theorem correct_bge
       = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])
       := by simp_all only
 
-    have h_ltuxt_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
+    have h_ltuxt_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + sign_extend imm) % 4 = 0 := by
       apply add_mod4_eq_zero_of_mod4_eq_zero
       · show _ % 4#64 = 0#64
+        rw [Word.toBitVec64, Word.toNat]
         rw [BitVec.ofNat64_mod_4_eq_zero_iff]
         have h_pc0_nat_mul4 : Main[3].val % 4 = 0 :=
           by
@@ -353,6 +347,7 @@ theorem correct_bge
             rw [Fin.mod_def, ← Fin.val_inj] at this
             exact this
         clear * - h_pc0_nat_mul4
+        simp
         omega
       · simp [sign_extend, Sail.BitVec.signExtend, imm, sp1_imm]
         rw [←h_trusted_signExtend]
@@ -403,24 +398,16 @@ theorem correct_bge
     have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
     have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; simp_all only
 
-    have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
-    rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-
-    simp [Word.toBitVec64, Word.toNat]
-    have h_ltuxtpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
-    rw [←BitVec.ofNatLT_eq_ofNat h_ltuxtpc_is_u64]
-
     have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
-      BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by simp_all only
+      BitVec.signExtend 64 (BitVec.ofNat 13 Main[21]) := by simp_all only
+
     simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
     rw [←trusted_imm]
 
     simp [Word.toBitVec64, Word.toNat]
-    rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
-
     simp [BitVec.add_def]
     apply BitVec.eq_of_toNat_eq
-    rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
+    rw [BitVec.toNat_ofNat]
     simp
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
