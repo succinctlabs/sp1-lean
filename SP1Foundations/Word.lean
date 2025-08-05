@@ -59,11 +59,12 @@ end isU64
 section conversions
 
 /-- Convert a word to a `Nat` by shifting and adding limbs. -/
-def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+def toNat (w : Word (Fin BB)) : ℕ := w[0].val + w[1].val <<< 16 + w[2].val <<< 32 + w[3].val <<< 48
 
 lemma toNat_lt_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) : w.toNat < 2^64 := by
   unfold toNat
-  aesop (add 50% tactic (by omega))
+  have := Word.lt_cases_of_isU64 hw
+  omega
 
 lemma toNat_lt_of_cases_lt (w : Word (Fin BB))
     (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
@@ -80,7 +81,7 @@ def toBitVec64 (w : Word (Fin BB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
 lemma toBitVec64_eq_add (w : Word (Fin BB)) : w.toBitVec64 =
     BitVec.ofNat 64 w[0] + BitVec.ofNat 64 (w[1] * 2^16) +
       BitVec.ofNat 64 (w[2] * 2^32) + BitVec.ofNat 64 (w[3] * 2^48) := by
-  simp [toBitVec64, toNat, BitVec.ofNat_add]
+  simp [toBitVec64, toNat, BitVec.ofNat_add, Nat.shiftLeft_eq]
 
 lemma toNat_toBitVec64 (w : Word (Fin BB)) (hw : w.isU64) :
     w.toBitVec64.toNat = w.toNat := by
@@ -97,7 +98,7 @@ lemma toBitVec64_LT_eq_toNat {w : Word (Fin BB)} (hw : w.isU64)
         have := hw 1
         have := hw 2
         have := hw 3
-        simp at *
+        simp [Nat.shiftLeft_eq] at *
         linarith)
   := by
     simp [Word.toBitVec64]
@@ -149,7 +150,7 @@ def toBitVec64LT (w : Word (Fin BB)) (h_w : w.isU64) : BitVec 64 :=
     have := h_w 1
     have := h_w 2
     have := h_w 3
-    simp at *
+    simp [Nat.shiftLeft_eq] at *
     linarith)
 
 end Word
