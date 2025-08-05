@@ -148,34 +148,36 @@ def htif_tohost_base (_ : Unit) : (BitVec (if 64 = 32 then 34 else 64)) :=
   (plat_htif_tohost ())
 
 /-- Type quantifiers: width : Int, width ≤ max_mem_access -/
+-- TODO(gzgz): this is meaningless to us!
 def within_phys_mem (typ_0 : physaddr) (width : Int) : SailM Bool := do
-  let .Physaddr addr : physaddr := typ_0
-  let addr_int := (BitVec.toNat addr)
-  let ram_base_int ← do (pure (BitVec.toNat (← readReg plat_ram_base)))
-  let rom_base_int ← do (pure (BitVec.toNat (← readReg plat_rom_base)))
-  let ram_size_int ← do (pure (BitVec.toNat (← readReg plat_ram_size)))
-  let rom_size_int ← do (pure (BitVec.toNat (← readReg plat_rom_size)))
-  if ((ram_base_int ≤b addr_int) && ((addr_int +i width) ≤b (ram_base_int +i ram_size_int)))
-  then (pure true)
-  else
-    (do
-      if ((rom_base_int ≤b addr_int) && ((addr_int +i width) ≤b (rom_base_int +i rom_size_int)))
-      then (pure true)
-      else
-        (do
-          let _ : Unit :=
-            (print_endline
-              (HAppend.hAppend "within_phys_mem: "
-                (HAppend.hAppend (BitVec.toFormatted addr) " not within phys-mem:")))
-          (pure (print_endline
-              (HAppend.hAppend "  plat_rom_base: " (BitVec.toFormatted (← readReg plat_rom_base)))))
-          (pure (print_endline
-              (HAppend.hAppend "  plat_rom_size: " (BitVec.toFormatted (← readReg plat_rom_size)))))
-          (pure (print_endline
-              (HAppend.hAppend "  plat_ram_base: " (BitVec.toFormatted (← readReg plat_ram_base)))))
-          (pure (print_endline
-              (HAppend.hAppend "  plat_ram_size: " (BitVec.toFormatted (← readReg plat_ram_size)))))
-          (pure false)))
+  pure true
+  -- let .Physaddr addr : physaddr := typ_0
+  -- let addr_int := (BitVec.toNat addr)
+  -- let ram_base_int ← do (pure (BitVec.toNat (← readReg plat_ram_base)))
+  -- let rom_base_int ← do (pure (BitVec.toNat (← readReg plat_rom_base)))
+  -- let ram_size_int ← do (pure (BitVec.toNat (← readReg plat_ram_size)))
+  -- let rom_size_int ← do (pure (BitVec.toNat (← readReg plat_rom_size)))
+  -- if ((ram_base_int ≤b addr_int) && ((addr_int +i width) ≤b (ram_base_int +i ram_size_int)))
+  -- then (pure true)
+  -- else
+  --   (do
+  --     if ((rom_base_int ≤b addr_int) && ((addr_int +i width) ≤b (rom_base_int +i rom_size_int)))
+  --     then (pure true)
+  --     else
+  --       (do
+  --         let _ : Unit :=
+  --           (print_endline
+  --             (HAppend.hAppend "within_phys_mem: "
+  --               (HAppend.hAppend (BitVec.toFormatted addr) " not within phys-mem:")))
+  --         (pure (print_endline
+  --             (HAppend.hAppend "  plat_rom_base: " (BitVec.toFormatted (← readReg plat_rom_base)))))
+  --         (pure (print_endline
+  --             (HAppend.hAppend "  plat_rom_size: " (BitVec.toFormatted (← readReg plat_rom_size)))))
+  --         (pure (print_endline
+  --             (HAppend.hAppend "  plat_ram_base: " (BitVec.toFormatted (← readReg plat_ram_base)))))
+  --         (pure (print_endline
+  --             (HAppend.hAppend "  plat_ram_size: " (BitVec.toFormatted (← readReg plat_ram_size)))))
+  --         (pure false)))
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def within_clint (typ_0 : physaddr) (width : Nat) : SailM Bool := do
