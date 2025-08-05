@@ -345,8 +345,6 @@ theorem correct_blt
 
     omega
 
-#print axioms correct_blt
-
 end BLT
 
 end Branch

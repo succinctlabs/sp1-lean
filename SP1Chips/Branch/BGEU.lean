@@ -164,22 +164,25 @@ theorem correct_bgeu
         by
           have h_ult_prop : op_a_val < op_b_val := BitVec.ult_iff_lt.mp h_ltu
           clear * - h_ult_prop
-          aesop
+          intro h
+          rw [h] at h_ult_prop
+          simp_all [BitVec.lt_irrefl]
       have h_actual_ltu : (op_b_val.toNat ≤b op_a_val.toNat) = false :=
         by
           clear * - h_ltu
           simp [BitVec.ult] at *
-          trivial
+          exact h_ltu
       simp only [op_a_val, op_b_val] at h_ltu h_neq h_actual_ltu
       simp [h_actual_ltu]
       simpM
       apply congrArg
-
+      -- stop
       simp [BitVec.ult] at h_ltu
       simp [h_neq, BitVec.ult, h_ltu, h_is_bgeu, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
 
       -- This should come from the spec of LtOperationSigned
       simp [h_neq, BitVec.ult, h_ltu, h_actual_ltu, h_30, h_31, h_33] at spec_lt
+      clear h_ltu
       have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
         by
           clear * - spec_lt
@@ -196,18 +199,15 @@ theorem correct_bgeu
       have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; clear * - reader_cstrs; simp_all only
       have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; clear * - reader_cstrs; simp_all only
       have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
       simp [BitVec.add_def]
       have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
 
       simp [Word.toBitVec64, Word.toNat]
       have h_ltuxtpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_ltuxtpc_is_u64]
 
-      simp [BitVec.ofNatLT]
       clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
-
+      simp [Nat.shiftLeft_eq]
+      refine congr_arg (BitVec.ofNat 64) ?_
       omega
 
     rename_i h_geu
@@ -229,7 +229,8 @@ theorem correct_bgeu
         = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])
         := by simp_all only
 
-      have h_ltuxt_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
+      have h_ltuxt_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + sign_extend imm) % 4 = 0 := by
+        simp [Word.toBitVec64, Word.toNat]
         apply add_mod4_eq_zero_of_mod4_eq_zero
         · show _ % 4#64 = 0#64
           rw [BitVec.ofNat64_mod_4_eq_zero_iff]
@@ -272,6 +273,7 @@ theorem correct_bgeu
 
       -- This should come from the spec of LtOperationSigned
       simp [h_eq, BitVec.ult, h_geu, h_30, h_31] at spec_lt
+      clear h_geu
       have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 :=
         by
           clear * - spec_lt
@@ -289,12 +291,7 @@ theorem correct_bgeu
       have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
       have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; simp_all only
 
-      have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-
       simp [Word.toBitVec64, Word.toNat]
-      have h_ltuxtpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
-      rw [←BitVec.ofNatLT_eq_ofNat h_ltuxtpc_is_u64]
 
       have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by simp_all only
@@ -302,11 +299,10 @@ theorem correct_bgeu
       rw [←trusted_imm]
 
       simp [Word.toBitVec64, Word.toNat]
-      rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
 
       simp [BitVec.add_def]
       apply BitVec.eq_of_toNat_eq
-      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
+      rw [BitVec.toNat_ofNat]
       simp
 
       clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
@@ -318,12 +314,12 @@ theorem correct_bgeu
       by
         clear * - h_geu h_neq
         simp [BitVec.ult] at *
-        trivial
+        exact h_geu
     simp only [op_a_val, op_b_val, BitVec.ult] at h_neq h_geu
     simp [op_a_val, op_b_val] at h_actual_geu
     simp [h_actual_geu]
     simpM
-
+    clear h_actual_geu
     simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
     rw [Std.ExtDHashMap.get?_insert]
     simp
@@ -335,7 +331,8 @@ theorem correct_bgeu
       = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])
       := by simp_all only
 
-    have h_ltuxt_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
+    have h_ltuxt_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + sign_extend imm) % 4 = 0 := by
+      simp [Word.toBitVec64, Word.toNat]
       apply add_mod4_eq_zero_of_mod4_eq_zero
       · show _ % 4#64 = 0#64
         rw [BitVec.ofNat64_mod_4_eq_zero_iff]
@@ -368,57 +365,43 @@ theorem correct_bgeu
     unfold EStateM.run at this
     simp [currentlyEnabled, hartSupports, this]
     clear this
-
     rw [helper]
 
     simpM
     simp [writeReg, PreSail.writeReg]
     simpM
     apply congrArg
-
-    -- This should come from the spec of LtOperationSigned
+    rw [← Nat.not_lt] at h_geu
     simp [h_neq, BitVec.ult, h_geu, h_30, h_31] at spec_lt
+    clear h_geu
     have h_is_neq : Main[36] + Main[37] + Main[38] + Main[39] = 1 :=
       by
         clear * - spec_lt
         aesop
-    have h_is_ge : Main[35] = 0 := by clear * - h_geu spec_lt; rw [if_neg] at spec_lt <;> aesop
-
+    have h_is_ge : Main[35] = 0 := by clear * - spec_lt; simp_all only
     simp [h_is_bgeu, h_neq, h_is_ge, h_is_neq, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
     simp [sub_eq_zero] at chip_cstrs
     have h_is_branching : Main[34] = 1 := by simp_all only
     simp [h_is_branching] at chip_cstrs
-
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-
     have h_pc_0 : Main[3].val < 65536 := by show Main[3] < 65536; simp_all only
     have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
     have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; simp_all only
-
     have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
-    rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-
     simp [Word.toBitVec64, Word.toNat]
     have h_ltuxtpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
-    rw [←BitVec.ofNatLT_eq_ofNat h_ltuxtpc_is_u64]
-
     have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by simp_all only
     simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
     rw [←trusted_imm]
-
     simp [Word.toBitVec64, Word.toNat]
-    rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
-
     simp [BitVec.add_def]
     apply BitVec.eq_of_toNat_eq
-    rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
+    rw [BitVec.toNat_ofNat]
     simp
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
     omega
-
-#print axioms correct_bgeu
 
 end BGEU
 

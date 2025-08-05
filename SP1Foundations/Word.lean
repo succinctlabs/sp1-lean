@@ -546,12 +546,11 @@ lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
     . rw [← BitVec.toNat_inj, BitVec.toNat_setWidth, toBitVec64_toNat h_64 ] at h_eq
       simp_all [BitVec.toNat_ofNat, toNat]
       omega
-    stop
     . rw [← BitVec.toInt_inj, toBitVec64_toInt h_64, toInt] at h_eq
       split_ifs at h_eq with h_neg <;>
       rw [isNegative_msb, BitVec.msb_eq_decide, toBitVec64_toNat h_64] at h_neg <;>
       subst imm_x <;>
-      simp_all [BitVec.toNat_ofNat, toNat] <;>
+      simp_all [BitVec.toNat_ofNat, toNat, Nat.shiftLeft_eq] <;>
       rw [Int.bmod_def] at h_eq <;>
       omega
 

@@ -412,8 +412,6 @@ theorem correct_bge
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
     omega
 
-#print axioms correct_bge
-
 end BGE
 
 end Branch

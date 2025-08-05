@@ -290,8 +290,6 @@ theorem correct_bne
 
       omega
 
-#print axioms correct_bne
-
 end BNE
 
 end Branch

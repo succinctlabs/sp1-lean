@@ -127,5 +127,3 @@ theorem SP1JAL_correct
     rw [BitVec.ofNatLT_eq_ofNat]
 
 end Jal
-
--- #print axioms JalChip.SP1JAL_correct

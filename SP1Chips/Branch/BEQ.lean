@@ -309,8 +309,6 @@ theorem correct_beq
 
       omega
 
-#print axioms correct_beq
-
 end BEQ
 
 end Branch
