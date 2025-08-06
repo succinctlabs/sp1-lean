@@ -156,10 +156,8 @@ lemma spec.branch
   rcases h_comp_limbs with ⟨ cmp_00, cmp_01, cmp_02 ⟩
   simp only [Nat.shiftLeft_eq] at *
   simp_all
-  stop
   constructor <;> intro sgn <;> (repeat rw [this]) <;> clear this <;> simp_all
-
-
+  stop
   . rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
     simp_all <;> split_ands

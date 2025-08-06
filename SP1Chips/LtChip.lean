@@ -23,8 +23,8 @@ def spec_slt (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6] ?_
-    show Main[6] < 32
+    refine BitVec.ofNatLT Main[6]$ ?_
+    show Main[6]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_slt h_is_slt] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -33,9 +33,9 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14] ?_
+    refine BitVec.ofNatLT Main[14]$ ?_
     simp
-    show Main[14] < 32
+    show Main[14]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_slt h_is_slt] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -44,9 +44,9 @@ def sp1_op_b : BitVec 5 :=
 
 def sp1_op_c : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[21] ?_
+    refine BitVec.ofNatLT Main[21]$ ?_
     simp
-    show Main[21] < 32
+    show Main[21]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_slt h_is_slt] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -57,8 +57,8 @@ def sp1_slt : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_slt
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35]$, 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_slt
@@ -71,7 +71,7 @@ theorem correct_slt
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_slt] at h_is_slt
     rw [allHold_constraints_iff_slt h_is_slt] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33, M34⟩ := cstrs
-    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
+    have h_is_real : Main[32]$ + Main[33]$ = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
@@ -88,10 +88,10 @@ theorem correct_slt
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
 
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (c := (Main[6]$)#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.signed at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
       simp_all [Word.toBitVec64, Word.toNat]
@@ -116,8 +116,8 @@ def spec_slti (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6] ?_
-    show Main[6] < 32
+    refine BitVec.ofNatLT Main[6]$ ?_
+    show Main[6]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_slti h_is_slti] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -126,23 +126,23 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14] ?_
+    refine BitVec.ofNatLT Main[14]$ ?_
     simp
-    show Main[14] < 32
+    show Main[14]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_slti h_is_slti] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
 
-def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
+def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21]$.val
 
 def sp1_slti : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_slti
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35]$, 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sltu
@@ -155,7 +155,7 @@ theorem correct_sltu
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_sltiu] at h_is_sltiu
     rw [allHold_constraints_iff_slti h_is_slti] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33, M34⟩ := cstrs
-    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
+    have h_is_real : Main[32]$ + Main[33]$ = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
@@ -164,7 +164,7 @@ theorem correct_sltu
     obtain ⟨throwaway, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all
-    have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
+    have is_U64_c : Word.isU64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$]
       := by apply Word.isU64_of_cases _ c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
     -- simp [h_is_addiw] at h_f h_imm_c
@@ -178,10 +178,10 @@ theorem correct_sltu
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
 
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (c := (Main[6]$)#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.signed at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
       simp_all [Word.toBitVec64, Word.toNat]
@@ -206,8 +206,8 @@ def spec_sltu (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6] ?_
-    show Main[6] < 32
+    refine BitVec.ofNatLT Main[6]$ ?_
+    show Main[6]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -216,9 +216,9 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14] ?_
+    refine BitVec.ofNatLT Main[14]$ ?_
     simp
-    show Main[14] < 32
+    show Main[14]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -227,9 +227,9 @@ def sp1_op_b : BitVec 5 :=
 
 def sp1_op_c : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[21] ?_
+    refine BitVec.ofNatLT Main[21]$ ?_
     simp
-    show Main[21] < 32
+    show Main[21]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -240,8 +240,8 @@ def sp1_sltu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35]$, 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sltu
@@ -254,7 +254,7 @@ theorem correct_sltu
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_sltu] at h_is_sltu
     rw [allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33, M34⟩ := cstrs
-    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
+    have h_is_real : Main[32]$ + Main[33]$ = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
@@ -272,10 +272,10 @@ theorem correct_sltu
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
 
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (c := (Main[6]$)#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.unsigned at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
       simp_all [Word.toBitVec64, Word.toNat]
@@ -300,8 +300,8 @@ def spec_sltiu (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6] ?_
-    show Main[6] < 32
+    refine BitVec.ofNatLT Main[6]$ ?_
+    show Main[6]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -310,23 +310,23 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14] ?_
+    refine BitVec.ofNatLT Main[14]$ ?_
     simp
-    show Main[14] < 32
+    show Main[14]$ < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
 
-def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
+def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21]$.val
 
 def sp1_sltiu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltiu
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35]$, 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sltu
@@ -339,7 +339,7 @@ theorem correct_sltu
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_sltiu] at h_is_sltiu
     rw [allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33, M34⟩ := cstrs
-    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
+    have h_is_real : Main[32]$ + Main[33]$ = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
@@ -348,7 +348,7 @@ theorem correct_sltu
     obtain ⟨throwaway, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all
-    have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
+    have is_U64_c : Word.isU64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$]
       := by apply Word.isU64_of_cases _ c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
     -- simp [h_is_addiw] at h_f h_imm_c
@@ -362,10 +362,10 @@ theorem correct_sltu
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
 
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (c := (Main[6]$)#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.unsigned at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
       simp_all [Word.toBitVec64, Word.toNat]

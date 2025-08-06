@@ -14,7 +14,7 @@ variable
   (Main : Vector (Fin BB) 33)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[32] = 1)
+  (h_is_real : Main[32]$ = 1)
 
 def spec_add (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
@@ -23,9 +23,9 @@ def spec_add (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6] ?_
+    refine BitVec.ofNatLT Main[6]$ ?_
     simp
-    show Main[6] < 32
+    show Main[6]$ < 32
 
     have reader_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
@@ -38,9 +38,9 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14] ?_
+    refine BitVec.ofNatLT Main[14]$ ?_
     simp
-    show Main[14] < 32
+    show Main[14]$ < 32
 
     have reader_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
@@ -53,9 +53,9 @@ def sp1_op_b : BitVec 5 :=
 
 def sp1_op_c : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[21] ?_
+    refine BitVec.ofNatLT Main[21]$ ?_
     simp
-    show Main[21] < 32
+    show Main[21]$ < 32
 
     have reader_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
@@ -68,8 +68,8 @@ def sp1_op_c : BitVec 5 :=
 
 def sp1_add : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28]$, Main[29]$, Main[30]$, Main[31]$])
 
 open Sail
 
@@ -101,7 +101,7 @@ theorem correct_add
     simp [sp1_op_c, read_op_c (by omega)]
     simp [sp1_op_a]
 
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
     . rw [← is_sub]
       simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]

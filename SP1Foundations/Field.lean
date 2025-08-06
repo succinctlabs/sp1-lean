@@ -3,6 +3,9 @@ import SP1Foundations.Misc
 notation "BB" => 2013265921
 @[simp] lemma BB_eq : BB = 2013265921 := rfl
 
+syntax:max term noWs "[" withoutPosition(term) "]$" : term
+macro_rules | `($x[$i]$) => `(getElem $x $i (by decide +kernel))
+
 namespace BabyBear
 
 -- dt: Need `#eval`-level `native_decide` strength to make this work on all OS
