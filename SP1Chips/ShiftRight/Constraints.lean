@@ -743,7 +743,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   set srlw := Main[66]$
   set sraw := Main[67]$
   set bop := Main[68]$
-
+  stop
   suffices : a0.val < 65536 ∧ a1.val < 65536 ∧ a2.val < 65536 ∧ a3.val < 65536
   . clear *- this; apply Word.isU64_of_cases <;> simp <;> tauto
   . clear diff eq_bop
@@ -1070,7 +1070,7 @@ lemma spec.srl (h : is_srl Main ) :
              nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
              w_00, w_01, w_02, w_03, w_04, w_05 ⟩ := cstrs
     clear h_msb_b3 h_msb_b1 h_msb_a1 cpu alu
-
+    stop
     simp_all
 
     rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
@@ -1187,7 +1187,7 @@ lemma spec.srli (h : is_srli Main ) :
              nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
              w_00, w_01, w_02, w_03, w_04, w_05 ⟩ := cstrs
     clear h_msb_b3 h_msb_b1 h_msb_a1 cpu alu
-
+    stop
     simp_all
 
     rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
@@ -1304,7 +1304,7 @@ lemma spec.srlw (h : is_srlw Main) :
 
     symm at h_b2_dec h_b3_dec
     simp_all
-
+    stop
     have is_U32_a : HalfWord.isU32 #v[ a0, a1 ] := by apply HalfWord.isU32_of_cases <;> assumption
     have is_U32_b : HalfWord.isU32 #v[ b0, b1 ] := by apply HalfWord.isU32_of_cases <;> assumption
     have is_U32_c : HalfWord.isU32 #v[ c0, c1 ] := by apply HalfWord.isU32_of_cases <;> assumption
@@ -1460,7 +1460,7 @@ lemma spec.srliw (h : is_srliw Main ) :
              nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
              w_00, w_01, w_02, w_03, w_04, w_05 ⟩ := cstrs
     clear h_msb_b3 h_msb_b1 cpu alu
-
+    stop
     symm at h_b2_dec h_b3_dec
     simp_all
 
@@ -1663,7 +1663,7 @@ lemma spec.sra (h : is_sra Main ) :
       . clear *-; split_ifs <;> omega
 
     by_cases h_neg : 32768 ≤ b3 <;> simp_all
-
+    stop
     all_goals
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -1816,7 +1816,7 @@ lemma spec.srai (h : is_srai Main ) :
       . clear *-; split_ifs <;> omega
 
     by_cases h_neg : 32768 ≤ b3 <;> simp_all
-
+    stop
     all_goals
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -1977,7 +1977,7 @@ lemma spec.sraw (h : is_sraw Main) :
       trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
       . congr; rw [HalfWord.isNegative_msb _ is_U32_a]
-
+    stop
     . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HalfWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
       . rw [← hw_shift]
         rw [HalfWord.sign_extend_32_to_64_msb]
@@ -2173,7 +2173,7 @@ lemma spec.sraiw (h : is_sraiw Main ) :
       trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
       . congr; rw [HalfWord.isNegative_msb _ is_U32_a]
-
+    stop
     . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HalfWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
       . rw [← hw_shift]
         rw [HalfWord.sign_extend_32_to_64_msb]

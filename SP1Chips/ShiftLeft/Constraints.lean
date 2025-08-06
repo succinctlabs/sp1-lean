@@ -599,7 +599,7 @@ lemma spec.sll (h : is_sll Main) :
     rw [this]; clear this
     rw [Word.toBitVec64_toNat (w := #v[b0, b1, b2, b3]) (by apply Word.isU64_of_cases <;> simp <;> assumption)]
     simp [Word.toNat]
-
+    stop
     -- 64-way case split
     rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
     rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -714,7 +714,7 @@ lemma spec.slli (h : is_slli Main) :
     rw [this]; clear this
     rw [Word.toBitVec64_toNat (w := #v[b0, b1, b2, b3]) (by apply Word.isU64_of_cases <;> simp <;> assumption)]
     simp [Word.toNat]
-
+    stop
     -- 64-way case split
     rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
     rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -837,7 +837,7 @@ lemma spec.sllw (h : is_sllw Main) :
         clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
         omega
     clear c0_mod_64
-
+    stop
     have h_isU32_a : HalfWord.isU32 #v[ a0, a1 ] := by
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> simp_all <;>
@@ -979,7 +979,7 @@ lemma spec.slliw (h : is_slliw Main) :
         clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
         omega
     clear c0_mod_64
-
+    stop
     have h_isU32_a : HalfWord.isU32 #v[ a0, a1 ] := by
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> simp_all <;>
