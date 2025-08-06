@@ -187,6 +187,13 @@ lemma lt_cases_of_isU64 {w : Word (Fin BB)} (hw : w.isU64) :
     w[0].val < 2^16 ∧ w[1].val < 2^16 ∧ w[2].val < 2^16 ∧ w[3].val < 2^16 :=
   ⟨hw 0, hw 1, hw 2, hw 3⟩
 
+lemma lt_cases_of_isU64_bv { w : Word (Fin BB) } (hw : w.isU64) :
+  BitVec.ofNat 64 w[0] < 65536 ∧ BitVec.ofNat 64 w[1] < 65536 ∧
+  BitVec.ofNat 64 w[2] < 65536 ∧ BitVec.ofNat 64 w[3] < 65536
+    := by
+  obtain ⟨ w0, w1, w2, w3 ⟩ := lt_cases_of_isU64 hw
+  simp; omega
+
 @[simp] -- common enough to want a lemma
 lemma four_isU64 : Word.isU64 #v[4, 0, 0, 0] :=
   Word.isU64_of_cases _ (by trivial) (by trivial) (by trivial) (by trivial)
@@ -348,13 +355,22 @@ lemma lt_cases_of_isU64 {w : ByteWord (Fin BB)} (hbw : w.isU64) :
     w[4].val < 2^8 ∧ w[5].val < 2^8 ∧ w[6].val < 2^8 ∧ w[7].val < 2^8 :=
   ⟨hbw 0, hbw 1, hbw 2, hbw 3, hbw 4, hbw 5, hbw 6, hbw 7⟩
 
+lemma lt_cases_of_isU64_bv { w : ByteWord (Fin BB) } (hw : w.isU64) :
+  BitVec.ofNat 64 w[0] < 256 ∧ BitVec.ofNat 64 w[1] < 256 ∧
+  BitVec.ofNat 64 w[2] < 256 ∧ BitVec.ofNat 64 w[3] < 256 ∧
+  BitVec.ofNat 64 w[4] < 256 ∧ BitVec.ofNat 64 w[5] < 256 ∧
+  BitVec.ofNat 64 w[6] < 256 ∧ BitVec.ofNat 64 w[7] < 256
+    := by
+  obtain ⟨ w0, w1, w2, w3, w4, w5, w6, w7 ⟩ := lt_cases_of_isU64 hw
+  simp; omega
+
 end U64
 
 section conversions
 
 /-- Convert a byteword to a `Word` by combining the limbs. -/
 def toWord (w : ByteWord (Fin BB)) : Word (Fin BB) :=
-  #v[w[0]! + 256 * w[1], w[2]! + 256 * w[3], w[4]! + 256 * w[5], w[6]! + 256 * w[7]]
+  #v[w[0]! + w[1] * 256, w[2]! + w[3] * 256, w[4]! + w[5] * 256, w[6]! + w[7] * 256]
 
 /-- Convert a byteword to a `Nat` by shifting and adding the limbs. -/
 def toNat (w : ByteWord (Fin BB)) : ℕ := w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24 + w[4] * 2^32 + w[5] * 2^40 + w[6] * 2^48 + w[7] * 2^56
@@ -501,7 +517,15 @@ namespace Word
 
 /-- Convert a word to a `ByteWord` by separating the limbs. -/
 def toByteWord (w : Word (Fin BB)) : ByteWord (Fin BB) :=
-  #v[w[0]! % 256, w[0] / 256, w[1]! % 256, w[1] / 256, w[2]! % 256, w[2] / 256, w[3]! % 256, w[3] / 256 ]
+  #v[w[0] % 256, w[0] / 256, w[1] % 256, w[1] / 256, w[2] % 256, w[2] / 256, w[3] % 256, w[3] / 256 ]
+
+lemma toU64_toByteWord
+  (w : Word (Fin BB))
+  (h_w_isU64 : w.isU64) :
+    w.toByteWord.isU64 := by
+  simp [Word.toByteWord]
+  apply Word.lt_cases_of_isU64 at h_w_isU64
+  apply ByteWord.isU64_of_cases <;> simp <;> omega
 
 lemma toNat_toByteWord
   (w : Word (Fin BB))
@@ -553,3 +577,32 @@ lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
       omega
 
 end Word
+
+section Bitwise
+
+namespace Word
+
+lemma and_toByteWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
+  a.toBitVec64 &&& b.toBitVec64 = a.toByteWord.toBitVec64 &&& b.toByteWord.toBitVec64
+    := by
+  intro h_a_64 h_b_64
+  simp [Word.toBitVec64, ByteWord.toBitVec64]
+  rw [Word.toNat_toByteWord _ h_a_64, Word.toNat_toByteWord _ h_b_64]
+
+lemma or_toByteWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
+  a.toBitVec64 ||| b.toBitVec64 = a.toByteWord.toBitVec64 ||| b.toByteWord.toBitVec64
+    := by
+  intro h_a_64 h_b_64
+  simp [Word.toBitVec64, ByteWord.toBitVec64]
+  rw [Word.toNat_toByteWord _ h_a_64, Word.toNat_toByteWord _ h_b_64]
+
+lemma xor_toByteWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
+  a.toBitVec64 ^^^ b.toBitVec64 = a.toByteWord.toBitVec64 ^^^ b.toByteWord.toBitVec64
+    := by
+  intro h_a_64 h_b_64
+  simp [Word.toBitVec64, ByteWord.toBitVec64]
+  rw [Word.toNat_toByteWord _ h_a_64, Word.toNat_toByteWord _ h_b_64]
+
+end Word
+
+end Bitwise
