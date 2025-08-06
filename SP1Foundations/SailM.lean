@@ -16,6 +16,16 @@ open LeanRV64IM.Functions
 
 section sailboats
 
+instance : ReflBEq Privilege where
+  rfl := by
+    intro a
+    cases a <;> trivial
+
+instance : ReflBEq SATPMode where
+  rfl := by
+    intro a
+    cases a <;> trivial
+
 namespace Option
 
 /-- Version of `Option.getM` using `throw` instead of `failure`-/
