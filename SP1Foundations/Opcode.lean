@@ -152,6 +152,7 @@ def trusted_instr_state
   --     (s.regs.get! Register.PC + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
   | LW | LWU =>
       ((s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
+      ∧ (s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] < 2^48
   | _ => True
 
 end Opcode
