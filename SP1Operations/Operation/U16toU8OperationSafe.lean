@@ -4,17 +4,7 @@ import SP1Operations.Operation.U16toU8OperationSafe.Constraints
 
 namespace U16toU8OperationSafe
 
-lemma allHold_constraints_iff
-  (u16_values : (Vector (Fin BB) 4))
-  (cols : U16toU8Operation)
-  (is_real : Fin BB) :
-  (constraints u16_values cols is_real).2.allHold ↔
-    (¬is_real = 0 → cols.low_bytes[0] < 256 ∧ ((u16_values[0] - cols.low_bytes[0]) * 2005401601) < 256) ∧
-    (¬is_real = 0 → cols.low_bytes[1] < 256 ∧ ((u16_values[1] - cols.low_bytes[1]) * 2005401601) < 256) ∧
-    (¬is_real = 0 → cols.low_bytes[2] < 256 ∧ ((u16_values[2] - cols.low_bytes[2]) * 2005401601) < 256) ∧
-    (¬is_real = 0 → cols.low_bytes[3] < 256 ∧ ((u16_values[3] - cols.low_bytes[3]) * 2005401601) < 256)
-  := by
-    simp [and_assoc, constraints, sub_eq_zero, Fin.lt_iff_val_lt_val]
+section decomposition
 
 lemma u16_to_u8_decomposition_bv64_bv64 (a b : BitVec 64) :
   a < BB → b < 256 → ((BB - b + a) * 2005401601) % BB < 256 → a < 65536 ∧ b = a % 256 ∧ ((a - b) * 2005401601) % 2013265921 = a / 256
@@ -53,6 +43,20 @@ lemma u16_to_u8_decomposition_bb (a b : Fin BB) :
     rw [← Fin.val_eq_val] at this
     aesop (add safe (by omega))
 
+end decomposition
+
+lemma allHold_constraints_iff
+  (u16_values : (Vector (Fin BB) 4))
+  (cols : U16toU8Operation)
+  (is_real : Fin BB) :
+  (constraints u16_values cols is_real).2.allHold ↔
+    (¬is_real = 0 → cols.low_bytes[0] < 256 ∧ ((u16_values[0] - cols.low_bytes[0]) * 2005401601) < 256) ∧
+    (¬is_real = 0 → cols.low_bytes[1] < 256 ∧ ((u16_values[1] - cols.low_bytes[1]) * 2005401601) < 256) ∧
+    (¬is_real = 0 → cols.low_bytes[2] < 256 ∧ ((u16_values[2] - cols.low_bytes[2]) * 2005401601) < 256) ∧
+    (¬is_real = 0 → cols.low_bytes[3] < 256 ∧ ((u16_values[3] - cols.low_bytes[3]) * 2005401601) < 256)
+  := by
+    simp [and_assoc, constraints, sub_eq_zero, Fin.lt_iff_val_lt_val]
+
 lemma spec.cstrs
   (u16_values : (Vector (Fin BB) 4))
   (cols : U16toU8Operation)
@@ -82,6 +86,18 @@ lemma spec.return
   := by
     have ⟨ h0, h1, h2, h3, h4, h5, h6, h7 ⟩ := spec.cstrs u16_values cols is_real cstrs h_is_real
     simp [constraints, Word.toByteWord]
+    aesop
+
+lemma spec.unsafe.return
+  (u16_values : (Vector (Fin BB) 4))
+  (cols : U16toU8Operation)
+  (is_real : Fin BB)
+  (cstrs : (constraints u16_values cols is_real).2.allHold)
+  (h_is_real : is_real ≠ 0) :
+      (U16toU8OperationUnsafe.constraints u16_values cols).1 = Word.toByteWord u16_values
+  := by
+    have ⟨ h0, h1, h2, h3, h4, h5, h6, h7 ⟩ := spec.cstrs u16_values cols is_real cstrs h_is_real
+    simp [U16toU8OperationUnsafe.constraints, Word.toByteWord]
     aesop
 
 end U16toU8OperationSafe

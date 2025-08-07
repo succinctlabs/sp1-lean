@@ -16,7 +16,7 @@ variable
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[32] = 1)
 
-def spec_add (rs2 rs1 rd : regidx) : SailM Unit := do
+def spec_sub (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute (.RTYPE (rs2, rs1, rd, rop.SUB))
   pure ()
@@ -66,19 +66,19 @@ def sp1_op_c : BitVec 5 :=
 
     exact reader_cstrs.1.1.2
 
-def sp1_add : SailM Unit := do
+def sp1_sub : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 open Sail
 
-theorem correct_add
+theorem correct_sub
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main cstrs h_is_real
   let op_b := sp1_op_b Main cstrs h_is_real
   let op_a := sp1_op_a Main cstrs h_is_real
-  (spec_add (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_add Main cstrs h_is_real).run s
+  (spec_sub (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sub Main cstrs h_is_real).run s
   := by
     -- Obtain and simplify state and pure constraints
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, SubOperation.constraints, CPUState.constraints, RTypeReader.constraints, h_is_real] at state_cstrs
@@ -95,7 +95,7 @@ theorem correct_add
     simp at *
 
     -- Now the monadic manipulation
-    simp [spec_add, sp1_add, execute, execute_RTYPE']
+    simp [spec_sub, sp1_sub, execute, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_b, read_op_b (by omega)]
     simp [sp1_op_c, read_op_c (by omega)]
