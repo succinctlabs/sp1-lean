@@ -156,19 +156,20 @@ lemma spec.branch
   rcases h_comp_limbs with ⟨ cmp_00, cmp_01, cmp_02 ⟩
   simp only [Nat.shiftLeft_eq] at *
   simp_all
+  repeat rw [eq_comm (a := 1)] at *; symm at lt_05 lt_06
   constructor <;> intro sgn <;> (repeat rw [this]) <;> clear this <;> simp_all
-  stop
   . rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
-    simp_all <;> split_ands
+    -- FIXME: `split_ands` hangs; `try_constructor` hangs
+    simp_all <;> [ skip; constructor; constructor; constructor; constructor ]
 
-    symm at lt_05 lt_06; simp_all
     on_goal 2 => intros; intro eqc; simp_all
     on_goal 3 => intros; intro eqc; simp_all
     on_goal 4 => intros; intro eqc; simp_all
     on_goal 5 => intro eqc; simp_all
 
     all_goals {
+      -- FIXME: `split_ifs` hangs
       split_ifs at spec.unsigned with cond
       all_goals {
         iterate 2 rw [← Word.toBitVec64_toNat (by assumption)] at cond

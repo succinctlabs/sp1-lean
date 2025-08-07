@@ -597,6 +597,7 @@ lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op :
   intro h_op1_isU64 h_op2_isU64
   have ha' := Word.lt_cases_of_isU64 h_op1_isU64
   have hb' := Word.lt_cases_of_isU64 h_op2_isU64
+  -- FIXME: the `congr` that used to be here now hangs.
   cases op
   · simp [execute_RTYPEW_pure]
     refine congr_arg (BitVec.signExtend 64) ?_

@@ -70,8 +70,7 @@ lemma spec
       apply U16CompareOperation.spec at h_comp_limbs <;> try assumption
       apply Word.lt_cases_of_isU64 at h_b_isU64
       apply Word.lt_cases_of_isU64 at h_d_isU64
-      unfold Word.toNat
-      simp [Nat.shiftLeft_eq]
+      simp [Word.toNat, Nat.shiftLeft_eq]
       rcases h_is_real_bool <;> simp_all
       rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
       rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
