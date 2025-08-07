@@ -120,6 +120,9 @@ theorem correct
     simp [constraints, AddressOperation.constraints, SP1Constraint.toProp, List.Forall, h_is_lb, h_not_lbu, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble, sub_eq_zero] at cstrs
     obtain ⟨addr_add_cstrs, h_addr_shift0, h_addr_shift1, h_addr_shift2, addr_cstr0, addr_cstr1, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
 
+    have h_42_is_upper_byte : Main[42]$ = Main[41]$ >>> 8 := by sorry
+    have h_msb : (Main[44]$ = 0 ∨ Main[44]$ = 1) ∧ (Main[44]$ = 1 ↔ 64 ≤ Main[43]$) := by extract_from_and chip_cstrs
+
     simp [ITypeReader.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
 
     have h_op_a_is_reg : Main[6]$ < 32 := by simp_all only
@@ -461,6 +464,17 @@ theorem correct
       (have h_correct_limb : Main[41]$ = Main[32]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs])
     ]
 
+    <;> [
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs])
+    ]
+
     any_goals
       -- nextPC write
       simp [Word.toBitVec64, Word.toNat]
@@ -483,8 +497,16 @@ theorem correct
     -- let byte1 = (local.selected_limb - byte0) * AB::F::from_canonical_u32(1 << 8).inverse();
     -- builder.slice_range_check_u8(&[byte0.into(), byte1.clone()], is_real.clone());
     -- ```
+    -- see the `sorry` at the start. It's possible that the `Fin.shiftRight` is not the most convenient notation to
+    -- prove, in which case feel free to change the type of h_42_is_upper_rem as long as you can prove it.
     -- 
-    -- only bitvec goals remaining
+    -- rw [h_correct_byte, h_42_is_upper_byte, h_correct_limb]
+    -- rw [h_correct_byte, h_42_is_upper_byte, h_correct_limb] at h_msb
+    any_goals
+      rw [h_correct_byte, h_42_is_upper_byte, h_correct_limb]
+      rw [h_correct_byte, h_42_is_upper_byte, h_correct_limb] at h_msb
+
+    -- only bitvec goals with h_msb remaining
     all_goals
       sorry
 
@@ -574,6 +596,9 @@ theorem correct
 
     simp [constraints, AddressOperation.constraints, SP1Constraint.toProp, List.Forall, h_is_lbu, h_not_lb, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble, sub_eq_zero] at cstrs
     obtain ⟨addr_add_cstrs, h_addr_shift0, h_addr_shift1, h_addr_shift2, addr_cstr0, addr_cstr1, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
+
+    have h_42_is_upper_byte : Main[42]$ = Main[41]$ >>> 8 := by sorry
+    have h_no_msb : Main[44]$ = 0 := by simp_all only [chip_cstrs]
 
     simp [ITypeReader.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
 
@@ -916,8 +941,18 @@ theorem correct
       (have h_correct_limb : Main[41]$ = Main[32]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs])
     ]
 
-    any_goals
-      -- nextPC write
+    <;> [
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = Main[42]$ := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs]);
+      (have h_correct_byte : Main[43]$ = (Main[41]$ - Main[42]$) * 2005401601 := by clear * - chip_cstrs; simp_all only [chip_cstrs])
+    ]
+
+    <;> (
       simp [Word.toBitVec64, Word.toNat]
       rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
       simp [BitVec.add_def]
@@ -928,9 +963,9 @@ theorem correct
       rw [this]
       clear this
       simp [op_a]
-
       apply congrArg
       apply congrArg
+    )
 
     -- TODO(gzgz): needs another proof on: byte1 = selected_limb >>> 8 from below
     -- ```rust
@@ -938,10 +973,13 @@ theorem correct
     -- let byte1 = (local.selected_limb - byte0) * AB::F::from_canonical_u32(1 << 8).inverse();
     -- builder.slice_range_check_u8(&[byte0.into(), byte1.clone()], is_real.clone());
     -- ```
-    -- 
+    -- see the `sorry` at the start. It's possible that the `Fin.shiftRight` is not the most convenient notation to
+    -- prove, in which case feel free to change the type of h_42_is_upper_rem as long as you can prove it.
+    <;> rw [h_correct_byte, h_42_is_upper_byte, h_correct_limb]
+    <;> simp [h_no_msb]
+
     -- only bitvec goals remaining
-    all_goals
-      sorry
+    all_goals sorry
 
 end LBU
 
