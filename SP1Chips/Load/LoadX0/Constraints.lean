@@ -149,6 +149,61 @@ def constraints (Main : Vector (Fin BB) 48) : SP1ConstraintList :=
 
 end constraints
 
+section helpers
+
+syntax:max term noWs "[" withoutPosition(term) "]$" : term
+macro_rules | `($x[$i]$) => `(getElem $x $i (by norm_num1))
+
+variable
+  (Main : Vector (Fin BB) 48)
+  (s : SailState)
+  (cstrs : (constraints Main).allHold)
+
+set_option maxHeartbeats 40000000 in
+theorem h_exactly_one
+  (Main : Vector (Fin BB) 48)
+  (_cstrs : (constraints Main).allHold)
+  : (Main[41]$ = 1 → Main[41]$ = 1 ∧ Main[42]$ = 0 ∧ Main[43]$ = 0 ∧ Main[44]$ = 0 ∧ Main[45]$ = 0 ∧ Main[46]$ = 0 ∧ Main[47]$ = 0)
+  ∧ (Main[42]$ = 1 → Main[41]$ = 0 ∧ Main[42]$ = 1 ∧ Main[43]$ = 0 ∧ Main[44]$ = 0 ∧ Main[45]$ = 0 ∧ Main[46]$ = 0 ∧ Main[47]$ = 0)
+  ∧ (Main[43]$ = 1 → Main[41]$ = 0 ∧ Main[42]$ = 0 ∧ Main[43]$ = 1 ∧ Main[44]$ = 0 ∧ Main[45]$ = 0 ∧ Main[46]$ = 0 ∧ Main[47]$ = 0)
+  ∧ (Main[44]$ = 1 → Main[41]$ = 0 ∧ Main[42]$ = 0 ∧ Main[43]$ = 0 ∧ Main[44]$ = 1 ∧ Main[45]$ = 0 ∧ Main[46]$ = 0 ∧ Main[47]$ = 0)
+  ∧ (Main[45]$ = 1 → Main[41]$ = 0 ∧ Main[42]$ = 0 ∧ Main[43]$ = 0 ∧ Main[44]$ = 0 ∧ Main[45]$ = 1 ∧ Main[46]$ = 0 ∧ Main[47]$ = 0)
+  ∧ (Main[46]$ = 1 → Main[41]$ = 0 ∧ Main[42]$ = 0 ∧ Main[43]$ = 0 ∧ Main[44]$ = 0 ∧ Main[45]$ = 0 ∧ Main[46]$ = 1 ∧ Main[47]$ = 0)
+  ∧ (Main[47]$ = 1 → Main[41]$ = 0 ∧ Main[42]$ = 0 ∧ Main[43]$ = 0 ∧ Main[44]$ = 0 ∧ Main[45]$ = 0 ∧ Main[46]$ = 0 ∧ Main[47]$ = 1)
+  := by
+    stop
+    simp [constraints, List.Forall, SP1Constraint.toProp, AddressOperation.constraints, sub_eq_zero] at cstrs
+    obtain ⟨_, _, _, _, _, _, _, _, _, chip_cstrs⟩ := cstrs
+    clear * - chip_cstrs
+
+    have h_is_lb_is_bool  : Main[41]$ = 0 ∨ Main[41]$ = 1 := by simp_all only
+    have h_is_lbu_is_bool : Main[42]$ = 0 ∨ Main[42]$ = 1 := by simp_all only
+    have h_is_lh_is_bool  : Main[43]$ = 0 ∨ Main[43]$ = 1 := by simp_all only
+    have h_is_lhu_is_bool : Main[44]$ = 0 ∨ Main[44]$ = 1 := by simp_all only
+    have h_is_lw_is_bool  : Main[45]$ = 0 ∨ Main[45]$ = 1 := by simp_all only
+    have h_is_lwu_is_bool : Main[46]$ = 0 ∨ Main[46]$ = 1 := by simp_all only
+    have h_is_ld_is_bool  : Main[47]$ = 0 ∨ Main[47]$ = 1 := by simp_all only
+    have h_sum_is_bool :
+      Main[41]$ + Main[42]$ + Main[43]$ + Main[44]$ + Main[45]$ + Main[46]$ + Main[47]$ = 0
+      ∨ Main[41]$ + Main[42]$ + Main[43]$ + Main[44]$ + Main[45]$ + Main[46]$ + Main[47]$ = 1
+      := by simp_all only
+    clear * - h_is_lb_is_bool h_is_lbu_is_bool
+              h_is_lh_is_bool h_is_lhu_is_bool
+              h_is_lw_is_bool h_is_lwu_is_bool
+              h_is_ld_is_bool h_sum_is_bool
+
+    cases h_is_lb_is_bool <;> rename_i h_lb <;> simp [h_lb] at h_sum_is_bool <;> simp [h_lb]
+    cases h_is_lbu_is_bool <;> rename_i h_lbu <;> simp [h_lbu] at h_sum_is_bool <;> simp [h_lbu]
+    cases h_is_lh_is_bool <;> rename_i h_lh <;> simp [h_lh] at h_sum_is_bool <;> simp [h_lh]
+    cases h_is_lhu_is_bool <;> rename_i h_lhu <;> simp [h_lhu] at h_sum_is_bool <;> simp [h_lhu]
+    cases h_is_lw_is_bool <;> rename_i h_lw <;> simp [h_lw] at h_sum_is_bool <;> simp [h_lw]
+    cases h_is_lwu_is_bool <;> rename_i h_lwu <;> simp [h_lwu] at h_sum_is_bool <;> simp [h_lwu]
+    cases h_is_ld_is_bool <;> rename_i h_ld <;> simp [h_ld] at h_sum_is_bool <;> simp [h_ld]
+
+    all_goals tauto
+
+end helpers
+
 end LoadX0
 
 end Load
