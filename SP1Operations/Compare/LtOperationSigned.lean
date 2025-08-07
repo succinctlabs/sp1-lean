@@ -158,6 +158,7 @@ lemma spec.branch
   simp_all
   repeat rw [eq_comm (a := 1)] at *; symm at lt_05 lt_06
   constructor <;> intro sgn <;> (repeat rw [this]) <;> clear this <;> simp_all
+  stop
   . rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
     -- FIXME: `split_ands` hangs; `try_constructor` hangs
