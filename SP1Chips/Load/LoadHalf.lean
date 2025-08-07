@@ -13,6 +13,11 @@ instance : Lean.Grind.NoNatZeroDivisors (Fin BB) where
 
 open LeanRV64IM.Functions
 
+lemma electric_slide (x : ℕ) :
+    (x >>> 8 % 256) <<< 8 ||| x % 256 = x := by
+  simp [Nat.shiftLeft_eq, Nat.shiftRight_eq_div_pow]
+  sorry
+
 namespace Sail
 
 lemma run_write_reg_no_run (idx : BitVec 5) (val : BitVec 64) :
@@ -43,6 +48,8 @@ variable
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_lh : Main[42] = 1)
+
+
 
 private theorem is_lh_eq_not_lhu
   (cstrs : (constraints Main).allHold)
@@ -196,7 +203,7 @@ theorem correct
     <;> simp [h_shift0, h_shift1] at chip_cstrs h_read_limb0 h_read_limb1 h_read_limb2 h_read_limb3 addr_cstr1
     <;> [
       -- case offset 0
-      ( 
+      (
         obtain
           ⟨h_read_mem0, h_read_mem1⟩
           : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[29]$))
@@ -241,7 +248,7 @@ theorem correct
       );
 
       -- case offset 2
-      ( 
+      (
         let h_addr_limb0_ge2 : Main[25]$ >= 2 :=
           by
             clear * - addr_cstr1
@@ -268,7 +275,7 @@ theorem correct
       );
 
       -- case offset 6
-      ( 
+      (
         let h_addr_limb0_ge6 : Main[25]$ >= 6 :=
           by
             clear * - addr_cstr1
@@ -281,13 +288,13 @@ theorem correct
         let h_addr_limb0_sub4_ge2 : Main[25]$ - 4 >= 2 :=
           by
             clear * - h_addr_limb0_ge6
-            simp at h_addr_limb0_ge6 ⊢ 
+            simp at h_addr_limb0_ge6 ⊢
             all_goals omega
 
         let h_addr_limb0_ge4 : Main[25]$ >= 4 :=
           by
             clear * - h_addr_limb0_ge6
-            simp at h_addr_limb0_ge6 ⊢ 
+            simp at h_addr_limb0_ge6 ⊢
             all_goals omega
 
         obtain
@@ -526,7 +533,7 @@ theorem correct
     <;> simp [h_shift0, h_shift1] at chip_cstrs h_read_limb0 h_read_limb1 h_read_limb2 h_read_limb3 addr_cstr1
     <;> [
       -- case offset 0
-      ( 
+      (
         obtain
           ⟨h_read_mem0, h_read_mem1⟩
           : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[29]$))
@@ -571,7 +578,7 @@ theorem correct
       );
 
       -- case offset 2
-      ( 
+      (
         let h_addr_limb0_ge2 : Main[25]$ >= 2 :=
           by
             clear * - addr_cstr1
@@ -598,7 +605,7 @@ theorem correct
       );
 
       -- case offset 6
-      ( 
+      (
         let h_addr_limb0_ge6 : Main[25]$ >= 6 :=
           by
             clear * - addr_cstr1
@@ -611,13 +618,13 @@ theorem correct
         let h_addr_limb0_sub4_ge2 : Main[25]$ - 4 >= 2 :=
           by
             clear * - h_addr_limb0_ge6
-            simp at h_addr_limb0_ge6 ⊢ 
+            simp at h_addr_limb0_ge6 ⊢
             all_goals omega
 
         let h_addr_limb0_ge4 : Main[25]$ >= 4 :=
           by
             clear * - h_addr_limb0_ge6
-            simp at h_addr_limb0_ge6 ⊢ 
+            simp at h_addr_limb0_ge6 ⊢
             all_goals omega
 
         obtain
@@ -685,8 +692,86 @@ theorem correct
       apply congrArg
       apply congrArg
 
-    -- only bitvec goals remaining
-    all_goals sorry
+    · simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+      simp [BitVec.ofNatLT_eq_ofNat]
+      simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
+      have : Main[41]'(by trivial) = 0 := by simp_all only
+      simp only [BB_eq, Fin.isValue] at this
+      simp [this]
+      have : Main[29]'(by trivial) < 2^16 := by
+        simp
+        have := h_limb0_is_u16
+        simpa using this
+      simp only [setWidth, setWidth']
+      simp
+      rw [BitVec.ofNatLT_eq_ofNat]
+      rw [BitVec.toNat_append]
+      refine congr_arg (BitVec.ofNat 64) ?_
+      simp
+      rw [Fin.lt_iff_val_lt_val] at this
+      simp at this
+      rw [Nat.mod_eq_of_lt this]
+      rw [electric_slide]
+    · simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+      simp [BitVec.ofNatLT_eq_ofNat]
+      simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
+      have : Main[41]'(by trivial) = 0 := by simp_all only
+      simp only [BB_eq, Fin.isValue] at this
+      simp [this]
+      have : Main[31]'(by trivial) < 2^16 := by
+        simp
+        have := h_limb2_is_u16
+        simpa using this
+      simp only [setWidth, setWidth']
+      simp
+      rw [BitVec.ofNatLT_eq_ofNat]
+      rw [BitVec.toNat_append]
+      refine congr_arg (BitVec.ofNat 64) ?_
+      simp
+      rw [Fin.lt_iff_val_lt_val] at this
+      simp at this
+      rw [Nat.mod_eq_of_lt this]
+      rw [electric_slide]
+    · simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+      simp [BitVec.ofNatLT_eq_ofNat]
+      simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
+      have : Main[41]'(by trivial) = 0 := by simp_all only
+      simp only [BB_eq, Fin.isValue] at this
+      simp [this]
+      have : Main[30]'(by trivial) < 2^16 := by
+        simp
+        have := h_limb1_is_u16
+        simpa using this
+      simp only [setWidth, setWidth']
+      simp
+      rw [BitVec.ofNatLT_eq_ofNat]
+      rw [BitVec.toNat_append]
+      refine congr_arg (BitVec.ofNat 64) ?_
+      simp
+      rw [Fin.lt_iff_val_lt_val] at this
+      simp at this
+      rw [Nat.mod_eq_of_lt this]
+      rw [electric_slide]
+    · simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+      simp [BitVec.ofNatLT_eq_ofNat]
+      simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
+      have : Main[41]'(by trivial) = 0 := by simp_all only
+      simp only [BB_eq, Fin.isValue] at this
+      simp [this]
+      have : Main[32]'(by trivial) < 2^16 := by
+        simp
+        have := h_limb3_is_u16
+        simpa using this
+      simp only [setWidth, setWidth']
+      simp
+      rw [BitVec.ofNatLT_eq_ofNat]
+      rw [BitVec.toNat_append]
+      refine congr_arg (BitVec.ofNat 64) ?_
+      simp
+      rw [Fin.lt_iff_val_lt_val] at this
+      simp at this
+      rw [Nat.mod_eq_of_lt this]
+      rw [electric_slide]
 
 end LHU
 

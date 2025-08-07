@@ -487,6 +487,10 @@ def readByte (addr : Nat) : PreSailM RegisterType c ue (BitVec 8) := do
 def readBytes (size : Nat) (addr : Nat) : PreSailM RegisterType c ue ((BitVec (8 * size)) × Option Bool) :=
   match size with
   | 0 => pure (default, none)
+  | 1 => do
+    let b ← readByte addr
+    have h : 8 * 1 = 8 := rfl
+    return (h ▸ b, none)
   | n + 1 => do
     let b ← readByte addr
     let (bytes, bool) ← readBytes n (addr+1)
@@ -646,4 +650,3 @@ macro_rules | `(tactic| decreasing_trivial) => `(tactic|
 -- termination.
 @[wf_preprocess]
 theorem cond_eq_ite (b : Bool) (x y : α) : cond b x y = ite b x y := by cases b <;> rfl
-
