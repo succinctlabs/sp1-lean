@@ -40,8 +40,6 @@ variable
   (s : SailState)
   (cstrs : (constraints Main).allHold)
 
-def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[21].val
-
 namespace LBU
 
 open BitVec

@@ -151,13 +151,15 @@ end constraints
 
 section helpers
 
-syntax:max term noWs "[" withoutPosition(term) "]$" : term
-macro_rules | `($x[$i]$) => `(getElem $x $i (by norm_num1))
+scoped syntax:max term noWs "[" withoutPosition(term) "]$" : term
+scoped macro_rules | `($x[$i]$) => `(getElem $x $i (by norm_num1))
 
 variable
   (Main : Vector (Fin BB) 48)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
+
+def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 set_option maxHeartbeats 40000000 in
 theorem h_exactly_one
