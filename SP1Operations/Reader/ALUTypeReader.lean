@@ -79,6 +79,6 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
       cols.op_c_memory.prev_value[1] = cols.op_c[1] ∧
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
-   := by  aesop (add safe (by simp [allHold_constraints_iff]))
+   := by aesop (add safe (by simp [allHold_constraints_iff]))
 
 end ALUTypeReader

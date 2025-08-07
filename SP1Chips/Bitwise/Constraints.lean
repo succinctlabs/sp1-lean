@@ -125,7 +125,7 @@ section entailed_constraints
 
 lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let imm := Main[31]
-  Main[6] < 32 ∧ Main[14] < 32 ∧ (imm = 0 → Main[21] < 32)
+  Main[6] < 32 ∧ Main[14] < 32 ∧ (imm = 0 → Main[21] < 32) ∧ Main[3] < 65536
     := by
   intro cstrs real
   have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs

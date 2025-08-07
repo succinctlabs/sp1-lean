@@ -421,7 +421,7 @@ section bounds
 
 lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let imm := Main[31]
-  Main[6] < 32 ∧ Main[14] < 32 ∧ (imm = 0 → Main[21] < 32) ∧
+  Main[6] < 32 ∧ Main[14] < 32 ∧ (imm = 0 → Main[21] < 32) ∧ Main[3] < 65536 ∧
   Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
   Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] ∧
   (imm = 1 →
@@ -492,7 +492,7 @@ def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[62] = 1 → BitVec 6 := by
   intro cstrs real imm nw
   refine BitVec.ofNatLT Main[21] ?_
-  have ⟨ _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
+  have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
   simp_all
   have ⟨ _, _, _, _, _ ⟩ := h_imm
   tauto
@@ -501,7 +501,7 @@ def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_re
 def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[63] = 1 → BitVec 5 := by
   intro cstrs real imm nw
   refine BitVec.ofNatLT Main[21] ?_
-  have ⟨ _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
+  have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
   simp_all
   have ⟨ _, _, _, _, _ ⟩ := h_imm
   tauto
@@ -516,7 +516,7 @@ lemma spec.sll (h : is_sll Main) :
   := by
     intro cstrs
     obtain ⟨ eq_sll, eq_imm ⟩ := h
-    have ⟨ h0, h1, h2, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (sll_real Main eq_sll)
+    have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (sll_real Main eq_sll)
     clear h0 h1 h2 h3 h4
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
     obtain ⟨ c0_16, c1_16, c2_16, c3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_c
@@ -631,7 +631,7 @@ lemma spec.slli (h : is_slli Main) :
   := by
     intro cstrs
     obtain ⟨ eq_sll, eq_imm ⟩ := h
-    have ⟨ h0, h1, h2, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sll_real Main eq_sll)
+    have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sll_real Main eq_sll)
     clear h0 h1 h2 h3
     rw [eq_imm] at imm_zeros; simp_all
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
@@ -746,7 +746,7 @@ lemma spec.sllw (h : is_sllw Main) :
   := by
     intro cstrs
     obtain ⟨ eq_sllw, eq_imm ⟩ := h
-    have ⟨ h0, h1, h2, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
+    have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
     clear h0 h1 h2 h3 h4
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
     obtain ⟨ c0_16, c1_16, c2_16, c3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_c
@@ -888,7 +888,7 @@ lemma spec.slliw (h : is_slliw Main) :
   := by
     intro cstrs
     obtain ⟨ eq_sllw, eq_imm ⟩ := h
-    have ⟨ h0, h1, h2, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
+    have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
     clear h0 h1 h2 h3
     rw [eq_imm] at imm_zeros; simp_all
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b

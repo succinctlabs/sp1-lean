@@ -114,6 +114,16 @@ lemma FinBB_mul4_means_LS2B_0 (x : Fin BB) :
 
 end BitVec
 
+namespace BabyBear
+
+lemma add4_into_pc_ofNat {x : Fin BB} {y z : ℕ} : x < 65536 →
+  BitVec.ofNat 64 (x.val + y + z) + 4#64 = BitVec.ofNat 64 ((x + 4).val + y + z) := by
+  intros
+  rw [Fin.val_add, Nat.mod_eq_of_lt (by omega)]
+  simp [ofNat_add]; ring_nf
+
+end BabyBear
+
 namespace Nat
 
 lemma bitVec_helper_xor (a b c d : ℕ)

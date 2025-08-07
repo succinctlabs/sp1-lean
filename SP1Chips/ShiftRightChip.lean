@@ -29,7 +29,7 @@ def sp1_srl : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -42,7 +42,7 @@ theorem correct_srl
   (spec_srl (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srl Main cstrs h_is_srl).run s
   := by
     let ⟨ srl, imm ⟩ := h_is_srl
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srl_real Main srl)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srl_real Main srl)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
     have h_imm := immediate_bounds Main cstrs (srl_real Main srl)
     have h_a0 := op_a_is_0 Main cstrs (srl_real Main srl)
@@ -56,6 +56,8 @@ theorem correct_srl
     simp [spec_srl, sp1_srl, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -87,7 +89,7 @@ def sp1_srli : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -100,7 +102,7 @@ theorem correct_srli
   (spec_srli op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srli Main cstrs h_is_srli).run s
   := by
     let ⟨ srl, imm ⟩ := h_is_srli
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srl_real Main srl)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srl_real Main srl)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
     have h_imm := immediate_bounds Main cstrs (srl_real Main srl)
     have h_a0 := op_a_is_0 Main cstrs (srl_real Main srl)
@@ -114,6 +116,8 @@ theorem correct_srli
     simp [spec_srli, sp1_srli, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -145,7 +149,7 @@ def sp1_srlw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -158,7 +162,7 @@ theorem correct_srlw
   (spec_srlw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srlw Main cstrs h_is_srlw).run s
   := by
     let ⟨ srlw, imm ⟩ := h_is_srlw
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
     have h_imm := immediate_bounds Main cstrs (srlw_real Main srlw)
     have h_a0 := op_a_is_0 Main cstrs (srlw_real Main srlw)
@@ -172,6 +176,8 @@ theorem correct_srlw
     simp [spec_srlw, sp1_srlw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -203,7 +209,7 @@ def sp1_srliw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -216,7 +222,7 @@ theorem correct_srliw
   (spec_srliw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srliw Main cstrs h_is_srliw).run s
   := by
     let ⟨ srlw, imm ⟩ := h_is_srliw
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
     have h_imm := immediate_bounds Main cstrs (srlw_real Main srlw)
     have h_a0 := op_a_is_0 Main cstrs (srlw_real Main srlw)
@@ -230,6 +236,8 @@ theorem correct_srliw
     simp [spec_srliw, sp1_srliw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -261,7 +269,7 @@ def sp1_sra : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -274,7 +282,7 @@ theorem correct_sra
   (spec_sra (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sra Main cstrs h_is_sra).run s
   := by
     let ⟨ sra, imm ⟩ := h_is_sra
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sra_real Main sra)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sra_real Main sra)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
     have h_imm := immediate_bounds Main cstrs (sra_real Main sra)
     have h_a0 := op_a_is_0 Main cstrs (sra_real Main sra)
@@ -288,6 +296,8 @@ theorem correct_sra
     simp [spec_sra, sp1_sra, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -319,7 +329,7 @@ def sp1_srai : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -332,7 +342,7 @@ theorem correct_srai
   (spec_srai op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srai Main cstrs h_is_srai).run s
   := by
     let ⟨ sra, imm ⟩ := h_is_srai
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sra_real Main sra)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sra_real Main sra)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
     have h_imm := immediate_bounds Main cstrs (sra_real Main sra)
     have h_a0 := op_a_is_0 Main cstrs (sra_real Main sra)
@@ -346,6 +356,8 @@ theorem correct_srai
     simp [spec_srai, sp1_srai, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -377,7 +389,7 @@ def sp1_sraw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -390,7 +402,7 @@ theorem correct_sraw
   (spec_sraw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraw Main cstrs h_is_sraw).run s
   := by
     let ⟨ sraw, imm ⟩ := h_is_sraw
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)
     have h_imm := immediate_bounds Main cstrs (sraw_real Main sraw)
     have h_a0 := op_a_is_0 Main cstrs (sraw_real Main sraw)
@@ -404,6 +416,8 @@ theorem correct_sraw
     simp [spec_sraw, sp1_sraw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -435,7 +449,7 @@ def sp1_sraiw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
@@ -448,7 +462,7 @@ theorem correct_sraiw
   (spec_sraiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraiw Main cstrs h_is_sraiw).run s
   := by
     let ⟨ sraw, imm ⟩ := h_is_sraiw
-    have ⟨ ha, hb, hc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)
     have h_imm := immediate_bounds Main cstrs (sraw_real Main sraw)
     have h_a0 := op_a_is_0 Main cstrs (sraw_real Main sraw)
@@ -462,6 +476,8 @@ theorem correct_sraiw
     simp [spec_sraiw, sp1_sraiw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]

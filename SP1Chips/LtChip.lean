@@ -57,7 +57,7 @@ def sp1_slt : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_slt
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
@@ -87,6 +87,7 @@ theorem correct_slt
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -141,7 +142,7 @@ def sp1_slti : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_slti
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
@@ -177,6 +178,7 @@ theorem correct_sltu
     rw [← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -240,7 +242,7 @@ def sp1_sltu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
@@ -271,6 +273,7 @@ theorem correct_sltu
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -325,7 +328,7 @@ def sp1_sltiu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltiu
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
@@ -351,8 +354,6 @@ theorem correct_sltu
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases _ c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
-    -- simp [h_is_addiw] at h_f h_imm_c
-    -- obtain ⟨ h_c, h_is_imm_c ⟩ := h_imm_c
 
     -- Now the monadic manipulation
     simp [spec_sltiu, sp1_sltiu, execute, execute_ITYPE']
@@ -361,6 +362,7 @@ theorem correct_sltu
     rw [← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

@@ -54,7 +54,7 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_addi : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]])
 
 open Sail
@@ -88,6 +88,7 @@ theorem correct_addi
     simp [sp1_op_b, read_op_b]
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . rw [← is_add]
