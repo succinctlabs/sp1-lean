@@ -4,6 +4,7 @@ import SP1Operations.Operation.SubwOperation.Constraints
 
 namespace SubwOperation
 
+set_option maxHeartbeats 1000000
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
 lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : SubwOperation) :
     List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔

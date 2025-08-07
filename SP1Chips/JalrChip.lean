@@ -10,7 +10,7 @@ open Sail SailState BitVec LeanRV64IM.Functions
 variable (Main : Vector (Fin BB) 38) (s : SailState)
 
 lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
-    (h_is_real : Main[29]$ = 1) : Main[6]$.val < 2^5 := by
+    (h_is_real : Main[29] = 1) : Main[6].val < 2^5 := by
   simp only [BB_eq, Nat.reducePow]
   have reader_cstrs := by
     simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
@@ -20,7 +20,7 @@ lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Mai
   aesop
 
 lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
-    (h_is_real : Main[29]$ = 1) : Main[14]$.val < 2^5 := by
+    (h_is_real : Main[29] = 1) : Main[14].val < 2^5 := by
   simp only [BB_eq, Nat.reducePow]
   have reader_cstrs := by
     simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
@@ -29,20 +29,20 @@ lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Mai
     Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
   aesop
 
-def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[29]$ = 1) : BitVec 5 :=
-  Main[6]$.val#'(op_a_lt32_of_constraints cstrs h_is_real)
+def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1) : BitVec 5 :=
+  Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
 
--- dt: could instead put `Word.toBitVec64 #v[Main[14]$, Main[15]$, Main[16]$, Main[17]$]` here...
-def sp1_op_b (cstrs : (constraints Main).allHold) (h_is_real : Main[29]$ = 1): BitVec 5 :=
-  Main[14]$.val#'(op_b_lt32_of_constraints cstrs h_is_real)
+-- dt: could instead put `Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]` here...
+def sp1_op_b (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): BitVec 5 :=
+  Main[14].val#'(op_b_lt32_of_constraints cstrs h_is_real)
 
--- dt: could instead put `Word.toBitVec64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$]` here...
-def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21]$.val
+-- dt: could instead put `Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]` here...
+def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
-def sp1_jalr  (cstrs : (constraints Main).allHold) (h_is_real : Main[29]$ = 1): SailM Unit := do
+def sp1_jalr  (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34]$, Main[35]$, Main[36]$, Main[37]$])
-  writeReg Register.nextPC (Word.toBitVec64 #v[Main[30]$, Main[31]$, Main[32]$, Main[33]$])
+  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
+  writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
 
 def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
@@ -50,7 +50,7 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
-    (h_is_real : Main[29]$ = 1)
+    (h_is_real : Main[29] = 1)
     (state_cstrs : (constraints Main).initialState s)
     (h_misa : Register.misa ∈ s.regs) :
     let op_b := sp1_op_b Main cstrs h_is_real
@@ -71,28 +71,28 @@ theorem JALR_correct
   obtain ⟨⟨h_op_b, h_c_sign_extend⟩, ⟨h_op_a, ⟨_, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
   let read_op_b' := read_op_b h_op_b
 
-  have b_is_u64 : Word.isU64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
-  let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] b_is_u64
+  have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
+  let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
 
-  have imm_is_u64 : Word.isU64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$] := by
-    refine Word.isU64_of_cases #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$] h_c_0 h_c_1 h_c_2 h_c_3
+  have imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] h_c_0 h_c_1 h_c_2 h_c_3
 
-  have pc_is_u64 : Word.isU64 #v[Main[3]$, Main[4]$, Main[5]$, 0] := by
-    exact Word.isU64_of_cases #v[Main[3]$, Main[4]$, Main[5]$, 0] h_pc_0 h_pc_1 h_pc_2 (by simp)
+  have pc_is_u64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
+    exact Word.isU64_of_cases #v[Main[3], Main[4], Main[5], 0] h_pc_0 h_pc_1 h_pc_2 (by simp)
 
-  have ⟨res_is_u64, h_res⟩ := (AddOperation.correct #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$] { value := #v[Main[30]$, Main[31]$, Main[32]$, Main[33]$] } Main[29]$ h_is_real res_cstrs) b_is_u64 imm_is_u64
+  have ⟨res_is_u64, h_res⟩ := (AddOperation.correct #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[30], Main[31], Main[32], Main[33]] } Main[29] h_is_real res_cstrs) b_is_u64 imm_is_u64
 
   have h_4_is_u64 : Word.isU64 #v[4,0,0,0] :=
     Word.isU64_of_cases _ (by trivial) (by trivial) (by trivial) (by trivial)
 
-  have hmod : (Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] +
-      Word.toBitVec64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$]) % 4 = 0 := by
+  have hmod : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
+      Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]) % 4 = 0 := by
     rw [BitVec.ofNatLT_eq_ofNat] at read_op_b'
     rw [read_op_b'] at op_b_val_plus_imm_mul4
     simpa using op_b_val_plus_imm_mul4
 
-  have hmod4 : (Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] +
-      Word.toBitVec64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$])[1] = false := by
+  have hmod4 : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
+      Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]])[1] = false := by
     refine (mul4_means_0_1_are_0 ?_).2
     simpa using hmod
 
@@ -118,7 +118,7 @@ theorem JALR_correct
 
   split_ifs with h6 <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
   refine congr_fun ?_ _
-  have htemp : Main[29]$ - Main[13]$ = 1 := by
+  have htemp : Main[29] - Main[13] = 1 := by
     simp [h_is_real] at chip_cstrs
     simp [← BitVec.toNat_inj] at h6
     simp [h6] at op_a_0_iff_op_a_is_0

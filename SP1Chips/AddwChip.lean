@@ -12,8 +12,8 @@ variable
   (Main : Vector (Fin BB) 37)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[35]$ = 1)
-  (h_is_addw : Main[31]$ = 0)
+  (h_is_real : Main[35] = 1)
+  (h_is_addw : Main[31] = 0)
 
 def spec_addw (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
@@ -22,9 +22,9 @@ def spec_addw (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6]$ ?_
+    refine BitVec.ofNatLT Main[6] ?_
     simp
-    show Main[6]$ < 32
+    show Main[6] < 32
 
     have alu_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
@@ -37,16 +37,16 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14]$ ?_
+    refine BitVec.ofNatLT Main[14] ?_
     simp
-    show Main[14]$ < 32
+    show Main[14] < 32
 
     have alu_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
       exact cstrs.2.2.1
 
     clear cstrs
-    have : (Main[31]$ = 0 ∨ Main[31]$ = 1) := by
+    have : (Main[31] = 0 ∨ Main[31] = 1) := by
       simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
       aesop
 
@@ -55,9 +55,9 @@ def sp1_op_b : BitVec 5 :=
 
 def sp1_op_c : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[21]$ ?_
+    refine BitVec.ofNatLT Main[21] ?_
     simp
-    show Main[21]$ < 32
+    show Main[21] < 32
 
     have alu_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
@@ -72,12 +72,12 @@ def sp1_addw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32]$, Main[33]$, Main[34]$ * 65535, Main[34]$ * 65535])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
 
 theorem correct_addw
   (state_cstrs : (constraints Main).initialState s)
-  (h_is_addw : Main[31]$ = 0) :
+  (h_is_addw : Main[31] = 0) :
   let op_c := sp1_op_c Main cstrs h_is_real h_is_addw
   let op_b := sp1_op_b Main cstrs h_is_real h_is_addw
   let op_a := sp1_op_a Main cstrs h_is_real
@@ -107,7 +107,7 @@ theorem correct_addw
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
 
-    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -126,8 +126,8 @@ variable
   (Main : Vector (Fin BB) 37)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[35]$ = 1)
-  (h_is_addiw : Main[31]$ = 1)
+  (h_is_real : Main[35] = 1)
+  (h_is_addiw : Main[31] = 1)
 
 def spec_addiw (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
@@ -136,9 +136,9 @@ def spec_addiw (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6]$ ?_
+    refine BitVec.ofNatLT Main[6] ?_
     simp
-    show Main[6]$ < 32
+    show Main[6] < 32
 
     have alu_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
@@ -151,30 +151,30 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14]$ ?_
+    refine BitVec.ofNatLT Main[14] ?_
     simp
-    show Main[14]$ < 32
+    show Main[14] < 32
 
     have alu_cstrs := by
       simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
       exact cstrs.2.2.1
 
     clear cstrs
-    have : (Main[31]$ = 0 ∨ Main[31]$ = 1) := by
+    have : (Main[31] = 0 ∨ Main[31] = 1) := by
       simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
       aesop
 
     simp [ALUTypeReader.allHold_constraints_iff_is_real (h := h_is_real), Opcode.ofNat, Nat.ble] at alu_cstrs
     rcases this <;> simp_all
 
-def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21]$.val
+def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_addiw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32]$, Main[33]$, Main[34]$ * 65535, Main[34]$ * 65535])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_addw
@@ -195,7 +195,7 @@ theorem correct_addw
     obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, _, _, _ ⟩ := alu_cstrs
     simp [Opcode.ofNat, Nat.ble] at *
     simp_all
-    have is_U64_c : Word.isU64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$]
+    have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases _ c0 c1 c2 c3
     specialize addw_op_cstrs is_U64_b is_U64_c
     obtain ⟨ is_U32_val, is_addw, is_msb ⟩ := addw_op_cstrs
@@ -213,7 +213,7 @@ theorem correct_addw
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
 
-    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]

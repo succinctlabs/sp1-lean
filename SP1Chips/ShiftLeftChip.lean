@@ -29,8 +29,8 @@ def sp1_sll : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32]$, Main[33]$, Main[34]$, Main[35]$])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sll
@@ -53,7 +53,7 @@ theorem correct_sll
     simp [spec_sll, sp1_sll, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -84,8 +84,8 @@ def sp1_slli : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32]$, Main[33]$, Main[34]$, Main[35]$])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_slli
@@ -108,7 +108,7 @@ theorem correct_slli
     simp [spec_slli, sp1_slli, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -139,8 +139,8 @@ def sp1_sllw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32]$, Main[33]$, Main[34]$, Main[35]$])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sllw
@@ -163,7 +163,7 @@ theorem correct_sllw
     simp [spec_sllw, sp1_sllw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -194,8 +194,8 @@ def sp1_slliw : SailM Unit := do
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3]$, Main[4]$, Main[5]$, 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32]$, Main[33]$, Main[34]$, Main[35]$])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_slliw
@@ -218,7 +218,7 @@ theorem correct_slliw
     simp [spec_slliw, sp1_slliw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    by_cases h_is_op_a_0 : Main[6]$ = 0 <;> simp_all
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
