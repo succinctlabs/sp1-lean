@@ -268,7 +268,18 @@ lemma spec.xor (h : is_xor Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .XOR
-  := by sorry
+  := by
+    intro cstrs
+    obtain ⟨ eq_xor, eq_imm ⟩ := h
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main eq_xor)
+    obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
+
+    simp [allHold_constraints_iff] at cstrs
+
+    obtain ⟨ h_bop, rest ⟩ := cstrs
+    simp_all
+
+    exact BitwiseU16Operation.spec.xor _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
 
 end xor
 
@@ -278,7 +289,22 @@ lemma spec.xori (h : is_xori Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .XORI
-  := by sorry
+  := by
+    intro cstrs
+    obtain ⟨ eq_xor, eq_imm ⟩ := h
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main eq_xor)
+    obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
+    have immediate_bounds := immediate_bounds Main cstrs (xor_real Main eq_xor)
+    rw [eq_imm] at immediate_bounds; simp_all
+    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, eq_c ⟩ := immediate_bounds
+    obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
+
+    simp [allHold_constraints_iff] at cstrs
+
+    obtain ⟨ h_bop, rest ⟩ := cstrs
+    simp_all
+
+    exact BitwiseU16Operation.spec.xor _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
 
 end xori
 
@@ -288,7 +314,18 @@ lemma spec.or (h : is_or Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .OR
-  := by sorry
+  := by
+    intro cstrs
+    obtain ⟨ eq_or, eq_imm ⟩ := h
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main eq_or)
+    obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
+
+    simp [allHold_constraints_iff] at cstrs
+
+    obtain ⟨ h_bop, rest ⟩ := cstrs
+    simp_all
+
+    exact BitwiseU16Operation.spec.or _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
 
 end or
 
@@ -298,7 +335,22 @@ lemma spec.ori (h : is_ori Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .ORI
-  := by sorry
+  := by
+    intro cstrs
+    obtain ⟨ eq_or, eq_imm ⟩ := h
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main eq_or)
+    obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
+    have immediate_bounds := immediate_bounds Main cstrs (or_real Main eq_or)
+    rw [eq_imm] at immediate_bounds; simp_all
+    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, eq_c ⟩ := immediate_bounds
+    obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
+
+    simp [allHold_constraints_iff] at cstrs
+
+    obtain ⟨ h_bop, rest ⟩ := cstrs
+    simp_all
+
+    exact BitwiseU16Operation.spec.or _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
 
 end ori
 
@@ -308,7 +360,18 @@ lemma spec.and (h : is_and Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .AND
-  := by sorry
+  := by
+    intro cstrs
+    obtain ⟨ eq_and, eq_imm ⟩ := h
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main eq_and)
+    obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
+
+    simp [allHold_constraints_iff] at cstrs
+
+    obtain ⟨ h_bop, rest ⟩ := cstrs
+    simp_all
+
+    exact BitwiseU16Operation.spec.and _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
 
 end and
 
@@ -318,7 +381,22 @@ lemma spec.andi (h : is_andi Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .ANDI
-  := by sorry
+  := by
+    intro cstrs
+    obtain ⟨ eq_and, eq_imm ⟩ := h
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main eq_and)
+    obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
+    have immediate_bounds := immediate_bounds Main cstrs (and_real Main eq_and)
+    rw [eq_imm] at immediate_bounds; simp_all
+    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, eq_c ⟩ := immediate_bounds
+    obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
+
+    simp [allHold_constraints_iff] at cstrs
+
+    obtain ⟨ h_bop, rest ⟩ := cstrs
+    simp_all
+
+    exact BitwiseU16Operation.spec.and _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
 
 end andi
 
