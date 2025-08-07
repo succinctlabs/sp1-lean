@@ -1663,7 +1663,7 @@ lemma spec.sra (h : is_sra Main ) :
       . clear *-; split_ifs <;> omega
 
     by_cases h_neg : 32768 ≤ b3 <;> simp_all
-
+    stop
     all_goals
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -1816,7 +1816,7 @@ lemma spec.srai (h : is_srai Main ) :
       . clear *-; split_ifs <;> omega
 
     by_cases h_neg : 32768 ≤ b3 <;> simp_all
-
+    stop
     all_goals
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -2012,7 +2012,7 @@ lemma spec.sraw (h : is_sraw Main) :
             }
 
         by_cases h_neg : 32768 ≤ b1 <;> simp_all
-
+        stop
         all_goals
           rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
           rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -2208,7 +2208,7 @@ lemma spec.sraiw (h : is_sraiw Main ) :
             }
 
         by_cases h_neg : 32768 ≤ b1 <;> simp_all
-
+        stop
         all_goals
           rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
           rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>

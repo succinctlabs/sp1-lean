@@ -38,7 +38,7 @@ lemma spec.and
       have ⟨ ⟨ ⟨ hr0, hb0, hc0 ⟩, heq_0 ⟩, ⟨ ⟨ hr1, hb1, hc1 ⟩, heq_1 ⟩, ⟨ ⟨ hr2, hb2, hc2 ⟩, heq_2 ⟩,  ⟨ ⟨ hr3, hb3, hc3 ⟩, heq_3 ⟩,
              ⟨ ⟨ hr4, hb4, hc4 ⟩, heq_4 ⟩, ⟨ ⟨ hr5, hb5, hc5 ⟩, heq_5 ⟩, ⟨ ⟨ hr6, hb6, hc6 ⟩, heq_6 ⟩,  ⟨ ⟨ hr7, hb7, hc7 ⟩, heq_7 ⟩  ⟩ := cstrs
       rw [Word.and_toByteWord is_U64_b is_U64_cc]
-      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, ByteWord.toBitVec64, ByteWord.toNat]
+      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, ByteWord.toBitVec64, ByteWord.toNat, Nat.shiftLeft_eq]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
@@ -83,7 +83,7 @@ lemma spec.or
       have ⟨ ⟨ ⟨ hr0, hb0, hc0 ⟩, heq_0 ⟩, ⟨ ⟨ hr1, hb1, hc1 ⟩, heq_1 ⟩, ⟨ ⟨ hr2, hb2, hc2 ⟩, heq_2 ⟩,  ⟨ ⟨ hr3, hb3, hc3 ⟩, heq_3 ⟩,
              ⟨ ⟨ hr4, hb4, hc4 ⟩, heq_4 ⟩, ⟨ ⟨ hr5, hb5, hc5 ⟩, heq_5 ⟩, ⟨ ⟨ hr6, hb6, hc6 ⟩, heq_6 ⟩,  ⟨ ⟨ hr7, hb7, hc7 ⟩, heq_7 ⟩  ⟩ := cstrs
       rw [Word.or_toByteWord is_U64_b is_U64_cc]
-      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, ByteWord.toBitVec64, ByteWord.toNat]
+      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, ByteWord.toBitVec64, ByteWord.toNat, Nat.shiftLeft_eq]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
@@ -128,7 +128,7 @@ lemma spec.xor
       have ⟨ ⟨ ⟨ hr0, hb0, hc0 ⟩, heq_0 ⟩, ⟨ ⟨ hr1, hb1, hc1 ⟩, heq_1 ⟩, ⟨ ⟨ hr2, hb2, hc2 ⟩, heq_2 ⟩,  ⟨ ⟨ hr3, hb3, hc3 ⟩, heq_3 ⟩,
              ⟨ ⟨ hr4, hb4, hc4 ⟩, heq_4 ⟩, ⟨ ⟨ hr5, hb5, hc5 ⟩, heq_5 ⟩, ⟨ ⟨ hr6, hb6, hc6 ⟩, heq_6 ⟩,  ⟨ ⟨ hr7, hb7, hc7 ⟩, heq_7 ⟩  ⟩ := cstrs
       rw [Word.xor_toByteWord is_U64_b is_U64_cc]
-      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, ByteWord.toBitVec64, ByteWord.toNat]
+      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, ByteWord.toBitVec64, ByteWord.toNat, Nat.shiftLeft_eq]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
