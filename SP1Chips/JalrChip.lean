@@ -112,7 +112,7 @@ theorem JALR_correct
     BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map,
     sign_extend, Sail.BitVec.signExtend, ← h_c_sign_extend, Nat.shiftLeft_eq]
   rw [map_const_run_readReg _ _ (by simp [h_misa])]
-  simp only
+  simp
   rw [run_readReg]
   simp only [Std.ExtDHashMap.get?_insert_self, run_wX_bits, BitVec.ofNat_eq_ofNat, EStateM.Result.map_ok]
 

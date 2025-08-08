@@ -13,15 +13,6 @@ variable
   (cstrs : (constraints Main).allHold)
   (s : SailState)
 
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
-
 namespace BGEU
 
 variable
@@ -174,7 +165,7 @@ theorem correct_bgeu
           exact h_ltu
       simp only [op_a_val, op_b_val] at h_ltu h_neq h_actual_ltu
       simp [h_actual_ltu]
-      simpM
+      simpM +run
       apply congrArg
       -- stop
       simp [BitVec.ult] at h_ltu
@@ -216,7 +207,7 @@ theorem correct_bgeu
       simp [zopz0zKzJ_u]
       simp only [op_a_val, op_b_val, BitVec.ult] at h_eq h_geu
       simp [h_eq]
-      simpM
+      simpM +run
 
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -264,9 +255,6 @@ theorem correct_bgeu
       simp [currentlyEnabled, hartSupports, this]
       clear this
 
-      rw [helper]
-
-      simpM
       simp [writeReg, PreSail.writeReg]
       simpM
       apply congrArg

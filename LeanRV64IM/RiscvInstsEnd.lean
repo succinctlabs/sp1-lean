@@ -151,7 +151,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
     (pure ((imm : (BitVec 20)) ++ ((encdec_reg_forwards rd) ++ (encdec_uop_forwards op))))
   | .JAL (v__68, rd) =>
     (do
-      bif ((Sail.BitVec.extractLsb v__68 0 0) == (0b0 : (BitVec 1)))
+      if ((Sail.BitVec.extractLsb v__68 0 0) == (0b0 : (BitVec 1)))
       then
         (let imm_19 : (BitVec 1) := (Sail.BitVec.extractLsb v__68 20 20)
         let imm_8 : (BitVec 1) := (Sail.BitVec.extractLsb v__68 11 11)
@@ -170,7 +170,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
                 rd) ++ (0b1100111 : (BitVec 7)))))))
   | .BTYPE (v__70, rs2, rs1, op) =>
     (do
-      bif ((Sail.BitVec.extractLsb v__70 0 0) == (0b0 : (BitVec 1)))
+      if ((Sail.BitVec.extractLsb v__70 0 0) == (0b0 : (BitVec 1)))
       then
         (let imm7_6 : (BitVec 1) := (Sail.BitVec.extractLsb v__70 12 12)
         let imm7_6 : (BitVec 1) := (Sail.BitVec.extractLsb v__70 12 12)
@@ -188,7 +188,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
                 rd) ++ (0b0010011 : (BitVec 7)))))))
   | .SHIFTIOP (shamt, rs1, rd, SLLI) =>
     (do
-      bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+      if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
       then
         (pure ((0b000000 : (BitVec 6)) ++ ((shamt : (BitVec 6)) ++ ((encdec_reg_forwards rs1) ++ ((0b001 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0010011 : (BitVec 7))))))))
@@ -198,7 +198,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SHIFTIOP (shamt, rs1, rd, SRLI) =>
     (do
-      bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+      if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
       then
         (pure ((0b000000 : (BitVec 6)) ++ ((shamt : (BitVec 6)) ++ ((encdec_reg_forwards rs1) ++ ((0b101 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0010011 : (BitVec 7))))))))
@@ -208,7 +208,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SHIFTIOP (shamt, rs1, rd, SRAI) =>
     (do
-      bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+      if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
       then
         (pure ((0b010000 : (BitVec 6)) ++ ((shamt : (BitVec 6)) ++ ((encdec_reg_forwards rs1) ++ ((0b101 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0010011 : (BitVec 7))))))))
@@ -248,7 +248,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
                   rd) ++ (0b0110011 : (BitVec 7))))))))
   | .LOAD (imm, rs1, rd, is_unsigned, width) =>
     (do
-      bif (valid_load_encdec width is_unsigned)
+      if (valid_load_encdec width is_unsigned)
       then
         (pure ((imm : (BitVec 12)) ++ ((encdec_reg_forwards rs1) ++ ((bool_bits_forwards is_unsigned) ++ ((size_enc_forwards
                     width) ++ ((encdec_reg_forwards rd) ++ (0b0000011 : (BitVec 7))))))))
@@ -258,7 +258,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .STORE (v__72, rs2, rs1, width) =>
     (do
-      bif (width ≤b xlen_bytes)
+      if (width ≤b xlen_bytes)
       then
         (let imm7 : (BitVec 7) := (Sail.BitVec.extractLsb v__72 11 5)
         let imm7 : (BitVec 7) := (Sail.BitVec.extractLsb v__72 11 5)
@@ -285,7 +285,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
     (pure ((0x105 : (BitVec 12)) ++ ((0b00000 : (BitVec 5)) ++ ((0b000 : (BitVec 3)) ++ ((0b00000 : (BitVec 5)) ++ (0b1110011 : (BitVec 7)))))))
   | .SFENCE_VMA (rs1, rs2) =>
     (do
-      bif ((← (virtual_memory_supported ())) || (not (false : Bool)))
+      if ((← (virtual_memory_supported ())) || (not (false : Bool)))
       then
         (pure ((0b0001001 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b000 : (BitVec 3)) ++ ((0b00000 : (BitVec 5)) ++ (0b1110011 : (BitVec 7))))))))
       else
@@ -294,7 +294,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ADDIW (imm, rs1, rd) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((imm : (BitVec 12)) ++ ((encdec_reg_forwards rs1) ++ ((0b000 : (BitVec 3)) ++ ((encdec_reg_forwards
                     rd) ++ (0b0011011 : (BitVec 7)))))))
@@ -304,7 +304,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .RTYPEW (rs2, rs1, rd, ADDW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0000000 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b000 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0111011 : (BitVec 7))))))))
@@ -314,7 +314,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .RTYPEW (rs2, rs1, rd, SUBW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0100000 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b000 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0111011 : (BitVec 7))))))))
@@ -324,7 +324,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .RTYPEW (rs2, rs1, rd, SLLW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0000000 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b001 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0111011 : (BitVec 7))))))))
@@ -334,7 +334,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .RTYPEW (rs2, rs1, rd, SRLW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0000000 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b101 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0111011 : (BitVec 7))))))))
@@ -344,7 +344,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .RTYPEW (rs2, rs1, rd, SRAW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0100000 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b101 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0111011 : (BitVec 7))))))))
@@ -354,7 +354,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SHIFTIWOP (shamt, rs1, rd, SLLIW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0000000 : (BitVec 7)) ++ ((shamt : (BitVec 5)) ++ ((encdec_reg_forwards rs1) ++ ((0b001 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0011011 : (BitVec 7))))))))
@@ -364,7 +364,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SHIFTIWOP (shamt, rs1, rd, SRLIW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0000000 : (BitVec 7)) ++ ((shamt : (BitVec 5)) ++ ((encdec_reg_forwards rs1) ++ ((0b101 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0011011 : (BitVec 7))))))))
@@ -374,7 +374,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SHIFTIWOP (shamt, rs1, rd, SRAIW) =>
     (do
-      bif (xlen == 64)
+      if (xlen == 64)
       then
         (pure ((0b0100000 : (BitVec 7)) ++ ((shamt : (BitVec 5)) ++ ((encdec_reg_forwards rs1) ++ ((0b101 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0011011 : (BitVec 7))))))))
@@ -384,7 +384,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .MUL (rs2, rs1, rd, mul_op) =>
     (do
-      bif ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul)))
+      if ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul)))
       then
         (pure ((0b0000001 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((← (encdec_mul_op_forwards
                       mul_op)) ++ ((encdec_reg_forwards rd) ++ (0b0110011 : (BitVec 7))))))))
@@ -394,7 +394,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .DIV (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif (← (currentlyEnabled Ext_M))
+      if (← (currentlyEnabled Ext_M))
       then
         (pure ((0b0000001 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b10 : (BitVec 2)) ++ ((bool_bits_forwards
                       is_unsigned) ++ ((encdec_reg_forwards rd) ++ (0b0110011 : (BitVec 7)))))))))
@@ -404,7 +404,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .REM (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif (← (currentlyEnabled Ext_M))
+      if (← (currentlyEnabled Ext_M))
       then
         (pure ((0b0000001 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b11 : (BitVec 2)) ++ ((bool_bits_forwards
                       is_unsigned) ++ ((encdec_reg_forwards rd) ++ (0b0110011 : (BitVec 7)))))))))
@@ -414,7 +414,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .MULW (rs2, rs1, rd) =>
     (do
-      bif ((xlen == 64) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul))))
+      if ((xlen == 64) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul))))
       then
         (pure ((0b0000001 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b000 : (BitVec 3)) ++ ((encdec_reg_forwards
                       rd) ++ (0b0111011 : (BitVec 7))))))))
@@ -424,7 +424,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .DIVW (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif ((xlen == 64) && (← (currentlyEnabled Ext_M)))
+      if ((xlen == 64) && (← (currentlyEnabled Ext_M)))
       then
         (pure ((0b0000001 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b10 : (BitVec 2)) ++ ((bool_bits_forwards
                       is_unsigned) ++ ((encdec_reg_forwards rd) ++ (0b0111011 : (BitVec 7)))))))))
@@ -434,7 +434,7 @@ def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .REMW (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif ((xlen == 64) && (← (currentlyEnabled Ext_M)))
+      if ((xlen == 64) && (← (currentlyEnabled Ext_M)))
       then
         (pure ((0b0000001 : (BitVec 7)) ++ ((encdec_reg_forwards rs2) ++ ((encdec_reg_forwards rs1) ++ ((0b11 : (BitVec 2)) ++ ((bool_bits_forwards
                       is_unsigned) ++ ((encdec_reg_forwards rd) ++ (0b0111011 : (BitVec 7)))))))))
@@ -452,7 +452,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
   let head_exp_ := arg_
   match (← do
     let v__248 := head_exp_
-    bif (let mapping1_ : (BitVec 7) := (Sail.BitVec.extractLsb v__248 6 0)
+    if (let mapping1_ : (BitVec 7) := (Sail.BitVec.extractLsb v__248 6 0)
        let mapping0_ : (BitVec 5) := (Sail.BitVec.extractLsb v__248 11 7)
        ((encdec_reg_backwards_matches mapping0_) && (encdec_uop_backwards_matches mapping1_)))
     then
@@ -468,7 +468,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
   | none =>
     (do
       match (let v__246 := head_exp_
-      bif ((let mapping2_ : (BitVec 5) := (Sail.BitVec.extractLsb v__246 11 7)
+      if ((let mapping2_ : (BitVec 5) := (Sail.BitVec.extractLsb v__246 11 7)
            (encdec_reg_backwards_matches mapping2_)) && ((Sail.BitVec.extractLsb v__246 6 0) == (0b1101111 : (BitVec 7))))
       then
         (let imm_19 : (BitVec 1) := (Sail.BitVec.extractLsb v__246 31 31)
@@ -488,7 +488,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
       | none =>
         (do
           match (let v__243 := head_exp_
-          bif ((let mapping4_ : (BitVec 5) := (Sail.BitVec.extractLsb v__243 11 7)
+          if ((let mapping4_ : (BitVec 5) := (Sail.BitVec.extractLsb v__243 11 7)
                let mapping3_ : (BitVec 5) := (Sail.BitVec.extractLsb v__243 19 15)
                ((encdec_reg_backwards_matches mapping3_) && (encdec_reg_backwards_matches mapping4_))) && (((Sail.BitVec.extractLsb
                      v__243 14 12) == (0b000 : (BitVec 3))) && ((Sail.BitVec.extractLsb v__243 6 0) == (0b1100111 : (BitVec 7)))))
@@ -505,7 +505,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
             (do
               match (← do
                 let v__241 := head_exp_
-                bif ((let mapping7_ : (BitVec 3) := (Sail.BitVec.extractLsb v__241 14 12)
+                if ((let mapping7_ : (BitVec 3) := (Sail.BitVec.extractLsb v__241 14 12)
                      let mapping6_ : (BitVec 5) := (Sail.BitVec.extractLsb v__241 19 15)
                      let mapping5_ : (BitVec 5) := (Sail.BitVec.extractLsb v__241 24 20)
                      ((encdec_reg_backwards_matches mapping5_) && ((encdec_reg_backwards_matches
@@ -533,7 +533,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                 (do
                   match (← do
                     let v__239 := head_exp_
-                    bif ((let mapping9_ : (BitVec 3) := (Sail.BitVec.extractLsb v__239 14 12)
+                    if ((let mapping9_ : (BitVec 3) := (Sail.BitVec.extractLsb v__239 14 12)
                          let mapping8_ : (BitVec 5) := (Sail.BitVec.extractLsb v__239 19 15)
                          let mapping10_ : (BitVec 5) := (Sail.BitVec.extractLsb v__239 11 7)
                          ((encdec_reg_backwards_matches mapping8_) && ((encdec_iop_backwards_matches
@@ -554,7 +554,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                   | none =>
                     (do
                       match (let v__235 := head_exp_
-                      bif ((let mapping12_ : (BitVec 5) := (Sail.BitVec.extractLsb v__235 11 7)
+                      if ((let mapping12_ : (BitVec 5) := (Sail.BitVec.extractLsb v__235 11 7)
                            let mapping11_ : (BitVec 5) := (Sail.BitVec.extractLsb v__235 19 15)
                            ((encdec_reg_backwards_matches mapping11_) && (encdec_reg_backwards_matches
                                mapping12_))) && (((Sail.BitVec.extractLsb v__235 31 26) == (0b000000 : (BitVec 6))) && (((Sail.BitVec.extractLsb
@@ -566,7 +566,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                         let mapping11_ : (BitVec 5) := (Sail.BitVec.extractLsb v__235 19 15)
                         match ((encdec_reg_backwards mapping11_), (encdec_reg_backwards mapping12_)) with
                         | (rs1, rd) =>
-                          (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+                          (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
                           then (some (SHIFTIOP (shamt, rs1, rd, SLLI)))
                           else none))
                       else none) with
@@ -574,7 +574,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                       | none =>
                         (do
                           match (let v__231 := head_exp_
-                          bif ((let mapping14_ : (BitVec 5) := (Sail.BitVec.extractLsb v__231 11 7)
+                          if ((let mapping14_ : (BitVec 5) := (Sail.BitVec.extractLsb v__231 11 7)
                                let mapping13_ : (BitVec 5) := (Sail.BitVec.extractLsb v__231 19 15)
                                ((encdec_reg_backwards_matches mapping13_) && (encdec_reg_backwards_matches
                                    mapping14_))) && (((Sail.BitVec.extractLsb v__231 31 26) == (0b000000 : (BitVec 6))) && (((Sail.BitVec.extractLsb
@@ -587,7 +587,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                             match ((encdec_reg_backwards mapping13_), (encdec_reg_backwards
                               mapping14_)) with
                             | (rs1, rd) =>
-                              (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+                              (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
                               then (some (SHIFTIOP (shamt, rs1, rd, SRLI)))
                               else none))
                           else none) with
@@ -595,7 +595,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                           | none =>
                             (do
                               match (let v__227 := head_exp_
-                              bif ((let mapping16_ : (BitVec 5) :=
+                              if ((let mapping16_ : (BitVec 5) :=
                                      (Sail.BitVec.extractLsb v__227 11 7)
                                    let mapping15_ : (BitVec 5) :=
                                      (Sail.BitVec.extractLsb v__227 19 15)
@@ -610,7 +610,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                 match ((encdec_reg_backwards mapping15_), (encdec_reg_backwards
                                   mapping16_)) with
                                 | (rs1, rd) =>
-                                  (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+                                  (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
                                   then (some (SHIFTIOP (shamt, rs1, rd, SRAI)))
                                   else none))
                               else none) with
@@ -618,7 +618,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                               | none =>
                                 (do
                                   match (let v__223 := head_exp_
-                                  bif ((let mapping19_ : (BitVec 5) :=
+                                  if ((let mapping19_ : (BitVec 5) :=
                                          (Sail.BitVec.extractLsb v__223 11 7)
                                        let mapping18_ : (BitVec 5) :=
                                          (Sail.BitVec.extractLsb v__223 19 15)
@@ -644,7 +644,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                   | none =>
                                     (do
                                       match (let v__219 := head_exp_
-                                      bif ((let mapping22_ : (BitVec 5) :=
+                                      if ((let mapping22_ : (BitVec 5) :=
                                              (Sail.BitVec.extractLsb v__219 11 7)
                                            let mapping21_ : (BitVec 5) :=
                                              (Sail.BitVec.extractLsb v__219 19 15)
@@ -671,7 +671,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                       | none =>
                                         (do
                                           match (let v__215 := head_exp_
-                                          bif ((let mapping25_ : (BitVec 5) :=
+                                          if ((let mapping25_ : (BitVec 5) :=
                                                  (Sail.BitVec.extractLsb v__215 11 7)
                                                let mapping24_ : (BitVec 5) :=
                                                  (Sail.BitVec.extractLsb v__215 19 15)
@@ -698,7 +698,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                           | none =>
                                             (do
                                               match (let v__211 := head_exp_
-                                              bif ((let mapping28_ : (BitVec 5) :=
+                                              if ((let mapping28_ : (BitVec 5) :=
                                                      (Sail.BitVec.extractLsb v__211 11 7)
                                                    let mapping27_ : (BitVec 5) :=
                                                      (Sail.BitVec.extractLsb v__211 19 15)
@@ -726,7 +726,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                               | none =>
                                                 (do
                                                   match (let v__207 := head_exp_
-                                                  bif ((let mapping31_ : (BitVec 5) :=
+                                                  if ((let mapping31_ : (BitVec 5) :=
                                                          (Sail.BitVec.extractLsb v__207 11 7)
                                                        let mapping30_ : (BitVec 5) :=
                                                          (Sail.BitVec.extractLsb v__207 19 15)
@@ -754,7 +754,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                   | none =>
                                                     (do
                                                       match (let v__203 := head_exp_
-                                                      bif ((let mapping34_ : (BitVec 5) :=
+                                                      if ((let mapping34_ : (BitVec 5) :=
                                                              (Sail.BitVec.extractLsb v__203 11 7)
                                                            let mapping33_ : (BitVec 5) :=
                                                              (Sail.BitVec.extractLsb v__203 19 15)
@@ -783,7 +783,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                       | none =>
                                                         (do
                                                           match (let v__199 := head_exp_
-                                                          bif ((let mapping37_ : (BitVec 5) :=
+                                                          if ((let mapping37_ : (BitVec 5) :=
                                                                  (Sail.BitVec.extractLsb v__199 11 7)
                                                                let mapping36_ : (BitVec 5) :=
                                                                  (Sail.BitVec.extractLsb v__199 19
@@ -815,7 +815,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                           | none =>
                                                             (do
                                                               match (let v__195 := head_exp_
-                                                              bif ((let mapping40_ : (BitVec 5) :=
+                                                              if ((let mapping40_ : (BitVec 5) :=
                                                                      (Sail.BitVec.extractLsb v__195
                                                                        11 7)
                                                                    let mapping39_ : (BitVec 5) :=
@@ -852,7 +852,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                               | none =>
                                                                 (do
                                                                   match (let v__191 := head_exp_
-                                                                  bif ((let mapping43_ : (BitVec 5) :=
+                                                                  if ((let mapping43_ : (BitVec 5) :=
                                                                          (Sail.BitVec.extractLsb
                                                                            v__191 11 7)
                                                                        let mapping42_ : (BitVec 5) :=
@@ -890,7 +890,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                   | none =>
                                                                     (do
                                                                       match (let v__187 := head_exp_
-                                                                      bif ((let mapping46_ : (BitVec 5) :=
+                                                                      if ((let mapping46_ : (BitVec 5) :=
                                                                              (Sail.BitVec.extractLsb
                                                                                v__187 11 7)
                                                                            let mapping45_ : (BitVec 5) :=
@@ -931,7 +931,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                         (do
                                                                           match (let v__185 :=
                                                                             head_exp_
-                                                                          bif ((let mapping50_ : (BitVec 5) :=
+                                                                          if ((let mapping50_ : (BitVec 5) :=
                                                                                  (Sail.BitVec.extractLsb
                                                                                    v__185 11 7)
                                                                                let mapping49_ : (BitVec 2) :=
@@ -974,7 +974,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                               mapping49_), (encdec_reg_backwards
                                                                               mapping50_)) with
                                                                             | (rs1, is_unsigned, width, rd) =>
-                                                                              (bif (valid_load_encdec
+                                                                              (if (valid_load_encdec
                                                                                    width is_unsigned)
                                                                               then
                                                                                 (some
@@ -988,7 +988,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                             (do
                                                                               match (let v__182 :=
                                                                                 head_exp_
-                                                                              bif ((let mapping53_ : (BitVec 2) :=
+                                                                              if ((let mapping53_ : (BitVec 2) :=
                                                                                      (Sail.BitVec.extractLsb
                                                                                        v__182 13 12)
                                                                                    let mapping52_ : (BitVec 5) :=
@@ -1028,7 +1028,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                   mapping52_), (size_enc_backwards
                                                                                   mapping53_)) with
                                                                                 | (rs2, rs1, width) =>
-                                                                                  (bif (width ≤b xlen_bytes)
+                                                                                  (if (width ≤b xlen_bytes)
                                                                                   then
                                                                                     (some
                                                                                       (STORE
@@ -1042,7 +1042,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                   match (← do
                                                                                     let v__131 :=
                                                                                       head_exp_
-                                                                                    bif (((Sail.BitVec.extractLsb
+                                                                                    if (((Sail.BitVec.extractLsb
                                                                                              v__131
                                                                                              31 28) == (0x0 : (BitVec 4))) && ((Sail.BitVec.extractLsb
                                                                                              v__131
@@ -1061,49 +1061,49 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                             (pred, succ)))))
                                                                                     else
                                                                                       (do
-                                                                                        bif (v__131 == (0x8330000F : (BitVec 32)))
+                                                                                        if (v__131 == (0x8330000F : (BitVec 32)))
                                                                                         then
                                                                                           (pure (some
                                                                                               (FENCE_TSO
                                                                                                 ())))
                                                                                         else
                                                                                           (do
-                                                                                            bif (v__131 == (0x00000073 : (BitVec 32)))
+                                                                                            if (v__131 == (0x00000073 : (BitVec 32)))
                                                                                             then
                                                                                               (pure (some
                                                                                                   (ECALL
                                                                                                     ())))
                                                                                             else
                                                                                               (do
-                                                                                                bif (v__131 == (0x30200073 : (BitVec 32)))
+                                                                                                if (v__131 == (0x30200073 : (BitVec 32)))
                                                                                                 then
                                                                                                   (pure (some
                                                                                                       (MRET
                                                                                                         ())))
                                                                                                 else
                                                                                                   (do
-                                                                                                    bif (v__131 == (0x10200073 : (BitVec 32)))
+                                                                                                    if (v__131 == (0x10200073 : (BitVec 32)))
                                                                                                     then
                                                                                                       (pure (some
                                                                                                           (SRET
                                                                                                             ())))
                                                                                                     else
                                                                                                       (do
-                                                                                                        bif (v__131 == (0x00100073 : (BitVec 32)))
+                                                                                                        if (v__131 == (0x00100073 : (BitVec 32)))
                                                                                                         then
                                                                                                           (pure (some
                                                                                                               (EBREAK
                                                                                                                 ())))
                                                                                                         else
                                                                                                           (do
-                                                                                                            bif (v__131 == (0x10500073 : (BitVec 32)))
+                                                                                                            if (v__131 == (0x10500073 : (BitVec 32)))
                                                                                                             then
                                                                                                               (pure (some
                                                                                                                   (WFI
                                                                                                                     ())))
                                                                                                             else
                                                                                                               (do
-                                                                                                                bif ((let mapping55_ : (BitVec 5) :=
+                                                                                                                if ((let mapping55_ : (BitVec 5) :=
                                                                                                                        (Sail.BitVec.extractLsb
                                                                                                                          v__131
                                                                                                                          19
@@ -1139,7 +1139,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                       mapping55_)) with
                                                                                                                     | (rs2, rs1) =>
                                                                                                                       (do
-                                                                                                                        bif ((← (virtual_memory_supported
+                                                                                                                        if ((← (virtual_memory_supported
                                                                                                                                  ())) || (not
                                                                                                                                (false : Bool)))
                                                                                                                         then
@@ -1156,7 +1156,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                     (do
                                                                                       match (let v__128 :=
                                                                                         head_exp_
-                                                                                      bif ((let mapping57_ : (BitVec 5) :=
+                                                                                      if ((let mapping57_ : (BitVec 5) :=
                                                                                              (Sail.BitVec.extractLsb
                                                                                                v__128
                                                                                                11 7)
@@ -1193,7 +1193,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                           mapping56_), (encdec_reg_backwards
                                                                                           mapping57_)) with
                                                                                         | (rs1, rd) =>
-                                                                                          (bif (xlen == 64)
+                                                                                          (if (xlen == 64)
                                                                                           then
                                                                                             (some
                                                                                               (ADDIW
@@ -1206,7 +1206,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                         (do
                                                                                           match (let v__124 :=
                                                                                             head_exp_
-                                                                                          bif ((let mapping60_ : (BitVec 5) :=
+                                                                                          if ((let mapping60_ : (BitVec 5) :=
                                                                                                  (Sail.BitVec.extractLsb
                                                                                                    v__124
                                                                                                    11
@@ -1254,7 +1254,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                               mapping59_), (encdec_reg_backwards
                                                                                               mapping60_)) with
                                                                                             | (rs2, rs1, rd) =>
-                                                                                              (bif (xlen == 64)
+                                                                                              (if (xlen == 64)
                                                                                               then
                                                                                                 (some
                                                                                                   (RTYPEW
@@ -1268,7 +1268,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                             (do
                                                                                               match (let v__120 :=
                                                                                                 head_exp_
-                                                                                              bif ((let mapping63_ : (BitVec 5) :=
+                                                                                              if ((let mapping63_ : (BitVec 5) :=
                                                                                                      (Sail.BitVec.extractLsb
                                                                                                        v__120
                                                                                                        11
@@ -1317,7 +1317,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                   mapping62_), (encdec_reg_backwards
                                                                                                   mapping63_)) with
                                                                                                 | (rs2, rs1, rd) =>
-                                                                                                  (bif (xlen == 64)
+                                                                                                  (if (xlen == 64)
                                                                                                   then
                                                                                                     (some
                                                                                                       (RTYPEW
@@ -1332,7 +1332,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                 (do
                                                                                                   match (let v__116 :=
                                                                                                     head_exp_
-                                                                                                  bif ((let mapping66_ : (BitVec 5) :=
+                                                                                                  if ((let mapping66_ : (BitVec 5) :=
                                                                                                          (Sail.BitVec.extractLsb
                                                                                                            v__116
                                                                                                            11
@@ -1381,7 +1381,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                       mapping65_), (encdec_reg_backwards
                                                                                                       mapping66_)) with
                                                                                                     | (rs2, rs1, rd) =>
-                                                                                                      (bif (xlen == 64)
+                                                                                                      (if (xlen == 64)
                                                                                                       then
                                                                                                         (some
                                                                                                           (RTYPEW
@@ -1396,7 +1396,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                     (do
                                                                                                       match (let v__112 :=
                                                                                                         head_exp_
-                                                                                                      bif ((let mapping69_ : (BitVec 5) :=
+                                                                                                      if ((let mapping69_ : (BitVec 5) :=
                                                                                                              (Sail.BitVec.extractLsb
                                                                                                                v__112
                                                                                                                11
@@ -1445,7 +1445,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                           mapping68_), (encdec_reg_backwards
                                                                                                           mapping69_)) with
                                                                                                         | (rs2, rs1, rd) =>
-                                                                                                          (bif (xlen == 64)
+                                                                                                          (if (xlen == 64)
                                                                                                           then
                                                                                                             (some
                                                                                                               (RTYPEW
@@ -1460,7 +1460,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                         (do
                                                                                                           match (let v__108 :=
                                                                                                             head_exp_
-                                                                                                          bif ((let mapping72_ : (BitVec 5) :=
+                                                                                                          if ((let mapping72_ : (BitVec 5) :=
                                                                                                                  (Sail.BitVec.extractLsb
                                                                                                                    v__108
                                                                                                                    11
@@ -1509,7 +1509,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                               mapping71_), (encdec_reg_backwards
                                                                                                               mapping72_)) with
                                                                                                             | (rs2, rs1, rd) =>
-                                                                                                              (bif (xlen == 64)
+                                                                                                              (if (xlen == 64)
                                                                                                               then
                                                                                                                 (some
                                                                                                                   (RTYPEW
@@ -1524,7 +1524,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                             (do
                                                                                                               match (let v__104 :=
                                                                                                                 head_exp_
-                                                                                                              bif ((let mapping74_ : (BitVec 5) :=
+                                                                                                              if ((let mapping74_ : (BitVec 5) :=
                                                                                                                      (Sail.BitVec.extractLsb
                                                                                                                        v__104
                                                                                                                        11
@@ -1566,7 +1566,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                   mapping73_), (encdec_reg_backwards
                                                                                                                   mapping74_)) with
                                                                                                                 | (rs1, rd) =>
-                                                                                                                  (bif (xlen == 64)
+                                                                                                                  (if (xlen == 64)
                                                                                                                   then
                                                                                                                     (some
                                                                                                                       (SHIFTIWOP
@@ -1581,7 +1581,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                 (do
                                                                                                                   match (let v__100 :=
                                                                                                                     head_exp_
-                                                                                                                  bif ((let mapping76_ : (BitVec 5) :=
+                                                                                                                  if ((let mapping76_ : (BitVec 5) :=
                                                                                                                          (Sail.BitVec.extractLsb
                                                                                                                            v__100
                                                                                                                            11
@@ -1623,7 +1623,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                       mapping75_), (encdec_reg_backwards
                                                                                                                       mapping76_)) with
                                                                                                                     | (rs1, rd) =>
-                                                                                                                      (bif (xlen == 64)
+                                                                                                                      (if (xlen == 64)
                                                                                                                       then
                                                                                                                         (some
                                                                                                                           (SHIFTIWOP
@@ -1638,7 +1638,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                     (do
                                                                                                                       match (let v__96 :=
                                                                                                                         head_exp_
-                                                                                                                      bif ((let mapping78_ : (BitVec 5) :=
+                                                                                                                      if ((let mapping78_ : (BitVec 5) :=
                                                                                                                              (Sail.BitVec.extractLsb
                                                                                                                                v__96
                                                                                                                                11
@@ -1680,7 +1680,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                           mapping77_), (encdec_reg_backwards
                                                                                                                           mapping78_)) with
                                                                                                                         | (rs1, rd) =>
-                                                                                                                          (bif (xlen == 64)
+                                                                                                                          (if (xlen == 64)
                                                                                                                           then
                                                                                                                             (some
                                                                                                                               (SHIFTIWOP
@@ -1696,7 +1696,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                           match (← do
                                                                                                                             let v__93 :=
                                                                                                                               head_exp_
-                                                                                                                            bif ((let mapping82_ : (BitVec 5) :=
+                                                                                                                            if ((let mapping82_ : (BitVec 5) :=
                                                                                                                                    (Sail.BitVec.extractLsb
                                                                                                                                      v__93
                                                                                                                                      11
@@ -1756,7 +1756,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                   mapping82_)) with
                                                                                                                                 | (rs2, rs1, mul_op, rd) =>
                                                                                                                                   (do
-                                                                                                                                    bif ((← (currentlyEnabled
+                                                                                                                                    if ((← (currentlyEnabled
                                                                                                                                              Ext_M)) || (← (currentlyEnabled
                                                                                                                                              Ext_Zmmul)))
                                                                                                                                     then
@@ -1774,7 +1774,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                               match (← do
                                                                                                                                 let v__89 :=
                                                                                                                                   head_exp_
-                                                                                                                                bif ((let mapping86_ : (BitVec 5) :=
+                                                                                                                                if ((let mapping86_ : (BitVec 5) :=
                                                                                                                                        (Sail.BitVec.extractLsb
                                                                                                                                          v__89
                                                                                                                                          11
@@ -1837,7 +1837,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                       mapping86_)) with
                                                                                                                                     | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                       (do
-                                                                                                                                        bif (← (currentlyEnabled
+                                                                                                                                        if (← (currentlyEnabled
                                                                                                                                                Ext_M))
                                                                                                                                         then
                                                                                                                                           (pure (some
@@ -1854,7 +1854,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                   match (← do
                                                                                                                                     let v__85 :=
                                                                                                                                       head_exp_
-                                                                                                                                    bif ((let mapping90_ : (BitVec 5) :=
+                                                                                                                                    if ((let mapping90_ : (BitVec 5) :=
                                                                                                                                            (Sail.BitVec.extractLsb
                                                                                                                                              v__85
                                                                                                                                              11
@@ -1917,7 +1917,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                           mapping90_)) with
                                                                                                                                         | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                           (do
-                                                                                                                                            bif (← (currentlyEnabled
+                                                                                                                                            if (← (currentlyEnabled
                                                                                                                                                    Ext_M))
                                                                                                                                             then
                                                                                                                                               (pure (some
@@ -1934,7 +1934,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                       match (← do
                                                                                                                                         let v__81 :=
                                                                                                                                           head_exp_
-                                                                                                                                        bif ((let mapping93_ : (BitVec 5) :=
+                                                                                                                                        if ((let mapping93_ : (BitVec 5) :=
                                                                                                                                                (Sail.BitVec.extractLsb
                                                                                                                                                  v__81
                                                                                                                                                  11
@@ -1985,7 +1985,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                               mapping93_)) with
                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                               (do
-                                                                                                                                                bif ((xlen == 64) && ((← (currentlyEnabled
+                                                                                                                                                if ((xlen == 64) && ((← (currentlyEnabled
                                                                                                                                                            Ext_M)) || (← (currentlyEnabled
                                                                                                                                                            Ext_Zmmul))))
                                                                                                                                                 then
@@ -2003,7 +2003,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                           match (← do
                                                                                                                                             let v__77 :=
                                                                                                                                               head_exp_
-                                                                                                                                            bif ((let mapping97_ : (BitVec 5) :=
+                                                                                                                                            if ((let mapping97_ : (BitVec 5) :=
                                                                                                                                                    (Sail.BitVec.extractLsb
                                                                                                                                                      v__77
                                                                                                                                                      11
@@ -2066,7 +2066,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                                   mapping97_)) with
                                                                                                                                                 | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                   (do
-                                                                                                                                                    bif ((xlen == 64) && (← (currentlyEnabled
+                                                                                                                                                    if ((xlen == 64) && (← (currentlyEnabled
                                                                                                                                                              Ext_M)))
                                                                                                                                                     then
                                                                                                                                                       (pure (some
@@ -2083,7 +2083,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                               match (← do
                                                                                                                                                 let v__73 :=
                                                                                                                                                   head_exp_
-                                                                                                                                                bif ((let mapping99_ : (BitVec 5) :=
+                                                                                                                                                if ((let mapping99_ : (BitVec 5) :=
                                                                                                                                                        (Sail.BitVec.extractLsb
                                                                                                                                                          v__73
                                                                                                                                                          19
@@ -2146,7 +2146,7 @@ def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := do
                                                                                                                                                       mapping101_)) with
                                                                                                                                                     | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                       (do
-                                                                                                                                                        bif ((xlen == 64) && (← (currentlyEnabled
+                                                                                                                                                        if ((xlen == 64) && (← (currentlyEnabled
                                                                                                                                                                  Ext_M)))
                                                                                                                                                         then
                                                                                                                                                           (pure (some
@@ -2168,25 +2168,25 @@ def encdec_forwards_matches (arg_ : instruction) : SailM Bool := do
   match arg_ with
   | .UTYPE (imm, rd, op) => (pure true)
   | .JAL (v__249, rd) =>
-    (bif ((Sail.BitVec.extractLsb v__249 0 0) == (0b0 : (BitVec 1)))
+    (if ((Sail.BitVec.extractLsb v__249 0 0) == (0b0 : (BitVec 1)))
     then (pure true)
     else (pure false))
   | .JALR (imm, rs1, rd) => (pure true)
   | .BTYPE (v__251, rs2, rs1, op) =>
-    (bif ((Sail.BitVec.extractLsb v__251 0 0) == (0b0 : (BitVec 1)))
+    (if ((Sail.BitVec.extractLsb v__251 0 0) == (0b0 : (BitVec 1)))
     then (pure true)
     else (pure false))
   | .ITYPE (imm, rs1, rd, op) => (pure true)
   | .SHIFTIOP (shamt, rs1, rd, SLLI) =>
-    (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+    (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
     then (pure true)
     else (pure false))
   | .SHIFTIOP (shamt, rs1, rd, SRLI) =>
-    (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+    (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
     then (pure true)
     else (pure false))
   | .SHIFTIOP (shamt, rs1, rd, SRAI) =>
-    (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+    (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
     then (pure true)
     else (pure false))
   | .RTYPE (rs2, rs1, rd, ADD) => (pure true)
@@ -2200,11 +2200,11 @@ def encdec_forwards_matches (arg_ : instruction) : SailM Bool := do
   | .RTYPE (rs2, rs1, rd, SUB) => (pure true)
   | .RTYPE (rs2, rs1, rd, SRA) => (pure true)
   | .LOAD (imm, rs1, rd, is_unsigned, width) =>
-    (bif (valid_load_encdec width is_unsigned)
+    (if (valid_load_encdec width is_unsigned)
     then (pure true)
     else (pure false))
   | .STORE (v__253, rs2, rs1, width) =>
-    (bif (width ≤b xlen_bytes)
+    (if (width ≤b xlen_bytes)
     then (pure true)
     else (pure false))
   | .FENCE (pred, succ) => (pure true)
@@ -2216,73 +2216,73 @@ def encdec_forwards_matches (arg_ : instruction) : SailM Bool := do
   | .WFI () => (pure true)
   | .SFENCE_VMA (rs1, rs2) =>
     (do
-      bif ((← (virtual_memory_supported ())) || (not (false : Bool)))
+      if ((← (virtual_memory_supported ())) || (not (false : Bool)))
       then (pure true)
       else (pure false))
   | .ADDIW (imm, rs1, rd) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .RTYPEW (rs2, rs1, rd, ADDW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .RTYPEW (rs2, rs1, rd, SUBW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .RTYPEW (rs2, rs1, rd, SLLW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .RTYPEW (rs2, rs1, rd, SRLW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .RTYPEW (rs2, rs1, rd, SRAW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .SHIFTIWOP (shamt, rs1, rd, SLLIW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .SHIFTIWOP (shamt, rs1, rd, SRLIW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .SHIFTIWOP (shamt, rs1, rd, SRAIW) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then (pure true)
     else (pure false))
   | .MUL (rs2, rs1, rd, mul_op) =>
     (do
-      bif ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul)))
+      if ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul)))
       then (pure true)
       else (pure false))
   | .DIV (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif (← (currentlyEnabled Ext_M))
+      if (← (currentlyEnabled Ext_M))
       then (pure true)
       else (pure false))
   | .REM (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif (← (currentlyEnabled Ext_M))
+      if (← (currentlyEnabled Ext_M))
       then (pure true)
       else (pure false))
   | .MULW (rs2, rs1, rd) =>
     (do
-      bif ((xlen == 64) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul))))
+      if ((xlen == 64) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul))))
       then (pure true)
       else (pure false))
   | .DIVW (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif ((xlen == 64) && (← (currentlyEnabled Ext_M)))
+      if ((xlen == 64) && (← (currentlyEnabled Ext_M)))
       then (pure true)
       else (pure false))
   | .REMW (rs2, rs1, rd, is_unsigned) =>
     (do
-      bif ((xlen == 64) && (← (currentlyEnabled Ext_M)))
+      if ((xlen == 64) && (← (currentlyEnabled Ext_M)))
       then (pure true)
       else (pure false))
   | .ILLEGAL s => (pure true)
@@ -2292,7 +2292,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
   let head_exp_ := arg_
   match (← do
     let v__429 := head_exp_
-    bif (let mapping1_ : (BitVec 7) := (Sail.BitVec.extractLsb v__429 6 0)
+    if (let mapping1_ : (BitVec 7) := (Sail.BitVec.extractLsb v__429 6 0)
        let mapping0_ : (BitVec 5) := (Sail.BitVec.extractLsb v__429 11 7)
        ((encdec_reg_backwards_matches mapping0_) && (encdec_uop_backwards_matches mapping1_)))
     then
@@ -2306,7 +2306,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
   | none =>
     (do
       match (let v__427 := head_exp_
-      bif ((let mapping2_ : (BitVec 5) := (Sail.BitVec.extractLsb v__427 11 7)
+      if ((let mapping2_ : (BitVec 5) := (Sail.BitVec.extractLsb v__427 11 7)
            (encdec_reg_backwards_matches mapping2_)) && ((Sail.BitVec.extractLsb v__427 6 0) == (0b1101111 : (BitVec 7))))
       then
         (let mapping2_ : (BitVec 5) := (Sail.BitVec.extractLsb v__427 11 7)
@@ -2317,7 +2317,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
       | none =>
         (do
           match (let v__424 := head_exp_
-          bif ((let mapping4_ : (BitVec 5) := (Sail.BitVec.extractLsb v__424 11 7)
+          if ((let mapping4_ : (BitVec 5) := (Sail.BitVec.extractLsb v__424 11 7)
                let mapping3_ : (BitVec 5) := (Sail.BitVec.extractLsb v__424 19 15)
                ((encdec_reg_backwards_matches mapping3_) && (encdec_reg_backwards_matches mapping4_))) && (((Sail.BitVec.extractLsb
                      v__424 14 12) == (0b000 : (BitVec 3))) && ((Sail.BitVec.extractLsb v__424 6 0) == (0b1100111 : (BitVec 7)))))
@@ -2332,7 +2332,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
             (do
               match (← do
                 let v__422 := head_exp_
-                bif ((let mapping7_ : (BitVec 3) := (Sail.BitVec.extractLsb v__422 14 12)
+                if ((let mapping7_ : (BitVec 3) := (Sail.BitVec.extractLsb v__422 14 12)
                      let mapping6_ : (BitVec 5) := (Sail.BitVec.extractLsb v__422 19 15)
                      let mapping5_ : (BitVec 5) := (Sail.BitVec.extractLsb v__422 24 20)
                      ((encdec_reg_backwards_matches mapping5_) && ((encdec_reg_backwards_matches
@@ -2352,7 +2352,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                 (do
                   match (← do
                     let v__420 := head_exp_
-                    bif ((let mapping9_ : (BitVec 3) := (Sail.BitVec.extractLsb v__420 14 12)
+                    if ((let mapping9_ : (BitVec 3) := (Sail.BitVec.extractLsb v__420 14 12)
                          let mapping8_ : (BitVec 5) := (Sail.BitVec.extractLsb v__420 19 15)
                          let mapping10_ : (BitVec 5) := (Sail.BitVec.extractLsb v__420 11 7)
                          ((encdec_reg_backwards_matches mapping8_) && ((encdec_iop_backwards_matches
@@ -2371,7 +2371,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                   | none =>
                     (do
                       match (let v__416 := head_exp_
-                      bif ((let mapping12_ : (BitVec 5) := (Sail.BitVec.extractLsb v__416 11 7)
+                      if ((let mapping12_ : (BitVec 5) := (Sail.BitVec.extractLsb v__416 11 7)
                            let mapping11_ : (BitVec 5) := (Sail.BitVec.extractLsb v__416 19 15)
                            ((encdec_reg_backwards_matches mapping11_) && (encdec_reg_backwards_matches
                                mapping12_))) && (((Sail.BitVec.extractLsb v__416 31 26) == (0b000000 : (BitVec 6))) && (((Sail.BitVec.extractLsb
@@ -2383,7 +2383,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                         let mapping11_ : (BitVec 5) := (Sail.BitVec.extractLsb v__416 19 15)
                         match ((encdec_reg_backwards mapping11_), (encdec_reg_backwards mapping12_)) with
                         | (rs1, rd) =>
-                          (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+                          (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
                           then (some true)
                           else none))
                       else none) with
@@ -2391,7 +2391,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                       | none =>
                         (do
                           match (let v__412 := head_exp_
-                          bif ((let mapping14_ : (BitVec 5) := (Sail.BitVec.extractLsb v__412 11 7)
+                          if ((let mapping14_ : (BitVec 5) := (Sail.BitVec.extractLsb v__412 11 7)
                                let mapping13_ : (BitVec 5) := (Sail.BitVec.extractLsb v__412 19 15)
                                ((encdec_reg_backwards_matches mapping13_) && (encdec_reg_backwards_matches
                                    mapping14_))) && (((Sail.BitVec.extractLsb v__412 31 26) == (0b000000 : (BitVec 6))) && (((Sail.BitVec.extractLsb
@@ -2404,7 +2404,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                             match ((encdec_reg_backwards mapping13_), (encdec_reg_backwards
                               mapping14_)) with
                             | (rs1, rd) =>
-                              (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+                              (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
                               then (some true)
                               else none))
                           else none) with
@@ -2412,7 +2412,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                           | none =>
                             (do
                               match (let v__408 := head_exp_
-                              bif ((let mapping16_ : (BitVec 5) :=
+                              if ((let mapping16_ : (BitVec 5) :=
                                      (Sail.BitVec.extractLsb v__408 11 7)
                                    let mapping15_ : (BitVec 5) :=
                                      (Sail.BitVec.extractLsb v__408 19 15)
@@ -2427,7 +2427,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                 match ((encdec_reg_backwards mapping15_), (encdec_reg_backwards
                                   mapping16_)) with
                                 | (rs1, rd) =>
-                                  (bif ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
+                                  (if ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))
                                   then (some true)
                                   else none))
                               else none) with
@@ -2435,7 +2435,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                               | none =>
                                 (do
                                   match (let v__404 := head_exp_
-                                  bif ((let mapping19_ : (BitVec 5) :=
+                                  if ((let mapping19_ : (BitVec 5) :=
                                          (Sail.BitVec.extractLsb v__404 11 7)
                                        let mapping18_ : (BitVec 5) :=
                                          (Sail.BitVec.extractLsb v__404 19 15)
@@ -2461,7 +2461,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                   | none =>
                                     (do
                                       match (let v__400 := head_exp_
-                                      bif ((let mapping22_ : (BitVec 5) :=
+                                      if ((let mapping22_ : (BitVec 5) :=
                                              (Sail.BitVec.extractLsb v__400 11 7)
                                            let mapping21_ : (BitVec 5) :=
                                              (Sail.BitVec.extractLsb v__400 19 15)
@@ -2488,7 +2488,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                       | none =>
                                         (do
                                           match (let v__396 := head_exp_
-                                          bif ((let mapping25_ : (BitVec 5) :=
+                                          if ((let mapping25_ : (BitVec 5) :=
                                                  (Sail.BitVec.extractLsb v__396 11 7)
                                                let mapping24_ : (BitVec 5) :=
                                                  (Sail.BitVec.extractLsb v__396 19 15)
@@ -2515,7 +2515,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                           | none =>
                                             (do
                                               match (let v__392 := head_exp_
-                                              bif ((let mapping28_ : (BitVec 5) :=
+                                              if ((let mapping28_ : (BitVec 5) :=
                                                      (Sail.BitVec.extractLsb v__392 11 7)
                                                    let mapping27_ : (BitVec 5) :=
                                                      (Sail.BitVec.extractLsb v__392 19 15)
@@ -2542,7 +2542,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                               | none =>
                                                 (do
                                                   match (let v__388 := head_exp_
-                                                  bif ((let mapping31_ : (BitVec 5) :=
+                                                  if ((let mapping31_ : (BitVec 5) :=
                                                          (Sail.BitVec.extractLsb v__388 11 7)
                                                        let mapping30_ : (BitVec 5) :=
                                                          (Sail.BitVec.extractLsb v__388 19 15)
@@ -2569,7 +2569,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                   | none =>
                                                     (do
                                                       match (let v__384 := head_exp_
-                                                      bif ((let mapping34_ : (BitVec 5) :=
+                                                      if ((let mapping34_ : (BitVec 5) :=
                                                              (Sail.BitVec.extractLsb v__384 11 7)
                                                            let mapping33_ : (BitVec 5) :=
                                                              (Sail.BitVec.extractLsb v__384 19 15)
@@ -2597,7 +2597,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                       | none =>
                                                         (do
                                                           match (let v__380 := head_exp_
-                                                          bif ((let mapping37_ : (BitVec 5) :=
+                                                          if ((let mapping37_ : (BitVec 5) :=
                                                                  (Sail.BitVec.extractLsb v__380 11 7)
                                                                let mapping36_ : (BitVec 5) :=
                                                                  (Sail.BitVec.extractLsb v__380 19
@@ -2628,7 +2628,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                           | none =>
                                                             (do
                                                               match (let v__376 := head_exp_
-                                                              bif ((let mapping40_ : (BitVec 5) :=
+                                                              if ((let mapping40_ : (BitVec 5) :=
                                                                      (Sail.BitVec.extractLsb v__376
                                                                        11 7)
                                                                    let mapping39_ : (BitVec 5) :=
@@ -2664,7 +2664,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                               | none =>
                                                                 (do
                                                                   match (let v__372 := head_exp_
-                                                                  bif ((let mapping43_ : (BitVec 5) :=
+                                                                  if ((let mapping43_ : (BitVec 5) :=
                                                                          (Sail.BitVec.extractLsb
                                                                            v__372 11 7)
                                                                        let mapping42_ : (BitVec 5) :=
@@ -2700,7 +2700,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                   | none =>
                                                                     (do
                                                                       match (let v__368 := head_exp_
-                                                                      bif ((let mapping46_ : (BitVec 5) :=
+                                                                      if ((let mapping46_ : (BitVec 5) :=
                                                                              (Sail.BitVec.extractLsb
                                                                                v__368 11 7)
                                                                            let mapping45_ : (BitVec 5) :=
@@ -2739,7 +2739,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                         (do
                                                                           match (let v__366 :=
                                                                             head_exp_
-                                                                          bif ((let mapping50_ : (BitVec 5) :=
+                                                                          if ((let mapping50_ : (BitVec 5) :=
                                                                                  (Sail.BitVec.extractLsb
                                                                                    v__366 11 7)
                                                                                let mapping49_ : (BitVec 2) :=
@@ -2776,7 +2776,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                               mapping49_), (encdec_reg_backwards
                                                                               mapping50_)) with
                                                                             | (rs1, is_unsigned, width, rd) =>
-                                                                              (bif (valid_load_encdec
+                                                                              (if (valid_load_encdec
                                                                                    width is_unsigned)
                                                                               then (some true)
                                                                               else none))
@@ -2787,7 +2787,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                             (do
                                                                               match (let v__363 :=
                                                                                 head_exp_
-                                                                              bif ((let mapping53_ : (BitVec 2) :=
+                                                                              if ((let mapping53_ : (BitVec 2) :=
                                                                                      (Sail.BitVec.extractLsb
                                                                                        v__363 13 12)
                                                                                    let mapping52_ : (BitVec 5) :=
@@ -2818,7 +2818,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                   mapping52_), (size_enc_backwards
                                                                                   mapping53_)) with
                                                                                 | (rs2, rs1, width) =>
-                                                                                  (bif (width ≤b xlen_bytes)
+                                                                                  (if (width ≤b xlen_bytes)
                                                                                   then (some true)
                                                                                   else none))
                                                                               else none) with
@@ -2829,7 +2829,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                   match (← do
                                                                                     let v__312 :=
                                                                                       head_exp_
-                                                                                    bif (((Sail.BitVec.extractLsb
+                                                                                    if (((Sail.BitVec.extractLsb
                                                                                              v__312
                                                                                              31 28) == (0x0 : (BitVec 4))) && ((Sail.BitVec.extractLsb
                                                                                              v__312
@@ -2839,43 +2839,43 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                           true))
                                                                                     else
                                                                                       (do
-                                                                                        bif (v__312 == (0x8330000F : (BitVec 32)))
+                                                                                        if (v__312 == (0x8330000F : (BitVec 32)))
                                                                                         then
                                                                                           (pure (some
                                                                                               true))
                                                                                         else
                                                                                           (do
-                                                                                            bif (v__312 == (0x00000073 : (BitVec 32)))
+                                                                                            if (v__312 == (0x00000073 : (BitVec 32)))
                                                                                             then
                                                                                               (pure (some
                                                                                                   true))
                                                                                             else
                                                                                               (do
-                                                                                                bif (v__312 == (0x30200073 : (BitVec 32)))
+                                                                                                if (v__312 == (0x30200073 : (BitVec 32)))
                                                                                                 then
                                                                                                   (pure (some
                                                                                                       true))
                                                                                                 else
                                                                                                   (do
-                                                                                                    bif (v__312 == (0x10200073 : (BitVec 32)))
+                                                                                                    if (v__312 == (0x10200073 : (BitVec 32)))
                                                                                                     then
                                                                                                       (pure (some
                                                                                                           true))
                                                                                                     else
                                                                                                       (do
-                                                                                                        bif (v__312 == (0x00100073 : (BitVec 32)))
+                                                                                                        if (v__312 == (0x00100073 : (BitVec 32)))
                                                                                                         then
                                                                                                           (pure (some
                                                                                                               true))
                                                                                                         else
                                                                                                           (do
-                                                                                                            bif (v__312 == (0x10500073 : (BitVec 32)))
+                                                                                                            if (v__312 == (0x10500073 : (BitVec 32)))
                                                                                                             then
                                                                                                               (pure (some
                                                                                                                   true))
                                                                                                             else
                                                                                                               (do
-                                                                                                                bif ((let mapping55_ : (BitVec 5) :=
+                                                                                                                if ((let mapping55_ : (BitVec 5) :=
                                                                                                                        (Sail.BitVec.extractLsb
                                                                                                                          v__312
                                                                                                                          19
@@ -2911,7 +2911,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                       mapping55_)) with
                                                                                                                     | (rs2, rs1) =>
                                                                                                                       (do
-                                                                                                                        bif ((← (virtual_memory_supported
+                                                                                                                        if ((← (virtual_memory_supported
                                                                                                                                  ())) || (not
                                                                                                                                (false : Bool)))
                                                                                                                         then
@@ -2927,7 +2927,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                     (do
                                                                                       match (let v__309 :=
                                                                                         head_exp_
-                                                                                      bif ((let mapping57_ : (BitVec 5) :=
+                                                                                      if ((let mapping57_ : (BitVec 5) :=
                                                                                              (Sail.BitVec.extractLsb
                                                                                                v__309
                                                                                                11 7)
@@ -2956,7 +2956,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                           mapping56_), (encdec_reg_backwards
                                                                                           mapping57_)) with
                                                                                         | (rs1, rd) =>
-                                                                                          (bif (xlen == 64)
+                                                                                          (if (xlen == 64)
                                                                                           then
                                                                                             (some
                                                                                               true)
@@ -2968,7 +2968,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                         (do
                                                                                           match (let v__305 :=
                                                                                             head_exp_
-                                                                                          bif ((let mapping60_ : (BitVec 5) :=
+                                                                                          if ((let mapping60_ : (BitVec 5) :=
                                                                                                  (Sail.BitVec.extractLsb
                                                                                                    v__305
                                                                                                    11
@@ -3016,7 +3016,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                               mapping59_), (encdec_reg_backwards
                                                                                               mapping60_)) with
                                                                                             | (rs2, rs1, rd) =>
-                                                                                              (bif (xlen == 64)
+                                                                                              (if (xlen == 64)
                                                                                               then
                                                                                                 (some
                                                                                                   true)
@@ -3029,7 +3029,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                             (do
                                                                                               match (let v__301 :=
                                                                                                 head_exp_
-                                                                                              bif ((let mapping63_ : (BitVec 5) :=
+                                                                                              if ((let mapping63_ : (BitVec 5) :=
                                                                                                      (Sail.BitVec.extractLsb
                                                                                                        v__301
                                                                                                        11
@@ -3078,7 +3078,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                   mapping62_), (encdec_reg_backwards
                                                                                                   mapping63_)) with
                                                                                                 | (rs2, rs1, rd) =>
-                                                                                                  (bif (xlen == 64)
+                                                                                                  (if (xlen == 64)
                                                                                                   then
                                                                                                     (some
                                                                                                       true)
@@ -3092,7 +3092,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                 (do
                                                                                                   match (let v__297 :=
                                                                                                     head_exp_
-                                                                                                  bif ((let mapping66_ : (BitVec 5) :=
+                                                                                                  if ((let mapping66_ : (BitVec 5) :=
                                                                                                          (Sail.BitVec.extractLsb
                                                                                                            v__297
                                                                                                            11
@@ -3141,7 +3141,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                       mapping65_), (encdec_reg_backwards
                                                                                                       mapping66_)) with
                                                                                                     | (rs2, rs1, rd) =>
-                                                                                                      (bif (xlen == 64)
+                                                                                                      (if (xlen == 64)
                                                                                                       then
                                                                                                         (some
                                                                                                           true)
@@ -3155,7 +3155,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                     (do
                                                                                                       match (let v__293 :=
                                                                                                         head_exp_
-                                                                                                      bif ((let mapping69_ : (BitVec 5) :=
+                                                                                                      if ((let mapping69_ : (BitVec 5) :=
                                                                                                              (Sail.BitVec.extractLsb
                                                                                                                v__293
                                                                                                                11
@@ -3204,7 +3204,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                           mapping68_), (encdec_reg_backwards
                                                                                                           mapping69_)) with
                                                                                                         | (rs2, rs1, rd) =>
-                                                                                                          (bif (xlen == 64)
+                                                                                                          (if (xlen == 64)
                                                                                                           then
                                                                                                             (some
                                                                                                               true)
@@ -3218,7 +3218,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                         (do
                                                                                                           match (let v__289 :=
                                                                                                             head_exp_
-                                                                                                          bif ((let mapping72_ : (BitVec 5) :=
+                                                                                                          if ((let mapping72_ : (BitVec 5) :=
                                                                                                                  (Sail.BitVec.extractLsb
                                                                                                                    v__289
                                                                                                                    11
@@ -3267,7 +3267,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                               mapping71_), (encdec_reg_backwards
                                                                                                               mapping72_)) with
                                                                                                             | (rs2, rs1, rd) =>
-                                                                                                              (bif (xlen == 64)
+                                                                                                              (if (xlen == 64)
                                                                                                               then
                                                                                                                 (some
                                                                                                                   true)
@@ -3281,7 +3281,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                             (do
                                                                                                               match (let v__285 :=
                                                                                                                 head_exp_
-                                                                                                              bif ((let mapping74_ : (BitVec 5) :=
+                                                                                                              if ((let mapping74_ : (BitVec 5) :=
                                                                                                                      (Sail.BitVec.extractLsb
                                                                                                                        v__285
                                                                                                                        11
@@ -3318,7 +3318,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                   mapping73_), (encdec_reg_backwards
                                                                                                                   mapping74_)) with
                                                                                                                 | (rs1, rd) =>
-                                                                                                                  (bif (xlen == 64)
+                                                                                                                  (if (xlen == 64)
                                                                                                                   then
                                                                                                                     (some
                                                                                                                       true)
@@ -3332,7 +3332,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                 (do
                                                                                                                   match (let v__281 :=
                                                                                                                     head_exp_
-                                                                                                                  bif ((let mapping76_ : (BitVec 5) :=
+                                                                                                                  if ((let mapping76_ : (BitVec 5) :=
                                                                                                                          (Sail.BitVec.extractLsb
                                                                                                                            v__281
                                                                                                                            11
@@ -3369,7 +3369,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                       mapping75_), (encdec_reg_backwards
                                                                                                                       mapping76_)) with
                                                                                                                     | (rs1, rd) =>
-                                                                                                                      (bif (xlen == 64)
+                                                                                                                      (if (xlen == 64)
                                                                                                                       then
                                                                                                                         (some
                                                                                                                           true)
@@ -3383,7 +3383,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                     (do
                                                                                                                       match (let v__277 :=
                                                                                                                         head_exp_
-                                                                                                                      bif ((let mapping78_ : (BitVec 5) :=
+                                                                                                                      if ((let mapping78_ : (BitVec 5) :=
                                                                                                                              (Sail.BitVec.extractLsb
                                                                                                                                v__277
                                                                                                                                11
@@ -3420,7 +3420,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                           mapping77_), (encdec_reg_backwards
                                                                                                                           mapping78_)) with
                                                                                                                         | (rs1, rd) =>
-                                                                                                                          (bif (xlen == 64)
+                                                                                                                          (if (xlen == 64)
                                                                                                                           then
                                                                                                                             (some
                                                                                                                               true)
@@ -3435,7 +3435,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                           match (← do
                                                                                                                             let v__274 :=
                                                                                                                               head_exp_
-                                                                                                                            bif ((let mapping82_ : (BitVec 5) :=
+                                                                                                                            if ((let mapping82_ : (BitVec 5) :=
                                                                                                                                    (Sail.BitVec.extractLsb
                                                                                                                                      v__274
                                                                                                                                      11
@@ -3495,7 +3495,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                   mapping82_)) with
                                                                                                                                 | (rs2, rs1, mul_op, rd) =>
                                                                                                                                   (do
-                                                                                                                                    bif ((← (currentlyEnabled
+                                                                                                                                    if ((← (currentlyEnabled
                                                                                                                                              Ext_M)) || (← (currentlyEnabled
                                                                                                                                              Ext_Zmmul)))
                                                                                                                                     then
@@ -3512,7 +3512,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                               match (← do
                                                                                                                                 let v__270 :=
                                                                                                                                   head_exp_
-                                                                                                                                bif ((let mapping86_ : (BitVec 5) :=
+                                                                                                                                if ((let mapping86_ : (BitVec 5) :=
                                                                                                                                        (Sail.BitVec.extractLsb
                                                                                                                                          v__270
                                                                                                                                          11
@@ -3575,7 +3575,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                       mapping86_)) with
                                                                                                                                     | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                       (do
-                                                                                                                                        bif (← (currentlyEnabled
+                                                                                                                                        if (← (currentlyEnabled
                                                                                                                                                Ext_M))
                                                                                                                                         then
                                                                                                                                           (pure (some
@@ -3591,7 +3591,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                   match (← do
                                                                                                                                     let v__266 :=
                                                                                                                                       head_exp_
-                                                                                                                                    bif ((let mapping90_ : (BitVec 5) :=
+                                                                                                                                    if ((let mapping90_ : (BitVec 5) :=
                                                                                                                                            (Sail.BitVec.extractLsb
                                                                                                                                              v__266
                                                                                                                                              11
@@ -3654,7 +3654,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                           mapping90_)) with
                                                                                                                                         | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                           (do
-                                                                                                                                            bif (← (currentlyEnabled
+                                                                                                                                            if (← (currentlyEnabled
                                                                                                                                                    Ext_M))
                                                                                                                                             then
                                                                                                                                               (pure (some
@@ -3670,7 +3670,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                       match (← do
                                                                                                                                         let v__262 :=
                                                                                                                                           head_exp_
-                                                                                                                                        bif ((let mapping93_ : (BitVec 5) :=
+                                                                                                                                        if ((let mapping93_ : (BitVec 5) :=
                                                                                                                                                (Sail.BitVec.extractLsb
                                                                                                                                                  v__262
                                                                                                                                                  11
@@ -3721,7 +3721,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                               mapping93_)) with
                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                               (do
-                                                                                                                                                bif ((xlen == 64) && ((← (currentlyEnabled
+                                                                                                                                                if ((xlen == 64) && ((← (currentlyEnabled
                                                                                                                                                            Ext_M)) || (← (currentlyEnabled
                                                                                                                                                            Ext_Zmmul))))
                                                                                                                                                 then
@@ -3738,7 +3738,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                           match (← do
                                                                                                                                             let v__258 :=
                                                                                                                                               head_exp_
-                                                                                                                                            bif ((let mapping97_ : (BitVec 5) :=
+                                                                                                                                            if ((let mapping97_ : (BitVec 5) :=
                                                                                                                                                    (Sail.BitVec.extractLsb
                                                                                                                                                      v__258
                                                                                                                                                      11
@@ -3801,7 +3801,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                                   mapping97_)) with
                                                                                                                                                 | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                   (do
-                                                                                                                                                    bif ((xlen == 64) && (← (currentlyEnabled
+                                                                                                                                                    if ((xlen == 64) && (← (currentlyEnabled
                                                                                                                                                              Ext_M)))
                                                                                                                                                     then
                                                                                                                                                       (pure (some
@@ -3817,7 +3817,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                               match (← do
                                                                                                                                                 let v__254 :=
                                                                                                                                                   head_exp_
-                                                                                                                                                bif ((let mapping99_ : (BitVec 5) :=
+                                                                                                                                                if ((let mapping99_ : (BitVec 5) :=
                                                                                                                                                        (Sail.BitVec.extractLsb
                                                                                                                                                          v__254
                                                                                                                                                          19
@@ -3880,7 +3880,7 @@ def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := do
                                                                                                                                                       mapping101_)) with
                                                                                                                                                     | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                       (do
-                                                                                                                                                        bif ((xlen == 64) && (← (currentlyEnabled
+                                                                                                                                                        if ((xlen == 64) && (← (currentlyEnabled
                                                                                                                                                                  Ext_M)))
                                                                                                                                                         then
                                                                                                                                                           (pure (some
@@ -3922,7 +3922,7 @@ def execute_WFI (_ : Unit) : SailM ExecutionResult := do
   | Machine => (pure (Enter_Wait WAIT_WFI))
   | Supervisor =>
     (do
-      bif ((_get_Mstatus_TW (← readReg mstatus)) == (0b1 : (BitVec 1)))
+      if ((_get_Mstatus_TW (← readReg mstatus)) == (0b1 : (BitVec 1)))
       then (pure (Illegal_Instruction ()))
       else (pure (Enter_Wait WAIT_WFI)))
   | User => (pure (Illegal_Instruction ()))
@@ -3952,11 +3952,11 @@ def execute_SRET (_ : Unit) : SailM ExecutionResult := do
     | Supervisor =>
       (pure ((not (← (currentlyEnabled Ext_S))) || ((_get_Mstatus_TSR (← readReg mstatus)) == (0b1 : (BitVec 1)))))
     | Machine => (pure (not (← (currentlyEnabled Ext_S)))) ) : SailM Bool )
-  bif sret_illegal
+  if sret_illegal
   then (pure (Illegal_Instruction ()))
   else
     (do
-      bif (not (ext_check_xret_priv Supervisor))
+      if (not (ext_check_xret_priv Supervisor))
       then (pure (Ext_XRET_Priv_Failure ()))
       else
         (do
@@ -3986,11 +3986,11 @@ def execute_SHIFTIOP (shamt : (BitVec 6)) (rs1 : regidx) (rd : regidx) (op : sop
 
 def execute_SFENCE_VMA (rs1 : regidx) (rs2 : regidx) : SailM ExecutionResult := do
   let addr ← do
-    bif (bne rs1 zreg)
+    if (bne rs1 zreg)
     then (pure (some (← (rX_bits rs1))))
     else (pure none)
   let asid ← do
-    bif (bne rs2 zreg)
+    if (bne rs2 zreg)
     then (pure (some (Sail.BitVec.extractLsb (← (rX_bits rs2)) (asidlen -i 1) 0)))
     else (pure none)
   match (← readReg cur_privilege) with
@@ -3998,7 +3998,7 @@ def execute_SFENCE_VMA (rs1 : regidx) (rs2 : regidx) : SailM ExecutionResult := 
   | Supervisor =>
     (do
       let b__0 ← do (pure (_get_Mstatus_TVM (← readReg mstatus)))
-      bif (b__0 == (0b1 : (BitVec 1)))
+      if (b__0 == (0b1 : (BitVec 1)))
       then (pure (Illegal_Instruction ()))
       else
         (do
@@ -4048,39 +4048,39 @@ def execute_RTYPE (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) : SailM
             (Sail.BitVec.extractLsb (← (rX_bits rs2)) (log2_xlen -i 1) 0)))))
   (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: k_ex72252# : Bool -/
+/-- Type quantifiers: k_ex72262# : Bool -/
 def execute_REMW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs1)) 31 0))
   let rs2_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) 31 0))
   let rs1_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
   let rs2_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
   let remainder :=
-    bif (rs2_int == 0)
+    if (rs2_int == 0)
     then rs1_int
     else (Int.tmod rs1_int rs2_int)
   (wX_bits rd (sign_extend (m := 64) (to_bits_truncate (l := 32) remainder)))
   (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: k_ex72261# : Bool -/
+/-- Type quantifiers: k_ex72271# : Bool -/
 def execute_REM (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
   let rs1_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
   let rs2_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
   let remainder :=
-    bif (rs2_int == 0)
+    if (rs2_int == 0)
     then rs1_int
     else (Int.tmod rs1_int rs2_int)
   (wX_bits rd (to_bits_truncate (l := 64) remainder))
@@ -4099,26 +4099,26 @@ def execute_MUL (rs2 : regidx) (rs1 : regidx) (rd : regidx) (mul_op : mul_op) : 
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
   let rs1_int :=
-    bif mul_op.signed_rs1
+    if mul_op.signed_rs1
     then (BitVec.toInt rs1_bits)
     else (BitVec.toNat rs1_bits)
   let rs2_int :=
-    bif mul_op.signed_rs2
+    if mul_op.signed_rs2
     then (BitVec.toInt rs2_bits)
     else (BitVec.toNat rs2_bits)
   let result_wide := (to_bits_truncate (l := (2 *i xlen)) (rs1_int *i rs2_int))
   (wX_bits rd
-    (bif mul_op.high
+    (if mul_op.high
     then (Sail.BitVec.extractLsb result_wide ((2 *i xlen) -i 1) xlen)
     else (Sail.BitVec.extractLsb result_wide (xlen -i 1) 0)))
   (pure RETIRE_SUCCESS)
 
 def execute_MRET (_ : Unit) : SailM ExecutionResult := do
-  bif (bne (← readReg cur_privilege) Machine)
+  if (bne (← readReg cur_privilege) Machine)
   then (pure (Illegal_Instruction ()))
   else
     (do
-      bif (not (ext_check_xret_priv Machine))
+      if (not (ext_check_xret_priv Machine))
       then (pure (Ext_XRET_Priv_Failure ()))
       else
         (do
@@ -4126,7 +4126,7 @@ def execute_MRET (_ : Unit) : SailM ExecutionResult := do
             (← (exception_handler (← readReg cur_privilege) (CTL_MRET ()) (← readReg PC))))
           (pure RETIRE_SUCCESS)))
 
-/-- Type quantifiers: width : Nat, k_ex72292# : Bool, width ∈ {1, 2, 4, 8} -/
+/-- Type quantifiers: width : Nat, k_ex72302# : Bool, width ∈ {1, 2, 4, 8} -/
 def execute_LOAD (imm : (BitVec 12)) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) (width : Nat) : SailM ExecutionResult := do
   let offset : xlenbits := (sign_extend (m := 64) imm)
   assert (width ≤b xlen_bytes) "model/riscv_insts_base.sail:293.28-293.29"
@@ -4144,7 +4144,7 @@ def execute_JALR (imm : (BitVec 12)) (rs1 : regidx) (rd : regidx) : SailM Execut
   | .Ext_ControlAddr_OK addr =>
     (do
       let target := (BitVec.update (bits_of_virtaddr addr) 0 0#1)
-      bif ((← (bit_to_bool (BitVec.access target 1))) && (not (← (currentlyEnabled Ext_Zca))))
+      if ((← (bit_to_bool (BitVec.access target 1))) && (not (← (currentlyEnabled Ext_Zca))))
       then (pure (Memory_Exception (addr, (E_Fetch_Addr_Align ()))))
       else
         (do
@@ -4159,7 +4159,7 @@ def execute_JAL (imm : (BitVec 21)) (rd : regidx) : SailM ExecutionResult := do
   | .Ext_ControlAddr_OK target =>
     (do
       let target_bits := (bits_of_virtaddr target)
-      bif ((← (bit_to_bool (BitVec.access target_bits 1))) && (not
+      if ((← (bit_to_bool (BitVec.access target_bits 1))) && (not
              (← (currentlyEnabled Ext_Zca))))
       then (pure (Memory_Exception (target, (E_Fetch_Addr_Align ()))))
       else
@@ -4196,54 +4196,54 @@ def execute_FENCE (pred : (BitVec 4)) (succ : (BitVec 4)) : SailM ExecutionResul
   match (pred, succ) with
   | (v__430, v__431) =>
     (do
-      bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b11 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+      if (((Sail.BitVec.extractLsb v__430 1 0) == (0b11 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                v__431 1 0) == (0b11 : (BitVec 2))))
       then (sail_barrier Barrier_RISCV_rw_rw)
       else
         (do
-          bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b10 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+          if (((Sail.BitVec.extractLsb v__430 1 0) == (0b10 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                    v__431 1 0) == (0b11 : (BitVec 2))))
           then (sail_barrier Barrier_RISCV_r_rw)
           else
             (do
-              bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b10 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+              if (((Sail.BitVec.extractLsb v__430 1 0) == (0b10 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                        v__431 1 0) == (0b10 : (BitVec 2))))
               then (sail_barrier Barrier_RISCV_r_r)
               else
                 (do
-                  bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b11 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+                  if (((Sail.BitVec.extractLsb v__430 1 0) == (0b11 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                            v__431 1 0) == (0b01 : (BitVec 2))))
                   then (sail_barrier Barrier_RISCV_rw_w)
                   else
                     (do
-                      bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b01 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+                      if (((Sail.BitVec.extractLsb v__430 1 0) == (0b01 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                                v__431 1 0) == (0b01 : (BitVec 2))))
                       then (sail_barrier Barrier_RISCV_w_w)
                       else
                         (do
-                          bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b01 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+                          if (((Sail.BitVec.extractLsb v__430 1 0) == (0b01 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                                    v__431 1 0) == (0b11 : (BitVec 2))))
                           then (sail_barrier Barrier_RISCV_w_rw)
                           else
                             (do
-                              bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b11 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+                              if (((Sail.BitVec.extractLsb v__430 1 0) == (0b11 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                                        v__431 1 0) == (0b10 : (BitVec 2))))
                               then (sail_barrier Barrier_RISCV_rw_r)
                               else
                                 (do
-                                  bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b10 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+                                  if (((Sail.BitVec.extractLsb v__430 1 0) == (0b10 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                                            v__431 1 0) == (0b01 : (BitVec 2))))
                                   then (sail_barrier Barrier_RISCV_r_w)
                                   else
                                     (do
-                                      bif (((Sail.BitVec.extractLsb v__430 1 0) == (0b01 : (BitVec 2))) && ((Sail.BitVec.extractLsb
+                                      if (((Sail.BitVec.extractLsb v__430 1 0) == (0b01 : (BitVec 2))) && ((Sail.BitVec.extractLsb
                                                v__431 1 0) == (0b10 : (BitVec 2))))
                                       then (sail_barrier Barrier_RISCV_w_r)
                                       else
-                                        (bif ((Sail.BitVec.extractLsb v__431 1 0) == (0b00 : (BitVec 2)))
+                                        (if ((Sail.BitVec.extractLsb v__431 1 0) == (0b00 : (BitVec 2)))
                                         then (pure ())
                                         else
-                                          (bif ((Sail.BitVec.extractLsb v__430 1 0) == (0b00 : (BitVec 2)))
+                                          (if ((Sail.BitVec.extractLsb v__430 1 0) == (0b00 : (BitVec 2)))
                                           then (pure ())
                                           else
                                             (let _ : Unit := (print "FIXME: unsupported fence")
@@ -4263,47 +4263,47 @@ def execute_ECALL (_ : Unit) : SailM ExecutionResult := do
 def execute_EBREAK (_ : Unit) : SailM ExecutionResult := do
   (pure (Memory_Exception ((Virtaddr (← readReg PC)), (E_Breakpoint ()))))
 
-/-- Type quantifiers: k_ex72361# : Bool -/
+/-- Type quantifiers: k_ex72371# : Bool -/
 def execute_DIVW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs1)) 31 0))
   let rs2_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) 31 0))
   let rs1_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
   let rs2_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
   let quotient :=
-    bif (rs2_int == 0)
+    if (rs2_int == 0)
     then (-1)
     else (Int.tdiv rs1_int rs2_int)
   let quotient :=
-    bif ((not is_unsigned) && (quotient ≥b (2 ^i 31)))
+    if ((not is_unsigned) && (quotient ≥b (2 ^i 31)))
     then (Neg.neg (2 ^i 31))
     else quotient
   (wX_bits rd (sign_extend (m := 64) (to_bits_truncate (l := 32) quotient)))
   (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: k_ex72370# : Bool -/
+/-- Type quantifiers: k_ex72380# : Bool -/
 def execute_DIV (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
   let rs1_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
   let rs2_int :=
-    bif is_unsigned
+    if is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
   let quotient :=
-    bif (rs2_int == 0)
+    if (rs2_int == 0)
     then (-1)
     else (Int.tdiv rs1_int rs2_int)
   let quotient :=
-    bif ((not is_unsigned) && (quotient ≥b (2 ^i (xlen -i 1))))
+    if ((not is_unsigned) && (quotient ≥b (2 ^i (xlen -i 1))))
     then (Neg.neg (2 ^i (xlen -i 1)))
     else quotient
   (wX_bits rd (to_bits_truncate (l := 64) quotient))
@@ -4321,7 +4321,7 @@ def execute_BTYPE (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) (op : bop) :
     | BGE => (pure (zopz0zKzJ_s (← (rX_bits rs1)) (← (rX_bits rs2))))
     | BLTU => (pure (zopz0zI_u (← (rX_bits rs1)) (← (rX_bits rs2))))
     | BGEU => (pure (zopz0zKzJ_u (← (rX_bits rs1)) (← (rX_bits rs2)))) ) : SailM Bool )
-  bif taken
+  if taken
   then
     (do
       let target ← do (pure ((← readReg PC) + (sign_extend (m := 64) imm)))
@@ -4330,7 +4330,7 @@ def execute_BTYPE (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) (op : bop) :
       | .Ext_ControlAddr_OK target =>
         (do
           let target_bits := (bits_of_virtaddr target)
-          bif ((← (bit_to_bool (BitVec.access target_bits 1))) && (not
+          if ((← (bit_to_bool (BitVec.access target_bits 1))) && (not
                  (← (currentlyEnabled Ext_Zca))))
           then (pure (Memory_Exception (target, (E_Fetch_Addr_Align ()))))
           else
@@ -4399,30 +4399,30 @@ def assembly_forwards_matches (arg_ : instruction) : Bool :=
   | .WFI () => true
   | .SFENCE_VMA (rs1, rs2) => true
   | .ADDIW (imm, rs1, rd) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then true
     else false)
   | .RTYPEW (rs2, rs1, rd, op) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then true
     else false)
   | .SHIFTIWOP (shamt, rs1, rd, op) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then true
     else false)
   | .MUL (rs2, rs1, rd, mul_op) => true
   | .DIV (rs2, rs1, rd, is_unsigned) => true
   | .REM (rs2, rs1, rd, is_unsigned) => true
   | .MULW (rs2, rs1, rd) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then true
     else false)
   | .DIVW (rs2, rs1, rd, is_unsigned) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then true
     else false)
   | .REMW (rs2, rs1, rd, is_unsigned) =>
-    (bif (xlen == 64)
+    (if (xlen == 64)
     then true
     else false)
   | .ILLEGAL s => true

@@ -13,15 +13,6 @@ variable
   (cstrs : (constraints Main).allHold)
   (s : SailState)
 
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
-
 namespace BLT
 
 variable
@@ -167,7 +158,7 @@ theorem correct_blt
           aesop
       simp [op_a_val, op_b_val, BitVec.slt] at h_lts h_neq
       simp [h_lts]
-      simpM
+      simpM +run
 
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -215,13 +206,6 @@ theorem correct_blt
       simp [currentlyEnabled, hartSupports, this]
       clear this
 
-      -- THIS IS SO CURSED! WHY DO I NEED THIS WRAPPER?!
-      -- simp [writeReg, PreSail.writeReg]
-      -- simpM
-      -- rw [map_pure (fun a ↦ RETIRE_SUCCESS)]
-      rw [helper]
-
-      simpM
       simp [writeReg, PreSail.writeReg]
       simpM
       apply congrArg
@@ -269,9 +253,9 @@ theorem correct_blt
     by_cases op_a_val = op_b_val
     · rename_i h_eq
       simp [zopz0zI_s]
-      simp only [op_a_val, op_b_val, BitVec.slt] at h_eq h_ges
-      simp [h_ges]
-      simpM
+      simp [op_a_val, op_b_val, BitVec.slt] at h_eq h_ges
+      simp [not_lt_of_ge h_ges]
+      simpM +run
       apply congrArg
 
       simp [h_eq, BitVec.slt, h_ges, h_is_blt, h_28, h_29, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
@@ -308,15 +292,15 @@ theorem correct_blt
 
     rename_i h_eq
     simp [zopz0zI_s]
-    simp only [op_a_val, op_b_val, BitVec.slt] at h_eq h_ges
-    simp [h_ges]
-    simpM
+    simp [op_a_val, op_b_val, BitVec.slt] at h_eq h_ges
+    simp [not_lt_of_ge h_ges]
+    simpM +run
     apply congrArg
 
     simp [h_eq, BitVec.slt, h_ges, h_is_blt, h_28, h_29, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
 
     -- This should come from the spec of LtOperationSigned
-    simp [h_eq, BitVec.slt, h_ges, h_is_blt, h_31] at spec_lt
+    simp [h_eq, BitVec.slt, not_lt_of_ge h_ges, h_is_blt, h_31] at spec_lt
     have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
       by
         clear * - spec_lt

@@ -13,15 +13,6 @@ variable
   (cstrs : (constraints Main).allHold)
   (s : SailState)
 
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
-
 namespace BNE
 
 variable
@@ -161,8 +152,8 @@ theorem correct_bne
     · rename_i h_ne
       simp [op_a_val, op_b_val] at h_ne
 
-      simp [bne_iff_ne.mpr h_ne]
-      simpM
+      simp [h_ne]
+      simpM +run
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
       simp
@@ -209,13 +200,6 @@ theorem correct_bne
       unfold EStateM.run at this
       simp [currentlyEnabled, hartSupports, this]
 
-      -- THIS IS SO CURSED! WHY DO I NEED THIS WRAPPER?!
-      -- simp [writeReg, PreSail.writeReg]
-      -- simpM
-      -- rw [map_pure (fun a ↦ RETIRE_SUCCESS)]
-      rw [helper]
-
-      simpM
       simp [writeReg, PreSail.writeReg]
       simpM
       apply congrArg
@@ -254,8 +238,8 @@ theorem correct_bne
 
     · rename_i h_eq
       simp [op_a_val, op_b_val] at h_eq
-      simp [bne_eq_false_iff_eq.mpr h_eq]
-      simpM
+      simp [h_eq]
+      simpM +run
       apply congrArg
 
       simp [h_is_bne, h_28, h_30, h_31, h_32, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs

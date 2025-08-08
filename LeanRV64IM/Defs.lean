@@ -41,27 +41,27 @@ inductive exception where
 
 abbrev xlen : Int := 64
 
-abbrev log2_xlen : Int := (bif xlen = 32 then 5 else 6)
+abbrev log2_xlen : Int := (if xlen = 32 then 5 else 6)
 
-abbrev xlen_bytes : Int := (bif xlen = 32 then 4 else 8)
+abbrev xlen_bytes : Int := (if xlen = 32 then 4 else 8)
 
-abbrev physaddrbits_len : Int := (bif xlen = 32 then 34 else 64)
+abbrev physaddrbits_len : Int := (if xlen = 32 then 34 else 64)
 
-abbrev asidlen : Int := (bif xlen = 32 then 9 else 16)
+abbrev asidlen : Int := (if xlen = 32 then 9 else 16)
 
-abbrev asidbits := (BitVec (bif 64 = 32 then 9 else 16))
+abbrev asidbits := (BitVec (if 64 = 32 then 9 else 16))
 
 abbrev ext_d_supported : Bool := false
 
-abbrev flen_bytes : Int := (bif ext_d_supported then 8 else 4)
+abbrev flen_bytes : Int := (if ext_d_supported then 8 else 4)
 
-abbrev flen : Int := (bif false then 8 else 4 * 8)
+abbrev flen : Int := (if false then 8 else 4 * 8)
 
-abbrev flenbits := (BitVec (bif false then 8 else 4 * 8))
+abbrev flenbits := (BitVec (if false then 8 else 4 * 8))
 
 abbrev vlenmax : Int := 65536
 
-abbrev physaddrbits := (BitVec (bif 64 = 32 then 34 else 64))
+abbrev physaddrbits := (BitVec (if 64 = 32 then 34 else 64))
 
 inductive physaddr where
   | Physaddr (_ : physaddrbits)
@@ -303,9 +303,9 @@ inductive wrsop where | WRS_STO | WRS_NTO
 
 abbrev level_range (k_v : Nat) := Nat
 
-abbrev pte_bits k_v := (BitVec (bif k_v = 32 then 32 else 64))
+abbrev pte_bits k_v := (BitVec (if k_v = 32 then 32 else 64))
 
-abbrev ppn_bits k_v := (BitVec (bif k_v = 32 then 22 else 44))
+abbrev ppn_bits k_v := (BitVec (if k_v = 32 then 22 else 44))
 
 abbrev vpn_bits k_v := (BitVec (k_v - 12))
 
@@ -826,12 +826,12 @@ abbrev RegisterType : Register → Type
   | .htif_tohost => (BitVec 64)
   | .stimecmp => (BitVec 64)
   | .mtimecmp => (BitVec 64)
-  | .plat_clint_size => (BitVec (bif 64 = 32 then 34 else 64))
-  | .plat_clint_base => (BitVec (bif 64 = 32 then 34 else 64))
-  | .plat_rom_size => (BitVec (bif 64 = 32 then 34 else 64))
-  | .plat_rom_base => (BitVec (bif 64 = 32 then 34 else 64))
-  | .plat_ram_size => (BitVec (bif 64 = 32 then 34 else 64))
-  | .plat_ram_base => (BitVec (bif 64 = 32 then 34 else 64))
+  | .plat_clint_size => (BitVec (if 64 = 32 then 34 else 64))
+  | .plat_clint_base => (BitVec (if 64 = 32 then 34 else 64))
+  | .plat_rom_size => (BitVec (if 64 = 32 then 34 else 64))
+  | .plat_rom_base => (BitVec (if 64 = 32 then 34 else 64))
+  | .plat_ram_size => (BitVec (if 64 = 32 then 34 else 64))
+  | .plat_ram_base => (BitVec (if 64 = 32 then 34 else 64))
   | .minstretcfg => (BitVec 64)
   | .mcyclecfg => (BitVec 64)
   | .mhpmcounter => (Vector (BitVec 64) 32)
@@ -985,7 +985,7 @@ abbrev SailM := PreSailM RegisterType trivialChoiceSource exception
 
 instance : Arch where
   va_size := 64
-  pa := (BitVec (bif 64 = 32 then 34 else 64))
+  pa := (BitVec (if 64 = 32 then 34 else 64))
   abort := Unit
   translation := Unit
   trans_start := Unit

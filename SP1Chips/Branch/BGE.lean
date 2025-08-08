@@ -16,15 +16,6 @@ variable
 
 -- include Main cstrs s h_is_real
 
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
-
 namespace BGE
 
 variable
@@ -183,7 +174,7 @@ theorem correct_bge
           exact h_lts
       simp only [op_a_val, op_b_val] at h_lts h_neq h_actual_lts
       simp [h_actual_lts]
-      simpM
+      simpM +run
       apply congrArg
 
       simp [BitVec.slt] at h_lts
@@ -223,7 +214,7 @@ theorem correct_bge
       simp [zopz0zKzJ_s]
       simp only [op_a_val, op_b_val, BitVec.slt] at h_eq h_ges
       simp [h_eq]
-      simpM
+      simpM +run
 
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
       rw [Std.ExtDHashMap.get?_insert]
@@ -271,9 +262,6 @@ theorem correct_bge
       simp [currentlyEnabled, hartSupports, this]
       clear this
 
-      rw [helper]
-
-      simpM
       simp [writeReg, PreSail.writeReg]
       simpM
       apply congrArg
@@ -322,7 +310,7 @@ theorem correct_bge
     simp only [op_a_val, op_b_val, BitVec.slt] at h_neq h_ges
     simp [op_a_val, op_b_val] at h_actual_ges
     simp [h_actual_ges]
-    simpM
+    simpM +run
 
     simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
     rw [Std.ExtDHashMap.get?_insert]
@@ -371,9 +359,6 @@ theorem correct_bge
     simp [currentlyEnabled, hartSupports, this]
     clear this
 
-    rw [helper]
-
-    simpM
     simp [writeReg, PreSail.writeReg]
     simpM
     apply congrArg

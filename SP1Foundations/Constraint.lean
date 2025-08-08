@@ -91,7 +91,23 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
           s.get_reg? (BitVec.ofNatLT addr0.val h_addrs.left)
             = some (Word.toBitVec64 #v[limb0, limb1, limb2, limb3])
         else
-          True -- TODO(gzgz): this is reading from memory
+          let addr_base : Nat := Word.toNat #v[addr0, addr1, addr2, 0]
+          let b0 := s.mem[addr_base]?
+          let b1 := s.mem[addr_base + 1]?
+          let b2 := s.mem[addr_base + 2]?
+          let b3 := s.mem[addr_base + 3]?
+          let b4 := s.mem[addr_base + 4]?
+          let b5 := s.mem[addr_base + 5]?
+          let b6 := s.mem[addr_base + 6]?
+          let b7 := s.mem[addr_base + 7]?
+          (b0 = some (BitVec.truncate 8 (BitVec.ofNat 16 limb0.val))
+            ∧ b1 = some (BitVec.truncate 8 ((BitVec.ofNat 16 limb0.val) >>> 8)))
+          ∧ (b2 = some (BitVec.truncate 8 (BitVec.ofNat 16 limb1.val))
+            ∧ b3 = some (BitVec.truncate 8 ((BitVec.ofNat 16 limb1.val) >>> 8)))
+          ∧ (b4 = some (BitVec.truncate 8 (BitVec.ofNat 16 limb2.val))
+            ∧ b5 = some (BitVec.truncate 8 ((BitVec.ofNat 16 limb2.val) >>> 8)))
+          ∧ (b6 = some (BitVec.truncate 8 (BitVec.ofNat 16 limb3.val))
+            ∧ b7 = some (BitVec.truncate 8 ((BitVec.ofNat 16 limb3.val) >>> 8)))
   | (.receive (.state _clk_high _clk_low pc0 pc1 pc2) mult) =>
       mult ≠ 0
       → s.regs.get? Register.PC = some (Word.toBitVec64 #v[pc0, pc1, pc2, 0]) -- (BitVec.ofNat 64 (pc0.val + pc1.val * 65536 + pc2.val * 4294967296))

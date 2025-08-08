@@ -2,6 +2,7 @@ import SP1Foundations.BitVec
 import SP1Foundations.Misc
 import SP1Foundations.Register
 import SP1Foundations.Word
+import SP1Foundations.Tactics
 
 open LeanRV64IM.Functions
 
@@ -17,6 +18,16 @@ open LeanRV64IM.Functions
 --   simp [s'] at this
 
 section sailboats
+
+instance : ReflBEq Privilege where
+  rfl := by
+    intro a
+    cases a <;> trivial
+
+instance : ReflBEq SATPMode where
+  rfl := by
+    intro a
+    cases a <;> trivial
 
 namespace Option
 
@@ -276,6 +287,20 @@ section rX_bits
 
 lemma rX_bits_eq_get_reg? {s : SailState} (idx : BitVec 5) :
     (rX_bits (regidx.Regidx idx)).run s = (s.get_reg? idx).toSailM.run s := by
+    fin_cases idx
+    · simp
+      congr
+    all_goals
+      simp [Option.toSailM, SailState.get_reg?] at *
+      simp [reg_idx_to_Register, Option.elim]
+      simp [rX_bits, rX, Sail.readReg, PreSail.readReg, regval_from_reg]
+      simpM
+      match s.regs.get? _ with
+      | none => rfl
+      | some _ => rfl
+
+lemma rX_bits_eq_get_reg?_no_run {s : SailState} (idx : BitVec 5) :
+    (rX_bits (regidx.Regidx idx)) s = ((s.get_reg? idx).toSailM) s := by
     fin_cases idx
     · simp
       congr
