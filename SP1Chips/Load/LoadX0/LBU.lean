@@ -40,8 +40,6 @@ variable
   (s : SailState)
   (cstrs : (constraints Main).allHold)
 
-def sp1_imm : BitVec 12 := BitVec.ofNat 12 Main[21].val
-
 namespace LBU
 
 open BitVec
@@ -164,7 +162,6 @@ theorem correct_x0
         (by clear * - reader_cstrs; simp; show Main[23] < 65536; simp_all only [reader_cstrs])
         (by clear * - reader_cstrs; simp; show Main[24] < 65536; simp_all only [reader_cstrs])
         )
-      (by exact h_read_addr_within_range) -- TODO(gzgz): not exceeding memory bounds, this should come from AddrAdd but we trust this too
     simp at h_add_addr_limb0 h_add_addr_limb1 h_add_addr_limb2 h_addr_add_spec
 
     cases h_addr_shift0

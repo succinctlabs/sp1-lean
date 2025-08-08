@@ -165,7 +165,6 @@ theorem correct
         (by clear * - reader_cstrs; simp; show Main[23] < 65536; simp_all only [reader_cstrs])
         (by clear * - reader_cstrs; simp; show Main[24] < 65536; simp_all only [reader_cstrs])
         )
-      (by exact h_read_addr_within_range) -- TODO(gzgz): not exceeding memory bounds, this should come from trusted_instr
     simp at h_add_addr_limb0 h_add_addr_limb1 h_add_addr_limb2 h_addr_add_spec
 
     simp [Word.toNat] at h_read_limb0 h_read_limb1 h_read_limb2 h_read_limb3
