@@ -97,8 +97,8 @@ theorem correct_add
     -- Now the monadic manipulation
     simp [spec_add, sp1_add, execute, execute_RTYPE']
     rw [run_readReg, read_pc]
-    simp [sp1_op_b, read_op_b (by omega)]
-    simp [sp1_op_c, read_op_c (by omega)]
+    simp [sp1_op_b, read_op_b]
+    simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all

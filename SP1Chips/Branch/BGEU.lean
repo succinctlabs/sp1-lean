@@ -127,10 +127,8 @@ theorem correct_bgeu
 
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_bgeu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    simp [h_op_a_is_reg, h_op_b_is_reg, SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_bgeu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
     obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
-    have h_op_a_read' := h_op_a_read h_op_a_is_reg
-    have h_op_b_read' := h_op_b_read h_op_b_is_reg
 
     simp [spec_bgeu, sp1_bgeu, execute_BTYPE]
     simpM
@@ -140,11 +138,11 @@ theorem correct_bgeu
     simpM
 
     simp [op_a, sp1_op_a]
-    rw [h_op_a_read']
+    rw [h_op_a_read]
     simpM
 
     simp [op_b, sp1_op_b]
-    rw [h_op_b_read']
+    rw [h_op_b_read]
     simpM
     simp [ext_control_check_pc]
 
@@ -158,7 +156,7 @@ theorem correct_bgeu
           intro h
           rw [h] at h_ult_prop
           simp_all [BitVec.lt_irrefl]
-      have h_actual_ltu : (op_b_val.toNat ≤b op_a_val.toNat) = false :=
+      have h_actual_ltu : (op_b_val.toNat ≤ op_a_val.toNat) = false :=
         by
           clear * - h_ltu
           simp [BitVec.ult] at *
@@ -306,7 +304,7 @@ theorem correct_bgeu
     simp only [op_a_val, op_b_val, BitVec.ult] at h_neq h_geu
     simp [op_a_val, op_b_val] at h_actual_geu
     simp [h_actual_geu]
-    simpM
+    simpM +run
     clear h_actual_geu
     simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
     rw [Std.ExtDHashMap.get?_insert]
@@ -353,9 +351,7 @@ theorem correct_bgeu
     unfold EStateM.run at this
     simp [currentlyEnabled, hartSupports, this]
     clear this
-    rw [helper]
 
-    simpM
     simp [writeReg, PreSail.writeReg]
     simpM
     apply congrArg

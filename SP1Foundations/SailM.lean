@@ -6,17 +6,6 @@ import SP1Foundations.Tactics
 
 open LeanRV64IM.Functions
 
--- /-- Axiom that the `misa` register is always zero. -/
--- axiom SailState.sp1_no_misa : ∀s : SailState, s.regs.get? Register.misa = some 0
-
--- -- dt: would be safer if we made this a hypothesis about specific states.
--- example (s : SailState) : False := by
---   let s' := {s with regs := s.regs.insert Register.misa 1}
---   have := SailState.sp1_no_misa s'
---   suffices : (0 : RegisterType Register.misa) = 1
---   · simp at this
---   simp [s'] at this
-
 section sailboats
 
 instance : ReflBEq Privilege where
@@ -325,18 +314,6 @@ lemma run_rX_bits (idx : BitVec 5) :
   | some v => rfl
   | none => rfl
 
--- problems with equality substitution again here
--- lemma rX_bits_eq_readReg (idx : BitVec 5) :
---     (rX_bits (.Regidx idx)) = if idx = 0#5 then pure 0#64
---       else regidxValToBitVec idx <$> Sail.readReg (reg_idx_to_Register idx) := by
---   refine EStateM.ext fun s => ?_
---   by_cases hidx : idx = 0#5
---   · simp [hidx, SailState.get_reg?]
---   · simp [hidx, SailState.get_reg?]
---     cases s.regs.get? (reg_idx_to_Register idx) with
---     | none => sorry
---     | some v => sorry
-
 end rX_bits
 
 section wX_bits
@@ -406,18 +383,6 @@ lemma writeReg_readReg_bind (reg : Register) (v : RegisterType reg)
       (do Sail.writeReg reg v; mx v) := by
   refine EStateM.ext fun s => ?_
   simp [run_writeReg, regidxToRegister_inj, run_readReg]
-
--- dt: Lemmas that mix things like this are maybe less useful because of eq-subst / casts
--- @[simp] lemma write_reg_readReg_bind (idx : BitVec 5) (v : BitVec 64)
---     (mx : BitVec 64 → SailM α) :
---     (do write_reg idx v; let w ← Sail.readReg (reg_idx_to_Register idx); mx w) =
---       (do write_reg idx v; mx v) := by
---   sorry
-
--- @[simp] lemma write_reg_readReg_bind  (idx : BitVec 5) (data : BitVec 64)
---     (mx : RegisterType reg → SailM α) :
---     (do write_reg idx data; let w ← Sail.readReg (reg_idx_to_Register idx); mx w) =
---       (do write_reg idx data; mx data)
 
 end write_read_bind
 
@@ -685,7 +650,8 @@ lemma execute_RTYPEW_eq_execute_RTYPEW' :
     refine bind_congr ?_; intro r1
     refine bind_congr ?_; intro r2
     simpM; ext s
-    simp [Sail.run_wX_bits]
+    erw [EStateM.run_map, EStateM.run_map]
+    simp [EStateM.run_map, Sail.run_wX_bits]
     split_ifs <;> [ rfl; (congr <;> ext s) ] <;>
     simp_all <;> congr <;> simp [← BitVec.toNat_inj]
 
@@ -757,6 +723,7 @@ lemma execute_ADDIW'_eq_execute_ADDIW' :
     simp_all [execute_ADDIW, execute_ADDIW', execute_RTYPEW_pure]
     refine bind_congr ?_; intro r1
     simpM; ext s
+    erw [EStateM.run_map, EStateM.run_map]
     simp [Sail.run_wX_bits]
     split_ifs <;> [ rfl; (congr; bv_decide) ]
 

@@ -46,8 +46,6 @@ theorem SP1JAL_correct
     List.Forall, AddOperation.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, h⟩ := state_cstrs
   have h_op_a : Main[6].val < 32 := op_a_lt32_of_constraints cstrs h_is_real
-  specialize h (by aesop)
-  clear h
 
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp, sub_eq_zero,
     h_is_real, Fin.isValue, BB_eq, true_and] at cstrs

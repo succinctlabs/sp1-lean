@@ -136,10 +136,9 @@ theorem correct_bge
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints] at state_cstrs
     -- errr some reason I reach macRecDepth when simp-ing together.
-    simp [h_is_real, h_is_bge, h_28, h_29, h_30, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    simp [h_is_real, h_is_bge, h_28, h_29, h_30, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq,
+      h_op_a_is_reg, h_op_b_is_reg] at state_cstrs
     obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
-    have h_op_a_read' := h_op_a_read h_op_a_is_reg
-    have h_op_b_read' := h_op_b_read h_op_b_is_reg
 
     simp [spec_bge, sp1_bge, execute_BTYPE]
     simpM
@@ -149,11 +148,11 @@ theorem correct_bge
     simpM
 
     simp [op_a, sp1_op_a]
-    rw [h_op_a_read']
+    rw [h_op_a_read]
     simpM
 
     simp [op_b, sp1_op_b]
-    rw [h_op_b_read']
+    rw [h_op_b_read]
     simpM
     simp [ext_control_check_pc]
 
@@ -167,7 +166,7 @@ theorem correct_bge
           simp [BitVec.slt] at *
           aesop
 
-      have h_actual_lts : (op_b_val.toInt ≤b op_a_val.toInt) = false :=
+      have h_actual_lts : (op_b_val.toInt ≤ op_a_val.toInt) = false :=
         by
           clear * - h_lts
           simp [BitVec.slt] at *

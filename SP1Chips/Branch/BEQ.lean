@@ -142,11 +142,8 @@ theorem correct_beq
 
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_beq, h_29, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    simp [h_op_a_is_reg, h_op_b_is_reg, SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_beq, h_29, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
     obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
-    have h_op_a_read' := h_op_a_read h_op_a_is_reg
-    have h_op_b_read' := h_op_b_read h_op_b_is_reg
-
     simp [spec_beq, sp1_beq, execute_BTYPE]
     simpM
     simp [Sail.readReg, PreSail.readReg]
@@ -155,11 +152,11 @@ theorem correct_beq
     simpM
 
     simp [op_a, sp1_op_a]
-    rw [h_op_a_read']
+    rw [h_op_a_read]
     simpM
 
     simp [op_b, sp1_op_b]
-    rw [h_op_b_read']
+    rw [h_op_b_read]
     simpM
     simp [ext_control_check_pc]
 

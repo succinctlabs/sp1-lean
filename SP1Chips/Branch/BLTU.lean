@@ -126,10 +126,8 @@ theorem correct_bltu
 
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_bltu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    simp [h_op_a_is_reg, h_op_b_is_reg, SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_bltu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
     obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
-    have h_op_a_read' := h_op_a_read h_op_a_is_reg
-    have h_op_b_read' := h_op_b_read h_op_b_is_reg
 
     simp [spec_bltu, sp1_bltu, execute_BTYPE]
     simpM
@@ -139,11 +137,11 @@ theorem correct_bltu
     simpM
 
     simp [op_a, sp1_op_a]
-    rw [h_op_a_read']
+    rw [h_op_a_read]
     simpM
 
     simp [op_b, sp1_op_b]
-    rw [h_op_b_read']
+    rw [h_op_b_read]
     simpM
     simp [ext_control_check_pc]
 
@@ -160,7 +158,7 @@ theorem correct_bltu
           simp_all only [BitVec.lt_irrefl, op_b_val]
       simp [op_a_val, op_b_val, BitVec.ult] at h_ltu h_neq
       simp [h_ltu]
-      simpM
+      simpM +run
       simp [h_neq, BitVec.ult, h_ltu, h_30, h_31] at spec_lt
       clear h_ltu
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]

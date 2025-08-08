@@ -97,8 +97,11 @@ theorem correct_sub
     -- Now the monadic manipulation
     simp [spec_sub, sp1_sub, execute, execute_RTYPE']
     rw [run_readReg, read_pc]
-    simp [sp1_op_b, read_op_b (by omega)]
-    simp [sp1_op_c, read_op_c (by omega)]
+    have op_b_is_reg : Main[14] < 32 := by simp_all only
+    have op_a_is_reg : Main[6] < 32 := by simp_all only
+    simp [op_b_is_reg, op_a_is_reg] at read_op_b read_op_c
+    simp [sp1_op_b, read_op_b]
+    simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all

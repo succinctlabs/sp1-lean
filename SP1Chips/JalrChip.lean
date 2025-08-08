@@ -69,7 +69,8 @@ theorem JALR_correct
 
   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
   obtain ⟨⟨h_op_b, h_c_sign_extend⟩, ⟨h_op_a, ⟨_, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
-  let read_op_b' := read_op_b h_op_b
+  simp [h_op_b] at read_op_b
+  simp [h_op_a] at read_op_a
 
   have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
   let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
@@ -87,8 +88,8 @@ theorem JALR_correct
 
   have hmod : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]) % 4 = 0 := by
-    rw [BitVec.ofNatLT_eq_ofNat] at read_op_b'
-    rw [read_op_b'] at op_b_val_plus_imm_mul4
+    rw [BitVec.ofNatLT_eq_ofNat] at read_op_b
+    rw [read_op_b] at op_b_val_plus_imm_mul4
     simpa using op_b_val_plus_imm_mul4
 
   have hmod4 : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
@@ -101,7 +102,7 @@ theorem JALR_correct
   simp [spec_jalr, sp1_jalr, execute_JALR, op_a, op_b, op_c,
     sp1_op_a, sp1_op_b, sp1_op_c, EStateM.run_bind]
   rw [run_readReg] -- `simp` refuses to apply this itself
-  simp only [read_pc, hmod4, read_op_b', run_rX_bits, get_reg?_insert_nextPC, ext_control_check_addr,
+  simp only [read_pc, hmod4, read_op_b, run_rX_bits, get_reg?_insert_nextPC, ext_control_check_addr,
     Sail.BitVec.access, bit_to_bool, Sail.BitVec.update, Sail.BitVec.updateSubrange',
     bits_of_virtaddr, BitVec.reduceAllOnes, BitVec.truncate_eq_setWidth, BitVec.reduceSetWidth,
     BitVec.shiftLeft_zero, BitVec.reduceNot, BitVec.setWidth_zero, BitVec.or_zero,
