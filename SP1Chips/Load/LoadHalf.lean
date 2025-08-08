@@ -11,12 +11,42 @@ macro_rules | `($x[$i]$) => `(getElem $x $i (by simp))
 instance : Lean.Grind.NoNatZeroDivisors (Fin BB) where
   no_nat_zero_divisors := sorry
 
+macro_rules | `(tactic | get_elem_tactic) => `(tactic | norm_num1)
+
 open LeanRV64IM.Functions
+
+--------- Missing BitVec Pieces -----------
 
 lemma electric_slide (x : ℕ) :
     (x >>> 8 % 256) <<< 8 ||| x % 256 = x := by
   simp [Nat.shiftLeft_eq, Nat.shiftRight_eq_div_pow]
   sorry
+
+lemma chacha_slide (x : ℕ) :
+    (BitVec.ofNat 8 (x >>> 8) ++ BitVec.ofNat 8 x : BitVec 16) =
+      BitVec.ofNat 16 x := by
+  simp [BitVec.ofNat, BitVec.append]
+  sorry
+
+lemma BitVec.ofInt_toInt_cases (x : ℕ) (hx : x < 65536) :
+    BitVec.ofInt 64 (BitVec.ofNat 16 x).toInt =
+      if x < 32768 then (BitVec.ofNat 64 x) else
+        BitVec.ofNat 64 (x + 4294967296 + 281470681743360 + 18446462598732840960)
+       := by
+  rw [BitVec.toInt]
+  simp
+  rw [Nat.mod_eq_of_lt hx]
+  have : 2 * x < 65536 ↔ x < 32768 := by omega
+  simp [this]
+  split_ifs with hx'
+  · rw [BitVec.ofInt]
+    simp [BitVec.ofNatLT_eq_ofNat]
+    grind only [cases Or]
+  · rw [BitVec.ofInt]
+    simp [BitVec.ofNatLT_eq_ofNat] --?
+    sorry
+
+-------------------------------------------
 
 namespace Sail
 
@@ -362,6 +392,44 @@ theorem correct
       apply congrArg
       apply congrArg
 
+
+    · have : Main[13] = 0 := by simp_all only
+      simp [this] at reader_cstrs
+      have h4029 : Main[40] = Main[29] := by
+        simp_all only
+      simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
+      have : Main[41] = 0 ∨ Main[41] = 1 := msb_cstrs.1
+      cases this with
+      | inl h41_0 =>
+        simp [h41_0, BitVec.ofNatLT_eq_ofNat,
+          Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+        simp [signExtend, setWidth]
+        have h29 : Main[29].val < 65536 := h_limb0_is_u16
+        rw [Nat.mod_eq_of_lt h29]
+        rw [chacha_slide]
+
+
+        simp [h41_0, h4029] at msb_cstrs
+        have : Main[29].val < 32768 := by sorry
+
+        rw [BitVec.ofInt_toInt_cases _ h29]
+        simp [this]
+
+
+      | inr h41_1 =>
+        simp [h41_1, BitVec.ofNatLT_eq_ofNat,
+          Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+        simp [signExtend, setWidth]
+        have h29 : Main[29].val < 65536 := h_limb0_is_u16
+        rw [Nat.mod_eq_of_lt h29]
+        rw [chacha_slide]
+
+        simp [h41_1, h4029] at msb_cstrs
+        have : 32768 ≤ Main[29].val := by sorry
+
+        rw [BitVec.ofInt_toInt_cases _ h29]
+        simp [not_lt_of_ge this]
+
     -- only bitvec goals remaining
     all_goals sorry
 
@@ -436,7 +504,7 @@ theorem correct
   (h_is_lhu : Main[43] = 1)
   (h_mstatus : s.regs.get? Register.mstatus = some 0)
   (h_priv : s.regs.get? Register.cur_privilege = some Privilege.Machine)
-  (mem0 mem1 mem2 mem3 : BitVec 8)
+  -- (mem0 mem1 mem2 mem3 : BitVec 8)
   -- assumptions!
   : let op_a := sp1_op_a Main cstrs h_is_lhu
     let op_b := sp1_op_b Main cstrs h_is_lhu
@@ -698,27 +766,28 @@ theorem correct
       have : Main[41]'(by trivial) = 0 := by simp_all only
       simp only [BB_eq, Fin.isValue] at this
       simp [this]
+      simp only [setWidth, setWidth']
+      simp [BitVec.ofNatLT_eq_ofNat]
       have : Main[29]'(by trivial) < 2^16 := by
         simp
         have := h_limb0_is_u16
         simpa using this
-      simp only [setWidth, setWidth']
-      simp
-      rw [BitVec.ofNatLT_eq_ofNat]
-      rw [BitVec.toNat_append]
-      refine congr_arg (BitVec.ofNat 64) ?_
-      simp
       rw [Fin.lt_iff_val_lt_val] at this
       simp at this
       rw [Nat.mod_eq_of_lt this]
-      rw [electric_slide]
+      rw [chacha_slide]
+      rw [BitVec.setWidth]
+      simp only [Nat.reduceLeDiff, ↓reduceDIte]
+      rw [BitVec.setWidth']
+      simp [BitVec.ofNatLT_eq_ofNat]
+      rw [Nat.mod_eq_of_lt this]
     · simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
       simp [BitVec.ofNatLT_eq_ofNat]
       simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
-      have : Main[41]'(by trivial) = 0 := by simp_all only
+      have : Main[41] = 0 := by simp_all only
       simp only [BB_eq, Fin.isValue] at this
       simp [this]
-      have : Main[31]'(by trivial) < 2^16 := by
+      have : Main[31] < 2^16 := by
         simp
         have := h_limb2_is_u16
         simpa using this
@@ -735,10 +804,10 @@ theorem correct
     · simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
       simp [BitVec.ofNatLT_eq_ofNat]
       simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
-      have : Main[41]'(by trivial) = 0 := by simp_all only
+      have : Main[41] = 0 := by simp_all only
       simp only [BB_eq, Fin.isValue] at this
       simp [this]
-      have : Main[30]'(by trivial) < 2^16 := by
+      have : Main[30] < 2^16 := by
         simp
         have := h_limb1_is_u16
         simpa using this
@@ -755,10 +824,10 @@ theorem correct
     · simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
       simp [BitVec.ofNatLT_eq_ofNat]
       simp [U16MSBOperation.constraints, sub_eq_zero] at msb_cstrs
-      have : Main[41]'(by trivial) = 0 := by simp_all only
+      have : Main[41] = 0 := by simp_all only
       simp only [BB_eq, Fin.isValue] at this
       simp [this]
-      have : Main[32]'(by trivial) < 2^16 := by
+      have : Main[32] < 2^16 := by
         simp
         have := h_limb3_is_u16
         simpa using this
