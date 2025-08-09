@@ -101,7 +101,7 @@ theorem correct_x0
     have h_imm_c_is_0 : Main[13] = 1 := by simp_all only [chip_cstrs]
 
     simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq, h_imm_c_is_0] at reader_cstrs
-
+    stop
     have h_op_a_x0 : op_a = 0#5 :=
       by
         simp [op_a, sp1_op_a, BitVec.ofNatLT, BitVec.ofNat]

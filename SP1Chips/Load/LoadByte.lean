@@ -110,7 +110,7 @@ theorem correct
   := by
     extract_lets op_a op_b op_c
     have h_not_lbu : Main[46] = 0 := is_lb_eq_not_lbu Main cstrs h_is_lb
-
+    stop
     simp [-Word.add_toBitVec64_mod4, constraints, AddressOperation.constraints, AddrAddOperation.constraints, CPUState.constraints, ITypeReader.constraints, SP1Constraint.toStateProp, List.Forall, h_is_lb, h_not_lbu, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble] at state_cstrs
     obtain ⟨h_read_pc, h_read_addr_within_range, h_read_op_a, h_read_op_b, h_read_mem⟩ := state_cstrs
 
@@ -592,7 +592,7 @@ theorem correct
 
     simp [constraints, AddressOperation.constraints, SP1Constraint.toProp, List.Forall, h_is_lbu, h_not_lb, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble, sub_eq_zero] at cstrs
     obtain ⟨addr_add_cstrs, h_addr_shift0, h_addr_shift1, h_addr_shift2, addr_cstr0, addr_cstr1, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
-
+    stop
     have h_42_is_upper_byte : Main[42] = Main[41] >>> 8 := by sorry
     have h_no_msb : Main[44] = 0 := by simp_all only [chip_cstrs]
 

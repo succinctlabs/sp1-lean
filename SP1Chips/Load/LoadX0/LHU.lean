@@ -92,7 +92,7 @@ theorem correct_x0
     (spec_lhu op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_lhu Main cstrs h_is_lhu).run s
   := by
     extract_lets op_a op_b op_c
-
+    stop
     have ⟨h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld⟩ := (h_exactly_one Main cstrs).2.2.2.1 h_is_lhu
 
     simp [-Word.add_toBitVec64_mod4, constraints, AddressOperation.constraints, AddrAddOperation.constraints, CPUState.constraints, ITypeReaderImmutable.constraints, SP1Constraint.toStateProp, List.Forall, h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble] at state_cstrs

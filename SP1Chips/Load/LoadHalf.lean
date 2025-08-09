@@ -148,7 +148,7 @@ theorem correct
     obtain ⟨addr_add_cstrs, h_addr_shift0, h_addr_shift1, addr_cstr0, addr_cstr1, msb_cstrs, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
 
     simp [ITypeReader.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-
+    stop
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     simp [h_op_a_is_reg] at h_read_op_a
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
@@ -515,7 +515,7 @@ theorem correct
     obtain ⟨addr_add_cstrs, h_addr_shift0, h_addr_shift1, addr_cstr0, addr_cstr1, msb_cstrs, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
 
     simp [ITypeReader.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-
+    stop
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     simp [h_op_a_is_reg] at h_read_op_a
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only

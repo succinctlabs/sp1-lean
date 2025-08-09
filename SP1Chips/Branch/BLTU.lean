@@ -258,6 +258,7 @@ theorem correct_bltu
       omega
       -- sorry
     rename_i h_geu
+    stop
     by_cases op_a_val = op_b_val
     · rename_i h_eq
       simp [zopz0zI_u]

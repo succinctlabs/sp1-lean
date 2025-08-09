@@ -144,7 +144,7 @@ theorem correct
     obtain ⟨addr_add_cstrs, addr_cstr0, addr_cstr1, addr_cstr2, msb_cstrs, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
 
     simp [ITypeReader.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-
+    stop
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     simp [h_op_a_is_reg] at h_read_op_a
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
@@ -436,10 +436,10 @@ lemma helper2
                               _ = (8 * q * 1761607681 % BB + r * 1761607681) % BB := by simp
                               _ = ((8 * 1761607681) * q % BB + r * 1761607681) % BB := by ring_nf
                               _ = ((8 * 1761607681) % BB * q % BB + r * 1761607681) % BB := by rw [Nat.mod_mul_mod]
-                              _ = (1 * q % BB + r * 1761607681) % BB := by simp [BB]
+                              _ = (1 * q % BB + r * 1761607681) % BB := by simp
                               _ = (q % BB + r * 1761607681) % BB := by simp
                               _ = (q + r * 1761607681) % BB := by simp
-    simp [BB] at this
+    simp at this
     rw [this] at hmul
     clear this h_inv
 
@@ -538,7 +538,7 @@ theorem correct
     obtain ⟨addr_add_cstrs, addr_cstr0, addr_cstr1, addr_cstr2, msb_cstrs, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
 
     simp [ITypeReader.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-
+    stop
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     simp [h_op_a_is_reg] at h_read_op_a
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only

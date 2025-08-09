@@ -11,12 +11,3 @@ import SP1Foundations.SailM
 import SP1Foundations.Tactics
 import SP1Foundations.Unsigned
 import SP1Foundations.Word
-
-----------------------------------
----- Special Indexing Macro ------
-----------------------------------
-macro_rules | `(tactic| get_elem_tactic) => `(tactic| norm_num1)
-
--- syntax:max term noWs "[" withoutPosition(term) "]$" : term
--- macro_rules | `($x[$i]$ ) => `(getElem $x $i (by decide +kernel))
---------------------------------------------------------------------

@@ -54,7 +54,7 @@ theorem is_u48_sum (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fi
       simp at ha' hb'
 
       simp [Word.toNat]
-
+      stop
       cases h0 <;> rename_i h0
       <;> simp [sub_eq_zero] at h0
       <;> simp [h0] at h1 h2 h3
@@ -87,7 +87,7 @@ theorem cols_is_a_sum_b (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real
       have ha' := Word.lt_cases_of_isU64 ha
       have hb' := Word.lt_cases_of_isU64 hb
       simp at ha' hb'
-
+      stop
       simp [Word.toNat]
       cases h0 <;> rename_i h0
       <;> simp [sub_eq_zero] at h0
@@ -128,7 +128,7 @@ theorem correct (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fin B
   have hb' := Word.lt_cases_of_isU64 hb
 
   refine ⟨hbd0, hbd1, hbd2, ?_⟩
-
+  stop
   have h_cols_is_u64 : Word.isU64 #v[cols.value[0], cols.value[1], cols.value[2], 0] := by
     exact Word.isU64_of_cases _ hbd0 hbd1 hbd2 (by simp)
 

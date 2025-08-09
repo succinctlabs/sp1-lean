@@ -94,7 +94,7 @@ theorem correct_x0
     extract_lets op_a op_b op_c
 
     have ⟨h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld⟩ := (h_exactly_one Main cstrs).2.2.1 h_is_lh
-
+    stop
     simp [-Word.add_toBitVec64_mod4, constraints, AddressOperation.constraints, AddrAddOperation.constraints, CPUState.constraints, ITypeReaderImmutable.constraints, SP1Constraint.toStateProp, List.Forall, h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble] at state_cstrs
     obtain ⟨h_read_pc, ⟨h_trusted_read, h_read_addr_within_range⟩, h_read_op_a, h_read_op_b, h_read_mem⟩ := state_cstrs
 

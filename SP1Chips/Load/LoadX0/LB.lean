@@ -110,7 +110,7 @@ theorem correct_x0
 
     simp [-Word.add_toBitVec64_mod4, constraints, AddressOperation.constraints, AddrAddOperation.constraints, CPUState.constraints, ITypeReaderImmutable.constraints, SP1Constraint.toStateProp, SP1Constraint.toProp, List.Forall, h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble] at state_cstrs
     obtain ⟨h_read_pc, h_read_addr_within_range, h_read_op_a, h_read_op_b, h_read_mem⟩ := state_cstrs
-
+    stop
     have h_mem_read_is_u64 : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by simp_all only [chip_cstrs]
 
     have h_over_addr : Main[26] ≠ 0 ∨ Main[27] ≠ 0 :=
