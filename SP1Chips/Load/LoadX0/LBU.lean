@@ -98,7 +98,7 @@ theorem correct_x0
     simp [constraints, List.Forall, SP1Constraint.toProp, AddressOperation.constraints, sub_eq_zero, h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld] at cstrs
     obtain ⟨addr_add_cstrs, h_addr_shift0, h_addr_shift1, h_addr_shift2, addr_cstr0, addr_cstr1, cpu_cstrs, reader_cstrs, chip_cstrs⟩ := cstrs
 
-    have h_imm_c_is_0 : Main[13]$ = 1 := by simp_all only [chip_cstrs]
+    have h_imm_c_is_0 : Main[13] = 1 := by simp_all only [chip_cstrs]
 
     simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp, List.Forall, Opcode.ofNat, ByteOpcode.ofNat, Nat.ble, Nat.beq, h_imm_c_is_0] at reader_cstrs
 
@@ -111,9 +111,9 @@ theorem correct_x0
     simp [-Word.add_toBitVec64_mod4, constraints, AddressOperation.constraints, AddrAddOperation.constraints, CPUState.constraints, ITypeReaderImmutable.constraints, SP1Constraint.toStateProp, SP1Constraint.toProp, List.Forall, h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld, Opcode.ofNat, ByteOpcode.ofNat, Nat.beq, Nat.ble] at state_cstrs
     obtain ⟨h_read_pc, h_read_addr_within_range, h_read_op_a, h_read_op_b, h_read_mem⟩ := state_cstrs
 
-    have h_mem_read_is_u64 : Word.isU64 #v[Main[29]$, Main[30]$, Main[31]$, Main[32]$] := by simp_all only [chip_cstrs]
+    have h_mem_read_is_u64 : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by simp_all only [chip_cstrs]
 
-    have h_over_addr : Main[26]$ ≠ 0 ∨ Main[27]$ ≠ 0 :=
+    have h_over_addr : Main[26] ≠ 0 ∨ Main[27] ≠ 0 :=
       by
         by_contra!
         obtain ⟨h_limb1_0, h_limb2_0⟩ := this
@@ -121,32 +121,32 @@ theorem correct_x0
     simp [not_and_or.mpr h_over_addr, Word.toNat] at h_read_mem
     obtain ⟨h_read_limb0, h_read_limb1, h_read_limb2, h_read_limb3⟩ := h_read_mem
 
-    have h_op_c_is_signExtend : Word.toBitVec64 #v[Main[21]$, Main[22]$, Main[23]$, Main[24]$] = BitVec.signExtend 64 (BitVec.ofNat 12 Main[21]$.val) := by
+    have h_op_c_is_signExtend : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] = BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
       simp_all only
 
-    have h_limb0_is_u16 : Main[29]$.val < 2^16 := h_mem_read_is_u64 0
-    have h_limb1_is_u16 : Main[30]$.val < 2^16 := h_mem_read_is_u64 1
-    have h_limb2_is_u16 : Main[31]$.val < 2^16 := h_mem_read_is_u64 2
-    have h_limb3_is_u16 : Main[32]$.val < 2^16 := h_mem_read_is_u64 3
-    have h_op_a_is_reg : Main[6]$ < 32 := by clear * - reader_cstrs; simp_all only; simp
+    have h_limb0_is_u16 : Main[29].val < 2^16 := h_mem_read_is_u64 0
+    have h_limb1_is_u16 : Main[30].val < 2^16 := h_mem_read_is_u64 1
+    have h_limb2_is_u16 : Main[31].val < 2^16 := h_mem_read_is_u64 2
+    have h_limb3_is_u16 : Main[32].val < 2^16 := h_mem_read_is_u64 3
+    have h_op_a_is_reg : Main[6] < 32 := by clear * - reader_cstrs; simp_all only; simp
     simp [h_op_a_is_reg] at h_read_op_a
-    have h_op_b_is_reg : Main[14]$ < 32 := by simp_all only [reader_cstrs]
+    have h_op_b_is_reg : Main[14] < 32 := by simp_all only [reader_cstrs]
     simp [h_op_b_is_reg] at h_read_op_b
     rw [←BitVec.ofNatLT_eq_ofNat h_op_b_is_reg, h_read_op_b, Option.get!_some] at h_read_addr_within_range
 
-    have h_op_a_limb0_is_0 : Main[7]$ = 0 := by simp_all only [chip_cstrs]
-    have h_op_a_limb1_is_0 : Main[8]$ = 0 := by simp_all only [chip_cstrs]
-    have h_op_a_limb2_is_0 : Main[9]$ = 0 := by simp_all only [chip_cstrs]
-    have h_op_a_limb3_is_0 : Main[10]$ = 0 := by simp_all only [chip_cstrs]
-    have h_op_a_val_is_0 : Word.toBitVec64 #v[Main[7]$, Main[8]$, Main[9]$, Main[10]$] = 0#64 :=
+    have h_op_a_limb0_is_0 : Main[7] = 0 := by simp_all only [chip_cstrs]
+    have h_op_a_limb1_is_0 : Main[8] = 0 := by simp_all only [chip_cstrs]
+    have h_op_a_limb2_is_0 : Main[9] = 0 := by simp_all only [chip_cstrs]
+    have h_op_a_limb3_is_0 : Main[10] = 0 := by simp_all only [chip_cstrs]
+    have h_op_a_val_is_0 : Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]] = 0#64 :=
       by
         simp [h_op_a_limb0_is_0, h_op_a_limb1_is_0, h_op_a_limb2_is_0, h_op_a_limb3_is_0, Word.toBitVec64, Word.toNat]
 
     simp [op_a, sp1_op_a] at h_op_a_x0
-    have h_pc0 : Main[3]$.val < 65536 := by clear * - reader_cstrs; show Main[3] < 65536; simp_all only
-    have h_pc1 : Main[4]$.val < 65536 := by clear * - reader_cstrs; show Main[4] < 65536; simp_all only
-    have h_pc2 : Main[5]$.val < 65536 := by clear * - reader_cstrs; show Main[5] < 65536; simp_all only
-    have h_pc_is_u64 : Main[3]$.val + Main[4]$.val <<< 16 + Main[5]$.val <<< 32 < 2^64 := by
+    have h_pc0 : Main[3].val < 65536 := by clear * - reader_cstrs; show Main[3] < 65536; simp_all only
+    have h_pc1 : Main[4].val < 65536 := by clear * - reader_cstrs; show Main[4] < 65536; simp_all only
+    have h_pc2 : Main[5].val < 65536 := by clear * - reader_cstrs; show Main[5] < 65536; simp_all only
+    have h_pc_is_u64 : Main[3].val + Main[4].val <<< 16 + Main[5].val <<< 32 < 2^64 := by
       simp
       clear * - h_pc0 h_pc1 h_pc2
       omega
@@ -175,7 +175,7 @@ theorem correct_x0
     <;> [
       -- case offset 0
       ( skip
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[29]$)) :=
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[29])) :=
           by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -188,7 +188,7 @@ theorem correct_x0
 
       -- case offset 4
       ( skip
-        let h_addr_limb0_ge4 : Main[25]$ >= 4 :=
+        let h_addr_limb0_ge4 : Main[25] >= 4 :=
           by
             clear * - addr_cstr1
             by_contra!
@@ -197,7 +197,7 @@ theorem correct_x0
             interval_cases Main[25].val
             <;> simp at addr_cstr1
 
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[31]$)) :=
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[31])) :=
           by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -206,13 +206,13 @@ theorem correct_x0
             rw [←BitVec.ofNatLT_eq_ofNat (by omega)]
             simp [BitVec.ofNatLT_toNat]
             simp [Fin.sub_val_of_le h_addr_limb0_ge4] at *
-            convert_to Main[25]$.val ≥ 4 at h_addr_limb0_ge4
+            convert_to Main[25].val ≥ 4 at h_addr_limb0_ge4
             grind
       );
 
       -- case offset 2
       ( skip
-        let h_addr_limb0_ge2 : Main[25]$ >= 2 :=
+        let h_addr_limb0_ge2 : Main[25] >= 2 :=
           by
             clear * - addr_cstr1
             by_contra!
@@ -221,7 +221,7 @@ theorem correct_x0
             interval_cases Main[25].val
             <;> simp at addr_cstr1
 
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[30]$)) :=
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[30])) :=
           by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -230,13 +230,13 @@ theorem correct_x0
             rw [←BitVec.ofNatLT_eq_ofNat (by omega)]
             simp [BitVec.ofNatLT_toNat]
             simp [Fin.sub_val_of_le h_addr_limb0_ge2] at *
-            convert_to Main[25]$.val ≥ 2 at h_addr_limb0_ge2
+            convert_to Main[25].val ≥ 2 at h_addr_limb0_ge2
             grind
       );
 
       -- case offset 6
       ( skip
-        let h_addr_limb0_ge6 : Main[25]$ >= 6 :=
+        let h_addr_limb0_ge6 : Main[25] >= 6 :=
           by
             clear * - addr_cstr1
             by_contra!
@@ -245,19 +245,19 @@ theorem correct_x0
             interval_cases Main[25].val
             <;> simp at addr_cstr1
 
-        let h_addr_limb0_sub4_ge2 : Main[25]$ - 4 >= 2 :=
+        let h_addr_limb0_sub4_ge2 : Main[25] - 4 >= 2 :=
           by
             clear * - h_addr_limb0_ge6
-            simp at h_addr_limb0_ge6 ⊢ 
+            simp at h_addr_limb0_ge6 ⊢
             all_goals omega
 
-        let h_addr_limb0_ge4 : Main[25]$ >= 4 :=
+        let h_addr_limb0_ge4 : Main[25] >= 4 :=
           by
             clear * - h_addr_limb0_ge6
-            simp at h_addr_limb0_ge6 ⊢ 
+            simp at h_addr_limb0_ge6 ⊢
             all_goals omega
 
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[32]$))
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[32]))
           := by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -266,14 +266,14 @@ theorem correct_x0
             rw [←BitVec.ofNatLT_eq_ofNat (by omega)]
             simp [BitVec.ofNatLT_toNat]
             simp [Fin.sub_val_of_le h_addr_limb0_sub4_ge2, Fin.sub_val_of_le h_addr_limb0_ge4] at *
-            convert_to Main[25]$.val ≥ 6 at h_addr_limb0_ge6
-            convert_to Main[25]$.val ≥ 4 at h_addr_limb0_ge4
+            convert_to Main[25].val ≥ 6 at h_addr_limb0_ge6
+            convert_to Main[25].val ≥ 4 at h_addr_limb0_ge4
             grind
       );
 
       -- case offset 1
       ( skip
-        let h_addr_limb0_ge1 : Main[25]$ >= 1 :=
+        let h_addr_limb0_ge1 : Main[25] >= 1 :=
           by
             clear * - addr_cstr1
             by_contra!
@@ -282,7 +282,7 @@ theorem correct_x0
             interval_cases Main[25].val
             simp at addr_cstr1
 
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[29]$ >>> 8)) :=
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (setWidth 8 (BitVec.ofNat 16 ↑Main[29] >>> 8)) :=
           by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -291,13 +291,13 @@ theorem correct_x0
             rw [←BitVec.ofNatLT_eq_ofNat (by omega)]
             simp [BitVec.ofNatLT_toNat]
             simp [Fin.sub_val_of_le h_addr_limb0_ge1] at *
-            convert_to Main[25]$.val ≥ 1 at h_addr_limb0_ge1
+            convert_to Main[25].val ≥ 1 at h_addr_limb0_ge1
             grind
       );
 
       -- case offset 5
       ( skip
-        let h_addr_limb0_ge5 : Main[25]$ >= 5 :=
+        let h_addr_limb0_ge5 : Main[25] >= 5 :=
           by
             clear * - addr_cstr1
             by_contra!
@@ -306,19 +306,19 @@ theorem correct_x0
             interval_cases Main[25].val
             <;> simp at addr_cstr1
 
-        let h_addr_limb0_sub4_ge1 : Main[25]$ - 4 >= 1 :=
+        let h_addr_limb0_sub4_ge1 : Main[25] - 4 >= 1 :=
           by
             clear * - h_addr_limb0_ge5
-            simp at h_addr_limb0_ge5 ⊢ 
+            simp at h_addr_limb0_ge5 ⊢
             all_goals omega
 
-        let h_addr_limb0_ge4 : Main[25]$ >= 4 :=
+        let h_addr_limb0_ge4 : Main[25] >= 4 :=
           by
             clear * - h_addr_limb0_ge5
-            simp at h_addr_limb0_ge5 ⊢ 
+            simp at h_addr_limb0_ge5 ⊢
             all_goals omega
 
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[31]$ >>> 8))
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[31] >>> 8))
           := by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -327,14 +327,14 @@ theorem correct_x0
             rw [←BitVec.ofNatLT_eq_ofNat (by omega)]
             simp [BitVec.ofNatLT_toNat]
             simp [Fin.sub_val_of_le h_addr_limb0_sub4_ge1, Fin.sub_val_of_le h_addr_limb0_ge4] at *
-            convert_to Main[25]$.val ≥ 5 at h_addr_limb0_ge5
-            convert_to Main[25]$.val ≥ 4 at h_addr_limb0_ge4
+            convert_to Main[25].val ≥ 5 at h_addr_limb0_ge5
+            convert_to Main[25].val ≥ 4 at h_addr_limb0_ge4
             grind
       );
 
       -- case offset 3
       ( skip
-        let h_addr_limb0_ge3 : Main[25]$ >= 3 :=
+        let h_addr_limb0_ge3 : Main[25] >= 3 :=
           by
             clear * - addr_cstr1
             by_contra!
@@ -343,19 +343,19 @@ theorem correct_x0
             interval_cases Main[25].val
             <;> simp at addr_cstr1
 
-        let h_addr_limb0_sub2_ge1 : Main[25]$ - 2 >= 1 :=
+        let h_addr_limb0_sub2_ge1 : Main[25] - 2 >= 1 :=
           by
             clear * - h_addr_limb0_ge3
-            simp at h_addr_limb0_ge3 ⊢ 
+            simp at h_addr_limb0_ge3 ⊢
             all_goals omega
 
-        let h_addr_limb0_ge2 : Main[25]$ >= 2 :=
+        let h_addr_limb0_ge2 : Main[25] >= 2 :=
           by
             clear * - h_addr_limb0_ge3
-            simp at h_addr_limb0_ge3 ⊢ 
+            simp at h_addr_limb0_ge3 ⊢
             all_goals omega
 
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[30]$ >>> 8))
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[30] >>> 8))
           := by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -364,13 +364,13 @@ theorem correct_x0
             rw [←BitVec.ofNatLT_eq_ofNat (by omega)]
             simp [BitVec.ofNatLT_toNat]
             simp [Fin.sub_val_of_le h_addr_limb0_sub2_ge1, Fin.sub_val_of_le h_addr_limb0_ge2] at *
-            convert_to Main[25]$.val ≥ 3 at h_addr_limb0_ge3
-            convert_to Main[25]$.val ≥ 2 at h_addr_limb0_ge2
+            convert_to Main[25].val ≥ 3 at h_addr_limb0_ge3
+            convert_to Main[25].val ≥ 2 at h_addr_limb0_ge2
             grind
       );
 
       ( skip
-        let h_addr_limb0_ge7 : Main[25]$ >= 7 :=
+        let h_addr_limb0_ge7 : Main[25] >= 7 :=
           by
             clear * - addr_cstr1
             by_contra!
@@ -379,25 +379,25 @@ theorem correct_x0
             interval_cases Main[25].val
             <;> simp at addr_cstr1
 
-        let h_addr_limb0_sub4_sub2_ge1 : Main[25]$ - 4 - 2 >= 1 :=
+        let h_addr_limb0_sub4_sub2_ge1 : Main[25] - 4 - 2 >= 1 :=
           by
             clear * - h_addr_limb0_ge7
-            simp at h_addr_limb0_ge7 ⊢ 
+            simp at h_addr_limb0_ge7 ⊢
             all_goals omega
 
-        let h_addr_limb0_sub4_ge2 : Main[25]$ - 4 >= 2 :=
+        let h_addr_limb0_sub4_ge2 : Main[25] - 4 >= 2 :=
           by
             clear * - h_addr_limb0_ge7
-            simp at h_addr_limb0_ge7 ⊢ 
+            simp at h_addr_limb0_ge7 ⊢
             all_goals omega
 
-        let h_addr_limb0_ge4 : Main[25]$ >= 4 :=
+        let h_addr_limb0_ge4 : Main[25] >= 4 :=
           by
             clear * - h_addr_limb0_ge7
-            simp at h_addr_limb0_ge7 ⊢ 
+            simp at h_addr_limb0_ge7 ⊢
             all_goals omega
-        
-        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15]$, Main[16]$, Main[17]$, Main[18]$] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[32]$ >>> 8))
+
+        obtain h_read_mem : s.mem[(Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + signExtend 64 op_c).toNat]? = some (BitVec.truncate 8 (BitVec.ofNat 16 ↑Main[32] >>> 8))
           := by
             simp only [op_c, sp1_imm, sign_extend, Sail.BitVec.signExtend]
             rw [←h_op_c_is_signExtend, ←h_addr_add_spec]
@@ -406,7 +406,7 @@ theorem correct_x0
             rw [←BitVec.ofNatLT_eq_ofNat (by omega)]
             simp [BitVec.ofNatLT_toNat]
             simp [Fin.sub_val_of_le h_addr_limb0_sub4_sub2_ge1, Fin.sub_val_of_le h_addr_limb0_sub4_ge2, Fin.sub_val_of_le h_addr_limb0_ge4] at *
-            convert_to Main[25]$.val ≥ 7 at h_addr_limb0_ge7
+            convert_to Main[25].val ≥ 7 at h_addr_limb0_ge7
             grind
       )
     ]
@@ -437,7 +437,7 @@ theorem correct_x0
       simp [Word.toBitVec64, Word.toNat]
       rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
       simp [BitVec.add_def]
-      have : (↑(Main[3]$ + 4) + ↑Main[4]$ <<< 16 + ↑Main[5]$ <<< 32 : ℕ) = ↑Main[3]$ + ↑Main[4]$ <<< 16 + ↑Main[5]$ <<< 32 + 4 := by
+      have : (↑(Main[3] + 4) + ↑Main[4] <<< 16 + ↑Main[5] <<< 32 : ℕ) = ↑Main[3] + ↑Main[4] <<< 16 + ↑Main[5] <<< 32 + 4 := by
         simp [Fin.add_def]
         rw [Nat.mod_eq_of_lt (by clear * - h_pc0; linarith)]
         ring_nf

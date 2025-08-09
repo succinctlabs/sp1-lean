@@ -7,9 +7,6 @@ open BitVec
 
 namespace AddrAddOperation
 
--- TODO(gzgz): this is just to not conflict temporarily;
-scoped macro_rules | `(tactic | get_elem_tactic) => `(tactic | norm_num1) 
-
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
 lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddrAddOperation) :
     List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
@@ -27,7 +24,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddrAddOperation) :
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
 lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddrAddOperation)
-    (h : (constraints a b cols 1).allHold) : 
+    (h : (constraints a b cols 1).allHold) :
     cols.value[0] < 65536 ∧ cols.value[1] < 65536 ∧ cols.value[2] < 65536 := by
   simp [allHold_constraints_iff] at h
   obtain ⟨_, _, _, _, h0, h1, h2⟩ := h
@@ -43,7 +40,7 @@ def spec (a b : Word (Fin BB)) (cols : AddrAddOperation) : Prop :=
 set_option maxHeartbeats 1000000 in
 theorem is_u48_sum (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fin BB)
     (h_is_real : is_real = 1)
-    (cstrs : (constraints a b cols is_real).allHold) 
+    (cstrs : (constraints a b cols is_real).allHold)
     (ha : a.isU64)
     (hb : b.isU64)
     : (a.toNat + b.toNat) % 2^64 < 2^48 := by
@@ -74,7 +71,7 @@ theorem is_u48_sum (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fi
 set_option maxHeartbeats 1000000 in
 theorem cols_is_a_sum_b (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fin BB)
     (h_is_real : is_real = 1)
-    (cstrs : (constraints a b cols is_real).allHold) 
+    (cstrs : (constraints a b cols is_real).allHold)
     (ha : a.isU64)
     (hb : b.isU64)
     : (a.toNat + b.toNat) % 2^64 = Word.toNat #v[cols.value[0], cols.value[1], cols.value[2], 0]
@@ -132,7 +129,7 @@ theorem correct (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fin B
 
   refine ⟨hbd0, hbd1, hbd2, ?_⟩
 
-  have h_cols_is_u64 : Word.isU64 #v[cols.value[0], cols.value[1], cols.value[2], 0] := by 
+  have h_cols_is_u64 : Word.isU64 #v[cols.value[0], cols.value[1], cols.value[2], 0] := by
     exact Word.isU64_of_cases _ hbd0 hbd1 hbd2 (by simp)
 
   simp [Word.toBitVec64_LT_eq_toNat h_cols_is_u64]
