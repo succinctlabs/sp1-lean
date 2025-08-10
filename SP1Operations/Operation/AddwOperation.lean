@@ -20,9 +20,9 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddwOperation) :
 
 def spec (a b : Word (Fin BB)) (cols : AddwOperation) : Prop :=
   a.isU64 → b.isU64 →
-    HalfWord.isU32 (cols.value) ∧
-    HalfWord.toBitVec32 (cols.value) = execute_RTYPEW_pure_32_w a b .ADDW ∧
-    cols.msb.msb = if (HalfWord.toBitVec32 cols.value).msb then 1 else 0
+    HWord.isU32 (cols.value) ∧
+    HWord.toBitVec32 (cols.value) = execute_RTYPEW_pure_32_w a b .ADDW ∧
+    cols.msb.msb = if (HWord.toBitVec32 cols.value).msb then 1 else 0
 
 set_option maxHeartbeats 1000000 in
 /-- If the operation is real and the input words have correctly bounded limbs,
@@ -44,15 +44,15 @@ theorem correct (a b : Word (Fin BB)) (cols : AddwOperation) (is_real : Fin BB)
 
   . constructor
     . simp
-      rw [HalfWord.toBitVec32_add_toBitVec32, HalfWord.toBitVec32_as_sum]
+      rw [HWord.toBitVec32_add_toBitVec32, HWord.toBitVec32_as_sum]
       simp [← inv_16BB_eq'] at *
-      simp [Word.low32, ← BitVec.ofNat_add, ← BitVec.ofNat_mul]
+      simp [Word.low, ← BitVec.ofNat_add, ← BitVec.ofNat_mul]
       simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
       rcases h0 <;> rcases h1 <;>
       simp_all <;> omega
     . simp [Fin.lt_iff_val_lt_val] at hbds
       apply (U16MSBOperation.spec cols.value[1] cols.msb 1 (by omega)) at hmsb
-      simp [HalfWord.toBitVec32, HalfWord.toNat, BitVec.msb_eq_toNat]
+      simp [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
       simp at hmsb; split_ifs at * <;> omega
 
 end AddwOperation

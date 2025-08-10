@@ -5,8 +5,6 @@ import LeanRV64IM.Sail.Sail
 
 open BitVec
 
-lemma bitVec_ofNat_toNat {w n : ℕ} : (BitVec.ofNat w n).toNat = n % 2 ^ w := by rfl
-
 lemma bitVec_sshiftright_eq (bv : BitVec w) (shift : ℕ) :
   bv.sshiftRight shift =
     BitVec.setWidth w
@@ -18,43 +16,9 @@ namespace BitVec
 attribute [simp] LeanRV64IM.Functions.sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
 attribute [simp] extractLsb extractLsb'
 
+def extend {m : ℕ} (bv : BitVec m) (n : ℕ) (sgn : Prop) [Decidable sgn] := (if sgn then signExtend else setWidth) n bv
+
 @[simp] lemma twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
-
-lemma shiftLeft_xor_shiftLeft16 (a b c d : BitVec 32)
-    (ha : a < 65536) (hb : b < 65536)
-    (hc : c < 65536) (hd : d < 65536) :
-    (a + b <<< 16) ^^^ (c + d <<< 16) =
-      (a ^^^ c) + (b ^^^ d) <<< 16 := by bv_decide
-
-lemma shiftLeft_or_shiftLeft16 (a b c d : BitVec 32)
-    (ha : a < 65536) (hb : b < 65536)
-    (hc : c < 65536) (hd : d < 65536) :
-    (a + b <<< 16) ||| (c + d <<< 16) =
-      (a ||| c) + (b ||| d) <<< 16 := by bv_decide
-
-lemma shiftLeft_and_shiftLeft16 (a b c d : BitVec 32)
-    (ha : a < 65536) (hb : b < 65536)
-    (hc : c < 65536) (hd : d < 65536) :
-    (a + b <<< 16) &&& (c + d <<< 16) =
-      (a &&& c) + (b &&& d) <<< 16 := by bv_decide
-
-lemma and_add_and_mul_bv {x_low x_high y_low y_high : BitVec 32}
-    (hx : x_low < 256) (hy : y_low < 256) :
-    (x_low &&& y_low) + (x_high &&& y_high) * 256 =
-      (x_low + x_high * 256) &&& (y_low + y_high * 256) := by
-  bv_decide
-
-lemma or_add_or_mul_bv {x_low x_high y_low y_high : BitVec 32}
-    (hx : x_low < 256) (hy : y_low < 256) :
-    (x_low ||| y_low) + (x_high ||| y_high) * 256 =
-      (x_low + x_high * 256) ||| (y_low + y_high * 256) := by
-  bv_decide
-
-lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
-    (hx : x_low < 256) (hy : y_low < 256) :
-    (x_low ^^^ y_low) + (x_high ^^^ y_high) * 256 =
-      (x_low + x_high * 256) ^^^ (y_low + y_high * 256) := by
-  bv_decide
 
 @[simp] lemma mod4_add_eq_mod4 (x y : BitVec 64)
     (hx : x < BitVec.twoPow 64 32)
@@ -71,20 +35,11 @@ lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
   rw [← Fin.val_inj]
   simp
 
-lemma ofNat64_mod_4_eq_zero (n : ℕ) :
-    (BitVec.ofNat 64 n) % 4 = n % 4 := rfl
-
 theorem twoPow64_and_eq_self {a b : BitVec 64} (h : (a + b) % 4 = 0) :
     18446744073709551614#64 &&& (a + b) = a + b := by bv_decide
 
 theorem add_mod4_eq_zero_of_mod4_eq_zero {a b : BitVec 64}
     (ha : a % 4 = 0) (hb : b % 4 = 0) : (a + b) % 4 = 0 := by bv_decide
-
-theorem FinBB_mul4_is_BV_mul4 {x : Fin BB} : x % 4 = 0 →
-    (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith)) % 4 = 0 := by
-  intro h
-  have h' : x.val % 4 = 0 := by simp [Fin.mod_def] at h; exact h
-  simp [BitVec.umod_def, BitVec.toNat_ofNatLT, h']
 
 theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧ x[1] = false := by
   have hx' : x.toNat % 4 = 0 := by bv_omega
@@ -104,14 +59,6 @@ theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧
     simp [BitVec.getLsb, Nat.testBit]
     omega
 
-lemma FinBB_mul4_means_LS2B_0 (x : Fin BB) :
-    let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith))
-    x % 4 = 0 → vx[0] = false ∧ vx[1] = false := by
-  extract_lets vx
-  intro hx
-  simp [vx]
-  exact mul4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
-
 end BitVec
 
 namespace BabyBear
@@ -125,33 +72,6 @@ lemma add4_into_pc_ofNat {x : Fin BB} {y z : ℕ} : x < 65536 →
 end BabyBear
 
 namespace Nat
-
-lemma bitVec_helper_xor (a b c d : ℕ)
-    (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
-    let bv_a := BitVec.ofNat 32 a; let bv_b := BitVec.ofNat 32 b
-    let bv_c := BitVec.ofNat 32 c; let bv_d := BitVec.ofNat 32 d
-    (bv_a + bv_b <<< 16) ^^^ (bv_c + bv_d <<< 16) =
-      (bv_a ^^^ bv_c) + (bv_b ^^^ bv_d) <<< 16 := by
-  apply shiftLeft_xor_shiftLeft16
-  all_goals simp [BitVec.lt_def]; omega
-
-lemma bitVec_helper_or (a b c d : ℕ)
-    (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
-    let bv_a := BitVec.ofNat 32 a; let bv_b := BitVec.ofNat 32 b
-    let bv_c := BitVec.ofNat 32 c; let bv_d := BitVec.ofNat 32 d
-    (bv_a + bv_b <<< 16) ||| (bv_c + bv_d <<< 16) =
-      (bv_a ||| bv_c) + (bv_b ||| bv_d) <<< 16 := by
-  apply shiftLeft_or_shiftLeft16
-  all_goals simp [BitVec.lt_def]; omega
-
-lemma bitVec_helper_and (a b c d : ℕ)
-    (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
-    let bv_a := BitVec.ofNat 32 a; let bv_b := BitVec.ofNat 32 b
-    let bv_c := BitVec.ofNat 32 c; let bv_d := BitVec.ofNat 32 d
-    (bv_a + bv_b <<< 16) &&& (bv_c + bv_d <<< 16) =
-      (bv_a &&& bv_c) + (bv_b &&& bv_d) <<< 16 := by
-  apply shiftLeft_and_shiftLeft16
-  all_goals simp [BitVec.lt_def]; omega
 
 lemma lift_lt {a b : ℕ} (w : ℕ) : a < 2 ^ w → b < 2 ^ w → (a < b ↔ BitVec.ofNat w a < BitVec.ofNat w b) := by
   intro haw hbw
@@ -258,5 +178,61 @@ theorem useless_signExtend_add {x : Fin BB} {hx : x.val < 2^12} {y : BitVec 64}
       exact h_suff bx64 sx y h_base
     intro a b c h_ab
     bv_decide
+
+lemma toInt_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
+  (r1.toInt * r2.toInt % 340282366920938463463374607431768211456).toNat =
+    (BitVec.signExtend 128 r1 * BitVec.signExtend 128 r2).toNat
+    := by
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r1) (by simp)]
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r2) (by simp)]
+
+  have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
+  have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
+  have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
+
+  simp [BitVec.toInt, BitVec.signExtend]; split_ifs
+
+  all_goals
+    simp_all
+    try omega
+
+  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
+  . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
+  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
+lemma toInt_toNat_as_toNat_128 {r1 r2 : BitVec 64} :
+  (r1.toInt * r2.toNat % 340282366920938463463374607431768211456).toNat =
+    (BitVec.signExtend 128 r1 * BitVec.setWidth 128 r2).toNat
+    := by
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r1) (by simp)]
+  rw [← setWidth_idem (n := 128) (bv := r2) (by simp)]
+
+  have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
+  have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
+  have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
+
+  simp [BitVec.toInt, BitVec.signExtend]; split_ifs
+
+  all_goals
+    simp_all
+    try omega
+
+  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
 
 end BitVec

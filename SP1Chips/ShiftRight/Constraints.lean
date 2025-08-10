@@ -1305,9 +1305,9 @@ lemma spec.srlw (h : is_srlw Main) :
     symm at h_b2_dec h_b3_dec
     simp_all
 
-    have is_U32_a : HalfWord.isU32 #v[ a0, a1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_b : HalfWord.isU32 #v[ b0, b1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_c : HalfWord.isU32 #v[ c0, c1 ] := by apply HalfWord.isU32_of_cases <;> assumption
+    have is_U32_a : HWord.isU32 #v[ a0, a1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_b : HWord.isU32 #v[ b0, b1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_c : HWord.isU32 #v[ c0, c1 ] := by apply HWord.isU32_of_cases <;> assumption
 
     have ⟨ eq_hl2, eq_ll2 ⟩ : hl2 = 0 ∧ ll2 = 0 := by
       clear *- lt_hl2 lt_ll2 b_cb0 b_cb1 b_cb2 b_cb3 h_b2_dec
@@ -1328,11 +1328,11 @@ lemma spec.srlw (h : is_srlw Main) :
     simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
     simp_all
 
-    have : ((Word.low32 #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low32, HalfWord.toBitVec32_toNat is_U32_c, HalfWord.toNat];
+    have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
+      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat];
       omega
     rw [this]; clear this
-    simp [Word.low32]
+    simp [Word.low]
 
     have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -1352,20 +1352,20 @@ lemma spec.srlw (h : is_srlw Main) :
         omega
     clear c0_mod_64
 
-    have h_a3 : a3 = if (HalfWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
+    have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
       have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
       simp at h_msb; rw [h_msb]
-      trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
-      . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HalfWord.isNegative_msb _ is_U32_a]
+      trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
+      . unfold HWord.isNegative; split_ifs <;> simp_all; omega
+      . congr; rw [HWord.isNegative_msb _ is_U32_a]
 
-    . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = (HalfWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
+    . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = (HWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
       . rw [← hw_shift]
-        rw [HalfWord.sign_extend_32_to_64_msb]
+        rw [HWord.sign_extend_32_to_64_msb]
         simp_all; congr
       . rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
-        rw [HalfWord.toBitVec32_toNat is_U32_a, HalfWord.toBitVec32_toNat is_U32_b]
+        rw [HWord.toBitVec32_toNat is_U32_a, HWord.toBitVec32_toNat is_U32_b]
         rw [this]; clear this h_a3
 
         cases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
@@ -1374,7 +1374,7 @@ lemma spec.srlw (h : is_srlw Main) :
         all_goals {
           (try apply cancel_mul_65536_v1 (by simp) at h_b0_dec)
           (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec)
-          simp_all [HalfWord.toNat]
+          simp_all [HWord.toNat]
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
           repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
           omega
@@ -1464,9 +1464,9 @@ lemma spec.srliw (h : is_srliw Main ) :
     symm at h_b2_dec h_b3_dec
     simp_all
 
-    have is_U32_a : HalfWord.isU32 #v[ a0, a1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_b : HalfWord.isU32 #v[ b0, b1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_c : HalfWord.isU32 #v[ c0, 0 ] := by apply HalfWord.isU32_of_cases <;> simp; omega
+    have is_U32_a : HWord.isU32 #v[ a0, a1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_b : HWord.isU32 #v[ b0, b1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_c : HWord.isU32 #v[ c0, 0 ] := by apply HWord.isU32_of_cases <;> simp; omega
 
     have ⟨ eq_hl2, eq_ll2 ⟩ : hl2 = 0 ∧ ll2 = 0 := by
       clear *- lt_hl2 lt_ll2 b_cb0 b_cb1 b_cb2 b_cb3 h_b2_dec
@@ -1487,10 +1487,10 @@ lemma spec.srliw (h : is_srliw Main ) :
     simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
     simp_all
 
-    have : ((Word.low32 #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low32, HalfWord.toBitVec32_toNat is_U32_c, HalfWord.toNat]
+    have : ((Word.low #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
+      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]
     rw [this]; clear this
-    simp [Word.low32]
+    simp [Word.low]
 
     have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -1510,20 +1510,20 @@ lemma spec.srliw (h : is_srliw Main ) :
         omega
     clear c0_mod_64
 
-    have h_a3 : a3 = if (HalfWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
+    have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
       have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
       simp at h_msb; rw [h_msb]
-      trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
-      . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HalfWord.isNegative_msb _ is_U32_a]
+      trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
+      . unfold HWord.isNegative; split_ifs <;> simp_all; omega
+      . congr; rw [HWord.isNegative_msb _ is_U32_a]
 
-    . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = (HalfWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
+    . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = (HWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
       . rw [← hw_shift]
-        rw [HalfWord.sign_extend_32_to_64_msb]
+        rw [HWord.sign_extend_32_to_64_msb]
         simp_all; congr
       . rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
-        rw [HalfWord.toBitVec32_toNat is_U32_a, HalfWord.toBitVec32_toNat is_U32_b]
+        rw [HWord.toBitVec32_toNat is_U32_a, HWord.toBitVec32_toNat is_U32_b]
         rw [this]; clear this h_a3
 
         cases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
@@ -1532,7 +1532,7 @@ lemma spec.srliw (h : is_srliw Main ) :
         all_goals {
           (try apply cancel_mul_65536_v1 (by simp) at h_b0_dec)
           (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec)
-          simp_all [HalfWord.toNat]
+          simp_all [HWord.toNat]
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
           repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
           omega
@@ -1923,9 +1923,9 @@ lemma spec.sraw (h : is_sraw Main) :
     symm at h_b2_dec h_b3_dec
     simp_all
 
-    have is_U32_a : HalfWord.isU32 #v[ a0, a1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_b : HalfWord.isU32 #v[ b0, b1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_c : HalfWord.isU32 #v[ c0, c1 ] := by apply HalfWord.isU32_of_cases <;> assumption
+    have is_U32_a : HWord.isU32 #v[ a0, a1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_b : HWord.isU32 #v[ b0, b1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_c : HWord.isU32 #v[ c0, c1 ] := by apply HWord.isU32_of_cases <;> assumption
 
     have ⟨ eq_hl2, eq_ll2 ⟩ : hl2 = 0 ∧ ll2 = 0 := by
       clear *- lt_hl2 lt_ll2 b_cb0 b_cb1 b_cb2 b_cb3 h_b2_dec
@@ -1946,11 +1946,11 @@ lemma spec.sraw (h : is_sraw Main) :
     simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
     simp_all
 
-    have : ((Word.low32 #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low32, HalfWord.toBitVec32_toNat is_U32_c, HalfWord.toNat];
+    have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
+      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat];
       omega
     rw [this]; clear this
-    simp [Word.low32]
+    simp [Word.low]
 
     have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -1970,22 +1970,22 @@ lemma spec.sraw (h : is_sraw Main) :
         omega
     clear c0_mod_64
 
-    have h_a3 : a3 = if (HalfWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
+    have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
       have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
       simp at h_msb; rw [h_msb]
-      trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
-      . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HalfWord.isNegative_msb _ is_U32_a]
+      trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
+      . unfold HWord.isNegative; split_ifs <;> simp_all; omega
+      . congr; rw [HWord.isNegative_msb _ is_U32_a]
 
-    . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HalfWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
+    . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
       . rw [← hw_shift]
-        rw [HalfWord.sign_extend_32_to_64_msb]
+        rw [HWord.sign_extend_32_to_64_msb]
         simp_all; congr
       . rw [this]; clear this h_a3
         rw [← BitVec.toInt_inj, BitVec.toInt_sshiftRight, Int.shiftRight_eq_div_pow]
-        rw [HalfWord.toBitVec32_toInt (w := #v[a0, a1]) is_U32_a]
-        rw [HalfWord.toBitVec32_toInt (w := #v[b0, b1]) is_U32_b]
+        rw [HWord.toBitVec32_toInt (w := #v[a0, a1]) is_U32_a]
+        rw [HWord.toBitVec32_toInt (w := #v[b0, b1]) is_U32_b]
 
         have msb_b1_spec := U16MSBOperation.spec _ _ _ b1_16 h_msb_b1 (by simp)
         simp at msb_b1_spec
@@ -1994,10 +1994,10 @@ lemma spec.sraw (h : is_sraw Main) :
           clear *- msb_b1_spec
           split_ifs at msb_b1_spec <;> simp_all
 
-        have b_msb_iff_neg_b : HalfWord.isNegative #v[b0, b1] ↔ msb_b = 1 := by rw [msb_b1_spec, HalfWord.isNegative]; aesop
+        have b_msb_iff_neg_b : HWord.isNegative #v[b0, b1] ↔ msb_b = 1 := by rw [msb_b1_spec, HWord.isNegative]; aesop
 
-        have b_msb_iff_neg_a : HalfWord.isNegative #v[a0, a1] ↔ msb_b = 1 := by
-          simp [msb_b1_spec, HalfWord.isNegative]
+        have b_msb_iff_neg_a : HWord.isNegative #v[a0, a1] ↔ msb_b = 1 := by
+          simp [msb_b1_spec, HWord.isNegative]
           obtain ⟨ h_su162, h_su163 ⟩ : su162 = 0 ∧ su163 = 0 := by clear *- b_cb4 h_su162 h_su163; aesop
           simp_all
           . rcases b_su161 with h_su161 | h_su161
@@ -2022,10 +2022,10 @@ lemma spec.sraw (h : is_sraw Main) :
           try apply cancel_mul_65536_v1 (by simp) at h_b0_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           simp_all
-          iterate 2 rw [HalfWord.toInt]
+          iterate 2 rw [HWord.toInt]
           try rw [if_pos b_msb_iff_neg_a, if_pos b_msb_iff_neg_b]
           try rw [if_neg b_msb_iff_neg_a, if_neg b_msb_iff_neg_b]
-          iterate 2 rw [HalfWord.toNat]
+          iterate 2 rw [HWord.toNat]
           iterate 4 rw [Vector.getElem_mk]
           simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
           clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1
@@ -2120,9 +2120,9 @@ lemma spec.sraiw (h : is_sraiw Main ) :
     symm at h_b2_dec h_b3_dec
     simp_all
 
-    have is_U32_a : HalfWord.isU32 #v[ a0, a1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_b : HalfWord.isU32 #v[ b0, b1 ] := by apply HalfWord.isU32_of_cases <;> assumption
-    have is_U32_c : HalfWord.isU32 #v[ c0, 0 ] := by apply HalfWord.isU32_of_cases <;> [ assumption; simp ]
+    have is_U32_a : HWord.isU32 #v[ a0, a1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_b : HWord.isU32 #v[ b0, b1 ] := by apply HWord.isU32_of_cases <;> assumption
+    have is_U32_c : HWord.isU32 #v[ c0, 0 ] := by apply HWord.isU32_of_cases <;> [ assumption; simp ]
 
     have ⟨ eq_hl2, eq_ll2 ⟩ : hl2 = 0 ∧ ll2 = 0 := by
       clear *- lt_hl2 lt_ll2 b_cb0 b_cb1 b_cb2 b_cb3 h_b2_dec
@@ -2143,10 +2143,10 @@ lemma spec.sraiw (h : is_sraiw Main ) :
     simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
     simp_all
 
-    have : ((Word.low32 #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low32, HalfWord.toBitVec32_toNat is_U32_c, HalfWord.toNat]
+    have : ((Word.low #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
+      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]
     rw [this]; clear this
-    simp [Word.low32]
+    simp [Word.low]
 
     have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -2166,22 +2166,22 @@ lemma spec.sraiw (h : is_sraiw Main ) :
         omega
     clear c0_mod_64
 
-    have h_a3 : a3 = if (HalfWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
+    have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
       have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
       simp at h_msb; rw [h_msb]
-      trans (if HalfWord.isNegative #v[a0, a1] then 65535 else 0)
-      . unfold HalfWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HalfWord.isNegative_msb _ is_U32_a]
+      trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
+      . unfold HWord.isNegative; split_ifs <;> simp_all; omega
+      . congr; rw [HWord.isNegative_msb _ is_U32_a]
 
-    . suffices hw_shift : HalfWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HalfWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
+    . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
       . rw [← hw_shift]
-        rw [HalfWord.sign_extend_32_to_64_msb]
+        rw [HWord.sign_extend_32_to_64_msb]
         simp_all; congr
       . rw [this]; clear this h_a3
         rw [← BitVec.toInt_inj, BitVec.toInt_sshiftRight, Int.shiftRight_eq_div_pow]
-        rw [HalfWord.toBitVec32_toInt (w := #v[a0, a1]) is_U32_a]
-        rw [HalfWord.toBitVec32_toInt (w := #v[b0, b1]) is_U32_b]
+        rw [HWord.toBitVec32_toInt (w := #v[a0, a1]) is_U32_a]
+        rw [HWord.toBitVec32_toInt (w := #v[b0, b1]) is_U32_b]
 
         have msb_b1_spec := U16MSBOperation.spec _ _ _ b1_16 h_msb_b1 (by simp)
         simp at msb_b1_spec
@@ -2190,10 +2190,10 @@ lemma spec.sraiw (h : is_sraiw Main ) :
           clear *- msb_b1_spec
           split_ifs at msb_b1_spec <;> simp_all
 
-        have b_msb_iff_neg_b : HalfWord.isNegative #v[b0, b1] ↔ msb_b = 1 := by rw [msb_b1_spec, HalfWord.isNegative]; aesop
+        have b_msb_iff_neg_b : HWord.isNegative #v[b0, b1] ↔ msb_b = 1 := by rw [msb_b1_spec, HWord.isNegative]; aesop
 
-        have b_msb_iff_neg_a : HalfWord.isNegative #v[a0, a1] ↔ msb_b = 1 := by
-          simp [msb_b1_spec, HalfWord.isNegative]
+        have b_msb_iff_neg_a : HWord.isNegative #v[a0, a1] ↔ msb_b = 1 := by
+          simp [msb_b1_spec, HWord.isNegative]
           obtain ⟨ h_su162, h_su163 ⟩ : su162 = 0 ∧ su163 = 0 := by clear *- b_cb4 h_su162 h_su163; aesop
           simp_all
           . rcases b_su161 with h_su161 | h_su161
@@ -2218,10 +2218,10 @@ lemma spec.sraiw (h : is_sraiw Main ) :
           try apply cancel_mul_65536_v1 (by simp) at h_b0_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           simp_all
-          iterate 2 rw [HalfWord.toInt]
+          iterate 2 rw [HWord.toInt]
           try rw [if_pos b_msb_iff_neg_a, if_pos b_msb_iff_neg_b]
           try rw [if_neg b_msb_iff_neg_a, if_neg b_msb_iff_neg_b]
-          iterate 2 rw [HalfWord.toNat]
+          iterate 2 rw [HWord.toNat]
           iterate 4 rw [Vector.getElem_mk]
           simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
           clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1

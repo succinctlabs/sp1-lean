@@ -566,10 +566,10 @@ section RTYPEW
   | .SRLW => Sail.shift_bits_right op1 (Sail.BitVec.extractLsb op2 4 0)
   | .SRAW => shift_bits_right_arith op1 (Sail.BitVec.extractLsb op2 4 0)
 
-/-- `execute_RTYPEW` pure part - 32-bit for `HalfWord` arguments -/
+/-- `execute_RTYPEW` pure part - 32-bit for `HWord` arguments -/
 @[simp] def execute_RTYPEW_pure_32_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : ropw) :=
-  let op1 := op1.low32
-  let op2 := op2.low32
+  let op1 := op1.low
+  let op2 := op2.low
   match op with
   | .ADDW => op1.toBitVec32 + op2.toBitVec32
   | .SUBW => op1.toBitVec32 - op2.toBitVec32
@@ -594,34 +594,34 @@ lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op :
   have ha' := Word.lt_cases_of_isU64 h_op1_isU64
   have hb' := Word.lt_cases_of_isU64 h_op2_isU64
   cases op <;> simp [execute_RTYPEW_pure] <;> congr
-  . apply Word.setWidth_eq_low32 op1 h_op1_isU64
-  . apply Word.setWidth_eq_low32 op2 h_op2_isU64
-  . apply Word.setWidth_eq_low32 op1 h_op1_isU64
-  . apply Word.setWidth_eq_low32 op2 h_op2_isU64
+  . apply Word.setWidth_eq_low op1 h_op1_isU64
+  . apply Word.setWidth_eq_low op2 h_op2_isU64
+  . apply Word.setWidth_eq_low op1 h_op1_isU64
+  . apply Word.setWidth_eq_low op2 h_op2_isU64
   . rw [Sail.shift_bits_left]
     simp [Word.toBitVec64_toNat h_op2_isU64]
-    rw [Word.setWidth_eq_low32 op1 h_op1_isU64]
+    rw [Word.setWidth_eq_low op1 h_op1_isU64]
     congr 1
-    simp [Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]
+    simp [Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
     omega
   . rw [Sail.shift_bits_right]
     simp [Word.toBitVec64_toNat h_op2_isU64]
-    rw [Word.setWidth_eq_low32 op1 h_op1_isU64]
+    rw [Word.setWidth_eq_low op1 h_op1_isU64]
     congr 1
-    simp [Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]
+    simp [Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
     omega
   . have mod_lt_31: forall x : ℕ, (31 + (x : ℤ) % 32).toNat = 31 + x % 32 := by omega
     have mod_lt_32 : forall x : ℕ, (32 + (x : ℤ) % 32).toNat = 32 + x % 32 := by omega
-    rw [Word.setWidth_eq_low32 _ h_op1_isU64]
+    rw [Word.setWidth_eq_low _ h_op1_isU64]
     simp [bitVec_sshiftright_eq]
     simp [shift_bits_right_arith, shift_right_arith]
-    (repeat rw [bitVec_ofNat_toNat]); simp
+    (repeat rw [BitVec.toNat_ofNat]); simp
     have : op2.toBitVec64.toNat % 4294967296 % 32 = op2.toBitVec64.toNat % 32 := by omega
     rw [this]
     have : (op2.toBitVec64.toNat : ℤ) % 4294967296 % 32 = op2.toBitVec64.toNat % 32 := by omega
     rw [this, mod_lt_31, mod_lt_32]; simp
-    have : op2.toBitVec64.toNat % 32 = op2.low32.toBitVec32.toNat % 32 := by
-      simp [Word.toBitVec64, Word.toNat, Word.low32, HalfWord.toBitVec32, HalfWord.toNat]
+    have : op2.toBitVec64.toNat % 32 = op2.low.toBitVec32.toNat % 32 := by
+      simp [Word.toBitVec64, Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
       omega
     rw [this]
 
@@ -823,13 +823,13 @@ def mul_op_of_mop (m : mop) : mul_op :=
   | .MULHSU => { high := true, signed_rs1 := true, signed_rs2 := false }
 
 /-- execute_MUL pure part -/
-def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (m : mop) : BitVec 64 :=
-  let rs1_int := if (m = .MULH ∨ m = .MULHSU ) then (BitVec.toInt op1) else (BitVec.toNat op1)
-  let rs2_int := if (m = .MULH) then (BitVec.toInt op2) else (BitVec.toNat op2)
-  let result_wide := (to_bits_truncate (l := (2 *i LeanRV64IM.Functions.xlen)) (rs1_int *i rs2_int))
-  (if (m = .MUL)
-    then (Sail.BitVec.extractLsb result_wide (LeanRV64IM.Functions.xlen -i 1) 0)
-    else (Sail.BitVec.extractLsb result_wide ((2 *i LeanRV64IM.Functions.xlen) -i 1) LeanRV64IM.Functions.xlen))
+def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : mop) : BitVec 64 :=
+  let rs1_ext : BitVec 128 := op1.extend 128 (op = .MULH ∨ op = .MULHSU)
+  let rs2_ext : BitVec 128 := op2.extend 128 (op = .MULH)
+  let result_wide := rs1_ext * rs2_ext
+  (if (op = .MUL)
+    then (Sail.BitVec.extractLsb result_wide 63 0)
+    else (Sail.BitVec.extractLsb result_wide 127 64))
 
 def execute_MUL' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
@@ -839,8 +839,49 @@ def execute_MUL' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) : SailM E
 
 @[simp]
 lemma execute_MUL'_eq_execute_MUL :
-  execute_MUL rs2 rs1 rd (mul_op_of_mop m) = execute_MUL' rs2 rs1 rd m
-  := by cases m <;> simp_all [execute_MUL', execute_MUL, execute_MUL_pure, mul_op_of_mop, LeanRV64IM.Functions.xlen]
+  execute_MUL rs2 rs1 rd (mul_op_of_mop op) = execute_MUL' rs2 rs1 rd op
+    := by
+  have mod_129_to_128 : forall (a : ℤ), -(2 ^ 127) ≤ a → a < 2 ^ 127  → (a % 680564733841876926926749214863536422912).toNat % 340282366920938463463374607431768211456 = (a % 340282366920938463463374607431768211456).toNat := by omega
+  have bounds_toInt_64 : forall (bv : BitVec 64), -2^63 ≤ bv.toInt ∧ bv.toInt < 2^63 := by
+    simp [BitVec.toInt]; intros; split_ifs <;> omega
+  have bounds_toNat_64 : forall (bv : BitVec 64), 0 ≤ bv.toNat ∧ bv.toNat < 2^64 := by omega
+
+  cases op
+
+  all_goals
+    simp_all [execute_MUL', execute_MUL, execute_MUL_pure, BitVec.extend, mul_op_of_mop, LeanRV64IM.Functions.xlen, to_bits_truncate, Sail.get_slice_int]
+    refine bind_congr ?_; intro r1
+    refine bind_congr ?_; intro r2
+    ext s; simp_all; congr 4
+
+  . rw [Int.toNat_emod (by nlinarith) (by simp)]
+    rw [Int.toNat_mul (by simp) (by simp)]
+    simp
+
+  . congr 2
+    rw [mod_129_to_128]
+    . rw [← BitVec.toNat_mul]
+      apply BitVec.toInt_toInt_as_toNat_128
+    . have := bounds_toInt_64 r1
+      have := bounds_toInt_64 r2
+      nlinarith
+    . have := bounds_toInt_64 r1
+      have := bounds_toInt_64 r2
+      nlinarith
+
+  . rw [Int.toNat_emod (by nlinarith) (by simp)]
+    rw [Int.toNat_mul (by simp) (by simp)]
+    simp
+
+  . congr 2
+    rw [mod_129_to_128]
+    . apply BitVec.toInt_toNat_as_toNat_128
+    . have := bounds_toInt_64 r1
+      have := bounds_toNat_64 r2
+      nlinarith
+    . have := bounds_toInt_64 r1
+      have := bounds_toNat_64 r2
+      nlinarith
 
 end MUL
 
