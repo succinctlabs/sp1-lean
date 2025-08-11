@@ -580,10 +580,10 @@ def high (w : ByteDWord (Fin BB)) : ByteWord (Fin BB) := #v[w[8], w[9], w[10], w
 
 /-- Convert a bytedword to a `Nat` by shifting and adding the limbs. -/
 def toNat (w : ByteDWord (Fin BB)) : ℕ :=
-  w[0] + w[1] * (1 <<< 8) + w[2] * (1 <<< 16) + w[3] * (1 <<< 24) + w[4] * (1 <<< 32) + w[5] * (1 <<< 40) + w[6] * (1 <<< 48) + w[7] * (1 <<< 56) +
-  w[8] * (1 <<< 64) + w[9] * (1 <<< 72) + w[10] * (1 <<< 80) + w[11] * (1 <<< 88) + w[12] * (1 <<< 96) + w[13] * (1 <<< 104) + w[14] * (1 <<< 112) + w[15] * (1 <<< 120)
+  w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24 + w[4] * 2^32 + w[5] * 2^40 + w[6] * 2^48 + w[7] * 2^56 +
+  w[8] * 2^64 + w[9] * 2^72 + w[10] * 2^80 + w[11] * 2^88 + w[12] * 2^96 + w[13] * 2^104 + w[14] * 2^112 + w[15] * 2^120
 
-lemma toNat_lt_of_isU128 {w : ByteDWord (Fin BB)} (hw : w.isU128) : w.toNat < (1 <<< 128) := by
+lemma toNat_lt_of_isU128 {w : ByteDWord (Fin BB)} (hw : w.isU128) : w.toNat < 2^128 := by
   unfold toNat
   aesop (add 50% tactic (by omega))
 
@@ -595,11 +595,11 @@ lemma toNat_lt_of_cases_lt (w : ByteDWord (Fin BB))
     (h8 : w[8].val < 256) (h9 : w[9].val < 256)
     (h10 : w[10].val < 256) (h11 : w[11].val < 256)
     (h12 : w[12].val < 256) (h13 : w[13].val < 256)
-    (h14 : w[14].val < 256) (h15 : w[15].val < 256) : w.toNat < (1 <<< 128) := by
+    (h14 : w[14].val < 256) (h15 : w[15].val < 256) : w.toNat < 2^128 := by
   unfold toNat; omega
 
 lemma toNat_lt_of_forall_lt (w : ByteDWord (Fin BB))
-    (h : ∀ i : Fin BYTE_DWORD_SIZE, w[i] < 256) : w.toNat < (1 <<< 128) := by
+    (h : ∀ i : Fin BYTE_DWORD_SIZE, w[i] < 256) : w.toNat < 2^128 := by
   refine toNat_lt_of_cases_lt w (h 0) (h 1) (h 2) (h 3) (h 4) (h 5) (h 6) (h 7) (h 8) (h 9) (h 10) (h 11) (h 12) (h 13) (h 14) (h 15)
 
 /-- Convert a byteword to a `BitVec 64` by shifting and adding the limbs. -/
@@ -627,7 +627,7 @@ lemma isNegative_msb
 lemma isNegative_BitVec.toInt
   (w : ByteDWord (Fin BB))
   (h_w_isU128 : w.isU128) :
-    w.isNegative ↔ ¬ 2 * w.toNat < (1 <<< 128) := by
+    w.isNegative ↔ ¬ 2 * w.toNat < 2^128 := by
   rw [isNegative_msb _ h_w_isU128]
   simp [BitVec.msb_eq_decide]
   rw [toBitVec128_toNat h_w_isU128]
@@ -635,7 +635,7 @@ lemma isNegative_BitVec.toInt
 
 /-- Convert a byteword to an `Int` by shifting and adding the limbs, with sign correction. -/
 def toInt (w : ByteDWord (Fin BB)) : ℤ :=
-  if (isNegative w) then w.toNat - (1 <<< 128) else w.toNat
+  if (isNegative w) then w.toNat - 2^128 else w.toNat
 
 set_option maxRecDepth 200000
 lemma toBitVec128_toInt {w : ByteDWord (Fin BB)} (h_w_isU128 : w.isU128) :
@@ -795,7 +795,7 @@ lemma extend_true_is_signExtend (w : ByteWord (Fin BB)) :
   rw [← BitVec.toInt_inj]
   simp [BitVec.toInt_signExtend_of_le.toInt_signExtend_of_lt]
   rw [toBitVec64_toInt is_U64_w, ByteDWord.toBitVec128_toInt is_U128_bdw]
-  simp [toInt, ByteDWord.toInt]
+  rw [toInt, ByteDWord.toInt]
   split_ifs <;> [ skip; tauto; tauto; skip ] <;>
   simp [sw, extend, ByteDWord.toNat, ByteWord.toNat] <;>
   simp_all; omega
