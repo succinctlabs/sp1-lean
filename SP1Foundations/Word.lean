@@ -469,6 +469,17 @@ lemma toBitVec64_toInt {w : ByteWord (Fin BB)} (h_w_isU64 : w.isU64) :
     by_cases h_neg : w.isNegative <;> unfold isNegative at * <;>
     unfold toNat at * <;> simp_all <;> omega
 
+lemma toWord_toBitVec64 {w : ByteWord (Fin BB)} (h_w_isU64 : w.isU64) :
+    w.toWord.toBitVec64 = w.toBitVec64
+  := by
+    have ⟨ w0, w1, w2, w3, w4, w5,w6, w7 ⟩ := lt_cases_of_isU64 h_w_isU64
+    rw [← BitVec.toNat_inj]
+    simp [ByteWord.toBitVec64, Word.toBitVec64]; congr
+    simp [ByteWord.toWord, Word.toNat, ByteWord.toNat]
+    simp_all [Fin.val_add, Fin.val_mul]
+    repeat rw [Nat.mod_eq_of_lt (by grind)]
+    omega
+
 end conversions
 
 section add
@@ -635,6 +646,22 @@ lemma toBitVec128_toInt {w : ByteDWord (Fin BB)} (h_w_isU128 : w.isU128) :
     simp_all [toBitVec128, toInt, BitVec.toInt]
     split_ifs <;> rw [isNegative_BitVec.toInt _ h_w_isU128] at * <;> omega
 
+lemma low_as_extract (w : ByteDWord (Fin BB)) (h_w_isU128 : w.isU128) :
+  (w.low).toBitVec64 = BitVec.extractLsb 63 0 (w.toBitVec128) := by
+  have ⟨ w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15 ⟩ := lt_cases_of_isU128 h_w_isU128
+  simp [ByteDWord.low, ByteWord.toBitVec64, ByteWord.toNat, ByteDWord.toBitVec128, ByteDWord.toNat]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  simp [← BitVec.toNat_inj]
+  omega
+
+lemma high_as_extract (w : ByteDWord (Fin BB)) (h_w_isU128 : w.isU128) :
+  (w.high).toBitVec64 = BitVec.extractLsb 127 64 (w.toBitVec128) := by
+  have ⟨ w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15 ⟩ := lt_cases_of_isU128 h_w_isU128
+  simp [ByteDWord.high, ByteWord.toBitVec64, ByteWord.toNat, ByteDWord.toBitVec128, ByteDWord.toNat]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  simp [← BitVec.toNat_inj]
+  omega
+
 end conversions
 
 end ByteDWord
@@ -706,6 +733,12 @@ lemma toInt_toByteWord
   simp [toByteWord, toInt, toNat, ByteWord.toInt, ByteWord.toNat, isNegative, ByteWord.isNegative, Fin.le_def]
   omega
 
+lemma toBitVec64_toByteWord
+  (w : Word (Fin BB))
+  (h_w_isU64 : w.isU64) :
+    w.toByteWord.toBitVec64 = w.toBitVec64 := by
+  rw [← BitVec.toNat_inj, ByteWord.toBitVec64_toNat (by apply toU64_toByteWord _ h_w_isU64), Word.toBitVec64_toNat h_w_isU64, Word.toNat_toByteWord _ h_w_isU64]
+
 lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
   let imm_x := BitVec.ofNat 12 x
   x < 65536 → isU64 #v[ x₀, x₁, x₂, x₃ ] →
@@ -740,7 +773,7 @@ def extend (w : ByteWord (Fin BB)) (sgn : Bool) : ByteDWord (Fin BB) :=
   let ext := (if sgn then (if w.isNegative then (1 : Fin BB) else 0) else 0) * 255
   #v[w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], ext, ext, ext, ext, ext, ext, ext, ext]
 
-lemma to128_extend {w : ByteWord (Fin BB)} (is_U64_w : w.isU64 ) (sgn : Bool) : (w.extend sgn).isU128 := by
+lemma extend_U64_U128 {w : ByteWord (Fin BB)} (is_U64_w : w.isU64 ) (sgn : Bool) : (w.extend sgn).isU128 := by
   have := lt_cases_of_isU64 is_U64_w
   apply ByteDWord.isU128_of_cases <;>
   simp [extend] <;> (try split_ifs) <;> omega

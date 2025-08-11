@@ -51,7 +51,7 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   | U8Range => a < 256 ∧ b < 256 ∧ c < 256
   | LTU => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
   | Range => a.val < 2 ^ b.val -- Is this right?
-  | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64)
+  | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 128)
 
 @[simp] lemma constrain_AND (a b c : Fin BB) :
     ByteOpcode.AND.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val &&& c.val := Iff.rfl
@@ -69,7 +69,7 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
     ByteOpcode.LTU.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c) := Iff.rfl
 
 @[simp] lemma constrain_MSB (a b c : Fin BB) :
-    ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 64) := Iff.rfl
+    ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 128) := Iff.rfl
 
 @[simp] lemma constrain_Range (a b c : Fin BB) :
     ByteOpcode.Range.constrain a b c ↔ (a.val < 2 ^ b.val) := Iff.rfl

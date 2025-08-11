@@ -831,6 +831,28 @@ def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : mop) : BitVec 64 
     then (Sail.BitVec.extractLsb result_wide 63 0)
     else (Sail.BitVec.extractLsb result_wide 127 64))
 
+/-- execute_MUL pure part for ByteWord arguments -/
+def execute_MUL_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : mop) : BitVec 64 :=
+  let op1_ext := op1.extend (op = .MULH ∨ op = .MULHSU)
+  let op2_ext := op2.extend (op = .MULH)
+  let result_wide := op1_ext.toBitVec128 * op2_ext.toBitVec128
+  (if (op = .MUL)
+    then (Sail.BitVec.extractLsb result_wide 63 0)
+    else (Sail.BitVec.extractLsb result_wide 127 64))
+
+lemma exec_MUL_pure_bv_to_bw (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : mop) :
+  op1.isU64 → op2.isU64 →
+  execute_MUL_pure op1.toBitVec64 op2.toBitVec64 op = execute_MUL_pure_bw op1.toByteWord op2.toByteWord op := by
+  intro is_U64_op1 is_U64_op2
+  have := op1.toU64_toByteWord is_U64_op1
+  have := op2.toU64_toByteWord is_U64_op2
+
+  cases op <;> simp [execute_MUL_pure, execute_MUL_pure_bw, -BitVec.toNat_mul] <;>
+  (repeat rw [ByteWord.extend_true_is_signExtend _ (by assumption)]) <;>
+  (repeat rw [ByteWord.extend_false_is_setWidth _ (by assumption)]) <;>
+  congr <;> simp [BitVec.extend] <;>
+  rw [Word.toBitVec64_toByteWord _ (by assumption)]
+
 def execute_MUL' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
@@ -884,5 +906,79 @@ lemma execute_MUL'_eq_execute_MUL :
       nlinarith
 
 end MUL
+
+section MULW
+
+/-- execute_MULW pure part -/
+def execute_MULW_pure (op1 : BitVec 64) (op2 : BitVec 64) : BitVec 64 :=
+  let rs1_low : BitVec 32 := BitVec.extractLsb 31 0 op1
+  let rs2_low : BitVec 32 := BitVec.extractLsb 31 0 op2
+  let prod : BitVec 32 := rs1_low * rs2_low
+  prod.extend 64 True
+
+/-- execute_MULW pure part for ByteWord arguments -/
+def execute_MULW_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) : BitVec 64 :=
+  let rs1_low : BitVec 32 := HWord.toBitVec32 #v[op1[0] + op1[1] * 256, op1[2] + op1[3] * 256]
+  let rs2_low : BitVec 32 := HWord.toBitVec32 #v[op2[0] + op2[1] * 256, op2[2] + op2[3] * 256]
+  let prod : BitVec 32 := rs1_low * rs2_low
+  prod.extend 64 True
+
+lemma exec_MULW_pure_bv_to_bw (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) :
+  op1.isU64 → op2.isU64 →
+  execute_MULW_pure op1.toBitVec64 op2.toBitVec64 = execute_MULW_pure_bw op1.toByteWord op2.toByteWord := by
+  intro is_U64_op1 is_U64_op2
+  have is_U64_bw1 := op1.toU64_toByteWord is_U64_op1
+  have is_U64_bw2 := op2.toU64_toByteWord is_U64_op2
+
+  simp [execute_MULW_pure, execute_MULW_pure_bw, BitVec.extend]; congr
+  . simp [← BitVec.toNat_inj, Word.toBitVec64, Word.toNat, Word.toByteWord, HWord.toBitVec32, HWord.toNat]
+    trans (op1[0].val + ↑op1[1] * 65536) % 4294967296
+    . omega
+    . have := Word.lt_cases_of_isU64 is_U64_op1
+      simp_all [Fin.val_add, Fin.val_mul]
+      repeat rw [Nat.mod_eq_of_lt (by omega)]
+      omega
+  . simp [← BitVec.toNat_inj, Word.toBitVec64, Word.toNat, Word.toByteWord, HWord.toBitVec32, HWord.toNat]
+    trans (op2[0].val + ↑op2[1] * 65536) % 4294967296
+    . omega
+    . have := Word.lt_cases_of_isU64 is_U64_op2
+      simp_all [Fin.val_add, Fin.val_mul]
+      repeat rw [Nat.mod_eq_of_lt (by omega)]
+      omega
+
+def execute_MULW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do
+  let rs1_bits ← do (rX_bits rs1)
+  let rs2_bits ← do (rX_bits rs2)
+  (wX_bits rd (execute_MULW_pure rs1_bits rs2_bits))
+  (pure RETIRE_SUCCESS)
+
+@[simp]
+lemma execute_MULW'_eq_execute_MULW :
+  execute_MULW rs2 rs1 rd = execute_MULW' rs2 rs1 rd
+    := by
+  have mod_33_to_32 : forall (a : ℤ), (a % 8589934592).toNat % 4294967296 = (a % 4294967296).toNat := by omega
+  have bounds_toInt_32 : forall (bv : BitVec 32), -2^31 ≤ bv.toInt ∧ bv.toInt < 2^31 := by
+    simp [BitVec.toInt]; intros; split_ifs <;> omega
+  have bounds_toNat_32 : forall (bv : BitVec 32), 0 ≤ bv.toNat ∧ bv.toNat < 2^32 := by omega
+
+  simp_all [execute_MULW, execute_MULW', execute_MULW_pure, to_bits_truncate, Sail.get_slice_int, -BitVec.extractLsb, -BitVec.toInt_extractLsb]
+  refine bind_congr ?_; intro r1
+  refine bind_congr ?_; intro r2
+  ext s; simp [-BitVec.extractLsb, -BitVec.toInt_extractLsb, BitVec.extend]; congr 4
+
+  set r1w : BitVec 32 := BitVec.extractLsb 31 0 r1
+  set r2w : BitVec 32 := BitVec.extractLsb 31 0 r2
+
+  trans BitVec.signExtend 64 (BitVec.ofNat 32 (r1w.toInt * r2w.toInt % 4294967296).toNat)
+  . congr 1
+    simp [← BitVec.toNat_inj, mod_33_to_32]
+    symm; apply Nat.mod_eq_of_lt (by omega)
+  . congr 1
+    trans (BitVec.ofInt 32 (r1w.toInt * r2w.toInt))
+    . simp [BitVec.ofInt, ← BitVec.toNat_inj]
+      omega
+    . simp [← BitVec.toInt_inj]
+
+end MULW
 
 end execution
