@@ -481,8 +481,8 @@ match op with
   | .SUB => op1.toBitVec64 - op2.toBitVec64
   | .SRA => op1.toBitVec64.sshiftRight (BitVec.setWidth 6 op2.toBitVec64).toNat
 
-/-- `execute_RTYPE` pure part for `ByteWord` arguments -/
-@[simp] def execute_RTYPE_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : rop) :=
+/-- `execute_RTYPE` pure part for `BWord` arguments -/
+@[simp] def execute_RTYPE_pure_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) (op : rop) :=
 match op with
   | .ADD => op1.toBitVec64 + op2.toBitVec64
   | .SLT => if op1.toInt < op2.toInt then 1#64 else 0#64
@@ -518,25 +518,25 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : 
     rw [mod_lt_63, mod_lt_64]
     symm; apply bitVec_sshiftright_eq
 
-lemma exec_RTYPE_pure_bv_to_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : rop) :
+lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) (op : rop) :
   op1.isU64 → op2.isU64 →
   execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_bw op1 op2 op := by
   intro h_op1_isU64 h_op2_isU64
   cases op <;> simp [execute_RTYPE_pure, LeanRV64IM.Functions.log2_xlen]
   . rw [Sail.shift_bits_left]
-    simp [ByteWord.toBitVec64_toNat h_op2_isU64]
+    simp [BWord.toBitVec64_toNat h_op2_isU64]
   . simp [zopz0zI_s, bool_to_bits]
-    repeat rw [ByteWord.toBitVec64_toInt (by assumption)]
+    repeat rw [BWord.toBitVec64_toInt (by assumption)]
     aesop
   . simp [zopz0zI_u, bool_to_bits]
-    repeat rw [ByteWord.toBitVec64_toNat (by assumption)]
+    repeat rw [BWord.toBitVec64_toNat (by assumption)]
     aesop
   . rw [Sail.shift_bits_right]
-    simp [ByteWord.toBitVec64_toNat h_op2_isU64]
+    simp [BWord.toBitVec64_toNat h_op2_isU64]
   . have mod_lt_63 : (63 + (op2.toNat : ℤ) % 64).toNat = 63 + op2.toNat % 64 := by omega
     have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
     simp [shift_bits_right_arith, shift_right_arith]
-    rw [BitVec.toNat_setWidth, ByteWord.toBitVec64_toNat (by assumption)]
+    rw [BitVec.toNat_setWidth, BWord.toBitVec64_toNat (by assumption)]
     simp
     rw [mod_lt_63, mod_lt_64]
     symm; apply bitVec_sshiftright_eq
@@ -666,8 +666,8 @@ def execute_ITYPE_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : iop) :=
 def execute_ITYPE_pure_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : iop) :=
   execute_RTYPE_pure_w op1 op2 (rop_of_iop op)
 
-/-- `execute_ITYPE` pure part for `ByteWord` arguments -/
-def execute_ITYPE_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : iop) :=
+/-- `execute_ITYPE` pure part for `BWord` arguments -/
+def execute_ITYPE_pure_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) (op : iop) :=
   execute_RTYPE_pure_bw op1 op2 (rop_of_iop op)
 
 lemma exec_ITYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : iop) :
@@ -677,7 +677,7 @@ lemma exec_ITYPE_pure_bv_to_w (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : 
   simp [execute_ITYPE_pure_w, execute_ITYPE_pure]
   cases op <;> simp <;> exact exec_RTYPE_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64
 
-lemma exec_ITYPE_pure_bv_to_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : iop) :
+lemma exec_ITYPE_pure_bv_to_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) (op : iop) :
   op1.isU64 → op2.isU64 →
   execute_ITYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_ITYPE_pure_bw op1 op2 op := by
   intro h_op1_isU64 h_op2_isU64
@@ -832,8 +832,8 @@ def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : mop) : BitVec 64 
     then (Sail.BitVec.extractLsb result_wide 63 0)
     else (Sail.BitVec.extractLsb result_wide 127 64))
 
-/-- execute_MUL pure part for ByteWord arguments -/
-def execute_MUL_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : mop) : BitVec 64 :=
+/-- execute_MUL pure part for BWord arguments -/
+def execute_MUL_pure_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) (op : mop) : BitVec 64 :=
   let op1_ext := op1.extend (op = .MULH ∨ op = .MULHSU)
   let op2_ext := op2.extend (op = .MULH ∨ op = .MULHUS)
   let result_wide := op1_ext.toBitVec128 * op2_ext.toBitVec128
@@ -849,8 +849,8 @@ lemma exec_MUL_pure_bv_to_bw (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : m
   have := op2.toU64_toByteWord is_U64_op2
 
   cases op <;> simp [execute_MUL_pure, execute_MUL_pure_bw, -BitVec.toNat_mul] <;>
-  (repeat rw [ByteWord.extend_true_is_signExtend _ (by assumption)]) <;>
-  (repeat rw [ByteWord.extend_false_is_setWidth _ (by assumption)]) <;>
+  (repeat rw [BWord.extend_true_is_signExtend _ (by assumption)]) <;>
+  (repeat rw [BWord.extend_false_is_setWidth _ (by assumption)]) <;>
   congr <;> simp [BitVec.extend] <;>
   rw [Word.toBitVec64_toByteWord _ (by assumption)]
 
@@ -1008,8 +1008,8 @@ def execute_MULW_pure (op1 : BitVec 64) (op2 : BitVec 64) : BitVec 64 :=
   let prod : BitVec 32 := rs1_low * rs2_low
   prod.extend 64 True
 
-/-- execute_MULW pure part for ByteWord arguments -/
-def execute_MULW_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) : BitVec 64 :=
+/-- execute_MULW pure part for BWord arguments -/
+def execute_MULW_pure_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) : BitVec 64 :=
   let rs1_low : BitVec 32 := HWord.toBitVec32 #v[op1[0] + op1[1] * 256, op1[2] + op1[3] * 256]
   let rs2_low : BitVec 32 := HWord.toBitVec32 #v[op2[0] + op2[1] * 256, op2[2] + op2[3] * 256]
   let prod : BitVec 32 := rs1_low * rs2_low

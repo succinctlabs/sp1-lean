@@ -45,10 +45,8 @@ theorem correct (a b : Word (Fin BB)) (cols : SubwOperation) (is_real : Fin BB)
 
   . constructor
     . simp [BitVec.eq_sub_iff_add_eq]
-      rw [HWord.toBitVec32_add_toBitVec32, HWord.toBitVec32_as_sum]
-      simp [← inv_16BB_eq'] at *
-      simp [Word.low, ← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-      simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
+      simp [HWord.toBitVec32, Word.low, HWord.toNat]
+      rw [← BitVec.toNat_inj, BitVec.toNat_add]
       rcases h0 <;> rcases h1 <;>
       simp_all <;> omega
     . simp [Fin.lt_iff_val_lt_val] at hbds

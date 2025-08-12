@@ -43,16 +43,13 @@ theorem correct (a b : Word (Fin BB)) (cols : AddwOperation) (is_real : Fin BB)
     aesop
 
   . constructor
-    . simp
-      rw [HWord.toBitVec32_add_toBitVec32, HWord.toBitVec32_as_sum]
-      simp [← inv_16BB_eq'] at *
-      simp [Word.low, ← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-      simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
+    . simp [HWord.toBitVec32, Word.low, HWord.toNat]
+      rw [← BitVec.toNat_inj, BitVec.toNat_add]
       rcases h0 <;> rcases h1 <;>
       simp_all <;> omega
     . simp [Fin.lt_iff_val_lt_val] at hbds
       apply (U16MSBOperation.spec cols.value[1] cols.msb 1 (by omega)) at hmsb
-      simp [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
-      simp at hmsb; split_ifs at * <;> omega
+      simp_all [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
+      split_ifs at * <;> omega
 
 end AddwOperation

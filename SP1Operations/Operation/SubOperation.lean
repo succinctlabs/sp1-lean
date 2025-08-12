@@ -52,10 +52,8 @@ theorem correct (a b : Word (Fin BB)) (cols : SubOperation) (is_real : Fin BB)
     aesop
 
   . simp [BitVec.eq_sub_iff_add_eq]
-    simp [Word.toBitVec64_add_toBitVec64, Word.toBitVec64_eq_add]
-    simp [← inv_16BB_eq'] at *
-    simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-    simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
+    simp [Word.toBitVec64, Word.toNat]
+    rw [← BitVec.toNat_inj, BitVec.toNat_add]
     rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>
     simp_all <;> omega
 
