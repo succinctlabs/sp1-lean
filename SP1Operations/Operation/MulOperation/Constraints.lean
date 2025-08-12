@@ -36,7 +36,7 @@ end field_operations
 
 section core_mul
 
-@[grind]
+@[grind ->]
 lemma le_two_prod {a b : Fin BB} (ha : a.val < 256) (hb : b.val < 256) :
   a.val * b.val ≤ 255 * 255 := by apply mul_le_mul <;> omega
 
@@ -50,6 +50,34 @@ lemma mod_add_mod_zero {a b n : ℕ} : 0 < n → b % n = 0 → (a + b) % n = a %
   intro hn hb
   rw [Nat.add_mod_eq_sub]; simp_all
   rw [if_pos] <;> [ simp; apply Nat.mod_lt _ hn ]
+
+set_option hygiene false in
+open Lean Elab Tactic in
+elab "resolve_decomposition" locs:ident* : tactic => do
+  let name (loc : Ident) : Ident × Ident × Nat × Ident :=
+    if let pref :: [suff] := loc.getId.toString.split (·='_')
+    then (
+      mkIdent (Name.mkSimple (pref ++ suff)),
+      mkIdent (Name.mkSimple (pref ++ "c" ++ suff.drop 1)),
+      suff.drop 1 |>.toNat!,
+      mkIdent (Name.mkSimple suff)
+    )
+    else default
+  for loc in locs do
+  let (name₁, name₂, num, suff) := name loc
+  let numStx := Syntax.mkNatLit num
+  let numPredStx := Syntax.mkNatLit num.pred
+  let cNumStx := mkIdent (Name.mkSimple s!"c{suff.getId.toString.drop 1}")
+  let term ← if num = 0
+             then `(cp sb sc $numStx (of_decide_eq_true (Eq.refl true)))
+             else `(cp sb sc $numStx (of_decide_eq_true (Eq.refl true)) + carry[$numPredStx])
+  evalTactic <|
+    ←`(tactic|(
+        obtain ⟨$name₁, $name₂⟩ : prod[$numStx] = ($term) % 256 ∧ carry[$numStx] = ($term) / 256
+          := (div_mod_decomposition $suff (by dsimp
+                                              rw [show 7864320 = (7864320 : Fin BB).1 from rfl, Fin.val_fin_lt]
+                                              apply lt_trans $cNumStx (by decide))).1 $loc
+      ))
 
 set_option maxHeartbeats 100000000 in
 set_option synthInstance.maxHeartbeats 1000000 in
@@ -100,23 +128,10 @@ lemma core_mul
   obtain ⟨ sb00, sb01, sb02, sb03, sb04, sb05, sb06, sb07, sb08, sb09, sb10, sb11, sb12, sb13, sb14, sb15 ⟩ := isU128_sb
   obtain ⟨ sc00, sc01, sc02, sc03, sc04, sc05, sc06, sc07, sc08, sc09, sc10, sc11, sc12, sc13, sc14, sc15 ⟩ := isU128_sc
 
-  rw [div_mod_decomposition (by assumption) (by omega)] at *
-  obtain ⟨ eqp00, eqc00 ⟩ := eq_p00
-  obtain ⟨ eqp01, eqc01 ⟩ := eq_p01
-  obtain ⟨ eqp02, eqc02 ⟩ := eq_p02
-  obtain ⟨ eqp03, eqc03 ⟩ := eq_p03
-  obtain ⟨ eqp04, eqc04 ⟩ := eq_p04
-  obtain ⟨ eqp05, eqc05 ⟩ := eq_p05
-  obtain ⟨ eqp06, eqc06 ⟩ := eq_p06
-  obtain ⟨ eqp07, eqc07 ⟩ := eq_p07
-  obtain ⟨ eqp08, eqc08 ⟩ := eq_p08
-  obtain ⟨ eqp09, eqc09 ⟩ := eq_p09
-  obtain ⟨ eqp10, eqc10 ⟩ := eq_p10
-  obtain ⟨ eqp11, eqc11 ⟩ := eq_p11
-  obtain ⟨ eqp12, eqc12 ⟩ := eq_p12
-  obtain ⟨ eqp13, eqc13 ⟩ := eq_p13
-  obtain ⟨ eqp14, eqc14 ⟩ := eq_p14
-  obtain ⟨ eqp15, eqc15 ⟩ := eq_p15
+  resolve_decomposition eq_p00 eq_p01 eq_p02 eq_p03
+                        eq_p04 eq_p05 eq_p06 eq_p07
+                        eq_p08 eq_p09 eq_p10 eq_p11
+                        eq_p12 eq_p13 eq_p14 eq_p15
 
   have lt_cp00 : (cp sb sc 00 (by decide)).val ≤ 01 * 65025 := by
     simp [cp, Vector.ofFn, Vector.get, ByteWord.extend, Fin.val_mul]; grind
@@ -1005,6 +1020,128 @@ lemma spec.mulh {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
 
 end mulh
 
+section mulhu
+
+lemma spec.mulhu {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
+  (is_U64_bw : bw.isU64)
+  (is_U64_cw : cw.isU64)
+  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
+  is_mulhu = 1 → aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHU
+    := by
+  intro h_one
+  have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op cstrs
+  simp_all [allHold_constraints_iff_is_real, -h_one]
+  set bbw := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).1
+  set U16_b := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).2
+  set cbw := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).1
+  set U16_c := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).2
+  set bbwe : Vector (Fin BB) 16 := #v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7], cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255]
+  set cbwe : Vector (Fin BB) 16 := #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7], cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255]
+
+  obtain ⟨ u16_b_cstrs, u16_c_cstrs, _, b_msb_ch, c_msb_ch, b_sgn_ext, c_sgn_ext, p0, p1, p2, p3, p4, p5, p6,
+           p7, p8, p9, p10, p11, p12, p13, p14, p15, _, _, _, _, _,
+           _, _, _, _, _, _, _, b_b_msb, b_c_msb, _, _, _, _, _,
+           _, _, _, _, _, c0, c1, c2, c3, c4, c5, c6, c7, c8,
+           c9, c10, c11, c12, c13, c14, c15, pp0, pp1, pp2, pp3, pp4, pp5, pp6,
+           pp7, pp8, pp9, pp10, pp11, pp12, pp13, pp14, pp15 ⟩ := cstrs
+
+  simp_all [-p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
+
+  have eq_aw : aw = ByteWord.toWord (ByteDWord.high (cols.product : ByteDWord (Fin BB))) := by
+    rw [ByteDWord.high, ByteWord.toWord, ← Word.eq_pointwise]
+    simp_all
+
+  have eq_bbw : bbw = bw.toByteWord := by
+    exact (U16toU8OperationSafe.spec.return _ _ _ u16_b_cstrs (by simp))
+  have eq_cbw : cbw = cw.toByteWord := by
+    exact (U16toU8OperationSafe.spec.return _ _ _ u16_c_cstrs (by simp))
+  have eq_bbwe : bbwe = ByteWord.extend bbw false := by simp [bbwe, ByteWord.extend]; assumption
+  have eq_cbwe : cbwe = ByteWord.extend cbw false := by simp [cbwe, ByteWord.extend]; assumption
+  have is_U64_bbw : ByteWord.isU64 bbw := by rw [eq_bbw]; apply bw.toU64_toByteWord is_U64_bw
+  have is_U64_cbw : ByteWord.isU64 cbw := by rw [eq_cbw]; apply cw.toU64_toByteWord is_U64_cw
+  simp_all [-eq_bbw, -eq_cbw, -p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
+  simp [eq_bbwe, eq_cbwe] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+
+  have mul_spec :=
+    core_mul bbw cbw is_U64_bbw is_U64_cbw false false cols.product cols.carry
+             p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+             c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
+
+  rw [exec_MUL_pure_bv_to_bw _ _ .MULHU is_U64_bw is_U64_cw]
+  simp [execute_MUL_pure_bw, -BitVec.extractLsb]
+  rw [← eq_bbw, ← eq_cbw, ← mul_spec]
+  rw [ByteWord.toWord_toBitVec64]
+  apply ByteDWord.high_as_extract
+  . apply ByteDWord.isU128_of_cases <;> assumption
+  . simp [ByteDWord.high]; apply ByteWord.isU64_of_cases <;> assumption
+
+end mulhu
+
+section mulhsu
+
+lemma spec.mulhsu {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
+  (is_U64_bw : bw.isU64)
+  (is_U64_cw : cw.isU64)
+  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
+  is_mulhsu = 1 → aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHSU
+    := by
+  intro h_one
+  have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op cstrs
+  simp_all [allHold_constraints_iff_is_real, -h_one]
+  set bbw := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).1
+  set U16_b := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).2
+  set cbw := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).1
+  set U16_c := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).2
+  set bbwe : Vector (Fin BB) 16 := #v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7], cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255]
+  set cbwe : Vector (Fin BB) 16 := #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7], cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255]
+
+  obtain ⟨ u16_b_cstrs, u16_c_cstrs, _, b_msb_ch, c_msb_ch, b_sgn_ext, c_sgn_ext, p0, p1, p2, p3, p4, p5, p6,
+           p7, p8, p9, p10, p11, p12, p13, p14, p15, _, _, _, _, _,
+           _, _, _, _, _, _, _, b_b_msb, b_c_msb, _, _, _, _, _,
+           _, _, _, _, _, c0, c1, c2, c3, c4, c5, c6, c7, c8,
+           c9, c10, c11, c12, c13, c14, c15, pp0, pp1, pp2, pp3, pp4, pp5, pp6,
+           pp7, pp8, pp9, pp10, pp11, pp12, pp13, pp14, pp15 ⟩ := cstrs
+
+  simp_all [-p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
+
+  have eq_aw : aw = ByteWord.toWord (ByteDWord.high (cols.product : ByteDWord (Fin BB))) := by
+    rw [ByteDWord.high, ByteWord.toWord, ← Word.eq_pointwise]
+    simp_all
+
+  have eq_bbw : bbw = bw.toByteWord := by
+    exact (U16toU8OperationSafe.spec.return _ _ _ u16_b_cstrs (by simp))
+  have eq_cbw : cbw = cw.toByteWord := by
+    exact (U16toU8OperationSafe.spec.return _ _ _ u16_c_cstrs (by simp))
+  have msb_ext_b : cols.b_sign_extend * 255 = if ByteWord.isNegative bbw then 255 else 0 := by
+    rw [b_sgn_ext]
+    clear *- b_b_msb b_msb_ch
+    unfold ByteWord.isNegative; split_ifs
+    . suffices : cols.b_msb = 1 <;> simp_all
+    . suffices : cols.b_msb = 0 <;> simp_all
+  have eq_bbwe : bbwe = ByteWord.extend bbw true := by simp [bbwe, ByteWord.extend]; exact msb_ext_b
+  have eq_cbwe : cbwe = ByteWord.extend cbw false := by simp [cbwe, ByteWord.extend]; assumption
+  have is_U64_bbw : ByteWord.isU64 bbw := by rw [eq_bbw]; apply bw.toU64_toByteWord is_U64_bw
+  have is_U64_cbw : ByteWord.isU64 cbw := by rw [eq_cbw]; apply cw.toU64_toByteWord is_U64_cw
+  simp_all [-eq_bbw, -eq_cbw, -p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
+  simp [eq_bbwe, eq_cbwe] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+
+  have mul_spec :=
+    core_mul bbw cbw is_U64_bbw is_U64_cbw true false cols.product cols.carry
+             p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+             c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
+
+  rw [exec_MUL_pure_bv_to_bw _ _ .MULHSU is_U64_bw is_U64_cw]
+  simp [execute_MUL_pure_bw, -BitVec.extractLsb]
+  rw [← eq_bbw, ← eq_cbw, ← mul_spec]
+  rw [ByteWord.toWord_toBitVec64]
+  apply ByteDWord.high_as_extract
+  . apply ByteDWord.isU128_of_cases <;> assumption
+  . simp [ByteDWord.high]; apply ByteWord.isU64_of_cases <;> assumption
+
+end mulhsu
+
 section mulw
 
 lemma spec.mulw {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
@@ -1139,128 +1276,5 @@ lemma spec.mulw {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
       omega
 
 end mulw
-
-section mulhu
-
-lemma spec.mulhu {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
-  (is_U64_bw : bw.isU64)
-  (is_U64_cw : cw.isU64)
-  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
-  is_mulhu = 1 → aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHU
-    := by
-  intro h_one
-  have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op cstrs
-  simp_all [allHold_constraints_iff_is_real, -h_one]
-  set bbw := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).1
-  set U16_b := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).2
-  set cbw := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).1
-  set U16_c := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).2
-  set bbwe : Vector (Fin BB) 16 := #v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7], cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255]
-  set cbwe : Vector (Fin BB) 16 := #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7], cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255]
-
-  obtain ⟨ u16_b_cstrs, u16_c_cstrs, _, b_msb_ch, c_msb_ch, b_sgn_ext, c_sgn_ext, p0, p1, p2, p3, p4, p5, p6,
-           p7, p8, p9, p10, p11, p12, p13, p14, p15, _, _, _, _, _,
-           _, _, _, _, _, _, _, b_b_msb, b_c_msb, _, _, _, _, _,
-           _, _, _, _, _, c0, c1, c2, c3, c4, c5, c6, c7, c8,
-           c9, c10, c11, c12, c13, c14, c15, pp0, pp1, pp2, pp3, pp4, pp5, pp6,
-           pp7, pp8, pp9, pp10, pp11, pp12, pp13, pp14, pp15 ⟩ := cstrs
-
-  simp_all [-p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
-
-  have eq_aw : aw = ByteWord.toWord (ByteDWord.high (cols.product : ByteDWord (Fin BB))) := by
-    rw [ByteDWord.high, ByteWord.toWord, ← Word.eq_pointwise]
-    simp_all
-
-  have eq_bbw : bbw = bw.toByteWord := by
-    exact (U16toU8OperationSafe.spec.return _ _ _ u16_b_cstrs (by simp))
-  have eq_cbw : cbw = cw.toByteWord := by
-    exact (U16toU8OperationSafe.spec.return _ _ _ u16_c_cstrs (by simp))
-  have eq_bbwe : bbwe = ByteWord.extend bbw false := by simp [bbwe, ByteWord.extend]; assumption
-  have eq_cbwe : cbwe = ByteWord.extend cbw false := by simp [cbwe, ByteWord.extend]; assumption
-  have is_U64_bbw : ByteWord.isU64 bbw := by rw [eq_bbw]; apply bw.toU64_toByteWord is_U64_bw
-  have is_U64_cbw : ByteWord.isU64 cbw := by rw [eq_cbw]; apply cw.toU64_toByteWord is_U64_cw
-  simp_all [-eq_bbw, -eq_cbw, -p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
-  simp [eq_bbwe, eq_cbwe] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-
-  have mul_spec :=
-    core_mul bbw cbw is_U64_bbw is_U64_cbw false false cols.product cols.carry
-             p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-             c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
-             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
-
-  rw [exec_MUL_pure_bv_to_bw _ _ .MULHU is_U64_bw is_U64_cw]
-  simp [execute_MUL_pure_bw, -BitVec.extractLsb]
-  rw [← eq_bbw, ← eq_cbw, ← mul_spec]
-  rw [ByteWord.toWord_toBitVec64]
-  apply ByteDWord.high_as_extract
-  . apply ByteDWord.isU128_of_cases <;> assumption
-  . simp [ByteDWord.high]; apply ByteWord.isU64_of_cases <;> assumption
-
-end mulhu
-
-section mulhsu
-
-lemma spec.mulhsu {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
-  (is_U64_bw : bw.isU64)
-  (is_U64_cw : cw.isU64)
-  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
-  is_mulhsu = 1 → aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHSU
-    := by
-  intro h_one
-  have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op cstrs
-  simp_all [allHold_constraints_iff_is_real, -h_one]
-  set bbw := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).1
-  set U16_b := (U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).2
-  set cbw := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).1
-  set U16_c := (U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).2
-  set bbwe : Vector (Fin BB) 16 := #v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7], cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255]
-  set cbwe : Vector (Fin BB) 16 := #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7], cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255]
-
-  obtain ⟨ u16_b_cstrs, u16_c_cstrs, _, b_msb_ch, c_msb_ch, b_sgn_ext, c_sgn_ext, p0, p1, p2, p3, p4, p5, p6,
-           p7, p8, p9, p10, p11, p12, p13, p14, p15, _, _, _, _, _,
-           _, _, _, _, _, _, _, b_b_msb, b_c_msb, _, _, _, _, _,
-           _, _, _, _, _, c0, c1, c2, c3, c4, c5, c6, c7, c8,
-           c9, c10, c11, c12, c13, c14, c15, pp0, pp1, pp2, pp3, pp4, pp5, pp6,
-           pp7, pp8, pp9, pp10, pp11, pp12, pp13, pp14, pp15 ⟩ := cstrs
-
-  simp_all [-p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
-
-  have eq_aw : aw = ByteWord.toWord (ByteDWord.high (cols.product : ByteDWord (Fin BB))) := by
-    rw [ByteDWord.high, ByteWord.toWord, ← Word.eq_pointwise]
-    simp_all
-
-  have eq_bbw : bbw = bw.toByteWord := by
-    exact (U16toU8OperationSafe.spec.return _ _ _ u16_b_cstrs (by simp))
-  have eq_cbw : cbw = cw.toByteWord := by
-    exact (U16toU8OperationSafe.spec.return _ _ _ u16_c_cstrs (by simp))
-  have msb_ext_b : cols.b_sign_extend * 255 = if ByteWord.isNegative bbw then 255 else 0 := by
-    rw [b_sgn_ext]
-    clear *- b_b_msb b_msb_ch
-    unfold ByteWord.isNegative; split_ifs
-    . suffices : cols.b_msb = 1 <;> simp_all
-    . suffices : cols.b_msb = 0 <;> simp_all
-  have eq_bbwe : bbwe = ByteWord.extend bbw true := by simp [bbwe, ByteWord.extend]; exact msb_ext_b
-  have eq_cbwe : cbwe = ByteWord.extend cbw false := by simp [cbwe, ByteWord.extend]; assumption
-  have is_U64_bbw : ByteWord.isU64 bbw := by rw [eq_bbw]; apply bw.toU64_toByteWord is_U64_bw
-  have is_U64_cbw : ByteWord.isU64 cbw := by rw [eq_cbw]; apply cw.toU64_toByteWord is_U64_cw
-  simp_all [-eq_bbw, -eq_cbw, -p0, -p1, -p2, -p3, -p4, -p5, -p6, -p7, -p8, -p9, -p10, -p11, -p12, -p13, -p14, -p15]
-  simp [eq_bbwe, eq_cbwe] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-
-  have mul_spec :=
-    core_mul bbw cbw is_U64_bbw is_U64_cbw true false cols.product cols.carry
-             p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-             c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
-             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
-
-  rw [exec_MUL_pure_bv_to_bw _ _ .MULHSU is_U64_bw is_U64_cw]
-  simp [execute_MUL_pure_bw, -BitVec.extractLsb]
-  rw [← eq_bbw, ← eq_cbw, ← mul_spec]
-  rw [ByteWord.toWord_toBitVec64]
-  apply ByteDWord.high_as_extract
-  . apply ByteDWord.isU128_of_cases <;> assumption
-  . simp [ByteDWord.high]; apply ByteWord.isU64_of_cases <;> assumption
-
-
-end mulhsu
 
 end MulOperation

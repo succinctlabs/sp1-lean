@@ -235,4 +235,28 @@ lemma toInt_toNat_as_toNat_128 {r1 r2 : BitVec 64} :
     ring_nf
     omega
 
+lemma toNat_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
+  ((r1.toNat : ℤ) * r2.toInt % 340282366920938463463374607431768211456).toNat =
+    (BitVec.setWidth 128 r1 * BitVec.signExtend 128 r2).toNat
+    := by
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r2) (by simp)]
+  rw [← setWidth_idem (n := 128) (bv := r1) (by simp)]
+
+  have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
+  have mr1 : max ((r1.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r1.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
+  have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
+
+  simp [BitVec.toInt, BitVec.signExtend]; split_ifs
+
+  all_goals
+    simp_all
+    try omega
+
+  . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
 end BitVec

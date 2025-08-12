@@ -812,20 +812,21 @@ end SHIFTIWOP
 section MUL
 
 /-- Multiplication opcodes -/
-inductive mop where | MUL | MULH | MULHU | MULHSU
+inductive mop where | MUL | MULH | MULHU | MULHUS | MULHSU
   deriving BEq, DecidableEq, Inhabited, Repr
 
-def mul_op_of_mop (m : mop) : mul_op :=
+def mop_of_mul_op (m : mul_op) : mop :=
   match m with
-  | .MUL => { high := false, signed_rs1 := false, signed_rs2 := false }
-  | .MULH => { high := true, signed_rs1 := true, signed_rs2 := true }
-  | .MULHU => { high := true, signed_rs1 := false, signed_rs2 := false }
-  | .MULHSU => { high := true, signed_rs1 := true, signed_rs2 := false }
+  | { high := false, signed_rs1 := _, signed_rs2 := _ } => .MUL
+  | { high := true, signed_rs1 := false, signed_rs2 := false } => .MULHU
+  | { high := true, signed_rs1 := false, signed_rs2 := true } => .MULHUS
+  | { high := true, signed_rs1 := true, signed_rs2 := false } => .MULHSU
+  | { high := true, signed_rs1 := true, signed_rs2 := true } => .MULH
 
 /-- execute_MUL pure part -/
 def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : mop) : BitVec 64 :=
   let rs1_ext : BitVec 128 := op1.extend 128 (op = .MULH ∨ op = .MULHSU)
-  let rs2_ext : BitVec 128 := op2.extend 128 (op = .MULH)
+  let rs2_ext : BitVec 128 := op2.extend 128 (op = .MULH ∨ op = .MULHUS)
   let result_wide := rs1_ext * rs2_ext
   (if (op = .MUL)
     then (Sail.BitVec.extractLsb result_wide 63 0)
@@ -834,7 +835,7 @@ def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : mop) : BitVec 64 
 /-- execute_MUL pure part for ByteWord arguments -/
 def execute_MUL_pure_bw (op1 : ByteWord (Fin BB)) (op2 : ByteWord (Fin BB)) (op : mop) : BitVec 64 :=
   let op1_ext := op1.extend (op = .MULH ∨ op = .MULHSU)
-  let op2_ext := op2.extend (op = .MULH)
+  let op2_ext := op2.extend (op = .MULH ∨ op = .MULHUS)
   let result_wide := op1_ext.toBitVec128 * op2_ext.toBitVec128
   (if (op = .MUL)
     then (Sail.BitVec.extractLsb result_wide 63 0)
@@ -861,49 +862,140 @@ def execute_MUL' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) : SailM E
 
 @[simp]
 lemma execute_MUL'_eq_execute_MUL :
-  execute_MUL rs2 rs1 rd (mul_op_of_mop op) = execute_MUL' rs2 rs1 rd op
+  execute_MUL rs2 rs1 rd op = execute_MUL' rs2 rs1 rd (mop_of_mul_op op)
     := by
-  have mod_129_to_128 : forall (a : ℤ), -(2 ^ 127) ≤ a → a < 2 ^ 127  → (a % 680564733841876926926749214863536422912).toNat % 340282366920938463463374607431768211456 = (a % 340282366920938463463374607431768211456).toNat := by omega
   have bounds_toInt_64 : forall (bv : BitVec 64), -2^63 ≤ bv.toInt ∧ bv.toInt < 2^63 := by
     simp [BitVec.toInt]; intros; split_ifs <;> omega
   have bounds_toNat_64 : forall (bv : BitVec 64), 0 ≤ bv.toNat ∧ bv.toNat < 2^64 := by omega
 
-  cases op
+  rcases op with ⟨ high, sgn1, sgn2 ⟩
+  rcases sgn2 with sgn2 | sgn2 <;> rcases sgn1 with sgn1 | sgn1 <;> rcases high with high | high
 
   all_goals
-    simp_all [execute_MUL', execute_MUL, execute_MUL_pure, BitVec.extend, mul_op_of_mop, LeanRV64IM.Functions.xlen, to_bits_truncate, Sail.get_slice_int]
+    simp_all [execute_MUL', execute_MUL, execute_MUL_pure, BitVec.extend, mop_of_mul_op, LeanRV64IM.Functions.xlen, to_bits_truncate, Sail.get_slice_int]
     refine bind_congr ?_; intro r1
     refine bind_congr ?_; intro r2
     ext s; simp_all; congr 4
+    have mod_129_to_128 : forall (a : ℤ), (a % 680564733841876926926749214863536422912).toNat % 340282366920938463463374607431768211456 = (a % 340282366920938463463374607431768211456).toNat := by omega
 
   . rw [Int.toNat_emod (by nlinarith) (by simp)]
     rw [Int.toNat_mul (by simp) (by simp)]
     simp
+
+  . rw [Int.toNat_emod (by nlinarith) (by simp)]
+    rw [Int.toNat_mul (by simp) (by simp)]
+    simp
+
+  . unfold BitVec.toInt
+    split_ifs <;> simp_all
+    . rw [Int.toNat_emod (by nlinarith) (by simp)]
+      simp; congr
+    . simp [← BitVec.toNat_inj]
+      trans (- (((18446744073709551616 : ℤ) - r1.toNat) * r2.toNat) % 340282366920938463463374607431768211456).toNat % 18446744073709551616
+      . congr 3
+        ring_nf
+      . rw [Int.neg_emod_eq_sub_emod]
+        have := bounds_toNat_64 r1
+        have := bounds_toNat_64 r2
+        rw [Int.toNat_emod (by nlinarith) (by simp)]
+        rw [Int.toNat_sub'' (by simp) (by nlinarith)]
+        simp only [Int.reduceToNat]
+        rw [Int.toNat_mul (by omega) (by omega)]
+        simp
+        rw [Nat.mul_sub_right_distrib]
+        rw [Nat.sub_sub_right _ (by nlinarith)]
+        omega
+
+  . congr 2
+    rw [mod_129_to_128]
+    apply BitVec.toInt_toNat_as_toNat_128
+
+  . unfold BitVec.toInt
+    split_ifs <;> simp_all
+    . rw [Int.toNat_emod (by nlinarith) (by simp)]
+      simp; congr
+    . simp [← BitVec.toNat_inj]
+      trans (- ((r1.toNat : ℤ) * ((18446744073709551616 : ℤ) - r2.toNat)) % 340282366920938463463374607431768211456).toNat % 18446744073709551616
+      . congr 3
+        ring_nf
+      . rw [Int.neg_emod_eq_sub_emod]
+        have := bounds_toNat_64 r1
+        have := bounds_toNat_64 r2
+        rw [Int.toNat_emod (by nlinarith) (by simp)]
+        rw [Int.toNat_sub'' (by simp) (by nlinarith)]
+        simp only [Int.reduceToNat]
+        rw [Int.toNat_mul (by omega) (by omega)]
+        simp
+        rw [Nat.mul_sub_left_distrib]
+        rw [Nat.sub_sub_right _ (by nlinarith)]
+        omega
+
+  . congr 2
+    rw [mod_129_to_128]
+    apply BitVec.toNat_toInt_as_toNat_128
+
+  . unfold BitVec.toInt
+    split_ifs <;> simp_all
+    . rw [Int.toNat_emod (by nlinarith) (by simp)]
+      simp; congr
+    . simp [← BitVec.toNat_inj]
+      trans (- ((r1.toNat : ℤ) * ((18446744073709551616 : ℤ) - r2.toNat)) % 340282366920938463463374607431768211456).toNat % 18446744073709551616
+      . congr 3
+        ring_nf
+      . rw [Int.neg_emod_eq_sub_emod]
+        have := bounds_toNat_64 r1
+        have := bounds_toNat_64 r2
+        rw [Int.toNat_emod (by nlinarith) (by simp)]
+        rw [Int.toNat_sub'' (by simp) (by nlinarith)]
+        simp only [Int.reduceToNat]
+        rw [Int.toNat_mul (by omega) (by omega)]
+        simp
+        rw [Nat.mul_sub_left_distrib ]
+        rw [Nat.sub_sub_right _ (by nlinarith)]
+        omega
+    . simp [← BitVec.toNat_inj]
+      trans (- (((18446744073709551616 : ℤ) - r1.toNat) * r2.toNat) % 340282366920938463463374607431768211456).toNat % 18446744073709551616
+      . congr 3
+        ring_nf
+      . rw [Int.neg_emod_eq_sub_emod]
+        have := bounds_toNat_64 r1
+        have := bounds_toNat_64 r2
+        rw [Int.toNat_emod (by nlinarith) (by simp)]
+        rw [Int.toNat_sub'' (by simp) (by nlinarith)]
+        simp only [Int.reduceToNat]
+        rw [Int.toNat_mul (by omega) (by omega)]
+        simp
+        rw [Nat.mul_sub_right_distrib]
+        rw [Nat.sub_sub_right _ (by nlinarith)]
+        omega
+    . simp [← BitVec.toNat_inj]
+      trans (((18446744073709551616 : ℤ) - r1.toNat) * (18446744073709551616 - r2.toNat) % 340282366920938463463374607431768211456).toNat % 18446744073709551616
+      . congr 3
+        ring_nf
+      . have := bounds_toNat_64 r1
+        have := bounds_toNat_64 r2
+        rw [Int.toNat_emod (by nlinarith) (by simp)]
+        simp only [Int.reduceToNat]
+        rw [Int.toNat_mul (by omega) (by omega)]
+        simp [Nat.mul_sub_right_distrib]
+        repeat rw [Nat.mul_sub_left_distrib]
+        rw [Nat.sub_sub_right _ (by nlinarith)]
+        ring_nf
+        suffices : (r1.toNat * 18446744073709551616) % 18446744073709551616 = 0
+        . have : forall x y, y * 18446744073709551616 ≤ x → (x - y * 18446744073709551616) % 18446744073709551616 = x % 18446744073709551616 := by intro; omega
+          rw [this]
+          . omega
+          . suffices : r1.toNat * 18446744073709551616 + r2.toNat * 18446744073709551616 ≤ r2.toNat * r1.toNat + 340282366920938463463374607431768211456
+            . rw [← Nat.add_sub_assoc (by omega)]
+              rw [Nat.le_sub_iff_add_le (by nlinarith)]
+              assumption
+            . nlinarith
+        . omega
 
   . congr 2
     rw [mod_129_to_128]
     . rw [← BitVec.toNat_mul]
       apply BitVec.toInt_toInt_as_toNat_128
-    . have := bounds_toInt_64 r1
-      have := bounds_toInt_64 r2
-      nlinarith
-    . have := bounds_toInt_64 r1
-      have := bounds_toInt_64 r2
-      nlinarith
-
-  . rw [Int.toNat_emod (by nlinarith) (by simp)]
-    rw [Int.toNat_mul (by simp) (by simp)]
-    simp
-
-  . congr 2
-    rw [mod_129_to_128]
-    . apply BitVec.toInt_toNat_as_toNat_128
-    . have := bounds_toInt_64 r1
-      have := bounds_toNat_64 r2
-      nlinarith
-    . have := bounds_toInt_64 r1
-      have := bounds_toNat_64 r2
-      nlinarith
 
 end MUL
 
