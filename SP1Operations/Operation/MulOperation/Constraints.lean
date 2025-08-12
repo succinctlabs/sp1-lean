@@ -36,7 +36,7 @@ end field_operations
 
 section core_mul
 
-@[grind]
+@[grind →]
 lemma le_two_prod {a b : Fin BB} (ha : a.val < 256) (hb : b.val < 256) :
   a.val * b.val ≤ 255 * 255 := by apply mul_le_mul <;> omega
 
@@ -50,6 +50,49 @@ lemma mod_add_mod_zero {a b n : ℕ} : 0 < n → b % n = 0 → (a + b) % n = a %
   intro hn hb
   rw [Nat.add_mod_eq_sub]; simp_all
   rw [if_pos] <;> [ simp; apply Nat.mod_lt _ hn ]
+
+set_option hygiene false in
+open Lean Elab Tactic in
+elab "resolve_decomposition" locs:ident* : tactic => do
+  let name (loc : Ident) : Ident × Ident :=
+    if let pref :: [suff] := loc.getId.toString.split (·='_')
+    then (
+      mkIdent (Name.mkSimple (pref ++ suff)),
+      mkIdent (Name.mkSimple (pref ++ "c" ++ suff.drop 1))
+    )
+    else default
+  for loc in locs do
+  let (name₁, name₂) := name loc
+  evalTactic <|
+    ←`(tactic|obtain ⟨$name₁, $name₂⟩ := (div_mod_decomposition (by assumption) (by omega)).1 $loc)
+
+set_option hygiene false in
+open Lean Elab Tactic in
+elab "resolve_decomposition_with_much_speed" locs:ident* : tactic => do
+  let name (loc : Ident) : Ident × Ident × Nat × Ident :=
+    if let pref :: [suff] := loc.getId.toString.split (·='_')
+    then (
+      mkIdent (Name.mkSimple (pref ++ suff)),
+      mkIdent (Name.mkSimple (pref ++ "c" ++ suff.drop 1)),
+      suff.drop 1 |>.toNat!,
+      mkIdent (Name.mkSimple suff)
+    )
+    else default
+  for loc in locs do
+  let (name₁, name₂, num, suff) := name loc
+  let numStx := Syntax.mkNatLit num
+  let numPredStx := Syntax.mkNatLit num.pred
+  let cNumStx := mkIdent (Name.mkSimple s!"c{suff.getId.toString.drop 1}")
+  let term ← if num = 0
+             then `(cp sb sc $numStx (of_decide_eq_true (Eq.refl true)))
+             else `(cp sb sc $numStx (of_decide_eq_true (Eq.refl true)) + carry[$numPredStx])
+  evalTactic <|
+    ←`(tactic|(
+        obtain ⟨$name₁, $name₂⟩ : prod[$numStx] = ($term) % 256 ∧ carry[$numStx] = ($term) / 256
+          := (div_mod_decomposition $suff (by dsimp
+                                              rw [show 7864320 = (7864320 : Fin BB).1 from rfl, Fin.val_fin_lt]
+                                              apply lt_trans $cNumStx (by decide))).1 $loc
+      ))
 
 set_option maxHeartbeats 100000000 in
 set_option synthInstance.maxHeartbeats 1000000 in
@@ -100,24 +143,19 @@ lemma core_mul
   obtain ⟨ sb00, sb01, sb02, sb03, sb04, sb05, sb06, sb07, sb08, sb09, sb10, sb11, sb12, sb13, sb14, sb15 ⟩ := isU128_sb
   obtain ⟨ sc00, sc01, sc02, sc03, sc04, sc05, sc06, sc07, sc08, sc09, sc10, sc11, sc12, sc13, sc14, sc15 ⟩ := isU128_sc
 
-  rw [div_mod_decomposition (by assumption) (by omega)] at *
-  obtain ⟨ eqp00, eqc00 ⟩ := eq_p00
-  obtain ⟨ eqp01, eqc01 ⟩ := eq_p01
-  obtain ⟨ eqp02, eqc02 ⟩ := eq_p02
-  obtain ⟨ eqp03, eqc03 ⟩ := eq_p03
-  obtain ⟨ eqp04, eqc04 ⟩ := eq_p04
-  obtain ⟨ eqp05, eqc05 ⟩ := eq_p05
-  obtain ⟨ eqp06, eqc06 ⟩ := eq_p06
-  obtain ⟨ eqp07, eqc07 ⟩ := eq_p07
-  obtain ⟨ eqp08, eqc08 ⟩ := eq_p08
-  obtain ⟨ eqp09, eqc09 ⟩ := eq_p09
-  obtain ⟨ eqp10, eqc10 ⟩ := eq_p10
-  obtain ⟨ eqp11, eqc11 ⟩ := eq_p11
-  obtain ⟨ eqp12, eqc12 ⟩ := eq_p12
-  obtain ⟨ eqp13, eqc13 ⟩ := eq_p13
-  obtain ⟨ eqp14, eqc14 ⟩ := eq_p14
-  obtain ⟨ eqp15, eqc15 ⟩ := eq_p15
+  /-
+    Naive approach. Slow-ish.
+  -/
+  -- resolve_decomposition eq_p00 eq_p01 eq_p02 eq_p03
+  --                       eq_p04 eq_p05 eq_p06 eq_p07
+  --                       eq_p08 eq_p09 eq_p10 eq_p11
+  --                       eq_p12 eq_p13 eq_p14 eq_p15
 
+  resolve_decomposition_with_much_speed eq_p00 eq_p01 eq_p02 eq_p03
+                                        eq_p04 eq_p05 eq_p06 eq_p07
+                                        eq_p08 eq_p09 eq_p10 eq_p11
+                                        eq_p12 eq_p13 eq_p14 eq_p15
+  
   have lt_cp00 : (cp sb sc 00 (by decide)).val ≤ 01 * 65025 := by
     simp [cp, Vector.ofFn, Vector.get, ByteWord.extend, Fin.val_mul]; grind
   have lt_cp01 : (cp sb sc 01 (by decide)).val ≤ 02 * 65025 := by
@@ -222,6 +260,8 @@ lemma core_mul
 end core_mul
 
 section constraints
+
+#exit
 
 def constraints
   (a_word : (Word (Fin BB)))
