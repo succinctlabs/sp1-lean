@@ -294,7 +294,7 @@ theorem correct_mulw
     . simp [Word.toBitVec64, Word.toNat]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
-      rw [exec_MULW_pure_bv_to_bw _ _ (by omega) (by omega)]
+      rw [exec_MULW_pure_bv_to_bhw _ _ (by omega) (by omega)]
       have := spec.mulw Main ⟨ is_mulw, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
       rfl

@@ -302,7 +302,7 @@ section mulw
 
 lemma spec.mulw (h : is_mulw Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MULW_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]])
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MULW_pure_bhw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]).low (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]).low
   := by
     intro cstrs
     obtain ⟨ eq_mulw, eq_imm ⟩ := h
@@ -315,7 +315,7 @@ lemma spec.mulw (h : is_mulw Main ) :
     simp_all
 
     have := MulOperation.spec.mulw is_U64_b is_U64_c h_mop (by simp)
-    rw [this, exec_MULW_pure_bv_to_bw _ _ is_U64_b is_U64_c]
+    rw [this, exec_MULW_pure_bv_to_bhw _ _ is_U64_b is_U64_c]
 
 end mulw
 
