@@ -278,6 +278,110 @@ end conversions
 
 end Word
 
+namespace BHWord
+
+/-- Prove two `BHWord`s equal by considering each index individually.
+    Extensionality tactics will default to using this version. -/
+@[ext] lemma ext_cases {w w' : BHWord T}
+    (h0 : w[0] = w'[0]) (h1 : w[1] = w'[1]) (h2 : w[2] = w'[2]) (h3 : w[3] = w'[3]) : w = w' :=
+  Vector.ext fun
+  | 0, _ => h0 | 1, _ => h1 | 2, _ => h2 | 3, _ => h3
+  | n + 4, h => by simp only [add_lt_iff_neg_right, not_lt_zero'] at h
+
+/-- Prove two `BHWord`s equal by considering all bounded indices. -/
+@[ext] lemma ext_forall {w w' : BHWord T}
+    (h : ∀ i : Fin BYTE_HWORD_SIZE, w[i] = w'[i]) : w = w' :=
+  Vector.ext fun i n => h ⟨i, n⟩
+
+lemma eq_mk_getElem (w : BHWord T) : w = #v[w[0], w[1], w[2], w[3]]
+  := ext_cases rfl rfl rfl rfl
+
+lemma eq_pointwise (w w': BHWord T) :
+    (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ↔ w = w' := by
+  constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
+
+/-- Prove something about arbitrary `BHWord`s by showing it for any two choices of limbs. -/
+@[elab_as_elim] protected def inductionOn {C : BHWord T → Prop}
+    (mk : ∀ x0 x1 x2 x3 : T, C #v[x0, x1, x2, x3]) (w : BHWord T) : C w := by
+  rw [eq_mk_getElem w]; apply mk
+
+section U32
+
+/-- `isU32 w` means that each limb of the word is properly bounded. -/
+def isU32 (w : BHWord (Fin BB)) : Prop := ∀ i : Fin BYTE_HWORD_SIZE, w[i].val < 256
+
+@[aesop unsafe apply]
+lemma isU32_of_cases (w : BHWord (Fin BB))
+    (h0 : w[0].val < 256) (h1 : w[1].val < 256)
+    (h2 : w[2].val < 256) (h3 : w[3].val < 256) : w.isU32
+  := by intro i; fin_cases i <;> simpa
+
+/-- Pull in bounds on a `BHWord`s limbs given a `isU32` proof. -/
+@[aesop unsafe forward]
+lemma lt_cases_of_isU32 {w : BHWord (Fin BB)} (hbhw : w.isU32) :
+    w[0].val < 256 ∧ w[1].val < 256 ∧ w[2].val < 256 ∧ w[3].val < 256
+    :=
+  ⟨hbhw 0, hbhw 1, hbhw 2, hbhw 3⟩
+
+end U32
+
+section conversions
+
+/-- Convert a `BHWord` to a `Nat` by shifting and adding the limbs. -/
+def toNat (w : BHWord (Fin BB)) : ℕ :=
+  w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24
+
+lemma toNat_lt_of_isU32 {w : BHWord (Fin BB)} (hw : w.isU32) : w.toNat < 2^32 := by
+  unfold toNat
+  aesop (add 50% tactic (by omega))
+
+/-- Convert a `BHWord` to a `BitVec 32` by shifting and adding the limbs. -/
+def toBitVec32 (w : BHWord (Fin BB)) : BitVec 32 := BitVec.ofNat 32 w.toNat
+
+lemma toBitVec32_toNat {w : BHWord (Fin BB)} (hw : w.isU32) :
+    w.toBitVec32.toNat = w.toNat := by
+  simp only [toBitVec32, toNat, BB_eq, Nat.reducePow, BitVec.toNat_ofNat,
+    Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
+  have := lt_cases_of_isU32 hw
+  omega
+
+/-- A 32-bit integer is negative if its msb equals one -/
+def isNegative (w : BHWord (Fin BB)) : Prop := w[3] ≥ 128
+instance : Decidable (isNegative w) := by unfold isNegative; infer_instance
+
+lemma isNegative_msb
+  (w : BHWord (Fin BB))
+  (h_w_isU32 : w.isU32) :
+    w.isNegative ↔ (w.toBitVec32.msb = true) := by
+  have := lt_cases_of_isU32 h_w_isU32
+  simp [isNegative, BHWord.toBitVec32, BHWord.toNat, BitVec.msb_eq_decide]
+  omega
+
+lemma isNegative_BitVec.toInt
+  (w : BHWord (Fin BB))
+  (h_w_isU32 : w.isU32) :
+    w.isNegative ↔ ¬ 2 * w.toNat < 2^32 := by
+  rw [isNegative_msb _ h_w_isU32]
+  simp [BitVec.msb_eq_decide]
+  rw [toBitVec32_toNat h_w_isU32]
+  omega
+
+/-- Convert a `BHWord` to an `Int` by shifting and adding the limbs, with sign correction. -/
+def toInt (w : BHWord (Fin BB)) : ℤ :=
+  if (isNegative w) then w.toNat - 2^32 else w.toNat
+
+lemma toBitVec32_toInt {w : BHWord (Fin BB)} (h_w_isU32 : w.isU32) :
+    w.toBitVec32.toInt = w.toInt
+  := by
+    have := lt_cases_of_isU32 h_w_isU32
+    have : w.toNat < 2^32 := by unfold BHWord.toNat; omega
+    simp_all [toBitVec32, toInt, BitVec.toInt]
+    split_ifs <;> rw [isNegative_BitVec.toInt _ h_w_isU32] at * <;> omega
+
+end conversions
+
+end BHWord
+
 namespace BWord
 
 /-- Prove two `BWord`s equal by considering each index individually.
@@ -420,113 +524,33 @@ lemma toWord_toBitVec64 {w : BWord (Fin BB)} (h_w_isU64 : w.isU64) :
     repeat rw [Nat.mod_eq_of_lt (by grind)]
     omega
 
+/-- Obtain the low 32 bits of a `BWord` -/
+def low (w : BWord (Fin BB)) : BHWord (Fin BB) := #v[w[0], w[1], w[2], w[3]]
+
+lemma isU64_low_isU32 {w : BWord (Fin BB)} (hw : w.isU64) : w.low.isU32 := by aesop
+
+lemma setWidth_eq_low (w : BWord (Fin BB )) (h_w_isU64 : w.isU64) :
+    BitVec.setWidth 32 w.toBitVec64 = w.low.toBitVec32
+  := by
+    have ⟨ _, _, _, _ ⟩ := lt_cases_of_isU64 h_w_isU64
+    simp [toBitVec64, ← BitVec.toNat_inj, low, BWord.toNat, BHWord.toBitVec32, BHWord.toNat]
+    omega
+
+/-- Obtain the high 32 bits of a `BWord` -/
+def high (w : BWord (Fin BB)) : BHWord (Fin BB) := #v[w[4], w[5], w[6], w[7]]
+
+lemma isU64_high_isU32 {w : BWord (Fin BB)} (hw : w.isU64) : w.high.isU32 := by aesop
+
+lemma setWidth_rshift_eq_high (w : BWord (Fin BB )) (h_w_isU64 : w.isU64) :
+    BitVec.setWidth 32 (w.toBitVec64 >>> 32) = w.high.toBitVec32
+  := by
+    have ⟨ _, _, _, _ ⟩ := lt_cases_of_isU64 h_w_isU64
+    simp_all [toBitVec64, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow, high, BWord.toNat, BHWord.toBitVec32, BHWord.toNat]
+    omega
+
 end conversions
 
 end BWord
-
-namespace BHWord
-
-/-- Prove two `BHWord`s equal by considering each index individually.
-    Extensionality tactics will default to using this version. -/
-@[ext] lemma ext_cases {w w' : BHWord T}
-    (h0 : w[0] = w'[0]) (h1 : w[1] = w'[1]) (h2 : w[2] = w'[2]) (h3 : w[3] = w'[3]) : w = w' :=
-  Vector.ext fun
-  | 0, _ => h0 | 1, _ => h1 | 2, _ => h2 | 3, _ => h3
-  | n + 4, h => by simp only [add_lt_iff_neg_right, not_lt_zero'] at h
-
-/-- Prove two `BHWord`s equal by considering all bounded indices. -/
-@[ext] lemma ext_forall {w w' : BHWord T}
-    (h : ∀ i : Fin BYTE_HWORD_SIZE, w[i] = w'[i]) : w = w' :=
-  Vector.ext fun i n => h ⟨i, n⟩
-
-lemma eq_mk_getElem (w : BHWord T) : w = #v[w[0], w[1], w[2], w[3]]
-  := ext_cases rfl rfl rfl rfl
-
-lemma eq_pointwise (w w': BHWord T) :
-    (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ↔ w = w' := by
-  constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
-
-/-- Prove something about arbitrary `BHWord`s by showing it for any two choices of limbs. -/
-@[elab_as_elim] protected def inductionOn {C : BHWord T → Prop}
-    (mk : ∀ x0 x1 x2 x3 : T, C #v[x0, x1, x2, x3]) (w : BHWord T) : C w := by
-  rw [eq_mk_getElem w]; apply mk
-
-section U32
-
-/-- `isU32 w` means that each limb of the word is properly bounded. -/
-def isU32 (w : BHWord (Fin BB)) : Prop := ∀ i : Fin BYTE_HWORD_SIZE, w[i].val < 256
-
-@[aesop unsafe apply]
-lemma isU32_of_cases (w : BHWord (Fin BB))
-    (h0 : w[0].val < 256) (h1 : w[1].val < 256)
-    (h2 : w[2].val < 256) (h3 : w[3].val < 256) : w.isU32
-  := by intro i; fin_cases i <;> simpa
-
-/-- Pull in bounds on a `BHWord`s limbs given a `isU32` proof. -/
-@[aesop unsafe forward]
-lemma lt_cases_of_isU32 {w : BHWord (Fin BB)} (hbhw : w.isU32) :
-    w[0].val < 256 ∧ w[1].val < 256 ∧ w[2].val < 256 ∧ w[3].val < 256
-    :=
-  ⟨hbhw 0, hbhw 1, hbhw 2, hbhw 3⟩
-
-end U32
-
-section conversions
-
-/-- Convert a `BHWord` to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : BHWord (Fin BB)) : ℕ :=
-  w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24
-
-lemma toNat_lt_of_isU32 {w : BHWord (Fin BB)} (hw : w.isU32) : w.toNat < 2^32 := by
-  unfold toNat
-  aesop (add 50% tactic (by omega))
-
-/-- Convert a `BHWord` to a `BitVec 32` by shifting and adding the limbs. -/
-def toBitVec32 (w : BHWord (Fin BB)) : BitVec 32 := BitVec.ofNat 32 w.toNat
-
-lemma toBitVec32_toNat {w : BHWord (Fin BB)} (hw : w.isU32) :
-    w.toBitVec32.toNat = w.toNat := by
-  simp only [toBitVec32, toNat, BB_eq, Nat.reducePow, BitVec.toNat_ofNat,
-    Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
-  have := lt_cases_of_isU32 hw
-  omega
-
-/-- A 32-bit integer is negative if its msb equals one -/
-def isNegative (w : BHWord (Fin BB)) : Prop := w[3] ≥ 128
-instance : Decidable (isNegative w) := by unfold isNegative; infer_instance
-
-lemma isNegative_msb
-  (w : BHWord (Fin BB))
-  (h_w_isU32 : w.isU32) :
-    w.isNegative ↔ (w.toBitVec32.msb = true) := by
-  have := lt_cases_of_isU32 h_w_isU32
-  simp [isNegative, BHWord.toBitVec32, BHWord.toNat, BitVec.msb_eq_decide]
-  omega
-
-lemma isNegative_BitVec.toInt
-  (w : BHWord (Fin BB))
-  (h_w_isU32 : w.isU32) :
-    w.isNegative ↔ ¬ 2 * w.toNat < 2^32 := by
-  rw [isNegative_msb _ h_w_isU32]
-  simp [BitVec.msb_eq_decide]
-  rw [toBitVec32_toNat h_w_isU32]
-  omega
-
-/-- Convert a `BHWord` to an `Int` by shifting and adding the limbs, with sign correction. -/
-def toInt (w : BHWord (Fin BB)) : ℤ :=
-  if (isNegative w) then w.toNat - 2^32 else w.toNat
-
-lemma toBitVec32_toInt {w : BHWord (Fin BB)} (h_w_isU32 : w.isU32) :
-    w.toBitVec32.toInt = w.toInt
-  := by
-    have := lt_cases_of_isU32 h_w_isU32
-    have : w.toNat < 2^32 := by unfold BHWord.toNat; omega
-    simp_all [toBitVec32, toInt, BitVec.toInt]
-    split_ifs <;> rw [isNegative_BitVec.toInt _ h_w_isU32] at * <;> omega
-
-end conversions
-
-end BHWord
 
 namespace BDWord
 
@@ -594,8 +618,10 @@ end U128
 
 section conversions
 
-/-- Lower and higher bytewords -/
+/-- Obtain the low 64 bits of a `BDWord` -/
 def low  (w : BDWord (Fin BB)) : BWord (Fin BB) := #v[w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]]
+
+/-- Obtain the high 64 bits of a `BDWord` -/
 def high (w : BDWord (Fin BB)) : BWord (Fin BB) := #v[w[8], w[9], w[10], w[11], w[12], w[13], w[14], w[15]]
 
 /-- Convert a bytedword to a `Nat` by shifting and adding the limbs. -/
@@ -701,46 +727,46 @@ end HWord
 namespace Word
 
 /-- Convert a word to a `BWord` by separating the limbs. -/
-def toByteWord (w : Word (Fin BB)) : BWord (Fin BB) :=
+def toBWord (w : Word (Fin BB)) : BWord (Fin BB) :=
   #v[w[0] % 256, w[0] / 256, w[1] % 256, w[1] / 256, w[2] % 256, w[2] / 256, w[3] % 256, w[3] / 256 ]
 
-lemma toU64_toByteWord
+lemma toU64_toBWord
   (w : Word (Fin BB))
   (h_w_isU64 : w.isU64) :
-    w.toByteWord.isU64 := by
-  simp [Word.toByteWord]
+    w.toBWord.isU64 := by
+  simp [Word.toBWord]
   apply Word.lt_cases_of_isU64 at h_w_isU64
   apply BWord.isU64_of_cases <;> simp <;> omega
 
-lemma toNat_toByteWord
+lemma toNat_toBWord
   (w : Word (Fin BB))
   (h_w_isU64 : w.isU64) :
-    w.toNat = BWord.toNat (w.toByteWord) := by
+    w.toNat = BWord.toNat (w.toBWord) := by
   have := w.lt_cases_of_isU64 h_w_isU64
-  simp [toNat, toByteWord, BWord.toNat]
+  simp [toNat, toBWord, BWord.toNat]
   omega
 
-lemma isNegative_toByteWord
+lemma isNegative_toBWord
   (w : Word (Fin BB))
   (h_w_isU64 : w.isU64) :
-    w.isNegative ↔ BWord.isNegative (w.toByteWord) := by
+    w.isNegative ↔ BWord.isNegative (w.toBWord) := by
   have := w.lt_cases_of_isU64 h_w_isU64
-  simp [isNegative, BWord.isNegative, toByteWord, Fin.le_def]
+  simp [isNegative, BWord.isNegative, toBWord, Fin.le_def]
   omega
 
-lemma toInt_toByteWord
+lemma toInt_toBWord
   (w : Word (Fin BB))
   (h_w_isU64 : w.isU64) :
-    w.toInt = BWord.toInt (w.toByteWord) := by
+    w.toInt = BWord.toInt (w.toBWord) := by
   have := w.lt_cases_of_isU64 h_w_isU64
-  simp [toByteWord, toInt, toNat, BWord.toInt, BWord.toNat, isNegative, BWord.isNegative, Fin.le_def]
+  simp [toBWord, toInt, toNat, BWord.toInt, BWord.toNat, isNegative, BWord.isNegative, Fin.le_def]
   omega
 
-lemma toBitVec64_toByteWord
+lemma toBitVec64_toBWord
   (w : Word (Fin BB))
   (h_w_isU64 : w.isU64) :
-    w.toByteWord.toBitVec64 = w.toBitVec64 := by
-  rw [← BitVec.toNat_inj, BWord.toBitVec64_toNat (by apply toU64_toByteWord _ h_w_isU64), Word.toBitVec64_toNat h_w_isU64, Word.toNat_toByteWord _ h_w_isU64]
+    w.toBWord.toBitVec64 = w.toBitVec64 := by
+  rw [← BitVec.toNat_inj, BWord.toBitVec64_toNat (by apply toU64_toBWord _ h_w_isU64), Word.toBitVec64_toNat h_w_isU64, Word.toNat_toBWord _ h_w_isU64]
 
 lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
   let imm_x := BitVec.ofNat 12 x
@@ -819,6 +845,15 @@ lemma extend_false_is_setWidth (w : BWord (Fin BB)) :
   rw [BWord.toBitVec64_toNat is_U64_w]
   simp [sw, BDWord.toNat, extend, BWord.toNat]
 
+lemma low_as_setWidth (w : BWord (Fin BB)) :
+  w.isU64 →
+  w.low.toBitVec32 = BitVec.setWidth 32 w.toBitVec64
+    := by
+  intro is_U64_w
+  simp [BWord.low, BHWord.toBitVec32, BHWord.toNat, BWord.toBitVec64, BWord.toNat]
+  simp [← BitVec.toNat_inj]
+  omega
+
 end BWord
 
 namespace BHWord
@@ -877,26 +912,26 @@ section Bitwise
 
 namespace Word
 
-lemma and_toByteWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
-  a.toBitVec64 &&& b.toBitVec64 = a.toByteWord.toBitVec64 &&& b.toByteWord.toBitVec64
+lemma and_toBWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
+  a.toBitVec64 &&& b.toBitVec64 = a.toBWord.toBitVec64 &&& b.toBWord.toBitVec64
     := by
   intro h_a_64 h_b_64
   simp [Word.toBitVec64, BWord.toBitVec64]
-  rw [Word.toNat_toByteWord _ h_a_64, Word.toNat_toByteWord _ h_b_64]
+  rw [Word.toNat_toBWord _ h_a_64, Word.toNat_toBWord _ h_b_64]
 
-lemma or_toByteWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
-  a.toBitVec64 ||| b.toBitVec64 = a.toByteWord.toBitVec64 ||| b.toByteWord.toBitVec64
+lemma or_toBWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
+  a.toBitVec64 ||| b.toBitVec64 = a.toBWord.toBitVec64 ||| b.toBWord.toBitVec64
     := by
   intro h_a_64 h_b_64
   simp [Word.toBitVec64, BWord.toBitVec64]
-  rw [Word.toNat_toByteWord _ h_a_64, Word.toNat_toByteWord _ h_b_64]
+  rw [Word.toNat_toBWord _ h_a_64, Word.toNat_toBWord _ h_b_64]
 
-lemma xor_toByteWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
-  a.toBitVec64 ^^^ b.toBitVec64 = a.toByteWord.toBitVec64 ^^^ b.toByteWord.toBitVec64
+lemma xor_toBWord {a b : Word (Fin BB)} : a.isU64 → b.isU64 →
+  a.toBitVec64 ^^^ b.toBitVec64 = a.toBWord.toBitVec64 ^^^ b.toBWord.toBitVec64
     := by
   intro h_a_64 h_b_64
   simp [Word.toBitVec64, BWord.toBitVec64]
-  rw [Word.toNat_toByteWord _ h_a_64, Word.toNat_toByteWord _ h_b_64]
+  rw [Word.toNat_toBWord _ h_a_64, Word.toNat_toBWord _ h_b_64]
 
 end Word
 

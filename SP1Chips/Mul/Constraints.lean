@@ -218,7 +218,7 @@ section mul
 
 lemma spec.mul (h : is_mul Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toByteWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toByteWord #v[Main[25], Main[26], Main[27], Main[28]]) .MUL
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MUL
   := by
     intro cstrs
     obtain ⟨ eq_mul, eq_imm ⟩ := h
@@ -239,7 +239,7 @@ section mulh
 
 lemma spec.mulh (h : is_mulh Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toByteWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toByteWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULH
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULH
   := by
     intro cstrs
     obtain ⟨ eq_mulh, eq_imm ⟩ := h
@@ -260,7 +260,7 @@ section mulhu
 
 lemma spec.mulhu (h : is_mulhu Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toByteWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toByteWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULHU
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULHU
   := by
     intro cstrs
     obtain ⟨ eq_mulhu, eq_imm ⟩ := h
@@ -281,7 +281,7 @@ section mulhsu
 
 lemma spec.mulhsu (h : is_mulhsu Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toByteWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toByteWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULHSU
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULHSU
   := by
     intro cstrs
     obtain ⟨ eq_mulhsu, eq_imm ⟩ := h
@@ -302,7 +302,7 @@ section mulw
 
 lemma spec.mulw (h : is_mulw Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MULW_pure_bw (Word.toByteWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toByteWord #v[Main[25], Main[26], Main[27], Main[28]])
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MULW_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]])
   := by
     intro cstrs
     obtain ⟨ eq_mulw, eq_imm ⟩ := h

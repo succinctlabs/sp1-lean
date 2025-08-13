@@ -82,10 +82,10 @@ lemma spec.return
   (is_real : Fin BB)
   (cstrs : (constraints u16_values cols is_real).2.allHold)
   (h_is_real : is_real ≠ 0) :
-    (constraints u16_values cols is_real).1 = Word.toByteWord u16_values
+    (constraints u16_values cols is_real).1 = Word.toBWord u16_values
   := by
     have ⟨ h0, h1, h2, h3, h4, h5, h6, h7 ⟩ := spec.cstrs u16_values cols is_real cstrs h_is_real
-    simp [constraints, Word.toByteWord]
+    simp [constraints, Word.toBWord]
     aesop
 
 lemma spec.unsafe.return
@@ -94,10 +94,10 @@ lemma spec.unsafe.return
   (is_real : Fin BB)
   (cstrs : (constraints u16_values cols is_real).2.allHold)
   (h_is_real : is_real ≠ 0) :
-      (U16toU8OperationUnsafe.constraints u16_values cols).1 = Word.toByteWord u16_values
+      (U16toU8OperationUnsafe.constraints u16_values cols).1 = Word.toBWord u16_values
   := by
     have ⟨ h0, h1, h2, h3, h4, h5, h6, h7 ⟩ := spec.cstrs u16_values cols is_real cstrs h_is_real
-    simp [U16toU8OperationUnsafe.constraints, Word.toByteWord]
+    simp [U16toU8OperationUnsafe.constraints, Word.toBWord]
     aesop
 
 end U16toU8OperationSafe

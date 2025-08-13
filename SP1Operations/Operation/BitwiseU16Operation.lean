@@ -30,15 +30,15 @@ lemma spec.and
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
       norm_num at *
       aesop
-    . simp [U16toU8OperationUnsafe.constraints, Word.toByteWord] at *
+    . simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := h_bw_b
       obtain ⟨ c0, c1, c2, c3, c4, c5, c6, c7 ⟩ := h_bw_c
       simp_all [constraints, U16toU8OperationUnsafe.constraints]
       simp [BitwiseOperation.constraints] at cstrs
       have ⟨ ⟨ ⟨ hr0, hb0, hc0 ⟩, heq_0 ⟩, ⟨ ⟨ hr1, hb1, hc1 ⟩, heq_1 ⟩, ⟨ ⟨ hr2, hb2, hc2 ⟩, heq_2 ⟩,  ⟨ ⟨ hr3, hb3, hc3 ⟩, heq_3 ⟩,
              ⟨ ⟨ hr4, hb4, hc4 ⟩, heq_4 ⟩, ⟨ ⟨ hr5, hb5, hc5 ⟩, heq_5 ⟩, ⟨ ⟨ hr6, hb6, hc6 ⟩, heq_6 ⟩,  ⟨ ⟨ hr7, hb7, hc7 ⟩, heq_7 ⟩  ⟩ := cstrs
-      rw [Word.and_toByteWord is_U64_b is_U64_cc]
-      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, BWord.toBitVec64, BWord.toNat]
+      rw [Word.and_toBWord is_U64_b is_U64_cc]
+      simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
@@ -75,15 +75,15 @@ lemma spec.or
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
       norm_num at *
       aesop
-    . simp [U16toU8OperationUnsafe.constraints, Word.toByteWord] at *
+    . simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := h_bw_b
       obtain ⟨ c0, c1, c2, c3, c4, c5, c6, c7 ⟩ := h_bw_c
       simp_all [constraints, U16toU8OperationUnsafe.constraints]
       simp [BitwiseOperation.constraints] at cstrs
       have ⟨ ⟨ ⟨ hr0, hb0, hc0 ⟩, heq_0 ⟩, ⟨ ⟨ hr1, hb1, hc1 ⟩, heq_1 ⟩, ⟨ ⟨ hr2, hb2, hc2 ⟩, heq_2 ⟩,  ⟨ ⟨ hr3, hb3, hc3 ⟩, heq_3 ⟩,
              ⟨ ⟨ hr4, hb4, hc4 ⟩, heq_4 ⟩, ⟨ ⟨ hr5, hb5, hc5 ⟩, heq_5 ⟩, ⟨ ⟨ hr6, hb6, hc6 ⟩, heq_6 ⟩,  ⟨ ⟨ hr7, hb7, hc7 ⟩, heq_7 ⟩  ⟩ := cstrs
-      rw [Word.or_toByteWord is_U64_b is_U64_cc]
-      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, BWord.toBitVec64, BWord.toNat]
+      rw [Word.or_toBWord is_U64_b is_U64_cc]
+      simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
@@ -120,15 +120,15 @@ lemma spec.xor
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
       norm_num at *
       aesop
-    . simp [U16toU8OperationUnsafe.constraints, Word.toByteWord] at *
+    . simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := h_bw_b
       obtain ⟨ c0, c1, c2, c3, c4, c5, c6, c7 ⟩ := h_bw_c
       simp_all [constraints, U16toU8OperationUnsafe.constraints]
       simp [BitwiseOperation.constraints] at cstrs
       have ⟨ ⟨ ⟨ hr0, hb0, hc0 ⟩, heq_0 ⟩, ⟨ ⟨ hr1, hb1, hc1 ⟩, heq_1 ⟩, ⟨ ⟨ hr2, hb2, hc2 ⟩, heq_2 ⟩,  ⟨ ⟨ hr3, hb3, hc3 ⟩, heq_3 ⟩,
              ⟨ ⟨ hr4, hb4, hc4 ⟩, heq_4 ⟩, ⟨ ⟨ hr5, hb5, hc5 ⟩, heq_5 ⟩, ⟨ ⟨ hr6, hb6, hc6 ⟩, heq_6 ⟩,  ⟨ ⟨ hr7, hb7, hc7 ⟩, heq_7 ⟩  ⟩ := cstrs
-      rw [Word.xor_toByteWord is_U64_b is_U64_cc]
-      simp [Word.toBitVec64, Word.toNat, Word.toByteWord, BWord.toBitVec64, BWord.toNat]
+      rw [Word.xor_toBWord is_U64_b is_U64_cc]
+      simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6

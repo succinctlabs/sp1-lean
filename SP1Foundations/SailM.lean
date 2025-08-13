@@ -843,16 +843,16 @@ def execute_MUL_pure_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) (op : mop)
 
 lemma exec_MUL_pure_bv_to_bw (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) (op : mop) :
   op1.isU64 → op2.isU64 →
-  execute_MUL_pure op1.toBitVec64 op2.toBitVec64 op = execute_MUL_pure_bw op1.toByteWord op2.toByteWord op := by
+  execute_MUL_pure op1.toBitVec64 op2.toBitVec64 op = execute_MUL_pure_bw op1.toBWord op2.toBWord op := by
   intro is_U64_op1 is_U64_op2
-  have := op1.toU64_toByteWord is_U64_op1
-  have := op2.toU64_toByteWord is_U64_op2
+  have := op1.toU64_toBWord is_U64_op1
+  have := op2.toU64_toBWord is_U64_op2
 
   cases op <;> simp [execute_MUL_pure, execute_MUL_pure_bw, -BitVec.toNat_mul] <;>
   (repeat rw [BWord.extend_true_is_signExtend _ (by assumption)]) <;>
   (repeat rw [BWord.extend_false_is_setWidth _ (by assumption)]) <;>
   congr <;> simp [BitVec.extend] <;>
-  rw [Word.toBitVec64_toByteWord _ (by assumption)]
+  rw [Word.toBitVec64_toBWord _ (by assumption)]
 
 def execute_MUL' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (m : mop) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
@@ -1006,37 +1006,22 @@ def execute_MULW_pure (op1 : BitVec 64) (op2 : BitVec 64) : BitVec 64 :=
   let rs1_low : BitVec 32 := BitVec.extractLsb 31 0 op1
   let rs2_low : BitVec 32 := BitVec.extractLsb 31 0 op2
   let prod : BitVec 32 := rs1_low * rs2_low
-  prod.extend 64 True
+  prod.extend 64 true
 
 /-- execute_MULW pure part for BWord arguments -/
-def execute_MULW_pure_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) : BitVec 64 :=
-  let rs1_low : BitVec 32 := HWord.toBitVec32 #v[op1[0] + op1[1] * 256, op1[2] + op1[3] * 256]
-  let rs2_low : BitVec 32 := HWord.toBitVec32 #v[op2[0] + op2[1] * 256, op2[2] + op2[3] * 256]
-  let prod : BitVec 32 := rs1_low * rs2_low
-  prod.extend 64 True
+def execute_MULW_pure_bhw (op1 : BHWord (Fin BB)) (op2 : BHWord (Fin BB)) : BitVec 64 :=
+  let prod : BitVec 32 := op1.toBitVec32 * op2.toBitVec32
+  prod.extend 64 true
 
-lemma exec_MULW_pure_bv_to_bw (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) :
+lemma exec_MULW_pure_bv_to_bhw (op1 : Word (Fin BB)) (op2 : Word (Fin BB)) :
   op1.isU64 → op2.isU64 →
-  execute_MULW_pure op1.toBitVec64 op2.toBitVec64 = execute_MULW_pure_bw op1.toByteWord op2.toByteWord := by
+  execute_MULW_pure op1.toBitVec64 op2.toBitVec64 = execute_MULW_pure_bhw op1.toBWord.low op2.toBWord.low := by
   intro is_U64_op1 is_U64_op2
-  have is_U64_bw1 := op1.toU64_toByteWord is_U64_op1
-  have is_U64_bw2 := op2.toU64_toByteWord is_U64_op2
+  have is_U64_bw1 := op1.toU64_toBWord is_U64_op1
+  have is_U64_bw2 := op2.toU64_toBWord is_U64_op2
 
-  simp [execute_MULW_pure, execute_MULW_pure_bw, BitVec.extend]; congr
-  . simp [← BitVec.toNat_inj, Word.toBitVec64, Word.toNat, Word.toByteWord, HWord.toBitVec32, HWord.toNat]
-    trans (op1[0].val + ↑op1[1] * 65536) % 4294967296
-    . omega
-    . have := Word.lt_cases_of_isU64 is_U64_op1
-      simp_all [Fin.val_add, Fin.val_mul]
-      repeat rw [Nat.mod_eq_of_lt (by omega)]
-      omega
-  . simp [← BitVec.toNat_inj, Word.toBitVec64, Word.toNat, Word.toByteWord, HWord.toBitVec32, HWord.toNat]
-    trans (op2[0].val + ↑op2[1] * 65536) % 4294967296
-    . omega
-    . have := Word.lt_cases_of_isU64 is_U64_op2
-      simp_all [Fin.val_add, Fin.val_mul]
-      repeat rw [Nat.mod_eq_of_lt (by omega)]
-      omega
+  simp [execute_MULW_pure, execute_MULW_pure_bhw, BitVec.extend]
+  repeat rw [← Word.toBitVec64_toBWord _ (by assumption), BWord.low_as_setWidth _ (by assumption)]
 
 def execute_MULW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
