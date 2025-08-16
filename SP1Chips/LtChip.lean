@@ -166,7 +166,7 @@ theorem correct_sltu
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
-      := by apply Word.isU64_of_cases _ c0 c1 c2 c3
+      := by apply Word.isU64_of_cases c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
     -- simp [h_is_addiw] at h_f h_imm_c
     -- obtain ⟨ h_c, h_is_imm_c ⟩ := h_imm_c
@@ -352,7 +352,7 @@ theorem correct_sltu
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
-      := by apply Word.isU64_of_cases _ c0 c1 c2 c3
+      := by apply Word.isU64_of_cases c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
 
     -- Now the monadic manipulation

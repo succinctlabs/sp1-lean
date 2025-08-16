@@ -87,11 +87,11 @@ theorem SP1JAL_correct
   have h16 : Main[16] < 65536 := by simp_all only
   have h17 : Main[17] < 65536 := by simp_all only
   have pc_isU64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] :=
-    Word.isU64_of_cases _ h3 h4 h5 (by simp)
+    Word.isU64_of_cases h3 h4 h5 (by simp)
   have imm_isU64 : Word.isU64 #v[Main[14], Main[15], Main[16], Main[17]] := by
-    refine Word.isU64_of_cases _ h14 h15 h16 h17
+    refine Word.isU64_of_cases h14 h15 h16 h17
 
-  have h_add' := (AddOperation.correct _ _ _  _ rfl h_add_imm pc_isU64 imm_isU64).2
+  have h_add' := (AddOperation.spec pc_isU64 imm_isU64 h_add_imm).2
   simp [Word.toBitVec64, Word.toNat] at h_add'
 
   simp only [ext_control_check_pc, bit_to_bool, access, ofBool, bits_of_virtaddr, Nat.one_lt_ofNat,
@@ -115,7 +115,7 @@ theorem SP1JAL_correct
     have h_add_pc : List.Forall SP1Constraint.toProp (AddOperation.constraints
         #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0]
         {value := #v[Main[26], Main[27], Main[28], Main[29]]} 1) := by aesop
-    have h_add_pc' := (AddOperation.correct _ _ _  _ rfl h_add_pc pc_isU64 Word.four_isU64).2
+    have h_add_pc' := (AddOperation.spec pc_isU64 Word.four_isU64 h_add_pc).2
     simp [Word.toBitVec64, Word.toNat] at h_add_pc'
     rw [h_add_pc', BitVec.ofNatLT_eq_ofNat]
 

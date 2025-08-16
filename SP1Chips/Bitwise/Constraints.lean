@@ -279,7 +279,7 @@ lemma spec.xor (h : is_xor Main ) :
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all
 
-    exact BitwiseU16Operation.spec.xor _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
+    exact BitwiseU16Operation.spec.xor is_U64_b is_U64_c h_bop
 
 end xor
 
@@ -304,7 +304,7 @@ lemma spec.xori (h : is_xori Main ) :
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all
 
-    exact BitwiseU16Operation.spec.xor _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
+    exact BitwiseU16Operation.spec.xor is_U64_b is_U64_c h_bop
 
 end xori
 
@@ -325,7 +325,7 @@ lemma spec.or (h : is_or Main ) :
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all
 
-    exact BitwiseU16Operation.spec.or _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
+    exact BitwiseU16Operation.spec.or is_U64_b is_U64_c h_bop
 
 end or
 
@@ -350,7 +350,7 @@ lemma spec.ori (h : is_ori Main ) :
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all
 
-    exact BitwiseU16Operation.spec.or _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
+    exact BitwiseU16Operation.spec.or is_U64_b is_U64_c h_bop
 
 end ori
 
@@ -371,7 +371,7 @@ lemma spec.and (h : is_and Main ) :
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all
 
-    exact BitwiseU16Operation.spec.and _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
+    exact BitwiseU16Operation.spec.and is_U64_b is_U64_c h_bop
 
 end and
 
@@ -396,7 +396,7 @@ lemma spec.andi (h : is_andi Main ) :
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all
 
-    exact BitwiseU16Operation.spec.and _ _ _ _ _ (by rfl) (by rfl) h_bop is_U64_b is_U64_c
+    exact BitwiseU16Operation.spec.and is_U64_b is_U64_c h_bop
 
 end andi
 

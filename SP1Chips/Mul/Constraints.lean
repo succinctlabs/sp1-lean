@@ -230,8 +230,8 @@ lemma spec.mul (h : is_mul Main ) :
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
 
-    have := MulOperation.spec.mul is_U64_b is_U64_c h_mop (by simp)
-    rw [this, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
+    have ⟨ _, spec ⟩ := MulOperation.spec.mul is_U64_b is_U64_c h_mop (by simp)
+    rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mul
 
@@ -251,8 +251,8 @@ lemma spec.mulh (h : is_mulh Main ) :
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
 
-    have := MulOperation.spec.mulh is_U64_b is_U64_c h_mop (by simp)
-    rw [this, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
+    have ⟨ _, spec ⟩ := MulOperation.spec.mulh is_U64_b is_U64_c h_mop (by simp)
+    rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mulh
 
@@ -272,8 +272,8 @@ lemma spec.mulhu (h : is_mulhu Main ) :
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
 
-    have := MulOperation.spec.mulhu is_U64_b is_U64_c h_mop (by simp)
-    rw [this, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
+    have ⟨ _, spec ⟩ := MulOperation.spec.mulhu is_U64_b is_U64_c h_mop (by simp)
+    rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mulhu
 
@@ -293,8 +293,8 @@ lemma spec.mulhsu (h : is_mulhsu Main ) :
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
 
-    have := MulOperation.spec.mulhsu is_U64_b is_U64_c h_mop (by simp)
-    rw [this, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
+    have ⟨ _, spec ⟩ := MulOperation.spec.mulhsu is_U64_b is_U64_c h_mop (by simp)
+    rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mulhsu
 
@@ -314,8 +314,8 @@ lemma spec.mulw (h : is_mulw Main ) :
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
 
-    have := MulOperation.spec.mulw is_U64_b is_U64_c h_mop (by simp)
-    rw [this, exec_MULW_pure_bv_to_bhw _ _ is_U64_b is_U64_c]
+    have ⟨ _, spec ⟩ := MulOperation.spec.mulw is_U64_b is_U64_c h_mop (by simp)
+    rw [spec, exec_MULW_pure_bv_to_bhw _ _ is_U64_b is_U64_c]
 
 end mulw
 

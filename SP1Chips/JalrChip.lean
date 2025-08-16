@@ -73,18 +73,19 @@ theorem JALR_correct
   let read_op_b' := read_op_b h_op_b
 
   have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
-  let b_bv64 : BitVec 64 := Word.toBitVec64LT #v[Main[15], Main[16], Main[17], Main[18]] b_is_u64
+  let b_bv64 : BitVec 64 := Word.toBitVec64LT b_is_u64
 
   have imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
-    refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] h_c_0 h_c_1 h_c_2 h_c_3
+    refine Word.isU64_of_cases h_c_0 h_c_1 h_c_2 h_c_3
 
   have pc_is_u64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
-    exact Word.isU64_of_cases #v[Main[3], Main[4], Main[5], 0] h_pc_0 h_pc_1 h_pc_2 (by simp)
+    exact Word.isU64_of_cases h_pc_0 h_pc_1 h_pc_2 (by simp)
 
-  have ⟨res_is_u64, h_res⟩ := (AddOperation.correct #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[30], Main[31], Main[32], Main[33]] } Main[29] h_is_real res_cstrs) b_is_u64 imm_is_u64
+  rw [h_is_real] at *
+  have ⟨res_is_u64, h_res⟩ := AddOperation.spec b_is_u64 imm_is_u64 res_cstrs
 
   have h_4_is_u64 : Word.isU64 #v[4,0,0,0] :=
-    Word.isU64_of_cases _ (by trivial) (by trivial) (by trivial) (by trivial)
+    Word.isU64_of_cases (by trivial) (by trivial) (by trivial) (by trivial)
 
   have hmod : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]) % 4 = 0 := by
@@ -99,28 +100,27 @@ theorem JALR_correct
 
   clear res_cstrs reader_cstrs pc_cstrs
 
-  simp [spec_jalr, sp1_jalr, execute_JALR, op_a, op_b, op_c,
-    sp1_op_a, sp1_op_b, sp1_op_c, EStateM.run_bind]
-  rw [run_readReg] -- `simp` refuses to apply this itself
+  simp [spec_jalr, sp1_jalr, execute_JALR, op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c]
+  rw [run_readReg]
   simp only [read_pc, hmod4, read_op_b', run_rX_bits, get_reg?_insert_nextPC, ext_control_check_addr,
     Sail.BitVec.access, bit_to_bool, Sail.BitVec.update, Sail.BitVec.updateSubrange',
     bits_of_virtaddr, BitVec.reduceAllOnes, BitVec.truncate_eq_setWidth, BitVec.reduceSetWidth,
     BitVec.shiftLeft_zero, BitVec.reduceNot, BitVec.setWidth_zero, BitVec.or_zero,
     Nat.one_lt_ofNat, getElem!_pos, BitVec.getElem_and, BitVec.reduceGetElem, Bool.true_and,
     BitVec.ofBool, BitVec.ofNat_eq_ofNat, cond_false, EStateM.run_bind,
-    run_bool_bit_backwards, Bool.false_and, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
+    run_bool_bit_backwards, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
     currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or, Bool.and_self,
     BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map,
     sign_extend, Sail.BitVec.signExtend, ← h_c_sign_extend]
-  rw [map_const_run_readReg _ _ (by simp [h_misa])]
+  rw [map_const_run_readReg (by simp [h_misa])]
   simp only
   rw [run_readReg]
   simp only [Std.ExtDHashMap.get?_insert_self, run_wX_bits, BitVec.ofNat_eq_ofNat, EStateM.Result.map_ok]
 
   split_ifs <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
-  refine congr_fun ?_ _
-  have htemp : Main[29] - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
-  have ⟨ _, h_add ⟩ := AddOperation.correct _ _ _ _ htemp inc_pc_cstrs pc_is_u64 h_4_is_u64
+  have htemp : (1 : Fin BB) - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
+  rw [htemp] at inc_pc_cstrs
+  have ⟨ _, h_add ⟩ := AddOperation.spec pc_is_u64 h_4_is_u64 inc_pc_cstrs
   rw [h_add]
   simp [Word.toBitVec64, Word.toNat]
 

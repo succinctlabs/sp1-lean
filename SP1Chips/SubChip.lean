@@ -80,17 +80,17 @@ theorem correct_sub
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_sub (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sub Main cstrs h_is_real).run s
   := by
-    -- Obtain and simplify state and pure constraints
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, SubOperation.constraints, CPUState.constraints, RTypeReader.constraints, h_is_real] at state_cstrs
     obtain ⟨read_pc, trusted_instr_state, _, read_op_b, read_op_c⟩ := state_cstrs
     simp [constraints] at cstrs
     obtain ⟨sub_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
-    apply SubOperation.correct (h_is_real := h_is_real) at sub_op_cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [RTypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
     obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at trusted_instr_state trusted_instr_prop
-    specialize sub_op_cstrs is_U64_b is_U64_c
+
+    rw [h_is_real] at *
+    apply SubOperation.spec is_U64_b is_U64_c at sub_op_cstrs
     obtain ⟨ is_U64_val, is_sub ⟩ := sub_op_cstrs
     simp at *
 

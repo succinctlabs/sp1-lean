@@ -824,14 +824,14 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
         }
       have a3_16 : (hl3 + (msb_b * 65536 - msb_b * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1)))).val < 65536 := by
         clear *- h_msb_b3 b_cb0 b_cb1 b_cb2 b_cb3 b3_16 h_b3_dec lt_ll3 lt_hl3
-        rw [← SP1ConstraintList.allHold, U16MSBOperation.allHold_constraints_iff] at h_msb_b3
+        rw [U16MSBOperation.allHold_constraints_iff] at h_msb_b3
         obtain ⟨ _, b_msb_b3, _ ⟩ := h_msb_b3
         rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> rcases b_msb_b3 <;> simp_all
         all_goals { clear *- lt_hl3; omega }
       have msb_b : (msb_b * 65535).val < 65536 := by
         suffices b_msb : msb_b = 0 ∨ msb_b = 1
         . clear *- b_msb;rcases b_msb <;> simp_all
-        . rw [← SP1ConstraintList.allHold, U16MSBOperation.allHold_constraints_iff] at h_msb_b3
+        . rw [U16MSBOperation.allHold_constraints_iff] at h_msb_b3
           clear *- h_msb_b3; simp_all
       rcases b_su160 <;> simp_all
       rcases b_su161 <;> simp_all
@@ -880,7 +880,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
       have msb_16 : (msb_srw * 65535).val < 65536 := by
         suffices b_msb : msb_srw = 0 ∨ msb_srw = 1
         . clear *- b_msb; rcases b_msb <;> simp_all
-        . rw [← SP1ConstraintList.allHold, U16MSBOperation.allHold_constraints_iff] at h_msb_a1
+        . rw [U16MSBOperation.allHold_constraints_iff] at h_msb_a1
           clear *- h_msb_a1; simp_all
 
       rcases b_su160 <;> simp_all
@@ -921,19 +921,19 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
         }
       have a1_16 : (hl1 + (msb_b * 65536 - msb_b * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1)))).val < 65536 := by
         clear *- h_msb_b3 b1_16 b2_16 b_cb0 b_cb1 b_cb2 b_cb3 h_b1_dec lt_ll1 lt_hl1
-        rw [← SP1ConstraintList.allHold, U16MSBOperation.allHold_constraints_iff] at h_msb_b3
+        rw [U16MSBOperation.allHold_constraints_iff] at h_msb_b3
         obtain ⟨ _, b_msb_b3, _ ⟩ := h_msb_b3
         rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> rcases b_msb_b3 <;> simp_all
         all_goals { clear *- lt_hl1; omega }
       have msb_b: (msb_b * 65535).val < 65536 := by
         suffices b_msb_b : msb_b = 0 ∨ msb_b = 1
         . clear *- b_msb_b; rcases b_msb_b <;> simp_all
-        . rw [← SP1ConstraintList.allHold, U16MSBOperation.allHold_constraints_iff] at h_msb_b1
+        . rw [U16MSBOperation.allHold_constraints_iff] at h_msb_b1
           clear *- h_msb_b1; simp_all
       have msb_srw : (msb_srw * 65535).val < 65536 := by
         suffices b_msb_srw : msb_srw = 0 ∨ msb_srw = 1
         . clear *- b_msb_srw; rcases b_msb_srw <;> simp_all
-        . rw [← SP1ConstraintList.allHold, U16MSBOperation.allHold_constraints_iff] at h_msb_a1
+        . rw [U16MSBOperation.allHold_constraints_iff] at h_msb_a1
           clear *- h_msb_a1; simp_all
 
       rcases b_su160 <;> simp_all
@@ -1354,11 +1354,11 @@ lemma spec.srlw (h : is_srlw Main) :
 
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
-      have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
+      have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1
       simp at h_msb; rw [h_msb]
       trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HWord.isNegative_msb _ is_U32_a]
+      . congr; rw [HWord.isNegative_msb is_U32_a]
 
     . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = (HWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
       . rw [← hw_shift]
@@ -1512,11 +1512,11 @@ lemma spec.srliw (h : is_srliw Main ) :
 
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
-      have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
+      have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1
       simp at h_msb; rw [h_msb]
       trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HWord.isNegative_msb _ is_U32_a]
+      . congr; rw [HWord.isNegative_msb is_U32_a]
 
     . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = (HWord.toBitVec32 #v[b0, b1] >>> (c0.val % 32))
       . rw [← hw_shift]
@@ -1637,7 +1637,7 @@ lemma spec.sra (h : is_sra Main ) :
     rw [Word.toBitVec64_toInt (w := #v[a0, a1, a2, a3]) is_U64_a]
     rw [Word.toBitVec64_toInt (w := #v[b0, b1, b2, b3]) is_U64_b]
 
-    have msb_b3_spec := U16MSBOperation.spec _ _ _ b3_16 h_msb_b3 (by simp)
+    have msb_b3_spec := U16MSBOperation.spec b3_16 h_msb_b3
     simp at msb_b3_spec
 
     have b_msb : msb_b = 0 ∨ msb_b = 1 := by
@@ -1790,7 +1790,7 @@ lemma spec.srai (h : is_srai Main ) :
     rw [Word.toBitVec64_toInt (w := #v[a0, a1, a2, a3]) is_U64_a]
     rw [Word.toBitVec64_toInt (w := #v[b0, b1, b2, b3]) is_U64_b]
 
-    have msb_b3_spec := U16MSBOperation.spec _ _ _ b3_16 h_msb_b3 (by simp)
+    have msb_b3_spec := U16MSBOperation.spec b3_16 h_msb_b3
     simp at msb_b3_spec
 
     have b_msb : msb_b = 0 ∨ msb_b = 1 := by
@@ -1972,11 +1972,11 @@ lemma spec.sraw (h : is_sraw Main) :
 
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
-      have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
+      have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1
       simp at h_msb; rw [h_msb]
       trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HWord.isNegative_msb _ is_U32_a]
+      . congr; rw [HWord.isNegative_msb is_U32_a]
 
     . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
       . rw [← hw_shift]
@@ -1987,7 +1987,7 @@ lemma spec.sraw (h : is_sraw Main) :
         rw [HWord.toBitVec32_toInt (w := #v[a0, a1]) is_U32_a]
         rw [HWord.toBitVec32_toInt (w := #v[b0, b1]) is_U32_b]
 
-        have msb_b1_spec := U16MSBOperation.spec _ _ _ b1_16 h_msb_b1 (by simp)
+        have msb_b1_spec := U16MSBOperation.spec b1_16 h_msb_b1
         simp at msb_b1_spec
 
         have b_msb : msb_b = 0 ∨ msb_b = 1 := by
@@ -2168,11 +2168,11 @@ lemma spec.sraiw (h : is_sraiw Main ) :
 
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
-      have h_msb := U16MSBOperation.spec a1 { msb := msb_srw } 1 (by assumption) h_msb_a1 (by simp)
+      have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1
       simp at h_msb; rw [h_msb]
       trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HWord.isNegative_msb _ is_U32_a]
+      . congr; rw [HWord.isNegative_msb is_U32_a]
 
     . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = BitVec.sshiftRight (HWord.toBitVec32 #v[b0, b1]) (c0.val % 32)
       . rw [← hw_shift]
@@ -2183,7 +2183,7 @@ lemma spec.sraiw (h : is_sraiw Main ) :
         rw [HWord.toBitVec32_toInt (w := #v[a0, a1]) is_U32_a]
         rw [HWord.toBitVec32_toInt (w := #v[b0, b1]) is_U32_b]
 
-        have msb_b1_spec := U16MSBOperation.spec _ _ _ b1_16 h_msb_b1 (by simp)
+        have msb_b1_spec := U16MSBOperation.spec b1_16 h_msb_b1
         simp at msb_b1_spec
 
         have b_msb : msb_b = 0 ∨ msb_b = 1 := by

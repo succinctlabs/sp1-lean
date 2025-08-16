@@ -38,6 +38,9 @@ lemma val_mod4_eq_zero (x : Fin BB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
   rw [← Fin.val_inj]
   simp only [BB_eq, Fin.isValue, Fin.mod_val, Fin.coe_ofNat_eq_mod, Nat.reduceMod, Nat.zero_mod]
 
+@[aesop safe forward]
+lemma mul_diff_one_neq {a b c : Fin BB} : a * (b - c) = 1 → b ≠ c := by aesop
+
 end BabyBear
 
 @[simp] lemma shiftl_1BB_eq_one : (1006632961 : Fin BB) <<< 1 = 1 := rfl

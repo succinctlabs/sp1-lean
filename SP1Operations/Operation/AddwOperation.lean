@@ -18,38 +18,31 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddwOperation) :
   simp [constraints, U16MSBOperation.constraints, sub_eq_zero, inv_16BB_eq']
   tauto
 
-def spec (a b : Word (Fin BB)) (cols : AddwOperation) : Prop :=
-  a.isU64 → b.isU64 →
+theorem spec
+  {a b : Word (Fin BB)}
+  {cols : AddwOperation}
+  (h_isU64_a : a.isU64)
+  (h_isU64_b : b.isU64) :
+  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
     HWord.isU32 (cols.value) ∧
     HWord.toBitVec32 (cols.value) = execute_RTYPEW_pure_32_w a b .ADDW ∧
     cols.msb.msb = if (HWord.toBitVec32 cols.value).msb then 1 else 0
+  := by
+    intro cstrs
+    simp [allHold_constraints_iff] at cstrs
+    obtain ⟨hmsb, h0, h1, hbds⟩ := cstrs
+    apply Word.lt_cases_of_isU64 at h_isU64_a
+    apply Word.lt_cases_of_isU64 at h_isU64_b
+    split_ands
 
-set_option maxHeartbeats 1000000 in
-/-- If the operation is real and the input words have correctly bounded limbs,
-then the constraints imply the spec. -/
-theorem correct (a b : Word (Fin BB)) (cols : AddwOperation) (is_real : Fin BB)
-    (h_is_real : is_real = 1)
-    (h_cstrs : (constraints a b cols is_real).allHold) :
-    spec a b cols := by
-  cases h_is_real
-  simp [allHold_constraints_iff] at h_cstrs
-  obtain ⟨hmsb, h0, h1, hbds⟩ := h_cstrs
-  intro ha hb
-  have ha' := Word.lt_cases_of_isU64 ha
-  have hb' := Word.lt_cases_of_isU64 hb
-
-  constructor
-  · clear *- hbds
-    aesop
-
-  . constructor
-    . simp [HWord.toBitVec32, Word.low, HWord.toNat]
+    . clear *- hbds; aesop
+    . simp [BitVec.eq_sub_iff_add_eq]
+      simp [HWord.toBitVec32, Word.low, HWord.toNat]
       rw [← BitVec.toNat_inj, BitVec.toNat_add]
-      rcases h0 <;> rcases h1 <;>
-      simp_all <;> omega
+      aesop (add safe (by omega))
     . simp [Fin.lt_iff_val_lt_val] at hbds
-      apply (U16MSBOperation.spec cols.value[1] cols.msb 1 (by omega)) at hmsb
-      simp_all [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
-      split_ifs at * <;> omega
+      apply U16MSBOperation.spec (by omega) at hmsb
+      simp [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
+      simp at hmsb; split_ifs at * <;> omega
 
 end AddwOperation

@@ -63,7 +63,7 @@ lemma allHold_constraints_iff_slt (h : is_slt Main) :
     Main[33] = 0 ∧ Main[34] = 51
    := by
   simp_all [constraints]
-  intro ltop; rw [LtOperationSigned.allHold_constraints_iff] at ltop
+  intro ltop; simp [LtOperationSigned.constraints] at ltop
   omega
 
 lemma allHold_constraints_iff_sltu (h : is_sltu Main) :
@@ -74,7 +74,7 @@ lemma allHold_constraints_iff_sltu (h : is_sltu Main) :
     Main[32] = 0 ∧ Main[34] = 51
    := by
   simp_all [constraints]
-  intro ltop; rw [LtOperationSigned.allHold_constraints_iff] at ltop
+  intro ltop; simp [LtOperationSigned.constraints] at ltop
   omega
 
 lemma allHold_constraints_iff_slti (h : is_slti Main) :
@@ -85,7 +85,7 @@ lemma allHold_constraints_iff_slti (h : is_slti Main) :
     Main[33] = 0 ∧ Main[34] = 19
    := by
   simp_all [constraints]
-  intro ltop _ _; rw [LtOperationSigned.allHold_constraints_iff] at ltop
+  intro ltop _ _; simp [LtOperationSigned.constraints] at ltop
   omega
 
 lemma allHold_constraints_iff_sltiu (h : is_sltiu Main) :
@@ -96,7 +96,7 @@ lemma allHold_constraints_iff_sltiu (h : is_sltiu Main) :
     Main[32] = 0 ∧ Main[34] = 19
    := by
   simp_all [constraints]
-  intro ltop _ _; rw [LtOperationSigned.allHold_constraints_iff] at ltop
+  intro ltop _ _; simp [LtOperationSigned.constraints] at ltop
   omega
 
 end constraints

@@ -9,12 +9,14 @@ import SP1Operations.Reader.ALUTypeReader
 
 namespace DivRem
 
-set_option maxHeartbeats 4000000
+set_option maxHeartbeats 100000000
+
+variable (Main : Vector (Fin BB) 251)
 
 section constraints
 
 -- Generated Lean code for chip DivRemChip
-def constraints (Main : Vector (Fin BB) 251) : SP1ConstraintList :=
+def constraints : SP1ConstraintList :=
   let E0 : Fin BB := Main[209] + Main[210]
   let E1 : Fin BB := E0 + Main[211]
   let E2 : Fin BB := E1 + Main[212]
@@ -634,6 +636,495 @@ def constraints (Main : Vector (Fin BB) 251) : SP1ConstraintList :=
     (.assertZero E440),
   ]
 
+set_option maxRecDepth 1000000 in
+lemma allHold_constraints_iff :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp
+    (MulOperation.constraints
+      #v[Main[72], Main[73], Main[74], Main[75]]
+      #v[Main[48], Main[49], Main[50], Main[51]]
+      #v[Main[40], Main[41], Main[42], Main[43]]
+      {
+        carry := #v[Main[80], Main[81], Main[82], Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89], Main[90], Main[91], Main[92], Main[93], Main[94], Main[95]],
+        product := #v[Main[96], Main[97], Main[98], Main[99], Main[100], Main[101], Main[102], Main[103], Main[104], Main[105], Main[106], Main[107], Main[108], Main[109], Main[110], Main[111]],
+        b_lower_byte := { low_bytes := #v[Main[112], Main[113], Main[114], Main[115]] },
+        c_lower_byte := { low_bytes := #v[Main[116], Main[117], Main[118], Main[119]] },
+        b_msb := Main[120],
+        c_msb := Main[121],
+        product_msb := { msb := Main[122] },
+        b_sign_extend := Main[123],
+        c_sign_extend := Main[124]
+      }
+      Main[249] Main[249] 0 0 0 0) ∧
+    List.Forall SP1Constraint.toProp
+    (MulOperation.constraints
+      #v[Main[76], Main[77], Main[78], Main[79]]
+      #v[Main[48], Main[49], Main[50], Main[51]]
+      #v[Main[40], Main[41], Main[42], Main[43]]
+      {
+        carry := #v[Main[125], Main[126], Main[127], Main[128], Main[129], Main[130], Main[131], Main[132], Main[133], Main[134], Main[135], Main[136], Main[137], Main[138], Main[139], Main[140]],
+        product := #v[Main[141], Main[142], Main[143], Main[144], Main[145], Main[146], Main[147], Main[148], Main[149], Main[150], Main[151], Main[152], Main[153], Main[154], Main[155], Main[156]],
+        b_lower_byte := { low_bytes := #v[Main[157], Main[158], Main[159], Main[160]] },
+        c_lower_byte := { low_bytes := #v[Main[161], Main[162], Main[163], Main[164]] },
+        b_msb := Main[165],
+        c_msb := Main[166],
+        product_msb := { msb := Main[167] },
+        b_sign_extend := Main[168],
+        c_sign_extend := Main[169]
+      }
+      Main[244] 0 (Main[205] + Main[207]) 0 (Main[206] + Main[208]) 0) ∧
+    List.Forall SP1Constraint.toProp
+    (IsEqualWordOperation.constraints
+      #v[Main[15], Main[16], Main[17], Main[18]]
+      #v[0, 0, 0, 32768]
+      {
+        is_diff_zero := {
+          is_zero_limb := #v[{ inverse := Main[215], result := Main[216] }, { inverse := Main[217], result := Main[218] }, { inverse := Main[219], result := Main[220] }, { inverse := Main[221], result := Main[222] }],
+          is_zero_first_half := Main[223],
+          is_zero_second_half := Main[224],
+          result := Main[225]
+        }
+      }
+      Main[244]) ∧
+    List.Forall SP1Constraint.toProp
+    (IsEqualWordOperation.constraints
+      #v[Main[25], Main[26], Main[27], Main[28]]
+      #v[65535, 65535, 65535, 65535]
+      {
+        is_diff_zero := {
+          is_zero_limb := #v[{ inverse := Main[226], result := Main[227] }, { inverse := Main[228], result := Main[229] }, { inverse := Main[230], result := Main[231] }, { inverse := Main[232], result := Main[233] }],
+          is_zero_first_half := Main[234],
+          is_zero_second_half := Main[235],
+          result := Main[236]
+        }
+      }
+      Main[244]) ∧
+    List.Forall SP1Constraint.toProp
+    (IsEqualWordOperation.constraints
+      #v[Main[15], Main[16], 0, 0]
+      #v[0, 32768, 0, 0]
+      {
+        is_diff_zero := {
+          is_zero_limb := #v[{ inverse := Main[215], result := Main[216] }, { inverse := Main[217], result := Main[218] }, { inverse := Main[219], result := Main[220] }, { inverse := Main[221], result := Main[222] }],
+          is_zero_first_half := Main[223],
+          is_zero_second_half := Main[224],
+          result := Main[225] }
+      }
+      (Main[209] + Main[210] + Main[211] + Main[212])) ∧
+    List.Forall SP1Constraint.toProp
+    (IsEqualWordOperation.constraints
+      #v[Main[25], Main[26], 0, 0]
+      #v[65535, 65535, 0, 0]
+      {
+        is_diff_zero := {
+          is_zero_limb := #v[{ inverse := Main[226], result := Main[227] }, { inverse := Main[228], result := Main[229] }, { inverse := Main[230], result := Main[231] }, { inverse := Main[232], result := Main[233] }],
+          is_zero_first_half := Main[234],
+          is_zero_second_half := Main[235],
+          result := Main[236] }
+      }
+      (Main[209] + Main[210] + Main[211] + Main[212])) ∧
+    List.Forall SP1Constraint.toProp
+    (IsZeroWordOperation.constraints
+      #v[Main[40], Main[41], Main[42], Main[43]]
+      {
+        is_zero_limb := #v[{ inverse := Main[194], result := Main[195] }, { inverse := Main[196], result := Main[197] }, { inverse := Main[198], result := Main[199] }, { inverse := Main[200], result := Main[201] }],
+        is_zero_first_half := Main[202],
+        is_zero_second_half := Main[203],
+        result := Main[204]
+      }
+      Main[249]) ∧
+    List.Forall SP1Constraint.toProp
+    (AddOperation.constraints
+      #v[Main[40], Main[41], Main[42], Main[43]]
+      #v[Main[64], Main[65], Main[66], Main[67]]
+      { value := #v[Main[170], Main[171], Main[172], Main[173]] }
+      Main[247]) ∧
+    List.Forall SP1Constraint.toProp
+    (AddOperation.constraints
+      #v[Main[52], Main[53], Main[54], Main[55]]
+      #v[Main[60], Main[61], Main[62], Main[63]]
+      { value := #v[Main[174], Main[175], Main[176], Main[177]] }
+      Main[248]) ∧
+    List.Forall SP1Constraint.toProp
+    (LtOperationUnsigned.constraints
+      #v[Main[60], Main[61], Main[62], Main[63]]
+      #v[Main[68], Main[69], Main[70], Main[71]]
+      {
+          u16_compare_operation := { bit := Main[178] },
+          u16_flags := #v[Main[179], Main[180], Main[181], Main[182]]
+          not_eq_inv := Main[183],
+          comparison_limbs := #v[Main[184], Main[185]]
+      }
+      Main[250]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[18] { msb := Main[237] } Main[244]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[28] { msb := Main[239] } Main[244]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[59] { msb := Main[238] } Main[244]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[16] { msb := Main[237] } (Main[209] + Main[210] + Main[211] + Main[212])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[26] { msb := Main[239] } (Main[209] + Main[210] + Main[211] + Main[212])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[57] { msb := Main[238] } (Main[209] + Main[210] + Main[211] + Main[212])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[45] { msb := Main[240] } (Main[209] + Main[210] + Main[211] + Main[212])) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 Main[249]) ∧
+    List.Forall SP1Constraint.toProp
+    (ALUTypeReader.constraints
+      Main[0]
+      (Main[2] + Main[1] * 65536)
+      #v[Main[3], Main[4], Main[5]]
+      (Main[206] * (16 : Fin BB) + Main[208] * (18 : Fin BB) + Main[205] * (15 : Fin BB) + Main[207] * (17 : Fin BB) +
+       Main[209] * (48 : Fin BB) + Main[210] * (50 : Fin BB) + Main[211] * (49 : Fin BB) + Main[212] * (51 : Fin BB))
+      #v[Main[213], Main[206] * (5 : Fin BB) + Main[208] * (7 : Fin BB) + Main[205] * (4 : Fin BB) + Main[207] * (6 : Fin BB) + Main[209] * (4 : Fin BB) + Main[210] * (6 : Fin BB) + Main[211] * (5 : Fin BB) + Main[212] * (7 : Fin BB), Main[206] + Main[208] + Main[205] + Main[207] + Main[209] + Main[210] + Main[211] + Main[212]]
+      #v[Main[32], Main[33], Main[34], Main[35]]
+      {
+        op_a := Main[6],
+        op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+        op_a_0 := Main[13],
+        op_b := Main[14],
+        op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+        op_c := #v[Main[21], Main[22], Main[23], Main[24]],
+        op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } },
+        imm_c := Main[31]
+      }
+      Main[249]) ∧
+    Main[244] = Main[249] * ((1 : Fin BB) - (Main[209] + Main[210] + Main[211] + Main[212])) ∧
+    Main[241] = Main[237] * (Main[205] + Main[207] + Main[209] + Main[210]) ∧
+    Main[245] = Main[238] * (Main[205] + Main[207] + Main[209] + Main[210]) ∧
+    Main[246] = Main[239] * (Main[205] + Main[207] + Main[209] + Main[210]) ∧
+    Main[15] = Main[36] ∧
+    Main[25] = Main[40] ∧
+    Main[16] = Main[37] ∧
+    Main[26] = Main[41] ∧
+    Main[38] = Main[17] * ((1 : Fin BB) - (Main[209] + Main[210] + Main[211] + Main[212])) + Main[241] * (Main[209] + Main[210] + Main[211] + Main[212]) * (65535 : Fin BB) ∧
+    Main[42] = Main[27] * ((1 : Fin BB) - (Main[209] + Main[210] + Main[211] + Main[212])) + Main[246] * (Main[209] + Main[210] + Main[211] + Main[212]) * (65535 : Fin BB) ∧
+    Main[39] = Main[18] * ((1 : Fin BB) - (Main[209] + Main[210] + Main[211] + Main[212])) + Main[241] * (Main[209] + Main[210] + Main[211] + Main[212]) * (65535 : Fin BB) ∧
+    Main[43] = Main[28] * ((1 : Fin BB) - (Main[209] + Main[210] + Main[211] + Main[212])) + Main[246] * (Main[209] + Main[210] + Main[211] + Main[212]) * (65535 : Fin BB) ∧
+    Main[48] = Main[44] ∧
+    Main[49] = Main[45] ∧
+    (Main[211] + Main[212] = 0 ∨ Main[50] = 0) ∧
+    (Main[209] + Main[210] = 0 ∨ Main[50] = Main[240] * 65535) ∧
+    (Main[209] + Main[210] + Main[211] + Main[212] = 0 ∨ Main[46] = Main[240] * 65535) ∧
+    (Main[206] + Main[208] + Main[205] + Main[207] = 0 ∨ Main[50] = Main[46]) ∧
+    (Main[211] + Main[212] = 0 ∨ Main[51] = 0) ∧
+    (Main[209] + Main[210] = 0 ∨ Main[51] = Main[240] * 65535) ∧
+    (Main[209] + Main[210] + Main[211] + Main[212] = 0 ∨ Main[47] = Main[240] * 65535) ∧
+    (Main[206] + Main[208] + Main[205] + Main[207] = 0 ∨ Main[51] = Main[47]) ∧
+    Main[52] = Main[56] ∧
+    Main[53] = Main[57] ∧
+    (Main[211] + Main[212] = 0 ∨ Main[54] = 0) ∧
+    (Main[209] + Main[210] = 0 ∨ Main[54] = Main[238] * (65535 : Fin BB)) ∧
+    (Main[209] + Main[210] + Main[211] + Main[212] = 0 ∨ Main[58] = Main[238] * (65535 : Fin BB)) ∧
+    (Main[206] + Main[208] + Main[205] + Main[207] = 0 ∨ Main[54] = Main[58]) ∧
+    (Main[211] + Main[212] = 0 ∨ Main[55] = 0) ∧
+    (Main[209] + Main[210] = 0 ∨ Main[55] = Main[238] * (65535 : Fin BB)) ∧
+    (Main[209] + Main[210] + Main[211] + Main[212] = 0 ∨ Main[59] = Main[238] * (65535 : Fin BB)) ∧
+    (Main[206] + Main[208] + Main[205] + Main[207] = 0 ∨ Main[55] = Main[59]) ∧
+    Main[214] = Main[225] * Main[236] * (Main[205] + Main[207] + Main[209] + Main[210]) ∧
+    Main[242] = Main[241] * ((1 : Fin BB) - Main[214]) ∧
+    Main[243] = ((1 : Fin BB) - Main[241]) * ((1 : Fin BB) - Main[214]) ∧
+    (Main[214] = 0 ∨ Main[44] = Main[36]) ∧
+    (Main[214] = 0 ∨ Main[56] = 0) ∧
+    (Main[214] = 0 ∨ Main[45] = Main[37]) ∧
+    (Main[214] = 0 ∨ Main[57] = 0) ∧
+    (Main[214] = 0 ∨ Main[46] = Main[38]) ∧
+    (Main[214] = 0 ∨ Main[58] = 0) ∧
+    (Main[214] = 0 ∨ Main[47] = Main[39]) ∧
+    (Main[214] = 0 ∨ Main[59] = 0) ∧
+    (Main[214] = 1 ∨ Main[36] = Main[72] + Main[52] - Main[186] * (65536 : Fin BB)) ∧
+    (Main[214] = 1 ∨ Main[37] = Main[73] + Main[53] - Main[187] * (65536 : Fin BB) + Main[186]) ∧
+    (Main[214] = 1 ∨ Main[38] = Main[74] + Main[54] - Main[188] * (65536 : Fin BB) + Main[187]) ∧
+    (Main[214] = 1 ∨ Main[39] = Main[75] + Main[55] - Main[189] * (65536 : Fin BB) + Main[188]) ∧
+    (Main[214] = 1 ∨ Main[241] * (65535 : Fin BB) = Main[76] + Main[245] * (65535 : Fin BB) - Main[190] * (65536 : Fin BB) + Main[189]) ∧
+    (Main[214] = 1 ∨ Main[241] * (65535 : Fin BB) = Main[77] + Main[245] * (65535 : Fin BB) - Main[191] * (65536 : Fin BB) + Main[190]) ∧
+    (Main[214] = 1 ∨ Main[241] * (65535 : Fin BB) = Main[78] + Main[245] * (65535 : Fin BB) - Main[192] * (65536 : Fin BB) + Main[191]) ∧
+    (Main[214] = 1 ∨ Main[241] * (65535 : Fin BB) = Main[79] + Main[245] * (65535 : Fin BB) - Main[193] * (65536 : Fin BB) + Main[192]) ∧
+    (¬Main[249] = 0 → (Main[72] + Main[52] - Main[186] * 65536).val < 65536) ∧
+    (¬Main[249] = 0 → (Main[73] + Main[53] - Main[187] * 65536 + Main[186]).val < 65536) ∧
+    (¬Main[249] = 0 → (Main[74] + Main[54] - Main[188] * 65536 + Main[187]).val < 65536) ∧
+    (¬Main[249] = 0 → (Main[75] + Main[55] - Main[189] * 65536 + Main[188]).val < 65536) ∧
+    (¬Main[249] = 0 → (Main[76] + Main[245] * 65535 - Main[190] * 65536 + Main[189]).val < 65536) ∧
+    (¬Main[249] = 0 → (Main[77] + Main[245] * 65535 - Main[191] * 65536 + Main[190]).val < 65536) ∧
+    (¬Main[249] = 0 → (Main[78] + Main[245] * 65535 - Main[192] * 65536 + Main[191]).val < 65536) ∧
+    (¬Main[249] = 0 → (Main[79] + Main[245] * 65535 - Main[193] * 65536 + Main[192]).val < 65536) ∧
+    (Main[206] + Main[205] + Main[209] + Main[211] = 0 ∨ Main[44] = Main[32]) ∧
+    (Main[208] + Main[207] + Main[210] + Main[212] = 0 ∨ Main[56] = Main[32]) ∧
+    (Main[206] + Main[205] + Main[209] + Main[211] = 0 ∨ Main[45] = Main[33]) ∧
+    (Main[208] + Main[207] + Main[210] + Main[212] = 0 ∨ Main[57] = Main[33]) ∧
+    (Main[206] + Main[205] + Main[209] + Main[211] = 0 ∨ Main[46] = Main[34]) ∧
+    (Main[208] + Main[207] + Main[210] + Main[212] = 0 ∨ Main[58] = Main[34]) ∧
+    (Main[206] + Main[205] + Main[209] + Main[211] = 0 ∨ Main[47] = Main[35]) ∧
+    (Main[208] + Main[207] + Main[210] + Main[212] = 0 ∨ Main[59] = Main[35]) ∧
+    (Main[245] = 0 ∨ Main[241] = 1) ∧
+    (Main[56] + Main[57] + Main[58] + Main[59] = 0 ∨ Main[245] = 1 ∨ Main[241] = 0) ∧
+    (Main[204] = 0 ∨ Main[44] = 65535) ∧
+    (Main[204] = 0 ∨ Main[45] = 65535) ∧
+    (Main[204] = 0 ∨ Main[46] = 65535) ∧
+    (Main[204] = 0 ∨ Main[47] = 65535) ∧
+    (Main[204] = 0 ∨ Main[52] = Main[36]) ∧
+    (Main[204] = 0 ∨ Main[53] = Main[37]) ∧
+    (Main[204] = 0 ∨ Main[54] = Main[38]) ∧
+    (Main[204] = 0 ∨ Main[55] = Main[39]) ∧
+    (Main[246] = 1 ∨ Main[40] = Main[64]) ∧
+    (Main[245] = 1 ∨ Main[52] = Main[60]) ∧
+    (Main[246] = 1 ∨ Main[41] = Main[65]) ∧
+    (Main[245] = 1 ∨ Main[53] = Main[61]) ∧
+    (Main[246] = 1 ∨ Main[42] = Main[66]) ∧
+    (Main[245] = 1 ∨ Main[54] = Main[62]) ∧
+    (Main[246] = 1 ∨ Main[43] = Main[67]) ∧
+    (Main[245] = 1 ∨ Main[55] = Main[63]) ∧
+    (¬Main[249] = 0 → Main[64].val < 65536) ∧
+    (¬Main[249] = 0 → Main[65].val < 65536) ∧
+    (¬Main[249] = 0 → Main[66].val < 65536) ∧
+    (¬Main[249] = 0 → Main[67].val < 65536) ∧
+    (Main[247] = 0 ∨ Main[170] = 0) ∧
+    (Main[247] = 0 ∨ Main[171] = 0) ∧
+    (Main[247] = 0 ∨ Main[172] = 0) ∧
+    (Main[247] = 0 ∨ Main[173] = 0) ∧
+    (¬Main[249] = 0 → Main[60].val < 65536) ∧
+    (¬Main[249] = 0 → Main[61].val < 65536) ∧
+    (¬Main[249] = 0 → Main[62].val < 65536) ∧
+    (¬Main[249] = 0 → Main[63].val < 65536) ∧
+    (Main[248] = 0 ∨ Main[174] = 0) ∧
+    (Main[248] = 0 ∨ Main[175] = 0) ∧
+    (Main[248] = 0 ∨ Main[176] = 0) ∧
+    (Main[248] = 0 ∨ Main[177] = 0) ∧
+    Main[247] = Main[246] * Main[249] ∧
+    Main[248] = Main[245] * Main[249] ∧
+    Main[68] = Main[204] + ((1 : Fin BB) - Main[204]) * Main[64] ∧
+    Main[69] = ((1 : Fin BB) - Main[204]) * Main[65] ∧
+    Main[70] = ((1 : Fin BB) - Main[204]) * Main[66] ∧
+    Main[71] = ((1 : Fin BB) - Main[204]) * Main[67] ∧
+    Main[250] = ((1 : Fin BB) - Main[204]) * Main[249] ∧
+    (Main[250] = 0 ∨ Main[178] = 1) ∧
+    (¬Main[249] = 0 → Main[44].val < 65536) ∧
+    (¬Main[249] = 0 → Main[45].val < 65536) ∧
+    (¬Main[249] = 0 → Main[46].val < 65536) ∧
+    (¬Main[249] = 0 → Main[47].val < 65536) ∧
+    (¬Main[249] = 0 → Main[56].val < 65536) ∧
+    (¬Main[249] = 0 → Main[57].val < 65536) ∧
+    (¬Main[249] = 0 → Main[58].val < 65536) ∧
+    (¬Main[249] = 0 → Main[59].val < 65536) ∧
+    (Main[186] = 0 ∨ Main[186] = 1) ∧
+    (Main[187] = 0 ∨ Main[187] = 1) ∧
+    (Main[188] = 0 ∨ Main[188] = 1) ∧
+    (Main[189] = 0 ∨ Main[189] = 1) ∧
+    (Main[190] = 0 ∨ Main[190] = 1) ∧
+    (Main[191] = 0 ∨ Main[191] = 1) ∧
+    (Main[192] = 0 ∨ Main[192] = 1) ∧
+    (Main[193] = 0 ∨ Main[193] = 1) ∧
+    (¬Main[249] = 0 → Main[72].val < 65536) ∧
+    (¬Main[249] = 0 → Main[73].val < 65536) ∧
+    (¬Main[249] = 0 → Main[74].val < 65536) ∧
+    (¬Main[249] = 0 → Main[75].val < 65536) ∧
+    (¬Main[249] = 0 → Main[76].val < 65536) ∧
+    (¬Main[249] = 0 → Main[77].val < 65536) ∧
+    (¬Main[249] = 0 → Main[78].val < 65536) ∧
+    (¬Main[249] = 0 → Main[79].val < 65536) ∧
+    (Main[205] = 0 ∨ Main[205] = 1) ∧
+    (Main[206] = 0 ∨ Main[206] = 1) ∧
+    (Main[207] = 0 ∨ Main[207] = 1) ∧
+    (Main[208] = 0 ∨ Main[208] = 1) ∧
+    (Main[209] = 0 ∨ Main[209] = 1) ∧
+    (Main[210] = 0 ∨ Main[210] = 1) ∧
+    (Main[211] = 0 ∨ Main[211] = 1) ∧
+    (Main[212] = 0 ∨ Main[212] = 1) ∧
+    (Main[214] = 0 ∨ Main[214] = 1) ∧
+    (Main[244] = 0 ∨ Main[244] = 1) ∧
+    (Main[241] = 0 ∨ Main[241] = 1) ∧
+    (Main[242] = 0 ∨ Main[242] = 1) ∧
+    (Main[243] = 0 ∨ Main[243] = 1) ∧
+    (Main[245] = 0 ∨ Main[245] = 1) ∧
+    (Main[246] = 0 ∨ Main[246] = 1) ∧
+    (Main[249] = 0 ∨ Main[249] = 1) ∧
+    (Main[247] = 0 ∨ Main[247] = 1) ∧
+    (Main[248] = 0 ∨ Main[248] = 1) ∧
+    Main[206] + Main[208] + Main[205] + Main[207] + Main[209] + Main[210] + Main[211] + Main[212] = 1 ∧
+    (Main[249] = 0 ∨ Main[213] = Main[31] * (Main[209] * (27 : Fin BB) + Main[210] * (27 : Fin BB) + Main[211] * (27 : Fin BB) + Main[212] * (27 : Fin BB)) + ((1 : Fin BB) - Main[31]) * (Main[206] * (51 : Fin BB) + Main[208] * (51 : Fin BB) + Main[205] * (51 : Fin BB) + Main[207] * (51 : Fin BB) + Main[209] * (59 : Fin BB) + Main[210] * (59 : Fin BB) + Main[211] * (59 : Fin BB) + Main[212] * (59 : Fin BB)))
+  := by
+    simp [constraints, sub_eq_zero]
+    iterate 3 rw [eq_comm (a := _ * (Main[205] + Main[207] + Main[209] + Main[210]))]
+    iterate 3 rw [eq_comm (a := (1 : Fin BB))]
+    rw [eq_comm (a := _ * _) (b := Main[250])]
+    simp
+
 end constraints
+
+-- section rem
+
+-- set_option maxRecDepth 1000000 in
+-- lemma allHold_constraints_iff_rem :
+--   Main[249] = 1 →
+--   Main[205] = 0 → Main[206] = 0 → Main[207] = 1 → Main[208] = 0 →
+--   Main[209] = 0 → Main[210] = 0 → Main[211] = 0 → Main[212] = 0 →
+--   List.Forall SP1Constraint.toProp (constraints Main) →
+--     False
+--   := by
+--   intro h_is_real h_div h_divu h_rem h_remu h_divw h_divuw h_remw h_remuw
+--   rw [allHold_constraints_iff]
+
+--   intro cstrs
+
+--   set a0 := Main[32]
+--   set a1 := Main[33]
+--   set a2 := Main[34]
+--   set a3 := Main[35]
+
+--   set b0 := Main[15]
+--   set b1 := Main[16]
+--   set b2 := Main[17]
+--   set b3 := Main[18]
+
+--   set c0 := Main[25]
+--   set c1 := Main[26]
+--   set c2 := Main[27]
+--   set c3 := Main[28]
+
+--   set lb0 := Main[36]
+--   set lb1 := Main[37]
+--   set lb2 := Main[38]
+--   set lb3 := Main[39]
+
+--   set lc0 := Main[40]
+--   set lc1 := Main[41]
+--   set lc2 := Main[42]
+--   set lc3 := Main[43]
+
+--   set q0 := Main[44]
+--   set q1 := Main[45]
+--   set q2 := Main[46]
+--   set q3 := Main[47]
+
+--   set qbc0 := Main[48]
+--   set qbc1 := Main[49]
+--   set qbc2 := Main[50]
+--   set qbc3 := Main[51]
+
+--   set rbc0 := Main[52]
+--   set rbc1 := Main[53]
+--   set rbc2 := Main[54]
+--   set rbc3 := Main[55]
+
+--   set r0 := Main[56]
+--   set r1 := Main[57]
+--   set r2 := Main[58]
+--   set r3 := Main[59]
+
+--   set ar0 := Main[60]
+--   set ar1 := Main[61]
+--   set ar2 := Main[62]
+--   set ar3 := Main[63]
+
+--   set ac0 := Main[64]
+--   set ac1 := Main[65]
+--   set ac2 := Main[66]
+--   set ac3 := Main[67]
+
+--   set maco10 := Main[68]
+--   set maco11 := Main[69]
+--   set maco12 := Main[70]
+--   set maco13 := Main[71]
+
+--   set ctq0 := Main[72]
+--   set ctq1 := Main[73]
+--   set ctq2 := Main[74]
+--   set ctq3 := Main[75]
+--   set ctq4 := Main[76]
+--   set ctq5 := Main[77]
+--   set ctq6 := Main[78]
+--   set ctq7 := Main[79]
+
+--   set cnop0 := Main[170]
+--   set cnop1 := Main[171]
+--   set cnop2 := Main[172]
+--   set cnop3 := Main[173]
+
+--   set rnop0 := Main[174]
+--   set rnop1 := Main[175]
+--   set rnop2 := Main[176]
+--   set rnop3 := Main[177]
+
+--   set arlt := Main[178]
+
+--   set cry0 := Main[186]
+--   set cry1 := Main[187]
+--   set cry2 := Main[188]
+--   set cry3 := Main[189]
+--   set cry4 := Main[190]
+--   set cry5 := Main[191]
+--   set cry6 := Main[192]
+--   set cry7 := Main[193]
+
+--   set is_c_0 := Main[204]
+
+--   set is_div := Main[205]
+--   set is_divu := Main[206]
+--   set is_rem := Main[207]
+--   set is_remu := Main[208]
+--   set is_divw := Main[209]
+--   set is_remw := Main[210]
+--   set is_divuw := Main[211]
+--   set is_remuw := Main[212]
+
+--   set is_overflow := Main[214]
+--   set is_overflow_b := Main[225]
+--   set is_overflow_c := Main[236]
+
+--   set msb_b := Main[237]
+--   set msb_rem := Main[238]
+--   set msb_c := Main[239]
+--   set msb_quot := Main[240]
+--   set b_neg := Main[241]
+--   set b_neg_not_overflow := Main[242]
+--   set b_not_neg_not_overflow := Main[243]
+--   set is_real_not_word := Main[244]
+--   set rem_neg := Main[245]
+--   set c_neg := Main[246]
+--   set abs_c_alu_event := Main[247]
+--   set abs_rem_alu_event := Main[248]
+--   set is_real := Main[249]
+--   set remainder_check_multiplicity := Main[250]
+
+--   obtain ⟨ main_mul_low, main_mul_high,
+--            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
+--            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
+--            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
+--            cpu, alu,
+--            eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
+--            eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
+--            eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2, w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
+--            eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2, w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
+--            eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
+--            of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
+--            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
+--            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
+--            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
+--            eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+--            r_neg_b_neg, r_pos_b_pos,
+--            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
+--            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
+--            u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
+--            u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
+--            eq_abs_c_alu_event, eq_abs_rem_alu_event,
+--            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
+--            eq_rcm, eq_arlt,
+--            u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+--            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
+--            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
+--            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
+--            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
+--            b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
+--            correct_opcode ⟩ := cstrs
+--   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
+--   rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+--   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
+--   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
+--   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
+--   rw [eq_comm (b := a3)] at eq_d_a3 eq_r_a3
+--   rw [eq_comm (b := ac0)] at cn_ac0; rw [eq_comm (b := ar0)] at rn_ar0
+--   rw [eq_comm (b := ac1)] at cn_ac1; rw [eq_comm (b := ar1)] at rn_ar1
+--   rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
+--   rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
+--   clear correct_opcode
+
+--   sorry
+
+-- end rem
 
 end DivRem

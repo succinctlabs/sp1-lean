@@ -73,10 +73,6 @@ def toProp : SP1Constraint → Prop
 @[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c : Fin BB) (mult : Fin BB) :
     (send (.byte op a b c) mult).toProp ↔ (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 
--- -- dt: change this back once airs work
--- @[simp] lemma toProp_recv (air : AirInteraction) (mult : Fin BB) :
---     (receive air mult).toProp ↔ True := Iff.rfl
-
 end toProp
 
 section toStateProp

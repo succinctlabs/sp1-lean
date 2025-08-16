@@ -20,3 +20,9 @@ macro_rules | `(tactic| get_elem_tactic) => `(tactic| norm_num1)
 -- syntax:max term noWs "[" withoutPosition(term) "]$" : term
 -- macro_rules | `($x[$i]$ ) => `(getElem $x $i (by decide +kernel))
 --------------------------------------------------------------------
+
+section grind
+
+grind_pattern Fin.coe_ofNat_eq_mod => (@Fin.val m (OfNat.ofNat n))
+
+end grind

@@ -9,12 +9,13 @@ preferReleaseBuild = true
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 linter.unusedSimpArgs = false
+synthInstance.maxHeartbeats = 1000000
 # autoImplicit = false -- Might be good to consider this, given the amount of coercions we use
 
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-rev = "v4.22.0-rc3"
+rev = "v4.23.0-rc2"
 
 # [[require]]
 # name = "Lean_RV32D"

@@ -71,16 +71,17 @@ theorem correct_addi
     obtain ⟨read_pc, trusted_instr_state, read_op_b, read_op_c⟩ := state_cstrs
     simp [constraints] at cstrs
     obtain ⟨add_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
-    apply AddOperation.correct (h_is_real := h_is_real) at add_op_cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ITypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
     obtain ⟨ trusted_instr_prop, _, _, c0, c1, c2, c3, _, _, _, _, _, _, _, _, _, _, ⟨ is_U64_a, is_U64_b, _ ⟩⟩ := reader_cstrs
     simp_all [Opcode.ofNat, Nat.ble]
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
-      := by apply Word.isU64_of_cases _ c0 c1 c2 c3
-    specialize add_op_cstrs is_U64_b is_U64_c
+      := by apply Word.isU64_of_cases c0 c1 c2 c3
+
+    rw [h_is_real] at *
+    apply AddOperation.spec is_U64_b is_U64_c at add_op_cstrs
     obtain ⟨ is_U64_val, is_add ⟩ := add_op_cstrs
-    simp_all
+    simp at *
 
     -- Now the monadic manipulation
     simp [spec_addi, sp1_addi, execute, execute_ITYPE]

@@ -27,8 +27,6 @@ def spec_sll (rs2 rs1 rd : regidx) : SailM Unit := do
 def sp1_sll : SailM Unit := do
   let ⟨ sll, imm ⟩ := h_is_sll
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
@@ -84,8 +82,6 @@ def spec_slli (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
 def sp1_slli : SailM Unit := do
   let ⟨ sll, imm ⟩ := h_is_slli
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
@@ -141,8 +137,6 @@ def spec_sllw (rs2 rs1 rd : regidx) : SailM Unit := do
 def sp1_sllw : SailM Unit := do
   let ⟨ sllw, imm ⟩ := h_is_sllw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
@@ -198,8 +192,6 @@ def spec_slliw (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
 def sp1_slliw : SailM Unit := do
   let ⟨ sllw, imm ⟩ := h_is_slliw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 

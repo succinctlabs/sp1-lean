@@ -850,11 +850,11 @@ lemma spec.sllw (h : is_sllw Main) :
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
       rw [← w_04] at *
-      have h_msb := U16MSBOperation.spec a1 { msb := msb } 1 (by assumption) h_msb_a1 (by simp)
+      have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1
       simp at h_msb; rw [h_msb]
       trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HWord.isNegative_msb _ h_isU32_a]
+      . congr; rw [HWord.isNegative_msb h_isU32_a]
 
     . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = (HWord.toBitVec32 #v[b0, b1] <<< (c0.val % 32))
       . rw [← hw_shift]
@@ -992,11 +992,11 @@ lemma spec.slliw (h : is_slliw Main) :
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
       simp_all
       rw [← w_04] at *
-      have h_msb := U16MSBOperation.spec a1 { msb := msb } 1 (by assumption) h_msb_a1 (by simp)
+      have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1
       simp at h_msb; rw [h_msb]
       trans (if HWord.isNegative #v[a0, a1] then 65535 else 0)
       . unfold HWord.isNegative; split_ifs <;> simp_all; omega
-      . congr; rw [HWord.isNegative_msb _ h_isU32_a]
+      . congr; rw [HWord.isNegative_msb h_isU32_a]
 
     . suffices hw_shift : HWord.toBitVec32 #v[ a0, a1 ] = (HWord.toBitVec32 #v[b0, b1] <<< (c0.val % 32))
       . rw [← hw_shift]
