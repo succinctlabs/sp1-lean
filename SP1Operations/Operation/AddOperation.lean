@@ -21,37 +21,39 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
       (cols.value[3].val < 65536) := by
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
-lemma isU64_of_allHold_constraints (a b : Word (Fin BB)) (cols : AddOperation)
-    (h : (constraints a b cols 1).allHold) : cols.value.isU64 := by
-  simp [allHold_constraints_iff] at h
-  refine Word.isU64_of_cases _ ?_ ?_ ?_ ?_ <;> tauto
-
-def spec (a b : Word (Fin BB)) (cols : AddOperation) : Prop :=
-  a.isU64 → b.isU64 → cols.value.isU64 ∧ cols.value.toBitVec64 = a.toBitVec64 + b.toBitVec64
-
 set_option maxHeartbeats 1000000 in
-/-- If the operation is real and the input words have correctly bounded limbs,
-then the constraints imply the spec. -/
-theorem correct (a b : Word (Fin BB)) (cols : AddOperation) (is_real : Fin BB)
-    (h_is_real : is_real = 1)
-    (h_cstrs : (constraints a b cols is_real).allHold) :
-    spec a b cols := by
-  cases h_is_real
-  simp [allHold_constraints_iff] at h_cstrs
-  obtain ⟨h0, h1, h2, h3, hbds⟩ := h_cstrs
-  intro ha hb
-  have ha' := Word.lt_cases_of_isU64 ha
-  have hb' := Word.lt_cases_of_isU64 hb
+theorem spec
+  {a b : Word (Fin BB)}
+  {cols : AddOperation}
+  (h_isU64_a : a.isU64)
+  (h_isU64_b : b.isU64) :
+  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
+    cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
+  intro cstrs
+  simp [allHold_constraints_iff] at cstrs
+  obtain ⟨h0, h1, h2, h3, hbds⟩ := cstrs
+  apply Word.lt_cases_of_isU64 at h_isU64_a
+  apply Word.lt_cases_of_isU64 at h_isU64_b
 
   constructor
-  · clear *- hbds
-    aesop
+  · clear *- hbds; aesop
 
-  . rw [Word.toBitVec64_add_toBitVec64, Word.toBitVec64_eq_add]
-    simp [← inv_16BB_eq'] at *
-    simp [← BitVec.ofNat_add, ← BitVec.ofNat_mul]
-    simp [BitVec.ofNat, Fin.ext_iff, Fin.add_def, Fin.sub_def]
+  . simp [BitVec.eq_sub_iff_add_eq]
+    simp [Word.toBitVec64, Word.toNat]
+    rw [← BitVec.toNat_inj, BitVec.toNat_add]
     rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>
     simp_all <;> omega
+
+theorem spec.gen
+  {a b : Word (Fin BB)}
+  {cols : AddOperation}
+  {is_real : Fin BB}
+  (h_isU64_a : a.isU64)
+  (h_isU64_b : b.isU64) :
+  List.Forall SP1Constraint.toProp (constraints a b cols is_real) →
+    is_real = 1 →
+      cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
+  intro cstrs is_real; simp_all
+  exact spec h_isU64_a h_isU64_b cstrs
 
 end AddOperation

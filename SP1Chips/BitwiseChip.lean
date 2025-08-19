@@ -3,272 +3,382 @@ import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.ALUTypeReader
 import SP1Chips.Bitwise.Constraints
 
--- import SP1Operations
+open LeanRV64IM.Functions
+open BitVec
 
--- open BitVec
+set_option maxHeartbeats 10000000
 
--- namespace BitwiseChip
+namespace Xor
 
--- section constraints
+open Bitwise
 
--- def constraints (Main : Vector (Fin BB) 33) : SP1ConstraintList :=
---   let E0 : Fin BB := Main[30] + Main[31]
---   let E1 : Fin BB := E0 + Main[32]
---   let E2 : Fin BB := Main[30] - 1
---   let E3 : Fin BB := Main[30] * E2
---   let E4 : Fin BB := Main[31] - 1
---   let E5 : Fin BB := Main[31] * E4
---   let E6 : Fin BB := Main[32] - 1
---   let E7 : Fin BB := Main[32] * E6
---   let E8 : Fin BB := E1 - 1
---   let E9 : Fin BB := E1 * E8
---   let E10 : Fin BB := Main[30] * 2
---   let E11 : Fin BB := Main[31] * 1
---   let E12 : Fin BB := E10 + E11
---   let E13 : Fin BB := Main[32] * 0
---   let E14 : Fin BB := E12 + E13
---   let E15 : Fin BB := Main[30] * 3
---   let E16 : Fin BB := Main[31] * 4
---   let E17 : Fin BB := E15 + E16
---   let E18 : Fin BB := Main[32] * 5
---   let E19 : Fin BB := E17 + E18
---   let ⟨⟨⟨[E20, E21]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints #v[Main[11], Main[12]] #v[Main[17], Main[18]] { b_low_bytes := { low_bytes := #v[Main[22], Main[23]] }, bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] }, c_low_bytes := { low_bytes := #v[Main[24], Main[25]] } } E14 E1
---   let E22 : Fin BB := Main[3] + 4
---   let CS1 : List SP1Constraint := CPUState.constraints { clk_0_16 := Main[2], clk_16_24 := Main[1], clk_high := Main[0], pc := Main[3] } E22 8 E1
---   let E23 : Fin BB := Main[1] * 65536
---   let E24 : Fin BB := Main[2] + E23
---   let CS2 : List SP1Constraint := ALUTypeReader.constraints Main[0] E24 Main[3] E19 #v[E20, E21] { imm_c := Main[21], op_a := Main[4], op_a_0 := Main[9], op_a_memory := { access_timestamp := { diff_low_limb := Main[8], prev_low := Main[7] }, prev_value := #v[Main[5], Main[6]] }, op_b := Main[10], op_b_memory := { access_timestamp := { diff_low_limb := Main[14], prev_low := Main[13] }, prev_value := #v[Main[11], Main[12]] }, op_c := #v[Main[15], Main[16]], op_c_memory := { access_timestamp := { diff_low_limb := Main[20], prev_low := Main[19] }, prev_value := #v[Main[17], Main[18]] } } E1
---   [
---     .assertZero E3,
---     .assertZero E5,
---     .assertZero E7,
---     .assertZero E9
---   ] ++ CS0 ++ CS1 ++ CS2
+variable
+  (Main : Vector (Fin BB) 52)
+  (s : SailState)
+  (cstrs : (constraints Main).allHold)
+  (h_is_xor : is_xor Main)
 
--- lemma BitWiseU16_constraints_of_constraints (Main : Vector (Fin BB) 33)
---     (h : (constraints Main).allHold) :
---     (BitwiseU16Operation.constraints #v[Main[11], Main[12]] #v[Main[17], Main[18]]
---       { b_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
---         bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] },
---         c_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
---         (Main[30] * 2 + Main[31] * 1)
---         (Main[30] + Main[31] + Main[32])).2.allHold := by
---   simp [constraints, BitwiseU16Operation.constraints] at *
---   tauto
+def spec_xor (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_RTYPE rs2 rs1 rd rop.XOR
+  pure ()
 
--- def main_output (Main : Vector (Fin BB) 33) : BitVec 32 :=
---   let E0 : Fin BB := Main[30] + Main[31]
---   let E1 : Fin BB := E0 + Main[32]
---   let E2 : Fin BB := Main[30] - 1
---   let E3 : Fin BB := Main[30] * E2
---   let E4 : Fin BB := Main[31] - 1
---   let E5 : Fin BB := Main[31] * E4
---   let E6 : Fin BB := Main[32] - 1
---   let E7 : Fin BB := Main[32] * E6
---   let E8 : Fin BB := E1 - 1
---   let E9 : Fin BB := E1 * E8
---   let E10 : Fin BB := Main[30] * 2
---   let E11 : Fin BB := Main[31] * 1
---   let E12 : Fin BB := E10 + E11
---   let E13 : Fin BB := Main[32] * 0
---   let E14 : Fin BB := E12 + E13
---   let E15 : Fin BB := Main[30] * 3
---   let E16 : Fin BB := Main[31] * 4
---   let E17 : Fin BB := E15 + E16
---   let E18 : Fin BB := Main[32] * 5
---   let E19 : Fin BB := E17 + E18
---   let ⟨⟨⟨[E20, E21]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints
---     #v[Main[11], Main[12]] #v[Main[17], Main[18]]
---     { b_low_bytes := { low_bytes := #v[Main[22], Main[23]] },
---       bitwise_operation := { result := #v[Main[26], Main[27], Main[28], Main[29]] },
---       c_low_bytes := { low_bytes := #v[Main[24], Main[25]] } }
---       E14
---       E1
---   BitVec.ofNat 32 (E20 + E21 * 65536)
+def sp1_xor : SailM Unit := do
+  let ⟨ xor, imm ⟩ := h_is_xor
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let op_a := sp1_op_a Main cstrs (xor_real Main xor)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
 
--- @[simp] lemma main_output_eq (Main : Vector (Fin BB) 33) : main_output Main =
---     BitVec.ofNat 32 ((Main[26] + Main[27] * 256).1 + (Main[28] + Main[29] * 256).1 * 65536) := by
---   simp [main_output, BitwiseU16Operation.constraints]
+theorem correct_xor
+  (state_cstrs : (constraints Main).initialState s) :
+  let ⟨ xor, imm ⟩ := h_is_xor
+  let op_c := sp1_op_c Main cstrs (xor_real Main xor) imm
+  let op_b := sp1_op_b Main cstrs (xor_real Main xor)
+  let op_a := sp1_op_a Main cstrs (xor_real Main xor)
+  (spec_xor (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xor Main cstrs h_is_xor).run s
+  := by
+    let ⟨ xor, imm ⟩ := h_is_xor
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (xor_real Main xor)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main xor)
+    have h_imm := immediate_bounds Main cstrs (xor_real Main xor)
+    have h_a0 := op_a_is_0 Main cstrs (xor_real Main xor)
+    have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
+    simp_all
 
--- lemma is_unique_operation_of_constraints (Main : Vector (Fin BB) 33)
---     (h : (constraints Main).allHold) :
---     (Main[30] = 1 → Main[31] = 0 ∧ Main[32] = 0) ∧
---       (Main[31] = 1 → Main[30] = 0 ∧ Main[32] = 0) ∧
---         (Main[32] = 1 → Main[30] = 0 ∧ Main[31] = 0) := by
---   simp [constraints, BitwiseU16Operation.constraints] at h
---   obtain ⟨h1, h2, h3, h4, extra1, extra2, extra3⟩ := h
---   clear extra1 extra2 extra3
---   rw [sub_eq_zero] at h1 h2 h3 h4
---   refine ⟨fun h_is_xor => ?_, fun h_is_or => ?_, fun h_is_and => ?_⟩
---   · refine ⟨(or_iff_not_imp_right.1 h2) fun h_is_or => ?_,
---       (or_iff_not_imp_right.1 h3) fun h_is_and => ?_⟩
---     · cases h3 with | inl h | inr h => simp [h, h_is_xor, h_is_or] at h4
---     · cases h2 with | inl h | inr h => simp [h, h_is_xor, h_is_and] at h4
---   · refine ⟨(or_iff_not_imp_right.1 h1) fun h_is_xor => ?_,
---       (or_iff_not_imp_right.1 h3) fun h_is_and => ?_⟩
---     · cases h3 with | inl h | inr h => simp [h, h_is_or, h_is_xor] at h4
---     · cases h1 with | inl h | inr h => simp [h, h_is_or, h_is_and] at h4
---   · refine ⟨(or_iff_not_imp_right.1 h1) fun h_is_xor => ?_,
---       (or_iff_not_imp_right.1 h2) fun h_is_or => ?_⟩
---     · cases h2 with | inl h | inr h => simp [h, h_is_and, h_is_xor] at h4
---     · cases h1 with | inl h | inr h => simp [h, h_is_and, h_is_or] at h4
+    simp [constraints] at state_cstrs
+    split at state_cstrs
 
--- end constraints
+    simp_all
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1 trusted_instr_state; simp_all
 
--- section specs
+    simp [spec_xor, sp1_xor, execute, execute_RTYPE']
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
--- def specXor (op_a op_b op_c : regidx) : StateM SP1State Unit := do
---   incrementPC
---   let b : BitVec 32 ← get_reg op_b
---   let c : BitVec 32 ← get_reg op_c
---   update_reg op_a (b ^^^ c)
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    . simp [Word.toBitVec64, Word.toNat]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
+      have := spec.xor Main ⟨ xor, imm ⟩ cstrs
+      simp_all [Word.toBitVec64, Word.toNat]
+      rfl
 
--- def specOr (op_a op_b op_c : regidx) : StateM SP1State Unit := do
---   incrementPC
---   let b : BitVec 32 ← get_reg op_b
---   let c : BitVec 32 ← get_reg op_c
---   update_reg op_a (b ||| c)
+end Xor
 
--- def specAnd (op_a op_b op_c : regidx) : StateM SP1State Unit := do
---   incrementPC
---   let b : BitVec 32 ← get_reg op_b
---   let c : BitVec 32 ← get_reg op_c
---   update_reg op_a (b &&& c)
+namespace Xori
 
--- end specs
+open Bitwise
 
--- def sp1Bitwise (Main : Vector (Fin BB) 33) : StateM SP1State Unit := do
---   incrementPC
---   let op_a := regidx.Regidx Main[4].val
---   update_reg op_a (main_output Main)
+variable
+  (Main : Vector (Fin BB) 52)
+  (s : SailState)
+  (cstrs : (constraints Main).allHold)
+  (h_is_xori : is_xori Main)
 
--- /-- If the constraints all hold, `is_xor` is set to true, and `op_b` and `op_c` are loaded
--- into the proper registers, then the bitwise chip conforms to the xor spec. -/
--- theorem SP1BitwiseChip_xor_correct (Main : Vector (Fin BB) 33)
---     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
---     (h_is_xor : Main[30] = 1) -- Is an `xor` operation
---     (h_imm : Main[21] = 0) -- Not an immediate operation
---     (pc : BitVec 32) (reg_state : regidx → BitVec 32) :
---     let op_a := regidx.Regidx Main[4].val
---     let op_b := regidx.Regidx Main[10].val
---     let op_c := regidx.Regidx Main[15].val
---     (reg_state op_b = .ofNat 32 (Main[11] + Main[12] * 65536)) →
---     (reg_state op_c = .ofNat 32 (Main[17] + Main[18] * 65536)) →
---       ((sp1Bitwise Main).run (pc, reg_state) = (specXor op_a op_b op_c).run (pc, reg_state)) := by
---   simp only []
---   intro hmem₁ hmem₂
---   unfold sp1Bitwise specXor
+def spec_xori (shamt : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_ITYPE shamt rs1 rd iop.XORI
+  pure ()
 
---   -- Because this is an `xor` it isn't and `and` or an `or`
---   obtain ⟨h31, h32⟩ := (is_unique_operation_of_constraints Main h_cstrs).1 h_is_xor
+def sp1_xori : SailM Unit := do
+  let ⟨ xor, imm ⟩ := h_is_xori
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let op_a := sp1_op_a Main cstrs (xor_real Main xor)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
 
---   -- Break up the different parts of the constraints
---   have hbwu16_cstrs := BitWiseU16_constraints_of_constraints Main h_cstrs
---   simp [constraints, BitwiseU16Operation.constraints] at h_cstrs
---   obtain ⟨h1, h2, h3, h4, bw_cstrs, cpu_cstrs, adapter_cstrs⟩ := h_cstrs
---   simp [h_is_xor, h31, h32] at *
+theorem correct_xori
+  (state_cstrs : (constraints Main).initialState s) :
+  let ⟨ xor, imm ⟩ := h_is_xori
+  let op_c := sp1_op_c_imm Main cstrs (xor_real Main xor) imm
+  let op_b := sp1_op_b Main cstrs (xor_real Main xor)
+  let op_a := sp1_op_a Main cstrs (xor_real Main xor)
+  (spec_xori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xori Main cstrs h_is_xori).run s
+  := by
+    let ⟨ xor, imm ⟩ := h_is_xori
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (xor_real Main xor)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main xor)
+    have h_imm := immediate_bounds Main cstrs (xor_real Main xor)
+    have h_a0 := op_a_is_0 Main cstrs (xor_real Main xor)
+    have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
+    simp_all
 
---   -- The `BitwiseOperation` bounds the size of its inputs, and that they are actually `xor`s
---   have hbw0 := BitwiseOperation.lt_of_constraints _ _ _ 0 .XOR (Or.inr (Or.inr rfl)) bw_cstrs
---   have hbw1 := BitwiseOperation.lt_of_constraints _ _ _ 1 .XOR (Or.inr (Or.inr rfl)) bw_cstrs
---   have hbw2 := BitwiseOperation.lt_of_constraints _ _ _ 2 .XOR (Or.inr (Or.inr rfl)) bw_cstrs
---   have hbw3 := BitwiseOperation.lt_of_constraints _ _ _ 3 .XOR (Or.inr (Or.inr rfl)) bw_cstrs
---   have hxor0 := BitwiseOperation.eq_xor_of_constraints _ _ _ 0 bw_cstrs
---   have hxor1 := BitwiseOperation.eq_xor_of_constraints _ _ _ 1 bw_cstrs
---   have hxor2 := BitwiseOperation.eq_xor_of_constraints _ _ _ 2 bw_cstrs
---   have hxor3 := BitwiseOperation.eq_xor_of_constraints _ _ _ 3 bw_cstrs
---   simp at hbw0 hbw1 hbw2 hbw3 hxor0 hxor1 hxor2 hxor3
+    simp [constraints] at state_cstrs
+    split at state_cstrs
 
---   -- The `RTypeReader` gives bounds on the size of previous memory values
---   obtain ⟨h11, h12⟩ : Main[11].1 < 2^16 ∧ Main[12].1 < 2^16 :=
---     ALUTypeReader.val_op_b_memory_lt_of_constraints adapter_cstrs
---   obtain ⟨h17, h18⟩ : Main[17].1 < 2^16 ∧ Main[18].1 < 2^16 :=
---     ALUTypeReader.val_op_c_memory_lt_of_constraints adapter_cstrs h_imm
---   have h1218 : Main[12].val ^^^ Main[18].val < 2013265921 :=
---     lt_of_lt_of_le (Nat.xor_lt_two_pow h12 h18) (by omega)
---   have h1117 : Main[11].val ^^^ Main[17].val < 2013265921 :=
---     lt_of_lt_of_le (Nat.xor_lt_two_pow h11 h17) (by omega)
+    simp_all
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b⟩ := state_cstrs
+    clear thr1 trusted_instr_state; simp_all
 
---   -- The `BitwiseU16Operation` constraints connects output values to `xor`
---   have h27 : Main[27] * (256 : Fin BB) = (Main[11] ^^^ Main[17]) - Main[26] := by
---     simpa using BitwiseU16Operation.eq_xor_word_sub_of_constraints _ _ _
---       (by tauto) (by tauto) hbwu16_cstrs
---   have h29 : Main[29] * (256 : Fin BB) = (Main[12] ^^^ Main[18]) - Main[28] := by
---     simpa using BitwiseU16Operation.eq_xor_word_sub_of_constraints' _ _ _
---       (by tauto) (by tauto) hbwu16_cstrs
---   rw [hxor0, hxor1] at h27
---   rw [hxor2, hxor3] at h29
+    simp [spec_xori, sp1_xori, execute, execute_ITYPE']
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
---   -- Suffices to show the new register map with cases on it being destination register
---   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
---   simp [hmem₁, hmem₂, hxor0, hxor1, hxor2, hxor3, h27, h29,
---     Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
---     bitVec_helper_xor _ _ _ _ h11 h12 h17 h18,
---     Fin.xor_val, ofNat_add, ofNat_mul, ofNat_xor]
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    . simp_all [Word.toBitVec64, Word.toNat]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      have := spec.xori Main ⟨ xor, imm ⟩ cstrs
+      rw [← h_imm]
+      rw [exec_ITYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
+      simp_all [Word.toBitVec64, Word.toNat]
+      rfl
 
--- /-- If the constraints all hold, `is_or` is set to true, and `op_b` and `op_c` are loaded
--- into the proper registers, then the bitwise chip conforms to the or spec. -/
--- theorem SP1BitwiseChip_or_correct (Main : Vector (Fin BB) 33)
---     (h_cstrs : SP1ConstraintList.allHold (constraints Main))
---     (h_is_or : Main[31] = 1) -- Is an `or` operation
---     (h_imm : Main[21] = 0) -- Is not an immediate operation
---     (pc : BitVec 32) (reg_state : regidx → BitVec 32) :
---     let op_a := regidx.Regidx Main[4].val
---     let op_b := regidx.Regidx Main[10].val
---     let op_c := regidx.Regidx Main[15].val
---     (reg_state op_b = .ofNat 32 (Main[11] + Main[12] * 65536)) →
---     (reg_state op_c = .ofNat 32 (Main[17] + Main[18] * 65536)) →
---       ((sp1Bitwise Main).run (pc, reg_state) = (specOr op_a op_b op_c).run (pc, reg_state)) := by
---   simp only []
---   intro hmem₁ hmem₂
---   unfold sp1Bitwise specOr
+end Xori
 
---   -- Because this is an `xor` it isn't and `and` or an `or`
---   obtain ⟨h31, h32⟩ := (is_unique_operation_of_constraints Main h_cstrs).2.1 h_is_or
+namespace Or
 
---   -- Break up the different parts of the constraints
---   have hbwu16_cstrs := BitWiseU16_constraints_of_constraints Main h_cstrs
---   simp [constraints, BitwiseU16Operation.constraints] at h_cstrs
---   obtain ⟨h1, h2, h3, h4, bw_cstrs, cpu_cstrs, adapter_cstrs⟩ := h_cstrs
---   simp [h_is_or, h31, h32] at *
+open Bitwise
 
---   -- The `BitwiseOperation` bounds the size of its inputs, and that they are actually `xor`s
---   have hbw0 := BitwiseOperation.lt_of_constraints _ _ _ 0 .OR (Or.inr (Or.inl rfl)) bw_cstrs
---   have hbw1 := BitwiseOperation.lt_of_constraints _ _ _ 1 .OR (Or.inr (Or.inl rfl)) bw_cstrs
---   have hbw2 := BitwiseOperation.lt_of_constraints _ _ _ 2 .OR (Or.inr (Or.inl rfl)) bw_cstrs
---   have hbw3 := BitwiseOperation.lt_of_constraints _ _ _ 3 .OR (Or.inr (Or.inl rfl)) bw_cstrs
---   have hxor0 := BitwiseOperation.eq_or_of_constraints _ _ _ 0 bw_cstrs
---   have hxor1 := BitwiseOperation.eq_or_of_constraints _ _ _ 1 bw_cstrs
---   have hxor2 := BitwiseOperation.eq_or_of_constraints _ _ _ 2 bw_cstrs
---   have hxor3 := BitwiseOperation.eq_or_of_constraints _ _ _ 3 bw_cstrs
---   simp at hbw0 hbw1 hbw2 hbw3 hxor0 hxor1 hxor2 hxor3
+variable
+  (Main : Vector (Fin BB) 52)
+  (s : SailState)
+  (cstrs : (constraints Main).allHold)
+  (h_is_or : is_or Main)
 
---   -- The `RTypeReader` gives bounds on the size of previous memory values
---   obtain ⟨h11, h12⟩ : Main[11].1 < 2^16 ∧ Main[12].1 < 2^16 :=
---     ALUTypeReader.val_op_b_memory_lt_of_constraints adapter_cstrs
---   obtain ⟨h17, h18⟩ : Main[17].1 < 2^16 ∧ Main[18].1 < 2^16 :=
---     ALUTypeReader.val_op_c_memory_lt_of_constraints adapter_cstrs h_imm
---   have h1218 : Main[12].val ||| Main[18].val < 2013265921 :=
---     lt_of_lt_of_le (Nat.or_lt_two_pow h12 h18) (by omega)
---   have h1117 : Main[11].val ||| Main[17].val < 2013265921 :=
---     lt_of_lt_of_le (Nat.or_lt_two_pow h11 h17) (by omega)
+def spec_or (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_RTYPE rs2 rs1 rd rop.OR
+  pure ()
 
---   -- The `BitwiseU16Operation` constraints connects output values to `xor`
---   have h27 : Main[27] * (256 : Fin BB) = (Main[11] ||| Main[17]) - Main[26] := by
---     simpa using BitwiseU16Operation.eq_or_word_sub_of_constraints _ _ _
---       (by tauto) (by tauto) hbwu16_cstrs
---   have h29 : Main[29] * (256 : Fin BB) = (Main[12] ||| Main[18]) - Main[28] := by
---     simpa using BitwiseU16Operation.eq_or_word_sub_of_constraints' _ _ _
---       (by tauto) (by tauto) hbwu16_cstrs
---   rw [hxor0, hxor1] at h27
---   rw [hxor2, hxor3] at h29
+def sp1_or : SailM Unit := do
+  let ⟨ or, imm ⟩ := h_is_or
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let op_a := sp1_op_a Main cstrs (or_real Main or)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
 
---   refine congr_arg (fun out => pure (_, (_, out))) (funext fun reg => ?_)
---   simp [hmem₁, hmem₂, hxor0, hxor1, hxor2, hxor3, h27, h29,
---     Nat.mod_eq_of_lt h1218, Nat.mod_eq_of_lt h1117,
---     bitVec_helper_or _ _ _ _ h11 h12 h17 h18,
---     Fin.or_val, ofNat_add, ofNat_mul, ofNat_or]
+theorem correct_or
+  (state_cstrs : (constraints Main).initialState s) :
+  let ⟨ or, imm ⟩ := h_is_or
+  let op_c := sp1_op_c Main cstrs (or_real Main or) imm
+  let op_b := sp1_op_b Main cstrs (or_real Main or)
+  let op_a := sp1_op_a Main cstrs (or_real Main or)
+  (spec_or (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_or Main cstrs h_is_or).run s
+  := by
+    let ⟨ or, imm ⟩ := h_is_or
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (or_real Main or)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main or)
+    have h_imm := immediate_bounds Main cstrs (or_real Main or)
+    have h_a0 := op_a_is_0 Main cstrs (or_real Main or)
+    have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
+    simp_all
 
--- -- dt: could just hardcode "and" also, would be nice to avoid that
+    simp [constraints] at state_cstrs
+    split at state_cstrs
 
--- end BitwiseChip
+    simp_all
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1 trusted_instr_state; simp_all
+
+    simp [spec_or, sp1_or, execute, execute_RTYPE']
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    . simp [Word.toBitVec64, Word.toNat]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
+      have := spec.or Main ⟨ or, imm ⟩ cstrs
+      simp_all [Word.toBitVec64, Word.toNat]
+      rfl
+
+end Or
+
+namespace Ori
+
+open Bitwise
+
+variable
+  (Main : Vector (Fin BB) 52)
+  (s : SailState)
+  (cstrs : (constraints Main).allHold)
+  (h_is_ori : is_ori Main)
+
+def spec_ori (shamt : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_ITYPE shamt rs1 rd iop.ORI
+  pure ()
+
+def sp1_ori : SailM Unit := do
+  let ⟨ or, imm ⟩ := h_is_ori
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let op_a := sp1_op_a Main cstrs (or_real Main or)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
+
+theorem correct_ori
+  (state_cstrs : (constraints Main).initialState s) :
+  let ⟨ or, imm ⟩ := h_is_ori
+  let op_c := sp1_op_c_imm Main cstrs (or_real Main or) imm
+  let op_b := sp1_op_b Main cstrs (or_real Main or)
+  let op_a := sp1_op_a Main cstrs (or_real Main or)
+  (spec_ori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_ori Main cstrs h_is_ori).run s
+  := by
+    let ⟨ or, imm ⟩ := h_is_ori
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (or_real Main or)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main or)
+    have h_imm := immediate_bounds Main cstrs (or_real Main or)
+    have h_a0 := op_a_is_0 Main cstrs (or_real Main or)
+    have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
+    simp_all
+
+    simp [constraints] at state_cstrs
+    split at state_cstrs
+
+    simp_all
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b⟩ := state_cstrs
+    clear thr1 trusted_instr_state; simp_all
+
+    simp [spec_ori, sp1_ori, execute, execute_ITYPE']
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    . simp_all [Word.toBitVec64, Word.toNat]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      have := spec.ori Main ⟨ or, imm ⟩ cstrs
+      rw [← h_imm]
+      rw [exec_ITYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
+      simp_all [Word.toBitVec64, Word.toNat]
+      rfl
+
+end Ori
+
+namespace And
+
+open Bitwise
+
+variable
+  (Main : Vector (Fin BB) 52)
+  (s : SailState)
+  (cstrs : (constraints Main).allHold)
+  (h_is_and : is_and Main)
+
+def spec_and (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_RTYPE rs2 rs1 rd rop.AND
+  pure ()
+
+def sp1_and : SailM Unit := do
+  let ⟨ and, imm ⟩ := h_is_and
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let op_a := sp1_op_a Main cstrs (and_real Main and)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
+
+theorem correct_and
+  (state_cstrs : (constraints Main).initialState s) :
+  let ⟨ and, imm ⟩ := h_is_and
+  let op_c := sp1_op_c Main cstrs (and_real Main and) imm
+  let op_b := sp1_op_b Main cstrs (and_real Main and)
+  let op_a := sp1_op_a Main cstrs (and_real Main and)
+  (spec_and (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_and Main cstrs h_is_and).run s
+  := by
+    let ⟨ and, imm ⟩ := h_is_and
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (and_real Main and)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main and)
+    have h_imm := immediate_bounds Main cstrs (and_real Main and)
+    have h_a0 := op_a_is_0 Main cstrs (and_real Main and)
+    have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
+    simp_all
+
+    simp [constraints] at state_cstrs
+    split at state_cstrs
+
+    simp_all
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1 trusted_instr_state; simp_all
+
+    simp [spec_and, sp1_and, execute, execute_RTYPE']
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    . simp [Word.toBitVec64, Word.toNat]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
+      have := spec.and Main ⟨ and, imm ⟩ cstrs
+      simp_all [Word.toBitVec64, Word.toNat]
+      rfl
+
+end And
+
+namespace Andi
+
+open Bitwise
+
+variable
+  (Main : Vector (Fin BB) 52)
+  (s : SailState)
+  (cstrs : (constraints Main).allHold)
+  (h_is_andi : is_andi Main)
+
+def spec_andi (shamt : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_ITYPE shamt rs1 rd iop.ANDI
+  pure ()
+
+def sp1_andi : SailM Unit := do
+  let ⟨ and, imm ⟩ := h_is_andi
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let op_a := sp1_op_a Main cstrs (and_real Main and)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
+
+theorem correct_andi
+  (state_cstrs : (constraints Main).initialState s) :
+  let ⟨ and, imm ⟩ := h_is_andi
+  let op_c := sp1_op_c_imm Main cstrs (and_real Main and) imm
+  let op_b := sp1_op_b Main cstrs (and_real Main and)
+  let op_a := sp1_op_a Main cstrs (and_real Main and)
+  (spec_andi op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_andi Main cstrs h_is_andi).run s
+  := by
+    let ⟨ and, imm ⟩ := h_is_andi
+    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (and_real Main and)
+    have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main and)
+    have h_imm := immediate_bounds Main cstrs (and_real Main and)
+    have h_a0 := op_a_is_0 Main cstrs (and_real Main and)
+    have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
+    simp_all
+
+    simp [constraints] at state_cstrs
+    split at state_cstrs
+
+    simp_all
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b⟩ := state_cstrs
+    clear thr1 trusted_instr_state; simp_all
+
+    simp [spec_andi, sp1_andi, execute, execute_ITYPE']
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+
+    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+    . simp_all [Word.toBitVec64, Word.toNat]
+    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
+      have := spec.andi Main ⟨ and, imm ⟩ cstrs
+      rw [← h_imm]
+      rw [exec_ITYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
+      simp_all [Word.toBitVec64, Word.toNat]
+      rfl
+
+end Andi

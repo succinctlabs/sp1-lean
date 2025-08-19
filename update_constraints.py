@@ -47,7 +47,7 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Bitwise", "U16toU8OperationUnsafe", "Operation"),
     ("LoadByte", "AddrAddOperation", "Operation"),
     ("LoadByte", "AddressOperation", "Operation"),
-    
+
     # Compare operations
     ("DivRem", "IsEqualWordOperation", "Compare"),
     ("DivRem", "IsZeroWordOperation", "Compare"),
@@ -83,11 +83,11 @@ def update_constraints_in_file(file_path: str, new_constraints: str):
     """Replace content between 'section constraints' and 'end constraints' markers."""
     with open(file_path, 'r') as f:
         lines = f.readlines()
-    
+
     # Find the start and end markers
     start_idx = None
     end_idx = None
-    
+
     for i, line in enumerate(lines):
         stripped = line.strip()
         if stripped == "section constraints":
@@ -95,20 +95,20 @@ def update_constraints_in_file(file_path: str, new_constraints: str):
         elif stripped == "end constraints" and start_idx is not None:
             end_idx = i
             break
-    
+
     # Validate we found both markers
     if start_idx is None:
         raise ValueError(f"Could not find 'section constraints' marker in {file_path}")
     if end_idx is None:
         raise ValueError(f"Could not find 'end constraints' marker after 'section constraints' in {file_path}")
-    
+
     # Ensure new_constraints ends with newline
     if new_constraints and not new_constraints.endswith('\n'):
         new_constraints += '\n'
-    
+
     # Reconstruct the file with new constraints
     new_lines = lines[:start_idx + 1] + [new_constraints] + lines[end_idx:]
-    
+
     with open(file_path, 'w') as f:
         f.writelines(new_lines)
 

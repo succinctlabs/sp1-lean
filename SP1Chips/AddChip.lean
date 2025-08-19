@@ -18,7 +18,7 @@ variable
 
 def spec_add (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute_RTYPE rs2 rs1 rd rop.ADD
+  _ ← execute (.RTYPE (rs2, rs1, rd, rop.ADD))
   pure ()
 
 def sp1_op_a : BitVec 5 :=
@@ -68,38 +68,40 @@ def sp1_op_c : BitVec 5 :=
 
 def sp1_add : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 open Sail
 
-theorem correct
+set_option pp.parens true in
+theorem correct_add
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main cstrs h_is_real
   let op_b := sp1_op_b Main cstrs h_is_real
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_add (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_add Main cstrs h_is_real).run s
   := by
-    -- Obtain and simplify state and pure constraints
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddOperation.constraints, CPUState.constraints, RTypeReader.constraints, h_is_real] at state_cstrs
     obtain ⟨read_pc, trusted_instr_state, _, read_op_b, read_op_c⟩ := state_cstrs
     simp [constraints] at cstrs
     obtain ⟨add_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
-    apply AddOperation.correct (h_is_real := h_is_real) at add_op_cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [RTypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
     obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
     simp [Opcode.ofNat, Nat.ble] at trusted_instr_state trusted_instr_prop
-    specialize add_op_cstrs is_U64_b is_U64_c
+
+    rw [h_is_real] at *
+    apply AddOperation.spec is_U64_b is_U64_c at add_op_cstrs
     obtain ⟨ is_U64_val, is_add ⟩ := add_op_cstrs
     simp at *
 
     -- Now the monadic manipulation
-    simp [spec_add, sp1_add, execute_RTYPE]
+    simp [spec_add, sp1_add, execute, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_b, read_op_b (by omega)]
     simp [sp1_op_c, read_op_c (by omega)]
     simp [sp1_op_a]
+    rw [BabyBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . rw [← is_add]

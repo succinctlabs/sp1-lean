@@ -1,48 +1,24 @@
 import SP1Foundations.Field
 import SP1Foundations.Word
+import LeanRV64IM.Prelude
 import LeanRV64IM.Sail.Sail
 
 open BitVec
 
+lemma bitVec_sshiftright_eq (bv : BitVec w) (shift : ℕ) :
+  bv.sshiftRight shift =
+    BitVec.setWidth w
+      (BitVec.extractLsb ((w - 1) + shift) shift (BitVec.signExtend (w + shift) bv))
+    := by grind
+
 namespace BitVec
 
+attribute [simp] LeanRV64IM.Functions.sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
+attribute [simp] extractLsb extractLsb'
+
+def extend {m : ℕ} (bv : BitVec m) (n : ℕ) (sgn : Prop) [Decidable sgn] := (if sgn then signExtend else setWidth) n bv
+
 @[simp] lemma twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
-
-lemma shiftLeft_xor_shiftLeft16 (a b c d : BitVec 32)
-    (ha : a < 65536) (hb : b < 65536)
-    (hc : c < 65536) (hd : d < 65536) :
-    (a + b <<< 16) ^^^ (c + d <<< 16) =
-      (a ^^^ c) + (b ^^^ d) <<< 16 := by bv_decide
-
-lemma shiftLeft_or_shiftLeft16 (a b c d : BitVec 32)
-    (ha : a < 65536) (hb : b < 65536)
-    (hc : c < 65536) (hd : d < 65536) :
-    (a + b <<< 16) ||| (c + d <<< 16) =
-      (a ||| c) + (b ||| d) <<< 16 := by bv_decide
-
-lemma shiftLeft_and_shiftLeft16 (a b c d : BitVec 32)
-    (ha : a < 65536) (hb : b < 65536)
-    (hc : c < 65536) (hd : d < 65536) :
-    (a + b <<< 16) &&& (c + d <<< 16) =
-      (a &&& c) + (b &&& d) <<< 16 := by bv_decide
-
-lemma and_add_and_mul_bv {x_low x_high y_low y_high : BitVec 32}
-    (hx : x_low < 256) (hy : y_low < 256) :
-    (x_low &&& y_low) + (x_high &&& y_high) * 256 =
-      (x_low + x_high * 256) &&& (y_low + y_high * 256) := by
-  bv_decide
-
-lemma or_add_or_mul_bv {x_low x_high y_low y_high : BitVec 32}
-    (hx : x_low < 256) (hy : y_low < 256) :
-    (x_low ||| y_low) + (x_high ||| y_high) * 256 =
-      (x_low + x_high * 256) ||| (y_low + y_high * 256) := by
-  bv_decide
-
-lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
-    (hx : x_low < 256) (hy : y_low < 256) :
-    (x_low ^^^ y_low) + (x_high ^^^ y_high) * 256 =
-      (x_low + x_high * 256) ^^^ (y_low + y_high * 256) := by
-  bv_decide
 
 @[simp] lemma mod4_add_eq_mod4 (x y : BitVec 64)
     (hx : x < BitVec.twoPow 64 32)
@@ -59,20 +35,11 @@ lemma xor_add_xor_mul_bv {x_low x_high y_low y_high : BitVec 32}
   rw [← Fin.val_inj]
   simp
 
-lemma ofNat64_mod_4_eq_zero (n : ℕ) :
-    (BitVec.ofNat 64 n) % 4 = n % 4 := rfl
-
 theorem twoPow64_and_eq_self {a b : BitVec 64} (h : (a + b) % 4 = 0) :
     18446744073709551614#64 &&& (a + b) = a + b := by bv_decide
 
 theorem add_mod4_eq_zero_of_mod4_eq_zero {a b : BitVec 64}
     (ha : a % 4 = 0) (hb : b % 4 = 0) : (a + b) % 4 = 0 := by bv_decide
-
-theorem FinBB_mul4_is_BV_mul4 {x : Fin BB} : x % 4 = 0 →
-    (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith)) % 4 = 0 := by
-  intro h
-  have h' : x.val % 4 = 0 := by simp [Fin.mod_def] at h; exact h
-  simp [BitVec.umod_def, BitVec.toNat_ofNatLT, h']
 
 theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧ x[1] = false := by
   have hx' : x.toNat % 4 = 0 := by bv_omega
@@ -92,136 +59,29 @@ theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧
     simp [BitVec.getLsb, Nat.testBit]
     omega
 
-lemma FinBB_mul4_means_LS2B_0 (x : Fin BB) :
-    let vx := (BitVec.ofNatLT (w := 64) x (by have := x.isLt; linarith))
-    x % 4 = 0 → vx[0] = false ∧ vx[1] = false := by
-  extract_lets vx
-  intro hx
-  simp [vx]
-  exact mul4_means_0_1_are_0 (FinBB_mul4_is_BV_mul4 hx)
-
 end BitVec
-
-namespace Nat
-
-lemma bitVec_helper_xor (a b c d : ℕ)
-    (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
-    let bv_a := BitVec.ofNat 32 a; let bv_b := BitVec.ofNat 32 b
-    let bv_c := BitVec.ofNat 32 c; let bv_d := BitVec.ofNat 32 d
-    (bv_a + bv_b <<< 16) ^^^ (bv_c + bv_d <<< 16) =
-      (bv_a ^^^ bv_c) + (bv_b ^^^ bv_d) <<< 16 := by
-  apply shiftLeft_xor_shiftLeft16
-  all_goals simp [BitVec.lt_def]; omega
-
-lemma bitVec_helper_or (a b c d : ℕ)
-    (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
-    let bv_a := BitVec.ofNat 32 a; let bv_b := BitVec.ofNat 32 b
-    let bv_c := BitVec.ofNat 32 c; let bv_d := BitVec.ofNat 32 d
-    (bv_a + bv_b <<< 16) ||| (bv_c + bv_d <<< 16) =
-      (bv_a ||| bv_c) + (bv_b ||| bv_d) <<< 16 := by
-  apply shiftLeft_or_shiftLeft16
-  all_goals simp [BitVec.lt_def]; omega
-
-lemma bitVec_helper_and (a b c d : ℕ)
-    (ha : a < 2^16) (hb : b < 2^16) (hc : c < 2^16) (hd : d < 2^16) :
-    let bv_a := BitVec.ofNat 32 a; let bv_b := BitVec.ofNat 32 b
-    let bv_c := BitVec.ofNat 32 c; let bv_d := BitVec.ofNat 32 d
-    (bv_a + bv_b <<< 16) &&& (bv_c + bv_d <<< 16) =
-      (bv_a &&& bv_c) + (bv_b &&& bv_d) <<< 16 := by
-  apply shiftLeft_and_shiftLeft16
-  all_goals simp [BitVec.lt_def]; omega
-
-end Nat
 
 namespace BabyBear
 
-lemma eq_of_bitVec_ofNat16_val_eq (x y : Fin BB)
-    (h : BitVec.ofNat 64 x.val = BitVec.ofNat 64 y.val) : x = y := by
-  simp [← BitVec.toNat_inj, BB, BitVec.toNat_ofNat, Nat.reducePow] at h; omega
-lemma eq_of_bitVec_ofNat32_val_eq (x y : Fin BB)
-    (h : BitVec.ofNat 32 x.val = BitVec.ofNat 32 y.val) : x = y := by
-  simp [← BitVec.toNat_inj, BB, BitVec.toNat_ofNat, Nat.reducePow] at h; omega
-
-lemma val_add_mul_256 {x y : Fin BB} (hx : x.val < 2^8) (hy : y.val < 2^8) :
-    (x + y * 256).val = x.val + y.val * 256 := by
-  simp [Fin.val_add, Fin.val_mul]; omega
-lemma val_add_mul_65536 {x y : Fin BB} (hx : x.val < 2^16) (hy : y.val < 2^8) :
-    (x + y * 65536).val = x.val + y.val * 65536 := by
-  simp [Fin.val_add, Fin.val_mul]; omega
-
-lemma val_add_shiftLeft8 {x y : Fin BB} (hx : x.1 < 2^8) (hy : y.1 < 2^8) :
-    (x + y <<< 8).1 = x.1 + y.1 <<< 8 := by
-  simp [Fin.val_add]; omega
-lemma val_add_shiftLeft16 {x y : Fin BB} (hx : x.1 < 2^16) (hy : y.1 < 2^8) :
-    (x + y <<< 16).1 = x.1 + y.1 <<< 16 := by
-  simp [Fin.val_add]; omega
-
-lemma and_add_and_mul256 {x_low x_high y_low y_high : Fin BB}
-    (hx : x_low < 256) (hy : y_low < 256)
-    (hx' : x_high < 256) (hy' : y_high < 256) :
-    (x_low &&& y_low) + (x_high &&& y_high) * 256 =
-      (x_low + x_high * 256) &&& (y_low + y_high * 256) := by
-  apply eq_of_bitVec_ofNat32_val_eq
-  simp [Fin.lt_iff_val_lt_val] at hx hy hx' hy'
-  have hxs : x_low.val + x_high.val * 256 < 2^16 := by omega
-  have hys : y_low.val + y_high.val * 256 < 2^16 := by omega
-  have hxy : x_low.1 &&& y_low.1 < 2^8 := Nat.and_lt_two_pow (n := 8) _ hy
-  have hxy' : x_high.1 &&& y_high.1 < 2^8 := Nat.and_lt_two_pow (n := 8) _ hy'
-  have hxsys : (x_low.1 + x_high.1 * 256) &&& (y_low.1 + y_high.1 * 256) < 2^16 :=
-    Nat.and_lt_two_pow (n := 16) _ hys
-  have hxy_comb : (x_low &&& y_low).1 < 2 ^ 8 := lt_of_le_of_lt (by simp [Fin.and_val]) hxy
-  have hxy_comb' : (x_high &&& y_high).1 < 2 ^ 8 := lt_of_le_of_lt (by simp [Fin.and_val]) hxy'
-  simpa [val_add_mul_256 hxy_comb hxy_comb', val_add_mul_256 hx hx',
-    val_add_mul_256 hy hy', BitVec.ofNat_add, BitVec.ofNat_mul]
-    using and_add_and_mul_bv (by simp; omega) (by simp; omega)
-
-lemma or_add_or_mul256 {x_low x_high y_low y_high : Fin BB}
-    (hx : x_low < 256) (hy : y_low < 256)
-    (hx' : x_high < 256) (hy' : y_high < 256) :
-    (x_low ||| y_low) + (x_high ||| y_high) * 256 =
-      (x_low + x_high * 256) ||| (y_low + y_high * 256) := by
-  apply eq_of_bitVec_ofNat32_val_eq
-  simp [Fin.lt_iff_val_lt_val] at hx hy hx' hy'
-  have hxs : x_low.val + x_high.val * 256 < 2^16 := by omega
-  have hys : y_low.val + y_high.val * 256 < 2^16 := by omega
-  have hxy : x_low.1 ||| y_low.1 < 2^8 := Nat.or_lt_two_pow (n := 8) hx hy
-  have hxy' : x_high.1 ||| y_high.1 < 2^8 := Nat.or_lt_two_pow (n := 8) hx' hy'
-  have hxsys : (x_low.1 + x_high.1 * 256) ||| (y_low.1 + y_high.1 * 256) < 2^16 :=
-    Nat.or_lt_two_pow (n := 16) hxs hys
-  have hxy_comb : (x_low ||| y_low).1 < 2 ^ 8 :=
-    lt_of_le_of_lt (by simp [Fin.or_val]; omega) hxy
-  have hxy_comb' : (x_high ||| y_high).1 < 2 ^ 8 :=
-    lt_of_le_of_lt (by simp [Fin.or_val]; omega) hxy'
-  simp only [BB_eq, Fin.isValue, val_add_mul_256 hxy_comb hxy_comb', Fin.or_val,
-    BitVec.ofNat_add, val_add_mul_256 hx hx', val_add_mul_256 hy hy']
-  rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
-  simpa [BitVec.ofNat_add, BitVec.ofNat_mul] using
-    or_add_or_mul_bv (by simp; omega) (by simp; omega)
-
-lemma xor_add_xor_mul256 {x_low x_high y_low y_high : Fin BB}
-    (hx : x_low < 256) (hy : y_low < 256)
-    (hx' : x_high < 256) (hy' : y_high < 256) :
-    (x_low ^^^ y_low) + (x_high ^^^ y_high) * 256 =
-      (x_low + x_high * 256) ^^^ (y_low + y_high * 256) := by
-  apply eq_of_bitVec_ofNat32_val_eq
-  simp [Fin.lt_iff_val_lt_val] at hx hy hx' hy'
-  have hxs : x_low.val + x_high.val * 256 < 2^16 := by omega
-  have hys : y_low.val + y_high.val * 256 < 2^16 := by omega
-  have hxy : x_low.1 ^^^ y_low.1 < 2^8 := Nat.xor_lt_two_pow (n := 8) hx hy
-  have hxy' : x_high.1 ^^^ y_high.1 < 2^8 := Nat.xor_lt_two_pow (n := 8) hx' hy'
-  have hxsys : (x_low.1 + x_high.1 * 256) ^^^ (y_low.1 + y_high.1 * 256) < 2^16 :=
-    Nat.xor_lt_two_pow (n := 16) hxs hys
-  have hxy_comb : (x_low ^^^ y_low).1 < 2 ^ 8 :=
-    lt_of_le_of_lt (by simp [Fin.xor_val]; omega) hxy
-  have hxy_comb' : (x_high ^^^ y_high).1 < 2 ^ 8 :=
-    lt_of_le_of_lt (by simp [Fin.xor_val]; omega) hxy'
-  simp only [BB_eq, Fin.isValue, val_add_mul_256 hxy_comb hxy_comb', Fin.xor_val,
-    BitVec.ofNat_add, val_add_mul_256 hx hx', val_add_mul_256 hy hy']
-  rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
-  simpa [BitVec.ofNat_add, BitVec.ofNat_mul]
-    using xor_add_xor_mul_bv (by simp; omega) (by simp; omega)
+lemma add4_into_pc_ofNat {x : Fin BB} {y z : ℕ} : x < 65536 →
+  BitVec.ofNat 64 (x.val + y + z) + 4#64 = BitVec.ofNat 64 ((x + 4).val + y + z) := by
+  intros
+  rw [Fin.val_add, Nat.mod_eq_of_lt (by omega)]
+  simp [ofNat_add]; ring_nf
 
 end BabyBear
+
+namespace Nat
+
+lemma lift_lt {a b : ℕ} (w : ℕ) : a < 2 ^ w → b < 2 ^ w → (a < b ↔ BitVec.ofNat w a < BitVec.ofNat w b) := by
+  intro haw hbw
+  constructor <;> intro lhs <;> simp_all
+  . repeat rw [Nat.mod_eq_of_lt (by omega)]
+    assumption
+  . repeat rw [Nat.mod_eq_of_lt (by omega)] at lhs
+    assumption
+
+end Nat
 
 namespace Word
 
@@ -275,7 +135,9 @@ theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
   := by
     extract_lets bx64
     have hx_bb : x.val < BB := x.isLt
-    have hx_64 : x.val < 2^64 := by simp [BB] at hx_bb; omega
+    have hx_64 : x.val < 2^64 := by omega
+
+    -- Now prove using bit representation
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_umod, BitVec.toNat_ofNat]
     have h_bx64 : bx64.toNat = x.val := by
@@ -316,5 +178,85 @@ theorem useless_signExtend_add {x : Fin BB} {hx : x.val < 2^12} {y : BitVec 64}
       exact h_suff bx64 sx y h_base
     intro a b c h_ab
     bv_decide
+
+lemma toInt_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
+  (r1.toInt * r2.toInt % 340282366920938463463374607431768211456).toNat =
+    (BitVec.signExtend 128 r1 * BitVec.signExtend 128 r2).toNat
+    := by
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r1) (by simp)]
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r2) (by simp)]
+
+  have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
+  have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
+  have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
+
+  simp [BitVec.toInt, BitVec.signExtend]; split_ifs
+
+  all_goals
+    simp_all
+    try omega
+
+  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
+  . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
+  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
+lemma toInt_toNat_as_toNat_128 {r1 r2 : BitVec 64} :
+  (r1.toInt * r2.toNat % 340282366920938463463374607431768211456).toNat =
+    (BitVec.signExtend 128 r1 * BitVec.setWidth 128 r2).toNat
+    := by
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r1) (by simp)]
+  rw [← setWidth_idem (n := 128) (bv := r2) (by simp)]
+
+  have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
+  have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
+  have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
+
+  simp [BitVec.toInt, BitVec.signExtend]; split_ifs
+
+  all_goals
+    simp_all
+    try omega
+
+  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
+
+lemma toNat_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
+  ((r1.toNat : ℤ) * r2.toInt % 340282366920938463463374607431768211456).toNat =
+    (BitVec.setWidth 128 r1 * BitVec.signExtend 128 r2).toNat
+    := by
+  rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r2) (by simp)]
+  rw [← setWidth_idem (n := 128) (bv := r1) (by simp)]
+
+  have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
+  have mr1 : max ((r1.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r1.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
+  have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
+  have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
+
+  simp [BitVec.toInt, BitVec.signExtend]; split_ifs
+
+  all_goals
+    simp_all
+    try omega
+
+  . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
+    zify; simp_all [Int.toNat_add, Int.toNat_mul]
+    ring_nf
+    omega
 
 end BitVec

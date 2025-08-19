@@ -50,6 +50,55 @@ def constraints (Main : Vector (Fin BB) 45) : SP1ConstraintList :=
     (.assertZero E28),
   ]
 
+@[simp] def is_slt (Main : Vector (Fin BB) 45) := Main[32] = 1 ∧ Main[31] = 0
+@[simp] def is_sltu (Main : Vector (Fin BB) 45) := Main[33] = 1 ∧ Main[31] = 0
+@[simp] def is_slti (Main : Vector (Fin BB) 45) := Main[32] = 1 ∧ Main[31] = 1
+@[simp] def is_sltiu (Main : Vector (Fin BB) 45) := Main[33] = 1 ∧ Main[31] = 1
+
+lemma allHold_constraints_iff_slt (h : is_slt Main) :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[35] }, u16_flags := #v[Main[36], Main[37], Main[38], Main[39]], not_eq_inv := Main[40], comparison_limbs := #v[Main[41], Main[42]] }, b_msb := { msb := Main[43] }, c_msb := { msb := Main[44] } } Main[32] (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[32] * 9 + Main[33] * 10) #v[Main[34], Main[32] * 2 + Main[33] * 3, 0] #v[Main[35], 0, 0, 0] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } (Main[32] + Main[33])) ∧
+    Main[33] = 0 ∧ Main[34] = 51
+   := by
+  simp_all [constraints]
+  intro ltop; simp [LtOperationSigned.constraints] at ltop
+  omega
+
+lemma allHold_constraints_iff_sltu (h : is_sltu Main) :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[35] }, u16_flags := #v[Main[36], Main[37], Main[38], Main[39]], not_eq_inv := Main[40], comparison_limbs := #v[Main[41], Main[42]] }, b_msb := { msb := Main[43] }, c_msb := { msb := Main[44] } } Main[32] (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[32] * 9 + Main[33] * 10) #v[Main[34], Main[32] * 2 + Main[33] * 3, 0] #v[Main[35], 0, 0, 0] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } (Main[32] + Main[33])) ∧
+    Main[32] = 0 ∧ Main[34] = 51
+   := by
+  simp_all [constraints]
+  intro ltop; simp [LtOperationSigned.constraints] at ltop
+  omega
+
+lemma allHold_constraints_iff_slti (h : is_slti Main) :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[35] }, u16_flags := #v[Main[36], Main[37], Main[38], Main[39]], not_eq_inv := Main[40], comparison_limbs := #v[Main[41], Main[42]] }, b_msb := { msb := Main[43] }, c_msb := { msb := Main[44] } } Main[32] (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[32] * 9 + Main[33] * 10) #v[Main[34], Main[32] * 2 + Main[33] * 3, 0] #v[Main[35], 0, 0, 0] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } (Main[32] + Main[33])) ∧
+    Main[33] = 0 ∧ Main[34] = 19
+   := by
+  simp_all [constraints]
+  intro ltop _ _; simp [LtOperationSigned.constraints] at ltop
+  omega
+
+lemma allHold_constraints_iff_sltiu (h : is_sltiu Main) :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[35] }, u16_flags := #v[Main[36], Main[37], Main[38], Main[39]], not_eq_inv := Main[40], comparison_limbs := #v[Main[41], Main[42]] }, b_msb := { msb := Main[43] }, c_msb := { msb := Main[44] } } Main[32] (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[32] * 9 + Main[33] * 10) #v[Main[34], Main[32] * 2 + Main[33] * 3, 0] #v[Main[35], 0, 0, 0] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } (Main[32] + Main[33])) ∧
+    Main[32] = 0 ∧ Main[34] = 19
+   := by
+  simp_all [constraints]
+  intro ltop _ _; simp [LtOperationSigned.constraints] at ltop
+  omega
+
 end constraints
 
 end Lt

@@ -118,25 +118,16 @@ theorem correct_bgeu
     have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; simp_all only
     have h_imm_is_u64 : Main[21].val + Main[22].val * 65536 + ↑Main[23] * 4294967296 + ↑Main[24] * 281474976710656 < 2^64 := by omega
     have op_c_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
-      by exact Word.isU64_of_cases _ h_imm_0 h_imm_1 h_imm_2 h_imm_3
+      by exact Word.isU64_of_cases h_imm_0 h_imm_1 h_imm_2 h_imm_3
 
-    have spec_lt :=
-      LtOperationSigned.correct_for_branch
-        #v[Main[7], Main[8], Main[9], Main[10]]
-        #v[Main[15], Main[16], Main[17], Main[18]]
-        _ 
-        _
-        _
-        lt_cstrs
-        h_is_real
-        op_a_is_u64
-        op_b_is_u64
-    simp [LtOperationSigned.spec_for_branch] at spec_lt
+    simp_all
+    have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
+    simp [LtOperationSigned.spec.branch.def] at spec_lt
     clear lt_cstrs
 
     have h_op_a_is_reg : Main[6] < 32 := by simp_all only
     have h_op_b_is_reg : Main[14] < 32 := by simp_all only
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_real, h_is_bgeu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_bgeu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
     obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
     have h_op_a_read' := h_op_a_read h_op_a_is_reg
     have h_op_b_read' := h_op_b_read h_op_b_is_reg
@@ -176,7 +167,6 @@ theorem correct_bgeu
       apply congrArg
 
       simp [BitVec.ult] at h_ltu
-      simp [h_neq, BitVec.ult, h_ltu, h_is_bgeu, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
 
       -- This should come from the spec of LtOperationSigned
       simp [h_neq, BitVec.ult, h_ltu, h_actual_ltu, h_30, h_31, h_33] at spec_lt
@@ -227,7 +217,7 @@ theorem correct_bgeu
       have h_trusted_signExtend :
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
         = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])
-        := by simp_all only
+        := by aesop
 
       have h_ltuxt_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
         apply add_mod4_eq_zero_of_mod4_eq_zero
@@ -235,7 +225,7 @@ theorem correct_bgeu
           rw [BitVec.ofNat64_mod_4_eq_zero_iff]
           have h_pc0_nat_mul4 : Main[3].val % 4 = 0 :=
             by
-              have : Main[3] % 4 = 0 := by simp_all only
+              have : Main[3] % 4 = 0 := by aesop
               rw [Fin.mod_def, ← Fin.val_inj] at this
               exact this
           clear * - h_pc0_nat_mul4
@@ -243,10 +233,10 @@ theorem correct_bgeu
         · simp [sign_extend, Sail.BitVec.signExtend, imm, sp1_imm]
           rw [←h_trusted_signExtend]
           simp [Word.toBitVec64, Word.toNat]
-          have h_pc0_mul4 : Main[21].val % 4 = 0 := by simp_all only
+          have h_pc0_mul4 : Main[21].val % 4 = 0 := by aesop
           omega
       obtain ⟨h_ltuxt_pc_b0, h_ltuxt_pc_b1⟩ := mul4_means_0_1_are_0 h_ltuxt_pc_is_mul4
-      simp [Sail.BitVec.access]
+      simp [Sail.BitVec.access] at *
       rw [h_ltuxt_pc_b1]
       simpM
 
@@ -278,7 +268,7 @@ theorem correct_bgeu
           aesop
       have h_is_ge : Main[35] = 0 := by clear * - spec_lt; simp_all only
 
-      simp [h_is_bgeu, h_eq, h_is_ge, h_is_eq, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
+      simp [h_is_bgeu, h_eq, h_is_ge, h_is_eq, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
       simp [sub_eq_zero] at chip_cstrs
       have h_is_branching : Main[34] = 1 := by simp_all only
       simp [h_is_branching] at chip_cstrs
@@ -305,7 +295,7 @@ theorem correct_bgeu
       rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
 
       simp [BitVec.add_def]
-      apply BitVec.eq_of_toNat_eq 
+      apply BitVec.eq_of_toNat_eq
       rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
       simp
 
@@ -352,7 +342,7 @@ theorem correct_bgeu
         have h_pc0_mul4 : Main[21].val % 4 = 0 := by simp_all only
         omega
     obtain ⟨h_ltuxt_pc_b0, h_ltuxt_pc_b1⟩ := mul4_means_0_1_are_0 h_ltuxt_pc_is_mul4
-    simp [Sail.BitVec.access]
+    simp [Sail.BitVec.access] at *
     rw [h_ltuxt_pc_b1]
     simpM
 
@@ -382,18 +372,18 @@ theorem correct_bgeu
       by
         clear * - spec_lt
         aesop
-    have h_is_ge : Main[35] = 0 := by clear * - spec_lt; simp_all only
+    have h_is_ge : Main[35] = 0 := by clear * - h_geu spec_lt; rw [if_neg] at spec_lt <;> aesop
 
-    simp [h_is_bgeu, h_neq, h_is_ge, h_is_neq, h_28, h_29, h_30, h_31, h_33, h_is_real, h_opcode, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
+    simp [h_is_bgeu, h_neq, h_is_ge, h_is_neq, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at chip_cstrs
     simp [sub_eq_zero] at chip_cstrs
-    have h_is_branching : Main[34] = 1 := by simp_all only
+    have h_is_branching : Main[34] = 1 := by aesop
     simp [h_is_branching] at chip_cstrs
 
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
-    have h_pc_0 : Main[3].val < 65536 := by show Main[3] < 65536; simp_all only
-    have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; simp_all only
-    have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; simp_all only
+    have h_pc_0 : Main[3].val < 65536 := by show Main[3] < 65536; aesop
+    have h_pc_1 : Main[4].val < 65536 := by show Main[4] < 65536; aesop
+    have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; aesop
 
     have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
@@ -411,7 +401,7 @@ theorem correct_bgeu
     rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
 
     simp [BitVec.add_def]
-    apply BitVec.eq_of_toNat_eq 
+    apply BitVec.eq_of_toNat_eq
     rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
     simp
 
@@ -423,4 +413,3 @@ theorem correct_bgeu
 end BGEU
 
 end Branch
-
