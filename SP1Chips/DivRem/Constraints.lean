@@ -10,13 +10,14 @@ import SP1Operations.Reader.ALUTypeReader
 namespace DivRem
 
 set_option maxHeartbeats 100000000
+set_option linter.constructorNameAsVariable false
 
 variable (Main : Vector (Fin BB) 251)
 
 section constraints
 
 -- Generated Lean code for chip DivRemChip
-def constraints : SP1ConstraintList :=
+@[irreducible] def constraints : SP1ConstraintList :=
   let E0 : Fin BB := Main[209] + Main[210]
   let E1 : Fin BB := E0 + Main[211]
   let E2 : Fin BB := E1 + Main[212]
@@ -944,22 +945,175 @@ lemma allHold_constraints_iff :
     rw [eq_comm (a := _ * _) (b := Main[250])]
     simp
 
+set_option maxRecDepth 1000000 in
+lemma allHold_constraints_alu_ops :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+  List.Forall SP1Constraint.toProp
+    (ALUTypeReader.constraints
+      Main[0]
+      (Main[2] + Main[1] * 65536)
+      #v[Main[3], Main[4], Main[5]]
+      (Main[206] * (16 : Fin BB) + Main[208] * (18 : Fin BB) + Main[205] * (15 : Fin BB) + Main[207] * (17 : Fin BB) +
+       Main[209] * (48 : Fin BB) + Main[210] * (50 : Fin BB) + Main[211] * (49 : Fin BB) + Main[212] * (51 : Fin BB))
+      #v[Main[213], Main[206] * (5 : Fin BB) + Main[208] * (7 : Fin BB) + Main[205] * (4 : Fin BB) + Main[207] * (6 : Fin BB) + Main[209] * (4 : Fin BB) + Main[210] * (6 : Fin BB) + Main[211] * (5 : Fin BB) + Main[212] * (7 : Fin BB), Main[206] + Main[208] + Main[205] + Main[207] + Main[209] + Main[210] + Main[211] + Main[212]]
+      #v[Main[32], Main[33], Main[34], Main[35]]
+      {
+        op_a := Main[6],
+        op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+        op_a_0 := Main[13],
+        op_b := Main[14],
+        op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+        op_c := #v[Main[21], Main[22], Main[23], Main[24]],
+        op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } },
+        imm_c := Main[31]
+      }
+      Main[249]) ∧
+    (Main[205] = 0 ∨ Main[205] = 1) ∧
+    (Main[206] = 0 ∨ Main[206] = 1) ∧
+    (Main[207] = 0 ∨ Main[207] = 1) ∧
+    (Main[208] = 0 ∨ Main[208] = 1) ∧
+    (Main[209] = 0 ∨ Main[209] = 1) ∧
+    (Main[210] = 0 ∨ Main[210] = 1) ∧
+    (Main[211] = 0 ∨ Main[211] = 1) ∧
+    (Main[212] = 0 ∨ Main[212] = 1) ∧
+    Main[206] + Main[208] + Main[205] + Main[207] + Main[209] + Main[210] + Main[211] + Main[212] = 1
+  := by
+    intro cstrs; rw [allHold_constraints_iff] at cstrs
+    obtain ⟨ main_mul_low, main_mul_high,
+             overflow_b, overflow_c, w_overflow_b, w_overflow_c,
+             div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
+             eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
+             cpu, alu,
+             eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
+             eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
+             eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2, w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
+             eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2, w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
+             eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
+             of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
+             nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
+             nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
+             u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
+             eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+             r_neg_b_neg, r_pos_b_pos,
+             c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
+             cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
+             u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
+             u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
+             eq_abs_c_alu_event, eq_abs_rem_alu_event,
+             eq_maco10, eq_maco11, eq_maco12, eq_maco13,
+             eq_rcm, eq_arlt,
+             u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+             b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
+             u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
+             b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
+             b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
+             b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
+             correct_opcode ⟩ := cstrs
+    clear *- alu b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
+    tauto
+
 end constraints
+
+section field_arithmetic
+
+lemma bb_bool_to_le {x : Fin BB} : x = (0 : Fin BB) ∨ x = (1 : Fin BB) ↔ (0 : Fin BB) ≤ x ∧ x ≤ (1 : Fin BB) := by grind
+
+end field_arithmetic
+
+section opcodes
+
+@[simp] def is_div := Main[205] = 1 ∧ Main[31] = 0
+@[simp] def is_divu := Main[206] = 1 ∧ Main[31] = 0
+@[simp] def is_rem := Main[207] = 1 ∧ Main[31] = 0
+@[simp] def is_remu := Main[208] = 1 ∧ Main[31] = 0
+@[simp] def is_divw := Main[209] = 1 ∧ Main[31] = 0
+@[simp] def is_remw := Main[210] = 1 ∧ Main[31] = 0
+@[simp] def is_divuw := Main[211] = 1 ∧ Main[31] = 0
+@[simp] def is_remuw := Main[212] = 1 ∧ Main[31] = 0
+
+lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
+  (Main[205] = 1 → Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0 ∧ Main[210] = 0 ∧ Main[211] = 0 ∧ Main[212] = 0) ∧
+  (Main[206] = 1 → Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0 ∧ Main[210] = 0 ∧ Main[211] = 0 ∧ Main[212] = 0) ∧
+  (Main[207] = 1 → Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0 ∧ Main[210] = 0 ∧ Main[211] = 0 ∧ Main[212] = 0) ∧
+  (Main[208] = 1 → Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[209] = 0 ∧ Main[210] = 0 ∧ Main[211] = 0 ∧ Main[212] = 0) ∧
+  (Main[209] = 1 → Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[210] = 0 ∧ Main[211] = 0 ∧ Main[212] = 0) ∧
+  (Main[210] = 1 → Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0 ∧ Main[211] = 0 ∧ Main[212] = 0) ∧
+  (Main[211] = 1 → Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0 ∧ Main[210] = 0 ∧ Main[212] = 0) ∧
+  (Main[212] = 1 → Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0 ∧ Main[210] = 0 ∧ Main[211] = 0)
+   := by
+  intro cstrs
+  have := allHold_constraints_alu_ops Main cstrs
+  obtain ⟨ alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops ⟩ := this
+  clear alu cstrs
+  rw [bb_bool_to_le] at *
+  split_ands <;> grind
+
+end opcodes
+
+section entailed_constraints
+
+lemma register_bounds :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Main[249] = 1 →
+      Main[31] = 0 →
+     Main[6] < 32 ∧ Main[14] < 32 ∧ (Main[31] = 0 → Main[21] < 32) ∧ Main[3] < 65536
+    := by
+  intro cstrs is_real is_imm
+  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
+  apply allHold_constraints_alu_ops at cstrs
+  obtain ⟨ alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops ⟩ := cstrs
+  simp_all
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
+  obtain ⟨ h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h20, h21 ⟩ := alu
+  simp_all
+  obtain ⟨ h17, h18, h19 ⟩ := h17
+  rcases b_is_div; rcases b_is_divu; rcases b_is_rem; rcases b_is_remu
+  rcases b_is_divw; rcases b_is_divuw; rcases b_is_remw; rcases b_is_remuw
+  all_goals
+    simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+
+lemma op_a_is_0 :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Main[249] = 1 →
+      Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0 := by
+  intro cstrs is_real is_zero
+  apply allHold_constraints_alu_ops at cstrs
+  obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
+  obtain ⟨ h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h20, h21 ⟩ := alu
+  simp_all
+
+lemma ops_U64_b_c :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Main[249] = 1 →
+      Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
+      Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] := by
+  intro cstrs is_real
+  apply allHold_constraints_alu_ops at cstrs
+  obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
+  obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h20, h21 ⟩ := alu
+  simp_all
+  rcases b_imm <;> simp_all
+  apply Word.isU64_of_cases <;> simp_all <;> grind
+
+end entailed_constraints
 
 -- section rem
 
 -- set_option maxRecDepth 1000000 in
--- lemma allHold_constraints_iff_rem :
---   Main[249] = 1 →
---   Main[205] = 0 → Main[206] = 0 → Main[207] = 1 → Main[208] = 0 →
---   Main[209] = 0 → Main[210] = 0 → Main[211] = 0 → Main[212] = 0 →
+-- lemma allHold_constraints_is_real :
 --   List.Forall SP1Constraint.toProp (constraints Main) →
---     False
+--     Main[249] = 1 → is_rem Main →
+--       Word.toInt #v[Main[32], Main[33], Main[34], Main[35]] =
+--         Int.tmod
+--           (Word.toInt #v[Main[15], Main[16], Main[17], Main[18]])
+--           (Word.toInt #v[Main[25], Main[26], Main[27], Main[28]])
 --   := by
---   intro h_is_real h_div h_divu h_rem h_remu h_divw h_divuw h_remw h_remuw
---   rw [allHold_constraints_iff]
-
---   intro cstrs
+--   intro cstrs h_is_real ⟨ h_is_rem, h_imm ⟩
+--   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
+--   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+--   rw [allHold_constraints_iff] at cstrs
 
 --   set a0 := Main[32]
 --   set a1 := Main[33]
@@ -1111,6 +1265,7 @@ end constraints
 --            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
 --            b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
 --            correct_opcode ⟩ := cstrs
+--   clear cpu alu correct_opcode
 --   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
 --   rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
 --   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
@@ -1121,9 +1276,47 @@ end constraints
 --   rw [eq_comm (b := ac1)] at cn_ac1; rw [eq_comm (b := ar1)] at rn_ar1
 --   rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
 --   rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
---   clear correct_opcode
 
---   sorry
+--   -- At this point, I would like to move away from `Main`, just take the hypotheses
+--   -- I have and prove stuff separately for each opcode, just so that I don't worry
+--   -- about access proofs. I would ideally like to apply the general versions of the
+--   -- specifications as per the below here as well, so that the abstractions aren't
+--   -- broken and only the indices really needed are kept.
+--   simp_all
+
+--   clear w_overflow_b w_overflow_c w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
+--   apply MulOperation.spec.mul _ is_U64_c at main_mul_low
+--   apply MulOperation.spec.mulh _ is_U64_c at main_mul_high
+--   apply IsEqualWordOperation.spec at overflow_b
+--   apply IsEqualWordOperation.spec at overflow_c
+--   apply IsZeroWordOperation.spec at div_zero
+--   apply U16MSBOperation.spec at eq_msb_b
+--   apply U16MSBOperation.spec at eq_msb_c
+--   apply U16MSBOperation.spec at eq_msb_rem
+--   simp at *
+
+--   split_ifs at div_zero with c_zero
+--   -- c is zero
+--   . obtain ⟨ c0_zero, c1_zero, c2_zero, c3_zero ⟩ := c_zero
+--     simp [c0_zero, c1_zero, c2_zero, c3_zero, div_zero] at *
+--     clear *- c0_eq_r0 c0_eq_r1 c0_eq_r2 c0_eq_r3
+--     simp_all
+--     have : Word.toInt #v[0, 0, 0, 0] = 0 := by simp [Word.toInt, Word.isNegative, Word.toNat]
+--     rw [this, Int.tmod_zero]
+--   -- c is not zero
+--   . simp_all [-overflow_b, -overflow_c]
+--     -- overflow
+--     by_cases h_overflow : b0 = 0 ∧ b1 = 0 ∧ b2 = 0 ∧ b3 = 32768 ∧ c0 = 65535 ∧ c1 = 65535 ∧ c2 = 65535 ∧ c3 = 65535
+--     . obtain ⟨ b0_zero, b1_zero, b2_zero, b3_max, c0_max, c1_max, c2_max, c3_max ⟩ := h_overflow
+--       simp [c0_max, c1_max, c2_max, c3_max, b0_zero, b1_zero, b2_zero, b3_max, eq_is_overflow] at *
+--       simp [Word.toInt, Word.isNegative, Word.toNat]
+--       simp_all
+--     -- no overflow
+--     . simp_all [-overflow_b, -overflow_c]
+--       have nob_or_noc : is_overflow_b * is_overflow_c = 0 := by simp_all; clear *- h_overflow; aesop
+--       have of_prod_zero : is_overflow_b = 0 ∨ is_overflow_c = 0 := by sorry
+--       simp [nob_or_noc] at *
+--       simp_all
 
 -- end rem
 

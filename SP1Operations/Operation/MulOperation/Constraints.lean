@@ -1007,6 +1007,15 @@ lemma spec.mul {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
   . apply BDWord.low_as_extract
     apply BDWord.isU128_of_cases <;> assumption
 
+lemma spec.mul.gen {aw bw cw cols is_real is_mulh is_mulw is_mulhu is_mulhsu}
+  (isU64_bw : bw.isU64)
+  (isU64_cw : cw.isU64)
+  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols is_real 1 is_mulh is_mulw is_mulhu is_mulhsu)) :
+  is_real = 1 →
+    aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MUL := by
+  intro is_real; simp_all
+  apply spec.mul isU64_bw isU64_cw cstrs (by simp)
+
 end mul
 
 section mulh
@@ -1087,6 +1096,15 @@ lemma spec.mulh {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
   . assumption
   . apply BDWord.high_as_extract
     apply BDWord.isU128_of_cases <;> assumption
+
+lemma spec.mulh.gen {aw bw cw cols is_real is_mul is_mulw is_mulhu is_mulhsu}
+  (isU64_bw : bw.isU64)
+  (isU64_cw : cw.isU64)
+  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols is_real is_mul 1 is_mulw is_mulhu is_mulhsu)) :
+  is_real = 1 →
+    aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULH := by
+  intro is_real; simp_all
+  apply spec.mulh isU64_bw isU64_cw cstrs (by simp)
 
 end mulh
 

@@ -44,4 +44,16 @@ theorem spec
     rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>
     simp_all <;> omega
 
+theorem spec.gen
+  {a b : Word (Fin BB)}
+  {cols : AddOperation}
+  {is_real : Fin BB}
+  (h_isU64_a : a.isU64)
+  (h_isU64_b : b.isU64) :
+  List.Forall SP1Constraint.toProp (constraints a b cols is_real) →
+    is_real = 1 →
+      cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
+  intro cstrs is_real; simp_all
+  exact spec h_isU64_a h_isU64_b cstrs
+
 end AddOperation

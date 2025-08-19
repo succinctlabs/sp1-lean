@@ -23,6 +23,16 @@ lemma spec
     cols.msb = if a >= 32768 then 1 else 0
   := by simp [constraints]; grind
 
+lemma spec.gen
+  {a : Fin BB}
+  {cols : U16MSBOperation}
+  {is_real : Fin BB}
+  (h_a_isU16 : a < 65536) :
+  List.Forall SP1Constraint.toProp (constraints a cols is_real) →
+    is_real = 1 →
+      cols.msb = if a >= 32768 then 1 else 0
+  := by simp [constraints]; grind
+
 lemma spec.U64
   {w : Word (Fin BB)}
   {cols : U16MSBOperation}
