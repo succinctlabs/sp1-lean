@@ -509,7 +509,7 @@ def is_CSR_defined (b__0 : (BitVec 12)) : SailM Bool := do
                                                                                                                                                                                                       Ext_Zihpm)
                                                                                                                                                                                                   else
                                                                                                                                                                                                     (do
-                                                                                                                                                                                                      bif (((Sail.BitVec.extractLsb
+                                                                                                                                                                                                      if (((Sail.BitVec.extractLsb
                                                                                                                                                                                                                b__0
                                                                                                                                                                                                                11
                                                                                                                                                                                                                5) == (0b1011100 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -984,4 +984,3 @@ def MemoryOpResult_drop_meta (r : (Result (k_t × Unit) ExceptionType)) : (Resul
   match r with
   | .Ok (v, m) => (Ok v)
   | .Err e => (Err e)
-
