@@ -1298,6 +1298,12 @@ lemma allHold_constraints_is_real :
   apply AddOperation.spec.gen ?_ ?_ at rem_neg_sum_zero
   apply LtOperationUnsigned.spec.nat.gen ?_ ?_ at abs_check
 
+  simp [-Vector.eq_mk, -Vector.mk_eq, -Vector.mk.injEq] at
+    main_mul_low main_mul_high overflow_b overflow_c
+    w_overflow_b w_overflow_c div_zero eq_msb_b eq_msb_c
+    eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
+    c_neg_sum_zero rem_neg_sum_zero abs_check
+
   -- At this point, I would like to move away from `Main`, just take the hypotheses
   -- I have and prove stuff separately for each opcode, just so that I don't worry
   -- about access proofs.
