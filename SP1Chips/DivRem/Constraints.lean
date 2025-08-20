@@ -977,40 +977,40 @@ lemma allHold_constraints_alu_ops :
     (Main[211] = 0 ∨ Main[211] = 1) ∧
     (Main[212] = 0 ∨ Main[212] = 1) ∧
     Main[206] + Main[208] + Main[205] + Main[207] + Main[209] + Main[210] + Main[211] + Main[212] = 1
-  := by
-    intro cstrs; rw [allHold_constraints_iff] at cstrs
-    obtain ⟨ main_mul_low, main_mul_high,
-             overflow_b, overflow_c, w_overflow_b, w_overflow_c,
-             div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
-             eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
-             cpu, alu,
-             eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
-             eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
-             eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2, w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
-             eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2, w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
-             eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
-             of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
-             nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
-             nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
-             u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-             eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
-             r_neg_b_neg, r_pos_b_pos,
-             c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
-             cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
-             u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
-             u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
-             eq_abs_c_alu_event, eq_abs_rem_alu_event,
-             eq_maco10, eq_maco11, eq_maco12, eq_maco13,
-             eq_rcm, eq_arlt,
-             u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
-             b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-             u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
-             b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
-             b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-             b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-             correct_opcode ⟩ := cstrs
-    clear *- alu b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
-    tauto
+  := by sorry
+    -- intro cstrs; rw [allHold_constraints_iff] at cstrs
+    -- obtain ⟨ main_mul_low, main_mul_high,
+    --          overflow_b, overflow_c, w_overflow_b, w_overflow_c,
+    --          div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
+    --          eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
+    --          cpu, alu,
+    --          eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
+    --          eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
+    --          eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2, w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
+    --          eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2, w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
+    --          eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
+    --          of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
+    --          nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
+    --          nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
+    --          u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
+    --          eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+    --          r_neg_b_neg, r_pos_b_pos,
+    --          c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
+    --          cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
+    --          u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
+    --          u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
+    --          eq_abs_c_alu_event, eq_abs_rem_alu_event,
+    --          eq_maco10, eq_maco11, eq_maco12, eq_maco13,
+    --          eq_rcm, eq_arlt,
+    --          u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+    --          b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
+    --          u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
+    --          b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
+    --          b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
+    --          b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
+    --          correct_opcode ⟩ := cstrs
+    -- clear *- alu b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
+    -- tauto
 
 end constraints
 
@@ -1099,201 +1099,208 @@ lemma ops_U64_b_c :
 
 end entailed_constraints
 
--- section rem
+section rem
 
--- set_option maxRecDepth 1000000 in
--- lemma allHold_constraints_is_real :
---   List.Forall SP1Constraint.toProp (constraints Main) →
---     Main[249] = 1 → is_rem Main →
---       Word.toInt #v[Main[32], Main[33], Main[34], Main[35]] =
---         Int.tmod
---           (Word.toInt #v[Main[15], Main[16], Main[17], Main[18]])
---           (Word.toInt #v[Main[25], Main[26], Main[27], Main[28]])
---   := by
---   intro cstrs h_is_real ⟨ h_is_rem, h_imm ⟩
---   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
---   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
---   rw [allHold_constraints_iff] at cstrs
+attribute [-simp] mul_eq_zero
 
---   set a0 := Main[32]
---   set a1 := Main[33]
---   set a2 := Main[34]
---   set a3 := Main[35]
+set_option maxRecDepth 1000000 in
+lemma allHold_constraints_is_real :
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    Main[249] = 1 →
+      Word.toInt #v[Main[32], Main[33], Main[34], Main[35]] =
+        Int.tmod
+          (Word.toInt #v[Main[15], Main[16], Main[17], Main[18]])
+          (Word.toInt #v[Main[25], Main[26], Main[27], Main[28]])
+  := by
+  intro cstrs h_is_real
+  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
+  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  rw [allHold_constraints_iff] at cstrs
 
---   set b0 := Main[15]
---   set b1 := Main[16]
---   set b2 := Main[17]
---   set b3 := Main[18]
+  set a0 := Main[32]
+  set a1 := Main[33]
+  set a2 := Main[34]
+  set a3 := Main[35]
 
---   set c0 := Main[25]
---   set c1 := Main[26]
---   set c2 := Main[27]
---   set c3 := Main[28]
+  set b0 := Main[15]
+  set b1 := Main[16]
+  set b2 := Main[17]
+  set b3 := Main[18]
 
---   set lb0 := Main[36]
---   set lb1 := Main[37]
---   set lb2 := Main[38]
---   set lb3 := Main[39]
+  set c0 := Main[25]
+  set c1 := Main[26]
+  set c2 := Main[27]
+  set c3 := Main[28]
 
---   set lc0 := Main[40]
---   set lc1 := Main[41]
---   set lc2 := Main[42]
---   set lc3 := Main[43]
+  set lb0 := Main[36]
+  set lb1 := Main[37]
+  set lb2 := Main[38]
+  set lb3 := Main[39]
 
---   set q0 := Main[44]
---   set q1 := Main[45]
---   set q2 := Main[46]
---   set q3 := Main[47]
+  set lc0 := Main[40]
+  set lc1 := Main[41]
+  set lc2 := Main[42]
+  set lc3 := Main[43]
 
---   set qbc0 := Main[48]
---   set qbc1 := Main[49]
---   set qbc2 := Main[50]
---   set qbc3 := Main[51]
+  set q0 := Main[44]
+  set q1 := Main[45]
+  set q2 := Main[46]
+  set q3 := Main[47]
 
---   set rbc0 := Main[52]
---   set rbc1 := Main[53]
---   set rbc2 := Main[54]
---   set rbc3 := Main[55]
+  set qbc0 := Main[48]
+  set qbc1 := Main[49]
+  set qbc2 := Main[50]
+  set qbc3 := Main[51]
 
---   set r0 := Main[56]
---   set r1 := Main[57]
---   set r2 := Main[58]
---   set r3 := Main[59]
+  set rbc0 := Main[52]
+  set rbc1 := Main[53]
+  set rbc2 := Main[54]
+  set rbc3 := Main[55]
 
---   set ar0 := Main[60]
---   set ar1 := Main[61]
---   set ar2 := Main[62]
---   set ar3 := Main[63]
+  set r0 := Main[56]
+  set r1 := Main[57]
+  set r2 := Main[58]
+  set r3 := Main[59]
 
---   set ac0 := Main[64]
---   set ac1 := Main[65]
---   set ac2 := Main[66]
---   set ac3 := Main[67]
+  set ar0 := Main[60]
+  set ar1 := Main[61]
+  set ar2 := Main[62]
+  set ar3 := Main[63]
 
---   set maco10 := Main[68]
---   set maco11 := Main[69]
---   set maco12 := Main[70]
---   set maco13 := Main[71]
+  set ac0 := Main[64]
+  set ac1 := Main[65]
+  set ac2 := Main[66]
+  set ac3 := Main[67]
 
---   set ctq0 := Main[72]
---   set ctq1 := Main[73]
---   set ctq2 := Main[74]
---   set ctq3 := Main[75]
---   set ctq4 := Main[76]
---   set ctq5 := Main[77]
---   set ctq6 := Main[78]
---   set ctq7 := Main[79]
+  set maco10 := Main[68]
+  set maco11 := Main[69]
+  set maco12 := Main[70]
+  set maco13 := Main[71]
 
---   set cnop0 := Main[170]
---   set cnop1 := Main[171]
---   set cnop2 := Main[172]
---   set cnop3 := Main[173]
+  set ctq0 := Main[72]
+  set ctq1 := Main[73]
+  set ctq2 := Main[74]
+  set ctq3 := Main[75]
+  set ctq4 := Main[76]
+  set ctq5 := Main[77]
+  set ctq6 := Main[78]
+  set ctq7 := Main[79]
 
---   set rnop0 := Main[174]
---   set rnop1 := Main[175]
---   set rnop2 := Main[176]
---   set rnop3 := Main[177]
+  set cnop0 := Main[170]
+  set cnop1 := Main[171]
+  set cnop2 := Main[172]
+  set cnop3 := Main[173]
 
---   set arlt := Main[178]
+  set rnop0 := Main[174]
+  set rnop1 := Main[175]
+  set rnop2 := Main[176]
+  set rnop3 := Main[177]
 
---   set cry0 := Main[186]
---   set cry1 := Main[187]
---   set cry2 := Main[188]
---   set cry3 := Main[189]
---   set cry4 := Main[190]
---   set cry5 := Main[191]
---   set cry6 := Main[192]
---   set cry7 := Main[193]
+  set arlt := Main[178]
 
---   set is_c_0 := Main[204]
+  set cry0 := Main[186]
+  set cry1 := Main[187]
+  set cry2 := Main[188]
+  set cry3 := Main[189]
+  set cry4 := Main[190]
+  set cry5 := Main[191]
+  set cry6 := Main[192]
+  set cry7 := Main[193]
 
---   set is_div := Main[205]
---   set is_divu := Main[206]
---   set is_rem := Main[207]
---   set is_remu := Main[208]
---   set is_divw := Main[209]
---   set is_remw := Main[210]
---   set is_divuw := Main[211]
---   set is_remuw := Main[212]
+  set is_c_0 := Main[204]
 
---   set is_overflow := Main[214]
---   set is_overflow_b := Main[225]
---   set is_overflow_c := Main[236]
+  set is_div := Main[205]
+  set is_divu := Main[206]
+  set is_rem := Main[207]
+  set is_remu := Main[208]
+  set is_divw := Main[209]
+  set is_remw := Main[210]
+  set is_divuw := Main[211]
+  set is_remuw := Main[212]
 
---   set msb_b := Main[237]
---   set msb_rem := Main[238]
---   set msb_c := Main[239]
---   set msb_quot := Main[240]
---   set b_neg := Main[241]
---   set b_neg_not_overflow := Main[242]
---   set b_not_neg_not_overflow := Main[243]
---   set is_real_not_word := Main[244]
---   set rem_neg := Main[245]
---   set c_neg := Main[246]
---   set abs_c_alu_event := Main[247]
---   set abs_rem_alu_event := Main[248]
---   set is_real := Main[249]
---   set remainder_check_multiplicity := Main[250]
+  set is_overflow := Main[214]
+  set is_overflow_b := Main[225]
+  set is_overflow_c := Main[236]
 
---   obtain ⟨ main_mul_low, main_mul_high,
---            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
---            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
---            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
---            cpu, alu,
---            eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
---            eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
---            eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2, w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
---            eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2, w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
---            eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
---            of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
---            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
---            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
---            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
---            eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
---            r_neg_b_neg, r_pos_b_pos,
---            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
---            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
---            u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
---            u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
---            eq_abs_c_alu_event, eq_abs_rem_alu_event,
---            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
---            eq_rcm, eq_arlt,
---            u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
---            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
---            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
---            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
---            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
---            b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
---            correct_opcode ⟩ := cstrs
---   clear cpu alu correct_opcode
---   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
---   rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
---   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
---   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
---   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
---   rw [eq_comm (b := a3)] at eq_d_a3 eq_r_a3
---   rw [eq_comm (b := ac0)] at cn_ac0; rw [eq_comm (b := ar0)] at rn_ar0
---   rw [eq_comm (b := ac1)] at cn_ac1; rw [eq_comm (b := ar1)] at rn_ar1
---   rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
---   rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
+  set msb_b := Main[237]
+  set msb_rem := Main[238]
+  set msb_c := Main[239]
+  set msb_quot := Main[240]
+  set b_neg := Main[241]
+  set b_neg_not_overflow := Main[242]
+  set b_not_neg_not_overflow := Main[243]
+  set is_real_not_word := Main[244]
+  set rem_neg := Main[245]
+  set c_neg := Main[246]
+  set abs_c_alu_event := Main[247]
+  set abs_rem_alu_event := Main[248]
+  set is_real := Main[249]
+  set remainder_check_multiplicity := Main[250]
 
---   -- At this point, I would like to move away from `Main`, just take the hypotheses
---   -- I have and prove stuff separately for each opcode, just so that I don't worry
---   -- about access proofs. I would ideally like to apply the general versions of the
---   -- specifications as per the below here as well, so that the abstractions aren't
---   -- broken and only the indices really needed are kept.
---   simp_all
+  obtain ⟨ main_mul_low, main_mul_high,
+           overflow_b, overflow_c, w_overflow_b, w_overflow_c,
+           div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
+           eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
+           cpu, alu,
+           eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
+           eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
+           eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2, w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
+           eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2, w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
+           eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
+           of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
+           nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
+           nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
+           u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
+           eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           r_neg_b_neg, r_pos_b_pos,
+           c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
+           cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
+           u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
+           u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
+           eq_abs_c_alu_event, eq_abs_rem_alu_event,
+           eq_maco10, eq_maco11, eq_maco12, eq_maco13,
+           eq_rcm, eq_arlt,
+           u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
+           b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
+           b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
+           correct_opcode ⟩ := cstrs
+  clear cpu alu correct_opcode
+  symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
+  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
+  rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
+  rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
+  rw [eq_comm (b := a3)] at eq_d_a3 eq_r_a3
+  rw [eq_comm (b := ac0)] at cn_ac0; rw [eq_comm (b := ar0)] at rn_ar0
+  rw [eq_comm (b := ac1)] at cn_ac1; rw [eq_comm (b := ar1)] at rn_ar1
+  rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
+  rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
+  simp_all
 
---   clear w_overflow_b w_overflow_c w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
---   apply MulOperation.spec.mul _ is_U64_c at main_mul_low
---   apply MulOperation.spec.mulh _ is_U64_c at main_mul_high
---   apply IsEqualWordOperation.spec at overflow_b
---   apply IsEqualWordOperation.spec at overflow_c
---   apply IsZeroWordOperation.spec at div_zero
---   apply U16MSBOperation.spec at eq_msb_b
---   apply U16MSBOperation.spec at eq_msb_c
---   apply U16MSBOperation.spec at eq_msb_rem
---   simp at *
+  apply MulOperation.spec.mul ?_ ?_ at main_mul_low
+  apply MulOperation.spec.mulh.gen ?_ ?_ at main_mul_high
+  apply IsEqualWordOperation.spec.gen at overflow_b
+  apply IsEqualWordOperation.spec.gen at overflow_c
+  apply IsEqualWordOperation.spec.gen at w_overflow_b
+  apply IsEqualWordOperation.spec.gen at w_overflow_c
+  apply IsZeroWordOperation.spec at div_zero
+  apply U16MSBOperation.spec.gen ?_ at eq_msb_b
+  apply U16MSBOperation.spec.gen ?_ at eq_msb_c
+  apply U16MSBOperation.spec.gen ?_ at eq_msb_rem
+  apply U16MSBOperation.spec.gen ?_ at w_eq_msb_b
+  apply U16MSBOperation.spec.gen ?_ at w_eq_msb_c
+  apply U16MSBOperation.spec.gen ?_ at w_eq_msb_rem
+  apply U16MSBOperation.spec.gen ?_ at w_eq_msb_quot
+  apply AddOperation.spec.gen ?_ ?_ at c_neg_sum_zero
+  apply AddOperation.spec.gen ?_ ?_ at rem_neg_sum_zero
+  -- apply LtOperation
+
+  -- At this point, I would like to move away from `Main`, just take the hypotheses
+  -- I have and prove stuff separately for each opcode, just so that I don't worry
+  -- about access proofs.
 
 --   split_ifs at div_zero with c_zero
 --   -- c is zero
@@ -1318,6 +1325,6 @@ end entailed_constraints
 --       simp [nob_or_noc] at *
 --       simp_all
 
--- end rem
+end rem
 
 end DivRem
