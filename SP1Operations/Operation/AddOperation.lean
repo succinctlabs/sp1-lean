@@ -44,6 +44,8 @@ theorem spec
     rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>
     simp_all <;> omega
 
+section gen
+
 theorem spec.gen
   {a b : Word (Fin BB)}
   {cols : AddOperation}
@@ -55,5 +57,7 @@ theorem spec.gen
       cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
   intro cstrs is_real; simp_all
   exact spec h_isU64_a h_isU64_b cstrs
+
+end gen
 
 end AddOperation

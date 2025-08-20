@@ -1296,7 +1296,7 @@ lemma allHold_constraints_is_real :
   apply U16MSBOperation.spec.gen ?_ at w_eq_msb_quot
   apply AddOperation.spec.gen ?_ ?_ at c_neg_sum_zero
   apply AddOperation.spec.gen ?_ ?_ at rem_neg_sum_zero
-  -- apply LtOperation
+  apply LtOperationUnsigned.spec.nat.gen ?_ ?_ at abs_check
 
   -- At this point, I would like to move away from `Main`, just take the hypotheses
   -- I have and prove stuff separately for each opcode, just so that I don't worry
