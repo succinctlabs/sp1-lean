@@ -102,20 +102,20 @@ theorem JALR_correct
 
   simp [spec_jalr, sp1_jalr, execute_JALR, op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c]
   rw [run_readReg]
-  simp only [read_pc, hmod4, read_op_b', run_rX_bits, get_reg?_insert_nextPC, ext_control_check_addr,
-    Sail.BitVec.access, bit_to_bool, Sail.BitVec.update, Sail.BitVec.updateSubrange',
-    bits_of_virtaddr, BitVec.reduceAllOnes, BitVec.truncate_eq_setWidth, BitVec.reduceSetWidth,
-    BitVec.shiftLeft_zero, BitVec.reduceNot, BitVec.setWidth_zero, BitVec.or_zero,
-    Nat.one_lt_ofNat, getElem!_pos, BitVec.getElem_and, BitVec.reduceGetElem, Bool.true_and,
-    BitVec.ofBool, BitVec.ofNat_eq_ofNat, cond_false, EStateM.run_bind,
-    run_bool_bit_backwards, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
-    currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or, Bool.and_self,
-    BitVec.ofNat_eq_ofNat, bind_pure_comp, Functor.map_map, EStateM.run_map,
-    sign_extend, Sail.BitVec.signExtend, ← h_c_sign_extend]
-  rw [map_const_run_readReg (by simp [h_misa])]
-  simp only
+  simp only [read_pc, read_op_b', ext_control_check_addr, ← h_c_sign_extend, bit_to_bool, access,
+    ofBool, update, updateSubrange', reduceAllOnes, truncate_eq_setWidth, reduceSetWidth,
+    shiftLeft_zero, reduceNot, bits_of_virtaddr, setWidth_zero, or_zero, Nat.one_lt_ofNat,
+    getElem!_pos, getElem_and, reduceGetElem, hmod4, Bool.and_false, ofNat_eq_ofNat, cond_false,
+    currentlyEnabled, hartSupports, LeanRV64IM.Functions.xlen, Nat.reduceBEq, Bool.and_self,
+    LeanRV64IM.Functions.not, Bool.not_true, Nat.reduceBNe, Bool.or_true, Bool.or_false,
+    _get_Misa_C, Sail.BitVec.extractLsb, BitVec.extractLsb, extractLsb', Nat.reduceSub,
+    Nat.reduceAdd, Bool.true_and, bind_pure_comp, bind_pure, Bool.not_eq_eq_eq_not, bind_map_left,
+    beq_eq_false_iff_ne, ne_eq, EStateM.run_bind, run_bool_bit_backwards, Bool.false_eq_true,
+    false_and, ↓reduceIte, run_ite, EStateM.run_map, run_writeReg, EStateM.Result.map_ok]
   rw [run_readReg]
-  simp only [Std.ExtDHashMap.get?_insert_self, run_wX_bits, BitVec.ofNat_eq_ofNat, EStateM.Result.map_ok]
+  simp only [Std.ExtDHashMap.get?_insert, beq_iff_eq, reduceCtorEq, ↓reduceDIte,
+    Std.ExtDHashMap.get?_eq_some_get h_misa]
+  rw [run_readReg, Std.ExtDHashMap.get?_insert_self]
 
   split_ifs <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
   have htemp : (1 : Fin BB) - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
@@ -123,7 +123,5 @@ theorem JALR_correct
   have ⟨ _, h_add ⟩ := AddOperation.spec pc_is_u64 h_4_is_u64 inc_pc_cstrs
   rw [h_add]
   simp [Word.toBitVec64, Word.toNat]
-
--- #print axioms Jalr.JALR_correct
 
 end Jalr

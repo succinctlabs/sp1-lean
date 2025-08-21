@@ -132,7 +132,7 @@ open AccessType
 
 def xt2 (x : (BitVec 8)) : SailM (BitVec 8) := do
   (pure ((shiftl x 1) ^^^ (← do
-        bif (← (bit_to_bool (BitVec.access x 7)))
+        if ((← (bit_to_bool (BitVec.access x 7))) : Bool)
         then (pure (0x1B : (BitVec 8)))
         else (pure (0x00 : (BitVec 8))))))
 
@@ -141,16 +141,16 @@ def xt3 (x : (BitVec 8)) : SailM (BitVec 8) := do
 
 def gfmul (x : (BitVec 8)) (y : (BitVec 4)) : SailM (BitVec 8) := do
   (pure ((← do
-        bif (← (bit_to_bool (BitVec.access y 0)))
+        if ((← (bit_to_bool (BitVec.access y 0))) : Bool)
         then (pure x)
         else (pure (0x00 : (BitVec 8)))) ^^^ ((← do
-          bif (← (bit_to_bool (BitVec.access y 1)))
+          if ((← (bit_to_bool (BitVec.access y 1))) : Bool)
           then (xt2 x)
           else (pure (0x00 : (BitVec 8)))) ^^^ ((← do
-            bif (← (bit_to_bool (BitVec.access y 2)))
+            if ((← (bit_to_bool (BitVec.access y 2))) : Bool)
             then (xt2 (← (xt2 x)))
             else (pure (0x00 : (BitVec 8)))) ^^^ (← do
-            bif (← (bit_to_bool (BitVec.access y 3)))
+            if ((← (bit_to_bool (BitVec.access y 3))) : Bool)
             then (xt2 (← (xt2 (← (xt2 x)))))
             else (pure (0x00 : (BitVec 8))))))))
 
@@ -202,43 +202,43 @@ def aes_mixcolumn_inv (x : (BitVec 32)) : SailM (BitVec 32) := do
 def aes_decode_rcon (r : (BitVec 4)) : SailM (BitVec 32) := do
   assert (zopz0zI_u r (0xA : (BitVec 4))) "model/riscv_types_kext.sail:87.18-87.19"
   let b__0 := r
-  bif (b__0 == (0x0 : (BitVec 4)))
+  if ((b__0 == (0x0 : (BitVec 4))) : Bool)
   then (pure (0x00000001 : (BitVec 32)))
   else
     (do
-      bif (b__0 == (0x1 : (BitVec 4)))
+      if ((b__0 == (0x1 : (BitVec 4))) : Bool)
       then (pure (0x00000002 : (BitVec 32)))
       else
         (do
-          bif (b__0 == (0x2 : (BitVec 4)))
+          if ((b__0 == (0x2 : (BitVec 4))) : Bool)
           then (pure (0x00000004 : (BitVec 32)))
           else
             (do
-              bif (b__0 == (0x3 : (BitVec 4)))
+              if ((b__0 == (0x3 : (BitVec 4))) : Bool)
               then (pure (0x00000008 : (BitVec 32)))
               else
                 (do
-                  bif (b__0 == (0x4 : (BitVec 4)))
+                  if ((b__0 == (0x4 : (BitVec 4))) : Bool)
                   then (pure (0x00000010 : (BitVec 32)))
                   else
                     (do
-                      bif (b__0 == (0x5 : (BitVec 4)))
+                      if ((b__0 == (0x5 : (BitVec 4))) : Bool)
                       then (pure (0x00000020 : (BitVec 32)))
                       else
                         (do
-                          bif (b__0 == (0x6 : (BitVec 4)))
+                          if ((b__0 == (0x6 : (BitVec 4))) : Bool)
                           then (pure (0x00000040 : (BitVec 32)))
                           else
                             (do
-                              bif (b__0 == (0x7 : (BitVec 4)))
+                              if ((b__0 == (0x7 : (BitVec 4))) : Bool)
                               then (pure (0x00000080 : (BitVec 32)))
                               else
                                 (do
-                                  bif (b__0 == (0x8 : (BitVec 4)))
+                                  if ((b__0 == (0x8 : (BitVec 4))) : Bool)
                                   then (pure (0x0000001B : (BitVec 32)))
                                   else
                                     (do
-                                      bif (b__0 == (0x9 : (BitVec 4)))
+                                      if ((b__0 == (0x9 : (BitVec 4))) : Bool)
                                       then (pure (0x00000036 : (BitVec 32)))
                                       else
                                         (internal_error "model/riscv_types_kext.sail" 99

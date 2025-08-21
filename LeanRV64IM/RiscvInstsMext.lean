@@ -148,28 +148,28 @@ def encdec_mul_op_forwards (arg_ : mul_op) : SailM (BitVec 3) := do
 
 def encdec_mul_op_backwards (arg_ : (BitVec 3)) : SailM mul_op := do
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if ((b__0 == (0b000 : (BitVec 3))) : Bool)
   then
     (pure { high := false
             signed_rs1 := true
             signed_rs2 := true })
   else
     (do
-      bif (b__0 == (0b001 : (BitVec 3)))
+      if ((b__0 == (0b001 : (BitVec 3))) : Bool)
       then
         (pure { high := true
                 signed_rs1 := true
                 signed_rs2 := true })
       else
         (do
-          bif (b__0 == (0b010 : (BitVec 3)))
+          if ((b__0 == (0b010 : (BitVec 3))) : Bool)
           then
             (pure { high := true
                     signed_rs1 := true
                     signed_rs2 := false })
           else
             (do
-              bif (b__0 == (0b011 : (BitVec 3)))
+              if ((b__0 == (0b011 : (BitVec 3))) : Bool)
               then
                 (pure { high := true
                         signed_rs1 := false
@@ -189,16 +189,16 @@ def encdec_mul_op_forwards_matches (arg_ : mul_op) : Bool :=
 
 def encdec_mul_op_backwards_matches (arg_ : (BitVec 3)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if ((b__0 == (0b000 : (BitVec 3))) : Bool)
   then true
   else
-    (bif (b__0 == (0b001 : (BitVec 3)))
+    (if ((b__0 == (0b001 : (BitVec 3))) : Bool)
     then true
     else
-      (bif (b__0 == (0b010 : (BitVec 3)))
+      (if ((b__0 == (0b010 : (BitVec 3))) : Bool)
       then true
       else
-        (bif (b__0 == (0b011 : (BitVec 3)))
+        (if ((b__0 == (0b011 : (BitVec 3))) : Bool)
         then true
         else false)))
 

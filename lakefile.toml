@@ -17,11 +17,6 @@ name = "mathlib"
 scope = "leanprover-community"
 rev = "v4.23.0-rc2"
 
-# [[require]]
-# name = "Lean_RV32D"
-# git = "https://github.com/succinctlabs/sail-rv32d-lean"
-# rev = "nightly"
-
 [[lean_lib]]
 name = "SP1Foundations"
 
@@ -30,16 +25,6 @@ name = "SP1Operations"
 
 [[lean_lib]]
 name = "SP1Chips"
-
-[[lean_lib]]
-name = "LeanRV32D"
-
-[[lean_exe]]
-name = "run-rv32d"
-root = "LeanRV32D"
-
-[[lean_lib]]
-name = "LeanRV32IM"
 
 [[lean_lib]]
 name = "LeanRV64IM"

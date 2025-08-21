@@ -1,8 +1,10 @@
 import LeanRV64IM.Flow
 import LeanRV64IM.Prelude
+import LeanRV64IM.RiscvXlen
 import LeanRV64IM.RiscvVlen
 import LeanRV64IM.RiscvExtensions
 import LeanRV64IM.RiscvTypes
+import LeanRV64IM.RiscvRegs
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -549,19 +551,19 @@ def _set_Misa_Z (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Uni
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Misa_Z r v)
 
-def sys_enable_writable_misa : Bool := false
+def sys_enable_writable_misa : Bool := true
 
-def sys_enable_writable_fiom : Bool := false
+def sys_enable_writable_fiom : Bool := true
 
-def sys_writable_hpm_counters : (BitVec 32) := (0x00000000 : (BitVec 32))
+def sys_writable_hpm_counters : (BitVec 32) := (0xFFFFFFFF : (BitVec 32))
 
 def ext_veto_disable_C (_ : Unit) : Bool :=
   false
 
 def legalize_misa (m : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
   let v := (Mk_Misa v)
-  bif ((not sys_enable_writable_misa) || (((_get_Misa_C v) == (0b0 : (BitVec 1))) && (((BitVec.access
-               (← readReg nextPC) 1) == 1#1) || (ext_veto_disable_C ()))))
+  if (((not sys_enable_writable_misa) || (((_get_Misa_C v) == (0b0 : (BitVec 1))) && (((BitVec.access
+               (← readReg nextPC) 1) == 1#1) || (ext_veto_disable_C ())))) : Bool)
   then (pure m)
   else
     (pure (_update_Misa_V
@@ -575,34 +577,34 @@ def legalize_misa (m : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
                       (_update_Misa_C
                         (_update_Misa_B
                           (_update_Misa_A m
-                            (bif (hartSupports Ext_A)
+                            (if ((hartSupports Ext_A) : Bool)
                             then (_get_Misa_A v)
                             else (0b0 : (BitVec 1))))
-                          (bif (hartSupports Ext_B)
+                          (if ((hartSupports Ext_B) : Bool)
                           then (_get_Misa_B v)
                           else (0b0 : (BitVec 1))))
-                        (bif (hartSupports Ext_C)
+                        (if ((hartSupports Ext_C) : Bool)
                         then (_get_Misa_C v)
                         else (0b0 : (BitVec 1))))
-                      (bif ((hartSupports Ext_D) && ((_get_Misa_F v) == (0b1 : (BitVec 1))))
+                      (if (((hartSupports Ext_D) && ((_get_Misa_F v) == (0b1 : (BitVec 1)))) : Bool)
                       then (_get_Misa_D v)
                       else (0b0 : (BitVec 1))))
-                    (bif (hartSupports Ext_F)
+                    (if ((hartSupports Ext_F) : Bool)
                     then (_get_Misa_F v)
                     else (0b0 : (BitVec 1))))
-                  (bif (hartSupports Ext_H)
+                  (if ((hartSupports Ext_H) : Bool)
                   then (_get_Misa_H v)
                   else (0b0 : (BitVec 1)))) (0b1 : (BitVec 1)))
-              (bif (hartSupports Ext_M)
+              (if ((hartSupports Ext_M) : Bool)
               then (_get_Misa_M v)
               else (0b0 : (BitVec 1))))
-            (bif ((hartSupports Ext_S) && ((_get_Misa_U v) == (0b1 : (BitVec 1))))
+            (if (((hartSupports Ext_S) && ((_get_Misa_U v) == (0b1 : (BitVec 1)))) : Bool)
             then (_get_Misa_S v)
             else (0b0 : (BitVec 1))))
-          (bif (hartSupports Ext_U)
+          (if ((hartSupports Ext_U) : Bool)
           then (_get_Misa_U v)
           else (0b0 : (BitVec 1))))
-        (bif ((hartSupports Ext_V) && (((_get_Misa_F v) == (0b1 : (BitVec 1))) && ((_get_Misa_D v) == (0b1 : (BitVec 1)))))
+        (if (((hartSupports Ext_V) && (((_get_Misa_F v) == (0b1 : (BitVec 1))) && ((_get_Misa_D v) == (0b1 : (BitVec 1))))) : Bool)
         then (_get_Misa_V v)
         else (0b0 : (BitVec 1)))))
 
@@ -687,20 +689,20 @@ def virtual_memory_supported (_ : Unit) : SailM Bool := do
               Ext_Sv48)) || (← (currentlyEnabled Ext_Sv57))))))
 
 def lowest_supported_privLevel (_ : Unit) : SailM Privilege := do
-  bif (← (currentlyEnabled Ext_U))
+  if ((← (currentlyEnabled Ext_U)) : Bool)
   then (pure User)
   else (pure Machine)
 
 def have_privLevel (priv : (BitVec 2)) : SailM Bool := do
   let b__0 := priv
-  bif (b__0 == (0b00 : (BitVec 2)))
+  if ((b__0 == (0b00 : (BitVec 2))) : Bool)
   then (currentlyEnabled Ext_U)
   else
     (do
-      bif (b__0 == (0b01 : (BitVec 2)))
+      if ((b__0 == (0b01 : (BitVec 2))) : Bool)
       then (currentlyEnabled Ext_S)
       else
-        (bif (b__0 == (0b10 : (BitVec 2)))
+        (if ((b__0 == (0b10 : (BitVec 2))) : Bool)
         then (pure false)
         else (pure true)))
 
@@ -1023,46 +1025,46 @@ def legalize_mstatus (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := 
                                 (_update_Mstatus_TW
                                   (_update_Mstatus_TSR o
                                     (← do
-                                      bif (← (currentlyEnabled Ext_S))
+                                      if ((← (currentlyEnabled Ext_S)) : Bool)
                                       then (pure (_get_Mstatus_TSR v))
                                       else (pure (0b0 : (BitVec 1)))))
                                   (← do
-                                    bif (← (currentlyEnabled Ext_U))
+                                    if ((← (currentlyEnabled Ext_U)) : Bool)
                                     then (pure (_get_Mstatus_TW v))
                                     else (pure (0b0 : (BitVec 1)))))
                                 (← do
-                                  bif (← (currentlyEnabled Ext_S))
+                                  if ((← (currentlyEnabled Ext_S)) : Bool)
                                   then (pure (_get_Mstatus_TVM v))
                                   else (pure (0b0 : (BitVec 1)))))
                               (← do
-                                bif (← (currentlyEnabled Ext_S))
+                                if ((← (currentlyEnabled Ext_S)) : Bool)
                                 then (pure (_get_Mstatus_MXR v))
                                 else (pure (0b0 : (BitVec 1)))))
                             (← do
-                              bif (← (virtual_memory_supported ()))
+                              if ((← (virtual_memory_supported ())) : Bool)
                               then (pure (_get_Mstatus_SUM v))
                               else (pure (0b0 : (BitVec 1)))))
                           (← do
-                            bif (← (currentlyEnabled Ext_U))
+                            if ((← (currentlyEnabled Ext_U)) : Bool)
                             then (pure (_get_Mstatus_MPRV v))
                             else (pure (0b0 : (BitVec 1))))) (extStatus_to_bits Off))
-                      (bif (hartSupports Ext_Zfinx)
+                      (if ((hartSupports Ext_Zfinx) : Bool)
                       then (extStatus_to_bits Off)
                       else (_get_Mstatus_FS v)))
                     (← do
-                      bif (← (have_privLevel (_get_Mstatus_MPP v)))
+                      if ((← (have_privLevel (_get_Mstatus_MPP v))) : Bool)
                       then (pure (_get_Mstatus_MPP v))
                       else (pure (privLevel_to_bits (← (lowest_supported_privLevel ()))))))
                   (← do
-                    bif (← (currentlyEnabled Ext_S))
+                    if ((← (currentlyEnabled Ext_S)) : Bool)
                     then (pure (_get_Mstatus_SPP v))
                     else (pure (0b0 : (BitVec 1))))) (_get_Mstatus_VS v)) (_get_Mstatus_MPIE v))
             (← do
-              bif (← (currentlyEnabled Ext_S))
+              if ((← (currentlyEnabled Ext_S)) : Bool)
               then (pure (_get_Mstatus_SPIE v))
               else (pure (0b0 : (BitVec 1))))) (_get_Mstatus_MIE v))
         (← do
-          bif (← (currentlyEnabled Ext_S))
+          if ((← (currentlyEnabled Ext_S)) : Bool)
           then (pure (_get_Mstatus_SIE v))
           else (pure (0b0 : (BitVec 1))))))
   let dirty :=
@@ -1117,10 +1119,10 @@ def legalize_mseccfg (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := 
   let v := (Mk_Seccfg v)
   (pure (_update_Seccfg_USEED
       (_update_Seccfg_SSEED o
-        (bif sseed_read_only_zero
+        (if (sseed_read_only_zero : Bool)
         then (0b0 : (BitVec 1))
         else (_get_Seccfg_SSEED v)))
-      (bif useed_read_only_zero
+      (if (useed_read_only_zero : Bool)
       then (0b0 : (BitVec 1))
       else (_get_Seccfg_USEED v))))
 
@@ -1273,26 +1275,26 @@ def legalize_menvcfg (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := 
         (_update_MEnvcfg_CBCFE
           (_update_MEnvcfg_CBZE
             (_update_MEnvcfg_FIOM o
-              (bif sys_enable_writable_fiom
+              (if (sys_enable_writable_fiom : Bool)
               then (_get_MEnvcfg_FIOM v)
               else (0b0 : (BitVec 1))))
             (← do
-              bif (← (currentlyEnabled Ext_Zicboz))
+              if ((← (currentlyEnabled Ext_Zicboz)) : Bool)
               then (pure (_get_MEnvcfg_CBZE v))
               else (pure (0b0 : (BitVec 1)))))
           (← do
-            bif (← (currentlyEnabled Ext_Zicbom))
+            if ((← (currentlyEnabled Ext_Zicbom)) : Bool)
             then (pure (_get_MEnvcfg_CBCFE v))
             else (pure (0b0 : (BitVec 1)))))
         (← do
-          bif (← (currentlyEnabled Ext_Zicbom))
+          if ((← (currentlyEnabled Ext_Zicbom)) : Bool)
           then
-            (bif ((_get_MEnvcfg_CBIE v) != (0b10 : (BitVec 2)))
+            (if (((_get_MEnvcfg_CBIE v) != (0b10 : (BitVec 2))) : Bool)
             then (pure (_get_MEnvcfg_CBIE v))
             else (pure (0b00 : (BitVec 2))))
           else (pure (0b00 : (BitVec 2)))))
       (← do
-        bif (← (currentlyEnabled Ext_Sstc))
+        if ((← (currentlyEnabled Ext_Sstc)) : Bool)
         then (pure (_get_MEnvcfg_STCE v))
         else (pure (0b0 : (BitVec 1))))))
 
@@ -1302,21 +1304,21 @@ def legalize_senvcfg (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := 
       (_update_SEnvcfg_CBCFE
         (_update_SEnvcfg_CBZE
           (_update_SEnvcfg_FIOM o
-            (bif sys_enable_writable_fiom
+            (if (sys_enable_writable_fiom : Bool)
             then (_get_SEnvcfg_FIOM v)
             else (0b0 : (BitVec 1))))
           (← do
-            bif (← (currentlyEnabled Ext_Zicboz))
+            if ((← (currentlyEnabled Ext_Zicboz)) : Bool)
             then (pure (_get_SEnvcfg_CBZE v))
             else (pure (0b0 : (BitVec 1)))))
         (← do
-          bif (← (currentlyEnabled Ext_Zicbom))
+          if ((← (currentlyEnabled Ext_Zicbom)) : Bool)
           then (pure (_get_SEnvcfg_CBCFE v))
           else (pure (0b0 : (BitVec 1)))))
       (← do
-        bif (← (currentlyEnabled Ext_Zicbom))
+        if ((← (currentlyEnabled Ext_Zicbom)) : Bool)
         then
-          (bif ((_get_SEnvcfg_CBIE v) != (0b10 : (BitVec 2)))
+          (if (((_get_SEnvcfg_CBIE v) != (0b10 : (BitVec 2))) : Bool)
           then (pure (_get_SEnvcfg_CBIE v))
           else (pure (0b00 : (BitVec 2))))
         else (pure (0b00 : (BitVec 2))))))
@@ -1430,18 +1432,18 @@ def legalize_mip (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
       (_update_Minterrupts_SSI
         (_update_Minterrupts_SEI o
           (← do
-            bif (← (currentlyEnabled Ext_S))
+            if ((← (currentlyEnabled Ext_S)) : Bool)
             then (pure (_get_Minterrupts_SEI v))
             else (pure (0b0 : (BitVec 1)))))
         (← do
-          bif (← (currentlyEnabled Ext_S))
+          if ((← (currentlyEnabled Ext_S)) : Bool)
           then (pure (_get_Minterrupts_SSI v))
           else (pure (0b0 : (BitVec 1)))))
       (← do
-        bif (← (currentlyEnabled Ext_S))
+        if ((← (currentlyEnabled Ext_S)) : Bool)
         then
           (do
-            bif ((← (currentlyEnabled Ext_Sstc)) && ((_get_MEnvcfg_STCE (← readReg menvcfg)) == (0b1 : (BitVec 1))))
+            if (((← (currentlyEnabled Ext_Sstc)) && ((_get_MEnvcfg_STCE (← readReg menvcfg)) == (0b1 : (BitVec 1)))) : Bool)
             then (pure (_get_Minterrupts_STI o))
             else (pure (_get_Minterrupts_STI v)))
         else (pure (0b0 : (BitVec 1))))))
@@ -1455,15 +1457,15 @@ def legalize_mie (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
             (_update_Minterrupts_MTI (_update_Minterrupts_MEI o (_get_Minterrupts_MEI v))
               (_get_Minterrupts_MTI v)) (_get_Minterrupts_MSI v))
           (← do
-            bif (← (currentlyEnabled Ext_S))
+            if ((← (currentlyEnabled Ext_S)) : Bool)
             then (pure (_get_Minterrupts_SEI v))
             else (pure (0b0 : (BitVec 1)))))
         (← do
-          bif (← (currentlyEnabled Ext_S))
+          if ((← (currentlyEnabled Ext_S)) : Bool)
           then (pure (_get_Minterrupts_STI v))
           else (pure (0b0 : (BitVec 1)))))
       (← do
-        bif (← (currentlyEnabled Ext_S))
+        if ((← (currentlyEnabled Ext_S)) : Bool)
         then (pure (_get_Minterrupts_SSI v))
         else (pure (0b0 : (BitVec 1))))))
 
@@ -1705,18 +1707,18 @@ def tvec_addr (m : (BitVec 64)) (c : (BitVec 64)) : (Option (BitVec 64)) :=
   match (trapVectorMode_of_bits (_get_Mtvec_Mode m)) with
   | TV_Direct => (some base)
   | TV_Vector =>
-    (bif ((_get_Mcause_IsInterrupt c) == (0b1 : (BitVec 1)))
+    (if (((_get_Mcause_IsInterrupt c) == (0b1 : (BitVec 1))) : Bool)
     then (some (base + (shiftl (zero_extend (m := 64) (_get_Mcause_Cause c)) 2)))
     else (some base))
   | TV_Reserved => none
 
 def legalize_xepc (v : (BitVec 64)) : (BitVec 64) :=
-  bif (hartSupports Ext_Zca)
+  if ((hartSupports Ext_Zca) : Bool)
   then (BitVec.update v 0 0#1)
   else (Sail.BitVec.updateSubrange v 1 0 (zeros (n := (1 -i (0 -i 1)))))
 
 def align_pc (addr : (BitVec 64)) : SailM (BitVec 64) := do
-  bif (← (currentlyEnabled Ext_Zca))
+  if ((← (currentlyEnabled Ext_Zca)) : Bool)
   then (pure (BitVec.update addr 0 0#1))
   else (pure (Sail.BitVec.updateSubrange addr 1 0 (zeros (n := (1 -i (0 -i 1))))))
 
@@ -1882,7 +1884,7 @@ def lower_mie (m : (BitVec 64)) (d : (BitVec 64)) : (BitVec 64) :=
 
 def lift_sip (o : (BitVec 64)) (d : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64) :=
   let m : Minterrupts := o
-  bif ((_get_Minterrupts_SSI d) == (0b1 : (BitVec 1)))
+  if (((_get_Minterrupts_SSI d) == (0b1 : (BitVec 1))) : Bool)
   then (_update_Minterrupts_SSI m (_get_Sinterrupts_SSI s))
   else m
 
@@ -1894,13 +1896,13 @@ def lift_sie (o : (BitVec 64)) (d : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64)
   (_update_Minterrupts_SSI
     (_update_Minterrupts_STI
       (_update_Minterrupts_SEI m
-        (bif ((_get_Minterrupts_SEI d) == (0b1 : (BitVec 1)))
+        (if (((_get_Minterrupts_SEI d) == (0b1 : (BitVec 1))) : Bool)
         then (_get_Sinterrupts_SEI s)
         else (_get_Minterrupts_SEI m)))
-      (bif ((_get_Minterrupts_STI d) == (0b1 : (BitVec 1)))
+      (if (((_get_Minterrupts_STI d) == (0b1 : (BitVec 1))) : Bool)
       then (_get_Sinterrupts_STI s)
       else (_get_Minterrupts_STI m)))
-    (bif ((_get_Minterrupts_SSI d) == (0b1 : (BitVec 1)))
+    (if (((_get_Minterrupts_SSI d) == (0b1 : (BitVec 1))) : Bool)
     then (_get_Sinterrupts_SSI s)
     else (_get_Minterrupts_SSI m)))
 
@@ -1968,22 +1970,22 @@ def legalize_satp (arch : Architecture) (prev_value : (BitVec 64)) (written_valu
       match Sv_mode with
       | Bare =>
         (do
-          bif (← (currentlyEnabled Ext_Svbare))
+          if ((← (currentlyEnabled Ext_Svbare)) : Bool)
           then (pure s)
           else (pure prev_value))
       | Sv39 =>
         (do
-          bif (← (currentlyEnabled Ext_Sv39))
+          if ((← (currentlyEnabled Ext_Sv39)) : Bool)
           then (pure s)
           else (pure prev_value))
       | Sv48 =>
         (do
-          bif (← (currentlyEnabled Ext_Sv48))
+          if ((← (currentlyEnabled Ext_Sv48)) : Bool)
           then (pure s)
           else (pure prev_value))
       | Sv57 =>
         (do
-          bif (← (currentlyEnabled Ext_Sv57))
+          if ((← (currentlyEnabled Ext_Sv57)) : Bool)
           then (pure s)
           else (pure prev_value))
       | _ => (pure prev_value))
@@ -2068,19 +2070,19 @@ def _set_Vtype_vta (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM 
 
 def sew_pow_val_forwards (arg_ : (BitVec 3)) : SailM Nat := do
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if ((b__0 == (0b000 : (BitVec 3))) : Bool)
   then (pure 3)
   else
     (do
-      bif (b__0 == (0b001 : (BitVec 3)))
+      if ((b__0 == (0b001 : (BitVec 3))) : Bool)
       then (pure 4)
       else
         (do
-          bif (b__0 == (0b010 : (BitVec 3)))
+          if ((b__0 == (0b010 : (BitVec 3))) : Bool)
           then (pure 5)
           else
             (do
-              bif (b__0 == (0b011 : (BitVec 3)))
+              if ((b__0 == (0b011 : (BitVec 3))) : Bool)
               then (pure 6)
               else
                 (do
@@ -2097,16 +2099,16 @@ def sew_pow_val_backwards (arg_ : Nat) : (BitVec 3) :=
 
 def sew_pow_val_forwards_matches (arg_ : (BitVec 3)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b000 : (BitVec 3)))
+  if ((b__0 == (0b000 : (BitVec 3))) : Bool)
   then true
   else
-    (bif (b__0 == (0b001 : (BitVec 3)))
+    (if ((b__0 == (0b001 : (BitVec 3))) : Bool)
     then true
     else
-      (bif (b__0 == (0b010 : (BitVec 3)))
+      (if ((b__0 == (0b010 : (BitVec 3))) : Bool)
       then true
       else
-        (bif (b__0 == (0b011 : (BitVec 3)))
+        (if ((b__0 == (0b011 : (BitVec 3))) : Bool)
         then true
         else false)))
 
@@ -2121,31 +2123,31 @@ def sew_pow_val_backwards_matches (arg_ : Nat) : Bool :=
 
 def lmul_pow_val_forwards (arg_ : (BitVec 3)) : SailM Int := do
   let b__0 := arg_
-  bif (b__0 == (0b101 : (BitVec 3)))
+  if ((b__0 == (0b101 : (BitVec 3))) : Bool)
   then (pure (-3))
   else
     (do
-      bif (b__0 == (0b110 : (BitVec 3)))
+      if ((b__0 == (0b110 : (BitVec 3))) : Bool)
       then (pure (-2))
       else
         (do
-          bif (b__0 == (0b111 : (BitVec 3)))
+          if ((b__0 == (0b111 : (BitVec 3))) : Bool)
           then (pure (-1))
           else
             (do
-              bif (b__0 == (0b000 : (BitVec 3)))
+              if ((b__0 == (0b000 : (BitVec 3))) : Bool)
               then (pure 0)
               else
                 (do
-                  bif (b__0 == (0b001 : (BitVec 3)))
+                  if ((b__0 == (0b001 : (BitVec 3))) : Bool)
                   then (pure 1)
                   else
                     (do
-                      bif (b__0 == (0b010 : (BitVec 3)))
+                      if ((b__0 == (0b010 : (BitVec 3))) : Bool)
                       then (pure 2)
                       else
                         (do
-                          bif (b__0 == (0b011 : (BitVec 3)))
+                          if ((b__0 == (0b011 : (BitVec 3))) : Bool)
                           then (pure 3)
                           else
                             (do
@@ -2165,25 +2167,25 @@ def lmul_pow_val_backwards (arg_ : Int) : (BitVec 3) :=
 
 def lmul_pow_val_forwards_matches (arg_ : (BitVec 3)) : Bool :=
   let b__0 := arg_
-  bif (b__0 == (0b101 : (BitVec 3)))
+  if ((b__0 == (0b101 : (BitVec 3))) : Bool)
   then true
   else
-    (bif (b__0 == (0b110 : (BitVec 3)))
+    (if ((b__0 == (0b110 : (BitVec 3))) : Bool)
     then true
     else
-      (bif (b__0 == (0b111 : (BitVec 3)))
+      (if ((b__0 == (0b111 : (BitVec 3))) : Bool)
       then true
       else
-        (bif (b__0 == (0b000 : (BitVec 3)))
+        (if ((b__0 == (0b000 : (BitVec 3))) : Bool)
         then true
         else
-          (bif (b__0 == (0b001 : (BitVec 3)))
+          (if ((b__0 == (0b001 : (BitVec 3))) : Bool)
           then true
           else
-            (bif (b__0 == (0b010 : (BitVec 3)))
+            (if ((b__0 == (0b010 : (BitVec 3))) : Bool)
             then true
             else
-              (bif (b__0 == (0b011 : (BitVec 3)))
+              (if ((b__0 == (0b011 : (BitVec 3))) : Bool)
               then true
               else false))))))
 
@@ -2235,7 +2237,7 @@ def num_of_agtype (arg_ : agtype) : Int :=
 
 def decode_agtype (ag : (BitVec 1)) : agtype :=
   let b__0 := ag
-  bif (b__0 == (0b0 : (BitVec 1)))
+  if ((b__0 == (0b0 : (BitVec 1))) : Bool)
   then UNDISTURBED
   else AGNOSTIC
 

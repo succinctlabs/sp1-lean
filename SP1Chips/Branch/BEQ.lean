@@ -164,9 +164,9 @@ theorem correct_beq
     simp [ext_control_check_pc]
 
     by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
-    · simp [h_eq]
-      simpM
+    · simp [h_eq, h_pc_read]
       simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
+      simp [bind, StateT.bind, ExceptT.bind, EStateM.bind, ExceptT.bindCont, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, Functor.map, StateT.map, ExceptT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet, liftM, monadLift, MonadLift.monadLift, ExceptT.lift, StateT.lift, ExceptT.mk, StateT.run, ExceptT.run, EStateM.run, SailME.run]
       rw [Std.ExtDHashMap.get?_insert]
       simp
       rw [h_pc_read]
@@ -226,7 +226,7 @@ theorem correct_beq
       -- simp [writeReg, PreSail.writeReg]
       -- simpM
       -- rw [map_pure (fun a ↦ RETIRE_SUCCESS)]
-      rw [helper]
+      -- rw [helper]
 
       simpM
       simp [writeReg, PreSail.writeReg]
