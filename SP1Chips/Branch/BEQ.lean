@@ -87,9 +87,6 @@ def sp1_beq : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
-attribute [simp] bit_to_bool bits_of_virtaddr bool_bit_backwards Sail.BitVec.access
-  ext_control_check_pc currentlyEnabled
-
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 theorem correct_beq
@@ -103,16 +100,17 @@ theorem correct_beq
     let op_b := sp1_op_b Main cstrs h_is_beq
     let op_a := sp1_op_a Main cstrs h_is_beq
     (spec_beq imm (.Regidx op_b) (.Regidx op_a)).run s = (sp1_beq Main).run s := by
-  extract_lets
-  rename_i imm op_b op_a
-
+  extract_lets imm op_b op_a
   obtain ⟨h_29, h_30, h_31, h_32, h_33⟩ := h_Main28_is_beq Main cstrs h_is_beq
 
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
+
+  -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
     h_is_beq, h_29, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
 
+  -- Introduce bounds on values
   have op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
   let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
@@ -130,6 +128,7 @@ theorem correct_beq
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
   have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
 
+  -- construct alignment assumption
   have h_next_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
     have h_pc0_nat_mul4 : Main[3].val % 4 = 0 := by
       have : Main[3] % 4 = 0 := by aesop
@@ -146,12 +145,14 @@ theorem correct_beq
         Word.toBitVec64, Word.toNat]
       omega
   obtain ⟨h_next_pc_b0, h_next_pc_b1⟩ := mul4_means_0_1_are_0 h_next_pc_is_mul4
-
   simp_all
+
+  -- simplify lt operation constraints
   have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
   clear lt_cstrs
   simp [LtOperationSigned.spec.branch.def] at spec_lt
 
+  -- simplify state constraints
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints,
     LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints,
@@ -160,6 +161,7 @@ theorem correct_beq
   specialize h_op_a_read (by simp_all only)
   specialize h_op_b_read (by simp_all only)
 
+  -- simplify main goal
   simp [spec_beq, sp1_beq, execute_BTYPE]
   rw [run_readReg]
 
@@ -168,62 +170,45 @@ theorem correct_beq
   simp [op_b, sp1_op_b, h_op_b_read]
 
   by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
-  · simp [h_eq, h_pc_read]
-    rw [run_readReg]
-    simp [Std.ExtDHashMap.get?_insert, h_pc_read]
-
-
-    simp [h_next_pc_b1]
-
-    rw [run_readReg]
-    simp [Std.ExtDHashMap.get?_insert]
-    simp [Std.ExtDHashMap.get?_eq_some_get h_misa]
-
-    refine congr_arg (s.regs.insert Register.nextPC) ?_
-
-
-    have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 :=
-      by
-        simp [h_eq, h_30, h_31] at spec_lt
-        clear * - spec_lt
-
-        aesop
-
+  · have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 := by
+      simp [h_eq, h_30, h_31] at spec_lt
+      clear * - spec_lt
+      aesop
     rw [h_is_eq] at chip_cstrs
     simp [sub_eq_zero] at chip_cstrs
     have h_is_branching : Main[34] = 1 := by aesop
     simp [h_is_branching] at chip_cstrs
-
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
+    simp [h_eq, h_pc_read]
+    rw [run_readReg]
+    simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b1]
+    rw [run_readReg]
+    simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
+
+    refine congr_arg (s.regs.insert Register.nextPC) ?_
+
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-
     simp [Word.toBitVec64, Word.toNat]
-
     rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
 
     have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by aesop
-    simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
+    simp [imm, sp1_imm, sign_extend]
     rw [←trusted_imm]
-
 
     simp [Word.toBitVec64, Word.toNat]
     rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
-
     simp [BitVec.add_def]
 
     apply BitVec.eq_of_toNat_eq
-    rw [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
-    simp
+
+    simp [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
     omega
-  · simp [h_eq]
 
-    apply congrArg
-
-    have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
+  · have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
       by
         simp [h_eq, h_30, h_31] at spec_lt
         clear * - spec_lt
@@ -233,19 +218,25 @@ theorem correct_beq
     have h_is_branching : Main[34] = 0 := by aesop
     simp [h_is_branching] at chip_cstrs
 
+    simp [h_eq]
+
+    refine congr_arg (s.regs.insert Register.nextPC) ?_
+
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
+
     simp [BitVec.add_def]
 
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
 
     simp [Word.toBitVec64, Word.toNat]
+
     rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
 
     simp [BitVec.ofNatLT]
-    clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
+    clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
 
 
