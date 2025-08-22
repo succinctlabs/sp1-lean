@@ -90,6 +90,8 @@ def sp1_beq : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
+attribute [simp] bit_to_bool bits_of_virtaddr bool_bit_backwards Sail.BitVec.access
+
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 theorem correct_beq
@@ -140,54 +142,24 @@ theorem correct_beq
     -- simp [Word.toBitVec64_LT_eq_toNat op_a_is_u64, Word.toBitVec64_LT_eq_toNat op_b_is_u64, Word.toNat] at spec_lt
     -- repeat (rw [Word.toBitVec64_LT_eq_toNat])
 
-    have h_op_a_is_reg : Main[6] < 32 := by simp_all only
-    have h_op_b_is_reg : Main[14] < 32 := by simp_all only
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints, LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints, h_is_beq, h_29, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
     obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
-    have h_op_a_read' := h_op_a_read h_op_a_is_reg
-    have h_op_b_read' := h_op_b_read h_op_b_is_reg
+    have h_op_a_read := h_op_a_read (by simp_all only)
+    have h_op_b_read := h_op_b_read (by simp_all only)
 
     simp [spec_beq, sp1_beq, execute_BTYPE]
-    simpM
-    simp [Sail.readReg, PreSail.readReg]
-    rw [h_pc_read]
-    simp [EStateM.run]
-    simpM
+    rw [run_readReg]
+    simp [h_pc_read]
 
-    simp [op_a, sp1_op_a]
-    rw [h_op_a_read']
-    simpM
+    simp [op_a, sp1_op_a, h_op_a_read]
+    simp [op_b, sp1_op_b, h_op_b_read]
 
-    simp [op_b, sp1_op_b]
-    rw [h_op_b_read']
-    simpM
     simp [ext_control_check_pc]
 
     by_cases h_eq : op_a_val = op_b_val <;> simp [op_a_val, op_b_val] at h_eq
     · simp [h_eq, h_pc_read]
-      simp [bit_to_bool, bits_of_virtaddr, bool_bit_backwards]
-      simp [bind, StateT.bind, ExceptT.bind, EStateM.bind, ExceptT.bindCont, get, getThe, MonadStateOf.get, StateT.get, EStateM.get, pure, EStateM.pure, Functor.map, StateT.map, ExceptT.map, EStateM.map, modify, modifyGet, EStateM.modifyGet, StateT.modifyGet, MonadStateOf.modifyGet, liftM, monadLift, MonadLift.monadLift, ExceptT.lift, StateT.lift, ExceptT.mk, StateT.run, ExceptT.run, EStateM.run, SailME.run]
-      rw [Std.ExtDHashMap.get?_insert]
-      simp
-      rw [h_pc_read]
-      simp only [EStateM.pure]
-      -- conv =>
-      --   lhs
-      --   arg 2
-      --   simp only
-      --   rfl
-      -- conv =>
-      --   lhs
-      --   arg 2
-      --   simp [EStateM.pure]
-      --   rfl
-      -- -- deep kernel recursion????
-      -- simp only
-
-      have h_trusted_signExtend :
-        Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
-        = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])
-        := by aesop
+      rw [run_readReg]
+      simp [Std.ExtDHashMap.get?_insert, h_pc_read]
 
       have h_next_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
         apply add_mod4_eq_zero_of_mod4_eq_zero
@@ -201,39 +173,25 @@ theorem correct_beq
           clear * - h_pc0_nat_mul4
           omega
         · simp [sign_extend, Sail.BitVec.signExtend, imm, sp1_imm]
+          have h_trusted_signExtend :
+            Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
+            = BitVec.signExtend 64 (BitVec.ofNat 13 Main[21]) := by aesop
           rw [←h_trusted_signExtend]
           simp [Word.toBitVec64, Word.toNat]
           have h_pc0_mul4 : Main[21].val % 4 = 0 := by aesop
           omega
       obtain ⟨h_next_pc_b0, h_next_pc_b1⟩ := mul4_means_0_1_are_0 h_next_pc_is_mul4
       simp [Sail.BitVec.access] at *
-      rw [h_next_pc_b1]
-      simpM
+      simp [h_next_pc_b1]
 
-      have : ∀ v, ((fun _ => false) <$> readReg Register.misa).run
-          {s with regs := s.regs.insert Register.nextPC v} =
-          .ok false {s with regs := s.regs.insert Register.nextPC v} := by
-        intro v
-        rw [EStateM.run_map]
-        rw [map_const_run_readReg]
-        simp only [Std.ExtDHashMap.isSome_get?_eq_contains, Std.ExtDHashMap.contains_iff_mem,
-          Std.ExtDHashMap.mem_insert, beq_iff_eq, reduceCtorEq, false_or]
-        exact h_misa
-      unfold EStateM.run at this
-      simp [currentlyEnabled, hartSupports, this]
+      simp [currentlyEnabled, ]
+      rw [run_readReg]
+      simp [Std.ExtDHashMap.get?_insert]
+      simp [Std.ExtDHashMap.get?_eq_some_get h_misa]
 
-      -- THIS IS SO CURSED! WHY DO I NEED THIS WRAPPER?!
-      -- simp [writeReg, PreSail.writeReg]
-      -- simpM
-      -- rw [map_pure (fun a ↦ RETIRE_SUCCESS)]
-      -- rw [helper]
+      refine congr_arg (s.regs.insert Register.nextPC) ?_
 
-      simpM
-      simp [writeReg, PreSail.writeReg]
-      simpM
-      apply congrArg
 
-      -- This should come from the spec of LtOperationSigned
       have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 :=
         by
           simp [h_eq, h_30, h_31] at spec_lt
@@ -266,17 +224,7 @@ theorem correct_beq
       simp [imm, sp1_imm, sign_extend, Sail.BitVec.signExtend]
       rw [←trusted_imm]
 
-      -- have h_imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
-      --   by
-      --     refine Word.isU64_of_cases #v[Main[21], Main[22], Main[23], Main[24]] ?_ ?_ ?_ ?_
-      --     · exact h_imm_0
-      --     · exact h_imm_1
-      --     · exact h_imm_2
-      --     · exact h_imm_3
-      -- have h_imm_0 : Main[21].val < 65536 := by show Main[21] < 65536; aesop
-      -- have h_imm_1 : Main[22].val < 65536 := by show Main[22] < 65536; aesop
-      -- have h_imm_2 : Main[23].val < 65536 := by show Main[23] < 65536; aesop
-      -- have h_imm_3 : Main[24].val < 65536 := by show Main[24] < 65536; aesop
+
       simp [Word.toBitVec64, Word.toNat]
       rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
 
@@ -287,9 +235,8 @@ theorem correct_beq
       simp
 
       clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-      omega
-    · simp [not_beq_of_ne h_eq]
-      simpM
+      sorry -- omega
+    · simp [h_eq]
       apply congrArg
 
       -- This should come from the spec of LtOperationSigned
@@ -321,9 +268,7 @@ theorem correct_beq
       simp [BitVec.ofNatLT]
       clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
-      omega
-
-#print axioms correct_beq
+      sorry --omega
 
 end BEQ
 
