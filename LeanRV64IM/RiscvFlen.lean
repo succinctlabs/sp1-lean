@@ -135,7 +135,7 @@ open ExceptionType
 open Architecture
 open AccessType
 
-def flen_bytes := 4
+def flen_bytes := 8
 
-def flen := (4 *i 8)
+def flen := (8 *i 8)
 

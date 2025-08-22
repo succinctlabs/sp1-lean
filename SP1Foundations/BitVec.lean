@@ -91,8 +91,7 @@ lemma toBitVec64_mod_of_lt (w : Word (Fin BB)) (n : Fin 8) :
   simp [toBitVec64, toNat]
   simp [BitVec.ofNat_add, BitVec.ofNat_mul]
   simp [BitVec.twoPow]
-  let k := BitVec.ofNat 64 w[0]
-  show (k + _ + _ + _) % _ = k % _
+  set k := BitVec.ofNat 64 w[0]
   fin_cases n
   · simp only [shiftLeft_zero, umod_one] -- trivial case
   all_goals {simp only [reduceHShiftLeft]; bv_decide}
@@ -113,16 +112,14 @@ lemma toBitVec64_mod_of_lt (w : Word (Fin BB)) (n : Fin 8) :
     (Word.toBitVec64 w + x) % 4#64 = (BitVec.ofNat 64 w[0] + x) % 4#64 := by
   simp [toBitVec64, Word.toNat]
   simp [BitVec.ofNat_add, BitVec.ofNat_mul]
-  let k := BitVec.ofNat 64 w[0]
-  show (k + _ + _ + _ + _) % 4 = (k + _) % 4
+  set k := BitVec.ofNat 64 w[0]
   bv_decide
 
 @[simp] lemma add_toBitVec64_mod4 (w : Word (Fin BB)) (x : BitVec 64) :
     (x + Word.toBitVec64 w) % 4#64 = (x + BitVec.ofNat 64 w[0]) % 4#64 := by
   simp [toBitVec64, Word.toNat]
   simp [BitVec.ofNat_add, BitVec.ofNat_mul]
-  let k := BitVec.ofNat 64 w[0]
-  show (_ + (k + _ + _ + _)) % 4 = (_ + k) % 4
+  set k := BitVec.ofNat 64 w[0]
   bv_decide
 
 end Word

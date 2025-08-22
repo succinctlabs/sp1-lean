@@ -159,10 +159,10 @@ def num_of_pmpAddrMatch (arg_ : pmpAddrMatch) : Int :=
 /-- Type quantifiers: width : Nat, addr : Nat, end_ : Nat, begin : Nat, 0 ≤ begin, 0 ≤ end_, 0
   ≤ addr, 0 ≤ width -/
 def pmpRangeMatch (begin : Nat) (end_ : Nat) (addr : Nat) (width : Nat) : pmpAddrMatch :=
-  bif (((addr +i width) ≤b begin) || (end_ ≤b addr))
+  if ((((addr +i width) ≤b begin) || (end_ ≤b addr)) : Bool)
   then PMP_NoMatch
   else
-    (bif ((begin ≤b addr) && ((addr +i width) ≤b end_))
+    (if (((begin ≤b addr) && ((addr +i width) ≤b end_)) : Bool)
     then PMP_Match
     else PMP_PartialMatch)
 
@@ -173,7 +173,7 @@ def pmpMatchAddr (typ_0 : physaddr) (width : (BitVec 64)) (ent : (BitVec 8)) (pm
   match (pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent)) with
   | OFF => (pure PMP_NoMatch)
   | TOR =>
-    (bif (zopz0zKzJ_u prev_pmpaddr pmpaddr)
+    (if ((zopz0zKzJ_u prev_pmpaddr pmpaddr) : Bool)
     then (pure PMP_NoMatch)
     else
       (pure (pmpRangeMatch ((BitVec.toNat prev_pmpaddr) *i 4) ((BitVec.toNat pmpaddr) *i 4) addr
@@ -206,7 +206,7 @@ def pmpCheck (addr : physaddr) (width : Nat) (acc : (AccessType Unit)) (priv : P
     let () := loop_vars
     loop_vars ← do
       let prev_pmpaddr ← do
-        bif (i >b 0)
+        if ((i >b 0) : Bool)
         then (pmpReadAddrReg (i -i 1))
         else (pure (zeros (n := 64)))
       let cfg ← do (pure (GetElem?.getElem! (← readReg pmpcfg_n) i))
@@ -214,11 +214,11 @@ def pmpCheck (addr : physaddr) (width : Nat) (acc : (AccessType Unit)) (priv : P
       | PMP_NoMatch => (pure ())
       | PMP_PartialMatch => SailME.throw ((some (accessToFault acc)) : (Option ExceptionType))
       | PMP_Match =>
-        SailME.throw (bif ((pmpCheckRWX cfg acc) || ((priv == Machine) && (not (pmpLocked cfg))))
+        SailME.throw (if (((pmpCheckRWX cfg acc) || ((priv == Machine) && (not (pmpLocked cfg)))) : Bool)
           then none
           else (some (accessToFault acc)) : (Option ExceptionType))
   (pure loop_vars)
-  bif (priv == Machine)
+  if ((priv == Machine) : Bool)
   then (pure none)
   else (pure (some (accessToFault acc)))
 

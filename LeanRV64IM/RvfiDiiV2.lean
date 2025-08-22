@@ -254,11 +254,11 @@ def rvfi_get_v2_support_packet (_ : Unit) : (BitVec 704) :=
 def rvfi_get_v2_trace_size (_ : Unit) : SailM (BitVec 64) := do
   let trace_size : (BitVec 64) := (to_bits (l := 64) 512)
   let trace_size ← do
-    bif (← readReg rvfi_int_data_present)
+    if ((← readReg rvfi_int_data_present) : Bool)
     then (pure (BitVec.addInt trace_size 320))
     else (pure trace_size)
   let trace_size ← do
-    bif (← readReg rvfi_mem_data_present)
+    if ((← readReg rvfi_mem_data_present) : Bool)
     then (pure (BitVec.addInt trace_size 704))
     else (pure trace_size)
   (pure (shiftr trace_size 3))
