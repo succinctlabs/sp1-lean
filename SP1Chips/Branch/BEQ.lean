@@ -15,26 +15,12 @@ namespace Branch
 
 open Sail SailState BitVec LeanRV64IM.Functions
 
+namespace BEQ
+
 variable
   (Main : Vector (Fin BB) 45)
   (cstrs : (constraints Main).allHold)
   (s : SailState)
-  -- (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] = 1)
-
--- include Main cstrs s h_is_real
-
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
-
-namespace BEQ
-
-variable
   (h_is_beq : Main[28] = 1)
 
 private theorem h_Main28_is_beq

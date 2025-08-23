@@ -112,6 +112,8 @@ theorem JALR_correct
     Nat.reduceAdd, Bool.true_and, bind_pure_comp, bind_pure, Bool.not_eq_eq_eq_not, bind_map_left,
     beq_eq_false_iff_ne, ne_eq, EStateM.run_bind, run_bool_bit_backwards, Bool.false_eq_true,
     false_and, ↓reduceIte, run_ite, EStateM.run_map, run_writeReg, EStateM.Result.map_ok]
+  simp only [EStateM.run_pure, Bool.false_eq_true, forall_const, and_true, false_and, ↓reduceIte,
+    EStateM.run_bind, run_ite, EStateM.run_map, run_writeReg, EStateM.Result.map_ok]
   rw [run_readReg]
   simp only [Std.ExtDHashMap.get?_insert, beq_iff_eq, reduceCtorEq, ↓reduceDIte,
     Std.ExtDHashMap.get?_eq_some_get h_misa]
