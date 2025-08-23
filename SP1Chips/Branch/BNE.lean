@@ -8,23 +8,12 @@ namespace Branch
 
 open Sail SailState BitVec LeanRV64IM.Functions
 
+namespace BNE
+
 variable
   (Main : Vector (Fin BB) 45)
   (cstrs : (constraints Main).allHold)
   (s : SailState)
-
-private theorem helper {x : BitVec 64}
-  : (fun _ => RETIRE_SUCCESS) <$> writeReg Register.nextPC x =
-    (do
-      writeReg Register.nextPC x
-      pure RETIRE_SUCCESS)
-  :=
-  by
-    simp [writeReg, PreSail.writeReg]
-
-namespace BNE
-
-variable
   (h_is_bne : Main[29] = 1)
 
 private theorem h_Main29_is_bne
