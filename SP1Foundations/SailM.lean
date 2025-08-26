@@ -977,29 +977,29 @@ def execute_DIV_REM_pure_int (op1 : BitVec 64) (op2 : BitVec 64) (op : drop) : �
   | .DRS =>
       let nop1 := BitVec.toInt op1
       let nop2 := BitVec.toInt op2
-      let q := bif nop2 == 0 then -1 else
-                 bif nop1 == -2^63 && nop2 == -1 then -2^63 else
+      let q := if nop2 = 0 then -1 else
+                 if nop1 = -2^63 && nop2 = -1 then -2^63 else
                    Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
       ⟨ q, r ⟩
   | .DRU =>
       let nop1 : ℤ := BitVec.toNat op1
       let nop2 : ℤ := BitVec.toNat op2
-      let q := bif nop2 == 0 then 2^64 - 1 else Int.tdiv nop1 nop2
+      let q := if nop2 = 0 then 2^64 - 1 else Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
       ⟨ q, r ⟩
   | .DRWS =>
       let nop1 := BitVec.toInt (BitVec.extractLsb 31 0 op1)
       let nop2 := BitVec.toInt (BitVec.extractLsb 31 0 op2)
-      let q := bif nop2 == 0 then -1 else
-                 bif nop1 == -2^31 && nop2 == -1 then -2^31 else
+      let q := if nop2 = 0 then -1 else
+                 if nop1 = -2^31 && nop2 = -1 then -2^31 else
                    Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
       ⟨ q, r ⟩
   | .DRWU =>
       let nop1 : ℤ := BitVec.toNat (BitVec.extractLsb 31 0 op1)
       let nop2 : ℤ := BitVec.toNat (BitVec.extractLsb 31 0 op2)
-      let q := bif nop2 == 0 then 2^64 - 1 else Int.tdiv nop1 nop2
+      let q := if nop2 = 0 then 2^64 - 1 else Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
       ⟨ q, r ⟩
 
@@ -1078,7 +1078,7 @@ lemma execute_DIV'_eq_execute_DIV :
   by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64IM.Functions.not, LeanRV64IM.Functions.xlen, instHPowInt_leanRV64IM] <;>
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
-  . repeat rw [ Bool.cond_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     rw [← BitVec.toNat_inj]
     simp [to_bits_truncate, Sail.get_slice_int]
     congr; rw [Int.emod_eq_of_lt]
@@ -1086,11 +1086,9 @@ lemma execute_DIV'_eq_execute_DIV :
     . have := @Int.ediv_le_self r1.toNat r2.toNat (by omega)
       omega
   . simp [to_bits_truncate, Sail.get_slice_int]
-  . repeat rw [ Bool.cond_neg (b := r2.toInt == 0) (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
-    by_cases of : 9223372036854775808 ≤ r1.toInt.tdiv r2.toInt <;>
+  . by_cases of : 9223372036854775808 ≤ r1.toInt.tdiv r2.toInt <;>
     have of' := div_overflow range_int_r1 range_int_r2 <;>
     simp_all [to_bits_truncate, Sail.get_slice_int]
-    repeat rw [ Bool.cond_neg (by simp; omega )]
     simp [BitVec.ofNat, BitVec.ofInt]
     congr; simp [Fin.ext_iff]
     omega
@@ -1144,7 +1142,7 @@ lemma execute_DIVW'_eq_execute_DIVW :
   by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64IM.Functions.not, LeanRV64IM.Functions.xlen, instHPowInt_leanRV64IM] <;>
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
-  . repeat rw [ Bool.cond_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     trans BitVec.signExtend 64 (BitVec.ofInt 32 (r1.toNat / r2.toNat))
     . congr
       simp [to_bits_truncate, Sail.get_slice_int]
@@ -1158,11 +1156,11 @@ lemma execute_DIVW'_eq_execute_DIVW :
         omega
     . congr
   . simp [to_bits_truncate, Sail.get_slice_int]
-  . repeat rw [ Bool.cond_neg (b := r2.toInt == 0) (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
+  . repeat rw [ if_neg (c := r2.toInt = 0) (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
     by_cases of : 2147483648 ≤ r1.toInt.tdiv r2.toInt <;>
     have of' := divw_overflow range_int_r1 range_int_r2 <;>
     simp_all [to_bits_truncate, Sail.get_slice_int, -not_and]
-    repeat rw [ Bool.cond_neg (by simp; omega )]
+    repeat rw [ if_neg (by simp; omega )]
     have : BitVec.ofNat 32 (r1.toInt.tdiv r2.toInt % 8589934592).toNat = BitVec.ofInt 32 (r1.toInt.tdiv r2.toInt) := by
       simp [BitVec.ofNat, BitVec.ofInt]
       congr; simp [Fin.ext_iff]
@@ -1205,7 +1203,7 @@ lemma execute_REM'_eq_execute_REM :
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
     rw [Nat.mod_eq_of_lt (by omega)]; simp
-  . repeat rw [ Bool.cond_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     rw [← BitVec.toNat_inj]
     simp [to_bits_truncate, Sail.get_slice_int]
     congr; rw [Int.emod_eq_of_lt]
@@ -1220,7 +1218,7 @@ lemma execute_REM'_eq_execute_REM :
     have mod_65_to_64 : forall (a : ℤ), (a % 36893488147419103232).toNat % 18446744073709551616 = (a % 18446744073709551616).toNat := by omega
     simp [mod_65_to_64, BitVec.toInt]
     split_ifs with hneg <;> [ skip; simp ] <;> rw [Int.emod_eq_of_lt (by omega)] <;> simp <;> omega
-  . repeat rw [ Bool.cond_neg (b := r2.toInt == 0) (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
+  . repeat rw [ if_neg (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
     simp_all [to_bits_truncate, Sail.get_slice_int]
     simp [BitVec.ofNat, BitVec.ofInt]
     congr; simp [Fin.ext_iff]
@@ -1243,7 +1241,7 @@ lemma execute_REMW'_eq_execute_REMW :
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
     rw [Nat.mod_eq_of_lt (by omega)]; simp
-  . repeat rw [ Bool.cond_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     trans BitVec.signExtend 64 (BitVec.ofInt 32 (r1.toNat % r2.toNat))
     . congr
       simp [to_bits_truncate, Sail.get_slice_int]
@@ -1268,7 +1266,7 @@ lemma execute_REMW'_eq_execute_REMW :
       have mod_33_to_32 : forall (a : ℤ), (a % 8589934592).toNat % 4294967296 = (a % 4294967296).toNat := by omega
       simp [mod_33_to_32, BitVec.toInt]
       split_ifs with hneg <;> [ skip; simp ] <;> rw [Int.emod_eq_of_lt (by omega)] <;> simp <;> omega
-  . repeat rw [ Bool.cond_neg (b := r2.toInt == 0) (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
+  . repeat rw [ if_neg (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
     have : to_bits_truncate (r1.toInt.tmod r2.toInt) = BitVec.ofInt 32 (r1.toInt.tmod r2.toInt) := by
       simp [to_bits_truncate, Sail.get_slice_int]
       simp [BitVec.ofNat, BitVec.ofInt]
