@@ -2,15 +2,19 @@ import SP1Foundations.BitVec
 import SP1Foundations.Misc
 import SP1Foundations.Register
 import SP1Foundations.Word
+import LeanRV64IM
 
 open LeanRV64IM.Functions
 
 set_option maxHeartbeats 10000000
 
+attribute [simp] LeanRV64IM.Functions.not LeanRV64IM.Functions.xlen
+
 attribute [local simp]
   regidxToRegister_inj
   nextPC_ne_reg_idx_toRegister
   PC_ne_reg_idx_toRegister
+  encdec_reg_forwards_matches
   Sail.readReg
   PreSail.readReg
   Std.ExtDHashMap.get?_insert

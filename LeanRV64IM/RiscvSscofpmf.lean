@@ -137,7 +137,7 @@ def read_mhpmeventh (index : Nat) : SailM (BitVec 32) := do
 
 /-- Type quantifiers: index : Nat, 3 ≤ index ∧ index ≤ 31 -/
 def write_mhpmeventh (index : Nat) (value : (BitVec 32)) : SailM Unit := do
-  bif ((BitVec.access sys_writable_hpm_counters index) == 1#1)
+  if (((BitVec.access sys_writable_hpm_counters index) == 1#1) : Bool)
   then
     writeReg mhpmevent (vectorUpdate (← readReg mhpmevent) index
       (← (legalize_hpmevent
