@@ -4,7 +4,7 @@ import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.ALUTypeReader
 import SP1Chips.ShiftRight.Constraints
 
-open LeanRV64IM.Functions
+open LeanRV64D.Functions
 open BitVec
 
 set_option maxHeartbeats 10000000

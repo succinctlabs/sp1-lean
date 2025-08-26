@@ -1,6 +1,6 @@
 import SP1Foundations
 import SP1Chips.Branch.Constraints
-import LeanRV64IM.RiscvInstsEnd
+import LeanRV64D.RiscvInstsEnd
 
 set_option autoImplicit false
 
@@ -13,7 +13,7 @@ original proof.
 
 namespace Branch
 
-open Sail SailState BitVec LeanRV64IM.Functions
+open Sail SailState BitVec LeanRV64D.Functions
 
 variable
   (Main : Vector (Fin BB) 45)

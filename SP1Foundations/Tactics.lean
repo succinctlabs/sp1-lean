@@ -1,5 +1,5 @@
 import Lean
-import LeanRV64IM.Specialization
+import LeanRV64D.Specialization
 
 open Lean
 

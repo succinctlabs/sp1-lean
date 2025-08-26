@@ -1,7 +1,7 @@
 import SP1Foundations.Field
 import SP1Foundations.Word
-import LeanRV64IM.Prelude
-import LeanRV64IM.Sail.Sail
+import LeanRV64D.Prelude
+import LeanRV64D.Sail.Sail
 
 open BitVec
 
@@ -13,7 +13,7 @@ lemma bitVec_sshiftright_eq (bv : BitVec w) (shift : ℕ) :
 
 namespace BitVec
 
-attribute [simp] LeanRV64IM.Functions.sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
+attribute [simp] LeanRV64D.Functions.sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
 attribute [simp] extractLsb extractLsb'
 
 def extend {m : ℕ} (bv : BitVec m) (n : ℕ) (sgn : Prop) [Decidable sgn] := (if sgn then signExtend else setWidth) n bv
