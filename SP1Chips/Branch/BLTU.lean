@@ -16,6 +16,9 @@ variable
   (s : SailState)
   (h_is_bltu : Main[32] = 1)
 
+lemma BitVec.toNat_lt_toNat_iff {n : ℕ} (x y : BitVec n) :
+    x.toNat < y.toNat ↔ x < y := by rfl
+
 private theorem h_Main32_is_bltu
   (cstrs : (constraints Main).allHold)
   (h_is_bltu : Main[32] = 1)
@@ -151,8 +154,10 @@ theorem correct_bltu
   simp [op_b, sp1_op_b, h_op_b_read]
 
   by_cases h_eq : op_a_val < op_b_val <;> simp [op_a_val, op_b_val] at h_eq
-  · stop
-    rw [BitVec.toNat_inj]
+  ·
+    simp [BitVec.toNat_lt_toNat_iff, h_eq]
+
+    stop
     have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 := by
       simp [h_eq, h_30, h_31] at spec_lt
       sorry
