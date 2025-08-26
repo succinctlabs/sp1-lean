@@ -27,4 +27,4 @@ name = "SP1Operations"
 name = "SP1Chips"
 
 [[lean_lib]]
-name = "LeanRV64IM"
+name = "LeanRV64D"

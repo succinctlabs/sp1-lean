@@ -9,7 +9,14 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:
+      [
+        runs-on,
+        runner=64cpu-linux-x64,
+        spot=false,
+        disk=large,
+        "run-id=${{ github.run_id }}",
+      ]
 
     steps:
       - uses: actions/checkout@v4
