@@ -4052,11 +4052,11 @@ def execute_RTYPE (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) : SailM
 def execute_REMW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs1)) 31 0))
   let rs2_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) 31 0))
-  let rs1_int :=
+  let rs1_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
-  let rs2_int :=
+  let rs2_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
@@ -4071,11 +4071,11 @@ def execute_REMW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool
 def execute_REM (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
-  let rs1_int :=
+  let rs1_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
-  let rs2_int :=
+  let rs2_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
@@ -4267,11 +4267,11 @@ def execute_EBREAK (_ : Unit) : SailM ExecutionResult := do
 def execute_DIVW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs1)) 31 0))
   let rs2_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) 31 0))
-  let rs1_int :=
+  let rs1_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
-  let rs2_int :=
+  let rs2_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
@@ -4290,11 +4290,11 @@ def execute_DIVW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool
 def execute_DIV (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
-  let rs1_int :=
+  let rs1_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs1_bits)
     else (BitVec.toInt rs1_bits)
-  let rs2_int :=
+  let rs2_int : Int :=
     bif is_unsigned
     then (BitVec.toNat rs2_bits)
     else (BitVec.toInt rs2_bits)
@@ -4431,4 +4431,3 @@ def assembly_forwards_matches (arg_ : instruction) : Bool :=
 def assembly_backwards_matches (arg_ : String) : SailM Bool := do
   match arg_ with
   | _ => throw Error.Exit
-

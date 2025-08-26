@@ -4,11 +4,13 @@ import SP1Foundations.Tactics
 @[simp] notation "BYTE_DWORD_SIZE" => 16
 @[simp] notation "BYTE_WORD_SIZE" => 8
 @[simp] notation "BYTE_HWORD_SIZE" => 4
+@[simp] notation "DWORD_SIZE" => 8
 @[simp] notation "WORD_SIZE" => 4
 @[simp] notation "HWORD_SIZE" => 2
 
 @[reducible] def HWord (T : Type) := Vector T HWORD_SIZE
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
+@[reducible] def DWord (T : Type) := Vector T DWORD_SIZE
 @[reducible] def BHWord (T : Type) := Vector T BYTE_HWORD_SIZE
 @[reducible] def BWord (T : Type) := Vector T BYTE_WORD_SIZE
 @[reducible] def BDWord (T : Type) := Vector T BYTE_DWORD_SIZE
@@ -187,6 +189,25 @@ section conversions
 @[aesop unsafe forward]
 def toNat (w : Word (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
 
+lemma eq_toNat_eq {wx wy : Word (Fin BB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
+  wx = wy ↔ wx.toNat = wy.toNat := by
+  constructor
+  . simp_all
+  . apply Word.lt_cases_of_isU64 at is64_wx
+    apply Word.lt_cases_of_isU64 at is64_wy
+    unfold Word.toNat; intro heq
+    rw [← Word.eq_pointwise]
+    omega
+
+lemma toNat_reconstruct {w : Word (Fin BB)} {x : ℕ} (is64_w : Word.isU64 w) :
+  w.toNat = x →
+    w = #v[⟨x % 65536, by omega⟩, ⟨ x / 65536 % 65536, by omega ⟩, ⟨ x / 4294967296 % 65536, by omega ⟩, ⟨ x / 281474976710656 % 65536, by omega ⟩ ] := by
+  intro toNat; rw [← toNat]; clear toNat
+  apply Word.lt_cases_of_isU64 at is64_w
+  rw [← Word.eq_pointwise]
+  simp_all [Word.toNat, Fin.ext_iff]
+  split_ands <;> omega
+
 /-- Convert a `Word` to a `BitVec 64` by shifting and adding the limbs. -/
 def toBitVec64 (w : Word (Fin BB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
 
@@ -248,6 +269,20 @@ def toBitVec64LT {w : Word (Fin BB)} (h_w : w.isU64) : BitVec 64 :=
 def toInt (w : Word (Fin BB)) : ℤ :=
   if (isNegative w) then w.toNat - 2 ^ 64 else w.toNat
 
+lemma eq_toInt_eq {wx wy : Word (Fin BB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
+  wx = wy ↔ wx.toInt = wy.toInt := by
+  constructor
+  . simp_all
+  . apply Word.lt_cases_of_isU64 at is64_wx
+    apply Word.lt_cases_of_isU64 at is64_wy
+    unfold Word.toInt Word.isNegative Word.toNat; intro heq
+    rw [← Word.eq_pointwise]
+    omega
+
+lemma isU64_toInt {w : Word (Fin BB)} (is64_w : Word.isU64 w) : - 2^63 ≤ w.toInt ∧ w.toInt < 2^63 := by
+  unfold Word.toInt Word.isNegative Word.toNat
+  grind
+
 lemma toBitVec64_toInt {w : Word (Fin BB)} (h_w_isU64 : w.isU64) :
     w.toBitVec64.toInt = w.toInt
   := by
@@ -258,9 +293,186 @@ lemma toBitVec64_toInt {w : Word (Fin BB)} (h_w_isU64 : w.isU64) :
     rw [toBitVec64_toNat h_w_isU64] at * <;>
     omega
 
+lemma isNegative_toInt {w : Word (Fin BB)} (is64_w : Word.isU64 w) :
+  w.isNegative ↔ w.toInt < 0
+    := by
+  unfold Word.toInt Word.isNegative Word.toNat
+  grind
+
+lemma toInt_nneg_reconstruct {w : Word (Fin BB)} {x : ℤ} (is64_w : Word.isU64 w) (nneg : 0 ≤ x) :
+  w.toInt = x →
+    w = #v[⟨x.toNat % 65536, by omega⟩, ⟨ x.toNat / 65536 % 65536, by omega ⟩, ⟨ x.toNat / 4294967296 % 65536, by omega ⟩, ⟨ x.toNat / 281474976710656 % 65536, by omega ⟩ ] := by
+  intro toInt; rw [← toInt]
+  have nneg : ¬ w.isNegative := by rw [isNegative_toInt is64_w]; omega
+  apply Word.lt_cases_of_isU64 at is64_w
+  rw [← Word.eq_pointwise]
+  simp_all [Word.toInt, Word.toNat, Fin.ext_iff]
+  split_ands <;> omega
+
+lemma sign_cases {w : Word (Fin BB)} (is64_w : Word.isU64 w) : w.toInt.sign = if w.isNegative then -1 else if w.toInt = 0 then 0 else 1 := by
+  simp [Word.isNegative_toInt is64_w]
+  exact Int.sign_cases w.toInt
+
 end conversions
 
 end Word
+
+namespace DWord
+
+/-- Prove two `DWord`s equal by considering each index individually.
+    Extensionality tactics will default to using this version. -/
+@[ext] lemma ext_cases {w w' : DWord T}
+    (h0 : w[0] = w'[0]) (h1 : w[1] = w'[1])
+    (h2 : w[2] = w'[2]) (h3 : w[3] = w'[3])
+    (h4 : w[4] = w'[4]) (h5 : w[5] = w'[5])
+    (h6 : w[6] = w'[6]) (h7 : w[7] = w'[7]) : w = w' :=
+  Vector.ext fun
+  | 0, _ => h0 | 1, _ => h1 | 2, _ => h2 | 3, _ => h3
+  | 4, _ => h4 | 5, _ => h5 | 6, _ => h6 | 7, _ => h7
+  | n + 8, h => by simp only [add_lt_iff_neg_right, not_lt_zero'] at h
+
+/-- Prove two `DWord`s equal by considering all bounded indices. -/
+@[ext] lemma ext_forall {w w' : DWord T}
+    (h : ∀ i : Fin DWORD_SIZE, w[i] = w'[i]) : w = w' :=
+  Vector.ext fun i n => h ⟨i, n⟩
+
+lemma eq_mk_getElem (w : DWord T) : w = #v[w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]] := ext_cases rfl rfl rfl rfl rfl rfl rfl rfl
+
+lemma eq_pointwise {w w': DWord T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ∧ (w[4] = w'[4]) ∧ (w[5] = w'[5]) ∧ (w[6] = w'[6]) ∧ (w[7] = w'[7]) ↔ w = w' := by
+   constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
+
+/-- Prove something about arbitrary `DWord`s by showing it for any two choices of limbs. -/
+@[elab_as_elim] protected def inductionOn {C : DWord T → Prop}
+    (mk : ∀ x1 x2 x3 x4 x5 x6 x7 x8 : T, C #v[x1, x2, x3, x4, x5, x6, x7, x8]) (w : DWord T) : C w := by
+  rw [eq_mk_getElem w]; apply mk
+
+section U128
+
+/-- `is128 w` means that each limb of the `DWord` is properly bounded. -/
+def isU128 (w : DWord (Fin BB)) : Prop := ∀ i : Fin DWORD_SIZE, w[i].val < 2^16
+
+@[aesop unsafe apply]
+lemma isU128_of_cases {w : DWord (Fin BB)}
+    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
+    (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16)
+    (h4 : w[4].val < 2^16) (h5 : w[5].val < 2^16)
+    (h6 : w[6].val < 2^16) (h7 : w[7].val < 2^16) : w.isU128
+  := by intro i; fin_cases i <;> simpa
+
+/-- Pull in bounds on a word's limbs given a `isU128` proof. -/
+@[aesop unsafe forward, grind →]
+lemma lt_cases_of_isU128 {w : DWord (Fin BB)} (hw : w.isU128) :
+    w[0].val < 2^16 ∧ w[1].val < 2^16 ∧ w[2].val < 2^16 ∧ w[3].val < 2^16 ∧
+    w[4].val < 2^16 ∧ w[5].val < 2^16 ∧ w[6].val < 2^16 ∧ w[7].val < 2^16 :=
+  ⟨hw 0, hw 1, hw 2, hw 3, hw 4, hw 5, hw 6, hw 7⟩
+
+end U128
+
+section conversions
+
+/-- Convert a `DWord` to a `Nat` by shifting and adding the limbs. -/
+@[aesop unsafe forward]
+def toNat (w : DWord (Fin BB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 + w[4] * 2^64 + w[5] * 2^80 + w[6] * 2^96 + w[7] * 2^112
+
+lemma eq_toNat_eq {wx wy : DWord (Fin BB)} (is128_wx : DWord.isU128 wx) (is128_wy : DWord.isU128 wy) :
+  wx = wy ↔ wx.toNat = wy.toNat := by
+  constructor
+  . simp_all
+  . apply DWord.lt_cases_of_isU128 at is128_wx
+    apply DWord.lt_cases_of_isU128 at is128_wy
+    unfold DWord.toNat; intro heq
+    rw [← DWord.eq_pointwise]
+    omega
+
+/-- Convert a `DWord` to a `BitVec 128` by shifting and adding the limbs. -/
+def toBitVec128 (w : DWord (Fin BB)) : BitVec 128 := BitVec.ofNat 128 w.toNat
+
+lemma toBitVec128_toNat {w : DWord (Fin BB)} (hw : w.isU128) :
+    w.toBitVec128.toNat = w.toNat := by
+  simp only [toBitVec128, toNat, BB_eq, Nat.reducePow, BitVec.toNat_ofNat,
+    Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
+  have := lt_cases_of_isU128 hw
+  omega
+
+/-- A 128-bit integer is negative if its msb equals one -/
+@[grind] def isNegative (w : DWord (Fin BB)) : Prop := w[7] ≥ 32768
+instance : Decidable (isNegative w) := by unfold isNegative; infer_instance
+
+lemma isNegative_msb
+  {w : DWord (Fin BB)}
+  (h_w_isU128 : w.isU128) :
+    w.isNegative ↔ (w.toBitVec128.msb = true) := by
+  have := lt_cases_of_isU128 h_w_isU128
+  simp [isNegative, toBitVec128, toNat, BitVec.msb_eq_decide]
+  omega
+
+/-- Obtain the low 64 bits of a `DWord` -/
+def low (w : DWord (Fin BB)) : Word (Fin BB) := #v[w[0], w[1], w[2], w[3]]
+
+lemma isU128_low_isU64 {w : DWord (Fin BB)} (hw : w.isU128) : w.low.isU64 := by aesop
+
+lemma setWidth_eq_low {w : DWord (Fin BB)} (h_w_isU64 : w.isU128) :
+    BitVec.setWidth 64 w.toBitVec128 = w.low.toBitVec64
+  := by
+    have ⟨ _, _, _, _, _, _, _, _ ⟩ := lt_cases_of_isU128 h_w_isU64
+    simp [toBitVec128, ← BitVec.toNat_inj, low, DWord.toNat, Word.toBitVec64, Word.toNat]
+    omega
+
+/-- Obtain the high 64 bits of a `DWord` -/
+def high (w : DWord (Fin BB)) : Word (Fin BB) := #v[w[4], w[5], w[6], w[7]]
+
+lemma isU128_high_isU32 {w : DWord (Fin BB)} (hw : w.isU128) : w.high.isU64 := by aesop
+
+lemma setWidth_rshift_eq_high {w : DWord (Fin BB)} (h_w_isU128 : w.isU128) :
+    BitVec.setWidth 64 (w.toBitVec128 >>> 64) = w.high.toBitVec64
+  := by
+    have ⟨ _, _, _, _, _, _, _, _ ⟩ := lt_cases_of_isU128 h_w_isU128
+    simp_all [toBitVec128, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow, high, DWord.toNat, Word.toBitVec64, Word.toNat]
+    omega
+
+/-- Convert a `DWord` to an `Int` by shifting and adding the limbs, with sign correction. -/
+def toInt (w : DWord (Fin BB)) : ℤ :=
+  if (isNegative w) then w.toNat - 2 ^ 128 else w.toNat
+
+lemma eq_toInt_eq {wx wy : DWord (Fin BB)} (is128_wx : DWord.isU128 wx) (is128_wy : DWord.isU128 wy) :
+  wx = wy ↔ wx.toInt = wy.toInt := by
+  constructor
+  . simp_all
+  . apply DWord.lt_cases_of_isU128 at is128_wx
+    apply DWord.lt_cases_of_isU128 at is128_wy
+    unfold DWord.toInt DWord.isNegative DWord.toNat; intro heq
+    rw [← DWord.eq_pointwise]
+    omega
+
+lemma isU128_toInt {w : DWord (Fin BB)} (is128_w : DWord.isU128 w) : - 2^127 ≤ w.toInt ∧ w.toInt < 2^127 := by
+  unfold DWord.toInt DWord.isNegative DWord.toNat
+  apply DWord.lt_cases_of_isU128 at is128_w
+  omega
+
+lemma toBitVec128_toInt {w : DWord (Fin BB)} (h_w_isU128 : w.isU128) :
+    w.toBitVec128.toInt = w.toInt
+  := by
+    rw [BitVec.toInt, DWord.toInt]
+    split_ifs <;>
+    rw [isNegative_msb h_w_isU128] at * <;>
+    simp [BitVec.msb_eq_decide] at * <;>
+    rw [toBitVec128_toNat h_w_isU128] at * <;>
+    omega
+
+lemma isNegative_toInt {w : DWord (Fin BB)} (is128_w : DWord.isU128 w) :
+  w.isNegative ↔ w.toInt < 0
+    := by
+  unfold DWord.toInt DWord.isNegative DWord.toNat
+  apply DWord.lt_cases_of_isU128 at is128_w
+  omega
+
+lemma sign_cases {w : DWord (Fin BB)} (is128_w : DWord.isU128 w) : w.toInt.sign = if w.isNegative then -1 else if w.toInt = 0 then 0 else 1 := by
+  simp [DWord.isNegative_toInt is128_w]
+  exact Int.sign_cases w.toInt
+
+end conversions
+
+end DWord
 
 namespace BHWord
 
@@ -774,6 +986,54 @@ lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin BB} {x : ℕ} :
       simp_all [BitVec.toNat_ofNat, toNat] <;>
       rw [Int.bmod_def] at h_eq <;>
       omega
+
+/-- Sign-extension to 128 bits -/
+def extend (w : Word (Fin BB)) (sgn : Bool) : DWord (Fin BB) :=
+  let ext := (if sgn then (if w.isNegative then (1 : Fin BB) else 0) else 0) * 65535
+  #v[w[0], w[1], w[2], w[3], ext, ext, ext, ext]
+
+lemma extend_U64_U128 {w : Word (Fin BB)} (is_U64_w : w.isU64) (sgn : Bool) : (w.extend sgn).isU128 := by
+  have := lt_cases_of_isU64 is_U64_w
+  apply DWord.isU128_of_cases <;>
+  simp [extend] <;> (try split_ifs) <;> omega
+
+lemma extend_true_is_signExtend {w : Word (Fin BB)} :
+  w.isU64 →
+  (w.extend true).toBitVec128 = BitVec.signExtend 128 w.toBitVec64
+    := by
+  set sw := extend w true
+  intro is_U64_w
+  have is_U128_bdw : sw.isU128 := by
+    have := lt_cases_of_isU64 is_U64_w
+    subst sw; simp [extend]
+    apply DWord.isU128_of_cases <;> split_ifs <;> simp_all
+  have is_neg : w.isNegative ↔ sw.isNegative := by
+    subst sw
+    simp [extend, isNegative, DWord.isNegative]
+    aesop
+  rw [← BitVec.toInt_inj]
+  simp [BitVec.toInt_signExtend_of_le]
+  rw [toBitVec64_toInt is_U64_w, DWord.toBitVec128_toInt is_U128_bdw]
+  rw [toInt, DWord.toInt]
+  split_ifs <;> [ skip; tauto; tauto; skip ] <;>
+  simp [sw, extend, DWord.toNat, Word.toNat] <;>
+  simp_all; omega
+
+lemma extend_false_is_setWidth {w : Word (Fin BB)} :
+  w.isU64 →
+  (w.extend false).toBitVec128 = BitVec.setWidth 128 w.toBitVec64
+    := by
+  set sw := extend w false
+  intro is_U64_w
+  have is_U128_bdw : sw.isU128 := by
+    have := lt_cases_of_isU64 is_U64_w
+    subst sw; simp [extend]
+    apply DWord.isU128_of_cases <;> split_ifs <;> simp_all
+  rw [← BitVec.toNat_inj]
+  rw [DWord.toBitVec128_toNat is_U128_bdw]
+  rw [BitVec.setWidth_idem (by simp)]
+  rw [Word.toBitVec64_toNat is_U64_w]
+  simp [sw, DWord.toNat, extend, Word.toNat]
 
 end Word
 
