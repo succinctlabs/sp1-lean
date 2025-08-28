@@ -955,12 +955,6 @@ abbrev Satp64 := (BitVec 64)
 abbrev Satp32 := (BitVec 32)
 
 /-- Type quantifiers: k_a : Type -/
-inductive Ext_FetchAddr_Check (k_a : Type) where
-  | Ext_FetchAddr_OK (_ : virtaddr)
-  | Ext_FetchAddr_Error (_ : k_a)
-  deriving Inhabited, BEq, Repr
-
-/-- Type quantifiers: k_a : Type -/
 inductive Ext_ControlAddr_Check (k_a : Type) where
   | Ext_ControlAddr_OK (_ : virtaddr)
   | Ext_ControlAddr_Error (_ : k_a)

@@ -168,7 +168,6 @@ open InterruptType
 open ISA_Format
 open HartState
 open FetchResult
-open Ext_FetchAddr_Check
 open Ext_DataAddr_Check
 open Ext_ControlAddr_Check
 open ExtStatus
@@ -252,37 +251,6 @@ def encdec_vlewidth_backwards_matches (arg_ : (BitVec 3)) : Bool :=
         (if ((b__0 == (0b111 : (BitVec 3))) : Bool)
         then true
         else false)))
-
-def vlewidth_bytesnumber_forwards (arg_ : vlewidth) : Int :=
-  match arg_ with
-  | VLE8 => 1
-  | VLE16 => 2
-  | VLE32 => 4
-  | VLE64 => 8
-
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/
-def vlewidth_bytesnumber_backwards (arg_ : Nat) : vlewidth :=
-  match arg_ with
-  | 1 => VLE8
-  | 2 => VLE16
-  | 4 => VLE32
-  | _ => VLE64
-
-def vlewidth_bytesnumber_forwards_matches (arg_ : vlewidth) : Bool :=
-  match arg_ with
-  | VLE8 => true
-  | VLE16 => true
-  | VLE32 => true
-  | VLE64 => true
-
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/
-def vlewidth_bytesnumber_backwards_matches (arg_ : Nat) : Bool :=
-  match arg_ with
-  | 1 => true
-  | 2 => true
-  | 4 => true
-  | 8 => true
-  | _ => false
 
 def vlewidth_pow_forwards (arg_ : vlewidth) : Int :=
   match arg_ with
@@ -507,7 +475,7 @@ def process_vsseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (load_width_bytes
                   data (Write Data) false false false)) with
               | .Ok true => (pure ())
               | .Ok false =>
-                (internal_error "riscv_insts_vext_mem.sail" 209 "store got false from vmem_write")
+                (internal_error "riscv_insts_vext_mem.sail" 202 "store got false from vmem_write")
               | .Err e => SailME.throw (e : ExecutionResult)
           (pure loop_vars_1))
       else (pure ())
@@ -614,7 +582,7 @@ def process_vssseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (load_width_byte
                   data (Write Data) false false false)) with
               | .Ok true => (pure ())
               | .Ok false =>
-                (internal_error "riscv_insts_vext_mem.sail" 330 "store got false from vmem_write")
+                (internal_error "riscv_insts_vext_mem.sail" 323 "store got false from vmem_write")
               | .Err e => SailME.throw (e : ExecutionResult)
           (pure loop_vars_1))
       else (pure ())
@@ -726,7 +694,7 @@ def process_vsxseg (nf : Nat) (vm : (BitVec 1)) (vs3 : vregidx) (EEW_index_bytes
                   data (Write Data) false false false)) with
               | .Ok true => (pure ())
               | .Ok false =>
-                (internal_error "riscv_insts_vext_mem.sail" 481 "store got false from vmem_write")
+                (internal_error "riscv_insts_vext_mem.sail" 474 "store got false from vmem_write")
               | .Err e => SailME.throw (e : ExecutionResult)
           (pure loop_vars_1))
       else (pure ())
@@ -834,7 +802,7 @@ def process_vsre (nf : Nat) (load_width_bytes : Nat) (rs1 : regidx) (vs3 : vregi
                       load_width_bytes data (Write Data) false false false)) with
                   | .Ok true => (pure ())
                   | .Ok false =>
-                    (internal_error "riscv_insts_vext_mem.sail" 625
+                    (internal_error "riscv_insts_vext_mem.sail" 619
                       "store got false from vmem_write")
                   | .Err e => SailME.throw (e : ExecutionResult)
                   (pure (cur_elem +i 1))
@@ -864,7 +832,7 @@ def process_vsre (nf : Nat) (load_width_bytes : Nat) (rs1 : regidx) (vs3 : vregi
                     (GetElem?.getElem! vs3_val i) (Write Data) false false false)) with
                 | .Ok true => (pure ())
                 | .Ok false =>
-                  (internal_error "riscv_insts_vext_mem.sail" 640 "store got false from vmem_write")
+                  (internal_error "riscv_insts_vext_mem.sail" 634 "store got false from vmem_write")
                 | .Err e => SailME.throw (e : ExecutionResult)
                 (pure (cur_elem +i 1))
             (pure loop_vars_2)
@@ -940,7 +908,7 @@ def process_vm (vd_or_vs3 : vregidx) (rs1 : regidx) (num_elem : Nat) (evl : Nat)
                       (GetElem?.getElem! vd_or_vs3_val i) (Write Data) false false false)) with
                   | .Ok true => (pure ())
                   | .Ok false =>
-                    (internal_error "riscv_insts_vext_mem.sail" 696
+                    (internal_error "riscv_insts_vext_mem.sail" 690
                       "store got false from vmem_write")
                   | .Err e => SailME.throw (e : ExecutionResult))
               else (pure ())))

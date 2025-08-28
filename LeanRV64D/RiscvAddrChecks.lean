@@ -157,7 +157,6 @@ open InterruptType
 open ISA_Format
 open HartState
 open FetchResult
-open Ext_FetchAddr_Check
 open Ext_DataAddr_Check
 open Ext_ControlAddr_Check
 open ExtStatus
@@ -166,8 +165,8 @@ open ExceptionType
 open Architecture
 open AccessType
 
-def ext_fetch_check_pc (start_pc : (BitVec 64)) (pc : (BitVec 64)) : (Ext_FetchAddr_Check Unit) :=
-  (Ext_FetchAddr_OK (Virtaddr pc))
+def ext_fetch_check_pc (start_pc : (BitVec 64)) (pc : (BitVec 64)) : (Option Unit) :=
+  none
 
 def ext_handle_fetch_check_error (err : Unit) : Unit :=
   ()
