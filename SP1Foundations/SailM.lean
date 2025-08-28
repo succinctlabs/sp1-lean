@@ -740,6 +740,30 @@ lemma combine_MUL_MULH {pl ph op1 op2: Word (Fin BB)}
     ring_nf
   . bv_decide
 
+lemma combine_MUL_MULHU {pl ph op1 op2: Word (Fin BB)}
+  (isU64_pl : pl.isU64) (isU64_ph : ph.isU64)
+  (isU64_op1 : op1.isU64) (isU64_op2 : op2.isU64) :
+  Word.toBitVec64 pl = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MUL →
+  Word.toBitVec64 ph = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MULHU →
+    DWord.toBitVec128 #v[pl[0], pl[1], pl[2], pl[3], ph[0], ph[1], ph[2], ph[3]] = (op1.extend false).toBitVec128 * (op2.extend false).toBitVec128
+   := by
+  iterate 2 rw [Word.extend_false_is_setWidth (by assumption)]
+  simp [execute_MUL_pure, -BitVec.extractLsb]
+  intro lo hi
+  simp [BitVec.extend, -BitVec.extractLsb] at *
+  set x := BitVec.setWidth 128 op1.toBitVec64 * BitVec.setWidth 128 op2.toBitVec64
+  trans BitVec.extractLsb 63 0 x + (BitVec.setWidth 128 (BitVec.extractLsb 127 64 x) <<< 64)
+  . rw [← lo, ← hi]
+    rw [← BitVec.toNat_inj]
+    rw [DWord.toBitVec128, DWord.toNat, Word.toBitVec64, Word.toBitVec64, Word.toNat, Word.toNat]
+    repeat rw [BitVec.toNat_add]
+    simp [Nat.shiftLeft_eq]
+    apply Word.lt_cases_of_isU64 at isU64_pl
+    apply Word.lt_cases_of_isU64 at isU64_ph
+    iterate 2 rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)]
+    ring_nf
+  . bv_decide
+
 /-- execute_MUL pure part for BWord arguments -/
 def execute_MUL_pure_bw (op1 : BWord (Fin BB)) (op2 : BWord (Fin BB)) (op : mop) : BitVec 64 :=
   let op1_ext := op1.extend (op = .MULH ∨ op = .MULHSU)

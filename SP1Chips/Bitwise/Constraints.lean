@@ -12,7 +12,7 @@ def is_real : Prop := Main[48] = 1 ∨ Main[49] = 1 ∨ Main[50] = 1
 section constraints
 
 -- Generated Lean code for chip BitwiseChip
-def constraints : SP1ConstraintList :=
+@[irreducible] def constraints : SP1ConstraintList :=
   let E0 : Fin BB := Main[48] + Main[49]
   let E1 : Fin BB := E0 + Main[50]
   let E2 : Fin BB := Main[48] - 1

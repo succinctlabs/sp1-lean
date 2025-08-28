@@ -7,7 +7,7 @@ namespace Lt
 section constraints
 
 -- Generated Lean code for chip LtChip
-def constraints (Main : Vector (Fin BB) 45) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 45) : SP1ConstraintList :=
   let E0 : Fin BB := Main[32] + Main[33]
   let E1 : Fin BB := Main[32] - 1
   let E2 : Fin BB := Main[32] * E1

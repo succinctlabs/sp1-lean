@@ -4,7 +4,7 @@ namespace CPUState
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (cols : CPUState)
   (next_pc : (Vector (Fin BB) 3))
   (clk_increment : (Fin BB))
