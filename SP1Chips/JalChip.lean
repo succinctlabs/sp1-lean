@@ -5,7 +5,7 @@ namespace Jal
 
 open BitVec
 
-open Sail SailState BitVec LeanRV64IM.Functions
+open Sail SailState BitVec LeanRV64D.Functions
 
 variable (Main : Vector (Fin BB) 31) (s : SailState)
 
@@ -25,8 +25,9 @@ def sp1_op_b : BitVec 21 := BitVec.ofNat 21 (Main[14].val + Main[15].val * 65536
 
 def sp1_jal (Main : Vector (Fin BB) 31) : SailM Unit := do
   let op_a := regidx.Regidx Main[6].val
-  wX_bits op_a (BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48))
   set_next_pc (BitVec.ofNat 64 (Main[22] + Main[23] * 2^16 + Main[24] * 2^32 + Main[25] * 2^48))
+
+  wX_bits op_a (BitVec.ofNat 64 (Main[26] + Main[27] * 2^16 + Main[28] * 2^32 +  Main[29] * 2^48))
 
 def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
@@ -62,13 +63,15 @@ theorem SP1JAL_correct
   have hmod : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
       Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]])[1] = false := by
     refine (mul4_means_0_1_are_0 ?_).2
-
     simp [hpc]
     refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
     · simp [ofNat_eq_ofNat, BabyBear.val_mod4_eq_zero]
       simp_all only [BB_eq, Fin.isValue, true_and]
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [BB_eq, Fin.isValue, true_and]
+
+  have hmod' : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
+      Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]])[0] = false := by sorry
 
   simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]
 
@@ -97,18 +100,17 @@ theorem SP1JAL_correct
   simp only [ext_control_check_pc, bit_to_bool, access, ofBool, bits_of_virtaddr, Nat.one_lt_ofNat,
     getElem!_pos, ofNat_eq_ofNat, currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or,
     Bool.and_self, bind_pure_comp, Functor.map_map, bind_map_left, EStateM.run_bind,
-    run_bool_bit_backwards, sign_extend, Sail.BitVec.signExtend, ← h_sign_extend]
+    run_bool_bit_backwards, sign_extend, Sail.BitVec.signExtend, ← h_sign_extend, jump_to]
 
   split_ifs with m6 m6b m6b <;>
   simp [← BitVec.toNat_inj] at m6 m6b <;>
   [ skip; omega; omega; skip ] <;>
   rw [run_readReg] <;>
-  simp [read_pc] <;>
+  simp [read_pc, jump_to] <;>
   rw [run_readReg] <;>
-  simp [Std.ExtDHashMap.get?_insert, read_pc, hmod] <;>
+  simp [Std.ExtDHashMap.get?_insert, read_pc, hmod, hmod', RETIRE_SUCCESS, jump_to, assert, PreSail.assert] <;>
   rw [run_readReg] <;>
-  simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa] <;>
-  rw [run_readReg]
+  simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
   . simp [h_add', Word.toBitVec64, Word.toNat]
   . simp [BitVec.ofNatLT_eq_ofNat, h_add']
     simp [Word.toBitVec64, Word.toNat]
@@ -120,5 +122,3 @@ theorem SP1JAL_correct
     rw [h_add_pc', BitVec.ofNatLT_eq_ofNat]
 
 end Jal
-
--- #print axioms JalChip.SP1JAL_correct

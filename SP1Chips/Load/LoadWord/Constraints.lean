@@ -11,7 +11,7 @@ namespace LoadWord
 section constraints
 
 -- Generated Lean code for chip LoadWordChip
-def constraints (Main : Vector (Fin BB) 44) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 44) : SP1ConstraintList :=
   let E0 : Fin BB := Main[1] * 65536
   let E1 : Fin BB := Main[2] + E0
   let E2 : Fin BB := Main[42] * 21

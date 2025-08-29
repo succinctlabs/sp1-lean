@@ -5,7 +5,7 @@ import SP1Chips.Jalr.Constraints
 
 namespace Jalr
 
-open Sail SailState BitVec LeanRV64IM.Functions
+open Sail SailState BitVec LeanRV64D.Functions
 
 variable (Main : Vector (Fin BB) 38) (s : SailState)
 
@@ -32,17 +32,15 @@ lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Mai
 def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1) : BitVec 5 :=
   Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
 
--- dt: could instead put `Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]` here...
 def sp1_op_b (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): BitVec 5 :=
   Main[14].val#'(op_b_lt32_of_constraints cstrs h_is_real)
 
--- dt: could instead put `Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]` here...
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_jalr  (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
-  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
+  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
 
 def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
@@ -98,32 +96,37 @@ theorem JALR_correct
     refine (mul4_means_0_1_are_0 ?_).2
     simpa using hmod
 
+  have hmod2 : (18446744073709551614#64 &&&
+      Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
+        Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]])[0]? = some false := by
+    simp only [Nat.ofNat_pos, getElem?_pos, getElem_and, reduceGetElem, Bool.false_and]
+
   clear res_cstrs reader_cstrs pc_cstrs
 
   simp [spec_jalr, sp1_jalr, execute_JALR, op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c]
   rw [run_readReg]
-  simp only [read_pc, read_op_b', ext_control_check_addr, ← h_c_sign_extend, bit_to_bool, access,
+  simp only [read_pc, read_op_b', ext_control_check_pc, ← h_c_sign_extend, bit_to_bool, access,
     ofBool, update, updateSubrange', reduceAllOnes, truncate_eq_setWidth, reduceSetWidth,
     shiftLeft_zero, reduceNot, bits_of_virtaddr, setWidth_zero, or_zero, Nat.one_lt_ofNat,
     getElem!_pos, getElem_and, reduceGetElem, hmod4, Bool.and_false, ofNat_eq_ofNat, cond_false,
-    currentlyEnabled, hartSupports, LeanRV64IM.Functions.xlen, Nat.reduceBEq, Bool.and_self,
-    LeanRV64IM.Functions.not, Bool.not_true, Nat.reduceBNe, Bool.or_true, Bool.or_false,
+    currentlyEnabled, hartSupports, LeanRV64D.Functions.xlen, Nat.reduceBEq, Bool.and_self,
+    LeanRV64D.Functions.not, Bool.not_true, Nat.reduceBNe, Bool.or_true, Bool.or_false,
     _get_Misa_C, Sail.BitVec.extractLsb, BitVec.extractLsb, extractLsb', Nat.reduceSub,
     Nat.reduceAdd, Bool.true_and, bind_pure_comp, bind_pure, Bool.not_eq_eq_eq_not, bind_map_left,
     beq_eq_false_iff_ne, ne_eq, EStateM.run_bind, run_bool_bit_backwards, Bool.false_eq_true,
-    false_and, ↓reduceIte, run_ite, EStateM.run_map, run_writeReg, EStateM.Result.map_ok]
-  simp only [EStateM.run_pure, Bool.false_eq_true, forall_const, and_true, false_and, ↓reduceIte,
-    EStateM.run_bind, run_ite, EStateM.run_map, run_writeReg, EStateM.Result.map_ok]
+    false_and, ↓reduceIte, run_ite, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
+    jump_to, assert, PreSail.assert, hmod2, getElem!_def]
+  simp only [BEq.rfl, ↓reduceIte, EStateM.run_pure, Bool.false_and, Bool.false_eq_true,
+    set_next_pc_eq, EStateM.run_map, run_writeReg, EStateM.Result.map_ok]
   rw [run_readReg]
   simp only [Std.ExtDHashMap.get?_insert, beq_iff_eq, reduceCtorEq, ↓reduceDIte,
-    Std.ExtDHashMap.get?_eq_some_get h_misa]
-  rw [run_readReg, Std.ExtDHashMap.get?_insert_self]
-
+    Std.ExtDHashMap.get?_eq_some_get h_misa, RETIRE_SUCCESS]
   split_ifs <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
   have htemp : (1 : Fin BB) - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
   rw [htemp] at inc_pc_cstrs
   have ⟨ _, h_add ⟩ := AddOperation.spec pc_is_u64 h_4_is_u64 inc_pc_cstrs
   rw [h_add]
   simp [Word.toBitVec64, Word.toNat]
+
 
 end Jalr

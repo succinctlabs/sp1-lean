@@ -5,7 +5,7 @@ namespace Jal
 section constraints
 
 -- Generated Lean code for chip JalChip
-def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
   let E0 : Fin BB := Main[30] - 1
   let E1 : Fin BB := Main[30] * E0
   let CS0 : SP1ConstraintList := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]] { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]

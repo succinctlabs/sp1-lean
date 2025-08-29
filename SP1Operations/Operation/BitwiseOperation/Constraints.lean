@@ -5,7 +5,7 @@ namespace BitwiseOperation
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (a : (Vector (Fin BB) 8))
   (b : (Vector (Fin BB) 8))
   (cols : BitwiseOperation)

@@ -20,12 +20,12 @@ lemma spec.and
     have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return b { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1], cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] } ?_
     have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return cc { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1], cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] } ?_
     rotate_left
-    . simp [constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
+    . simp [constraints, BitwiseOperation.constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
-      simp at *; aesop
-    . simp [constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
+      aesop
+    . simp [constraints, BitwiseOperation.constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
-      simp at *; aesop
+      aesop
     . simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := h_bw_b
       obtain ⟨ c0, c1, c2, c3, c4, c5, c6, c7 ⟩ := h_bw_c
@@ -61,12 +61,12 @@ lemma spec.or
     have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return b { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1], cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] } ?_
     have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return cc { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1], cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] } ?_
     rotate_left
-    . simp [constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
+    . simp [constraints, BitwiseOperation.constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
-      simp at *; aesop
-    . simp [constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
+      aesop
+    . simp [constraints, BitwiseOperation.constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
-      simp at *; aesop
+      aesop
     . simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := h_bw_b
       obtain ⟨ c0, c1, c2, c3, c4, c5, c6, c7 ⟩ := h_bw_c
@@ -102,12 +102,12 @@ lemma spec.xor
     have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return b { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1], cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] } ?_
     have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return cc { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1], cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] } ?_
     rotate_left
-    . simp [constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
+    . simp [constraints, BitwiseOperation.constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
-      simp at *; aesop
-    . simp [constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
+      aesop
+    . simp [constraints, BitwiseOperation.constraints, U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := cstrs
-      simp at *; aesop
+      aesop
     . simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at *
       obtain ⟨ b0, b1, b2, b3, b4, b5, b6, b7 ⟩ := h_bw_b
       obtain ⟨ c0, c1, c2, c3, c4, c5, c6, c7 ⟩ := h_bw_c

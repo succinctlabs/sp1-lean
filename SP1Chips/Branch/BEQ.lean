@@ -1,6 +1,6 @@
 import SP1Foundations
 import SP1Chips.Branch.Constraints
-import LeanRV64IM.RiscvInstsEnd
+import LeanRV64D.RiscvInstsEnd
 
 set_option autoImplicit false
 
@@ -13,7 +13,7 @@ original proof.
 
 namespace Branch
 
-open Sail SailState BitVec LeanRV64IM.Functions
+open Sail SailState BitVec LeanRV64D.Functions
 
 namespace BEQ
 
@@ -168,7 +168,8 @@ theorem correct_beq
 
     simp [h_eq, h_pc_read]
     rw [run_readReg]
-    simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b1]
+    simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b1,
+      jump_to, assert, PreSail.assert, ofBool, h_next_pc_b0]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
 

@@ -17,7 +17,7 @@ lake lean -q <file.lean>
 
 # Check specific module
 lake build SP1Foundations
-lake build SP1Operations  
+lake build SP1Operations
 lake build SP1Chips
 ```
 
@@ -55,14 +55,14 @@ structure Operation where
   -- fields for outputs/intermediates
 
 def spec (op : Operation) (inputs) (is_real : U1) : Prop := -- mathematical spec
-def constraints (op : Operation) (inputs) (is_real : U1) : List SP1Constraint := -- field constraints  
+@[irreducible] def constraints (op : Operation) (inputs) (is_real : U1) : List SP1Constraint := -- field constraints
 theorem correct : constraints → spec -- correctness proof
 ```
 
 ### Conditional Execution
 All constraints are gated by `is_real : U1` parameter to handle both real execution and padding in the same constraint system.
 
-### Air Interactions  
+### Air Interactions
 Byte-level operations use algebraic intermediate representation (AIR) with lookup tables for efficient constraint verification.
 
 ## Proof Strategy Guidelines
@@ -76,7 +76,7 @@ Based on PROMPT.md, follow these practices:
 ## Key Dependencies
 
 - **mathlib**: Lean's mathematical library
-- **Lean_RV32D**: RISC-V specification from sail-rv32d-lean  
+- **Lean_RV32D**: RISC-V specification from sail-rv32d-lean
 - **aesop**: Automated proof search
 - Lean toolchain: 4.21.0-rc3
 

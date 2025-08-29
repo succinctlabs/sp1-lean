@@ -3,7 +3,7 @@ import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.RTypeReader
 import SP1Chips.Subw.Constraints
 
-open LeanRV64IM.Functions
+open LeanRV64D.Functions
 open BitVec
 
 namespace Subw
