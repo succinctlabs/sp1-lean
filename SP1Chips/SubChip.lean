@@ -16,7 +16,7 @@ variable
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[32] = 1)
 
-def spec_sub (rs2 rs1 rd : regidx) : SailM Unit := do
+noncomputable def spec_sub (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd rop.SUB
   pure ()

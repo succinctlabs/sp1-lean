@@ -15,7 +15,7 @@ variable
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[29] = 1)
 
-def spec_addi (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+noncomputable def spec_addi (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute_ITYPE imm rs1 rd iop.ADDI
   pure ()
