@@ -199,7 +199,27 @@ theorem correct_bge
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
+    rw [Nat.mod_eq_of_lt]
+    ·
+      sorry
+    ·
+      sorry
 
+    /-
+    Main : Vector (Fin BB) 45
+    h_limb0 : Main[3] + 4 = Main[25] ∨ Main[3] + 4 - Main[25] = 65536
+    h_limb1 : (Main[3] + 4 - Main[25]) * 2013235201 + Main[4] = Main[26] ∨
+      (Main[3] + 4 - Main[25]) * 2013235201 + Main[4] - Main[26] = 65536
+    h_limb2 : ((Main[3] + 4 - Main[25]) * 2013235201 + Main[4] - Main[26]) * 2013235201 + Main[5] = Main[27] ∨
+      ((Main[3] + 4 - Main[25]) * 2013235201 + Main[4] - Main[26]) * 2013235201 + Main[5] - Main[27] = 65536
+    h_limb3 : ((Main[3] + 4 - Main[25]) * 2013235201 + Main[4] - Main[26]) * 2013235201 + Main[5] = Main[27] ∨
+      (((Main[3] + 4 - Main[25]) * 2013235201 + Main[4] - Main[26]) * 2013235201 + Main[5] - Main[27]) * 2013235201 = 65536
+    h_bound_checks : ↑Main[25] < 65536 ∧ ↑Main[26] < 65536 ∧ ↑Main[27] < 65536
+    h_pc_0 : ↑Main[3] < 65536
+    h_pc_1 : ↑Main[4] < 65536
+    h_pc_2 : ↑Main[5] < 65536
+    ⊢ ↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296 + 4 = ↑Main[25] + ↑Main[26] * 65536 + ↑Main[27] * 4294967296
+    -/
     stop
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 --h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
     omega
@@ -214,7 +234,7 @@ theorem correct_bge
       tauto
     simp [h35] at chip_cstrs
     have h34 : Main[34] = 0 := by clear * - chip_cstrs; aesop
-    simp [h34] at chip_cstrs
+    simp [h34, sub_eq_zero] at chip_cstrs
 
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
@@ -222,7 +242,8 @@ theorem correct_bge
 
     apply BitVec.eq_of_toNat_eq
     simp [Word.toBitVec64, Word.toNat]
-
+    refine congr_arg (· % _) ?_
+    omega
 
     stop
     have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 :=
