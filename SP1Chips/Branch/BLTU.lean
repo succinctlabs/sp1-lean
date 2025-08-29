@@ -16,9 +16,6 @@ variable
   (s : SailState)
   (h_is_bltu : Main[32] = 1)
 
-lemma BitVec.toNat_lt_toNat_iff {n : ℕ} (x y : BitVec n) :
-    x.toNat < y.toNat ↔ x < y := by rfl
-
 private theorem h_Main32_is_bltu
   (cstrs : (constraints Main).allHold)
   (h_is_bltu : Main[32] = 1)
@@ -155,18 +152,14 @@ theorem correct_bltu
   simp [sub_eq_zero] at chip_cstrs
 
   by_cases h_eq : op_a_val < op_b_val <;> simp [op_a_val, op_b_val] at h_eq
-  ·
-    have : Main[35] = 1 := by
+  · have : Main[35] = 1 := by
       clear * - spec_lt h_eq
       simp [BitVec.ult, BitVec.toNat_lt_toNat_iff, h_eq] at spec_lt
       aesop
     simp [this] at chip_cstrs
-    have : Main[34] = 1 := by
-      clear * - chip_cstrs
-      aesop
+    have : Main[34] = 1 := by clear * - chip_cstrs; aesop
 
     simp [this] at chip_cstrs
-
     simp [BitVec.toNat_lt_toNat_iff, h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b1,
@@ -174,7 +167,6 @@ theorem correct_bltu
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
     refine congr_arg (s.regs.insert _) ?_
-
 
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
@@ -184,72 +176,35 @@ theorem correct_bltu
     rw [←trusted_imm]
     simp [Word.toBitVec64, Word.toNat]
     rw [← BitVec.ofNat_add]
-    -- simp [BitVec.add_def]
-    refine congr_arg (BitVec.ofNat 64) ?_
+    simp [BitVec.ofNat, Fin.ofNat]
 
-    clear * - h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
+    clear * - h_imm_is_u64 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
     omega
 
-    stop
-    simp [h_eq, h_pc_read]
-    rw [run_readReg]
-    simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b1]
-    rw [run_readReg]
-    simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
+  · have h_eq' : ¬ Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]] <
+        Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] := by
+      aesop
 
-    refine congr_arg (s.regs.insert Register.nextPC) ?_
+    have : Main[35] = 0 := by
+      clear * - spec_lt h_eq'
+      simp [BitVec.ult, BitVec.toNat_lt_toNat_iff, h_eq'] at spec_lt
+      aesop
+    simp [this] at chip_cstrs
+    have : Main[34] = 0 := by clear * - chip_cstrs; aesop
 
-    rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-    simp [Word.toBitVec64, Word.toNat]
-    rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
+    simp [this] at chip_cstrs
 
-    have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
-      BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by aesop
-    simp [imm, sp1_imm, sign_extend]
-    rw [←trusted_imm]
-
-    simp [Word.toBitVec64, Word.toNat]
-    rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
-    simp [BitVec.add_def]
-
-    apply BitVec.eq_of_toNat_eq
-
-    simp [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
-
-    clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    omega
-
-  · stop
-    have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 0 :=
-      by
-        simp [h_eq, h_30, h_31] at spec_lt
-        clear * - spec_lt
-        aesop
-    rw [h_is_neq] at chip_cstrs
-    simp [sub_eq_zero] at chip_cstrs
-    have h_is_branching : Main[34] = 0 := by aesop
-    simp [h_is_branching] at chip_cstrs
-
-    simp [h_eq]
-
+    simp [BitVec.toNat_lt_toNat_iff, h_eq']
     refine congr_arg (s.regs.insert Register.nextPC) ?_
 
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
+    simp [Word.toBitVec64]
+    rw [← BitVec.ofNat_add]
+    simp [BitVec.ofNat, Fin.ofNat]
+    simp [Word.toNat]
+    clear * - h_imm_is_u64 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
-    rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-
-    simp [BitVec.add_def]
-
-    rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
-
-    simp [Word.toBitVec64, Word.toNat]
-
-    rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
-
-    simp [BitVec.ofNatLT]
-
-    clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
 
 end BLTU
