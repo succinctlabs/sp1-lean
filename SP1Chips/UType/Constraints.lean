@@ -7,7 +7,7 @@ namespace UType
 section constraints
 
 -- Generated Lean code for chip UTypeChip
-def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 31) : SP1ConstraintList :=
   let E0 : Fin BB := Main[30] - 1
   let E1 : Fin BB := Main[30] * E0
   let E2 : Fin BB := Main[29] - 1

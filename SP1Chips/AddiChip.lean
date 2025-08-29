@@ -17,7 +17,7 @@ variable
 
 noncomputable def spec_addi (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute (.ITYPE (imm, rs1, rd, iop.ADDI))
+  _ ← execute_ITYPE imm rs1 rd iop.ADDI
   pure ()
 
 def sp1_op_a : BitVec 5 :=

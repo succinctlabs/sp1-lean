@@ -18,7 +18,7 @@ variable
 
 noncomputable def spec_add (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute (.RTYPE (rs2, rs1, rd, rop.ADD))
+  _ ← execute_RTYPE rs2 rs1 rd rop.ADD
   pure ()
 
 def sp1_op_a : BitVec 5 :=

@@ -12,7 +12,7 @@ def is_real : Prop := Main[62] = 1 ∨ Main[63] = 1
 section constraints
 
 -- Generated Lean code for chip ShiftLeftChip
-def constraints  : SP1ConstraintList :=
+@[irreducible] def constraints  : SP1ConstraintList :=
   let E0 : Fin BB := Main[62] + Main[63]
   let E1 : Fin BB := E0 - 1
   let E2 : Fin BB := E0 * E1
