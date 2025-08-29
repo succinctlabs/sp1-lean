@@ -17,6 +17,11 @@ name = "mathlib"
 scope = "leanprover-community"
 rev = "v4.23.0-rc2"
 
+[[require]]
+name = "Lean_RV64D"
+git = "https://github.com/succinctlabs/sail-riscv-lean"
+rev = "sp1-lean-air-verification"
+
 [[lean_lib]]
 name = "SP1Foundations"
 
@@ -25,6 +30,3 @@ name = "SP1Operations"
 
 [[lean_lib]]
 name = "SP1Chips"
-
-[[lean_lib]]
-name = "LeanRV64IM"

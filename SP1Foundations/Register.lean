@@ -1,5 +1,5 @@
 import Mathlib
-import LeanRV64IM.RiscvInstsEnd
+import LeanRV64D.RiscvInstsEnd
 import SP1Foundations.Misc
 
 -- dt: should this be a macro instead?

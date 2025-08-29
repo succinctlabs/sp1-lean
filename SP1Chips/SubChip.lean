@@ -2,11 +2,11 @@ import SP1Foundations
 import SP1Operations.Operation.SubOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.RTypeReader
-import LeanRV64IM.RiscvInstsEnd
+import LeanRV64D.RiscvInstsEnd
 
 import SP1Chips.Sub.Constraints
 
-open LeanRV64IM.Functions BitVec
+open LeanRV64D.Functions BitVec
 
 namespace Sub
 
@@ -18,7 +18,7 @@ variable
 
 def spec_sub (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute (.RTYPE (rs2, rs1, rd, rop.SUB))
+  _ ← execute_RTYPE rs2 rs1 rd rop.SUB
   pure ()
 
 def sp1_op_a : BitVec 5 :=
