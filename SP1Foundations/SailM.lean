@@ -1099,7 +1099,7 @@ lemma execute_DIV'_eq_execute_DIV :
   have range_int_r2 : -9223372036854775808 ≤ r2.toInt ∧ r2.toInt < 9223372036854775808 := by constructor <;> [ apply BitVec.le_toInt; apply BitVec.toInt_lt ]
   have range_nat_r1 : 0 ≤ r1.toNat ∧ r1.toNat < 18446744073709551616 := by omega
   have range_nat_r2 : 0 ≤ r2.toNat ∧ r2.toNat < 18446744073709551616 := by omega
-  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64IM.Functions.not, LeanRV64IM.Functions.xlen, instHPowInt_leanRV64IM] <;>
+  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64D.Functions.not, LeanRV64D.Functions.xlen, instHPowInt_leanRV64IM] <;>
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
   . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
@@ -1163,7 +1163,7 @@ lemma execute_DIVW'_eq_execute_DIVW :
   have range_int_r2 : -2147483648 ≤ r2.toInt ∧ r2.toInt < 2147483648 := by constructor <;> [ apply BitVec.le_toInt; apply BitVec.toInt_lt ]
   have range_nat_r1 : 0 ≤ r1.toNat ∧ r1.toNat < 4294967296 := by omega
   have range_nat_r2 : 0 ≤ r2.toNat ∧ r2.toNat < 4294967296 := by omega
-  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64IM.Functions.not, LeanRV64IM.Functions.xlen, instHPowInt_leanRV64IM] <;>
+  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64D.Functions.not, LeanRV64D.Functions.xlen, instHPowInt_leanRV64IM] <;>
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
   . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
@@ -1223,7 +1223,7 @@ lemma execute_REM'_eq_execute_REM :
   have range_int_r2 : -9223372036854775808 ≤ r2.toInt ∧ r2.toInt < 9223372036854775808 := by constructor <;> [ apply BitVec.le_toInt; apply BitVec.toInt_lt ]
   have range_nat_r1 : 0 ≤ r1.toNat ∧ r1.toNat < 18446744073709551616 := by omega
   have range_nat_r2 : 0 ≤ r2.toNat ∧ r2.toNat < 18446744073709551616 := by omega
-  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64IM.Functions.not, LeanRV64IM.Functions.xlen, instHPowInt_leanRV64IM] <;>
+  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64D.Functions.not, LeanRV64D.Functions.xlen, instHPowInt_leanRV64IM] <;>
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
     rw [Nat.mod_eq_of_lt (by omega)]; simp
@@ -1261,7 +1261,7 @@ lemma execute_REMW'_eq_execute_REMW :
   have range_int_r2 : -2147483648 ≤ r2.toInt ∧ r2.toInt < 2147483648 := by constructor <;> [ apply BitVec.le_toInt; apply BitVec.toInt_lt ]
   have range_nat_r1 : 0 ≤ r1.toNat ∧ r1.toNat < 4294967296 := by omega
   have range_nat_r2 : 0 ≤ r2.toNat ∧ r2.toNat < 4294967296 := by omega
-  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64IM.Functions.not, LeanRV64IM.Functions.xlen, instHPowInt_leanRV64IM] <;>
+  by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64D.Functions.not, LeanRV64D.Functions.xlen, instHPowInt_leanRV64IM] <;>
   by_cases r2z : r2 = 0 <;> simp_all
   . simp [to_bits_truncate, Sail.get_slice_int]
     rw [Nat.mod_eq_of_lt (by omega)]; simp
