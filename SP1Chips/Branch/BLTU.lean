@@ -152,27 +152,46 @@ theorem correct_bltu
   simp [h_pc_read]
   simp [op_a, sp1_op_a, h_op_a_read]
   simp [op_b, sp1_op_b, h_op_b_read]
+  simp [sub_eq_zero] at chip_cstrs
 
   by_cases h_eq : op_a_val < op_b_val <;> simp [op_a_val, op_b_val] at h_eq
   ·
-    simp [BitVec.toNat_lt_toNat_iff, h_eq]
-
-    stop
-    have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 := by
-      simp [h_eq, h_30, h_31] at spec_lt
-      sorry
-      clear * - spec_lt
+    have : Main[35] = 1 := by
+      clear * - spec_lt h_eq
+      simp [BitVec.ult, BitVec.toNat_lt_toNat_iff, h_eq] at spec_lt
+      aesop
+    simp [this] at chip_cstrs
+    have : Main[34] = 1 := by
+      clear * - chip_cstrs
       aesop
 
-    -- stop
-    rw [h_is_eq] at chip_cstrs
-    simp [sub_eq_zero] at chip_cstrs
+    simp [this] at chip_cstrs
 
-    have h_is_branching : Main[34] = 1 := by aesop
+    simp [BitVec.toNat_lt_toNat_iff, h_eq]
+    rw [run_readReg]
+    simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b1,
+      jump_to, assert, PreSail.assert, ofBool, h_next_pc_b0]
+    rw [run_readReg]
+    simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
+    refine congr_arg (s.regs.insert _) ?_
 
-    simp [h_is_branching] at chip_cstrs
+
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
+    have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
+      BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by aesop
+    simp [imm, sp1_imm, sign_extend]
+    rw [←trusted_imm]
+    simp [Word.toBitVec64, Word.toNat]
+    rw [← BitVec.ofNat_add]
+    -- simp [BitVec.add_def]
+    refine congr_arg (BitVec.ofNat 64) ?_
+
+    clear * - h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
+
+    omega
+
+    stop
     simp [h_eq, h_pc_read]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b1]

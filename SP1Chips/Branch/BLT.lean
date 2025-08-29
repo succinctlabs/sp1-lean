@@ -219,8 +219,6 @@ theorem correct_blt
     refine congr_arg (· % _) ?_
     omega
 
-#print axioms correct_blt
-
 end BLT
 
 end Branch
