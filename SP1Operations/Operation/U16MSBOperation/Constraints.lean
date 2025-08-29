@@ -5,7 +5,7 @@ namespace U16MSBOperation
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (a : (Fin BB))
   (cols : U16MSBOperation)
   (is_real : (Fin BB))

@@ -7,7 +7,7 @@ namespace Addi
 section constraints
 
 -- Generated Lean code for chip AddiChip
-def constraints (Main : Vector (Fin BB) 30) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 30) : SP1ConstraintList :=
   let E0 : Fin BB := Main[29] - 1
   let E1 : Fin BB := Main[29] * E0
   let CS0 : SP1ConstraintList := AddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[25], Main[26], Main[27], Main[28]] } Main[29]

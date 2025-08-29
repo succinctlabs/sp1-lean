@@ -288,7 +288,7 @@ end core_mul
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (a_word : (Word (Fin BB)))
   (b_word : (Word (Fin BB)))
   (c_word : (Word (Fin BB)))
@@ -1007,15 +1007,6 @@ lemma spec.mul {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
   . apply BDWord.low_as_extract
     apply BDWord.isU128_of_cases <;> assumption
 
-lemma spec.mul.gen {aw bw cw cols is_real is_mulh is_mulw is_mulhu is_mulhsu}
-  (isU64_bw : bw.isU64)
-  (isU64_cw : cw.isU64)
-  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols is_real 1 is_mulh is_mulw is_mulhu is_mulhsu)) :
-  is_real = 1 →
-    aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MUL := by
-  intro is_real; simp_all
-  apply spec.mul isU64_bw isU64_cw cstrs (by simp)
-
 end mul
 
 section mulh
@@ -1096,15 +1087,6 @@ lemma spec.mulh {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
   . assumption
   . apply BDWord.high_as_extract
     apply BDWord.isU128_of_cases <;> assumption
-
-lemma spec.mulh.gen {aw bw cw cols is_real is_mul is_mulw is_mulhu is_mulhsu}
-  (isU64_bw : bw.isU64)
-  (isU64_cw : cw.isU64)
-  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols is_real is_mul 1 is_mulw is_mulhu is_mulhsu)) :
-  is_real = 1 →
-    aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULH := by
-  intro is_real; simp_all
-  apply spec.mulh isU64_bw isU64_cw cstrs (by simp)
 
 end mulh
 
@@ -1346,5 +1328,31 @@ lemma spec.mulw {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
       simp_all; try rw [Fin.lt_def]; try omega
 
 end mulw
+
+section gen
+
+lemma spec.mul.gen {aw bw cw cols is_real is_mulh is_mulw is_mulhu is_mulhsu}
+  (isU64_bw : bw.isU64)
+  (isU64_cw : cw.isU64)
+  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols is_real 1 is_mulh is_mulw is_mulhu is_mulhsu)) :
+  is_real = 1 →
+    aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MUL := by
+  intro is_real; simp_all
+  apply spec.mul isU64_bw isU64_cw cstrs (by simp)
+
+lemma spec.mulh.gen {aw bw cw cols is_real is_mul is_mulw is_mulhu is_mulhsu}
+  (isU64_bw : bw.isU64)
+  (isU64_cw : cw.isU64)
+  (cstrs : List.Forall SP1Constraint.toProp (constraints aw bw cw cols is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
+  is_real = 1 →
+    (is_mulh = 1 → aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULH) ∧
+    (is_mulhu = 1 → aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHU) ∧
+    (is_mulhsu = 1 → aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHSU) := by
+  intro h_is_real; split_ands <;> intro h_op <;> simp_all
+  . apply spec.mulh isU64_bw isU64_cw cstrs (by simp)
+  . apply spec.mulhu isU64_bw isU64_cw cstrs (by simp)
+  . apply spec.mulhsu isU64_bw isU64_cw cstrs (by simp)
+
+end gen
 
 end MulOperation

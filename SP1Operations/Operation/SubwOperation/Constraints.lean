@@ -6,7 +6,7 @@ namespace SubwOperation
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (a : (Word (Fin BB)))
   (b : (Word (Fin BB)))
   (cols : SubwOperation)

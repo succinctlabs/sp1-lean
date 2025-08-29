@@ -12,7 +12,7 @@ def is_real : Prop := Main[81] = 1 ∨ Main[82] = 1 ∨ Main[83] = 1 ∨ Main[84
 section constraints
 
 -- Generated Lean code for chip MulChip
-def constraints (Main : Vector (Fin BB) 87) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 87) : SP1ConstraintList :=
   let E0 : Fin BB := Main[81] + Main[82]
   let E1 : Fin BB := E0 + Main[83]
   let E2 : Fin BB := E1 + Main[84]

@@ -67,4 +67,19 @@ lemma spec
     BitVec.ofNat 64 cols.u16_compare_operation.bit = execute_RTYPE_pure_w b d .SLTU
   := by aesop
 
+section gen
+
+lemma spec.nat.gen
+  {b d : Word (Fin BB)}
+  {cols : LtOperationUnsigned}
+  {is_real : Fin BB}
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
+  List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
+    is_real = 1 →
+      cols.u16_compare_operation.bit = if b.toNat < d.toNat then (1 : Fin BB) else (0 : Fin BB)
+    := by aesop
+
+end gen
+
 end LtOperationUnsigned
