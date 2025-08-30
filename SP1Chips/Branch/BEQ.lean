@@ -150,7 +150,6 @@ theorem correct_beq
   -- simplify main goal
   simp [spec_beq, sp1_beq, execute_BTYPE]
   rw [run_readReg]
-
   simp [h_pc_read]
   simp [op_a, sp1_op_a, h_op_a_read]
   simp [op_b, sp1_op_b, h_op_b_read]
@@ -172,26 +171,19 @@ theorem correct_beq
       jump_to, assert, PreSail.assert, ofBool, h_next_pc_b0]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
-
     refine congr_arg (s.regs.insert Register.nextPC) ?_
-
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
     simp [Word.toBitVec64, Word.toNat]
     rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
-
     have trusted_imm : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]) := by aesop
     simp [imm, sp1_imm, sign_extend]
     rw [←trusted_imm]
-
     simp [Word.toBitVec64, Word.toNat]
     rw [←BitVec.ofNatLT_eq_ofNat h_imm_is_u64]
     simp [BitVec.add_def]
-
     apply BitVec.eq_of_toNat_eq
-
     simp [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
-
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
     omega
 
@@ -204,25 +196,15 @@ theorem correct_beq
     simp [sub_eq_zero] at chip_cstrs
     have h_is_branching : Main[34] = 0 := by aesop
     simp [h_is_branching] at chip_cstrs
-
     simp [h_eq]
-
     refine congr_arg (s.regs.insert Register.nextPC) ?_
-
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
-
     simp [BitVec.add_def]
-
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_add4_is_u64]
-
     simp [Word.toBitVec64, Word.toNat]
-
     rw [←BitVec.ofNatLT_eq_ofNat h_nextpc_is_u64]
-
     simp [BitVec.ofNatLT]
-
     clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
 

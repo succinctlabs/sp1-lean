@@ -18,6 +18,12 @@ attribute [simp] extractLsb extractLsb'
 
 def extend {m : ℕ} (bv : BitVec m) (n : ℕ) (sgn : Prop) [Decidable sgn] := (if sgn then signExtend else setWidth) n bv
 
+lemma toNat_lt_toNat_iff {n : ℕ} (x y : BitVec n) :
+    x.toNat < y.toNat ↔ x < y := by rfl
+
+lemma toNat_le_toNat_iff {n : ℕ} (x y : BitVec n) :
+    x.toNat ≤ y.toNat ↔ x ≤ y := by rfl
+
 @[simp] lemma twoPow_65536_32 : 65536#32 = BitVec.twoPow 32 16 := rfl
 
 @[simp] lemma mod4_add_eq_mod4 (x y : BitVec 64)
