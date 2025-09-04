@@ -2,7 +2,7 @@ import Mathlib
 
 section bitvec
 
-theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12} :
+theorem useless_signExtend (BB : ℕ) {x : Fin BB} {hx : x.val < 2^12} :
     let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
     bx64 % 4 = (BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4 := by
   sorry
