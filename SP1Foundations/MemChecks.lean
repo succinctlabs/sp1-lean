@@ -14,6 +14,9 @@ lemma run_within_mmio_writable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
     (hclint_size : s.regs.get Register.plat_clint_size (hs _) = 0) :
     (within_mmio_writable (physaddr.Physaddr
       (zero_extend (BitVec.addInt (reg_val + offset) 0))) width).run s = .ok false s := by
+  -- Harmonic: can it reason about external libraries (LeanRV64D here)?
+  -- it basically just needs to recognize that these definitions can just be simp-ed
+  stop
   simp [within_mmio_writable, get_config_rvfi, within_clint]
   simp [run_readReg_of_isInitialized s _ hs, hclint_base, hclint_size]
   simp [within_htif_writable, htif_tohost_base]
@@ -29,6 +32,9 @@ lemma run_within_phys_mem (reg_val : BitVec 64) (offset : BitVec 64)
     (h_does_fit : reg_val.toNat + offset.toNat + width ≤
       (s.regs.get Register.plat_ram_size (hs _)).toNat) :
     (within_phys_mem (physaddr.Physaddr (reg_val + offset)) width).run s = .ok true s := by
+  -- Harmonic: can it reason about external libraries (LeanRV64D here)?
+  -- it basically just needs to recognize that these definitions can just be simp-ed
+  stop
   simp [within_phys_mem]
   simp [run_readReg_of_isInitialized s _ hs]
   simp [h_plat_ram_base, h_plat_rom_base]
