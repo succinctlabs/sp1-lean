@@ -1078,6 +1078,8 @@ lemma div_overflow {x y : ℤ} :
   -9223372036854775808 ≤ x ∧ x < 9223372036854775808 →
     -9223372036854775808 ≤ y ∧ y < 9223372036854775808 →
       (9223372036854775808 ≤ x.tdiv y ↔ x = -9223372036854775808 ∧ y = -1) := by
+  -- Harmonic: can it handle tedious integer arithmetic like this?
+  stop
   intro hx hy
   constructor <;> intro hc
   have : (x.tdiv y).sign = 1 := by rw [Int.sign_cases, if_neg (by omega), if_neg (by omega)]

@@ -37,6 +37,10 @@ theorem is_u48_sum (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fi
 
       simp [Word.toNat]
 
+      -- Harmonic: can if figure out the ramaining case analysis?
+      -- Can it figure out the above constraint simplification as well?
+      stop
+
       cases h0 <;> rename_i h0
       <;> simp [sub_eq_zero] at h0
       <;> simp [h0] at h1 h2 h3
@@ -69,6 +73,10 @@ theorem cols_is_a_sum_b (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real
       have ha' := Word.lt_cases_of_isU64 ha
       have hb' := Word.lt_cases_of_isU64 hb
       simp at ha' hb'
+
+      -- Harmonic: can it do this slightly harder case analysis?
+      -- Can it figure out the above constraint simplification as well?
+      stop
 
       simp [Word.toNat]
       cases h0 <;> rename_i h0

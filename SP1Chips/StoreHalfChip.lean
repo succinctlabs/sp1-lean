@@ -159,6 +159,8 @@ theorem correct (Main : Vector (Fin BB) 45)
   -- Arithmetic Caclulations
   · simp [sp1_sb, h_imm_c, imm_c, sp1_imm_c, Sail.write_ram, PreSail.write_ram,
       PreSail.writeBytes, PreSail.writeByte]
+    -- Harmonic: can it understand reasoning with all these hashmaps involved?
+    stop
     constructor
     · simp [Word.toBitVec64, Word.toNat, Fin.val_add]
       refine congr_arg (s.regs.insert Register.nextPC) ?_
