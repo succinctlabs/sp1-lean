@@ -5,6 +5,19 @@ import SP1Foundations.Misc
 -- dt: should this be a macro instead?
 @[simp] abbrev SailState := PreSail.SequentialState RegisterType Sail.trivialChoiceSource
 
+/-- Every register has been initialized to some unspecified value. -/
+@[reducible] def SailState.isInitialized (s : SailState) : Prop :=
+  ∀ reg : Register, reg ∈ s.regs
+
+/-- All the registers needed for memory ops are set appropriately. -/
+structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
+  h_mprv_disabled : BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) = 0#1
+  h_cur_privilege : s.regs.get Register.cur_privilege (hs _) = Privilege.Machine
+  h_clint_base : s.regs.get Register.plat_clint_base (hs _) = 0
+  h_clint_size : s.regs.get Register.plat_clint_size (hs _) = 0
+  h_plat_ram_base : s.regs.get Register.plat_ram_base (hs _) = 0
+  h_plat_rom_base : s.regs.get Register.plat_rom_base (hs _) = 0
+
 section regidx
 
 instance : DecidableEq regidx | .Regidx v, .Regidx v' => by simp; infer_instance
