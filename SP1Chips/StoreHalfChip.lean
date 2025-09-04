@@ -16,6 +16,8 @@ attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
 
 namespace Store
 
+namespace StoreHalf
+
 noncomputable def spec_sb (imm : BitVec 12) (rs1 rs2 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let width : ℕ := 2 -- two bytes
@@ -173,5 +175,7 @@ theorem correct (Main : Vector (Fin BB) 45)
   · simpa [imm_c, sp1_imm_c] using h_is_aligned
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · simpa [Std.ExtDHashMap.get_insert]
+
+end StoreHalf
 
 end Store

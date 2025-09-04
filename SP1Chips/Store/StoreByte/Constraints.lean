@@ -5,7 +5,7 @@ import SP1Operations.Reader.CPUState.Constraints
 
 namespace Store
 
-namespace StoreByte
+namespace StoreByte 
 
 section constraints
 
