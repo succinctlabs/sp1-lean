@@ -5,7 +5,7 @@
    "type": "git",
    "subDir": null,
    "scope": "",
-   "rev": "0554ecc5a8cdc8b8fcfeef2d3fa0775880a85d3a",
+   "rev": "86db517db6815e4c4b74757df60800d6dcc6c691",
    "name": "Lean_RV64D",
    "manifestFile": "lake-manifest.json",
    "inputRev": "sp1-lean-air-verification",

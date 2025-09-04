@@ -117,7 +117,7 @@ section constraintList
 /-- Wrapper for lists of constraints. Mainly used to namespace lemmas. -/
 @[reducible] def SP1ConstraintList := List SP1Constraint
 
-@[simp] protected def SP1ConstraintList.allHold (xs : SP1ConstraintList) : Prop :=
+@[reducible] protected def SP1ConstraintList.allHold (xs : SP1ConstraintList) : Prop :=
   List.Forall SP1Constraint.toProp xs
 
 lemma allHold_nil : SP1ConstraintList.allHold [] := True.intro

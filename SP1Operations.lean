@@ -19,6 +19,11 @@ import SP1Operations.Compare.U16CompareOperation.Operation
 import SP1Operations.Operation.AddOperation
 import SP1Operations.Operation.AddOperation.Constraints
 import SP1Operations.Operation.AddOperation.Operation
+import SP1Operations.Operation.AddrAddOperation
+import SP1Operations.Operation.AddrAddOperation.Constraints
+import SP1Operations.Operation.AddrAddOperation.Operation
+import SP1Operations.Operation.AddressOperation.Constraints
+import SP1Operations.Operation.AddressOperation.Operation
 import SP1Operations.Operation.AddwOperation
 import SP1Operations.Operation.AddwOperation.Constraints
 import SP1Operations.Operation.AddwOperation.Operation
@@ -54,9 +59,9 @@ import SP1Operations.Reader.CPUState.Constraints
 import SP1Operations.Reader.CPUState.Operation
 import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.ITypeReader.Constraints
+import SP1Operations.Reader.ITypeReader.Operation
 import SP1Operations.Reader.ITypeReaderImmutable
 import SP1Operations.Reader.ITypeReaderImmutable.Constraints
-import SP1Operations.Reader.ITypeReader.Operation
 import SP1Operations.Reader.JTypeReader
 import SP1Operations.Reader.JTypeReader.Constraints
 import SP1Operations.Reader.JTypeReader.Operation

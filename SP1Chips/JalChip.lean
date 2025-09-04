@@ -71,7 +71,14 @@ theorem SP1JAL_correct
       simp_all only [BB_eq, Fin.isValue, true_and]
 
   have hmod' : (BitVec.ofNat 64 (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296) +
-      Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]])[0] = false := by sorry
+      Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]])[0] = false := by
+    refine (mul4_means_0_1_are_0 ?_).1
+    simp [hpc]
+    refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
+    · simp [ofNat_eq_ofNat, BabyBear.val_mod4_eq_zero]
+      simp_all only [BB_eq, Fin.isValue, true_and]
+    · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
+      simp_all only [BB_eq, Fin.isValue, true_and]
 
   simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]
 
