@@ -90,7 +90,12 @@ theorem correct (Main : Vector (Fin BB) 44)
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
       let ram_size := (s.regs.get Register.plat_ram_size (hs _)).toNat
-      reg_val + offset + 4 ≤ ram_size) :
+      reg_val + offset + 4 ≤ ram_size)
+    -- dt: This should eventually come from trusted instruction assumption
+    -- should try to simplify it more first to minimize assumptions though
+    (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])))) 4 = true) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
@@ -166,8 +171,7 @@ theorem correct (Main : Vector (Fin BB) 44)
   -- Other hypothesis for the lemma
   · simp [SailState.isInitialized, hs]
   · simpa using h14_op_a
-  · simp [is_aligned_vaddr]
-    sorry
+  · simpa [imm_c, sp1_imm_c] using h_is_aligned
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · simpa [Std.ExtDHashMap.get_insert]
 
