@@ -51,7 +51,7 @@ lemma run_vmem_write_of_width_1'
       (s.regs.get Register.plat_ram_size (hs _)).toNat) :
     (vmem_write (.Regidx rs_addr_bv) offset 1 data
       (AccessType.Write Data) false false false).run s = .ok (.Ok true)
-        { s with mem := s.mem.insert (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat) } := by
+        { s with mem := s.mem.insert (reg_val + offset).toNat data } := by
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
@@ -68,7 +68,7 @@ lemma run_vmem_write_of_width_1'
   simp [effectivePrivilege, hfetch, h_mprv_disabled]
   simp [mem_write_value_priv_meta, checked_mem_write, h_cur_privilege, phys_access_check, SailME.run]
   simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
-  simp [run_within_mmio_writable_mmio reg_val offset s hs h_clint_base h_clint_size]
+  simp [run_within_mmio_writable_mmio reg_val offset 1 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
   simp [run_within_phys_mem reg_val offset 1 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
   simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
