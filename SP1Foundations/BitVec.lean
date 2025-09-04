@@ -136,7 +136,6 @@ theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
   : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
   bx64 % 4 = (BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4
   := by
-    stop -- Harmonic: can it figure out how to do bitvec arithmetic stuff
     extract_lets bx64
     have hx_bb : x.val < BB := x.isLt
     have hx_64 : x.val < 2^64 := by omega
@@ -187,7 +186,6 @@ lemma toInt_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
   (r1.toInt * r2.toInt % 340282366920938463463374607431768211456).toNat =
     (BitVec.signExtend 128 r1 * BitVec.signExtend 128 r2).toNat
     := by
-  stop -- Harmonic: can it figure out how to do bitvec arithmetic stuff
   rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r1) (by simp)]
   rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r2) (by simp)]
 
