@@ -4,7 +4,7 @@ namespace CPUState
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (cols : CPUState)
   (next_pc : (Vector (Fin BB) 3))
   (clk_increment : (Fin BB))
@@ -16,7 +16,7 @@ section constraints
   let E3 : Fin BB := is_real * E2
   let E4 : Fin BB := E1 + clk_increment
   let E5 : Fin BB := cols.clk_0_16 - 1
-  let E6 : Fin BB := E5 * 1761607681
+  let E6 : Fin BB := E5 * 1864368129
   [
     (.assertZero E3),
     (.receive (.state cols.clk_high E1 cols.pc[0] cols.pc[1] cols.pc[2]) is_real),

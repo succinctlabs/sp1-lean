@@ -6,7 +6,7 @@ namespace LtOperationSigned
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (b : (Word (Fin BB)))
   (cc : (Word (Fin BB)))
   (cols : LtOperationSigned)

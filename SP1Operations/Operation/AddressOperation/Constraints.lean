@@ -6,7 +6,7 @@ namespace AddressOperation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (b : (Word (Fin BB)))
   (cc : (Word (Fin BB)))
   (offset_bit0 : (Fin BB))
@@ -32,7 +32,7 @@ section constraints
   let E13 : Fin BB := 2 * offset_bit1
   let E14 : Fin BB := E12 - E13
   let E15 : Fin BB := E14 - offset_bit0
-  let E16 : Fin BB := E15 * 1761607681
+  let E16 : Fin BB := E15 * 1864368129
   let E17 : Fin BB := 4 * offset_bit2
   let E18 : Fin BB := cols.addr_operation.value[0] - E17
   let E19 : Fin BB := 2 * offset_bit1

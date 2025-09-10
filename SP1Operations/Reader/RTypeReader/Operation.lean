@@ -9,3 +9,4 @@ structure RTypeReader where
   op_b_memory : MemoryAccessInSharedCols
   op_c : Fin BB
   op_c_memory : MemoryAccessInSharedCols
+  is_trusted : Fin BB

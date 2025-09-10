@@ -1298,7 +1298,7 @@ lemma byte_decomp_128 (bv : BitVec 128) :
     := by
   have : 256 = (256#128).toNat := by simp
   simp [getByte, BDWord.toBitVec128, BDWord.toNat]
-  repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+  repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
   simp [ofNat_add, ofNat_mul]
   repeat rw [← BitVec.toNat_ushiftRight]
   repeat rw [this, ← BitVec.toNat_umod]; simp [-toNat_umod, -toNat_ushiftRight]

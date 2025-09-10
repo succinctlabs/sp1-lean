@@ -5,7 +5,7 @@ namespace IsZeroWordOperation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (a : (Word (Fin BB)))
   (cols : IsZeroWordOperation)
   (is_real : (Fin BB))

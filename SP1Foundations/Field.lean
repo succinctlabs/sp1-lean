@@ -1,7 +1,7 @@
 import SP1Foundations.Misc
 
-notation "BB" => 2013265921
-@[simp] lemma BB_eq : BB = 2013265921 := rfl
+notation "BB" => 2130706433
+@[simp] lemma BB_eq : BB = 2130706433 := rfl
 
 namespace BabyBear
 
@@ -13,7 +13,7 @@ instance : NeZero BB := by constructor; decide
 
 -- dt: Wouldn't need this if `ZMod` was the fundamental object for us.
 instance : Field (Fin BB) := ZMod.instField BB
-instance : NoZeroDivisors (Fin 2013265921) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
+instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
 
 section const_vals
 
@@ -43,56 +43,64 @@ lemma mul_diff_one_neq {a b c : Fin BB} : a * (b - c) = 1 → b ≠ c := by aeso
 
 end BabyBear
 
-@[simp] lemma shiftl_1BB_eq_one : (1006632961 : Fin BB) <<< 1 = 1 := rfl
-@[simp] lemma shiftl_2BB_eq_one : (1509949441 : Fin BB) <<< 2 = 1 := rfl
-@[simp] lemma shiftl_3BB_eq_one : (1761607681 : Fin BB) <<< 3 = 1 := rfl
-@[simp] lemma shiftl_8BB_eq_one : (2005401601 : Fin BB) <<< 8 = 1 := rfl
-@[simp] lemma shiftl_16BB_eq_one : (2013235201 : Fin BB) <<< 16 = 1 := rfl
+/- 2013265921
+1006632961 --> 1065353217
+1509949441 --> 1598029825
+1761607681 --> 1864368129
+2005401601 --> 2122383361
+2013235201 --> 2130673921
+-/
 
-lemma inv_1BB_eq : (1006632961 : Fin BB)⁻¹ = 2 := by native_decide
-lemma inv_2BB_eq : (1509949441 : Fin BB)⁻¹ = 4 := by native_decide
-lemma inv_3BB_eq : (1761607681 : Fin BB)⁻¹ = 8 := by native_decide
-lemma inv_8BB_eq : (2005401601 : Fin BB)⁻¹ = 256 := by native_decide
-lemma inv_16BB_eq : (2013235201 : Fin BB)⁻¹ = 65536 := by native_decide
+@[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin BB) <<< 1 = 1 := rfl
+@[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin BB) <<< 2 = 1 := rfl
+@[simp] lemma shiftl_3BB_eq_one : (1864368129 : Fin BB) <<< 3 = 1 := rfl
+@[simp] lemma shiftl_8BB_eq_one : (2122383361 : Fin BB) <<< 8 = 1 := rfl
+@[simp] lemma shiftl_16BB_eq_one : (2130673921 : Fin BB) <<< 16 = 1 := rfl
 
-lemma inv_1BB_eq' : (1006632961 : Fin BB) = 2⁻¹ := by native_decide
-lemma inv_2BB_eq' : (1509949441 : Fin BB) = 4⁻¹ := by native_decide
-lemma inv_3BB_eq' : (1761607681 : Fin BB) = 8⁻¹ := by native_decide
-lemma inv_8BB_eq' : (2005401601 : Fin BB) = 256⁻¹ := by native_decide
-lemma inv_16BB_eq' : (2013235201 : Fin BB) = 65536⁻¹ := by native_decide
+lemma inv_1BB_eq : (1065353217 : Fin BB)⁻¹ = 2 := by native_decide
+lemma inv_2BB_eq : (1598029825 : Fin BB)⁻¹ = 4 := by native_decide
+lemma inv_3BB_eq : (1864368129 : Fin BB)⁻¹ = 8 := by native_decide
+lemma inv_8BB_eq : (2122383361 : Fin BB)⁻¹ = 256 := by native_decide
+lemma inv_16BB_eq : (2130673921 : Fin BB)⁻¹ = 65536 := by native_decide
 
-@[simp] lemma inv_mul_1BB_eq_one : (1006632961 : Fin BB) * 2 = 1 := by rfl
-@[simp] lemma inv_mul_2BB_eq_one : (1509949441 : Fin BB) * 4 = 1 := by rfl
-@[simp] lemma inv_mul_3BB_eq_one : (1761607681 : Fin BB) * 8 = 1 := by rfl
-@[simp] lemma inv_mul_8BB_eq_one : (2005401601 : Fin BB) * 256 = 1 := by rfl
-@[simp] lemma inv_mul_16BB_eq_one : (2013235201 : Fin BB) * 65536 = 1 := by rfl
+lemma inv_1BB_eq' : (1065353217 : Fin BB) = 2⁻¹ := by native_decide
+lemma inv_2BB_eq' : (1598029825 : Fin BB) = 4⁻¹ := by native_decide
+lemma inv_3BB_eq' : (1864368129 : Fin BB) = 8⁻¹ := by native_decide
+lemma inv_8BB_eq' : (2122383361 : Fin BB) = 256⁻¹ := by native_decide
+lemma inv_16BB_eq' : (2130673921 : Fin BB) = 65536⁻¹ := by native_decide
 
-@[simp] lemma mul_inv_1BB_eq_one : 2 * (1006632961 : Fin BB) = 1 := by rfl
-@[simp] lemma mul_inv_2BB_eq_one : 4 * (1509949441 : Fin BB) = 1 := by rfl
-@[simp] lemma mul_inv_3BB_eq_one : 8 * (1761607681 : Fin BB) = 1 := by rfl
-@[simp] lemma mul_inv_8BB_eq_one : 256 * (2005401601 : Fin BB) = 1 := by rfl
-@[simp] lemma mul_inv_16BB_eq_one : 65536 * (2013235201 : Fin BB) = 1 := by rfl
+@[simp] lemma inv_mul_1BB_eq_one : (1065353217 : Fin BB) * 2 = 1 := by rfl
+@[simp] lemma inv_mul_2BB_eq_one : (1598029825 : Fin BB) * 4 = 1 := by rfl
+@[simp] lemma inv_mul_3BB_eq_one : (1864368129 : Fin BB) * 8 = 1 := by rfl
+@[simp] lemma inv_mul_8BB_eq_one : (2122383361 : Fin BB) * 256 = 1 := by rfl
+@[simp] lemma inv_mul_16BB_eq_one : (2130673921 : Fin BB) * 65536 = 1 := by rfl
 
-@[simp] lemma inv_mul_1BB_eq_iff : (1006632961 : Fin BB) * x = 1 ↔ x = 2 := by
+@[simp] lemma mul_inv_1BB_eq_one : 2 * (1065353217 : Fin BB) = 1 := by rfl
+@[simp] lemma mul_inv_2BB_eq_one : 4 * (1598029825 : Fin BB) = 1 := by rfl
+@[simp] lemma mul_inv_3BB_eq_one : 8 * (1864368129 : Fin BB) = 1 := by rfl
+@[simp] lemma mul_inv_8BB_eq_one : 256 * (2122383361 : Fin BB) = 1 := by rfl
+@[simp] lemma mul_inv_16BB_eq_one : 65536 * (2130673921 : Fin BB) = 1 := by rfl
+
+@[simp] lemma inv_mul_1BB_eq_iff : (1065353217 : Fin BB) * x = 1 ↔ x = 2 := by
   rw [inv_1BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_2, eq_comm]
-@[simp] lemma inv_mul_2BB_eq_iff : (1509949441 : Fin BB) * x = 1 ↔ x = 4 := by
+@[simp] lemma inv_mul_2BB_eq_iff : (1598029825 : Fin BB) * x = 1 ↔ x = 4 := by
   rw [inv_2BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_4, eq_comm]
-@[simp] lemma inv_mul_3BB_eq_iff : (1761607681 : Fin BB) * x = 1 ↔ x = 8 := by
+@[simp] lemma inv_mul_3BB_eq_iff : (1864368129 : Fin BB) * x = 1 ↔ x = 8 := by
   rw [inv_3BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_8, eq_comm]
-@[simp] lemma inv_mul_8BB_eq_iff : (2005401601 : Fin BB) * x = 1 ↔ x = 256 := by
+@[simp] lemma inv_mul_8BB_eq_iff : (2122383361 : Fin BB) * x = 1 ↔ x = 256 := by
   rw [inv_8BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_256, eq_comm]
-@[simp] lemma inv_mul_16BB_eq_iff : (2013235201 : Fin BB) * x = 1 ↔ x = 65536 := by
+@[simp] lemma inv_mul_16BB_eq_iff : (2130673921 : Fin BB) * x = 1 ↔ x = 65536 := by
   rw [inv_16BB_eq', inv_mul_eq_one₀ BabyBear.ne_zero_65536, eq_comm]
 
-@[simp] lemma inv_mul_1BB_eq_iff' : x * (1006632961 : Fin BB) = 1 ↔ x = 2 := by
+@[simp] lemma inv_mul_1BB_eq_iff' : x * (1065353217 : Fin BB) = 1 ↔ x = 2 := by
   rw [mul_comm, inv_mul_1BB_eq_iff]
-@[simp] lemma inv_mul_2BB_eq_iff' : x * (1509949441 : Fin BB) = 1 ↔ x = 4 := by
+@[simp] lemma inv_mul_2BB_eq_iff' : x * (1598029825 : Fin BB) = 1 ↔ x = 4 := by
   rw [mul_comm, inv_mul_2BB_eq_iff]
-@[simp] lemma inv_mul_3BB_eq_iff' : x * (1761607681 : Fin BB) = 1 ↔ x = 8 := by
+@[simp] lemma inv_mul_3BB_eq_iff' : x * (1864368129 : Fin BB) = 1 ↔ x = 8 := by
   rw [mul_comm, inv_mul_3BB_eq_iff]
-@[simp] lemma inv_mul_8BB_eq_iff' : x * (2005401601 : Fin BB) = 1 ↔ x = 256 := by
+@[simp] lemma inv_mul_8BB_eq_iff' : x * (2122383361 : Fin BB) = 1 ↔ x = 256 := by
   rw [mul_comm, inv_mul_8BB_eq_iff]
-@[simp] lemma inv_mul_16BB_eq_iff' : x * (2013235201 : Fin BB) = 1 ↔ x = 65536 := by
+@[simp] lemma inv_mul_16BB_eq_iff' : x * (2130673921 : Fin BB) = 1 ↔ x = 65536 := by
   rw [mul_comm, inv_mul_16BB_eq_iff]
 
 -- dt: remaining versions of these

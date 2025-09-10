@@ -11,3 +11,4 @@ structure ALUTypeReader where
   op_c : Word (Fin BB)
   op_c_memory : MemoryAccessInSharedCols
   imm_c : Fin BB
+  is_trusted : Fin BB

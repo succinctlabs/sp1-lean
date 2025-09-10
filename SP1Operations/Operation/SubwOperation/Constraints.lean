@@ -6,7 +6,7 @@ namespace SubwOperation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (a : (Word (Fin BB)))
   (b : (Word (Fin BB)))
   (cols : SubwOperation)
@@ -19,7 +19,7 @@ section constraints
   let E4 : Fin BB := E3 - b[0]
   let E5 : Fin BB := E4 - cols.value[0]
   let E6 : Fin BB := E5 + 1
-  let E7 : Fin BB := E6 * 2013235201
+  let E7 : Fin BB := E6 * 2130673921
   let E8 : Fin BB := E7 - 1
   let E9 : Fin BB := E7 * E8
   let E10 : Fin BB := is_real * E9
@@ -28,7 +28,7 @@ section constraints
   let E13 : Fin BB := E12 - b[1]
   let E14 : Fin BB := E13 - cols.value[1]
   let E15 : Fin BB := E14 + E7
-  let E16 : Fin BB := E15 * 2013235201
+  let E16 : Fin BB := E15 * 2130673921
   let E17 : Fin BB := E16 - 1
   let E18 : Fin BB := E16 * E17
   let E19 : Fin BB := is_real * E18

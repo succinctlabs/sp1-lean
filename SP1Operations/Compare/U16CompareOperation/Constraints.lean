@@ -5,7 +5,7 @@ namespace U16CompareOperation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (a : (Fin BB))
   (b : (Fin BB))
   (cols : U16CompareOperation)

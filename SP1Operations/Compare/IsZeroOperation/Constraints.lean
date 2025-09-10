@@ -5,7 +5,7 @@ namespace IsZeroOperation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (a : (Fin BB))
   (cols : IsZeroOperation)
   (is_real : (Fin BB))

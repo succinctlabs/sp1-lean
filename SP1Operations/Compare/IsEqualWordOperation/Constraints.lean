@@ -5,7 +5,7 @@ namespace IsEqualWordOperation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (a : (Word (Fin BB)))
   (b : (Word (Fin BB)))
   (cols : IsEqualWordOperation)

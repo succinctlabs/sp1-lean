@@ -18,8 +18,7 @@ inductive AirInteraction where
       op_c_0 op_c_1 op_c_2 op_c_3
       op_a_0
       imm_b
-      imm_c
-      instr_const0 instr_const1 instr_const2 : Fin BB)
+      imm_c : Fin BB)
   deriving DecidableEq
 
 inductive SP1Constraint where
@@ -52,8 +51,7 @@ def toProp : SP1Constraint → Prop
       op_c_0 op_c_1 op_c_2 op_c_3
       op_a_0
       imm_b
-      imm_c
-      _instr_const0 _instr_const1 _instr_const2)
+      imm_c)
       mult =>
         mult ≠ 0
         -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
@@ -101,8 +99,7 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
       op_c_0 op_c_1 op_c_2 op_c_3
       _op_a_0
       _imm_b
-      _imm_c
-      _instr_const0 _instr_const1 _instr_const2)
+      _imm_c)
       mult =>
         mult ≠ 0
         -> opcode.trusted_instr_state s op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3

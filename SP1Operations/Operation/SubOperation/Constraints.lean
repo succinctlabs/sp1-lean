@@ -5,7 +5,7 @@ namespace SubOperation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (a : (Word (Fin BB)))
   (b : (Word (Fin BB)))
   (cols : SubOperation)
@@ -18,7 +18,7 @@ section constraints
   let E4 : Fin BB := E3 - b[0]
   let E5 : Fin BB := E4 - cols.value[0]
   let E6 : Fin BB := E5 + 1
-  let E7 : Fin BB := E6 * 2013235201
+  let E7 : Fin BB := E6 * 2130673921
   let E8 : Fin BB := E7 - 1
   let E9 : Fin BB := E7 * E8
   let E10 : Fin BB := is_real * E9
@@ -27,7 +27,7 @@ section constraints
   let E13 : Fin BB := E12 - b[1]
   let E14 : Fin BB := E13 - cols.value[1]
   let E15 : Fin BB := E14 + E7
-  let E16 : Fin BB := E15 * 2013235201
+  let E16 : Fin BB := E15 * 2130673921
   let E17 : Fin BB := E16 - 1
   let E18 : Fin BB := E16 * E17
   let E19 : Fin BB := is_real * E18
@@ -36,7 +36,7 @@ section constraints
   let E22 : Fin BB := E21 - b[2]
   let E23 : Fin BB := E22 - cols.value[2]
   let E24 : Fin BB := E23 + E16
-  let E25 : Fin BB := E24 * 2013235201
+  let E25 : Fin BB := E24 * 2130673921
   let E26 : Fin BB := E25 - 1
   let E27 : Fin BB := E25 * E26
   let E28 : Fin BB := is_real * E27
@@ -45,7 +45,7 @@ section constraints
   let E31 : Fin BB := E30 - b[3]
   let E32 : Fin BB := E31 - cols.value[3]
   let E33 : Fin BB := E32 + E25
-  let E34 : Fin BB := E33 * 2013235201
+  let E34 : Fin BB := E33 * 2130673921
   let E35 : Fin BB := E34 - 1
   let E36 : Fin BB := E34 * E35
   let E37 : Fin BB := is_real * E36

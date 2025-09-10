@@ -6,7 +6,7 @@ namespace BitwiseU16Operation
 
 section constraints
 
-@[irreducible] def constraints
+def constraints
   (b : (Word (Fin BB)))
   (cc : (Word (Fin BB)))
   (cols : BitwiseU16Operation)
