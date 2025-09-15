@@ -17,20 +17,20 @@ instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp 
 
 section const_vals
 
-@[simp] lemma val_16 : ((16 : Fin BB) : ℕ) = 16 := rfl
-@[simp] lemma val_256 : ((256 : Fin BB) : ℕ) = 256 := rfl
-@[simp] lemma val_32768 : ((32768 : Fin BB) : ℕ) = 32768 := rfl
-@[simp] lemma val_65536 : ((65536 : Fin BB) : ℕ) = 65536 := rfl
+lemma val_16 : ((16 : Fin BB) : ℕ) = 16 := rfl
+lemma val_256 : ((256 : Fin BB) : ℕ) = 256 := rfl
+lemma val_32768 : ((32768 : Fin BB) : ℕ) = 32768 := rfl
+lemma val_65536 : ((65536 : Fin BB) : ℕ) = 65536 := rfl
 
-@[simp] lemma ne_zero_2 : (2 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_4 : (4 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_8 : (8 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_16 : (16 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_32 : (32 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_64 : (64 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_128 : (128 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_256 : (256 : Fin BB) ≠ 0 := by simp
-@[simp] lemma ne_zero_65536 : (65536 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_2 : (2 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_4 : (4 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_8 : (8 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_16 : (16 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_32 : (32 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_64 : (64 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_128 : (128 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_256 : (256 : Fin BB) ≠ 0 := by simp
+lemma ne_zero_65536 : (65536 : Fin BB) ≠ 0 := by simp
 
 end const_vals
 
@@ -42,14 +42,6 @@ lemma val_mod4_eq_zero (x : Fin BB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
 lemma mul_diff_one_neq {a b c : Fin BB} : a * (b - c) = 1 → b ≠ c := by aesop
 
 end BabyBear
-
-/- 2013265921
-1006632961 --> 1065353217
-1509949441 --> 1598029825
-1761607681 --> 1864368129
-2005401601 --> 2122383361
-2013235201 --> 2130673921
--/
 
 @[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin BB) <<< 1 = 1 := rfl
 @[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin BB) <<< 2 = 1 := rfl

@@ -1,5 +1,6 @@
 import SP1Foundations.BitVec
 import SP1Foundations.ByteOpcode
+import SP1Foundations.Config
 import SP1Foundations.Constraint
 import SP1Foundations.Field
 import SP1Foundations.MemChecks

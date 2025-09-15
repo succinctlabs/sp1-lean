@@ -25,7 +25,7 @@ def constraints
   let E6 : Fin BB := cols.is_trusted * E5
   let E7 : Fin BB := E2 + cols.is_trusted
   let E8 : Fin BB := E7 - is_real
-  let E9 : Fin BB := 0 - 1
+  let E9 : Fin BB := mprotect_enabled () - 1
   let E10 : Fin BB := E2 * E9
   let E11 : Fin BB := 0 + cols.op_b
   let E12 : Fin BB := op_a_write_value[0] - 0
