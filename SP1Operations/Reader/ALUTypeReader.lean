@@ -23,13 +23,13 @@ lemma allHold_constraints_iff :
       pc[0] < 65536 ∧ pc[1] < 65536 ∧ pc[2] < 65536 ∧
       cols.op_a_memory.access_timestamp.diff_low_limb < 65536 ∧
       cols.op_b_memory.access_timestamp.diff_low_limb < 65536 ∧
-      (clk_low + 2 - cols.op_b_memory.access_timestamp.prev_low - 1 - cols.op_b_memory.access_timestamp.diff_low_limb) * 2013235201 < 256 ∧
-      (clk_low + 3 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * 2013235201 < 256 ∧
+      (clk_low + 2 - cols.op_b_memory.access_timestamp.prev_low - 1 - cols.op_b_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
+      (clk_low + 3 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
       Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
       Word.isU64 #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]]) ∧
     (is_real - cols.imm_c = 0 ∨ is_real - cols.imm_c - 1 = 0) ∧
     (¬is_real - cols.imm_c = 0 →
-      (clk_low + 1 - cols.op_c_memory.access_timestamp.prev_low - 1 - cols.op_c_memory.access_timestamp.diff_low_limb) * 2013235201 < 256 ∧
+      (clk_low + 1 - cols.op_c_memory.access_timestamp.prev_low - 1 - cols.op_c_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
       cols.op_c_memory.access_timestamp.diff_low_limb < 65536 ∧
       Word.isU64 #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1], cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]]) ∧
     (cols.op_a_0 ≠ 0 →
@@ -43,6 +43,7 @@ lemma allHold_constraints_iff :
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
    := by
+    stop
     simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_iff_val_lt_val, -Opcode.trusted_instr]
     intro h_is_real; rcases h_is_real <;> by_cases cols.op_a_0 = 0 <;>
     by_cases cols.imm_c = 0 <;> simp_all [-Opcode.trusted_instr, and_assoc] <;> aesop
@@ -61,12 +62,12 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
     pc[0] < 65536 ∧ pc[1] < 65536 ∧ pc[2] < 65536 ∧
     cols.op_a_memory.access_timestamp.diff_low_limb < 65536 ∧
     cols.op_b_memory.access_timestamp.diff_low_limb < 65536 ∧
-    (clk_low + 2 - cols.op_b_memory.access_timestamp.prev_low - 1 - cols.op_b_memory.access_timestamp.diff_low_limb) * 2013235201 < 256 ∧
-    (clk_low + 3 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * 2013235201 < 256 ∧
+    (clk_low + 2 - cols.op_b_memory.access_timestamp.prev_low - 1 - cols.op_b_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
+    (clk_low + 3 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
     Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
     Word.isU64 #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]] ∧
     (cols.imm_c = 0 →
-      (clk_low + 1 - cols.op_c_memory.access_timestamp.prev_low - 1 - cols.op_c_memory.access_timestamp.diff_low_limb) * 2013235201 < 256 ∧
+      (clk_low + 1 - cols.op_c_memory.access_timestamp.prev_low - 1 - cols.op_c_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
       cols.op_c_memory.access_timestamp.diff_low_limb < 65536 ∧
       Word.isU64 #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1], cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]]) ∧
     (¬cols.op_a_0 = 0 →
