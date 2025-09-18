@@ -8,7 +8,7 @@ namespace Branch
 section constraints
 
 -- Generated Lean code for chip BranchChip
-def constraints (Main : Vector (Fin BB) 46) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 46) : SP1ConstraintList :=
   let E0 : Fin BB := Main[29] - 1
   let E1 : Fin BB := Main[29] * E0
   let E2 : Fin BB := Main[30] - 1

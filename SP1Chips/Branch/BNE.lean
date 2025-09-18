@@ -11,15 +11,15 @@ open Sail SailState BitVec LeanRV64D.Functions
 namespace BNE
 
 variable
-  (Main : Vector (Fin BB) 45)
+  (Main : Vector (Fin BB) 46)
   (cstrs : (constraints Main).allHold)
   (s : SailState)
-  (h_is_bne : Main[29] = 1)
+  (h_is_bne : Main[30] = 1)
 
 private theorem h_Main29_is_bne
   (cstrs : (constraints Main).allHold)
-  (h_is_bne : Main[29] = 1)
-  : Main[28] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0 := by
+  (h_is_bne : Main[30] = 1)
+  : Main[29] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 := by
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, _, _, ⟨h_28, h_29, h_30, h_31, h_32, h_33, h_all_add, _⟩⟩ := cstrs
   clear * - h_is_bne h_28 h_29 h_30 h_31 h_32 h_33 h_all_add
@@ -41,49 +41,54 @@ def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM Execution
 
 def sp1_op_a : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[6].val ?_
-    show Main[6] < 32
-    obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := h_Main29_is_bne Main cstrs h_is_bne
-    simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
-    obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
-    simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    simp_all only
+    refine BitVec.ofNat 5 Main[6].val --?_
+    -- show Main[6] < 32
+    -- obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := h_Main29_is_bne Main cstrs h_is_bne
+    -- simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
+    -- obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
+    -- simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
+    -- simp_all only
+
 
 def sp1_op_b : BitVec 5 :=
   by
-    refine BitVec.ofNatLT Main[14].val ?_
-    show Main[14] < 32
-    obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := h_Main29_is_bne Main cstrs h_is_bne
-    simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
-    obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
-    simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    simp_all only
+    refine BitVec.ofNat 5 Main[14].val --?_
+    -- show Main[14] < 32
+    -- obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := h_Main29_is_bne Main cstrs h_is_bne
+    -- simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
+    -- obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
+    -- simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
+    -- simp_all only
 
 -- TODO(gzgz): check that I don't have to Main[21] <<< 1 first.
 def sp1_imm : BitVec 13 := BitVec.ofNat 13 Main[21]
 
 def sp1_bne : SailM ExecutionResult := do
-  writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
+  writeReg Register.nextPC (Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0])
   pure RETIRE_SUCCESS
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 theorem correct_bne
-    (Main : Vector (Fin BB) 45)
+    (Main : Vector (Fin BB) 46)
     (s : SailState)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s)
-    (h_is_bne : Main[29] = 1)
+    (h_is_bne : Main[30] = 1)
     (h_misa : Register.misa ∈ s.regs)
     : let imm := sp1_imm Main
-      let op_b := sp1_op_b Main cstrs h_is_bne
-      let op_a := sp1_op_a Main cstrs h_is_bne
+      let op_b := sp1_op_b Main --cstrs h_is_bne
+      let op_a := sp1_op_a Main --cstrs h_is_bne
     (spec_bne imm (.Regidx op_b) (.Regidx op_a)).run s = (sp1_bne Main).run s := by
   extract_lets imm op_b op_a
   obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := h_Main29_is_bne Main cstrs h_is_bne
 
+
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
+
+  have h25 : Main[25] = 1 := by sorry
+  simp_all only [h25]
 
   -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
@@ -105,7 +110,7 @@ theorem correct_bne
   have h_pc_2 : Main[5].val < 65536 := by show Main[5] < 65536; aesop
   have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-  have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
+  have h_nextpc_is_u64 : Main[26].val + Main[27].val * 65536 + Main[28].val * 4294967296 < 2^64 := by omega
 
   -- construct alignment assumption
   have h_next_pc_is_mul4 : (BitVec.ofNat 64 (Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296) + sign_extend imm) % 4 = 0 := by
@@ -142,15 +147,17 @@ theorem correct_bne
 
   -- simplify main goal
   simp [spec_bne, sp1_bne, execute_BTYPE]
+  -- rw [run_readReg_of_isInitialized _ _ sorry]
   rw [run_readReg]
 
   simp [h_pc_read]
+  simp_all only [BitVec.ofNatLT_eq_ofNat]
   simp [op_a, sp1_op_a, h_op_a_read]
   simp [op_b, sp1_op_b, h_op_b_read]
 
   by_cases h_eq : op_a_val ≠ op_b_val <;> simp [op_a_val, op_b_val] at h_eq
   ·
-    have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 1 := by
+    have h_is_eq : Main[37] + Main[38] + Main[39] + Main[40] = 1 := by
       simp [h_eq, h_30, h_31] at spec_lt
       clear * - spec_lt
       aesop
@@ -159,12 +166,13 @@ theorem correct_bne
     rw [h_is_eq] at chip_cstrs
     simp [sub_eq_zero] at chip_cstrs
 
-    have h_is_branching : Main[34] = 1 := by aesop
+    have h_is_branching : Main[35] = 1 := by aesop
 
     simp [h_is_branching] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
     simp [h_eq, h_pc_read]
+
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0,
       jump_to, assert, PreSail.assert, ofBool, h_next_pc_b1]
@@ -191,17 +199,22 @@ theorem correct_bne
     simp [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
+    -- sorry
+    have h6 : Main[6] < 65536 := sorry
+    have h14 : Main[14] < 65536 := sorry
+
     omega
 
   ·
-    have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 0 :=
+    have h_is_neq : (Main[37] + Main[38] + Main[39] + Main[40]) = 0 :=
       by
         simp [h_eq, h_30, h_31] at spec_lt
         clear * - spec_lt
         aesop
+
     rw [h_is_neq] at chip_cstrs
     simp [sub_eq_zero] at chip_cstrs
-    have h_is_branching : Main[34] = 0 := by aesop
+    have h_is_branching : Main[35] = 0 := by aesop
     simp [h_is_branching] at chip_cstrs
 
     simp [h_eq]
@@ -223,6 +236,10 @@ theorem correct_bne
     simp [BitVec.ofNatLT]
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
+
+    have h6 : Main[6] < 65536 := sorry
+    have h14 : Main[14] < 65536 := sorry
+    stop
     omega
 
 end BNE

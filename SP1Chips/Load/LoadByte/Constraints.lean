@@ -10,7 +10,7 @@ namespace LoadByte
 section constraints
 
 -- Generated Lean code for chip LoadByteChip
-def constraints (Main : Vector (Fin BB) 49) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 49) : SP1ConstraintList :=
   let E0 : Fin BB := Main[1] * 65536
   let E1 : Fin BB := Main[2] + E0
   let E2 : Fin BB := 19 * Main[46]

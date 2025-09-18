@@ -7,7 +7,7 @@ namespace Subw
 section constraints
 
 -- Generated Lean code for chip SubwChip
-def constraints (Main : Vector (Fin BB) 33) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 33) : SP1ConstraintList :=
   let E0 : Fin BB := Main[32] - 1
   let E1 : Fin BB := Main[32] * E0
   let CS0 : SP1ConstraintList := SubwOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[22], Main[23], Main[24], Main[25]] { value := #v[Main[29], Main[30]], msb := { msb := Main[31] } } Main[32]

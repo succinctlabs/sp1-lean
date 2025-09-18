@@ -17,7 +17,7 @@ variable (Main : Vector (Fin BB) 251)
 section constraints
 
 -- Generated Lean code for chip DivRemChip
-def constraints (Main : Vector (Fin BB) 247) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 247) : SP1ConstraintList :=
   let E0 : Fin BB := Main[206] + Main[207]
   let E1 : Fin BB := E0 + Main[208]
   let E2 : Fin BB := E1 + Main[209]
@@ -754,7 +754,7 @@ end operands
 section auxiliaries
 
 lemma div_mod_decomposition_w {a b c : Fin BB} :
-  a.val < 65536 → c.val < 2013265921 / 65536 → (a = b - c * 65536 ↔ a = b % 65536 ∧ c = b / 65536) := by
+  a.val < 65536 → c.val < 2130706433 / 65536 → (a = b - c * 65536 ↔ a = b % 65536 ∧ c = b / 65536) := by
   intro ub_a ub_c
   constructor
   . intro eq_a
@@ -1184,7 +1184,7 @@ lemma div_rem
                     simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2, nof_eq_ctqpr4.2, nof_eq_ctqpr5.2, nof_eq_ctqpr6.2, nof_eq_ctqpr7.2]
 
                   simp [Fin.val_add]
-                  iterate 8 rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+                  iterate 8 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                   have joins : forall (i : Fin 8) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
                     clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                   have divs : forall (i : Fin 8) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
@@ -2055,7 +2055,7 @@ lemma divu_remu
               simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2, nof_eq_ctqpr4.2, nof_eq_ctqpr5.2, nof_eq_ctqpr6.2, nof_eq_ctqpr7.2]
 
             simp [Fin.val_add]
-            iterate 4 rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+            iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
             have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
               clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
             have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
@@ -2087,16 +2087,16 @@ lemma divu_remu
               subst ctq7; simp at *
               subst cry7; simp at *
               omega
-            . have : ctq4 = 65535 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr4; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)] at hlt; omega
+            . have : ctq4 = 65535 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr4; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq4; simp at *
               subst cry4; simp at *
-              have : ctq5 = 65535 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr5; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)] at hlt; omega
+              have : ctq5 = 65535 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr5; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq5; simp at *
               subst cry5; simp at *
-              have : ctq6 = 65535 := by clear *- nof_eq_ctqpr6 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr6; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)] at hlt; omega
+              have : ctq6 = 65535 := by clear *- nof_eq_ctqpr6 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr6; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq6; simp at *
               subst cry6; simp at *
-              have : ctq7 = 65535 := by clear *- nof_eq_ctqpr7 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr7; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)] at hlt; omega
+              have : ctq7 = 65535 := by clear *- nof_eq_ctqpr7 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr7; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq7; simp at *
               subst cry7; simp at *
               omega
@@ -2898,7 +2898,7 @@ lemma divw_remw
                             simp [nof_eq_ctqpr0.1, nof_eq_ctqpr1.1]
                             simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2]
                     simp [Fin.val_add]
-                    iterate 4 rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+                    iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                     have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
                       clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                     have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
@@ -3793,7 +3793,7 @@ lemma divuw_remuw
                         simp [nof_eq_ctqpr0.1, nof_eq_ctqpr1.1]
                         simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2]
                 simp [Fin.val_add]
-                iterate 4 rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+                iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                 have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
                   clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                 have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by

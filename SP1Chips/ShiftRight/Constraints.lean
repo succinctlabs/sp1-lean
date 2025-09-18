@@ -12,7 +12,7 @@ def is_real : Prop := Main[64] = 1 ∨ Main[65] = 1 ∨ Main[66] = 1 ∨ Main[67
 section constraints
 
 -- Generated Lean code for chip ShiftRightChip
-def constraints (Main : Vector (Fin BB) 70) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin BB) 70) : SP1ConstraintList :=
   let E0 : Fin BB := Main[65] + Main[66]
   let E1 : Fin BB := E0 + Main[67]
   let E2 : Fin BB := E1 + Main[68]
@@ -367,7 +367,7 @@ lemma cancel_mul_65536_v1 { a b c x : Fin BB } (h_dvd : (x : ℕ) ∣ 65536) : a
   := by
   obtain ⟨ z, h_eq ⟩ := h_dvd; rw [h_eq]
   have x_pos : 0 < (x : ℕ) := by nlinarith
-  have xz_BB : (x : ℕ) * z < 2013265921 := by nlinarith
+  have xz_BB : (x : ℕ) * z < 2130706433 := by nlinarith
   have h_eq_BB : 65536 = x * z := by simp [Fin.ext_iff, Fin.mul_def]; omega
   rw [h_eq_BB]
   rw [mul_comm x z, ← mul_assoc, ← right_distrib]
@@ -388,7 +388,7 @@ lemma is_mod_64 {c0 m : Fin BB} : m < 64 → c0 < 65536 → ((c0 - m) * 19818086
   . simp [BitVec.toNat_eq] at this
     repeat rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)] at this
     assumption
-  . suffices : ((2013265921 - BitVec.ofNat 64 ↑m) * BitVec.ofNat 64 1981808641 + BitVec.ofNat 64 ↑c0 * 1981808641#64) % 2013265921#64 < 1024#64
+  . suffices : ((2130706433 - BitVec.ofNat 64 ↑m) * BitVec.ofNat 64 1981808641 + BitVec.ofNat 64 ↑c0 * 1981808641#64) % 2130706433#64 < 1024#64
     . clear hdiff
       have : BitVec.ofNat 64 c0.val < 65536 := by simp; omega
       have : BitVec.ofNat 64 m.val < 64 := by simp; omega
@@ -618,7 +618,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b0_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a1_16 : (hl1 + ll2 * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1))).val < 65536 := by
@@ -628,7 +628,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b2_dec
           try simp [Fin.val_add, Fin.val_mul] at b1_16 b2_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a2_16 : (hl2 + ll3 * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1))).val < 65536 := by
@@ -638,7 +638,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b2_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b3_dec
           try simp [Fin.val_add, Fin.val_mul] at b2_16 b3_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a3_16 : hl3.val < 65536 := by
@@ -659,7 +659,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b0_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a1_16 : (hl1 + ll2 * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1))).val < 65536 := by
@@ -669,7 +669,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b2_dec
           try simp [Fin.val_add, Fin.val_mul] at b1_16 b2_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a2_16 : (hl2 + ll3 * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1))).val < 65536 := by
@@ -679,7 +679,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b2_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b3_dec
           try simp [Fin.val_add, Fin.val_mul] at b2_16 b3_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a3_16 : (hl3 + (msb_b * 65536 - msb_b * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1)))).val < 65536 := by
@@ -726,7 +726,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b0_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a1_16 : hl1.val < 65536 := by
@@ -776,7 +776,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
           try apply cancel_mul_65536_v1 (by simp) at h_b0_dec
           try apply cancel_mul_65536_v1 (by simp) at h_b1_dec
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           try omega
         }
       have a1_16 : (hl1 + (msb_b * 65536 - msb_b * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1)))).val < 65536 := by
@@ -965,7 +965,7 @@ lemma spec.srl (h : is_srl Main ) :
 
     all_goals {
       try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-      repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
       try omega
     }
 
@@ -1080,7 +1080,7 @@ lemma spec.srli (h : is_srli Main ) :
 
     all_goals {
       try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-      repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
       try omega
     }
 
@@ -1236,7 +1236,7 @@ lemma spec.srlw (h : is_srlw Main) :
           (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec)
           simp_all [HWord.toNat]
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           omega
         }
 
@@ -1394,7 +1394,7 @@ lemma spec.srliw (h : is_srliw Main ) :
           (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec)
           simp_all [HWord.toNat]
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           omega
         }
 
@@ -1543,8 +1543,8 @@ lemma spec.sra (h : is_sra Main ) :
       simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
       clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1 lt_ll2 lt_hl2 lt_ll3 lt_hl3
       try simp only [Fin.add_def, Fin.mul_def]
-      repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2013265921) (by omega)]
-      repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2130706433) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
       simp_all
       omega
     }
@@ -1696,8 +1696,8 @@ lemma spec.srai (h : is_srai Main ) :
       simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
       clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1 lt_ll2 lt_hl2 lt_ll3 lt_hl3
       try simp only [Fin.add_def, Fin.mul_def]
-      repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2013265921) (by omega)]
-      repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2130706433) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
       simp_all
       omega
     }
@@ -1890,8 +1890,8 @@ lemma spec.sraw (h : is_sraw Main) :
           simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
           clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1
           try simp only [Fin.add_def, Fin.mul_def]
-          repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2013265921) (by omega)]
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2130706433) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           simp_all
           omega
         }
@@ -2086,8 +2086,8 @@ lemma spec.sraiw (h : is_sraiw Main ) :
           simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
           clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1
           try simp only [Fin.add_def, Fin.mul_def]
-          repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2013265921) (by omega)]
-          repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (a := _ * _) (b := 2130706433) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
           simp_all
           omega
         }

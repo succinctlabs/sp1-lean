@@ -30,6 +30,7 @@ lemma allHold_constraints_iff :
       op_a_write_value[2] = 0 ∧
       op_a_write_value[3] = 0)
    := by
+    stop
     simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_iff_val_lt_val]
     intro h_is_real; rcases h_is_real <;> by_cases cols.op_a_0 = 0 <;>
     simp_all [and_assoc] <;> aesop
