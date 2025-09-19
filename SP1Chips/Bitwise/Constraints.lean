@@ -7,7 +7,7 @@ namespace Bitwise
 set_option maxHeartbeats 100000000
 
 variable (Main : Vector (Fin BB) 52)
-def is_real : Prop := Main[48] = 1 ∨ Main[49] = 1 ∨ Main[50] = 1
+def is_real : Prop := Main[49] = 1 ∨ Main[50] = 1 ∨ Main[51] = 1
 
 section constraints
 
@@ -74,48 +74,67 @@ end constraints
 
 lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
-    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
-    List.Forall SP1Constraint.toProp (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).2 ∧
-    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[(Main[3] + 4), Main[4], Main[5]] 8 (Main[48] + Main[49] + Main[50])) ∧
-    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[48] * 3 + Main[49] * 4 + Main[50] * 5) #v[Main[51], (Main[48] * 4 + Main[49] * 6 + Main[50] * 7), 0, 0] #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31], is_trusted := sorry } (Main[48] + Main[49] + Main[50])) ∧
-    (Main[48] = 0 ∨ Main[48] = 1) ∧
+    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
+    List.Forall SP1Constraint.toProp (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).2 ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[(Main[3] + 4), Main[4], Main[5]] 8 (Main[49] + Main[50] + Main[51])) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[49] * 3 + Main[50] * 4 + Main[51] * 5)
+      #v[Main[49] * 8 + Main[50] * 8 + Main[51] * 8 - 4 * Main[31],
+      Main[49] * 51 + Main[50] * 51 + Main[51] * 51 - 32 * Main[31], Main[49] * 4 + Main[50] * 6 + Main[51] * 7, 0]
+      #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31], is_trusted := Main[32] } (Main[49] + Main[50] + Main[51])) ∧
     (Main[49] = 0 ∨ Main[49] = 1) ∧
     (Main[50] = 0 ∨ Main[50] = 1) ∧
-    (Main[48] + Main[49] + Main[50] = 0 ∨ Main[48] + Main[49] + Main[50] - 1 = 0) ∧
-    (Main[48] + Main[49] + Main[50] = 0 ∨ Main[51] - (Main[31] * (Main[48] * 19 + Main[49] * 19 + Main[50] * 19) + (1 - Main[31]) * (Main[48] * 51 + Main[49] * 51 + Main[50] * 51)) = 0)
+    (Main[51] = 0 ∨ Main[51] = 1) ∧
+    (Main[49] + Main[50] + Main[51] = 0 ∨ Main[49] + Main[50] + Main[51] - 1 = 0)
+    --∧
+    -- (Main[49] + Main[50] + Main[51] = 0 ∨ Main[51] - (Main[31] * (Main[48] * 19 + Main[49] * 19 + Main[50] * 19) + (1 - Main[31]) * (Main[48] * 51 + Main[49] * 51 + Main[50] * 51)) = 0)
   := by
-    stop
+
     simp [constraints]
-    split; constructor <;> simp_all [sub_eq_zero]
+
+    split
+
+    constructor <;> simp_all [sub_eq_zero]
+
+    -- ·
+    --   intros
+
+    --   sorry
+    -- stop
+    -- -- <;> simp_all [sub_eq_zero]
+    -- · intros
+
+    --   sorry
+    -- stop
+    -- sorry
 
 section opcodes
 
-@[simp] def is_xor := Main[48] = 1 ∧ Main[31] = 0
-@[simp] def is_xori := Main[48] = 1 ∧ Main[31] = 1
-@[simp] def is_or := Main[49] = 1 ∧ Main[31] = 0
-@[simp] def is_ori := Main[49] = 1 ∧ Main[31] = 1
-@[simp] def is_and := Main[50] = 1 ∧ Main[31] = 0
-@[simp] def is_andi := Main[50] = 1 ∧ Main[31] = 1
+@[simp] def is_xor := Main[49] = 1 ∧ Main[31] = 0
+@[simp] def is_xori := Main[49] = 1 ∧ Main[31] = 1
+@[simp] def is_or := Main[50] = 1 ∧ Main[31] = 0
+@[simp] def is_ori := Main[50] = 1 ∧ Main[31] = 1
+@[simp] def is_and := Main[51] = 1 ∧ Main[31] = 0
+@[simp] def is_andi := Main[51] = 1 ∧ Main[31] = 1
 
 
 lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
-  (Main[48] = 1 → Main[49] = 0 ∧ Main[50] = 0) ∧
-  (Main[49] = 1 → Main[48] = 0 ∧ Main[50] = 0) ∧
-  (Main[50] = 1 → Main[48] = 0 ∧ Main[49] = 0)
+  (Main[49] = 1 → Main[50] = 0 ∧ Main[51] = 0) ∧
+  (Main[50] = 1 → Main[49] = 0 ∧ Main[51] = 0) ∧
+  (Main[51] = 1 → Main[49] = 0 ∧ Main[50] = 0)
    := by
   intro cstrs
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops, rest ⟩ := cstrs
-  clear h_bop cpu alu rest
+  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
+  clear h_bop cpu alu
   aesop
 
 end opcodes
 
 section is_real
 
-lemma xor_real : Main[48] = 1 → is_real Main := by simp [is_real]; aesop
-lemma or_real : Main[49] = 1 → is_real Main := by simp [is_real]; aesop
-lemma and_real : Main[50] = 1 → is_real Main := by simp [is_real]; aesop
+lemma xor_real : Main[49] = 1 → is_real Main := by simp [is_real]; aesop
+lemma or_real : Main[50] = 1 → is_real Main := by simp [is_real]; aesop
+lemma and_real : Main[51] = 1 → is_real Main := by simp [is_real]; aesop
 
 end is_real
 
@@ -129,8 +148,8 @@ lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → 
   have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops, rest ⟩ := cstrs
-  clear h_bop cpu rest
+  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
+  clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
   . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     clear h18
@@ -147,22 +166,22 @@ lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) →
   have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops, rest ⟩ := cstrs
-  clear h_bop cpu rest
+  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
+  clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
   . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     clear h18; rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
   . clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
   (Main[6] = 0 → ret_val[0] = 0 ∧ ret_val[1] = 0 ∧ ret_val[2] = 0 ∧ ret_val[3] = 0) := by
   intro cstrs real
   have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops, rest ⟩ := cstrs
-  clear h_bop cpu rest
+  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
+  clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
   . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     intro ret_val hm6; simp_all
@@ -176,8 +195,8 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops, rest ⟩ := cstrs
-  clear h_bop cpu rest
+  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
+  clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
   . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     simp_all; clear h18
@@ -186,7 +205,7 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   . clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
   Word.isU64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] := by
   intro cstrs real ret_val
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs real
@@ -195,7 +214,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   have ⟨ sop1, sop2, sop3 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops, rest ⟩ := cstrs
+  obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear cpu alu
 
   suffices : ret_val[0] < 65536 ∧ ret_val[1] < 65536 ∧ ret_val[2] < 65536 ∧ ret_val[3] < 65536
@@ -215,7 +234,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
     }
 
 lemma ops_U64 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
   Word.isU64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] ∧
   Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
   Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]]
@@ -264,7 +283,7 @@ section xor
 
 lemma spec.xor (h : is_xor Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .XOR
   := by
     intro cstrs
@@ -285,7 +304,7 @@ section xori
 
 lemma spec.xori (h : is_xori Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .XORI
   := by
     intro cstrs
@@ -310,7 +329,7 @@ section or
 
 lemma spec.or (h : is_or Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .OR
   := by
     intro cstrs
@@ -331,7 +350,7 @@ section ori
 
 lemma spec.ori (h : is_ori Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .ORI
   := by
     intro cstrs
@@ -356,7 +375,7 @@ section and
 
 lemma spec.and (h : is_and Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .AND
   := by
     intro cstrs
@@ -377,7 +396,7 @@ section andi
 
 lemma spec.andi (h : is_andi Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
+    let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .ANDI
   := by
     intro cstrs

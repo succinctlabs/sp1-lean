@@ -39,33 +39,19 @@ def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM Execution
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BNE
 
-def sp1_op_a : BitVec 5 :=
-  by
-    refine BitVec.ofNat 5 Main[6].val --?_
-    -- show Main[6] < 32
-    -- obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := h_Main29_is_bne Main cstrs h_is_bne
-    -- simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
-    -- obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
-    -- simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    -- simp_all only
+def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6]
 
+def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14]
 
-def sp1_op_b : BitVec 5 :=
-  by
-    refine BitVec.ofNat 5 Main[14].val --?_
-    -- show Main[14] < 32
-    -- obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := h_Main29_is_bne Main cstrs h_is_bne
-    -- simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
-    -- obtain ⟨_, reader_cstrs, _, _⟩ := cstrs
-    -- simp [SP1ConstraintList.allHold, ITypeReaderImmutable.constraints, SP1Constraint.toProp, h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.beq, Nat.ble] at reader_cstrs
-    -- simp_all only
-
--- TODO(gzgz): check that I don't have to Main[21] <<< 1 first.
 def sp1_imm : BitVec 13 := BitVec.ofNat 13 Main[21]
 
 def sp1_bne : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0])
   pure RETIRE_SUCCESS
+
+@[simp] lemma helper (x : Fin BB) (h : (x * 4⁻¹).val < 16384) :
+    x.val < 65536 := by
+  sorry
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
@@ -199,10 +185,51 @@ theorem correct_bne
     simp [BitVec.toNat_ofNat, BitVec.toNat_ofNatLT]
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    -- sorry
-    have h6 : Main[6] < 65536 := sorry
-    have h14 : Main[14] < 65536 := sorry
 
+    /-
+    Main : Vector (Fin 2013265921) 45
+    h_imm_0 : ↑Main[21] < 65536
+    h_imm_1 : ↑Main[22] < 65536
+    h_imm_2 : ↑Main[23] < 65536
+    h_imm_3 : ↑Main[24] < 65536
+    h_pc_0 : ↑Main[3] < 65536
+    h_pc_1 : ↑Main[4] < 65536
+    h_pc_2 : ↑Main[5] < 65536
+    h_limb0 : Main[3] + Main[21] = Main[25] ∨ Main[3] + Main[21] - Main[25] = 65536
+    h_limb1 : (Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] = Main[26] ∨
+      (Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26] = 65536
+    h_limb2 : ((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] =
+        Main[27] ∨
+      ((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] -
+          Main[27] =
+        65536
+    h_limb3 : (((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] -
+              Main[27]) *
+            2013235201 +
+          Main[24] =
+        0 ∨
+      (((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] -
+              Main[27]) *
+            2013235201 +
+          Main[24] =
+        65536
+    h_bound_checks : ↑Main[25] < 65536 ∧ ↑Main[26] < 65536 ∧ ↑Main[27] < 65536
+    ⊢ (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296 +
+          (↑Main[21] + ↑Main[22] * 65536 + ↑Main[23] * 4294967296 + ↑Main[24] * 281474976710656)) %
+        18446744073709551616 =
+      ↑Main[25] + ↑Main[26] * 65536 + ↑Main[27] * 4294967296
+    -/
+    -- simp [Fin.val_mul] at h_bound_checks
+    have h26 : Main[26].val < 65536 := by
+      clear *- h_bound_checks
+      have := h_bound_checks.1
+      clear *- this
+      rw [inv_2BB_eq'] at this
+      apply helper
+      simpa
+      -- sorry
+
+    stop
     omega
 
   ·
@@ -237,9 +264,14 @@ theorem correct_bne
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
 
-    have h6 : Main[6] < 65536 := sorry
-    have h14 : Main[14] < 65536 := sorry
-    stop
+    have h26 : Main[26].val < 65536 := by
+      clear *- h_bound_checks
+      have := h_bound_checks.1
+      clear *- this
+      rw [inv_2BB_eq'] at this
+      apply helper
+      simpa
+
     omega
 
 end BNE
