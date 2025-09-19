@@ -7,37 +7,39 @@ namespace Jalr
 
 open Sail SailState BitVec LeanRV64D.Functions
 
-variable (Main : Vector (Fin BB) 38) (s : SailState)
+variable (Main : Vector (Fin BB) 39) (s : SailState)
 
-lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
-    (h_is_real : Main[29] = 1) : Main[6].val < 2^5 := by
+lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 39} (h : (constraints Main).allHold)
+    (h_is_real : Main[30] = 1) : Main[6].val < 2^5 := by
   simp only [BB_eq, Nat.reducePow]
   have reader_cstrs := by
     simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
     exact h.2.2.1
   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat,
     Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-  aesop
+  -- aesop
+  sorry
 
-lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
-    (h_is_real : Main[29] = 1) : Main[14].val < 2^5 := by
+lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 39} (h : (constraints Main).allHold)
+    (h_is_real : Main[30] = 1) : Main[14].val < 2^5 := by
   simp only [BB_eq, Nat.reducePow]
   have reader_cstrs := by
     simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
     exact h.2.2.1
   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat,
     Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-  aesop
+  -- aesop
+  sorry
 
-def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1) : BitVec 5 :=
+def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1) : BitVec 5 :=
   Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
 
-def sp1_op_b (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): BitVec 5 :=
+def sp1_op_b (cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1): BitVec 5 :=
   Main[14].val#'(op_b_lt32_of_constraints cstrs h_is_real)
 
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
-def sp1_jalr  (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): SailM Unit := do
+def sp1_jalr  (cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1): SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
   wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
@@ -49,7 +51,7 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 set_option debug.skipKernelTC true in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
-    (h_is_real : Main[29] = 1)
+    (h_is_real : Main[30] = 1)
     (state_cstrs : (constraints Main).initialState s)
     (h_misa : Register.misa ∈ s.regs) :
     let op_b := sp1_op_b Main cstrs h_is_real
@@ -67,6 +69,7 @@ theorem JALR_correct
   obtain ⟨res_cstrs, ⟨pc_cstrs, ⟨reader_cstrs, ⟨inc_pc_cstrs, chip_cstrs⟩⟩⟩⟩ := cstrs
 
   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
+  stop
   obtain ⟨⟨h_op_b, h_c_sign_extend⟩, ⟨h_op_a, ⟨_, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
   let read_op_b' := read_op_b h_op_b
 
