@@ -6,8 +6,8 @@ namespace ShiftLeft
 
 set_option maxHeartbeats 100000000
 
-variable (Main : Vector (Fin BB) 65)
-def is_real : Prop := Main[62] = 1 ∨ Main[63] = 1
+variable (Main : Vector (Fin BB) 66)
+def is_real : Prop := Main[63] = 1 ∨ Main[64] = 1
 
 section constraints
 
@@ -281,6 +281,80 @@ section constraints
 
 end constraints
 
+lemma allHold_constraints_iff :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[34] { msb := Main[62] } Main[64]) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[63] + Main[64])) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[63] * 6 + Main[64] * 41) (
+      #v[Main[63] * 8 + Main[64] * 8 - (6 * Main[31] + Main[65]), Main[63] * 51 + Main[64] * 59 - 32 * Main[31],
+          Main[63] + Main[64], 0]
+    ) #v[Main[33], Main[34], Main[35], Main[36]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31], is_trusted := Main[32] } (Main[63] + Main[64])) ∧
+    (Main[63] + Main[64] = 0 ∨ Main[63] + Main[64] = 1) ∧
+    (Main[63] = 0 ∨ Main[63] = 1) ∧
+    (Main[64] = 0 ∨ Main[64] = 1) ∧
+    (Main[37] = 0 ∨ Main[37] = 1) ∧
+    (Main[38] = 0 ∨ Main[38] = 1) ∧
+    (Main[39] = 0 ∨ Main[39] = 1) ∧
+    (Main[40] = 0 ∨ Main[40] = 1) ∧
+    (Main[41] = 0 ∨ Main[41] = 1) ∧
+    (Main[42] = 0 ∨ Main[42] = 1) ∧
+    (¬Main[63] + Main[64] = 0 → ((Main[25] - (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8 + Main[41] * 16 + Main[42] * 32)) * 2097414145).val < 1024) ∧
+    (Main[46] = 0 ∨ Main[41] + Main[42] * 2 * Main[63] = 0) ∧
+    (Main[46] = 0 ∨ Main[46] = 1) ∧
+    (Main[47] = 0 ∨ Main[41] + Main[42] * 2 * Main[63] = 1) ∧
+    (Main[47] = 0 ∨ Main[47] = 1) ∧
+    (Main[48] = 0 ∨ Main[41] + Main[42] * 2 * Main[63] = 2) ∧
+    (Main[48] = 0 ∨ Main[48] = 1) ∧
+    (Main[49] = 0 ∨ Main[41] + Main[42] * 2 * Main[63] = 3) ∧
+    (Main[49] = 0 ∨ Main[49] = 1) ∧
+    (Main[63] + Main[64] = 0 ∨ Main[46] + Main[47] + Main[48] + Main[49] = 1) ∧
+    (Main[43] = (Main[37] + 1) * (Main[38] * 3 + 1)) ∧
+    (Main[44] = Main[43] * (Main[39] * 15 + 1)) ∧
+    (Main[45] = Main[44] * (Main[40] * 255 + 1)) ∧
+    (¬Main[63] + Main[64] = 0 → Main[50].val < 2 ^ ((16 : Fin BB) - (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8)).val) ∧
+    (¬Main[63] + Main[64] = 0 → Main[54].val < 2 ^ (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8).val) ∧
+    (Main[15] * Main[45] = Main[54] * 65536 + Main[50] * Main[45]) ∧
+    (¬Main[63] + Main[64] = 0 → Main[51].val < 2 ^ ((16 : Fin BB) - (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8)).val) ∧
+    (¬Main[63] + Main[64] = 0 → Main[55].val < 2 ^ (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8).val) ∧
+    (Main[16] * Main[45] = Main[55] * 65536 + Main[51] * Main[45]) ∧
+    (¬Main[63] + Main[64] = 0 → Main[52].val < 2 ^ ((16 : Fin BB) - (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8)).val) ∧
+    (¬Main[63] + Main[64] = 0 → Main[56].val < 2 ^ (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8).val) ∧
+    (Main[17] * Main[45] = Main[56] * 65536 + Main[52] * Main[45]) ∧
+    (¬Main[63] + Main[64] = 0 → Main[53].val < 2 ^ ((16 : Fin BB) - (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8)).val) ∧
+    (¬Main[63] + Main[64] = 0 → Main[57].val < 2 ^ (Main[37] + Main[38] * 2 + Main[39] * 4 + Main[40] * 8).val) ∧
+    (Main[18] * Main[45] = Main[57] * 65536 + Main[53] * Main[45]) ∧
+
+    (Main[58] = Main[50] * Main[45]) ∧
+    (Main[59] = Main[51] * Main[45] + Main[54]) ∧
+    (Main[60] = Main[52] * Main[45] + Main[55]) ∧
+    (Main[61] = Main[53] * Main[45] + Main[56]) ∧
+    (Main[63] = 0 ∨ Main[46] = 0 ∨ Main[33] = Main[58]) ∧
+    (Main[63] = 0 ∨ Main[46] = 0 ∨ Main[34] = Main[59]) ∧
+    (Main[63] = 0 ∨ Main[46] = 0 ∨ Main[35] = Main[60]) ∧
+    (Main[63] = 0 ∨ Main[46] = 0 ∨ Main[36] = Main[61]) ∧
+    (Main[63] = 0 ∨ Main[47] = 0 ∨ Main[33] = 0) ∧
+    (Main[63] = 0 ∨ Main[47] = 0 ∨ Main[34] = Main[58]) ∧
+    (Main[63] = 0 ∨ Main[47] = 0 ∨ Main[35] = Main[59]) ∧
+    (Main[63] = 0 ∨ Main[47] = 0 ∨ Main[36] = Main[60]) ∧
+    (Main[63] = 0 ∨ Main[48] = 0 ∨ Main[33] = 0) ∧
+    (Main[63] = 0 ∨ Main[48] = 0 ∨ Main[34] = 0) ∧
+    (Main[63] = 0 ∨ Main[48] = 0 ∨ Main[35] = Main[58]) ∧
+    (Main[63] = 0 ∨ Main[48] = 0 ∨ Main[36] = Main[59]) ∧
+    (Main[63] = 0 ∨ Main[49] = 0 ∨ Main[33] = 0) ∧
+    (Main[63] = 0 ∨ Main[49] = 0 ∨ Main[34] = 0) ∧
+    (Main[63] = 0 ∨ Main[49] = 0 ∨ Main[35] = 0) ∧
+    (Main[63] = 0 ∨ Main[49] = 0 ∨ Main[36] = Main[58]) ∧
+    (Main[64] = 0 ∨ Main[46] = 0 ∨ Main[33] = Main[58]) ∧
+    (Main[64] = 0 ∨ Main[46] = 0 ∨ Main[34] = Main[59]) ∧
+    (Main[64] = 0 ∨ Main[47] = 0 ∨ Main[33] = 0) ∧
+    (Main[64] = 0 ∨ Main[47] = 0 ∨ Main[34] = Main[58]) ∧
+    (Main[64] = 0 ∨ Main[62] * 65535 = Main[35]) ∧
+    (Main[64] = 0 ∨ Main[62] * 65535 = Main[36]) ∧
+    Main[65] = Main[64] * Main[31]
+    -- (Main[63] + Main[63] = 0 ∨ Main[64] = Main[31] * (Main[62] * 19 + Main[63] * 27) + (1 - Main[31]) * (Main[62] * 51 + Main[63] * 59))
+   := by
+  simp [constraints, sub_eq_zero]
+
 section field_arithmetic
 
 lemma cancel_mul_65536 { a b c x : Fin BB } (h_dvd : (x : ℕ) ∣ 65536) : a * x = b * 65536 + c * x → a = b * ((65536 : ℕ) / (x : ℕ)) + c
@@ -298,14 +372,14 @@ lemma cancel_mul_65536 { a b c x : Fin BB } (h_dvd : (x : ℕ) ∣ 65536) : a * 
   rw [Nat.mod_eq_of_lt (by omega)]
   aesop
 
-lemma is_mod_64 {c0 m : Fin BB} : m < 64 → c0 < 65536 → ((c0 - m) * 1981808641).val < 1024 → c0.val % 64 = m := by
+lemma is_mod_64 {c0 m : Fin BB} : m < 64 → c0 < 65536 → ((c0 - m) * 2097414145).val < 1024 → c0.val % 64 = m := by
   simp [Fin.sub_def, Fin.mul_def, Fin.lt_def]; ring_nf
   intro hm hc hdiff
   suffices : (BitVec.ofNat 64 c0.val) % 64#64 = BitVec.ofNat 64 m.val
   . simp [BitVec.toNat_eq] at this
     repeat rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)] at this
     assumption
-  . suffices : ((2130706433 - BitVec.ofNat 64 ↑m) * BitVec.ofNat 64 1981808641 + BitVec.ofNat 64 ↑c0 * 1981808641#64) % 2130706433#64 < 1024#64
+  . suffices : ((2130706433 - BitVec.ofNat 64 ↑m) * BitVec.ofNat 64 2097414145 + BitVec.ofNat 64 ↑c0 * 2097414145#64) % 2130706433#64 < 1024#64
     . clear hdiff
       have : BitVec.ofNat 64 c0.val < 65536 := by simp; omega
       have : BitVec.ofNat 64 m.val < 64 := by simp; omega
@@ -325,16 +399,15 @@ end field_arithmetic
 
 section opcodes
 
-@[simp] def is_sll := Main[62] = 1 ∧ Main[31] = 0
-@[simp] def is_sllw := Main[63] = 1 ∧ Main[31] = 0
-@[simp] def is_slli := Main[62] = 1 ∧ Main[31] = 1
-@[simp] def is_slliw := Main[63] = 1 ∧ Main[31] = 1
+@[simp] def is_sll := Main[63] = 1 ∧ Main[31] = 0
+@[simp] def is_sllw := Main[64] = 1 ∧ Main[31] = 0
+@[simp] def is_slli := Main[63] = 1 ∧ Main[31] = 1
+@[simp] def is_slliw := Main[64] = 1 ∧ Main[31] = 1
 
 lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
-  (Main[62] = 1 → Main[63] = 0) ∧
-  (Main[63] = 1 → Main[62] = 0)
+  (Main[63] = 1 → Main[64] = 0) ∧
+  (Main[64] = 1 → Main[63] = 0)
    := by
-
   intro cstrs
   simp [allHold_constraints_iff] at cstrs
   obtain ⟨ h_msb, cpu, alu, one_of_ops, b_sll, b_sllw, rest ⟩ := cstrs
@@ -345,8 +418,8 @@ end opcodes
 
 section is_real
 
-lemma sll_real : Main[62] = 1 → is_real Main := by simp [is_real]; aesop
-lemma sllw_real : Main[63] = 1 → is_real Main := by simp [is_real]; aesop
+lemma sll_real : Main[63] = 1 → is_real Main := by simp [is_real]; aesop
+lemma sllw_real : Main[64] = 1 → is_real Main := by simp [is_real]; aesop
 
 end is_real
 
@@ -359,9 +432,9 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
   Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] ∧
   (imm = 1 →
     (Main[21] = Main[25] ∧ Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
-      ((Main[62] = 1 → Main[25] < 64) ∧
-       (Main[63] = 1 → Main[25] < 32)))) ∧
-  (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0)
+      ((Main[63] = 1 → Main[25] < 64) ∧
+       (Main[64] = 1 → Main[25] < 32)))) ∧
+  (Main[6] = 0 → Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0 ∧ Main[36] = 0)
   := by
   intro cstrs real
   simp [allHold_constraints_iff] at cstrs
@@ -370,10 +443,10 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
   simp [is_real] at real
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
   . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu; simp_all
-    by_cases sll : Main[62] = 0
-    . by_cases sllw : Main[63] = 0
+    by_cases sll : Main[63] = 0
+    . by_cases sllw : Main[64] = 0
       . clear *- real sll sllw; aesop
-      . have : Main[62] = 0 := by
+      . have : Main[63] = 0 := by
           clear *- real b_sll b_sllw sll sllw one_of_ops
           aesop
         simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
@@ -382,7 +455,7 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
         . rcases b_imm <;> simp_all
           apply Word.isU64_of_cases <;> simp; omega
         . aesop
-    . have : Main[63] = 0 := by
+    . have : Main[64] = 0 := by
         clear *- real b_sll b_sllw sll one_of_ops
         aesop
       simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
@@ -422,7 +495,7 @@ def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
   tauto
 
 @[simp]
-def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[62] = 1 → BitVec 6 := by
+def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[63] = 1 → BitVec 6 := by
   intro cstrs real imm nw
   refine BitVec.ofNatLT Main[21] ?_
   have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
@@ -431,7 +504,7 @@ def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_re
   tauto
 
 @[simp]
-def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[63] = 1 → BitVec 5 := by
+def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[64] = 1 → BitVec 5 := by
   intro cstrs real imm nw
   refine BitVec.ofNatLT Main[21] ?_
   have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
@@ -445,7 +518,7 @@ section sll
 
 lemma spec.sll (h : is_sll Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLL
+    Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLL
   := by
     intro cstrs
     obtain ⟨ eq_sll, eq_imm ⟩ := h
@@ -466,38 +539,39 @@ lemma spec.sll (h : is_sll Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set a0 := Main[32]
-    set a1 := Main[33]
-    set a2 := Main[34]
-    set a3 := Main[35]
-    set cb0 := Main[36]
-    set cb1 := Main[37]
-    set cb2 := Main[38]
-    set cb3 := Main[39]
-    set cb4 := Main[40]
-    set cb5 := Main[41]
-    set v01 := Main[42]
-    set v012 := Main[43]
-    set v0123 := Main[44]
-    set su160 := Main[45]
-    set su161 := Main[46]
-    set su162 := Main[47]
-    set su163 := Main[48]
-    set ll0 := Main[49]
-    set ll1 := Main[50]
-    set ll2 := Main[51]
-    set ll3 := Main[52]
-    set hl0 := Main[53]
-    set hl1 := Main[54]
-    set hl2 := Main[55]
-    set hl3 := Main[56]
-    set lr0 := Main[57]
-    set lr1 := Main[58]
-    set lr2 := Main[59]
-    set lr3 := Main[60]
-    set msb := Main[61]
-    set sll := Main[62]
-    set sllw := Main[63]
+    set is_trusted := Main[32]
+    set a0 := Main[33]
+    set a1 := Main[34]
+    set a2 := Main[35]
+    set a3 := Main[36]
+    set cb0 := Main[37]
+    set cb1 := Main[38]
+    set cb2 := Main[39]
+    set cb3 := Main[40]
+    set cb4 := Main[41]
+    set cb5 := Main[42]
+    set v01 := Main[43]
+    set v012 := Main[44]
+    set v0123 := Main[45]
+    set su160 := Main[46]
+    set su161 := Main[47]
+    set su162 := Main[48]
+    set su163 := Main[49]
+    set ll0 := Main[50]
+    set ll1 := Main[51]
+    set ll2 := Main[52]
+    set ll3 := Main[53]
+    set hl0 := Main[54]
+    set hl1 := Main[55]
+    set hl2 := Main[56]
+    set hl3 := Main[57]
+    set lr0 := Main[58]
+    set lr1 := Main[59]
+    set lr2 := Main[60]
+    set lr3 := Main[61]
+    set msb := Main[62]
+    set sll := Main[63]
+    set sllw := Main[64]
 
     obtain ⟨ h_msb_a1, cpu, alu, one_of_ops,
              b_sll, b_sllw,
@@ -560,7 +634,7 @@ section slli
 
 lemma spec.slli (h : is_slli Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLL
+    Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLL
   := by
     intro cstrs
     obtain ⟨ eq_sll, eq_imm ⟩ := h
@@ -582,38 +656,39 @@ lemma spec.slli (h : is_slli Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set a0 := Main[32]
-    set a1 := Main[33]
-    set a2 := Main[34]
-    set a3 := Main[35]
-    set cb0 := Main[36]
-    set cb1 := Main[37]
-    set cb2 := Main[38]
-    set cb3 := Main[39]
-    set cb4 := Main[40]
-    set cb5 := Main[41]
-    set v01 := Main[42]
-    set v012 := Main[43]
-    set v0123 := Main[44]
-    set su160 := Main[45]
-    set su161 := Main[46]
-    set su162 := Main[47]
-    set su163 := Main[48]
-    set ll0 := Main[49]
-    set ll1 := Main[50]
-    set ll2 := Main[51]
-    set ll3 := Main[52]
-    set hl0 := Main[53]
-    set hl1 := Main[54]
-    set hl2 := Main[55]
-    set hl3 := Main[56]
-    set lr0 := Main[57]
-    set lr1 := Main[58]
-    set lr2 := Main[59]
-    set lr3 := Main[60]
-    set msb := Main[61]
-    set sll := Main[62]
-    set sllw := Main[63]
+    set is_trusted := Main[32]
+    set a0 := Main[33]
+    set a1 := Main[34]
+    set a2 := Main[35]
+    set a3 := Main[36]
+    set cb0 := Main[37]
+    set cb1 := Main[38]
+    set cb2 := Main[39]
+    set cb3 := Main[40]
+    set cb4 := Main[41]
+    set cb5 := Main[42]
+    set v01 := Main[43]
+    set v012 := Main[44]
+    set v0123 := Main[45]
+    set su160 := Main[46]
+    set su161 := Main[47]
+    set su162 := Main[48]
+    set su163 := Main[49]
+    set ll0 := Main[50]
+    set ll1 := Main[51]
+    set ll2 := Main[52]
+    set ll3 := Main[53]
+    set hl0 := Main[54]
+    set hl1 := Main[55]
+    set hl2 := Main[56]
+    set hl3 := Main[57]
+    set lr0 := Main[58]
+    set lr1 := Main[59]
+    set lr2 := Main[60]
+    set lr3 := Main[61]
+    set msb := Main[62]
+    set sll := Main[63]
+    set sllw := Main[64]
 
     obtain ⟨ h_msb_a1, cpu, alu, one_of_ops,
              b_sll, b_sllw,
@@ -675,7 +750,7 @@ section sllw
 
 lemma spec.sllw (h : is_sllw Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
+    Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
   := by
     intro cstrs
     obtain ⟨ eq_sllw, eq_imm ⟩ := h
@@ -696,38 +771,39 @@ lemma spec.sllw (h : is_sllw Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set a0 := Main[32]
-    set a1 := Main[33]
-    set a2 := Main[34]
-    set a3 := Main[35]
-    set cb0 := Main[36]
-    set cb1 := Main[37]
-    set cb2 := Main[38]
-    set cb3 := Main[39]
-    set cb4 := Main[40]
-    set cb5 := Main[41]
-    set v01 := Main[42]
-    set v012 := Main[43]
-    set v0123 := Main[44]
-    set su160 := Main[45]
-    set su161 := Main[46]
-    set su162 := Main[47]
-    set su163 := Main[48]
-    set ll0 := Main[49]
-    set ll1 := Main[50]
-    set ll2 := Main[51]
-    set ll3 := Main[52]
-    set hl0 := Main[53]
-    set hl1 := Main[54]
-    set hl2 := Main[55]
-    set hl3 := Main[56]
-    set lr0 := Main[57]
-    set lr1 := Main[58]
-    set lr2 := Main[59]
-    set lr3 := Main[60]
-    set msb := Main[61]
-    set sll := Main[62]
-    set sllw := Main[63]
+    set is_trusted := Main[32]
+    set a0 := Main[33]
+    set a1 := Main[34]
+    set a2 := Main[35]
+    set a3 := Main[36]
+    set cb0 := Main[37]
+    set cb1 := Main[38]
+    set cb2 := Main[39]
+    set cb3 := Main[40]
+    set cb4 := Main[41]
+    set cb5 := Main[42]
+    set v01 := Main[43]
+    set v012 := Main[44]
+    set v0123 := Main[45]
+    set su160 := Main[46]
+    set su161 := Main[47]
+    set su162 := Main[48]
+    set su163 := Main[49]
+    set ll0 := Main[50]
+    set ll1 := Main[51]
+    set ll2 := Main[52]
+    set ll3 := Main[53]
+    set hl0 := Main[54]
+    set hl1 := Main[55]
+    set hl2 := Main[56]
+    set hl3 := Main[57]
+    set lr0 := Main[58]
+    set lr1 := Main[59]
+    set lr2 := Main[60]
+    set lr3 := Main[61]
+    set msb := Main[62]
+    set sll := Main[63]
+    set sllw := Main[64]
 
     obtain ⟨ h_msb_a1, cpu, alu, one_of_ops,
              b_sll, b_sllw,
@@ -817,7 +893,7 @@ section slliw
 
 lemma spec.slliw (h : is_slliw Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
+    Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
   := by
     intro cstrs
     obtain ⟨ eq_sllw, eq_imm ⟩ := h
@@ -839,38 +915,39 @@ lemma spec.slliw (h : is_slliw Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set a0 := Main[32]
-    set a1 := Main[33]
-    set a2 := Main[34]
-    set a3 := Main[35]
-    set cb0 := Main[36]
-    set cb1 := Main[37]
-    set cb2 := Main[38]
-    set cb3 := Main[39]
-    set cb4 := Main[40]
-    set cb5 := Main[41]
-    set v01 := Main[42]
-    set v012 := Main[43]
-    set v0123 := Main[44]
-    set su160 := Main[45]
-    set su161 := Main[46]
-    set su162 := Main[47]
-    set su163 := Main[48]
-    set ll0 := Main[49]
-    set ll1 := Main[50]
-    set ll2 := Main[51]
-    set ll3 := Main[52]
-    set hl0 := Main[53]
-    set hl1 := Main[54]
-    set hl2 := Main[55]
-    set hl3 := Main[56]
-    set lr0 := Main[57]
-    set lr1 := Main[58]
-    set lr2 := Main[59]
-    set lr3 := Main[60]
-    set msb := Main[61]
-    set sll := Main[62]
-    set sllw := Main[63]
+    set is_trusted := Main[32]
+    set a0 := Main[33]
+    set a1 := Main[34]
+    set a2 := Main[35]
+    set a3 := Main[36]
+    set cb0 := Main[37]
+    set cb1 := Main[38]
+    set cb2 := Main[39]
+    set cb3 := Main[40]
+    set cb4 := Main[41]
+    set cb5 := Main[42]
+    set v01 := Main[43]
+    set v012 := Main[44]
+    set v0123 := Main[45]
+    set su160 := Main[46]
+    set su161 := Main[47]
+    set su162 := Main[48]
+    set su163 := Main[49]
+    set ll0 := Main[50]
+    set ll1 := Main[51]
+    set ll2 := Main[52]
+    set ll3 := Main[53]
+    set hl0 := Main[54]
+    set hl1 := Main[55]
+    set hl2 := Main[56]
+    set hl3 := Main[57]
+    set lr0 := Main[58]
+    set lr1 := Main[59]
+    set lr2 := Main[60]
+    set lr3 := Main[61]
+    set msb := Main[62]
+    set sll := Main[63]
+    set sllw := Main[64]
 
     obtain ⟨ h_msb_a1, cpu, alu, one_of_ops,
              b_sll, b_sllw,
