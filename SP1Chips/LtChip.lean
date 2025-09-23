@@ -11,7 +11,7 @@ namespace Slt
 open Lt
 
 variable
-  (Main : Vector (Fin BB) 45)
+  (Main : Vector (Fin KB) 45)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slt : is_slt Main)
@@ -89,7 +89,7 @@ theorem correct_slt
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -107,7 +107,7 @@ namespace Slti
 open Lt
 
 variable
-  (Main : Vector (Fin BB) 45)
+  (Main : Vector (Fin KB) 45)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slti : is_slti Main)
@@ -182,7 +182,7 @@ theorem correct_sltu
     rw [← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -200,7 +200,7 @@ namespace Sltu
 open Lt
 
 variable
-  (Main : Vector (Fin BB) 45)
+  (Main : Vector (Fin KB) 45)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sltu : is_sltu Main)
@@ -280,7 +280,7 @@ theorem correct_sltu
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -298,7 +298,7 @@ namespace Sltiu
 open Lt
 
 variable
-  (Main : Vector (Fin BB) 45)
+  (Main : Vector (Fin KB) 45)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sltiu : is_sltiu Main)
@@ -371,7 +371,7 @@ theorem correct_sltu
     rw [← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

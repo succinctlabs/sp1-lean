@@ -9,7 +9,7 @@ set_option maxHeartbeats 10000000
 namespace BitwiseU16Operation
 
 lemma spec.and
-  {b cc : Word (Fin BB)}
+  {b cc : Word (Fin KB)}
   {cols : BitwiseU16Operation}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :
@@ -50,7 +50,7 @@ lemma spec.and
       bv_decide
 
 lemma spec.or
-  {b cc : Word (Fin BB)}
+  {b cc : Word (Fin KB)}
   {cols : BitwiseU16Operation}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :
@@ -91,7 +91,7 @@ lemma spec.or
       bv_decide
 
 lemma spec.xor
-  {b cc : Word (Fin BB)}
+  {b cc : Word (Fin KB)}
   {cols : BitwiseU16Operation}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :

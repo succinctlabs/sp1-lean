@@ -11,7 +11,7 @@ open Sail SailState BitVec LeanRV64D.Functions
 namespace BNE
 
 variable
-  (Main : Vector (Fin BB) 46)
+  (Main : Vector (Fin KB) 46)
   (cstrs : (constraints Main).allHold)
   (s : SailState)
   (h_is_bne : Main[30] = 1)
@@ -49,14 +49,14 @@ def sp1_bne : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0])
   pure RETIRE_SUCCESS
 
-@[simp] lemma helper (x : Fin BB) (h : (x * 4⁻¹).val < 16384) :
+@[simp] lemma helper (x : Fin KB) (h : (x * 4⁻¹).val < 16384) :
     x.val < 65536 := by
   sorry
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 theorem correct_bne
-    (Main : Vector (Fin BB) 46)
+    (Main : Vector (Fin KB) 46)
     (s : SailState)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s)

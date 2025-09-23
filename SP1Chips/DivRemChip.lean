@@ -16,7 +16,7 @@ set_option maxHeartbeats 10000000
 open DivRem
 
 variable
-  (Main : Vector (Fin BB) 251)
+  (Main : Vector (Fin KB) 251)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : is_real Main)
@@ -62,7 +62,7 @@ theorem correct_div
     simp [spec_div, sp1_op, execute, execute_DIV']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -110,7 +110,7 @@ theorem correct_divu
     simp [spec_divu, sp1_op, execute, execute_DIV']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -158,7 +158,7 @@ theorem correct_divw
     simp [spec_divw, sp1_op, execute, execute_DIVW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -206,7 +206,7 @@ theorem correct_divuw
     simp [spec_divuw, sp1_op, execute, execute_DIVW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -254,7 +254,7 @@ theorem correct_rem
     simp [spec_rem, sp1_op, execute, execute_REM']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -302,7 +302,7 @@ theorem correct_remu
     simp [spec_remu, sp1_op, execute, execute_REM']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -350,7 +350,7 @@ theorem correct_remw
     simp [spec_remw, sp1_op, execute, execute_REMW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -398,7 +398,7 @@ theorem correct_remuw
     simp [spec_remuw, sp1_op, execute, execute_REMW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

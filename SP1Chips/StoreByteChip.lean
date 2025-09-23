@@ -23,16 +23,16 @@ noncomputable def spec_sb (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Execution
   let width : ℕ := 1 -- single byte
   execute_STORE imm rs1 rs2 width
 
-def sp1_op_a (Main : Vector (Fin BB) 52) : BitVec 5 :=
+def sp1_op_a (Main : Vector (Fin KB) 52) : BitVec 5 :=
   BitVec.ofNat 5 Main[6]
 
-def sp1_ob_b (Main : Vector (Fin BB) 52) : BitVec 5 :=
+def sp1_ob_b (Main : Vector (Fin KB) 52) : BitVec 5 :=
   BitVec.ofNat 5 Main[14]
 
-def sp1_imm_c (Main : Vector (Fin BB) 52) : BitVec 12 :=
+def sp1_imm_c (Main : Vector (Fin KB) 52) : BitVec 12 :=
   BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])
 
-def sp1_sb (Main : Vector (Fin BB) 52) : SailM ExecutionResult := do
+def sp1_sb (Main : Vector (Fin KB) 52) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   let addr : BitVec 64 := Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0]
@@ -78,7 +78,7 @@ lemma run_vmem_write_of_width_1'
     PreSail.writeByte, Except.map, BitVec.addInt]
 
 set_option debug.skipKernelTC true in
-theorem correct (Main : Vector (Fin BB) 52)
+theorem correct (Main : Vector (Fin KB) 52)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (StoreByte.constraints Main).allHold)

@@ -9,7 +9,7 @@ open BitVec
 namespace Subw
 
 variable
-  (Main : Vector (Fin BB) 32)
+  (Main : Vector (Fin KB) 32)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[31] = 1)
@@ -99,7 +99,7 @@ theorem correct_subw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_subw] at is_msb
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

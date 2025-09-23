@@ -12,330 +12,330 @@ namespace DivRem
 set_option maxHeartbeats 100000000
 set_option linter.constructorNameAsVariable false
 
-variable (Main : Vector (Fin BB) 251)
+variable (Main : Vector (Fin KB) 251)
 
 section constraints
 
 -- Generated Lean code for chip DivRemChip
-@[irreducible] def constraints (Main : Vector (Fin BB) 247) : SP1ConstraintList :=
-  let E0 : Fin BB := Main[206] + Main[207]
-  let E1 : Fin BB := E0 + Main[208]
-  let E2 : Fin BB := E1 + Main[209]
-  let E3 : Fin BB := Main[203] + Main[205]
-  let E4 : Fin BB := E3 + Main[202]
-  let E5 : Fin BB := E4 + Main[204]
-  let E6 : Fin BB := Main[206] + Main[207]
-  let E7 : Fin BB := Main[208] + Main[209]
-  let E8 : Fin BB := Main[202] + Main[204]
-  let E9 : Fin BB := E8 + Main[206]
-  let E10 : Fin BB := E9 + Main[207]
-  let E11 : Fin BB := 1 - E2
-  let E12 : Fin BB := Main[245] * E11
-  let E13 : Fin BB := Main[240] - E12
-  let E14 : Fin BB := Main[233] * E10
-  let E15 : Fin BB := E14 - Main[237]
-  let E16 : Fin BB := Main[234] * E10
-  let E17 : Fin BB := E16 - Main[241]
-  let E18 : Fin BB := Main[235] * E10
-  let E19 : Fin BB := E18 - Main[242]
-  let E20 : Fin BB := Main[15] - Main[33]
-  let E21 : Fin BB := Main[22] - Main[37]
-  let E22 : Fin BB := Main[16] - Main[34]
-  let E23 : Fin BB := Main[23] - Main[38]
-  let E24 : Fin BB := 1 - E2
-  let E25 : Fin BB := Main[17] * E24
-  let E26 : Fin BB := Main[237] * E2
-  let E27 : Fin BB := E26 * 65535
-  let E28 : Fin BB := E25 + E27
-  let E29 : Fin BB := Main[35] - E28
-  let E30 : Fin BB := 1 - E2
-  let E31 : Fin BB := Main[24] * E30
-  let E32 : Fin BB := Main[242] * E2
-  let E33 : Fin BB := E32 * 65535
-  let E34 : Fin BB := E31 + E33
-  let E35 : Fin BB := Main[39] - E34
-  let E36 : Fin BB := 1 - E2
-  let E37 : Fin BB := Main[18] * E36
-  let E38 : Fin BB := Main[237] * E2
-  let E39 : Fin BB := E38 * 65535
-  let E40 : Fin BB := E37 + E39
-  let E41 : Fin BB := Main[36] - E40
-  let E42 : Fin BB := 1 - E2
-  let E43 : Fin BB := Main[25] * E42
-  let E44 : Fin BB := Main[242] * E2
-  let E45 : Fin BB := E44 * 65535
-  let E46 : Fin BB := E43 + E45
-  let E47 : Fin BB := Main[40] - E46
-  let E48 : Fin BB := Main[45] - Main[41]
-  let E49 : Fin BB := Main[46] - Main[42]
-  let E50 : Fin BB := Main[47] - 0
-  let E51 : Fin BB := E7 * E50
-  let E52 : Fin BB := Main[236] * 65535
-  let E53 : Fin BB := Main[47] - E52
-  let E54 : Fin BB := E6 * E53
-  let E55 : Fin BB := Main[236] * 65535
-  let E56 : Fin BB := Main[43] - E55
-  let E57 : Fin BB := E2 * E56
-  let E58 : Fin BB := Main[47] - Main[43]
-  let E59 : Fin BB := E5 * E58
-  let E60 : Fin BB := Main[48] - 0
-  let E61 : Fin BB := E7 * E60
-  let E62 : Fin BB := Main[236] * 65535
-  let E63 : Fin BB := Main[48] - E62
-  let E64 : Fin BB := E6 * E63
-  let E65 : Fin BB := Main[236] * 65535
-  let E66 : Fin BB := Main[44] - E65
-  let E67 : Fin BB := E2 * E66
-  let E68 : Fin BB := Main[48] - Main[44]
-  let E69 : Fin BB := E5 * E68
-  let E70 : Fin BB := Main[49] - Main[53]
-  let E71 : Fin BB := Main[50] - Main[54]
-  let E72 : Fin BB := Main[51] - 0
-  let E73 : Fin BB := E7 * E72
-  let E74 : Fin BB := Main[234] * 65535
-  let E75 : Fin BB := Main[51] - E74
-  let E76 : Fin BB := E6 * E75
-  let E77 : Fin BB := Main[234] * 65535
-  let E78 : Fin BB := Main[55] - E77
-  let E79 : Fin BB := E2 * E78
-  let E80 : Fin BB := Main[51] - Main[55]
-  let E81 : Fin BB := E5 * E80
-  let E82 : Fin BB := Main[52] - 0
-  let E83 : Fin BB := E7 * E82
-  let E84 : Fin BB := Main[234] * 65535
-  let E85 : Fin BB := Main[52] - E84
-  let E86 : Fin BB := E6 * E85
-  let E87 : Fin BB := Main[234] * 65535
-  let E88 : Fin BB := Main[56] - E87
-  let E89 : Fin BB := E2 * E88
-  let E90 : Fin BB := Main[52] - Main[56]
-  let E91 : Fin BB := E5 * E90
+@[irreducible] def constraints (Main : Vector (Fin KB) 247) : SP1ConstraintList :=
+  let E0 : Fin KB := Main[206] + Main[207]
+  let E1 : Fin KB := E0 + Main[208]
+  let E2 : Fin KB := E1 + Main[209]
+  let E3 : Fin KB := Main[203] + Main[205]
+  let E4 : Fin KB := E3 + Main[202]
+  let E5 : Fin KB := E4 + Main[204]
+  let E6 : Fin KB := Main[206] + Main[207]
+  let E7 : Fin KB := Main[208] + Main[209]
+  let E8 : Fin KB := Main[202] + Main[204]
+  let E9 : Fin KB := E8 + Main[206]
+  let E10 : Fin KB := E9 + Main[207]
+  let E11 : Fin KB := 1 - E2
+  let E12 : Fin KB := Main[245] * E11
+  let E13 : Fin KB := Main[240] - E12
+  let E14 : Fin KB := Main[233] * E10
+  let E15 : Fin KB := E14 - Main[237]
+  let E16 : Fin KB := Main[234] * E10
+  let E17 : Fin KB := E16 - Main[241]
+  let E18 : Fin KB := Main[235] * E10
+  let E19 : Fin KB := E18 - Main[242]
+  let E20 : Fin KB := Main[15] - Main[33]
+  let E21 : Fin KB := Main[22] - Main[37]
+  let E22 : Fin KB := Main[16] - Main[34]
+  let E23 : Fin KB := Main[23] - Main[38]
+  let E24 : Fin KB := 1 - E2
+  let E25 : Fin KB := Main[17] * E24
+  let E26 : Fin KB := Main[237] * E2
+  let E27 : Fin KB := E26 * 65535
+  let E28 : Fin KB := E25 + E27
+  let E29 : Fin KB := Main[35] - E28
+  let E30 : Fin KB := 1 - E2
+  let E31 : Fin KB := Main[24] * E30
+  let E32 : Fin KB := Main[242] * E2
+  let E33 : Fin KB := E32 * 65535
+  let E34 : Fin KB := E31 + E33
+  let E35 : Fin KB := Main[39] - E34
+  let E36 : Fin KB := 1 - E2
+  let E37 : Fin KB := Main[18] * E36
+  let E38 : Fin KB := Main[237] * E2
+  let E39 : Fin KB := E38 * 65535
+  let E40 : Fin KB := E37 + E39
+  let E41 : Fin KB := Main[36] - E40
+  let E42 : Fin KB := 1 - E2
+  let E43 : Fin KB := Main[25] * E42
+  let E44 : Fin KB := Main[242] * E2
+  let E45 : Fin KB := E44 * 65535
+  let E46 : Fin KB := E43 + E45
+  let E47 : Fin KB := Main[40] - E46
+  let E48 : Fin KB := Main[45] - Main[41]
+  let E49 : Fin KB := Main[46] - Main[42]
+  let E50 : Fin KB := Main[47] - 0
+  let E51 : Fin KB := E7 * E50
+  let E52 : Fin KB := Main[236] * 65535
+  let E53 : Fin KB := Main[47] - E52
+  let E54 : Fin KB := E6 * E53
+  let E55 : Fin KB := Main[236] * 65535
+  let E56 : Fin KB := Main[43] - E55
+  let E57 : Fin KB := E2 * E56
+  let E58 : Fin KB := Main[47] - Main[43]
+  let E59 : Fin KB := E5 * E58
+  let E60 : Fin KB := Main[48] - 0
+  let E61 : Fin KB := E7 * E60
+  let E62 : Fin KB := Main[236] * 65535
+  let E63 : Fin KB := Main[48] - E62
+  let E64 : Fin KB := E6 * E63
+  let E65 : Fin KB := Main[236] * 65535
+  let E66 : Fin KB := Main[44] - E65
+  let E67 : Fin KB := E2 * E66
+  let E68 : Fin KB := Main[48] - Main[44]
+  let E69 : Fin KB := E5 * E68
+  let E70 : Fin KB := Main[49] - Main[53]
+  let E71 : Fin KB := Main[50] - Main[54]
+  let E72 : Fin KB := Main[51] - 0
+  let E73 : Fin KB := E7 * E72
+  let E74 : Fin KB := Main[234] * 65535
+  let E75 : Fin KB := Main[51] - E74
+  let E76 : Fin KB := E6 * E75
+  let E77 : Fin KB := Main[234] * 65535
+  let E78 : Fin KB := Main[55] - E77
+  let E79 : Fin KB := E2 * E78
+  let E80 : Fin KB := Main[51] - Main[55]
+  let E81 : Fin KB := E5 * E80
+  let E82 : Fin KB := Main[52] - 0
+  let E83 : Fin KB := E7 * E82
+  let E84 : Fin KB := Main[234] * 65535
+  let E85 : Fin KB := Main[52] - E84
+  let E86 : Fin KB := E6 * E85
+  let E87 : Fin KB := Main[234] * 65535
+  let E88 : Fin KB := Main[56] - E87
+  let E89 : Fin KB := E2 * E88
+  let E90 : Fin KB := Main[52] - Main[56]
+  let E91 : Fin KB := E5 * E90
   let CS0 : SP1ConstraintList := MulOperation.constraints #v[Main[69], Main[70], Main[71], Main[72]] #v[Main[45], Main[46], Main[47], Main[48]] #v[Main[37], Main[38], Main[39], Main[40]] { carry := #v[Main[77], Main[78], Main[79], Main[80], Main[81], Main[82], Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89], Main[90], Main[91], Main[92]], product := #v[Main[93], Main[94], Main[95], Main[96], Main[97], Main[98], Main[99], Main[100], Main[101], Main[102], Main[103], Main[104], Main[105], Main[106], Main[107], Main[108]], b_lower_byte := { low_bytes := #v[Main[109], Main[110], Main[111], Main[112]] }, c_lower_byte := { low_bytes := #v[Main[113], Main[114], Main[115], Main[116]] }, b_msb := Main[117], c_msb := Main[118], product_msb := { msb := Main[119] }, b_sign_extend := Main[120], c_sign_extend := Main[121] } Main[245] Main[245] 0 0 0 0
-  let E92 : Fin BB := Main[202] + Main[204]
-  let E93 : Fin BB := Main[203] + Main[205]
+  let E92 : Fin KB := Main[202] + Main[204]
+  let E93 : Fin KB := Main[203] + Main[205]
   let CS1 : SP1ConstraintList := MulOperation.constraints #v[Main[73], Main[74], Main[75], Main[76]] #v[Main[45], Main[46], Main[47], Main[48]] #v[Main[37], Main[38], Main[39], Main[40]] { carry := #v[Main[122], Main[123], Main[124], Main[125], Main[126], Main[127], Main[128], Main[129], Main[130], Main[131], Main[132], Main[133], Main[134], Main[135], Main[136], Main[137]], product := #v[Main[138], Main[139], Main[140], Main[141], Main[142], Main[143], Main[144], Main[145], Main[146], Main[147], Main[148], Main[149], Main[150], Main[151], Main[152], Main[153]], b_lower_byte := { low_bytes := #v[Main[154], Main[155], Main[156], Main[157]] }, c_lower_byte := { low_bytes := #v[Main[158], Main[159], Main[160], Main[161]] }, b_msb := Main[162], c_msb := Main[163], product_msb := { msb := Main[164] }, b_sign_extend := Main[165], c_sign_extend := Main[166] } Main[240] 0 E92 0 E93 0
   let CS2 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[0, 0, 0, 32768] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[211], result := Main[212] }, { inverse := Main[213], result := Main[214] }, { inverse := Main[215], result := Main[216] }, { inverse := Main[217], result := Main[218] }], is_zero_first_half := Main[219], is_zero_second_half := Main[220], result := Main[221] } } Main[240]
   let CS3 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[22], Main[23], Main[24], Main[25]] #v[65535, 65535, 65535, 65535] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[222], result := Main[223] }, { inverse := Main[224], result := Main[225] }, { inverse := Main[226], result := Main[227] }, { inverse := Main[228], result := Main[229] }], is_zero_first_half := Main[230], is_zero_second_half := Main[231], result := Main[232] } } Main[240]
   let CS4 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[15], Main[16], 0, 0] #v[0, 32768, 0, 0] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[211], result := Main[212] }, { inverse := Main[213], result := Main[214] }, { inverse := Main[215], result := Main[216] }, { inverse := Main[217], result := Main[218] }], is_zero_first_half := Main[219], is_zero_second_half := Main[220], result := Main[221] } } E2
   let CS5 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[22], Main[23], 0, 0] #v[65535, 65535, 0, 0] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[222], result := Main[223] }, { inverse := Main[224], result := Main[225] }, { inverse := Main[226], result := Main[227] }, { inverse := Main[228], result := Main[229] }], is_zero_first_half := Main[230], is_zero_second_half := Main[231], result := Main[232] } } E2
-  let E94 : Fin BB := Main[221] * Main[232]
-  let E95 : Fin BB := E94 * E10
-  let E96 : Fin BB := Main[210] - E95
-  let E97 : Fin BB := 1 - Main[210]
-  let E98 : Fin BB := Main[237] * E97
-  let E99 : Fin BB := Main[238] - E98
-  let E100 : Fin BB := 1 - Main[237]
-  let E101 : Fin BB := 1 - Main[210]
-  let E102 : Fin BB := E100 * E101
-  let E103 : Fin BB := Main[239] - E102
-  let E104 : Fin BB := Main[41] - Main[33]
-  let E105 : Fin BB := Main[210] * E104
-  let E106 : Fin BB := Main[53] - 0
-  let E107 : Fin BB := Main[210] * E106
-  let E108 : Fin BB := Main[42] - Main[34]
-  let E109 : Fin BB := Main[210] * E108
-  let E110 : Fin BB := Main[54] - 0
-  let E111 : Fin BB := Main[210] * E110
-  let E112 : Fin BB := Main[43] - Main[35]
-  let E113 : Fin BB := Main[210] * E112
-  let E114 : Fin BB := Main[55] - 0
-  let E115 : Fin BB := Main[210] * E114
-  let E116 : Fin BB := Main[44] - Main[36]
-  let E117 : Fin BB := Main[210] * E116
-  let E118 : Fin BB := Main[56] - 0
-  let E119 : Fin BB := Main[210] * E118
-  let E120 : Fin BB := Main[241] * 65535
-  let E121 : Fin BB := Main[69] + Main[49]
-  let E122 : Fin BB := Main[183] * 65536
-  let E123 : Fin BB := E121 - E122
-  let E124 : Fin BB := Main[70] + Main[50]
-  let E125 : Fin BB := Main[184] * 65536
-  let E126 : Fin BB := E124 - E125
-  let E127 : Fin BB := E126 + Main[183]
-  let E128 : Fin BB := Main[71] + Main[51]
-  let E129 : Fin BB := Main[185] * 65536
-  let E130 : Fin BB := E128 - E129
-  let E131 : Fin BB := E130 + Main[184]
-  let E132 : Fin BB := Main[72] + Main[52]
-  let E133 : Fin BB := Main[186] * 65536
-  let E134 : Fin BB := E132 - E133
-  let E135 : Fin BB := E134 + Main[185]
-  let E136 : Fin BB := Main[73] + E120
-  let E137 : Fin BB := Main[187] * 65536
-  let E138 : Fin BB := E136 - E137
-  let E139 : Fin BB := E138 + Main[186]
-  let E140 : Fin BB := Main[74] + E120
-  let E141 : Fin BB := Main[188] * 65536
-  let E142 : Fin BB := E140 - E141
-  let E143 : Fin BB := E142 + Main[187]
-  let E144 : Fin BB := Main[75] + E120
-  let E145 : Fin BB := Main[189] * 65536
-  let E146 : Fin BB := E144 - E145
-  let E147 : Fin BB := E146 + Main[188]
-  let E148 : Fin BB := Main[76] + E120
-  let E149 : Fin BB := Main[190] * 65536
-  let E150 : Fin BB := E148 - E149
-  let E151 : Fin BB := E150 + Main[189]
-  let E152 : Fin BB := Main[210] - 1
-  let E153 : Fin BB := Main[33] - E123
-  let E154 : Fin BB := E152 * E153
-  let E155 : Fin BB := Main[210] - 1
-  let E156 : Fin BB := Main[34] - E127
-  let E157 : Fin BB := E155 * E156
-  let E158 : Fin BB := Main[210] - 1
-  let E159 : Fin BB := Main[35] - E131
-  let E160 : Fin BB := E158 * E159
-  let E161 : Fin BB := Main[210] - 1
-  let E162 : Fin BB := Main[36] - E135
-  let E163 : Fin BB := E161 * E162
-  let E164 : Fin BB := Main[210] - 1
-  let E165 : Fin BB := Main[237] * 65535
-  let E166 : Fin BB := E165 - E139
-  let E167 : Fin BB := E164 * E166
-  let E168 : Fin BB := Main[210] - 1
-  let E169 : Fin BB := Main[237] * 65535
-  let E170 : Fin BB := E169 - E143
-  let E171 : Fin BB := E168 * E170
-  let E172 : Fin BB := Main[210] - 1
-  let E173 : Fin BB := Main[237] * 65535
-  let E174 : Fin BB := E173 - E147
-  let E175 : Fin BB := E172 * E174
-  let E176 : Fin BB := Main[210] - 1
-  let E177 : Fin BB := Main[237] * 65535
-  let E178 : Fin BB := E177 - E151
-  let E179 : Fin BB := E176 * E178
-  let E180 : Fin BB := Main[203] + Main[202]
-  let E181 : Fin BB := E180 + Main[206]
-  let E182 : Fin BB := E181 + Main[208]
-  let E183 : Fin BB := Main[41] - Main[29]
-  let E184 : Fin BB := E182 * E183
-  let E185 : Fin BB := Main[205] + Main[204]
-  let E186 : Fin BB := E185 + Main[207]
-  let E187 : Fin BB := E186 + Main[209]
-  let E188 : Fin BB := Main[53] - Main[29]
-  let E189 : Fin BB := E187 * E188
-  let E190 : Fin BB := Main[203] + Main[202]
-  let E191 : Fin BB := E190 + Main[206]
-  let E192 : Fin BB := E191 + Main[208]
-  let E193 : Fin BB := Main[42] - Main[30]
-  let E194 : Fin BB := E192 * E193
-  let E195 : Fin BB := Main[205] + Main[204]
-  let E196 : Fin BB := E195 + Main[207]
-  let E197 : Fin BB := E196 + Main[209]
-  let E198 : Fin BB := Main[54] - Main[30]
-  let E199 : Fin BB := E197 * E198
-  let E200 : Fin BB := Main[203] + Main[202]
-  let E201 : Fin BB := E200 + Main[206]
-  let E202 : Fin BB := E201 + Main[208]
-  let E203 : Fin BB := Main[43] - Main[31]
-  let E204 : Fin BB := E202 * E203
-  let E205 : Fin BB := Main[205] + Main[204]
-  let E206 : Fin BB := E205 + Main[207]
-  let E207 : Fin BB := E206 + Main[209]
-  let E208 : Fin BB := Main[55] - Main[31]
-  let E209 : Fin BB := E207 * E208
-  let E210 : Fin BB := Main[203] + Main[202]
-  let E211 : Fin BB := E210 + Main[206]
-  let E212 : Fin BB := E211 + Main[208]
-  let E213 : Fin BB := Main[44] - Main[32]
-  let E214 : Fin BB := E212 * E213
-  let E215 : Fin BB := Main[205] + Main[204]
-  let E216 : Fin BB := E215 + Main[207]
-  let E217 : Fin BB := E216 + Main[209]
-  let E218 : Fin BB := Main[56] - Main[32]
-  let E219 : Fin BB := E217 * E218
-  let E220 : Fin BB := 0 + Main[53]
-  let E221 : Fin BB := E220 + Main[54]
-  let E222 : Fin BB := E221 + Main[55]
-  let E223 : Fin BB := E222 + Main[56]
-  let E224 : Fin BB := Main[237] - 1
-  let E225 : Fin BB := Main[241] * E224
-  let E226 : Fin BB := 1 - Main[241]
-  let E227 : Fin BB := E226 * Main[237]
-  let E228 : Fin BB := E223 * E227
+  let E94 : Fin KB := Main[221] * Main[232]
+  let E95 : Fin KB := E94 * E10
+  let E96 : Fin KB := Main[210] - E95
+  let E97 : Fin KB := 1 - Main[210]
+  let E98 : Fin KB := Main[237] * E97
+  let E99 : Fin KB := Main[238] - E98
+  let E100 : Fin KB := 1 - Main[237]
+  let E101 : Fin KB := 1 - Main[210]
+  let E102 : Fin KB := E100 * E101
+  let E103 : Fin KB := Main[239] - E102
+  let E104 : Fin KB := Main[41] - Main[33]
+  let E105 : Fin KB := Main[210] * E104
+  let E106 : Fin KB := Main[53] - 0
+  let E107 : Fin KB := Main[210] * E106
+  let E108 : Fin KB := Main[42] - Main[34]
+  let E109 : Fin KB := Main[210] * E108
+  let E110 : Fin KB := Main[54] - 0
+  let E111 : Fin KB := Main[210] * E110
+  let E112 : Fin KB := Main[43] - Main[35]
+  let E113 : Fin KB := Main[210] * E112
+  let E114 : Fin KB := Main[55] - 0
+  let E115 : Fin KB := Main[210] * E114
+  let E116 : Fin KB := Main[44] - Main[36]
+  let E117 : Fin KB := Main[210] * E116
+  let E118 : Fin KB := Main[56] - 0
+  let E119 : Fin KB := Main[210] * E118
+  let E120 : Fin KB := Main[241] * 65535
+  let E121 : Fin KB := Main[69] + Main[49]
+  let E122 : Fin KB := Main[183] * 65536
+  let E123 : Fin KB := E121 - E122
+  let E124 : Fin KB := Main[70] + Main[50]
+  let E125 : Fin KB := Main[184] * 65536
+  let E126 : Fin KB := E124 - E125
+  let E127 : Fin KB := E126 + Main[183]
+  let E128 : Fin KB := Main[71] + Main[51]
+  let E129 : Fin KB := Main[185] * 65536
+  let E130 : Fin KB := E128 - E129
+  let E131 : Fin KB := E130 + Main[184]
+  let E132 : Fin KB := Main[72] + Main[52]
+  let E133 : Fin KB := Main[186] * 65536
+  let E134 : Fin KB := E132 - E133
+  let E135 : Fin KB := E134 + Main[185]
+  let E136 : Fin KB := Main[73] + E120
+  let E137 : Fin KB := Main[187] * 65536
+  let E138 : Fin KB := E136 - E137
+  let E139 : Fin KB := E138 + Main[186]
+  let E140 : Fin KB := Main[74] + E120
+  let E141 : Fin KB := Main[188] * 65536
+  let E142 : Fin KB := E140 - E141
+  let E143 : Fin KB := E142 + Main[187]
+  let E144 : Fin KB := Main[75] + E120
+  let E145 : Fin KB := Main[189] * 65536
+  let E146 : Fin KB := E144 - E145
+  let E147 : Fin KB := E146 + Main[188]
+  let E148 : Fin KB := Main[76] + E120
+  let E149 : Fin KB := Main[190] * 65536
+  let E150 : Fin KB := E148 - E149
+  let E151 : Fin KB := E150 + Main[189]
+  let E152 : Fin KB := Main[210] - 1
+  let E153 : Fin KB := Main[33] - E123
+  let E154 : Fin KB := E152 * E153
+  let E155 : Fin KB := Main[210] - 1
+  let E156 : Fin KB := Main[34] - E127
+  let E157 : Fin KB := E155 * E156
+  let E158 : Fin KB := Main[210] - 1
+  let E159 : Fin KB := Main[35] - E131
+  let E160 : Fin KB := E158 * E159
+  let E161 : Fin KB := Main[210] - 1
+  let E162 : Fin KB := Main[36] - E135
+  let E163 : Fin KB := E161 * E162
+  let E164 : Fin KB := Main[210] - 1
+  let E165 : Fin KB := Main[237] * 65535
+  let E166 : Fin KB := E165 - E139
+  let E167 : Fin KB := E164 * E166
+  let E168 : Fin KB := Main[210] - 1
+  let E169 : Fin KB := Main[237] * 65535
+  let E170 : Fin KB := E169 - E143
+  let E171 : Fin KB := E168 * E170
+  let E172 : Fin KB := Main[210] - 1
+  let E173 : Fin KB := Main[237] * 65535
+  let E174 : Fin KB := E173 - E147
+  let E175 : Fin KB := E172 * E174
+  let E176 : Fin KB := Main[210] - 1
+  let E177 : Fin KB := Main[237] * 65535
+  let E178 : Fin KB := E177 - E151
+  let E179 : Fin KB := E176 * E178
+  let E180 : Fin KB := Main[203] + Main[202]
+  let E181 : Fin KB := E180 + Main[206]
+  let E182 : Fin KB := E181 + Main[208]
+  let E183 : Fin KB := Main[41] - Main[29]
+  let E184 : Fin KB := E182 * E183
+  let E185 : Fin KB := Main[205] + Main[204]
+  let E186 : Fin KB := E185 + Main[207]
+  let E187 : Fin KB := E186 + Main[209]
+  let E188 : Fin KB := Main[53] - Main[29]
+  let E189 : Fin KB := E187 * E188
+  let E190 : Fin KB := Main[203] + Main[202]
+  let E191 : Fin KB := E190 + Main[206]
+  let E192 : Fin KB := E191 + Main[208]
+  let E193 : Fin KB := Main[42] - Main[30]
+  let E194 : Fin KB := E192 * E193
+  let E195 : Fin KB := Main[205] + Main[204]
+  let E196 : Fin KB := E195 + Main[207]
+  let E197 : Fin KB := E196 + Main[209]
+  let E198 : Fin KB := Main[54] - Main[30]
+  let E199 : Fin KB := E197 * E198
+  let E200 : Fin KB := Main[203] + Main[202]
+  let E201 : Fin KB := E200 + Main[206]
+  let E202 : Fin KB := E201 + Main[208]
+  let E203 : Fin KB := Main[43] - Main[31]
+  let E204 : Fin KB := E202 * E203
+  let E205 : Fin KB := Main[205] + Main[204]
+  let E206 : Fin KB := E205 + Main[207]
+  let E207 : Fin KB := E206 + Main[209]
+  let E208 : Fin KB := Main[55] - Main[31]
+  let E209 : Fin KB := E207 * E208
+  let E210 : Fin KB := Main[203] + Main[202]
+  let E211 : Fin KB := E210 + Main[206]
+  let E212 : Fin KB := E211 + Main[208]
+  let E213 : Fin KB := Main[44] - Main[32]
+  let E214 : Fin KB := E212 * E213
+  let E215 : Fin KB := Main[205] + Main[204]
+  let E216 : Fin KB := E215 + Main[207]
+  let E217 : Fin KB := E216 + Main[209]
+  let E218 : Fin KB := Main[56] - Main[32]
+  let E219 : Fin KB := E217 * E218
+  let E220 : Fin KB := 0 + Main[53]
+  let E221 : Fin KB := E220 + Main[54]
+  let E222 : Fin KB := E221 + Main[55]
+  let E223 : Fin KB := E222 + Main[56]
+  let E224 : Fin KB := Main[237] - 1
+  let E225 : Fin KB := Main[241] * E224
+  let E226 : Fin KB := 1 - Main[241]
+  let E227 : Fin KB := E226 * Main[237]
+  let E228 : Fin KB := E223 * E227
   let CS6 : SP1ConstraintList := IsZeroWordOperation.constraints #v[Main[37], Main[38], Main[39], Main[40]] { is_zero_limb := #v[{ inverse := Main[191], result := Main[192] }, { inverse := Main[193], result := Main[194] }, { inverse := Main[195], result := Main[196] }, { inverse := Main[197], result := Main[198] }], is_zero_first_half := Main[199], is_zero_second_half := Main[200], result := Main[201] } Main[245]
-  let E229 : Fin BB := Main[41] - 65535
-  let E230 : Fin BB := Main[201] * E229
-  let E231 : Fin BB := Main[42] - 65535
-  let E232 : Fin BB := Main[201] * E231
-  let E233 : Fin BB := Main[43] - 65535
-  let E234 : Fin BB := Main[201] * E233
-  let E235 : Fin BB := Main[44] - 65535
-  let E236 : Fin BB := Main[201] * E235
-  let E237 : Fin BB := Main[49] - Main[33]
-  let E238 : Fin BB := Main[201] * E237
-  let E239 : Fin BB := Main[50] - Main[34]
-  let E240 : Fin BB := Main[201] * E239
-  let E241 : Fin BB := Main[51] - Main[35]
-  let E242 : Fin BB := Main[201] * E241
-  let E243 : Fin BB := Main[52] - Main[36]
-  let E244 : Fin BB := Main[201] * E243
-  let E245 : Fin BB := Main[242] - 1
-  let E246 : Fin BB := Main[37] - Main[61]
-  let E247 : Fin BB := E245 * E246
-  let E248 : Fin BB := Main[241] - 1
-  let E249 : Fin BB := Main[49] - Main[57]
-  let E250 : Fin BB := E248 * E249
-  let E251 : Fin BB := Main[242] - 1
-  let E252 : Fin BB := Main[38] - Main[62]
-  let E253 : Fin BB := E251 * E252
-  let E254 : Fin BB := Main[241] - 1
-  let E255 : Fin BB := Main[50] - Main[58]
-  let E256 : Fin BB := E254 * E255
-  let E257 : Fin BB := Main[242] - 1
-  let E258 : Fin BB := Main[39] - Main[63]
-  let E259 : Fin BB := E257 * E258
-  let E260 : Fin BB := Main[241] - 1
-  let E261 : Fin BB := Main[51] - Main[59]
-  let E262 : Fin BB := E260 * E261
-  let E263 : Fin BB := Main[242] - 1
-  let E264 : Fin BB := Main[40] - Main[64]
-  let E265 : Fin BB := E263 * E264
-  let E266 : Fin BB := Main[241] - 1
-  let E267 : Fin BB := Main[52] - Main[60]
-  let E268 : Fin BB := E266 * E267
+  let E229 : Fin KB := Main[41] - 65535
+  let E230 : Fin KB := Main[201] * E229
+  let E231 : Fin KB := Main[42] - 65535
+  let E232 : Fin KB := Main[201] * E231
+  let E233 : Fin KB := Main[43] - 65535
+  let E234 : Fin KB := Main[201] * E233
+  let E235 : Fin KB := Main[44] - 65535
+  let E236 : Fin KB := Main[201] * E235
+  let E237 : Fin KB := Main[49] - Main[33]
+  let E238 : Fin KB := Main[201] * E237
+  let E239 : Fin KB := Main[50] - Main[34]
+  let E240 : Fin KB := Main[201] * E239
+  let E241 : Fin KB := Main[51] - Main[35]
+  let E242 : Fin KB := Main[201] * E241
+  let E243 : Fin KB := Main[52] - Main[36]
+  let E244 : Fin KB := Main[201] * E243
+  let E245 : Fin KB := Main[242] - 1
+  let E246 : Fin KB := Main[37] - Main[61]
+  let E247 : Fin KB := E245 * E246
+  let E248 : Fin KB := Main[241] - 1
+  let E249 : Fin KB := Main[49] - Main[57]
+  let E250 : Fin KB := E248 * E249
+  let E251 : Fin KB := Main[242] - 1
+  let E252 : Fin KB := Main[38] - Main[62]
+  let E253 : Fin KB := E251 * E252
+  let E254 : Fin KB := Main[241] - 1
+  let E255 : Fin KB := Main[50] - Main[58]
+  let E256 : Fin KB := E254 * E255
+  let E257 : Fin KB := Main[242] - 1
+  let E258 : Fin KB := Main[39] - Main[63]
+  let E259 : Fin KB := E257 * E258
+  let E260 : Fin KB := Main[241] - 1
+  let E261 : Fin KB := Main[51] - Main[59]
+  let E262 : Fin KB := E260 * E261
+  let E263 : Fin KB := Main[242] - 1
+  let E264 : Fin KB := Main[40] - Main[64]
+  let E265 : Fin KB := E263 * E264
+  let E266 : Fin KB := Main[241] - 1
+  let E267 : Fin KB := Main[52] - Main[60]
+  let E268 : Fin KB := E266 * E267
   let CS7 : SP1ConstraintList := AddOperation.constraints #v[Main[37], Main[38], Main[39], Main[40]] #v[Main[61], Main[62], Main[63], Main[64]] { value := #v[Main[167], Main[168], Main[169], Main[170]] } Main[243]
-  let E269 : Fin BB := 0 - Main[167]
-  let E270 : Fin BB := Main[243] * E269
-  let E271 : Fin BB := 0 - Main[168]
-  let E272 : Fin BB := Main[243] * E271
-  let E273 : Fin BB := 0 - Main[169]
-  let E274 : Fin BB := Main[243] * E273
-  let E275 : Fin BB := 0 - Main[170]
-  let E276 : Fin BB := Main[243] * E275
+  let E269 : Fin KB := 0 - Main[167]
+  let E270 : Fin KB := Main[243] * E269
+  let E271 : Fin KB := 0 - Main[168]
+  let E272 : Fin KB := Main[243] * E271
+  let E273 : Fin KB := 0 - Main[169]
+  let E274 : Fin KB := Main[243] * E273
+  let E275 : Fin KB := 0 - Main[170]
+  let E276 : Fin KB := Main[243] * E275
   let CS8 : SP1ConstraintList := AddOperation.constraints #v[Main[49], Main[50], Main[51], Main[52]] #v[Main[57], Main[58], Main[59], Main[60]] { value := #v[Main[171], Main[172], Main[173], Main[174]] } Main[244]
-  let E277 : Fin BB := 0 - Main[171]
-  let E278 : Fin BB := Main[244] * E277
-  let E279 : Fin BB := 0 - Main[172]
-  let E280 : Fin BB := Main[244] * E279
-  let E281 : Fin BB := 0 - Main[173]
-  let E282 : Fin BB := Main[244] * E281
-  let E283 : Fin BB := 0 - Main[174]
-  let E284 : Fin BB := Main[244] * E283
-  let E285 : Fin BB := Main[242] * Main[245]
-  let E286 : Fin BB := Main[243] - E285
-  let E287 : Fin BB := Main[241] * Main[245]
-  let E288 : Fin BB := Main[244] - E287
-  let E289 : Fin BB := Main[201] * 1
-  let E290 : Fin BB := 1 - Main[201]
-  let E291 : Fin BB := E290 * Main[61]
-  let E292 : Fin BB := E289 + E291
-  let E293 : Fin BB := 1 - Main[201]
-  let E294 : Fin BB := E293 * Main[62]
-  let E295 : Fin BB := 1 - Main[201]
-  let E296 : Fin BB := E295 * Main[63]
-  let E297 : Fin BB := 1 - Main[201]
-  let E298 : Fin BB := E297 * Main[64]
-  let E299 : Fin BB := Main[65] - E292
-  let E300 : Fin BB := Main[66] - E294
-  let E301 : Fin BB := Main[67] - E296
-  let E302 : Fin BB := Main[68] - E298
-  let E303 : Fin BB := 1 - Main[201]
-  let E304 : Fin BB := E303 * Main[245]
-  let E305 : Fin BB := E304 - Main[246]
+  let E277 : Fin KB := 0 - Main[171]
+  let E278 : Fin KB := Main[244] * E277
+  let E279 : Fin KB := 0 - Main[172]
+  let E280 : Fin KB := Main[244] * E279
+  let E281 : Fin KB := 0 - Main[173]
+  let E282 : Fin KB := Main[244] * E281
+  let E283 : Fin KB := 0 - Main[174]
+  let E284 : Fin KB := Main[244] * E283
+  let E285 : Fin KB := Main[242] * Main[245]
+  let E286 : Fin KB := Main[243] - E285
+  let E287 : Fin KB := Main[241] * Main[245]
+  let E288 : Fin KB := Main[244] - E287
+  let E289 : Fin KB := Main[201] * 1
+  let E290 : Fin KB := 1 - Main[201]
+  let E291 : Fin KB := E290 * Main[61]
+  let E292 : Fin KB := E289 + E291
+  let E293 : Fin KB := 1 - Main[201]
+  let E294 : Fin KB := E293 * Main[62]
+  let E295 : Fin KB := 1 - Main[201]
+  let E296 : Fin KB := E295 * Main[63]
+  let E297 : Fin KB := 1 - Main[201]
+  let E298 : Fin KB := E297 * Main[64]
+  let E299 : Fin KB := Main[65] - E292
+  let E300 : Fin KB := Main[66] - E294
+  let E301 : Fin KB := Main[67] - E296
+  let E302 : Fin KB := Main[68] - E298
+  let E303 : Fin KB := 1 - Main[201]
+  let E304 : Fin KB := E303 * Main[245]
+  let E305 : Fin KB := E304 - Main[246]
   let CS9 : SP1ConstraintList := LtOperationUnsigned.constraints #v[Main[57], Main[58], Main[59], Main[60]] #v[Main[65], Main[66], Main[67], Main[68]] { u16_compare_operation := { bit := Main[175] }, u16_flags := #v[Main[176], Main[177], Main[178], Main[179]], not_eq_inv := Main[180], comparison_limbs := #v[Main[181], Main[182]] } Main[246]
-  let E306 : Fin BB := 1 - Main[175]
-  let E307 : Fin BB := Main[246] * E306
+  let E306 : Fin KB := 1 - Main[175]
+  let E307 : Fin KB := Main[246] * E306
   let CS10 : SP1ConstraintList := U16MSBOperation.constraints Main[18] { msb := Main[233] } Main[240]
   let CS11 : SP1ConstraintList := U16MSBOperation.constraints Main[25] { msb := Main[235] } Main[240]
   let CS12 : SP1ConstraintList := U16MSBOperation.constraints Main[56] { msb := Main[234] } Main[240]
@@ -343,143 +343,143 @@ section constraints
   let CS14 : SP1ConstraintList := U16MSBOperation.constraints Main[23] { msb := Main[235] } E2
   let CS15 : SP1ConstraintList := U16MSBOperation.constraints Main[54] { msb := Main[234] } E2
   let CS16 : SP1ConstraintList := U16MSBOperation.constraints Main[42] { msb := Main[236] } E2
-  let E308 : Fin BB := Main[183] - 1
-  let E309 : Fin BB := Main[183] * E308
-  let E310 : Fin BB := Main[184] - 1
-  let E311 : Fin BB := Main[184] * E310
-  let E312 : Fin BB := Main[185] - 1
-  let E313 : Fin BB := Main[185] * E312
-  let E314 : Fin BB := Main[186] - 1
-  let E315 : Fin BB := Main[186] * E314
-  let E316 : Fin BB := Main[187] - 1
-  let E317 : Fin BB := Main[187] * E316
-  let E318 : Fin BB := Main[188] - 1
-  let E319 : Fin BB := Main[188] * E318
-  let E320 : Fin BB := Main[189] - 1
-  let E321 : Fin BB := Main[189] * E320
-  let E322 : Fin BB := Main[190] - 1
-  let E323 : Fin BB := Main[190] * E322
-  let E324 : Fin BB := Main[202] - 1
-  let E325 : Fin BB := Main[202] * E324
-  let E326 : Fin BB := Main[203] - 1
-  let E327 : Fin BB := Main[203] * E326
-  let E328 : Fin BB := Main[204] - 1
-  let E329 : Fin BB := Main[204] * E328
-  let E330 : Fin BB := Main[205] - 1
-  let E331 : Fin BB := Main[205] * E330
-  let E332 : Fin BB := Main[206] - 1
-  let E333 : Fin BB := Main[206] * E332
-  let E334 : Fin BB := Main[207] - 1
-  let E335 : Fin BB := Main[207] * E334
-  let E336 : Fin BB := Main[208] - 1
-  let E337 : Fin BB := Main[208] * E336
-  let E338 : Fin BB := Main[209] - 1
-  let E339 : Fin BB := Main[209] * E338
-  let E340 : Fin BB := Main[210] - 1
-  let E341 : Fin BB := Main[210] * E340
-  let E342 : Fin BB := Main[240] - 1
-  let E343 : Fin BB := Main[240] * E342
-  let E344 : Fin BB := Main[237] - 1
-  let E345 : Fin BB := Main[237] * E344
-  let E346 : Fin BB := Main[238] - 1
-  let E347 : Fin BB := Main[238] * E346
-  let E348 : Fin BB := Main[239] - 1
-  let E349 : Fin BB := Main[239] * E348
-  let E350 : Fin BB := Main[241] - 1
-  let E351 : Fin BB := Main[241] * E350
-  let E352 : Fin BB := Main[242] - 1
-  let E353 : Fin BB := Main[242] * E352
-  let E354 : Fin BB := Main[245] - 1
-  let E355 : Fin BB := Main[245] * E354
-  let E356 : Fin BB := Main[243] - 1
-  let E357 : Fin BB := Main[243] * E356
-  let E358 : Fin BB := Main[244] - 1
-  let E359 : Fin BB := Main[244] * E358
-  let E360 : Fin BB := Main[203] + Main[205]
-  let E361 : Fin BB := E360 + Main[202]
-  let E362 : Fin BB := E361 + Main[204]
-  let E363 : Fin BB := E362 + Main[206]
-  let E364 : Fin BB := E363 + Main[207]
-  let E365 : Fin BB := E364 + Main[208]
-  let E366 : Fin BB := E365 + Main[209]
-  let E367 : Fin BB := 1 - E366
-  let E368 : Fin BB := Main[203] * 16
-  let E369 : Fin BB := Main[205] * 18
-  let E370 : Fin BB := E368 + E369
-  let E371 : Fin BB := Main[202] * 15
-  let E372 : Fin BB := E370 + E371
-  let E373 : Fin BB := Main[204] * 17
-  let E374 : Fin BB := E372 + E373
-  let E375 : Fin BB := Main[206] * 48
-  let E376 : Fin BB := E374 + E375
-  let E377 : Fin BB := Main[207] * 50
-  let E378 : Fin BB := E376 + E377
-  let E379 : Fin BB := Main[208] * 49
-  let E380 : Fin BB := E378 + E379
-  let E381 : Fin BB := Main[209] * 51
-  let E382 : Fin BB := E380 + E381
-  let E383 : Fin BB := Main[203] * 5
-  let E384 : Fin BB := Main[205] * 7
-  let E385 : Fin BB := E383 + E384
-  let E386 : Fin BB := Main[202] * 4
-  let E387 : Fin BB := E385 + E386
-  let E388 : Fin BB := Main[204] * 6
-  let E389 : Fin BB := E387 + E388
-  let E390 : Fin BB := Main[206] * 4
-  let E391 : Fin BB := E389 + E390
-  let E392 : Fin BB := Main[207] * 6
-  let E393 : Fin BB := E391 + E392
-  let E394 : Fin BB := Main[208] * 5
-  let E395 : Fin BB := E393 + E394
-  let E396 : Fin BB := Main[209] * 7
-  let E397 : Fin BB := E395 + E396
-  let E398 : Fin BB := Main[203] * 1
-  let E399 : Fin BB := Main[205] * 1
-  let E400 : Fin BB := E398 + E399
-  let E401 : Fin BB := Main[202] * 1
-  let E402 : Fin BB := E400 + E401
-  let E403 : Fin BB := Main[204] * 1
-  let E404 : Fin BB := E402 + E403
-  let E405 : Fin BB := Main[206] * 1
-  let E406 : Fin BB := E404 + E405
-  let E407 : Fin BB := Main[207] * 1
-  let E408 : Fin BB := E406 + E407
-  let E409 : Fin BB := Main[208] * 1
-  let E410 : Fin BB := E408 + E409
-  let E411 : Fin BB := Main[209] * 1
-  let E412 : Fin BB := E410 + E411
-  let E413 : Fin BB := Main[203] * 51
-  let E414 : Fin BB := Main[205] * 51
-  let E415 : Fin BB := E413 + E414
-  let E416 : Fin BB := Main[202] * 51
-  let E417 : Fin BB := E415 + E416
-  let E418 : Fin BB := Main[204] * 51
-  let E419 : Fin BB := E417 + E418
-  let E420 : Fin BB := Main[206] * 59
-  let E421 : Fin BB := E419 + E420
-  let E422 : Fin BB := Main[207] * 59
-  let E423 : Fin BB := E421 + E422
-  let E424 : Fin BB := Main[208] * 59
-  let E425 : Fin BB := E423 + E424
-  let E426 : Fin BB := Main[209] * 59
-  let E427 : Fin BB := E425 + E426
-  let E428 : Fin BB := Main[203] * 8
-  let E429 : Fin BB := Main[205] * 8
-  let E430 : Fin BB := E428 + E429
-  let E431 : Fin BB := Main[202] * 8
-  let E432 : Fin BB := E430 + E431
-  let E433 : Fin BB := Main[204] * 8
-  let E434 : Fin BB := E432 + E433
-  let E435 : Fin BB := Main[206] * 8
-  let E436 : Fin BB := E434 + E435
-  let E437 : Fin BB := Main[207] * 8
-  let E438 : Fin BB := E436 + E437
-  let E439 : Fin BB := Main[208] * 8
-  let E440 : Fin BB := E438 + E439
-  let E441 : Fin BB := Main[3] + 4
+  let E308 : Fin KB := Main[183] - 1
+  let E309 : Fin KB := Main[183] * E308
+  let E310 : Fin KB := Main[184] - 1
+  let E311 : Fin KB := Main[184] * E310
+  let E312 : Fin KB := Main[185] - 1
+  let E313 : Fin KB := Main[185] * E312
+  let E314 : Fin KB := Main[186] - 1
+  let E315 : Fin KB := Main[186] * E314
+  let E316 : Fin KB := Main[187] - 1
+  let E317 : Fin KB := Main[187] * E316
+  let E318 : Fin KB := Main[188] - 1
+  let E319 : Fin KB := Main[188] * E318
+  let E320 : Fin KB := Main[189] - 1
+  let E321 : Fin KB := Main[189] * E320
+  let E322 : Fin KB := Main[190] - 1
+  let E323 : Fin KB := Main[190] * E322
+  let E324 : Fin KB := Main[202] - 1
+  let E325 : Fin KB := Main[202] * E324
+  let E326 : Fin KB := Main[203] - 1
+  let E327 : Fin KB := Main[203] * E326
+  let E328 : Fin KB := Main[204] - 1
+  let E329 : Fin KB := Main[204] * E328
+  let E330 : Fin KB := Main[205] - 1
+  let E331 : Fin KB := Main[205] * E330
+  let E332 : Fin KB := Main[206] - 1
+  let E333 : Fin KB := Main[206] * E332
+  let E334 : Fin KB := Main[207] - 1
+  let E335 : Fin KB := Main[207] * E334
+  let E336 : Fin KB := Main[208] - 1
+  let E337 : Fin KB := Main[208] * E336
+  let E338 : Fin KB := Main[209] - 1
+  let E339 : Fin KB := Main[209] * E338
+  let E340 : Fin KB := Main[210] - 1
+  let E341 : Fin KB := Main[210] * E340
+  let E342 : Fin KB := Main[240] - 1
+  let E343 : Fin KB := Main[240] * E342
+  let E344 : Fin KB := Main[237] - 1
+  let E345 : Fin KB := Main[237] * E344
+  let E346 : Fin KB := Main[238] - 1
+  let E347 : Fin KB := Main[238] * E346
+  let E348 : Fin KB := Main[239] - 1
+  let E349 : Fin KB := Main[239] * E348
+  let E350 : Fin KB := Main[241] - 1
+  let E351 : Fin KB := Main[241] * E350
+  let E352 : Fin KB := Main[242] - 1
+  let E353 : Fin KB := Main[242] * E352
+  let E354 : Fin KB := Main[245] - 1
+  let E355 : Fin KB := Main[245] * E354
+  let E356 : Fin KB := Main[243] - 1
+  let E357 : Fin KB := Main[243] * E356
+  let E358 : Fin KB := Main[244] - 1
+  let E359 : Fin KB := Main[244] * E358
+  let E360 : Fin KB := Main[203] + Main[205]
+  let E361 : Fin KB := E360 + Main[202]
+  let E362 : Fin KB := E361 + Main[204]
+  let E363 : Fin KB := E362 + Main[206]
+  let E364 : Fin KB := E363 + Main[207]
+  let E365 : Fin KB := E364 + Main[208]
+  let E366 : Fin KB := E365 + Main[209]
+  let E367 : Fin KB := 1 - E366
+  let E368 : Fin KB := Main[203] * 16
+  let E369 : Fin KB := Main[205] * 18
+  let E370 : Fin KB := E368 + E369
+  let E371 : Fin KB := Main[202] * 15
+  let E372 : Fin KB := E370 + E371
+  let E373 : Fin KB := Main[204] * 17
+  let E374 : Fin KB := E372 + E373
+  let E375 : Fin KB := Main[206] * 48
+  let E376 : Fin KB := E374 + E375
+  let E377 : Fin KB := Main[207] * 50
+  let E378 : Fin KB := E376 + E377
+  let E379 : Fin KB := Main[208] * 49
+  let E380 : Fin KB := E378 + E379
+  let E381 : Fin KB := Main[209] * 51
+  let E382 : Fin KB := E380 + E381
+  let E383 : Fin KB := Main[203] * 5
+  let E384 : Fin KB := Main[205] * 7
+  let E385 : Fin KB := E383 + E384
+  let E386 : Fin KB := Main[202] * 4
+  let E387 : Fin KB := E385 + E386
+  let E388 : Fin KB := Main[204] * 6
+  let E389 : Fin KB := E387 + E388
+  let E390 : Fin KB := Main[206] * 4
+  let E391 : Fin KB := E389 + E390
+  let E392 : Fin KB := Main[207] * 6
+  let E393 : Fin KB := E391 + E392
+  let E394 : Fin KB := Main[208] * 5
+  let E395 : Fin KB := E393 + E394
+  let E396 : Fin KB := Main[209] * 7
+  let E397 : Fin KB := E395 + E396
+  let E398 : Fin KB := Main[203] * 1
+  let E399 : Fin KB := Main[205] * 1
+  let E400 : Fin KB := E398 + E399
+  let E401 : Fin KB := Main[202] * 1
+  let E402 : Fin KB := E400 + E401
+  let E403 : Fin KB := Main[204] * 1
+  let E404 : Fin KB := E402 + E403
+  let E405 : Fin KB := Main[206] * 1
+  let E406 : Fin KB := E404 + E405
+  let E407 : Fin KB := Main[207] * 1
+  let E408 : Fin KB := E406 + E407
+  let E409 : Fin KB := Main[208] * 1
+  let E410 : Fin KB := E408 + E409
+  let E411 : Fin KB := Main[209] * 1
+  let E412 : Fin KB := E410 + E411
+  let E413 : Fin KB := Main[203] * 51
+  let E414 : Fin KB := Main[205] * 51
+  let E415 : Fin KB := E413 + E414
+  let E416 : Fin KB := Main[202] * 51
+  let E417 : Fin KB := E415 + E416
+  let E418 : Fin KB := Main[204] * 51
+  let E419 : Fin KB := E417 + E418
+  let E420 : Fin KB := Main[206] * 59
+  let E421 : Fin KB := E419 + E420
+  let E422 : Fin KB := Main[207] * 59
+  let E423 : Fin KB := E421 + E422
+  let E424 : Fin KB := Main[208] * 59
+  let E425 : Fin KB := E423 + E424
+  let E426 : Fin KB := Main[209] * 59
+  let E427 : Fin KB := E425 + E426
+  let E428 : Fin KB := Main[203] * 8
+  let E429 : Fin KB := Main[205] * 8
+  let E430 : Fin KB := E428 + E429
+  let E431 : Fin KB := Main[202] * 8
+  let E432 : Fin KB := E430 + E431
+  let E433 : Fin KB := Main[204] * 8
+  let E434 : Fin KB := E432 + E433
+  let E435 : Fin KB := Main[206] * 8
+  let E436 : Fin KB := E434 + E435
+  let E437 : Fin KB := Main[207] * 8
+  let E438 : Fin KB := E436 + E437
+  let E439 : Fin KB := Main[208] * 8
+  let E440 : Fin KB := E438 + E439
+  let E441 : Fin KB := Main[3] + 4
   let CS17 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E441, Main[4], Main[5]] 8 Main[245]
-  let E442 : Fin BB := Main[1] * 65536
-  let E443 : Fin BB := Main[2] + E442
+  let E442 : Fin KB := Main[1] * 65536
+  let E443 : Fin KB := Main[2] + E442
   let CS18 : SP1ConstraintList := RTypeReader.constraints Main[0] E443 #v[Main[3], Main[4], Main[5]] E382 #v[E440, E427, E397, E412] #v[Main[29], Main[30], Main[31], Main[32]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } }, is_trusted := Main[28] } Main[245]
   CS0 ++ CS1 ++ CS2 ++ CS3 ++ CS4 ++ CS5 ++ CS6 ++ CS7 ++ CS8 ++ CS9 ++ CS10 ++ CS11 ++ CS12 ++ CS13 ++ CS14 ++ CS15 ++ CS16 ++ CS17 ++ CS18 ++ [
     (.assertZero E13),
@@ -640,7 +640,7 @@ end constraints
 
 section field_arithmetic
 
-lemma bb_bool_to_le {x : Fin BB} : x = (0 : Fin BB) ∨ x = (1 : Fin BB) ↔ (0 : Fin BB) ≤ x ∧ x ≤ (1 : Fin BB) := by grind
+lemma bb_bool_to_le {x : Fin KB} : x = (0 : Fin KB) ∨ x = (1 : Fin KB) ↔ (0 : Fin KB) ≤ x ∧ x ≤ (1 : Fin KB) := by grind
 
 end field_arithmetic
 
@@ -753,7 +753,7 @@ end operands
 
 section auxiliaries
 
-lemma div_mod_decomposition_w {a b c : Fin BB} :
+lemma div_mod_decomposition_w {a b c : Fin KB} :
   a.val < 65536 → c.val < 2130706433 / 65536 → (a = b - c * 65536 ↔ a = b % 65536 ∧ c = b / 65536) := by
   intro ub_a ub_c
   constructor
@@ -831,7 +831,7 @@ lemma tdiv_tmod_unique_full_nat {b c q r : ℕ} (hcnz : c ≠ 0) :
     rw [Int.toNat_natCast, Int.toNat_natCast, Int.natCast_inj, Int.natCast_inj]
   . omega
 
-lemma sum_zero_abs {wx wy : Word (Fin BB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
+lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
   wx.isNegative →
     Word.toBitVec64 #v[0, 0, 0, 0] = Word.toBitVec64 wx + Word.toBitVec64 wy →
     (wx.toInt = -2^63 → wy.toInt = -2^63) ∧
@@ -869,7 +869,7 @@ section div_rem
 
 set_option linter.unusedVariables false in
 lemma div_rem
-  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin BB)
+  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin KB)
   (is_U64_b : Word.isU64 #v[b0, b1, b2, b3])
   (is_U64_c : Word.isU64 #v[c0, c1, c2, c3])
   (sop1 : is_div = 1 → is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
@@ -1084,12 +1084,12 @@ lemma div_rem
         . simp [nof] at *
           rw [if_neg]; rotate_left
           . intro ⟨ h_eq_b, h_eq_c ⟩
-            have : (#v[b0, b1, b2, b3] : Word (Fin BB)) = #v[0, 0, 0, 32768] := by
+            have : (#v[b0, b1, b2, b3] : Word (Fin KB)) = #v[0, 0, 0, 32768] := by
               rw [Word.eq_toInt_eq is_U64_b, h_eq_b]
               simp [Word.toInt, Word.isNegative, Word.toNat]
               apply Word.isU64_of_cases <;> simp
             simp at this; rw [if_pos (by exact this)] at overflow_b; simp [overflow_b] at *; clear this
-            have : (#v[c0, c1, c2, c3] : Word (Fin BB)) = #v[65535, 65535, 65535, 65535] := by
+            have : (#v[c0, c1, c2, c3] : Word (Fin KB)) = #v[65535, 65535, 65535, 65535] := by
               rw [Word.eq_toInt_eq is_U64_c, h_eq_c]
               simp [Word.toInt, Word.isNegative, Word.toNat]
               apply Word.isU64_of_cases <;> simp
@@ -1135,11 +1135,11 @@ lemma div_rem
                 obtain ⟨ is_U64_ctqh, ctq_high ⟩ := main_mul_high
                 have ctq := combine_MUL_MULH is_U64_ctql is_U64_ctqh is_U64_q is_U64_c ctq_low ctq_high
                 simp at ctq
-                have eq_eb : (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535, msb_b * 65535, msb_b * 65535] : DWord (Fin BB)) = Word.extend #v[b0, b1, b2, b3] true := by
+                have eq_eb : (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535, msb_b * 65535, msb_b * 65535] : DWord (Fin KB)) = Word.extend #v[b0, b1, b2, b3] true := by
                   clear *- is_U64_b eq_msb_b
                   simp [Word.extend, Word.isNegative]
                   aesop
-                have eq_er : (#v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535] : DWord (Fin BB)) = Word.extend #v[r0, r1, r2, r3] true := by
+                have eq_er : (#v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535] : DWord (Fin KB)) = Word.extend #v[r0, r1, r2, r3] true := by
                   clear *- is_U64_r eq_msb_rem
                   simp [Word.extend, Word.isNegative]
                   aesop
@@ -1788,7 +1788,7 @@ section divu_remu
 
 set_option linter.unusedVariables false in
 lemma divu_remu
-  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin BB)
+  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin KB)
   (is_U64_b : Word.isU64 #v[b0, b1, b2, b3])
   (is_U64_c : Word.isU64 #v[c0, c1, c2, c3])
   (sop1 : is_div = 1 → is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
@@ -2016,8 +2016,8 @@ lemma divu_remu
           obtain ⟨ is_U64_ctqh, ctq_high ⟩ := main_mul_high
           have ctq := combine_MUL_MULHU is_U64_ctql is_U64_ctqh is_U64_q is_U64_c ctq_low ctq_high
           simp at ctq
-          have eq_eb : (#v[b0, b1, b2, b3, 0, 0, 0, 0] : DWord (Fin BB)) = Word.extend #v[b0, b1, b2, b3] false := by simp [Word.extend]
-          have eq_er : (#v[r0, r1, r2, r3, 0, 0, 0, 0] : DWord (Fin BB)) = Word.extend #v[r0, r1, r2, r3] false := by simp [Word.extend]
+          have eq_eb : (#v[b0, b1, b2, b3, 0, 0, 0, 0] : DWord (Fin KB)) = Word.extend #v[b0, b1, b2, b3] false := by simp [Word.extend]
+          have eq_er : (#v[r0, r1, r2, r3, 0, 0, 0, 0] : DWord (Fin KB)) = Word.extend #v[r0, r1, r2, r3] false := by simp [Word.extend]
           suffices bv_ctqr:
             DWord.toBitVec128 #v[b0, b1, b2, b3, 0, 0, 0, 0] =
               DWord.toBitVec128 #v[ctq0, ctq1, ctq2, ctq3, ctq4, ctq5, ctq6, ctq7] +
@@ -2579,7 +2579,7 @@ section divw_remw
 
 set_option linter.unusedVariables false in
 lemma divw_remw
-  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin BB)
+  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin KB)
   (is_U64_b : Word.isU64 #v[b0, b1, b2, b3])
   (is_U64_c : Word.isU64 #v[c0, c1, c2, c3])
   (sop1 : is_div = 1 → is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
@@ -2807,13 +2807,13 @@ lemma divw_remw
         . simp [nof] at *
           rw [if_neg]; rotate_left
           . intro ⟨ h_eq_b, h_eq_c ⟩
-            have : (#v[b0, b1] : HWord (Fin BB)) = #v[0, 32768] := by
+            have : (#v[b0, b1] : HWord (Fin KB)) = #v[0, 32768] := by
               rw [HWord.eq_toInt_eq is_U32_bl, h_eq_b]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
               apply HWord.isU32_of_cases <;> simp
             simp at this
             rw [if_pos (by exact this)] at w_overflow_b; simp [w_overflow_b] at *; clear this
-            have : (#v[c0, c1] : HWord (Fin BB)) = #v[65535, 65535] := by
+            have : (#v[c0, c1] : HWord (Fin KB)) = #v[65535, 65535] := by
               rw [HWord.eq_toInt_eq is_U32_cl, h_eq_c]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
               apply HWord.isU32_of_cases <;> simp
@@ -2858,8 +2858,8 @@ lemma divw_remw
                          nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
                          main_mul_low main_mul_high lb_b ub_b lb_c ub_c lb_q ub_q lb_r ub_r
                 obtain ⟨ is_U64_ctql, ctq_low ⟩ := main_mul_low
-                have eq_eb : (#v[b0, b1, msb_b * 65535, msb_b * 65535] : Word (Fin BB)) = HWord.extend #v[b0, b1] true := by simp [HWord.extend, HWord.isNegative, w_eq_msb_b]
-                have eq_er : (#v[r0, r1, msb_rem * 65535, msb_rem * 65535] : Word (Fin BB)) = HWord.extend #v[r0, r1] true := by simp [HWord.extend, HWord.isNegative, w_eq_msb_rem]
+                have eq_eb : (#v[b0, b1, msb_b * 65535, msb_b * 65535] : Word (Fin KB)) = HWord.extend #v[b0, b1] true := by simp [HWord.extend, HWord.isNegative, w_eq_msb_b]
+                have eq_er : (#v[r0, r1, msb_rem * 65535, msb_rem * 65535] : Word (Fin KB)) = HWord.extend #v[r0, r1] true := by simp [HWord.extend, HWord.isNegative, w_eq_msb_rem]
                 suffices bv_ctqr:
                   Word.toBitVec64 #v[b0, b1, msb_b * 65535, msb_b * 65535] =
                     Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] +
@@ -3523,7 +3523,7 @@ section divuw_remuw
 
 set_option linter.unusedVariables false in
 lemma divuw_remuw
-  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin BB)
+  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : Fin KB)
   (is_U64_b : Word.isU64 #v[b0, b1, b2, b3])
   (is_U64_c : Word.isU64 #v[c0, c1, c2, c3])
   (sop1 : is_div = 1 → is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
@@ -3758,8 +3758,8 @@ lemma divuw_remuw
                      nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
                      main_mul_low
             obtain ⟨ is_U64_ctql, ctq_low ⟩ := main_mul_low
-            have eq_eb : (#v[b0, b1, 0, 0] : Word (Fin BB)) = HWord.extend #v[b0, b1] false := by simp [HWord.extend]
-            have eq_er : (#v[r0, r1, 0, 0] : Word (Fin BB)) = HWord.extend #v[r0, r1] false := by simp [HWord.extend]
+            have eq_eb : (#v[b0, b1, 0, 0] : Word (Fin KB)) = HWord.extend #v[b0, b1] false := by simp [HWord.extend]
+            have eq_er : (#v[r0, r1, 0, 0] : Word (Fin KB)) = HWord.extend #v[r0, r1] false := by simp [HWord.extend]
             suffices bv_ctqr:
               Word.toBitVec64 #v[b0, b1, 0, 0] =
                 Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] +

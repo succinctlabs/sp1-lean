@@ -6,10 +6,10 @@ import SP1Operations.Operation.AddwOperation.Constraints
 namespace AddwOperation
 
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
-lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddwOperation) :
+lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddwOperation) :
     List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
-      let carry0 : Fin BB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
-      let carry1 : Fin BB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
+      let carry0 : Fin KB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
+      let carry1 : Fin KB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
       (U16MSBOperation.constraints cols.value[1] cols.msb 1).allHold ∧
       ((carry0 = 0 ∨ carry0 = 1) ∧
       (carry1 = 0 ∨ carry1 = 1) ∧
@@ -19,7 +19,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddwOperation) :
   tauto
 
 theorem spec
-  {a b : Word (Fin BB)}
+  {a b : Word (Fin KB)}
   {cols : AddwOperation}
   (h_isU64_a : a.isU64)
   (h_isU64_b : b.isU64) :

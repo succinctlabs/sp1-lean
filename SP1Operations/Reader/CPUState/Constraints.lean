@@ -6,17 +6,17 @@ section constraints
 
 @[irreducible] def constraints
   (cols : CPUState)
-  (next_pc : (Vector (Fin BB) 3))
-  (clk_increment : (Fin BB))
-  (is_real : (Fin BB))
+  (next_pc : (Vector (Fin KB) 3))
+  (clk_increment : (Fin KB))
+  (is_real : (Fin KB))
   : SP1ConstraintList :=
-  let E0 : Fin BB := cols.clk_16_24 * 65536
-  let E1 : Fin BB := cols.clk_0_16 + E0
-  let E2 : Fin BB := is_real - 1
-  let E3 : Fin BB := is_real * E2
-  let E4 : Fin BB := E1 + clk_increment
-  let E5 : Fin BB := cols.clk_0_16 - 1
-  let E6 : Fin BB := E5 * 1864368129
+  let E0 : Fin KB := cols.clk_16_24 * 65536
+  let E1 : Fin KB := cols.clk_0_16 + E0
+  let E2 : Fin KB := is_real - 1
+  let E3 : Fin KB := is_real * E2
+  let E4 : Fin KB := E1 + clk_increment
+  let E5 : Fin KB := cols.clk_0_16 - 1
+  let E6 : Fin KB := E5 * 1864368129
   [
     (.assertZero E3),
     (.receive (.state cols.clk_high E1 cols.pc[0] cols.pc[1] cols.pc[2]) is_real),

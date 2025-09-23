@@ -13,7 +13,7 @@ namespace Mul
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 87)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mul : is_mul Main)
@@ -54,7 +54,7 @@ theorem correct_mul
     simp [spec_mul, sp1_mul, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -72,7 +72,7 @@ namespace Mulh
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 87)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulh : is_mulh Main)
@@ -113,7 +113,7 @@ theorem correct_mulh
     simp [spec_mulh, sp1_mulh, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -131,7 +131,7 @@ namespace Mulhu
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 87)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulhu : is_mulhu Main)
@@ -172,7 +172,7 @@ theorem correct_mulh
     simp [spec_mulhu, sp1_mulhu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -188,7 +188,7 @@ end Mulhu
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 87)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulhsu : is_mulhsu Main)
@@ -229,7 +229,7 @@ theorem correct_mulh
     simp [spec_mulhsu, sp1_mulhsu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -247,7 +247,7 @@ end Mulhsu
 namespace Mulw
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 87)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulw : is_mulw Main)
@@ -288,7 +288,7 @@ theorem correct_mulw
     simp [spec_mulw, sp1_mulw, execute, execute_MULW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

@@ -14,7 +14,7 @@ namespace Srl
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srl : is_srl Main)
@@ -56,7 +56,7 @@ theorem correct_srl
     simp [spec_srl, sp1_srl, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -74,7 +74,7 @@ namespace Srli
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srli : is_srli Main)
@@ -116,7 +116,7 @@ theorem correct_srli
     simp [spec_srli, sp1_srli, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -134,7 +134,7 @@ namespace Srlw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srlw : is_srlw Main)
@@ -176,7 +176,7 @@ theorem correct_srlw
     simp [spec_srlw, sp1_srlw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -194,7 +194,7 @@ namespace Srliw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srliw : is_srliw Main)
@@ -236,7 +236,7 @@ theorem correct_srliw
     simp [spec_srliw, sp1_srliw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -254,7 +254,7 @@ namespace Sra
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sra : is_sra Main)
@@ -296,7 +296,7 @@ theorem correct_sra
     simp [spec_sra, sp1_sra, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -314,7 +314,7 @@ namespace Srai
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srai : is_srai Main)
@@ -356,7 +356,7 @@ theorem correct_srai
     simp [spec_srai, sp1_srai, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -374,7 +374,7 @@ namespace Sraw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sraw : is_sraw Main)
@@ -416,7 +416,7 @@ theorem correct_sraw
     simp [spec_sraw, sp1_sraw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -434,7 +434,7 @@ namespace Sraiw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin BB) 69)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sraiw : is_sraiw Main)
@@ -476,7 +476,7 @@ theorem correct_sraiw
     simp [spec_sraiw, sp1_sraiw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

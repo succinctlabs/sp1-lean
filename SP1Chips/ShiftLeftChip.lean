@@ -14,7 +14,7 @@ namespace Sll
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 65)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sll : is_sll Main)
@@ -51,7 +51,7 @@ theorem correct_sll
     simp [spec_sll, sp1_sll, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -69,7 +69,7 @@ namespace Slli
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 65)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slli : is_slli Main)
@@ -106,7 +106,7 @@ theorem correct_slli
     simp [spec_slli, sp1_slli, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -124,7 +124,7 @@ namespace Sllw
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 65)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sllw : is_sllw Main)
@@ -161,7 +161,7 @@ theorem correct_sllw
     simp [spec_sllw, sp1_sllw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -179,7 +179,7 @@ namespace Slliw
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin BB) 65)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slliw : is_slliw Main)
@@ -216,7 +216,7 @@ theorem correct_slliw
     simp [spec_slliw, sp1_slliw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

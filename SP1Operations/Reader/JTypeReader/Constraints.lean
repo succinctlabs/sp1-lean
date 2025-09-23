@@ -7,41 +7,41 @@ set_option linter.unusedVariables false
 section constraints
 
 @[irreducible] def constraints
-  (clk_high : (Fin BB))
-  (clk_low : (Fin BB))
-  (pc : (Vector (Fin BB) 3))
-  (opcode : (Fin BB))
-  (instr_field_consts : (Vector (Fin BB) 4))
-  (op_a_write_value : (Word (Fin BB)))
+  (clk_high : (Fin KB))
+  (clk_low : (Fin KB))
+  (pc : (Vector (Fin KB) 3))
+  (opcode : (Fin KB))
+  (instr_field_consts : (Vector (Fin KB) 4))
+  (op_a_write_value : (Word (Fin KB)))
   (cols : JTypeReader)
-  (is_real : (Fin BB))
+  (is_real : (Fin KB))
   : SP1ConstraintList :=
-  let E0 : Fin BB := is_real - 1
-  let E1 : Fin BB := is_real * E0
-  let E2 : Fin BB := is_real - cols.is_trusted
-  let E3 : Fin BB := E2 - 1
-  let E4 : Fin BB := E2 * E3
-  let E5 : Fin BB := cols.is_trusted - 1
-  let E6 : Fin BB := cols.is_trusted * E5
-  let E7 : Fin BB := E2 + cols.is_trusted
-  let E8 : Fin BB := E7 - is_real
-  let E9 : Fin BB := mprotect_enabled () - 1
-  let E10 : Fin BB := E2 * E9
-  let E11 : Fin BB := op_a_write_value[0] - 0
-  let E12 : Fin BB := cols.op_a_0 * E11
-  let E13 : Fin BB := op_a_write_value[1] - 0
-  let E14 : Fin BB := cols.op_a_0 * E13
-  let E15 : Fin BB := op_a_write_value[2] - 0
-  let E16 : Fin BB := cols.op_a_0 * E15
-  let E17 : Fin BB := op_a_write_value[3] - 0
-  let E18 : Fin BB := cols.op_a_0 * E17
-  let E19 : Fin BB := clk_low + 4
-  let E20 : Fin BB := is_real - 1
-  let E21 : Fin BB := is_real * E20
-  let E22 : Fin BB := E19 - cols.op_a_memory.access_timestamp.prev_low
-  let E23 : Fin BB := E22 - 1
-  let E24 : Fin BB := E23 - cols.op_a_memory.access_timestamp.diff_low_limb
-  let E25 : Fin BB := E24 * 2130673921
+  let E0 : Fin KB := is_real - 1
+  let E1 : Fin KB := is_real * E0
+  let E2 : Fin KB := is_real - cols.is_trusted
+  let E3 : Fin KB := E2 - 1
+  let E4 : Fin KB := E2 * E3
+  let E5 : Fin KB := cols.is_trusted - 1
+  let E6 : Fin KB := cols.is_trusted * E5
+  let E7 : Fin KB := E2 + cols.is_trusted
+  let E8 : Fin KB := E7 - is_real
+  let E9 : Fin KB := mprotect_enabled () - 1
+  let E10 : Fin KB := E2 * E9
+  let E11 : Fin KB := op_a_write_value[0] - 0
+  let E12 : Fin KB := cols.op_a_0 * E11
+  let E13 : Fin KB := op_a_write_value[1] - 0
+  let E14 : Fin KB := cols.op_a_0 * E13
+  let E15 : Fin KB := op_a_write_value[2] - 0
+  let E16 : Fin KB := cols.op_a_0 * E15
+  let E17 : Fin KB := op_a_write_value[3] - 0
+  let E18 : Fin KB := cols.op_a_0 * E17
+  let E19 : Fin KB := clk_low + 4
+  let E20 : Fin KB := is_real - 1
+  let E21 : Fin KB := is_real * E20
+  let E22 : Fin KB := E19 - cols.op_a_memory.access_timestamp.prev_low
+  let E23 : Fin KB := E22 - 1
+  let E24 : Fin KB := E23 - cols.op_a_memory.access_timestamp.diff_low_limb
+  let E25 : Fin KB := E24 * 2130673921
   [
     (.assertZero E1),
     (.assertZero E4),

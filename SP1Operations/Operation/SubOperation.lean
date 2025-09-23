@@ -5,12 +5,12 @@ import SP1Operations.Operation.SubOperation.Constraints
 namespace SubOperation
 
 set_option maxHeartbeats 2000000 in
-lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : SubOperation) :
+lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : SubOperation) :
     List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
-    let carry0 : Fin BB := (b[0] + cols.value[0] - a[0]) * 65536⁻¹
-    let carry1 : Fin BB := (b[1] + cols.value[1] - a[1] + carry0) * 65536⁻¹
-    let carry2 : Fin BB := (b[2] + cols.value[2] - a[2] + carry1) * 65536⁻¹
-    let carry3 : Fin BB := (b[3] + cols.value[3] - a[3] + carry2) * 65536⁻¹
+    let carry0 : Fin KB := (b[0] + cols.value[0] - a[0]) * 65536⁻¹
+    let carry1 : Fin KB := (b[1] + cols.value[1] - a[1] + carry0) * 65536⁻¹
+    let carry2 : Fin KB := (b[2] + cols.value[2] - a[2] + carry1) * 65536⁻¹
+    let carry3 : Fin KB := (b[3] + cols.value[3] - a[3] + carry2) * 65536⁻¹
     (carry0 = 0 ∨ carry0 = 1) ∧
     (carry1 = 0 ∨ carry1 = 1) ∧
     (carry2 = 0 ∨ carry2 = 1) ∧
@@ -27,7 +27,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : SubOperation) :
 
 set_option maxHeartbeats 1000000 in
 theorem spec
-  {a b : Word (Fin BB)}
+  {a b : Word (Fin KB)}
   {cols : SubOperation}
   (h_isU64_a : a.isU64)
   (h_isU64_b : b.isU64) :

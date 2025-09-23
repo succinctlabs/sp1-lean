@@ -9,7 +9,7 @@ open BitVec
 namespace Addw
 
 variable
-  (Main : Vector (Fin BB) 37)
+  (Main : Vector (Fin KB) 37)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[36] = 1)
@@ -73,7 +73,7 @@ theorem correct_addw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -91,7 +91,7 @@ namespace Addiw
 open Addw
 
 variable
-  (Main : Vector (Fin BB) 37)
+  (Main : Vector (Fin KB) 37)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[35] = 1)
@@ -158,7 +158,7 @@ theorem correct_addw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

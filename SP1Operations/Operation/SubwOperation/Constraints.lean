@@ -7,31 +7,31 @@ namespace SubwOperation
 section constraints
 
 @[irreducible] def constraints
-  (a : (Word (Fin BB)))
-  (b : (Word (Fin BB)))
+  (a : (Word (Fin KB)))
+  (b : (Word (Fin KB)))
   (cols : SubwOperation)
-  (is_real : (Fin BB))
+  (is_real : (Fin KB))
   : SP1ConstraintList :=
-  let E0 : Fin BB := is_real - 1
-  let E1 : Fin BB := is_real * E0
-  let E2 : Fin BB := a[0] + 65536
-  let E3 : Fin BB := E2 - 1
-  let E4 : Fin BB := E3 - b[0]
-  let E5 : Fin BB := E4 - cols.value[0]
-  let E6 : Fin BB := E5 + 1
-  let E7 : Fin BB := E6 * 2130673921
-  let E8 : Fin BB := E7 - 1
-  let E9 : Fin BB := E7 * E8
-  let E10 : Fin BB := is_real * E9
-  let E11 : Fin BB := a[1] + 65536
-  let E12 : Fin BB := E11 - 1
-  let E13 : Fin BB := E12 - b[1]
-  let E14 : Fin BB := E13 - cols.value[1]
-  let E15 : Fin BB := E14 + E7
-  let E16 : Fin BB := E15 * 2130673921
-  let E17 : Fin BB := E16 - 1
-  let E18 : Fin BB := E16 * E17
-  let E19 : Fin BB := is_real * E18
+  let E0 : Fin KB := is_real - 1
+  let E1 : Fin KB := is_real * E0
+  let E2 : Fin KB := a[0] + 65536
+  let E3 : Fin KB := E2 - 1
+  let E4 : Fin KB := E3 - b[0]
+  let E5 : Fin KB := E4 - cols.value[0]
+  let E6 : Fin KB := E5 + 1
+  let E7 : Fin KB := E6 * 2130673921
+  let E8 : Fin KB := E7 - 1
+  let E9 : Fin KB := E7 * E8
+  let E10 : Fin KB := is_real * E9
+  let E11 : Fin KB := a[1] + 65536
+  let E12 : Fin KB := E11 - 1
+  let E13 : Fin KB := E12 - b[1]
+  let E14 : Fin KB := E13 - cols.value[1]
+  let E15 : Fin KB := E14 + E7
+  let E16 : Fin KB := E15 * 2130673921
+  let E17 : Fin KB := E16 - 1
+  let E18 : Fin KB := E16 * E17
+  let E19 : Fin KB := is_real * E18
   let CS0 : SP1ConstraintList := U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } is_real
   CS0 ++ [
     (.assertZero E1),

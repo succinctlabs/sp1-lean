@@ -3,12 +3,12 @@ import SP1Foundations
 
 --- A Reader that only accesses values of type `T`.
 structure ALUTypeReader where
-  op_a : Fin BB
+  op_a : Fin KB
   op_a_memory : MemoryAccessInSharedCols
-  op_a_0 : Fin BB
-  op_b : Fin BB
+  op_a_0 : Fin KB
+  op_b : Fin KB
   op_b_memory : MemoryAccessInSharedCols
-  op_c : Word (Fin BB)
+  op_c : Word (Fin KB)
   op_c_memory : MemoryAccessInSharedCols
-  imm_c : Fin BB
-  is_trusted : Fin BB
+  imm_c : Fin KB
+  is_trusted : Fin KB

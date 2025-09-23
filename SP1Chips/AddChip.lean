@@ -11,7 +11,7 @@ open LeanRV64D.Functions BitVec
 namespace Add
 
 variable
-  (Main : Vector (Fin BB) 34)
+  (Main : Vector (Fin KB) 34)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[33] = 1)
@@ -75,7 +75,7 @@ open Sail
 
 set_option pp.parens true in
 theorem correct_add
-  (Main : Vector (Fin BB) 34)
+  (Main : Vector (Fin KB) 34)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[33] = 1)
@@ -107,7 +107,7 @@ theorem correct_add
     simp [sp1_op_b, read_op_b (by omega)]
     simp [sp1_op_c, read_op_c (by omega)]
     simp [sp1_op_a]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . rw [← is_add]

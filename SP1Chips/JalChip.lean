@@ -7,9 +7,9 @@ open BitVec
 
 open Sail SailState BitVec LeanRV64D.Functions
 
-variable (Main : Vector (Fin BB) 32) (s : SailState)
+variable (Main : Vector (Fin KB) 32) (s : SailState)
 
-lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 32}
+lemma op_a_lt32_of_constraints {Main : Vector (Fin KB) 32}
     (h_cstrs : (constraints Main).allHold) (h_is_real : Main[31] = 1) : Main[6].val < 32 := by
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h_cstrs
   have h22 : Main[22] = 1 := by simp_all [sub_eq_zero]
@@ -24,7 +24,7 @@ def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[31] = 1) : B
 -- dt: could instead put `Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]` here...
 def sp1_op_b : BitVec 21 := BitVec.ofNat 21 (Main[14].val + Main[15].val * 65536)
 
-def sp1_jal (Main : Vector (Fin BB) 32) : SailM Unit := do
+def sp1_jal (Main : Vector (Fin KB) 32) : SailM Unit := do
   let op_a := regidx.Regidx Main[6].val
   set_next_pc (BitVec.ofNat 64 (Main[23] + Main[24] * 2^16 + Main[25] * 2^32 + Main[26] * 2^48))
   wX_bits op_a (BitVec.ofNat 64 (Main[27] + Main[28] * 2^16 + Main[29] * 2^32 +  Main[30] * 2^48))
@@ -76,7 +76,7 @@ theorem SP1JAL_correct
     refine (mul4_means_0_1_are_0 ?_).2
     simp [hpc]
     refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
-    · simp [ofNat_eq_ofNat, BabyBear.val_mod4_eq_zero]
+    · simp [ofNat_eq_ofNat, KoalaBear.val_mod4_eq_zero]
       simp_all only []
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [BB_eq, Fin.isValue, true_and]
@@ -86,7 +86,7 @@ theorem SP1JAL_correct
     refine (mul4_means_0_1_are_0 ?_).1
     simp [hpc]
     refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
-    · simp [ofNat_eq_ofNat, BabyBear.val_mod4_eq_zero]
+    · simp [ofNat_eq_ofNat, KoalaBear.val_mod4_eq_zero]
       simp_all only [BB_eq, Fin.isValue, true_and]
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [BB_eq, Fin.isValue, true_and]

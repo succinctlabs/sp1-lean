@@ -23,26 +23,26 @@ abbrev SP1State := BitVec 64 × (regidx → BitVec 64)
 -- section ControlFlowState
 
 -- structure SP1ControlFlowState where
---   pc : Fin BB
---   shard : Fin BB
---   clk : Fin BB
+--   pc : Fin KB
+--   shard : Fin KB
+--   clk : Fin KB
 
--- @[reducible] def increment_pc (c : Fin BB) : StateM SP1ControlFlowState Unit :=
+-- @[reducible] def increment_pc (c : Fin KB) : StateM SP1ControlFlowState Unit :=
 --   do modify fun st => { pc := st.pc + c, __ := st }
 
--- @[reducible] def increment_shard (c : Fin BB) : StateM SP1ControlFlowState Unit :=
+-- @[reducible] def increment_shard (c : Fin KB) : StateM SP1ControlFlowState Unit :=
 --   do modify fun st => { shard := st.shard + c, __ := st }
 
--- @[reducible] def increment_clk (c : Fin BB) : StateM SP1ControlFlowState Unit :=
+-- @[reducible] def increment_clk (c : Fin KB) : StateM SP1ControlFlowState Unit :=
 --   do modify fun st => { clk := st.clk + c, __ := st }
 
--- @[reducible] def set_pc (new_pc : Fin BB) : StateM SP1ControlFlowState Unit :=
+-- @[reducible] def set_pc (new_pc : Fin KB) : StateM SP1ControlFlowState Unit :=
 --   do modify fun st => { pc := new_pc, __ := st }
 
--- @[reducible] def set_shard (new_shard : Fin BB) : StateM SP1ControlFlowState Unit :=
+-- @[reducible] def set_shard (new_shard : Fin KB) : StateM SP1ControlFlowState Unit :=
 --   do modify fun st => { shard := new_shard, __ := st }
 
--- @[reducible] def set_clk (new_clk : Fin BB) : StateM SP1ControlFlowState Unit :=
+-- @[reducible] def set_clk (new_clk : Fin KB) : StateM SP1ControlFlowState Unit :=
 --   do modify fun st => { clk := new_clk, __ := st }
 
 -- def SP1ConstraintList.toControlFlowM : SP1ConstraintList → StateM SP1ControlFlowState Unit

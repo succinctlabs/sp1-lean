@@ -4,10 +4,10 @@ import SP1Operations.Compare.LtOperationSigned.Constraints
 namespace LtOperationSigned
 
 lemma allHold_constraints_iff
-  {b : Word (Fin BB)}
-  {d : Word (Fin BB)}
+  {b : Word (Fin KB)}
+  {d : Word (Fin KB)}
   {cols : LtOperationSigned}
-  {is_signed : Fin BB} :
+  {is_signed : Fin KB} :
   List.Forall SP1Constraint.toProp (constraints b d cols is_signed 1) ↔
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints b[3] cols.b_msb is_signed) ∧
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints d[3] cols.c_msb is_signed) ∧
@@ -26,8 +26,8 @@ lemma allHold_constraints_iff
 
 set_option maxHeartbeats 1000000 in
 lemma spec.unsigned
-  {b : Word (Fin BB)}
-  {d : Word (Fin BB)}
+  {b : Word (Fin KB)}
+  {d : Word (Fin KB)}
   {cols : LtOperationSigned}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
@@ -46,8 +46,8 @@ lemma spec.unsigned
 
 set_option maxHeartbeats 1000000 in
 lemma spec.signed
-  {b : Word (Fin BB)}
-  {d : Word (Fin BB)}
+  {b : Word (Fin KB)}
+  {d : Word (Fin KB)}
   {cols : LtOperationSigned}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
@@ -79,10 +79,10 @@ lemma spec.signed
     split_ifs <;> simp <;> omega
 
 def spec.branch.def
-  (b : (Word (Fin BB)))
-  (c : (Word (Fin BB)))
+  (b : (Word (Fin KB)))
+  (c : (Word (Fin KB)))
   (cols : LtOperationSigned)
-  (is_signed : (Fin BB))
+  (is_signed : (Fin KB))
   : Prop :=
   let bv := b.toBitVec64
   let cv := c.toBitVec64
@@ -117,10 +117,10 @@ def spec.branch.def
 
 set_option maxHeartbeats 10000000 in
 lemma spec.branch
-  {b : (Word (Fin BB))}
-  {d : (Word (Fin BB))}
+  {b : (Word (Fin KB))}
+  {d : (Word (Fin KB))}
   {cols : LtOperationSigned}
-  {is_signed : (Fin BB)}
+  {is_signed : (Fin KB)}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_signed 1) →

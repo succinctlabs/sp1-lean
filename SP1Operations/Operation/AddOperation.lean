@@ -5,12 +5,12 @@ import SP1Operations.Operation.AddOperation.Constraints
 namespace AddOperation
 
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
-lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
+lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddOperation) :
     List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
-      let carry0 : Fin BB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
-      let carry1 : Fin BB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
-      let carry2 : Fin BB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
-      let carry3 : Fin BB := (a[3] + b[3] - cols.value[3] + carry2) * 65536⁻¹
+      let carry0 : Fin KB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
+      let carry1 : Fin KB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
+      let carry2 : Fin KB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
+      let carry3 : Fin KB := (a[3] + b[3] - cols.value[3] + carry2) * 65536⁻¹
       (carry0 = 0 ∨ carry0 = 1) ∧
       (carry1 = 0 ∨ carry1 = 1) ∧
       (carry2 = 0 ∨ carry2 = 1) ∧
@@ -23,7 +23,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddOperation) :
 
 set_option maxHeartbeats 1000000 in
 theorem spec
-  {a b : Word (Fin BB)}
+  {a b : Word (Fin KB)}
   {cols : AddOperation}
   (h_isU64_a : a.isU64)
   (h_isU64_b : b.isU64) :
@@ -47,9 +47,9 @@ theorem spec
 section gen
 
 theorem spec.gen
-  {a b : Word (Fin BB)}
+  {a b : Word (Fin KB)}
   {cols : AddOperation}
-  {is_real : Fin BB}
+  {is_real : Fin KB}
   (h_isU64_a : a.isU64)
   (h_isU64_b : b.isU64) :
   List.Forall SP1Constraint.toProp (constraints a b cols is_real) →

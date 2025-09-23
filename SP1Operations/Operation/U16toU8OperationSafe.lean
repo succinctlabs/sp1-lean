@@ -7,14 +7,14 @@ namespace U16toU8OperationSafe
 section decomposition
 
 lemma u16_to_u8_decomposition_bv64_bv64 (a b : BitVec 64) :
-  a < BB → b < 256 → ((BB - b + a) * 2122383361) % BB < 256 → a < 65536 ∧ b = a % 256 ∧ ((a - b) * 2122383361) % BB = a / 256
+  a < KB → b < 256 → ((KB - b + a) * 2122383361) % KB < 256 → a < 65536 ∧ b = a % 256 ∧ ((a - b) * 2122383361) % KB = a / 256
   := by sorry --bv_decide --check "U16toU8OperationSafe.u16_to_u8_decomposition_bv64_bv64-21-8.lrat"
 
 lemma u16_to_u8_decomposition_fin64 {a b : Fin (2 ^ 64)} :
-  a < BB →
+  a < KB →
   b < 256 →
-  ((BB - b + a) * 2122383361) % BB < 256 →
-  a < 65536 ∧ b = a % 256 ∧ (((a - b) * 2122383361) % BB) = a / 256
+  ((KB - b + a) * 2122383361) % KB < 256 →
+  a < 65536 ∧ b = a % 256 ∧ (((a - b) * 2122383361) % KB) = a / 256
   := by
     intro h_a h_b h_diff
     have ⟨ h_lt, h_mod, h_div ⟩ :=
@@ -27,16 +27,16 @@ lemma u16_to_u8_decomposition_fin64 {a b : Fin (2 ^ 64)} :
     simp_all
 
 @[grind →, aesop safe forward]
-lemma u16_to_u8_decomposition_bb {a b : Fin BB} :
+lemma u16_to_u8_decomposition_bb {a b : Fin KB} :
   b < 256 → ((a - b) * 2122383361) < 256 → a < 65536 ∧ b = a % 256 ∧ ((a - b) * 2122383361) = a / 256
   := by
     intro h_b h_diff
     set a64 : Fin (2^64) := ⟨a.val, by omega⟩ with h_eq_a64
     set b64 : Fin (2^64) := ⟨b.val, by omega⟩ with h_eq_b64
-    have h_diff_64 : ((BB - b64 + a64) * 2122383361) % BB < 256 := by
+    have h_diff_64 : ((KB - b64 + a64) * 2122383361) % KB < 256 := by
       simp [Fin.lt_def, Fin.mul_def, Fin.sub_def] at h_diff
       simp only [Fin.lt_def, Fin.mul_def, Fin.mod_val]
-      have h_eq : (BB - b64 + a64).val = ((BB : ℕ) - ↑b + ↑a) := by
+      have h_eq : (KB - b64 + a64).val = ((KB : ℕ) - ↑b + ↑a) := by
         rw [Fin.add_def, Fin.sub_val_of_le (by aesop (add safe cases Fin) (add safe (by omega)))]
         aesop (add safe cases Fin) (add safe (by omega))
       rw [Nat.mod_eq_of_lt (b := 2 ^ 64)] <;> aesop (add safe (by omega))
@@ -47,9 +47,9 @@ lemma u16_to_u8_decomposition_bb {a b : Fin BB} :
 end decomposition
 
 lemma allHold_constraints_iff
-  (u16_values : (Vector (Fin BB) 4))
+  (u16_values : (Vector (Fin KB) 4))
   (cols : U16toU8Operation)
-  (is_real : Fin BB) :
+  (is_real : Fin KB) :
   List.Forall SP1Constraint.toProp (constraints u16_values cols is_real).2 ↔
     (¬is_real = 0 → cols.low_bytes[0] < 256 ∧ ((u16_values[0] - cols.low_bytes[0]) * 2122383361) < 256) ∧
     (¬is_real = 0 → cols.low_bytes[1] < 256 ∧ ((u16_values[1] - cols.low_bytes[1]) * 2122383361) < 256) ∧
@@ -58,7 +58,7 @@ lemma allHold_constraints_iff
   := by simp [constraints]
 
 lemma spec.cstrs
-  {u16_values : (Vector (Fin BB) 4)}
+  {u16_values : (Vector (Fin KB) 4)}
   {cols : U16toU8Operation} :
   List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     cols.low_bytes[0] = u16_values[0]! % 256 ∧ ((u16_values[0] - cols.low_bytes[0]!) * 2122383361) = u16_values[0] / 256 ∧
@@ -68,7 +68,7 @@ lemma spec.cstrs
   := by intro cstrs; rw [allHold_constraints_iff] at cstrs; aesop
 
 lemma spec.return
-  {u16_values : (Vector (Fin BB) 4)}
+  {u16_values : (Vector (Fin KB) 4)}
   {cols : U16toU8Operation} :
   List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     (constraints u16_values cols is_real).1 = Word.toBWord u16_values
@@ -77,7 +77,7 @@ lemma spec.return
     simp [constraints, Word.toBWord]; aesop
 
 lemma spec.unsafe.return
-  {u16_values : (Vector (Fin BB) 4)}
+  {u16_values : (Vector (Fin KB) 4)}
   {cols : U16toU8Operation} :
   List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     (U16toU8OperationUnsafe.constraints u16_values cols).1 = Word.toBWord u16_values

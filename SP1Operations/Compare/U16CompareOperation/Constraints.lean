@@ -6,18 +6,18 @@ namespace U16CompareOperation
 section constraints
 
 @[irreducible] def constraints
-  (a : (Fin BB))
-  (b : (Fin BB))
+  (a : (Fin KB))
+  (b : (Fin KB))
   (cols : U16CompareOperation)
-  (is_real : (Fin BB))
+  (is_real : (Fin KB))
   : SP1ConstraintList :=
-  let E0 : Fin BB := is_real - 1
-  let E1 : Fin BB := is_real * E0
-  let E2 : Fin BB := cols.bit - 1
-  let E3 : Fin BB := cols.bit * E2
-  let E4 : Fin BB := a - b
-  let E5 : Fin BB := cols.bit * 65536
-  let E6 : Fin BB := E4 + E5
+  let E0 : Fin KB := is_real - 1
+  let E1 : Fin KB := is_real * E0
+  let E2 : Fin KB := cols.bit - 1
+  let E3 : Fin KB := cols.bit * E2
+  let E4 : Fin KB := a - b
+  let E5 : Fin KB := cols.bit * 65536
+  let E6 : Fin KB := E4 + E5
   [
     (.assertZero E1),
     (.assertZero E3),

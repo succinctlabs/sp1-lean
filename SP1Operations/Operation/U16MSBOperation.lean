@@ -5,9 +5,9 @@ import SP1Operations.Operation.U16MSBOperation.Constraints
 namespace U16MSBOperation
 
 lemma allHold_constraints_iff
-  {a : Fin BB}
+  {a : Fin KB}
   {cols : U16MSBOperation}
-  {is_real : Fin BB} :
+  {is_real : Fin KB} :
   List.Forall SP1Constraint.toProp (constraints a cols is_real) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (cols.msb = 0 ∨ cols.msb = 1) ∧
@@ -16,7 +16,7 @@ lemma allHold_constraints_iff
 
 @[grind →, aesop safe forward]
 lemma spec
-  {a : Fin BB}
+  {a : Fin KB}
   {cols : U16MSBOperation}
   (h_a_isU16 : a < 65536) :
   List.Forall SP1Constraint.toProp (constraints a cols 1) →
@@ -24,7 +24,7 @@ lemma spec
   := by simp [constraints]; grind
 
 lemma spec.U64
-  {w : Word (Fin BB)}
+  {w : Word (Fin KB)}
   {cols : U16MSBOperation}
   (h_w_isU64 : w.isU64) :
   List.Forall SP1Constraint.toProp (constraints w[3] cols 1) →
@@ -35,9 +35,9 @@ section gen
 
 
 lemma spec.gen
-  {a : Fin BB}
+  {a : Fin KB}
   {cols : U16MSBOperation}
-  {is_real : Fin BB}
+  {is_real : Fin KB}
   (h_a_isU16 : a < 65536) :
   List.Forall SP1Constraint.toProp (constraints a cols is_real) →
     is_real = 1 →

@@ -13,7 +13,7 @@ namespace Xor
 open Bitwise
 
 variable
-  (Main : Vector (Fin BB) 52)
+  (Main : Vector (Fin KB) 52)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_xor : is_xor Main)
@@ -58,7 +58,7 @@ theorem correct_xor
     simp [spec_xor, sp1_xor, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -76,7 +76,7 @@ namespace Xori
 open Bitwise
 
 variable
-  (Main : Vector (Fin BB) 52)
+  (Main : Vector (Fin KB) 52)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_xori : is_xori Main)
@@ -120,7 +120,7 @@ theorem correct_xori
     simp [spec_xori, sp1_xori, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp_all [Word.toBitVec64, Word.toNat]
@@ -139,7 +139,7 @@ namespace Or
 open Bitwise
 
 variable
-  (Main : Vector (Fin BB) 52)
+  (Main : Vector (Fin KB) 52)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_or : is_or Main)
@@ -183,7 +183,7 @@ theorem correct_or
     simp [spec_or, sp1_or, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -201,7 +201,7 @@ namespace Ori
 open Bitwise
 
 variable
-  (Main : Vector (Fin BB) 52)
+  (Main : Vector (Fin KB) 52)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_ori : is_ori Main)
@@ -245,7 +245,7 @@ theorem correct_ori
     simp [spec_ori, sp1_ori, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp_all [Word.toBitVec64, Word.toNat]
@@ -264,7 +264,7 @@ namespace And
 open Bitwise
 
 variable
-  (Main : Vector (Fin BB) 52)
+  (Main : Vector (Fin KB) 52)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_and : is_and Main)
@@ -308,7 +308,7 @@ theorem correct_and
     simp [spec_and, sp1_and, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -326,7 +326,7 @@ namespace Andi
 open Bitwise
 
 variable
-  (Main : Vector (Fin BB) 52)
+  (Main : Vector (Fin KB) 52)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_andi : is_andi Main)
@@ -370,7 +370,7 @@ theorem correct_andi
     simp [spec_andi, sp1_andi, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp_all [Word.toBitVec64, Word.toNat]

@@ -7,9 +7,9 @@ namespace Jalr
 
 open Sail SailState BitVec LeanRV64D.Functions
 
-variable (Main : Vector (Fin BB) 39) (s : SailState)
+variable (Main : Vector (Fin KB) 39) (s : SailState)
 
-lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 39} (h : (constraints Main).allHold)
+lemma op_a_lt32_of_constraints {Main : Vector (Fin KB) 39} (h : (constraints Main).allHold)
     (h_is_real : Main[30] = 1) : Main[6].val < 2^5 := by
   simp only [BB_eq, Nat.reducePow]
   have reader_cstrs := by
@@ -20,7 +20,7 @@ lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 39} (h : (constraints Mai
   -- aesop
   sorry
 
-lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 39} (h : (constraints Main).allHold)
+lemma op_b_lt32_of_constraints {Main : Vector (Fin KB) 39} (h : (constraints Main).allHold)
     (h_is_real : Main[30] = 1) : Main[14].val < 2^5 := by
   simp only [BB_eq, Nat.reducePow]
   have reader_cstrs := by
@@ -125,7 +125,7 @@ theorem JALR_correct
   simp only [Std.ExtDHashMap.get?_insert, beq_iff_eq, reduceCtorEq, ↓reduceDIte,
     Std.ExtDHashMap.get?_eq_some_get h_misa, RETIRE_SUCCESS]
   split_ifs <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
-  have htemp : (1 : Fin BB) - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
+  have htemp : (1 : Fin KB) - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
   rw [htemp] at inc_pc_cstrs
   have ⟨ _, h_add ⟩ := AddOperation.spec pc_is_u64 h_4_is_u64 inc_pc_cstrs
   rw [h_add]

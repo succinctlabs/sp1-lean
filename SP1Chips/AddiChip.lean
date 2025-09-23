@@ -10,7 +10,7 @@ open LeanRV64D.Functions BitVec
 namespace Addi
 
 variable
-  (Main : Vector (Fin BB) 31)
+  (Main : Vector (Fin KB) 31)
   (s : SailState)
 
 noncomputable def spec_addi (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
@@ -101,7 +101,7 @@ theorem correct_addi
       rw [Std.ExtDHashMap.get?_eq_some_get] at read_pc
       rw [read_pc]
       erw [Option.some_inj] at read_pc
-      rw [BabyBear.add4_into_pc_ofNat (by omega)]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       sorry
     ·
       sorry
@@ -122,7 +122,7 @@ theorem correct_addi
     simp [sp1_op_b, read_op_b]
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0
     .

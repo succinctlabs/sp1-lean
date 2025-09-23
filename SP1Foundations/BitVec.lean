@@ -67,15 +67,15 @@ theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧
 
 end BitVec
 
-namespace BabyBear
+namespace KoalaBear
 
-lemma add4_into_pc_ofNat {x : Fin BB} {y z : ℕ} : x < 65536 →
+lemma add4_into_pc_ofNat {x : Fin KB} {y z : ℕ} : x < 65536 →
   BitVec.ofNat 64 (x.val + y + z) + 4#64 = BitVec.ofNat 64 ((x + 4).val + y + z) := by
   intros
   rw [Fin.val_add, Nat.mod_eq_of_lt (by omega)]
   simp [ofNat_add]; ring_nf
 
-end BabyBear
+end KoalaBear
 
 namespace Nat
 
@@ -91,7 +91,7 @@ end Nat
 
 namespace Word
 
-lemma toBitVec64_mod_of_lt (w : Word (Fin BB)) (n : Fin 8) :
+lemma toBitVec64_mod_of_lt (w : Word (Fin KB)) (n : Fin 8) :
     (Word.toBitVec64 w) % BitVec.twoPow 64 n.val =
       (BitVec.ofNat 64 w[0]) % BitVec.twoPow 64 n.val := by
   simp [toBitVec64, toNat]
@@ -102,26 +102,26 @@ lemma toBitVec64_mod_of_lt (w : Word (Fin BB)) (n : Fin 8) :
   · simp only [shiftLeft_zero, umod_one] -- trivial case
   all_goals {simp only [reduceHShiftLeft]; bv_decide}
 
-@[simp] lemma toBitVec64_mod2 (w : Word (Fin BB)) :
+@[simp] lemma toBitVec64_mod2 (w : Word (Fin KB)) :
     (Word.toBitVec64 w) % 2#64 = (BitVec.ofNat 64 w[0]) % 2#64 :=
   toBitVec64_mod_of_lt w 1
 
-@[simp] lemma toBitVec64_mod4 (w : Word (Fin BB)) :
+@[simp] lemma toBitVec64_mod4 (w : Word (Fin KB)) :
     (Word.toBitVec64 w) % 4#64 = (BitVec.ofNat 64 w[0]) % 4#64 :=
   toBitVec64_mod_of_lt w 2
 
-@[simp] lemma toBitVec64_mod8 (w : Word (Fin BB)) :
+@[simp] lemma toBitVec64_mod8 (w : Word (Fin KB)) :
     (Word.toBitVec64 w) % 8#64 = (BitVec.ofNat 64 w[0]) % 8#64 :=
   toBitVec64_mod_of_lt w 3
 
-@[simp] lemma toBitVec64_add_mod4 (w : Word (Fin BB)) (x : BitVec 64) :
+@[simp] lemma toBitVec64_add_mod4 (w : Word (Fin KB)) (x : BitVec 64) :
     (Word.toBitVec64 w + x) % 4#64 = (BitVec.ofNat 64 w[0] + x) % 4#64 := by
   simp [toBitVec64, Word.toNat]
   simp [BitVec.ofNat_add, BitVec.ofNat_mul]
   set k := BitVec.ofNat 64 w[0]
   bv_decide
 
-@[simp] lemma add_toBitVec64_mod4 (w : Word (Fin BB)) (x : BitVec 64) :
+@[simp] lemma add_toBitVec64_mod4 (w : Word (Fin KB)) (x : BitVec 64) :
     (x + Word.toBitVec64 w) % 4#64 = (x + BitVec.ofNat 64 w[0]) % 4#64 := by
   simp [toBitVec64, Word.toNat]
   simp [BitVec.ofNat_add, BitVec.ofNat_mul]
@@ -132,12 +132,12 @@ end Word
 
 namespace BitVec
 
-theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
+theorem useless_signExtend {x : Fin KB} {hx : x.val < 2^12}
   : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
   bx64 % 4 = (BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4
   := by
     extract_lets bx64
-    have hx_bb : x.val < BB := x.isLt
+    have hx_bb : x.val < KB := x.isLt
     have hx_64 : x.val < 2^64 := by omega
 
     -- Now prove using bit representation
@@ -169,7 +169,7 @@ theorem useless_signExtend {x : Fin BB} {hx : x.val < 2^12}
     have : bx12 = BitVec.ofNatLT (w := 12) x.val hx := rfl
     rw [← this, ← h_sign_ext]
 
-theorem useless_signExtend_add {x : Fin BB} {hx : x.val < 2^12} {y : BitVec 64}
+theorem useless_signExtend_add {x : Fin KB} {hx : x.val < 2^12} {y : BitVec 64}
   : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
   (y + bx64) % 4 = (y + BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4
   := by

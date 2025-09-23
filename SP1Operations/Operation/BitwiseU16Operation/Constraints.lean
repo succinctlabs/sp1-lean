@@ -7,25 +7,25 @@ namespace BitwiseU16Operation
 section constraints
 
 @[irreducible] def constraints
-  (b : (Word (Fin BB)))
-  (cc : (Word (Fin BB)))
+  (b : (Word (Fin KB)))
+  (cc : (Word (Fin KB)))
   (cols : BitwiseU16Operation)
-  (opcode : (Fin BB))
-  (is_real : (Fin BB))
-  : (Word (Fin BB)) × SP1ConstraintList :=
-  let E0 : Fin BB := is_real - 1
-  let E1 : Fin BB := is_real * E0
+  (opcode : (Fin KB))
+  (is_real : (Fin KB))
+  : (Word (Fin KB)) × SP1ConstraintList :=
+  let E0 : Fin KB := is_real - 1
+  let E1 : Fin KB := is_real * E0
   let ⟨⟨⟨[E2, E3, E4, E5, E6, E7, E8, E9]⟩, _⟩, CS0⟩ := U16toU8OperationUnsafe.constraints #v[b[0], b[1], b[2], b[3]] { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1], cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] }
   let ⟨⟨⟨[E10, E11, E12, E13, E14, E15, E16, E17]⟩, _⟩, CS1⟩ := U16toU8OperationUnsafe.constraints #v[cc[0], cc[1], cc[2], cc[3]] { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1], cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] }
   let CS2 : SP1ConstraintList := BitwiseOperation.constraints #v[E2, E3, E4, E5, E6, E7, E8, E9] #v[E10, E11, E12, E13, E14, E15, E16, E17] { result := #v[cols.bitwise_operation.result[0], cols.bitwise_operation.result[1], cols.bitwise_operation.result[2], cols.bitwise_operation.result[3], cols.bitwise_operation.result[4], cols.bitwise_operation.result[5], cols.bitwise_operation.result[6], cols.bitwise_operation.result[7]] } opcode is_real
-  let E18 : Fin BB := cols.bitwise_operation.result[1] * 256
-  let E19 : Fin BB := cols.bitwise_operation.result[0] + E18
-  let E20 : Fin BB := cols.bitwise_operation.result[3] * 256
-  let E21 : Fin BB := cols.bitwise_operation.result[2] + E20
-  let E22 : Fin BB := cols.bitwise_operation.result[5] * 256
-  let E23 : Fin BB := cols.bitwise_operation.result[4] + E22
-  let E24 : Fin BB := cols.bitwise_operation.result[7] * 256
-  let E25 : Fin BB := cols.bitwise_operation.result[6] + E24
+  let E18 : Fin KB := cols.bitwise_operation.result[1] * 256
+  let E19 : Fin KB := cols.bitwise_operation.result[0] + E18
+  let E20 : Fin KB := cols.bitwise_operation.result[3] * 256
+  let E21 : Fin KB := cols.bitwise_operation.result[2] + E20
+  let E22 : Fin KB := cols.bitwise_operation.result[5] * 256
+  let E23 : Fin KB := cols.bitwise_operation.result[4] + E22
+  let E24 : Fin KB := cols.bitwise_operation.result[7] * 256
+  let E25 : Fin KB := cols.bitwise_operation.result[6] + E24
   ⟨#v[E19, E21, E23, E25], CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E1),
   ]⟩

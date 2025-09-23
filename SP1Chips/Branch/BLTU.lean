@@ -11,7 +11,7 @@ open Sail SailState BitVec LeanRV64D.Functions
 namespace BLTU
 
 variable
-  (Main : Vector (Fin BB) 45)
+  (Main : Vector (Fin KB) 45)
   (cstrs : (constraints Main).allHold)
   (s : SailState)
   (h_is_bltu : Main[32] = 1)
@@ -71,7 +71,7 @@ attribute [simp] zopz0zI_u
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 theorem correct_bltu
-    (Main : Vector (Fin BB) 45)
+    (Main : Vector (Fin KB) 45)
     (s : SailState)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s)

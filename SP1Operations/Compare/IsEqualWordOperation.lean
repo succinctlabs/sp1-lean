@@ -6,18 +6,18 @@ attribute [local simp ← high] Word.eq_pointwise
 
 @[grind →, aesop safe forward]
 lemma spec
-  {a b : Word (Fin BB)}
+  {a b : Word (Fin KB)}
   {cols : IsEqualWordOperation} :
   List.Forall SP1Constraint.toProp (constraints a b cols 1) →
     cols.is_diff_zero.result = if a = b then 1 else 0
   := by simp [constraints]; grind
 
 lemma spec.gen
-  {a b : Word (Fin BB)}
+  {a b : Word (Fin KB)}
   {cols : IsEqualWordOperation}
-  {is_real : Fin BB} :
+  {is_real : Fin KB} :
   List.Forall SP1Constraint.toProp (constraints a b cols is_real) →
-    is_real = (1 : Fin BB) →
+    is_real = (1 : Fin KB) →
       cols.is_diff_zero.result = if a = b then 1 else 0
   := by simp [constraints]; grind
 
