@@ -1,13 +1,13 @@
 import SP1Operations.Operation.MulOperation
 import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Reader.RTypeReader
 
 namespace Mul
 
 set_option maxHeartbeats 100000000
 
-variable (Main : Vector (Fin BB) 87)
-def is_real : Prop := Main[81] = 1 ∨ Main[82] = 1 ∨ Main[83] = 1 ∨ Main[84] = 1 ∨ Main[85] = 1
+variable (Main : Vector (Fin BB) 83)
+def is_real : Prop := Main[78] = 1 ∨ Main[79] = 1 ∨ Main[80] = 1 ∨ Main[81] = 1 ∨ Main[82] = 1
 
 section constraints
 
@@ -91,36 +91,52 @@ section constraints
 
 end constraints
 
+lemma allHold_constraints_iff :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp (MulOperation.constraints #v[Main[29], Main[30], Main[31], Main[32]] #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[22], Main[23], Main[24], Main[25]] { carry := #v[Main[33], Main[34], Main[35], Main[36], Main[37], Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]], product := #v[Main[49], Main[50], Main[51], Main[52], Main[53], Main[54], Main[55], Main[56], Main[57], Main[58], Main[59], Main[60], Main[61], Main[62], Main[63], Main[64]], b_lower_byte := { low_bytes := #v[Main[65], Main[66], Main[67], Main[68]] }, c_lower_byte := { low_bytes := #v[Main[69], Main[70], Main[71], Main[72]] }, b_msb := Main[73], c_msb := Main[74], product_msb := { msb := Main[75] }, b_sign_extend := Main[76], c_sign_extend := Main[77] } (Main[78] + Main[79] + Main[80] + Main[81] + Main[82]) Main[78] Main[79] Main[82] Main[80] Main[81]) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[78] + Main[79] + Main[80] + Main[81] + Main[82])) ∧
+    List.Forall SP1Constraint.toProp (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[78] * 11 + Main[79] * 12 + Main[80] * 13 + Main[81] * 14 + Main[82] * 47) #v[Main[78] * 8 + Main[79] * 8 + Main[80] * 8 + Main[81] * 8 + Main[82] * 8,
+          Main[78] * 51 + Main[79] * 51 + Main[80] * 51 + Main[81] * 51 + Main[82] * 59,
+          Main[79] + Main[80] * 3 + Main[81] * 2, Main[78] + Main[79] + Main[80] + Main[81] + Main[82]] #v[Main[29], Main[30], Main[31], Main[32]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } , is_trusted := Main[28] } (Main[78] + Main[79] + Main[80] + Main[81] + Main[82])) ∧
+    (Main[78] = 0 ∨ Main[78] = 1) ∧
+    (Main[79] = 0 ∨ Main[79] = 1) ∧
+    (Main[80] = 0 ∨ Main[80] = 1) ∧
+    (Main[82] = 0 ∨ Main[82] = 1) ∧
+    (Main[81] = 0 ∨ Main[81] = 1) ∧
+    (Main[78] + Main[79] + Main[80] + Main[81] + Main[82] = 0 ∨ Main[78] + Main[79] + Main[80] + Main[81] + Main[82] - 1 = 0) --∧
+  := by
+    simp [constraints, sub_eq_zero]
+
 section opcodes
 
-@[simp] def is_mul := Main[81] = 1 ∧ Main[31] = 0
-@[simp] def is_mulh := Main[82] = 1 ∧ Main[31] = 0
-@[simp] def is_mulhu := Main[83] = 1 ∧ Main[31] = 0
-@[simp] def is_mulhsu := Main[84] = 1 ∧ Main[31] = 0
-@[simp] def is_mulw := Main[85] = 1 ∧ Main[31] = 0
+@[simp] def is_mul := Main[78] = 1 ∧ Main[31] = 0
+@[simp] def is_mulh := Main[79] = 1 ∧ Main[31] = 0
+@[simp] def is_mulhu := Main[80] = 1 ∧ Main[31] = 0
+@[simp] def is_mulhsu := Main[81] = 1 ∧ Main[31] = 0
+@[simp] def is_mulw := Main[82] = 1 ∧ Main[31] = 0
 
 lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
-  (Main[81] = 1 → Main[82] = 0 ∧ Main[83] = 0 ∧ Main[84] = 0 ∧ Main[85] = 0) ∧
-  (Main[82] = 1 → Main[81] = 0 ∧ Main[83] = 0 ∧ Main[84] = 0 ∧ Main[85] = 0) ∧
-  (Main[83] = 1 → Main[81] = 0 ∧ Main[82] = 0 ∧ Main[84] = 0 ∧ Main[85] = 0) ∧
-  (Main[84] = 1 → Main[81] = 0 ∧ Main[82] = 0 ∧ Main[83] = 0 ∧ Main[85] = 0) ∧
-  (Main[85] = 1 → Main[81] = 0 ∧ Main[82] = 0 ∧ Main[83] = 0 ∧ Main[84] = 0)
+  (Main[78] = 1 → Main[79] = 0 ∧ Main[80] = 0 ∧ Main[81] = 0 ∧ Main[82] = 0) ∧
+  (Main[79] = 1 → Main[78] = 0 ∧ Main[80] = 0 ∧ Main[81] = 0 ∧ Main[82] = 0) ∧
+  (Main[80] = 1 → Main[78] = 0 ∧ Main[79] = 0 ∧ Main[81] = 0 ∧ Main[82] = 0) ∧
+  (Main[81] = 1 → Main[78] = 0 ∧ Main[79] = 0 ∧ Main[80] = 0 ∧ Main[82] = 0) ∧
+  (Main[82] = 1 → Main[78] = 0 ∧ Main[79] = 0 ∧ Main[80] = 0 ∧ Main[81] = 0)
    := by
   intro cstrs
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, one_of_ops, rest ⟩ := cstrs
-  clear h_mop cpu alu rest
+  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
+  clear h_mop cpu alu
   aesop
 
 end opcodes
 
 section is_real
 
-lemma mul_real : Main[81] = 1 → is_real Main := by simp [is_real]; tauto
-lemma mulh_real : Main[82] = 1 → is_real Main := by simp [is_real]; tauto
-lemma mulhu_real : Main[83] = 1 → is_real Main := by simp [is_real]; tauto
-lemma mulhsu_real : Main[84] = 1 → is_real Main := by simp [is_real]; tauto
-lemma mulw_real : Main[85] = 1 → is_real Main := by simp [is_real]; tauto
+lemma mul_real : Main[78] = 1 → is_real Main := by simp [is_real]; tauto
+lemma mulh_real : Main[79] = 1 → is_real Main := by simp [is_real]; tauto
+lemma mulhu_real : Main[80] = 1 → is_real Main := by simp [is_real]; tauto
+lemma mulhsu_real : Main[81] = 1 → is_real Main := by simp [is_real]; tauto
+lemma mulw_real : Main[82] = 1 → is_real Main := by simp [is_real]; tauto
 
 end is_real
 
