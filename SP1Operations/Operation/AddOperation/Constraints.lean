@@ -5,7 +5,7 @@ namespace AddOperation
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (a : (Word (Fin BB)))
   (b : (Word (Fin BB)))
   (cols : AddOperation)

@@ -5,7 +5,7 @@ namespace ITypeReaderImmutable
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (clk_high : (Fin BB))
   (clk_low : (Fin BB))
   (pc : (Vector (Fin BB) 3))

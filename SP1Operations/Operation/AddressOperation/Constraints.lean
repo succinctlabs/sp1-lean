@@ -6,7 +6,7 @@ namespace AddressOperation
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (b : (Word (Fin BB)))
   (cc : (Word (Fin BB)))
   (offset_bit0 : (Fin BB))

@@ -5,7 +5,7 @@ namespace U16toU8OperationSafe
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (u16_values : (Vector (Fin BB) 4))
   (cols : U16toU8Operation)
   (is_real : (Fin BB))

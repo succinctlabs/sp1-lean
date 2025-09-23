@@ -6,7 +6,7 @@ set_option linter.unusedVariables false
 -- Generated Lean code for operation RTypeReader (from chip Add)
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (clk_high : (Fin BB))
   (clk_low : (Fin BB))
   (pc : (Vector (Fin BB) 3))

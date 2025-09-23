@@ -5,7 +5,7 @@ namespace U16toU8OperationUnsafe
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (u16_values : (Vector (Fin BB) 4))
   (cols : U16toU8Operation)
   : (Vector (Fin BB) 8) × SP1ConstraintList :=

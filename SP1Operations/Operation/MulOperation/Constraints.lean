@@ -290,7 +290,7 @@ end core_mul
 
 section constraints
 
-def constraints
+@[irreducible] def constraints
   (a_word : (Word (Fin BB)))
   (b_word : (Word (Fin BB)))
   (c_word : (Word (Fin BB)))
