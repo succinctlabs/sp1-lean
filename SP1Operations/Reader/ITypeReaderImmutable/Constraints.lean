@@ -3,6 +3,9 @@ import SP1Operations.Reader.ITypeReader.Operation
 
 namespace ITypeReaderImmutable
 
+-- dtumad: shouldn't need this really
+set_option linter.unusedVariables false
+
 section constraints
 
 @[irreducible] def constraints
@@ -23,7 +26,7 @@ section constraints
   let E6 : Fin KB := cols.is_trusted * E5
   let E7 : Fin KB := E2 + cols.is_trusted
   let E8 : Fin KB := E7 - is_real
-  let E9 : Fin KB := mprotect_enabled () - 1
+  let E9 : Fin KB := public_value () 151 - 1
   let E10 : Fin KB := E2 * E9
   let E11 : Fin KB := 0 + cols.op_b
   let E12 : Fin KB := cols.op_a_memory.prev_value[0] - 0

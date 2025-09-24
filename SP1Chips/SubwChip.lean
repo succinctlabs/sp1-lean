@@ -35,9 +35,9 @@ theorem correct_subw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[32] = 1)
   (state_cstrs : (constraints Main).initialState s) :
-  let op_c := sp1_op_c Main --cstrs h_is_real
-  let op_b := sp1_op_b Main --cstrs h_is_real
-  let op_a := sp1_op_a Main --cstrs h_is_real
+  let op_c := sp1_op_c Main
+  let op_b := sp1_op_b Main
+  let op_a := sp1_op_a Main
   (spec_subw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_subw Main).run s
   := by
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, SubwOperation.constraints, CPUState.constraints, RTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs

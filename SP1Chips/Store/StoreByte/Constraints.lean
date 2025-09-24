@@ -39,7 +39,7 @@ section constraints
   let E27 : Fin KB := Main[37] + E26
   let E28 : Fin KB := E25 - E27
   let E29 : Fin KB := Main[50] * E28
-  let E30 : Fin KB := mprotect_enabled () * Main[50]
+  let E30 : Fin KB := public_value () 151 * Main[50]
   let E31 : Fin KB := Main[51] - E30
   let E32 : Fin KB := E1 + 1
   let E33 : Fin KB := Main[40] - 1
