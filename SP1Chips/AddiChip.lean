@@ -88,7 +88,7 @@ theorem correct_addi
     simp [sp1_op_b, read_op_b]
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
-
+    stop
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp [h_is_op_a_0]
       have : #v[Main[26], Main[27], Main[28], Main[29]] = 0 := by sorry
