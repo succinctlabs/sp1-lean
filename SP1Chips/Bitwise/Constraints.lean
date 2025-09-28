@@ -85,27 +85,10 @@ lemma allHold_constraints_iff :
     (Main[50] = 0 ∨ Main[50] = 1) ∧
     (Main[51] = 0 ∨ Main[51] = 1) ∧
     (Main[49] + Main[50] + Main[51] = 0 ∨ Main[49] + Main[50] + Main[51] - 1 = 0)
-    --∧
-    -- (Main[49] + Main[50] + Main[51] = 0 ∨ Main[51] - (Main[31] * (Main[48] * 19 + Main[49] * 19 + Main[50] * 19) + (1 - Main[31]) * (Main[48] * 51 + Main[49] * 51 + Main[50] * 51)) = 0)
   := by
-
     simp [constraints]
-
     split
-
     constructor <;> simp_all [sub_eq_zero]
-
-    -- ·
-    --   intros
-
-    --   sorry
-    -- stop
-    -- -- <;> simp_all [sub_eq_zero]
-    -- · intros
-
-    --   sorry
-    -- stop
-    -- sorry
 
 section opcodes
 
@@ -151,7 +134,7 @@ lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → 
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+  . obtain ⟨ h0, h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu
     clear h18
     rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
     rcases b_imm <;> simp_all
@@ -183,9 +166,9 @@ lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
     intro ret_val hm6; simp_all
-    clear *- h18; subst ret_val; simp_all
+    subst ret_val; simp_all
   . clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
@@ -197,8 +180,9 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   simp [allHold_constraints_iff] at cstrs
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
+  stop
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+  . obtain ⟨ h0, h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu
     simp_all; clear h18
     rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
     rcases b_imm <;> simp_all <;> apply Word.isU64_of_cases <;> simp <;> omega

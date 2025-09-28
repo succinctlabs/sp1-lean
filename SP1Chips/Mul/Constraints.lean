@@ -143,47 +143,46 @@ end is_real
 section entailed_constraints
 
 lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
-  let imm := Main[31]
-  Main[6] < 32 ∧ Main[14] < 32 ∧ (imm = 0 → Main[21] < 32) ∧ Main[3] < 65536
+  Main[6] < 32 ∧ Main[14] < 32 ∧ (Main[31] = 0 → Main[21] < 32) ∧ Main[3] < 65536
     := by
   intro cstrs real
   have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, one_of_ops, rest ⟩ := cstrs
+  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
   clear h_mop cpu rest
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
-    clear h18
+  rw [RTypeReader.allHold_constraints_iff_is_real] at alu
+  simp only at alu
+  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
     rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
   . clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
 lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
-  (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0) := by
+  (Main[6] = 0 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0) := by
   intro cstrs real
   have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, one_of_ops, rest ⟩ := cstrs
+  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
   clear h_mop cpu rest
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+  rw [RTypeReader.allHold_constraints_iff_is_real] at alu
+  simp only at alu
+  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
     intro hm6; simp_all
   . clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
 lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
-  Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] := by
+  Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] := by
   intro cstrs real
   have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, one_of_ops, rest ⟩ := cstrs
+  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
   clear h_mop cpu rest
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
-    simp_all; clear h18
-    rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+  rw [RTypeReader.allHold_constraints_iff_is_real] at alu
+  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+    simp_all
   . clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
 end entailed_constraints
@@ -220,7 +219,7 @@ section mul
 
 lemma spec.mul (h : is_mul Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MUL
+    Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MUL
   := by
     intro cstrs
     obtain ⟨ eq_mul, eq_imm ⟩ := h
@@ -241,7 +240,7 @@ section mulh
 
 lemma spec.mulh (h : is_mulh Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULH
+    Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULH
   := by
     intro cstrs
     obtain ⟨ eq_mulh, eq_imm ⟩ := h
@@ -262,7 +261,7 @@ section mulhu
 
 lemma spec.mulhu (h : is_mulhu Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULHU
+    Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULHU
   := by
     intro cstrs
     obtain ⟨ eq_mulhu, eq_imm ⟩ := h
@@ -283,7 +282,7 @@ section mulhsu
 
 lemma spec.mulhsu (h : is_mulhsu Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]) .MULHSU
+    Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULHSU
   := by
     intro cstrs
     obtain ⟨ eq_mulhsu, eq_imm ⟩ := h
@@ -304,7 +303,7 @@ section mulw
 
 lemma spec.mulw (h : is_mulw Main ) :
   List.Forall SP1Constraint.toProp (constraints Main) →
-    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_MULW_pure_bhw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]).low (Word.toBWord #v[Main[25], Main[26], Main[27], Main[28]]).low
+    Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MULW_pure_bhw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]).low (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]).low
   := by
     intro cstrs
     obtain ⟨ eq_mulw, eq_imm ⟩ := h
