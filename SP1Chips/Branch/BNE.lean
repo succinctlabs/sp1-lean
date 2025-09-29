@@ -73,7 +73,9 @@ theorem correct_bne
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
 
-  have h25 : Main[25] = 1 := by sorry
+  have h25 : Main[25] = 1 := by
+
+    sorry
   simp_all only [h25]
 
   -- simplify reader constraints

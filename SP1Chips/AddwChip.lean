@@ -109,9 +109,7 @@ def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14]
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21]
 
 def sp1_addiw : SailM Unit := do
-  let op_a := sp1_op_a Main --cstrs h_is_real
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
+  let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35] * 65535, Main[35] * 65535])
 
@@ -120,7 +118,6 @@ theorem correct_addw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[36] = 1)
   (h_is_addiw : Main[31] = 1)
-  (h_is_trusted : Main[32] = 1)
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main

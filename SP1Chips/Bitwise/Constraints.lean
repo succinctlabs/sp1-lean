@@ -180,12 +180,14 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   simp [allHold_constraints_iff] at cstrs
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
-  stop
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu
-    simp_all; clear h18
+  . simp only [and_assoc] at alu
+    obtain ⟨ h0, h1, h2, h3, h21, h22, h23, h24, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+    simp_all
+    clear h1 h18
     rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
-    rcases b_imm <;> simp_all <;> apply Word.isU64_of_cases <;> simp <;> omega
+    rcases b_imm <;> simp_all <;> apply Word.isU64_of_cases <;> simp <;>
+      {simp_all; clear *- h21 h22 h23 h24 h19; aesop}
   . clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →

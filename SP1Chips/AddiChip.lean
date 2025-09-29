@@ -48,9 +48,6 @@ theorem correct_addi
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ITypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
 
-    specialize read_op_b sorry
-    specialize read_op_c sorry
-
     obtain ⟨ _, trusted_instr_prop, hcm1, hcm2, c0, c1, c2, c3, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, ⟨ is_U64_a, is_U64_b, hu64 ⟩⟩ := reader_cstrs
 
     simp_all [Opcode.ofNat, Nat.ble]
@@ -70,11 +67,16 @@ theorem correct_addi
     simp [sp1_op_a]
     rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . rw [← is_add] at *
-      simp [Word.toBitVec64, Word.toNat]
+    by_cases h_is_op_a_0 : Main[6] = 0
+    .
+      have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop --sorry --aesop
+      rw [← is_add] at *
+      simp [Word.toBitVec64, Word.toNat, h_is_op_a_0]
+      clear *- this hu64
+      aesop
     . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+      rw [is_add, trusted_instr_prop.2]
       simp [Word.toBitVec64, Word.toNat]
       rfl
 
