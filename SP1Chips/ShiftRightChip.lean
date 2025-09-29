@@ -14,7 +14,7 @@ namespace Srl
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srl : is_srl Main)
@@ -30,7 +30,7 @@ def sp1_srl : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_srl
@@ -74,7 +74,7 @@ namespace Srli
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srli : is_srli Main)
@@ -90,7 +90,7 @@ def sp1_srli : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_srli
@@ -134,7 +134,7 @@ namespace Srlw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srlw : is_srlw Main)
@@ -150,7 +150,7 @@ def sp1_srlw : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_srlw
@@ -194,7 +194,7 @@ namespace Srliw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srliw : is_srliw Main)
@@ -210,7 +210,7 @@ def sp1_srliw : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_srliw
@@ -254,7 +254,7 @@ namespace Sra
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sra : is_sra Main)
@@ -270,7 +270,7 @@ def sp1_sra : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sra
@@ -314,7 +314,7 @@ namespace Srai
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srai : is_srai Main)
@@ -330,7 +330,7 @@ def sp1_srai : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_srai
@@ -374,7 +374,7 @@ namespace Sraw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sraw : is_sraw Main)
@@ -390,7 +390,7 @@ def sp1_sraw : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sraw
@@ -434,7 +434,7 @@ namespace Sraiw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 69)
+  (Main : Vector (Fin KB) 70)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sraiw : is_sraiw Main)
@@ -450,7 +450,7 @@ def sp1_sraiw : SailM Unit := do
   -- TODO(gzgz): we can obtain this from the constraint compiler
   -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sraiw

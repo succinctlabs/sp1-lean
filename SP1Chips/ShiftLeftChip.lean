@@ -14,7 +14,7 @@ namespace Sll
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 65)
+  (Main : Vector (Fin KB) 66)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sll : is_sll Main)
@@ -28,7 +28,7 @@ def sp1_sll : SailM Unit := do
   let ⟨ sll, imm ⟩ := h_is_sll
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sll
@@ -69,7 +69,7 @@ namespace Slli
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 65)
+  (Main : Vector (Fin KB) 66)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slli : is_slli Main)
@@ -83,7 +83,7 @@ def sp1_slli : SailM Unit := do
   let ⟨ sll, imm ⟩ := h_is_slli
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_slli
@@ -124,7 +124,7 @@ namespace Sllw
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 65)
+  (Main : Vector (Fin KB) 66)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sllw : is_sllw Main)
@@ -138,7 +138,7 @@ def sp1_sllw : SailM Unit := do
   let ⟨ sllw, imm ⟩ := h_is_sllw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_sllw
@@ -179,7 +179,7 @@ namespace Slliw
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 65)
+  (Main : Vector (Fin KB) 66)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slliw : is_slliw Main)
@@ -193,7 +193,7 @@ def sp1_slliw : SailM Unit := do
   let ⟨ sllw, imm ⟩ := h_is_slliw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
 
 set_option maxHeartbeats 1000000 in
 theorem correct_slliw

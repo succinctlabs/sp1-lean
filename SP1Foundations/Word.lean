@@ -1,5 +1,5 @@
 import SP1Foundations.Unsigned
-import SP1Foundations.Tactics
+-- import SP1Foundations.Tactics
 
 @[simp] notation "BYTE_DWORD_SIZE" => 16
 @[simp] notation "BYTE_WORD_SIZE" => 8
