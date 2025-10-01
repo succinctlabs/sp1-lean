@@ -9,6 +9,14 @@ import SP1Foundations.Misc
 @[reducible] def SailState.isInitialized (s : SailState) : Prop :=
   ∀ reg : Register, reg ∈ s.regs
 
+@[simp] lemma SailState.isInitialized_iff (s : SailState) :
+    s.isInitialized ↔ ∀ reg : Register, reg ∈ s.regs := Iff.rfl
+
+@[aesop unsafe 50% forward]
+lemma mem_regs_of_isInitialized {s : SailState}
+    (hs : s.isInitialized) (reg : Register) :
+    reg ∈ s.regs := by aesop
+
 /-- All the registers needed for memory ops are set appropriately. -/
 structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
   h_mprv_disabled : BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) = 0#1
