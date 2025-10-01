@@ -154,7 +154,6 @@ theorem correct (Main : Vector (Fin KB) 52)
       PreSail.writeBytes, PreSail.writeByte]
     constructor
     · simp [Word.toBitVec64, Word.toNat, Fin.val_add]
-      refine congr_arg (s.regs.insert Register.nextPC) ?_
       refine congr_arg (BitVec.ofNat 64) ?_
       simp [BitVec.toNat_ofNat]
       omega

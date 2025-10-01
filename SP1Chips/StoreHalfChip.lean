@@ -78,7 +78,6 @@ lemma run_vmem_write_of_width_2'
   simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
     sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
     PreSail.writeByte, Except.map, BitVec.addInt]
-  -- sorry
 
 set_option debug.skipKernelTC true in
 theorem correct (Main : Vector (Fin KB) 47)
@@ -163,7 +162,6 @@ theorem correct (Main : Vector (Fin KB) 47)
       PreSail.writeBytes, PreSail.writeByte]
     constructor
     · simp [Word.toBitVec64, Word.toNat, Fin.val_add]
-      refine congr_arg (s.regs.insert Register.nextPC) ?_
       refine congr_arg (BitVec.ofNat 64) ?_
       simp [BitVec.toNat_ofNat]
       omega

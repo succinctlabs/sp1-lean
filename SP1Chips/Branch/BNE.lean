@@ -33,8 +33,7 @@ private theorem h_Main29_is_bne
   <;> rw [h_is_bne, h_28, h_30, h_31, h_32, h_33] at h_all_add
   <;> trivial
 
--- TODO(gzgz): not being able to get away with `ExecutionResult`?
--- I guess that makes sense...
+
 def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BNE
@@ -48,10 +47,6 @@ def sp1_imm : BitVec 13 := BitVec.ofNat 13 Main[21]
 def sp1_bne : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0])
   pure RETIRE_SUCCESS
-
-@[simp] lemma helper (x : Fin KB) (h : (x * 4⁻¹).val < 16384) :
-    x.val < 65536 := by
-  sorry
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
@@ -74,8 +69,11 @@ theorem correct_bne
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
 
   have h25 : Main[25] = 1 := by
+    simp [ITypeReaderImmutable.constraints,
+      h_is_bne, h_28, h_30, h_31, h_32, h_33] at reader_cstrs
+    clear *- reader_cstrs
+    omega
 
-    sorry
   simp_all only [h25]
 
   -- simplify reader constraints
@@ -135,7 +133,6 @@ theorem correct_bne
 
   -- simplify main goal
   simp [spec_bne, sp1_bne, execute_BTYPE]
-  -- rw [run_readReg_of_isInitialized _ _ sorry]
   rw [run_readReg]
 
   simp [h_pc_read]
@@ -150,7 +147,6 @@ theorem correct_bne
       clear * - spec_lt
       aesop
 
-    -- stop
     rw [h_is_eq] at chip_cstrs
     simp [sub_eq_zero] at chip_cstrs
 
@@ -166,8 +162,6 @@ theorem correct_bne
       jump_to, assert, PreSail.assert, ofBool, h_next_pc_b1]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, Std.ExtDHashMap.get?_eq_some_get h_misa]
-
-    refine congr_arg (s.regs.insert Register.nextPC) ?_
 
     rw [←BitVec.ofNatLT_eq_ofNat h_pc_is_u64]
     simp [Word.toBitVec64, Word.toNat]
@@ -188,50 +182,13 @@ theorem correct_bne
 
     clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
 
-    /-
-    Main : Vector (Fin 2013265921) 45
-    h_imm_0 : ↑Main[21] < 65536
-    h_imm_1 : ↑Main[22] < 65536
-    h_imm_2 : ↑Main[23] < 65536
-    h_imm_3 : ↑Main[24] < 65536
-    h_pc_0 : ↑Main[3] < 65536
-    h_pc_1 : ↑Main[4] < 65536
-    h_pc_2 : ↑Main[5] < 65536
-    h_limb0 : Main[3] + Main[21] = Main[25] ∨ Main[3] + Main[21] - Main[25] = 65536
-    h_limb1 : (Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] = Main[26] ∨
-      (Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26] = 65536
-    h_limb2 : ((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] =
-        Main[27] ∨
-      ((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] -
-          Main[27] =
-        65536
-    h_limb3 : (((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] -
-              Main[27]) *
-            2013235201 +
-          Main[24] =
-        0 ∨
-      (((Main[3] + Main[21] - Main[25]) * 2013235201 + Main[4] + Main[22] - Main[26]) * 2013235201 + Main[5] + Main[23] -
-              Main[27]) *
-            2013235201 +
-          Main[24] =
-        65536
-    h_bound_checks : ↑Main[25] < 65536 ∧ ↑Main[26] < 65536 ∧ ↑Main[27] < 65536
-    ⊢ (↑Main[3] + ↑Main[4] * 65536 + ↑Main[5] * 4294967296 +
-          (↑Main[21] + ↑Main[22] * 65536 + ↑Main[23] * 4294967296 + ↑Main[24] * 281474976710656)) %
-        18446744073709551616 =
-      ↑Main[25] + ↑Main[26] * 65536 + ↑Main[27] * 4294967296
-    -/
-    -- simp [Fin.val_mul] at h_bound_checks
     have h26 : Main[26].val < 65536 := by
       clear *- h_bound_checks
       have := h_bound_checks.1
       clear *- this
       rw [inv_2BB_eq'] at this
-      apply helper
+      apply KoalaBear.lt_65536_of_mul_inv_lt
       simpa
-      -- sorry
-
-    stop
     omega
 
   ·
@@ -247,8 +204,6 @@ theorem correct_bne
     simp [h_is_branching] at chip_cstrs
 
     simp [h_eq]
-
-    refine congr_arg (s.regs.insert Register.nextPC) ?_
 
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
 
@@ -271,7 +226,7 @@ theorem correct_bne
       have := h_bound_checks.1
       clear *- this
       rw [inv_2BB_eq'] at this
-      apply helper
+      apply KoalaBear.lt_65536_of_mul_inv_lt
       simpa
 
     omega

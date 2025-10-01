@@ -68,8 +68,7 @@ theorem correct_addi
     rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0
-    .
-      have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop --sorry --aesop
+    . have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop
       rw [← is_add] at *
       simp [Word.toBitVec64, Word.toNat, h_is_op_a_0]
       clear *- this hu64

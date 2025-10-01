@@ -41,6 +41,10 @@ lemma val_mod4_eq_zero (x : Fin KB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
 @[aesop safe forward]
 lemma mul_diff_one_neq {a b c : Fin KB} : a * (b - c) = 1 → b ≠ c := by aesop
 
+@[simp] lemma lt_65536_of_mul_inv_lt (x : Fin KB) (h : (x * 4⁻¹).val < 16384) :
+    x.val < 65536 := by
+  sorry
+
 end KoalaBear
 
 @[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin KB) <<< 1 = 1 := rfl

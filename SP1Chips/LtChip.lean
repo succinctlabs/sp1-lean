@@ -26,7 +26,7 @@ def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14]
 def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
 
 def sp1_slt : SailM Unit := do
-  let op_a := sp1_op_a Main ---cstrs h_is_slt
+  let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
@@ -35,9 +35,9 @@ theorem correct_slt
   (cstrs : (constraints Main).allHold)
   (h_is_slt : is_slt Main)
   (state_cstrs : (constraints Main).initialState s) :
-  let op_c := sp1_op_c Main --cstrs h_is_slt
-  let op_b := sp1_op_b Main ---cstrs h_is_slt
-  let op_a := sp1_op_a Main --cstrs h_is_slt
+  let op_c := sp1_op_c Main
+  let op_b := sp1_op_b Main
+  let op_a := sp1_op_a Main
   (spec_slt (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slt Main).run s
   := by
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_slt] at h_is_slt
@@ -199,8 +199,6 @@ def sp1_op_c : BitVec 5 :=
 
 def sp1_sltu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
@@ -287,8 +285,6 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_sltiu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltiu
-  -- TODO(gzgz): we can obtain this from the constraint compiler
-  -- This comes from the Interaction.state in CPUState
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
