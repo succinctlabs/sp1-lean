@@ -9,7 +9,7 @@ set_option maxHeartbeats 10000000
 namespace BitwiseU16Operation
 
 lemma spec.and
-  {b cc : Word (Fin BB)}
+  {b cc : Word (Fin KB)}
   {cols : BitwiseU16Operation}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :
@@ -36,7 +36,7 @@ lemma spec.and
       rw [Word.and_toBWord h_isU64_b h_isU64_cc]
       simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
-      repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
       rw [Fin.lt_iff_val_lt_val, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
       simp_all
@@ -50,7 +50,7 @@ lemma spec.and
       bv_decide
 
 lemma spec.or
-  {b cc : Word (Fin BB)}
+  {b cc : Word (Fin KB)}
   {cols : BitwiseU16Operation}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :
@@ -77,7 +77,7 @@ lemma spec.or
       rw [Word.or_toBWord h_isU64_b h_isU64_cc]
       simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
-      repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
       rw [Fin.lt_iff_val_lt_val, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
       simp_all
@@ -91,7 +91,7 @@ lemma spec.or
       bv_decide
 
 lemma spec.xor
-  {b cc : Word (Fin BB)}
+  {b cc : Word (Fin KB)}
   {cols : BitwiseU16Operation}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :
@@ -118,7 +118,7 @@ lemma spec.xor
       rw [Word.xor_toBWord h_isU64_b h_isU64_cc]
       simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
-      repeat rw [Nat.mod_eq_of_lt (b := 2013265921) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
       rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
       rw [Fin.lt_iff_val_lt_val, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
       simp_all

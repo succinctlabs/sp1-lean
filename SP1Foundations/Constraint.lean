@@ -7,28 +7,27 @@ import SP1Foundations.Opcode
 import LeanRV64D.Defs
 
 inductive AirInteraction where
-  | byte (op : ByteOpcode) (a b c : Fin BB)
-  | memory (clk_high clk_low addr0 addr1 addr2 limb0 limb1 limb2 limb3: Fin BB)
-  | state (clk_high clk_low pc0 pc1 pc2: Fin BB)
+  | byte (op : ByteOpcode) (a b c : Fin KB)
+  | memory (clk_high clk_low addr0 addr1 addr2 limb0 limb1 limb2 limb3: Fin KB)
+  | state (clk_high clk_low pc0 pc1 pc2: Fin KB)
   | program
-      (pc0 pc1 pc2 : Fin BB)
+      (pc0 pc1 pc2 : Fin KB)
       (opcode : Opcode)
       (op_a
       op_b_0 op_b_1 op_b_2 op_b_3
       op_c_0 op_c_1 op_c_2 op_c_3
       op_a_0
       imm_b
-      imm_c
-      instr_const0 instr_const1 instr_const2 : Fin BB)
+      imm_c : Fin KB)
   deriving DecidableEq
 
 inductive SP1Constraint where
   /-- Assertion that a particular value is zero. -/
-  | assertZero (x : Fin BB)
+  | assertZero (x : Fin KB)
   /-- Sending an air interaction -/
-  | send (interaction : AirInteraction) (mult : Fin BB)
+  | send (interaction : AirInteraction) (mult : Fin KB)
   /-- Receiving an air interaction -/
-  | receive (interaction : AirInteraction) (mult : Fin BB)
+  | receive (interaction : AirInteraction) (mult : Fin KB)
   -- | ofList (cs : List SP1Constraint) : SP1Constraint
   deriving DecidableEq
 
@@ -52,8 +51,7 @@ def toProp : SP1Constraint → Prop
       op_c_0 op_c_1 op_c_2 op_c_3
       op_a_0
       imm_b
-      imm_c
-      _instr_const0 _instr_const1 _instr_const2)
+      imm_c)
       mult =>
         mult ≠ 0
         -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
@@ -67,10 +65,10 @@ def toProp : SP1Constraint → Prop
            ∧ (pc0 % 4 = 0 ∧ (pc0 < 65536 ∧ pc1 < 65536 ∧ pc2 < 65536))
   | _ => True
 
-@[simp] lemma toProp_assertZero (x : Fin BB) :
+@[simp] lemma toProp_assertZero (x : Fin KB) :
     (assertZero x).toProp ↔ x = 0 := Iff.rfl
 
-@[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c : Fin BB) (mult : Fin BB) :
+@[simp] lemma toProp_send_byte (op : ByteOpcode) (a b c : Fin KB) (mult : Fin KB) :
     (send (.byte op a b c) mult).toProp ↔ (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 
 end toProp
@@ -101,8 +99,7 @@ def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
       op_c_0 op_c_1 op_c_2 op_c_3
       _op_a_0
       _imm_b
-      _imm_c
-      _instr_const0 _instr_const1 _instr_const2)
+      _imm_c)
       mult =>
         mult ≠ 0
         -> opcode.trusted_instr_state s op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3

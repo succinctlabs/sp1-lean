@@ -5,7 +5,7 @@ namespace U16CompareOperation
 
 @[grind →, aesop safe forward]
 lemma spec
-  (a b : Fin BB)
+  (a b : Fin KB)
   (cols : U16CompareOperation)
   (h_a_isU16 : (a : ℕ) < 65536)
   (h_b_isU16 : (b : ℕ) < 65536) :

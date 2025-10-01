@@ -1,7 +1,10 @@
-import Lean
 import LeanRV64D.Specialization
+import Mathlib
 
 open Lean
+
+/-- Custom array indexing tactic, scales better with large contexts. -/
+macro_rules | `(tactic| get_elem_tactic) => `(tactic| norm_num1)
 
 /-- Recursively extract a goal from nested conjunctions in the context.
     Splits ANDs and tries exact on each branch, recursing if needed. -/

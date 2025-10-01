@@ -8,86 +8,99 @@ set_option linter.unusedVariables false
 section constraints
 
 @[irreducible] def constraints
-  (clk_high : (Fin BB))
-  (clk_low : (Fin BB))
-  (pc : (Vector (Fin BB) 3))
-  (opcode : (Fin BB))
-  (instr_field_consts : (Vector (Fin BB) 3))
-  (op_a_write_value : (Word (Fin BB)))
+  (clk_high : (Fin KB))
+  (clk_low : (Fin KB))
+  (pc : (Vector (Fin KB) 3))
+  (opcode : (Fin KB))
+  (instr_field_consts : (Vector (Fin KB) 4))
+  (op_a_write_value : (Word (Fin KB)))
   (cols : ALUTypeReader)
-  (is_real : (Fin BB))
+  (is_real : (Fin KB))
   : SP1ConstraintList :=
-  let E0 : Fin BB := is_real - 1
-  let E1 : Fin BB := is_real * E0
-  let E2 : Fin BB := is_real - 1
-  let E3 : Fin BB := cols.imm_c - 0
-  let E4 : Fin BB := E2 * E3
-  let E5 : Fin BB := 0 + cols.op_b
-  let E6 : Fin BB := op_a_write_value[0] - 0
-  let E7 : Fin BB := cols.op_a_0 * E6
-  let E8 : Fin BB := op_a_write_value[1] - 0
-  let E9 : Fin BB := cols.op_a_0 * E8
-  let E10 : Fin BB := op_a_write_value[2] - 0
-  let E11 : Fin BB := cols.op_a_0 * E10
-  let E12 : Fin BB := op_a_write_value[3] - 0
-  let E13 : Fin BB := cols.op_a_0 * E12
-  let E14 : Fin BB := clk_low + 3
-  let E15 : Fin BB := is_real - 1
-  let E16 : Fin BB := is_real * E15
-  let E17 : Fin BB := E14 - cols.op_a_memory.access_timestamp.prev_low
-  let E18 : Fin BB := E17 - 1
-  let E19 : Fin BB := E18 - cols.op_a_memory.access_timestamp.diff_low_limb
-  let E20 : Fin BB := E19 * 2013235201
-  let E21 : Fin BB := clk_low + 2
-  let E22 : Fin BB := is_real - 1
-  let E23 : Fin BB := is_real * E22
-  let E24 : Fin BB := E21 - cols.op_b_memory.access_timestamp.prev_low
-  let E25 : Fin BB := E24 - 1
-  let E26 : Fin BB := E25 - cols.op_b_memory.access_timestamp.diff_low_limb
-  let E27 : Fin BB := E26 * 2013235201
-  let E28 : Fin BB := clk_low + 1
-  let E29 : Fin BB := is_real - cols.imm_c
-  let E30 : Fin BB := E29 - 1
-  let E31 : Fin BB := E29 * E30
-  let E32 : Fin BB := E28 - cols.op_c_memory.access_timestamp.prev_low
-  let E33 : Fin BB := E32 - 1
-  let E34 : Fin BB := E33 - cols.op_c_memory.access_timestamp.diff_low_limb
-  let E35 : Fin BB := E34 * 2013235201
-  let E36 : Fin BB := cols.op_c_memory.prev_value[0] - cols.op_c[0]
-  let E37 : Fin BB := cols.imm_c * E36
-  let E38 : Fin BB := cols.op_c_memory.prev_value[1] - cols.op_c[1]
-  let E39 : Fin BB := cols.imm_c * E38
-  let E40 : Fin BB := cols.op_c_memory.prev_value[2] - cols.op_c[2]
-  let E41 : Fin BB := cols.imm_c * E40
-  let E42 : Fin BB := cols.op_c_memory.prev_value[3] - cols.op_c[3]
-  let E43 : Fin BB := cols.imm_c * E42
+  let E0 : Fin KB := is_real - 1
+  let E1 : Fin KB := is_real * E0
+  let E2 : Fin KB := is_real - cols.is_trusted
+  let E3 : Fin KB := E2 - 1
+  let E4 : Fin KB := E2 * E3
+  let E5 : Fin KB := cols.is_trusted - 1
+  let E6 : Fin KB := cols.is_trusted * E5
+  let E7 : Fin KB := E2 + cols.is_trusted
+  let E8 : Fin KB := E7 - is_real
+  let E9 : Fin KB := public_value () 151 - 1
+  let E10 : Fin KB := E2 * E9
+  let E11 : Fin KB := is_real - 1
+  let E12 : Fin KB := cols.imm_c - 0
+  let E13 : Fin KB := E11 * E12
+  let E14 : Fin KB := 0 + cols.op_b
+  let E15 : Fin KB := op_a_write_value[0] - 0
+  let E16 : Fin KB := cols.op_a_0 * E15
+  let E17 : Fin KB := op_a_write_value[1] - 0
+  let E18 : Fin KB := cols.op_a_0 * E17
+  let E19 : Fin KB := op_a_write_value[2] - 0
+  let E20 : Fin KB := cols.op_a_0 * E19
+  let E21 : Fin KB := op_a_write_value[3] - 0
+  let E22 : Fin KB := cols.op_a_0 * E21
+  let E23 : Fin KB := clk_low + 4
+  let E24 : Fin KB := is_real - 1
+  let E25 : Fin KB := is_real * E24
+  let E26 : Fin KB := E23 - cols.op_a_memory.access_timestamp.prev_low
+  let E27 : Fin KB := E26 - 1
+  let E28 : Fin KB := E27 - cols.op_a_memory.access_timestamp.diff_low_limb
+  let E29 : Fin KB := E28 * 2130673921
+  let E30 : Fin KB := clk_low + 3
+  let E31 : Fin KB := is_real - 1
+  let E32 : Fin KB := is_real * E31
+  let E33 : Fin KB := E30 - cols.op_b_memory.access_timestamp.prev_low
+  let E34 : Fin KB := E33 - 1
+  let E35 : Fin KB := E34 - cols.op_b_memory.access_timestamp.diff_low_limb
+  let E36 : Fin KB := E35 * 2130673921
+  let E37 : Fin KB := clk_low + 2
+  let E38 : Fin KB := is_real - cols.imm_c
+  let E39 : Fin KB := E38 - 1
+  let E40 : Fin KB := E38 * E39
+  let E41 : Fin KB := E37 - cols.op_c_memory.access_timestamp.prev_low
+  let E42 : Fin KB := E41 - 1
+  let E43 : Fin KB := E42 - cols.op_c_memory.access_timestamp.diff_low_limb
+  let E44 : Fin KB := E43 * 2130673921
+  let E45 : Fin KB := cols.op_c_memory.prev_value[0] - cols.op_c[0]
+  let E46 : Fin KB := cols.imm_c * E45
+  let E47 : Fin KB := cols.op_c_memory.prev_value[1] - cols.op_c[1]
+  let E48 : Fin KB := cols.imm_c * E47
+  let E49 : Fin KB := cols.op_c_memory.prev_value[2] - cols.op_c[2]
+  let E50 : Fin KB := cols.imm_c * E49
+  let E51 : Fin KB := cols.op_c_memory.prev_value[3] - cols.op_c[3]
+  let E52 : Fin KB := cols.imm_c * E51
   [
     (.assertZero E1),
     (.assertZero E4),
-    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E5 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] cols.op_a_0 0 cols.imm_c instr_field_consts[0] instr_field_consts[1] instr_field_consts[2]) is_real),
-    (.assertZero E7),
-    (.assertZero E9),
-    (.assertZero E11),
+    (.assertZero E6),
+    (.assertZero E8),
+    (.assertZero E10),
     (.assertZero E13),
+    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E14 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] cols.op_a_0 0 cols.imm_c) cols.is_trusted),
     (.assertZero E16),
+    (.assertZero E18),
+    (.assertZero E20),
+    (.assertZero E22),
+    (.assertZero E25),
     (.send (.byte (ByteOpcode.ofNat 6) cols.op_a_memory.access_timestamp.diff_low_limb 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 3) 0 E20 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 E29 0) is_real),
     (.send (.memory clk_high cols.op_a_memory.access_timestamp.prev_low cols.op_a 0 0 cols.op_a_memory.prev_value[0] cols.op_a_memory.prev_value[1] cols.op_a_memory.prev_value[2] cols.op_a_memory.prev_value[3]) is_real),
-    (.receive (.memory clk_high E14 cols.op_a 0 0 op_a_write_value[0] op_a_write_value[1] op_a_write_value[2] op_a_write_value[3]) is_real),
-    (.assertZero E23),
+    (.receive (.memory clk_high E23 cols.op_a 0 0 op_a_write_value[0] op_a_write_value[1] op_a_write_value[2] op_a_write_value[3]) is_real),
+    (.assertZero E32),
     (.send (.byte (ByteOpcode.ofNat 6) cols.op_b_memory.access_timestamp.diff_low_limb 16 0) is_real),
-    (.send (.byte (ByteOpcode.ofNat 3) 0 E27 0) is_real),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 E36 0) is_real),
     (.send (.memory clk_high cols.op_b_memory.access_timestamp.prev_low cols.op_b 0 0 cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1] cols.op_b_memory.prev_value[2] cols.op_b_memory.prev_value[3]) is_real),
-    (.receive (.memory clk_high E21 cols.op_b 0 0 cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1] cols.op_b_memory.prev_value[2] cols.op_b_memory.prev_value[3]) is_real),
-    (.assertZero E31),
-    (.send (.byte (ByteOpcode.ofNat 6) cols.op_c_memory.access_timestamp.diff_low_limb 16 0) E29),
-    (.send (.byte (ByteOpcode.ofNat 3) 0 E35 0) E29),
-    (.send (.memory clk_high cols.op_c_memory.access_timestamp.prev_low cols.op_c[0] 0 0 cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1] cols.op_c_memory.prev_value[2] cols.op_c_memory.prev_value[3]) E29),
-    (.receive (.memory clk_high E28 cols.op_c[0] 0 0 cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1] cols.op_c_memory.prev_value[2] cols.op_c_memory.prev_value[3]) E29),
-    (.assertZero E37),
-    (.assertZero E39),
-    (.assertZero E41),
-    (.assertZero E43),
+    (.receive (.memory clk_high E30 cols.op_b 0 0 cols.op_b_memory.prev_value[0] cols.op_b_memory.prev_value[1] cols.op_b_memory.prev_value[2] cols.op_b_memory.prev_value[3]) is_real),
+    (.assertZero E40),
+    (.send (.byte (ByteOpcode.ofNat 6) cols.op_c_memory.access_timestamp.diff_low_limb 16 0) E38),
+    (.send (.byte (ByteOpcode.ofNat 3) 0 E44 0) E38),
+    (.send (.memory clk_high cols.op_c_memory.access_timestamp.prev_low cols.op_c[0] 0 0 cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1] cols.op_c_memory.prev_value[2] cols.op_c_memory.prev_value[3]) E38),
+    (.receive (.memory clk_high E37 cols.op_c[0] 0 0 cols.op_c_memory.prev_value[0] cols.op_c_memory.prev_value[1] cols.op_c_memory.prev_value[2] cols.op_c_memory.prev_value[3]) E38),
+    (.assertZero E46),
+    (.assertZero E48),
+    (.assertZero E50),
+    (.assertZero E52),
   ]
 
 end constraints

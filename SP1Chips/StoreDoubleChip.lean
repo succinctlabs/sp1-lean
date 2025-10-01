@@ -23,19 +23,19 @@ noncomputable def spec_sb (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Execution
   let width : ℕ := 8 -- eight bytes
   execute_STORE imm rs1 rs2 width
 
-def sp1_op_a (Main : Vector (Fin BB) 39) : BitVec 5 :=
+def sp1_op_a (Main : Vector (Fin KB) 41) : BitVec 5 :=
   BitVec.ofNat 5 Main[6]
 
-def sp1_ob_b (Main : Vector (Fin BB) 39) : BitVec 5 :=
+def sp1_ob_b (Main : Vector (Fin KB) 41) : BitVec 5 :=
   BitVec.ofNat 5 Main[14]
 
-def sp1_imm_c (Main : Vector (Fin BB) 39) : BitVec 12 :=
+def sp1_imm_c (Main : Vector (Fin KB) 41) : BitVec 12 :=
   BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])
 
-def sp1_sb (Main : Vector (Fin BB) 39) : SailM ExecutionResult := do
+def sp1_sb (Main : Vector (Fin KB) 41) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  let addr : BitVec 64 := Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0]
+  let addr : BitVec 64 := Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0]
   Sail.write_ram 64 8 0#64 addr (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
   return RETIRE_SUCCESS
 
@@ -86,12 +86,12 @@ lemma run_vmem_write_of_width_8
     PreSail.writeByte, Except.map, BitVec.addInt]
 
 set_option debug.skipKernelTC true in
-theorem correct (Main : Vector (Fin BB) 39)
+theorem correct (Main : Vector (Fin KB) 41)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (StoreDouble.constraints Main).allHold)
     (state_cstrs : (StoreDouble.constraints Main).initialState s)
-    (h_is_real : Main[38] = 1)
+    (h_is_real : Main[39] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
@@ -129,6 +129,8 @@ theorem correct (Main : Vector (Fin BB) 39)
   -- Extract constraints about the reader
   simp [ITypeReaderImmutable.constraints,
       SP1Constraint.toProp, Opcode.ofNat, Nat.ble, Nat.beq] at h_reader
+  have hprot : Main[25] = 1 := by clear *- h_reader; simp_all only [sub_eq_zero]
+  simp [hprot] at *
   have h_imm_c : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21]) := by clear *- h_reader; simp_all only
   have h6_32 : Main[6] < 32 := by clear *- h_reader; simp_all only
@@ -166,7 +168,6 @@ theorem correct (Main : Vector (Fin BB) 39)
       PreSail.writeBytes, PreSail.writeByte]
     constructor
     · simp [Word.toBitVec64, Word.toNat, Fin.val_add]
-      refine congr_arg (s.regs.insert Register.nextPC) ?_
       refine congr_arg (BitVec.ofNat 64) ?_
       simp [BitVec.toNat_ofNat]
       omega

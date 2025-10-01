@@ -6,12 +6,12 @@ import SP1Chips.Addw.Constraints
 import SP1Chips.AddwChip
 import SP1Chips.Bitwise.Constraints
 import SP1Chips.BitwiseChip
-import SP1Chips.Branch.BEQ
-import SP1Chips.Branch.BGE
-import SP1Chips.Branch.BGEU
-import SP1Chips.Branch.BLT
-import SP1Chips.Branch.BLTU
-import SP1Chips.Branch.BNE
+-- import SP1Chips.Branch.BEQ
+-- import SP1Chips.Branch.BGE
+-- import SP1Chips.Branch.BGEU
+-- import SP1Chips.Branch.BLT
+-- import SP1Chips.Branch.BLTU
+-- import SP1Chips.Branch.BNE
 import SP1Chips.Branch.Constraints
 import SP1Chips.BranchChip
 import SP1Chips.DivRem.Constraints

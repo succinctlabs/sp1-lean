@@ -3,10 +3,10 @@ import SP1Operations.Compare.LtOperationUnsigned.Constraints
 namespace LtOperationUnsigned
 
 lemma allHold_constraints_iff
-  (b : Word (Fin BB))
-  (d : Word (Fin BB))
+  (b : Word (Fin KB))
+  (d : Word (Fin KB))
   (cols : LtOperationUnsigned)
-  (is_real : Fin BB) :
+  (is_real : Fin KB) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_real) ↔
     List.Forall SP1Constraint.toProp (U16CompareOperation.constraints cols.comparison_limbs[0] cols.comparison_limbs[1] cols.u16_compare_operation is_real) ∧
     ((is_real = 0 ∨ is_real = 1) ∧
@@ -27,10 +27,10 @@ lemma allHold_constraints_iff
 
 @[grind →]
 lemma cl_are_U16
-  {b : Word (Fin BB)}
-  {d : Word (Fin BB)}
+  {b : Word (Fin KB)}
+  {d : Word (Fin KB)}
   {cols : LtOperationUnsigned}
-  {is_real : Fin BB}
+  {is_real : Fin KB}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
@@ -41,12 +41,12 @@ lemma cl_are_U16
 set_option maxHeartbeats 1000000 in
 @[grind →, aesop safe forward]
 lemma spec.nat
-  {b d : Word (Fin BB)}
+  {b d : Word (Fin KB)}
   {cols : LtOperationUnsigned}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1) →
-    cols.u16_compare_operation.bit = if b.toNat < d.toNat then (1 : Fin BB) else (0 : Fin BB)
+    cols.u16_compare_operation.bit = if b.toNat < d.toNat then (1 : Fin KB) else (0 : Fin KB)
   := by
     intro cstrs
     have ⟨ _, _ ⟩ := cl_are_U16 h_b_isU64 h_d_isU64 cstrs (by rfl)
@@ -59,7 +59,7 @@ lemma spec.nat
     aesop (add safe (by omega)) (add safe cases LtOperationUnsigned)
 
 lemma spec
-  {b d : Word (Fin BB)}
+  {b d : Word (Fin KB)}
   {cols : LtOperationUnsigned}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
@@ -70,14 +70,14 @@ lemma spec
 section gen
 
 lemma spec.nat.gen
-  {b d : Word (Fin BB)}
+  {b d : Word (Fin KB)}
   {cols : LtOperationUnsigned}
-  {is_real : Fin BB}
+  {is_real : Fin KB}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
     is_real = 1 →
-      cols.u16_compare_operation.bit = if b.toNat < d.toNat then (1 : Fin BB) else (0 : Fin BB)
+      cols.u16_compare_operation.bit = if b.toNat < d.toNat then (1 : Fin KB) else (0 : Fin KB)
     := by aesop
 
 end gen

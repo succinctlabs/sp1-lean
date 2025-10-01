@@ -7,55 +7,39 @@ namespace Jalr
 
 open Sail SailState BitVec LeanRV64D.Functions
 
-variable (Main : Vector (Fin BB) 38) (s : SailState)
+attribute [simp] jump_to ofBool
+  update updateSubrange'
+  assert PreSail.assert
+  LeanRV64D.Functions.RETIRE_SUCCESS
 
-lemma op_a_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
-    (h_is_real : Main[29] = 1) : Main[6].val < 2^5 := by
-  simp only [BB_eq, Nat.reducePow]
-  have reader_cstrs := by
-    simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
-    exact h.2.2.1
-  simp [ITypeReader.constraints, h_is_real, Opcode.ofNat,
-    Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-  aesop
+variable (Main : Vector (Fin KB) 39) (s : SailState)
 
-lemma op_b_lt32_of_constraints {Main : Vector (Fin BB) 38} (h : (constraints Main).allHold)
-    (h_is_real : Main[29] = 1) : Main[14].val < 2^5 := by
-  simp only [BB_eq, Nat.reducePow]
-  have reader_cstrs := by
-    simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h
-    exact h.2.2.1
-  simp [ITypeReader.constraints, h_is_real, Opcode.ofNat,
-    Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-  aesop
+def sp1_op_a (Main : Vector (Fin KB) 39) : BitVec 5 := BitVec.ofNat 5 Main[6].val
 
-def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1) : BitVec 5 :=
-  Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
+def sp1_op_b (Main : Vector (Fin KB) 39) : BitVec 5 := BitVec.ofNat 5 Main[14].val
 
-def sp1_op_b (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): BitVec 5 :=
-  Main[14].val#'(op_b_lt32_of_constraints cstrs h_is_real)
+def sp1_op_c (Main : Vector (Fin KB) 39) : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
-def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
-
-def sp1_jalr  (cstrs : (constraints Main).allHold) (h_is_real : Main[29] = 1): SailM Unit := do
-  let op_a := sp1_op_a Main cstrs h_is_real
-  writeReg Register.nextPC (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
-  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[34], Main[35], Main[36], Main[37]])
+def sp1_jalr (Main : Vector (Fin KB) 39) : SailM Unit := do
+  let op_a := sp1_op_a Main
+  writeReg Register.nextPC (Word.toBitVec64 #v[Main[31], Main[32], Main[33], Main[34]])
+  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[35], Main[36], Main[37], Main[38]])
 
 def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
 
 set_option debug.skipKernelTC true in
+set_option maxHeartbeats 10000000 in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
-    (h_is_real : Main[29] = 1)
-    (state_cstrs : (constraints Main).initialState s)
-    (h_misa : Register.misa ∈ s.regs) :
-    let op_b := sp1_op_b Main cstrs h_is_real
-    let op_a := sp1_op_a Main cstrs h_is_real
+    (h_is_real : Main[30] = 1)
+    (hs : isInitialized s)
+    (state_cstrs : (constraints Main).initialState s) :
+    let op_b := sp1_op_b Main
+    let op_a := sp1_op_a Main
     let op_c := sp1_op_c Main
-    (spec_jalr op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_jalr Main cstrs h_is_real).run s := by
+    (spec_jalr op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_jalr Main).run s := by
   extract_lets op_c op_b op_a
 
   -- pull out state constraints about the contents of register and pc reads
@@ -66,67 +50,57 @@ theorem JALR_correct
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
   obtain ⟨res_cstrs, ⟨pc_cstrs, ⟨reader_cstrs, ⟨inc_pc_cstrs, chip_cstrs⟩⟩⟩⟩ := cstrs
 
-  simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq, SP1Constraint.toProp] at reader_cstrs
-  obtain ⟨⟨h_op_b, h_c_sign_extend⟩, ⟨h_op_a, ⟨_, ⟨⟨h_c_0, ⟨h_c_1, ⟨h_c_2, h_c_3⟩⟩⟩, ⟨op_a_0_is_bool, ⟨op_a_0_iff_op_a_is_0, ⟨pc_mul_4, ⟨h_pc_0, ⟨h_pc_1, h_pc_2⟩⟩⟩⟩⟩⟩⟩⟩⟩ := reader_cstrs.1
-  let read_op_b' := read_op_b h_op_b
+  simp [h_is_real] at *
+  simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq,
+    SP1Constraint.toProp, sub_eq_zero] at reader_cstrs
 
-  have b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := reader_cstrs.2.2.2.2.2.2.2.2.2.2
-  let b_bv64 : BitVec 64 := Word.toBitVec64LT b_is_u64
+  have h25 : Main[25] = 1 := by aesop
+  simp [h25] at reader_cstrs
+  specialize read_op_a (by aesop)
+  specialize read_op_b (by aesop)
+  simp only [BitVec.ofNatLT_eq_ofNat] at read_op_a read_op_b
 
-  have imm_is_u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
-    refine Word.isU64_of_cases h_c_0 h_c_1 h_c_2 h_c_3
-
-  have pc_is_u64 : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
-    exact Word.isU64_of_cases h_pc_0 h_pc_1 h_pc_2 (by simp)
-
-  rw [h_is_real] at *
-  have ⟨res_is_u64, h_res⟩ := AddOperation.spec b_is_u64 imm_is_u64 res_cstrs
-
-  have h_4_is_u64 : Word.isU64 #v[4,0,0,0] :=
-    Word.isU64_of_cases (by trivial) (by trivial) (by trivial) (by trivial)
-
-  have hmod : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
+  have h_sign_extend : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
+    BitVec.signExtend 64 (BitVec.ofNat 12 Main[21]) := by aesop
+  have hmod4' : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]) % 4 = 0 := by
-    rw [BitVec.ofNatLT_eq_ofNat] at read_op_b'
-    rw [read_op_b'] at op_b_val_plus_imm_mul4
-    simpa using op_b_val_plus_imm_mul4
+    simp [h25, read_op_b] at op_b_val_plus_imm_mul4
+    clear *- op_b_val_plus_imm_mul4
+    simp [Word.toBitVec64, BitVec.ofNat, Word.toNat, ← BitVec.toNat_inj, Fin.val_add] at *
+    omega
 
-  have hmod4 : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
-      Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]])[1] = false := by
-    refine (mul4_means_0_1_are_0 ?_).2
-    simpa using hmod
+  have h15 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
+    clear *- reader_cstrs; aesop
+  have h22 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    clear *- reader_cstrs; apply Word.isU64_of_cases <;> aesop
+  have hu64pc : Word.isU64 #v[Main[3], Main[4], Main[5], 0] := by
+    clear *- reader_cstrs; apply Word.isU64_of_cases <;> aesop
+  have h_add := AddOperation.spec h15 h22 res_cstrs
 
-  have hmod2 : (18446744073709551614#64 &&&
-      Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
-        Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]])[0]? = some false := by
-    simp only [Nat.ofNat_pos, getElem?_pos, getElem_and, reduceGetElem, Bool.false_and]
+  simp [spec_jalr, sp1_jalr,
+    run_readReg_of_isInitialized _ _ hs,
+    EStateM.Result.map, cond,
+    execute_JALR,
+    op_a, op_b, op_c,
+    sp1_op_a, sp1_op_b, sp1_op_c,
+    read_op_a, read_op_b,
+    ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2,
+    assert, PreSail.assert]
 
-  clear res_cstrs reader_cstrs pc_cstrs
+  rw [run_readReg_of_isInitialized _ _ (by aesop)]
+  rw [twoPow64_and_eq_self hmod4']
 
-  simp [spec_jalr, sp1_jalr, execute_JALR, op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c]
-  rw [run_readReg]
-  simp only [read_pc, read_op_b', ext_control_check_pc, ← h_c_sign_extend, bit_to_bool, access,
-    ofBool, update, updateSubrange', reduceAllOnes, truncate_eq_setWidth, reduceSetWidth,
-    shiftLeft_zero, reduceNot, bits_of_virtaddr, setWidth_zero, or_zero, Nat.one_lt_ofNat,
-    getElem!_pos, getElem_and, reduceGetElem, hmod4, Bool.and_false, ofNat_eq_ofNat, cond_false,
-    currentlyEnabled, hartSupports, LeanRV64D.Functions.xlen, Nat.reduceBEq, Bool.and_self,
-    LeanRV64D.Functions.not, Bool.not_true, Nat.reduceBNe, Bool.or_true, Bool.or_false,
-    _get_Misa_C, Sail.BitVec.extractLsb, BitVec.extractLsb, extractLsb', Nat.reduceSub,
-    Nat.reduceAdd, Bool.true_and, bind_pure_comp, bind_pure, Bool.not_eq_eq_eq_not, bind_map_left,
-    beq_eq_false_iff_ne, ne_eq, EStateM.run_bind, run_bool_bit_backwards, Bool.false_eq_true,
-    false_and, ↓reduceIte, run_ite, EStateM.run_map, run_writeReg, EStateM.Result.map_ok,
-    jump_to, assert, PreSail.assert, hmod2, getElem!_def]
-  simp only [BEq.rfl, ↓reduceIte, EStateM.run_pure, Bool.false_and, Bool.false_eq_true,
-    set_next_pc_eq, EStateM.run_map, run_writeReg, EStateM.Result.map_ok]
-  rw [run_readReg]
-  simp only [Std.ExtDHashMap.get?_insert, beq_iff_eq, reduceCtorEq, ↓reduceDIte,
-    Std.ExtDHashMap.get?_eq_some_get h_misa, RETIRE_SUCCESS]
-  split_ifs <;> simp [BitVec.twoPow64_and_eq_self hmod, h_res]
-  have htemp : (1 : Fin BB) - Main[13] = 1 := by rcases op_a_0_is_bool <;> simp_all
-  rw [htemp] at inc_pc_cstrs
-  have ⟨ _, h_add ⟩ := AddOperation.spec pc_is_u64 h_4_is_u64 inc_pc_cstrs
-  rw [h_add]
-  simp [Word.toBitVec64, Word.toNat]
+  by_cases h6 : BitVec.ofNat 5 Main[6] = 0#5
+  · simp [h_add, h6]
+  · have h6' : Main[6] ≠ 0 := by clear *- h6; aesop
+    have h13 : Main[13] = 0 := by clear *- reader_cstrs h6'; aesop
+    simp [h13] at *
+
+    have h_inc_pc := AddOperation.spec hu64pc (by aesop) inc_pc_cstrs
+    simp [execute_RTYPE_pure_w] at h_inc_pc
+
+    simp [Std.ExtDHashMap.get_eq_get_get?, read_pc, h_add, h_inc_pc]
+    simp [Word.toBitVec64, Word.toNat]
 
 
 end Jalr

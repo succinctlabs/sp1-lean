@@ -1,4 +1,4 @@
 import SP1Foundations
 
 structure SubOperation where
-  value : Word (Fin BB)
+  value : Word (Fin KB)

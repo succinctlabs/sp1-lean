@@ -3,4 +3,4 @@ import SP1Operations.Operation.AddrAddOperation.Operation
 
 structure AddressOperation where
   addr_operation : AddrAddOperation
-  top_two_limb_inv : Fin BB
+  top_two_limb_inv : Fin KB

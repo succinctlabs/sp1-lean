@@ -13,6 +13,32 @@ grind_pattern Fin.coe_ofNat_eq_mod => (@Fin.val m (OfNat.ofNat n))
 
 end grind
 
+@[simp] lemma Std.ExtDHashMap.insert_inj' {α β}
+    [BEq α] [LawfulBEq α] [EquivBEq α]
+    [Hashable α] [LawfulHashable α]
+    (m m' : Std.ExtDHashMap α β)
+    (x : α) (y y' : β x) :
+    m.insert x y = m'.insert x y' ↔
+      (y = y' ∧ ∀ x', x ≠ x' → m.get? x' = m'.get? x') := by
+  simp [Std.ExtDHashMap.ext_get?_iff,
+    Std.ExtDHashMap.get?_insert]
+  refine ⟨fun h => ?_, fun h k => ?_⟩
+  · refine ⟨by simpa using h x, fun x' hx' => ?_⟩
+    simpa [beq_iff_eq, hx'] using h x'
+  · split_ifs <;> aesop
+
+@[simp] lemma Std.ExtDHashMap.insert_inj {α β}
+    [BEq α] [LawfulBEq α] [EquivBEq α]
+    [Hashable α] [LawfulHashable α]
+    (m : Std.ExtDHashMap α β)
+    (x : α) (y y' : β x) :
+    m.insert x y = m.insert x y' ↔ y = y' := by
+  simp [Std.ExtDHashMap.ext_get?_iff,
+    Std.ExtDHashMap.get?_insert]
+  refine ⟨fun h => ?_, fun h k => ?_⟩
+  · simpa using h x
+  · split_ifs <;> simp [h]
+
 instance Fin.noZeroDivisors_of_prime (p : ℕ)
     [hp : Fact (Nat.Prime (p + 1))] : NoZeroDivisors (Fin (p + 1)) := by
   refine IsDomain.to_noZeroDivisors (ZMod (p + 1))

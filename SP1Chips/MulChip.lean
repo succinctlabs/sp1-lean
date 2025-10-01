@@ -1,6 +1,6 @@
 import SP1Operations.Operation.MulOperation
 import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Reader.RTypeReader
 import SP1Chips.Mul.Constraints
 
 open LeanRV64D.Functions
@@ -13,7 +13,7 @@ namespace Mul
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 83)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mul : is_mul Main)
@@ -27,7 +27,7 @@ def sp1_mul : SailM Unit := do
   let ⟨ is_mul, imm ⟩ := h_is_mul
   let op_a := sp1_op_a Main cstrs (mul_real Main is_mul)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
 
 theorem correct_mul
   (state_cstrs : (constraints Main).initialState s) :
@@ -47,14 +47,15 @@ theorem correct_mul
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
+
     obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1 trusted_instr_state; simp_all
 
     simp [spec_mul, sp1_mul, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -72,7 +73,7 @@ namespace Mulh
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 83)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulh : is_mulh Main)
@@ -86,7 +87,7 @@ def sp1_mulh : SailM Unit := do
   let ⟨ is_mulh, imm ⟩ := h_is_mulh
   let op_a := sp1_op_a Main cstrs (mulh_real Main is_mulh)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
 
 theorem correct_mulh
   (state_cstrs : (constraints Main).initialState s) :
@@ -106,14 +107,14 @@ theorem correct_mulh
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
     obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1 trusted_instr_state; simp_all
 
     simp [spec_mulh, sp1_mulh, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -131,7 +132,7 @@ namespace Mulhu
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 83)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulhu : is_mulhu Main)
@@ -145,7 +146,7 @@ def sp1_mulhu : SailM Unit := do
   let ⟨ is_mulhu, imm ⟩ := h_is_mulhu
   let op_a := sp1_op_a Main cstrs (mulhu_real Main is_mulhu)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
 
 theorem correct_mulh
   (state_cstrs : (constraints Main).initialState s) :
@@ -165,14 +166,14 @@ theorem correct_mulh
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
     obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1 trusted_instr_state; simp_all
 
     simp [spec_mulhu, sp1_mulhu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -188,7 +189,7 @@ end Mulhu
 open Mul
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 83)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulhsu : is_mulhsu Main)
@@ -202,7 +203,7 @@ def sp1_mulhsu : SailM Unit := do
   let ⟨ is_mulhsu, imm ⟩ := h_is_mulhsu
   let op_a := sp1_op_a Main cstrs (mulhsu_real Main is_mulhsu)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
 
 theorem correct_mulh
   (state_cstrs : (constraints Main).initialState s) :
@@ -222,14 +223,14 @@ theorem correct_mulh
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
     obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1 trusted_instr_state; simp_all
 
     simp [spec_mulhsu, sp1_mulhsu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
@@ -247,7 +248,7 @@ end Mulhsu
 namespace Mulw
 
 variable
-  (Main : Vector (Fin BB) 87)
+  (Main : Vector (Fin KB) 83)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulw : is_mulw Main)
@@ -261,7 +262,7 @@ def sp1_mulw : SailM Unit := do
   let ⟨ is_mulw, imm ⟩ := h_is_mulw
   let op_a := sp1_op_a Main cstrs (mulw_real Main is_mulw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
 
 theorem correct_mulw
   (state_cstrs : (constraints Main).initialState s) :
@@ -281,14 +282,14 @@ theorem correct_mulw
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
     obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1 trusted_instr_state; simp_all
 
     simp [spec_mulw, sp1_mulw, execute, execute_MULW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [BabyBear.add4_into_pc_ofNat (by omega)]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]

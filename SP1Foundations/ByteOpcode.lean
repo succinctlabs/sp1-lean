@@ -26,7 +26,7 @@ section ofNat
 @[simp] lemma ofNat_five : ByteOpcode.ofNat 5 = .MSB := rfl
 @[simp] lemma ofNat_seven : ByteOpcode.ofNat 6 = .Range := rfl
 
-def toBB : ByteOpcode → Fin BB
+def toBB : ByteOpcode → Fin KB
   | AND => 0
   | OR => 1
   | XOR => 2
@@ -43,7 +43,7 @@ end ofNat
 section constrain
 
 -- dt: it might make sense to add `Fin.val` calls in more places here.
-def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
+def constrain (op : ByteOpcode) (a b c : Fin KB) : Prop :=
   match op with
   | AND => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val &&& c.val
   | OR  => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val ||| c.val
@@ -53,25 +53,25 @@ def constrain (op : ByteOpcode) (a b c : Fin BB) : Prop :=
   | Range => a.val < 2 ^ b.val -- Is this right?
   | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 128)
 
-@[simp] lemma constrain_AND (a b c : Fin BB) :
+@[simp] lemma constrain_AND (a b c : Fin KB) :
     ByteOpcode.AND.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val &&& c.val := Iff.rfl
 
-@[simp] lemma constrain_OR (a b c : Fin BB) :
+@[simp] lemma constrain_OR (a b c : Fin KB) :
     ByteOpcode.OR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val ||| c.val := Iff.rfl
 
-@[simp] lemma constrain_XOR (a b c : Fin BB) :
+@[simp] lemma constrain_XOR (a b c : Fin KB) :
     ByteOpcode.XOR.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val ^^^ c.val := Iff.rfl
 
-@[simp] lemma constrain_U8Range (a b c : Fin BB) :
+@[simp] lemma constrain_U8Range (a b c : Fin KB) :
     ByteOpcode.U8Range.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) := Iff.rfl
 
-@[simp] lemma constrain_LTU (a b c : Fin BB) :
+@[simp] lemma constrain_LTU (a b c : Fin KB) :
     ByteOpcode.LTU.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c) := Iff.rfl
 
-@[simp] lemma constrain_MSB (a b c : Fin BB) :
+@[simp] lemma constrain_MSB (a b c : Fin KB) :
     ByteOpcode.MSB.constrain a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 128) := Iff.rfl
 
-@[simp] lemma constrain_Range (a b c : Fin BB) :
+@[simp] lemma constrain_Range (a b c : Fin KB) :
     ByteOpcode.Range.constrain a b c ↔ (a.val < 2 ^ b.val) := Iff.rfl
 
 end constrain
@@ -101,23 +101,23 @@ def toBitwise' (op : ByteOpcode) : BitVec n → BitVec n → BitVec n :=
 
 /-- Convert a `ByteOpcode` to a bitwise operation.
 Gives dummy outputs outside `AND`, `OR`, and `XOR` operations. -/
-def toBitwise (op : ByteOpcode) : Fin BB → Fin BB → Fin BB :=
+def toBitwise (op : ByteOpcode) : Fin KB → Fin KB → Fin KB :=
   by induction op using ByteOpcode.bitwise_induction with
   | and => exact (· &&& ·)
   | or => exact (· ||| ·)
   | xor => exact (· ^^^ ·)
   | other _ _ => exact 0
 
-@[simp] lemma toBitwise_and (x y : Fin BB) :
+@[simp] lemma toBitwise_and (x y : Fin KB) :
     toBitwise AND x y = x &&& y := rfl
 
-@[simp] lemma toBitwise_or (x y : Fin BB) :
+@[simp] lemma toBitwise_or (x y : Fin KB) :
     toBitwise OR x y = x ||| y := rfl
 
-@[simp] lemma toBitwise_xor (x y : Fin BB) :
+@[simp] lemma toBitwise_xor (x y : Fin KB) :
     toBitwise XOR x y = x ^^^ y := rfl
 
-lemma toBitwise_of_ne (x y : Fin BB) (op : ByteOpcode) (h : op ≠ AND ∧ op ≠ OR ∧ op ≠ XOR) :
+lemma toBitwise_of_ne (x y : Fin KB) (op : ByteOpcode) (h : op ≠ AND ∧ op ≠ OR ∧ op ≠ XOR) :
     toBitwise op x y = 0 := by
   match op with
   | .AND | .OR | XOR => simp at h

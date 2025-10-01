@@ -4,12 +4,12 @@ import SP1Operations.Operation.AddrAddOperation.Constraints
 
 namespace AddrAddOperation
 
-lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddrAddOperation) :
+lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddrAddOperation) :
     (constraints a b cols 1).allHold ↔
-      let carry0 : Fin BB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
-      let carry1 : Fin BB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
-      let carry2 : Fin BB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
-      let carry3 : Fin BB := (a[3] + b[3] - 0 + carry2) * 65536⁻¹
+      let carry0 : Fin KB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
+      let carry1 : Fin KB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
+      let carry2 : Fin KB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
+      let carry3 : Fin KB := (a[3] + b[3] - 0 + carry2) * 65536⁻¹
       (carry0 = 0 ∨ carry0 = 1) ∧
       (carry1 = 0 ∨ carry1 = 1) ∧
       (carry2 = 0 ∨ carry2 = 1) ∧
@@ -19,7 +19,7 @@ lemma allHold_constraints_iff (a b : Word (Fin BB)) (cols : AddrAddOperation) :
       (cols.value[2].val < 65536) := by
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
-theorem is_u48_sum (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fin BB)
+theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fin KB)
     (h_is_real : is_real = 1)
     (cstrs : (constraints a b cols is_real).allHold)
     (ha : a.isU64)
@@ -51,7 +51,7 @@ theorem is_u48_sum (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fi
       <;> omega
 
 set_option maxHeartbeats 1000000 in
-theorem cols_is_a_sum_b (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real : Fin BB)
+theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fin KB)
     (h_is_real : is_real = 1)
     (cstrs : (constraints a b cols is_real).allHold)
     (ha : a.isU64)
@@ -84,12 +84,12 @@ theorem cols_is_a_sum_b (a b : Word (Fin BB)) (cols : AddrAddOperation) (is_real
       <;> simp [sub_eq_zero] at h3
       <;> omega
 
-def spec (a b : Word (Fin BB)) (cols : AddrAddOperation) : Prop :=
-  let cols_word : Word (Fin BB) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
+def spec (a b : Word (Fin KB)) (cols : AddrAddOperation) : Prop :=
+  let cols_word : Word (Fin KB) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
   cols_word.isU64 ∧ cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
 set_option debug.skipKernelTC true in
-lemma spec_of_constraints (a : Word (Fin BB)) (b : Word (Fin BB))
+lemma spec_of_constraints (a : Word (Fin KB)) (b : Word (Fin KB))
     (ha : a.isU64) (hb : b.isU64)
     (cols : AddrAddOperation)
     (h : SP1ConstraintList.allHold (AddrAddOperation.constraints a b cols 1)) :
