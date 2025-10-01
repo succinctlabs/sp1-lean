@@ -79,20 +79,51 @@ open Lt
 variable
   (Main : Vector (Fin KB) 45)
   (s : SailState)
+  (cstrs : (constraints Main).allHold)
+  (h_is_sltu : is_sltu Main)
 
 def spec_slti (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute_ITYPE imm rs1 rd iop.SLTI
   pure ()
 
-def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6]
+def sp1_op_a : BitVec 5 :=
+  by
+    refine BitVec.ofNatLT Main[6] ?_
+    show Main[6] < 32
 
-def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14]
+    rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
+    obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
+    simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
+    simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+    omega
 
-def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
+def sp1_op_b : BitVec 5 :=
+  by
+    refine BitVec.ofNatLT Main[14] ?_
+    simp
+    show Main[14] < 32
+
+    rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
+    obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
+    simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
+    simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+    omega
+
+def sp1_op_c : BitVec 5 :=
+  by
+    refine BitVec.ofNatLT Main[21] ?_
+    simp
+    show Main[21] < 32
+
+    rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
+    obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
+    simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
+    simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+    omega
 
 def sp1_slti : SailM Unit := do
-  let op_a := sp1_op_a Main
+  let op_a := sp1_op_a Main cstrs h_is_sltu
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
@@ -101,11 +132,21 @@ theorem correct_slti
   (cstrs : (constraints Main).allHold)
   (h_is_slti : is_slti Main)
   (state_cstrs : (constraints Main).initialState s) :
-  let op_c := sp1_op_c Main
-  let op_b := sp1_op_b Main
-  let op_a := sp1_op_a Main
-  (spec_slti op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slti Main).run s
+  let op_c := sp1_op_c Main cstrs h_is_sltu
+  let op_b := sp1_op_b Main cstrs h_is_sltu
+  let op_a := sp1_op_a Main cstrs h_is_sltu
+  (spec_slti op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slti Main cstrs h_is_sltu).run s
   := by
+    have h21 : Main[21].val < 32 := by
+      rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
+      obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
+      simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
+      simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+    have h632 : Main[6].val < 32 := by
+      rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
+      obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
+      simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
+      simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_slti] at h_is_slti
     rw [allHold_constraints_iff_slti h_is_slti] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33⟩ := cstrs
@@ -116,33 +157,36 @@ theorem correct_slti
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
-    simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all [BitVec.ofNatLT_eq_ofNat]
+    simp [Opcode.ofNat, Nat.ble, Nat.beq] at *
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
 
-    simp [spec_slti, sp1_slti, execute, execute_ITYPE']
-    rw [Sail.run_readReg, read_pc]
-    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-
-    have h21 : Main[21].val < 32 := by
-      sorry
     have h_imm' : setWidth 12 (BitVec.ofNat 5 ↑Main[21]) = BitVec.ofNat 12 Main[21] := by
-      clear *- h21
       simp [setWidth, setWidth', BitVec.ofNatLT_eq_ofNat]
       grind
-    rw [h_imm', ← h_imm_c]
+
+    specialize read_op_b h_f
+    simp [spec_slti, sp1_slti, execute, execute_ITYPE']
+    rw [Sail.run_readReg, read_pc]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_a]
+    simp [BitVec.ofNatLT_eq_ofNat, h_imm', ← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
     rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
-    . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
-      rw [if_neg (c := _ = 0#5) (by simp [← BitVec.toNat_inj]; omega)]
-      apply LtOperationSigned.spec.signed at lt_op_cstrs <;>
-      [ simp_all; exact is_U64_b; exact is_U64_c ]
-      simp_all [Word.toBitVec64, Word.toNat]
+    . have h6' : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+        simp [← BitVec.toNat_inj]
+        clear *- h_is_op_a_0 h632
+        omega
+      simp [h6']
+      simp [Word.toBitVec64, Word.toNat]
+
+      apply LtOperationSigned.spec.signed is_U64_b is_U64_c at lt_op_cstrs
+      simp at lt_op_cstrs
+      simp [lt_op_cstrs]
       rfl
 
 end Slti
@@ -171,7 +215,7 @@ def sp1_op_a : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    sorry
+    omega
 
 def sp1_op_b : BitVec 5 :=
   by
@@ -183,7 +227,7 @@ def sp1_op_b : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    sorry
+    omega
 
 def sp1_op_c : BitVec 5 :=
   by
@@ -195,7 +239,7 @@ def sp1_op_c : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    sorry
+    omega
 
 def sp1_sltu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
@@ -267,7 +311,7 @@ def sp1_op_a : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    sorry
+    omega
 
 def sp1_op_b : BitVec 5 :=
   by
@@ -279,7 +323,7 @@ def sp1_op_b : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    sorry
+    omega
 
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 

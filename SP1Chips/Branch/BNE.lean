@@ -189,6 +189,7 @@ theorem correct_bne
       rw [inv_2BB_eq'] at this
       apply KoalaBear.lt_65536_of_mul_inv_lt
       simpa
+
     omega
 
   ·
