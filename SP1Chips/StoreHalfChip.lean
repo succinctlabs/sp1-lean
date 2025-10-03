@@ -79,7 +79,6 @@ lemma run_vmem_write_of_width_2'
     sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
     PreSail.writeByte, Except.map, BitVec.addInt]
 
-set_option debug.skipKernelTC true in
 theorem correct (Main : Vector (Fin KB) 47)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)

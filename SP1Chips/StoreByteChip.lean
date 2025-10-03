@@ -77,7 +77,6 @@ lemma run_vmem_write_of_width_1'
     sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
     PreSail.writeByte, Except.map, BitVec.addInt]
 
-set_option debug.skipKernelTC true in
 theorem correct (Main : Vector (Fin KB) 52)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -158,8 +157,7 @@ theorem correct (Main : Vector (Fin KB) 52)
       simp [BitVec.toNat_ofNat]
       omega
     · apply congr_arg₂ s.mem.insert
-      · simp [Word.toBitVec64, Word.toNat, sp1_imm_c,
-          BitVec.ofNat_add]
+      · simp [Word.toBitVec64, Word.toNat_def, sp1_imm_c]
         congr 4
         simp [BitVec.toNat_eq]
         omega
