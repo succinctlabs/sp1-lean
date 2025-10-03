@@ -14,10 +14,13 @@ attribute [simp] jump_to ofBool
 
 variable (Main : Vector (Fin KB) 39) (s : SailState)
 
+@[simp]
 def sp1_op_a (Main : Vector (Fin KB) 39) : BitVec 5 := BitVec.ofNat 5 Main[6].val
 
+@[simp]
 def sp1_op_b (Main : Vector (Fin KB) 39) : BitVec 5 := BitVec.ofNat 5 Main[14].val
 
+@[simp]
 def sp1_op_c (Main : Vector (Fin KB) 39) : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_jalr (Main : Vector (Fin KB) 39) : SailM Unit := do
@@ -66,8 +69,8 @@ theorem JALR_correct
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]) % 4 = 0 := by
     simp [h25, read_op_b] at op_b_val_plus_imm_mul4
     clear *- op_b_val_plus_imm_mul4
-    simp [Word.toBitVec64, BitVec.ofNat, Word.toNat, ← BitVec.toNat_inj, Fin.val_add] at *
-    omega
+    simp [← BitVec.toNat_inj] at *
+    assumption
 
   have h15 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
     clear *- reader_cstrs; aesop
@@ -77,18 +80,24 @@ theorem JALR_correct
     clear *- reader_cstrs; apply Word.isU64_of_cases <;> aesop
   have h_add := AddOperation.spec h15 h22 res_cstrs
 
-  simp [spec_jalr, sp1_jalr,
-    run_readReg_of_isInitialized _ _ hs,
-    EStateM.Result.map, cond,
-    execute_JALR,
-    op_a, op_b, op_c,
-    sp1_op_a, sp1_op_b, sp1_op_c,
-    read_op_a, read_op_b,
-    ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2,
-    assert, PreSail.assert]
+  simp [spec_jalr, sp1_jalr, execute_JALR,
+        run_readReg_of_isInitialized _ _ hs,
+        op_a, op_b, op_c]
+
+  -- Mask the contents of `op_b` so kernel does not break
+  obtain ⟨ b', read_b' ⟩ : ∃ x, s.get_reg? (BitVec.ofNat 5 Main[14]) = some x
+    := by exists Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
+  simp [read_b']
+  have h_eq_b' : Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] = b' := by grind
+  simp_all
+
+  simp [(mul4_means_0_1_are_0 hmod4').2]
 
   rw [run_readReg_of_isInitialized _ _ (by aesop)]
   rw [twoPow64_and_eq_self hmod4']
+
+  -- Bring back contents of `op_b`
+  subst b'
 
   by_cases h6 : BitVec.ofNat 5 Main[6] = 0#5
   · simp [h_add, h6]
@@ -102,5 +111,6 @@ theorem JALR_correct
     simp [Std.ExtDHashMap.get_eq_get_get?, read_pc, h_add, h_inc_pc]
     simp [Word.toBitVec64, Word.toNat]
 
+    aesop
 
 end Jalr
