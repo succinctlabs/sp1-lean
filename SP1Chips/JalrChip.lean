@@ -14,13 +14,10 @@ attribute [simp] jump_to ofBool
 
 variable (Main : Vector (Fin KB) 39) (s : SailState)
 
-@[simp]
 def sp1_op_a (Main : Vector (Fin KB) 39) : BitVec 5 := BitVec.ofNat 5 Main[6].val
 
-@[simp]
 def sp1_op_b (Main : Vector (Fin KB) 39) : BitVec 5 := BitVec.ofNat 5 Main[14].val
 
-@[simp]
 def sp1_op_c (Main : Vector (Fin KB) 39) : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_jalr (Main : Vector (Fin KB) 39) : SailM Unit := do
@@ -32,7 +29,6 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 10000000 in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
@@ -80,24 +76,17 @@ theorem JALR_correct
     clear *- reader_cstrs; apply Word.isU64_of_cases <;> aesop
   have h_add := AddOperation.spec h15 h22 res_cstrs
 
-  simp [spec_jalr, sp1_jalr, execute_JALR,
-        run_readReg_of_isInitialized _ _ hs,
-        op_a, op_b, op_c]
-
-  -- Mask the contents of `op_b` so kernel does not break
-  obtain ⟨ b', read_b' ⟩ : ∃ x, s.get_reg? (BitVec.ofNat 5 Main[14]) = some x
-    := by exists Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
-  simp [read_b']
-  have h_eq_b' : Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] = b' := by grind
-  simp_all
-
-  simp [(mul4_means_0_1_are_0 hmod4').2]
+  simp [spec_jalr, sp1_jalr,
+    run_readReg_of_isInitialized _ _ hs,
+    EStateM.Result.map, cond,
+    execute_JALR,
+    op_a, op_b, op_c,
+    sp1_op_a, sp1_op_b, sp1_op_c,
+    read_op_a, read_op_b,
+    ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2]
 
   rw [run_readReg_of_isInitialized _ _ (by aesop)]
   rw [twoPow64_and_eq_self hmod4']
-
-  -- Bring back contents of `op_b`
-  subst b'
 
   by_cases h6 : BitVec.ofNat 5 Main[6] = 0#5
   · simp [h_add, h6]
@@ -110,7 +99,5 @@ theorem JALR_correct
 
     simp [Std.ExtDHashMap.get_eq_get_get?, read_pc, h_add, h_inc_pc]
     simp [Word.toBitVec64, Word.toNat]
-
-    aesop
 
 end Jalr
