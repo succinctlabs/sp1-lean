@@ -75,7 +75,7 @@ lemma spec.signed
     apply LtOperationUnsigned.spec (h_b_isU64 := h_sb_isU64) (h_d_isU64 := h_sd_isU64) at h_lt
     simp [Word.toNat] at h_lt
     rw [h_lt, h_b_msb, h_c_msb]
-    unfold Word.toInt Word.toNat Word.isNegative
+    simp only [Word.toInt, Word.toNat_def, Word.isNegative]
     split_ifs <;> simp <;> omega
 
 def spec.branch.def
