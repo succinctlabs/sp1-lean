@@ -218,9 +218,22 @@ end U64
 
 section conversions
 
+opaque toNat_aux : { f : Word (Fin KB) → ℕ //
+    ∀ w, f w = w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 } :=
+  ⟨fun w => w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48, fun _ => rfl⟩
+
+@[simp] lemma toNat_aux_def (w : Word (Fin KB)) : toNat_aux.1 w =
+    w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 := toNat_aux.2 w
+
 /-- Convert a `Word` to a `Nat` by shifting and adding the limbs. -/
+def toNat (w : Word (Fin KB)) : ℕ := toNat_aux.1 w --w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+
+-- /-- Convert a `Word` to a `Nat` by shifting and adding the limbs. -/
+-- def toNat (w : Word (Fin KB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+
 @[aesop unsafe forward]
-def toNat (w : Word (Fin KB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+lemma toNat_def (w : Word (Fin KB)) : w.toNat = w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 :=
+  toNat_aux.2 w
 
 lemma toNat_lt_of_isU64 {w : Word (Fin KB)} (hw : w.isU64) : w.toNat < 2^64 := by
   unfold Word.toNat
@@ -232,7 +245,7 @@ lemma eq_toNat_eq {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : W
   . simp_all
   . apply Word.lt_cases_of_isU64 at is64_wx
     apply Word.lt_cases_of_isU64 at is64_wy
-    unfold Word.toNat; intro heq
+    simp [Word.toNat]; intro heq
     rw [← Word.eq_pointwise]
     omega
 
@@ -250,7 +263,7 @@ def toBitVec64 (w : Word (Fin KB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
 
 lemma toBitVec64_toNat {w : Word (Fin KB)} (hw : w.isU64) :
     w.toBitVec64.toNat = w.toNat := by
-  simp only [toBitVec64, toNat, BB_eq, Nat.reducePow, BitVec.toNat_ofNat,
+  simp only [toBitVec64, toNat_def, BB_eq, Nat.reducePow, BitVec.toNat_ofNat,
     Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
   have := lt_cases_of_isU64 hw
   omega
@@ -317,7 +330,7 @@ lemma eq_toInt_eq {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : W
   . simp_all
   . apply Word.lt_cases_of_isU64 at is64_wx
     apply Word.lt_cases_of_isU64 at is64_wy
-    unfold Word.toInt Word.isNegative Word.toNat; intro heq
+    simp only [Word.toInt, Word.isNegative, Word.toNat_def]; intro heq
     rw [← Word.eq_pointwise]
     omega
 

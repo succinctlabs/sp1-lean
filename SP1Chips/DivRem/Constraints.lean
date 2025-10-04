@@ -1415,7 +1415,7 @@ lemma div_rem
       simp [zc0, zc1, zc2, zc3] at *
       have : (Word.toBitVec64 #v[0, 0, 0, 0]).toInt = 0 := by simp [Word.toBitVec64, Word.toNat]
       simp [this, c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3]
-      simp only [Word.toBitVec64, Word.toNat]
+      simp only [Word.toBitVec64, Word.toNat_def]
       simp [-Fin.coe_ofNat_eq_mod]; rw [Fin.coe_ofNat_eq_mod]
     . simp [eq_arlt] at *
       rw [if_neg]; rotate_left
@@ -1432,7 +1432,7 @@ lemma div_rem
           obtain ⟨ec0, ec1, ec2, ec3⟩ := ofc
           simp [of_eq_q0, of_eq_q1, of_eq_q2, of_eq_q3, of_eq_r0, of_eq_r1, of_eq_r2, of_eq_r3]
           simp [eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3]
-          simp only [Word.toBitVec64, Word.toInt, Word.isNegative, Word.toNat, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
+          simp only [Word.toBitVec64, Word.toInt, Word.isNegative, Word.toNat_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
           simp
         . simp [nof] at *
           rw [if_neg]; rotate_left
@@ -2336,6 +2336,7 @@ lemma divu_remu
       subst c0 c1 c2 c3 q0 q1 q2 q3 r0 r1 r2 r3
       simp [Word.toBitVec64_toNat is_U64_b]
       simp [Word.toBitVec64, Word.toNat]
+      rfl
     . subst arlt maco10 maco11 maco12 maco13 is_c_0; simp at *
       rw [if_neg]; rotate_left
       . rw [Word.toBitVec64_toNat is_U64_c]
@@ -3186,7 +3187,7 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz
                   obtain ⟨ hc_lb, hc_nlb ⟩ := heqz
                   have : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
-                    rw [Word.toInt, Word.toNat, HWord.toInt, HWord.toNat]
+                    rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
                     simp [if_pos]; omega
@@ -3207,7 +3208,7 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz
                   obtain ⟨ hr_lb, hr_nlb ⟩ := heqz
                   have : Word.toInt #v[r0, r1, 65535, 65535] = HWord.toInt #v[r0, r1] := by
-                    rw [Word.toInt, Word.toNat, HWord.toInt, HWord.toNat]
+                    rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
                     simp [if_pos]; omega
@@ -3228,12 +3229,12 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz_c
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz_rem
                   have eqc : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
-                    rw [Word.toInt, Word.toNat, HWord.toInt, HWord.toNat]
+                    rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
                     simp [if_pos w_eq_msb_c]; omega
                   have eqr : Word.toInt #v[r0, r1, 65535, 65535] = HWord.toInt #v[r0, r1] := by
-                    rw [Word.toInt, Word.toNat, HWord.toInt, HWord.toNat]
+                    rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
                     simp [if_pos]; omega

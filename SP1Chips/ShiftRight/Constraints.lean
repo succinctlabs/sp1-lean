@@ -1672,7 +1672,7 @@ lemma spec.sra (h : is_sra Main ) :
       iterate 2 rw [Word.toInt]
       try rw [if_pos b_msb_iff_neg_a, if_pos b_msb_iff_neg_b]
       try rw [if_neg b_msb_iff_neg_a, if_neg b_msb_iff_neg_b]
-      iterate 2 rw [Word.toNat]
+      iterate 2 rw [Word.toNat_def]
       iterate 8 rw [Vector.getElem_mk]
       simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
       clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1 lt_ll2 lt_hl2 lt_ll3 lt_hl3
@@ -1826,7 +1826,7 @@ lemma spec.srai (h : is_srai Main ) :
       iterate 2 rw [Word.toInt]
       try rw [if_pos b_msb_iff_neg_a, if_pos b_msb_iff_neg_b]
       try rw [if_neg b_msb_iff_neg_a, if_neg b_msb_iff_neg_b]
-      iterate 2 rw [Word.toNat]
+      iterate 2 rw [Word.toNat_def]
       iterate 8 rw [Vector.getElem_mk]
       simp only [List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
       clear *- lt_ll0 lt_hl0 lt_ll1 lt_hl1 lt_ll2 lt_hl2 lt_ll3 lt_hl3

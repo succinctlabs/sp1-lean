@@ -29,7 +29,6 @@ def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 10000000 in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
@@ -66,8 +65,8 @@ theorem JALR_correct
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]) % 4 = 0 := by
     simp [h25, read_op_b] at op_b_val_plus_imm_mul4
     clear *- op_b_val_plus_imm_mul4
-    simp [Word.toBitVec64, BitVec.ofNat, Word.toNat, ← BitVec.toNat_inj, Fin.val_add] at *
-    omega
+    simp [← BitVec.toNat_inj] at *
+    assumption
 
   have h15 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
     clear *- reader_cstrs; aesop
@@ -84,8 +83,7 @@ theorem JALR_correct
     op_a, op_b, op_c,
     sp1_op_a, sp1_op_b, sp1_op_c,
     read_op_a, read_op_b,
-    ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2,
-    assert, PreSail.assert]
+    ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2]
 
   rw [run_readReg_of_isInitialized _ _ (by aesop)]
   rw [twoPow64_and_eq_self hmod4']
@@ -101,6 +99,5 @@ theorem JALR_correct
 
     simp [Std.ExtDHashMap.get_eq_get_get?, read_pc, h_add, h_inc_pc]
     simp [Word.toBitVec64, Word.toNat]
-
 
 end Jalr

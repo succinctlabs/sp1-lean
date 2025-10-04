@@ -88,7 +88,6 @@ def spec (a b : Word (Fin KB)) (cols : AddrAddOperation) : Prop :=
   let cols_word : Word (Fin KB) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
   cols_word.isU64 ∧ cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
-set_option debug.skipKernelTC true in
 lemma spec_of_constraints (a : Word (Fin KB)) (b : Word (Fin KB))
     (ha : a.isU64) (hb : b.isU64)
     (cols : AddrAddOperation)

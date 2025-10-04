@@ -280,8 +280,7 @@ lemma spec.xor (h : is_xor Main ) :
     simp [allHold_constraints_iff] at cstrs
 
     obtain ⟨ h_bop, rest ⟩ := cstrs
-    simp_all
-
+    simp_all [← Word.eq_mk_getElem]
     exact BitwiseU16Operation.spec.xor is_U64_b is_U64_c h_bop
 
 end xor
@@ -305,7 +304,7 @@ lemma spec.xori (h : is_xori Main ) :
     simp [allHold_constraints_iff] at cstrs
 
     obtain ⟨ h_bop, rest ⟩ := cstrs
-    simp_all
+    simp_all [← Word.eq_mk_getElem]
 
     exact BitwiseU16Operation.spec.xor is_U64_b is_U64_c h_bop
 
@@ -326,7 +325,7 @@ lemma spec.or (h : is_or Main ) :
     simp [allHold_constraints_iff] at cstrs
 
     obtain ⟨ h_bop, rest ⟩ := cstrs
-    simp_all
+    simp_all [← Word.eq_mk_getElem]
 
     exact BitwiseU16Operation.spec.or is_U64_b is_U64_c h_bop
 
@@ -351,7 +350,7 @@ lemma spec.ori (h : is_ori Main ) :
     simp [allHold_constraints_iff] at cstrs
 
     obtain ⟨ h_bop, rest ⟩ := cstrs
-    simp_all
+    simp_all [← Word.eq_mk_getElem]
 
     exact BitwiseU16Operation.spec.or is_U64_b is_U64_c h_bop
 
@@ -372,7 +371,7 @@ lemma spec.and (h : is_and Main ) :
     simp [allHold_constraints_iff] at cstrs
 
     obtain ⟨ h_bop, rest ⟩ := cstrs
-    simp_all
+    simp_all [← Word.eq_mk_getElem]
 
     exact BitwiseU16Operation.spec.and is_U64_b is_U64_c h_bop
 
@@ -397,7 +396,7 @@ lemma spec.andi (h : is_andi Main ) :
     simp [allHold_constraints_iff] at cstrs
 
     obtain ⟨ h_bop, rest ⟩ := cstrs
-    simp_all
+    simp_all [← Word.eq_mk_getElem]
 
     exact BitwiseU16Operation.spec.and is_U64_b is_U64_c h_bop
 
