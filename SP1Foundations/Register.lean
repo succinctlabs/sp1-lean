@@ -25,6 +25,7 @@ structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitializ
   h_clint_size : s.regs.get Register.plat_clint_size (hs _) = 0
   h_plat_ram_base : s.regs.get Register.plat_ram_base (hs _) = 0
   h_plat_rom_base : s.regs.get Register.plat_rom_base (hs _) = 0
+  h_plat_ram_size : s.regs.get Register.plat_ram_size (hs _) = BitVec.ofNat 64 (2^64 - 1)
 
 section regidx
 

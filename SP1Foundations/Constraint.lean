@@ -1,8 +1,5 @@
-import SP1Foundations.Field
-import SP1Foundations.Word
 import SP1Foundations.ByteOpcode
-import SP1Foundations.SailM
-import SP1Foundations.Opcode
+import SP1Foundations.Assumptions
 
 import LeanRV64D.Defs
 
@@ -79,30 +76,21 @@ open PreSail
 
 def toStateProp (cstr : SP1Constraint) (s : SailState) : Prop :=
   match cstr with
-  | (.send (.memory _clk_high _clk_low addr0 addr1 addr2 limb0 limb1 limb2 limb3) mult) =>
-      mult ≠ 0
-      → if h_addrs : addr0 < 32 ∧ addr1 = 0 ∧ addr2 = 0 then
-          s.get_reg? (BitVec.ofNatLT addr0.val h_addrs.left)
-            = some (Word.toBitVec64 #v[limb0, limb1, limb2, limb3])
-        else
-          True -- TODO(gzgz): this is reading from memory
-  | (.receive (.state _clk_high _clk_low pc0 pc1 pc2) mult) =>
-      mult ≠ 0
-      → s.regs.get? Register.PC
-        = some (BitVec.ofNat 64 (pc0.val + pc1.val * 65536 + pc2.val * 4294967296))
-  | .send
-      (.program
-      _pc0 _pc1 _pc2
-      opcode
-      op_a
-      op_b_0 op_b_1 op_b_2 op_b_3
-      op_c_0 op_c_1 op_c_2 op_c_3
-      _op_a_0
-      _imm_b
-      _imm_c)
-      mult =>
-        mult ≠ 0
-        -> opcode.trusted_instr_state s op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3
+  | .send (.memory _ _ addr0 addr1 addr2 limb0 limb1 limb2 limb3) mult => mult ≠ 0 →
+      if h_addrs : addr0 < 32 ∧ addr1 = 0 ∧ addr2 = 0 then
+        s.get_reg? (BitVec.ofNatLT addr0.val h_addrs.left) =
+          some (Word.toBitVec64 #v[limb0, limb1, limb2, limb3])
+      else
+        s.mem[Word.toNat #v[addr0, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb0.val) ∧
+        s.mem[Word.toNat #v[addr0 + 1, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb0.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 2, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb1.val) ∧
+        s.mem[Word.toNat #v[addr0 + 3, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb1.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 4, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb2.val) ∧
+        s.mem[Word.toNat #v[addr0 + 5, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb2.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 6, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb3.val) ∧
+        s.mem[Word.toNat #v[addr0 + 7, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb3.val >>> 8))
+  | .receive (.state _ _ pc0 pc1 pc2) mult => mult ≠ 0 →
+      s.regs.get? Register.PC = some (Word.toBitVec64 #v[pc0, pc1, pc2, 0])
   | _ => True
 
 end toStateProp

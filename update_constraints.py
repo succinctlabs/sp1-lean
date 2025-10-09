@@ -116,7 +116,7 @@ def main():
     # Get SP1_DIR from environment
     sp1_dir = os.environ.get('SP1_DIR')
     if not sp1_dir:
-        raise ValueError("SP1_DIR environment variable not set. Also make sure sp1-wip is gzgz/rv64-operationize")
+        raise ValueError("SP1_DIR environment variable not set.")
 
     for chip, operation, prefix in CONSTRAINTS_LIST:
         print(f"Processing {chip}" + (f" - {operation}" if operation else ""))

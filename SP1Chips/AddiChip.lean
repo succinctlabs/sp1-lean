@@ -41,14 +41,22 @@ theorem correct_addi
   (spec_addi op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addi Main).run s
   := by
     -- Obtain and simplify state and pure constraints
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddOperation.constraints, CPUState.constraints, ITypeReader.constraints, h_is_real] at state_cstrs
-    obtain ⟨read_pc, trusted_instr_state, read_op_b, read_op_c⟩ := state_cstrs
     simp [constraints] at cstrs
     obtain ⟨add_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ITypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
+    simp [Opcode.ofNat, Nat.ble] at reader_cstrs
 
     obtain ⟨ _, trusted_instr_prop, hcm1, hcm2, c0, c1, c2, c3, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, ⟨ is_U64_a, is_U64_b, hu64 ⟩⟩ := reader_cstrs
+
+    have h6 : Main[6] < 32 := by aesop
+    have h14 : Main[14] < 32 := by aesop
+
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
+      List.Forall, AddOperation.constraints, CPUState.constraints, ITypeReader.constraints,
+      h6, h14, h_is_real] at state_cstrs
+
+    obtain ⟨read_pc, read_op_b, read_op_c⟩ := state_cstrs
 
     simp_all [Opcode.ofNat, Nat.ble]
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
@@ -65,18 +73,21 @@ theorem correct_addi
     simp [sp1_op_b, read_op_b]
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+
 
     by_cases h_is_op_a_0 : Main[6] = 0
     . have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop
       rw [← is_add] at *
       simp [Word.toBitVec64, Word.toNat, h_is_op_a_0]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       clear *- this hu64
       aesop
     . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
-      rw [is_add, trusted_instr_prop.2]
+      rw [is_add, trusted_instr_prop]
       simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp
       rfl
 
 end Addi

@@ -41,8 +41,7 @@ theorem correct_sub
   let op_a := sp1_op_a Main
   (spec_sub (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sub Main ).run s
   := by
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, SubOperation.constraints, CPUState.constraints, RTypeReader.constraints, h_is_real] at state_cstrs
-    obtain ⟨read_pc, trusted_instr_state, _, read_op_b, read_op_c⟩ := state_cstrs
+
     simp [constraints] at cstrs
     obtain ⟨sub_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
@@ -50,7 +49,16 @@ theorem correct_sub
       Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
 
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
-    simp [Opcode.ofNat, Nat.ble, Nat.beq] at trusted_instr_state trusted_instr_prop
+
+    have h6 : Main[6] < 32 := by aesop
+    have h14 : Main[14] < 32 := by aesop
+    have h21 : Main[21] < 32 := by aesop
+
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
+      List.Forall, SubOperation.constraints, CPUState.constraints, RTypeReader.constraints,
+      h6, h14, h21, h_is_real] at state_cstrs
+
+    obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
 
     rw [h_is_real] at *
     apply SubOperation.spec is_U64_b is_U64_c at sub_op_cstrs
@@ -60,17 +68,19 @@ theorem correct_sub
     -- Now the monadic manipulation
     simp [spec_sub, sp1_sub, execute, execute_RTYPE']
     rw [run_readReg, read_pc]
-    simp [sp1_op_b, read_op_b (by omega)]
-    simp [sp1_op_c, read_op_c (by omega)]
+    simp [sp1_op_b, read_op_b]
+    simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . rw [← is_sub]
       simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp
       rfl
 
 end Sub

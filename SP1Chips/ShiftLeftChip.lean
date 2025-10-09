@@ -44,23 +44,25 @@ theorem correct_sll
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr trusted_instr_state; simp_all
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
+      List.Forall, CPUState.constraints, ALUTypeReader.constraints, ha, hb, hc] at state_cstrs
+    obtain ⟨thr, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr; simp_all
 
     simp [spec_sll, sp1_sll, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.sll Main ⟨ sll, imm ⟩ cstrs]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Sll
 
@@ -99,23 +101,25 @@ theorem correct_slli
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr trusted_instr_state; simp_all
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
+      List.Forall, CPUState.constraints, ALUTypeReader.constraints, ha, hb] at state_cstrs
+    obtain ⟨thr, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr; simp_all
 
     simp [spec_slli, sp1_slli, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.slli Main ⟨ sll, imm ⟩ cstrs]
       rw [exec_SHIFTIOP_pure_bv_to_w _ _ _ is_U64_b]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Slli
 
@@ -154,23 +158,25 @@ theorem correct_sllw
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr trusted_instr_state; simp_all
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
+      List.Forall, CPUState.constraints, ALUTypeReader.constraints, ha, hb, hc] at state_cstrs
+    obtain ⟨thr, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr; simp_all
 
     simp [spec_sllw, sp1_sllw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.sllw Main ⟨ sllw, imm ⟩ cstrs]
       rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Sllw
 
@@ -209,22 +215,24 @@ theorem correct_slliw
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
     simp_all
 
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr trusted_instr_state; simp_all
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
+      List.Forall, CPUState.constraints, ALUTypeReader.constraints, ha, hb] at state_cstrs
+    obtain ⟨thr, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr; simp_all
 
     simp [spec_slliw, sp1_slliw, execute, execute_SHIFTIWOP']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.slliw Main ⟨ sllw, imm ⟩ cstrs]
       rw [exec_SHIFTIWOP_pure_bv_to_w _ _ _ is_U64_b]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Slliw

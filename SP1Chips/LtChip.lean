@@ -49,7 +49,7 @@ theorem correct_slt
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
 
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨throwaway, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all [BitVec.ofNatLT_eq_ofNat]
     obtain ⟨ _, _, is_U64_c ⟩ := is_U64_c
@@ -59,16 +59,17 @@ theorem correct_slt
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (c := BitVec.ofNat 5 ↑Main[6] = 0#5) (by simp [← BitVec.toNat_inj]; omega)]
       apply LtOperationSigned.spec.signed at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Slt
 
@@ -155,7 +156,7 @@ theorem correct_slti
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨throwaway, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
@@ -166,17 +167,17 @@ theorem correct_slti
       simp [setWidth, setWidth', BitVec.ofNatLT_eq_ofNat]
       grind
 
-    specialize read_op_b h_f
+    simp [h_f] at read_op_b
     simp [spec_slti, sp1_slti, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_a]
     simp [BitVec.ofNatLT_eq_ofNat, h_imm', ← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . have h6' : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
         simp [← BitVec.toNat_inj]
         clear *- h_is_op_a_0 h632
@@ -187,7 +188,8 @@ theorem correct_slti
       apply LtOperationSigned.spec.signed is_U64_b is_U64_c at lt_op_cstrs
       simp at lt_op_cstrs
       simp [lt_op_cstrs]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Slti
 
@@ -263,7 +265,7 @@ theorem correct_sltu
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
 
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨throwaway, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all
     obtain ⟨ _, _, is_U64_c ⟩ := is_U64_c
@@ -274,16 +276,17 @@ theorem correct_sltu
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.unsigned at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Sltu
 
@@ -349,7 +352,7 @@ theorem correct_sltu
     obtain ⟨ _, trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
 
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨throwaway, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
@@ -363,15 +366,16 @@ theorem correct_sltu
     rw [← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.unsigned at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Sltiu
