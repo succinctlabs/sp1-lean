@@ -1,7 +1,5 @@
 <div align="center">
 
-# SP1 Lean
-
 ![SP1 Lean](./.github/assets/header.png)
 
 Formal verification of SP1 zkVM arithmetization
