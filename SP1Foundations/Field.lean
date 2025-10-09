@@ -41,10 +41,6 @@ lemma val_mod4_eq_zero (x : Fin KB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
 @[aesop safe forward]
 lemma mul_diff_one_neq {a b c : Fin KB} : a * (b - c) = 1 → b ≠ c := by aesop
 
-@[simp] lemma lt_65536_of_mul_inv_lt (x : Fin KB) (h : (x * 4⁻¹).val < 16384) :
-    x.val < 65536 := by
-  sorry
-
 end KoalaBear
 
 @[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin KB) <<< 1 = 1 := rfl
@@ -105,6 +101,19 @@ lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := by native_decide
 
 @[simp] lemma inv_16BB_zero_or_one {x : Fin KB} : x * 65536⁻¹ = 0 ∨ x * 65536⁻¹ = 1 ↔ x = 0 ∨ x = 65536
   := by aesop
+
+lemma mul_256_inv_KB (x : Fin KB)
+    (hx : x.val % 256 = 0) : x * (256 : Fin KB)⁻¹ = x >>> 8 := by
+  rw [mul_inv_eq_iff_eq_mul₀ (by omega), ← Fin.val_inj]
+  simp [Fin.val_mul, Nat.shiftRight_eq_div_pow, Nat.div_mul_self_eq_mod_sub_self]
+  omega
+
+-- @[simp] lemma lt_65536_of_mul_inv_lt (x : Fin KB) (h : (x * 4⁻¹).val < 16384) :
+--     x.val < 65536 := by
+
+--   rw [Fin.val_mul] at h
+
+--   sorry
 
 namespace Int
 

@@ -169,7 +169,7 @@ section constraints
   let E154 : Fin KB := E152 - 1
   let E155 : Fin KB := E152 * E154
   let E156 : Fin KB := E153 * E155
-  let E157 : Fin KB := Main[26] * 1598029825
+  let E157 : Fin KB := Main[26]
   CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E1),
     (.assertZero E3),
@@ -188,13 +188,94 @@ section constraints
     (.assertZero E140),
     (.assertZero E148),
     (.assertZero E156),
-    (.send (.byte (ByteOpcode.ofNat 6) E157 14 0) E16),
+    (.send (.byte (ByteOpcode.ofNat 6) E157 16 0) E16),
     (.send (.byte (ByteOpcode.ofNat 6) Main[27] 16 0) E16),
     (.send (.byte (ByteOpcode.ofNat 6) Main[28] 16 0) E16),
   ]
 
 end constraints
 
--- dt: combined proof here
+def is_real (Main : Vector (Fin KB) 46) :=
+  Main[29] = 1 ∨ Main[30] = 1 ∨ Main[31] = 1 ∨ Main[32] = 1 ∨ Main[33] = 1 ∨ Main[34] = 1
+
+lemma single_op (Main : Vector (Fin KB) 46) (cstrs : (constraints Main).allHold) :
+    (Main[29] = 1 → Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0) ∧
+    (Main[30] = 1 → Main[29] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0) ∧
+    (Main[31] = 1 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0) ∧
+    (Main[32] = 1 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0) ∧
+    (Main[33] = 1 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[34] = 0) ∧
+    (Main[34] = 1 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) := by
+  simp [constraints, sub_eq_zero] at cstrs
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, rest⟩ := cstrs
+  clear h1 h2 h3 rest
+  cases h4 <;> cases h5 <;> cases h6 <;> cases h7 <;> cases h8 <;> cases h9
+  all_goals simp_all only [Fin.isValue, add_zero, zero_add, one_ne_zero, or_true, zero_ne_one,
+    and_self, implies_true, imp_self, Fin.reduceAdd, Fin.reduceEq, or_self]
+
+lemma is_trusted_of_constraints (Main : Vector (Fin KB) 46)
+    (cstrs : (constraints Main).allHold)
+    (is_real : is_real Main) : Main[25] = 1 := by
+  have := single_op Main cstrs
+  simp [SP1ConstraintList.allHold, Branch.constraints,
+    ITypeReaderImmutable.constraints, sub_eq_zero] at cstrs
+  rcases is_real with h | h | h | h | h | h
+  all_goals
+  · simp [h] at cstrs this
+    simp_all only [add_zero, zero_add]
+
+set_option maxHeartbeats 20000000
+lemma eq_signExtend_of_is_real (Main : Vector (Fin KB) 46)
+    (cstrs : (constraints Main).allHold)
+    (is_real : is_real Main) :
+    Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
+      BitVec.signExtend 64 (BitVec.ofNat 13 Main[21]) := by
+  have := single_op Main cstrs
+  have htrust := is_trusted_of_constraints Main cstrs is_real
+
+  rcases is_real with h | h | h | h | h | h
+  all_goals
+  · simp_all [constraints, ITypeReaderImmutable.constraints,
+      SP1Constraint.toProp, Opcode.ofNat, Nat.ble, Nat.beq]
+
+set_option maxHeartbeats 20000000
+lemma add_signExtend_of_constraints (Main : Vector (Fin KB) 46)
+    (cstrs : (constraints Main).allHold)
+    (is_real : is_real Main) :
+    (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
+      BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])) % 4 = 0 := by
+  have := single_op Main cstrs
+  have htrust := is_trusted_of_constraints Main cstrs is_real
+
+  rcases is_real with h | h | h | h | h | h
+  all_goals
+  · simp only [Fin.isValue, add_zero, zero_add, one_ne_zero, or_true, zero_ne_one,
+      and_self, implies_true, imp_self, Fin.reduceAdd, Fin.reduceEq, or_self, h] at this
+
+    simp only [SP1ConstraintList.allHold, constraints, Fin.isValue, mul_zero, mul_one, zero_add,
+      add_zero, List.append_assoc, sub_sub_cancel, Nat.cast_one, Nat.cast_zero, sub_zero,
+      ByteOpcode.ofNat_seven, List.forall_append, List.Forall, SP1Constraint.toProp_assertZero,
+      mul_eq_zero, Fin.reduceEq, or_false, SP1Constraint.toProp_send_byte, ne_eq,
+      ByteOpcode.constrain_Range, Fin.coe_ofNat_eq_mod, Nat.reduceMod, Nat.reducePow] at cstrs
+    obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
+    clear lt_cstrs chip_cstrs
+    simp_all
+
+    simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
+      Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+
+    have h_pc0_nat_mul4 : Main[3].val % 4 = 0 := by
+      have : Main[3] % 4 = 0 := by simp_all only [Fin.isValue]
+      rwa [Fin.mod_def, ← Fin.val_inj] at this
+    have h_trusted_signExtend : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
+      BitVec.signExtend 64 (BitVec.ofNat 13 Main[21]) := by simp_all only
+    have h_pc0_mul4 : Main[21].val % 4 = 0 := by simp_all only
+    apply BitVec.add_mod4_eq_zero_of_mod4_eq_zero
+    · show _ % 4#64 = 0#64
+      rw [BitVec.ofNat64_mod_4_eq_zero_iff]
+      exact h_pc0_nat_mul4
+    · simp only [← h_trusted_signExtend, Word.toBitVec64, Word.toNat, Nat.reducePow,
+      Word.toNat_aux_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ, BitVec.ofNat_eq_ofNat, BitVec.ofNat64_mod_4_eq_zero_iff]
+      omega
 
 end Branch

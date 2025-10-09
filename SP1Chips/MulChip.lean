@@ -47,24 +47,26 @@ theorem correct_mul
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints,
+      RTypeReader.constraints, ha, hb, hc] at state_cstrs
 
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1
 
     simp [spec_mul, sp1_mul, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mul Main ⟨ is_mul, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mul
 
@@ -107,23 +109,25 @@ theorem correct_mulh
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints,
+      RTypeReader.constraints, ha, hb, hc] at state_cstrs
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1
 
     simp [spec_mulh, sp1_mulh, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulh Main ⟨ is_mulh, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mulh
 
@@ -166,23 +170,25 @@ theorem correct_mulh
     simp [constraints] at state_cstrs
     simp_all
 
-    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints,
+      RTypeReader.constraints, ha, hb, hc] at state_cstrs
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1
 
     simp [spec_mulhu, sp1_mulhu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulhu Main ⟨ is_mulhu, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mulhu
 
@@ -224,22 +230,23 @@ theorem correct_mulh
     simp_all
 
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1
 
     simp [spec_mulhsu, sp1_mulhsu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulhsu Main ⟨ is_mulhsu, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal, mop_of_mul_op]
 
 namespace Mulhsu
 
@@ -283,21 +290,22 @@ theorem correct_mulw
     simp_all
 
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1; simp_all
 
     simp [spec_mulw, sp1_mulw, execute, execute_MULW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MULW_pure_bv_to_bhw _ _ (by omega) (by omega)]
       have := spec.mulw Main ⟨ is_mulw, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Mulw

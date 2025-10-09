@@ -1673,6 +1673,7 @@ lemma spec.div :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_div] at h_is_div
 
   set a0 := Main[29]
   set a1 := Main[30]
@@ -1721,7 +1722,7 @@ lemma spec.div :
 
   set ar0 := Main[57]
   set ar1 := Main[58]
-  set ar2 := Main[39]
+  set ar2 := Main[59]
   set ar3 := Main[60]
 
   set ac0 := Main[61]
@@ -1789,11 +1790,11 @@ lemma spec.div :
   set is_real_not_word := Main[240]
   set rem_neg := Main[241]
   set c_neg := Main[242]
-  set abs_c_alu_event := Main[239]
-  set abs_rem_alu_event := Main[240]
-  set is_real := Main[241]
-  set remainder_check_multiplicity := Main[242]
-  stop
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
+
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -1821,12 +1822,12 @@ lemma spec.div :
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
-          --  b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-          --  b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
@@ -1909,6 +1910,7 @@ lemma spec.rem :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_rem] at h_is_rem
 
   set a0 := Main[29]
   set a1 := Main[30]
@@ -1957,7 +1959,7 @@ lemma spec.rem :
 
   set ar0 := Main[57]
   set ar1 := Main[58]
-  set ar2 := Main[39]
+  set ar2 := Main[59]
   set ar3 := Main[60]
 
   set ac0 := Main[61]
@@ -2025,11 +2027,10 @@ lemma spec.rem :
   set is_real_not_word := Main[240]
   set rem_neg := Main[241]
   set c_neg := Main[242]
-  set abs_c_alu_event := Main[239]
-  set abs_rem_alu_event := Main[240]
-  set is_real := Main[241]
-  set remainder_check_multiplicity := Main[242]
-  stop
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
 
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -2059,11 +2060,10 @@ lemma spec.rem :
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
@@ -2466,6 +2466,7 @@ lemma spec.divu :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_divu] at h_is_divu
 
   set a0 := Main[29]
   set a1 := Main[30]
@@ -2514,7 +2515,7 @@ lemma spec.divu :
 
   set ar0 := Main[57]
   set ar1 := Main[58]
-  set ar2 := Main[39]
+  set ar2 := Main[59]
   set ar3 := Main[60]
 
   set ac0 := Main[61]
@@ -2582,11 +2583,10 @@ lemma spec.divu :
   set is_real_not_word := Main[240]
   set rem_neg := Main[241]
   set c_neg := Main[242]
-  set abs_c_alu_event := Main[239]
-  set abs_rem_alu_event := Main[240]
-  set is_real := Main[241]
-  set remainder_check_multiplicity := Main[242]
-  stop
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
 
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -2616,11 +2616,10 @@ lemma spec.divu :
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
@@ -2703,8 +2702,127 @@ lemma spec.remu :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_remu] at h_is_remu
 
-  stop
+  set a0 := Main[29]
+  set a1 := Main[30]
+  set a2 := Main[31]
+  set a3 := Main[32]
+
+  set b0 := Main[15]
+  set b1 := Main[16]
+  set b2 := Main[17]
+  set b3 := Main[18]
+
+  set c0 := Main[22]
+  set c1 := Main[23]
+  set c2 := Main[24]
+  set c3 := Main[25]
+
+  set lb0 := Main[33]
+  set lb1 := Main[34]
+  set lb2 := Main[35]
+  set lb3 := Main[36]
+
+  set lc0 := Main[37]
+  set lc1 := Main[38]
+  set lc2 := Main[39]
+  set lc3 := Main[40]
+
+  set q0 := Main[41]
+  set q1 := Main[42]
+  set q2 := Main[43]
+  set q3 := Main[44]
+
+  set qbc0 := Main[45]
+  set qbc1 := Main[46]
+  set qbc2 := Main[47]
+  set qbc3 := Main[48]
+
+  set rbc0 := Main[49]
+  set rbc1 := Main[50]
+  set rbc2 := Main[51]
+  set rbc3 := Main[52]
+
+  set r0 := Main[53]
+  set r1 := Main[54]
+  set r2 := Main[55]
+  set r3 := Main[56]
+
+  set ar0 := Main[57]
+  set ar1 := Main[58]
+  set ar2 := Main[59]
+  set ar3 := Main[60]
+
+  set ac0 := Main[61]
+  set ac1 := Main[62]
+  set ac2 := Main[63]
+  set ac3 := Main[64]
+
+  set maco10 := Main[65]
+  set maco11 := Main[66]
+  set maco12 := Main[67]
+  set maco13 := Main[68]
+
+  set ctq0 := Main[69]
+  set ctq1 := Main[70]
+  set ctq2 := Main[71]
+  set ctq3 := Main[72]
+  set ctq4 := Main[73]
+  set ctq5 := Main[74]
+  set ctq6 := Main[75]
+  set ctq7 := Main[76]
+
+  set cnop0 := Main[167]
+  set cnop1 := Main[168]
+  set cnop2 := Main[169]
+  set cnop3 := Main[170]
+
+  set rnop0 := Main[171]
+  set rnop1 := Main[172]
+  set rnop2 := Main[173]
+  set rnop3 := Main[174]
+
+  set arlt := Main[175]
+
+  set cry0 := Main[183]
+  set cry1 := Main[184]
+  set cry2 := Main[185]
+  set cry3 := Main[186]
+  set cry4 := Main[187]
+  set cry5 := Main[188]
+  set cry6 := Main[189]
+  set cry7 := Main[190]
+
+  set is_c_0 := Main[201]
+
+  set is_div := Main[202]
+  set is_divu := Main[203]
+  set is_rem := Main[204]
+  set is_remu := Main[205]
+  set is_divw := Main[206]
+  set is_remw := Main[207]
+  set is_divuw := Main[208]
+  set is_remuw := Main[209]
+
+  set is_overflow := Main[210]
+  set is_overflow_b := Main[221]
+  set is_overflow_c := Main[232]
+
+  set msb_b := Main[233]
+  set msb_rem := Main[234]
+  set msb_c := Main[235]
+  set msb_quot := Main[236]
+  set b_neg := Main[237]
+  set b_neg_not_overflow := Main[238]
+  set b_not_neg_not_overflow := Main[239]
+  set is_real_not_word := Main[240]
+  set rem_neg := Main[241]
+  set c_neg := Main[242]
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
 
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -2734,11 +2852,10 @@ lemma spec.remu :
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
@@ -3293,6 +3410,7 @@ lemma spec.divw :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_divw] at h_is_divw
 
   set a0 := Main[29]
   set a1 := Main[30]
@@ -3341,7 +3459,7 @@ lemma spec.divw :
 
   set ar0 := Main[57]
   set ar1 := Main[58]
-  set ar2 := Main[39]
+  set ar2 := Main[59]
   set ar3 := Main[60]
 
   set ac0 := Main[61]
@@ -3409,11 +3527,10 @@ lemma spec.divw :
   set is_real_not_word := Main[240]
   set rem_neg := Main[241]
   set c_neg := Main[242]
-  set abs_c_alu_event := Main[239]
-  set abs_rem_alu_event := Main[240]
-  set is_real := Main[241]
-  set remainder_check_multiplicity := Main[242]
-  stop
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
 
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -3443,11 +3560,10 @@ lemma spec.divw :
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
@@ -3530,6 +3646,7 @@ lemma spec.remw :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_remw] at h_is_remw
 
   set a0 := Main[29]
   set a1 := Main[30]
@@ -3578,7 +3695,7 @@ lemma spec.remw :
 
   set ar0 := Main[57]
   set ar1 := Main[58]
-  set ar2 := Main[39]
+  set ar2 := Main[59]
   set ar3 := Main[60]
 
   set ac0 := Main[61]
@@ -3646,11 +3763,10 @@ lemma spec.remw :
   set is_real_not_word := Main[240]
   set rem_neg := Main[241]
   set c_neg := Main[242]
-  set abs_c_alu_event := Main[239]
-  set abs_rem_alu_event := Main[240]
-  set is_real := Main[241]
-  set remainder_check_multiplicity := Main[242]
-  stop
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
 
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -3680,11 +3796,10 @@ lemma spec.remw :
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
@@ -4061,6 +4176,7 @@ lemma spec.divuw :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_divuw] at h_is_divuw
 
   set a0 := Main[29]
   set a1 := Main[30]
@@ -4109,7 +4225,7 @@ lemma spec.divuw :
 
   set ar0 := Main[57]
   set ar1 := Main[58]
-  set ar2 := Main[39]
+  set ar2 := Main[59]
   set ar3 := Main[60]
 
   set ac0 := Main[61]
@@ -4177,11 +4293,10 @@ lemma spec.divuw :
   set is_real_not_word := Main[240]
   set rem_neg := Main[241]
   set c_neg := Main[242]
-  set abs_c_alu_event := Main[239]
-  set abs_rem_alu_event := Main[240]
-  set is_real := Main[241]
-  set remainder_check_multiplicity := Main[242]
-  stop
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
 
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -4211,11 +4326,10 @@ lemma spec.divuw :
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
@@ -4298,6 +4412,7 @@ lemma spec.remuw :
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  simp [is_remuw] at h_is_remuw
 
   set a0 := Main[29]
   set a1 := Main[30]
@@ -4346,7 +4461,7 @@ lemma spec.remuw :
 
   set ar0 := Main[57]
   set ar1 := Main[58]
-  set ar2 := Main[39]
+  set ar2 := Main[59]
   set ar3 := Main[60]
 
   set ac0 := Main[61]
@@ -4414,11 +4529,10 @@ lemma spec.remuw :
   set is_real_not_word := Main[240]
   set rem_neg := Main[241]
   set c_neg := Main[242]
-  set abs_c_alu_event := Main[239]
-  set abs_rem_alu_event := Main[240]
-  set is_real := Main[241]
-  set remainder_check_multiplicity := Main[242]
-  stop
+  set abs_c_alu_event := Main[243]
+  set abs_rem_alu_event := Main[244]
+  set is_real := Main[245]
+  set remainder_check_multiplicity := Main[246]
 
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -4448,11 +4562,10 @@ lemma spec.remuw :
            u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7,
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops,
-           correct_opcode ⟩ := cstrs
-  clear cpu alu correct_opcode
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := cstrs
+  clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
-  rw [eq_comm (a := b_neg * 65535)] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
   rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
   rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
   rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2

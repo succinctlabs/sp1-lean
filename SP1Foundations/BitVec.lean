@@ -128,6 +128,12 @@ lemma toBitVec64_mod_of_lt (w : Word (Fin KB)) (n : Fin 8) :
   set k := BitVec.ofNat 64 w[0]
   bv_decide
 
+@[simp] lemma setWidth8_toBitVec64 (w : Word (Fin KB)) :
+    BitVec.setWidth 8 w.toBitVec64 = BitVec.ofNat 8 w[0] := by
+  simp [toBitVec64, Word.toNat_def]
+  simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
+  omega
+
 end Word
 
 namespace BitVec

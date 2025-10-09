@@ -4,16 +4,6 @@ import SP1Operations.Operation.AddrAddOperation
 
 open LeanRV64D.Functions Sail SailState
 
-attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
-  ext_data_get_addr check_misaligned
-  LeanRV64D.Functions.plat_enable_misaligned_access
-  split_misaligned misaligned_order
-  allowed_misaligned sys_misaligned_order_decreasing
-  get_config_print_platform
-  LeanRV64D.Functions.xlen
-  _get_Mstatus_MPP _get_Mstatus_MPRV
-  privLevel_of_bits default_write_acc
-
 namespace Store
 
 namespace StoreWord
@@ -38,48 +28,6 @@ def sp1_sb (Main : Vector (Fin KB) 46) : SailM ExecutionResult := do
   let addr : BitVec 64 := Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0]
   Sail.write_ram 64 4 0#64 addr (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
   return RETIRE_SUCCESS
-
-lemma run_vmem_write_of_width_4
-    (rs_addr_bv : BitVec 5)
-    (reg_val : BitVec 64) -- thing inside `rs_addr_bv`
-    (offset : BitVec 64)
-    (data : BitVec 32) -- bigger for others
-    (s : SailState)
-    (hs : SailState.isInitialized s)
-    (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
-    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true) ---width
-    (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 4 ≤ --width
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
-    (vmem_write (.Regidx rs_addr_bv) offset 4 data
-      (AccessType.Write Data) false false false).run s = .ok (.Ok true)
-        { s with mem := ((((s.mem.insert
-          (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat)).insert
-          ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
-          ((reg_val + offset).toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
-          ((reg_val + offset).toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hconfig
-  have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
-  have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (AccessType.Write Data != AccessType.InstructionFetch ()) = true := rfl
-  simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
-  simp [untilFuelM, untilFuelM.go]
-  simp [translateAddr, translationMode, effectivePrivilege]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [privLevel_bits_backwards]
-  simp [h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare]
-  simp [mem_write_ea, write_kind_of_flags, mem_write_value, mem_write_value_meta]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [effectivePrivilege, hfetch, h_mprv_disabled]
-  simp [mem_write_value_priv_meta, checked_mem_write, h_cur_privilege, phys_access_check, SailME.run]
-  simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
-  simp [run_within_mmio_writable_mmio reg_val offset 4 (by omega) s hs h_clint_base h_clint_size]
-  simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
-  simp [run_within_phys_mem reg_val offset 4 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
-  simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
-    sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
-    PreSail.writeByte, Except.map, BitVec.addInt]
 
 theorem correct (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : SailState.isInitialized s)
@@ -114,14 +62,6 @@ theorem correct (Main : Vector (Fin KB) 46)
 
   obtain ⟨h_add_addr, h38, h39, h40, h_cpu, h_reader, h_cstrs⟩ := h_cstrs
 
-  -- Extract constraints about the state of operations
-  simp [StoreWord.constraints, AddressOperation.constraints,
-    SP1Constraint.toStateProp, AddrAddOperation.constraints,
-    CPUState.constraints, ITypeReaderImmutable.constraints,
-    Opcode.ofNat, Nat.ble, h_is_real, Nat.beq] at state_cstrs
-  obtain ⟨h_read_pc, h6_op_a, h14_op_a, h_imm_state⟩ := state_cstrs
-  rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
-
   -- Extract constraints about the reader
   simp [ITypeReaderImmutable.constraints,
       SP1Constraint.toProp, Opcode.ofNat, Nat.ble, Nat.beq] at h_reader
@@ -133,8 +73,14 @@ theorem correct (Main : Vector (Fin KB) 46)
   have h6_32 : Main[6] < 32 := by clear *- h_reader; simp_all only
   have h14_32 : Main[14] < 32 := by clear *- h_reader; simp_all only
 
-  specialize h6_op_a h6_32
-  specialize h14_op_a h14_32
+  -- Extract constraints about the state of operations
+  simp [StoreWord.constraints, AddressOperation.constraints,
+    SP1Constraint.toStateProp, AddrAddOperation.constraints,
+    CPUState.constraints, ITypeReaderImmutable.constraints,
+    Opcode.ofNat, Nat.ble, h_is_real, h6_32, h14_32, Nat.beq] at state_cstrs
+  obtain ⟨h_read_pc, h6_op_a, h14_op_a, h_imm_state⟩ := state_cstrs
+  rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
+
   have h15u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
     clear *- h_reader; simp_all only
   have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by

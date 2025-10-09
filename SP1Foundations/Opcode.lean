@@ -1,6 +1,4 @@
 import SP1Foundations.Field
-import SP1Foundations.SailM
-import SP1Foundations.Word
 
 inductive Opcode where
   | ADD
@@ -63,93 +61,5 @@ namespace Opcode
 @[simp] lemma ofNat_33 : Opcode.ofNat 33 = Opcode.JAL := rfl
 
 @[simp] lemma ofNat_34 : Opcode.ofNat 34 = Opcode.JALR := rfl
-
-@[simp]
-def i_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=
-  (imm_b = 0 ∧ imm_c = 1)
-  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0)
-
-@[simp]
-def shift_i_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=
-  (imm_b = 0 ∧ imm_c = 1)
-  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ op_c_0 < 2^6 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
-
-@[simp]
-def w_shift_i_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=
-  (imm_b = 0 ∧ imm_c = 1)
-  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ op_c_0 < 2^5 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
-
-@[simp]
-def r_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=
-  (imm_b = 0 ∧ imm_c = 0)
-  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ op_c_0 < 32 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
-
-@[simp]
-def b_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=
-  (imm_b = 0 ∧ imm_c = 1)
-  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 13 op_c_0)
-  ∧ (Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] % 4#64 = 0)
-
-@[simp]
-def trusted_instr
-  (opcode : Opcode)
-  (op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB)
-  : Prop :=
-  match opcode with
-  | ADD | SUB | SUBW =>
-      r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | ADDI | JALR =>
-      i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | AND | OR | XOR | SLT | SLTU
-  | ADDW =>
-      -- We can actually just do `r_type_constraints ∨ i_type_constraints` to
-      -- save the duplicate `imm_c = (0|1)` constraints, but for simplicity of
-      -- proving (i.e. casing) and readability, let's be redundant.
-      (imm_c = 0 → r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-      ∧ (imm_c = 1 → i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-  | BEQ | BNE | BLT | BGE | BLTU | BGEU =>
-      b_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | SLL | SRL | SRA =>
-      (imm_c = 0 → r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-      ∧ (imm_c = 1 → shift_i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-  | LUI | AUIPC =>
-      -- u_type
-      (imm_b = 1 ∧ imm_c = 1)
-      ∧ op_b_0 >= 2^12
-      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
-  | JAL =>
-      (imm_b = 1 ∧ imm_c = 1) ∧
-      -- `op_b` properly initiallized to a sign extended value
-      Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val * 65536)) ∧
-      -- `op_b` is a multiple of `4`
-      (Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]) % 4#64 = 0
-  | LB | LH | LW | LD | LBU | LHU | LWU =>
-      i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | SB | SH | SW | SD =>
-      i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-  | SLLW | SRLW | SRAW =>
-      (imm_c = 0 → r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-      ∧ (imm_c = 1 → w_shift_i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
-  | UNIMP | ECALL | EBREAK => True
-  | MUL | MULW | MULH | MULHU | MULHSU | DIV | DIVU | DIVW | DIVUW | REM | REMU | REMW | REMUW =>
-      r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-
-@[simp]
-def trusted_instr_state
-  (s : SailState)
-  (opcode : Opcode)
-  (_op_a op_b_0 _op_b_1 _op_b_2 _op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 : Fin KB)
-  : Prop :=
-  match opcode with
-  | JALR =>
-      ((s.get_reg? (BitVec.ofNat 5 op_b_0.val)).get! + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
-  -- | BEQ | BNE | BLT | BGE | BLTU | BGEU =>
-  --     (s.regs.get! Register.PC + Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3]) % 4 = 0
-  | _ => True
 
 end Opcode

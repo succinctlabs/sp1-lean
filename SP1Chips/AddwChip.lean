@@ -43,16 +43,18 @@ theorem correct_addw
   let op_a := sp1_op_a Main
   (spec_addw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addw Main).run s
   := by
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
-      AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints,
-      h_is_real, h_is_trusted] at state_cstrs
-    obtain ⟨read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp [constraints] at cstrs
 
     obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
+
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
+      AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints,
+      h_is_real, h_is_trusted] at state_cstrs
+    obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+
     simp [Opcode.ofNat, Nat.ble] at *
     simp_all
 
@@ -73,16 +75,18 @@ theorem correct_addw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
         simp [← BitVec.toNat_inj]; omega
       simp [this, Word.toBitVec64, Word.toNat]
-      rw [← is_addw]; congr
+      rw [← is_addw]
       rw [HWord.sign_extend_32_to_64_msb is_U32_val]
       simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Addw
 
@@ -124,14 +128,15 @@ theorem correct_addw
   let op_a := sp1_op_a Main
   (spec_addiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addiw Main).run s
   := by
-    -- Obtain and simplify state and pure constraints
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs
-    obtain ⟨read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp [constraints] at cstrs
     obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _ ⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, _, _, _ ⟩ := alu_cstrs
+
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs
+    obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+
     simp [Opcode.ofNat, Nat.ble] at *
     simp_all
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
@@ -155,15 +160,17 @@ theorem correct_addw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
         simp [← BitVec.toNat_inj]; omega
       simp [this, Word.toBitVec64, Word.toNat]
-      rw [← is_addw]; congr
+      rw [← is_addw]
       rw [HWord.sign_extend_32_to_64_msb is_U32_val]
       simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Addiw

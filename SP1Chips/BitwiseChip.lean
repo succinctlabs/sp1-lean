@@ -52,22 +52,23 @@ theorem correct_xor
 
     simp_all
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1; simp_all
 
     simp [spec_xor, sp1_xor, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       have := spec.xor Main ⟨ xor, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Xor
 
@@ -114,23 +115,24 @@ theorem correct_xori
 
     simp_all
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b⟩ := state_cstrs
+    clear thr1; simp_all
 
     simp [spec_xori, sp1_xori, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp_all [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       have := spec.xori Main ⟨ xor, imm ⟩ cstrs
       rw [← h_imm]
       rw [exec_ITYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Xori
 
@@ -177,22 +179,23 @@ theorem correct_or
 
     simp_all
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1; simp_all
 
     simp [spec_or, sp1_or, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       have := spec.or Main ⟨ or, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Or
 
@@ -239,23 +242,24 @@ theorem correct_ori
 
     simp_all
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b⟩ := state_cstrs
+    clear thr1; simp_all
 
     simp [spec_ori, sp1_ori, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp_all [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       have := spec.ori Main ⟨ or, imm ⟩ cstrs
       rw [← h_imm]
       rw [exec_ITYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Ori
 
@@ -302,22 +306,23 @@ theorem correct_and
 
     simp_all
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    clear thr1; simp_all
 
     simp [spec_and, sp1_and, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       have := spec.and Main ⟨ and, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end And
 
@@ -364,22 +369,23 @@ theorem correct_andi
 
     simp_all
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, read_pc, trusted_instr_state, read_op_a, read_op_b⟩ := state_cstrs
-    clear thr1 trusted_instr_state; simp_all
+    obtain ⟨thr1, read_pc, read_op_a, read_op_b⟩ := state_cstrs
+    clear thr1; simp_all
 
     simp [spec_andi, sp1_andi, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp_all [Word.toBitVec64, Word.toNat]
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       have := spec.andi Main ⟨ and, imm ⟩ cstrs
       rw [← h_imm]
       rw [exec_ITYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp_all [Word.toBitVec64, Word.toNat]
-      rfl
+      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      simp [bitVecToRegidxVal]
 
 end Andi

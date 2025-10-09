@@ -34,6 +34,8 @@ theorem JALR_correct
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)
     (hs : isInitialized s)
+    -- Write value is a valid PC value. This can be proved from constraints on newest sp1 branch
+    (h_valid_pc : (Main[15].val + Main[21].val) % 4 = 0)
     (state_cstrs : (constraints Main).initialState s) :
     let op_b := sp1_op_b Main
     let op_a := sp1_op_a Main
@@ -41,32 +43,29 @@ theorem JALR_correct
     (spec_jalr op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_jalr Main).run s := by
   extract_lets op_c op_b op_a
 
-  -- pull out state constraints about the contents of register and pc reads
-  simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddOperation.constraints, ITypeReader.constraints, CPUState.constraints, h_is_real] at state_cstrs
-  obtain ⟨read_pc, ⟨op_b_val_plus_imm_mul4, ⟨read_op_a, read_op_b⟩⟩⟩ := state_cstrs
-
   -- pull out constraints
-  simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at cstrs
+  simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp, h_is_real] at cstrs
   obtain ⟨res_cstrs, ⟨pc_cstrs, ⟨reader_cstrs, ⟨inc_pc_cstrs, chip_cstrs⟩⟩⟩⟩ := cstrs
-
-  simp [h_is_real] at *
   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq,
     SP1Constraint.toProp, sub_eq_zero] at reader_cstrs
 
+  have h6 : Main[6] < 32 := by aesop
+  have h14 : Main[14] < 32 := by aesop
+
+  simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
+    AddOperation.constraints, ITypeReader.constraints, CPUState.constraints,
+    h_is_real, h6, h14] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
+
   have h25 : Main[25] = 1 := by aesop
   simp [h25] at reader_cstrs
-  specialize read_op_a (by aesop)
-  specialize read_op_b (by aesop)
   simp only [BitVec.ofNatLT_eq_ofNat] at read_op_a read_op_b
 
   have h_sign_extend : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
     BitVec.signExtend 64 (BitVec.ofNat 12 Main[21]) := by aesop
   have hmod4' : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]) % 4 = 0 := by
-    simp [h25, read_op_b] at op_b_val_plus_imm_mul4
-    clear *- op_b_val_plus_imm_mul4
-    simp [← BitVec.toNat_inj] at *
-    assumption
+    clear *- h_valid_pc; simpa [← BitVec.toNat_inj]
 
   have h15 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
     clear *- reader_cstrs; aesop
@@ -76,13 +75,9 @@ theorem JALR_correct
     clear *- reader_cstrs; apply Word.isU64_of_cases <;> aesop
   have h_add := AddOperation.spec h15 h22 res_cstrs
 
-  simp [spec_jalr, sp1_jalr,
-    run_readReg_of_isInitialized _ _ hs,
-    EStateM.Result.map, cond,
-    execute_JALR,
-    op_a, op_b, op_c,
-    sp1_op_a, sp1_op_b, sp1_op_c,
-    read_op_a, read_op_b,
+  simp [spec_jalr, sp1_jalr, run_readReg_of_isInitialized _ _ hs,
+    EStateM.Result.map, cond, execute_JALR,
+    op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c, read_op_a, read_op_b,
     ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2]
 
   rw [run_readReg_of_isInitialized _ _ (by aesop)]
