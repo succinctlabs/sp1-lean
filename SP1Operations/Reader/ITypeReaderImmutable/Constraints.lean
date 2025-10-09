@@ -3,7 +3,6 @@ import SP1Operations.Reader.ITypeReader.Operation
 
 namespace ITypeReaderImmutable
 
--- dtumad: shouldn't need this really
 set_option linter.unusedVariables false
 
 section constraints
