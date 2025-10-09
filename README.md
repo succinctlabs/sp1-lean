@@ -2,19 +2,13 @@
 
 ![SP1 Lean](./.github/assets/header.png)
 
-Formal verification of SP1 zkVM arithmetization
+Formal verification of SP1 Hypercube zkVM arithmetization
 
 </div>
 
 ## Overview
 
-This repository provides **formal proofs for the arithmetization of the SP1 zkVM**, a zero-knowledge virtual machine for verifying RISC-V 64-bit computations. Using the Lean 4 theorem prover, we formally verify that the constraint systems used in SP1's AIR (Algebraic Intermediate Representation) correctly implement the RISC-V ISA semantics.
-
-## What is SP1?
-
-[SP1](https://github.com/succinctlabs/sp1) is a zero-knowledge virtual machine that generates proofs of RISC-V program execution. It uses AIR-based arithmetization to encode the computation into polynomial constraints that can be proven using cryptographic proof systems.
-
-This repository focuses on **proving the correctness of those constraints** - ensuring that the polynomial equations actually enforce the intended RISC-V semantics.
+This repository provides formal specifications and proofs for the arithmetization of the SP1 Hypercube zkVM using the Lean 4 theorem prover, we formally verify that the constraint systems used in SP1's AIR (Algebraic Intermediate Representation) in addition to constraints implied by the lookup argument, correctly implement the RISC-V ISA semantics.
 
 ## Repository Structure
 
@@ -99,25 +93,3 @@ lake build
 
 - **[Mathlib](https://github.com/leanprover-community/mathlib4)**: Lean's mathematics library (v4.23.0-rc2)
 - **[Lean_RV64D](https://github.com/succinctlabs/sail-riscv-lean)**: Formal RISC-V semantics extracted from Sail
-
-## Current Status
-
-The repository currently includes formal verification for:
-- ✅ Arithmetic operations (add, sub, mul, div/rem)
-- ✅ Bitwise operations
-- ✅ Shift operations
-- ✅ Comparison operations
-- ✅ Memory operations (load/store)
-- ✅ Control flow (branches, jumps)
-- ✅ Immediate operations
-
-## Contributing
-
-Contributions are welcome! Please see the [contributing guidelines](CONTRIBUTING.md) for more information.
-
-## Acknowledgments
-
-This work builds on:
-- The [Sail RISC-V specification](https://github.com/rems-project/sail-riscv)
-- The [Lean 4 theorem prover](https://github.com/leanprover/lean4)
-- The [Mathlib](https://github.com/leanprover-community/mathlib4) mathematics library
