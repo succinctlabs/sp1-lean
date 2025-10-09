@@ -117,10 +117,6 @@ The repository currently includes formal verification for:
 
 Contributions are welcome! Please see the [contributing guidelines](CONTRIBUTING.md) for more information.
 
-## License
-
-See [LICENSE](LICENSE) for details.
-
 ## Acknowledgments
 
 This work builds on:
