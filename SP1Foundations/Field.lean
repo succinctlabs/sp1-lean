@@ -108,13 +108,6 @@ lemma mul_256_inv_KB (x : Fin KB)
   simp [Fin.val_mul, Nat.shiftRight_eq_div_pow, Nat.div_mul_self_eq_mod_sub_self]
   omega
 
--- @[simp] lemma lt_65536_of_mul_inv_lt (x : Fin KB) (h : (x * 4⁻¹).val < 16384) :
---     x.val < 65536 := by
-
---   rw [Fin.val_mul] at h
-
---   sorry
-
 namespace Int
 
 lemma abs_cases {a : ℤ} : abs a = if 0 ≤ a then a else -a := by
