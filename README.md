@@ -50,7 +50,7 @@ Each chip contains:
 For each RISC-V instruction, we prove that:
 
 1. **The constraints are satisfiable**: When the instruction executes correctly, there exists an assignment to the constraint variables
-2. **The constraints are sound**: Any satisfying assignment corresponds to a valid RISC-V execution
+2. **The constraints are sound**: Any satisfying assignment corresponds to a valid RISC-V execution.
 
 The proofs connect two representations:
 - **RISC-V Semantics**: Formal specification from the Sail RISC-V model
@@ -71,6 +71,11 @@ theorem correct_add
 ```
 
 This theorem states that when all constraints hold, the SP1 add operation produces the same result as the RISC-V specification.
+
+## Constraints
+Constraints come from two sources:
+- Constraints implied by the lookup argument.
+- Constraints implied by the equations.
 
 ## Building
 
