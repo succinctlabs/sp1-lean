@@ -2,3 +2,5 @@
 /.claude
 .env
 .env.fish
+
+.DS_Store
