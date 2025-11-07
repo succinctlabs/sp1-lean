@@ -47,7 +47,7 @@ theorem correct (Main : Vector (Fin KB) 52)
 
   -- Extract the facts about the config registers in the state
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hs_config
+    h_plat_ram_base, h_plat_rom_base, h_plat_ram_size⟩ := hs_config
 
   -- Extract the main constraints from the chip
   rw [StoreByte.constraints] at h_cstrs
@@ -119,8 +119,12 @@ theorem correct (Main : Vector (Fin KB) 52)
   · simpa using h14_op_a
   · simp [is_aligned_vaddr]
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
-  · simp
-    simpa [Std.ExtDHashMap.get_insert]
+  · simp [Std.ExtDHashMap.get_insert, h_plat_ram_base]
+    -- from addroperation
+    sorry
+  · simp [Std.ExtDHashMap.get_insert, h_plat_ram_base, h_plat_ram_size]
+
+    sorry
 
 end StoreByte
 

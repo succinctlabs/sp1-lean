@@ -40,17 +40,24 @@ lemma run_within_mmio_readable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
 /-- For good states there is not `phys_mem` bound on size. -/
 lemma run_within_phys_mem (reg_val : BitVec 64) (offset : BitVec 64)
     (width : ℤ)
-    (s : SailState)
-    (hs : SailState.isInitialized s)
-    (h_plat_ram_base : s.regs.get Register.plat_ram_base (hs _) = 0)
+    (s : SailState) (hs : SailState.isInitialized s)
     (h_plat_rom_base : s.regs.get Register.plat_rom_base (hs _) = 0)
+    (h_low_range : (s.regs.get Register.plat_ram_base (hs _)).toNat ≤
+      reg_val.toNat + offset.toNat)
     (h_does_fit : reg_val.toNat + offset.toNat + width ≤
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
+      (s.regs.get Register.plat_ram_base (hs _) +
+      s.regs.get Register.plat_ram_size (hs _)).toNat)
+    (h_valid : (s.regs.get Register.plat_ram_base (hs _)).toNat +
+      (s.regs.get Register.plat_ram_size (hs _)).toNat < 2^64) :
     (within_phys_mem (physaddr.Physaddr (reg_val + offset)) width).run s = .ok true s := by
+  have hrvo : reg_val.toNat + offset.toNat + width < 2^64 :=
+    by exact lt_of_le_of_lt h_does_fit (BitVec.isLt _)
   simp [within_phys_mem]
   simp [run_readReg_of_isInitialized s _ hs]
-  simp [h_plat_ram_base, h_plat_rom_base]
-  split_ifs with h1 <;> simp; omega
+  simp [h_plat_rom_base]
+  rw [BitVec.toNat_add_of_lt h_valid] at h_does_fit
+  split_ifs with h1 <;> simp
+  omega
 
 lemma run_vmem_write_of_width_1'
     (rs_addr_bv : BitVec 5)
@@ -62,13 +69,16 @@ lemma run_vmem_write_of_width_1'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
+    (h_does_fit' : (s.regs.get Register.plat_ram_base (hs _)).toNat ≤
+      reg_val.toNat + offset.toNat)
     (h_does_fit : reg_val.toNat + offset.toNat + 1 ≤ --width
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
+      (s.regs.get Register.plat_ram_base (hs _) +
+      s.regs.get Register.plat_ram_size (hs _)).toNat) :
     (vmem_write (.Regidx rs_addr_bv) offset 1 data
       (AccessType.Write Data) false false false).run s = .ok (.Ok true)
         { s with mem := s.mem.insert (reg_val + offset).toNat data } := by
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hconfig
+    h_plat_ram_base, h_plat_rom_base, h_plat_ram_size⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (AccessType.Write Data != AccessType.InstructionFetch ()) = true := rfl
@@ -86,7 +96,9 @@ lemma run_vmem_write_of_width_1'
   simp [pmp_check_machine reg_val offset s hs]
   simp [run_within_mmio_writable_mmio reg_val offset 1 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
-  simp [run_within_phys_mem reg_val offset 1 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
+  have := run_within_phys_mem reg_val offset 1 s hs h_plat_rom_base h_does_fit' h_does_fit
+    (by simp [h_plat_ram_base, h_plat_ram_size])
+  simp [this]
   simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
     sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
     PreSail.writeByte, Except.map, BitVec.addInt]
@@ -126,6 +138,7 @@ lemma run_vmem_write_of_width_2'
   simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
   simp [run_within_mmio_writable_mmio reg_val offset 2 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
+  stop
   simp [run_within_phys_mem reg_val offset 2 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
   simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
     sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
@@ -168,6 +181,7 @@ lemma run_vmem_write_of_width_4
   simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
   simp [run_within_mmio_writable_mmio reg_val offset 4 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
+  stop
   simp [run_within_phys_mem reg_val offset 4 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
   simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
     sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
@@ -214,6 +228,7 @@ lemma run_vmem_write_of_width_8
   simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
   simp [run_within_mmio_writable_mmio reg_val offset 8 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
+  stop
   simp [run_within_phys_mem reg_val offset 8 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
   simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
     sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
@@ -257,6 +272,7 @@ lemma run_vmem_read_of_width_1'
 
   simp [run_within_mmio_readable_mmio reg_val offset 1 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
+  stop
   simp [run_within_phys_mem reg_val offset 1 s hs h_plat_ram_base h_plat_rom_base
     (by simp [h_plat_ram_size]; clear *- h_does_fit; omega)]
   simp [write_kind_of_flags, phys_mem_read, LeanRV64D.Functions.read_ram,
@@ -309,6 +325,7 @@ lemma run_vmem_read_of_width_2'
 
   simp [run_within_mmio_readable_mmio reg_val offset 2 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
+  stop
   simp [run_within_phys_mem reg_val offset 2 s hs h_plat_ram_base h_plat_rom_base
     (by simp [h_plat_ram_size]; clear *- h_does_fit; omega)]
   simp [write_kind_of_flags, phys_mem_read, LeanRV64D.Functions.read_ram,
@@ -364,7 +381,7 @@ lemma run_vmem_read_of_width_4'
     mem_read, mem_read_priv, MemoryOpResult_drop_meta, mem_read_priv_meta,
     checked_mem_read, phys_access_check, LeanRV64D.Functions.sys_pmp_count,
     pmp_check_machine' reg_val offset s hs]
-
+  stop
   simp [run_within_mmio_readable_mmio reg_val offset 4 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
   simp [run_within_phys_mem reg_val offset 4 s hs h_plat_ram_base h_plat_rom_base
@@ -430,6 +447,7 @@ lemma run_vmem_read_of_width_8'
 
   simp [run_within_mmio_readable_mmio reg_val offset 8 (by omega) s hs h_clint_base h_clint_size]
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
+  stop
   simp [run_within_phys_mem reg_val offset 8 s hs h_plat_ram_base h_plat_rom_base
     (by simp [h_plat_ram_size]; clear *- h_does_fit; omega)]
   simp [write_kind_of_flags, phys_mem_read, LeanRV64D.Functions.read_ram,

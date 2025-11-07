@@ -61,6 +61,35 @@ section constraints
 
 end constraints
 
+lemma allHold_constraints_iff (Main : Vector (Fin KB) 41) (h_is_real : Main[39] = 1) :
+    (constraints Main).allHold ↔ (
+    List.Forall SP1Constraint.toProp (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
+        #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[26], Main[27], Main[28]] } 1) ∧
+    Main[29] * (Main[27] + Main[28]) = 1 ∧ ↑(Main[26] * 1864368129) < 8192 ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints
+      { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+        pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
+    List.Forall SP1Constraint.toProp
+        (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 45
+          #v[4, 3, 3, 0] #v[Main[30], Main[31], Main[32], Main[33]]
+          { op_a := Main[6],
+            op_a_memory :=
+              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+            op_a_0 := Main[13], op_b := Main[14],
+            op_b_memory :=
+              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]], is_trusted := Main[25] } 1) ∧
+    (Main[36] = 0 ∨ Main[36] = 1) ∧ (Main[36] = 0 ∨ Main[0] = Main[34]) ∧
+    Main[36] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[36]) * Main[0] - (Main[36] * Main[35] + (1 - Main[36]) * Main[34]) - 1 =
+    Main[37] + Main[38] * 65536 ∧
+    ↑Main[37] < 65536 ∧ Main[38] < 256 ∧
+    Word.isU64 #v[Main[30], Main[31], Main[32], Main[33]] ∧ Main[40] = 0 ∧ Main[13] = 0
+    ) := by
+  simp [constraints, AddressOperation.constraints, h_is_real, sub_eq_zero,
+    SP1Constraint.toProp]
+
 end LoadDouble
 
 end Load
