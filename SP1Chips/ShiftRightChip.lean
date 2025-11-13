@@ -126,6 +126,7 @@ theorem correct_srli
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
+      sorry
 
 end Srli
 
@@ -246,6 +247,7 @@ theorem correct_srliw
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
+      sorry
 
 end Srliw
 
@@ -366,6 +368,7 @@ theorem correct_srai
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
+      sorry
 
 end Srai
 
@@ -486,5 +489,6 @@ theorem correct_sraiw
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
+      sorry
 
 end Sraiw

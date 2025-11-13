@@ -89,9 +89,10 @@ def sp1_slli : SailM Unit := do
 
 set_option maxHeartbeats 1000000 in
 theorem correct_slli
-  (state_cstrs : (constraints Main).initialState s) :
+  (state_cstrs : (constraints Main).initialState s)
+  (h_imm : Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0) :
   let ⟨ sll, imm ⟩ := h_is_slli
-  let op_c := sp1_op_c_imm Main cstrs (sll_real Main sll) imm (by tauto)
+  let op_c := sp1_op_c_univ Main -- sp1_op_c_imm Main cstrs (sll_real Main sll) imm (by tauto)
   let op_b := sp1_op_b Main cstrs (sll_real Main sll)
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   (spec_slli op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slli Main cstrs h_is_slli).run s
@@ -108,8 +109,7 @@ theorem correct_slli
 
     simp [spec_slli, sp1_slli, execute, execute_SHIFTIOP']
     rw [Sail.run_readReg, read_pc]
-    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, sp1_op_c_univ]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -203,7 +203,8 @@ def sp1_slliw : SailM Unit := do
 
 set_option maxHeartbeats 1000000 in
 theorem correct_slliw
-  (state_cstrs : (constraints Main).initialState s) :
+  (state_cstrs : (constraints Main).initialState s)
+  (h_imm : Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0) :
   let ⟨ sllw, imm ⟩ := h_is_slliw
   let op_c := sp1_op_c_imm_w Main cstrs (sllw_real Main sllw) imm (by tauto)
   let op_b := sp1_op_b Main cstrs (sllw_real Main sllw)

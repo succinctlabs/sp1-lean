@@ -3,6 +3,77 @@ import SP1Foundations.Opcode
 
 open LeanRV64D.Functions Sail SailState
 
+/-
+i type
+imm_b = 0, imm_c = 1 is correct
+op_b < 32 is correct since it's a register
+op_c being 12-bit sign-extension is correct
+
+shift i type
+imm_b = 0, imm_c = 1, op_b < 32 is correct
+op_c < 2^6 is not sure, probably not needed :eyes:
+in that case probably can just remove shift i type assumption and use I type
+w shift i type
+imm_b = 0, imm_c = 1, op_b < 32 is correct
+op_c < 2^5 is not sure, probably not needed  :eyes:
+in that case probably can just remove shift i type assumption and use I type
+r type
+imm_b = 0, imm_c = 0 is correct
+op_b, op_c < 32 is correct since they are registers
+b type
+imm_b = 0, imm_c = 1 is correct
+op_b < 32 is correct since its register
+op_c being 13-bit sign extended is right
+not sure if op_c % 4 == 0 is necessarily true?  :eyes:
+I know that op_c % 2 == 0 is true though
+(edited)
+:eyes:
+1
+
+Also sent as direct message
+
+
+Min
+  Oct 8th at 6:53 PM
+trusted_instr_state :eyes:
+as mentioned, the (op_b + op_c) % 4 == 0 is now in constraints
+so maybe it's possible to just fully remove trusted_instr_state
+(edited)
+Also sent as direct message
+
+
+Min
+  Oct 8th at 7:23 PM
+trusted_instr
+ADD/SUB/SUBW -> RType (true)
+ADDI / JALR -> IType (true)
+AND/OR/XOR/SLT/SLTU/ADDW
+these are between R / I (true)
+so imm_c = 0 -> RType, and imm_c = 1 -> IType
+BEQ | BNE | BLT | BGE | BLTU | BGEU -> BType (true)
+SLL | SRL | SRA
+these are between R & shift-I (true)
+so imm_c = 0 -> RType, and imm_c = 1 -> shiftIType
+LUI | AUIPC
+these are U type, so imm_b = imm_c = 1 is true
+not sure op_b_0 >= 2^12 is true? it's a multiple of 2^12 probably, but it can be zero I think? :eyes:
+the sign extension is correct (2^12 * 20bit = 32 bit -> sign extended to 64 bit)
+JAL
+this is J type, so imm_b = imm_c = 1 is true
+21-bit sign extension is correct since its J type
+technically we only know op_b % 2 == 0 I think?  :eyes:
+also here we do constrain (pc + op_b) % 4 == 0 directly as well
+so you don't need to assume op_b % 4 == 0 here
+LOAD & STORE
+these are all I types
+to be exact, STORE is S type, but the immediate is 12-bit sign extended
+SLLW / SRLW / SRAW
+these are between R & w-shift-I (true)
+so imm_c = 0 -> RType, and imm_c = 1 -> w-shiftIType
+MUL & DIV
+these are R type (true)
+-/
+
 section reader_constraints
 
 @[simp] def i_type_constraints
@@ -15,14 +86,12 @@ section reader_constraints
     (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=
   (imm_b = 0 ∧ imm_c = 1)
   ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ op_c_0 < 2^6 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
 
 @[simp]
 def w_shift_i_type_constraints
     (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=
   (imm_b = 0 ∧ imm_c = 1)
   ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ op_c_0 < 2^5 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
 
 @[simp] def r_type_constraints
     (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : Fin KB) : Prop :=

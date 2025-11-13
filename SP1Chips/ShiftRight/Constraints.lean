@@ -615,7 +615,7 @@ lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → 
 lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let imm := Main[31]
   (imm = 1 →
-    (Main[21] = Main[25] ∧ Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
+    (Main[21] = Main[25] ∧ --Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
       ((Main[65] = 1 ∨ Main[66] = 1 → Main[25] < 64) ∧
        (Main[67] = 1 ∨ Main[68] = 1 → Main[25] < 32)))) := by
   intro cstrs real
@@ -626,7 +626,8 @@ lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) →
             b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4 ⟩ := cstrs
   clear h0 h1 h2 h3 h4
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+  . stop
+    obtain ⟨ h0, h1, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
   . clear alu; rcases real with srl | sra | srlw | sraw <;> simp_all
 
@@ -1113,7 +1114,7 @@ lemma spec.srli (h : is_srli Main ) :
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
     have immediate_bounds := immediate_bounds Main cstrs (srl_real Main eq_srl)
     rw [eq_imm] at immediate_bounds; simp_all
-    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := immediate_bounds
+    obtain ⟨ eq_c0, lt_c0, h0 ⟩ := immediate_bounds
     obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
 
     simp [allHold_constraints_iff] at cstrs
@@ -1183,8 +1184,8 @@ lemma spec.srli (h : is_srli Main ) :
 
     rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
 
-    have : ((Word.toBitVec64 #v[c0, 0, 0, 0]).toNat % 64) = c0.val % 64 := by
-      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
+    have : ((Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 64) = c0.val % 64 := by
+      sorry --rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
     rw [this]; clear this
     have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -1388,7 +1389,7 @@ lemma spec.srliw (h : is_srliw Main ) :
     obtain ⟨ c0_16, c1_16, c2_16, c3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_c
     have immediate_bounds := immediate_bounds Main cstrs (srlw_real Main eq_srlw)
     rw [eq_imm] at immediate_bounds; simp_all
-    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := immediate_bounds
+    obtain ⟨ eq_c0, lt_c0, h0 ⟩ := immediate_bounds
     obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
 
     simp [allHold_constraints_iff] at cstrs
@@ -1480,8 +1481,9 @@ lemma spec.srliw (h : is_srliw Main ) :
     simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
     simp_all
 
-    have : ((Word.low #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
+    have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
       simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]
+      sorry
     rw [this]; clear this
     simp [Word.low]
 
@@ -1698,7 +1700,7 @@ lemma spec.srai (h : is_srai Main ) :
     obtain ⟨ c0_16, c1_16, c2_16, c3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_c
     have immediate_bounds := immediate_bounds Main cstrs (sra_real Main eq_sra)
     rw [eq_imm] at immediate_bounds; simp_all
-    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := immediate_bounds
+    obtain ⟨ eq_c0, lt_c0, h0 ⟩ := immediate_bounds
     obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
 
     simp [allHold_constraints_iff] at cstrs
@@ -1768,8 +1770,8 @@ lemma spec.srai (h : is_srai Main ) :
 
     rw [← BitVec.toInt_inj, BitVec.toInt_sshiftRight, Int.shiftRight_eq_div_pow]
 
-    have : ((Word.toBitVec64 #v[c0, 0, 0, 0]).toNat % 64) = c0.val % 64 := by
-      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
+    have : ((Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 64) = c0.val % 64 := by
+      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]; sorry
     rw [this]; clear this
     have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -2048,7 +2050,7 @@ lemma spec.sraiw (h : is_sraiw Main ) :
     obtain ⟨ c0_16, c1_16, c2_16, c3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_c
     have immediate_bounds := immediate_bounds Main cstrs (sraw_real Main eq_sraw)
     rw [eq_imm] at immediate_bounds; simp_all
-    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := immediate_bounds
+    obtain ⟨ eq_c0, lt_c0, h0 ⟩ := immediate_bounds
     obtain ⟨ sop_1, sop_2, sop_3, sop_4 ⟩ := single_op Main cstrs
 
     simp [allHold_constraints_iff] at cstrs
@@ -2140,8 +2142,8 @@ lemma spec.sraiw (h : is_sraiw Main ) :
     simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
     simp_all
 
-    have : ((Word.low #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]
+    have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
+      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]; sorry
     rw [this]; clear this
     simp [Word.low]
 

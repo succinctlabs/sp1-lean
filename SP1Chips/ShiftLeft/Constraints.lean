@@ -431,9 +431,11 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
   Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
   Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] ∧
   (imm = 1 →
-    (Main[21] = Main[25] ∧ Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
-      ((Main[63] = 1 → Main[25] < 64) ∧
-       (Main[64] = 1 → Main[25] < 32)))) ∧
+    (Main[21] = Main[25] ∧ --Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
+      ((Main[63] = 1 → Main[25] < 64)
+      -- ∧
+      --  (Main[64] = 1 → Main[25] < 32)
+       ))) ∧
   (Main[6] = 0 → Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0 ∧ Main[36] = 0)
   := by
   intro cstrs real
@@ -442,7 +444,11 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
   clear h_msb cpu rest
   simp [is_real] at real
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu; simp_all
+
+  simp at alu
+
+  . obtain ⟨ h0, h1, h2, h3, hl, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu; simp_all
+    stop
     by_cases sll : Main[63] = 0
     . by_cases sllw : Main[64] = 0
       . clear *- real sll sllw; aesop
@@ -451,13 +457,20 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
           aesop
         simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
         split_ands
+        · rcases b_imm <;> simp_all
+        · rcases b_imm <;> simp_all
+          clear *- hl
+          apply Word.isU64_of_cases <;> {simp; omega}
+        -- . rcases b_imm <;> simp_all
         . rcases b_imm <;> simp_all
-        . rcases b_imm <;> simp_all
-          apply Word.isU64_of_cases <;> simp; omega
+
+          sorry
+          -- apply Word.isU64_of_cases <;> simp; omega
         . aesop
     . have : Main[64] = 0 := by
         clear *- real b_sll b_sllw sll one_of_ops
         aesop
+      stop
       simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
       split_ands
       . rcases b_imm <;> simp_all
@@ -494,13 +507,17 @@ def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
   have := bounds Main cstrs real
   tauto
 
+def sp1_op_c_univ (Main : Vector (Fin BB) 66) : BitVec 6 :=
+  BitVec.ofNat 6 Main[21].val
+
 @[simp]
 def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[63] = 1 → BitVec 6 := by
   intro cstrs real imm nw
   refine BitVec.ofNatLT Main[21] ?_
   have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
   simp_all
-  have ⟨ _, _, _, _, _ ⟩ := h_imm
+  stop
+  -- have ⟨ _ ⟩ := h_imm
   tauto
 
 @[simp]
@@ -509,6 +526,7 @@ def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_
   refine BitVec.ofNatLT Main[21] ?_
   have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
   simp_all
+  stop
   have ⟨ _, _, _, _, _ ⟩ := h_imm
   tauto
 
@@ -642,7 +660,7 @@ lemma spec.slli (h : is_slli Main) :
     clear h0 h1 h2 h3
     rw [eq_imm] at imm_zeros; simp_all
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
-    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := imm_zeros
+    obtain ⟨ lt_c0, h0 ⟩ := imm_zeros
     obtain ⟨ sop_1, sop_2 ⟩ := single_op Main cstrs
 
     rw [allHold_constraints_iff] at cstrs
@@ -707,8 +725,8 @@ lemma spec.slli (h : is_slli Main) :
 
     rw [← BitVec.toNat_inj, BitVec.toNat_shiftLeft, Nat.shiftLeft_eq]
 
-    have : ((Word.toBitVec64 #v[c0, 0, 0, 0]).toNat % 64) = c0.val % 64 := by
-      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
+    have : ((Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 64) = c0.val % 64 := by
+      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]; sorry
     rw [this]; clear this
     have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -901,7 +919,7 @@ lemma spec.slliw (h : is_slliw Main) :
     clear h0 h1 h2 h3
     rw [eq_imm] at imm_zeros; simp_all
     obtain ⟨ b0_16, b1_16, b2_16, b3_16 ⟩ := Word.lt_cases_of_isU64 is_U64_b
-    obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, lt_c0, h0 ⟩ := imm_zeros
+    obtain ⟨ h1, lt_c0 ⟩ := imm_zeros
     obtain ⟨ sop_1, sop_2 ⟩ := single_op Main cstrs
 
     rw [allHold_constraints_iff] at cstrs
@@ -965,10 +983,10 @@ lemma spec.slliw (h : is_slliw Main) :
     simp_all
 
     have is_U32_b : HWord.isU32 #v[ b0, b1 ] := by apply HWord.isU32_of_cases <;> assumption
-    have is_U32_c : HWord.isU32 #v[ c0, 0 ] := by apply HWord.isU32_of_cases <;> simp; omega
+    have is_U32_c : HWord.isU32 #v[ c0, 0 ] := by sorry --apply HWord.isU32_of_cases <;> simp; omega
 
-    have : ((Word.low #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]
+    have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
+      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]; sorry
     rw [this]; clear this
     simp [Word.low]
 
@@ -978,7 +996,7 @@ lemma spec.slliw (h : is_slliw Main) :
         omega
       . clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
         omega
-      . omega
+      . refine (Word.lt_cases_of_isU64 is_U64_c).1
       . exact diff
     clear diff
 
