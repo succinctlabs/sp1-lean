@@ -126,7 +126,8 @@ theorem correct_srli
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
-      sorry
+      congr 2
+      omega
 
 end Srli
 
@@ -247,7 +248,11 @@ theorem correct_srliw
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
-      sorry
+      have : (Word.low #v[Main[25], 0, 0, 0]).toBitVec32.toNat % 32 =
+        (Word.low #v[Main[25], Main[26], Main[27], Main[28]]).toBitVec32.toNat % 32 := by
+        simp [Word.low, HWord.toBitVec32, HWord.toNat]
+        omega
+      rw [this]
 
 end Srliw
 
@@ -368,7 +373,8 @@ theorem correct_srai
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
-      sorry
+      congr 2
+      omega
 
 end Srai
 
@@ -489,6 +495,10 @@ theorem correct_sraiw
       simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       simp [bitVecToRegidxVal]
-      sorry
+      have : (Word.low #v[Main[25], 0, 0, 0]).toBitVec32.toNat % 32 =
+        (Word.low #v[Main[25], Main[26], Main[27], Main[28]]).toBitVec32.toNat % 32 := by
+        simp [Word.low, HWord.toBitVec32, HWord.toNat]
+        omega
+      rw [this]
 
 end Sraiw

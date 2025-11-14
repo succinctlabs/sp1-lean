@@ -626,9 +626,12 @@ lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) →
             b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4 ⟩ := cstrs
   clear h0 h1 h2 h3 h4
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . stop
+  .
     obtain ⟨ h0, h1, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+
+    stop
+    sorry
   . clear alu; rcases real with srl | sra | srlw | sraw <;> simp_all
 
 lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
@@ -1185,7 +1188,7 @@ lemma spec.srli (h : is_srli Main ) :
     rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
 
     have : ((Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 64) = c0.val % 64 := by
-      sorry --rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
+      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]; omega
     rw [this]; clear this
     have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -1482,8 +1485,8 @@ lemma spec.srliw (h : is_srliw Main ) :
     simp_all
 
     have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]
-      sorry
+      simp [Word.low, HWord.toBitVec32, HWord.toNat]
+      omega
     rw [this]; clear this
     simp [Word.low]
 
@@ -1771,7 +1774,7 @@ lemma spec.srai (h : is_srai Main ) :
     rw [← BitVec.toInt_inj, BitVec.toInt_sshiftRight, Int.shiftRight_eq_div_pow]
 
     have : ((Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 64) = c0.val % 64 := by
-      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]; sorry
+      rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]; omega
     rw [this]; clear this
     have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
@@ -2143,7 +2146,7 @@ lemma spec.sraiw (h : is_sraiw Main ) :
     simp_all
 
     have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]; sorry
+      simp [Word.low, HWord.toBitVec32, HWord.toNat]; omega
     rw [this]; clear this
     simp [Word.low]
 
