@@ -16,9 +16,6 @@ variable (Main : Vector (Fin KB) 247)
 
 section constraints
 
--- cut 22 23 24
--- add 28
-
 -- Generated Lean code for chip DivRemChip
 @[irreducible] def constraints (Main : Vector (Fin KB) 247) : SP1ConstraintList :=
   let E0 : Fin KB := Main[206] + Main[207]
@@ -1409,7 +1406,7 @@ lemma div_rem
     simp [eq_is_word] at *
     subst lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3
     subst abs_c_alu_event abs_rem_alu_event b_neg rem_neg c_neg
-    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, cond_eq_ite]
+    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, _root_.cond_eq_ite]
     split_ifs at div_zero with nzc <;> simp [div_zero] at *
     . obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
       simp [zc0, zc1, zc2, zc3] at *
@@ -2330,7 +2327,7 @@ lemma divu_remu
     subst lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 abs_c_alu_event abs_rem_alu_event b_neg rem_neg c_neg
     simp [eq_is_overflow] at *
     subst ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 b_neg_not_overflow b_not_neg_not_overflow
-    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, cond_eq_ite]
+    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, Bool.cond_eq_ite]
     split_ifs at div_zero with nzc <;> simp [div_zero] at *
     . obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
       subst c0 c1 c2 c3 q0 q1 q2 q3 r0 r1 r2 r3
@@ -3123,7 +3120,7 @@ lemma divw_remw
     subst abs_c_alu_event abs_rem_alu_event b_neg rem_neg c_neg
     have div_zero' : is_c_0 = if c0 = 0 ∧ c1 = 0 then 1 else 0 := by rw [div_zero, w_eq_msb_c]; clear *-; aesop
     clear div_zero
-    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, cond_eq_ite, -BitVec.toInt_setWidth]
+    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, Bool.cond_eq_ite, -BitVec.toInt_setWidth]
     rw [Word.setWidth_eq_low is_U64_b, Word.setWidth_eq_low is_U64_c]
     have is_U32_bl := Word.isU64_low_isU32 is_U64_b
     have is_U32_cl := Word.isU64_low_isU32 is_U64_c
@@ -4067,7 +4064,7 @@ lemma divuw_remuw
     simp [eq_is_overflow] at *
     subst ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 b_neg_not_overflow b_not_neg_not_overflow; simp at *
     subst maco12 maco13
-    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, cond_eq_ite, -BitVec.toNat_setWidth]
+    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, Bool.cond_eq_ite, -BitVec.toNat_setWidth]
     rw [Word.setWidth_eq_low is_U64_b, Word.setWidth_eq_low is_U64_c]
     have is_U32_bl := Word.isU64_low_isU32 is_U64_b
     have is_U32_cl := Word.isU64_low_isU32 is_U64_c

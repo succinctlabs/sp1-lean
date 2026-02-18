@@ -20,7 +20,7 @@ variable
 
 def spec_mul (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute_MUL rs2 rs1 rd { high := false, signed_rs1 := false, signed_rs2 := false }
+  _ ← execute_MUL rs2 rs1 rd { result_part := .Low, signed_rs1 := .Unsigned, signed_rs2 := .Unsigned }
   pure ()
 
 def sp1_mul : SailM Unit := do
@@ -82,7 +82,7 @@ variable
 
 def spec_mulh (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute_MUL rs2 rs1 rd { high := true, signed_rs1 := true, signed_rs2 := true }
+  _ ← execute_MUL rs2 rs1 rd { result_part := .High, signed_rs1 := .Signed, signed_rs2 := .Signed }
   pure ()
 
 def sp1_mulh : SailM Unit := do
@@ -143,7 +143,7 @@ variable
 
 def spec_mulhu (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute_MUL rs2 rs1 rd { high := true, signed_rs1 := false, signed_rs2 := false }
+  _ ← execute_MUL rs2 rs1 rd { result_part := .High, signed_rs1 := .Unsigned, signed_rs2 := .Unsigned }
   pure ()
 
 def sp1_mulhu : SailM Unit := do
@@ -202,7 +202,7 @@ variable
 
 def spec_mulhsu (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  _ ← execute_MUL rs2 rs1 rd { high := true, signed_rs1 := true, signed_rs2 := false }
+  _ ← execute_MUL rs2 rs1 rd { result_part := .High, signed_rs1 := .Signed, signed_rs2 := .Unsigned }
   pure ()
 
 def sp1_mulhsu : SailM Unit := do

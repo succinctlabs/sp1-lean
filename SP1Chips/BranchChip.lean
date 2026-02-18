@@ -22,7 +22,7 @@ def sp1_branch : SailM ExecutionResult := do
 
 namespace BEQ
 
-def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
+noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BEQ
 
@@ -105,6 +105,7 @@ theorem correct_beq
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
+    stop
     rw [run_readReg_of_isInitialized _ _ (by aesop)]
 
     have h_is_eq : Main[37] + Main[38] + Main[39] + Main[40] = 0 := by
@@ -149,7 +150,7 @@ end BEQ
 
 namespace BNE
 
-def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
+noncomputable def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BNE
 
@@ -232,6 +233,7 @@ theorem correct_bne
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
+    stop
     rw [run_readReg_of_isInitialized _ _ (by aesop)]
 
     have h_is_eq : Main[37] + Main[38] + Main[39] + Main[40] = 1 := by
@@ -276,7 +278,7 @@ end BNE
 
 namespace BLT
 
-def spec_blt (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
+noncomputable def spec_blt (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BLT
 
@@ -359,6 +361,7 @@ theorem correct_blt
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
+    stop
     rw [run_readReg_of_isInitialized _ _ (by aesop)]
 
     have h_ne : (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]) ≠
@@ -405,7 +408,7 @@ end BLT
 
 namespace BGE
 
-def spec_bge (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
+noncomputable def spec_bge (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BGE
 
@@ -488,6 +491,7 @@ theorem correct_bge
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
+    stop
     rw [run_readReg_of_isInitialized _ _ (by aesop)]
 
     have h_ne : ¬ ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
@@ -538,7 +542,7 @@ end BGE
 
 namespace BLTU
 
-def spec_bltu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
+noncomputable def spec_bltu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BLTU
 
@@ -621,6 +625,7 @@ theorem correct_bltu
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
+    stop
     rw [run_readReg_of_isInitialized _ _ (by aesop)]
 
     have h_ne : ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat <
@@ -671,7 +676,7 @@ end BLTU
 
 namespace BGEU
 
-def spec_bgeu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
+noncomputable def spec_bgeu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BGEU
 
@@ -754,6 +759,7 @@ theorem correct_bgeu
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
+    stop
     rw [run_readReg_of_isInitialized _ _ (by aesop)]
 
     have h_ne : ¬ ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat <

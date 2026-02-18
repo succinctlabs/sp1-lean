@@ -57,12 +57,12 @@ set_option hygiene false in
 open Lean Elab Tactic in
 elab "resolve_decomposition" locs:ident* : tactic => do
   let name (loc : Ident) : Ident × Ident × Nat × Ident :=
-    if let pref :: [suff] := loc.getId.toString.split (·='_')
+    if let pref :: [suff] := (loc.getId.toString.split (·='_')).toList
     then (
-      mkIdent (Name.mkSimple (pref ++ suff)),
-      mkIdent (Name.mkSimple (pref ++ "c" ++ suff.drop 1)),
+      mkIdent (Name.mkSimple (pref.toString ++ suff)),
+      mkIdent (Name.mkSimple (pref.toString ++ "c" ++ suff.drop 1)),
       suff.drop 1 |>.toNat!,
-      mkIdent (Name.mkSimple suff)
+      mkIdent (Name.mkSimple suff.toString)
     )
     else default
   for loc in locs do

@@ -164,7 +164,7 @@ lemma spec.branch
       }
     }
   . have spec.signed := spec.signed h_b_isU64 h_d_isU64 cstrs
-
+    stop
     rw [U16MSBOperation.allHold_constraints_iff] at h_b_msb
     rw [U16MSBOperation.allHold_constraints_iff] at h_d_msb
     rcases h_b_msb with ⟨ _, b_msb_b, hb3 ⟩; rcases h_d_msb with ⟨ _, b_msb_d, hd3 ⟩
