@@ -37,8 +37,8 @@ lemma spec.and
       simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-      rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
-      rw [Fin.lt_iff_val_lt_val, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
+      rw [Fin.lt_def, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
+      rw [Fin.lt_def, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
       simp_all
       set b0 := b[0].val % 256; set b1 := b[0].val / 256; set b2 := b[1].val % 256; set b3 := b[1].val / 256
       set b4 := b[2].val % 256; set b5 := b[2].val / 256; set b6 := b[3].val % 256; set b7 := b[3].val / 256
@@ -78,8 +78,8 @@ lemma spec.or
       simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-      rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
-      rw [Fin.lt_iff_val_lt_val, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
+      rw [Fin.lt_def, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
+      rw [Fin.lt_def, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
       simp_all
       set b0 := b[0].val % 256; set b1 := b[0].val / 256; set b2 := b[1].val % 256; set b3 := b[1].val / 256
       set b4 := b[2].val % 256; set b5 := b[2].val / 256; set b6 := b[3].val % 256; set b7 := b[3].val / 256
@@ -119,8 +119,8 @@ lemma spec.xor
       simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
       simp [Fin.val_add, Fin.val_mul]
       repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-      rw [Fin.lt_iff_val_lt_val, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
-      rw [Fin.lt_iff_val_lt_val, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
+      rw [Fin.lt_def, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
+      rw [Fin.lt_def, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
       simp_all
       set b0 := b[0].val % 256; set b1 := b[0].val / 256; set b2 := b[1].val % 256; set b3 := b[1].val / 256
       set b4 := b[2].val % 256; set b5 := b[2].val / 256; set b6 := b[3].val % 256; set b7 := b[3].val / 256

@@ -1,7 +1,6 @@
 import SP1Foundations.Field
 import SP1Foundations.Word
-import LeanRV64D.Prelude
-import LeanRV64D.Sail.Sail
+import LeanRV64D
 
 open BitVec
 

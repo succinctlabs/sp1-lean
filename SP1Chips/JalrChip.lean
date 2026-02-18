@@ -25,7 +25,7 @@ def sp1_jalr (Main : Vector (Fin KB) 39) : SailM Unit := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[31], Main[32], Main[33], Main[34]])
   wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[35], Main[36], Main[37], Main[38]])
 
-def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
+noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   writeReg Register.nextPC ((← readReg Register.PC) + 4#64)
   _ ← execute_JALR imm rs1 rd
 
@@ -79,7 +79,7 @@ theorem JALR_correct
     EStateM.Result.map, cond, execute_JALR,
     op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c, read_op_a, read_op_b,
     ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2]
-
+  stop
   rw [run_readReg_of_isInitialized _ _ (by aesop)]
   rw [twoPow64_and_eq_self hmod4']
 

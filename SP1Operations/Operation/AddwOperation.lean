@@ -40,7 +40,7 @@ theorem spec
       simp [HWord.toBitVec32, Word.low, HWord.toNat]
       rw [← BitVec.toNat_inj, BitVec.toNat_add]
       aesop (add safe (by omega))
-    . simp [Fin.lt_iff_val_lt_val] at hbds
+    . simp [Fin.lt_def] at hbds
       apply U16MSBOperation.spec (by omega) at hmsb
       simp [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
       simp at hmsb; split_ifs at * <;> omega

@@ -1111,10 +1111,10 @@ lemma div_mod_decomposition_w {a b c : Fin KB} :
   intro ub_a ub_c
   constructor
   . intro eq_a
-    simp [Fin.lt_iff_val_lt_val, Fin.ext_iff] at *
+    simp [Fin.lt_def, Fin.ext_iff] at *
     have lb_b : c * 65536 ≤ b := by
       by_contra lb_b
-      simp [Fin.lt_iff_val_lt_val, Fin.sub_def, Fin.mul_def] at *
+      simp [Fin.lt_def, Fin.sub_def, Fin.mul_def] at *
       rw [Nat.mod_eq_of_lt (a := (c : ℕ) * 65536) (by omega)] at eq_a lb_b
       omega
     rw [Fin.sub_val_of_le lb_b] at eq_a

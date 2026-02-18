@@ -57,7 +57,7 @@ theorem correct_lb (Main : Vector (Fin KB) 46)
   have h25 : Main[25] = 1 := by omega
   simp [h25, SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
   obtain ⟨h14, h21, h6, rest⟩ := h_reader
-  simp [Fin.lt_iff_val_lt_val] at rest
+  simp [Fin.lt_def] at rest
 
   have h2728 : ¬ (Main[27] = 0 ∧ Main[28] = 0) := by clear *- h29; aesop
 
@@ -100,14 +100,14 @@ theorem correct_lb (Main : Vector (Fin KB) 46)
       · rw [Fin.val_mul]
         rw [Nat.mod_eq_of_lt (by
           set k := (Main[42] - Main[43]) * 2122383361
-          simp [Fin.lt_iff_val_lt_val] at h34
+          simp [Fin.lt_def] at h34
           omega
         ), add_comm, mul_comm]
         simp
 
       set k := (Main[42] - Main[43]) * 2122383361
       rw [Fin.val_mul]
-      simp [Fin.lt_iff_val_lt_val] at h34
+      simp [Fin.lt_def] at h34
       rw [Nat.mod_eq_of_lt (by omega)]
       omega
 
@@ -150,7 +150,7 @@ theorem correct_lb (Main : Vector (Fin KB) 46)
         rw [h_low_limb, hand] at this
         omega
       clear *- this h256
-      rw [Fin.lt_iff_val_lt_val,
+      rw [Fin.lt_def,
         Fin.sub_val_of_le h256] at this
       simp at this
       -- stop
@@ -241,7 +241,7 @@ theorem correct_lb (Main : Vector (Fin KB) 46)
         rw [h_low_limb, hand] at this
         omega
       clear *- this h256
-      rw [Fin.lt_iff_val_lt_val,
+      rw [Fin.lt_def,
         Fin.sub_val_of_le h256] at this
       simp at this
       -- stop
@@ -342,7 +342,7 @@ theorem correct_lbu (Main : Vector (Fin KB) 46)
   have h25 : Main[25] = 1 := by omega
   simp [h25, SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
   obtain ⟨h14, h21, h6, rest⟩ := h_reader
-  simp [Fin.lt_iff_val_lt_val] at rest
+  simp [Fin.lt_def] at rest
 
   have h2728 : ¬ (Main[27] = 0 ∧ Main[28] = 0) := by clear *- h29; aesop
 
@@ -385,14 +385,14 @@ theorem correct_lbu (Main : Vector (Fin KB) 46)
       · rw [Fin.val_mul]
         rw [Nat.mod_eq_of_lt (by
           set k := (Main[42] - Main[43]) * 2122383361
-          simp [Fin.lt_iff_val_lt_val] at h34
+          simp [Fin.lt_def] at h34
           omega
         ), add_comm, mul_comm]
         simp
 
       set k := (Main[42] - Main[43]) * 2122383361
       rw [Fin.val_mul]
-      simp [Fin.lt_iff_val_lt_val] at h34
+      simp [Fin.lt_def] at h34
       rw [Nat.mod_eq_of_lt (by omega)]
       omega
 
@@ -428,7 +428,7 @@ theorem correct_lbu (Main : Vector (Fin KB) 46)
       rw [h_low_limb, hand] at this
       omega
     clear *- this h256
-    rw [Fin.lt_iff_val_lt_val,
+    rw [Fin.lt_def,
       Fin.sub_val_of_le h256] at this
     simp at this
     -- stop

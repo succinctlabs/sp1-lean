@@ -1,5 +1,5 @@
 import Mathlib
-import LeanRV64D.RiscvInstsEnd
+import LeanRV64D
 import SP1Foundations.Misc
 
 -- dt: should this be a macro instead?
@@ -21,11 +21,11 @@ lemma mem_regs_of_isInitialized {s : SailState}
 structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
   h_mprv_disabled : BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) = 0#1
   h_cur_privilege : s.regs.get Register.cur_privilege (hs _) = Privilege.Machine
-  h_clint_base : s.regs.get Register.plat_clint_base (hs _) = 0
-  h_clint_size : s.regs.get Register.plat_clint_size (hs _) = 0
-  h_plat_ram_base : s.regs.get Register.plat_ram_base (hs _) = 0
-  h_plat_rom_base : s.regs.get Register.plat_rom_base (hs _) = 0
-  h_plat_ram_size : s.regs.get Register.plat_ram_size (hs _) = BitVec.ofNat 64 (2^64 - 1)
+  -- h_clint_base : s.regs.get Register.plat_clint_base (hs _) = 0
+  -- h_clint_size : s.regs.get Register.plat_clint_size (hs _) = 0
+  -- h_plat_ram_base : s.regs.get Register.plat_ram_base (hs _) = 0
+  -- h_plat_rom_base : s.regs.get Register.plat_rom_base (hs _) = 0
+  -- h_plat_ram_size : s.regs.get Register.plat_ram_size (hs _) = BitVec.ofNat 64 (2^64 - 1)
 
 section regidx
 

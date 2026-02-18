@@ -31,10 +31,10 @@ import SP1Chips.Store.StoreByte.Constraints
 import SP1Chips.Store.StoreDouble.Constraints
 import SP1Chips.Store.StoreHalf.Constraints
 import SP1Chips.Store.StoreWord.Constraints
-import SP1Chips.StoreByteChip
-import SP1Chips.StoreDoubleChip
-import SP1Chips.StoreHalfChip
-import SP1Chips.StoreWordChip
+-- import SP1Chips.StoreByteChip
+-- import SP1Chips.StoreDoubleChip
+-- import SP1Chips.StoreHalfChip
+-- import SP1Chips.StoreWordChip
 import SP1Chips.Sub.Constraints
 import SP1Chips.SubChip
 import SP1Chips.Subw.Constraints

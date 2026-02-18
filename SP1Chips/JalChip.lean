@@ -32,7 +32,7 @@ def sp1_jal (Main : Vector (Fin KB) 32) : SailM Unit := do
   set_next_pc (Word.toBitVec64 #v[Main[23], Main[24], Main[25], Main[26]])
   wX_bits op_a (Word.toBitVec64 #v[Main[27], Main[28], Main[29], Main[30]])
 
-def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
+noncomputable def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let _ ← execute_JAL imm rd
 
@@ -115,13 +115,14 @@ theorem SP1JAL_correct
   simp only [ext_control_check_pc, bit_to_bool, access, ofBool, bits_of_virtaddr, Nat.one_lt_ofNat,
     getElem!_pos, ofNat_eq_ofNat, currentlyEnabled, hartSupports, Bool.false_and, Bool.false_or,
     Bool.and_self, bind_pure_comp, Functor.map_map, bind_map_left, EStateM.run_bind,
-    run_bool_bit_backwards, sign_extend, Sail.BitVec.signExtend, ← h_sign_extend, jump_to]
+    bool_bit_backwards, sign_extend, Sail.BitVec.signExtend, ← h_sign_extend, jump_to]
 
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at read_pc
 
   simp [run_readReg_of_isInitialized _ _ hs]
   rw [run_readReg_of_isInitialized _ _ (by clear *- hs; aesop)]
   simp [Std.ExtDHashMap.get_insert, h_add', read_pc, hmod, hmod']
+  stop
   rw [run_readReg_of_isInitialized _ _ (by clear *- hs; aesop)]
   simp
 

@@ -1,7 +1,7 @@
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Assumptions
 
-import LeanRV64D.Defs
+import LeanRV64D
 
 inductive AirInteraction where
   | byte (op : ByteOpcode) (a b c : Fin KB)

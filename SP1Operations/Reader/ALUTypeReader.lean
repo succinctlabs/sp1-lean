@@ -44,7 +44,7 @@ lemma allHold_constraints_iff :
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
    := by
-  simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_iff_val_lt_val]
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_def]
   intros h_is_real
   rcases h_is_real with h | h
   · simp [h]

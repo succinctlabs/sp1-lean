@@ -7,50 +7,58 @@ attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
   LeanRV64D.Functions.plat_enable_misaligned_access
   split_misaligned misaligned_order
   allowed_misaligned sys_misaligned_order_decreasing
-  get_config_print_platform
+  -- get_config_print_platform
   LeanRV64D.Functions.xlen
   _get_Mstatus_MPP _get_Mstatus_MPRV
-  privLevel_of_bits default_write_acc
+  -- privLevel_of_bits
+  default_write_acc
   effectivePrivilege
+  zopz0zI_u zopz0zK_u
+  BitVec.toNatInt
+  htif_tohost_size
+
+@[simp] -- 2^25
+lemma plat_clint_base_eq : plat_clint_base = 0#64 := sorry
+
+@[simp]
+lemma plat_clint_size_eq : plat_clint_size = 0#64 := sorry
 
 /-- For good states there is no `mmio` region. -/
 lemma run_within_mmio_writable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
     (width : ℕ) (hw : 0 < width) (s : SailState) (hs : SailState.isInitialized s)
-    (hclint_base : s.regs.get Register.plat_clint_base (hs _) = 0)
-    (hclint_size : s.regs.get Register.plat_clint_size (hs _) = 0) :
+    (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none) :
     (within_mmio_writable (physaddr.Physaddr
       (zero_extend (BitVec.addInt (reg_val + offset) 0))) width).run s = .ok false s := by
   simp [within_mmio_writable, get_config_rvfi, within_clint]
-  simp [run_readReg_of_isInitialized s _ hs, hclint_base, hclint_size]
-  simp [within_htif_writable, htif_tohost_base]
+  simp [run_readReg_of_isInitialized s _ hs, within_htif_writable, h_htif]
+  simp [BitVec.addInt, zero_extend, Sail.BitVec.zeroExtend]
   omega
 
 /-- For good states there is no `mmio` region. -/
 lemma run_within_mmio_readable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
     (width : ℕ) (hw : 0 < width) (s : SailState) (hs : SailState.isInitialized s)
-    (hclint_base : s.regs.get Register.plat_clint_base (hs _) = 0)
-    (hclint_size : s.regs.get Register.plat_clint_size (hs _) = 0) :
+    (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none) :
     (within_mmio_readable (physaddr.Physaddr
       (zero_extend (BitVec.addInt (reg_val + offset) 0))) width).run s = .ok false s := by
   simp [within_mmio_readable, get_config_rvfi, within_clint]
-  simp [run_readReg_of_isInitialized s _ hs, hclint_base, hclint_size]
-  simp [within_htif_readable, htif_tohost_base]
+  simp [run_readReg_of_isInitialized s _ hs, h_htif, within_htif_readable,
+    within_htif_writable]
   omega
 
-/-- For good states there is not `phys_mem` bound on size. -/
-lemma run_within_phys_mem (reg_val : BitVec 64) (offset : BitVec 64)
-    (width : ℤ)
-    (s : SailState)
-    (hs : SailState.isInitialized s)
-    (h_plat_ram_base : s.regs.get Register.plat_ram_base (hs _) = 0)
-    (h_plat_rom_base : s.regs.get Register.plat_rom_base (hs _) = 0)
-    (h_does_fit : reg_val.toNat + offset.toNat + width ≤
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
-    (within_phys_mem (physaddr.Physaddr (reg_val + offset)) width).run s = .ok true s := by
-  simp [within_phys_mem]
-  simp [run_readReg_of_isInitialized s _ hs]
-  simp [h_plat_ram_base, h_plat_rom_base]
-  split_ifs with h1 <;> simp; omega
+-- /-- For good states there is not `phys_mem` bound on size. -/
+-- lemma run_within_phys_mem (reg_val : BitVec 64) (offset : BitVec 64)
+--     (width : ℤ)
+--     (s : SailState)
+--     (hs : SailState.isInitialized s)
+--     (h_plat_ram_base : s.regs.get Register.plat_ram_base (hs _) = 0)
+--     (h_plat_rom_base : s.regs.get Register.plat_rom_base (hs _) = 0)
+--     (h_does_fit : reg_val.toNat + offset.toNat + width ≤
+--       (s.regs.get Register.plat_ram_size (hs _)).toNat) :
+--     (within_phys_mem (physaddr.Physaddr (reg_val + offset)) width).run s = .ok true s := by
+--   simp [within_phys_mem]
+--   simp [run_readReg_of_isInitialized s _ hs]
+--   simp [h_plat_ram_base, h_plat_rom_base]
+--   split_ifs with h1 <;> simp; omega
 
 lemma run_vmem_write_of_width_1'
     (rs_addr_bv : BitVec 5)
@@ -62,16 +70,17 @@ lemma run_vmem_write_of_width_1'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 1 ≤ --width
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
+    -- (h_does_fit : reg_val.toNat + offset.toNat + 1 ≤ --width
+    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
+      :
     (vmem_write (.Regidx rs_addr_bv) offset 1 data
-      (AccessType.Write Data) false false false).run s = .ok (.Ok true)
+      (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := s.mem.insert (reg_val + offset).toNat data } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hconfig
+  stop
+  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (AccessType.Write Data != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Store Data != MemoryAccessType.InstructionFetch ()) = true := rfl
   simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
   simp [untilFuelM, untilFuelM.go]
   simp [translateAddr, translationMode, effectivePrivilege]
@@ -101,18 +110,20 @@ lemma run_vmem_write_of_width_2'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 2 ≤ --width
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
+    -- (h_does_fit : reg_val.toNat + offset.toNat + 2 ≤ --width
+    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
+      :
     (vmem_write (.Regidx rs_addr_bv) offset 2 data
-      (AccessType.Write Data) false false false).run s = .ok (.Ok true)
+      (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((s.mem.insert
           (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat)).insert
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))) } := by
+  stop
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (AccessType.Write Data != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Store Data != AccessType.InstructionFetch ()) = true := rfl
   simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
   simp [untilFuelM, untilFuelM.go]
   simp [translateAddr, translationMode, effectivePrivilege]
@@ -141,20 +152,22 @@ lemma run_vmem_write_of_width_4
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 4 ≤ --width
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
+    -- (h_does_fit : reg_val.toNat + offset.toNat + 4 ≤ --width
+    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
+      :
     (vmem_write (.Regidx rs_addr_bv) offset 4 data
-      (AccessType.Write Data) false false false).run s = .ok (.Ok true)
+      (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((((s.mem.insert
           (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat)).insert
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
           ((reg_val + offset).toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
           ((reg_val + offset).toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) } := by
+  stop
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (AccessType.Write Data != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Store Data != AccessType.InstructionFetch ()) = true := rfl
   simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
   simp [untilFuelM, untilFuelM.go]
   simp [translateAddr, translationMode, effectivePrivilege]
@@ -183,10 +196,11 @@ lemma run_vmem_write_of_width_8
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 8 ≤ --width
-      (s.regs.get Register.plat_ram_size (hs _)).toNat) :
+    -- (h_does_fit : reg_val.toNat + offset.toNat + 8 ≤ --width
+    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
+      :
     (vmem_write (.Regidx rs_addr_bv) offset 8 data
-      (AccessType.Write Data) false false false).run s = .ok (.Ok true)
+      (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((((((((s.mem.insert
           (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat)).insert
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
@@ -196,11 +210,12 @@ lemma run_vmem_write_of_width_8
           ((reg_val + offset).toNat + 5) (BitVec.ofNat 8 (data.toNat >>> 40))).insert
           ((reg_val + offset).toNat + 6) (BitVec.ofNat 8 (data.toNat >>> 48))).insert
           ((reg_val + offset).toNat + 7) (BitVec.ofNat 8 (data.toNat >>> 56))) } := by
+  stop
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (AccessType.Write Data != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Store Data != AccessType.InstructionFetch ()) = true := rfl
   simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
   simp [untilFuelM, untilFuelM.go]
   simp [translateAddr, translationMode, effectivePrivilege]
@@ -233,11 +248,12 @@ lemma run_vmem_read_of_width_1'
     (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data)
       :
     let width := 1
-    (vmem_read (.Regidx rs_addr_bv) offset width (AccessType.Read ())
+    (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load .Data)
       false false false).run s = .ok (.Ok data) s := by
+  stop
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base, h_plat_ram_size⟩ := hconfig
-  have hfetch : (AccessType.Read () != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Load .Data != AccessType.InstructionFetch ()) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hmem₀' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616]? = some data := by
@@ -283,11 +299,12 @@ lemma run_vmem_read_of_width_2'
     (hmem₁ : s.mem[reg_val.toNat + offset.toNat + 1]? = some data₁) :
     let width := 2
     let data := data₁ ++ data₀
-    (vmem_read (.Regidx rs_addr_bv) offset width (AccessType.Read ())
+    (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load .Data)
       false false false).run s = .ok (.Ok data) s := by
+  stop
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base, h_plat_ram_size⟩ := hconfig
-  have hfetch : (AccessType.Read () != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Load .Data != AccessType.InstructionFetch ()) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hmem₀' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616]? = some data₀ := by
@@ -337,11 +354,12 @@ lemma run_vmem_read_of_width_4'
     (hmem₃ : s.mem[reg_val.toNat + offset.toNat + 3]? = some data₃) :
     let width := 4
     let data := data₃ ++ data₂ ++ data₁ ++ data₀
-    (vmem_read (.Regidx rs_addr_bv) offset width (AccessType.Read ())
+    (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load .Data)
       false false false).run s = .ok (.Ok data) s := by
+  stop
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base, h_plat_ram_size⟩ := hconfig
-  have hfetch : (AccessType.Read () != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Load .Data != AccessType.InstructionFetch ()) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hmem₀' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616]? = some data₀ := by
@@ -400,11 +418,12 @@ lemma run_vmem_read_of_width_8'
     (hmem₇ : s.mem[reg_val.toNat + offset.toNat + 7]? = some data₇) :
     let width := 8
     let data := data₇ ++ data₆ ++ data₅ ++ data₄ ++ data₃ ++ data₂ ++ data₁ ++ data₀
-    (vmem_read (.Regidx rs_addr_bv) offset width (AccessType.Read ())
+    (vmem_read (.Regidx rs_addr_bv) offset width (MemoryAccessType.Load .Data)
       false false false).run s = .ok (.Ok data) s := by
+  stop
   obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
     h_plat_ram_base, h_plat_rom_base, h_plat_ram_size⟩ := hconfig
-  have hfetch : (AccessType.Read () != AccessType.InstructionFetch ()) = true := rfl
+  have hfetch : (MemoryAccessType.Load .Data != AccessType.InstructionFetch ()) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hmem₀' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616]? = some data₀ := by

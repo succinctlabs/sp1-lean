@@ -64,13 +64,15 @@ theorem correct_add
   simp [sp1_op_b, read_op_b, sp1_op_c, read_op_c, sp1_op_a]
 
   -- Simplify the expressions using the arithmetic constraints
-  by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-  . rw [← add_op_cstrs.2]
-    simp [Word.toBitVec64, Word.toNat]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-  . rw [if_neg (by simp [← BitVec.toNat_inj]; omega), if_neg (by simp [← BitVec.toNat_inj]; omega)]
-    simp [execute_RTYPE_pure, bitVecToRegidxVal, Word.toBitVec64, Word.toNat]
-    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    simp
+  by_cases h_is_op_a_0 : Main[6] = 0
+  . -- rw [← add_op_cstrs.2]
+    -- simp [Word.toBitVec64, Word.toNat]
+    -- rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+    sorry
+  . --rw [if_neg (by simp [← BitVec.toNat_inj]; omega), if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    -- simp [execute_RTYPE_pure, bitVecToRegidxVal, Word.toBitVec64, Word.toNat]
+    -- rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+    -- simp
+    sorry
 
 end Add

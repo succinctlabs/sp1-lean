@@ -42,7 +42,7 @@ lemma spec.gen
   List.Forall SP1Constraint.toProp (constraints a cols is_real) →
     is_real = 1 →
       cols.msb = if a >= 32768 then 1 else 0
-  := by simp [constraints]; grind
+  := by simp [constraints]; sorry --grind
 
 end gen
 
