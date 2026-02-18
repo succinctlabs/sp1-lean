@@ -151,16 +151,15 @@ section SailState
 
 /-- Class specifying a number of register values that are expected to be true in the SP1 VM.
 Note: it should be shown inductively that SP1 will preserve these values given the constrains. -/
-class SailState.SP1Config (s : SailState) where
-  is_mem_regs (reg : Register) : reg ∈ s.regs
-  -- dt: we should have a more natural way to express this
-  h_mprv_disabled : BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (is_mem_regs _)) >>> 17) = 0#1
-  h_cur_privilege : s.regs.get Register.cur_privilege (is_mem_regs _) = Privilege.Machine
-  h_clint_base : s.regs.get Register.plat_clint_base (is_mem_regs _) = 0
-  h_clint_size : s.regs.get Register.plat_clint_size (is_mem_regs _) = 0
-  h_plat_rom_base : s.regs.get Register.plat_rom_base (is_mem_regs _) = 0
-  h_plat_ram_base : s.regs.get Register.plat_ram_base (is_mem_regs _) = 2^16
-  h_plat_ram_size : s.regs.get Register.plat_ram_size (is_mem_regs _) = 2^48 - 2^16 - 1
+structure SailState.isValidSP1State (s : SailState) where
+  mem_regs (reg : Register) : reg ∈ s.regs
+  h_cur_privilege : s.regs.get Register.cur_privilege (mem_regs _) = Privilege.Machine
+  h_clint_base : s.regs.get Register.plat_clint_base (mem_regs _) = 0
+  h_clint_size : s.regs.get Register.plat_clint_size (mem_regs _) = 0
+  h_plat_ram_base : s.regs.get Register.plat_ram_base (mem_regs _) = 2^16
+  h_plat_ram_size : s.regs.get Register.plat_ram_size (mem_regs _) = 2^48 - 2^16 - 1
+  h_mprv_disabled : BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (mem_regs _)) >>> 17) = 0#1
+
 
 end SailState
 

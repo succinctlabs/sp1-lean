@@ -626,11 +626,9 @@ lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) →
             b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4 ⟩ := cstrs
   clear h0 h1 h2 h3 h4
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  .
-    obtain ⟨ h0, h1, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+  . obtain ⟨ h0, h1, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-
-    stop
+    stop -- dt: Need to decide how much more to excise in the thm statement.
     sorry
   . clear alu; rcases real with srl | sra | srlw | sraw <;> simp_all
 

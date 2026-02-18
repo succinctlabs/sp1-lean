@@ -25,7 +25,6 @@ inductive SP1Constraint where
   | send (interaction : AirInteraction) (mult : Fin KB)
   /-- Receiving an air interaction -/
   | receive (interaction : AirInteraction) (mult : Fin KB)
-  -- | ofList (cs : List SP1Constraint) : SP1Constraint
   deriving DecidableEq
 
 namespace SP1Constraint
@@ -35,31 +34,19 @@ section toProp
 def toProp : SP1Constraint → Prop
   | .assertZero x => (x = 0)
   | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
-  -- dt: the other send/recv interactions should also imply bounds
-  -- should be based on only running "trusted" programs and what that entails.
-  | (.send (.memory _clk_high _clk_low _addr0 _addr1 _addr2 limb0 limb1 limb2 limb3) mult) =>
+  | .send (.memory _clk_high _clk_low _addr0 _addr1 _addr2 limb0 limb1 limb2 limb3) mult =>
       mult ≠ 0 → Word.isU64 #v[limb0, limb1, limb2, limb3]
-  | .send
-      (.program
-      pc0 pc1 pc2
-      opcode
-      op_a
-      op_b_0 op_b_1 op_b_2 op_b_3
-      op_c_0 op_c_1 op_c_2 op_c_3
-      op_a_0
-      imm_b
-      imm_c)
-      mult =>
-        mult ≠ 0
-        -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
-           ∧ op_a < 32
-           ∧ (op_b_0 < 65536 ∧ op_b_1 < 65536 ∧ op_b_2 < 65536 ∧ op_b_3 < 65536)
-           ∧ (op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ op_c_2 < 65536 ∧ op_c_3 < 65536)
-           ∧ (op_a_0 = 0 ∨ op_a_0 = 1)
-           ∧ (op_a_0 = 1 ↔ op_a = 0)
-           ∧ (imm_b = 0 ∨ imm_b = 1)
-           ∧ (imm_c = 0 ∨ imm_c = 1)
-           ∧ (pc0 % 4 = 0 ∧ (pc0 < 65536 ∧ pc1 < 65536 ∧ pc2 < 65536))
+  | .send (.program pc0 pc1 pc2 opcode op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3
+      op_a_0 imm_b imm_c) mult => mult ≠ 0 ->
+      opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+      ∧ op_a < 32
+      ∧ (op_b_0 < 65536 ∧ op_b_1 < 65536 ∧ op_b_2 < 65536 ∧ op_b_3 < 65536)
+      ∧ (op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ op_c_2 < 65536 ∧ op_c_3 < 65536)
+      ∧ (op_a_0 = 0 ∨ op_a_0 = 1)
+      ∧ (op_a_0 = 1 ↔ op_a = 0)
+      ∧ (imm_b = 0 ∨ imm_b = 1)
+      ∧ (imm_c = 0 ∨ imm_c = 1)
+      ∧ (pc0 % 4 = 0 ∧ (pc0 < 65536 ∧ pc1 < 65536 ∧ pc2 < 65536))
   | _ => True
 
 @[simp] lemma toProp_assertZero (x : Fin KB) :
