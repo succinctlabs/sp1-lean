@@ -49,15 +49,14 @@ theorem JALR_correct
   simp [ITypeReader.constraints, h_is_real, Opcode.ofNat, Nat.ble, Nat.beq,
     SP1Constraint.toProp, sub_eq_zero] at reader_cstrs
 
-  have h6 : Main[6] < 32 := by aesop
-  have h14 : Main[14] < 32 := by aesop
+  have h25 : Main[25] = 1 := (reader_cstrs.2.2.1).resolve_right (by decide) |>.symm
+  have h6 : Main[6] < 32 := (reader_cstrs.2.2.2.1 (by rw [h25]; decide)).2.1
+  have h14 : Main[14] < 32 := (reader_cstrs.2.2.2.1 (by rw [h25]; decide)).1.1
 
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     AddOperation.constraints, ITypeReader.constraints, CPUState.constraints,
     h_is_real, h6, h14] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
-
-  have h25 : Main[25] = 1 := by aesop
   simp [h25] at reader_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at read_op_a read_op_b
 

@@ -495,15 +495,21 @@ lemma cancel_mul_65536_v1 { a b c x : Fin KB } (h_dvd : (x : ℕ) ∣ 65536) : a
   obtain ⟨ z, h_eq ⟩ := h_dvd; rw [h_eq]
   have x_pos : 0 < (x : ℕ) := by nlinarith
   have xz_BB : (x : ℕ) * z < 2130706433 := by nlinarith
-  have h_eq_BB : 65536 = x * z := by simp [Fin.ext_iff, Fin.mul_def]; omega
+  have z_BB : z < 2130706433 := by nlinarith
+  have h_eq_BB : 65536 = x * z := by
+    apply Fin.ext
+    simp [Fin.mul_def, Nat.mod_eq_of_lt z_BB, Nat.mod_eq_of_lt xz_BB]
+    have hz : ((z : Fin 2130706433) : ℕ) = z := Nat.mod_eq_of_lt z_BB
+    rw [hz, Nat.mod_eq_of_lt xz_BB]
+    exact h_eq
   rw [h_eq_BB]
   rw [mul_comm x z, ← mul_assoc, ← right_distrib]
   intro eq; apply mul_right_cancel₀ (by omega) at eq; rw [eq]
   congr
-  rw [Fin.ext_iff]; simp [Fin.mul_def]
-  rw [Nat.mod_eq_of_lt (by nlinarith)]
-  rw [Nat.mod_eq_of_lt (by omega)]
-  aesop
+  rw [Fin.ext_iff]
+  show z % 2130706433 = (↑x * z % 2130706433 / (x.val % 2130706433))
+  rw [Nat.mod_eq_of_lt z_BB, Nat.mod_eq_of_lt xz_BB, Nat.mod_eq_of_lt x.isLt,
+    Nat.mul_div_cancel_left _ x_pos]
 
 lemma cancel_mul_65536_v2 { b c x : Fin KB } (h_dvd : (x : ℕ) ∣ 65536) : b * 65536 + c * x = 0 → b * ((65536 : ℕ) / (x : ℕ)) + c = 0
   := by intro h_eq; symm; apply cancel_mul_65536_v1 <;> aesop
@@ -627,7 +633,8 @@ lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) →
   clear h0 h1 h2 h3 h4
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
   . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
-    rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
+    rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
+      intro h31 <;> exact (h1.2 h31).2.1
   . clear alu; rcases real with srl | sra | srlw | sraw <;> simp_all
 
 lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →

@@ -29,7 +29,7 @@ structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitializ
 
 section regidx
 
-instance : DecidableEq regidx | .Regidx v, .Regidx v' => by simp; infer_instance
+instance : DecidableEq regidx | .Regidx v, .Regidx v' => decidable_of_iff (v = v') (by simp)
 
 /-- Convert a bitvec into the corresponding `RV64` register.
 dt: some of the lemmas below would be nicer if we just mapped `0#5` and `31#5` to diff values. -/

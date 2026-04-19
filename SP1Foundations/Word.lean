@@ -1315,6 +1315,13 @@ lemma byte_decomp_128 (bv : BitVec 128) :
   simp [ofNat_add, ofNat_mul]
   repeat rw [← BitVec.toNat_ushiftRight]
   repeat rw [this, ← BitVec.toNat_umod]; simp [-toNat_umod, -toNat_ushiftRight]
+  have hcast : ∀ (x : BitVec 128),
+      (((x % 256#128).toNat : Fin 2130706433) : ℕ) = (x % 256#128).toNat := by
+    intro x
+    apply Fin.val_cast_of_lt
+    rw [BitVec.toNat_umod]; simp
+    have := Nat.mod_lt x.toNat (show 0 < 256 by omega); omega
+  simp_rw [hcast, BitVec.ofNat_toNat]
   bv_decide
 
 end BitVec

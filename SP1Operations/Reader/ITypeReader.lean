@@ -39,9 +39,11 @@ lemma allHold_constraints_iff :
       · simp [htrust]
         by_cases ha0 : cols.op_a_0 = 0 <;> simp [ha0]
       · simp [htrust]
+        tauto
     · simp [h]
       by_cases htrust : cols.is_trusted = 0
       · simp [htrust]
+        tauto
       · simp [htrust, ← @eq_comm _ cols.is_trusted, and_assoc]
         by_cases hop_a_0 : cols.op_a_0 = 0
         · simp [hop_a_0]

@@ -56,9 +56,12 @@ lemma allHold_constraints_iff :
       · intro himm_c
         simp [himm_c]
     · simp [htrust]
+      intro h1 h2; exfalso
+      rcases h1 with h | h <;> [exact htrust h.symm; (rw [h2] at h; revert h; decide)]
   · simp [h]
     by_cases htrust : cols.is_trusted = 0
     · simp [htrust]
+      intro h; exfalso; revert h; decide
     · simp [htrust, ← @eq_comm _ cols.is_trusted, and_assoc]
       intros
       by_cases hop_a_0 : cols.op_a_0 = 0

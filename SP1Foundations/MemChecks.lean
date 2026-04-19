@@ -3,7 +3,7 @@ import SP1Foundations.Assumptions
 open LeanRV64D.Functions Sail SailState
 
 attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
-  ext_data_get_addr check_misaligned
+  ext_data_get_addr
   LeanRV64D.Functions.plat_enable_misaligned_access
   split_misaligned misaligned_order
   allowed_misaligned sys_misaligned_order_decreasing
@@ -11,7 +11,6 @@ attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
   LeanRV64D.Functions.xlen
   _get_Mstatus_MPP _get_Mstatus_MPRV
   -- privLevel_of_bits
-  default_write_acc
   effectivePrivilege
   zopz0zI_u zopz0zK_u
   BitVec.toNatInt
@@ -31,7 +30,7 @@ lemma run_within_mmio_writable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
       (zero_extend (BitVec.addInt (reg_val + offset) 0))) width).run s = .ok false s := by
   simp [within_mmio_writable, get_config_rvfi, within_clint]
   simp [run_readReg_of_isInitialized s _ hs, within_htif_writable, h_htif]
-  simp [BitVec.addInt, zero_extend, Sail.BitVec.zeroExtend]
+  simp [BitVec.addInt, zero_extend, Sail.BitVec.zeroExtend, Sail.BitVec.toNatInt]
   omega
 
 /-- For good states there is no `mmio` region. -/

@@ -420,13 +420,8 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : 
     aesop
   . rw [Sail.shift_bits_right]
     simp [Word.toBitVec64_toNat h_op2_isU64]
-  . have mod_lt_63 : (63 + (op2.toNat : ℤ) % 64).toNat = 63 + op2.toNat % 64 := by omega
-    have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
-    simp [shift_bits_right_arith, shift_right_arith, Sail.BitVec.toNatInt]
-    rw [BitVec.toNat_setWidth, Word.toBitVec64_toNat (by assumption)]
-    simp
-    rw [mod_lt_63, mod_lt_64]
-    symm; apply bitVec_sshiftright_eq
+  . simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
+    congr 1
 
 set_option debug.skipKernelTC true in
 lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : rop) :
@@ -444,13 +439,8 @@ lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op
     aesop
   . rw [Sail.shift_bits_right]
     simp [BWord.toBitVec64_toNat h_op2_isU64]
-  . have mod_lt_63 : (63 + (op2.toNat : ℤ) % 64).toNat = 63 + op2.toNat % 64 := by omega
-    have mod_lt_64 : (64 + (op2.toNat : ℤ) % 64).toNat = 64 + op2.toNat % 64 := by omega
-    simp [shift_bits_right_arith, shift_right_arith, Sail.BitVec.toNatInt]
-    rw [BitVec.toNat_setWidth, BWord.toBitVec64_toNat (by assumption)]
-    simp
-    rw [mod_lt_63, mod_lt_64]
-    symm; apply bitVec_sshiftright_eq
+  . simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
+    congr 1
 
 /-- `execute_RTYPE` with isolated pure part -/
 def execute_RTYPE' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) : SailM ExecutionResult := do
@@ -525,17 +515,15 @@ lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op :
     have mod_lt_32 : forall x : ℕ, (32 + (x : ℤ) % 32).toNat = 32 + x % 32 := by omega
     rw [Word.setWidth_eq_low h_op1_isU64]
     simp [bitVec_sshiftright_eq]
-    simp [shift_bits_right_arith, shift_right_arith]
-    (repeat rw [BitVec.toNat_ofNat]); simp
-    have : op2.toBitVec64.toNat % 4294967296 % 32 = op2.toBitVec64.toNat % 32 := by omega
-    rw [this]
-    have : (op2.toBitVec64.toNat : ℤ) % 4294967296 % 32 = op2.toBitVec64.toNat % 32 := by omega
-    rw [this, mod_lt_31, mod_lt_32]; simp
-    have : op2.toBitVec64.toNat % 32 = op2.low.toBitVec32.toNat % 32 := by
+    simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
+    have htoNat : (↑op2.toBitVec64.toNat % (32:ℤ)).toNat = op2.toBitVec64.toNat % 32 := by omega
+    rw [htoNat]
+    have hlow : op2.toBitVec64.toNat % 32 = op2.low.toBitVec32.toNat % 32 := by
       simp [Word.toBitVec64, Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
       omega
-    rw [this]
-    congr
+    rw [hlow]
+    symm; rw [bitVec_sshiftright_eq]
+    simp [BitVec.extractLsb, BitVec.setWidth_eq, BitVec.extractLsb', BitVec.toNat_setWidth]
 
 /-- `execute_RTYPEW` with isolated pure part -/
 def execute_RTYPEW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : ropw) : SailM ExecutionResult := do

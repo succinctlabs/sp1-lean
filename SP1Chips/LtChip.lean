@@ -97,7 +97,8 @@ def sp1_op_a : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).2.1
 
 def sp1_op_b : BitVec 5 :=
   by
@@ -109,7 +110,8 @@ def sp1_op_b : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).1.1
 
 def sp1_op_c : BitVec 5 :=
   by
@@ -121,7 +123,8 @@ def sp1_op_c : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).1.2.1
 
 def sp1_slti : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
@@ -217,7 +220,8 @@ def sp1_op_a : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).2.1
 
 def sp1_op_b : BitVec 5 :=
   by
@@ -229,7 +233,8 @@ def sp1_op_b : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).1.1
 
 def sp1_op_c : BitVec 5 :=
   by
@@ -241,7 +246,8 @@ def sp1_op_c : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).1.2.1
 
 def sp1_sltu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
@@ -314,7 +320,8 @@ def sp1_op_a : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).2.1
 
 def sp1_op_b : BitVec 5 :=
   by
@@ -326,7 +333,8 @@ def sp1_op_b : BitVec 5 :=
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
     simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-    omega
+    have h32 : Main[32] = 1 := (sub_eq_zero.mp (alu.2.2.1.resolve_right (by decide))).symm
+    exact (alu.2.2.2.1 (by rw [h32]; decide)).1.1
 
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 

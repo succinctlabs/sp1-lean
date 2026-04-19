@@ -221,6 +221,7 @@ lemma is_trusted_of_constraints (Main : Vector (Fin KB) 46)
   rcases is_real with h | h | h | h | h | h
   all_goals
   · simp [h] at cstrs this
+    have h25 := (cstrs.2.2.2.2.1).resolve_right (by decide)
     simp_all only [add_zero, zero_add]
 
 set_option maxHeartbeats 20000000

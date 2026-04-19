@@ -15,7 +15,10 @@ variable (Main : Vector (Fin KB) 32) (s : SailState)
 lemma op_a_lt32_of_constraints {Main : Vector (Fin KB) 32}
     (h_cstrs : (constraints Main).allHold) (h_is_real : Main[31] = 1) : Main[6].val < 32 := by
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h_cstrs
-  have h22 : Main[22] = 1 := by simp_all [sub_eq_zero]
+  have h22 : Main[22] = 1 := by
+    have h31_22 : Main[31] - Main[22] = 0 :=
+      (h_cstrs.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1).resolve_right (by decide)
+    rw [← h_is_real]; exact (sub_eq_zero.mp h31_22).symm
   have h : Main[6] < 32 := by simp_all only [BB_eq, Fin.isValue, one_ne_zero, sub_self,
     or_true, not_false_eq_true, forall_const, true_or, true_and]
   simp_all only [BB_eq, Fin.isValue, gt_iff_lt]
@@ -58,7 +61,8 @@ theorem SP1JAL_correct
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp, sub_eq_zero,
     h_is_real, Fin.isValue, BB_eq, true_and] at cstrs
 
-  have h22 : Main[22] = 1 := by simp_all only [Fin.isValue]
+  have h22 : Main[22] = 1 := by
+    exact (cstrs.2.2.2.2.2.2.2.2.2.2.2.2.1).resolve_right (by decide) |>.symm
   simp [h22] at *
 
   have h3 : Main[3] < 65536 := by simp_all only
