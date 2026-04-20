@@ -948,7 +948,8 @@ lemma allHold_constraints_iff :
     iterate 3 rw [eq_comm (a := _ * (Main[202] + Main[204] + Main[206] + Main[207]))]
     iterate 3 rw [eq_comm (a := (1 : Fin KB))]
     rw [eq_comm (a := _ * _) (b := Main[246])]
-    simp [neg_eq_zero, mul_comm]
+    simp
+    repeat (first | (congr! 1; exact neg_eq_zero) | (congr! 1))
 
 set_option maxRecDepth 1000000 in
 lemma allHold_constraints_alu_ops :
