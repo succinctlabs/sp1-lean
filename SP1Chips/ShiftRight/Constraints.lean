@@ -744,7 +744,6 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
     apply Word.isU64_of_cases <;> simp_all
   . clear diff eq_bop
     rcases real with hsrl | hsra | hsrlw | hsraw
-    stop
     . simp_all
 
       have a0_16 : (hl0 + ll1 * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1))).val < 65536 := by
@@ -1089,7 +1088,6 @@ lemma spec.srl (h : is_srl Main ) :
     rw [this]; clear this
     rw [Word.toBitVec64_toNat is_U64_a, Word.toBitVec64_toNat is_U64_b]
     simp [Word.toNat]
-    stop
     -- 64-way case split
     rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
     rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -1205,7 +1203,6 @@ lemma spec.srli (h : is_srli Main ) :
     rw [this]; clear this
     rw [Word.toBitVec64_toNat is_U64_a, Word.toBitVec64_toNat is_U64_b]
     simp [Word.toNat]
-    stop
     -- 64-way case split
     rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
     rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -1366,7 +1363,6 @@ lemma spec.srlw (h : is_srlw Main) :
       . rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
         rw [HWord.toBitVec32_toNat is_U32_a, HWord.toBitVec32_toNat is_U32_b]
         rw [this]; clear this h_a3
-        stop
         cases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
         rcases b_cb3 <;> rcases b_cb4 <;> simp_all
 
@@ -1525,7 +1521,6 @@ lemma spec.srliw (h : is_srliw Main ) :
       . rw [← BitVec.toNat_inj, BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
         rw [HWord.toBitVec32_toNat is_U32_a, HWord.toBitVec32_toNat is_U32_b]
         rw [this]; clear this h_a3
-        stop
         cases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
         rcases b_cb3 <;> rcases b_cb4 <;> simp_all
 
@@ -1664,7 +1659,6 @@ lemma spec.sra (h : is_sra Main ) :
       . clear *-; split_ifs <;> omega
 
     by_cases h_neg : 32768 ≤ b3 <;> simp_all
-    stop
     all_goals
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -1818,7 +1812,6 @@ lemma spec.srai (h : is_srai Main ) :
       . clear *-; split_ifs <;> omega
 
     by_cases h_neg : 32768 ≤ b3 <;> simp_all
-    stop
     all_goals
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -2015,7 +2008,6 @@ lemma spec.sraw (h : is_sraw Main) :
             }
 
         by_cases h_neg : 32768 ≤ b1 <;> simp_all
-        stop
         all_goals
           rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
           rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
@@ -2212,7 +2204,6 @@ lemma spec.sraiw (h : is_sraiw Main ) :
             }
 
         by_cases h_neg : 32768 ≤ b1 <;> simp_all
-        stop
         all_goals
           rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
           rcases b_cb3 <;> rcases b_cb4 <;> rcases b_cb5 <;>
