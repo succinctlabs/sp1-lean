@@ -63,97 +63,51 @@ lemma run_vmem_write_of_width_1'
     (rs_addr_bv : BitVec 5)
     (reg_val : BitVec 64) -- thing inside `rs_addr_bv`
     (offset : BitVec 64)
-    (data : BitVec 8) -- bigger for others
+    (data : BitVec 8)
     (s : SailState)
     (hs : SailState.isInitialized s)
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
-    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true) ---width
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    -- (h_does_fit : reg_val.toNat + offset.toNat + 1 ≤ --width
-    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
-      :
+    (h_does_fit : reg_val.toNat + offset.toNat + 1 < 2^64) :
     (vmem_write (.Regidx rs_addr_bv) offset 1 data
       (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := s.mem.insert (reg_val + offset).toNat data } := by
-  stop
-  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hconfig
-  have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
-  have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (MemoryAccessType.Store Data != MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
-  simp [untilFuelM, untilFuelM.go]
-  simp [translateAddr, translationMode, effectivePrivilege]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [privLevel_bits_backwards]
-  simp [h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare]
-  simp [mem_write_ea, write_kind_of_flags, mem_write_value, mem_write_value_meta]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [effectivePrivilege, hfetch, h_mprv_disabled]
-  simp [mem_write_value_priv_meta, checked_mem_write, h_cur_privilege, phys_access_check, SailME.run]
-  simp [LeanRV64D.Functions.sys_pmp_count]
-  simp [pmp_check_machine reg_val offset s hs]
-  simp [run_within_mmio_writable_mmio reg_val offset 1 (by omega) s hs h_clint_base h_clint_size]
-  simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
-  simp [run_within_phys_mem reg_val offset 1 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
-  simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
-    sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
-    PreSail.writeByte, Except.map, BitVec.addInt]
+  -- TODO(sp1-lean): `within_phys_mem` was removed in Sail v4; new `vmem_write` goes
+  -- through `phys_access_check`. Restoring this proof requires fresh work against the
+  -- rewritten memory infrastructure — see VmemUtils.vmem_write_addr.
+  sorry
 
 lemma run_vmem_write_of_width_2'
     (rs_addr_bv : BitVec 5)
-    (reg_val : BitVec 64) -- thing inside `rs_addr_bv`
+    (reg_val : BitVec 64)
     (offset : BitVec 64)
-    (data : BitVec 16) -- bigger for others
+    (data : BitVec 16)
     (s : SailState)
     (hs : SailState.isInitialized s)
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
-    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true) ---width
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    -- (h_does_fit : reg_val.toNat + offset.toNat + 2 ≤ --width
-    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
-      :
+    (h_does_fit : reg_val.toNat + offset.toNat + 2 < 2^64) :
     (vmem_write (.Regidx rs_addr_bv) offset 2 data
       (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((s.mem.insert
           (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat)).insert
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))) } := by
-  stop
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hconfig
-  have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
-  have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (MemoryAccessType.Store Data != AccessType.InstructionFetch ()) = true := rfl
-  simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
-  simp [untilFuelM, untilFuelM.go]
-  simp [translateAddr, translationMode, effectivePrivilege]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [privLevel_bits_backwards]
-  simp [h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare]
-  simp [mem_write_ea, write_kind_of_flags, mem_write_value, mem_write_value_meta]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [effectivePrivilege, hfetch, h_mprv_disabled]
-  simp [mem_write_value_priv_meta, checked_mem_write, h_cur_privilege, phys_access_check, SailME.run]
-  simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
-  simp [run_within_mmio_writable_mmio reg_val offset 2 (by omega) s hs h_clint_base h_clint_size]
-  simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
-  simp [run_within_phys_mem reg_val offset 2 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
-  simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
-    sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
-    PreSail.writeByte, Except.map, BitVec.addInt]
+  -- TODO(sp1-lean): see width_1' for context; proof pending Sail v4 rewrite.
+  sorry
 
 lemma run_vmem_write_of_width_4
     (rs_addr_bv : BitVec 5)
-    (reg_val : BitVec 64) -- thing inside `rs_addr_bv`
+    (reg_val : BitVec 64)
     (offset : BitVec 64)
-    (data : BitVec 32) -- bigger for others
+    (data : BitVec 32)
     (s : SailState)
     (hs : SailState.isInitialized s)
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
-    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true) ---width
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    -- (h_does_fit : reg_val.toNat + offset.toNat + 4 ≤ --width
-    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
-      :
+    (h_does_fit : reg_val.toNat + offset.toNat + 4 < 2^64) :
     (vmem_write (.Regidx rs_addr_bv) offset 4 data
       (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((((s.mem.insert
@@ -161,43 +115,20 @@ lemma run_vmem_write_of_width_4
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
           ((reg_val + offset).toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
           ((reg_val + offset).toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) } := by
-  stop
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hconfig
-  have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
-  have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (MemoryAccessType.Store Data != AccessType.InstructionFetch ()) = true := rfl
-  simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
-  simp [untilFuelM, untilFuelM.go]
-  simp [translateAddr, translationMode, effectivePrivilege]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [privLevel_bits_backwards]
-  simp [h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare]
-  simp [mem_write_ea, write_kind_of_flags, mem_write_value, mem_write_value_meta]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [effectivePrivilege, hfetch, h_mprv_disabled]
-  simp [mem_write_value_priv_meta, checked_mem_write, h_cur_privilege, phys_access_check, SailME.run]
-  simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
-  simp [run_within_mmio_writable_mmio reg_val offset 4 (by omega) s hs h_clint_base h_clint_size]
-  simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
-  simp [run_within_phys_mem reg_val offset 4 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
-  simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
-    sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
-    PreSail.writeByte, Except.map, BitVec.addInt]
+  -- TODO(sp1-lean): see width_1' for context; proof pending Sail v4 rewrite.
+  sorry
 
 lemma run_vmem_write_of_width_8
     (rs_addr_bv : BitVec 5)
-    (reg_val : BitVec 64) -- thing inside `rs_addr_bv`
+    (reg_val : BitVec 64)
     (offset : BitVec 64)
-    (data : BitVec 64) -- bigger for others
+    (data : BitVec 64)
     (s : SailState)
     (hs : SailState.isInitialized s)
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
-    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true) ---width
+    (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    -- (h_does_fit : reg_val.toNat + offset.toNat + 8 ≤ --width
-    --   (s.regs.get Register.plat_ram_size (hs _)).toNat)
-      :
+    (h_does_fit : reg_val.toNat + offset.toNat + 8 < 2^64) :
     (vmem_write (.Regidx rs_addr_bv) offset 8 data
       (MemoryAccessType.Store Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((((((((s.mem.insert
@@ -209,29 +140,8 @@ lemma run_vmem_write_of_width_8
           ((reg_val + offset).toNat + 5) (BitVec.ofNat 8 (data.toNat >>> 40))).insert
           ((reg_val + offset).toNat + 6) (BitVec.ofNat 8 (data.toNat >>> 48))).insert
           ((reg_val + offset).toNat + 7) (BitVec.ofNat 8 (data.toNat >>> 56))) } := by
-  stop
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hconfig
-  have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
-  have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
-  have hfetch : (MemoryAccessType.Store Data != AccessType.InstructionFetch ()) = true := rfl
-  simp [vmem_write, vmem_write_addr, SailME.run, h_reg_val, h_aligned]
-  simp [untilFuelM, untilFuelM.go]
-  simp [translateAddr, translationMode, effectivePrivilege]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [privLevel_bits_backwards]
-  simp [h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare]
-  simp [mem_write_ea, write_kind_of_flags, mem_write_value, mem_write_value_meta]
-  simp [run_readReg_of_isInitialized s _ hs, Std.ExtDHashMap.get?_eq_some_get (hs _)]
-  simp [effectivePrivilege, hfetch, h_mprv_disabled]
-  simp [mem_write_value_priv_meta, checked_mem_write, h_cur_privilege, phys_access_check, SailME.run]
-  simp [LeanRV64D.Functions.sys_pmp_count, pmp_check_machine reg_val offset s hs]
-  simp [run_within_mmio_writable_mmio reg_val offset 8 (by omega) s hs h_clint_base h_clint_size]
-  simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
-  simp [run_within_phys_mem reg_val offset 8 s hs h_plat_ram_base h_plat_rom_base h_does_fit]
-  simp [write_kind_of_flags, phys_mem_write, LeanRV64D.Functions.write_ram,
-    sail_mem_write, PreSail.sail_mem_write, PreSail.writeBytes,
-    PreSail.writeByte, Except.map, BitVec.addInt]
+  -- TODO(sp1-lean): see width_1' for context; proof pending Sail v4 rewrite.
+  sorry
 
 lemma run_vmem_read_of_width_1'
     (rs_addr_bv : BitVec 5)

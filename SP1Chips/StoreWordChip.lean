@@ -26,7 +26,8 @@ def sp1_sb (Main : Vector (Fin KB) 46) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   let addr : BitVec 64 := Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0]
-  Sail.write_ram 64 4 0#64 addr (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
+  Sail.ConcurrencyInterfaceV1.write_ram 64 4 0#64 addr
+    (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
   return RETIRE_SUCCESS
 
 theorem correct (Main : Vector (Fin KB) 46)
@@ -38,8 +39,7 @@ theorem correct (Main : Vector (Fin KB) 46)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
-      let ram_size := (s.regs.get Register.plat_ram_size (hs _)).toNat
-      reg_val + offset + 4 ≤ ram_size)
+      reg_val + offset + 4 < 2^64)
     -- dt: This should eventually come from trusted instruction assumption
     -- should try to simplify it more first to minimize assumptions though
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
@@ -52,8 +52,7 @@ theorem correct (Main : Vector (Fin KB) 46)
   extract_lets op_a op_b imm_c
 
   -- Extract the facts about the config registers in the state
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_clint_base, h_clint_size,
-    h_plat_ram_base, h_plat_rom_base⟩ := hs_config
+  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
 
   -- Extract the main constraints from the chip
   rw [StoreWord.constraints] at h_cstrs
@@ -65,7 +64,7 @@ theorem correct (Main : Vector (Fin KB) 46)
   -- Extract constraints about the reader
   simp [ITypeReaderImmutable.constraints,
       SP1Constraint.toProp, Opcode.ofNat, Nat.ble, Nat.beq] at h_reader
-  have hprot : Main[25] = 1 := by clear *- h_reader; simp_all only [sub_eq_zero]
+  have hprot : Main[25] = 1 := by have := h_reader.2.2.1.resolve_right (by decide); omega
   simp [hprot] at *
   have h_imm_c : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21]) := by
@@ -107,8 +106,8 @@ theorem correct (Main : Vector (Fin KB) 46)
     (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])]
 
   -- Arithmetic Caclulations
-  · simp [sp1_sb, h_imm_c, imm_c, sp1_imm_c, Sail.write_ram, PreSail.write_ram,
-      PreSail.writeBytes, PreSail.writeByte]
+  · simp [sp1_sb, h_imm_c, imm_c, sp1_imm_c, Sail.ConcurrencyInterfaceV1.write_ram,
+      PreSail.write_ram, PreSail.writeBytes, PreSail.writeByte]
     constructor
     · simp [Word.toBitVec64, Word.toNat, Fin.val_add]
       refine congr_arg (BitVec.ofNat 64) ?_
