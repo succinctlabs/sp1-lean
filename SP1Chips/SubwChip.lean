@@ -63,11 +63,12 @@ theorem correct_subw
     rw [h_is_real] at *
     apply SubwOperation.spec is_U64_b is_U64_c at subw_op_cstrs
     obtain ⟨ is_U32_val, is_subw, is_msb ⟩ := subw_op_cstrs
-    simp_all [BitVec.ofNatLT_eq_ofNat]
-    stop
+    simp_all
+
     -- Now the monadic manipulation
     simp [spec_subw, sp1_subw, execute, execute_RTYPEW']
     rw [Sail.run_readReg, read_pc]
+    simp only [BitVec.ofNatLT_eq_ofNat] at *
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
