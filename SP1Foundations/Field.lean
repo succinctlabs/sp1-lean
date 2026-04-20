@@ -15,33 +15,15 @@ instance : NeZero KB := by constructor; decide
 instance : Field (Fin KB) := ZMod.instField KB
 instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
 
-section const_vals
-
-lemma val_16 : ((16 : Fin KB) : ℕ) = 16 := rfl
-lemma val_256 : ((256 : Fin KB) : ℕ) = 256 := rfl
-lemma val_32768 : ((32768 : Fin KB) : ℕ) = 32768 := rfl
-lemma val_65536 : ((65536 : Fin KB) : ℕ) = 65536 := rfl
-
-lemma ne_zero_2 : (2 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_4 : (4 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_8 : (8 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_16 : (16 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_32 : (32 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_64 : (64 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_128 : (128 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_256 : (256 : Fin KB) ≠ 0 := by simp
-lemma ne_zero_65536 : (65536 : Fin KB) ≠ 0 := by simp
-
-end const_vals
-
 lemma val_mod4_eq_zero (x : Fin KB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
   rw [← Fin.val_inj]
   simp only [BB_eq, Fin.isValue, Fin.mod_val, Fin.coe_ofNat_eq_mod, Nat.reduceMod, Nat.zero_mod]
 
-@[aesop safe forward]
-lemma mul_diff_one_neq {a b c : Fin KB} : a * (b - c) = 1 → b ≠ c := by aesop
-
 end KoalaBear
+
+@[aesop safe forward]
+lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
+    a * (b - c) = 1 → b ≠ c := by aesop
 
 @[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin KB) <<< 1 = 1 := rfl
 @[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin KB) <<< 2 = 1 := rfl
@@ -74,15 +56,15 @@ lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := by native_decide
 @[simp] lemma mul_inv_16BB_eq_one : 65536 * (2130673921 : Fin KB) = 1 := by rfl
 
 @[simp] lemma inv_mul_1BB_eq_iff : (1065353217 : Fin KB) * x = 1 ↔ x = 2 := by
-  rw [inv_1BB_eq', inv_mul_eq_one₀ KoalaBear.ne_zero_2, eq_comm]
+  rw [inv_1BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 @[simp] lemma inv_mul_2BB_eq_iff : (1598029825 : Fin KB) * x = 1 ↔ x = 4 := by
-  rw [inv_2BB_eq', inv_mul_eq_one₀ KoalaBear.ne_zero_4, eq_comm]
+  rw [inv_2BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 @[simp] lemma inv_mul_3BB_eq_iff : (1864368129 : Fin KB) * x = 1 ↔ x = 8 := by
-  rw [inv_3BB_eq', inv_mul_eq_one₀ KoalaBear.ne_zero_8, eq_comm]
+  rw [inv_3BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 @[simp] lemma inv_mul_8BB_eq_iff : (2122383361 : Fin KB) * x = 1 ↔ x = 256 := by
-  rw [inv_8BB_eq', inv_mul_eq_one₀ KoalaBear.ne_zero_256, eq_comm]
+  rw [inv_8BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 @[simp] lemma inv_mul_16BB_eq_iff : (2130673921 : Fin KB) * x = 1 ↔ x = 65536 := by
-  rw [inv_16BB_eq', inv_mul_eq_one₀ KoalaBear.ne_zero_65536, eq_comm]
+  rw [inv_16BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 
 @[simp] lemma inv_mul_1BB_eq_iff' : x * (1065353217 : Fin KB) = 1 ↔ x = 2 := by
   rw [mul_comm, inv_mul_1BB_eq_iff]
