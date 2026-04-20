@@ -19,6 +19,6 @@ lemma spec.gen
   List.Forall SP1Constraint.toProp (constraints a cols is_real) →
     is_real = 1 →
       cols.result = if a = #v[(0 : Fin KB), (0 : Fin KB), (0 : Fin KB), (0 : Fin KB)] then 1 else 0
-  := by simp [constraints]; sorry --grind
+  := by simp [constraints]; intros; subst_vars; grind
 
 end IsZeroWordOperation

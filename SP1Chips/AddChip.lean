@@ -57,22 +57,23 @@ theorem correct_add
 
   rw [h_is_real] at *
   apply AddOperation.spec (by aesop) (by aesop) at add_op_cstrs
+  obtain ⟨ is_U64_val, is_add ⟩ := add_op_cstrs
 
   -- Simplify the monadic operations
-  simp [spec_add, sp1_add, execute, execute_RTYPE']
+  simp [spec_add, sp1_add, execute_RTYPE']
   rw [run_readReg, read_pc]
   simp [sp1_op_b, read_op_b, sp1_op_c, read_op_c, sp1_op_a]
 
   -- Simplify the expressions using the arithmetic constraints
-  by_cases h_is_op_a_0 : Main[6] = 0
-  . -- rw [← add_op_cstrs.2]
-    -- simp [Word.toBitVec64, Word.toNat]
-    -- rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    sorry
-  . --rw [if_neg (by simp [← BitVec.toNat_inj]; omega), if_neg (by simp [← BitVec.toNat_inj]; omega)]
-    -- simp [execute_RTYPE_pure, bitVecToRegidxVal, Word.toBitVec64, Word.toNat]
-    -- rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    -- simp
-    sorry
+  by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
+  . rw [← is_add]
+    simp [Word.toBitVec64, Word.toNat]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+  . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    simp [Word.toBitVec64, Word.toNat]
+    rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+    simp
+    rfl
 
 end Add
