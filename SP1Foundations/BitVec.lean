@@ -46,6 +46,9 @@ theorem twoPow64_and_eq_self {a b : BitVec 64} (h : (a + b) % 4 = 0) :
 theorem add_mod4_eq_zero_of_mod4_eq_zero {a b : BitVec 64}
     (ha : a % 4 = 0) (hb : b % 4 = 0) : (a + b) % 4 = 0 := by bv_decide
 
+theorem mod4_eq_zero_of_0_1_are_0 {x : BitVec 64} (h0 : x[0] = false) (h1 : x[1] = false) :
+    x % 4 = 0 := by bv_decide
+
 theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧ x[1] = false := by
   have hx' : x.toNat % 4 = 0 := by bv_omega
   apply And.intro
