@@ -85,7 +85,7 @@ theorem SP1JAL_correct
     refine (mul4_means_0_1_are_0 ?_).2
     simp [hpc]
     refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
-    · simp [ofNat_eq_ofNat, KoalaBear.val_mod4_eq_zero]
+    · simp [ofNat_eq_ofNat, Fin.val_mod_eq_zero_iff_of_lt (show 4 < KB by decide)]
       simp_all only []
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [BB_eq, Fin.isValue, true_and]
@@ -95,7 +95,7 @@ theorem SP1JAL_correct
     refine (mul4_means_0_1_are_0 ?_).1
     simp [hpc]
     refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
-    · simp [ofNat_eq_ofNat, KoalaBear.val_mod4_eq_zero]
+    · simp [ofNat_eq_ofNat, Fin.val_mod_eq_zero_iff_of_lt (show 4 < KB by decide)]
       simp_all only [BB_eq, Fin.isValue, true_and]
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [BB_eq, Fin.isValue, true_and]
