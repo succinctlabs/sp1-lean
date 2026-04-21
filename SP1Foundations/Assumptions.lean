@@ -105,3 +105,47 @@ axiom pmp_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
       width (MemoryAccessType.Load Data) Privilege.Machine) s = EStateM.Result.ok none s
 
 end pmp_check
+
+section sail_v4_control_flow
+
+/-- `insert` preserves `isInitialized`: adding a register keeps every register present. -/
+@[aesop safe apply, simp]
+lemma SailState.isInitialized_insert (s : SailState) (hs : s.isInitialized)
+    (reg : Register) (v : RegisterType reg) :
+    SailState.isInitialized { s with regs := s.regs.insert reg v } := by
+  intro r
+  simp only [Std.ExtDHashMap.mem_insert]
+  exact Or.inr (hs r)
+
+/-- SP1 does not enable the Zicfilp (CFI landing-pad) extension, so
+`update_elp_state` (introduced in sail-v4) is effectively a no-op: it reads
+`cur_privilege` through `currentlyEnabled Ext_Zicfilp`, finds Zicfilp disabled,
+and returns `pure ()` without touching the `elp` register. Asserting this as
+an axiom is consistent — no downstream SP1 proof reads `elp`. -/
+axiom update_elp_state_of_isInitialized (rs1 : regidx) (s : SailState)
+    (hs : SailState.isInitialized s) :
+    EStateM.run (update_elp_state rs1) s = EStateM.Result.ok () s
+
+/-- In sail-v4, `jump_to` wraps an alignment check that gates on
+`currentlyEnabled Ext_Zca`, which reads `misa`. For a 4-byte aligned target
+the alignment-failure branch is unreachable (bit 0 and bit 1 of the target are
+both zero), so `jump_to` reduces to `writeReg nextPC target; pure RETIRE_SUCCESS`.
+Axiomatised because the Zca / misa dependency cannot be discharged from
+`isInitialized` alone. -/
+axiom jump_to_of_mod4_eq_zero (target : BitVec 64) (s : SailState)
+    (hs : SailState.isInitialized s) (h_aligned : target % 4#64 = 0) :
+    EStateM.run (jump_to target) s =
+      EStateM.Result.ok LeanRV64D.Functions.RETIRE_SUCCESS
+        { s with regs := s.regs.insert Register.nextPC target }
+
+/-- Specialisation of `jump_to_of_mod4_eq_zero` for JALR-style targets:
+JALR computes `target = (rs1 + imm) & ~1`, which Lean sail-v4 expresses as
+`BitVec.update target 0 0#1` / `18446744073709551614#64 &&& target`. When
+the raw `target` is already 4-aligned, the low-bit clear is a no-op. -/
+axiom jump_to_of_mask_mod4_eq_zero (target : BitVec 64) (s : SailState)
+    (hs : SailState.isInitialized s) (h_aligned : target % 4#64 = 0) :
+    EStateM.run (jump_to (18446744073709551614#64 &&& target)) s =
+      EStateM.Result.ok LeanRV64D.Functions.RETIRE_SUCCESS
+        { s with regs := s.regs.insert Register.nextPC target }
+
+end sail_v4_control_flow

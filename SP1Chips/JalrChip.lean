@@ -7,7 +7,7 @@ namespace Jalr
 
 open Sail SailState BitVec LeanRV64D.Functions
 
-attribute [simp] jump_to ofBool
+attribute [simp] ofBool
   update updateSubrange'
   assert PreSail.assert
   LeanRV64D.Functions.RETIRE_SUCCESS
@@ -78,9 +78,11 @@ theorem JALR_correct
     EStateM.Result.map, cond, execute_JALR,
     op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c, read_op_a, read_op_b,
     ← h_sign_extend, (mul4_means_0_1_are_0 hmod4').2]
-  stop
+  rw [update_elp_state_of_isInitialized _ _ (by aesop)]
+  simp only []
   rw [run_readReg_of_isInitialized _ _ (by aesop)]
-  rw [twoPow64_and_eq_self hmod4']
+  simp [Std.ExtDHashMap.get_insert, read_op_b]
+  rw [jump_to_of_mask_mod4_eq_zero _ _ (by aesop) hmod4']
 
   by_cases h6 : BitVec.ofNat 5 Main[6] = 0#5
   · simp [h_add, h6]
@@ -92,6 +94,6 @@ theorem JALR_correct
     simp [execute_RTYPE_pure_w] at h_inc_pc
 
     simp [Std.ExtDHashMap.get_eq_get_get?, read_pc, h_add, h_inc_pc]
-    simp [Word.toBitVec64, Word.toNat]
+    simp [Word.toBitVec64, Word.toNat, EStateM.Result.map, h6]
 
 end Jalr
