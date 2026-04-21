@@ -10,6 +10,21 @@ open Sail SailState BitVec LeanRV64D.Functions
 attribute [simp] jump_to assert PreSail.assert ofBool
   zopz0zI_s zopz0zKzJ_s zopz0zKzJ_u zopz0zI_u
 
+-- Close the branching-case address equation `PC + signExtend imm = #v[Main[26..28], 0]`
+-- by converting sign-extended immediate to its limb form (via `reader_cstrs`), pushing the
+-- BitVec equality down to `Nat` arithmetic, and discharging with `omega` over the PC, immediate,
+-- and chip-output limb bounds plus the `h_limb0..h_limb3, h_bound_checks` chip constraints.
+-- The macro expects the ambient setup from each `correct_b*` proof: local `imm` let-binding,
+-- `reader_cstrs`, `h_pc_0..h_pc_2`, `h_imm_0..h_imm_3`, `h_limb0..h_limb3`, `h_bound_checks`, `h26`.
+set_option hygiene false in
+local macro "close_branch_addr_eq" : tactic => `(tactic| (
+  unfold imm
+  rw [sp1_imm, ← reader_cstrs.1.1.1]
+  simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
+  clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
+    h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
+  omega))
+
 variable (Main : Vector (Fin KB) 46)
 
 def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6]
@@ -107,8 +122,9 @@ theorem correct_beq
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
-    stop
-    rw [run_readReg_of_isInitialized _ _ (by aesop)]
+    rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
+      (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
+    simp only [Std.ExtDHashMap.insert_insert]
 
     have h_is_eq : Main[37] + Main[38] + Main[39] + Main[40] = 0 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
@@ -121,13 +137,10 @@ theorem correct_beq
     have h26 : Main[26].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
 
-    unfold imm
-    rw [sp1_imm, ← reader_cstrs.1.1.1]
-    simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
-
-    clear * - h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
-      h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    omega
+    have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
+        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+      close_branch_addr_eq
+    rw [h_addr_eq]
 
   · have h_is_neq : (Main[37] + Main[38] + Main[39] + Main[40]) = 1 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
@@ -235,8 +248,9 @@ theorem correct_bne
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
-    stop
-    rw [run_readReg_of_isInitialized _ _ (by aesop)]
+    rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
+      (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
+    simp only [Std.ExtDHashMap.insert_insert]
 
     have h_is_eq : Main[37] + Main[38] + Main[39] + Main[40] = 1 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
@@ -249,13 +263,10 @@ theorem correct_bne
     have h26 : Main[26].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
 
-    unfold imm
-    rw [sp1_imm, ← reader_cstrs.1.1.1]
-    simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
-
-    clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
-      h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    omega
+    have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
+        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+      close_branch_addr_eq
+    rw [h_addr_eq]
 
   · have h_is_neq : (Main[37] + Main[38] + Main[39] + Main[40]) = 0 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
@@ -363,8 +374,9 @@ theorem correct_blt
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
-    stop
-    rw [run_readReg_of_isInitialized _ _ (by aesop)]
+    rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
+      (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
+    simp only [Std.ExtDHashMap.insert_insert]
 
     have h_ne : (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]) ≠
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) := by
@@ -381,13 +393,10 @@ theorem correct_blt
     have h26 : Main[26].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
 
-    unfold imm
-    rw [sp1_imm, ← reader_cstrs.1.1.1]
-    simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
-
-    clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
-      h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    omega
+    have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
+        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+      close_branch_addr_eq
+    rw [h_addr_eq]
 
   · simp [h_eq]
 
@@ -493,8 +502,9 @@ theorem correct_bge
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
-    stop
-    rw [run_readReg_of_isInitialized _ _ (by aesop)]
+    rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
+      (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
+    simp only [Std.ExtDHashMap.insert_insert]
 
     have h_ne : ¬ ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toInt) := by
@@ -511,13 +521,10 @@ theorem correct_bge
     have h26 : Main[26].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
 
-    unfold imm
-    rw [sp1_imm, ← reader_cstrs.1.1.1]
-    simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
-
-    clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
-      h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    omega
+    have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
+        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+      close_branch_addr_eq
+    rw [h_addr_eq]
 
   · simp [h_eq]
 
@@ -627,8 +634,9 @@ theorem correct_bltu
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
-    stop
-    rw [run_readReg_of_isInitialized _ _ (by aesop)]
+    rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
+      (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
+    simp only [Std.ExtDHashMap.insert_insert]
 
     have h_ne : ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat <
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
@@ -645,13 +653,10 @@ theorem correct_bltu
     have h26 : Main[26].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
 
-    unfold imm
-    rw [sp1_imm, ← reader_cstrs.1.1.1]
-    simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
-
-    clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
-      h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    omega
+    have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
+        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+      close_branch_addr_eq
+    rw [h_addr_eq]
 
   · simp [h_eq]
 
@@ -761,8 +766,9 @@ theorem correct_bgeu
   · simp [h_eq]
     rw [run_readReg]
     simp [Std.ExtDHashMap.get?_insert, h_pc_read, h_next_pc_b0, h_next_pc_b1]
-    stop
-    rw [run_readReg_of_isInitialized _ _ (by aesop)]
+    rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
+      (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
+    simp only [Std.ExtDHashMap.insert_insert]
 
     have h_ne : ¬ ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat <
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
@@ -779,13 +785,10 @@ theorem correct_bgeu
     have h26 : Main[26].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
 
-    unfold imm
-    rw [sp1_imm, ← reader_cstrs.1.1.1]
-    simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
-
-    clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
-      h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-    omega
+    have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
+        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+      close_branch_addr_eq
+    rw [h_addr_eq]
 
   · simp [h_eq]
 
