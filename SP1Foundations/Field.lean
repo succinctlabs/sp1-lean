@@ -3,6 +3,22 @@ import SP1Foundations.Misc
 notation "KB" => 2130706433
 @[simp] lemma BB_eq : KB = 2130706433 := rfl
 
+/-- `Fin n`-level mod equals zero iff the underlying `Nat` mod does. Generic over any
+`Fin n`; the only dependence was on `(m : Fin n).val = m.val`. Useful because the
+statement naturally arises when bridging between bitvector and modular views. -/
+lemma Fin.val_mod_eq_zero_iff {n : ℕ} [NeZero n] (x m : Fin n) :
+    x.val % m.val = 0 ↔ x % m = 0 := by
+  rw [← Fin.val_inj]; simp [Fin.mod_val]
+
+/-- Literal-compatible variant of `Fin.val_mod_eq_zero_iff`: takes the modulus as a `ℕ`
+literal (rather than `m.val` for some `m : Fin n`). The Nat-literal form of `m` on the
+LHS is what SP1 chip proofs actually see (e.g. `Main[i].val % 4 = 0`), so this is the
+version that fires in `simp` calls. -/
+lemma Fin.val_mod_eq_zero_iff_of_lt {n : ℕ} [NeZero n] {x : Fin n} {m : ℕ} (hm : m < n) :
+    x.val % m = 0 ↔ x % (Fin.ofNat n m) = 0 := by
+  conv_lhs => rw [show m = (Fin.ofNat n m).val from (Nat.mod_eq_of_lt hm).symm]
+  exact Fin.val_mod_eq_zero_iff x (Fin.ofNat n m)
+
 namespace KoalaBear
 
 -- dt: Need `#eval`-level `native_decide` strength to make this work on all OS
@@ -15,9 +31,8 @@ instance : NeZero KB := by constructor; decide
 instance : Field (Fin KB) := ZMod.instField KB
 instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
 
-lemma val_mod4_eq_zero (x : Fin KB) : x.val % 4 = 0 ↔ x % 4 = 0 := by
-  rw [← Fin.val_inj]
-  simp only [BB_eq, Fin.isValue, Fin.mod_val, Fin.coe_ofNat_eq_mod, Nat.reduceMod, Nat.zero_mod]
+lemma val_mod4_eq_zero (x : Fin KB) : x.val % 4 = 0 ↔ x % 4 = 0 :=
+  Fin.val_mod_eq_zero_iff x 4
 
 end KoalaBear
 
@@ -25,23 +40,30 @@ end KoalaBear
 lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
     a * (b - c) = 1 → b ≠ c := by aesop
 
+/-- `Fin (n + 1)` is a field whenever `n + 1` is prime — via `ZMod.instField`, noting
+that `ZMod (n + 1)` is definitionally `Fin (n + 1)`. Avoids having to restate a
+`Field (Fin p)` instance for each specific prime `p` (e.g. `Field (Fin KB)` above
+reduces to an application of this instance). -/
+instance Fin.instField {n : ℕ} [Fact (Nat.Prime (n + 1))] : Field (Fin (n + 1)) :=
+  ZMod.instField (n + 1)
+
 @[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin KB) <<< 1 = 1 := rfl
 @[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin KB) <<< 2 = 1 := rfl
 @[simp] lemma shiftl_3BB_eq_one : (1864368129 : Fin KB) <<< 3 = 1 := rfl
 @[simp] lemma shiftl_8BB_eq_one : (2122383361 : Fin KB) <<< 8 = 1 := rfl
 @[simp] lemma shiftl_16BB_eq_one : (2130673921 : Fin KB) <<< 16 = 1 := rfl
 
-lemma inv_1BB_eq : (1065353217 : Fin KB)⁻¹ = 2 := by native_decide
-lemma inv_2BB_eq : (1598029825 : Fin KB)⁻¹ = 4 := by native_decide
-lemma inv_3BB_eq : (1864368129 : Fin KB)⁻¹ = 8 := by native_decide
-lemma inv_8BB_eq : (2122383361 : Fin KB)⁻¹ = 256 := by native_decide
-lemma inv_16BB_eq : (2130673921 : Fin KB)⁻¹ = 65536 := by native_decide
+lemma inv_1BB_eq : (1065353217 : Fin KB)⁻¹ = 2 := inv_eq_of_mul_eq_one_right (by rfl)
+lemma inv_2BB_eq : (1598029825 : Fin KB)⁻¹ = 4 := inv_eq_of_mul_eq_one_right (by rfl)
+lemma inv_3BB_eq : (1864368129 : Fin KB)⁻¹ = 8 := inv_eq_of_mul_eq_one_right (by rfl)
+lemma inv_8BB_eq : (2122383361 : Fin KB)⁻¹ = 256 := inv_eq_of_mul_eq_one_right (by rfl)
+lemma inv_16BB_eq : (2130673921 : Fin KB)⁻¹ = 65536 := inv_eq_of_mul_eq_one_right (by rfl)
 
-lemma inv_1BB_eq' : (1065353217 : Fin KB) = 2⁻¹ := by native_decide
-lemma inv_2BB_eq' : (1598029825 : Fin KB) = 4⁻¹ := by native_decide
-lemma inv_3BB_eq' : (1864368129 : Fin KB) = 8⁻¹ := by native_decide
-lemma inv_8BB_eq' : (2122383361 : Fin KB) = 256⁻¹ := by native_decide
-lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := by native_decide
+lemma inv_1BB_eq' : (1065353217 : Fin KB) = 2⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
+lemma inv_2BB_eq' : (1598029825 : Fin KB) = 4⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
+lemma inv_3BB_eq' : (1864368129 : Fin KB) = 8⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
+lemma inv_8BB_eq' : (2122383361 : Fin KB) = 256⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
+lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
 
 @[simp] lemma inv_mul_1BB_eq_one : (1065353217 : Fin KB) * 2 = 1 := by rfl
 @[simp] lemma inv_mul_2BB_eq_one : (1598029825 : Fin KB) * 4 = 1 := by rfl

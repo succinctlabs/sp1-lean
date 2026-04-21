@@ -69,13 +69,21 @@ theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧
 
 end BitVec
 
+/-- Absorbing a concrete bitvec constant `c` into a `Fin n`-based `BitVec.ofNat`
+expression. The only dependence on the modulus is the no-wrap hypothesis
+`x.val + c.val < n`; generic version of `add4_into_pc_ofNat`. -/
+lemma Fin.BitVec_ofNat_add_eq_add_ofNat {n : ℕ} [NeZero n] (x c : Fin n) {y z : ℕ}
+    (hx : x.val + c.val < n) :
+    BitVec.ofNat 64 (x.val + y + z) + BitVec.ofNat 64 c.val =
+      BitVec.ofNat 64 ((x + c).val + y + z) := by
+  rw [Fin.val_add, Nat.mod_eq_of_lt hx]
+  simp [BitVec.ofNat_add]; ring_nf
+
 namespace KoalaBear
 
-lemma add4_into_pc_ofNat {x : Fin KB} {y z : ℕ} : x < 65536 →
-  BitVec.ofNat 64 (x.val + y + z) + 4#64 = BitVec.ofNat 64 ((x + 4).val + y + z) := by
-  intros
-  rw [Fin.val_add, Nat.mod_eq_of_lt (by omega)]
-  simp [ofNat_add]; ring_nf
+lemma add4_into_pc_ofNat {x : Fin KB} {y z : ℕ} (hx : x < 65536) :
+    BitVec.ofNat 64 (x.val + y + z) + 4#64 = BitVec.ofNat 64 ((x + 4).val + y + z) :=
+  Fin.BitVec_ofNat_add_eq_add_ofNat x 4 (by omega)
 
 end KoalaBear
 

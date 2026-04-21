@@ -81,12 +81,15 @@ theorem SP1JAL_correct
       Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]) % 4 = 0 := by
     simp
     refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
-    · simp [ofNat_eq_ofNat, KoalaBear.val_mod4_eq_zero]
+    · simp [ofNat_eq_ofNat, Fin.val_mod_eq_zero_iff_of_lt (show 4 < KB by decide)]
       simp_all only []
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [Fin.isValue, true_and]
+
   have hmod  := (mul4_means_0_1_are_0 hmod4).2
   have hmod' := (mul4_means_0_1_are_0 hmod4).1
+
+  simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]
 
   have h_add_imm : List.Forall SP1Constraint.toProp (AddOperation.constraints
       #v[Main[3], Main[4], Main[5], 0]
