@@ -21,6 +21,49 @@ variable
   (cstrs : (constraints Main).allHold)
   (h_is_real : is_real Main)
 
+set_option maxHeartbeats 1000000 in
+set_option maxRecDepth 1000000 in
+/-- Bundled prologue facts shared by every `correct_*` theorem: register bounds,
+    U64 shapes of `op_b`/`op_c`, the `op_a = 0 → result = 0` implication, the
+    eight mutually-exclusive `is_<op>` implications, and the four initial-state
+    reads (PC and the three operand registers). The eight `sopᵢ` implications
+    are returned as-is; callers collapse seven of them with `simp_all` against
+    their specific `h_is_<op>` hypothesis. -/
+lemma correct_prologue_facts
+  (cstrs : (constraints Main).allHold)
+  (h_is_real : is_real Main)
+  (state_cstrs : (constraints Main).initialState s) :
+  ∃ (ha : Main[6].val < 32) (hb : Main[14].val < 32) (hc : Main[21].val < 32),
+    Main[3] < 65536 ∧
+    Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] ∧
+    (Main[6] = 0 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0) ∧
+    (Main[202] = 1 → Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
+    (Main[203] = 1 → Main[202] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
+    (Main[204] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
+    (Main[205] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
+    (Main[206] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
+    (Main[207] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
+    (Main[208] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[209] = 0) ∧
+    (Main[209] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    s.regs.get? Register.PC = some (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0]) ∧
+    s.get_reg? ((Main[6].val)#'ha) = some (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]) ∧
+    s.get_reg? ((Main[14].val)#'hb) = some (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) ∧
+    s.get_reg? ((Main[21].val)#'hc) = some (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) := by
+  have ⟨ha, hb, hc, hpc⟩ := register_bounds Main cstrs h_is_real
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
+  have h_a0 := op_a_is_0 Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  simp at h_is_real
+  simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
+    List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp [h_is_real, ha, hb, hc] at read_pc read_op_a read_op_b read_op_c
+  exact ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+    sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+    read_pc, read_op_a, read_op_b, read_op_c⟩
+
 def sp1_op : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
@@ -45,18 +88,10 @@ theorem correct_div
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
-      List.Forall, CPUState.constraints, RTypeReader.constraints, ha, hb, hc] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17; simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_div, sp1_op, execute, execute_DIV']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
@@ -92,17 +127,10 @@ theorem correct_divu
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17 ;simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_divu, sp1_op, execute, execute_DIV']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
@@ -138,17 +166,10 @@ theorem correct_divw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17 ;simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_divw, sp1_op, execute, execute_DIVW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
@@ -184,17 +205,10 @@ theorem correct_divuw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17 ;simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_divuw, sp1_op, execute, execute_DIVW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
@@ -230,17 +244,10 @@ theorem correct_rem
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_rem (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17 ;simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_rem, sp1_op, execute, execute_REM']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
@@ -276,17 +283,10 @@ theorem correct_remu
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17 ;simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_remu, sp1_op, execute, execute_REM']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
@@ -322,17 +322,10 @@ theorem correct_remw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17 ;simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_remw, sp1_op, execute, execute_REMW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
@@ -368,17 +361,10 @@ theorem correct_remuw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    simp at h_is_real
-    have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs h_is_real
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-    have h_a0 := op_a_is_0 Main cstrs h_is_real
-    have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-    simp_all
-
-    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
-    obtain ⟨thr1, thr2, thr3, thr4, thr5, thr6, thr7, thr8, thr9, thr10, thr11, thr12, thr13, thr14, thr15, thr16, thr17, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-    clear thr1 thr2 thr3 thr4 thr5 thr6 thr7 thr8 thr9 thr10 thr11 thr12 thr13 thr14 thr15 thr16 thr17 ;simp_all
-
+    obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+      sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
+      read_pc, read_op_a, read_op_b, read_op_c⟩ :=
+      correct_prologue_facts Main s cstrs h_is_real state_cstrs
     simp [spec_remuw, sp1_op, execute, execute_REMW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
