@@ -229,6 +229,25 @@ lemma map_const_run_readReg
   rw [Option.isSome_iff_exists] at h
   aesop
 
+/-- Inside `SailME.run`, reading one register (which must be present) and then writing
+    another register while discarding the read value simplifies to just the writeReg's
+    effect. This shows up in instruction specs where `execute_BTYPE` / `execute_JAL` read
+    `Register.misa` purely to check the `C` extension bit before writing `nextPC`. -/
+lemma SailME_run_readReg_map_writeReg
+    {α : Type} (s : SailState) (reg_r reg_w : Register)
+    (hs_r : (s.regs.get? reg_r).isSome) (v : RegisterType reg_w) (f : Unit → α) :
+    EStateM.run (SailME.run do
+        let _ ← liftM (Sail.readReg reg_r)
+        f <$> liftM (Sail.writeReg reg_w v)) s =
+      .ok (f ()) { s with regs := s.regs.insert reg_w v } := by
+  rw [Option.isSome_iff_exists] at hs_r
+  obtain ⟨v_r, hv_r⟩ := hs_r
+  simp only [SailME.run, PreSail.PreSailME.run, Sail.readReg, Sail.writeReg, PreSail.readReg,
+    PreSail.writeReg, ExceptT.run, ExceptT.mk, ExceptT.bindCont, ExceptT.bind, ExceptT.lift,
+    ExceptT.map, Functor.map, Except.map, MonadLift.monadLift, liftM, monadLift, pure, bind,
+    EStateM.run, EStateM.bind, EStateM.pure, EStateM.modifyGet, EStateM.map, EStateM.get,
+    getThe, MonadStateOf.get, MonadState.get, get,
+    MonadStateOf.modifyGet, modifyGet, MonadState.modifyGet, modify, hv_r]
 
 end readReg
 
