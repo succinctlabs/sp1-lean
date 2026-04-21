@@ -33,6 +33,7 @@ instance (bound_dec : ℕ) : Zero (BoundedKoalaBear bound_dec.succ) := ⟨bounde
 instance (bound_dec_dec : ℕ) : One (BoundedKoalaBear bound_dec_dec.succ.succ) := ⟨boundedKoalaBear.one _⟩
 
 /-- Should only make an actual instance for special cases. -/
+@[reducible]
 def coe_of_le {bound bound' : ℕ} (h : bound ≤ bound') :
     Coe (BoundedKoalaBear bound) (BoundedKoalaBear bound') where
   coe x := { in_range := lt_of_lt_of_le x.in_range h, __ := x }
