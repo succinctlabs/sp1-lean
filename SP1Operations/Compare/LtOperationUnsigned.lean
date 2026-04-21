@@ -36,7 +36,18 @@ lemma cl_are_U16
   List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
     is_real = 1 →
       (cols.comparison_limbs[0] : ℕ) < 65536 ∧ (cols.comparison_limbs[1] : ℕ) < 65536
-  := by simp [constraints]; sorry --grind (splits := 16)
+  := by
+    intro cstrs his
+    rw [allHold_constraints_iff] at cstrs
+    rcases cstrs with
+      ⟨ _, _, h_f0, h_f1, h_f2, h_f3, _, _, _, _, _, h_e0, h_e1, _ ⟩
+    obtain ⟨ _, _, _, _ ⟩ := Word.lt_cases_of_isU64 h_b_isU64
+    obtain ⟨ _, _, _, _ ⟩ := Word.lt_cases_of_isU64 h_d_isU64
+    rcases h_f0 with hf0 | hf0 <;> rcases h_f1 with hf1 | hf1 <;>
+      rcases h_f2 with hf2 | hf2 <;> rcases h_f3 with hf3 | hf3 <;>
+      rw [hf0, hf1, hf2, hf3] at h_e0 h_e1 <;>
+      simp only [zero_mul, one_mul, mul_zero, mul_one, zero_add, add_zero] at h_e0 h_e1 <;>
+      constructor <;> omega
 
 set_option maxHeartbeats 1000000 in
 @[grind →, aesop safe forward]
