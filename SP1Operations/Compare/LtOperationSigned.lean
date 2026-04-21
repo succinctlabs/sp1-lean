@@ -164,31 +164,27 @@ lemma spec.branch
       }
     }
   . have spec.signed := spec.signed h_b_isU64 h_d_isU64 cstrs
-    stop
     rw [U16MSBOperation.allHold_constraints_iff] at h_b_msb
     rw [U16MSBOperation.allHold_constraints_iff] at h_d_msb
     rcases h_b_msb with ⟨ _, b_msb_b, hb3 ⟩; rcases h_d_msb with ⟨ _, b_msb_d, hd3 ⟩
+    simp only [show (1 : Fin KB) ≠ 0 by decide, not_false_iff, forall_true_left] at hb3 hd3
 
     rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
-    simp_all <;> split_ands
-
-    on_goal 1 => grind
-    on_goal 1 => symm at lt_05 lt_06; aesop (add safe (by omega))
-
-    on_goal 2 => grind
-    on_goal 3 => grind
-    on_goal 4 => grind
-    on_goal 5 => grind
-
-    all_goals {
-      split_ifs at spec.signed with cond
-      all_goals {
-        iterate 2 rw [← Word.toBitVec64_toInt (by assumption)] at cond
-        rw [← BitVec.slt_iff_toInt_lt (w := 64)] at cond
-        simp [← BitVec.toNat_inj] at spec.signed
-        simp_all; omega
-      }
-    }
+    symm at lt_05 lt_06 <;>
+    simp_all <;> split_ands <;>
+    rcases b_msb_b with bm | bm <;> rcases b_msb_d with dm | dm <;>
+    simp_all <;>
+    (first
+      | (split_ifs at spec.signed with cond <;>
+          (iterate 2 rw [← Word.toBitVec64_toInt (by assumption)] at cond) <;>
+          rw [← BitVec.slt_iff_toInt_lt (w := 64)] at cond <;>
+          simp [← BitVec.toNat_inj] at spec.signed <;>
+          simp_all <;> omega)
+      | (intros; rename_i eqc; exfalso;
+          rw [eqc] at lt_07;
+          simp only [sub_self, mul_zero] at lt_07;
+          exact absurd lt_07 (by decide))
+      | (intros; subst_vars; grind))
 
 end LtOperationSigned
