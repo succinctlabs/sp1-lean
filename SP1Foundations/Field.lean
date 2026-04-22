@@ -31,6 +31,22 @@ instance : NeZero KB := by constructor; decide
 instance : Field (Fin KB) := ZMod.instField KB
 instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
 
+-- High-priority direct instances for Fin KB arithmetic. Without these, Lean's
+-- typeclass synth considers 5-9 candidates per Add/Mul/Sub/OfNat query (via
+-- AddZero.toAdd, Lean.Grind.Semiring.toAdd, AddSemigroup.toAdd, etc.). The
+-- constraints files have thousands of Fin KB arithmetic ops, so this matters —
+-- initial profile showed 779s cumulative typeclass inference in ShiftRight.
+@[instance 10000] instance instAdd : Add (Fin KB) := Fin.instAdd
+@[instance 10000] instance instMul : Mul (Fin KB) := Fin.instMul
+@[instance 10000] instance instSub : Sub (Fin KB) := Fin.instSub
+@[instance 10000] instance instNeg : Neg (Fin KB) := inferInstance
+@[instance 10000] instance instZero : Zero (Fin KB) := inferInstance
+@[instance 10000] instance instOne : One (Fin KB) := inferInstance
+@[instance 10000] instance instOfNat (n : Nat) : OfNat (Fin KB) n := Fin.instOfNat
+@[instance 10000] instance instHAdd : HAdd (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a + b⟩
+@[instance 10000] instance instHMul : HMul (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a * b⟩
+@[instance 10000] instance instHSub : HSub (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a - b⟩
+
 lemma val_mod4_eq_zero (x : Fin KB) : x.val % 4 = 0 ↔ x % 4 = 0 :=
   Fin.val_mod_eq_zero_iff x 4
 
