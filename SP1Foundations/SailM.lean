@@ -327,21 +327,6 @@ lemma wX_bits_eq_writeReg :
 
 end wX_bits
 
--- @[simp]
--- lemma run_bool_bit_backwards :
---     (bool_bit_backwards b).run s = match b with
---     | 1#1 => .ok true s
---     | 0#1 => .ok false s := by
---   simp [bool_bit_backwards]
---   fin_cases b <;> rfl
-
--- @[simp]
--- lemma run_bit_to_bool :
---     (bit_to_bool b).run s = match b with
---     | 1#1 => .ok true s
---     | 0#1 => .ok false s := by
---   fin_cases b <;> rfl
-
 section write_read_bind
 
 /-- Reading a just written value looks like just using the written value. -/

@@ -1,8 +1,6 @@
 import SP1Foundations
 import SP1Chips.Branch.Constraints
 
-set_option linter.unusedVariables false
-
 namespace Branch
 
 open Sail SailState BitVec LeanRV64D.Functions

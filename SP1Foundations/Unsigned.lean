@@ -48,11 +48,6 @@ lemma default_eq_zero : (default : BoundedKoalaBear bound.succ) = 0 := rfl
 
 section toFin
 
--- /-- Convert a `BoundedKoalaBear` to a `Fin KB` by forgetting the bound. -/
--- @[simp] alias toKoalaBear := BoundedKoalaBear.toFin
-
--- lemma toKoalaBear_def (x : BoundedKoalaBear bound) : x.toKoalaBear = x.toFin := rfl
-
 @[simp] lemma toFin_zero : (0 : BoundedKoalaBear bound.succ).toFin = 0 := rfl
 @[simp] lemma toFin_one : (1 : BoundedKoalaBear bound.succ.succ).toFin = 1 := rfl
 
@@ -67,22 +62,6 @@ lemma toFin_eq_iff (x : BoundedKoalaBear bound) (y : Fin KB) : x.toFin = y ↔ x
   erw [Fin.ext_iff]
 
 end toFin
-
--- section toKoalaBear
-
--- lemma toKoalaBear_zero : (0 : BoundedKoalaBear bound.succ).toKoalaBear = 0 := rfl
--- lemma toKoalaBear_one : (1 : BoundedKoalaBear bound.succ.succ).toKoalaBear = 1 := rfl
-
--- lemma val_toKoalaBear (x : BoundedKoalaBear bound) : (x.toKoalaBear : ℕ) = x.val := rfl
-
--- lemma toKoalaBear_inj (x y : BoundedKoalaBear bound) : toKoalaBear x = toKoalaBear y ↔ x = y := by
---   simp [toKoalaBear, toFin_inj]
-
--- lemma injective_toKoalaBear :
---     Function.Injective (toKoalaBear : BoundedKoalaBear bound → Fin KB) :=
---   fun x y h => (toKoalaBear_inj x y).1 h
-
--- end toKoalaBear
 
 lemma eq_zero_iff (x : BoundedKoalaBear bound.succ) : x = 0 ↔ x.val = 0 := by aesop
 
