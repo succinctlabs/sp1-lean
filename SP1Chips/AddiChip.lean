@@ -71,14 +71,14 @@ theorem correct_addi
     · have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop
       rw [← is_add] at *
       simp [Word.toBitVec64, Word.toNat, h_is_op_a_0]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       clear *- this hu64
       aesop
     · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [is_add, trusted_instr_prop]
       simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp
       rfl
 

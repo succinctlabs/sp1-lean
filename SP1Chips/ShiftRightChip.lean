@@ -58,13 +58,13 @@ theorem correct_srl
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.srl Main ⟨ srl, imm ⟩ cstrs]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Srl
@@ -117,13 +117,13 @@ theorem correct_srli
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.srli Main ⟨ srl, imm ⟩ cstrs]
       rw [exec_SHIFTIOP_pure_bv_to_w _ _ _ is_U64_b]
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Srli
@@ -176,13 +176,13 @@ theorem correct_srlw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.srlw Main ⟨ srlw, imm ⟩ cstrs]
       rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Srlw
@@ -235,13 +235,13 @@ theorem correct_srliw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.srliw Main ⟨ srlw, imm ⟩ cstrs]
       rw [exec_SHIFTIWOP_pure_bv_to_w _ _ _ is_U64_b]
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Srliw
@@ -294,13 +294,13 @@ theorem correct_sra
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.sra Main ⟨ sra, imm ⟩ cstrs]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Sra
@@ -353,13 +353,13 @@ theorem correct_srai
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.srai Main ⟨ sra, imm ⟩ cstrs]
       rw [exec_SHIFTIOP_pure_bv_to_w _ _ _ is_U64_b]
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Srai
@@ -412,13 +412,13 @@ theorem correct_sraw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.sraw Main ⟨ sraw, imm ⟩ cstrs]
       rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
       simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Sraw
@@ -471,13 +471,13 @@ theorem correct_sraiw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [spec.sraiw Main ⟨ sraw, imm ⟩ cstrs]
       rw [exec_SHIFTIWOP_pure_bv_to_w _ _ _ is_U64_b]
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Sraiw

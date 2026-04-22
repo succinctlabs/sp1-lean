@@ -1294,6 +1294,270 @@ end Word
 
 end Bitwise
 
+lemma shiftRight_eq_sub_mod (x : ℕ) {n : ℕ} :
+    x >>> n = (x - (x % 2 ^ n)) >>> n := by
+  simp only [Nat.shiftRight_eq_div_pow]; exact Nat.div_eq_sub_mod_div
+
+lemma lt_65536_of_mul_inv_lt' (x : Fin KB) (h : (x * (256 : Fin KB)⁻¹).val < 256) :
+    x.val < 65536 := by
+  have hne : (256 : Fin KB) ≠ 0 := by decide
+  have hinv : x * (256 : Fin KB)⁻¹ * 256 = x := by field_simp
+  rw [← hinv, Fin.val_mul]
+  have h256 : ((256 : Fin KB).val = 256) := by decide
+  rw [h256, Nat.mod_eq_of_lt (by omega)]
+  omega
+
+/-- Sign-extend a byte whose MSB is 1: produces 0xFFFFFFFFFFFFFF00 | byte. -/
+lemma signExtend64_ofNat8_of_ge_128 (x : Fin KB) (hlt : x.val < 256) (hge : 128 ≤ x.val) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x + 65280, 65535, 65535, 65535] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb : BitVec.msb (BitVec.ofNat 8 x.val) = true := by
+    rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]
+    rw [Nat.mod_eq_of_lt (by omega)]; omega
+  simp [hmsb, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat]
+  rw [Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  have hcast : ((x + 65280 : Fin KB).val : ℕ) = x.val + 65280 := by
+    rw [Fin.val_add]; rw [show ((65280 : Fin KB).val = 65280) from rfl]
+    rw [Nat.mod_eq_of_lt (by omega)]
+  rw [hcast]
+  rw [show ((65535 : Fin KB).val = 65535) from rfl]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  omega
+
+/-- If `lo + hi * 256 = x` (in Fin KB) with `lo < 256` and `hi < 256`, then
+    `x.val = lo.val + hi.val * 256` at the Nat level (no mod). -/
+lemma nat_decomp_of_inv8_decomp (lo hi x : Fin KB)
+    (h : lo + hi * (2^8 : Fin KB) = x)
+    (hlo : lo.val < 256) (hhi : hi.val < 256) :
+    x.val = lo.val + hi.val * 256 := by
+  have hx := congr_arg Fin.val h
+  have h256 : ((2^8 : Fin KB).val = 256) := by decide
+  rw [Fin.val_add, Fin.val_mul, h256,
+      Nat.mod_eq_of_lt (show hi.val * 256 < _ by omega),
+      Nat.mod_eq_of_lt (show lo.val + hi.val * 256 < _ by omega)] at hx
+  omega
+
+/-- The byte-slice of an 8-bit `ofNat` equals itself modulo 256. -/
+lemma bitVec_ofNat8_eq_of_mod (a b : ℕ) (h : a % 256 = b % 256) :
+    BitVec.ofNat 8 a = BitVec.ofNat 8 b := by
+  rw [← BitVec.toNat_inj, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
+  show a % 2^8 = b % 2^8
+  simpa using h
+
+/-- Zero-extend a byte: always produces just the byte (upper zeros). -/
+lemma setWidth64_ofNat8 (x : Fin KB) (hlt : x.val < 256) :
+    BitVec.setWidth 64 (BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, 0, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  simp [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat]
+  rw [Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
+  rw [Nat.mod_eq_of_lt (by have := x.isLt; omega)]
+  omega
+
+/-- Sign-extend a byte whose MSB is 0: produces just the byte (upper zeros). -/
+lemma signExtend64_ofNat8_of_lt_128 (x : Fin KB) (hlt : x.val < 256) (hge : x.val < 128) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, 0, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb : BitVec.msb (BitVec.ofNat 8 x.val) = false := by
+    rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]
+    rw [Nat.mod_eq_of_lt (by omega)]; omega
+  simp [hmsb, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat]
+  rw [Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
+  rw [Nat.mod_eq_of_lt (by have := x.isLt; omega)]
+  omega
+
+/-- toNat of `hi ++ lo` as bytes equals `(hi.toNat) * 256 + (lo.toNat)`. Specialized form. -/
+private lemma toNat_append_bytes (hi lo : BitVec 8) :
+    (hi ++ lo).toNat = hi.toNat * 256 + lo.toNat := by
+  rw [BitVec.toNat_append]
+  have hlo : lo.toNat < 2^8 := lo.isLt
+  rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) hlo, Nat.shiftLeft_eq]
+
+/-- Concat of low and high bytes of a halfword `x` (value < 65536) equals `x.val` as Nat. -/
+private lemma toNat_concat_halfword_bytes (x : Fin KB) (hlt : x.val < 65536) :
+    (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val).toNat = x.val := by
+  rw [toNat_append_bytes, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
+  have h256 : (2^8 : ℕ) = 256 := rfl
+  rw [h256]
+  omega
+
+/-- Zero-extend a halfword (16-bit) split into two bytes: always produces just the halfword. -/
+lemma setWidth64_ofNat16_concat (x : Fin KB) (hlt : x.val < 65536) :
+    BitVec.setWidth 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, 0, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes x hlt]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat, Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
+  rw [Nat.mod_eq_of_lt (by have := x.isLt; omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Sign-extend a halfword whose MSB is 0 (value < 32768): zero-extend form. -/
+lemma signExtend64_ofNat16_concat_of_lt_32768
+    (x : Fin KB) (hlt : x.val < 65536) (hmsb : x.val < 32768) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, 0, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_false : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = false := by
+    rw [BitVec.msb_eq_decide, toNat_concat_halfword_bytes x hlt]
+    simp only [decide_eq_false_iff_not, not_le]
+    show _ < 2^15
+    omega
+  rw [hmsb_false]
+  simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
+  rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes x hlt]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat, Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
+  rw [Nat.mod_eq_of_lt (by have := x.isLt; omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Sign-extend a halfword whose MSB is 1 (value ≥ 32768): fills upper with 0xFFFF. -/
+lemma signExtend64_ofNat16_concat_of_ge_32768
+    (x : Fin KB) (hlt : x.val < 65536) (hmsb : 32768 ≤ x.val) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, 65535, 65535, 65535] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_true : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = true := by
+    rw [BitVec.msb_eq_decide, toNat_concat_halfword_bytes x hlt]
+    simp only [decide_eq_true_eq]
+    show 2^15 ≤ _
+    omega
+  rw [hmsb_true]
+  simp only [↓reduceIte]
+  rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes x hlt]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat, Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((65535 : Fin KB).val = 65535) from rfl]
+  rw [Nat.mod_eq_of_lt (by have := x.isLt; omega)]
+  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
+  show x.val + (2^64 - 2^(8 + 8)) = x.val + 65535 * 2^16 + 65535 * 2^32 + 65535 * 2^48
+  omega
+
+/-- toNat of a 4-byte (32-bit word) concat equals `x.val + y.val * 65536` when each halfword
+    fits in 16 bits. Left-associative concat matches `run_vmem_read_of_width_4'` output. -/
+private lemma toNat_concat_word_bytes (x y : Fin KB)
+    (hx : x.val < 65536) (hy : y.val < 65536) :
+    (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val).toNat =
+      x.val + y.val * 65536 := by
+  have hx_hi : x.val >>> 8 < 256 := by rw [Nat.shiftRight_eq_div_pow]; omega
+  have hy_hi : y.val >>> 8 < 256 := by rw [Nat.shiftRight_eq_div_pow]; omega
+  have hx_decomp : x.val % 256 + (x.val >>> 8) * 256 = x.val := by
+    rw [Nat.shiftRight_eq_div_pow]; omega
+  have hy_decomp : y.val % 256 + (y.val >>> 8) * 256 = y.val := by
+    rw [Nat.shiftRight_eq_div_pow]; omega
+  simp only [BitVec.toNat_append, BitVec.toNat_ofNat, Nat.reducePow,
+    show (2^8 : ℕ) = 256 from rfl]
+  have hx_hi_mod : x.val >>> 8 % 256 = x.val >>> 8 := Nat.mod_eq_of_lt hx_hi
+  have hy_hi_mod : y.val >>> 8 % 256 = y.val >>> 8 := Nat.mod_eq_of_lt hy_hi
+  rw [hx_hi_mod, hy_hi_mod]
+  -- innermost: (y >>> 8) <<< 8 ||| (y % 256) = y.val
+  rw [show y.val >>> 8 <<< 8 ||| y.val % 256 = y.val by
+    rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) (by omega), Nat.shiftLeft_eq]; omega]
+  -- next: y <<< 8 ||| (x >>> 8) = y * 256 + x >>> 8
+  rw [show y.val <<< 8 ||| x.val >>> 8 = y.val * 256 + x.val >>> 8 by
+    rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) hx_hi, Nat.shiftLeft_eq]]
+  -- outer: (y*256 + x>>>8) <<< 8 ||| (x % 256) = (y*256 + x>>>8) * 256 + x%256 = x + y*65536
+  rw [show (y.val * 256 + x.val >>> 8) <<< 8 ||| x.val % 256 =
+      (y.val * 256 + x.val >>> 8) * 256 + x.val % 256 by
+    rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) (by omega), Nat.shiftLeft_eq]]
+  have := hx_decomp
+  omega
+
+/-- Zero-extend a word (32-bit) split into four bytes: always produces just the word. -/
+lemma setWidth64_ofNat32_concat (x y : Fin KB) (hx : x.val < 65536) (hy : y.val < 65536) :
+    BitVec.setWidth 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, y, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_setWidth, toNat_concat_word_bytes x y hx hy]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat, Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
+  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Sign-extend a word whose MSB is 0 (high halfword `y` has `y.val < 32768`): zero-extend form. -/
+lemma signExtend64_ofNat32_concat_of_lt_32768
+    (x y : Fin KB) (hx : x.val < 65536) (hy : y.val < 65536) (hmsb : y.val < 32768) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, y, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_false : BitVec.msb
+      (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+       BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = false := by
+    rw [BitVec.msb_eq_decide, toNat_concat_word_bytes x y hx hy]
+    simp only [decide_eq_false_iff_not, not_le]
+    show _ < 2^31
+    omega
+  rw [hmsb_false]
+  simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
+  rw [BitVec.toNat_setWidth, toNat_concat_word_bytes x y hx hy]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat, Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
+  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Sign-extend a word whose MSB is 1 (high halfword `y` has `32768 ≤ y.val`): upper fills 0xFFFF_FFFF. -/
+lemma signExtend64_ofNat32_concat_of_ge_32768
+    (x y : Fin KB) (hx : x.val < 65536) (hy : y.val < 65536) (hmsb : 32768 ≤ y.val) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64 #v[x, y, 65535, 65535] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_true : BitVec.msb
+      (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+       BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = true := by
+    rw [BitVec.msb_eq_decide, toNat_concat_word_bytes x y hx hy]
+    simp only [decide_eq_true_eq]
+    show 2^31 ≤ _
+    omega
+  rw [hmsb_true]
+  simp only [↓reduceIte]
+  rw [BitVec.toNat_setWidth, toNat_concat_word_bytes x y hx hy]
+  unfold Word.toBitVec64
+  rw [BitVec.toNat_ofNat, Word.toNat_def]
+  simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, show ((65535 : Fin KB).val = 65535) from rfl]
+  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
+  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
+  show x.val + y.val * 2^16 + (2^64 - 2^(8 + 8 + 8 + 8)) =
+       x.val + y.val * 2^16 + 65535 * 2^32 + 65535 * 2^48
+  omega
+
 section getByte
 
 namespace BitVec

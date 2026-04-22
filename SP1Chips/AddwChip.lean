@@ -71,14 +71,14 @@ theorem correct_addw
     rw [← is_addw] at is_msb
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
         simp [← BitVec.toNat_inj]; omega
       simp [this, Word.toBitVec64, Word.toNat]
       rw [← is_addw]
       rw [HWord.sign_extend_32_to_64_msb is_U32_val]
       simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Addw
@@ -152,14 +152,14 @@ theorem correct_addw
     rw [← is_addw] at is_msb
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
         simp [← BitVec.toNat_inj]; omega
       simp [this, Word.toBitVec64, Word.toNat]
       rw [← is_addw]
       rw [HWord.sign_extend_32_to_64_msb is_U32_val]
       simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Addiw

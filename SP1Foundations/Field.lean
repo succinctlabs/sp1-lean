@@ -64,6 +64,22 @@ reduces to an application of this instance). -/
 instance Fin.instField {n : ℕ} [Fact (Nat.Prime (n + 1))] : Field (Fin (n + 1)) :=
   ZMod.instField (n + 1)
 
+/-- Multiplying by the inverse of a power of two equals a right shift, in any prime
+field where that power of two is strictly less than the modulus. Generic over the
+prime `p + 1`; the KB-specific `mul_256_inv_KB` was a `k = 8`, `p + 1 = KB` instance. -/
+lemma Fin.mul_inv_pow2_eq_shiftRight {p : ℕ} [Fact (Nat.Prime (p + 1))] (k : Fin (p + 1))
+    (hk : 2 ^ k.val < p + 1) (x : Fin (p + 1)) (hx : x.val % 2 ^ k.val = 0) :
+    x * ((2 ^ k.val : ℕ) : Fin (p + 1))⁻¹ = x >>> k := by
+  have h2k_pos : 0 < 2 ^ k.val := by positivity
+  have h2k_val : ((2 ^ k.val : ℕ) : Fin (p + 1)).val = 2 ^ k.val :=
+    Nat.mod_eq_of_lt hk
+  have hne : ((2 ^ k.val : ℕ) : Fin (p + 1)) ≠ 0 := by
+    rw [Ne, ← Fin.val_inj, h2k_val]; exact h2k_pos.ne'
+  rw [mul_inv_eq_iff_eq_mul₀ hne, ← Fin.val_inj, Fin.val_mul, h2k_val,
+    Fin.shiftRight_val, Nat.shiftRight_eq_div_pow,
+    Nat.div_mul_cancel (Nat.dvd_of_mod_eq_zero hx),
+    Nat.mod_eq_of_lt x.isLt]
+
 @[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin KB) <<< 1 = 1 := rfl
 @[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin KB) <<< 2 = 1 := rfl
 @[simp] lemma shiftl_3BB_eq_one : (1864368129 : Fin KB) <<< 3 = 1 := rfl
@@ -122,12 +138,6 @@ lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := eq_inv_of_mul_eq_one_
 
 @[simp] lemma inv_16BB_zero_or_one {x : Fin KB} : x * 65536⁻¹ = 0 ∨ x * 65536⁻¹ = 1 ↔ x = 0 ∨ x = 65536
   := by aesop
-
-lemma mul_256_inv_KB (x : Fin KB)
-    (hx : x.val % 256 = 0) : x * (256 : Fin KB)⁻¹ = x >>> 8 := by
-  rw [mul_inv_eq_iff_eq_mul₀ (by omega), ← Fin.val_inj]
-  simp [Fin.val_mul, Nat.shiftRight_eq_div_pow, Nat.div_mul_self_eq_mod_sub_self]
-  omega
 
 namespace Int
 
