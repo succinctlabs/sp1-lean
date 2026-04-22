@@ -24,3 +24,5 @@ section constraints
   ]
 
 end constraints
+
+end BitwiseOperation

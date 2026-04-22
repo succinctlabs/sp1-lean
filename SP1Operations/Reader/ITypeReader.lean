@@ -75,4 +75,4 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
       op_a_write_value[3] = 0)
    := by aesop (add safe (by simp [allHold_constraints_iff]))
 
-namespace ITypeReader
+end ITypeReader

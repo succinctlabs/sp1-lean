@@ -31,3 +31,5 @@ section constraints
   ]⟩
 
 end constraints
+
+end BitwiseU16Operation

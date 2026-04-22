@@ -104,3 +104,5 @@ section constraints
   ]
 
 end constraints
+
+end ALUTypeReader

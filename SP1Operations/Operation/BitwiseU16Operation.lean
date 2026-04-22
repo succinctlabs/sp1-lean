@@ -130,3 +130,5 @@ lemma spec.xor
       rw [Nat.lift_lt 64 (by omega) (by omega)] at hb0 hb1 hb2 hb3 hb4 hb5 hb6 hb7
       rw [Nat.lift_lt 64 (by omega) (by omega)] at hc0 hc1 hc2 hc3 hc4 hc5 hc6 hc7
       bv_decide
+
+end BitwiseU16Operation
