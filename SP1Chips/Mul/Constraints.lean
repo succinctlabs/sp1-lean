@@ -218,7 +218,7 @@ end operands
 
 section mul
 
-lemma spec.mul (h : is_mul Main ) :
+lemma spec.mul (h : is_mul Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MUL
   := by
@@ -239,7 +239,7 @@ end mul
 
 section mulh
 
-lemma spec.mulh (h : is_mulh Main ) :
+lemma spec.mulh (h : is_mulh Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULH
   := by
@@ -260,7 +260,7 @@ end mulh
 
 section mulhu
 
-lemma spec.mulhu (h : is_mulhu Main ) :
+lemma spec.mulhu (h : is_mulhu Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULHU
   := by
@@ -281,7 +281,7 @@ end mulhu
 
 section mulhsu
 
-lemma spec.mulhsu (h : is_mulhsu Main ) :
+lemma spec.mulhsu (h : is_mulhsu Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULHSU
   := by
@@ -302,7 +302,7 @@ end mulhsu
 
 section mulw
 
-lemma spec.mulw (h : is_mulw Main ) :
+lemma spec.mulw (h : is_mulw Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = execute_MULW_pure_bhw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]).low (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]).low
   := by

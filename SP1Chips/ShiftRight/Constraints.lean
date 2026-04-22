@@ -491,7 +491,7 @@ lemma allHold_constraints_iff :
 
 section field_arithmetic
 
-lemma cancel_mul_65536_v1 { a b c x : Fin KB } (h_dvd : (x : ℕ) ∣ 65536) : a * x = b * 65536 + c * x → a = b * ((65536 : ℕ) / (x : ℕ)) + c
+lemma cancel_mul_65536_v1 {a b c x : Fin KB} (h_dvd : (x : ℕ) ∣ 65536) : a * x = b * 65536 + c * x → a = b * ((65536 : ℕ) / (x : ℕ)) + c
   := by
   obtain ⟨ z, h_eq ⟩ := h_dvd; rw [h_eq]
   have x_pos : 0 < (x : ℕ) := by nlinarith
@@ -512,7 +512,7 @@ lemma cancel_mul_65536_v1 { a b c x : Fin KB } (h_dvd : (x : ℕ) ∣ 65536) : a
   rw [Nat.mod_eq_of_lt z_BB, Nat.mod_eq_of_lt xz_BB, Nat.mod_eq_of_lt x.isLt,
     Nat.mul_div_cancel_left _ x_pos]
 
-lemma cancel_mul_65536_v2 { b c x : Fin KB } (h_dvd : (x : ℕ) ∣ 65536) : b * 65536 + c * x = 0 → b * ((65536 : ℕ) / (x : ℕ)) + c = 0
+lemma cancel_mul_65536_v2 {b c x : Fin KB} (h_dvd : (x : ℕ) ∣ 65536) : b * 65536 + c * x = 0 → b * ((65536 : ℕ) / (x : ℕ)) + c = 0
   := by intro h_eq; symm; apply cancel_mul_65536_v1 <;> aesop
 
 lemma is_mod_64 {c0 m : Fin KB} : m < 64 → c0 < 65536 → ((c0 - m) * 2097414145).val < 1024 → c0.val % 64 = m := by

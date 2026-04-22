@@ -47,7 +47,7 @@ namespace HWord
 
 lemma eq_mk_getElem (w : HWord T) : w = #v[w[0], w[1]] := ext_cases rfl rfl
 
-lemma eq_pointwise (w w': HWord T) : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ↔ w = w' := by
+lemma eq_pointwise (w w' : HWord T) : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ↔ w = w' := by
    constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
 
 /-- Prove something about arbitrary `HWord`s by showing it for any two choices of limbs. -/
@@ -58,17 +58,17 @@ lemma eq_pointwise (w w': HWord T) : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ↔ w = w
 section U32
 
 /-- `isU32 w` means that each limb of the `HWord` is properly bounded. -/
-def isU32 (w : HWord (Fin KB)) : Prop := ∀ i : Fin HWORD_SIZE, w[i].val < 2^16
+def isU32 (w : HWord (Fin KB)) : Prop := ∀ i : Fin HWORD_SIZE, w[i].val < 2 ^ 16
 
 @[aesop unsafe apply]
 lemma isU32_of_cases {w : HWord (Fin KB)}
-    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16) : w.isU32
+    (h0 : w[0].val < 2 ^ 16) (h1 : w[1].val < 2 ^ 16) : w.isU32
   := by intro i; fin_cases i <;> simpa
 
 /-- Pull in bounds on a `HWord`s limbs given a `isU32` proof. -/
 @[aesop unsafe forward]
 lemma lt_cases_of_isU32 {w : HWord (Fin KB)} (hw : w.isU32) :
-    w[0].val < 2^16 ∧ w[1].val < 2^16 :=
+    w[0].val < 2 ^ 16 ∧ w[1].val < 2 ^ 16 :=
   ⟨hw 0, hw 1⟩
 
 end U32
@@ -76,9 +76,9 @@ end U32
 section conversions
 
 /-- Convert a `HWord` to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : HWord (Fin KB)) : ℕ := w[0] + w[1] * 2^16
+def toNat (w : HWord (Fin KB)) : ℕ := w[0] + w[1] * 2 ^ 16
 
-lemma toNat_lt_of_isU32 {w : HWord (Fin KB)} (hw : w.isU32) : w.toNat < 2^32 := by
+lemma toNat_lt_of_isU32 {w : HWord (Fin KB)} (hw : w.isU32) : w.toNat < 2 ^ 32 := by
   unfold toNat
   aesop (add 50% tactic (by omega))
 
@@ -186,7 +186,7 @@ namespace Word
 
 lemma eq_mk_getElem (w : Word T) : w = #v[w[0], w[1], w[2], w[3]] := ext_cases rfl rfl rfl rfl
 
-lemma eq_pointwise {w w': Word T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ↔ w = w' := by
+lemma eq_pointwise {w w' : Word T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ↔ w = w' := by
    constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
 
 /-- Prove something about arbitrary `Word`s by showing it for any two choices of limbs. -/
@@ -197,18 +197,18 @@ lemma eq_pointwise {w w': Word T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] 
 section U64
 
 /-- `isU64 w` means that each limb of the `Word` is properly bounded. -/
-def isU64 (w : Word (Fin KB)) : Prop := ∀ i : Fin WORD_SIZE, w[i].val < 2^16
+def isU64 (w : Word (Fin KB)) : Prop := ∀ i : Fin WORD_SIZE, w[i].val < 2 ^ 16
 
 @[aesop unsafe apply]
 lemma isU64_of_cases {w : Word (Fin KB)}
-    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
-    (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16) : w.isU64
+    (h0 : w[0].val < 2 ^ 16) (h1 : w[1].val < 2 ^ 16)
+    (h2 : w[2].val < 2 ^ 16) (h3 : w[3].val < 2 ^ 16) : w.isU64
   := by intro i; fin_cases i <;> simpa
 
 /-- Pull in bounds on a word's limbs given a `isU64` proof. -/
 @[aesop unsafe forward, grind →]
 lemma lt_cases_of_isU64 {w : Word (Fin KB)} (hw : w.isU64) :
-    w[0].val < 2^16 ∧ w[1].val < 2^16 ∧ w[2].val < 2^16 ∧ w[3].val < 2^16 :=
+    w[0].val < 2 ^ 16 ∧ w[1].val < 2 ^ 16 ∧ w[2].val < 2 ^ 16 ∧ w[3].val < 2 ^ 16 :=
   ⟨hw 0, hw 1, hw 2, hw 3⟩
 
 @[simp] -- common enough to want a lemma
@@ -219,23 +219,23 @@ end U64
 section conversions
 
 opaque toNat_aux : { f : Word (Fin KB) → ℕ //
-    ∀ w, f w = w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 } :=
-  ⟨fun w => w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48, fun _ => rfl⟩
+    ∀ w, f w = w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48 } :=
+  ⟨fun w => w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48, fun _ => rfl⟩
 
 @[simp] lemma toNat_aux_def (w : Word (Fin KB)) : toNat_aux.1 w =
-    w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 := toNat_aux.2 w
+    w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48 := toNat_aux.2 w
 
 /-- Convert a `Word` to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : Word (Fin KB)) : ℕ := toNat_aux.1 w --w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+def toNat (w : Word (Fin KB)) : ℕ := toNat_aux.1 w --w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48
 
 -- /-- Convert a `Word` to a `Nat` by shifting and adding the limbs. -/
--- def toNat (w : Word (Fin KB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48
+-- def toNat (w : Word (Fin KB)) : ℕ := w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48
 
 @[aesop unsafe forward]
-lemma toNat_def (w : Word (Fin KB)) : w.toNat = w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 :=
+lemma toNat_def (w : Word (Fin KB)) : w.toNat = w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48 :=
   toNat_aux.2 w
 
-lemma toNat_lt_of_isU64 {w : Word (Fin KB)} (hw : w.isU64) : w.toNat < 2^64 := by
+lemma toNat_lt_of_isU64 {w : Word (Fin KB)} (hw : w.isU64) : w.toNat < 2 ^ 64 := by
   unfold Word.toNat
   aesop (add 50% tactic (by omega))
 
@@ -285,7 +285,7 @@ def low (w : Word (Fin KB)) : HWord (Fin KB) := #v[w[0], w[1]]
 
 lemma isU64_low_isU32 {w : Word (Fin KB)} (hw : w.isU64) : w.low.isU32 := by aesop
 
-lemma low_toNat (hw : HWord.isU32 #v[b0, b1]): (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat = HWord.toNat #v[b0, b1] := by
+lemma low_toNat (hw : HWord.isU32 #v[b0, b1]) : (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat = HWord.toNat #v[b0, b1] := by
   rw [Word.toBitVec64_toNat]
   . simp [Word.toNat, HWord.toNat]
   . apply HWord.lt_cases_of_isU32 at hw; apply Word.isU64_of_cases <;> simp_all
@@ -346,7 +346,7 @@ lemma toInt_ub {w : Word (Fin KB)} (is_U64_w : w.isU64) :
   simp [Word.toInt, Word.isNegative, Word.toNat] at *
   omega
 
-lemma isU64_toInt {w : Word (Fin KB)} (is64_w : Word.isU64 w) : - 2^63 ≤ w.toInt ∧ w.toInt < 2^63 := by
+lemma isU64_toInt {w : Word (Fin KB)} (is64_w : Word.isU64 w) : - 2 ^ 63 ≤ w.toInt ∧ w.toInt < 2 ^ 63 := by
   unfold Word.toInt Word.isNegative Word.toNat
   grind
 
@@ -405,7 +405,7 @@ namespace DWord
 
 lemma eq_mk_getElem (w : DWord T) : w = #v[w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]] := ext_cases rfl rfl rfl rfl rfl rfl rfl rfl
 
-lemma eq_pointwise {w w': DWord T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ∧ (w[4] = w'[4]) ∧ (w[5] = w'[5]) ∧ (w[6] = w'[6]) ∧ (w[7] = w'[7]) ↔ w = w' := by
+lemma eq_pointwise {w w' : DWord T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ∧ (w[4] = w'[4]) ∧ (w[5] = w'[5]) ∧ (w[6] = w'[6]) ∧ (w[7] = w'[7]) ↔ w = w' := by
    constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
 
 /-- Prove something about arbitrary `DWord`s by showing it for any two choices of limbs. -/
@@ -416,21 +416,21 @@ lemma eq_pointwise {w w': DWord T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2]
 section U128
 
 /-- `is128 w` means that each limb of the `DWord` is properly bounded. -/
-def isU128 (w : DWord (Fin KB)) : Prop := ∀ i : Fin DWORD_SIZE, w[i].val < 2^16
+def isU128 (w : DWord (Fin KB)) : Prop := ∀ i : Fin DWORD_SIZE, w[i].val < 2 ^ 16
 
 @[aesop unsafe apply]
 lemma isU128_of_cases {w : DWord (Fin KB)}
-    (h0 : w[0].val < 2^16) (h1 : w[1].val < 2^16)
-    (h2 : w[2].val < 2^16) (h3 : w[3].val < 2^16)
-    (h4 : w[4].val < 2^16) (h5 : w[5].val < 2^16)
-    (h6 : w[6].val < 2^16) (h7 : w[7].val < 2^16) : w.isU128
+    (h0 : w[0].val < 2 ^ 16) (h1 : w[1].val < 2 ^ 16)
+    (h2 : w[2].val < 2 ^ 16) (h3 : w[3].val < 2 ^ 16)
+    (h4 : w[4].val < 2 ^ 16) (h5 : w[5].val < 2 ^ 16)
+    (h6 : w[6].val < 2 ^ 16) (h7 : w[7].val < 2 ^ 16) : w.isU128
   := by intro i; fin_cases i <;> simpa
 
 /-- Pull in bounds on a word's limbs given a `isU128` proof. -/
 @[aesop unsafe forward, grind →]
 lemma lt_cases_of_isU128 {w : DWord (Fin KB)} (hw : w.isU128) :
-    w[0].val < 2^16 ∧ w[1].val < 2^16 ∧ w[2].val < 2^16 ∧ w[3].val < 2^16 ∧
-    w[4].val < 2^16 ∧ w[5].val < 2^16 ∧ w[6].val < 2^16 ∧ w[7].val < 2^16 :=
+    w[0].val < 2 ^ 16 ∧ w[1].val < 2 ^ 16 ∧ w[2].val < 2 ^ 16 ∧ w[3].val < 2 ^ 16 ∧
+    w[4].val < 2 ^ 16 ∧ w[5].val < 2 ^ 16 ∧ w[6].val < 2 ^ 16 ∧ w[7].val < 2 ^ 16 :=
   ⟨hw 0, hw 1, hw 2, hw 3, hw 4, hw 5, hw 6, hw 7⟩
 
 end U128
@@ -439,7 +439,7 @@ section conversions
 
 /-- Convert a `DWord` to a `Nat` by shifting and adding the limbs. -/
 @[aesop unsafe forward]
-def toNat (w : DWord (Fin KB)) : ℕ := w[0] + w[1] * 2^16 + w[2] * 2^32 + w[3] * 2^48 + w[4] * 2^64 + w[5] * 2^80 + w[6] * 2^96 + w[7] * 2^112
+def toNat (w : DWord (Fin KB)) : ℕ := w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48 + w[4] * 2 ^ 64 + w[5] * 2 ^ 80 + w[6] * 2 ^ 96 + w[7] * 2 ^ 112
 
 lemma eq_toNat_eq {wx wy : DWord (Fin KB)} (is128_wx : DWord.isU128 wx) (is128_wy : DWord.isU128 wy) :
   wx = wy ↔ wx.toNat = wy.toNat := by
@@ -511,7 +511,7 @@ lemma eq_toInt_eq {wx wy : DWord (Fin KB)} (is128_wx : DWord.isU128 wx) (is128_w
     rw [← DWord.eq_pointwise]
     omega
 
-lemma isU128_toInt {w : DWord (Fin KB)} (is128_w : DWord.isU128 w) : - 2^127 ≤ w.toInt ∧ w.toInt < 2^127 := by
+lemma isU128_toInt {w : DWord (Fin KB)} (is128_w : DWord.isU128 w) : - 2 ^ 127 ≤ w.toInt ∧ w.toInt < 2 ^ 127 := by
   unfold DWord.toInt DWord.isNegative DWord.toNat
   apply DWord.lt_cases_of_isU128 at is128_w
   omega
@@ -559,7 +559,7 @@ namespace BHWord
 lemma eq_mk_getElem (w : BHWord T) : w = #v[w[0], w[1], w[2], w[3]]
   := ext_cases rfl rfl rfl rfl
 
-lemma eq_pointwise {w w': BHWord T} :
+lemma eq_pointwise {w w' : BHWord T} :
     (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ↔ w = w' := by
   constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
 
@@ -592,9 +592,9 @@ section conversions
 
 /-- Convert a `BHWord` to a `Nat` by shifting and adding the limbs. -/
 def toNat (w : BHWord (Fin KB)) : ℕ :=
-  w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24
+  w[0] + w[1] * 2 ^ 8 + w[2] * 2 ^ 16 + w[3] * 2 ^ 24
 
-lemma toNat_lt_of_isU32 {w : BHWord (Fin KB)} (hw : w.isU32) : w.toNat < 2^32 := by
+lemma toNat_lt_of_isU32 {w : BHWord (Fin KB)} (hw : w.isU32) : w.toNat < 2 ^ 32 := by
   unfold toNat
   aesop (add 50% tactic (by omega))
 
@@ -623,7 +623,7 @@ lemma isNegative_msb
 lemma isNegative_BitVec.toInt
   {w : BHWord (Fin KB)}
   (h_w_isU32 : w.isU32) :
-    w.isNegative ↔ ¬ 2 * w.toNat < 2^32 := by
+    w.isNegative ↔ ¬ 2 * w.toNat < 2 ^ 32 := by
   rw [isNegative_msb h_w_isU32]
   simp [BitVec.msb_eq_decide]
   rw [toBitVec32_toNat h_w_isU32]
@@ -631,13 +631,13 @@ lemma isNegative_BitVec.toInt
 
 /-- Convert a `BHWord` to an `Int` by shifting and adding the limbs, with sign correction. -/
 def toInt (w : BHWord (Fin KB)) : ℤ :=
-  if (isNegative w) then w.toNat - 2^32 else w.toNat
+  if (isNegative w) then w.toNat - 2 ^ 32 else w.toNat
 
 lemma toBitVec32_toInt {w : BHWord (Fin KB)} (h_w_isU32 : w.isU32) :
     w.toBitVec32.toInt = w.toInt
   := by
     have := lt_cases_of_isU32 h_w_isU32
-    have : w.toNat < 2^32 := by unfold BHWord.toNat; omega
+    have : w.toNat < 2 ^ 32 := by unfold BHWord.toNat; omega
     simp_all [toBitVec32, toInt, BitVec.toInt]
     split_ifs <;> rw [isNegative_BitVec.toInt h_w_isU32] at * <;> omega
 
@@ -663,7 +663,7 @@ namespace BWord
 
 lemma eq_mk_getElem (w : BWord T) : w = #v[w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]] := ext_cases rfl rfl rfl rfl rfl rfl rfl rfl
 
-lemma eq_pointwise {w w': BWord T} :
+lemma eq_pointwise {w w' : BWord T} :
     (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ∧
     (w[4] = w'[4]) ∧ (w[5] = w'[5]) ∧ (w[6] = w'[6]) ∧ (w[7] = w'[7]) ↔ w = w' := by
   constructor <;> intro h <;> [ apply ext_cases; skip ] <;> aesop
@@ -676,21 +676,21 @@ lemma eq_pointwise {w w': BWord T} :
 section U64
 
 /-- `isU64 w` means that each limb of the `BWord` is properly bounded. -/
-def isU64 (w : BWord (Fin KB)) : Prop := ∀ i : Fin BYTE_WORD_SIZE, w[i].val < 2^8
+def isU64 (w : BWord (Fin KB)) : Prop := ∀ i : Fin BYTE_WORD_SIZE, w[i].val < 2 ^ 8
 
 @[aesop unsafe apply]
 lemma isU64_of_cases {w : BWord (Fin KB)}
-    (h0 : w[0].val < 2^8) (h1 : w[1].val < 2^8)
-    (h2 : w[2].val < 2^8) (h3 : w[3].val < 2^8)
-    (h4 : w[4].val < 2^8) (h5 : w[5].val < 2^8)
-    (h6 : w[6].val < 2^8) (h7 : w[7].val < 2^8) : w.isU64
+    (h0 : w[0].val < 2 ^ 8) (h1 : w[1].val < 2 ^ 8)
+    (h2 : w[2].val < 2 ^ 8) (h3 : w[3].val < 2 ^ 8)
+    (h4 : w[4].val < 2 ^ 8) (h5 : w[5].val < 2 ^ 8)
+    (h6 : w[6].val < 2 ^ 8) (h7 : w[7].val < 2 ^ 8) : w.isU64
   := by intro i; fin_cases i <;> simpa
 
 /-- Pull in bounds on a `BWord`'s limbs given a `isU64` proof. -/
 @[aesop unsafe forward]
 lemma lt_cases_of_isU64 {w : BWord (Fin KB)} (hbw : w.isU64) :
-    w[0].val < 2^8 ∧ w[1].val < 2^8 ∧ w[2].val < 2^8 ∧ w[3].val < 2^8 ∧
-    w[4].val < 2^8 ∧ w[5].val < 2^8 ∧ w[6].val < 2^8 ∧ w[7].val < 2^8 :=
+    w[0].val < 2 ^ 8 ∧ w[1].val < 2 ^ 8 ∧ w[2].val < 2 ^ 8 ∧ w[3].val < 2 ^ 8 ∧
+    w[4].val < 2 ^ 8 ∧ w[5].val < 2 ^ 8 ∧ w[6].val < 2 ^ 8 ∧ w[7].val < 2 ^ 8 :=
   ⟨hbw 0, hbw 1, hbw 2, hbw 3, hbw 4, hbw 5, hbw 6, hbw 7⟩
 
 end U64
@@ -702,7 +702,7 @@ def toWord (w : BWord (Fin KB)) : Word (Fin KB) :=
   #v[w[0] + w[1] * 256, w[2] + w[3] * 256, w[4] + w[5] * 256, w[6] + w[7] * 256]
 
 /-- Convert a `BWord` to a `Nat` by shifting and adding the limbs. -/
-def toNat (w : BWord (Fin KB)) : ℕ := w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24 + w[4] * 2^32 + w[5] * 2^40 + w[6] * 2^48 + w[7] * 2^56
+def toNat (w : BWord (Fin KB)) : ℕ := w[0] + w[1] * 2 ^ 8 + w[2] * 2 ^ 16 + w[3] * 2 ^ 24 + w[4] * 2 ^ 32 + w[5] * 2 ^ 40 + w[6] * 2 ^ 48 + w[7] * 2 ^ 56
 
 lemma toNat_toWord
   {w : BWord (Fin KB)}
@@ -831,7 +831,7 @@ namespace BDWord
 lemma eq_mk_getElem (w : BDWord T) : w = #v[w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9], w[10], w[11], w[12], w[13], w[14], w[15]]
   := ext_cases rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
 
-lemma eq_pointwise {w w': BDWord T} :
+lemma eq_pointwise {w w' : BDWord T} :
     (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2] = w'[2]) ∧ (w[3] = w'[3]) ∧
     (w[4] = w'[4]) ∧ (w[5] = w'[5]) ∧ (w[6] = w'[6]) ∧ (w[7] = w'[7]) ∧
     (w[8] = w'[8]) ∧ (w[9] = w'[9]) ∧ (w[10] = w'[10]) ∧ (w[11] = w'[11]) ∧
@@ -887,10 +887,10 @@ lemma isU128_high_isU64 {w : BDWord (Fin KB)} (hw : w.isU128) : w.high.isU64 := 
 
 /-- Convert a bytedword to a `Nat` by shifting and adding the limbs. -/
 def toNat (w : BDWord (Fin KB)) : ℕ :=
-  w[0] + w[1] * 2^8 + w[2] * 2^16 + w[3] * 2^24 + w[4] * 2^32 + w[5] * 2^40 + w[6] * 2^48 + w[7] * 2^56 +
-  w[8] * 2^64 + w[9] * 2^72 + w[10] * 2^80 + w[11] * 2^88 + w[12] * 2^96 + w[13] * 2^104 + w[14] * 2^112 + w[15] * 2^120
+  w[0] + w[1] * 2 ^ 8 + w[2] * 2 ^ 16 + w[3] * 2 ^ 24 + w[4] * 2 ^ 32 + w[5] * 2 ^ 40 + w[6] * 2 ^ 48 + w[7] * 2 ^ 56 +
+  w[8] * 2 ^ 64 + w[9] * 2 ^ 72 + w[10] * 2 ^ 80 + w[11] * 2 ^ 88 + w[12] * 2 ^ 96 + w[13] * 2 ^ 104 + w[14] * 2 ^ 112 + w[15] * 2 ^ 120
 
-lemma toNat_lt_of_isU128 {w : BDWord (Fin KB)} (hw : w.isU128) : w.toNat < 2^128 := by
+lemma toNat_lt_of_isU128 {w : BDWord (Fin KB)} (hw : w.isU128) : w.toNat < 2 ^ 128 := by
   unfold toNat
   aesop (add 50% tactic (by omega))
 
@@ -919,7 +919,7 @@ lemma isNegative_msb
 lemma isNegative_BitVec.toInt
   {w : BDWord (Fin KB)}
   (h_w_isU128 : w.isU128) :
-    w.isNegative ↔ ¬ 2 * w.toNat < 2^128 := by
+    w.isNegative ↔ ¬ 2 * w.toNat < 2 ^ 128 := by
   rw [isNegative_msb h_w_isU128]
   simp [BitVec.msb_eq_decide]
   rw [toBitVec128_toNat h_w_isU128]
@@ -927,14 +927,14 @@ lemma isNegative_BitVec.toInt
 
 /-- Convert a bytedword to an `Int` by shifting and adding the limbs, with sign correction. -/
 def toInt (w : BDWord (Fin KB)) : ℤ :=
-  if (isNegative w) then w.toNat - 2^128 else w.toNat
+  if (isNegative w) then w.toNat - 2 ^ 128 else w.toNat
 
 set_option maxRecDepth 200000
 lemma toBitVec128_toInt {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
     w.toBitVec128.toInt = w.toInt
   := by
     have := lt_cases_of_isU128 h_w_isU128
-    have : w.toNat < 2^128 := by unfold BDWord.toNat; omega
+    have : w.toNat < 2 ^ 128 := by unfold BDWord.toNat; omega
     simp_all [toBitVec128, toInt, BitVec.toInt]
     split_ifs <;> rw [isNegative_BitVec.toInt h_w_isU128] at * <;> omega
 

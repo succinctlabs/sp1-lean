@@ -39,7 +39,7 @@ theorem correct (Main : Vector (Fin KB) 47)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
-      reg_val + offset + 2 < 2^64)
+      reg_val + offset + 2 < 2 ^ 64)
     -- dt: This should eventually come from trusted instruction assumption
     -- should try to simplify it more first to minimize assumptions though
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr

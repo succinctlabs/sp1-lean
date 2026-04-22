@@ -1201,7 +1201,7 @@ lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : 
     rw [Int.bmod_eq_emod] at sum_zero
     split_ifs at sum_zero with h_bmod <;> omega
 
-lemma extractLsb_is_toInt {x : BitVec 128} (hlb : - 9223372036854775808 ≤ x.toInt) (hub : x.toInt < 9223372036854775808) :
+lemma extractLsb_is_toInt {x : BitVec 128} (hlb : -9223372036854775808 ≤ x.toInt) (hub : x.toInt < 9223372036854775808) :
   (BitVec.extractLsb 63 0 x).toInt = x.toInt := by
     by_cases case : 0 ≤ x.toInt <;> simp at case
     . simp [BitVec.toInt] at *; split_ifs at * <;> omega

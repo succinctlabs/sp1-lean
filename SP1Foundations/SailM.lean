@@ -745,7 +745,7 @@ def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : mop) : BitVec 64 
     then (Sail.BitVec.extractLsb result_wide 63 0)
     else (Sail.BitVec.extractLsb result_wide 127 64))
 
-lemma combine_MUL_MULH {pl ph op1 op2: Word (Fin KB)}
+lemma combine_MUL_MULH {pl ph op1 op2 : Word (Fin KB)}
   (isU64_pl : pl.isU64) (isU64_ph : ph.isU64)
   (isU64_op1 : op1.isU64) (isU64_op2 : op2.isU64) :
   Word.toBitVec64 pl = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MUL →
@@ -771,7 +771,7 @@ lemma combine_MUL_MULH {pl ph op1 op2: Word (Fin KB)}
     ring_nf
   . bv_decide
 
-lemma combine_MUL_MULHU {pl ph op1 op2: Word (Fin KB)}
+lemma combine_MUL_MULHU {pl ph op1 op2 : Word (Fin KB)}
   (isU64_pl : pl.isU64) (isU64_ph : ph.isU64)
   (isU64_op1 : op1.isU64) (isU64_op2 : op2.isU64) :
   Word.toBitVec64 pl = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MUL →

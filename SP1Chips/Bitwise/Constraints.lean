@@ -268,7 +268,7 @@ end operands
 
 section xor
 
-lemma spec.xor (h : is_xor Main ) :
+lemma spec.xor (h : is_xor Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .XOR
@@ -288,7 +288,7 @@ end xor
 
 section xori
 
-lemma spec.xori (h : is_xori Main ) :
+lemma spec.xori (h : is_xori Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .XORI
@@ -313,7 +313,7 @@ end xori
 
 section or
 
-lemma spec.or (h : is_or Main ) :
+lemma spec.or (h : is_or Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .OR
@@ -334,7 +334,7 @@ end or
 
 section ori
 
-lemma spec.ori (h : is_ori Main ) :
+lemma spec.ori (h : is_ori Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .ORI
@@ -359,7 +359,7 @@ end ori
 
 section and
 
-lemma spec.and (h : is_and Main ) :
+lemma spec.and (h : is_and Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .AND
@@ -380,7 +380,7 @@ end and
 
 section andi
 
-lemma spec.andi (h : is_andi Main ) :
+lemma spec.andi (h : is_andi Main) :
   List.Forall SP1Constraint.toProp (constraints Main) →
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
     Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]] = execute_ITYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .ANDI

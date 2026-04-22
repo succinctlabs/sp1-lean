@@ -38,7 +38,7 @@ theorem correct (Main : Vector (Fin KB) 52)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
-      reg_val + offset + 1 < 2^64)
+      reg_val + offset + 1 < 2 ^ 64)
     (h_below_clint :
       let reg_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
       let offset := BitVec.signExtend 64 (sp1_imm_c Main)

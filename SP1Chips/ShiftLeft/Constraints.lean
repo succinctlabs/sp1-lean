@@ -358,7 +358,7 @@ lemma allHold_constraints_iff :
 
 section field_arithmetic
 
-lemma cancel_mul_65536 { a b c x : Fin KB } (h_dvd : (x : ℕ) ∣ 65536) : a * x = b * 65536 + c * x → a = b * ((65536 : ℕ) / (x : ℕ)) + c
+lemma cancel_mul_65536 {a b c x : Fin KB} (h_dvd : (x : ℕ) ∣ 65536) : a * x = b * 65536 + c * x → a = b * ((65536 : ℕ) / (x : ℕ)) + c
   := by
   obtain ⟨ z, h_eq ⟩ := h_dvd; rw [h_eq]
   have x_pos : 0 < (x : ℕ) := by nlinarith

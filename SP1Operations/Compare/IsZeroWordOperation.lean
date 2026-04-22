@@ -15,7 +15,7 @@ lemma spec
 lemma spec.gen
   {a : Word (Fin KB)}
   {cols : IsZeroWordOperation}
-  {is_real : Fin KB}:
+  {is_real : Fin KB} :
   List.Forall SP1Constraint.toProp (constraints a cols is_real) →
     is_real = 1 →
       cols.result = if a = #v[(0 : Fin KB), (0 : Fin KB), (0 : Fin KB), (0 : Fin KB)] then 1 else 0
