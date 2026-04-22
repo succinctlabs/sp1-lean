@@ -275,7 +275,7 @@ lemma add_signExtend_of_constraints (Main : Vector (Fin KB) 46)
       BitVec.signExtend 64 (BitVec.ofNat 13 Main[21]) := by simp_all only
     have h_pc0_mul4 : Main[21].val % 4 = 0 := by simp_all only
     apply BitVec.add_mod4_eq_zero_of_mod4_eq_zero
-    · show _ % 4#64 = 0#64
+    · change _ % 4#64 = 0#64
       rw [BitVec.ofNat64_mod_4_eq_zero_iff]
       exact h_pc0_nat_mul4
     · simp only [← h_trusted_signExtend, Word.toBitVec64, Word.toNat, Nat.reducePow,

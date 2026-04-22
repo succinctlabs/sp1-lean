@@ -194,7 +194,7 @@ section operands
 def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
   intro cstrs real
   refine BitVec.ofNatLT Main[6] ?_
-  show Main[6] < 32
+  change Main[6] < 32
   have := register_bounds Main cstrs real
   tauto
 
@@ -202,7 +202,7 @@ def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
   intro cstrs real
   refine BitVec.ofNatLT Main[14] ?_
-  show Main[14] < 32
+  change Main[14] < 32
   have := register_bounds Main cstrs real
   tauto
 
@@ -210,7 +210,7 @@ def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 0 → BitVec 5 := by
   intro cstrs real imm
   refine BitVec.ofNatLT Main[21] ?_
-  show Main[21] < 32
+  change Main[21] < 32
   have := register_bounds Main cstrs real
   tauto
 

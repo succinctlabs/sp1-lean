@@ -375,7 +375,7 @@ lemma cancel_mul_65536 {a b c x : Fin KB} (h_dvd : (x : ℕ) ∣ 65536) : a * x 
   intro eq; apply mul_right_cancel₀ (by omega) at eq; rw [eq]
   congr
   rw [Fin.ext_iff]
-  show z % 2130706433 = (↑x * z % 2130706433 / (x.val % 2130706433))
+  change z % 2130706433 = (↑x * z % 2130706433 / (x.val % 2130706433))
   rw [Nat.mod_eq_of_lt z_BB, Nat.mod_eq_of_lt xz_BB, Nat.mod_eq_of_lt x.isLt,
     Nat.mul_div_cancel_left _ x_pos]
 
@@ -483,7 +483,7 @@ section operands
 def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
   intro cstrs real
   refine BitVec.ofNatLT Main[6] ?_
-  show Main[6] < 32
+  change Main[6] < 32
   have := bounds Main cstrs real
   tauto
 
@@ -491,7 +491,7 @@ def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
   intro cstrs real
   refine BitVec.ofNatLT Main[14] ?_
-  show Main[14] < 32
+  change Main[14] < 32
   have := bounds Main cstrs real
   tauto
 
@@ -499,7 +499,7 @@ def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 0 → BitVec 5 := by
   intro cstrs real imm
   refine BitVec.ofNatLT Main[21] ?_
-  show Main[21] < 32
+  change Main[21] < 32
   have := bounds Main cstrs real
   tauto
 

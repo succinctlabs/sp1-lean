@@ -93,7 +93,7 @@ def spec_slti (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 def sp1_op_a : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[6] ?_
-    show Main[6] < 32
+    change Main[6] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -106,7 +106,7 @@ def sp1_op_b : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[14] ?_
     simp
-    show Main[14] < 32
+    change Main[14] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -119,7 +119,7 @@ def sp1_op_c : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[21] ?_
     simp
-    show Main[21] < 32
+    change Main[21] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -218,7 +218,7 @@ def spec_sltu (rs2 rs1 rd : regidx) : SailM Unit := do
 def sp1_op_a : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[6] ?_
-    show Main[6] < 32
+    change Main[6] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -231,7 +231,7 @@ def sp1_op_b : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[14] ?_
     simp
-    show Main[14] < 32
+    change Main[14] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -244,7 +244,7 @@ def sp1_op_c : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[21] ?_
     simp
-    show Main[21] < 32
+    change Main[21] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -320,7 +320,7 @@ def spec_sltiu (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 def sp1_op_a : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[6] ?_
-    show Main[6] < 32
+    change Main[6] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -333,7 +333,7 @@ def sp1_op_b : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[14] ?_
     simp
-    show Main[14] < 32
+    change Main[14] < 32
 
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
