@@ -44,7 +44,11 @@ theorem correct (Main : Vector (Fin KB) 47)
     -- should try to simplify it more first to minimize assumptions though
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
-        (BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])))) 2 = true) :
+        (BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])))) 2 = true)
+    (h_below_clint :
+      let reg_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
+      let offset := BitVec.signExtend 64 (sp1_imm_c Main)
+      BitVec.toNat (reg_val + offset) + 2 ≤ 33554432) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
@@ -121,6 +125,7 @@ theorem correct (Main : Vector (Fin KB) 47)
   · simpa [imm_c, sp1_imm_c] using h_is_aligned
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · simpa [Std.ExtDHashMap.get_insert]
+  · simpa [imm_c, sp1_imm_c] using h_below_clint
 
 end StoreHalf
 
