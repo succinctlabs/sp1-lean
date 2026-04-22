@@ -1333,11 +1333,11 @@ lemma signExtend64_ofNat8_of_ge_128 (x : Fin KB) (hlt : x.val < 256) (hge : 128 
 /-- If `lo + hi * 256 = x` (in Fin KB) with `lo < 256` and `hi < 256`, then
     `x.val = lo.val + hi.val * 256` at the Nat level (no mod). -/
 lemma nat_decomp_of_inv8_decomp (lo hi x : Fin KB)
-    (h : lo + hi * (2^8 : Fin KB) = x)
+    (h : lo + hi * (2 ^ 8 : Fin KB) = x)
     (hlo : lo.val < 256) (hhi : hi.val < 256) :
     x.val = lo.val + hi.val * 256 := by
   have hx := congr_arg Fin.val h
-  have h256 : ((2^8 : Fin KB).val = 256) := by decide
+  have h256 : ((2 ^ 8 : Fin KB).val = 256) := by decide
   rw [Fin.val_add, Fin.val_mul, h256,
       Nat.mod_eq_of_lt (show hi.val * 256 < _ by omega),
       Nat.mod_eq_of_lt (show lo.val + hi.val * 256 < _ by omega)] at hx
@@ -1347,7 +1347,6 @@ lemma nat_decomp_of_inv8_decomp (lo hi x : Fin KB)
 lemma bitVec_ofNat8_eq_of_mod (a b : ℕ) (h : a % 256 = b % 256) :
     BitVec.ofNat 8 a = BitVec.ofNat 8 b := by
   rw [← BitVec.toNat_inj, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  show a % 2^8 = b % 2^8
   simpa using h
 
 /-- Zero-extend a byte: always produces just the byte (upper zeros). -/
@@ -1386,14 +1385,14 @@ lemma signExtend64_ofNat8_of_lt_128 (x : Fin KB) (hlt : x.val < 256) (hge : x.va
 private lemma toNat_append_bytes (hi lo : BitVec 8) :
     (hi ++ lo).toNat = hi.toNat * 256 + lo.toNat := by
   rw [BitVec.toNat_append]
-  have hlo : lo.toNat < 2^8 := lo.isLt
+  have hlo : lo.toNat < 2 ^ 8 := lo.isLt
   rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) hlo, Nat.shiftLeft_eq]
 
 /-- Concat of low and high bytes of a halfword `x` (value < 65536) equals `x.val` as Nat. -/
 private lemma toNat_concat_halfword_bytes (x : Fin KB) (hlt : x.val < 65536) :
     (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val).toNat = x.val := by
   rw [toNat_append_bytes, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
-  have h256 : (2^8 : ℕ) = 256 := rfl
+  have h256 : (2 ^ 8 : ℕ) = 256 := rfl
   rw [h256]
   omega
 
@@ -1421,7 +1420,7 @@ lemma signExtend64_ofNat16_concat_of_lt_32768
   have hmsb_false : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = false := by
     rw [BitVec.msb_eq_decide, toNat_concat_halfword_bytes x hlt]
     simp only [decide_eq_false_iff_not, not_le]
-    show _ < 2^15
+    change _ < 2 ^ 15
     omega
   rw [hmsb_false]
   simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
@@ -1444,7 +1443,7 @@ lemma signExtend64_ofNat16_concat_of_ge_32768
   have hmsb_true : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = true := by
     rw [BitVec.msb_eq_decide, toNat_concat_halfword_bytes x hlt]
     simp only [decide_eq_true_eq]
-    show 2^15 ≤ _
+    change 2 ^ 15 ≤ _
     omega
   rw [hmsb_true]
   simp only [↓reduceIte]
@@ -1454,8 +1453,8 @@ lemma signExtend64_ofNat16_concat_of_ge_32768
   simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, show ((65535 : Fin KB).val = 65535) from rfl]
   rw [Nat.mod_eq_of_lt (by have := x.isLt; omega)]
-  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
-  show x.val + (2^64 - 2^(8 + 8)) = x.val + 65535 * 2^16 + 65535 * 2^32 + 65535 * 2^48
+  rw [Nat.mod_eq_of_lt (by omega)]
+  change x.val + (2 ^ 64 - 2^(8 + 8)) = x.val + 65535 * 2 ^ 16 + 65535 * 2 ^ 32 + 65535 * 2 ^ 48
   omega
 
 /-- toNat of a 4-byte (32-bit word) concat equals `x.val + y.val * 65536` when each halfword
@@ -1472,7 +1471,7 @@ private lemma toNat_concat_word_bytes (x y : Fin KB)
   have hy_decomp : y.val % 256 + (y.val >>> 8) * 256 = y.val := by
     rw [Nat.shiftRight_eq_div_pow]; omega
   simp only [BitVec.toNat_append, BitVec.toNat_ofNat, Nat.reducePow,
-    show (2^8 : ℕ) = 256 from rfl]
+    show (2 ^ 8 : ℕ) = 256 from rfl]
   have hx_hi_mod : x.val >>> 8 % 256 = x.val >>> 8 := Nat.mod_eq_of_lt hx_hi
   have hy_hi_mod : y.val >>> 8 % 256 = y.val >>> 8 := Nat.mod_eq_of_lt hy_hi
   rw [hx_hi_mod, hy_hi_mod]
@@ -1500,7 +1499,7 @@ lemma setWidth64_ofNat32_concat (x y : Fin KB) (hx : x.val < 65536) (hy : y.val 
   rw [BitVec.toNat_ofNat, Word.toNat_def]
   simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
-  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
   rw [Nat.mod_eq_of_lt (by omega)]
   ring
 
@@ -1517,7 +1516,7 @@ lemma signExtend64_ofNat32_concat_of_lt_32768
        BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = false := by
     rw [BitVec.msb_eq_decide, toNat_concat_word_bytes x y hx hy]
     simp only [decide_eq_false_iff_not, not_le]
-    show _ < 2^31
+    change _ < 2 ^ 31
     omega
   rw [hmsb_false]
   simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
@@ -1526,7 +1525,7 @@ lemma signExtend64_ofNat32_concat_of_lt_32768
   rw [BitVec.toNat_ofNat, Word.toNat_def]
   simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, show ((0 : Fin KB).val = 0) from rfl]
-  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
   rw [Nat.mod_eq_of_lt (by omega)]
   ring
 
@@ -1543,7 +1542,7 @@ lemma signExtend64_ofNat32_concat_of_ge_32768
        BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = true := by
     rw [BitVec.msb_eq_decide, toNat_concat_word_bytes x y hx hy]
     simp only [decide_eq_true_eq]
-    show 2^31 ≤ _
+    change 2 ^ 31 ≤ _
     omega
   rw [hmsb_true]
   simp only [↓reduceIte]
@@ -1552,10 +1551,10 @@ lemma signExtend64_ofNat32_concat_of_ge_32768
   rw [BitVec.toNat_ofNat, Word.toNat_def]
   simp only [Fin.isValue, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, show ((65535 : Fin KB).val = 65535) from rfl]
-  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
-  rw [Nat.mod_eq_of_lt (by show _ < 2^64; omega)]
-  show x.val + y.val * 2^16 + (2^64 - 2^(8 + 8 + 8 + 8)) =
-       x.val + y.val * 2^16 + 65535 * 2^32 + 65535 * 2^48
+  rw [Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  change x.val + y.val * 2 ^ 16 + (2 ^ 64 - 2^(8 + 8 + 8 + 8)) =
+       x.val + y.val * 2 ^ 16 + 65535 * 2 ^ 32 + 65535 * 2 ^ 48
   omega
 
 section getByte

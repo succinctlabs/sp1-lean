@@ -77,6 +77,7 @@ private lemma halfword_msb (a b : Fin KB)
       omega
 
 set_option maxHeartbeats 4000000 in
+-- correct_lh unfolds Load chip + Sail 2-byte memory read
 theorem correct_lh (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -86,7 +87,7 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
-      reg_val + offset + 2 < 2^64)
+      reg_val + offset + 2 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 2 = true)
@@ -104,16 +105,13 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
   obtain ⟨h_addr, h39, h40, h29, hb,
     h_u16msb, h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',
     h45_zero, h13, h30, h31, h32, h33, h44_zero⟩ := h_cstrs
-
   -- Extract reader facts
   simp [ITypeReader.constraints] at h_reader
   have h25 : Main[25] = 1 := by have := h_reader.2.2.1.resolve_right (by decide); omega
   simp [h25, SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
   obtain ⟨h14, h21, h6, rest⟩ := h_reader
   simp [Fin.lt_def] at rest
-
   have h2728 : ¬ (Main[27] = 0 ∧ Main[28] = 0) := by clear *- h29; aesop
-
   -- Extract U16MSB facts: Main[42] ∈ {0,1} and (2*Main[41] - Main[42]*65536).val < 65536
   simp [U16MSBOperation.constraints, SP1Constraint.toProp, Opcode.ofNat, Nat.ble] at h_u16msb
   obtain ⟨h42_01, h41_hi⟩ := h_u16msb
@@ -121,7 +119,6 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
     rcases h42_01 with h | h
     · left; exact h
     · right; rw [sub_eq_zero] at h; exact h
-
   -- Memory send tells us Main[30..33] < 65536 (via Word.isU64).
   have hmem_isU64 : Word.isU64 #v[Main[30], Main[31], Main[32], Main[33]] := by
     have := hmem; simp [SP1Constraint.toProp] at this; exact this
@@ -129,7 +126,6 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
   have h31_lt : Main[31].val < 65536 := by have := hmem_isU64 ⟨1, by decide⟩; simpa using this
   have h32_lt : Main[32].val < 65536 := by have := hmem_isU64 ⟨2, by decide⟩; simpa using this
   have h33_lt : Main[33].val < 65536 := by have := hmem_isU64 ⟨3, by decide⟩; simpa using this
-
   -- Main[41] equals exactly one of Main[30..33] based on h39/h40.
   -- Combining this with h30..h33_lt gives Main[41].val < 65536.
   have h41_eq : Main[41] = Main[30] ∧ Main[39] = 0 ∧ Main[40] = 0 ∨
@@ -157,17 +153,14 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
       · rw [h39] at h; exact absurd h (by decide)
       · rw [h40] at h; exact absurd h (by decide)
       · exact h
-
   have h41_lt : Main[41].val < 65536 := by
     rcases h41_eq with ⟨he, _⟩ | ⟨he, _⟩ | ⟨he, _⟩ | ⟨he, _⟩
     · rw [he]; exact h30_lt
     · rw [he]; exact h31_lt
     · rw [he]; exact h32_lt
     · rw [he]; exact h33_lt
-
   -- Derive MSB characterization using the helper lemma
   have h42_iff : Main[42] = 1 ↔ 32768 ≤ Main[41].val := halfword_msb _ _ h41_lt h42_01' h41_hi
-
   -- Extract initial-state facts
   simp [LoadHalf.constraints, AddressOperation.constraints,
     SP1Constraint.toStateProp, AddrAddOperation.constraints,
@@ -175,39 +168,31 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
     CPUState.constraints, ITypeReader.constraints, BitVec.ofNatLT_eq_ofNat,
     Opcode.ofNat, Nat.ble, h6, h14, h25, h2728, h_is_lh] at state_cstrs
   obtain ⟨h_read_pc, h6_op_a, h14_op_a, hload⟩ := state_cstrs
-
   -- h_read_pc etc. are gated by `¬ 1 + Main[44] = 0`. Since Main[44] = 0 (h44_zero), 1 + 0 = 1 ≠ 0.
   have h_not : ¬ ((1 : Fin KB) + Main[44] = 0) := by rw [h44_zero]; decide
   specialize h_read_pc h_not
   specialize h6_op_a h_not
   specialize h14_op_a h_not
   specialize hload h_not
-
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
-
   have h6 : BitVec.ofNat 5 Main[6] ≠ 0#5 := by simp [← BitVec.toNat_inj]; omega
-
   -- The immediate fits into a 12-bit word
   have hu6421 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
     apply Word.isU64_of_cases <;> {clear *- rest; simp_all}
-
   have h21' : BitVec.signExtend 64 (BitVec.ofNat 12 (Main[21] : ℕ)) =
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] := h21.symm
-
   -- From AddrAddOperation: (reg_val + offset) = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0]
   have haddr_add := AddrAddOperation.spec_of_constraints _ _ (by
     clear *- rest; simp_all only) hu6421 _ h_addr
   obtain ⟨_, haddr_eq⟩ := haddr_add
   simp only [Vector.getElem_mk, List.getElem_toArray,
     List.getElem_cons_zero, List.getElem_cons_succ] at haddr_eq
-
   have h_fits_real : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
-      (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat < 2^64 := by
+      (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat < 2 ^ 64 := by
     have := h_fits_in_mem
     simp only [sp1_imm_c] at this
     rw [← h21] at this
     omega
-
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Word.toNat #v[Main[26], Main[27], Main[28], 0] := by
@@ -215,24 +200,20 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at this
     rw [← this, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by simp [Word.toNat]; omega)]
-
   have h26_isLt : Main[26].val < KB := Main[26].isLt
   have h27_isLt : Main[27].val < KB := Main[27].isLt
   have h28_isLt : Main[28].val < KB := Main[28].isLt
   have h_KB : KB = 2130706433 := rfl
-
   -- Simplify monadic form on the spec side
   simp [spec_lh, sp1_load_half,
     sp1_op_a, sp1_ob_b, sp1_imm_c,
     op_a, op_b, imm_c, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, h6]
-
   rw [run_vmem_read_of_width_2' (BitVec.ofNat 5 Main[14])
     (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
     (BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val))
     (BitVec.ofNat 8 Main[41].val)
     (BitVec.ofNat 8 (Main[41].val >>> 8))]
-
   -- Main goal: reconstruct the halfword and sign/zero-extend appropriately.
   · by_cases h_neg : 32768 ≤ Main[41].val
     · -- Main[42] = 1
@@ -254,26 +235,19 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
         signExtend64_ofNat16_concat_of_lt_32768 Main[41] h41_lt h_neg
       simp [extend_value, sign_extend, Sail.BitVec.signExtend, bitVecToRegidxVal,
         hext, h42, mul_zero, h_read_pc]
-
   -- Side condition: isInitialized of post-write-pc state
   · simp only [isInitialized_iff, Std.ExtDHashMap.mem_insert, beq_iff_eq, hs,
       or_true, implies_true]
-
   -- Side condition: get_reg? of op_b in post-write-pc state
   · simpa [BitVec.ofNatLT_eq_ofNat] using h14_op_a
-
   -- Side condition: is_aligned_vaddr
   · exact h_is_aligned
-
   -- Side condition: isValidMemConfig
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
-
-  -- Side condition: fits in 2^64
+  -- Side condition: fits in 2 ^ 64
   · exact h_fits_in_mem
-
   -- Side condition: below clint
   · exact h_below_clint
-
   -- Memory at addr contains low byte
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
             Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] from h21.symm,
@@ -292,7 +266,6 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
     · rw [he]
       rw [show Main[26] = Main[26] - 4 * Main[40] - 2 * Main[39] + 6 by rw [he39, he40]; ring]
       exact hL6
-
   -- Memory at addr+1 contains high byte
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
             Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] from h21.symm,
@@ -334,6 +307,7 @@ theorem correct_lh (Main : Vector (Fin KB) 46)
       exact hL7
 
 set_option maxHeartbeats 4000000 in
+-- correct_lhu unfolds Load chip + Sail 2-byte memory read
 theorem correct_lhu (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -343,7 +317,7 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
-      reg_val + offset + 2 < 2^64)
+      reg_val + offset + 2 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 2 = true)
@@ -361,16 +335,13 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
   obtain ⟨h_addr, h39, h40, h29, hb,
     h_u16msb, h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',
     h45_zero, h13, h30, h31, h32, h33, h43_zero, h42_zero⟩ := h_cstrs
-
   -- Extract reader facts
   simp [ITypeReader.constraints] at h_reader
   have h25 : Main[25] = 1 := by have := h_reader.2.2.1.resolve_right (by decide); omega
   simp [h25, SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
   obtain ⟨h14, h21, h6, rest⟩ := h_reader
   simp [Fin.lt_def] at rest
-
   have h2728 : ¬ (Main[27] = 0 ∧ Main[28] = 0) := by clear *- h29; aesop
-
   -- Memory send tells us Main[30..33] < 65536.
   have hmem_isU64 : Word.isU64 #v[Main[30], Main[31], Main[32], Main[33]] := by
     have := hmem; simp [SP1Constraint.toProp] at this; exact this
@@ -378,7 +349,6 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
   have h31_lt : Main[31].val < 65536 := by have := hmem_isU64 ⟨1, by decide⟩; simpa using this
   have h32_lt : Main[32].val < 65536 := by have := hmem_isU64 ⟨2, by decide⟩; simpa using this
   have h33_lt : Main[33].val < 65536 := by have := hmem_isU64 ⟨3, by decide⟩; simpa using this
-
   have h41_eq : Main[41] = Main[30] ∧ Main[39] = 0 ∧ Main[40] = 0 ∨
                 Main[41] = Main[31] ∧ Main[39] = 1 ∧ Main[40] = 0 ∨
                 Main[41] = Main[32] ∧ Main[39] = 0 ∧ Main[40] = 1 ∨
@@ -404,14 +374,12 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
       · rw [h39] at h; exact absurd h (by decide)
       · rw [h40] at h; exact absurd h (by decide)
       · exact h
-
   have h41_lt : Main[41].val < 65536 := by
     rcases h41_eq with ⟨he, _⟩ | ⟨he, _⟩ | ⟨he, _⟩ | ⟨he, _⟩
     · rw [he]; exact h30_lt
     · rw [he]; exact h31_lt
     · rw [he]; exact h32_lt
     · rw [he]; exact h33_lt
-
   -- Extract initial-state facts (use Main[44] = 1 guard)
   simp [LoadHalf.constraints, AddressOperation.constraints,
     SP1Constraint.toStateProp, AddrAddOperation.constraints,
@@ -425,28 +393,22 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
   specialize h14_op_a h_not
   specialize hload h_not
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
-
   have h6 : BitVec.ofNat 5 Main[6] ≠ 0#5 := by simp [← BitVec.toNat_inj]; omega
-
   have hu6421 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
     apply Word.isU64_of_cases <;> {clear *- rest; simp_all}
-
   have h21' : BitVec.signExtend 64 (BitVec.ofNat 12 (Main[21] : ℕ)) =
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] := h21.symm
-
   have haddr_add := AddrAddOperation.spec_of_constraints _ _ (by
     clear *- rest; simp_all only) hu6421 _ h_addr
   obtain ⟨_, haddr_eq⟩ := haddr_add
   simp only [Vector.getElem_mk, List.getElem_toArray,
     List.getElem_cons_zero, List.getElem_cons_succ] at haddr_eq
-
   have h_fits_real : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
-      (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat < 2^64 := by
+      (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat < 2 ^ 64 := by
     have := h_fits_in_mem
     simp only [sp1_imm_c] at this
     rw [← h21] at this
     omega
-
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Word.toNat #v[Main[26], Main[27], Main[28], 0] := by
@@ -454,23 +416,19 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at this
     rw [← this, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by simp [Word.toNat]; omega)]
-
   have h26_isLt : Main[26].val < KB := Main[26].isLt
   have h27_isLt : Main[27].val < KB := Main[27].isLt
   have h28_isLt : Main[28].val < KB := Main[28].isLt
   have h_KB : KB = 2130706433 := rfl
-
   simp [spec_lhu, sp1_load_half,
     sp1_op_a, sp1_ob_b, sp1_imm_c,
     op_a, op_b, imm_c, run_readReg_of_isInitialized _ _ hs,
     EStateM.Result.map, execute_LOAD, h_read_pc, h6]
-
   rw [run_vmem_read_of_width_2' (BitVec.ofNat 5 Main[14])
     (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
     (BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val))
     (BitVec.ofNat 8 Main[41].val)
     (BitVec.ofNat 8 (Main[41].val >>> 8))]
-
   -- Main goal: zero-extend
   · have hext : BitVec.setWidth 64 (BitVec.ofNat 8 (Main[41].val >>> 8) ++
           BitVec.ofNat 8 Main[41].val) =
@@ -478,7 +436,6 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
       setWidth64_ofNat16_concat Main[41] h41_lt
     simp [extend_value, zero_extend, Sail.BitVec.zeroExtend, bitVecToRegidxVal,
       hext, h42_zero, mul_zero]
-
   -- Side conditions
   · simp only [isInitialized_iff, Std.ExtDHashMap.mem_insert, beq_iff_eq, hs,
       or_true, implies_true]
@@ -487,7 +444,6 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · exact h_fits_in_mem
   · exact h_below_clint
-
   -- Memory byte 0
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
             Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] from h21.symm,
@@ -506,7 +462,6 @@ theorem correct_lhu (Main : Vector (Fin KB) 46)
     · rw [he]
       rw [show Main[26] = Main[26] - 4 * Main[40] - 2 * Main[39] + 6 by rw [he39, he40]; ring]
       exact hL6
-
   -- Memory byte 1
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
             Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] from h21.symm,
