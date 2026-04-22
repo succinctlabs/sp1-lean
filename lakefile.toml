@@ -9,6 +9,7 @@ preferReleaseBuild = true
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 linter.unusedSimpArgs = false
+linter.flexible = false
 synthInstance.maxHeartbeats = 1000000
 weak.linter.mathlibStandardSet = true
 # autoImplicit = false -- Might be good to consider this, given the amount of coercions we use
