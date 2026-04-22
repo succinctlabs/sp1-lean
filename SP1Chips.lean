@@ -15,9 +15,13 @@ import SP1Chips.JalChip
 import SP1Chips.Jalr.Constraints
 import SP1Chips.JalrChip
 import SP1Chips.Load.LoadByte.Constraints
+import SP1Chips.LoadByteChip
 import SP1Chips.Load.LoadDouble.Constraints
+import SP1Chips.LoadDoubleChip
 import SP1Chips.Load.LoadHalf.Constraints
+import SP1Chips.LoadHalfChip
 import SP1Chips.Load.LoadWord.Constraints
+import SP1Chips.LoadWordChip
 import SP1Chips.Load.LoadX0.Constraints
 import SP1Chips.Lt.Constraints
 import SP1Chips.LtChip
