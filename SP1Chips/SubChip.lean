@@ -64,10 +64,10 @@ theorem correct_sub
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . rw [← is_sub]
+    · rw [← is_sub]
       simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]

@@ -34,12 +34,12 @@ theorem spec
     apply Word.lt_cases_of_isU64 at h_isU64_a
     apply Word.lt_cases_of_isU64 at h_isU64_b
     split_ands
-    . clear *- hbds; aesop
-    . simp [BitVec.eq_sub_iff_add_eq]
+    · clear *- hbds; aesop
+    · simp [BitVec.eq_sub_iff_add_eq]
       simp [HWord.toBitVec32, Word.low, HWord.toNat]
       rw [← BitVec.toNat_inj, BitVec.toNat_add]
       aesop (add safe (by omega))
-    . simp [Fin.lt_def] at hbds
+    · simp [Fin.lt_def] at hbds
       apply U16MSBOperation.spec (by omega) at hmsb
       simp [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
       simp at hmsb; split_ifs at * <;> omega

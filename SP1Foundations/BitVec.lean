@@ -92,9 +92,9 @@ namespace Nat
 lemma lift_lt {a b : ℕ} (w : ℕ) : a < 2 ^ w → b < 2 ^ w → (a < b ↔ BitVec.ofNat w a < BitVec.ofNat w b) := by
   intro haw hbw
   constructor <;> intro lhs <;> simp_all
-  . repeat rw [Nat.mod_eq_of_lt (by omega)]
+  · repeat rw [Nat.mod_eq_of_lt (by omega)]
     assumption
-  . repeat rw [Nat.mod_eq_of_lt (by omega)] at lhs
+  · repeat rw [Nat.mod_eq_of_lt (by omega)] at lhs
     assumption
 
 end Nat
@@ -211,15 +211,15 @@ lemma toInt_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
   all_goals
     simp_all
     try omega
-  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+  · have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
     omega
-  . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
+  · have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
     omega
-  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+  · have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
     omega
@@ -238,7 +238,7 @@ lemma toInt_toNat_as_toNat_128 {r1 r2 : BitVec 64} :
   all_goals
     simp_all
     try omega
-  . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
+  · have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
     omega
@@ -258,7 +258,7 @@ lemma toNat_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
   all_goals
     simp_all
     try omega
-  . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
+  · have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
     omega

@@ -18,7 +18,7 @@ lemma div_mod_decomposition {a b c : Fin KB} :
   a < 256 → c.val < 2130706433 / 256 → (a = b - c * 256 ↔ a = b % 256 ∧ c = b / 256) := by
   intro ub_a ub_c
   constructor
-  . intro eq_a
+  · intro eq_a
     simp [Fin.lt_def, Fin.ext_iff] at *
     have lb_b : c * 256 ≤ b := by
       by_contra lb_b
@@ -29,7 +29,7 @@ lemma div_mod_decomposition {a b c : Fin KB} :
     simp [Fin.mul_def] at eq_a
     rw [Nat.mod_eq_of_lt (by omega)] at eq_a
     omega
-  . intro ⟨ eq_a, eq_c ⟩
+  · intro ⟨ eq_a, eq_c ⟩
     simp_all
     have := Nat.div_add_mod b.val 256
     symm; rw [sub_eq_iff_eq_add]; symm
@@ -198,9 +198,9 @@ lemma core_mul
   simp_all [BWord.extend, BDWord.toNat]
   ring_nf
   rw [mod_add_mod_zero (b := _ * _ * 1780731860627700044767655233185921512125162448076065661987177973493530624 ) (by simp)]
-  . repeat apply mod_add_split _ (by apply mod_mul_split (by rfl) (by simp))
+  · repeat apply mod_add_split _ (by apply mod_mul_split (by rfl) (by simp))
     rfl
-  . split_ifs <;> simp
+  · split_ifs <;> simp
   all_goals
     clear *- bw00 bw01 bw02 bw03 bw04 bw05 bw06 bw07 bw08 bw09 bw10 bw11 bw12 bw13 bw14 bw15
              cw00 cw01 cw02 cw03 cw04 cw05 cw06 cw07 cw08 cw09 cw10 cw11 cw12 cw13 cw14 cw15
@@ -971,8 +971,8 @@ lemma spec.mul {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
     apply BWord.toWord_U64; apply BDWord.isU128_low_isU64 isU128_prod
   rw [BWord.toWord_toBitVec64 this]
   constructor
-  . assumption
-  . apply BDWord.low_as_extract
+  · assumption
+  · apply BDWord.low_as_extract
     apply BDWord.isU128_of_cases <;> assumption
 
 end mul
@@ -1013,14 +1013,14 @@ lemma spec.mulh {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
     rw [b_sgn_ext]
     clear *- b_b_msb b_msb_ch
     unfold BWord.isNegative; split_ifs
-    . suffices : cols.b_msb = 1 <;> simp_all
-    . suffices : cols.b_msb = 0 <;> simp_all
+    · suffices : cols.b_msb = 1 <;> simp_all
+    · suffices : cols.b_msb = 0 <;> simp_all
   have msb_ext_c : cols.c_sign_extend * 255 = if BWord.isNegative cbw then 255 else 0 := by
     rw [c_sgn_ext]
     clear *- b_c_msb c_msb_ch
     unfold BWord.isNegative; split_ifs
-    . suffices : cols.c_msb = 1 <;> simp_all
-    . suffices : cols.c_msb = 0 <;> simp_all
+    · suffices : cols.c_msb = 1 <;> simp_all
+    · suffices : cols.c_msb = 0 <;> simp_all
   have eq_bbwe : bbwe = BWord.extend bbw true := by simp [bbwe, BWord.extend]; exact msb_ext_b
   have eq_cbwe : cbwe = BWord.extend cbw true := by simp [cbwe, BWord.extend]; exact msb_ext_c
   have isU64_bbw : BWord.isU64 bbw := by rw [eq_bbw]; apply bw.toBWord_toU64 isU64_bw
@@ -1043,8 +1043,8 @@ lemma spec.mulh {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
     apply BWord.toWord_U64; apply BDWord.isU128_high_isU64 isU128_prod
   rw [BWord.toWord_toBitVec64 this]
   constructor
-  . assumption
-  . apply BDWord.high_as_extract
+  · assumption
+  · apply BDWord.high_as_extract
     apply BDWord.isU128_of_cases <;> assumption
 
 end mulh
@@ -1103,8 +1103,8 @@ lemma spec.mulhu {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
     apply BWord.toWord_U64; apply BDWord.isU128_high_isU64 isU128_prod
   rw [BWord.toWord_toBitVec64 this]
   constructor
-  . assumption
-  . apply BDWord.high_as_extract
+  · assumption
+  · apply BDWord.high_as_extract
     apply BDWord.isU128_of_cases <;> assumption
 
 end mulhu
@@ -1145,8 +1145,8 @@ lemma spec.mulhsu {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
     rw [b_sgn_ext]
     clear *- b_b_msb b_msb_ch
     unfold BWord.isNegative; split_ifs
-    . suffices : cols.b_msb = 1 <;> simp_all
-    . suffices : cols.b_msb = 0 <;> simp_all
+    · suffices : cols.b_msb = 1 <;> simp_all
+    · suffices : cols.b_msb = 0 <;> simp_all
   have eq_bbwe : bbwe = BWord.extend bbw true := by simp [bbwe, BWord.extend]; exact msb_ext_b
   have eq_cbwe : cbwe = BWord.extend cbw false := by simp [cbwe, BWord.extend]; assumption
   have isU64_bbw : BWord.isU64 bbw := by rw [eq_bbw]; apply bw.toBWord_toU64 isU64_bw
@@ -1169,8 +1169,8 @@ lemma spec.mulhsu {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
     apply BWord.toWord_U64; apply BDWord.isU128_high_isU64 isU128_prod
   rw [BWord.toWord_toBitVec64 this]
   constructor
-  . assumption
-  . apply BDWord.high_as_extract
+  · assumption
+  · apply BDWord.high_as_extract
     apply BDWord.isU128_of_cases <;> assumption
 
 end mulhsu
@@ -1231,8 +1231,8 @@ lemma spec.mulw {aw bw cw cols is_mul is_mulh is_mulw is_mulhu is_mulhsu}
   rw [exec_MULW_pure_bv_to_bhw _ _ isU64_bw isU64_cw, execute_MULW_pure_bhw]
   rw [eq_aw, ← eq_hbw, ← eq_hcw]
   constructor
-  . apply BWord.toWord_U64; apply BHWord.extend_U32_U64 isU32_ahw
-  . rw [BWord.toWord_toBitVec64 (BHWord.extend_U32_U64 isU32_ahw true), BHWord.extend_true_is_signExtend isU32_ahw]
+  · apply BWord.toWord_U64; apply BHWord.extend_U32_U64 isU32_ahw
+  · rw [BWord.toWord_toBitVec64 (BHWord.extend_U32_U64 isU32_ahw true), BHWord.extend_true_is_signExtend isU32_ahw]
     simp [BitVec.extend]; congr
     have isU32_hbw : BHWord.isU32 hbw := by
       rw [eq_hbw]; apply BWord.isU64_low_isU32 _
@@ -1275,9 +1275,9 @@ lemma spec.mulh.gen {aw bw cw cols is_real is_mul is_mulw is_mulhu is_mulhsu}
     (is_mulhu = 1 → aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHU) ∧
     (is_mulhsu = 1 → aw.isU64 ∧ aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHSU) := by
   intro h_is_real; split_ands <;> intro h_op <;> simp_all
-  . apply spec.mulh isU64_bw isU64_cw cstrs (by simp)
-  . apply spec.mulhu isU64_bw isU64_cw cstrs (by simp)
-  . apply spec.mulhsu isU64_bw isU64_cw cstrs (by simp)
+  · apply spec.mulh isU64_bw isU64_cw cstrs (by simp)
+  · apply spec.mulhu isU64_bw isU64_cw cstrs (by simp)
+  · apply spec.mulhsu isU64_bw isU64_cw cstrs (by simp)
 
 end gen
 

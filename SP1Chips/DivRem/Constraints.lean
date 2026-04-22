@@ -1113,7 +1113,7 @@ lemma div_mod_decomposition_w {a b c : Fin KB} :
   a.val < 65536 → c.val < 2130706433 / 65536 → (a = b - c * 65536 ↔ a = b % 65536 ∧ c = b / 65536) := by
   intro ub_a ub_c
   constructor
-  . intro eq_a
+  · intro eq_a
     simp [Fin.lt_def, Fin.ext_iff] at *
     have lb_b : c * 65536 ≤ b := by
       by_contra lb_b
@@ -1124,7 +1124,7 @@ lemma div_mod_decomposition_w {a b c : Fin KB} :
     simp [Fin.mul_def] at eq_a
     rw [Nat.mod_eq_of_lt (by omega)] at eq_a
     omega
-  . intro ⟨ eq_a, eq_c ⟩
+  · intro ⟨ eq_a, eq_c ⟩
     simp_all
     symm; rw [sub_eq_iff_eq_add]; symm
     rw [mul_comm, add_comm]
@@ -1141,35 +1141,35 @@ lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
   rw [@eq_comm (a := q), @eq_comm (a := r), @eq_comm (a := b), add_comm, mul_comm]
   repeat rw [Int.natCast_natAbs] at *; repeat rw [Int.abs_cases] at *
   by_cases hb_split : 0 ≤ b
-  . simp_all; intro heq; clear hmod1 hmod2
+  · simp_all; intro heq; clear hmod1 hmod2
     constructor <;> intro ⟨ h0, h1 ⟩
-    . simp_all
+    · simp_all
       by_cases hr_split : r = 0 <;> [ simp_all; right ]
       rw [Int.sign_eq_one_of_pos (by omega)]
       rw [Int.sign_eq_one_of_pos]
       suffices : ¬ b = 0
-      . omega
-      . intro bz; simp_all
+      · omega
+      · intro bz; simp_all
         apply Int.split_nzp q <;> intro hq <;> [ skip; simp_all; skip ]
         all_goals
           have : c * q > r := by split_ifs at * <;> nlinarith
           omega
-    . rcases h1 with rz | h_sign <;> [ omega; skip ]
+    · rcases h1 with rz | h_sign <;> [ omega; skip ]
       split_ifs with hc_split <;> split_ifs at h0 with hr_split <;> simp_all
       all_goals
         rw [Int.sign_eq_neg_one_of_neg (by assumption)] at h_sign
         symm at h_sign; rw [Int.sign_eq_neg_one_iff_neg] at h_sign
         omega
-  . rw [hmod2 (by omega) hcnz]; simp_all; intro heq; clear hmod2
+  · rw [hmod2 (by omega) hcnz]; simp_all; intro heq; clear hmod2
     constructor <;> intro ⟨ h0, h1 ⟩
-    . constructor
-      . by_cases hr_split : r = 0 <;> [ simp_all; skip ]
+    · constructor
+      · by_cases hr_split : r = 0 <;> [ simp_all; skip ]
         rw [if_neg (by omega)]
         omega
-      . by_cases hr_split : r = 0 <;> [ simp_all; right ]
+      · by_cases hr_split : r = 0 <;> [ simp_all; right ]
         rw [Int.sign_eq_neg_one_of_neg (by omega)]
         rw [Int.sign_eq_neg_one_of_neg hb_split]
-    . rcases h1 with rz | h_sign <;> [ omega; skip ]
+    · rcases h1 with rz | h_sign <;> [ omega; skip ]
       rw [Int.sign_eq_neg_one_of_neg hb_split] at h_sign
       rw [Int.sign_eq_neg_one_iff_neg] at h_sign
       rw [if_neg (by omega)] at h0
@@ -1182,10 +1182,10 @@ lemma tdiv_tmod_unique_full_nat {b c q r : ℕ} (hcnz : c ≠ 0) :
   simp_all [Int.tmod_eq_emod]
   rw [@eq_comm (a := q), @eq_comm (a := r), @eq_comm (a := b), add_comm, mul_comm]
   trans (r : ℤ) + c * q = b ∧ r < c
-  . rw [← hmod]
+  · rw [← hmod]
     rw [Int.ofNat_ediv_ofNat, ← Int.natCast_emod]
     rw [Int.toNat_natCast, Int.toNat_natCast, Int.natCast_inj, Int.natCast_inj]
-  . omega
+  · omega
 
 lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
   wx.isNegative →
@@ -1208,14 +1208,14 @@ lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : 
 lemma extractLsb_is_toInt {x : BitVec 128} (hlb : -9223372036854775808 ≤ x.toInt) (hub : x.toInt < 9223372036854775808) :
   (BitVec.extractLsb 63 0 x).toInt = x.toInt := by
     by_cases case : 0 ≤ x.toInt <;> simp at case
-    . simp [BitVec.toInt] at *; split_ifs at * <;> omega
-    . trans (BitVec.signExtend 128 (BitVec.extractLsb 63 0 x)).toInt
-      . rw [BitVec.toInt_signExtend_of_le (by simp)]
-      . rw [BitVec.toInt_inj]
+    · simp [BitVec.toInt] at *; split_ifs at * <;> omega
+    · trans (BitVec.signExtend 128 (BitVec.extractLsb 63 0 x)).toInt
+      · rw [BitVec.toInt_signExtend_of_le (by simp)]
+      · rw [BitVec.toInt_inj]
         simp [BitVec.toInt] at *; split_ifs at * <;> [ omega; simp at * ]
         suffices : 340282366920938463454151235394913435648#128 ≤ x
-        . bv_decide
-        . simp [BitVec.le_def]; omega
+        · bv_decide
+        · simp [BitVec.le_def]; omega
 
 end auxiliaries
 
@@ -1414,21 +1414,21 @@ lemma div_rem
     subst abs_c_alu_event abs_rem_alu_event b_neg rem_neg c_neg
     simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, _root_.cond_eq_ite]
     split_ifs at div_zero with nzc <;> simp [div_zero] at *
-    . obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
+    · obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
       simp [zc0, zc1, zc2, zc3] at *
       have : (Word.toBitVec64 #v[0, 0, 0, 0]).toInt = 0 := by simp [Word.toBitVec64, Word.toNat]
       simp [this, c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3]
       simp only [Word.toBitVec64, Word.toNat_def]
       simp [-Fin.coe_ofNat_eq_mod]; rw [Fin.coe_ofNat_eq_mod]
-    . simp [eq_arlt] at *
+    · simp [eq_arlt] at *
       rw [if_neg]; rotate_left
-      . rw [Word.toBitVec64_toInt is_U64_c]
+      · rw [Word.toBitVec64_toInt is_U64_c]
         intro zc; apply Word.toInt_nneg_reconstruct is_U64_c (by rfl) at zc; simp at zc
         apply nzc; exact zc
-      . repeat rw [Word.toBitVec64_toInt is_U64_b]
+      · repeat rw [Word.toBitVec64_toInt is_U64_b]
         repeat rw [Word.toBitVec64_toInt is_U64_c]
         rcases b_is_overflow with nof | of; rotate_left
-        . simp [of] at *
+        · simp [of] at *
           split_ifs at overflow_b with ofb <;> simp [overflow_b] at *
           split_ifs at overflow_c with ofc <;> simp [overflow_c] at *
           obtain ⟨eb0, eb1, eb2, eb3⟩ := ofb
@@ -1437,9 +1437,9 @@ lemma div_rem
           simp [eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3]
           simp only [Word.toBitVec64, Word.toInt, Word.isNegative, Word.toNat_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
           simp
-        . simp [nof] at *
+        · simp [nof] at *
           rw [if_neg]; rotate_left
-          . intro ⟨ h_eq_b, h_eq_c ⟩
+          · intro ⟨ h_eq_b, h_eq_c ⟩
             have : (#v[b0, b1, b2, b3] : Word (Fin KB)) = #v[0, 0, 0, 32768] := by
               rw [Word.eq_toInt_eq is_U64_b, h_eq_b]
               simp [Word.toInt, Word.isNegative, Word.toNat]
@@ -1450,18 +1450,18 @@ lemma div_rem
               simp [Word.toInt, Word.isNegative, Word.toNat]
               apply Word.isU64_of_cases <;> simp
             simp at this; rw [if_pos (by exact this)] at overflow_c; simp [overflow_c] at *
-          . have is_U64_r : Word.isU64 #v[r0, r1, r2, r3] := by apply Word.isU64_of_cases <;> simpa
+          · have is_U64_r : Word.isU64 #v[r0, r1, r2, r3] := by apply Word.isU64_of_cases <;> simpa
             have is_U64_q : Word.isU64 #v[q0, q1, q2, q3] := by apply Word.isU64_of_cases <;> simpa
             suffices :
               Word.toInt #v[q0, q1, q2, q3] = (Word.toInt #v[b0, b1, b2, b3]).tdiv (Word.toInt #v[c0, c1, c2, c3]) ∧
               Word.toInt #v[r0, r1, r2, r3] = (Word.toInt #v[b0, b1, b2, b3]).tmod (Word.toInt #v[c0, c1, c2, c3])
-            . obtain ⟨ hdiv, hrem ⟩ := this
+            · obtain ⟨ hdiv, hrem ⟩ := this
               rw [← hdiv, ← hrem]
               simp [← BitVec.toInt_inj]
               rw [Word.toBitVec64_toInt is_U64_q, Word.toBitVec64_toInt is_U64_r]
               rw [Int.bmod_eq_of_le (Word.toInt_lb is_U64_q) (Word.toInt_ub is_U64_q), Int.bmod_eq_of_le (Word.toInt_lb is_U64_r) (Word.toInt_ub is_U64_r)]
               trivial
-            . have is_U64_ar : Word.isU64 #v[ar0, ar1, ar2, ar3] := by apply Word.isU64_of_cases <;> simpa
+            · have is_U64_ar : Word.isU64 #v[ar0, ar1, ar2, ar3] := by apply Word.isU64_of_cases <;> simpa
               have is_U64_ac : Word.isU64 #v[ac0, ac1, ac2, ac3] := by apply Word.isU64_of_cases <;> simpa
               have sgn_msb_b : msb_b = 1 → (Word.toInt #v[b0, b1, b2, b3]).sign = -1 := by
                 intro h_msb_b; rw [Word.sign_cases is_U64_b]; simp [h_msb_b] at *
@@ -1502,7 +1502,7 @@ lemma div_rem
                   DWord.toBitVec128 #v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535, msb_b * 65535, msb_b * 65535] =
                     DWord.toBitVec128 #v[ctq0, ctq1, ctq2, ctq3, ctq4, ctq5, ctq6, ctq7] +
                     DWord.toBitVec128 #v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535]
-                . rw [eq_eb, eq_er] at bv_ctqr
+                · rw [eq_eb, eq_er] at bv_ctqr
                   rw [ctq] at bv_ctqr
                   repeat rw [Word.extend_true_is_signExtend (by assumption)] at bv_ctqr
                   simp [← BitVec.toInt_inj] at bv_ctqr
@@ -1516,7 +1516,7 @@ lemma div_rem
                   have ubc := Word.toInt_ub is_U64_c
                   rw [bv_ctqr]
                   apply Int.bmod_eq_of_le <;> simp <;> nlinarith
-                . have is_U16_msb_b : (msb_b * 65535).val < 65536 := by clear *- eq_msb_b; split_ifs at eq_msb_b <;> simp_all
+                · have is_U16_msb_b : (msb_b * 65535).val < 65536 := by clear *- eq_msb_b; split_ifs at eq_msb_b <;> simp_all
                   have is_U16_msb_rem : (msb_rem * 65535).val < 65536 := by clear *- eq_msb_rem; split_ifs at eq_msb_rem <;> simp_all
                   clear is_U64_c eq_msb_b eq_msb_c eq_msb_rem ctq_low ctq_high ctq eq_is_word r_neg_b_neg r_pos_b_pos eq_eb eq_er
                   apply Word.lt_cases_of_isU64 at is_U64_b
@@ -1562,45 +1562,45 @@ lemma div_rem
                         eq_rnop0 eq_rnop1 eq_rnop2 eq_rnop3 eq_cnop0 eq_cnop1 eq_cnop2 eq_cnop3
                 have h_eq_nmax : - 2^63 = Word.toInt #v[0, 0, 0, 32768] := by simp [Word.toInt, Word.isNegative, Word.toNat]
                 rcases b_rem_neg with rem_nneg | rem_neg <;> rcases b_c_neg with c_nneg | c_neg
-                . simp [rem_nneg, c_nneg] at *; simp_all
+                · simp [rem_nneg, c_nneg] at *; simp_all
                   simp [Word.toInt, Word.isNegative]
                   iterate 2 rw [if_neg (by omega)]
                   simpa
-                . simp [rem_nneg, c_neg] at *; simp_all
+                · simp [rem_nneg, c_neg] at *; simp_all
                   obtain ⟨ _, heqz ⟩ := c_neg_sum_zero
                   apply sum_zero_abs is_U64_c is_U64_ac (by rw [Word.isNegative_toInt is_U64_c]; assumption) at heqz
                   obtain ⟨ hc_lb, hc_nlb ⟩ := heqz
                   by_cases is_c_lb : Word.toInt #v[c0, c1, c2, c3] = -2 ^ 63
-                  . rw [is_c_lb]; simp
+                  · rw [is_c_lb]; simp
                     simp [Word.toInt, Word.isNegative, Word.toNat]
                     rw [abs_of_nonneg (by omega)]
                     apply Word.lt_cases_of_isU64 at is_U64_r
                     simp at is_U64_r; omega
-                  . apply hc_nlb at is_c_lb
+                  · apply hc_nlb at is_c_lb
                     have is_c_lb' := is_c_lb
                     rw [Word.toInt] at is_c_lb; rw [if_neg] at is_c_lb; rw [← is_c_lb]
                     rw [Word.toInt]; rw [if_neg (by simpa [Word.isNegative])]; simpa
                     rw [Word.isNegative_toInt is_U64_ac, is_c_lb']
                     simp
-                . simp [rem_neg, c_nneg] at *; simp_all
+                · simp [rem_neg, c_nneg] at *; simp_all
                   obtain ⟨ _, heqz_rem ⟩ := rem_neg_sum_zero
                   apply sum_zero_abs is_U64_r is_U64_ar (by rw [Word.isNegative_toInt is_U64_r]; assumption) at heqz_rem
                   simp [h_eq_nmax] at heqz_rem
                   by_cases is_rem_lb : Word.toInt #v[r0, r1, r2, r3] = Word.toInt #v[0, 0, 0, 32768] <;> simp_all
-                  . rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_rem
+                  · rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_rem
                     simp_all
                     simp [Word.toNat] at abs_check
                     apply Word.lt_cases_of_isU64 at is_U64_c
                     simp_all; omega
-                  . rw [← h_eq_nmax] at is_rem_lb
+                  · rw [← h_eq_nmax] at is_rem_lb
                     rw [← heqz_rem]
                     simp [Word.toInt]
                     rw [if_neg, if_neg]
-                    . simpa
-                    . unfold Word.isNegative; simp; omega
-                    . simp [Word.isNegative_toInt is_U64_ar]
+                    · simpa
+                    · unfold Word.isNegative; simp; omega
+                    · simp [Word.isNegative_toInt is_U64_ar]
                       rw [heqz_rem]; simp
-                . simp [rem_neg, c_neg] at *; subst rnop0 rnop1 rnop2 rnop3 cnop0 cnop1 cnop2 cnop3
+                · simp [rem_neg, c_neg] at *; subst rnop0 rnop1 rnop2 rnop3 cnop0 cnop1 cnop2 cnop3
                   obtain ⟨ _, heqz_c ⟩ := c_neg_sum_zero
                   obtain ⟨ _, heqz_rem ⟩ := rem_neg_sum_zero
                   apply sum_zero_abs is_U64_c is_U64_ac (by rw [Word.isNegative_toInt is_U64_c]; assumption) at heqz_c
@@ -1609,30 +1609,30 @@ lemma div_rem
                   by_cases is_rem_lb : Word.toInt #v[r0, r1, r2, r3] = Word.toInt #v[0, 0, 0, 32768] <;>
                   by_cases is_c_lb : Word.toInt #v[c0, c1, c2, c3] = Word.toInt #v[0, 0, 0, 32768] <;>
                   simp_all
-                  . rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_c
+                  · rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_c
                     rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_rem
                     simp_all
-                  . rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_rem
+                  · rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_rem
                     simp_all
                     rw [Word.toNat] at abs_check; simp at abs_check
                     have ac_neg : 32768 ≤ ac3 := by clear *- abs_check is_U64_ac; apply Word.lt_cases_of_isU64 at is_U64_ac; simp [Word.toNat] at *; omega
                     have ac_neg' : Word.toInt #v[ac0, ac1, ac2, ac3] < 0 := by rw [← Word.isNegative_toInt is_U64_ac]; simpa [Word.isNegative]
                     have := abs_nonneg (Word.toInt #v[c0, c1, c2, c3])
                     omega
-                  . rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_c
+                  · rw [← Word.eq_toInt_eq (by assumption) (by apply Word.isU64_of_cases <;> simp)] at heqz_c
                     simp [← h_eq_nmax] at is_rem_lb ⊢
                     rw [Int.abs_cases, if_neg (by omega)]
                     have := Word.isU64_toInt is_U64_r
                     omega
-                  . rw [← heqz_c, ← heqz_rem]; simp [Word.toInt]
+                  · rw [← heqz_c, ← heqz_rem]; simp [Word.toInt]
                     iterate 2 rw [if_neg]
-                    . omega
-                    . simp_all [Word.isNegative_toInt is_U64_ac]
-                    . simp_all [Word.isNegative_toInt is_U64_ar]
+                    · omega
+                    · simp_all [Word.isNegative_toInt is_U64_ac]
+                    · simp_all [Word.isNegative_toInt is_U64_ar]
               -- Third condition
               have h_sign : (Word.toInt #v[r0, r1, r2, r3] = 0 ∨ (Word.toInt #v[r0, r1, r2, r3]).sign = (Word.toInt #v[b0, b1, b2, b3]).sign) := by
                 rcases b_b_neg with b_msb_nneg | b_msb_neg
-                . simp [b_msb_nneg] at *
+                · simp [b_msb_nneg] at *
                   simp [r_neg_b_neg] at *
                   by_cases rz : Word.toInt #v[r0, r1, r2, r3] = 0 <;> [ simp_all; right ]
                   rw [Word.sign_cases is_U64_b, Word.sign_cases is_U64_r]
@@ -1649,7 +1649,7 @@ lemma div_rem
                   all_goals
                     have : c * q > r := by split_ifs at * <;> nlinarith
                     nlinarith
-                . simp [b_msb_neg] at *
+                · simp [b_msb_neg] at *
                   simp [Int.sign_eq_neg_one_of_neg sgn_msb_b]
                   clear *- u16_r0 u16_r1 u16_r2 u16_r3 r_pos_b_pos sgn_msb_rem
                   rcases r_pos_b_pos with hrz | hmsb <;> [ left; simp_all ]
@@ -1850,24 +1850,24 @@ lemma spec.div :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop1 h_is_div
     simp [h_is_div, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
+  · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
 
 set_option maxRecDepth 1000000 in
 lemma spec.rem :
@@ -2061,24 +2061,24 @@ lemma spec.rem :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop3 h_is_rem
     simp [h_is_rem, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
+  · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
 
 end div_rem
 
@@ -2276,31 +2276,31 @@ lemma divu_remu
     subst ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 b_neg_not_overflow b_not_neg_not_overflow
     simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, Bool.cond_eq_ite]
     split_ifs at div_zero with nzc <;> simp [div_zero] at *
-    . obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
+    · obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
       subst c0 c1 c2 c3 q0 q1 q2 q3 r0 r1 r2 r3
       simp [Word.toBitVec64_toNat is_U64_b]
       simp [Word.toBitVec64, Word.toNat]
       rfl
-    . subst arlt maco10 maco11 maco12 maco13 is_c_0; simp at *
+    · subst arlt maco10 maco11 maco12 maco13 is_c_0; simp at *
       rw [if_neg]; rotate_left
-      . rw [Word.toBitVec64_toNat is_U64_c]
+      · rw [Word.toBitVec64_toNat is_U64_c]
         intro zc; apply Word.toNat_reconstruct is_U64_c at zc
         aesop
-      . repeat rw [Word.toBitVec64_toNat is_U64_b]
+      · repeat rw [Word.toBitVec64_toNat is_U64_b]
         repeat rw [Word.toBitVec64_toNat is_U64_c]
         have is_U64_r : Word.isU64 #v[r0, r1, r2, r3] := by apply Word.isU64_of_cases <;> simpa
         have is_U64_q : Word.isU64 #v[q0, q1, q2, q3] := by apply Word.isU64_of_cases <;> simpa
         suffices :
           Word.toNat #v[q0, q1, q2, q3] = (((Word.toNat #v[b0, b1, b2, b3]) : ℤ).tdiv (Word.toNat #v[c0, c1, c2, c3])).toNat ∧
           Word.toNat #v[r0, r1, r2, r3] = (((Word.toNat #v[b0, b1, b2, b3]) : ℤ).tmod (Word.toNat #v[c0, c1, c2, c3])).toNat
-        . obtain ⟨ hdiv, hrem ⟩ := this
+        · obtain ⟨ hdiv, hrem ⟩ := this
           simp at hdiv; rw [← hdiv, ← hrem]
           simp [← BitVec.toNat_inj]
           rw [Word.toBitVec64_toNat is_U64_q, Word.toBitVec64_toNat is_U64_r]
           rw [Nat.mod_eq_of_lt (by apply Word.toNat_lt_of_isU64 is_U64_q)]
           rw [Nat.mod_eq_of_lt (by apply Word.toNat_lt_of_isU64 is_U64_r)]
           trivial
-        . have cnz : Word.toNat #v[c0, c1, c2, c3] ≠ 0 := by
+        · have cnz : Word.toNat #v[c0, c1, c2, c3] ≠ 0 := by
             intro zc; apply Word.toNat_reconstruct is_U64_c at zc
             simp at zc; apply nzc; exact zc
           rw [tdiv_tmod_unique_full_nat cnz]
@@ -2321,7 +2321,7 @@ lemma divu_remu
             DWord.toBitVec128 #v[b0, b1, b2, b3, 0, 0, 0, 0] =
               DWord.toBitVec128 #v[ctq0, ctq1, ctq2, ctq3, ctq4, ctq5, ctq6, ctq7] +
               DWord.toBitVec128 #v[r0, r1, r2, r3, 0, 0, 0, 0]
-          . have := Word.toNat_lt_of_isU64 is_U64_b
+          · have := Word.toNat_lt_of_isU64 is_U64_b
             have := Word.toNat_lt_of_isU64 is_U64_q
             have := Word.toNat_lt_of_isU64 is_U64_c
             have := Word.toNat_lt_of_isU64 is_U64_r
@@ -2333,7 +2333,7 @@ lemma divu_remu
             rw [bv_ctqr, BitVec.toNat_add, BitVec.toNat_mul]
             simp; repeat rw [Word.toBitVec64_toNat (by assumption)]
             apply Nat.mod_eq_of_lt (by nlinarith)
-          . clear is_U64_c eq_msb_b eq_msb_c eq_msb_rem ctq_low ctq_high ctq eq_is_word r_neg_b_neg r_pos_b_pos eq_eb eq_er
+          · clear is_U64_c eq_msb_b eq_msb_c eq_msb_rem ctq_low ctq_high ctq eq_is_word r_neg_b_neg r_pos_b_pos eq_eb eq_er
             apply Word.lt_cases_of_isU64 at is_U64_b
             apply Word.lt_cases_of_isU64 at is_U64_r
             apply Word.lt_cases_of_isU64 at is_U64_q
@@ -2368,7 +2368,7 @@ lemma divu_remu
             iterate 2 rw [DWord.toBitVec128_toNat (by apply DWord.isU128_of_cases <;> simp <;> omega)]
             simp [DWord.toNat]; ring_nf
             rcases b_cry3 with of | nof <;> subst cry3 <;> simp at *
-            . have : ctq4 = 0 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ _, h ⟩ := nof_eq_ctqpr4; clear h; grind
+            · have : ctq4 = 0 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ _, h ⟩ := nof_eq_ctqpr4; clear h; grind
               subst ctq4; simp at *
               subst cry4; simp at *
               have : ctq5 = 0 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨ _, h ⟩ := nof_eq_ctqpr5; clear h; grind
@@ -2381,7 +2381,7 @@ lemma divu_remu
               subst ctq7; simp at *
               subst cry7; simp at *
               omega
-            . have : ctq4 = 65535 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr4; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
+            · have : ctq4 = 65535 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr4; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq4; simp at *
               subst cry4; simp at *
               have : ctq5 = 65535 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr5; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
@@ -2587,24 +2587,24 @@ lemma spec.divu :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop2 h_is_divu
     simp [h_is_divu, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
+  · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
 
 set_option maxRecDepth 1000000 in
 lemma spec.remu :
@@ -2798,24 +2798,24 @@ lemma spec.remu :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop4 h_is_remu
     simp [h_is_remu, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . exact is_U64_c
+  · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · exact is_U64_c
 
 end divu_remu
 
@@ -3025,21 +3025,21 @@ lemma divw_remw
     have lb_b := HWord.toInt_lb is_U32_bl; have ub_b := HWord.toInt_ub is_U32_bl
     have lb_c := HWord.toInt_lb is_U32_cl; have ub_c := HWord.toInt_ub is_U32_cl
     split_ifs at div_zero' with nzc <;> simp [div_zero'] at *
-    . obtain ⟨zc0, zc1⟩ := nzc
+    · obtain ⟨zc0, zc1⟩ := nzc
       simp [zc0, zc1] at *
       have : HWord.toInt #v[0, 0] = 0 := by simp [HWord.toInt, HWord.isNegative, HWord.toNat]
       simp [this, c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3]
       split_ands
-      . simp [HWord.toBitVec32, HWord.toNat]
-      . simp only [← BitVec.toInt_inj]
+      · simp [HWord.toBitVec32, HWord.toNat]
+      · simp only [← BitVec.toInt_inj]
         rw [BitVec.toInt_signExtend_of_le (by simp), HWord.toBitVec32_toInt is_U32_bl]
         simp; rw [Int.bmod_eq_of_le] <;> simp <;> omega
-    . subst arlt maco10 maco11 maco12 maco13
+    · subst arlt maco10 maco11 maco12 maco13
       rw [if_neg]; rotate_left
-      . intro zc; simp [HWord.toInt, HWord.isNegative, HWord.toNat] at zc; apply nzc
+      · intro zc; simp [HWord.toInt, HWord.isNegative, HWord.toNat] at zc; apply nzc
         apply HWord.lt_cases_of_isU32 at is_U32_cl; simp at is_U32_cl; omega
-      . rcases b_is_overflow with nof | of; rotate_left
-        . simp [of] at *
+      · rcases b_is_overflow with nof | of; rotate_left
+        · simp [of] at *
           split_ifs at w_overflow_b with ofb <;> simp [w_overflow_b] at *
           split_ifs at w_overflow_c with ofc <;> simp [w_overflow_c] at *
           obtain ⟨eb0, eb1⟩ := ofb
@@ -3048,9 +3048,9 @@ lemma divw_remw
           simp only [HWord.toBitVec32, HWord.toInt, HWord.isNegative, HWord.toNat]
           simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
           simp
-        . simp [nof] at *
+        · simp [nof] at *
           rw [if_neg]; rotate_left
-          . intro ⟨ h_eq_b, h_eq_c ⟩
+          · intro ⟨ h_eq_b, h_eq_c ⟩
             have : (#v[b0, b1] : HWord (Fin KB)) = #v[0, 32768] := by
               rw [HWord.eq_toInt_eq is_U32_bl, h_eq_b]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
@@ -3062,21 +3062,21 @@ lemma divw_remw
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
               apply HWord.isU32_of_cases <;> simp
             simp at this; rw [if_pos (by exact this)] at w_overflow_c; simp [w_overflow_c] at *
-          . have is_U32_rl : HWord.isU32 #v[r0, r1] := by apply HWord.isU32_of_cases <;> simpa
+          · have is_U32_rl : HWord.isU32 #v[r0, r1] := by apply HWord.isU32_of_cases <;> simpa
             have is_U32_ql : HWord.isU32 #v[q0, q1] := by apply HWord.isU32_of_cases <;> simpa
             have lb_q := HWord.toInt_lb is_U32_ql; have ub_q := HWord.toInt_ub is_U32_ql
             have lb_r := HWord.toInt_lb is_U32_rl; have ub_r := HWord.toInt_ub is_U32_rl
             suffices :
               HWord.toInt #v[q0, q1] = (HWord.toInt #v[b0, b1]).tdiv (HWord.toInt #v[c0, c1]) ∧
               HWord.toInt #v[r0, r1] = (HWord.toInt #v[b0, b1]).tmod (HWord.toInt #v[c0, c1])
-            . obtain ⟨ hdiv, hrem ⟩ := this
+            · obtain ⟨ hdiv, hrem ⟩ := this
               rw [← hdiv, ← hrem]
               simp [← BitVec.toInt_inj]
               repeat rw [BitVec.toInt_signExtend_of_le (by simp)]
               rw [HWord.toBitVec32_toInt is_U32_ql, HWord.toBitVec32_toInt is_U32_rl]
               iterate 2 rw [Int.bmod_eq_of_le (by omega) (by omega)]
               trivial
-            . have sgn_msb_b : msb_b = 1 → (HWord.toInt #v[b0, b1]).sign = -1 := by
+            · have sgn_msb_b : msb_b = 1 → (HWord.toInt #v[b0, b1]).sign = -1 := by
                 intro h_msb_b; rw [HWord.sign_cases is_U32_bl]; simp [h_msb_b] at *
                 intro hneg; simp [HWord.isNegative] at hneg
                 omega
@@ -3107,7 +3107,7 @@ lemma divw_remw
                   Word.toBitVec64 #v[b0, b1, msb_b * 65535, msb_b * 65535] =
                     Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] +
                     Word.toBitVec64 #v[r0, r1, msb_rem * 65535, msb_rem * 65535]
-                . rw [eq_eb, eq_er] at bv_ctqr
+                · rw [eq_eb, eq_er] at bv_ctqr
                   simp [execute_MUL_pure, -BitVec.extractLsb] at ctq_low
                   have : BitVec.extractLsb 63 0 ((Word.toBitVec64 #v[q0, q1, msb_quot * 65535, msb_quot * 65535]).extend 128 False * (Word.toBitVec64 #v[c0, c1, msb_c * 65535, msb_c * 65535]).extend 128 False) = BitVec.extractLsb 63 0 ((Word.toBitVec64 #v[q0, q1, msb_quot * 65535, msb_quot * 65535]).extend 128 True * (Word.toBitVec64 #v[c0, c1, msb_c * 65535, msb_c * 65535]).extend 128 True) := by simp [BitVec.extend, -BitVec.extractLsb]; bv_decide
                   rw [this] at ctq_low; clear this
@@ -3127,7 +3127,7 @@ lemma divw_remw
                   iterate 2 rw [HWord.extend_true_is_signExtend (by assumption), BitVec.toInt_signExtend_of_le (by simp), HWord.toBitVec32_toInt (by assumption)] at bv_ctqr
                   rw [bv_ctqr]
                   rw [Int.bmod_eq_of_le] <;> simp <;> nlinarith
-                . clear is_U32_cl is_U32_ql lb_b ub_b lb_c ub_c lb_q ub_q lb_r ub_r ctq_low eq_eb eq_er w_eq_msb_c w_eq_msb_quot r_neg_b_neg r_pos_b_pos eq_is_word main_mul_high
+                · clear is_U32_cl is_U32_ql lb_b ub_b lb_c ub_c lb_q ub_q lb_r ub_r ctq_low eq_eb eq_er w_eq_msb_c w_eq_msb_quot r_neg_b_neg r_pos_b_pos eq_is_word main_mul_high
                   apply HWord.lt_cases_of_isU32 at is_U32_bl
                   apply HWord.lt_cases_of_isU32 at is_U32_rl
                   apply Word.lt_cases_of_isU64 at is_U64_ctql
@@ -3136,8 +3136,8 @@ lemma divw_remw
                   rw [← add_sub_right_comm] at u16_ctqpr1 u16_ctqpr2 u16_ctqpr3 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
                   rw [div_mod_decomposition_w (by omega) (by omega)] at nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
                   trans Word.toBitVec64 #v[b0, b1, (ctq2 + msb_rem * 65535 + cry1) % 65536, (ctq3 + msb_rem * 65535 + cry2) % 65536]
-                  . rw [← nof_eq_ctqpr2.1, ← nof_eq_ctqpr3.1]
-                  . conv => lhs; simp [Word.toBitVec64, Word.toNat]
+                  · rw [← nof_eq_ctqpr2.1, ← nof_eq_ctqpr3.1]
+                  · conv => lhs; simp [Word.toBitVec64, Word.toNat]
                             simp [nof_eq_ctqpr0.1, nof_eq_ctqpr1.1]
                             simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2]
                     simp [Fin.val_add]
@@ -3175,13 +3175,13 @@ lemma divw_remw
                 subst r2 r3
                 have u16_c2 : (msb_c * 65535).val < 65536 := by rw [w_eq_msb_c]; split_ifs <;> simp
                 rcases b_rem_neg with rem_nneg | rem_neg <;> rcases b_c_neg with c_nneg | c_neg
-                . simp [rem_nneg, c_nneg] at *
+                · simp [rem_nneg, c_nneg] at *
                   subst ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3
                   simp [HWord.toInt, HWord.isNegative]
                   iterate 2 rw [if_neg (by omega)]
                   simp [Word.toNat] at abs_check
                   simpa
-                . simp [rem_nneg, c_neg] at *
+                · simp [rem_nneg, c_neg] at *
                   subst ar0 ar1 ar2 ar3 cnop0 cnop1 cnop2 cnop3
                   simp at *
                   obtain ⟨ _, heqz ⟩ := c_neg_sum_zero
@@ -3194,15 +3194,15 @@ lemma divw_remw
                     simp [if_pos]; omega
                   rw [this] at hc_lb hc_nlb; clear this
                   by_cases is_c_lb : HWord.toInt #v[c0, c1] = -2 ^ 63
-                  . omega
-                  . have is_c_lb' := is_c_lb
+                  · omega
+                  · have is_c_lb' := is_c_lb
                     apply hc_nlb at is_c_lb'
                     rw [Word.toInt] at is_c_lb'; rw [if_neg] at is_c_lb'; rw [← is_c_lb']
-                    . rw [HWord.toInt, if_neg (by simp [HWord.isNegative]; omega)]
+                    · rw [HWord.toInt, if_neg (by simp [HWord.isNegative]; omega)]
                       simp; simp [HWord.toNat, Word.toNat]
                       simp [Word.toNat] at abs_check; exact abs_check
-                    . rw [Word.isNegative_toInt is_U64_ac]; simp_all
-                . simp [rem_neg, c_nneg] at *
+                    · rw [Word.isNegative_toInt is_U64_ac]; simp_all
+                · simp [rem_neg, c_nneg] at *
                   subst ac0 ac1 ac2 ac3 rnop0 rnop1 rnop2 rnop3
                   simp at *
                   obtain ⟨ _, heqz ⟩ := rem_neg_sum_zero
@@ -3215,15 +3215,15 @@ lemma divw_remw
                     simp [if_pos]; omega
                   rw [this] at hr_lb hr_nlb; clear this
                   by_cases is_rem_lb : HWord.toInt #v[r0, r1] = -2 ^ 63
-                  . omega
-                  . have is_rem_lb' := is_rem_lb
+                  · omega
+                  · have is_rem_lb' := is_rem_lb
                     apply hr_nlb at is_rem_lb'
                     rw [Word.toInt] at is_rem_lb'; rw [if_neg] at is_rem_lb'; rw [← is_rem_lb']
-                    . rw [HWord.toInt, if_neg (by simp [HWord.isNegative]; omega)]
+                    · rw [HWord.toInt, if_neg (by simp [HWord.isNegative]; omega)]
                       simp; simp [HWord.toNat, Word.toNat]
                       simp [Word.toNat] at abs_check; exact abs_check
-                    . rw [Word.isNegative_toInt is_U64_ar]; simp_all
-                . simp [rem_neg, c_neg] at *
+                    · rw [Word.isNegative_toInt is_U64_ar]; simp_all
+                · simp [rem_neg, c_neg] at *
                   subst rnop0 rnop1 rnop2 rnop3 cnop0 cnop1 cnop2 cnop3
                   obtain ⟨ _, heqz_c ⟩ := c_neg_sum_zero
                   obtain ⟨ _, heqz_rem ⟩ := rem_neg_sum_zero
@@ -3241,22 +3241,22 @@ lemma divw_remw
                     simp [if_pos]; omega
                   rw [eqc] at heqz_c; rw [eqr] at heqz_rem
                   by_cases is_c_lb : HWord.toInt #v[c0, c1] = -2 ^ 63
-                  . by_contra; clear *- lb_c ub_c is_c_lb; omega
-                  . by_cases is_r_lb : HWord.toInt #v[r0, r1] = -2 ^ 63
-                    . by_contra; clear *- lb_r ub_r is_r_lb; omega
-                    . obtain ⟨ hc_lb, hc_nlb ⟩ := heqz_c
+                  · by_contra; clear *- lb_c ub_c is_c_lb; omega
+                  · by_cases is_r_lb : HWord.toInt #v[r0, r1] = -2 ^ 63
+                    · by_contra; clear *- lb_r ub_r is_r_lb; omega
+                    · obtain ⟨ hc_lb, hc_nlb ⟩ := heqz_c
                       obtain ⟨ hr_lb, hr_nlb ⟩ := heqz_rem
                       clear hc_lb hr_lb
                       specialize hc_nlb is_c_lb; specialize hr_nlb is_r_lb
                       rw [← hc_nlb, ← hr_nlb]; simp [Word.toInt]
                       iterate 2 rw [if_neg]
-                      . omega
-                      . simp_all [Word.isNegative_toInt is_U64_ac]
-                      . simp_all [Word.isNegative_toInt is_U64_ar]
+                      · omega
+                      · simp_all [Word.isNegative_toInt is_U64_ac]
+                      · simp_all [Word.isNegative_toInt is_U64_ar]
               -- Third condition
               have h_sign : HWord.toInt #v[r0, r1] = 0 ∨ (HWord.toInt #v[r0, r1]).sign = (HWord.toInt #v[b0, b1]).sign := by
                 rcases b_b_neg with b_msb_nneg | b_msb_neg
-                . simp [b_msb_nneg] at *
+                · simp [b_msb_nneg] at *
                   simp [r_neg_b_neg] at *
                   by_cases rz : HWord.toInt #v[r0, r1] = 0 <;> [ (left; exact rz); right ]
                   rw [HWord.sign_cases is_U32_bl, HWord.sign_cases is_U32_rl]
@@ -3273,7 +3273,7 @@ lemma divw_remw
                   all_goals
                     have : c * q > r := by split_ifs at * <;> nlinarith
                     nlinarith
-                . simp [b_msb_neg] at *
+                · simp [b_msb_neg] at *
                   simp [Int.sign_eq_neg_one_of_neg sgn_msb_b]
                   clear *- u16_r0 u16_r1 u16_r2 u16_r3 r_pos_b_pos sgn_msb_rem
                   rcases r_pos_b_pos with hrz | hmsb <;> [ left; simp_all ]
@@ -3474,24 +3474,24 @@ lemma spec.divw :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop5 h_is_divw
     simp [h_is_divw, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rw [w_eq_msb_c] <;> split_ifs <;> simp
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
+  · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rw [w_eq_msb_c] <;> split_ifs <;> simp
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
 
 set_option maxRecDepth 1000000 in
 lemma spec.remw :
@@ -3685,24 +3685,24 @@ lemma spec.remw :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop6 h_is_remw
     simp [h_is_remw, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rw [w_eq_msb_c] <;> split_ifs <;> simp
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
+  · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rw [w_eq_msb_c] <;> split_ifs <;> simp
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
 
 end divw_remw
 
@@ -3912,28 +3912,28 @@ lemma divuw_remuw
     suffices :
       HWord.toBitVec32 #v[q0, q1] = BitVec.ofNat 32 (if HWord.toNat #v[c0, c1] = 0 then (18446744073709551615 : ℤ) else (HWord.toNat #v[b0, b1]) / (HWord.toNat #v[c0, c1])).toNat ∧
       HWord.toBitVec32 #v[r0, r1] = BitVec.ofNat 32 (((HWord.toNat #v[b0, b1]) : ℤ).tmod ↑(HWord.toNat #v[c0, c1])).toNat
-    . split_ands <;> congr 1 <;> [ exact this.1; exact this.2 ]
-    . split_ifs at div_zero with nzc <;> simp [div_zero] at *
-      . obtain ⟨zc0, zc1⟩ := nzc
+    · split_ands <;> congr 1 <;> [ exact this.1; exact this.2 ]
+    · split_ifs at div_zero with nzc <;> simp [div_zero] at *
+      · obtain ⟨zc0, zc1⟩ := nzc
         subst c0 c1 q0 q1 q2 q3 r0 r1 r2 r3
         simp [HWord.toBitVec32, HWord.toNat]
         congr
-      . subst arlt maco10 maco11 is_c_0; simp at *
+      · subst arlt maco10 maco11 is_c_0; simp at *
         rw [if_neg]; rotate_left
-        . intro zc; simp [HWord.toNat] at zc; omega
-        . have is_U32_r : HWord.isU32 #v[r0, r1] := by apply HWord.isU32_of_cases <;> simp <;> [ exact u16_r0; exact u16_r1 ]
+        · intro zc; simp [HWord.toNat] at zc; omega
+        · have is_U32_r : HWord.isU32 #v[r0, r1] := by apply HWord.isU32_of_cases <;> simp <;> [ exact u16_r0; exact u16_r1 ]
           have is_U32_q : HWord.isU32 #v[q0, q1] := by apply HWord.isU32_of_cases <;> simp <;> [ exact u16_q0; exact u16_q1 ]
           suffices :
             HWord.toNat #v[q0, q1] = (((HWord.toNat #v[b0, b1]) : ℤ).tdiv (HWord.toNat #v[c0, c1])).toNat ∧
             HWord.toNat #v[r0, r1] = (((HWord.toNat #v[b0, b1]) : ℤ).tmod (HWord.toNat #v[c0, c1])).toNat
-          . obtain ⟨ hdiv, hrem ⟩ := this
+          · obtain ⟨ hdiv, hrem ⟩ := this
             simp at hdiv; rw [← hdiv, ← hrem]
             simp [← BitVec.toNat_inj]
             rw [HWord.toBitVec32_toNat is_U32_q, HWord.toBitVec32_toNat is_U32_r]
             rw [Nat.mod_eq_of_lt (by apply HWord.toNat_lt_of_isU32 is_U32_q)]
             rw [Nat.mod_eq_of_lt (by apply HWord.toNat_lt_of_isU32 is_U32_r)]
             simp
-          . have cnz : HWord.toNat #v[c0, c1] ≠ 0 := by
+          · have cnz : HWord.toNat #v[c0, c1] ≠ 0 := by
               intro zc; simp [HWord.toNat] at zc; omega
             rw [tdiv_tmod_unique_full_nat cnz]
             split_ands <;> [ skip; (simp [HWord.toNat]; simp [Word.toNat] at abs_check; exact abs_check) ]
@@ -3951,13 +3951,13 @@ lemma divuw_remuw
               Word.toBitVec64 #v[b0, b1, 0, 0] =
                 Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] +
                 Word.toBitVec64 #v[r0, r1, 0, 0]
-            . have := HWord.toNat_lt_of_isU32 is_U32_b
+            · have := HWord.toNat_lt_of_isU32 is_U32_b
               have := HWord.toNat_lt_of_isU32 is_U32_q
               have := HWord.toNat_lt_of_isU32 is_U32_c
               have := HWord.toNat_lt_of_isU32 is_U32_r
               trans (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat
-              . rw [Word.low_toNat is_U32_b]
-              . have : (Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3]).toNat = HWord.toNat #v[q0, q1] * HWord.toNat #v[c0, c1] := by
+              · rw [Word.low_toNat is_U32_b]
+              · have : (Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3]).toNat = HWord.toNat #v[q0, q1] * HWord.toNat #v[c0, c1] := by
                   simp only [ctq_low, execute_MUL_pure, ↓reduceIte, reduceCtorEq, or_self]
                   simp only [BitVec.extend, ↓reduceIte]
                   simp only [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
@@ -3966,7 +3966,7 @@ lemma divuw_remuw
                   nlinarith
                 rw [bv_ctqr, BitVec.toNat_add, this, Word.low_toNat is_U32_r]
                 simp; nlinarith
-            . clear is_U32_c eq_msb_b eq_msb_c eq_msb_rem ctq_low eq_is_word r_neg_b_neg r_pos_b_pos eq_eb eq_er
+            · clear is_U32_c eq_msb_b eq_msb_c eq_msb_rem ctq_low eq_is_word r_neg_b_neg r_pos_b_pos eq_eb eq_er
               apply HWord.lt_cases_of_isU32 at is_U32_b
               apply HWord.lt_cases_of_isU32 at is_U32_r
               apply HWord.lt_cases_of_isU32 at is_U32_q
@@ -3975,8 +3975,8 @@ lemma divuw_remuw
               rw [← add_sub_right_comm] at u16_ctqpr1 u16_ctqpr2 u16_ctqpr3 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
               rw [div_mod_decomposition_w (by omega) (by omega)] at nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
               trans Word.toBitVec64 #v[b0, b1, (ctq2 + cry1) % 65536, (ctq3 + cry2) % 65536]
-              . rw [← nof_eq_ctqpr2.1, ← nof_eq_ctqpr3.1]
-              . conv => lhs; simp [Word.toBitVec64, Word.toNat]
+              · rw [← nof_eq_ctqpr2.1, ← nof_eq_ctqpr3.1]
+              · conv => lhs; simp [Word.toBitVec64, Word.toNat]
                         simp [nof_eq_ctqpr0.1, nof_eq_ctqpr1.1]
                         simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2]
                 simp [Fin.val_add]
@@ -4187,24 +4187,24 @@ lemma spec.divuw :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop7 h_is_divuw
     simp [h_is_divuw, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
+  · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
 
 set_option maxRecDepth 1000000 in
 lemma spec.remuw :
@@ -4398,24 +4398,24 @@ lemma spec.remuw :
   all_goals
     obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop8 h_is_remuw
     simp [h_is_remuw, z0, z1, z2, z3, z4, z5, z6] at *
-  . rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . rw [Fin.lt_def]; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . rw [Fin.lt_def]; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
-  . apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
-  . apply Word.isU64_of_cases <;> simp <;> omega
-  . apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
+  · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · split_ifs at div_zero <;> simp [div_zero] <;> apply Word.isU64_of_cases <;> simp <;> assumption
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · rw [Fin.lt_def]; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · rw [Fin.lt_def]; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega
+  · apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
+  · apply Word.isU64_of_cases <;> simp <;> omega
+  · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega
 
 end divuw_remuw
 

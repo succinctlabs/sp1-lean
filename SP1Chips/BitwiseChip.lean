@@ -56,9 +56,9 @@ theorem correct_xor
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       have := spec.xor Main ⟨ xor, imm ⟩ cstrs
@@ -115,9 +115,9 @@ theorem correct_xori
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp_all [Word.toBitVec64, Word.toNat]
+    · simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       have := spec.xori Main ⟨ xor, imm ⟩ cstrs
       rw [← h_imm]
@@ -175,9 +175,9 @@ theorem correct_or
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       have := spec.or Main ⟨ or, imm ⟩ cstrs
@@ -234,9 +234,9 @@ theorem correct_ori
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp_all [Word.toBitVec64, Word.toNat]
+    · simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       have := spec.ori Main ⟨ or, imm ⟩ cstrs
       rw [← h_imm]
@@ -294,9 +294,9 @@ theorem correct_and
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       have := spec.and Main ⟨ and, imm ⟩ cstrs
@@ -353,9 +353,9 @@ theorem correct_andi
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp_all [Word.toBitVec64, Word.toNat]
+    · simp_all [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       have := spec.andi Main ⟨ and, imm ⟩ cstrs
       rw [← h_imm]

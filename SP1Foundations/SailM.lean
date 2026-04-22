@@ -433,17 +433,17 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : 
   execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_w op1 op2 op := by
   intro h_op1_isU64 h_op2_isU64
   cases op <;> simp [execute_RTYPE_pure, LeanRV64D.Functions.log2_xlen]
-  . rw [Sail.shift_bits_left]
+  · rw [Sail.shift_bits_left]
     simp [Word.toBitVec64_toNat h_op2_isU64]
-  . simp [zopz0zI_s, bool_to_bit]
+  · simp [zopz0zI_s, bool_to_bit]
     repeat rw [Word.toBitVec64_toInt (by assumption)]
     aesop
-  . simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]
+  · simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]
     repeat rw [Word.toBitVec64_toNat (by assumption)]
     aesop
-  . rw [Sail.shift_bits_right]
+  · rw [Sail.shift_bits_right]
     simp [Word.toBitVec64_toNat h_op2_isU64]
-  . simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
+  · simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
     congr 1
 
 set_option debug.skipKernelTC true in
@@ -452,17 +452,17 @@ lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op
   execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_bw op1 op2 op := by
   intro h_op1_isU64 h_op2_isU64
   cases op <;> simp [execute_RTYPE_pure, LeanRV64D.Functions.log2_xlen]
-  . rw [Sail.shift_bits_left]
+  · rw [Sail.shift_bits_left]
     simp [BWord.toBitVec64_toNat h_op2_isU64]
-  . simp [zopz0zI_s, bool_to_bit]
+  · simp [zopz0zI_s, bool_to_bit]
     repeat rw [BWord.toBitVec64_toInt (by assumption)]
     aesop
-  . simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]
+  · simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]
     repeat rw [BWord.toBitVec64_toNat (by assumption)]
     aesop
-  . rw [Sail.shift_bits_right]
+  · rw [Sail.shift_bits_right]
     simp [BWord.toBitVec64_toNat h_op2_isU64]
-  . simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
+  · simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
     congr 1
 
 /-- `execute_RTYPE` with isolated pure part -/
@@ -518,23 +518,23 @@ lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op :
   have ha' := Word.lt_cases_of_isU64 h_op1_isU64
   have hb' := Word.lt_cases_of_isU64 h_op2_isU64
   cases op <;> simp [execute_RTYPEW_pure] <;> congr
-  . apply Word.setWidth_eq_low h_op1_isU64
-  . apply Word.setWidth_eq_low h_op2_isU64
-  . apply Word.setWidth_eq_low h_op1_isU64
-  . apply Word.setWidth_eq_low h_op2_isU64
-  . rw [Sail.shift_bits_left]
+  · apply Word.setWidth_eq_low h_op1_isU64
+  · apply Word.setWidth_eq_low h_op2_isU64
+  · apply Word.setWidth_eq_low h_op1_isU64
+  · apply Word.setWidth_eq_low h_op2_isU64
+  · rw [Sail.shift_bits_left]
     simp [Word.toBitVec64_toNat h_op2_isU64]
     rw [Word.setWidth_eq_low h_op1_isU64]
     congr 1
     simp [Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
     omega
-  . rw [Sail.shift_bits_right]
+  · rw [Sail.shift_bits_right]
     simp [Word.toBitVec64_toNat h_op2_isU64]
     rw [Word.setWidth_eq_low h_op1_isU64]
     congr 1
     simp [Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
     omega
-  . have mod_lt_31: forall x : ℕ, (31 + (x : ℤ) % 32).toNat = 31 + x % 32 := by omega
+  · have mod_lt_31: forall x : ℕ, (31 + (x : ℤ) % 32).toNat = 31 + x % 32 := by omega
     have mod_lt_32 : forall x : ℕ, (32 + (x : ℤ) % 32).toNat = 32 + x % 32 := by omega
     rw [Word.setWidth_eq_low h_op1_isU64]
     simp [bitVec_sshiftright_eq]
@@ -657,8 +657,8 @@ lemma exec_SHIFTIOP_pure_bv_to_w (op1 : Word (Fin KB)) (shamt : BitVec 6) (op : 
   simp only [execute_SHIFTIOP_pure_w, execute_SHIFTIOP_pure]
   rw [← exec_RTYPE_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
   suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨ shamt.toNat, by omega ⟩, 0, 0, 0]
-  . rw [this]
-  . rw [← BitVec.toNat_inj]
+  · rw [this]
+  · rw [← BitVec.toNat_inj]
     rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
     simp; omega
 
@@ -703,8 +703,8 @@ lemma exec_SHIFTIWOP_pure_bv_to_w (op1 : Word (Fin KB)) (shamt : BitVec 5) (op :
   simp only [execute_SHIFTIWOP_pure_w, execute_SHIFTIWOP_pure]
   rw [← exec_RTYPEW_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
   suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨ shamt.toNat, by omega ⟩, 0, 0, 0]
-  . rw [this]
-  . rw [← BitVec.toNat_inj]
+  · rw [this]
+  · rw [← BitVec.toNat_inj]
     rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
     simp; omega
 
@@ -762,7 +762,7 @@ lemma combine_MUL_MULH {pl ph op1 op2 : Word (Fin KB)}
   simp [BitVec.extend, -BitVec.extractLsb] at *
   set x := BitVec.signExtend 128 op1.toBitVec64 * BitVec.signExtend 128 op2.toBitVec64
   trans BitVec.extractLsb 63 0 x + (BitVec.setWidth 128 (BitVec.extractLsb 127 64 x) <<< 64)
-  . rw [← lo, ← hi]
+  · rw [← lo, ← hi]
     rw [← BitVec.toNat_inj]
     rw [DWord.toBitVec128, DWord.toNat, Word.toBitVec64, Word.toBitVec64, Word.toNat, Word.toNat]
     repeat rw [BitVec.toNat_add]
@@ -771,7 +771,7 @@ lemma combine_MUL_MULH {pl ph op1 op2 : Word (Fin KB)}
     apply Word.lt_cases_of_isU64 at isU64_ph
     iterate 2 rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)]
     ring_nf
-  . bv_decide
+  · bv_decide
 
 lemma combine_MUL_MULHU {pl ph op1 op2 : Word (Fin KB)}
   (isU64_pl : pl.isU64) (isU64_ph : ph.isU64)
@@ -786,7 +786,7 @@ lemma combine_MUL_MULHU {pl ph op1 op2 : Word (Fin KB)}
   simp [BitVec.extend, -BitVec.extractLsb] at *
   set x := BitVec.setWidth 128 op1.toBitVec64 * BitVec.setWidth 128 op2.toBitVec64
   trans BitVec.extractLsb 63 0 x + (BitVec.setWidth 128 (BitVec.extractLsb 127 64 x) <<< 64)
-  . rw [← lo, ← hi]
+  · rw [← lo, ← hi]
     rw [← BitVec.toNat_inj]
     rw [DWord.toBitVec128, DWord.toNat, Word.toBitVec64, Word.toBitVec64, Word.toNat, Word.toNat]
     repeat rw [BitVec.toNat_add]
@@ -795,7 +795,7 @@ lemma combine_MUL_MULHU {pl ph op1 op2 : Word (Fin KB)}
     apply Word.lt_cases_of_isU64 at isU64_ph
     iterate 2 rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)]
     ring_nf
-  . bv_decide
+  · bv_decide
 
 /-- execute_MUL pure part for BWord arguments -/
 def execute_MUL_pure_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : mop) : BitVec 64 :=
@@ -840,44 +840,44 @@ lemma execute_MUL'_eq_execute_MUL :
     ext s; simp_all; congr 4
     have mod_129_to_128 : forall (a : ℤ), (a % 680564733841876926926749214863536422912).toNat % 340282366920938463463374607431768211456 = (a % 340282366920938463463374607431768211456).toNat := by omega
   -- Signed.Signed.High
-  . congr 2
+  · congr 2
     rw [mod_129_to_128]
     rw [← BitVec.toNat_mul]
     exact BitVec.toInt_toInt_as_toNat_128
   -- Signed.Signed.Low
-  . rw [mod_129_to_128]
+  · rw [mod_129_to_128]
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
     unfold BitVec.toInt
     split_ifs <;> (push_cast; ring_nf; omega)
   -- Signed.Unsigned.High
-  . congr 2
+  · congr 2
     rw [mod_129_to_128]
     rw [BitVec.toNat_toInt_as_toNat_128]
     simp
   -- Signed.Unsigned.Low
-  . rw [mod_129_to_128]
+  · rw [mod_129_to_128]
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
     unfold BitVec.toInt
     split_ifs <;> (push_cast; ring_nf; omega)
   -- Unsigned.Signed.High
-  . congr 2
+  · congr 2
     rw [mod_129_to_128]
     rw [BitVec.toInt_toNat_as_toNat_128]
     simp
   -- Unsigned.Signed.Low
-  . rw [mod_129_to_128]
+  · rw [mod_129_to_128]
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
     unfold BitVec.toInt
     split_ifs <;> (push_cast; ring_nf; omega)
   -- Unsigned.Unsigned.High
-  . congr 2
+  · congr 2
     rw [mod_129_to_128]
     rfl
   -- Unsigned.Unsigned.Low
-  . rw [mod_129_to_128]
+  · rw [mod_129_to_128]
     rfl
 
 end MUL
@@ -926,14 +926,14 @@ lemma execute_MULW'_eq_execute_MULW :
   set r1w : BitVec 32 := BitVec.extractLsb 31 0 r1
   set r2w : BitVec 32 := BitVec.extractLsb 31 0 r2
   trans BitVec.signExtend 64 (BitVec.ofNat 32 (r1w.toInt * r2w.toInt % 4294967296).toNat)
-  . congr 1
+  · congr 1
     simp [← BitVec.toNat_inj, mod_33_to_32]
     symm; apply Nat.mod_eq_of_lt (by omega)
-  . congr 1
+  · congr 1
     trans (BitVec.ofInt 32 (r1w.toInt * r2w.toInt))
-    . simp [BitVec.ofInt, ← BitVec.toNat_inj]
+    · simp [BitVec.ofInt, ← BitVec.toNat_inj]
       omega
-    . simp [← BitVec.toInt_inj]
+    · simp [← BitVec.toInt_inj]
 
 end MULW
 
@@ -1018,22 +1018,22 @@ lemma div_overflow {x y : ℤ} :
   have : (x.tdiv y).sign = 1 := by rw [Int.sign_cases, if_neg (by omega), if_neg (by omega)]
   rw [Int.sign_tdiv] at this
   split_ifs at this with hyp <;> [ simp_all; clear hyp ]
-  . simp [Int.sign_cases] at this
+  · simp [Int.sign_cases] at this
     split_ifs at this <;> simp_all
-    . suffices : -x = 9223372036854775808 ∧ -y = 1
-      . omega
-      . have eq : x.tdiv y = (-x).tdiv (-y) := by simp
+    · suffices : -x = 9223372036854775808 ∧ -y = 1
+      · omega
+      · have eq : x.tdiv y = (-x).tdiv (-y) := by simp
         rw [eq, Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
         by_cases yone : -y = 1
-        . simp_all; omega
-        . have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
+        · simp_all; omega
+        · have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
           omega
-    . rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
+    · rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
       by_cases yone : y = 1
-      . simp_all; omega
-      . have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
+      · simp_all; omega
+      · have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
         omega
-  . simp_all
+  · simp_all
 
 @[simp]
 lemma execute_DIV'_eq_execute_DIV :
@@ -1049,17 +1049,17 @@ lemma execute_DIV'_eq_execute_DIV :
   by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int,
     LeanRV64D.Functions.not, LeanRV64D.Functions.xlen] <;>
   by_cases r2z : r2 = 0 <;> simp_all
-  . simp [to_bits_truncate, Sail.get_slice_int]
-  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  · simp [to_bits_truncate, Sail.get_slice_int]
+  · repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     rw [← BitVec.toNat_inj]
     simp [to_bits_truncate, Sail.get_slice_int]
     congr; rw [Int.emod_eq_of_lt]
-    . apply Int.zero_le_ofNat
-    . have := @Int.ediv_le_self r1.toNat r2.toNat (by omega)
+    · apply Int.zero_le_ofNat
+    · have := @Int.ediv_le_self r1.toNat r2.toNat (by omega)
       omega
-  . simp [to_bits_truncate, Sail.get_slice_int]
+  · simp [to_bits_truncate, Sail.get_slice_int]
     rfl
-  . by_cases of : 9223372036854775808 ≤ r1.toInt.tdiv r2.toInt <;>
+  · by_cases of : 9223372036854775808 ≤ r1.toInt.tdiv r2.toInt <;>
     have of' := div_overflow range_int_r1 range_int_r2 <;>
     simp_all [to_bits_truncate, Sail.get_slice_int]
     simp [BitVec.ofNat, BitVec.ofInt]
@@ -1076,22 +1076,22 @@ lemma divw_overflow {x y : ℤ} :
   have : (x.tdiv y).sign = 1 := by rw [Int.sign_cases, if_neg (by omega), if_neg (by omega)]
   rw [Int.sign_tdiv] at this
   split_ifs at this with hyp <;> [ simp_all; clear hyp ]
-  . simp [Int.sign_cases] at this
+  · simp [Int.sign_cases] at this
     split_ifs at this <;> simp_all
-    . suffices : -x = 2147483648 ∧ -y = 1
-      . omega
-      . have eq : x.tdiv y = (-x).tdiv (-y) := by simp
+    · suffices : -x = 2147483648 ∧ -y = 1
+      · omega
+      · have eq : x.tdiv y = (-x).tdiv (-y) := by simp
         rw [eq, Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
         by_cases yone : -y = 1
-        . simp_all; omega
-        . have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
+        · simp_all; omega
+        · have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
           omega
-    . rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
+    · rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
       by_cases yone : y = 1
-      . simp_all; omega
-      . have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
+      · simp_all; omega
+      · have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
         omega
-  . simp_all
+  · simp_all
 
 lemma BitVec.signExtend_ofInt {x : ℤ} (lb : -2147483648 ≤ x) (ub : x < 2147483648) :
   BitVec.signExtend 64 (BitVec.ofInt 32 x) = BitVec.ofInt 64 x
@@ -1115,22 +1115,22 @@ lemma execute_DIVW'_eq_execute_DIVW :
   have range_nat_r2 : 0 ≤ r2.toNat ∧ r2.toNat < 4294967296 := by omega
   by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64D.Functions.not, LeanRV64D.Functions.xlen] <;>
   by_cases r2z : r2 = 0 <;> simp_all
-  . simp [to_bits_truncate, Sail.get_slice_int]
-  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  · simp [to_bits_truncate, Sail.get_slice_int]
+  · repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     trans BitVec.signExtend 64 (BitVec.ofInt 32 (r1.toNat / r2.toNat))
-    . congr
+    · congr
       simp [to_bits_truncate, Sail.get_slice_int]
       simp [BitVec.ofNat, BitVec.ofInt]; congr
       rw [Int.emod_eq_of_lt]
-      . trans (@Nat.cast ℤ instNatCastInt (r1.toNat / r2.toNat)).toNat
-        . simp
-        . rw [Int.toNat_natCast]
-      . apply Int.zero_le_ofNat
-      . have := @Int.ediv_le_self r1.toNat r2.toNat (by omega)
+      · trans (@Nat.cast ℤ instNatCastInt (r1.toNat / r2.toNat)).toNat
+        · simp
+        · rw [Int.toNat_natCast]
+      · apply Int.zero_le_ofNat
+      · have := @Int.ediv_le_self r1.toNat r2.toNat (by omega)
         omega
-    . congr
-  . simp [to_bits_truncate, Sail.get_slice_int]; decide
-  . repeat rw [ if_neg (c := r2.toInt = 0) (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
+    · congr
+  · simp [to_bits_truncate, Sail.get_slice_int]; decide
+  · repeat rw [ if_neg (c := r2.toInt = 0) (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
     by_cases of : 2147483648 ≤ r1.toInt.tdiv r2.toInt <;>
     have of' := divw_overflow range_int_r1 range_int_r2 <;>
     simp_all [to_bits_truncate, Sail.get_slice_int, -not_and]
@@ -1141,27 +1141,27 @@ lemma execute_DIVW'_eq_execute_DIVW :
       congr; simp [Fin.ext_iff]
       omega
     rw [this, BitVec.signExtend_ofInt ?_ of']
-    . by_contra hlt; simp at hlt
+    · by_contra hlt; simp at hlt
       have sgn : (r1.toInt.tdiv r2.toInt).sign = -1 := by rw [Int.sign_cases, if_pos (by omega)]
       rw [Int.sign_tdiv, Int.sign_cases, Int.sign_cases] at sgn
       split_ifs at sgn <;> simp_all
-      . have hlt : ((-r1.toInt).tdiv (-r2.toInt) < -2147483648) := by simpa
+      · have hlt : ((-r1.toInt).tdiv (-r2.toInt) < -2147483648) := by simpa
         rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hlt; simp_all
         by_cases eq_one : r2.toInt = 1
-        . simp [eq_one] at *
+        · simp [eq_one] at *
           omega
-        . have := @Int.ediv_lt_self_of_pos_of_ne_one (-r1.toInt) r2.toInt (by omega) eq_one
+        · have := @Int.ediv_lt_self_of_pos_of_ne_one (-r1.toInt) r2.toInt (by omega) eq_one
           omega
-      . rw [Int.tdiv_eq_ediv_of_nonneg (by assumption)] at hlt
+      · rw [Int.tdiv_eq_ediv_of_nonneg (by assumption)] at hlt
         suffices hneg : 2147483648 < r1.toInt / (-r2.toInt)
-        . have hgt : (-r2.toInt > 0) := by omega
+        · have hgt : (-r2.toInt > 0) := by omega
           set r2 := -r2.toInt
           by_cases eq_one : r2 = 1
-          . simp [eq_one] at *
+          · simp [eq_one] at *
             omega
-          . have := @Int.ediv_lt_self_of_pos_of_ne_one r1.toInt r2 (by omega) eq_one
+          · have := @Int.ediv_lt_self_of_pos_of_ne_one r1.toInt r2 (by omega) eq_one
             omega
-        . simp; omega
+        · simp; omega
 
 @[simp]
 lemma execute_REM'_eq_execute_REM :
@@ -1176,24 +1176,24 @@ lemma execute_REM'_eq_execute_REM :
   have range_nat_r2 : 0 ≤ r2.toNat ∧ r2.toNat < 18446744073709551616 := by omega
   by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int, LeanRV64D.Functions.not, LeanRV64D.Functions.xlen] <;>
   by_cases r2z : r2 = 0 <;> simp_all
-  . simp [to_bits_truncate, Sail.get_slice_int]
+  · simp [to_bits_truncate, Sail.get_slice_int]
     rw [Nat.mod_eq_of_lt (by omega)]; simp
-  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  · repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     rw [← BitVec.toNat_inj]
     simp [to_bits_truncate, Sail.get_slice_int]
     congr; rw [Int.emod_eq_of_lt]
-    . apply Int.zero_le_ofNat
-    . rw [Int.tmod_eq_emod_of_nonneg (by omega)]
+    · apply Int.zero_le_ofNat
+    · rw [Int.tmod_eq_emod_of_nonneg (by omega)]
       trans (r2.toNat : ℤ)
-      . simp [← BitVec.toNat_inj] at r2z
+      · simp [← BitVec.toNat_inj] at r2z
         apply Int.emod_lt_of_pos r1.toNat (by omega)
-      . omega
-  . simp [to_bits_truncate, Sail.get_slice_int]
+      · omega
+  · simp [to_bits_truncate, Sail.get_slice_int]
     simp [← BitVec.toNat_inj]
     have mod_65_to_64 : forall (a : ℤ), (a % 36893488147419103232).toNat % 18446744073709551616 = (a % 18446744073709551616).toNat := by omega
     simp [mod_65_to_64, BitVec.toInt]
     split_ifs with hneg <;> [ skip; simp ] <;> rw [Int.emod_eq_of_lt (by omega)] <;> simp <;> omega
-  . repeat rw [ if_neg (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
+  · repeat rw [ if_neg (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
     simp_all [to_bits_truncate, Sail.get_slice_int]
     simp [BitVec.ofNat, BitVec.ofInt]
     congr; simp [Fin.ext_iff]
@@ -1215,56 +1215,56 @@ lemma execute_REMW'_eq_execute_REMW :
   by_cases usgn <;> simp_all [execute_DIV_REM_pure, execute_DIV_REM_pure_int,
     LeanRV64D.Functions.not, LeanRV64D.Functions.xlen] <;>
   by_cases r2z : r2 = 0 <;> simp_all
-  . simp [to_bits_truncate, Sail.get_slice_int]
+  · simp [to_bits_truncate, Sail.get_slice_int]
     rw [Nat.mod_eq_of_lt (by omega)]; simp
-  . repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
+  · repeat rw [ if_neg (by rw [← BitVec.toNat_inj] at r2z; simp_all) ]
     trans BitVec.signExtend 64 (BitVec.ofInt 32 (r1.toNat % r2.toNat))
-    . congr
+    · congr
       simp [to_bits_truncate, Sail.get_slice_int]
       simp [BitVec.ofNat, BitVec.ofInt]; congr
       rw [Int.emod_eq_of_lt]
-      . rw [Int.tmod_eq_emod_of_nonneg (by omega)]; simp; omega
-      . apply Int.zero_le_ofNat
-      . rw [Int.tmod_eq_emod_of_nonneg (by omega)]
+      · rw [Int.tmod_eq_emod_of_nonneg (by omega)]; simp; omega
+      · apply Int.zero_le_ofNat
+      · rw [Int.tmod_eq_emod_of_nonneg (by omega)]
         trans (r2.toNat : ℤ)
-        . simp [← BitVec.toNat_inj] at r2z
+        · simp [← BitVec.toNat_inj] at r2z
           apply Int.emod_lt_of_pos r1.toNat (by omega)
-        . omega
-    . congr
-  . suffices : to_bits_truncate r1.toInt = r1
-    . simp [this]
+        · omega
+    · congr
+  · suffices : to_bits_truncate r1.toInt = r1
+    · simp [this]
       simp [← BitVec.toInt_inj]
       rw [BitVec.toInt_signExtend_of_le (by simp)]
       simp [BitVec.toInt, Int.bmod_def]
       split_ifs <;> omega
-    . simp [to_bits_truncate, Sail.get_slice_int]
+    · simp [to_bits_truncate, Sail.get_slice_int]
       simp [← BitVec.toNat_inj]
       have mod_33_to_32 : forall (a : ℤ), (a % 8589934592).toNat % 4294967296 = (a % 4294967296).toNat := by omega
       simp [mod_33_to_32, BitVec.toInt]
       split_ifs with hneg <;> [ skip; simp ] <;> rw [Int.emod_eq_of_lt (by omega)] <;> simp <;> omega
-  . repeat rw [ if_neg (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
+  · repeat rw [ if_neg (by rw [← BitVec.toInt_inj] at r2z; simp_all) ]
     have : to_bits_truncate (r1.toInt.tmod r2.toInt) = BitVec.ofInt 32 (r1.toInt.tmod r2.toInt) := by
       simp [to_bits_truncate, Sail.get_slice_int]
       simp [BitVec.ofNat, BitVec.ofInt]
       congr; simp [Fin.ext_iff]
       omega
     rw [this, BitVec.signExtend_ofInt]
-    . by_contra hlt; simp at hlt
+    · by_contra hlt; simp at hlt
       have sgn : (r1.toInt.tmod r2.toInt).sign = -1 := by rw [Int.sign_cases, if_pos (by omega)]
       rw [Int.sign_tmod, Int.sign_cases] at sgn
       split_ifs at sgn
-      . apply (Int.split_nzp r2.toInt) <;> intro h <;> simp_all
-        . have : 2147483648 < (-r1.toInt).tmod (-r2.toInt) := by simp; omega
+      · apply (Int.split_nzp r2.toInt) <;> intro h <;> simp_all
+        · have : 2147483648 < (-r1.toInt).tmod (-r2.toInt) := by simp; omega
           have := @Int.tmod_lt_of_pos (-r1.toInt) (-r2.toInt) (by omega)
           omega
-        . omega
-        . have : 2147483648 < (-r1.toInt).tmod r2.toInt := by simp; omega
+        · omega
+        · have : 2147483648 < (-r1.toInt).tmod r2.toInt := by simp; omega
           have := @Int.tmod_lt_of_pos (-r1.toInt) r2.toInt (by omega)
           omega
-    . apply (Int.split_nzp r2.toInt) <;> intro h <;> simp_all
-      . have := @Int.tmod_lt_of_pos r1.toInt (-r2.toInt) (by omega)
+    · apply (Int.split_nzp r2.toInt) <;> intro h <;> simp_all
+      · have := @Int.tmod_lt_of_pos r1.toInt (-r2.toInt) (by omega)
         simp_all; omega
-      . have := @Int.tmod_lt_of_pos r1.toInt r2.toInt (by omega)
+      · have := @Int.tmod_lt_of_pos r1.toInt r2.toInt (by omega)
         omega
 
 end DIV_REM

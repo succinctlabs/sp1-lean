@@ -45,9 +45,9 @@ lemma spec.unsigned
     apply Word.lt_cases_of_isU64 at h_b_isU64
     apply Word.lt_cases_of_isU64 at h_d_isU64
     apply LtOperationUnsigned.spec at h_lt
-    . simp_all [execute_RTYPE_pure_w, Word.toNat]
-    . apply Word.isU64_of_cases <;> simp_all
-    . apply Word.isU64_of_cases <;> simp_all
+    · simp_all [execute_RTYPE_pure_w, Word.toNat]
+    · apply Word.isU64_of_cases <;> simp_all
+    · apply Word.isU64_of_cases <;> simp_all
 
 set_option maxHeartbeats 1000000 in
 
@@ -72,13 +72,13 @@ lemma spec.signed
     have h_sb_isU64 : Word.isU64 #v[b[0], b[1], b[2], b[3] + 32768 - 65536 * cols.b_msb.msb] := by
       rw [h_b_msb]; clear h_lt h_b_msb h_c_msb
       by_cases b.isNegative <;> unfold Word.isNegative at *
-      . apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
-      . apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
+      · apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
+      · apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
     have h_sd_isU64 : Word.isU64 #v[d[0], d[1], d[2], d[3] + 32768 - 65536 * cols.c_msb.msb] := by
       rw [h_c_msb]; clear h_lt h_b_msb h_c_msb
       by_cases d.isNegative <;> unfold Word.isNegative at *
-      . apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
-      . apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
+      · apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
+      · apply Word.isU64_of_cases <;> rw [Vector.getElem_mk] <;> grind
     apply LtOperationUnsigned.spec (h_b_isU64 := h_sb_isU64) (h_d_isU64 := h_sd_isU64) at h_lt
     simp [Word.toNat] at h_lt
     rw [h_lt, h_b_msb, h_c_msb]
@@ -149,7 +149,7 @@ lemma spec.branch
   rcases h_comp_limbs with ⟨ cmp_00, cmp_01 ⟩
   simp_all
   constructor <;> intro sgn <;> (repeat rw [this]) <;> clear this <;> simp_all
-  . have spec.unsigned := spec.unsigned h_b_isU64 h_d_isU64 cstrs
+  · have spec.unsigned := spec.unsigned h_b_isU64 h_d_isU64 cstrs
     rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
     simp_all <;> split_ands
@@ -167,7 +167,7 @@ lemma spec.branch
         simp_all; omega
       }
     }
-  . have spec.signed := spec.signed h_b_isU64 h_d_isU64 cstrs
+  · have spec.signed := spec.signed h_b_isU64 h_d_isU64 cstrs
     rw [U16MSBOperation.allHold_constraints_iff] at h_b_msb
     rw [U16MSBOperation.allHold_constraints_iff] at h_d_msb
     rcases h_b_msb with ⟨ _, b_msb_b, hb3 ⟩; rcases h_d_msb with ⟨ _, b_msb_d, hd3 ⟩

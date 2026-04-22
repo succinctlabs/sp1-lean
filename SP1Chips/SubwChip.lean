@@ -70,9 +70,9 @@ theorem correct_subw
     simp [execute_RTYPEW_pure_w]
     rw [← is_subw] at is_msb
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]

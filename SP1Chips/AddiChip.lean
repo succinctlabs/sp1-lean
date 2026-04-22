@@ -68,13 +68,13 @@ theorem correct_addi
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
     by_cases h_is_op_a_0 : Main[6] = 0
-    . have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop
+    · have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop
       rw [← is_add] at *
       simp [Word.toBitVec64, Word.toNat, h_is_op_a_0]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
       clear *- this hu64
       aesop
-    . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [is_add, trusted_instr_prop]
       simp [Word.toBitVec64, Word.toNat]

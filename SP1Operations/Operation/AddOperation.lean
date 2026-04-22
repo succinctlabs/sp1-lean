@@ -38,7 +38,7 @@ theorem spec
   apply Word.lt_cases_of_isU64 at h_isU64_b
   constructor
   · clear *- hbds; aesop
-  . simp [BitVec.eq_sub_iff_add_eq]
+  · simp [BitVec.eq_sub_iff_add_eq]
     simp [Word.toBitVec64, Word.toNat]
     rw [← BitVec.toNat_inj, BitVec.toNat_add]
     rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>

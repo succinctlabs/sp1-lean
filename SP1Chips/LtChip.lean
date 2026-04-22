@@ -60,9 +60,9 @@ theorem correct_slt
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (c := BitVec.ofNat 5 ↑Main[6] = 0#5) (by simp [← BitVec.toNat_inj]; omega)]
       apply LtOperationSigned.spec.signed at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
@@ -174,9 +174,9 @@ theorem correct_slti
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . have h6' : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+    · have h6' : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
         simp [← BitVec.toNat_inj]
         clear *- h_is_op_a_0 h632
         omega
@@ -274,9 +274,9 @@ theorem correct_sltu
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.unsigned at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
@@ -363,9 +363,9 @@ theorem correct_sltu
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (c := (Main[6])#'_ = 0#5) (by simpa [← BitVec.toNat_inj])]
       apply LtOperationSigned.spec.unsigned at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]

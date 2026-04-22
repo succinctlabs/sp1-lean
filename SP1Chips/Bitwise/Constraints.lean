@@ -135,11 +135,11 @@ lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → 
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu
+  · obtain ⟨ h0, h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu
     clear h18
     rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
     rcases b_imm <;> simp_all
-  . clear alu; rcases real with xor | or | and <;> simp_all
+  · clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let imm := Main[31]
@@ -153,9 +153,9 @@ lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) →
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+  · obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     clear h18; rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-  . clear alu; rcases real with xor | or | and <;> simp_all
+  · clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
@@ -167,10 +167,10 @@ lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+  · obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
     intro ret_val hm6; simp_all
     subst ret_val; simp_all
-  . clear alu; rcases real with xor | or | and <;> simp_all
+  · clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
@@ -182,14 +182,14 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  . simp only [and_assoc] at alu
+  · simp only [and_assoc] at alu
     obtain ⟨ h0, h1, h2, h3, h21, h22, h23, h24, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     simp_all
     clear h1 h18
     rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
     rcases b_imm <;> simp_all <;> apply Word.isU64_of_cases <;> simp <;>
       {simp_all; clear *- h21 h22 h23 h24 h19; aesop}
-  . clear alu; rcases real with xor | or | and <;> simp_all
+  · clear alu; rcases real with xor | or | and <;> simp_all
 
 lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
@@ -204,8 +204,8 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear cpu alu
   suffices : ret_val[0] < 65536 ∧ ret_val[1] < 65536 ∧ ret_val[2] < 65536 ∧ ret_val[3] < 65536
-  . clear *- this; apply Word.isU64_of_cases <;> simp <;> omega
-  . rcases real with xor | and | or <;> simp_all
+  · clear *- this; apply Word.isU64_of_cases <;> simp <;> omega
+  · rcases real with xor | and | or <;> simp_all
     all_goals {
       subst ret_val
       simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints, BitwiseOperation.constraints] at *
@@ -226,8 +226,8 @@ lemma ops_U64 : List.Forall SP1Constraint.toProp (constraints Main) → is_real 
     := by
   intro cstrs real
   constructor
-  . exact ops_U64_a Main cstrs real
-  . exact ops_U64_b_c Main cstrs real
+  · exact ops_U64_a Main cstrs real
+  · exact ops_U64_b_c Main cstrs real
 
 end entailed_constraints
 

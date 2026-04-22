@@ -70,9 +70,9 @@ theorem correct_addw
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
+    · have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
         simp [← BitVec.toNat_inj]; omega
       simp [this, Word.toBitVec64, Word.toNat]
       rw [← is_addw]
@@ -151,9 +151,9 @@ theorem correct_addw
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    . simp [Word.toBitVec64, Word.toNat]
+    · simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
-    . have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
+    · have : BitVec.ofNat 5 Main[6] ≠ 0#5 := by
         simp [← BitVec.toNat_inj]; omega
       simp [this, Word.toBitVec64, Word.toNat]
       rw [← is_addw]

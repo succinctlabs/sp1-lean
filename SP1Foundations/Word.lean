@@ -23,8 +23,8 @@ lemma setWidth_idem {m n : ℕ} {bv : BitVec m} :
   intro hle; simp
   rw [Nat.mod_eq_of_lt]
   apply lt_of_lt_of_le (b := 2 ^ m)
-  . unfold BitVec.toNat; apply bv.toFin.isLt
-  . apply Nat.pow_le_pow_right (by simp) (by assumption)
+  · unfold BitVec.toNat; apply bv.toFin.isLt
+  · apply Nat.pow_le_pow_right (by simp) (by assumption)
 
 end BitVec
 
@@ -126,8 +126,8 @@ lemma toInt_ub {w : HWord (Fin KB)} (is_U32_w : w.isU32) :
 lemma eq_toInt_eq {wx wy : HWord (Fin KB)} (is32_wx : HWord.isU32 wx) (is32_wy : HWord.isU32 wy) :
   wx = wy ↔ wx.toInt = wy.toInt := by
   constructor
-  . simp_all
-  . apply HWord.lt_cases_of_isU32 at is32_wx
+  · simp_all
+  · apply HWord.lt_cases_of_isU32 at is32_wx
     apply HWord.lt_cases_of_isU32 at is32_wy
     unfold HWord.toInt HWord.isNegative HWord.toNat; intro heq
     rw [← HWord.eq_pointwise]
@@ -242,8 +242,8 @@ lemma toNat_lt_of_isU64 {w : Word (Fin KB)} (hw : w.isU64) : w.toNat < 2 ^ 64 :=
 lemma eq_toNat_eq {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
   wx = wy ↔ wx.toNat = wy.toNat := by
   constructor
-  . simp_all
-  . apply Word.lt_cases_of_isU64 at is64_wx
+  · simp_all
+  · apply Word.lt_cases_of_isU64 at is64_wx
     apply Word.lt_cases_of_isU64 at is64_wy
     simp [Word.toNat]; intro heq
     rw [← Word.eq_pointwise]
@@ -287,8 +287,8 @@ lemma isU64_low_isU32 {w : Word (Fin KB)} (hw : w.isU64) : w.low.isU32 := by aes
 
 lemma low_toNat (hw : HWord.isU32 #v[b0, b1]) : (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat = HWord.toNat #v[b0, b1] := by
   rw [Word.toBitVec64_toNat]
-  . simp [Word.toNat, HWord.toNat]
-  . apply HWord.lt_cases_of_isU32 at hw; apply Word.isU64_of_cases <;> simp_all
+  · simp [Word.toNat, HWord.toNat]
+  · apply HWord.lt_cases_of_isU32 at hw; apply Word.isU64_of_cases <;> simp_all
 
 lemma setWidth_eq_low {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     BitVec.setWidth 32 w.toBitVec64 = w.low.toBitVec32
@@ -327,8 +327,8 @@ def toInt (w : Word (Fin KB)) : ℤ :=
 lemma eq_toInt_eq {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
   wx = wy ↔ wx.toInt = wy.toInt := by
   constructor
-  . simp_all
-  . apply Word.lt_cases_of_isU64 at is64_wx
+  · simp_all
+  · apply Word.lt_cases_of_isU64 at is64_wx
     apply Word.lt_cases_of_isU64 at is64_wy
     simp only [Word.toInt, Word.isNegative, Word.toNat_def]; intro heq
     rw [← Word.eq_pointwise]
@@ -444,8 +444,8 @@ def toNat (w : DWord (Fin KB)) : ℕ := w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w
 lemma eq_toNat_eq {wx wy : DWord (Fin KB)} (is128_wx : DWord.isU128 wx) (is128_wy : DWord.isU128 wy) :
   wx = wy ↔ wx.toNat = wy.toNat := by
   constructor
-  . simp_all
-  . apply DWord.lt_cases_of_isU128 at is128_wx
+  · simp_all
+  · apply DWord.lt_cases_of_isU128 at is128_wx
     apply DWord.lt_cases_of_isU128 at is128_wy
     unfold DWord.toNat; intro heq
     rw [← DWord.eq_pointwise]
@@ -504,8 +504,8 @@ def toInt (w : DWord (Fin KB)) : ℤ :=
 lemma eq_toInt_eq {wx wy : DWord (Fin KB)} (is128_wx : DWord.isU128 wx) (is128_wy : DWord.isU128 wy) :
   wx = wy ↔ wx.toInt = wy.toInt := by
   constructor
-  . simp_all
-  . apply DWord.lt_cases_of_isU128 at is128_wx
+  · simp_all
+  · apply DWord.lt_cases_of_isU128 at is128_wx
     apply DWord.lt_cases_of_isU128 at is128_wy
     unfold DWord.toInt DWord.isNegative DWord.toNat; intro heq
     rw [← DWord.eq_pointwise]
@@ -1091,10 +1091,10 @@ lemma sign_extend_imm_toBitVec64 {x₀ x₁ x₂ x₃ : Fin KB} {x : ℕ} :
     rw [signExtend, BitVec.toInt] at *
     rw [BitVec.msb_eq_decide] at *
     split_ifs at * <;> simp_all <;> [ omega; skip; skip; omega ]
-    . rw [← BitVec.toNat_inj, BitVec.toNat_setWidth, toBitVec64_toNat h_64 ] at h_eq
+    · rw [← BitVec.toNat_inj, BitVec.toNat_setWidth, toBitVec64_toNat h_64 ] at h_eq
       simp_all [BitVec.toNat_ofNat, toNat]
       omega
-    . rw [← BitVec.toInt_inj, toBitVec64_toInt h_64, toInt] at h_eq
+    · rw [← BitVec.toInt_inj, toBitVec64_toInt h_64, toInt] at h_eq
       split_ifs at h_eq with h_neg <;>
       rw [isNegative_msb, BitVec.msb_eq_decide, toBitVec64_toNat h_64] at h_neg <;>
       subst imm_x <;>

@@ -156,9 +156,9 @@ lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → 
   clear h_mop cpu rest
   rw [RTypeReader.allHold_constraints_iff_is_real] at alu
   simp only at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+  · obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
     rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-  . clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
+  · clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
 lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   (Main[6] = 0 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0) := by
@@ -170,9 +170,9 @@ lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   clear h_mop cpu rest
   rw [RTypeReader.allHold_constraints_iff_is_real] at alu
   simp only at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+  · obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
     intro hm6; simp_all
-  . clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
+  · clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
 lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
@@ -184,9 +184,9 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
   clear h_mop cpu rest
   rw [RTypeReader.allHold_constraints_iff_is_real] at alu
-  . obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+  · obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
     simp_all
-  . clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
+  · clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
 end entailed_constraints
 
