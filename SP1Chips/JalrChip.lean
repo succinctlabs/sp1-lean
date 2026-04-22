@@ -30,6 +30,8 @@ noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := 
   _ ← execute_JALR imm rs1 rd
 
 set_option maxHeartbeats 10000000 in
+
+-- correctness proof with PC-rewrite + Sail spec
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)

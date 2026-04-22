@@ -43,6 +43,7 @@ noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
+-- correctness proof across all 6 branch-opcode cases
 theorem correct_beq
     (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : s.isInitialized)
@@ -169,6 +170,7 @@ noncomputable def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
+-- correctness proof across all 6 branch-opcode cases
 theorem correct_bne
     (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : s.isInitialized)
@@ -295,6 +297,7 @@ noncomputable def spec_blt (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
+-- correctness proof across all 6 branch-opcode cases
 theorem correct_blt
     (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : s.isInitialized)
@@ -423,6 +426,7 @@ noncomputable def spec_bge (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
+-- correctness proof across all 6 branch-opcode cases
 theorem correct_bge
     (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : s.isInitialized)
@@ -555,6 +559,7 @@ noncomputable def spec_bltu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
+-- correctness proof across all 6 branch-opcode cases
 theorem correct_bltu
     (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : s.isInitialized)
@@ -687,6 +692,7 @@ noncomputable def spec_bgeu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
+-- correctness proof across all 6 branch-opcode cases
 theorem correct_bgeu
     (Main : Vector (Fin KB) 46)
     (s : SailState) (hs : s.isInitialized)

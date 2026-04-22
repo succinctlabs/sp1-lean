@@ -31,6 +31,8 @@ def sp1_slt : SailM Unit := do
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
+
+-- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_slt
   (cstrs : (constraints Main).allHold)
   (h_is_slt : is_slt Main)
@@ -132,6 +134,8 @@ def sp1_slti : SailM Unit := do
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
+
+-- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_slti
   (cstrs : (constraints Main).allHold)
   (h_is_slti : is_slti Main)
@@ -255,6 +259,8 @@ def sp1_sltu : SailM Unit := do
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
+
+-- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_sltu
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main cstrs h_is_sltu
@@ -344,6 +350,8 @@ def sp1_sltiu : SailM Unit := do
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
+
+-- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_sltu
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main

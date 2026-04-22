@@ -22,6 +22,8 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddOperation) :
   simp [constraints, sub_eq_zero, inv_16BB_eq']
 
 set_option maxHeartbeats 1000000 in
+
+-- arithmetic spec proof over Word/BitVec
 theorem spec
   {a b : Word (Fin KB)}
   {cols : AddOperation}

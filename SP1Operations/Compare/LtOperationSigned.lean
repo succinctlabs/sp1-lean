@@ -25,6 +25,8 @@ lemma allHold_constraints_iff
   := by simp [constraints, sub_eq_zero]
 
 set_option maxHeartbeats 1000000 in
+
+-- spec proof with 32-bit comparison lemmas
 lemma spec.unsigned
   {b : Word (Fin KB)}
   {d : Word (Fin KB)}
@@ -45,6 +47,8 @@ lemma spec.unsigned
     . apply Word.isU64_of_cases <;> simp_all
 
 set_option maxHeartbeats 1000000 in
+
+-- spec proof with 32-bit comparison lemmas
 lemma spec.signed
   {b : Word (Fin KB)}
   {d : Word (Fin KB)}
@@ -116,6 +120,8 @@ def spec.branch.def
         else (cols.result.u16_compare_operation.bit = 0))
 
 set_option maxHeartbeats 10000000 in
+
+-- branch-form spec over Word (Fin KB)
 lemma spec.branch
   {b : (Word (Fin KB))}
   {d : (Word (Fin KB))}

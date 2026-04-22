@@ -23,6 +23,8 @@ variable
   (h_is_real : is_real Main)
 
 set_option maxHeartbeats 1000000 in
+
+-- bundled prologue unfolds 247-column constraint list
 set_option maxRecDepth 1000000 in
 /-- Bundled prologue facts shared by every `correct_*` theorem: register bounds,
     U64 shapes of `op_b`/`op_c`, the `op_a = 0 → result = 0` implication, the
@@ -80,6 +82,8 @@ def spec_div (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_div
   (h_is_div : is_div Main)
@@ -119,6 +123,8 @@ def spec_divu (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_divu
   (h_is_divu : is_divu Main)
@@ -158,6 +164,8 @@ def spec_divw (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_divw
   (h_is_divw : is_divw Main)
@@ -197,6 +205,8 @@ def spec_divuw (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_divuw
   (h_is_divuw : is_divuw Main)
@@ -236,6 +246,8 @@ def spec_rem (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_rem
   (h_is_rem : is_rem Main)
@@ -275,6 +287,8 @@ def spec_remu (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_remu
   (h_is_remu : is_remu Main)
@@ -314,6 +328,8 @@ def spec_remw (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_remw
   (h_is_remw : is_remw Main)
@@ -353,6 +369,8 @@ def spec_remuw (rs2 rs1 rd : regidx) : SailM Unit := do
   pure ()
 
 set_option maxHeartbeats 1000000 in
+
+-- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
 theorem correct_remuw
   (h_is_remuw : is_remuw Main)

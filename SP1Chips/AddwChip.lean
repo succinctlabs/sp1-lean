@@ -32,6 +32,8 @@ def sp1_addw : SailM Unit := do
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35] * 65535, Main[35] * 65535])
 
 set_option maxHeartbeats 1000000 in
+
+-- correctness proof across instruction arms
 theorem correct_addw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[36] = 1)
@@ -118,6 +120,8 @@ def sp1_addiw : SailM Unit := do
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35] * 65535, Main[35] * 65535])
 
 set_option maxHeartbeats 1000000 in
+
+-- correctness proof across instruction arms
 theorem correct_addw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[36] = 1)

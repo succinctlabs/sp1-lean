@@ -50,6 +50,8 @@ lemma cl_are_U16
       constructor <;> omega
 
 set_option maxHeartbeats 1000000 in
+
+-- arithmetic spec proof over Word/BitVec
 @[grind →, aesop safe forward]
 lemma spec.nat
   {b d : Word (Fin KB)}

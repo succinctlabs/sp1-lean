@@ -83,6 +83,8 @@ elab "resolve_decomposition" locs:ident* : tactic => do
       ))
 
 set_option maxHeartbeats 100000000 in
+
+-- very deep mul-constraint unfolding
 set_option maxRecDepth 200000 in
 set_option synthInstance.maxHeartbeats 1000000 in
 lemma core_mul
@@ -220,6 +222,8 @@ lemma core_mul
     grind (ematch := 2048) (splits := 128)
 
 set_option maxHeartbeats 100000000 in
+
+-- very deep mul-constraint unfolding
 set_option maxRecDepth 200000 in
 set_option synthInstance.maxHeartbeats 1000000 in
 lemma core_mulw

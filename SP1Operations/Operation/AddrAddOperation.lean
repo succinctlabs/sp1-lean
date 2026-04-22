@@ -51,6 +51,8 @@ theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fi
       <;> omega
 
 set_option maxHeartbeats 1000000 in
+
+-- address-add correctness with U64 unfolding
 theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fin KB)
     (h_is_real : is_real = 1)
     (cstrs : (constraints a b cols is_real).allHold)
