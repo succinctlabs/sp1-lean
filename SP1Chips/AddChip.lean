@@ -43,27 +43,22 @@ theorem correct_add
   rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
   rw [RTypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
   simp [Opcode.ofNat, Nat.ble] at reader_cstrs
-
   -- Show the write values are all register values (i.e. are 5-bit)
   have h6 : Main[6] < 32 := by aesop
   have h14 : Main[14] < 32 := by aesop
   have h21 : Main[21] < 32 := by aesop
-
   -- Extract constraints about the initial register states
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
     List.Forall, AddOperation.constraints, CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
     RTypeReader.constraints, h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-
   rw [h_is_real] at *
   apply AddOperation.spec (by aesop) (by aesop) at add_op_cstrs
   obtain ⟨ is_U64_val, is_add ⟩ := add_op_cstrs
-
   -- Simplify the monadic operations
   simp [spec_add, sp1_add, execute_RTYPE']
   rw [run_readReg, read_pc]
   simp [sp1_op_b, read_op_b, sp1_op_c, read_op_c, sp1_op_a]
-
   -- Simplify the expressions using the arithmetic constraints
   by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
   . rw [← is_add]

@@ -812,7 +812,6 @@ lemma exec_MUL_pure_bv_to_bw (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : m
   intro is_U64_op1 is_U64_op2
   have := op1.toBWord_toU64 is_U64_op1
   have := op2.toBWord_toU64 is_U64_op2
-
   cases op <;> simp [execute_MUL_pure, execute_MUL_pure_bw, -BitVec.toNat_mul] <;>
   (repeat rw [BWord.extend_true_is_signExtend (by assumption)]) <;>
   (repeat rw [BWord.extend_false_is_setWidth (by assumption)]) <;>
@@ -832,7 +831,6 @@ lemma execute_MUL'_eq_execute_MUL :
   have bounds_toInt_64 : forall (bv : BitVec 64), -2^63 ≤ bv.toInt ∧ bv.toInt < 2^63 := by
     simp [BitVec.toInt]; intros; split_ifs <;> omega
   have bounds_toNat_64 : forall (bv : BitVec 64), 0 ≤ bv.toNat ∧ bv.toNat < 2^64 := by omega
-
   rcases op with ⟨ high, sgn1, sgn2 ⟩
   rcases sgn2 with sgn2 | sgn2 <;> rcases sgn1 with sgn1 | sgn1 <;> rcases high with high | high
   all_goals
@@ -841,51 +839,43 @@ lemma execute_MUL'_eq_execute_MUL :
     refine bind_congr ?_; intro r2
     ext s; simp_all; congr 4
     have mod_129_to_128 : forall (a : ℤ), (a % 680564733841876926926749214863536422912).toNat % 340282366920938463463374607431768211456 = (a % 340282366920938463463374607431768211456).toNat := by omega
-
   -- Signed.Signed.High
   . congr 2
     rw [mod_129_to_128]
     rw [← BitVec.toNat_mul]
     exact BitVec.toInt_toInt_as_toNat_128
-
   -- Signed.Signed.Low
   . rw [mod_129_to_128]
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
     unfold BitVec.toInt
     split_ifs <;> (push_cast; ring_nf; omega)
-
   -- Signed.Unsigned.High
   . congr 2
     rw [mod_129_to_128]
     rw [BitVec.toNat_toInt_as_toNat_128]
     simp
-
   -- Signed.Unsigned.Low
   . rw [mod_129_to_128]
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
     unfold BitVec.toInt
     split_ifs <;> (push_cast; ring_nf; omega)
-
   -- Unsigned.Signed.High
   . congr 2
     rw [mod_129_to_128]
     rw [BitVec.toInt_toNat_as_toNat_128]
     simp
-
   -- Unsigned.Signed.Low
   . rw [mod_129_to_128]
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
     unfold BitVec.toInt
     split_ifs <;> (push_cast; ring_nf; omega)
-
   -- Unsigned.Unsigned.High
   . congr 2
     rw [mod_129_to_128]
     rfl
-
   -- Unsigned.Unsigned.Low
   . rw [mod_129_to_128]
     rfl
@@ -912,7 +902,6 @@ lemma exec_MULW_pure_bv_to_bhw (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) :
   intro is_U64_op1 is_U64_op2
   have is_U64_bw1 := op1.toBWord_toU64 is_U64_op1
   have is_U64_bw2 := op2.toBWord_toU64 is_U64_op2
-
   simp [execute_MULW_pure, execute_MULW_pure_bhw, BitVec.extend]
   iterate 2 rw [← Word.toBitVec64_toBWord (by assumption), BWord.low_as_setWidth (by assumption)]
 
@@ -930,15 +919,12 @@ lemma execute_MULW'_eq_execute_MULW :
   have bounds_toInt_32 : forall (bv : BitVec 32), -2^31 ≤ bv.toInt ∧ bv.toInt < 2^31 := by
     simp [BitVec.toInt]; intros; split_ifs <;> omega
   have bounds_toNat_32 : forall (bv : BitVec 32), 0 ≤ bv.toNat ∧ bv.toNat < 2^32 := by omega
-
   simp_all [execute_MULW, execute_MULW', execute_MULW_pure, to_bits_truncate, Sail.get_slice_int, -BitVec.extractLsb, -BitVec.toInt_extractLsb]
   refine bind_congr ?_; intro r1
   refine bind_congr ?_; intro r2
   ext s; simp [-BitVec.extractLsb, -BitVec.toInt_extractLsb, BitVec.extend]; congr 4
-
   set r1w : BitVec 32 := BitVec.extractLsb 31 0 r1
   set r2w : BitVec 32 := BitVec.extractLsb 31 0 r2
-
   trans BitVec.signExtend 64 (BitVec.ofNat 32 (r1w.toInt * r2w.toInt % 4294967296).toNat)
   . congr 1
     simp [← BitVec.toNat_inj, mod_33_to_32]

@@ -228,12 +228,9 @@ lemma spec.mul (h : is_mul Main) :
     obtain ⟨ eq_mul, eq_imm ⟩ := h
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mul_real Main eq_mul)
     obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
-
     have ⟨ _, spec ⟩ := MulOperation.spec.mul is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
@@ -249,12 +246,9 @@ lemma spec.mulh (h : is_mulh Main) :
     obtain ⟨ eq_mulh, eq_imm ⟩ := h
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulh_real Main eq_mulh)
     obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
-
     have ⟨ _, spec ⟩ := MulOperation.spec.mulh is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
@@ -270,12 +264,9 @@ lemma spec.mulhu (h : is_mulhu Main) :
     obtain ⟨ eq_mulhu, eq_imm ⟩ := h
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhu_real Main eq_mulhu)
     obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
-
     have ⟨ _, spec ⟩ := MulOperation.spec.mulhu is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
@@ -291,12 +282,9 @@ lemma spec.mulhsu (h : is_mulhsu Main) :
     obtain ⟨ eq_mulhsu, eq_imm ⟩ := h
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhsu_real Main eq_mulhsu)
     obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
-
     have ⟨ _, spec ⟩ := MulOperation.spec.mulhsu is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
@@ -312,12 +300,9 @@ lemma spec.mulw (h : is_mulw Main) :
     obtain ⟨ eq_mulw, eq_imm ⟩ := h
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulw_real Main eq_mulw)
     obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_mop, rest ⟩ := cstrs
     simp_all
-
     have ⟨ _, spec ⟩ := MulOperation.spec.mulw is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MULW_pure_bv_to_bhw _ _ is_U64_b is_U64_c]
 

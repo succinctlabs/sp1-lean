@@ -46,22 +46,16 @@ theorem correct_addi
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ITypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
     simp [Opcode.ofNat, Nat.ble] at reader_cstrs
-
     obtain ⟨ _, trusted_instr_prop, hcm1, hcm2, c0, c1, c2, c3, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, ⟨ is_U64_a, is_U64_b, hu64 ⟩⟩ := reader_cstrs
-
     have h6 : Main[6] < 32 := by aesop
     have h14 : Main[14] < 32 := by aesop
-
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, AddOperation.constraints, CPUState.constraints, ITypeReader.constraints,
       h6, h14, h_is_real] at state_cstrs
-
     obtain ⟨read_pc, read_op_b, read_op_c⟩ := state_cstrs
-
     simp_all [Opcode.ofNat, Nat.ble]
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases c0 c1 c2 c3
-
     rw [h_is_real] at *
     apply AddOperation.spec is_U64_b is_U64_c at add_op_cstrs
     obtain ⟨ is_U64_val, is_add ⟩ := add_op_cstrs
@@ -73,8 +67,6 @@ theorem correct_addi
     simp [sp1_op_b, read_op_b]
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
-
-
     by_cases h_is_op_a_0 : Main[6] = 0
     . have : Main[13] = 1 := by clear *- h12 h_is_op_a_0; aesop
       rw [← is_add] at *

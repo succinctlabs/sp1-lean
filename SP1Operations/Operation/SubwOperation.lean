@@ -35,7 +35,6 @@ theorem spec
     apply Word.lt_cases_of_isU64 at h_isU64_a
     apply Word.lt_cases_of_isU64 at h_isU64_b
     split_ands
-
     . clear *- hbds; aesop
     . simp [BitVec.eq_sub_iff_add_eq]
       simp [HWord.toBitVec32, Word.low, HWord.toNat]

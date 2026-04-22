@@ -155,7 +155,6 @@ theorem useless_signExtend {x : Fin KB} {hx : x.val < 2 ^ 12}
     extract_lets bx64
     have hx_bb : x.val < KB := x.isLt
     have hx_64 : x.val < 2 ^ 64 := by omega
-
     -- Now prove using bit representation
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_umod, BitVec.toNat_ofNat]
@@ -204,28 +203,22 @@ lemma toInt_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
     := by
   rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r1) (by simp)]
   rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r2) (by simp)]
-
   have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
   have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
   have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
   have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
-
   simp [BitVec.toInt, BitVec.signExtend]; split_ifs
-
   all_goals
     simp_all
     try omega
-
   . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
     omega
-
   . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
     omega
-
   . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
@@ -237,18 +230,14 @@ lemma toInt_toNat_as_toNat_128 {r1 r2 : BitVec 64} :
     := by
   rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r1) (by simp)]
   rw [← setWidth_idem (n := 128) (bv := r2) (by simp)]
-
   have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
   have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
   have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
   have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
-
   simp [BitVec.toInt, BitVec.signExtend]; split_ifs
-
   all_goals
     simp_all
     try omega
-
   . have : ((r1.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r1.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf
@@ -260,19 +249,15 @@ lemma toNat_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
     := by
   rw [← BitVec.toInt_signExtend_of_le (v := 128) (x := r2) (by simp)]
   rw [← setWidth_idem (n := 128) (bv := r1) (by simp)]
-
   have h_max : forall (x : ℤ), max (x % 340282366920938463463374607431768211456) 0 = x % 340282366920938463463374607431768211456 := by omega
   have mr1 : max ((r1.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r1.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
   have mr2 : max ((r2.toNat : ℤ) % 340282366920938463463374607431768211456) 0 = (r2.toNat : ℤ) % 340282366920938463463374607431768211456 := by omega
   have rr1 : (r1.toNat : ℤ) % 340282366920938463463374607431768211456 = r1.toNat := by omega
   have rr2 : (r2.toNat : ℤ) % 340282366920938463463374607431768211456 = r2.toNat := by omega
-
   simp [BitVec.toInt, BitVec.signExtend]; split_ifs
-
   all_goals
     simp_all
     try omega
-
   . have : ((r2.toNat : ℤ) - 18446744073709551616) % 340282366920938463463374607431768211456 = 340282366920938463444927863358058659840 + ↑r2.toNat := by omega
     zify; simp_all [Int.toNat_add, Int.toNat_mul]
     ring_nf

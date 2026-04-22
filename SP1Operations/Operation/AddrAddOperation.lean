@@ -27,16 +27,12 @@ theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fi
     : (a.toNat + b.toNat) % 2^64 < 2^48 := by
       simp [SP1ConstraintList.allHold, h_is_real] at cstrs
       simp only [allHold_constraints_iff a b cols] at cstrs
-
       obtain ⟨h0, h1, h2, h3, hbd0, hbd1, hbd2⟩ := cstrs
       simp [← inv_16BB_eq'] at *
-
       have ha' := Word.lt_cases_of_isU64 ha
       have hb' := Word.lt_cases_of_isU64 hb
       simp at ha' hb'
-
       simp [Word.toNat]
-
       cases h0 <;> rename_i h0
       <;> simp [sub_eq_zero] at h0
       <;> simp [h0] at h1 h2 h3
@@ -62,16 +58,13 @@ theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real
     := by
       have h_sum_u48 := is_u48_sum _ _ _ _ h_is_real cstrs ha hb
       simp [Word.toNat] at h_sum_u48
-
       simp [SP1ConstraintList.allHold, h_is_real] at cstrs
       simp [allHold_constraints_iff a b cols] at cstrs
       obtain ⟨h0, h1, h2, h3, hbd0, hbd1, hbd2⟩ := cstrs
       simp [← inv_16BB_eq'] at *
-
       have ha' := Word.lt_cases_of_isU64 ha
       have hb' := Word.lt_cases_of_isU64 hb
       simp at ha' hb'
-
       simp [Word.toNat]
       cases h0 <;> rename_i h0
       <;> simp [sub_eq_zero] at h0

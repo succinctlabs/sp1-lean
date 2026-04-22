@@ -42,10 +42,8 @@ theorem spec
   obtain ⟨h0, h1, h2, h3, hbds⟩ := cstrs
   apply Word.lt_cases_of_isU64 at h_isU64_a
   apply Word.lt_cases_of_isU64 at h_isU64_b
-
   constructor
   · clear *- hbds; aesop
-
   . simp [BitVec.eq_sub_iff_add_eq]
     simp [Word.toBitVec64, Word.toNat]
     rw [← BitVec.toNat_inj, BitVec.toNat_add]

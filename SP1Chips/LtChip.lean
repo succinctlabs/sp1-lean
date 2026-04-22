@@ -49,19 +49,16 @@ theorem correct_slt
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
-
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all [BitVec.ofNatLT_eq_ofNat]
     obtain ⟨ _, _, is_U64_c ⟩ := is_U64_c
-
     -- Now the monadic manipulation
     simp [spec_slt, sp1_slt, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -94,7 +91,6 @@ def sp1_op_a : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[6] ?_
     change Main[6] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -107,7 +103,6 @@ def sp1_op_b : BitVec 5 :=
     refine BitVec.ofNatLT Main[14] ?_
     simp
     change Main[14] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -120,7 +115,6 @@ def sp1_op_c : BitVec 5 :=
     refine BitVec.ofNatLT Main[21] ?_
     simp
     change Main[21] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -169,11 +163,9 @@ theorem correct_slti
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
-
     have h_imm' : setWidth 12 (BitVec.ofNat 5 ↑Main[21]) = BitVec.ofNat 12 Main[21] := by
       simp [setWidth, setWidth', BitVec.ofNatLT_eq_ofNat]
       grind
-
     simp [h_f] at read_op_b
     simp [spec_slti, sp1_slti, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
@@ -181,7 +173,6 @@ theorem correct_slti
     simp [BitVec.ofNatLT_eq_ofNat, h_imm', ← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -191,7 +182,6 @@ theorem correct_slti
         omega
       simp [h6']
       simp [Word.toBitVec64, Word.toNat]
-
       apply LtOperationSigned.spec.signed is_U64_b is_U64_c at lt_op_cstrs
       simp at lt_op_cstrs
       simp [lt_op_cstrs]
@@ -219,7 +209,6 @@ def sp1_op_a : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[6] ?_
     change Main[6] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -232,7 +221,6 @@ def sp1_op_b : BitVec 5 :=
     refine BitVec.ofNatLT Main[14] ?_
     simp
     change Main[14] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -245,7 +233,6 @@ def sp1_op_c : BitVec 5 :=
     refine BitVec.ofNatLT Main[21] ?_
     simp
     change Main[21] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -275,20 +262,17 @@ theorem correct_sltu
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
-
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all
     obtain ⟨ _, _, is_U64_c ⟩ := is_U64_c
-
     -- Now the monadic manipulation
     simp [spec_sltu, sp1_sltu, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -321,7 +305,6 @@ def sp1_op_a : BitVec 5 :=
   by
     refine BitVec.ofNatLT Main[6] ?_
     change Main[6] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -334,7 +317,6 @@ def sp1_op_b : BitVec 5 :=
     refine BitVec.ofNatLT Main[14] ?_
     simp
     change Main[14] < 32
-
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
     simp [ALUTypeReader.constraints, SP1Constraint.toProp] at alu
@@ -366,7 +348,6 @@ theorem correct_sltu
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
-
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
@@ -374,7 +355,6 @@ theorem correct_sltu
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
-
     -- Now the monadic manipulation
     simp [spec_sltiu, sp1_sltiu, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
@@ -382,7 +362,6 @@ theorem correct_sltu
     rw [← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]

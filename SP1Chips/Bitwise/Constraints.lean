@@ -203,11 +203,9 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   simp [allHold_constraints_iff] at cstrs
   obtain ⟨ h_bop, cpu, alu, b_xor, b_or, b_and, one_of_ops ⟩ := cstrs
   clear cpu alu
-
   suffices : ret_val[0] < 65536 ∧ ret_val[1] < 65536 ∧ ret_val[2] < 65536 ∧ ret_val[3] < 65536
   . clear *- this; apply Word.isU64_of_cases <;> simp <;> omega
   . rcases real with xor | and | or <;> simp_all
-
     all_goals {
       subst ret_val
       simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints, BitwiseOperation.constraints] at *
@@ -277,9 +275,7 @@ lemma spec.xor (h : is_xor Main) :
     obtain ⟨ eq_xor, eq_imm ⟩ := h
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main eq_xor)
     obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all [← Word.eq_mk_getElem]
     exact BitwiseU16Operation.spec.xor is_U64_b is_U64_c h_bop
@@ -301,12 +297,9 @@ lemma spec.xori (h : is_xori Main) :
     rw [eq_imm] at immediate_bounds; simp_all
     obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, eq_c ⟩ := immediate_bounds
     obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all [← Word.eq_mk_getElem]
-
     exact BitwiseU16Operation.spec.xor is_U64_b is_U64_c h_bop
 
 end xori
@@ -322,12 +315,9 @@ lemma spec.or (h : is_or Main) :
     obtain ⟨ eq_or, eq_imm ⟩ := h
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main eq_or)
     obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all [← Word.eq_mk_getElem]
-
     exact BitwiseU16Operation.spec.or is_U64_b is_U64_c h_bop
 
 end or
@@ -347,12 +337,9 @@ lemma spec.ori (h : is_ori Main) :
     rw [eq_imm] at immediate_bounds; simp_all
     obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, eq_c ⟩ := immediate_bounds
     obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all [← Word.eq_mk_getElem]
-
     exact BitwiseU16Operation.spec.or is_U64_b is_U64_c h_bop
 
 end ori
@@ -368,12 +355,9 @@ lemma spec.and (h : is_and Main) :
     obtain ⟨ eq_and, eq_imm ⟩ := h
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main eq_and)
     obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all [← Word.eq_mk_getElem]
-
     exact BitwiseU16Operation.spec.and is_U64_b is_U64_c h_bop
 
 end and
@@ -393,12 +377,9 @@ lemma spec.andi (h : is_andi Main) :
     rw [eq_imm] at immediate_bounds; simp_all
     obtain ⟨ eq_c0, eq_c1, eq_c2, eq_c3, eq_c ⟩ := immediate_bounds
     obtain ⟨ sop_1, sop_2, sop_3 ⟩ := single_op Main cstrs
-
     simp [allHold_constraints_iff] at cstrs
-
     obtain ⟨ h_bop, rest ⟩ := cstrs
     simp_all [← Word.eq_mk_getElem]
-
     exact BitwiseU16Operation.spec.and is_U64_b is_U64_c h_bop
 
 end andi

@@ -48,16 +48,13 @@ theorem correct (Main : Vector (Fin KB) 52)
     let imm_c := sp1_imm_c Main
     (spec_sb imm_c (.Regidx op_a) (.Regidx op_b)).run s = (sp1_sb Main).run s := by
   extract_lets op_a op_b imm_c
-
   -- Extract the facts about the config registers in the state
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
-
   -- Extract the main constraints from the chip
   rw [StoreByte.constraints] at h_cstrs
   simp [SP1ConstraintList.allHold] at h_cstrs
   simp [AddressOperation.constraints, sub_eq_zero, h_is_real] at h_cstrs
   obtain ⟨h_add_addr, h49, h38, h39, h40, h49, h_cpu, h_reader, h_cstrs⟩ := h_cstrs
-
   -- Extract constraints about the reader
   simp [ITypeReaderImmutable.constraints,
       SP1Constraint.toProp, Opcode.ofNat, Nat.ble] at h_reader
@@ -68,7 +65,6 @@ theorem correct (Main : Vector (Fin KB) 52)
   have h6_32 : Main[6] < 32 := by clear *- h_reader; simp_all only
   have h14_32 : Main[14] < 32 := by clear *- h_reader; simp_all only
   have h2728 : ¬ (Main[27] = 0 ∧ Main[28] = 0) := by clear *- h40; aesop
-
   -- Extract constraints about the state of operations
   simp [StoreByte.constraints, AddressOperation.constraints,
     SP1Constraint.toStateProp, AddrAddOperation.constraints,
@@ -76,15 +72,12 @@ theorem correct (Main : Vector (Fin KB) 52)
     Opcode.ofNat, Nat.ble, h_is_real, h6_32, h14_32, h2728] at state_cstrs
   obtain ⟨h_read_pc, h6_op_a, h14_op_a, h_imm_state⟩ := state_cstrs
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
-
   have h15u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
     clear *- h_reader; simp_all only
   have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
     clear *- h_reader; apply Word.isU64_of_cases <;> (simp; omega)
-
   -- Extract constraints about the addr add
   have haddr_add := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_add_addr
-
   -- Simplify the monadic computation
   simp [spec_sb]
   simp [run_readReg_of_isInitialized s _ hs]
@@ -95,13 +88,11 @@ theorem correct (Main : Vector (Fin KB) 52)
   simp [op_b, sp1_ob_b, h14_op_a]
   simp [AddrAddOperation.spec] at haddr_add
   simp [sp1_sb, haddr_add.2]
-
   -- Apply the main helper lemma
   rw [run_vmem_write_of_width_1' (BitVec.ofNat 5 Main[14])
     (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
     (BitVec.signExtend 64 imm_c)
     (BitVec.ofNat 8 ↑Main[7])]
-
   -- Arithmetic Caclulations
   · simp [sp1_sb, h_imm_c, imm_c, Sail.ConcurrencyInterfaceV1.write_ram, PreSail.write_ram,
       PreSail.writeBytes, PreSail.writeByte]
@@ -116,7 +107,6 @@ theorem correct (Main : Vector (Fin KB) 52)
         simp [BitVec.toNat_eq]
         omega
       · simp [BitVec.toNat_eq]
-
   -- Other hypothesis for the lemma
   · simp [SailState.isInitialized, hs]
   · simpa using h14_op_a

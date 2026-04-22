@@ -141,7 +141,6 @@ lemma spec.branch
   have : b.toBitVec64 = d.toBitVec64 ↔ b[0] = d[0] ∧ b[1] = d[1] ∧ b[2] = d[2] ∧ b[3] = d[3] := by
     simp_all [← BitVec.toNat_inj, Word.toBitVec64, Word.toNat]
     omega
-
   rw [allHold_constraints_iff] at cstrs
   rcases cstrs with ⟨ h_b_msb, h_d_msb, h_lt, ⟨ h_is_signed_bool, h_is_signed_b_msb, h_is_signed_d_msb ⟩ ⟩
   rw [LtOperationUnsigned.allHold_constraints_iff] at h_lt
@@ -149,20 +148,16 @@ lemma spec.branch
   simp [U16CompareOperation.constraints] at h_comp_limbs
   rcases h_comp_limbs with ⟨ cmp_00, cmp_01 ⟩
   simp_all
-
   constructor <;> intro sgn <;> (repeat rw [this]) <;> clear this <;> simp_all
   . have spec.unsigned := spec.unsigned h_b_isU64 h_d_isU64 cstrs
-
     rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
     simp_all <;> split_ands
-
     symm at lt_05 lt_06; simp_all
     on_goal 2 => intros; intro eqc; simp_all
     on_goal 3 => intros; intro eqc; simp_all
     on_goal 4 => intros; intro eqc; simp_all
     on_goal 5 => intro eqc; simp_all
-
     all_goals {
       split_ifs at spec.unsigned with cond
       all_goals {
@@ -177,7 +172,6 @@ lemma spec.branch
     rw [U16MSBOperation.allHold_constraints_iff] at h_d_msb
     rcases h_b_msb with ⟨ _, b_msb_b, hb3 ⟩; rcases h_d_msb with ⟨ _, b_msb_d, hd3 ⟩
     simp only [show (1 : Fin KB) ≠ 0 by decide, not_false_iff, forall_true_left] at hb3 hd3
-
     rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>
     rcases h_flag_2_bool <;> rcases h_flag_3_bool <;>
     symm at lt_05 lt_06 <;>

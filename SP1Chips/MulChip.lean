@@ -44,20 +44,15 @@ theorem correct_mul
     have h_a0 := op_a_is_0 Main cstrs (mul_real Main is_mul)
     have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
     simp_all
-
     simp [constraints] at state_cstrs
     simp_all
-
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints,
       RTypeReader.constraints, ha, hb, hc] at state_cstrs
-
     obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1
-
     simp [spec_mul, sp1_mul, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -106,19 +101,15 @@ theorem correct_mulh
     have h_a0 := op_a_is_0 Main cstrs (mulh_real Main is_mulh)
     have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
     simp_all
-
     simp [constraints] at state_cstrs
     simp_all
-
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints,
       RTypeReader.constraints, ha, hb, hc] at state_cstrs
     obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1
-
     simp [spec_mulh, sp1_mulh, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -167,19 +158,15 @@ theorem correct_mulh
     have h_a0 := op_a_is_0 Main cstrs (mulhu_real Main is_mulhu)
     have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
     simp_all
-
     simp [constraints] at state_cstrs
     simp_all
-
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints,
       RTypeReader.constraints, ha, hb, hc] at state_cstrs
     obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1
-
     simp [spec_mulhu, sp1_mulhu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -226,18 +213,14 @@ theorem correct_mulh
     have h_a0 := op_a_is_0 Main cstrs (mulhsu_real Main is_mulhsu)
     have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
     simp_all
-
     simp [constraints] at state_cstrs
     simp_all
-
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
     obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1
-
     simp [spec_mulhsu, sp1_mulhsu, execute, execute_MUL']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]
@@ -286,18 +269,14 @@ theorem correct_mulw
     have h_a0 := op_a_is_0 Main cstrs (mulw_real Main is_mulw)
     have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
     simp_all
-
     simp [constraints] at state_cstrs
     simp_all
-
     simp [SP1Constraint.toStateProp, List.Forall, CPUState.constraints, RTypeReader.constraints] at state_cstrs
     obtain ⟨thr1, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear thr1; simp_all
-
     simp [spec_mulw, sp1_mulw, execute, execute_MULW']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
       rw [KoalaBear.add4_into_pc_ofNat (by omega)]

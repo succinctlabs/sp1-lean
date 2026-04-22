@@ -234,7 +234,6 @@ lemma eq_signExtend_of_is_real (Main : Vector (Fin KB) 46)
       BitVec.signExtend 64 (BitVec.ofNat 13 Main[21]) := by
   have := single_op Main cstrs
   have htrust := is_trusted_of_constraints Main cstrs is_real
-
   rcases is_real with h | h | h | h | h | h
   all_goals
   · simp_all [constraints, ITypeReaderImmutable.constraints,
@@ -250,12 +249,10 @@ lemma add_signExtend_of_constraints (Main : Vector (Fin KB) 46)
       BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])) % 4 = 0 := by
   have := single_op Main cstrs
   have htrust := is_trusted_of_constraints Main cstrs is_real
-
   rcases is_real with h | h | h | h | h | h
   all_goals
   · simp only [Fin.isValue, add_zero, zero_add, one_ne_zero, or_true, zero_ne_one,
       and_self, implies_true, imp_self, Fin.reduceAdd, Fin.reduceEq, or_self, h] at this
-
     simp only [SP1ConstraintList.allHold, constraints, Fin.isValue, mul_zero, mul_one, zero_add,
       add_zero, List.append_assoc, sub_sub_cancel, Nat.cast_one, Nat.cast_zero, sub_zero,
       ByteOpcode.ofNat_seven, List.forall_append, List.Forall, SP1Constraint.toProp_assertZero,
@@ -264,10 +261,8 @@ lemma add_signExtend_of_constraints (Main : Vector (Fin KB) 46)
     obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
     clear lt_cstrs chip_cstrs
     simp_all
-
     simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
       Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-
     have h_pc0_nat_mul4 : Main[3].val % 4 = 0 := by
       have : Main[3] % 4 = 0 := by simp_all only [Fin.isValue]
       rwa [Fin.mod_def, ← Fin.val_inj] at this
