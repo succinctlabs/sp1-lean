@@ -11,12 +11,12 @@ def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6]
 def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14]
 def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
 
-/-- Specification of the ADD operation in sail, while setting the next program counter-/
+/-- Specification of the ADD operation in sail, while setting the next program counter. -/
 def spec_add (rs2 rs1 rd : regidx) : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_RTYPE rs2 rs1 rd rop.ADD
 
-/-- Behavior of the ADD operation in SP1, writing the given values to registers-/
+/-- Behavior of the ADD operation in SP1, writing the given values to registers. -/
 def sp1_add : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg (sp1_op_a Main) (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
