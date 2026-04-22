@@ -69,23 +69,16 @@ theorem mul4_means_0_1_are_0 {x : BitVec 64} (hx : x % 4 = 0) : x[0] = false ∧
 
 end BitVec
 
-/-- Absorbing a concrete bitvec constant `c` into a `Fin n`-based `BitVec.ofNat`
-expression. The only dependence on the modulus is the no-wrap hypothesis
-`x.val + c.val < n`; generic version of `add4_into_pc_ofNat`. -/
-lemma Fin.BitVec_ofNat_add_eq_add_ofNat {n : ℕ} [NeZero n] (x c : Fin n) {y z : ℕ}
-    (hx : x.val + c.val < n) :
-    BitVec.ofNat 64 (x.val + y + z) + BitVec.ofNat 64 c.val =
-      BitVec.ofNat 64 ((x + c).val + y + z) := by
-  rw [Fin.val_add, Nat.mod_eq_of_lt hx]
+/-- Absorbing a concrete bitvec constant `c` (as a `ℕ` literal) into a `Fin n`-based
+`BitVec.ofNat` expression. The `c : ℕ` form is chosen so callsites with literals like
+`4#64 = BitVec.ofNat 64 4` unify syntactically against the LHS pattern. -/
+lemma Fin.BitVec_ofNat_add_eq_add_ofNat {n : ℕ} [NeZero n] (x : Fin n) (c : ℕ) {y z : ℕ}
+    (hc : c < n) (hx : x.val + c < n) :
+    BitVec.ofNat 64 (x.val + y + z) + BitVec.ofNat 64 c =
+      BitVec.ofNat 64 ((x + Fin.ofNat n c).val + y + z) := by
+  have hcval : (Fin.ofNat n c).val = c := Nat.mod_eq_of_lt hc
+  rw [Fin.val_add, hcval, Nat.mod_eq_of_lt hx]
   simp [BitVec.ofNat_add]; ring_nf
-
-namespace KoalaBear
-
-lemma add4_into_pc_ofNat {x : Fin KB} {y z : ℕ} (hx : x < 65536) :
-    BitVec.ofNat 64 (x.val + y + z) + 4#64 = BitVec.ofNat 64 ((x + 4).val + y + z) :=
-  Fin.BitVec_ofNat_add_eq_add_ofNat x 4 (by omega)
-
-end KoalaBear
 
 namespace Nat
 

@@ -59,13 +59,13 @@ theorem correct_mul
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mul Main ⟨ is_mul, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mul
@@ -120,13 +120,13 @@ theorem correct_mulh
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulh Main ⟨ is_mulh, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mulh
@@ -181,13 +181,13 @@ theorem correct_mulh
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulhu Main ⟨ is_mulhu, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mulhu
@@ -239,13 +239,13 @@ theorem correct_mulh
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulhsu Main ⟨ is_mulhsu, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 namespace Mulhsu
@@ -299,13 +299,13 @@ theorem correct_mulw
 
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     . simp [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     . rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MULW_pure_bv_to_bhw _ _ (by omega) (by omega)]
       have := spec.mulw Main ⟨ is_mulw, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [KoalaBear.add4_into_pc_ofNat (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Mulw

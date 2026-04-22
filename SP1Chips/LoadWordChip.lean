@@ -138,7 +138,7 @@ theorem correct_lb (Main : Vector (Fin KB) 49)
         rw [Fin.le_iff_val_le_val]
         simp
         omega
-      rw [inv_8BB_eq', mul_256_inv_KB _,
+      rw [inv_8BB_eq', Fin.mul_inv_pow2_eq_shiftRight (8 : Fin KB) (by decide) _,
         hand, shiftRight_eq_sub_mod]
       congr 1
       simp [Fin.mod_val]
@@ -229,7 +229,7 @@ theorem correct_lb (Main : Vector (Fin KB) 49)
         rw [Fin.le_iff_val_le_val]
         simp
         omega
-      rw [inv_8BB_eq', mul_256_inv_KB _,
+      rw [inv_8BB_eq', Fin.mul_inv_pow2_eq_shiftRight (8 : Fin KB) (by decide) _,
         hand, shiftRight_eq_sub_mod]
       congr 1
       simp [Fin.mod_val]
@@ -423,7 +423,7 @@ theorem correct_lbu (Main : Vector (Fin KB) 49)
       rw [Fin.le_iff_val_le_val]
       simp
       omega
-    rw [inv_8BB_eq', mul_256_inv_KB _,
+    rw [inv_8BB_eq', Fin.mul_inv_pow2_eq_shiftRight (8 : Fin KB) (by decide) _,
       hand, shiftRight_eq_sub_mod]
     congr 1
     simp [Fin.mod_val]
