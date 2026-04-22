@@ -22,6 +22,7 @@ lemma Fin.val_mod_eq_zero_iff_of_lt {n : ℕ} [NeZero n] {x : Fin n} {m : ℕ} (
 namespace KoalaBear
 
 -- dt: Need `#eval`-level `native_decide` strength to make this work on all OS
+set_option linter.style.nativeDecide false in
 lemma prime_KoalaBearPrime : Nat.Prime KB := by native_decide
 
 instance Fact_BBPrime : Fact (Nat.Prime KB) := ⟨prime_KoalaBearPrime⟩

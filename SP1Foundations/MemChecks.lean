@@ -16,6 +16,7 @@ attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
   BitVec.toNatInt
   htif_tohost_size
 
+set_option linter.style.nativeDecide false in
 /-- The CLINT region sits at `[plat_clint_base, plat_clint_base + plat_clint_size)`
 with `plat_clint_base = 2^25 = 33554432`. Every caller below supplies a bound
 placing the access strictly below this region. -/
@@ -36,6 +37,7 @@ lemma run_within_mmio_writable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
   have h' := h_base ▸ h
   omega
 
+set_option linter.style.nativeDecide false in
 /-- Read counterpart of `run_within_mmio_writable_mmio`. -/
 lemma run_within_mmio_readable_mmio (reg_val : BitVec 64) (offset : BitVec 64)
     (width : ℕ) (hw : 0 < width) (s : SailState) (hs : SailState.isInitialized s)
