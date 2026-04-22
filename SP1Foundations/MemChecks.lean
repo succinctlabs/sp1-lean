@@ -1,7 +1,5 @@
 import SP1Foundations.Assumptions
 
-set_option linter.unusedVariables false
-
 open LeanRV64D.Functions Sail SailState
 
 attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
@@ -783,7 +781,7 @@ lemma run_vmem_write_of_width_1'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 1 < 2^64)
+    (_h_does_fit : reg_val.toNat + offset.toNat + 1 < 2^64)
     (h_below_clint : BitVec.toNat (reg_val + offset) + 1 ≤ 33554432) :
     (vmem_write (.Regidx rs_addr_bv) offset 1 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
@@ -856,7 +854,7 @@ lemma run_vmem_write_of_width_2'
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 2 < 2^64)
+    (_h_does_fit : reg_val.toNat + offset.toNat + 2 < 2^64)
     (h_below_clint : BitVec.toNat (reg_val + offset) + 2 ≤ 33554432) :
     (vmem_write (.Regidx rs_addr_bv) offset 2 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
@@ -915,7 +913,7 @@ lemma run_vmem_write_of_width_4
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 4 < 2^64)
+    (_h_does_fit : reg_val.toNat + offset.toNat + 4 < 2^64)
     (h_below_clint : BitVec.toNat (reg_val + offset) + 4 ≤ 33554432) :
     (vmem_write (.Regidx rs_addr_bv) offset 4 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
@@ -976,7 +974,7 @@ lemma run_vmem_write_of_width_8
     (h_reg_val : s.get_reg? rs_addr_bv = some reg_val)
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_does_fit : reg_val.toNat + offset.toNat + 8 < 2^64)
+    (_h_does_fit : reg_val.toNat + offset.toNat + 8 < 2^64)
     (h_below_clint : BitVec.toNat (reg_val + offset) + 8 ≤ 33554432) :
     (vmem_write (.Regidx rs_addr_bv) offset 8 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)

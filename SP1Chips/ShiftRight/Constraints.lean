@@ -544,29 +544,22 @@ private lemma bool_mul_65535_lt {b : Fin KB} (hb : b = 0 ∨ b = 1) :
   rcases hb <;> simp_all
 
 /-- Shared pattern for the `aK_16` proofs inside `ops_U64_a`: a 16-way case split on
-`cb0..cb3` followed by `cancel_mul_65536_v1` on two limb decompositions and an
-`omega` close. Replaces the inline body at multiple sites that all differ only in
-the specific `b_lo`/`b_hi` indices. -/
+`cb0..cb3` closed by `omega` using the limb bounds. -/
 private lemma limb_16_of_cancel
-    {b_lo b_hi hl_lo hl_hi ll_lo ll_hi v0123 : Fin KB}
+    {hl_lo hl_hi ll_lo ll_hi : Fin KB}
     {cb0 cb1 cb2 cb3 : Fin KB}
     (b_cb0 : cb0 = 0 ∨ cb0 = 1) (b_cb1 : cb1 = 0 ∨ cb1 = 1)
     (b_cb2 : cb2 = 0 ∨ cb2 = 1) (b_cb3 : cb3 = 0 ∨ cb3 = 1)
-    (b_lo_16 : b_lo.val < 65536) (b_hi_16 : b_hi.val < 65536)
     (_lt_ll_lo : ll_lo.val < 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8).val)
-    (_lt_hl_lo : hl_lo.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val)
-    (_lt_ll_hi : ll_hi.val < 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8).val)
-    (_lt_hl_hi : hl_hi.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val)
-    (h_b_lo_dec : b_lo * v0123 = hl_lo * 65536 + ll_lo * v0123)
-    (h_b_hi_dec : b_hi * v0123 = hl_hi * 65536 + ll_hi * v0123) :
+    (lt_hl_lo : hl_lo.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val)
+    (lt_ll_hi : ll_hi.val < 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8).val)
+    (_lt_hl_hi : hl_hi.val < 2 ^ (16 - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8)).val) :
     (hl_lo + ll_hi * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1))).val < 65536 := by
   rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> simp_all
   all_goals {
-    try apply cancel_mul_65536_v1 (by simp) at h_b_lo_dec
-    try apply cancel_mul_65536_v1 (by simp) at h_b_hi_dec
-    try simp [Fin.val_add, Fin.val_mul] at b_lo_16 b_hi_16 ⊢
+    simp [Fin.val_add, Fin.val_mul]
     repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-    try omega
+    omega
   }
 
 end field_arithmetic
@@ -778,12 +771,9 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
     rcases real with hsrl | hsra | hsrlw | hsraw
     . simp_all
 
-      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b0_16 b1_16
-        lt_ll0 lt_hl0 lt_ll1 lt_hl1 h_b0_dec h_b1_dec
-      have a1_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b1_16 b2_16
-        lt_ll1 lt_hl1 lt_ll2 lt_hl2 h_b1_dec h_b2_dec
-      have a2_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b2_16 b3_16
-        lt_ll2 lt_hl2 lt_ll3 lt_hl3 h_b2_dec h_b3_dec
+      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll0 lt_hl0 lt_ll1 lt_hl1
+      have a1_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll1 lt_hl1 lt_ll2 lt_hl2
+      have a2_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll2 lt_hl2 lt_ll3 lt_hl3
       have a3_16 : hl3.val < 65536 := by
         clear *- b_cb0 b_cb1 b_cb2 b_cb3 b3_16 h_b3_dec lt_ll3 lt_hl3
         rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> simp_all
@@ -795,12 +785,9 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
 
     . simp_all
 
-      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b0_16 b1_16
-        lt_ll0 lt_hl0 lt_ll1 lt_hl1 h_b0_dec h_b1_dec
-      have a1_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b1_16 b2_16
-        lt_ll1 lt_hl1 lt_ll2 lt_hl2 h_b1_dec h_b2_dec
-      have a2_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b2_16 b3_16
-        lt_ll2 lt_hl2 lt_ll3 lt_hl3 h_b2_dec h_b3_dec
+      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll0 lt_hl0 lt_ll1 lt_hl1
+      have a1_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll1 lt_hl1 lt_ll2 lt_hl2
+      have a2_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll2 lt_hl2 lt_ll3 lt_hl3
       have a3_16 : (hl3 + (msb_b * 65536 - msb_b * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1)))).val < 65536 := by
         clear *- h_msb_b3 b_cb0 b_cb1 b_cb2 b_cb3 b3_16 h_b3_dec lt_ll3 lt_hl3
         rw [U16MSBOperation.allHold_constraints_iff] at h_msb_b3
@@ -837,8 +824,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
       simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
       simp_all
 
-      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b0_16 b1_16
-        lt_ll0 lt_hl0 lt_ll1 lt_hl1 h_b0_dec h_b1_dec
+      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll0 lt_hl0 lt_ll1 lt_hl1
       have a1_16 : hl1.val < 65536 := by
         clear *- b1_16 b2_16 b_cb0 b_cb1 b_cb2 b_cb3 h_b1_dec lt_ll1 lt_hl1
         rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;> rcases b_cb3 <;> simp_all
@@ -878,8 +864,7 @@ lemma ops_U64_a : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
       simp [eq_hl2, eq_ll2, eq_hl3, eq_ll3] at *
       simp_all
 
-      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 b0_16 b1_16
-        lt_ll0 lt_hl0 lt_ll1 lt_hl1 h_b0_dec h_b1_dec
+      have a0_16 := limb_16_of_cancel b_cb0 b_cb1 b_cb2 b_cb3 lt_ll0 lt_hl0 lt_ll1 lt_hl1
       have a1_16 : (hl1 + (msb_b * 65536 - msb_b * ((1 - cb0 + 1) * 2 * ((1 - cb1) * 3 + 1) * ((1 - cb2) * 15 + 1) * ((1 - cb3) * 255 + 1)))).val < 65536 := by
         clear *- h_msb_b3 b1_16 b2_16 b_cb0 b_cb1 b_cb2 b_cb3 h_b1_dec lt_ll1 lt_hl1
         rw [U16MSBOperation.allHold_constraints_iff] at h_msb_b3
