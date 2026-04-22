@@ -38,7 +38,11 @@ theorem correct (Main : Vector (Fin KB) 52)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
-      reg_val + offset + 1 < 2^64) :
+      reg_val + offset + 1 < 2^64)
+    (h_below_clint :
+      let reg_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
+      let offset := BitVec.signExtend 64 (sp1_imm_c Main)
+      BitVec.toNat (reg_val + offset) + 1 ≤ 33554432) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
@@ -120,6 +124,7 @@ theorem correct (Main : Vector (Fin KB) 52)
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · simp
     simpa [Std.ExtDHashMap.get_insert]
+  · simpa [imm_c, sp1_imm_c] using h_below_clint
 
 end StoreByte
 

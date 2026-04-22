@@ -94,15 +94,36 @@ section pmp_check
 Adding this is at least consistent, since the left-hand side has no actual value. -/
 axiom pmp_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ) :
-    EStateM.run (pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
-      width (MemoryAccessType.Store Data) Privilege.Machine) s = EStateM.Result.ok none s
+    pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+      width (MemoryAccessType.Store mem_payload.Data) Privilege.Machine s =
+        EStateM.Result.ok none s
 
 /-- We can't prove this directly because the loop in `pmpCheck` doesn't unfold.
 Adding this is at least consistent, since the left-hand side has no actual value. -/
 axiom pmp_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ) :
-    EStateM.run (pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
-      width (MemoryAccessType.Load Data) Privilege.Machine) s = EStateM.Result.ok none s
+    pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+      width (MemoryAccessType.Load mem_payload.Data) Privilege.Machine s =
+        EStateM.Result.ok none s
+
+/-- Companion to `pmp_check_machine` for the PMA half of `phys_access_check`.
+`pmaCheck` walks `pma_regions` and dispatches on per-region attributes; in our
+kernel configuration no fault is raised. Axiomatising is consistent since the
+left-hand side has no actual value. -/
+axiom pma_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
+    (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
+    (pbmt : page_based_mem_type) (res_or_con : Bool) :
+    pmaCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+      width (MemoryAccessType.Store mem_payload.Data) pbmt res_or_con s =
+        EStateM.Result.ok none s
+
+/-- Load counterpart of `pma_check_machine`. -/
+axiom pma_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
+    (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
+    (pbmt : page_based_mem_type) (res_or_con : Bool) :
+    pmaCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+      width (MemoryAccessType.Load mem_payload.Data) pbmt res_or_con s =
+        EStateM.Result.ok none s
 
 end pmp_check
 

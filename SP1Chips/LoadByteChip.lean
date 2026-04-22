@@ -4,12 +4,6 @@ import SP1Operations.Operation.AddrAddOperation
 
 open LeanRV64D.Functions Sail SailState
 
--- @[simp] lemma lt_65536_of_mul_inv_lt' (x : Fin KB) (h : (x * 256⁻¹).val < 256) :
---     x.val < 65536 := by
-
--- lemma shiftRight_eq_sub_mod (x : ℕ) :
---     x >>> n = (x - (x % 2 ^ n)) >>> n := by
-
 namespace Load
 
 namespace LoadByte
