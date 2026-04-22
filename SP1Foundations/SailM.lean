@@ -209,6 +209,27 @@ lemma run_readReg_of_isInitialized (s : SailState) (reg : Register)
   rw [run_readReg]
   simp [Std.ExtDHashMap.get?_eq_some_get (hs _)]
 
+/-- Bind version of `run_readReg_of_isInitialized`: inside an `EStateM.bind`,
+the `readReg reg` step resolves to `s.regs.get reg _` under `isInitialized`.
+Useful when the `readReg` is buried in a `do`-block that can't be collapsed
+directly by the `.run s` form. -/
+lemma run_readReg_bind_of_isInitialized {α : Type}
+    (s : SailState) (reg : Register) (hs : SailState.isInitialized s)
+    (k : RegisterType reg → SailM α) :
+    (Sail.readReg reg >>= k).run s = (k (s.regs.get reg (hs reg))).run s := by
+  simp only [bind, Bind.bind, EStateM.bind, EStateM.run]
+  rw [show (Sail.readReg reg : SailM _) s = .ok (s.regs.get reg (hs reg)) s from
+    run_readReg_of_isInitialized s reg hs]
+
+/-- Direct-application variant of `run_readReg_bind_of_isInitialized`. Useful
+when the `readReg reg >>= k` is syntactically applied to a state without a
+visible `.run`, e.g. inside a `match … s with …` scrutinee. -/
+lemma readReg_bind_apply_of_isInitialized {α : Type}
+    (s : SailState) (reg : Register) (hs : SailState.isInitialized s)
+    (k : RegisterType reg → SailM α) :
+    (Sail.readReg reg >>= k) s = k (s.regs.get reg (hs reg)) s :=
+  run_readReg_bind_of_isInitialized s reg hs k
+
 @[simp]
 lemma run_readReg_insert_of_ne (s : SailState) (h : reg ≠ reg') :
   (Sail.readReg reg').run { s with regs := s.regs.insert reg v} =
