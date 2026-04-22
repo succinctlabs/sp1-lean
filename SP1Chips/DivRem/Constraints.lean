@@ -9,6 +9,7 @@ import SP1Operations.Reader.RTypeReader
 
 namespace DivRem
 
+set_option linter.style.setOption false
 set_option maxHeartbeats 100000000
 set_option linter.constructorNameAsVariable false
 

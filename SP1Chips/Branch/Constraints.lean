@@ -224,7 +224,8 @@ lemma is_trusted_of_constraints (Main : Vector (Fin KB) 46)
     have h25 := (cstrs.2.2.2.2.1).resolve_right (by decide)
     simp_all only [add_zero, zero_add]
 
-set_option maxHeartbeats 20000000
+-- Large 6-arm case split over `is_real`.
+set_option maxHeartbeats 20000000 in
 lemma eq_signExtend_of_is_real (Main : Vector (Fin KB) 46)
     (cstrs : (constraints Main).allHold)
     (is_real : is_real Main) :
@@ -238,7 +239,8 @@ lemma eq_signExtend_of_is_real (Main : Vector (Fin KB) 46)
   · simp_all [constraints, ITypeReaderImmutable.constraints,
       SP1Constraint.toProp, Opcode.ofNat, Nat.ble, Nat.beq]
 
-set_option maxHeartbeats 20000000
+-- Large 6-arm case split over `is_real` with `signExtend` unfolding.
+set_option maxHeartbeats 20000000 in
 lemma add_signExtend_of_constraints (Main : Vector (Fin KB) 46)
     (cstrs : (constraints Main).allHold)
     (is_real : is_real Main) :

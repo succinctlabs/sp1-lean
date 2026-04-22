@@ -2,6 +2,7 @@ import SP1Foundations
 import SP1Operations.Operation.SubwOperation.Operation
 import SP1Operations.Operation.SubwOperation.Constraints
 
+set_option linter.style.setOption false
 set_option maxHeartbeats 10000000
 
 namespace SubwOperation

@@ -4,6 +4,7 @@ import SP1Operations.Operation.BitwiseOperation
 import SP1Operations.Operation.BitwiseU16Operation.Operation
 import SP1Operations.Operation.BitwiseU16Operation.Constraints
 
+set_option linter.style.setOption false
 set_option maxHeartbeats 10000000
 
 namespace BitwiseU16Operation

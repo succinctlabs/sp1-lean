@@ -7,6 +7,7 @@ namespace MulOperation
 
 set_option linter.unusedTactic false
 set_option linter.unreachableTactic false
+set_option linter.style.setOption false
 set_option maxHeartbeats 10000000
 
 section field_operations

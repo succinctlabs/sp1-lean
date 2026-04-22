@@ -4,6 +4,7 @@ import SP1Operations.Reader.ALUTypeReader
 
 namespace ShiftRight
 
+set_option linter.style.setOption false
 set_option maxHeartbeats 100000000
 
 variable (Main : Vector (Fin KB) 70)
