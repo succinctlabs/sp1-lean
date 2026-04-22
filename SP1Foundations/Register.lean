@@ -58,24 +58,15 @@ def reg_idx_to_Register (idx : BitVec 5) : Register :=
   | 30#5 => Register.x30
   | _ => Register.x31
 
-lemma reg_idx_31_is_x31 : reg_idx_to_Register 31#5 = Register.x31 := rfl
-
 /-- All of the registers corresponding to a `BitVec 5` contain 64-bit values. -/
 lemma reg_idx_must_64 (idx : BitVec 5) :
     RegisterType (reg_idx_to_Register idx) = BitVec 64 := by
   simp [reg_idx_to_Register]
   split <;> rfl
 
-/-- Interpret a value in a register type as a bitvector. -/
-def regidxValToBitVec (idx : BitVec 5) (val : RegisterType (reg_idx_to_Register idx)) :
-    BitVec 64 := cast (reg_idx_must_64 idx) val
-
 /-- Interpret a bitvec into a register type for some vector index. -/
 def bitVecToRegidxVal (idx : BitVec 5) (val : BitVec 64) :
     RegisterType (reg_idx_to_Register idx) := reg_idx_must_64 idx ▸ val
-
-lemma case_31 {val : BitVec 64} {s : SailState} :
-    s.regs.insert (reg_idx_to_Register 31#5) val = s.regs.insert Register.x31 val := rfl
 
 section no_confusion
 -- dt: having these in non-iff versions as `simp` lemmas causes unexpected simp paths
