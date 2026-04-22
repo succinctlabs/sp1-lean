@@ -14,6 +14,14 @@ Formal verification in Lean 4 that SP1 Hypercube's AIR constraints correctly imp
 - Toolchain is pinned in `lean-toolchain` (`leanprover/lean4:v4.29.0`). Matching Mathlib pin (`v4.29.0`) is in `lakefile.toml`. The `lean-sail` dep tracks the `v4` branch — Sail v4 dropped or renamed several v2 helpers (`bool_to_bits` → `bool_to_bit`, `bool_bits_forwards` → `bool_bit_forwards`, `shift_right_arith` removed, `check_misaligned` and `default_write_acc` removed, `force_pc_eq` no longer holds), and `Sail.BitVec.toNatInt` now appears explicitly in goals — add it to the `simp [...]` list whenever you see `↑BitVec.toNat` residue.
 - `--tstack=400000` and `synthInstance.maxHeartbeats = 1000000` are already set in `lakefile.toml` — some proofs legitimately need this. If you see instance-synth or stack failures, that's expected scale, not a bug to fix.
 - There are no unit tests; correctness lives in the `correct_*` theorems themselves. "Test" = it elaborates.
+- **`lake build` is considered "passing" only when both `^error:` and `^warning:` counts are zero** (`grep -cE '^(error|warning):' build.log`). The mathlib standard linter set is enabled via `weak.linter.mathlibStandardSet = true` and the repo has driven warnings to zero; a green build that emits new warnings is a regression. Common fix patterns used in the repo:
+  - `show <goal>` used to reshape the actual elaboration target → `change <goal>`; `show X from Y` inside term-level `simp only [...]` is NOT a tactic and must stay `show`.
+  - `set_option maxHeartbeats N in <decl>` requires a preceding `-- <why>` comment line *between* the `set_option` and the declaration (not before the `set_option`, not trailing on the same line — both forms interact badly with the `emptyLine` linter).
+  - File-wide `set_option maxHeartbeats N` is preceded by a `set_option linter.style.setOption false` line on its own.
+  - `. <tac>` bullets → `· <tac>` (U+00B7). Only at bullet position; never inside expressions like `Foo.bar`.
+  - `2^N` → `2 ^ N` (mathlib spacing). `{ a b c : T }` → `{a b c : T}`.
+  - Blank lines inside a `by ...` block or any `set_option ... in` wrapped command trigger `linter.style.emptyLine` — delete them.
+  - Already disabled globally in `lakefile.toml`: `linter.flexible`, `linter.style.longLine`, `linter.unusedSimpArgs`. Per-file disables for `linter.style.multiGoal` in 8 files with imbalanced-goal-tree proofs (DivRem/Constraints, SailM, etc.).
 
 ## Architecture
 
