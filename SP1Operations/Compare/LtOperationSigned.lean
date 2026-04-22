@@ -3,6 +3,9 @@ import SP1Operations.Compare.LtOperationSigned.Constraints
 
 namespace LtOperationSigned
 
+
+-- Imbalanced goal tree: proof applies tactics per-focused-case.
+set_option linter.style.multiGoal false
 lemma allHold_constraints_iff
   {b : Word (Fin KB)}
   {d : Word (Fin KB)}

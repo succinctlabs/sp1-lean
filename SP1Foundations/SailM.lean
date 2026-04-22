@@ -10,6 +10,8 @@ open LeanRV64D.Functions
 -- @[simp] axiom plat_enable_htif_eq_false : plat_enable_htif () = false
 
 set_option linter.style.setOption false
+-- Imbalanced goal tree: proof applies tactics per-focused-case.
+set_option linter.style.multiGoal false
 -- Sail-bridge `simp` and `run_*` lemmas unfold deep `SailM` monadic programs.
 set_option maxHeartbeats 10000000
 

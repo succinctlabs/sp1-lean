@@ -8,6 +8,8 @@ namespace MulOperation
 set_option linter.unusedTactic false
 set_option linter.unreachableTactic false
 set_option linter.style.setOption false
+-- Imbalanced goal tree: proof applies tactics per-focused-case.
+set_option linter.style.multiGoal false
 set_option maxHeartbeats 10000000
 
 section field_operations

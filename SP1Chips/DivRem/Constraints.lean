@@ -12,6 +12,11 @@ namespace DivRem
 set_option linter.style.setOption false
 set_option maxHeartbeats 100000000
 set_option linter.constructorNameAsVariable false
+-- The chip's `correct_*` proofs drive an imbalanced goal tree via chained
+-- `apply ... at` / `specialize ... at` that operates on one focused case at a
+-- time. Rewriting each to `<;>` would flatten the tree but require goal-state
+-- reasoning the linter can't see; keep the existing structure.
+set_option linter.style.multiGoal false
 
 variable (Main : Vector (Fin KB) 247)
 
