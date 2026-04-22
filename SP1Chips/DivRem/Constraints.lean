@@ -1670,7 +1670,7 @@ lemma spec.div :
   intro cstrs h_is_real h_is_div
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_div] at h_is_div
 
   set a0 := Main[29]
@@ -1907,7 +1907,7 @@ lemma spec.rem :
   intro cstrs h_is_real h_is_rem
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_rem] at h_is_rem
 
   set a0 := Main[29]
@@ -2463,7 +2463,7 @@ lemma spec.divu :
   intro cstrs h_is_real h_is_divu
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divu] at h_is_divu
 
   set a0 := Main[29]
@@ -2699,7 +2699,7 @@ lemma spec.remu :
   intro cstrs h_is_real h_is_remu
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remu] at h_is_remu
 
   set a0 := Main[29]
@@ -3407,7 +3407,7 @@ lemma spec.divw :
   intro cstrs h_is_real h_is_divw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divw] at h_is_divw
 
   set a0 := Main[29]
@@ -3643,7 +3643,7 @@ lemma spec.remw :
   intro cstrs h_is_real h_is_remw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remw] at h_is_remw
 
   set a0 := Main[29]
@@ -4173,7 +4173,7 @@ lemma spec.divuw :
   intro cstrs h_is_real h_is_divuw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divuw] at h_is_divuw
 
   set a0 := Main[29]
@@ -4409,7 +4409,7 @@ lemma spec.remuw :
   intro cstrs h_is_real h_is_remuw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
-  rw [allHold_constraints_iff] at cstrs; simp at h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remuw] at h_is_remuw
 
   set a0 := Main[29]
