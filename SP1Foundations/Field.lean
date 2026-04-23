@@ -48,70 +48,37 @@ instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp 
 @[instance 10000] instance instHMul : HMul (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a * b⟩
 @[instance 10000] instance instHSub : HSub (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a - b⟩
 
-lemma val_mod4_eq_zero (x : Fin KB) : x.val % 4 = 0 ↔ x % 4 = 0 :=
-  Fin.val_mod_eq_zero_iff x 4
-
 end KoalaBear
 
 @[aesop safe forward]
 lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
     a * (b - c) = 1 → b ≠ c := by aesop
 
-/-- `Fin (n + 1)` is a field whenever `n + 1` is prime — via `ZMod.instField`, noting
-that `ZMod (n + 1)` is definitionally `Fin (n + 1)`. Avoids having to restate a
-`Field (Fin p)` instance for each specific prime `p` (e.g. `Field (Fin KB)` above
-reduces to an application of this instance). -/
-instance Fin.instField {n : ℕ} [Fact (Nat.Prime (n + 1))] : Field (Fin (n + 1)) :=
-  ZMod.instField (n + 1)
-
-/-- Multiplying by the inverse of a power of two equals a right shift, in any prime
-field where that power of two is strictly less than the modulus. Generic over the
-prime `p + 1`; the KB-specific `mul_256_inv_KB` was a `k = 8`, `p + 1 = KB` instance. -/
-lemma Fin.mul_inv_pow2_eq_shiftRight {p : ℕ} [Fact (Nat.Prime (p + 1))] (k : Fin (p + 1))
-    (hk : 2 ^ k.val < p + 1) (x : Fin (p + 1)) (hx : x.val % 2 ^ k.val = 0) :
-    x * ((2 ^ k.val : ℕ) : Fin (p + 1))⁻¹ = x >>> k := by
-  have h2k_pos : 0 < 2 ^ k.val := by positivity
-  have h2k_val : ((2 ^ k.val : ℕ) : Fin (p + 1)).val = 2 ^ k.val :=
-    Nat.mod_eq_of_lt hk
-  have hne : ((2 ^ k.val : ℕ) : Fin (p + 1)) ≠ 0 := by
-    rw [Ne, ← Fin.val_inj, h2k_val]; exact h2k_pos.ne'
-  rw [mul_inv_eq_iff_eq_mul₀ hne, ← Fin.val_inj, Fin.val_mul, h2k_val,
-    Fin.shiftRight_val, Nat.shiftRight_eq_div_pow,
-    Nat.div_mul_cancel (Nat.dvd_of_mod_eq_zero hx),
-    Nat.mod_eq_of_lt x.isLt]
-
-@[simp] lemma shiftl_1BB_eq_one : (1065353217 : Fin KB) <<< 1 = 1 := rfl
 @[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin KB) <<< 2 = 1 := rfl
 @[simp] lemma shiftl_3BB_eq_one : (1864368129 : Fin KB) <<< 3 = 1 := rfl
 @[simp] lemma shiftl_8BB_eq_one : (2122383361 : Fin KB) <<< 8 = 1 := rfl
 @[simp] lemma shiftl_16BB_eq_one : (2130673921 : Fin KB) <<< 16 = 1 := rfl
 
-lemma inv_1BB_eq : (1065353217 : Fin KB)⁻¹ = 2 := inv_eq_of_mul_eq_one_right (by rfl)
 lemma inv_2BB_eq : (1598029825 : Fin KB)⁻¹ = 4 := inv_eq_of_mul_eq_one_right (by rfl)
 lemma inv_3BB_eq : (1864368129 : Fin KB)⁻¹ = 8 := inv_eq_of_mul_eq_one_right (by rfl)
 lemma inv_8BB_eq : (2122383361 : Fin KB)⁻¹ = 256 := inv_eq_of_mul_eq_one_right (by rfl)
 lemma inv_16BB_eq : (2130673921 : Fin KB)⁻¹ = 65536 := inv_eq_of_mul_eq_one_right (by rfl)
 
-lemma inv_1BB_eq' : (1065353217 : Fin KB) = 2⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
 lemma inv_2BB_eq' : (1598029825 : Fin KB) = 4⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
 lemma inv_3BB_eq' : (1864368129 : Fin KB) = 8⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
 lemma inv_8BB_eq' : (2122383361 : Fin KB) = 256⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
 lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
 
-@[simp] lemma inv_mul_1BB_eq_one : (1065353217 : Fin KB) * 2 = 1 := by rfl
 @[simp] lemma inv_mul_2BB_eq_one : (1598029825 : Fin KB) * 4 = 1 := by rfl
 @[simp] lemma inv_mul_3BB_eq_one : (1864368129 : Fin KB) * 8 = 1 := by rfl
 @[simp] lemma inv_mul_8BB_eq_one : (2122383361 : Fin KB) * 256 = 1 := by rfl
 @[simp] lemma inv_mul_16BB_eq_one : (2130673921 : Fin KB) * 65536 = 1 := by rfl
 
-@[simp] lemma mul_inv_1BB_eq_one : 2 * (1065353217 : Fin KB) = 1 := by rfl
 @[simp] lemma mul_inv_2BB_eq_one : 4 * (1598029825 : Fin KB) = 1 := by rfl
 @[simp] lemma mul_inv_3BB_eq_one : 8 * (1864368129 : Fin KB) = 1 := by rfl
 @[simp] lemma mul_inv_8BB_eq_one : 256 * (2122383361 : Fin KB) = 1 := by rfl
 @[simp] lemma mul_inv_16BB_eq_one : 65536 * (2130673921 : Fin KB) = 1 := by rfl
 
-@[simp] lemma inv_mul_1BB_eq_iff : (1065353217 : Fin KB) * x = 1 ↔ x = 2 := by
-  rw [inv_1BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 @[simp] lemma inv_mul_2BB_eq_iff : (1598029825 : Fin KB) * x = 1 ↔ x = 4 := by
   rw [inv_2BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 @[simp] lemma inv_mul_3BB_eq_iff : (1864368129 : Fin KB) * x = 1 ↔ x = 8 := by
@@ -121,8 +88,6 @@ lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := eq_inv_of_mul_eq_one_
 @[simp] lemma inv_mul_16BB_eq_iff : (2130673921 : Fin KB) * x = 1 ↔ x = 65536 := by
   rw [inv_16BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
 
-@[simp] lemma inv_mul_1BB_eq_iff' : x * (1065353217 : Fin KB) = 1 ↔ x = 2 := by
-  rw [mul_comm, inv_mul_1BB_eq_iff]
 @[simp] lemma inv_mul_2BB_eq_iff' : x * (1598029825 : Fin KB) = 1 ↔ x = 4 := by
   rw [mul_comm, inv_mul_2BB_eq_iff]
 @[simp] lemma inv_mul_3BB_eq_iff' : x * (1864368129 : Fin KB) = 1 ↔ x = 8 := by
