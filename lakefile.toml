@@ -13,7 +13,6 @@ linter.flexible = false
 linter.style.longLine = false
 synthInstance.maxHeartbeats = 1000000
 weak.linter.mathlibStandardSet = true
-# autoImplicit = false -- Might be good to consider this, given the amount of coercions we use
 
 [[require]]
 name = "mathlib"
