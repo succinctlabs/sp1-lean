@@ -198,14 +198,19 @@ end constraints
 def is_real (Main : Vector (Fin KB) 45) :=
   Main[28] = 1 ∨ Main[29] = 1 ∨ Main[30] = 1 ∨ Main[31] = 1 ∨ Main[32] = 1 ∨ Main[33] = 1
 
-lemma single_op (Main : Vector (Fin KB) 45) (_ : (constraints Main).allHold) :
+lemma single_op (Main : Vector (Fin KB) 45) (cstrs : (constraints Main).allHold) :
     (Main[28] = 1 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) ∧
     (Main[29] = 1 → Main[28] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) ∧
     (Main[30] = 1 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) ∧
     (Main[31] = 1 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) ∧
     (Main[32] = 1 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[33] = 0) ∧
     (Main[33] = 1 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0) := by
-  sorry
+  simp [constraints, sub_eq_zero] at cstrs
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, _⟩ := cstrs
+  clear h1 h2 h3
+  cases h4 <;> cases h5 <;> cases h6 <;> cases h7 <;> cases h8 <;> cases h9
+  all_goals simp_all only [Fin.isValue, add_zero, zero_add, one_ne_zero, or_true, zero_ne_one,
+    and_self, implies_true, Fin.reduceAdd, Fin.reduceEq, or_self]
 
 lemma eq_signExtend_of_is_real (Main : Vector (Fin KB) 45)
     (_ : (constraints Main).allHold)

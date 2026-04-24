@@ -293,8 +293,10 @@ end constraints
 
 
 
-lemma sll_real (Main : Vector (Fin KB) 65) (_ : Main[63] = 1) : is_real Main := by sorry
-lemma sllw_real (Main : Vector (Fin KB) 65) (_ : Main[64] = 1) : is_real Main := by sorry
+lemma sll_real (Main : Vector (Fin KB) 65) (h : Main[62] = 1) : is_real Main := by
+  simp [is_real, h]
+lemma sllw_real (Main : Vector (Fin KB) 65) (h : Main[63] = 1) : is_real Main := by
+  simp [is_real, h]
 
 @[simp]
 def sp1_op_a {Main : Vector (Fin KB) 65} (_ : (constraints Main).allHold) (_ : is_real Main) : BitVec 5 :=

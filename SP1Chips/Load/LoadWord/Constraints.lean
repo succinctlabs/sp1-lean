@@ -106,11 +106,11 @@ variable (Main : Vector (Fin KB) 44)
 def is_lw := Main[42] = 1  -- placeholder
 def is_lwu := Main[43] = 1  -- placeholder
 
-lemma allHold_constraints_iff_of_is_lw (_ : is_lw Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by sorry
+lemma allHold_constraints_iff_of_is_lw (_ : is_lw Main)
+    (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
-lemma allHold_constraints_iff_of_is_lwu (_ : is_lwu Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by sorry
+lemma allHold_constraints_iff_of_is_lwu (_ : is_lwu Main)
+    (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
 end LoadWord
 

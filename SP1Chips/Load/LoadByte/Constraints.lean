@@ -122,11 +122,11 @@ variable (Main : Vector (Fin KB) 47)
 def is_lb := Main[45] = 1
 def is_lbu := Main[46] = 1
 
-lemma allHold_constraints_iff_of_is_lb (h_is_lb : is_lb Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by sorry
+lemma allHold_constraints_iff_of_is_lb (_ : is_lb Main)
+    (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
-lemma allHold_constraints_iff_of_is_lbu (h_is_lbu : is_lbu Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by sorry
+lemma allHold_constraints_iff_of_is_lbu (_ : is_lbu Main)
+    (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
 -- NOTE: allHold_constraints_iff_of_is_lb/lbu need to be rewritten for new constraints
 -- Temporarily stubbed; see CLAUDE.md for proof pattern

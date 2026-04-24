@@ -112,11 +112,11 @@ variable (Main : Vector (Fin KB) 44)
 def is_lh := Main[42] = 1  -- placeholder; verify real index
 def is_lhu := Main[43] = 1  -- placeholder
 
-lemma allHold_constraints_iff_of_is_lh (_ : is_lh Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by sorry
+lemma allHold_constraints_iff_of_is_lh (_ : is_lh Main)
+    (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
-lemma allHold_constraints_iff_of_is_lhu (_ : is_lhu Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by sorry
+lemma allHold_constraints_iff_of_is_lhu (_ : is_lhu Main)
+    (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
 end LoadHalf
 

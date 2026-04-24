@@ -82,9 +82,12 @@ end constraints
 @[simp] def is_and (Main : Vector (Fin KB) 51) := Main[50] = 1 ∧ Main[31] = 0
 @[simp] def is_andi (Main : Vector (Fin KB) 51) := Main[50] = 1 ∧ Main[31] = 1
 
-lemma xor_real (Main : Vector (Fin KB) 51) (_ : Main[48] = 1) : is_real Main := by sorry
-lemma or_real (Main : Vector (Fin KB) 51) (_ : Main[49] = 1) : is_real Main := by sorry
-lemma and_real (Main : Vector (Fin KB) 51) (_ : Main[50] = 1) : is_real Main := by sorry
+lemma xor_real (Main : Vector (Fin KB) 51) (h : Main[48] = 1) : is_real Main := by
+  simp [is_real, h]
+lemma or_real (Main : Vector (Fin KB) 51) (h : Main[49] = 1) : is_real Main := by
+  simp [is_real, h]
+lemma and_real (Main : Vector (Fin KB) 51) (h : Main[50] = 1) : is_real Main := by
+  simp [is_real, h]
 
 @[simp]
 def sp1_op_a {Main : Vector (Fin KB) 51} (_ : (constraints Main).allHold) (_ : is_real Main) : BitVec 5 :=

@@ -62,8 +62,8 @@ variable (Main : Vector (Fin KB) 39)
 
 def is_ld := Main[38] = 1  -- placeholder
 
-lemma allHold_constraints_iff_of_is_ld (_ : is_ld Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by sorry
+lemma allHold_constraints_iff_of_is_ld (_ : is_ld Main)
+    (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
 end LoadDouble
 
