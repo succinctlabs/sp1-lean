@@ -56,13 +56,6 @@ theorem correct (Main : Vector (Fin KB) 45)
   extract_lets op_a op_b imm_c
   -- Extract the facts about the config registers in the state
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
-  have _ := h_cstrs
-  have _ := state_cstrs
-  have _ := h_is_real
-  have _ := h_fits_in_mem
-  have _ := h_is_aligned
-  have _ := h_below_clint
-  stop
   -- Extract the main constraints from the chip
   rw [StoreHalf.constraints] at h_cstrs
   simp [SP1ConstraintList.allHold] at h_cstrs
@@ -71,8 +64,6 @@ theorem correct (Main : Vector (Fin KB) 45)
   -- Extract constraints about the reader
   simp [ITypeReaderImmutable.constraints,
       SP1Constraint.toProp, Opcode.ofNat, Nat.ble, Nat.beq] at h_reader
-  have h25 : Main[25] = 1 := by have := h_reader.2.2.1.resolve_right (by decide); omega
-  simp [h25] at *
   have h_imm_c : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21]) := by clear *- h_reader; simp_all only
   have h6_32 : Main[6] < 32 := by clear *- h_reader; simp_all only
