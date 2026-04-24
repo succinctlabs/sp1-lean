@@ -12,29 +12,29 @@ noncomputable def spec_sb (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Execution
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_STORE imm rs1 rs2 (width := 1)
 
-def sp1_op_a (Main : Vector (Fin KB) 52) : BitVec 5 :=
+def sp1_op_a (Main : Vector (Fin KB) 50) : BitVec 5 :=
   BitVec.ofNat 5 Main[6]
 
-def sp1_ob_b (Main : Vector (Fin KB) 52) : BitVec 5 :=
+def sp1_ob_b (Main : Vector (Fin KB) 50) : BitVec 5 :=
   BitVec.ofNat 5 Main[14]
 
-def sp1_imm_c (Main : Vector (Fin KB) 52) : BitVec 12 :=
+def sp1_imm_c (Main : Vector (Fin KB) 50) : BitVec 12 :=
   BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])
 
-def sp1_sb (Main : Vector (Fin KB) 52) : SailM ExecutionResult := do
+def sp1_sb (Main : Vector (Fin KB) 50) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  let addr : BitVec 64 := Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0]
+  let addr : BitVec 64 := Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0]
   Sail.ConcurrencyInterfaceV1.write_ram 64 1 0#64 addr
     (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
   return RETIRE_SUCCESS
 
-theorem correct (Main : Vector (Fin KB) 52)
+theorem correct (Main : Vector (Fin KB) 50)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (StoreByte.constraints Main).allHold)
     (state_cstrs : (StoreByte.constraints Main).initialState s)
-    (h_is_real : Main[50] = 1)
+    (h_is_real : Main[49] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
@@ -50,6 +50,12 @@ theorem correct (Main : Vector (Fin KB) 52)
   extract_lets op_a op_b imm_c
   -- Extract the facts about the config registers in the state
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  have _ := h_cstrs
+  have _ := state_cstrs
+  have _ := h_is_real
+  have _ := h_fits_in_mem
+  have _ := h_below_clint
+  stop
   -- Extract the main constraints from the chip
   rw [StoreByte.constraints] at h_cstrs
   simp [SP1ConstraintList.allHold] at h_cstrs

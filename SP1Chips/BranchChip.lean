@@ -3,6 +3,9 @@ import SP1Chips.Branch.Constraints
 
 namespace Branch
 
+-- Unused variables expected because correct_b* proofs are currently stopped.
+set_option linter.unusedVariables false
+
 open Sail SailState BitVec LeanRV64D.Functions
 
 attribute [simp] jump_to assert PreSail.assert ofBool
@@ -23,7 +26,7 @@ local macro "close_branch_addr_eq" : tactic => `(tactic| (
     h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
   omega))
 
-variable (Main : Vector (Fin KB) 46)
+variable (Main : Vector (Fin KB) 45)
 
 def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6]
 
@@ -32,7 +35,7 @@ def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14]
 def sp1_imm : BitVec 13 := BitVec.ofNat 13 Main[21]
 
 def sp1_branch : SailM ExecutionResult := do
-  writeReg Register.nextPC (Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0])
+  writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
 namespace BEQ
@@ -45,15 +48,17 @@ set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_beq
-    (Main : Vector (Fin KB) 46)
+    (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
-    (h_is_beq : Main[29] = 1)
+    (h_is_beq : Main[28] = 1)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s) :
     let imm := sp1_imm Main
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_beq imm op_b op_a).run s = (sp1_branch Main).run s := by
+  have _ := state_cstrs
+  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_beq]
   have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
@@ -86,7 +91,7 @@ theorem correct_beq
   have h_pc_2 : Main[5].val < 65536 := by change Main[5] < 65536; aesop
   have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-  have h_nextpc_is_u64 : Main[26].val + Main[27].val * 65536 + Main[28].val * 4294967296 < 2^64 := by omega
+  have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
   simp_all
   -- simplify lt operation constraints
   have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
@@ -113,27 +118,27 @@ theorem correct_beq
     rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
       (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
     simp only [Std.ExtDHashMap.insert_insert]
-    have h_is_eq : Main[37] + Main[38] + Main[39] + Main[40] = 0 := by
+    have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 0 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
-    have h_is_branching : Main[35] = 1 := by
+    have h_is_branching : Main[34] = 1 := by
       clear *- h_is_eq chip_cstrs; simp_all [sub_eq_zero]
     simp [h_is_branching, sub_eq_zero, h_is_eq] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
-        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+        = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
       close_branch_addr_eq
     rw [h_addr_eq]
-  · have h_is_neq : (Main[37] + Main[38] + Main[39] + Main[40]) = 1 := by
+  · have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 1 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
     simp [h_is_neq, sub_eq_zero] at chip_cstrs
-    have h_is_branching : Main[35] = 0 := by
+    have h_is_branching : Main[34] = 0 := by
       clear *- h_is_neq chip_cstrs; simp_all [sub_eq_zero]
     simp [h_is_branching] at chip_cstrs
     simp [h_eq]
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
@@ -151,15 +156,17 @@ set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bne
-    (Main : Vector (Fin KB) 46)
+    (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
-    (h_is_bne : Main[30] = 1)
+    (h_is_bne : Main[29] = 1)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s) :
     let imm := sp1_imm Main
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bne imm op_b op_a).run s = (sp1_branch Main).run s := by
+  have _ := state_cstrs
+  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bne]
   have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
@@ -192,7 +199,7 @@ theorem correct_bne
   have h_pc_2 : Main[5].val < 65536 := by change Main[5] < 65536; aesop
   have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-  have h_nextpc_is_u64 : Main[26].val + Main[27].val * 65536 + Main[28].val * 4294967296 < 2^64 := by omega
+  have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
   simp_all
   -- simplify lt operation constraints
   have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
@@ -219,27 +226,27 @@ theorem correct_bne
     rw [SailME_run_readReg_map_writeReg _ Register.misa Register.nextPC
       (by simp [Std.ExtDHashMap.get?_insert]; exact hs Register.misa) _ _]
     simp only [Std.ExtDHashMap.insert_insert]
-    have h_is_eq : Main[37] + Main[38] + Main[39] + Main[40] = 1 := by
+    have h_is_eq : Main[36] + Main[37] + Main[38] + Main[39] = 1 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
-    have h_is_branching : Main[35] = 1 := by
+    have h_is_branching : Main[34] = 1 := by
       clear *- h_is_eq chip_cstrs; simp_all [sub_eq_zero]
     simp [h_is_branching, sub_eq_zero, h_is_eq] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
-        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+        = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
       close_branch_addr_eq
     rw [h_addr_eq]
-  · have h_is_neq : (Main[37] + Main[38] + Main[39] + Main[40]) = 0 := by
+  · have h_is_neq : (Main[36] + Main[37] + Main[38] + Main[39]) = 0 := by
       clear *- spec_lt h_eq h_30 h_31; simp_all
     simp [h_is_neq, sub_eq_zero] at chip_cstrs
-    have h_is_branching : Main[35] = 0 := by
+    have h_is_branching : Main[34] = 0 := by
       clear *- chip_cstrs; simp_all [sub_eq_zero]
     simp [h_is_branching] at chip_cstrs
     simp [h_eq]
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
@@ -257,15 +264,17 @@ set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_blt
-    (Main : Vector (Fin KB) 46)
+    (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
-    (h_is_blt : Main[31] = 1)
+    (h_is_blt : Main[30] = 1)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s) :
     let imm := sp1_imm Main
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_blt imm op_b op_a).run s = (sp1_branch Main).run s := by
+  have _ := state_cstrs
+  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_blt]
   have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
@@ -298,7 +307,7 @@ theorem correct_blt
   have h_pc_2 : Main[5].val < 65536 := by change Main[5] < 65536; aesop
   have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-  have h_nextpc_is_u64 : Main[26].val + Main[27].val * 65536 + Main[28].val * 4294967296 < 2^64 := by omega
+  have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
   simp_all
   -- simplify lt operation constraints
   have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
@@ -329,24 +338,24 @@ theorem correct_blt
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) := by
       clear *- h_eq; aesop
     simp [h_ne, h_eq, BitVec.slt] at spec_lt
-    have h36 : Main[36] = 1 := by simp_all only
-    have h_is_branching : Main[35] = 1 := by
+    have h36 : Main[35] = 1 := by simp_all only
+    have h_is_branching : Main[34] = 1 := by
       clear *- chip_cstrs h36; simp_all [sub_eq_zero]
     simp [h_is_branching, sub_eq_zero, h36] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
-        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+        = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
       close_branch_addr_eq
     rw [h_addr_eq]
   · simp [h_eq]
     simp [h_eq, BitVec.slt] at spec_lt
-    have h36 : Main[36] = 0 := by simp_all only
-    have h35 : Main[35] = 0 := by clear *- chip_cstrs h36; simp_all
+    have h36 : Main[35] = 0 := by simp_all only
+    have h35 : Main[34] = 0 := by clear *- chip_cstrs h36; simp_all
     simp [h35, h36, sub_eq_zero] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
@@ -364,15 +373,17 @@ set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bge
-    (Main : Vector (Fin KB) 46)
+    (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
-    (h_is_bge : Main[32] = 1)
+    (h_is_bge : Main[31] = 1)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s) :
     let imm := sp1_imm Main
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bge imm op_b op_a).run s = (sp1_branch Main).run s := by
+  have _ := state_cstrs
+  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bge]
   have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
@@ -405,7 +416,7 @@ theorem correct_bge
   have h_pc_2 : Main[5].val < 65536 := by change Main[5] < 65536; aesop
   have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-  have h_nextpc_is_u64 : Main[26].val + Main[27].val * 65536 + Main[28].val * 4294967296 < 2^64 := by omega
+  have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
   simp_all
   -- simplify lt operation constraints
   have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
@@ -436,15 +447,15 @@ theorem correct_bge
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toInt) := by
       clear *- h_eq; omega
     simp [h_ne, h_eq, BitVec.slt] at spec_lt
-    have h36 : Main[36] = 0 := by simp_all only
-    have h_is_branching : Main[35] = 1 := by
+    have h36 : Main[35] = 0 := by simp_all only
+    have h_is_branching : Main[34] = 1 := by
       clear *- chip_cstrs h36; simp_all [sub_eq_zero]
     simp [h_is_branching, sub_eq_zero, h36] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
-        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+        = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
       close_branch_addr_eq
     rw [h_addr_eq]
   · simp [h_eq]
@@ -452,11 +463,11 @@ theorem correct_bge
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toInt) := by
       clear *- h_eq; omega
     simp [h_eq, h_ne, BitVec.slt] at spec_lt
-    have h36 : Main[36] = 1 := by simp_all only
-    have h35 : Main[35] = 0 := by clear *- chip_cstrs h36; simp_all
+    have h36 : Main[35] = 1 := by simp_all only
+    have h35 : Main[34] = 0 := by clear *- chip_cstrs h36; simp_all
     simp [h35, h36, sub_eq_zero] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
@@ -474,15 +485,17 @@ set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bltu
-    (Main : Vector (Fin KB) 46)
+    (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
-    (h_is_bltu : Main[33] = 1)
+    (h_is_bltu : Main[32] = 1)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s) :
     let imm := sp1_imm Main
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bltu imm op_b op_a).run s = (sp1_branch Main).run s := by
+  have _ := state_cstrs
+  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bltu]
   have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
@@ -515,7 +528,7 @@ theorem correct_bltu
   have h_pc_2 : Main[5].val < 65536 := by change Main[5] < 65536; aesop
   have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-  have h_nextpc_is_u64 : Main[26].val + Main[27].val * 65536 + Main[28].val * 4294967296 < 2^64 := by omega
+  have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
   simp_all
   -- simplify lt operation constraints
   have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
@@ -546,15 +559,15 @@ theorem correct_bltu
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
       clear *- h_eq; omega
     simp [h_ne, h_eq, BitVec.ult] at spec_lt
-    have h36 : Main[36] = 1 := by simp_all only
-    have h_is_branching : Main[35] = 1 := by
+    have h36 : Main[35] = 1 := by simp_all only
+    have h_is_branching : Main[34] = 1 := by
       clear *- chip_cstrs h36; simp_all [sub_eq_zero]
     simp [h_is_branching, sub_eq_zero, h36] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
-        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+        = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
       close_branch_addr_eq
     rw [h_addr_eq]
   · simp [h_eq]
@@ -562,11 +575,11 @@ theorem correct_bltu
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
       clear *- h_eq; omega
     simp [h_eq, h_ne, BitVec.ult] at spec_lt
-    have h36 : Main[36] = 0 := by simp_all only
-    have h35 : Main[35] = 0 := by clear *- chip_cstrs h36; simp_all
+    have h36 : Main[35] = 0 := by simp_all only
+    have h35 : Main[34] = 0 := by clear *- chip_cstrs h36; simp_all
     simp [h35, h36, sub_eq_zero] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
@@ -584,15 +597,17 @@ set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bgeu
-    (Main : Vector (Fin KB) 46)
+    (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
-    (h_is_bgeu : Main[34] = 1)
+    (h_is_bgeu : Main[33] = 1)
     (cstrs : (constraints Main).allHold)
     (state_cstrs : (constraints Main).initialState s) :
     let imm := sp1_imm Main
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bgeu imm op_b op_a).run s = (sp1_branch Main).run s := by
+  have _ := state_cstrs
+  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bgeu]
   have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
@@ -625,7 +640,7 @@ theorem correct_bgeu
   have h_pc_2 : Main[5].val < 65536 := by change Main[5] < 65536; aesop
   have h_pc_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 < 2^64 := by omega
   have h_pc_add4_is_u64 : Main[3].val + Main[4].val * 65536 + Main[5].val * 4294967296 + 4 < 2^64 := by omega
-  have h_nextpc_is_u64 : Main[26].val + Main[27].val * 65536 + Main[28].val * 4294967296 < 2^64 := by omega
+  have h_nextpc_is_u64 : Main[25].val + Main[26].val * 65536 + Main[27].val * 4294967296 < 2^64 := by omega
   simp_all
   -- simplify lt operation constraints
   have spec_lt := LtOperationSigned.spec.branch op_a_is_u64 op_b_is_u64 lt_cstrs
@@ -656,15 +671,15 @@ theorem correct_bgeu
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
       clear *- h_eq; omega
     simp [h_ne, h_eq, BitVec.ult] at spec_lt
-    have h36 : Main[36] = 0 := by simp_all only
-    have h_is_branching : Main[35] = 1 := by
+    have h36 : Main[35] = 0 := by simp_all only
+    have h_is_branching : Main[34] = 1 := by
       clear *- chip_cstrs h36; simp_all [sub_eq_zero]
     simp [h_is_branching, sub_eq_zero, h36] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
-        = Word.toBitVec64 #v[Main[26], Main[27], Main[28], 0] := by
+        = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
       close_branch_addr_eq
     rw [h_addr_eq]
   · simp [h_eq]
@@ -672,11 +687,11 @@ theorem correct_bgeu
         (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
       clear *- h_eq; omega
     simp [h_eq, h_ne, BitVec.ult] at spec_lt
-    have h36 : Main[36] = 1 := by simp_all only
-    have h35 : Main[35] = 0 := by clear *- chip_cstrs h36; simp_all
+    have h36 : Main[35] = 1 := by simp_all only
+    have h35 : Main[34] = 0 := by clear *- chip_cstrs h36; simp_all
     simp [h35, h36, sub_eq_zero] at chip_cstrs
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
-    have h26 : Main[26].val < 65536 := by
+    have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3

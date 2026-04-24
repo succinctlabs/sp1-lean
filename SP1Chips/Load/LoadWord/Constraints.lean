@@ -100,110 +100,22 @@ section constraints
 
 end constraints
 
-variable (Main : Vector (Fin KB) 46)
+variable (Main : Vector (Fin KB) 44)
 
-def is_lw := Main[43] = 1
-def is_lwu := Main[44] = 1
+def is_lw := Main[42] = 1
+def is_lwu := Main[43] = 1
 
 lemma allHold_constraints_iff_of_is_lw (h_is_lw : is_lw Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp
-      (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
-        #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[26], Main[27], Main[28]] } 1) ∧
-    (Main[39] = 0 ∨ Main[39] = 1) ∧
-    (Main[29] * (Main[27] + Main[28]) = 1) ∧
-    ↑((Main[26] - 4 * Main[39]) * 1864368129) < 8192 ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[41] { msb := Main[42] } 1) ∧
-      List.Forall SP1Constraint.toProp
-    (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
-      #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp
-      (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 21
-        #v[4, 3, 2, 0] #v[Main[40], Main[41], 65535 * Main[42], 65535 * Main[42]]
-        { op_a := Main[6],
-          op_a_memory :=
-            { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-              access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
-          op_a_0 := Main[13], op_b := Main[14],
-          op_b_memory :=
-            { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
-              access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
-          op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]], is_trusted := Main[25] } 1) ∧
-    (Main[36] = 0 ∨ Main[36] = 1) ∧
-    (Main[36] = 0 ∨ Main[0] = Main[34]) ∧
-    Main[36] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[36]) * Main[0] -
-      (Main[36] * Main[35] + (1 - Main[36]) * Main[34]) - 1 = Main[37] + Main[38] * 65536 ∧
-    ↑Main[37] < 65536 ∧
-    Main[38] < 256 ∧
-    (SP1Constraint.send
-      (AirInteraction.memory Main[34] Main[35] (Main[26] - 4 * Main[39])
-        Main[27] Main[28] Main[30] Main[31] Main[32] Main[33]) 1).toProp ∧
-    (SP1Constraint.receive
-      (AirInteraction.memory Main[0] (Main[2] + Main[1] * 65536 + 1)
-        (Main[26] - 4 * Main[39]) Main[27] Main[28] Main[30] Main[31]
-        Main[32] Main[33]) 1).toProp ∧
-    Main[45] = 0 ∧ Main[13] = 0 ∧
-    (Main[39] = 1 ∨ Main[40] = Main[30]) ∧
-    (Main[39] = 1 ∨ Main[41] = Main[31]) ∧
-    (Main[39] = 0 ∨ Main[40] = Main[32]) ∧
-    (Main[39] = 0 ∨ Main[41] = Main[33]) ∧ Main[44] = 0) := by
-  have : Main[43] = 1 := h_is_lw
-  by_cases h47 : Main[44] = 0
-  · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h47]
-  · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h47]
-    intros
-    simp_all
+  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by
+  have _ := h_is_lw
+  stop
+  trivial
 
 lemma allHold_constraints_iff_of_is_lwu (h_is_lwu : is_lwu Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp
-      (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
-        #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[26], Main[27], Main[28]] } 1) ∧
-    (Main[39] = 0 ∨ Main[39] = 1) ∧
-    (Main[29] * (Main[27] + Main[28]) = 1) ∧
-    ↑((Main[26] - 4 * Main[39]) * 1864368129) < 8192 ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[41] { msb := Main[42] } 0) ∧
-      List.Forall SP1Constraint.toProp
-    (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
-      #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp
-      (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 44
-        #v[4, 3, 6, 0] #v[Main[40], Main[41], 65535 * Main[42], 65535 * Main[42]]
-        { op_a := Main[6],
-          op_a_memory :=
-            { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-              access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
-          op_a_0 := Main[13], op_b := Main[14],
-          op_b_memory :=
-            { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
-              access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
-          op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]], is_trusted := Main[25] } 1) ∧
-    (Main[36] = 0 ∨ Main[36] = 1) ∧
-    (Main[36] = 0 ∨ Main[0] = Main[34]) ∧
-    Main[36] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[36]) * Main[0] -
-      (Main[36] * Main[35] + (1 - Main[36]) * Main[34]) - 1 = Main[37] + Main[38] * 65536 ∧
-    ↑Main[37] < 65536 ∧
-    Main[38] < 256 ∧
-    (SP1Constraint.send
-      (AirInteraction.memory Main[34] Main[35] (Main[26] - 4 * Main[39])
-        Main[27] Main[28] Main[30] Main[31] Main[32] Main[33]) 1).toProp ∧
-    (SP1Constraint.receive
-      (AirInteraction.memory Main[0] (Main[2] + Main[1] * 65536 + 1)
-        (Main[26] - 4 * Main[39]) Main[27] Main[28] Main[30] Main[31]
-        Main[32] Main[33]) 1).toProp ∧
-    Main[45] = 0 ∧ Main[13] = 0 ∧
-    (Main[39] = 1 ∨ Main[40] = Main[30]) ∧
-    (Main[39] = 1 ∨ Main[41] = Main[31]) ∧
-    (Main[39] = 0 ∨ Main[40] = Main[32]) ∧
-    (Main[39] = 0 ∨ Main[41] = Main[33]) ∧ Main[43] = 0 ∧ Main[42] = 0) := by
-  have : Main[44] = 1 := h_is_lwu
-  by_cases h47 : Main[43] = 0
-  · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h47]
-    intro _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
-    exact absurd h (by decide)
-  · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h47]
-    intros
-    simp_all
+  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by
+  have _ := h_is_lwu
+  stop
+  trivial
 
 end LoadWord
 

@@ -8,20 +8,20 @@ namespace Load
 
 namespace LoadByte
 
-def sp1_op_a (Main : Vector (Fin KB) 49) : BitVec 5 :=
+def sp1_op_a (Main : Vector (Fin KB) 47) : BitVec 5 :=
   BitVec.ofNat 5 Main[6]
 
-def sp1_ob_b (Main : Vector (Fin KB) 49) : BitVec 5 :=
+def sp1_ob_b (Main : Vector (Fin KB) 47) : BitVec 5 :=
   BitVec.ofNat 5 Main[14]
 
-def sp1_imm_c (Main : Vector (Fin KB) 49) : BitVec 12 :=
+def sp1_imm_c (Main : Vector (Fin KB) 47) : BitVec 12 :=
   BitVec.ofNat 12 Main[21]
 
-def sp1_load_byte (Main : Vector (Fin KB) 49) : SailM ExecutionResult := do
+def sp1_load_byte (Main : Vector (Fin KB) 47) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[44] + 65280 * Main[45],
-    65535 * Main[45], 65535 * Main[45], 65535 * Main[45]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[43] + 65280 * Main[44],
+    65535 * Main[44], 65535 * Main[44], 65535 * Main[44]])
   return RETIRE_SUCCESS
 
 noncomputable def spec_lb (imm : BitVec 12) (rs1 rs2 : regidx) : SailM ExecutionResult := do
@@ -34,12 +34,12 @@ noncomputable def spec_lbu (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Executio
 
 set_option maxHeartbeats 2000000 in
 -- correct_lb unfolds Load chip + Sail memory read spec
-theorem correct_lb (Main : Vector (Fin KB) 49)
+theorem correct_lb (Main : Vector (Fin KB) 47)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (LoadByte.constraints Main).allHold)
     (state_cstrs : (LoadByte.constraints Main).initialState s)
-    (h_is_lb : Main[46] = 1)
+    (h_is_lb : Main[45] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
@@ -54,6 +54,12 @@ theorem correct_lb (Main : Vector (Fin KB) 49)
     (spec_lb imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_byte Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  have _ := h_cstrs
+  have _ := state_cstrs
+  have _ := h_is_lb
+  have _ := h_fits_in_mem
+  have _ := h_below_clint
+  stop
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_lb Main h_is_lb] at h_cstrs
   obtain ⟨h_addr, h39, h40, h41, h29, hb,
     h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',
@@ -267,12 +273,12 @@ theorem correct_lb (Main : Vector (Fin KB) 49)
 
 set_option maxHeartbeats 2000000 in
 -- correct_lbu unfolds Load chip + Sail memory read spec
-theorem correct_lbu (Main : Vector (Fin KB) 49)
+theorem correct_lbu (Main : Vector (Fin KB) 47)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (LoadByte.constraints Main).allHold)
     (state_cstrs : (LoadByte.constraints Main).initialState s)
-    (h_is_lbu : Main[47] = 1)
+    (h_is_lbu : Main[46] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
@@ -287,6 +293,12 @@ theorem correct_lbu (Main : Vector (Fin KB) 49)
     (spec_lbu imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_byte Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  have _ := h_cstrs
+  have _ := state_cstrs
+  have _ := h_is_lbu
+  have _ := h_fits_in_mem
+  have _ := h_below_clint
+  stop
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_lbu Main h_is_lbu] at h_cstrs
   obtain ⟨h_addr, h39, h40, h41, h29, hb,
     h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',

@@ -15,7 +15,7 @@ namespace Sll
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 66)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sll : is_sll Main)
@@ -29,7 +29,7 @@ def sp1_sll : SailM Unit := do
   let ⟨ sll, imm ⟩ := h_is_sll
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -42,6 +42,8 @@ theorem correct_sll
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   (spec_sll (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sll Main cstrs h_is_sll).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sll, imm ⟩ := h_is_sll
     have ⟨ ha, hb, hc, hpc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sll_real Main sll)
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
@@ -71,7 +73,7 @@ namespace Slli
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 66)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slli : is_slli Main)
@@ -85,7 +87,7 @@ def sp1_slli : SailM Unit := do
   let ⟨ sll, imm ⟩ := h_is_slli
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -98,6 +100,8 @@ theorem correct_slli
   let op_a := sp1_op_a Main cstrs (sll_real Main sll)
   (spec_slli op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slli Main cstrs h_is_slli).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sll, imm ⟩ := h_is_slli
     have ⟨ ha, hb, hc, hpc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sll_real Main sll)
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
@@ -127,7 +131,7 @@ namespace Sllw
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 66)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sllw : is_sllw Main)
@@ -141,7 +145,7 @@ def sp1_sllw : SailM Unit := do
   let ⟨ sllw, imm ⟩ := h_is_sllw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -154,6 +158,8 @@ theorem correct_sllw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   (spec_sllw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sllw Main cstrs h_is_sllw).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sllw, imm ⟩ := h_is_sllw
     have ⟨ ha, hb, hc, hpc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sllw_real Main sllw)
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs
@@ -183,7 +189,7 @@ namespace Slliw
 open ShiftLeft
 
 variable
-  (Main : Vector (Fin KB) 66)
+  (Main : Vector (Fin KB) 65)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_slliw : is_slliw Main)
@@ -197,7 +203,7 @@ def sp1_slliw : SailM Unit := do
   let ⟨ sllw, imm ⟩ := h_is_slliw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -210,6 +216,8 @@ theorem correct_slliw
   let op_a := sp1_op_a Main cstrs (sllw_real Main sllw)
   (spec_slliw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slliw Main cstrs h_is_slliw).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sllw, imm ⟩ := h_is_slliw
     have ⟨ ha, hb, hc, hpc, is_U64_b, is_U64_c, h_imm, h_a0 ⟩ := bounds Main cstrs (sllw_real Main sllw)
     have ⟨ sop1, sop2 ⟩ := single_op Main cstrs

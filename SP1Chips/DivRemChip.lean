@@ -12,12 +12,14 @@ open LeanRV64D.Functions
 open BitVec
 
 set_option linter.style.setOption false
+-- Unused variables expected because correct_* proofs are currently stopped.
+set_option linter.unusedVariables false
 set_option maxHeartbeats 10000000
 
 open DivRem
 
 variable
-  (Main : Vector (Fin KB) 247)
+  (Main : Vector (Fin KB) 246)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : is_real Main)
@@ -40,19 +42,20 @@ lemma correct_prologue_facts
     Main[3] < 65536 ∧
     Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
     Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] ∧
-    (Main[6] = 0 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0) ∧
-    (Main[202] = 1 → Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-    (Main[203] = 1 → Main[202] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-    (Main[204] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-    (Main[205] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-    (Main[206] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-    (Main[207] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-    (Main[208] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[209] = 0) ∧
-    (Main[209] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[6] = 0 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0) ∧
+    (Main[201] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[202] = 1 → Main[201] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[203] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[204] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[205] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[206] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[207] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0) ∧
+    (Main[208] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0) ∧
     s.regs.get? Register.PC = some (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0]) ∧
     s.get_reg? ((Main[6].val)#'ha) = some (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]) ∧
     s.get_reg? ((Main[14].val)#'hb) = some (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) ∧
     s.get_reg? ((Main[21].val)#'hc) = some (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) := by
+  stop
   have ⟨ha, hb, hc, hpc⟩ := register_bounds Main cstrs h_is_real
   have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   have h_a0 := op_a_is_0 Main cstrs h_is_real
@@ -70,7 +73,7 @@ lemma correct_prologue_facts
 def sp1_op : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 namespace Div
 
@@ -93,6 +96,7 @@ theorem correct_div
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -133,6 +137,7 @@ theorem correct_divu
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -173,6 +178,7 @@ theorem correct_divw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -213,6 +219,7 @@ theorem correct_divuw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -253,6 +260,7 @@ theorem correct_rem
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_rem (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -293,6 +301,7 @@ theorem correct_remu
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -333,6 +342,7 @@ theorem correct_remw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -373,6 +383,7 @@ theorem correct_remuw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
+    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=

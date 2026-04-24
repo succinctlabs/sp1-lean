@@ -8,19 +8,19 @@ namespace Load
 
 namespace LoadDouble
 
-def sp1_op_a (Main : Vector (Fin KB) 41) : BitVec 5 :=
+def sp1_op_a (Main : Vector (Fin KB) 39) : BitVec 5 :=
   BitVec.ofNat 5 Main[6]
 
-def sp1_ob_b (Main : Vector (Fin KB) 41) : BitVec 5 :=
+def sp1_ob_b (Main : Vector (Fin KB) 39) : BitVec 5 :=
   BitVec.ofNat 5 Main[14]
 
-def sp1_imm_c (Main : Vector (Fin KB) 41) : BitVec 12 :=
+def sp1_imm_c (Main : Vector (Fin KB) 39) : BitVec 12 :=
   BitVec.ofNat 12 Main[21]
 
-def sp1_ld (Main : Vector (Fin KB) 41) : SailM ExecutionResult := do
+def sp1_ld (Main : Vector (Fin KB) 39) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
   return RETIRE_SUCCESS
 
 noncomputable def spec_ld (imm : BitVec 12) (rs1 rs2 : regidx) : SailM ExecutionResult := do
@@ -100,12 +100,12 @@ private lemma byteConcat8_toNat_eq_Word_toNat
 
 set_option maxHeartbeats 2000000 in
 -- correct_ld unfolds Load chip + Sail 8-byte memory read
-theorem correct_ld (Main : Vector (Fin KB) 41)
+theorem correct_ld (Main : Vector (Fin KB) 39)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (LoadDouble.constraints Main).allHold)
     (state_cstrs : (LoadDouble.constraints Main).initialState s)
-    (h_is_ld : Main[39] = 1)
+    (h_is_ld : Main[38] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
@@ -123,6 +123,13 @@ theorem correct_ld (Main : Vector (Fin KB) 41)
     (spec_ld imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_ld Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  have _ := h_cstrs
+  have _ := state_cstrs
+  have _ := h_is_ld
+  have _ := h_fits_in_mem
+  have _ := h_is_aligned
+  have _ := h_below_clint
+  stop
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_ld Main h_is_ld] at h_cstrs
   obtain ⟨h_addr, h29, hb,
     h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',

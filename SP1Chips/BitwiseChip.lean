@@ -14,7 +14,7 @@ namespace Xor
 open Bitwise
 
 variable
-  (Main : Vector (Fin KB) 52)
+  (Main : Vector (Fin KB) 51)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_xor : is_xor Main)
@@ -26,7 +26,7 @@ def spec_xor (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_xor : SailM Unit := do
   let ⟨ xor, imm ⟩ := h_is_xor
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
   let op_a := sp1_op_a Main cstrs (xor_real Main xor)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
@@ -39,6 +39,8 @@ theorem correct_xor
   let op_a := sp1_op_a Main cstrs (xor_real Main xor)
   (spec_xor (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xor Main cstrs h_is_xor).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ xor, imm ⟩ := h_is_xor
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (xor_real Main xor)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main xor)
@@ -73,7 +75,7 @@ namespace Xori
 open Bitwise
 
 variable
-  (Main : Vector (Fin KB) 52)
+  (Main : Vector (Fin KB) 51)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_xori : is_xori Main)
@@ -85,7 +87,7 @@ def spec_xori (shamt : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_xori : SailM Unit := do
   let ⟨ xor, imm ⟩ := h_is_xori
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
   let op_a := sp1_op_a Main cstrs (xor_real Main xor)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
@@ -98,6 +100,8 @@ theorem correct_xori
   let op_a := sp1_op_a Main cstrs (xor_real Main xor)
   (spec_xori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xori Main cstrs h_is_xori).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ xor, imm ⟩ := h_is_xori
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (xor_real Main xor)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main xor)
@@ -133,7 +137,7 @@ namespace Or
 open Bitwise
 
 variable
-  (Main : Vector (Fin KB) 52)
+  (Main : Vector (Fin KB) 51)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_or : is_or Main)
@@ -145,7 +149,7 @@ def spec_or (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_or : SailM Unit := do
   let ⟨ or, imm ⟩ := h_is_or
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
   let op_a := sp1_op_a Main cstrs (or_real Main or)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
@@ -158,6 +162,8 @@ theorem correct_or
   let op_a := sp1_op_a Main cstrs (or_real Main or)
   (spec_or (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_or Main cstrs h_is_or).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ or, imm ⟩ := h_is_or
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (or_real Main or)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main or)
@@ -192,7 +198,7 @@ namespace Ori
 open Bitwise
 
 variable
-  (Main : Vector (Fin KB) 52)
+  (Main : Vector (Fin KB) 51)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_ori : is_ori Main)
@@ -204,7 +210,7 @@ def spec_ori (shamt : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_ori : SailM Unit := do
   let ⟨ or, imm ⟩ := h_is_ori
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
   let op_a := sp1_op_a Main cstrs (or_real Main or)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
@@ -217,6 +223,8 @@ theorem correct_ori
   let op_a := sp1_op_a Main cstrs (or_real Main or)
   (spec_ori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_ori Main cstrs h_is_ori).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ or, imm ⟩ := h_is_ori
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (or_real Main or)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main or)
@@ -252,7 +260,7 @@ namespace And
 open Bitwise
 
 variable
-  (Main : Vector (Fin KB) 52)
+  (Main : Vector (Fin KB) 51)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_and : is_and Main)
@@ -264,7 +272,7 @@ def spec_and (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_and : SailM Unit := do
   let ⟨ and, imm ⟩ := h_is_and
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
   let op_a := sp1_op_a Main cstrs (and_real Main and)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
@@ -277,6 +285,8 @@ theorem correct_and
   let op_a := sp1_op_a Main cstrs (and_real Main and)
   (spec_and (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_and Main cstrs h_is_and).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ and, imm ⟩ := h_is_and
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (and_real Main and)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main and)
@@ -311,7 +321,7 @@ namespace Andi
 open Bitwise
 
 variable
-  (Main : Vector (Fin KB) 52)
+  (Main : Vector (Fin KB) 51)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_andi : is_andi Main)
@@ -323,7 +333,7 @@ def spec_andi (shamt : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_andi : SailM Unit := do
   let ⟨ and, imm ⟩ := h_is_andi
-  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[33], Main[34], Main[35], Main[36]] }, c_low_bytes := { low_bytes := #v[Main[37], Main[38], Main[39], Main[40]] }, bitwise_operation := { result := #v[Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47], Main[48]] } } (Main[49] * 2 + Main[50] * 1 + Main[51] * 0) (Main[49] + Main[50] + Main[51])).1
+  let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
   let op_a := sp1_op_a Main cstrs (and_real Main and)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]])
@@ -336,6 +346,8 @@ theorem correct_andi
   let op_a := sp1_op_a Main cstrs (and_real Main and)
   (spec_andi op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_andi Main cstrs h_is_andi).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ and, imm ⟩ := h_is_andi
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (and_real Main and)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main and)

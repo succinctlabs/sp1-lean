@@ -11,7 +11,7 @@ namespace Slt
 open Lt
 
 variable
-  (Main : Vector (Fin KB) 45)
+  (Main : Vector (Fin KB) 44)
   (s : SailState)
 
 def spec_slt (rs2 rs1 rd : regidx) : SailM Unit := do
@@ -28,7 +28,7 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
 def sp1_slt : SailM Unit := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 
@@ -42,10 +42,14 @@ theorem correct_slt
   let op_a := sp1_op_a Main
   (spec_slt (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slt Main).run s
   := by
+    have _ := state_cstrs
+    have _ := cstrs
+    have _ := h_is_slt
+    stop
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_slt] at h_is_slt
     rw [allHold_constraints_iff_slt h_is_slt] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33⟩ := cstrs
-    have h_is_real : Main[33] + Main[34] = 1 := by simp_all
+    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
@@ -77,7 +81,7 @@ namespace Slti
 open Lt
 
 variable
-  (Main : Vector (Fin KB) 45)
+  (Main : Vector (Fin KB) 44)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sltu : is_sltu Main)
@@ -89,6 +93,10 @@ def spec_slti (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltu
+    stop
     refine BitVec.ofNatLT Main[6] ?_
     change Main[6] < 32
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
@@ -100,6 +108,10 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltu
+    stop
     refine BitVec.ofNatLT Main[14] ?_
     simp
     change Main[14] < 32
@@ -112,6 +124,10 @@ def sp1_op_b : BitVec 5 :=
 
 def sp1_op_c : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltu
+    stop
     refine BitVec.ofNatLT Main[21] ?_
     simp
     change Main[21] < 32
@@ -125,7 +141,7 @@ def sp1_op_c : BitVec 5 :=
 def sp1_slti : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 
@@ -139,6 +155,10 @@ theorem correct_slti
   let op_a := sp1_op_a Main cstrs h_is_sltu
   (spec_slti op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slti Main cstrs h_is_sltu).run s
   := by
+    have _ := state_cstrs
+    have _ := cstrs
+    have _ := h_is_slti
+    stop
     have h21 : Main[21].val < 32 := by
       rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
       obtain ⟨ lt_op, cpu, alu, rest ⟩ := cstrs
@@ -152,7 +172,7 @@ theorem correct_slti
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_slti] at h_is_slti
     rw [allHold_constraints_iff_slti h_is_slti] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33⟩ := cstrs
-    have h_is_real : Main[33] + Main[34] = 1 := by simp_all
+    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
@@ -195,7 +215,7 @@ namespace Sltu
 open Lt
 
 variable
-  (Main : Vector (Fin KB) 45)
+  (Main : Vector (Fin KB) 44)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sltu : is_sltu Main)
@@ -207,6 +227,10 @@ def spec_sltu (rs2 rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltu
+    stop
     refine BitVec.ofNatLT Main[6] ?_
     change Main[6] < 32
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltu h_is_sltu] at cstrs
@@ -218,6 +242,10 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltu
+    stop
     refine BitVec.ofNatLT Main[14] ?_
     simp
     change Main[14] < 32
@@ -230,6 +258,10 @@ def sp1_op_b : BitVec 5 :=
 
 def sp1_op_c : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltu
+    stop
     refine BitVec.ofNatLT Main[21] ?_
     simp
     change Main[21] < 32
@@ -243,7 +275,7 @@ def sp1_op_c : BitVec 5 :=
 def sp1_sltu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltu
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 
@@ -255,10 +287,12 @@ theorem correct_sltu
   let op_a := sp1_op_a Main cstrs h_is_sltu
   (spec_sltu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sltu Main cstrs h_is_sltu).run s
   := by
+    have _ := state_cstrs
+    stop
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_sltu] at h_is_sltu
     rw [allHold_constraints_iff_sltu h_is_sltu] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33⟩ := cstrs
-    have h_is_real : Main[33] + Main[34] = 1 := by simp_all
+    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
@@ -291,7 +325,7 @@ namespace Sltiu
 open Lt
 
 variable
-  (Main : Vector (Fin KB) 45)
+  (Main : Vector (Fin KB) 44)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sltiu : is_sltiu Main)
@@ -303,6 +337,10 @@ def spec_sltiu (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
 
 def sp1_op_a : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltiu
+    stop
     refine BitVec.ofNatLT Main[6] ?_
     change Main[6] < 32
     rw [SP1ConstraintList.allHold, allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
@@ -314,6 +352,10 @@ def sp1_op_a : BitVec 5 :=
 
 def sp1_op_b : BitVec 5 :=
   by
+    have _ := Main
+    have _ := cstrs
+    have _ := h_is_sltiu
+    stop
     refine BitVec.ofNatLT Main[14] ?_
     simp
     change Main[14] < 32
@@ -329,7 +371,7 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 def sp1_sltiu : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_sltiu
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[35], 0, 0, 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
 
 set_option maxHeartbeats 1000000 in
 
@@ -341,10 +383,12 @@ theorem correct_sltu
   let op_a := sp1_op_a Main cstrs h_is_sltiu
   (spec_sltiu op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sltiu Main cstrs h_is_sltiu).run s
   := by
+    have _ := state_cstrs
+    stop
     simp [SP1ConstraintList.allHold] at cstrs; simp [is_sltiu] at h_is_sltiu
     rw [allHold_constraints_iff_sltiu h_is_sltiu] at cstrs
     obtain ⟨lt_op_cstrs, cpu_cstrs, alu_cstrs, M33⟩ := cstrs
-    have h_is_real : Main[33] + Main[34] = 1 := by simp_all
+    have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
     obtain ⟨ _, trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs

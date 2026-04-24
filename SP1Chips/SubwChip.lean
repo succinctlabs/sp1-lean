@@ -9,10 +9,10 @@ open BitVec
 namespace Subw
 
 variable
-  (Main : Vector (Fin KB) 33)
+  (Main : Vector (Fin KB) 32)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[32] = 1)
+  (h_is_real : Main[31] = 1)
 
 def spec_subw (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
@@ -28,14 +28,14 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
 def sp1_subw : SailM Unit := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31] * 65535, Main[31] * 65535])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535])
 
 set_option maxHeartbeats 1000000 in
 
 -- correctness proof across instruction arms
 theorem correct_subw
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[32] = 1)
+  (h_is_real : Main[31] = 1)
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
@@ -47,7 +47,7 @@ theorem correct_subw
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     simp [RTypeReader.allHold_constraints_iff_is_real h_is_real,
       Opcode.ofNat, Nat.ble] at reader_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
+    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
     have h6 : Main[6] < 32 := by aesop
     have h14 : Main[14] < 32 := by aesop
     have h21 : Main[21] < 32 := by aesop
@@ -69,10 +69,10 @@ theorem correct_subw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_subw] at is_msb
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
-    · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    by_cases h_is_op_a_0 : Main[6] = 0
+    · simp_all
+    · simp_all
+      rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       simp [Word.toBitVec64, Word.toNat]
       rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]

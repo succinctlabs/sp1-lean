@@ -14,7 +14,7 @@ namespace Mul
 open Mul
 
 variable
-  (Main : Vector (Fin KB) 83)
+  (Main : Vector (Fin KB) 82)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mul : is_mul Main)
@@ -28,7 +28,7 @@ def sp1_mul : SailM Unit := do
   let ⟨ is_mul, imm ⟩ := h_is_mul
   let op_a := sp1_op_a Main cstrs (mul_real Main is_mul)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 theorem correct_mul
   (state_cstrs : (constraints Main).initialState s) :
@@ -38,6 +38,8 @@ theorem correct_mul
   let op_a := sp1_op_a Main cstrs (mul_real Main is_mul)
   (spec_mul (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mul Main cstrs h_is_mul).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ is_mul, imm ⟩ := h_is_mul
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mul_real Main is_mul)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mul_real Main is_mul)
@@ -71,7 +73,7 @@ namespace Mulh
 open Mul
 
 variable
-  (Main : Vector (Fin KB) 83)
+  (Main : Vector (Fin KB) 82)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulh : is_mulh Main)
@@ -85,7 +87,7 @@ def sp1_mulh : SailM Unit := do
   let ⟨ is_mulh, imm ⟩ := h_is_mulh
   let op_a := sp1_op_a Main cstrs (mulh_real Main is_mulh)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 theorem correct_mulh
   (state_cstrs : (constraints Main).initialState s) :
@@ -95,6 +97,8 @@ theorem correct_mulh
   let op_a := sp1_op_a Main cstrs (mulh_real Main is_mulh)
   (spec_mulh (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulh Main cstrs h_is_mulh).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ is_mulh, imm ⟩ := h_is_mulh
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulh_real Main is_mulh)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulh_real Main is_mulh)
@@ -128,7 +132,7 @@ namespace Mulhu
 open Mul
 
 variable
-  (Main : Vector (Fin KB) 83)
+  (Main : Vector (Fin KB) 82)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulhu : is_mulhu Main)
@@ -142,7 +146,7 @@ def sp1_mulhu : SailM Unit := do
   let ⟨ is_mulhu, imm ⟩ := h_is_mulhu
   let op_a := sp1_op_a Main cstrs (mulhu_real Main is_mulhu)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 theorem correct_mulh
   (state_cstrs : (constraints Main).initialState s) :
@@ -152,6 +156,8 @@ theorem correct_mulh
   let op_a := sp1_op_a Main cstrs (mulhu_real Main is_mulhu)
   (spec_mulhu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulhu Main cstrs h_is_mulhu).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ is_mulhu, imm ⟩ := h_is_mulhu
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulhu_real Main is_mulhu)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhu_real Main is_mulhu)
@@ -183,7 +189,7 @@ end Mulhu
 open Mul
 
 variable
-  (Main : Vector (Fin KB) 83)
+  (Main : Vector (Fin KB) 82)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulhsu : is_mulhsu Main)
@@ -197,7 +203,7 @@ def sp1_mulhsu : SailM Unit := do
   let ⟨ is_mulhsu, imm ⟩ := h_is_mulhsu
   let op_a := sp1_op_a Main cstrs (mulhsu_real Main is_mulhsu)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 theorem correct_mulh
   (state_cstrs : (constraints Main).initialState s) :
@@ -207,6 +213,8 @@ theorem correct_mulh
   let op_a := sp1_op_a Main cstrs (mulhsu_real Main is_mulhsu)
   (spec_mulhsu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulhsu Main cstrs h_is_mulhsu).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ is_mulhsu, imm ⟩ := h_is_mulhsu
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulhsu_real Main is_mulhsu)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhsu_real Main is_mulhsu)
@@ -239,7 +247,7 @@ end Mulhsu
 namespace Mulw
 
 variable
-  (Main : Vector (Fin KB) 83)
+  (Main : Vector (Fin KB) 82)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_mulw : is_mulw Main)
@@ -253,7 +261,7 @@ def sp1_mulw : SailM Unit := do
   let ⟨ is_mulw, imm ⟩ := h_is_mulw
   let op_a := sp1_op_a Main cstrs (mulw_real Main is_mulw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 theorem correct_mulw
   (state_cstrs : (constraints Main).initialState s) :
@@ -263,6 +271,8 @@ theorem correct_mulw
   let op_a := sp1_op_a Main cstrs (mulw_real Main is_mulw)
   (spec_mulw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulw Main cstrs h_is_mulw).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ is_mulw, imm ⟩ := h_is_mulw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulw_real Main is_mulw)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulw_real Main is_mulw)

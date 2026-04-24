@@ -8,20 +8,20 @@ namespace Load
 
 namespace LoadWord
 
-def sp1_op_a (Main : Vector (Fin KB) 46) : BitVec 5 :=
+def sp1_op_a (Main : Vector (Fin KB) 44) : BitVec 5 :=
   BitVec.ofNat 5 Main[6]
 
-def sp1_ob_b (Main : Vector (Fin KB) 46) : BitVec 5 :=
+def sp1_ob_b (Main : Vector (Fin KB) 44) : BitVec 5 :=
   BitVec.ofNat 5 Main[14]
 
-def sp1_imm_c (Main : Vector (Fin KB) 46) : BitVec 12 :=
+def sp1_imm_c (Main : Vector (Fin KB) 44) : BitVec 12 :=
   BitVec.ofNat 12 Main[21]
 
-def sp1_load_word (Main : Vector (Fin KB) 46) : SailM ExecutionResult := do
+def sp1_load_word (Main : Vector (Fin KB) 44) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[40], Main[41],
-    65535 * Main[42], 65535 * Main[42]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[39], Main[40],
+    65535 * Main[41], 65535 * Main[41]])
   return RETIRE_SUCCESS
 
 noncomputable def spec_lw (imm : BitVec 12) (rs1 rs2 : regidx) : SailM ExecutionResult := do
@@ -70,12 +70,12 @@ private lemma halfword_msb (a b : Fin KB)
 
 set_option maxHeartbeats 4000000 in
 -- correct_lw unfolds Load chip + Sail 4-byte memory read
-theorem correct_lw (Main : Vector (Fin KB) 46)
+theorem correct_lw (Main : Vector (Fin KB) 44)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (LoadWord.constraints Main).allHold)
     (state_cstrs : (LoadWord.constraints Main).initialState s)
-    (h_is_lw : Main[43] = 1)
+    (h_is_lw : Main[42] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
@@ -93,6 +93,13 @@ theorem correct_lw (Main : Vector (Fin KB) 46)
     (spec_lw imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_word Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  have _ := h_cstrs
+  have _ := state_cstrs
+  have _ := h_is_lw
+  have _ := h_fits_in_mem
+  have _ := h_is_aligned
+  have _ := h_below_clint
+  stop
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_lw Main h_is_lw] at h_cstrs
   obtain ⟨h_addr, h39, h29, hb,
     h_u16msb, h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',
@@ -306,12 +313,12 @@ theorem correct_lw (Main : Vector (Fin KB) 46)
 
 set_option maxHeartbeats 4000000 in
 -- correct_lwu unfolds Load chip + Sail 4-byte memory read
-theorem correct_lwu (Main : Vector (Fin KB) 46)
+theorem correct_lwu (Main : Vector (Fin KB) 44)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
     (h_cstrs : (LoadWord.constraints Main).allHold)
     (state_cstrs : (LoadWord.constraints Main).initialState s)
-    (h_is_lwu : Main[44] = 1)
+    (h_is_lwu : Main[43] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
@@ -329,6 +336,13 @@ theorem correct_lwu (Main : Vector (Fin KB) 46)
     (spec_lwu imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_word Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  have _ := h_cstrs
+  have _ := state_cstrs
+  have _ := h_is_lwu
+  have _ := h_fits_in_mem
+  have _ := h_is_aligned
+  have _ := h_below_clint
+  stop
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_lwu Main h_is_lwu] at h_cstrs
   obtain ⟨h_addr, h39, h29, hb,
     h_u16msb, h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',

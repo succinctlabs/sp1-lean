@@ -15,7 +15,7 @@ namespace Srl
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srl : is_srl Main)
@@ -29,7 +29,7 @@ def sp1_srl : SailM Unit := do
   let ⟨ srl, imm ⟩ := h_is_srl
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -42,6 +42,8 @@ theorem correct_srl
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   (spec_srl (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srl Main cstrs h_is_srl).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ srl, imm ⟩ := h_is_srl
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srl_real Main srl)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
@@ -74,7 +76,7 @@ namespace Srli
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srli : is_srli Main)
@@ -88,7 +90,7 @@ def sp1_srli : SailM Unit := do
   let ⟨ srl, imm ⟩ := h_is_srli
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -101,6 +103,8 @@ theorem correct_srli
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   (spec_srli op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srli Main cstrs h_is_srli).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ srl, imm ⟩ := h_is_srli
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srl_real Main srl)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
@@ -133,7 +137,7 @@ namespace Srlw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srlw : is_srlw Main)
@@ -147,7 +151,7 @@ def sp1_srlw : SailM Unit := do
   let ⟨ srlw, imm ⟩ := h_is_srlw
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -160,6 +164,8 @@ theorem correct_srlw
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   (spec_srlw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srlw Main cstrs h_is_srlw).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ srlw, imm ⟩ := h_is_srlw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
@@ -192,7 +198,7 @@ namespace Srliw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srliw : is_srliw Main)
@@ -206,7 +212,7 @@ def sp1_srliw : SailM Unit := do
   let ⟨ srlw, imm ⟩ := h_is_srliw
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -219,6 +225,8 @@ theorem correct_srliw
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   (spec_srliw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srliw Main cstrs h_is_srliw).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ srlw, imm ⟩ := h_is_srliw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
@@ -251,7 +259,7 @@ namespace Sra
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sra : is_sra Main)
@@ -265,7 +273,7 @@ def sp1_sra : SailM Unit := do
   let ⟨ sra, imm ⟩ := h_is_sra
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -278,6 +286,8 @@ theorem correct_sra
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   (spec_sra (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sra Main cstrs h_is_sra).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sra, imm ⟩ := h_is_sra
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sra_real Main sra)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
@@ -310,7 +320,7 @@ namespace Srai
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_srai : is_srai Main)
@@ -324,7 +334,7 @@ def sp1_srai : SailM Unit := do
   let ⟨ sra, imm ⟩ := h_is_srai
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -337,6 +347,8 @@ theorem correct_srai
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   (spec_srai op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srai Main cstrs h_is_srai).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sra, imm ⟩ := h_is_srai
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sra_real Main sra)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
@@ -369,7 +381,7 @@ namespace Sraw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sraw : is_sraw Main)
@@ -383,7 +395,7 @@ def sp1_sraw : SailM Unit := do
   let ⟨ sraw, imm ⟩ := h_is_sraw
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -396,6 +408,8 @@ theorem correct_sraw
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   (spec_sraw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraw Main cstrs h_is_sraw).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sraw, imm ⟩ := h_is_sraw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)
@@ -428,7 +442,7 @@ namespace Sraiw
 open ShiftRight
 
 variable
-  (Main : Vector (Fin KB) 70)
+  (Main : Vector (Fin KB) 69)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_sraiw : is_sraiw Main)
@@ -442,7 +456,7 @@ def sp1_sraiw : SailM Unit := do
   let ⟨ sraw, imm ⟩ := h_is_sraiw
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35], Main[36]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 set_option maxHeartbeats 1000000 in
 
@@ -455,6 +469,8 @@ theorem correct_sraiw
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   (spec_sraiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraiw Main cstrs h_is_sraiw).run s
   := by
+    have _ := state_cstrs
+    stop
     let ⟨ sraw, imm ⟩ := h_is_sraiw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)

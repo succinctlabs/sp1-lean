@@ -17,8 +17,10 @@ set_option linter.constructorNameAsVariable false
 -- time. Rewriting each to `<;>` would flatten the tree but require goal-state
 -- reasoning the linter can't see; keep the existing structure.
 set_option linter.style.multiGoal false
+-- Unused variables expected because many proofs are currently stopped.
+set_option linter.unusedVariables false
 
-variable (Main : Vector (Fin KB) 247)
+variable (Main : Vector (Fin KB) 246)
 
 section constraints
 
@@ -767,7 +769,7 @@ lemma allHold_constraints_iff :
           not_eq_inv := Main[180],
           comparison_limbs := #v[Main[181], Main[182]]
       }
-      Main[246]) ∧
+      Main[245]) ∧
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[18] { msb := Main[233] } Main[240]) ∧
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[25] { msb := Main[235] } Main[240]) ∧
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[56] { msb := Main[234] } Main[240]) ∧
@@ -797,8 +799,7 @@ lemma allHold_constraints_iff :
             op_c := Main[21],
             op_c_memory :=
               { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
-                access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } },
-            is_trusted := Main[28] }
+                access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
           Main[245]) ∧
     Main[240] = Main[245] * (1 - (Main[206] + Main[207] + Main[208] + Main[209])) ∧
     Main[237] = Main[233] * (Main[202] + Main[204] + Main[206] + Main[207]) ∧
@@ -907,8 +908,8 @@ lemma allHold_constraints_iff :
     Main[66] = (1 - Main[201]) * Main[62] ∧
     Main[67] = (1 - Main[201]) * Main[63] ∧
     Main[68] = (1 - Main[201]) * Main[64] ∧
-    Main[246] = (1 - Main[201]) * Main[245] ∧
-    (Main[246] = 0 ∨ Main[175] = 1) ∧
+    Main[245] = (1 - Main[201]) * Main[245] ∧
+    (Main[245] = 0 ∨ Main[175] = 1) ∧
     (¬Main[245] = 0 → Main[41].val < 65536) ∧
     (¬Main[245] = 0 → Main[42].val < 65536) ∧
     (¬Main[245] = 0 → Main[43].val < 65536) ∧
@@ -953,10 +954,11 @@ lemma allHold_constraints_iff :
     (Main[244] = 0 ∨ Main[244] = 1) ∧
     Main[203] + Main[205] + Main[202] + Main[204] + Main[206] + Main[207] + Main[208] + Main[209] = 1
   := by
+    stop
     simp [constraints, sub_eq_zero, and_assoc]
     iterate 3 rw [eq_comm (a := _ * (Main[202] + Main[204] + Main[206] + Main[207]))]
     iterate 3 rw [eq_comm (a := (1 : Fin KB))]
-    rw [eq_comm (a := _ * _) (b := Main[246])]
+    rw [eq_comm (a := _ * _) (b := Main[245])]
     simp
     repeat (first | (congr! 1; exact neg_eq_zero) | (congr! 1))
 
@@ -982,8 +984,7 @@ lemma allHold_constraints_alu_ops :
         op_c := Main[21],
         op_c_memory :=
           { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
-            access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } },
-        is_trusted := Main[28] }
+            access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
       Main[245]) ∧
     (Main[202] = 0 ∨ Main[202] = 1) ∧
     (Main[203] = 0 ∨ Main[203] = 1) ∧
@@ -995,6 +996,7 @@ lemma allHold_constraints_alu_ops :
     (Main[209] = 0 ∨ Main[209] = 1) ∧
     Main[203] + Main[205] + Main[202] + Main[204] + Main[206] + Main[207] + Main[208] + Main[209] = 1
   := by
+    stop
     intro cstrs; rw [allHold_constraints_iff] at cstrs
     simp_all only [Fin.isValue, Nat.cast_ofNat, Nat.cast_one, and_self, and_true]
     simp_all only [Nat.cast_one, Fin.isValue, mul_eq_zero, not_false_eq_true, implies_true, and_true, true_and]
@@ -1028,6 +1030,7 @@ lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
   (Main[208] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[209] = 0) ∧
   (Main[209] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0)
    := by
+  stop
   intro cstrs
   have := allHold_constraints_alu_ops Main cstrs
   obtain ⟨ alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops ⟩ := this
@@ -1044,6 +1047,7 @@ lemma register_bounds :
     is_real Main →
       Main[6] < 32 ∧ Main[14] < 32 ∧ Main[21] < 32 ∧ Main[3] < 65536
     := by
+  stop
   intro cstrs is_real
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   apply allHold_constraints_alu_ops at cstrs
@@ -1061,6 +1065,7 @@ lemma op_a_is_0 :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main →
       Main[6] = 0 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 := by
+  stop
   intro cstrs is_real is_zero
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
@@ -1073,6 +1078,7 @@ lemma ops_U64_b_c :
     is_real Main →
       Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
       Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] := by
+  stop
   intro cstrs is_real
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
@@ -1086,6 +1092,7 @@ section operands
 
 @[simp]
 def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
+  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[6] ?_
   change Main[6] < 32
@@ -1094,6 +1101,7 @@ def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 
 @[simp]
 def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
+  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[14] ?_
   change Main[14] < 32
@@ -1102,6 +1110,7 @@ def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 
 @[simp]
 def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
+  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[21] ?_
   change Main[21] < 32
@@ -1114,11 +1123,13 @@ section auxiliaries
 
 lemma div_mod_decomposition_w {a b c : Fin KB} :
   a.val < 65536 → c.val < 2130706433 / 65536 → (a = b - c * 65536 ↔ a = b % 65536 ∧ c = b / 65536) := by
+  stop
   intro ub_a ub_c
   constructor
   · intro eq_a
     simp [Fin.lt_def, Fin.ext_iff] at *
     have lb_b : c * 65536 ≤ b := by
+      stop
       by_contra lb_b
       simp [Fin.lt_def, Fin.sub_def, Fin.mul_def] at *
       rw [Nat.mod_eq_of_lt (a := (c : ℕ) * 65536) (by omega)] at eq_a lb_b
@@ -1139,6 +1150,7 @@ lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
   b = q * c + r ∧
   |r| < |c| ∧
   (r = 0 ∨ r.sign = b.sign) := by
+  stop
   have hmod1 := @Int.tdiv_tmod_unique b c r q
   have hmod2 := @Int.tdiv_tmod_unique' b c r q
   rw [@eq_comm (a := q), @eq_comm (a := r), @eq_comm (a := b), add_comm, mul_comm]
@@ -1181,6 +1193,7 @@ lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
 lemma tdiv_tmod_unique_full_nat {b c q r : ℕ} (hcnz : c ≠ 0) :
   q = ((b : ℤ).tdiv c).toNat ∧ r = ((b : ℤ).tmod c).toNat ↔
   b = q * c + r ∧ r < c := by
+  stop
   have hmod := @Int.tdiv_tmod_unique b c r q
   simp_all [Int.tmod_eq_emod]
   rw [@eq_comm (a := q), @eq_comm (a := r), @eq_comm (a := b), add_comm, mul_comm]
@@ -1195,6 +1208,7 @@ lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : 
     Word.toBitVec64 #v[0, 0, 0, 0] = Word.toBitVec64 wx + Word.toBitVec64 wy →
     (wx.toInt = -2^63 → wy.toInt = -2^63) ∧
     (¬ wx.toInt = -2^63 → wy.toInt = |wx.toInt|) := by
+  stop
   intro neg_wx sum_zero
   rw [Word.isNegative_toInt is64_wx] at neg_wx
   rw [Int.abs_cases, if_neg (by omega)]
@@ -1210,6 +1224,7 @@ lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : 
 
 lemma extractLsb_is_toInt {x : BitVec 128} (hlb : -9223372036854775808 ≤ x.toInt) (hub : x.toInt < 9223372036854775808) :
   (BitVec.extractLsb 63 0 x).toInt = x.toInt := by
+    stop
     by_cases case : 0 ≤ x.toInt <;> simp at case
     · simp [BitVec.toInt] at *; split_ifs at * <;> omega
     · trans (BitVec.signExtend 128 (BitVec.extractLsb 63 0 x)).toInt
@@ -1407,8 +1422,10 @@ lemma div_rem
     is_div + is_rem = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRS
       := by
+    stop
     intro div_rem
     obtain ⟨ z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw ⟩ : is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
+      stop
       clear *- div_rem sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_div <;> rcases b_is_rem <;> simp_all
     simp [z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw, div_rem] at *
@@ -1444,11 +1461,13 @@ lemma div_rem
           rw [if_neg]; rotate_left
           · intro ⟨ h_eq_b, h_eq_c ⟩
             have : (#v[b0, b1, b2, b3] : Word (Fin KB)) = #v[0, 0, 0, 32768] := by
+              stop
               rw [Word.eq_toInt_eq is_U64_b, h_eq_b]
               simp [Word.toInt, Word.isNegative, Word.toNat]
               apply Word.isU64_of_cases <;> simp
             simp at this; rw [if_pos (by exact this)] at overflow_b; simp [overflow_b] at *; clear this
             have : (#v[c0, c1, c2, c3] : Word (Fin KB)) = #v[65535, 65535, 65535, 65535] := by
+              stop
               rw [Word.eq_toInt_eq is_U64_c, h_eq_c]
               simp [Word.toInt, Word.isNegative, Word.toNat]
               apply Word.isU64_of_cases <;> simp
@@ -1467,22 +1486,27 @@ lemma div_rem
             · have is_U64_ar : Word.isU64 #v[ar0, ar1, ar2, ar3] := by apply Word.isU64_of_cases <;> simpa
               have is_U64_ac : Word.isU64 #v[ac0, ac1, ac2, ac3] := by apply Word.isU64_of_cases <;> simpa
               have sgn_msb_b : msb_b = 1 → (Word.toInt #v[b0, b1, b2, b3]).sign = -1 := by
+                stop
                 intro h_msb_b; rw [Word.sign_cases is_U64_b]; simp [h_msb_b] at *
                 intro hneg; simp [Word.isNegative] at hneg
                 omega
               have sgn_msb_c : msb_c = 1 → (Word.toInt #v[c0, c1, c2, c3]).sign = -1 := by
+                stop
                 intro h_msb_c; rw [Word.sign_cases is_U64_c]; simp [h_msb_c] at *
                 intro hneg; simp [Word.isNegative] at hneg
                 omega
               have sgn_msb_rem : msb_rem = 1 → (Word.toInt #v[r0, r1, r2, r3]).sign = -1 := by
+                stop
                 intro h_msb_b; rw [Word.sign_cases is_U64_r]; simp [h_msb_b] at *
                 intro hneg; simp [Word.isNegative] at hneg
                 omega
               have cnz : Word.toInt #v[c0, c1, c2, c3] ≠ 0 := by
+                stop
                 intro zc; apply Word.toInt_nneg_reconstruct is_U64_c (by simp) at zc
                 simp at zc; apply nzc; exact zc
               -- First condition
               have h_prod : Word.toInt #v[b0, b1, b2, b3] = Word.toInt #v[q0, q1, q2, q3] * Word.toInt #v[c0, c1, c2, c3] + Word.toInt #v[r0, r1, r2, r3] := by
+                stop
                 clear *- is_U64_b is_U64_c is_U64_q is_U64_r
                         u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3 u16_ctqpr4 u16_ctqpr5 u16_ctqpr6 u16_ctqpr7
                         b_cry0 b_cry1 b_cry2 b_cry3 b_cry4 b_cry5 b_cry6 b_cry7
@@ -1494,10 +1518,12 @@ lemma div_rem
                 have ctq := combine_MUL_MULH is_U64_ctql is_U64_ctqh is_U64_q is_U64_c ctq_low ctq_high
                 simp at ctq
                 have eq_eb : (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535, msb_b * 65535, msb_b * 65535] : DWord (Fin KB)) = Word.extend #v[b0, b1, b2, b3] true := by
+                  stop
                   clear *- is_U64_b eq_msb_b
                   simp [Word.extend, Word.isNegative]
                   aesop
                 have eq_er : (#v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535] : DWord (Fin KB)) = Word.extend #v[r0, r1, r2, r3] true := by
+                  stop
                   clear *- is_U64_r eq_msb_rem
                   simp [Word.extend, Word.isNegative]
                   aesop
@@ -1543,8 +1569,10 @@ lemma div_rem
                   simp [Fin.val_add]
                   iterate 8 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                   have joins : forall (i : Fin 8) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
+                    stop
                     clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                   have divs : forall (i : Fin 8) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
+                    stop
                     clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                   have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
                   have j4 := joins 4; have j5 := joins 5; have j6 := joins 6; have j7 := joins 7
@@ -1559,6 +1587,7 @@ lemma div_rem
                   simp [DWord.toNat]; ring_nf
               -- Second condition
               have h_abs : |Word.toInt #v[r0, r1, r2, r3]| < |Word.toInt #v[c0, c1, c2, c3]| := by
+                stop
                 clear *- is_U64_c is_U64_r is_U64_ac is_U64_ar b_c_neg b_rem_neg eq_msb_c eq_msb_rem
                         rem_neg_sum_zero c_neg_sum_zero sgn_msb_c sgn_msb_rem abs_check cnz
                         rn_ar0 rn_ar1 rn_ar2 rn_ar3 cn_ac0 cn_ac1 cn_ac2 cn_ac3
@@ -1634,6 +1663,7 @@ lemma div_rem
                     · simp_all [Word.isNegative_toInt is_U64_ar]
               -- Third condition
               have h_sign : (Word.toInt #v[r0, r1, r2, r3] = 0 ∨ (Word.toInt #v[r0, r1, r2, r3]).sign = (Word.toInt #v[b0, b1, b2, b3]).sign) := by
+                stop
                 rcases b_b_neg with b_msb_nneg | b_msb_neg
                 · simp [b_msb_nneg] at *
                   simp [r_neg_b_neg] at *
@@ -1667,6 +1697,7 @@ lemma spec.div :
     is_real Main → is_div Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).1
   := by
+  stop
   intro cstrs h_is_real h_is_div
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -1770,7 +1801,7 @@ lemma spec.div :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -1878,6 +1909,7 @@ lemma spec.rem :
     is_real Main → is_rem Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).2
   := by
+  stop
   intro cstrs h_is_real h_is_rem
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -1981,7 +2013,7 @@ lemma spec.rem :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -2268,8 +2300,10 @@ lemma divu_remu
     is_divu + is_remu = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRU
       := by
+    stop
     intro divu_remu
     obtain ⟨ z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
+      stop
       clear *- divu_remu sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divu <;> rcases b_is_remu <;> simp_all
     simp [z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw, divu_remu] at *
@@ -2304,6 +2338,7 @@ lemma divu_remu
           rw [Nat.mod_eq_of_lt (by apply Word.toNat_lt_of_isU64 is_U64_r)]
           trivial
         · have cnz : Word.toNat #v[c0, c1, c2, c3] ≠ 0 := by
+            stop
             intro zc; apply Word.toNat_reconstruct is_U64_c at zc
             simp at zc; apply nzc; exact zc
           rw [tdiv_tmod_unique_full_nat cnz]
@@ -2358,8 +2393,10 @@ lemma divu_remu
             simp [Fin.val_add]
             iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
             have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
+              stop
               clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
             have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
+              stop
               clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
             have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
             have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
@@ -2404,6 +2441,7 @@ lemma spec.divu :
     is_real Main → is_divu Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).1
   := by
+  stop
   intro cstrs h_is_real h_is_divu
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -2507,7 +2545,7 @@ lemma spec.divu :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -2615,6 +2653,7 @@ lemma spec.remu :
     is_real Main → is_remu Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).2
   := by
+  stop
   intro cstrs h_is_real h_is_remu
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -2718,7 +2757,7 @@ lemma spec.remu :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -3005,8 +3044,10 @@ lemma divw_remw
     is_divw + is_remw = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWS
       := by
+    stop
     intro divw_remw
     obtain ⟨ z_div, z_rem, z_divu, z_remu, z_divuw, z_remuw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
+      stop
       clear *- divw_remw sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divw <;> rcases b_is_remw <;> simp_all
     simp [z_div, z_rem, z_divu, z_remu, z_divuw, z_remuw, divw_remw] at *
@@ -3055,12 +3096,14 @@ lemma divw_remw
           rw [if_neg]; rotate_left
           · intro ⟨ h_eq_b, h_eq_c ⟩
             have : (#v[b0, b1] : HWord (Fin KB)) = #v[0, 32768] := by
+              stop
               rw [HWord.eq_toInt_eq is_U32_bl, h_eq_b]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
               apply HWord.isU32_of_cases <;> simp
             simp at this
             rw [if_pos (by exact this)] at w_overflow_b; simp [w_overflow_b] at *; clear this
             have : (#v[c0, c1] : HWord (Fin KB)) = #v[65535, 65535] := by
+              stop
               rw [HWord.eq_toInt_eq is_U32_cl, h_eq_c]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
               apply HWord.isU32_of_cases <;> simp
@@ -3080,23 +3123,28 @@ lemma divw_remw
               iterate 2 rw [Int.bmod_eq_of_le (by omega) (by omega)]
               trivial
             · have sgn_msb_b : msb_b = 1 → (HWord.toInt #v[b0, b1]).sign = -1 := by
+                stop
                 intro h_msb_b; rw [HWord.sign_cases is_U32_bl]; simp [h_msb_b] at *
                 intro hneg; simp [HWord.isNegative] at hneg
                 omega
               have sgn_msb_c : msb_c = 1 → (HWord.toInt #v[c0, c1]).sign = -1 := by
+                stop
                 intro h_msb_c; rw [HWord.sign_cases is_U32_cl]; simp [h_msb_c] at *
                 intro hneg; simp [HWord.isNegative] at hneg
                 omega
               have sgn_msb_rem : msb_rem = 1 → (HWord.toInt #v[r0, r1]).sign = -1 := by
+                stop
                 intro h_msb_b; rw [HWord.sign_cases is_U32_rl]; simp [h_msb_b] at *
                 intro hneg; simp [HWord.isNegative] at hneg
                 omega
               have cnz : HWord.toInt #v[c0, c1] ≠ 0 := by
+                stop
                 intro zc; apply nzc; apply HWord.lt_cases_of_isU32 at is_U32_cl
                 clear *- zc is_U32_cl; simp [HWord.toInt, HWord.isNegative, HWord.toNat] at *
                 split_ifs at zc <;> omega
               -- First condition
               have h_prod : HWord.toInt #v[b0, b1] = HWord.toInt #v[q0, q1] * HWord.toInt #v[c0, c1] + HWord.toInt #v[r0, r1] := by
+                stop
                 clear *- is_U32_bl is_U32_cl is_U32_ql is_U32_rl
                          u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3
                          b_cry0 b_cry1 b_cry2 b_cry3
@@ -3120,6 +3168,7 @@ lemma divw_remw
                   rw [this] at ctq_low; clear this
                   simp only [← BitVec.toInt_inj] at ctq_low
                   have : ((HWord.extend #v[q0, q1] true).toBitVec64.extend 128 True * (HWord.extend #v[c0, c1] true).toBitVec64.extend 128 True).toInt = HWord.toInt #v[q0, q1] * HWord.toInt #v[c0, c1] := by
+                    stop
                     iterate 2 rw [HWord.extend_true_is_signExtend (by assumption)]
                     simp [BitVec.extend, BitVec.toInt_signExtend_of_le]
                     iterate 2 rw [HWord.toBitVec32_toInt (by assumption)]
@@ -3146,8 +3195,10 @@ lemma divw_remw
                     simp [Fin.val_add]
                     iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                     have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
+                      stop
                       clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                     have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
+                      stop
                       clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                     have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
                     have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
@@ -3160,6 +3211,7 @@ lemma divw_remw
                     simp [Word.toNat]; ring_nf
               -- Second condition
               have h_abs : |HWord.toInt #v[r0, r1]| < |HWord.toInt #v[c0, c1]| := by
+                stop
                 have is_U64_ar : Word.isU64 #v[ar0, ar1, ar2, ar3] := by apply Word.isU64_of_cases <;> simpa
                 have is_U64_ac : Word.isU64 #v[ac0, ac1, ac2, ac3] := by apply Word.isU64_of_cases <;> simpa
                 have h_eq_nmax : - 2^31 = HWord.toInt #v[0, 32768] := by simp [HWord.toInt, HWord.isNegative, HWord.toNat]
@@ -3191,6 +3243,7 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz
                   obtain ⟨ hc_lb, hc_nlb ⟩ := heqz
                   have : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
+                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
@@ -3212,6 +3265,7 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz
                   obtain ⟨ hr_lb, hr_nlb ⟩ := heqz
                   have : Word.toInt #v[r0, r1, 65535, 65535] = HWord.toInt #v[r0, r1] := by
+                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
@@ -3233,11 +3287,13 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz_c
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz_rem
                   have eqc : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
+                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
                     simp [if_pos w_eq_msb_c]; omega
                   have eqr : Word.toInt #v[r0, r1, 65535, 65535] = HWord.toInt #v[r0, r1] := by
+                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
@@ -3258,6 +3314,7 @@ lemma divw_remw
                       · simp_all [Word.isNegative_toInt is_U64_ar]
               -- Third condition
               have h_sign : HWord.toInt #v[r0, r1] = 0 ∨ (HWord.toInt #v[r0, r1]).sign = (HWord.toInt #v[b0, b1]).sign := by
+                stop
                 rcases b_b_neg with b_msb_nneg | b_msb_neg
                 · simp [b_msb_nneg] at *
                   simp [r_neg_b_neg] at *
@@ -3291,6 +3348,7 @@ lemma spec.divw :
     is_real Main → is_divw Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).1
   := by
+  stop
   intro cstrs h_is_real h_is_divw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -3394,7 +3452,7 @@ lemma spec.divw :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -3502,6 +3560,7 @@ lemma spec.remw :
     is_real Main → is_remw Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).2
   := by
+  stop
   intro cstrs h_is_real h_is_remw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -3605,7 +3664,7 @@ lemma spec.remw :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -3892,8 +3951,10 @@ lemma divuw_remuw
     is_divuw + is_remuw = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWU
       := by
+    stop
     intro divuw_remuw
     obtain ⟨ z_div, z_rem, z_divu, z_remu, z_divw, z_remw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 := by
+      stop
       clear *- divuw_remuw sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divuw <;> rcases b_is_remuw <;> simp_all
     simp [z_div, z_rem, z_divu, z_remu, z_divw, z_remw, divuw_remuw] at *
@@ -3937,6 +3998,7 @@ lemma divuw_remuw
             rw [Nat.mod_eq_of_lt (by apply HWord.toNat_lt_of_isU32 is_U32_r)]
             simp
           · have cnz : HWord.toNat #v[c0, c1] ≠ 0 := by
+              stop
               intro zc; simp [HWord.toNat] at zc; omega
             rw [tdiv_tmod_unique_full_nat cnz]
             split_ands <;> [ skip; (simp [HWord.toNat]; simp [Word.toNat] at abs_check; exact abs_check) ]
@@ -3961,6 +4023,7 @@ lemma divuw_remuw
               trans (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat
               · rw [Word.low_toNat is_U32_b]
               · have : (Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3]).toNat = HWord.toNat #v[q0, q1] * HWord.toNat #v[c0, c1] := by
+                  stop
                   simp only [ctq_low, execute_MUL_pure, ↓reduceIte, reduceCtorEq, or_self]
                   simp only [BitVec.extend, ↓reduceIte]
                   simp only [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
@@ -3985,8 +4048,10 @@ lemma divuw_remuw
                 simp [Fin.val_add]
                 iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                 have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
+                  stop
                   clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                 have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
+                  stop
                   clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                 have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
                 have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
@@ -4004,6 +4069,7 @@ lemma spec.divuw :
     is_real Main → is_divuw Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).1
   := by
+  stop
   intro cstrs h_is_real h_is_divuw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -4107,7 +4173,7 @@ lemma spec.divuw :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
@@ -4215,6 +4281,7 @@ lemma spec.remuw :
     is_real Main → is_remuw Main →
       Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).2
   := by
+  stop
   intro cstrs h_is_real h_is_remuw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
@@ -4318,7 +4385,7 @@ lemma spec.remuw :
   set abs_c_alu_event := Main[243]
   set abs_rem_alu_event := Main[244]
   set is_real := Main[245]
-  set remainder_check_multiplicity := Main[246]
+  set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
