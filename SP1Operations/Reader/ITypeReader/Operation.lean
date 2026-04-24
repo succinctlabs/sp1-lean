@@ -7,4 +7,3 @@ structure ITypeReader where
   op_b : Fin KB
   op_b_memory : MemoryAccessInSharedCols
   op_c_imm : Word (Fin KB)
-  is_trusted : Fin KB

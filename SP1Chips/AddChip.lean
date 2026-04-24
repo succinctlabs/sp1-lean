@@ -4,7 +4,7 @@ open LeanRV64D.Functions
 
 namespace Add
 
-variable (Main : Vector (Fin KB) 34)
+variable (Main : Vector (Fin KB) 33)
 
 -- The input and output values in the SP1 implementation
 def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6]
@@ -19,7 +19,7 @@ def spec_add (rs2 rs1 rd : regidx) : SailM ExecutionResult := do
 /-- Behavior of the ADD operation in SP1, writing the given values to registers. -/
 def sp1_add : SailM ExecutionResult := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg (sp1_op_a Main) (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg (sp1_op_a Main) (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
   return RETIRE_SUCCESS
 
 open Sail
@@ -28,10 +28,10 @@ open Sail
 registers initialized to appropriate values, and the column is a real column,
 the Sail spec and SP1 implementation behave the same. -/
 theorem correct_add
-    (Main : Vector (Fin KB) 34)
+    (Main : Vector (Fin KB) 33)
     (s : SailState)
     (h_cstrs : (constraints Main).allHold)
-    (h_is_real : Main[33] = 1)
+    (h_is_real : Main[32] = 1)
     (state_cstrs : (constraints Main).initialState s) :
     let op_c := .Regidx (sp1_op_c Main)
     let op_b := .Regidx (sp1_op_b Main)
@@ -60,6 +60,7 @@ theorem correct_add
   rw [run_readReg, read_pc]
   simp [sp1_op_b, read_op_b, sp1_op_c, read_op_c, sp1_op_a]
   -- Simplify the expressions using the arithmetic constraints
+  clear rest
   by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
   · rw [← is_add]
     simp [Word.toBitVec64, Word.toNat]

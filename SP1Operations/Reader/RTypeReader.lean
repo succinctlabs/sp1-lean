@@ -11,7 +11,6 @@ set_option maxHeartbeats 1000000 in
 lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
     (is_real = 0 ∨ is_real = 1) ∧
-    (cols.is_trusted = is_real) ∧
     (¬is_real = 0 →
       Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
       cols.op_a < 32 ∧
@@ -39,27 +38,18 @@ lemma allHold_constraints_iff :
     intro h_is_real
     rcases h_is_real with h_is_real | h_is_real
     · simp [h_is_real]
-      by_cases h_trust : cols.is_trusted = 0
-      · simp [h_trust]
-        tauto
-      · simp [h_trust]
-        tauto
-    · simp [h_is_real]
-      by_cases h_trust : cols.is_trusted = 0
-      · simp [h_trust]
-        tauto
-      · simp [h_trust, @eq_comm _ cols.is_trusted]
-        intro h_trust'
-        by_cases hop_a_0 : cols.op_a_0 = 0
-        · simp [hop_a_0, h_trust']
-          aesop
-        · simp [hop_a_0, h_trust']
-          aesop
+      by_cases hop_a_0 : cols.op_a_0 = 0
+      · simp [hop_a_0]
+      · tauto
+    · by_cases hop_a_0 : cols.op_a_0 = 0
+      · simp [hop_a_0]
+        aesop
+      · simp [hop_a_0]
+        aesop
 
 lemma allHold_constraints_iff_is_real
     (h : is_real = 1) :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
-    cols.is_trusted = 1 ∧
     Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
     cols.op_a < 32 ∧
     cols.op_b < 65536 ∧

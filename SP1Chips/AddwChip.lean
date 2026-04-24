@@ -9,10 +9,10 @@ open BitVec
 namespace Addw
 
 variable
-  (Main : Vector (Fin KB) 37)
+  (Main : Vector (Fin KB) 36)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[36] = 1)
+  (h_is_real : Main[35] = 1)
   (h_is_addw : Main[31] = 0)
 
 def spec_addw (rs2 rs1 rd : regidx) : SailM Unit := do
@@ -29,16 +29,15 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
 def sp1_addw : SailM Unit := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35] * 65535, Main[35] * 65535])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
 
 set_option maxHeartbeats 1000000 in
 
 -- correctness proof across instruction arms
 theorem correct_addw
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[36] = 1)
+  (h_is_real : Main[35] = 1)
   (h_is_addw : Main[31] = 0)
-  (h_is_trusted : Main[32] = 1)
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
@@ -49,10 +48,10 @@ theorem correct_addw
     obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
+    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
       AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints,
-      h_is_real, h_is_trusted] at state_cstrs
+      h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp [Opcode.ofNat, Nat.ble] at *
     simp_all
@@ -69,6 +68,7 @@ theorem correct_addw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
+    stop
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
       exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
@@ -88,7 +88,7 @@ namespace Addiw
 open Addw
 
 variable
-  (Main : Vector (Fin KB) 37)
+  (Main : Vector (Fin KB) 36)
   (s : SailState)
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[35] = 1)
@@ -108,14 +108,14 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21]
 def sp1_addiw : SailM Unit := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[33], Main[34], Main[35] * 65535, Main[35] * 65535])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
 
 set_option maxHeartbeats 1000000 in
 
 -- correctness proof across instruction arms
 theorem correct_addw
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[36] = 1)
+  (h_is_real : Main[35] = 1)
   (h_is_addiw : Main[31] = 1)
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
@@ -127,7 +127,7 @@ theorem correct_addw
     obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _ ⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ _, trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, _, _, _ ⟩ := alu_cstrs
+    obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, _, _, _ ⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp [Opcode.ofNat, Nat.ble] at *
@@ -150,6 +150,7 @@ theorem correct_addw
     rw [exec_RTYPEW_pure_bv_to_w _ _ _ (by omega) (by omega)]
     simp [execute_RTYPEW_pure_w]
     rw [← is_addw] at is_msb
+    stop
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
       exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
