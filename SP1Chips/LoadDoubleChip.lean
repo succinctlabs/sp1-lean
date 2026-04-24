@@ -100,6 +100,9 @@ private lemma byteConcat8_toNat_eq_Word_toNat
 
 set_option maxHeartbeats 2000000 in
 -- correct_ld unfolds Load chip + Sail 8-byte memory read
+-- Pre-regen proof at commit 750a3e6:SP1Chips/LoadDoubleChip.lean -- correct_ld
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/LoadDoubleChip.lean` for the full pre-regen proof body)
 theorem correct_ld (Main : Vector (Fin KB) 39)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)

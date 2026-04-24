@@ -34,6 +34,9 @@ noncomputable def spec_lbu (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Executio
 
 set_option maxHeartbeats 2000000 in
 -- correct_lb unfolds Load chip + Sail memory read spec
+-- Pre-regen proof at commit 750a3e6:SP1Chips/LoadByteChip.lean -- correct_lb
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/LoadByteChip.lean` for the full pre-regen proof body)
 theorem correct_lb (Main : Vector (Fin KB) 47)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -55,6 +58,9 @@ theorem correct_lb (Main : Vector (Fin KB) 47)
   sorry
 set_option maxHeartbeats 2000000 in
 -- correct_lbu unfolds Load chip + Sail memory read spec
+-- Pre-regen proof at commit 750a3e6:SP1Chips/LoadByteChip.lean -- correct_lbu
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/LoadByteChip.lean` for the full pre-regen proof body)
 theorem correct_lbu (Main : Vector (Fin KB) 47)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)

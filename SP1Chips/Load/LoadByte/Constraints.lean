@@ -122,9 +122,15 @@ variable (Main : Vector (Fin KB) 47)
 def is_lb := Main[45] = 1
 def is_lbu := Main[46] = 1
 
+-- Pre-regen proof at commit 750a3e6:SP1Chips/Constraints.lean -- allHold_constraints_iff_of_is_lb
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/Load/LoadByte/Constraints.lean` for the full pre-regen proof body)
 lemma allHold_constraints_iff_of_is_lb (_ : is_lb Main)
     (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
+-- Pre-regen proof at commit 750a3e6:SP1Chips/Constraints.lean -- allHold_constraints_iff_of_is_lbu
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/Load/LoadByte/Constraints.lean` for the full pre-regen proof body)
 lemma allHold_constraints_iff_of_is_lbu (_ : is_lbu Main)
     (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 

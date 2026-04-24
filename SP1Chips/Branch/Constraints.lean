@@ -212,6 +212,22 @@ lemma single_op (Main : Vector (Fin KB) 45) (cstrs : (constraints Main).allHold)
   all_goals simp_all only [Fin.isValue, add_zero, zero_add, one_ne_zero, or_true, zero_ne_one,
     and_self, implies_true, Fin.reduceAdd, Fin.reduceEq, or_self]
 
+-- Pre-regen proof, preserved for reference. The `is_trusted_of_constraints`
+-- helper no longer exists (is_trusted column was removed), so the step that
+-- pulled `Main[25] = 1` is gone. The b_type_constraints equality is still
+-- derivable from the `.send (.program ...)` trusted_instr for BEQ/…/BGEU
+-- (opcodes 40-45), but simp_all does not close the goal against the new
+-- constraint tree and direct destructuring of cstrs fails because of nested
+-- Fin-KB arithmetic that won't normalize through `cases`.
+--
+-- set_option maxHeartbeats 20000000 in
+-- lemma eq_signExtend_of_is_real ... := by
+--   have := single_op Main cstrs
+--   have htrust := is_trusted_of_constraints Main cstrs is_real
+--   rcases is_real with h | h | h | h | h | h
+--   all_goals
+--   · simp_all [constraints, ITypeReaderImmutable.constraints,
+--       SP1Constraint.toProp, Opcode.ofNat, Nat.ble, Nat.beq]
 lemma eq_signExtend_of_is_real (Main : Vector (Fin KB) 45)
     (_ : (constraints Main).allHold)
     (_ : is_real Main) :
@@ -219,6 +235,30 @@ lemma eq_signExtend_of_is_real (Main : Vector (Fin KB) 45)
       BitVec.signExtend 64 (BitVec.ofNat 13 Main[21]) := by
   sorry
 
+-- Pre-regen proof preserved for reference:
+-- set_option maxHeartbeats 20000000 in
+-- lemma add_signExtend_of_constraints (Main : Vector (Fin KB) 46)
+--     (cstrs : (constraints Main).allHold)
+--     (is_real : is_real Main) :
+--     (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
+--       BitVec.signExtend 64 (BitVec.ofNat 13 Main[21])) % 4 = 0 := by
+--   have := single_op Main cstrs
+--   have htrust := is_trusted_of_constraints Main cstrs is_real
+--   rcases is_real with h | h | h | h | h | h
+--   all_goals
+--   · simp only [Fin.isValue, add_zero, zero_add, one_ne_zero, or_true, zero_ne_one,
+--       and_self, implies_true, imp_self, Fin.reduceAdd, Fin.reduceEq, or_self, h] at this
+--     simp only [SP1ConstraintList.allHold, constraints, Fin.isValue, mul_zero, mul_one, zero_add,
+--       add_zero, List.append_assoc, sub_sub_cancel, Nat.cast_one, Nat.cast_zero, sub_zero,
+--       ByteOpcode.ofNat_seven, List.forall_append, List.Forall, SP1Constraint.toProp_assertZero,
+--       mul_eq_zero, Fin.reduceEq, or_false, SP1Constraint.toProp_send_byte, ne_eq,
+--       ByteOpcode.constrain_Range, Fin.coe_ofNat_eq_mod, Nat.reduceMod, Nat.reducePow] at cstrs
+--     obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
+--     clear lt_cstrs chip_cstrs
+--     simp_all
+--     simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
+--       Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+--     ... -- see git history at commit 750a3e6 for the full body
 lemma add_signExtend_of_constraints (Main : Vector (Fin KB) 45)
     (_ : (constraints Main).allHold)
     (_ : is_real Main) :

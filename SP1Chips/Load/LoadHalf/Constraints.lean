@@ -112,9 +112,15 @@ variable (Main : Vector (Fin KB) 44)
 def is_lh := Main[42] = 1  -- placeholder; verify real index
 def is_lhu := Main[43] = 1  -- placeholder
 
+-- Pre-regen proof at commit 750a3e6:SP1Chips/Constraints.lean -- allHold_constraints_iff_of_is_lh
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/Load/LoadHalf/Constraints.lean` for the full pre-regen proof body)
 lemma allHold_constraints_iff_of_is_lh (_ : is_lh Main)
     (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 
+-- Pre-regen proof at commit 750a3e6:SP1Chips/Constraints.lean -- allHold_constraints_iff_of_is_lhu
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/Load/LoadHalf/Constraints.lean` for the full pre-regen proof body)
 lemma allHold_constraints_iff_of_is_lhu (_ : is_lhu Main)
     (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 

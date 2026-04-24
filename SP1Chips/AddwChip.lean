@@ -34,6 +34,9 @@ def sp1_addw : SailM Unit := do
 set_option maxHeartbeats 1000000 in
 
 -- correctness proof across instruction arms
+-- Pre-regen proof at commit 750a3e6:SP1Chips/AddwChip.lean -- correct_addw
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/AddwChip.lean` for the full pre-regen proof body)
 theorem correct_addw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[35] = 1)
@@ -88,6 +91,9 @@ def sp1_addiw : SailM Unit := do
 set_option maxHeartbeats 1000000 in
 
 -- correctness proof across instruction arms
+-- Pre-regen proof at commit 750a3e6:SP1Chips/AddwChip.lean -- correct_addw
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/AddwChip.lean` for the full pre-regen proof body)
 theorem correct_addw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[35] = 1)

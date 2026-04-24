@@ -62,6 +62,9 @@ variable (Main : Vector (Fin KB) 39)
 
 def is_ld := Main[38] = 1  -- placeholder
 
+-- Pre-regen proof at commit 750a3e6:SP1Chips/Constraints.lean -- allHold_constraints_iff_of_is_ld
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/Load/LoadDouble/Constraints.lean` for the full pre-regen proof body)
 lemma allHold_constraints_iff_of_is_ld (_ : is_ld Main)
     (_ : List.Forall SP1Constraint.toProp (constraints Main)) : True := trivial
 

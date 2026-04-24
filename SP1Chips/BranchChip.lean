@@ -44,6 +44,9 @@ noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
+-- Pre-regen proof at commit 750a3e6:SP1Chips/BranchChip.lean -- correct_beq
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/BranchChip.lean` for the full pre-regen proof body)
 theorem correct_beq
     (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
@@ -66,6 +69,9 @@ noncomputable def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
+-- Pre-regen proof at commit 750a3e6:SP1Chips/BranchChip.lean -- correct_bne
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/BranchChip.lean` for the full pre-regen proof body)
 theorem correct_bne
     (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
@@ -88,6 +94,9 @@ noncomputable def spec_blt (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
+-- Pre-regen proof at commit 750a3e6:SP1Chips/BranchChip.lean -- correct_blt
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/BranchChip.lean` for the full pre-regen proof body)
 theorem correct_blt
     (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
@@ -110,6 +119,9 @@ noncomputable def spec_bge (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
+-- Pre-regen proof at commit 750a3e6:SP1Chips/BranchChip.lean -- correct_bge
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/BranchChip.lean` for the full pre-regen proof body)
 theorem correct_bge
     (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
@@ -132,6 +144,9 @@ noncomputable def spec_bltu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
+-- Pre-regen proof at commit 750a3e6:SP1Chips/BranchChip.lean -- correct_bltu
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/BranchChip.lean` for the full pre-regen proof body)
 theorem correct_bltu
     (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)
@@ -154,6 +169,9 @@ noncomputable def spec_bgeu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
+-- Pre-regen proof at commit 750a3e6:SP1Chips/BranchChip.lean -- correct_bgeu
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/BranchChip.lean` for the full pre-regen proof body)
 theorem correct_bgeu
     (Main : Vector (Fin KB) 45)
     (s : SailState) (hs : s.isInitialized)

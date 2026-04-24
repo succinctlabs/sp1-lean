@@ -70,6 +70,9 @@ private lemma halfword_msb (a b : Fin KB)
 
 set_option maxHeartbeats 4000000 in
 -- correct_lw unfolds Load chip + Sail 4-byte memory read
+-- Pre-regen proof at commit 750a3e6:SP1Chips/LoadWordChip.lean -- correct_lw
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/LoadWordChip.lean` for the full pre-regen proof body)
 theorem correct_lw (Main : Vector (Fin KB) 44)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -94,6 +97,9 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
   sorry
 set_option maxHeartbeats 4000000 in
 -- correct_lwu unfolds Load chip + Sail 4-byte memory read
+-- Pre-regen proof at commit 750a3e6:SP1Chips/LoadWordChip.lean -- correct_lwu
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/LoadWordChip.lean` for the full pre-regen proof body)
 theorem correct_lwu (Main : Vector (Fin KB) 44)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)

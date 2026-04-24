@@ -30,6 +30,9 @@ def sp1_sb (Main : Vector (Fin KB) 44) : SailM ExecutionResult := do
     (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
   return RETIRE_SUCCESS
 
+-- Pre-regen proof at commit 750a3e6:SP1Chips/StoreWordChip.lean -- correct
+-- (not ported: constraint tree reshape requires rewalking the obtain chain;
+-- see `git show 750a3e6:SP1Chips/StoreWordChip.lean` for the full pre-regen proof body)
 theorem correct (Main : Vector (Fin KB) 44)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
