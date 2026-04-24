@@ -12,7 +12,6 @@ set_option maxHeartbeats 2000000 in
 lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
     (is_real = 0 ∨ is_real = 1) ∧
-    (cols.is_trusted = is_real) ∧
     (is_real = 0 → cols.imm_c = 0) ∧
     (¬is_real = 0 →
       Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
@@ -49,35 +48,22 @@ lemma allHold_constraints_iff :
   simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_def]
   intros h_is_real
   rcases h_is_real with h | h
-  · simp [h]
-    by_cases htrust : cols.is_trusted = 0
-    · simp [htrust]
-      by_cases ha0 : cols.op_a_0 = 0 <;> simp [ha0]
-      · intro himm_c
-        simp [himm_c]
-      · intro himm_c
-        simp [himm_c]
-    · simp [htrust]
-      intro h1 h2; exfalso
-      rcases h1 with h | h <;> [exact htrust h.symm; (rw [h2] at h; revert h; decide)]
-  · simp [h]
-    by_cases htrust : cols.is_trusted = 0
-    · simp [htrust]
-      intro h; exfalso; revert h; decide
-    · simp [htrust, ← @eq_comm _ cols.is_trusted, and_assoc]
-      intros
-      by_cases hop_a_0 : cols.op_a_0 = 0
-      · simp [hop_a_0]
-        aesop
-      · simp [hop_a_0]
-        aesop
+  · simp [h, and_assoc]
+    intros
+    by_cases ha0 : cols.op_a_0 = 0 <;> aesop
+  · simp [h, and_assoc]
+    intros
+    by_cases hop_a_0 : cols.op_a_0 = 0
+    · simp [hop_a_0]
+      aesop
+    · simp [hop_a_0]
+      aesop
 
 set_option maxHeartbeats 1000000 in
 
 -- is-real specialization of constraint iff
 lemma allHold_constraints_iff_is_real (h : is_real = 1) :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
-    (cols.is_trusted = is_real) ∧
     Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
     cols.op_a < 32 ∧
     cols.op_b < 65536 ∧

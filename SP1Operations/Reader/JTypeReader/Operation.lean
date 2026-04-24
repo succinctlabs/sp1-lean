@@ -7,4 +7,3 @@ structure JTypeReader where
   op_a_0 : Fin KB
   op_b_imm : Word (Fin KB)
   op_c_imm : Word (Fin KB)
-  is_trusted : Fin KB

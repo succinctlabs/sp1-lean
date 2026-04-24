@@ -10,7 +10,7 @@ open LeanRV64D.Functions BitVec
 namespace Sub
 
 variable
-  (Main : Vector (Fin KB) 34)
+  (Main : Vector (Fin KB) 33)
   (s : SailState)
 
 noncomputable def spec_sub (rs2 rs1 rd : regidx) : SailM Unit := do
@@ -27,13 +27,13 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
 def sp1_sub : SailM Unit := do
   let op_a := sp1_op_a Main --cstrs h_is_real
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 open Sail
 
 theorem correct_sub
   (cstrs : (constraints Main).allHold)
-  (h_is_real : Main[33] = 1)
+  (h_is_real : Main[32] = 1)
   (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
@@ -44,8 +44,8 @@ theorem correct_sub
     obtain ⟨sub_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     simp [RTypeReader.allHold_constraints_iff_is_real h_is_real,
-      Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-    obtain ⟨ _, trusted_instr_prop, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
+      Opcode.ofNat, Nat.ble] at reader_cstrs
+    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
     have h6 : Main[6] < 32 := by aesop
     have h14 : Main[14] < 32 := by aesop
     have h21 : Main[21] < 32 := by aesop
@@ -58,11 +58,12 @@ theorem correct_sub
     obtain ⟨ is_U64_val, is_sub ⟩ := sub_op_cstrs
     simp [BitVec.ofNatLT_eq_ofNat] at *
     -- Now the monadic manipulation
-    simp [spec_sub, sp1_sub, execute, execute_RTYPE']
+    simp [spec_sub, sp1_sub, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_b, read_op_b]
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
+    clear rest
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · rw [← is_sub]
       simp [Word.toBitVec64, Word.toNat]
