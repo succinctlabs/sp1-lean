@@ -11,14 +11,11 @@ namespace DivRem
 
 set_option linter.style.setOption false
 set_option maxHeartbeats 100000000
-set_option linter.constructorNameAsVariable false
 -- The chip's `correct_*` proofs drive an imbalanced goal tree via chained
 -- `apply ... at` / `specialize ... at` that operates on one focused case at a
 -- time. Rewriting each to `<;>` would flatten the tree but require goal-state
 -- reasoning the linter can't see; keep the existing structure.
 set_option linter.style.multiGoal false
--- Unused variables expected because many proofs are currently stopped.
-set_option linter.unusedVariables false
 
 variable (Main : Vector (Fin KB) 246)
 
@@ -1032,7 +1029,7 @@ lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
    := by
   intro cstrs
   have := allHold_constraints_alu_ops Main cstrs
-  obtain ⟨ alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops ⟩ := this
+  obtain ⟨alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops⟩ := this
   clear alu cstrs
   rw [KB_bool_to_le] at *
   split_ands <;> grind
@@ -1047,12 +1044,12 @@ lemma register_bounds :
       Main[6] < 32 ∧ Main[14] < 32 ∧ Main[21] < 32 ∧ Main[3] < 65536
     := by
   intro cstrs is_real
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
   apply allHold_constraints_alu_ops at cstrs
-  obtain ⟨ alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops ⟩ := cstrs
+  obtain ⟨alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops⟩ := cstrs
   simp_all only [DivRem.is_real, Fin.isValue, Nat.cast_ofNat]
   rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
-  obtain ⟨ h1, h2, h3, h4, h5, h6, h7, h8, rest ⟩ := alu; clear rest
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, rest⟩ := alu; clear rest
   simp_all
   rcases b_is_div; rcases b_is_divu; rcases b_is_rem; rcases b_is_remu
   rcases b_is_divw; rcases b_is_divuw; rcases b_is_remw; rcases b_is_remuw
@@ -1065,9 +1062,9 @@ lemma op_a_is_0 :
       Main[6] = 0 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 := by
   intro cstrs is_real is_zero
   apply allHold_constraints_alu_ops at cstrs
-  obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
+  obtain ⟨alu, rest⟩ := cstrs; clear rest; simp_all
   rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
-  obtain ⟨ h1, h2, h3, h4, h5, h6, h7, h8, h9 ⟩ := alu
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := alu
   simp_all
 
 lemma ops_U64_b_c :
@@ -1077,9 +1074,9 @@ lemma ops_U64_b_c :
       Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] := by
   intro cstrs is_real
   apply allHold_constraints_alu_ops at cstrs
-  obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
+  obtain ⟨alu, rest⟩ := cstrs; clear rest; simp_all
   rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
-  obtain ⟨ h1, h2, h3, h4, h5, b_imm, h7, h8 ⟩ := alu
+  obtain ⟨h1, h2, h3, h4, h5, b_imm, h7, h8⟩ := alu
   simp_all
 
 end entailed_constraints
@@ -1129,7 +1126,7 @@ lemma div_mod_decomposition_w {a b c : Fin KB} :
     simp [Fin.mul_def] at eq_a
     rw [Nat.mod_eq_of_lt (by omega)] at eq_a
     omega
-  · intro ⟨ eq_a, eq_c ⟩
+  · intro ⟨eq_a, eq_c⟩
     simp_all
     symm; rw [sub_eq_iff_eq_add]; symm
     rw [mul_comm, add_comm]
@@ -1147,7 +1144,7 @@ lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
   repeat rw [Int.natCast_natAbs] at *; repeat rw [Int.abs_cases] at *
   by_cases hb_split : 0 ≤ b
   · simp_all; intro heq; clear hmod1 hmod2
-    constructor <;> intro ⟨ h0, h1 ⟩
+    constructor <;> intro ⟨h0, h1⟩
     · simp_all
       by_cases hr_split : r = 0 <;> [ simp_all; right ]
       rw [Int.sign_eq_one_of_pos (by omega)]
@@ -1166,7 +1163,7 @@ lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
         symm at h_sign; rw [Int.sign_eq_neg_one_iff_neg] at h_sign
         omega
   · rw [hmod2 (by omega) hcnz]; simp_all; intro heq; clear hmod2
-    constructor <;> intro ⟨ h0, h1 ⟩
+    constructor <;> intro ⟨h0, h1⟩
     · constructor
       · by_cases hr_split : r = 0 <;> [ simp_all; skip ]
         rw [if_neg (by omega)]
@@ -1407,10 +1404,10 @@ lemma div_rem
   (w_eq_msb_quot : is_word = 1 → msb_quot = if 32768 ≤ q1 then 1 else 0)
   (abs_check : is_c_0 = 0 → arlt = if Word.toNat #v[ar0, ar1, ar2, ar3] < Word.toNat #v[is_c_0 + (1 - is_c_0) * ac0, (1 - is_c_0) * ac1, (1 - is_c_0) * ac2, (1 - is_c_0) * ac3] then 1 else 0) :
     is_div + is_rem = 1 →
-    ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRS
+    ⟨Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRS
       := by
     intro div_rem
-    obtain ⟨ z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw ⟩ : is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
+    obtain ⟨z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw⟩ : is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
       clear *- div_rem sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_div <;> rcases b_is_rem <;> simp_all
     simp [z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw, div_rem] at *
@@ -1444,7 +1441,7 @@ lemma div_rem
           simp
         · simp [nof] at *
           rw [if_neg]; rotate_left
-          · intro ⟨ h_eq_b, h_eq_c ⟩
+          · intro ⟨h_eq_b, h_eq_c⟩
             have : (#v[b0, b1, b2, b3] : Word (Fin KB)) = #v[0, 0, 0, 32768] := by
               rw [Word.eq_toInt_eq is_U64_b, h_eq_b]
               simp [Word.toInt, Word.isNegative, Word.toNat]
@@ -1460,7 +1457,7 @@ lemma div_rem
             suffices :
               Word.toInt #v[q0, q1, q2, q3] = (Word.toInt #v[b0, b1, b2, b3]).tdiv (Word.toInt #v[c0, c1, c2, c3]) ∧
               Word.toInt #v[r0, r1, r2, r3] = (Word.toInt #v[b0, b1, b2, b3]).tmod (Word.toInt #v[c0, c1, c2, c3])
-            · obtain ⟨ hdiv, hrem ⟩ := this
+            · obtain ⟨hdiv, hrem⟩ := this
               rw [← hdiv, ← hrem]
               simp [← BitVec.toInt_inj]
               rw [Word.toBitVec64_toInt is_U64_q, Word.toBitVec64_toInt is_U64_r]
@@ -1491,8 +1488,8 @@ lemma div_rem
                         eq_msb_b eq_msb_c eq_msb_rem r_neg_b_neg r_pos_b_pos
                         nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3 nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
                         main_mul_low main_mul_high
-                obtain ⟨ is_U64_ctql, ctq_low ⟩ := main_mul_low
-                obtain ⟨ is_U64_ctqh, ctq_high ⟩ := main_mul_high
+                obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
+                obtain ⟨is_U64_ctqh, ctq_high⟩ := main_mul_high
                 have ctq := combine_MUL_MULH is_U64_ctql is_U64_ctqh is_U64_q is_U64_c ctq_low ctq_high
                 simp at ctq
                 have eq_eb : (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535, msb_b * 65535, msb_b * 65535] : DWord (Fin KB)) = Word.extend #v[b0, b1, b2, b3] true := by
@@ -1572,9 +1569,9 @@ lemma div_rem
                   iterate 2 rw [if_neg (by omega)]
                   simpa
                 · simp [rem_nneg, c_neg] at *; simp_all
-                  obtain ⟨ _, heqz ⟩ := c_neg_sum_zero
+                  obtain ⟨_, heqz⟩ := c_neg_sum_zero
                   apply sum_zero_abs is_U64_c is_U64_ac (by rw [Word.isNegative_toInt is_U64_c]; assumption) at heqz
-                  obtain ⟨ hc_lb, hc_nlb ⟩ := heqz
+                  obtain ⟨hc_lb, hc_nlb⟩ := heqz
                   by_cases is_c_lb : Word.toInt #v[c0, c1, c2, c3] = -2 ^ 63
                   · rw [is_c_lb]; simp
                     simp [Word.toInt, Word.isNegative, Word.toNat]
@@ -1588,7 +1585,7 @@ lemma div_rem
                     rw [Word.isNegative_toInt is_U64_ac, is_c_lb']
                     simp
                 · simp [rem_neg, c_nneg] at *; simp_all
-                  obtain ⟨ _, heqz_rem ⟩ := rem_neg_sum_zero
+                  obtain ⟨_, heqz_rem⟩ := rem_neg_sum_zero
                   apply sum_zero_abs is_U64_r is_U64_ar (by rw [Word.isNegative_toInt is_U64_r]; assumption) at heqz_rem
                   simp [h_eq_nmax] at heqz_rem
                   by_cases is_rem_lb : Word.toInt #v[r0, r1, r2, r3] = Word.toInt #v[0, 0, 0, 32768] <;> simp_all
@@ -1606,8 +1603,8 @@ lemma div_rem
                     · simp [Word.isNegative_toInt is_U64_ar]
                       rw [heqz_rem]; simp
                 · simp [rem_neg, c_neg] at *; subst rnop0 rnop1 rnop2 rnop3 cnop0 cnop1 cnop2 cnop3
-                  obtain ⟨ _, heqz_c ⟩ := c_neg_sum_zero
-                  obtain ⟨ _, heqz_rem ⟩ := rem_neg_sum_zero
+                  obtain ⟨_, heqz_c⟩ := c_neg_sum_zero
+                  obtain ⟨_, heqz_rem⟩ := rem_neg_sum_zero
                   apply sum_zero_abs is_U64_c is_U64_ac (by rw [Word.isNegative_toInt is_U64_c]; assumption) at heqz_c
                   apply sum_zero_abs is_U64_r is_U64_ar (by rw [Word.isNegative_toInt is_U64_r]; assumption) at heqz_rem
                   simp [h_eq_nmax] at heqz_c heqz_rem
@@ -1670,8 +1667,8 @@ lemma spec.div :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).1
   := by
   intro cstrs h_is_real h_is_div
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_div] at h_is_div
   set a0 := Main[28]
@@ -1773,7 +1770,7 @@ lemma spec.div :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -1787,8 +1784,8 @@ lemma spec.div :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -1797,14 +1794,14 @@ lemma spec.div :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -1853,7 +1850,7 @@ lemma spec.div :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop1 h_is_div
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop1 h_is_div
     simp [h_is_div, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega
@@ -1881,8 +1878,8 @@ lemma spec.rem :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).2
   := by
   intro cstrs h_is_real h_is_rem
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_rem] at h_is_rem
   set a0 := Main[28]
@@ -1984,7 +1981,7 @@ lemma spec.rem :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -1998,8 +1995,8 @@ lemma spec.rem :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -2008,14 +2005,14 @@ lemma spec.rem :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -2064,7 +2061,7 @@ lemma spec.rem :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop3 h_is_rem
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop3 h_is_rem
     simp [h_is_rem, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega
@@ -2268,10 +2265,10 @@ lemma divu_remu
   (w_eq_msb_quot : is_word = 1 → msb_quot = if 32768 ≤ q1 then 1 else 0)
   (abs_check : is_c_0 = 0 → arlt = if Word.toNat #v[ar0, ar1, ar2, ar3] < Word.toNat #v[is_c_0 + (1 - is_c_0) * ac0, (1 - is_c_0) * ac1, (1 - is_c_0) * ac2, (1 - is_c_0) * ac3] then 1 else 0) :
     is_divu + is_remu = 1 →
-    ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRU
+    ⟨Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRU
       := by
     intro divu_remu
-    obtain ⟨ z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
+    obtain ⟨z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
       clear *- divu_remu sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divu <;> rcases b_is_remu <;> simp_all
     simp [z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw, divu_remu] at *
@@ -2298,7 +2295,7 @@ lemma divu_remu
         suffices :
           Word.toNat #v[q0, q1, q2, q3] = (((Word.toNat #v[b0, b1, b2, b3]) : ℤ).tdiv (Word.toNat #v[c0, c1, c2, c3])).toNat ∧
           Word.toNat #v[r0, r1, r2, r3] = (((Word.toNat #v[b0, b1, b2, b3]) : ℤ).tmod (Word.toNat #v[c0, c1, c2, c3])).toNat
-        · obtain ⟨ hdiv, hrem ⟩ := this
+        · obtain ⟨hdiv, hrem⟩ := this
           simp at hdiv; rw [← hdiv, ← hrem]
           simp [← BitVec.toNat_inj]
           rw [Word.toBitVec64_toNat is_U64_q, Word.toBitVec64_toNat is_U64_r]
@@ -2316,8 +2313,8 @@ lemma divu_remu
                   eq_msb_b eq_msb_c eq_msb_rem r_neg_b_neg r_pos_b_pos
                   nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3 nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
                   main_mul_low main_mul_high
-          obtain ⟨ is_U64_ctql, ctq_low ⟩ := main_mul_low
-          obtain ⟨ is_U64_ctqh, ctq_high ⟩ := main_mul_high
+          obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
+          obtain ⟨is_U64_ctqh, ctq_high⟩ := main_mul_high
           have ctq := combine_MUL_MULHU is_U64_ctql is_U64_ctqh is_U64_q is_U64_c ctq_low ctq_high
           simp at ctq
           have eq_eb : (#v[b0, b1, b2, b3, 0, 0, 0, 0] : DWord (Fin KB)) = Word.extend #v[b0, b1, b2, b3] false := by simp [Word.extend]
@@ -2373,29 +2370,29 @@ lemma divu_remu
             iterate 2 rw [DWord.toBitVec128_toNat (by apply DWord.isU128_of_cases <;> simp <;> omega)]
             simp [DWord.toNat]; ring_nf
             rcases b_cry3 with of | nof <;> subst cry3 <;> simp at *
-            · have : ctq4 = 0 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ _, h ⟩ := nof_eq_ctqpr4; clear h; grind
+            · have : ctq4 = 0 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨_, h⟩ := nof_eq_ctqpr4; clear h; grind
               subst ctq4; simp at *
               subst cry4; simp at *
-              have : ctq5 = 0 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨ _, h ⟩ := nof_eq_ctqpr5; clear h; grind
+              have : ctq5 = 0 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨_, h⟩ := nof_eq_ctqpr5; clear h; grind
               subst ctq5; simp at *
               subst cry5; simp at *
-              have : ctq6 = 0 := by clear *- nof_eq_ctqpr6 is_U64_ctqh; obtain ⟨ _, h ⟩ := nof_eq_ctqpr6; clear h; grind
+              have : ctq6 = 0 := by clear *- nof_eq_ctqpr6 is_U64_ctqh; obtain ⟨_, h⟩ := nof_eq_ctqpr6; clear h; grind
               subst ctq6; simp at *
               subst cry6; simp at *
-              have : ctq7 = 0 := by clear *- nof_eq_ctqpr7 is_U64_ctqh; obtain ⟨ _, h ⟩ := nof_eq_ctqpr7; clear h; grind
+              have : ctq7 = 0 := by clear *- nof_eq_ctqpr7 is_U64_ctqh; obtain ⟨_, h⟩ := nof_eq_ctqpr7; clear h; grind
               subst ctq7; simp at *
               subst cry7; simp at *
               omega
-            · have : ctq4 = 65535 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr4; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
+            · have : ctq4 = 65535 := by clear *- nof_eq_ctqpr4 is_U64_ctqh; obtain ⟨hlt, h⟩ := nof_eq_ctqpr4; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq4; simp at *
               subst cry4; simp at *
-              have : ctq5 = 65535 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr5; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
+              have : ctq5 = 65535 := by clear *- nof_eq_ctqpr5 is_U64_ctqh; obtain ⟨hlt, h⟩ := nof_eq_ctqpr5; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq5; simp at *
               subst cry5; simp at *
-              have : ctq6 = 65535 := by clear *- nof_eq_ctqpr6 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr6; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
+              have : ctq6 = 65535 := by clear *- nof_eq_ctqpr6 is_U64_ctqh; obtain ⟨hlt, h⟩ := nof_eq_ctqpr6; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq6; simp at *
               subst cry6; simp at *
-              have : ctq7 = 65535 := by clear *- nof_eq_ctqpr7 is_U64_ctqh; obtain ⟨ hlt, h ⟩ := nof_eq_ctqpr7; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
+              have : ctq7 = 65535 := by clear *- nof_eq_ctqpr7 is_U64_ctqh; obtain ⟨hlt, h⟩ := nof_eq_ctqpr7; clear h; simp [Fin.ext_iff, Fin.val_add] at *; rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)] at hlt; omega
               subst ctq7; simp at *
               subst cry7; simp at *
               omega
@@ -2407,8 +2404,8 @@ lemma spec.divu :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).1
   := by
   intro cstrs h_is_real h_is_divu
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divu] at h_is_divu
   set a0 := Main[28]
@@ -2510,7 +2507,7 @@ lemma spec.divu :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -2524,8 +2521,8 @@ lemma spec.divu :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -2534,14 +2531,14 @@ lemma spec.divu :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -2590,7 +2587,7 @@ lemma spec.divu :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop2 h_is_divu
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop2 h_is_divu
     simp [h_is_divu, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega
@@ -2618,8 +2615,8 @@ lemma spec.remu :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).2
   := by
   intro cstrs h_is_real h_is_remu
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remu] at h_is_remu
   set a0 := Main[28]
@@ -2721,7 +2718,7 @@ lemma spec.remu :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -2735,8 +2732,8 @@ lemma spec.remu :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -2745,14 +2742,14 @@ lemma spec.remu :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -2801,7 +2798,7 @@ lemma spec.remu :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop4 h_is_remu
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop4 h_is_remu
     simp [h_is_remu, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega
@@ -3005,10 +3002,10 @@ lemma divw_remw
   (w_eq_msb_quot : is_word = 1 → msb_quot = if 32768 ≤ q1 then 1 else 0)
   (abs_check : is_c_0 = 0 → arlt = if Word.toNat #v[ar0, ar1, ar2, ar3] < Word.toNat #v[is_c_0 + (1 - is_c_0) * ac0, (1 - is_c_0) * ac1, (1 - is_c_0) * ac2, (1 - is_c_0) * ac3] then 1 else 0) :
     is_divw + is_remw = 1 →
-    ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWS
+    ⟨Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWS
       := by
     intro divw_remw
-    obtain ⟨ z_div, z_rem, z_divu, z_remu, z_divuw, z_remuw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
+    obtain ⟨z_div, z_rem, z_divu, z_remu, z_divuw, z_remuw⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
       clear *- divw_remw sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divw <;> rcases b_is_remw <;> simp_all
     simp [z_div, z_rem, z_divu, z_remu, z_divuw, z_remuw, divw_remw] at *
@@ -3055,7 +3052,7 @@ lemma divw_remw
           simp
         · simp [nof] at *
           rw [if_neg]; rotate_left
-          · intro ⟨ h_eq_b, h_eq_c ⟩
+          · intro ⟨h_eq_b, h_eq_c⟩
             have : (#v[b0, b1] : HWord (Fin KB)) = #v[0, 32768] := by
               rw [HWord.eq_toInt_eq is_U32_bl, h_eq_b]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
@@ -3074,7 +3071,7 @@ lemma divw_remw
             suffices :
               HWord.toInt #v[q0, q1] = (HWord.toInt #v[b0, b1]).tdiv (HWord.toInt #v[c0, c1]) ∧
               HWord.toInt #v[r0, r1] = (HWord.toInt #v[b0, b1]).tmod (HWord.toInt #v[c0, c1])
-            · obtain ⟨ hdiv, hrem ⟩ := this
+            · obtain ⟨hdiv, hrem⟩ := this
               rw [← hdiv, ← hrem]
               simp [← BitVec.toInt_inj]
               repeat rw [BitVec.toInt_signExtend_of_le (by simp)]
@@ -3105,7 +3102,7 @@ lemma divw_remw
                          w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot r_neg_b_neg r_pos_b_pos
                          nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
                          main_mul_low main_mul_high lb_b ub_b lb_c ub_c lb_q ub_q lb_r ub_r
-                obtain ⟨ is_U64_ctql, ctq_low ⟩ := main_mul_low
+                obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
                 have eq_eb : (#v[b0, b1, msb_b * 65535, msb_b * 65535] : Word (Fin KB)) = HWord.extend #v[b0, b1] true := by simp [HWord.extend, HWord.isNegative, w_eq_msb_b]
                 have eq_er : (#v[r0, r1, msb_rem * 65535, msb_rem * 65535] : Word (Fin KB)) = HWord.extend #v[r0, r1] true := by simp [HWord.extend, HWord.isNegative, w_eq_msb_rem]
                 suffices bv_ctqr:
@@ -3189,9 +3186,9 @@ lemma divw_remw
                 · simp [rem_nneg, c_neg] at *
                   subst ar0 ar1 ar2 ar3 cnop0 cnop1 cnop2 cnop3
                   simp at *
-                  obtain ⟨ _, heqz ⟩ := c_neg_sum_zero
+                  obtain ⟨_, heqz⟩ := c_neg_sum_zero
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz
-                  obtain ⟨ hc_lb, hc_nlb ⟩ := heqz
+                  obtain ⟨hc_lb, hc_nlb⟩ := heqz
                   have : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
@@ -3210,9 +3207,9 @@ lemma divw_remw
                 · simp [rem_neg, c_nneg] at *
                   subst ac0 ac1 ac2 ac3 rnop0 rnop1 rnop2 rnop3
                   simp at *
-                  obtain ⟨ _, heqz ⟩ := rem_neg_sum_zero
+                  obtain ⟨_, heqz⟩ := rem_neg_sum_zero
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz
-                  obtain ⟨ hr_lb, hr_nlb ⟩ := heqz
+                  obtain ⟨hr_lb, hr_nlb⟩ := heqz
                   have : Word.toInt #v[r0, r1, 65535, 65535] = HWord.toInt #v[r0, r1] := by
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
@@ -3230,8 +3227,8 @@ lemma divw_remw
                     · rw [Word.isNegative_toInt is_U64_ar]; simp_all
                 · simp [rem_neg, c_neg] at *
                   subst rnop0 rnop1 rnop2 rnop3 cnop0 cnop1 cnop2 cnop3
-                  obtain ⟨ _, heqz_c ⟩ := c_neg_sum_zero
-                  obtain ⟨ _, heqz_rem ⟩ := rem_neg_sum_zero
+                  obtain ⟨_, heqz_c⟩ := c_neg_sum_zero
+                  obtain ⟨_, heqz_rem⟩ := rem_neg_sum_zero
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz_c
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz_rem
                   have eqc : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
@@ -3249,8 +3246,8 @@ lemma divw_remw
                   · by_contra; clear *- lb_c ub_c is_c_lb; omega
                   · by_cases is_r_lb : HWord.toInt #v[r0, r1] = -2 ^ 63
                     · by_contra; clear *- lb_r ub_r is_r_lb; omega
-                    · obtain ⟨ hc_lb, hc_nlb ⟩ := heqz_c
-                      obtain ⟨ hr_lb, hr_nlb ⟩ := heqz_rem
+                    · obtain ⟨hc_lb, hc_nlb⟩ := heqz_c
+                      obtain ⟨hr_lb, hr_nlb⟩ := heqz_rem
                       clear hc_lb hr_lb
                       specialize hc_nlb is_c_lb; specialize hr_nlb is_r_lb
                       rw [← hc_nlb, ← hr_nlb]; simp [Word.toInt]
@@ -3294,8 +3291,8 @@ lemma spec.divw :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).1
   := by
   intro cstrs h_is_real h_is_divw
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divw] at h_is_divw
   set a0 := Main[28]
@@ -3397,7 +3394,7 @@ lemma spec.divw :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -3411,8 +3408,8 @@ lemma spec.divw :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -3421,14 +3418,14 @@ lemma spec.divw :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -3477,7 +3474,7 @@ lemma spec.divw :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop5 h_is_divw
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop5 h_is_divw
     simp [h_is_divw, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega
@@ -3505,8 +3502,8 @@ lemma spec.remw :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).2
   := by
   intro cstrs h_is_real h_is_remw
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remw] at h_is_remw
   set a0 := Main[28]
@@ -3608,7 +3605,7 @@ lemma spec.remw :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -3622,8 +3619,8 @@ lemma spec.remw :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -3632,14 +3629,14 @@ lemma spec.remw :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -3688,7 +3685,7 @@ lemma spec.remw :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop6 h_is_remw
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop6 h_is_remw
     simp [h_is_remw, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega
@@ -3892,10 +3889,10 @@ lemma divuw_remuw
   (w_eq_msb_quot : is_word = 1 → msb_quot = if 32768 ≤ q1 then 1 else 0)
   (abs_check : is_c_0 = 0 → arlt = if Word.toNat #v[ar0, ar1, ar2, ar3] < Word.toNat #v[is_c_0 + (1 - is_c_0) * ac0, (1 - is_c_0) * ac1, (1 - is_c_0) * ac2, (1 - is_c_0) * ac3] then 1 else 0) :
     is_divuw + is_remuw = 1 →
-    ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWU
+    ⟨Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWU
       := by
     intro divuw_remuw
-    obtain ⟨ z_div, z_rem, z_divu, z_remu, z_divw, z_remw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 := by
+    obtain ⟨z_div, z_rem, z_divu, z_remu, z_divw, z_remw⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 := by
       clear *- divuw_remuw sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divuw <;> rcases b_is_remuw <;> simp_all
     simp [z_div, z_rem, z_divu, z_remu, z_divw, z_remw, divuw_remuw] at *
@@ -3931,7 +3928,7 @@ lemma divuw_remuw
           suffices :
             HWord.toNat #v[q0, q1] = (((HWord.toNat #v[b0, b1]) : ℤ).tdiv (HWord.toNat #v[c0, c1])).toNat ∧
             HWord.toNat #v[r0, r1] = (((HWord.toNat #v[b0, b1]) : ℤ).tmod (HWord.toNat #v[c0, c1])).toNat
-          · obtain ⟨ hdiv, hrem ⟩ := this
+          · obtain ⟨hdiv, hrem⟩ := this
             simp at hdiv; rw [← hdiv, ← hrem]
             simp [← BitVec.toNat_inj]
             rw [HWord.toBitVec32_toNat is_U32_q, HWord.toBitVec32_toNat is_U32_r]
@@ -3949,7 +3946,7 @@ lemma divuw_remuw
                      eq_msb_b eq_msb_c eq_msb_rem r_neg_b_neg r_pos_b_pos
                      nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
                      main_mul_low
-            obtain ⟨ is_U64_ctql, ctq_low ⟩ := main_mul_low
+            obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
             have eq_eb : (#v[b0, b1, 0, 0] : Word (Fin KB)) = HWord.extend #v[b0, b1] false := by simp [HWord.extend]
             have eq_er : (#v[r0, r1, 0, 0] : Word (Fin KB)) = HWord.extend #v[r0, r1] false := by simp [HWord.extend]
             suffices bv_ctqr:
@@ -4007,8 +4004,8 @@ lemma spec.divuw :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).1
   := by
   intro cstrs h_is_real h_is_divuw
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divuw] at h_is_divuw
   set a0 := Main[28]
@@ -4110,7 +4107,7 @@ lemma spec.divuw :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -4124,8 +4121,8 @@ lemma spec.divuw :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -4134,14 +4131,14 @@ lemma spec.divuw :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -4190,7 +4187,7 @@ lemma spec.divuw :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop7 h_is_divuw
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop7 h_is_divuw
     simp [h_is_divuw, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega
@@ -4218,8 +4215,8 @@ lemma spec.remuw :
       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).2
   := by
   intro cstrs h_is_real h_is_remuw
-  have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
-  have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remuw] at h_is_remuw
   set a0 := Main[28]
@@ -4321,7 +4318,7 @@ lemma spec.remuw :
   set abs_rem_alu_event := Main[243]
   set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
-  obtain ⟨ main_mul_low, main_mul_high,
+  obtain ⟨main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
            div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
            eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
@@ -4335,8 +4332,8 @@ lemma spec.remuw :
            nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
            nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
            u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3, u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
-           rest2 ⟩ := cstrs
-  obtain ⟨ eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
            r_neg_b_neg, r_pos_b_pos,
            c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
            cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
@@ -4345,14 +4342,14 @@ lemma spec.remuw :
            eq_abs_c_alu_event, eq_abs_rem_alu_event,
            eq_maco10, eq_maco11, eq_maco12, eq_maco13,
            eq_rcm, eq_arlt,
-           rest3 ⟩ := rest2
-  obtain ⟨ u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
            b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
-           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4 ⟩ := rest3
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3, u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -4401,7 +4398,7 @@ lemma spec.remuw :
   simp only [eq_is_word] at *
   specialize this div_zero c_neg_sum_zero rem_neg_sum_zero main_mul_low main_mul_high overflow_b overflow_c eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
-    obtain ⟨ z0, z1, z2, z3, z4, z5, z6 ⟩ := sop8 h_is_remuw
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop8 h_is_remuw
     simp [h_is_remuw, z0, z1, z2, z3, z4, z5, z6] at *
   · rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3]
   · apply Word.isU64_of_cases <;> simp <;> omega

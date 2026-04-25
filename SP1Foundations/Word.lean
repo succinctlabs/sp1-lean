@@ -251,7 +251,7 @@ lemma eq_toNat_eq {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : W
 
 lemma toNat_reconstruct {w : Word (Fin KB)} {x : ℕ} (is64_w : Word.isU64 w) :
   w.toNat = x →
-    w = #v[⟨x % 65536, by omega⟩, ⟨ x / 65536 % 65536, by omega ⟩, ⟨ x / 4294967296 % 65536, by omega ⟩, ⟨ x / 281474976710656 % 65536, by omega ⟩ ] := by
+    w = #v[⟨x % 65536, by omega⟩, ⟨x / 65536 % 65536, by omega⟩, ⟨x / 4294967296 % 65536, by omega⟩, ⟨x / 281474976710656 % 65536, by omega⟩ ] := by
   intro toNat; rw [← toNat]; clear toNat
   apply Word.lt_cases_of_isU64 at is64_w
   rw [← Word.eq_pointwise]
@@ -293,7 +293,7 @@ lemma low_toNat (hw : HWord.isU32 #v[b0, b1]) : (Word.toBitVec64 #v[b0, b1, 0, 0
 lemma setWidth_eq_low {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     BitVec.setWidth 32 w.toBitVec64 = w.low.toBitVec32
   := by
-    have ⟨ _, _, _, _ ⟩ := lt_cases_of_isU64 h_w_isU64
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64 h_w_isU64
     simp [toBitVec64, ← BitVec.toNat_inj, low, Word.toNat, HWord.toBitVec32, HWord.toNat]
     omega
 
@@ -305,7 +305,7 @@ lemma isU64_high_isU32 {w : Word (Fin KB)} (hw : w.isU64) : w.high.isU32 := by a
 lemma setWidth_rshift_eq_high {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     BitVec.setWidth 32 (w.toBitVec64 >>> 32) = w.high.toBitVec32
   := by
-    have ⟨ _, _, _, _ ⟩ := lt_cases_of_isU64 h_w_isU64
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64 h_w_isU64
     simp_all [toBitVec64, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow, high, Word.toNat, HWord.toBitVec32, HWord.toNat]
     omega
 
@@ -368,7 +368,7 @@ lemma isNegative_toInt {w : Word (Fin KB)} (is64_w : Word.isU64 w) :
 
 lemma toInt_nneg_reconstruct {w : Word (Fin KB)} {x : ℤ} (is64_w : Word.isU64 w) (nneg : 0 ≤ x) :
   w.toInt = x →
-    w = #v[⟨x.toNat % 65536, by omega⟩, ⟨ x.toNat / 65536 % 65536, by omega ⟩, ⟨ x.toNat / 4294967296 % 65536, by omega ⟩, ⟨ x.toNat / 281474976710656 % 65536, by omega ⟩ ] := by
+    w = #v[⟨x.toNat % 65536, by omega⟩, ⟨x.toNat / 65536 % 65536, by omega⟩, ⟨x.toNat / 4294967296 % 65536, by omega⟩, ⟨x.toNat / 281474976710656 % 65536, by omega⟩ ] := by
   intro toInt; rw [← toInt]
   have nneg : ¬ w.isNegative := by rw [isNegative_toInt is64_w]; omega
   apply Word.lt_cases_of_isU64 at is64_w
@@ -481,7 +481,7 @@ lemma isU128_low_isU64 {w : DWord (Fin KB)} (hw : w.isU128) : w.low.isU64 := by 
 lemma setWidth_eq_low {w : DWord (Fin KB)} (h_w_isU64 : w.isU128) :
     BitVec.setWidth 64 w.toBitVec128 = w.low.toBitVec64
   := by
-    have ⟨ _, _, _, _, _, _, _, _ ⟩ := lt_cases_of_isU128 h_w_isU64
+    have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU128 h_w_isU64
     simp [toBitVec128, ← BitVec.toNat_inj, low, DWord.toNat, Word.toBitVec64, Word.toNat]
     omega
 
@@ -493,7 +493,7 @@ lemma isU128_high_isU32 {w : DWord (Fin KB)} (hw : w.isU128) : w.high.isU64 := b
 lemma setWidth_rshift_eq_high {w : DWord (Fin KB)} (h_w_isU128 : w.isU128) :
     BitVec.setWidth 64 (w.toBitVec128 >>> 64) = w.high.toBitVec64
   := by
-    have ⟨ _, _, _, _, _, _, _, _ ⟩ := lt_cases_of_isU128 h_w_isU128
+    have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU128 h_w_isU128
     simp_all [toBitVec128, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow, high, DWord.toNat, Word.toBitVec64, Word.toNat]
     omega
 
@@ -789,7 +789,7 @@ lemma isU64_low_isU32 {w : BWord (Fin KB)} (hw : w.isU64) : w.low.isU32 := by ae
 lemma setWidth_eq_low {w : BWord (Fin KB)} (h_w_isU64 : w.isU64) :
     BitVec.setWidth 32 w.toBitVec64 = w.low.toBitVec32
   := by
-    have ⟨ _, _, _, _ ⟩ := lt_cases_of_isU64 h_w_isU64
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64 h_w_isU64
     simp [toBitVec64, ← BitVec.toNat_inj, low, BWord.toNat, BHWord.toBitVec32, BHWord.toNat]
     omega
 
@@ -801,7 +801,7 @@ lemma isU64_high_isU32 {w : BWord (Fin KB)} (hw : w.isU64) : w.high.isU32 := by 
 lemma setWidth_rshift_eq_high {w : BWord (Fin KB)} (h_w_isU64 : w.isU64) :
     BitVec.setWidth 32 (w.toBitVec64 >>> 32) = w.high.toBitVec32
   := by
-    have ⟨ _, _, _, _ ⟩ := lt_cases_of_isU64 h_w_isU64
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64 h_w_isU64
     simp_all [toBitVec64, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow, high, BWord.toNat, BHWord.toBitVec32, BHWord.toNat]
     omega
 
@@ -940,14 +940,14 @@ lemma toBitVec128_toInt {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
 
 lemma low_as_extract {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
   (w.low).toBitVec64 = BitVec.extractLsb 63 0 (w.toBitVec128) := by
-  have ⟨ w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15 ⟩ := lt_cases_of_isU128 h_w_isU128
+  have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ := lt_cases_of_isU128 h_w_isU128
   simp [BDWord.low, BWord.toBitVec64, BDWord.toBitVec128]
   simp [← BitVec.toNat_inj, BWord.toNat, BDWord.toNat]
   omega
 
 lemma high_as_extract {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
   (w.high).toBitVec64 = BitVec.extractLsb 127 64 (w.toBitVec128) := by
-  have ⟨ w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15 ⟩ := lt_cases_of_isU128 h_w_isU128
+  have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ := lt_cases_of_isU128 h_w_isU128
   simp [BDWord.high, BWord.toBitVec64, BDWord.toBitVec128]
   simp [← BitVec.toNat_inj, BWord.toNat, BDWord.toNat]
   omega
@@ -1606,7 +1606,7 @@ end getByte
 section cross_product
 
 def cp {n : ℕ} (a b : Vector (Fin KB) n) (k : ℕ) (hk : k < n) : Fin KB :=
-  let product := ((Vector.ofFn (fun i => a.get ⟨ i.val, by omega ⟩ * b.get ⟨k - i.val, by
+  let product := ((Vector.ofFn (fun i => a.get ⟨i.val, by omega⟩ * b.get ⟨k - i.val, by
                      have h : i.val < (k + 1) := i.isLt
                      omega⟩)) : Vector (Fin KB) (k + 1)).toList
   product.foldl (· + ·) 0

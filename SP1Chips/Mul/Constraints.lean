@@ -4,9 +4,6 @@ import SP1Operations.Reader.RTypeReader
 
 namespace Mul
 
--- Imbalanced goal tree: proof applies tactics per-focused-case.
-set_option linter.style.multiGoal false
-
 variable (Main : Vector (Fin KB) 82)
 def is_real : Prop := Main[77] = 1 ∨ Main[78] = 1 ∨ Main[79] = 1 ∨ Main[80] = 1 ∨ Main[81] = 1
 
@@ -127,7 +124,7 @@ lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
    := by
   intro cstrs
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
+  obtain ⟨h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest⟩ := cstrs
   clear h_mop cpu alu
   aesop
 
@@ -145,32 +142,34 @@ end is_real
 
 section entailed_constraints
 
+set_option linter.style.multiGoal false in
 lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   Main[6] < 32 ∧ Main[14] < 32 ∧ (Main[30] = 0 → Main[21] < 32) ∧ Main[3] < 65536
     := by
   intro cstrs real
-  have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
+  have ⟨sop1, sop2, sop3, sop4, sop5⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
+  obtain ⟨h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest⟩ := cstrs
   clear h_mop cpu rest
   rw [RTypeReader.allHold_constraints_iff_is_real] at alu
   simp only at alu
-  · obtain ⟨ h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+  · obtain ⟨h1, h2, h3, h4, h5, b_imm, h7, h8, h9⟩ := alu
     rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all [Opcode.ofNat, Nat.ble]
   · clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
+set_option linter.style.multiGoal false in
 lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   (Main[6] = 0 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0) := by
   intro cstrs real
-  have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
+  have ⟨sop1, sop2, sop3, sop4, sop5⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
+  obtain ⟨h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest⟩ := cstrs
   clear h_mop cpu rest
   rw [RTypeReader.allHold_constraints_iff_is_real] at alu
   simp only at alu
-  · obtain ⟨ h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+  · obtain ⟨h1, h2, h3, h4, h5, b_imm, h7, h8, h9⟩ := alu
     intro hm6; simp_all
   · clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
@@ -178,13 +177,13 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
   Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] := by
   intro cstrs real
-  have ⟨ sop1, sop2, sop3, sop4, sop5 ⟩ := single_op Main cstrs
+  have ⟨sop1, sop2, sop3, sop4, sop5⟩ := single_op Main cstrs
   simp [is_real] at real
   simp [allHold_constraints_iff] at cstrs
-  obtain ⟨ h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest ⟩ := cstrs
+  obtain ⟨h_mop, cpu, alu, b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, rest⟩ := cstrs
   clear h_mop cpu rest
   rw [RTypeReader.allHold_constraints_iff_is_real] at alu
-  · obtain ⟨ h1, h2, h3, h4, h5, b_imm, h7, h8, h9 ⟩ := alu
+  · obtain ⟨h1, h2, h3, h4, h5, b_imm, h7, h8, h9⟩ := alu
     simp_all
   · clear alu; rcases real with mul | mulh | mulhu | mulhsu | mulw <;> simp_all
 
@@ -225,13 +224,13 @@ lemma spec.mul (h : is_mul Main) :
     Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MUL
   := by
     intro cstrs
-    obtain ⟨ eq_mul, eq_imm ⟩ := h
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mul_real Main eq_mul)
-    obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
+    obtain ⟨eq_mul, eq_imm⟩ := h
+    have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs (mul_real Main eq_mul)
+    obtain ⟨sop_1, sop_2, sop_3, sop_4, sop_5⟩ := single_op Main cstrs
     simp [allHold_constraints_iff] at cstrs
-    obtain ⟨ h_mop, rest ⟩ := cstrs
+    obtain ⟨h_mop, rest⟩ := cstrs
     simp_all
-    have ⟨ _, spec ⟩ := MulOperation.spec.mul is_U64_b is_U64_c h_mop (by simp)
+    have ⟨_, spec⟩ := MulOperation.spec.mul is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mul
@@ -243,13 +242,13 @@ lemma spec.mulh (h : is_mulh Main) :
     Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULH
   := by
     intro cstrs
-    obtain ⟨ eq_mulh, eq_imm ⟩ := h
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulh_real Main eq_mulh)
-    obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
+    obtain ⟨eq_mulh, eq_imm⟩ := h
+    have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs (mulh_real Main eq_mulh)
+    obtain ⟨sop_1, sop_2, sop_3, sop_4, sop_5⟩ := single_op Main cstrs
     simp [allHold_constraints_iff] at cstrs
-    obtain ⟨ h_mop, rest ⟩ := cstrs
+    obtain ⟨h_mop, rest⟩ := cstrs
     simp_all
-    have ⟨ _, spec ⟩ := MulOperation.spec.mulh is_U64_b is_U64_c h_mop (by simp)
+    have ⟨_, spec⟩ := MulOperation.spec.mulh is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mulh
@@ -261,13 +260,13 @@ lemma spec.mulhu (h : is_mulhu Main) :
     Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULHU
   := by
     intro cstrs
-    obtain ⟨ eq_mulhu, eq_imm ⟩ := h
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhu_real Main eq_mulhu)
-    obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
+    obtain ⟨eq_mulhu, eq_imm⟩ := h
+    have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs (mulhu_real Main eq_mulhu)
+    obtain ⟨sop_1, sop_2, sop_3, sop_4, sop_5⟩ := single_op Main cstrs
     simp [allHold_constraints_iff] at cstrs
-    obtain ⟨ h_mop, rest ⟩ := cstrs
+    obtain ⟨h_mop, rest⟩ := cstrs
     simp_all
-    have ⟨ _, spec ⟩ := MulOperation.spec.mulhu is_U64_b is_U64_c h_mop (by simp)
+    have ⟨_, spec⟩ := MulOperation.spec.mulhu is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mulhu
@@ -279,13 +278,13 @@ lemma spec.mulhsu (h : is_mulhsu Main) :
     Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = execute_MUL_pure_bw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]) .MULHSU
   := by
     intro cstrs
-    obtain ⟨ eq_mulhsu, eq_imm ⟩ := h
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhsu_real Main eq_mulhsu)
-    obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
+    obtain ⟨eq_mulhsu, eq_imm⟩ := h
+    have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs (mulhsu_real Main eq_mulhsu)
+    obtain ⟨sop_1, sop_2, sop_3, sop_4, sop_5⟩ := single_op Main cstrs
     simp [allHold_constraints_iff] at cstrs
-    obtain ⟨ h_mop, rest ⟩ := cstrs
+    obtain ⟨h_mop, rest⟩ := cstrs
     simp_all
-    have ⟨ _, spec ⟩ := MulOperation.spec.mulhsu is_U64_b is_U64_c h_mop (by simp)
+    have ⟨_, spec⟩ := MulOperation.spec.mulhsu is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MUL_pure_bv_to_bw _ _ _ is_U64_b is_U64_c]
 
 end mulhsu
@@ -297,13 +296,13 @@ lemma spec.mulw (h : is_mulw Main) :
     Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = execute_MULW_pure_bhw (Word.toBWord #v[Main[15], Main[16], Main[17], Main[18]]).low (Word.toBWord #v[Main[22], Main[23], Main[24], Main[25]]).low
   := by
     intro cstrs
-    obtain ⟨ eq_mulw, eq_imm ⟩ := h
-    have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulw_real Main eq_mulw)
-    obtain ⟨ sop_1, sop_2, sop_3, sop_4, sop_5 ⟩ := single_op Main cstrs
+    obtain ⟨eq_mulw, eq_imm⟩ := h
+    have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs (mulw_real Main eq_mulw)
+    obtain ⟨sop_1, sop_2, sop_3, sop_4, sop_5⟩ := single_op Main cstrs
     simp [allHold_constraints_iff] at cstrs
-    obtain ⟨ h_mop, rest ⟩ := cstrs
+    obtain ⟨h_mop, rest⟩ := cstrs
     simp_all
-    have ⟨ _, spec ⟩ := MulOperation.spec.mulw is_U64_b is_U64_c h_mop (by simp)
+    have ⟨_, spec⟩ := MulOperation.spec.mulw is_U64_b is_U64_c h_mop (by simp)
     rw [spec, exec_MULW_pure_bv_to_bhw _ _ is_U64_b is_U64_c]
 
 end mulw

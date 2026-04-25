@@ -638,7 +638,7 @@ def rop_of_sop (op : sop) : rop :=
   | .SRAI => .SRA
 
 @[simp] def execute_SHIFTIOP_pure_w (op1 : Word (Fin KB)) (shamt : BitVec 6) (op : sop) :=
-  let shamtBB : Fin KB := ⟨ shamt.toNat, by omega ⟩
+  let shamtBB : Fin KB := ⟨shamt.toNat, by omega⟩
   execute_RTYPE_pure_w op1 #v[shamtBB, 0, 0, 0] (rop_of_sop op)
 
 def execute_SHIFTIOP_pure (op1 : BitVec 64) (shamt : BitVec 6) (op : sop) :=
@@ -649,10 +649,10 @@ lemma exec_SHIFTIOP_pure_bv_to_w (op1 : Word (Fin KB)) (shamt : BitVec 6) (op : 
   op1.isU64 →
   execute_SHIFTIOP_pure op1.toBitVec64 shamt op = execute_SHIFTIOP_pure_w op1 shamt op := by
   intro h_op1_isU64
-  have h_op2_isU64 : Word.isU64 #v[ ⟨ shamt.toNat, by omega ⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
+  have h_op2_isU64 : Word.isU64 #v[ ⟨shamt.toNat, by omega⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
   simp only [execute_SHIFTIOP_pure_w, execute_SHIFTIOP_pure]
   rw [← exec_RTYPE_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
-  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨ shamt.toNat, by omega ⟩, 0, 0, 0]
+  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨shamt.toNat, by omega⟩, 0, 0, 0]
   · rw [this]
   · rw [← BitVec.toNat_inj]
     rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
@@ -684,7 +684,7 @@ def ropw_of_sopw (op : sopw) : ropw :=
   | .SRAIW => .SRAW
 
 @[simp] def execute_SHIFTIWOP_pure_w (op1 : Word (Fin KB)) (shamt : BitVec 5) (op : sopw) :=
-  let shamtBB : Fin KB := ⟨ shamt.toNat, by omega ⟩
+  let shamtBB : Fin KB := ⟨shamt.toNat, by omega⟩
   execute_RTYPEW_pure_w op1 #v[shamtBB, 0, 0, 0] (ropw_of_sopw op)
 
 def execute_SHIFTIWOP_pure (op1 : BitVec 64) (shamt : BitVec 5) (op : sopw) :=
@@ -695,10 +695,10 @@ lemma exec_SHIFTIWOP_pure_bv_to_w (op1 : Word (Fin KB)) (shamt : BitVec 5) (op :
   op1.isU64 →
   execute_SHIFTIWOP_pure op1.toBitVec64 shamt op = execute_SHIFTIWOP_pure_w op1 shamt op := by
   intro h_op1_isU64
-  have h_op2_isU64 : Word.isU64 #v[ ⟨ shamt.toNat, by omega ⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
+  have h_op2_isU64 : Word.isU64 #v[ ⟨shamt.toNat, by omega⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
   simp only [execute_SHIFTIWOP_pure_w, execute_SHIFTIWOP_pure]
   rw [← exec_RTYPEW_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
-  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨ shamt.toNat, by omega ⟩, 0, 0, 0]
+  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨shamt.toNat, by omega⟩, 0, 0, 0]
   · rw [this]
   · rw [← BitVec.toNat_inj]
     rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
@@ -827,7 +827,7 @@ lemma execute_MUL'_eq_execute_MUL :
   have bounds_toInt_64 : forall (bv : BitVec 64), -2^63 ≤ bv.toInt ∧ bv.toInt < 2^63 := by
     simp [BitVec.toInt]; intros; split_ifs <;> omega
   have bounds_toNat_64 : forall (bv : BitVec 64), 0 ≤ bv.toNat ∧ bv.toNat < 2^64 := by omega
-  rcases op with ⟨ high, sgn1, sgn2 ⟩
+  rcases op with ⟨high, sgn1, sgn2⟩
   rcases sgn2 with sgn2 | sgn2 <;> rcases sgn1 with sgn1 | sgn1 <;> rcases high with high | high
   all_goals
     simp_all [execute_MUL', execute_MUL, execute_MUL_pure, mult_to_bits_half, BitVec.extend, mop_of_mul_op, LeanRV64D.Functions.xlen, to_bits_truncate, Sail.get_slice_int]
@@ -948,13 +948,13 @@ def execute_DIV_REM_pure_int (op1 : BitVec 64) (op2 : BitVec 64) (op : drop) : �
                  if nop1 = -2^63 && nop2 = -1 then -2^63 else
                    Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
-      ⟨ q, r ⟩
+      ⟨q, r⟩
   | .DRU =>
       let nop1 : ℤ := BitVec.toNat op1
       let nop2 : ℤ := BitVec.toNat op2
       let q := if nop2 = 0 then 2^64 - 1 else Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
-      ⟨ q, r ⟩
+      ⟨q, r⟩
   | .DRWS =>
       let nop1 := BitVec.toInt (BitVec.extractLsb 31 0 op1)
       let nop2 := BitVec.toInt (BitVec.extractLsb 31 0 op2)
@@ -962,46 +962,46 @@ def execute_DIV_REM_pure_int (op1 : BitVec 64) (op2 : BitVec 64) (op : drop) : �
                  if nop1 = -2^31 && nop2 = -1 then -2^31 else
                    Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
-      ⟨ q, r ⟩
+      ⟨q, r⟩
   | .DRWU =>
       let nop1 : ℤ := BitVec.toNat (BitVec.extractLsb 31 0 op1)
       let nop2 : ℤ := BitVec.toNat (BitVec.extractLsb 31 0 op2)
       let q := if nop2 = 0 then 2^64 - 1 else Int.tdiv nop1 nop2
       let r := Int.tmod nop1 nop2
-      ⟨ q, r ⟩
+      ⟨q, r⟩
 
 def execute_DIV_REM_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : drop) : BitVec 64 × BitVec 64 :=
-  let ⟨ q, r ⟩ := execute_DIV_REM_pure_int op1 op2 op
+  let ⟨q, r⟩ := execute_DIV_REM_pure_int op1 op2 op
   match op with
-  | .DRS | .DRWS => ⟨ BitVec.ofInt 64 q, BitVec.ofInt 64 r ⟩
-  | .DRU => ⟨ BitVec.ofNat 64 q, BitVec.ofNat 64 r ⟩
-  | .DRWU => ⟨ BitVec.signExtend 64 (BitVec.ofNat 32 q), BitVec.signExtend 64 (BitVec.ofNat 32 r) ⟩
+  | .DRS | .DRWS => ⟨BitVec.ofInt 64 q, BitVec.ofInt 64 r⟩
+  | .DRU => ⟨BitVec.ofNat 64 q, BitVec.ofNat 64 r⟩
+  | .DRWU => ⟨BitVec.signExtend 64 (BitVec.ofNat 32 q), BitVec.signExtend 64 (BitVec.ofNat 32 r)⟩
 
 def execute_DIV' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
-  let ⟨ result, _ ⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRU else .DRS)
+  let ⟨result, _⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRU else .DRS)
   (wX_bits rd result)
   (pure RETIRE_SUCCESS)
 
 def execute_REM' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
-  let ⟨ _, result ⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRU else .DRS)
+  let ⟨_, result⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRU else .DRS)
   (wX_bits rd result)
   (pure RETIRE_SUCCESS)
 
 def execute_DIVW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
-  let ⟨ result, _ ⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRWU else .DRWS)
+  let ⟨result, _⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRWU else .DRWS)
   (wX_bits rd result)
   (pure RETIRE_SUCCESS)
 
 def execute_REMW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
-  let ⟨ _, result ⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRWU else .DRWS)
+  let ⟨_, result⟩ := execute_DIV_REM_pure rs1_bits rs2_bits (if is_unsigned then .DRWU else .DRWS)
   (wX_bits rd result)
   (pure RETIRE_SUCCESS)
 

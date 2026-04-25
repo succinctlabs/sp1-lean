@@ -45,7 +45,7 @@ theorem correct_sub
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     simp [RTypeReader.allHold_constraints_iff_is_real h_is_real,
       Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, ⟨ ⟨ _, _, ⟨ _, is_U64_b, is_U64_c ⟩ ⟩, _ ⟩⟩ := reader_cstrs
+    obtain ⟨trusted_instr_prop, _, _, _, _, _, _, ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := reader_cstrs
     have h6 : Main[6] < 32 := by aesop
     have h14 : Main[14] < 32 := by aesop
     have h21 : Main[21] < 32 := by aesop
@@ -55,7 +55,7 @@ theorem correct_sub
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     rw [h_is_real] at *
     apply SubOperation.spec is_U64_b is_U64_c at sub_op_cstrs
-    obtain ⟨ is_U64_val, is_sub ⟩ := sub_op_cstrs
+    obtain ⟨is_U64_val, is_sub⟩ := sub_op_cstrs
     simp [BitVec.ofNatLT_eq_ofNat] at *
     -- Now the monadic manipulation
     simp [spec_sub, sp1_sub, execute, execute_RTYPE']

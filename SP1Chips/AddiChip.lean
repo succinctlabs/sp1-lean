@@ -46,7 +46,7 @@ theorem correct_addi
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ITypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
     simp [Opcode.ofNat, Nat.ble] at reader_cstrs
-    obtain ⟨ trusted_instr_prop, hcm1, hcm2, c0, c1, c2, c3, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, ⟨ is_U64_a, is_U64_b, hu64 ⟩⟩ := reader_cstrs
+    obtain ⟨trusted_instr_prop, hcm1, hcm2, c0, c1, c2, c3, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, ⟨is_U64_a, is_U64_b, hu64⟩⟩ := reader_cstrs
     have h6 : Main[6] < 32 := by aesop
     have h14 : Main[14] < 32 := by aesop
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
@@ -57,7 +57,7 @@ theorem correct_addi
       := by apply Word.isU64_of_cases c0 c1 c2 c3
     rw [h_is_real] at *
     apply AddOperation.spec is_U64_b is_U64_c at add_op_cstrs
-    obtain ⟨ is_U64_val, is_add ⟩ := add_op_cstrs
+    obtain ⟨is_U64_val, is_add⟩ := add_op_cstrs
     simp at *
     simp [BitVec.ofNatLT_eq_ofNat] at *
     -- Now the monadic manipulation

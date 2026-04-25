@@ -46,12 +46,12 @@ theorem correct_slt
     have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
+    obtain ⟨trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all [BitVec.ofNatLT_eq_ofNat]
-    obtain ⟨ _, _, is_U64_c ⟩ := is_U64_c
+    obtain ⟨_, _, is_U64_c⟩ := is_U64_c
     -- Now the monadic manipulation
     simp [spec_slt, sp1_slt, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
@@ -110,14 +110,14 @@ theorem correct_slti
     have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
+    obtain ⟨trusted_instr_prop, _, _, ⟨c0, c1, c2, c3⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all [BitVec.ofNatLT_eq_ofNat]
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases c0 c1 c2 c3
-    obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
+    obtain ⟨h_f, h_imm_c⟩ := trusted_instr_prop
     -- Now the monadic manipulation
     simp [spec_slti, sp1_slti, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
@@ -178,12 +178,12 @@ theorem correct_sltu
     have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
+    obtain ⟨trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all [BitVec.ofNatLT_eq_ofNat]
-    obtain ⟨ _, _, is_U64_c ⟩ := is_U64_c
+    obtain ⟨_, _, is_U64_c⟩ := is_U64_c
     -- Now the monadic manipulation
     simp [spec_sltu, sp1_sltu, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
@@ -242,14 +242,14 @@ theorem correct_sltiu
     have h_is_real : Main[32] + Main[33] = 1 := by simp_all
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
+    obtain ⟨trusted_instr_prop, _, _, ⟨c0, c1, c2, c3⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, CPUState.constraints, ALUTypeReader.constraints] at state_cstrs
     obtain ⟨throwaway, read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     clear throwaway; simp_all
     simp [Opcode.ofNat, Nat.ble, Nat.beq] at *; simp_all [BitVec.ofNatLT_eq_ofNat]
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases c0 c1 c2 c3
-    obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
+    obtain ⟨h_f, h_imm_c⟩ := trusted_instr_prop
     -- Now the monadic manipulation
     simp [spec_sltiu, sp1_sltiu, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]

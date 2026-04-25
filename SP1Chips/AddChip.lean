@@ -54,7 +54,7 @@ theorem correct_add
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   rw [h_is_real] at *
   apply AddOperation.spec (by aesop) (by aesop) at add_op_cstrs
-  obtain ⟨ is_U64_val, is_add ⟩ := add_op_cstrs
+  obtain ⟨is_U64_val, is_add⟩ := add_op_cstrs
   -- Simplify the monadic operations
   simp [spec_add, sp1_add, execute_RTYPE']
   rw [run_readReg, read_pc]

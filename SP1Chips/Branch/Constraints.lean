@@ -5,9 +5,6 @@ import SP1Operations.Reader.ITypeReaderImmutable
 
 namespace Branch
 
--- Unused variables expected because many helper proofs are currently stopped.
-set_option linter.unusedVariables false
-
 section constraints
 
 -- Generated Lean code for chip BranchChip

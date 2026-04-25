@@ -40,9 +40,9 @@ lemma cl_are_U16
     intro cstrs his
     rw [allHold_constraints_iff] at cstrs
     rcases cstrs with
-      ⟨ _, _, h_f0, h_f1, h_f2, h_f3, _, _, _, _, _, h_e0, h_e1, _ ⟩
-    obtain ⟨ _, _, _, _ ⟩ := Word.lt_cases_of_isU64 h_b_isU64
-    obtain ⟨ _, _, _, _ ⟩ := Word.lt_cases_of_isU64 h_d_isU64
+      ⟨_, _, h_f0, h_f1, h_f2, h_f3, _, _, _, _, _, h_e0, h_e1, _⟩
+    obtain ⟨_, _, _, _⟩ := Word.lt_cases_of_isU64 h_b_isU64
+    obtain ⟨_, _, _, _⟩ := Word.lt_cases_of_isU64 h_d_isU64
     rcases h_f0 with hf0 | hf0 <;> rcases h_f1 with hf1 | hf1 <;>
       rcases h_f2 with hf2 | hf2 <;> rcases h_f3 with hf3 | hf3 <;>
       rw [hf0, hf1, hf2, hf3] at h_e0 h_e1 <;>
@@ -60,9 +60,9 @@ lemma spec.nat
     cols.u16_compare_operation.bit = if b.toNat < d.toNat then (1 : Fin KB) else (0 : Fin KB)
   := by
     intro cstrs
-    have ⟨ _, _ ⟩ := cl_are_U16 h_b_isU64 h_d_isU64 cstrs (by rfl)
+    have ⟨_, _⟩ := cl_are_U16 h_b_isU64 h_d_isU64 cstrs (by rfl)
     rw [allHold_constraints_iff] at cstrs
-    rcases cstrs with ⟨ h_comp_limbs, ⟨ h_is_real_bool, h_flag_0_bool, h_flag_1_bool, h_flag_2_bool, h_flag_3_bool, cstrs ⟩ ⟩
+    rcases cstrs with ⟨h_comp_limbs, ⟨h_is_real_bool, h_flag_0_bool, h_flag_1_bool, h_flag_2_bool, h_flag_3_bool, cstrs⟩⟩
     apply U16CompareOperation.spec at h_comp_limbs <;> try assumption
     unfold Word.toNat
     rcases h_flag_0_bool <;> rcases h_flag_1_bool <;>

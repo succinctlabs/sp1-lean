@@ -17,7 +17,7 @@ lemma u16_to_u8_decomposition_fin64 {a b : Fin (2 ^ 64)} :
   a < 65536 ∧ b = a % 256 ∧ (((a - b) * 2122383361) % KB) = a / 256
   := by
     intro h_a h_b h_diff
-    have ⟨ h_lt, h_mod, h_div ⟩ :=
+    have ⟨h_lt, h_mod, h_div⟩ :=
       u16_to_u8_decomposition_bv64_bv64 (.ofFin a) (.ofFin b)
                                         (by simp_all) (by simp_all)
                                         (by bv_amicus_kerneli at *

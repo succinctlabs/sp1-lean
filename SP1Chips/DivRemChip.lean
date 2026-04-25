@@ -11,10 +11,6 @@ import SP1Chips.DivRem.Constraints
 open LeanRV64D.Functions
 open BitVec
 
-set_option linter.style.setOption false
--- Unused variables expected because correct_* proofs are currently stopped.
-set_option linter.unusedVariables false
-
 open DivRem
 
 variable

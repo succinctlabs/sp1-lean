@@ -46,17 +46,17 @@ theorem correct_addw
     obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _ ⟩ := alu_cstrs
+    obtain ⟨trusted_instr_prop, _, _, _, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, is_U64_c , _, _⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
       AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints,
       h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp [Opcode.ofNat, Nat.ble] at *
     simp_all
-    obtain ⟨ _, _, is_U64_c ⟩ := is_U64_c
+    obtain ⟨_, _, is_U64_c⟩ := is_U64_c
     rw [h_is_real] at *
     apply AddwOperation.spec is_U64_b is_U64_c at addw_op_cstrs
-    obtain ⟨ is_U32_val, is_addw, is_msb ⟩ := addw_op_cstrs
+    obtain ⟨is_U32_val, is_addw, is_msb⟩ := addw_op_cstrs
     simp_all
     -- Now the monadic manipulation
     simp [spec_addw, sp1_addw, execute, execute_RTYPEW']
@@ -119,10 +119,10 @@ theorem correct_addw
   (spec_addiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_addiw Main).run s
   := by
     simp [constraints] at cstrs
-    obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _ ⟩ := cstrs
+    obtain ⟨addw_op_cstrs, cpu_cstrs, alu_cstrs, _⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
     rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real] at alu_cstrs
-    obtain ⟨ trusted_instr_prop, _, _, ⟨ c0, c1, c2, c3 ⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, _, _, _ ⟩ := alu_cstrs
+    obtain ⟨trusted_instr_prop, _, _, ⟨c0, c1, c2, c3⟩, _, _, _, _, _, _, _, _, _, _, _, is_U64_a, is_U64_b, _, _, _⟩ := alu_cstrs
     simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints, U16MSBOperation.constraints, h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp [Opcode.ofNat, Nat.ble] at *
@@ -131,11 +131,11 @@ theorem correct_addw
       := by apply Word.isU64_of_cases c0 c1 c2 c3
     rw [h_is_real] at *
     apply AddwOperation.spec is_U64_b is_U64_c at addw_op_cstrs
-    obtain ⟨ is_U32_val, is_addw, is_msb ⟩ := addw_op_cstrs
+    obtain ⟨is_U32_val, is_addw, is_msb⟩ := addw_op_cstrs
     simp_all
-    obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
+    obtain ⟨h_f, h_imm_c⟩ := trusted_instr_prop
     simp [h_is_addiw] at h_f h_imm_c
-    obtain ⟨ h_c, h_is_imm_c ⟩ := h_imm_c
+    obtain ⟨h_c, h_is_imm_c⟩ := h_imm_c
     simp [BitVec.ofNatLT_eq_ofNat] at *
     -- Now the monadic manipulation
     simp [spec_addiw, sp1_addiw, execute, execute_ADDIW']

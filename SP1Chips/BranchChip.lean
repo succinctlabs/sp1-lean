@@ -3,9 +3,6 @@ import SP1Chips.Branch.Constraints
 
 namespace Branch
 
--- Unused variables expected because correct_b* proofs are currently stopped.
-set_option linter.unusedVariables false
-
 open Sail SailState BitVec LeanRV64D.Functions
 
 attribute [simp] jump_to assert PreSail.assert ofBool
