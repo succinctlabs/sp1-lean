@@ -11,7 +11,7 @@ Formal verification in Lean 4 that SP1 Hypercube's AIR constraints correctly imp
 - Full build: `lake build` (defaults to `SP1Operations` and `SP1Chips`).
 - Single library: `lake build SP1Chips` / `lake build SP1Foundations` / `lake build SP1Operations`.
 - Single file: `lake env lean SP1Chips/AddChip.lean` (builds deps via cache, then elaborates the file).
-- Toolchain is pinned in `lean-toolchain` (`leanprover/lean4:v4.29.0`). Matching Mathlib pin (`v4.29.0`) is in `lakefile.toml`. The `lean-sail` dep tracks the `v4` branch — Sail v4 dropped or renamed several v2 helpers (`bool_to_bits` → `bool_to_bit`, `bool_bits_forwards` → `bool_bit_forwards`, `shift_right_arith` removed, `check_misaligned` and `default_write_acc` removed, `force_pc_eq` no longer holds), and `Sail.BitVec.toNatInt` now appears explicitly in goals — add it to the `simp [...]` list whenever you see `↑BitVec.toNat` residue.
+- Toolchain is pinned in `lean-toolchain` (`leanprover/lean4:v4.29.0`). Matching Mathlib pin (`v4.29.0`) is in `lakefile.toml`. The `Lean_RV64D` dep now tracks `opencompl/sail-riscv-lean` `main` (moved upstream from the old `succinctlabs/sail-riscv-lean @ sp1-lean-air-verification` fork during this PR). Sail v4 renamed/removed many v2 helpers — see `docs/LEAN_4_29_AND_SAIL_V4.md` for the full list and the new platform-read axioms (`update_elp_state_of_isInitialized`, `jump_to_of_mod4_eq_zero`, `jump_to_of_mask_mod4_eq_zero`). Common touchpoints: `bool_to_bits` → `bool_to_bit`, `bool_bits_forwards` → `bool_bit_forwards`; `shift_right_arith`, `check_misaligned`, `default_write_acc`, `force_pc_eq` are gone; `Sail.BitVec.toNatInt` now appears explicitly in goals — add it to the `simp [...]` list whenever you see `↑BitVec.toNat` residue.
 - `--tstack=400000` and `synthInstance.maxHeartbeats = 1000000` are already set in `lakefile.toml` — some proofs legitimately need this. If you see instance-synth or stack failures, that's expected scale, not a bug to fix.
 - There are no unit tests; correctness lives in the `correct_*` theorems themselves. "Test" = it elaborates.
 - **`lake build` is considered "passing" only when both `^error:` and `^warning:` counts are zero** (`grep -cE '^(error|warning):' build.log`). The mathlib standard linter set is enabled via `weak.linter.mathlibStandardSet = true` and the repo has driven warnings to zero; a green build that emits new warnings is a regression. Common fix patterns used in the repo:
@@ -21,7 +21,7 @@ Formal verification in Lean 4 that SP1 Hypercube's AIR constraints correctly imp
   - `. <tac>` bullets → `· <tac>` (U+00B7). Only at bullet position; never inside expressions like `Foo.bar`.
   - `2^N` → `2 ^ N` (mathlib spacing). `{ a b c : T }` → `{a b c : T}`.
   - Blank lines inside a `by ...` block or any `set_option ... in` wrapped command trigger `linter.style.emptyLine` — delete them.
-  - Already disabled globally in `lakefile.toml`: `linter.flexible`, `linter.style.longLine`, `linter.unusedSimpArgs`. Per-file disables for `linter.style.multiGoal` in 8 files with imbalanced-goal-tree proofs (DivRem/Constraints, SailM, etc.).
+  - Already disabled globally in `lakefile.toml`: `linter.flexible`, `linter.style.longLine`, `linter.unusedSimpArgs`. Per-file disables for `linter.style.multiGoal` in 7 files with imbalanced-goal-tree proofs (DivRem/Constraints, ShiftRight/Constraints, ShiftLeft/Constraints, Mul/Constraints, MulOperation/Constraints, BitwiseU16Operation, LtOperationSigned).
 
 ## Architecture
 
@@ -56,9 +56,18 @@ The body of every `constraints` definition between `section constraints` and `en
 
 **Never edit `Main[k]` indices, opcode literals, or any other content inside `section constraints ... end constraints`.** This block reflects the constraint compiler's current output verbatim. If indices in this block look wrong, the right fix is to re-run `SP1_DIR=… python3 update_constraints.py` (you can run this yourself), then update the *hand-written* helpers (iff lemma RHS, `set` aliases, `is_real`, `sp1_op_*` defs, etc.) to match. Hand-editing the generated block silently desyncs it from the SP1 source of truth and any later regeneration will overwrite the changes — exactly the failure mode that occurred when the iff RHS, `set` aliases, and the constraints def all went out of sync after a manual `−1` shift was applied across the whole file.
 
-## Stopped proofs — is_trusted removal cleanup
+## docs/ pointers
 
-After commit `e686807` dropped the `is_trusted` Reader field, 17 chips were mechanically updated with `stop` markers as a fallback rather than re-closing each proof. See `docs/STOPPED_PROOFS.md` for the per-chip coverage table, the index-shift rules, and the Python shift + `stop` pattern to reuse if another column is ever removed. `JalrChip` is still broken and deferred — additional changes beyond is_trusted.
+Topical guides live in `docs/`. Skim the relevant one when you hit a matching surface:
+
+- `docs/AUDIT_PR92.md` — what landed in the v6.1.0 / Lean 4.29 / Sail v4 update beyond the PR description.
+- `docs/LEAN_4_29_AND_SAIL_V4.md` — Lean 4.29 quirks (instance priority, `simp_all` regression, `BitVec.ofNat` ordering) plus the Sail v4 rename/removal table and new platform-read axioms.
+- `docs/CONSTRAINT_REGEN.md` — playbook to follow the next time the constraint compiler adds or drops a column. Reusable across "is_trusted"-style cascades.
+- `docs/PERF_PATTERNS.md` — proof-perf wins from this PR (high-priority `Fin KB` instances, breaking large `obtain` chains, dedicated shift lemmas).
+
+## Constraint-shape cascades
+
+The `is_trusted` cleanup is complete: zero `stop` markers remain in `SP1Chips/`, every `correct_*` theorem closes (including `correct_JALR`), and the old `docs/STOPPED_PROOFS.md` was deleted. If another column is ever added or removed by the SP1 constraint compiler, follow `docs/CONSTRAINT_REGEN.md` for the regen + index-shift + iff-lemma update sequence used here.
 
 ## Custom tactics (`SP1Foundations/Tactics.lean`)
 
@@ -78,4 +87,4 @@ After commit `e686807` dropped the `is_trusted` Reader field, 17 chips were mech
 
 ## MCP servers
 
-`.mcp.json` declares `LeanExplore` (semantic search over Mathlib) and `lean-lsp` (live goal/tactic state from the Lean LSP). Both launch via `uvx`, so `uv` must be on `PATH` — if it's missing, install with `curl -LsSf https://astral.sh/uv/install.sh | sh` (puts `uv`/`uvx` in `~/.local/bin`). Local enable/disable is in `.claude/settings.local.json` (gitignored; `enableAllProjectMcpServers: true` opts this project in). Restart Claude Code after installing or toggling.
+`.mcp.json` declares `lean-lsp` (live goal/tactic state from the Lean LSP). It launches via `uvx`, so `uv` must be on `PATH` — if it's missing, install with `curl -LsSf https://astral.sh/uv/install.sh | sh` (puts `uv`/`uvx` in `~/.local/bin`). Local enable/disable is in `.claude/settings.local.json` (gitignored; `enableAllProjectMcpServers: true` opts this project in). Restart Claude Code after installing or toggling. (An earlier `LeanExplore` server was dropped from `.mcp.json`; if you need Mathlib semantic search, add it back locally.)

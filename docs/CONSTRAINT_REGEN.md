@@ -1,0 +1,101 @@
+# Constraint regeneration playbook
+
+When the SP1 constraint compiler changes the column shape of any chip — adds, removes, or reorders columns — the auto-generated body of `<Chip>/Constraints.lean` is rewritten by `update_constraints.py`, but several hand-written sites that reference column indices need a coordinated update too. This doc captures the recipe used for the `is_trusted` removal in PR #92, since that single column drop cascaded across 17 chips and was the single largest source of regressions.
+
+Reuse this playbook for any future column-shape change.
+
+## What `update_constraints.py` does
+
+- Reads `SP1_DIR` from the environment (path to an external SP1 checkout that builds `sp1-constraint-compiler`).
+- For each `(chip, operation?, prefix)` entry in `CONSTRAINTS_LIST` at the top of the script, shells out to `cargo run -p sp1-constraint-compiler -- --chip <chip> [--operation <op>] --format lean`.
+- Splices the compiler's stdout into the target Lean file *between* the `section constraints` and `end constraints` markers. Everything outside those markers is preserved.
+- Output paths: chip-level → `SP1Chips/<prefix>/<chip>/Constraints.lean`, operation-level → `SP1Operations/<prefix>/<operation>/Constraints.lean`.
+
+## What it does NOT touch
+
+These sites all need manual updates after a column-shape change:
+
+1. The `allHold_constraints_iff` lemma in each Reader (RHS conjunct list).
+2. The `allHold_constraints_iff_is_real` specialization that fires when `is_real = 1`.
+3. `set` aliases in `<Chip>/Constraints.lean` outside the markers (e.g. `set is_real := Main[N-1]`).
+4. `def sp1_op_a / sp1_op_b / sp1_op_c` projections in `<Chip>Chip.lean`.
+5. `is_real` location: if the last column moved, `h_is_real : Main[N-1] = 1` needs the new index.
+6. The `Vector (Fin KB) N` width if the total column count changed.
+7. Any `by_cases` chains in Reader proofs that case-split on a column you removed (they collapse to fewer cases).
+
+## Prerequisites
+
+- An external SP1 checkout that builds `sp1-constraint-compiler`. Set `SP1_DIR` to the checkout root.
+- `cargo` on `PATH`.
+- Lean toolchain installed (`lake` resolves `lean-toolchain`).
+
+Run from repo root: `SP1_DIR=/path/to/sp1 python3 update_constraints.py`.
+
+## Recipe for a column drop (canonical: `is_trusted` removal)
+
+1. **Identify the cutoff index.** Find the column's old position before regenerating:
+   ```
+   git show <pre-removal-commit>^:SP1Chips/Add/Constraints.lean \
+     | grep -oE "is_trusted := Main\[[0-9]+\]"
+   ```
+   Call this `removed_idx`. If multiple columns were removed, you have multiple cutoffs (and the shift is multi-step).
+
+2. **Regenerate.** `SP1_DIR=… python3 update_constraints.py`. This rewrites the auto-generated bodies but leaves index references in hand-written code stale.
+
+3. **Mechanically shift `Main[k]` references** in every hand-written `*/Constraints.lean` and `*Chip.lean`:
+   ```python
+   import re
+   removed_idx = ...   # from step 1
+   shift = 1           # 1 column dropped
+   text = re.sub(r', is_trusted := Main\[\d+\]', '', text)
+   def sub(m):
+       k = int(m.group(1))
+       return f"Main[{k - shift}]" if k > removed_idx else m.group(0)
+   text = re.sub(r"Main\[(\d+)\]", sub, text)
+   ```
+   For an inserted column, `shift` is negative and the comparison flips to `>= insert_idx`.
+
+4. **Adjust the `Vector (Fin KB) N` width** in any signature that mentions it explicitly (chip helpers, theorem statements). `sed -i 's/Vector (Fin KB) <old>/Vector (Fin KB) <new>/g'` over the chip's two files.
+
+5. **Update the iff-lemma RHS** in the Reader files (`SP1Operations/Reader/<Reader>.lean`):
+   - Remove (or add) the column's conjunct from `allHold_constraints_iff`.
+   - Remove (or add) the matching simplification in `allHold_constraints_iff_is_real`.
+   - Collapse any `by_cases` branch that case-split on the removed column. ALUTypeReader is the canonical example: a nested `by_cases htrust` flattened to the single remaining branch when `is_trusted` left.
+
+6. **Update `set` aliases** in `<Chip>/Constraints.lean` outside the markers — e.g. if `set is_real := Main[34]` is now `Main[33]`.
+
+7. **Re-check `sp1_op_a/b/c`** in `<Chip>Chip.lean`. These project specific indices; they need the same shift.
+
+8. **Build chip-by-chip** with `lake env lean SP1Chips/<Chip>Chip.lean`. Anything that fails on an out-of-range `Main[k]` or a stale RHS in `allHold_constraints_iff` points to step 5–7 missing an edit.
+
+## Stop-marker fallback (when re-closing 17 chips at once)
+
+If the cascade is too large to re-close one chip at a time, the alternative is a "shift + stop" pattern: shift the indices mechanically and inject `stop` markers at the start of each broken proof so the build stays green while you work down the list.
+
+This was the strategy used during the `is_trusted` cleanup. Pattern:
+
+1. After the index shift, walk each `Constraints.lean` and `<Chip>Chip.lean` line-by-line. For every `theorem correct_*` and every `:= by` in a hand-written lemma, inject `stop` at the indent of the next non-blank line.
+2. `stop` alone is not a valid proof terminator — append a `trivial` or leave the original tactics in place (they won't execute past `stop`).
+3. If a `def` body uses `by ... stop ...` and only references `Main`/`cstrs`/`h_is_X` after `stop`, Lean won't auto-include them from the `variable` block. Inject `have _ := Main; have _ := cstrs; have _ := h_is_X` before `stop`.
+4. For lemmas with `(h : is_<op> Main)` that get stopped early, inject `have _ := h` before `stop` to avoid an unused-variable warning.
+5. When most lemmas in a file stop early, prefer `set_option linter.unusedVariables false` at the top of the namespace over scattering `have _ := X` everywhere. Branch / ShiftRight / DivRem / Jal all used this during the cascade.
+6. Old Load/Store helpers (e.g. `allHold_constraints_iff_of_is_lb`) sometimes have RHSes that no longer elaborate after the shift. Stubbing them to `↔ True` is fine; chip proofs that call them should `stop` right before the rewrite.
+
+Once all chips compile with stops, work down the list re-closing each `correct_*` proof. The state-of-the-art commit trail to study as a worked example:
+
+- `e686807` — the regen + initial shift (introduces the stops).
+- `3322146` / `6de007b` / `1526474` / `af299c9` — successive waves of stop removal as proofs close.
+- `f2f5ccd` / `c9a458c` — JAL / JALR closure, which needed the new sail-v4 axioms in addition to the index shift.
+- `899d1c3` — final cleanup once nothing was stopped: removes assumptions and axioms whose preconditions never fired anymore.
+
+## Verification
+
+- `grep -rn "stop" SP1Chips/ SP1Operations/` should return zero. (After PR #92, this is the steady state.)
+- `grep -rn "sorry" SP1Chips/ SP1Operations/ SP1Foundations/` should also return zero.
+- `lake build` finishes with zero `^error:` and zero `^warning:` (`grep -cE '^(error|warning):' build.log`).
+- The first chip you re-close end-to-end (typically AddChip — smallest, highest leverage) should look identical in shape to the version of `AddChip.lean` that's currently in HEAD; deviations indicate the shift or iff-lemma update was inconsistent.
+
+## When NOT to use this playbook
+
+- **Don't hand-edit anything inside `section constraints ... end constraints`.** The next regeneration will overwrite it. If the auto-generated block looks wrong, regenerate.
+- **Don't apply a `-1` shift to a chip without confirming what the compiler actually output.** PR #92 (and earlier) saw bugs where the iff RHS, set aliases, and constraints def all went out of sync because someone manually shifted indices without re-running `update_constraints.py`. Always regenerate first, shift second.
