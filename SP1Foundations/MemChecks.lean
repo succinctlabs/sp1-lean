@@ -140,7 +140,7 @@ lemma run_mem_write_value_one_byte_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA false false false).run s
       = .ok (.Ok true) { s with mem := s.mem.insert paddr_nat data } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
@@ -225,7 +225,7 @@ lemma run_mem_write_value_two_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
@@ -310,7 +310,7 @@ lemma run_mem_write_value_four_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
@@ -403,7 +403,7 @@ lemma run_mem_write_value_eight_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
@@ -480,7 +480,7 @@ lemma run_mem_read_one_byte_of_isInitialized
         page_based_mem_type.PBMT_PMA
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 1
         false false false).run s = .ok (.Ok data) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
@@ -562,7 +562,7 @@ lemma run_mem_read_two_bytes_of_isInitialized
         page_based_mem_type.PBMT_PMA
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 2
         false false false).run s = .ok (.Ok (data₁ ++ data₀)) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
@@ -652,7 +652,7 @@ lemma run_mem_read_four_bytes_of_isInitialized
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 4
         false false false).run s
       = .ok (.Ok (data₃ ++ data₂ ++ data₁ ++ data₀)) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
@@ -760,7 +760,7 @@ lemma run_mem_read_eight_bytes_of_isInitialized
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 8
         false false false).run s
       = .ok (.Ok (data₇ ++ data₆ ++ data₅ ++ data₄ ++ data₃ ++ data₂ ++ data₁ ++ data₀)) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=
       MemoryAccessType.InstructionFetch ()) = true := rfl
   simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
@@ -818,7 +818,7 @@ lemma run_vmem_write_of_width_1'
     (vmem_write (.Regidx rs_addr_bv) offset 1 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
         { s with mem := s.mem.insert (reg_val + offset).toNat data } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data != MemoryAccessType.InstructionFetch ()) = true := rfl
@@ -864,7 +864,7 @@ lemma run_vmem_write_of_width_1'
   -- lemma. It handles `effectivePrivilege → Machine` plus
   -- `checked_mem_write → mem.insert` in one shot.
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
   have h := run_mem_write_value_one_byte_of_isInitialized reg_val offset data s hs hconfig
     h_below_clint
   simp only [EStateM.run] at h
@@ -893,7 +893,7 @@ lemma run_vmem_write_of_width_2'
         { s with mem := ((s.mem.insert
           (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat)).insert
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))) } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
@@ -927,7 +927,7 @@ lemma run_vmem_write_of_width_2'
     bind, Bind.bind, pure, Pure.pure, Functor.map,
     ExceptT.bindCont, ExceptT.pure, ExceptT.bind]
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
   have h := run_mem_write_value_two_bytes_of_isInitialized reg_val offset data s hs hconfig
     h_below_clint
   simp only [EStateM.run] at h
@@ -954,7 +954,7 @@ lemma run_vmem_write_of_width_4
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
           ((reg_val + offset).toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
           ((reg_val + offset).toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
@@ -988,7 +988,7 @@ lemma run_vmem_write_of_width_4
     bind, Bind.bind, pure, Pure.pure, Functor.map,
     ExceptT.bindCont, ExceptT.pure, ExceptT.bind]
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
   have h := run_mem_write_value_four_bytes_of_isInitialized reg_val offset data s hs hconfig
     h_below_clint
   simp only [EStateM.run] at h
@@ -1019,7 +1019,7 @@ lemma run_vmem_write_of_width_8
           ((reg_val + offset).toNat + 5) (BitVec.ofNat 8 (data.toNat >>> 40))).insert
           ((reg_val + offset).toNat + 6) (BitVec.ofNat 8 (data.toNat >>> 48))).insert
           ((reg_val + offset).toNat + 7) (BitVec.ofNat 8 (data.toNat >>> 56))) } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
@@ -1053,7 +1053,7 @@ lemma run_vmem_write_of_width_8
     bind, Bind.bind, pure, Pure.pure, Functor.map,
     ExceptT.bindCont, ExceptT.pure, ExceptT.bind]
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_mprv_disabled, h_cur_privilege, h_htif⟩
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
   have h := run_mem_write_value_eight_bytes_of_isInitialized reg_val offset data s hs hconfig
     h_below_clint
   simp only [EStateM.run] at h
