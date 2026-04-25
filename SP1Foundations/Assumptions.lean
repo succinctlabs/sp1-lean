@@ -3,6 +3,17 @@ import SP1Foundations.Opcode
 
 open LeanRV64D.Functions Sail SailState
 
+section isValidMemConfig
+
+/-- All the registers needed for memory ops are set appropriately. -/
+structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
+  h_cur_privilege : s.regs.get Register.cur_privilege (hs _) = Privilege.Machine
+  h_mprv_disabled : BitVec.ofNat 1 ((s.regs.get Register.mstatus (hs _)).toNat >>> 17) = 0#1
+  h_mseccfg_disabled : BitVec.ofNat 1 ((s.regs.get Register.mseccfg (hs _)).toNat >>> 10) = 0#1
+  h_htif_disabled : s.regs.get Register.htif_tohost_base (hs _) = none
+
+end isValidMemConfig
+
 section reader_constraints
 
 @[simp] def i_type_constraints
@@ -77,17 +88,6 @@ namespace Opcode
   | UNIMP | ECALL | EBREAK => True
 
 end Opcode
-
-section isValidMemConfig
-
-/-- All the registers needed for memory ops are set appropriately. -/
-structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
-  h_cur_privilege : s.regs.get Register.cur_privilege (hs _) = Privilege.Machine
-  h_mprv_disabled : BitVec.ofNat 1 ((s.regs.get Register.mstatus (hs _)).toNat >>> 17) = 0#1
-  h_mseccfg_disabled : BitVec.ofNat 1 ((s.regs.get Register.mseccfg (hs _)).toNat >>> 10) = 0#1
-  h_htif_disabled : s.regs.get Register.htif_tohost_base (hs _) = none
-
-end isValidMemConfig
 
 section pmp_check
 

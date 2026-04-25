@@ -8,8 +8,9 @@ from typing import List, Tuple, Optional
 # List of (chip_name, optional_operation_name, prefix_path)
 CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     # Add your chips and operations here
-    # Example entries:
-    ("Add", None, ""),  # Chip-level constraints
+    
+    # Chip-level constraints
+    ("Add", None, ""),  
     ("Addi", None, ""),
     ("Addw", None, ""),
     ("Bitwise", None, ""),
