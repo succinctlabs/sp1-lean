@@ -6,9 +6,6 @@ import LeanRV64D
 
 open LeanRV64D.Functions
 
--- /-- We don't care about `htif` in our VM. -/
--- @[simp] axiom plat_enable_htif_eq_false : plat_enable_htif () = false
-
 set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 -- Sail-bridge `simp` and `run_*` lemmas unfold deep `SailM` monadic programs.

@@ -16,6 +16,36 @@ attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert
   BitVec.toNatInt
   htif_tohost_size
 
+/-- In sail-v4, `jump_to target` runs:
+  1. an extension hook `ext_control_check_pc target` (constant `none`),
+  2. an `assert` that `target` bit 0 is `0`,
+  3. an `if (bit_to_bool (target bit 1)) && (not (← currentlyEnabled Ext_Zca))`
+     guard, and otherwise
+  4. `writeReg nextPC target; pure RETIRE_SUCCESS`.
+For `target % 4 = 0` both bit 0 and bit 1 are 0, so the assert passes and
+`bit_to_bool 0#1 = false` short-circuits the `&&` regardless of the Zca read's
+value. The Zca read still executes monadically (reading `misa`), but is
+state-preserving on `isInitialized s` — handled by `SailME_run_readReg_map_writeReg`. -/
+theorem jump_to_of_mod4_eq_zero (target : BitVec 64) (s : SailState)
+    (hs : SailState.isInitialized s) (h_aligned : target % 4#64 = 0) :
+    EStateM.run (jump_to target) s =
+      EStateM.Result.ok LeanRV64D.Functions.RETIRE_SUCCESS
+        { s with regs := s.regs.insert Register.nextPC target } := by
+  have h0 : target[0] = false := by bv_decide
+  have h1 : target[1] = false := by bv_decide
+  have hs_misa : (s.regs.get? Register.misa).isSome := by
+    simp [Std.ExtDHashMap.get?_eq_some_get (hs _)]
+  simp [jump_to, ext_control_check_pc, h0, h1]
+  exact SailME_run_readReg_map_writeReg s Register.misa Register.nextPC hs_misa target
+    (fun _ => RETIRE_SUCCESS)
+
+lemma update_elp_state_of_isInitialized (rs1 : regidx) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs' : isValidMemConfig s hs) :
+    EStateM.run (update_elp_state rs1) s = EStateM.Result.ok () s := by
+  simp [update_elp_state, run_readReg_of_isInitialized s _ hs, hs'.h_cur_privilege,
+    get_xLPE, _get_Seccfg_MLPE, hartSupports, hs'.h_mseccfg_disabled]
+
 set_option linter.style.nativeDecide false in
 /-- The CLINT region sits at `[plat_clint_base, plat_clint_base + plat_clint_size)`
 with `plat_clint_base = 2 ^ 25 = 33554432`. Every caller below supplies a bound
@@ -1050,7 +1080,6 @@ lemma run_vmem_read_of_width_1'
       false false false).run s = .ok (.Ok data) s := by
   have h_mprv_disabled := hconfig.h_mprv_disabled
   have h_cur_privilege := hconfig.h_cur_privilege
-  have h_htif := hconfig.h_htif_tohost_base
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=
@@ -1111,7 +1140,6 @@ lemma run_vmem_read_of_width_2'
       false false false).run s = .ok (.Ok data) s := by
   have h_mprv_disabled := hconfig.h_mprv_disabled
   have h_cur_privilege := hconfig.h_cur_privilege
-  have h_htif := hconfig.h_htif_tohost_base
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=
@@ -1175,7 +1203,6 @@ lemma run_vmem_read_of_width_4'
       false false false).run s = .ok (.Ok data) s := by
   have h_mprv_disabled := hconfig.h_mprv_disabled
   have h_cur_privilege := hconfig.h_cur_privilege
-  have h_htif := hconfig.h_htif_tohost_base
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=
@@ -1246,7 +1273,6 @@ lemma run_vmem_read_of_width_8'
       false false false).run s = .ok (.Ok data) s := by
   have h_mprv_disabled := hconfig.h_mprv_disabled
   have h_cur_privilege := hconfig.h_cur_privilege
-  have h_htif := hconfig.h_htif_tohost_base
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Load mem_payload.Data !=

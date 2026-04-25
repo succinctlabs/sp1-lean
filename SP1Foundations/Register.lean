@@ -12,11 +12,14 @@ import SP1Foundations.Misc
 @[simp] lemma SailState.isInitialized_iff (s : SailState) :
     s.isInitialized ↔ ∀ reg : Register, reg ∈ s.regs := Iff.rfl
 
-/-- All the registers needed for memory ops are set appropriately. -/
-structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
-  h_mprv_disabled : BitVec.ofNat 1 (BitVec.toNat (s.regs.get Register.mstatus (hs _)) >>> 17) = 0#1
-  h_cur_privilege : s.regs.get Register.cur_privilege (hs _) = Privilege.Machine
-  h_htif_tohost_base : s.regs.get Register.htif_tohost_base (hs _) = none
+/-- `insert` preserves `isInitialized`: adding a register keeps every register present. -/
+@[aesop safe apply, simp]
+lemma SailState.isInitialized_insert (s : SailState) (hs : s.isInitialized)
+    (reg : Register) (v : RegisterType reg) :
+    SailState.isInitialized { s with regs := s.regs.insert reg v } := by
+  intro r
+  simp only [Std.ExtDHashMap.mem_insert]
+  exact Or.inr (hs r)
 
 section regidx
 

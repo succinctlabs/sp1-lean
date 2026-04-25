@@ -78,38 +78,49 @@ namespace Opcode
 
 end Opcode
 
-section public_values
+section isValidMemConfig
 
-/-- Mock function that the constraint extractor uses to print public values. -/
-opaque public_value : Unit → ℕ → Fin KB := fun _ => 0
+/-- All the registers needed for memory ops are set appropriately. -/
+structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
+  h_cur_privilege : s.regs.get Register.cur_privilege (hs _) = Privilege.Machine
+  h_mprv_disabled : BitVec.ofNat 1 (BitVec.toNat
+    (s.regs.get Register.mstatus (hs _)) >>> 17) = 0#1
+  h_mseccfg_disabled : BitVec.ofNat 1 (BitVec.toNat
+    (s.regs.get Register.mseccfg (hs _)) >>> 10) = 0#1
 
-/-- Assume mprotect is globally disabled in SP1 via a public value. -/
-@[simp] axiom mprotect_disabled : public_value () 151 = 0
-
-end public_values
+end isValidMemConfig
 
 section pmp_check
 
-/-- We can't prove this directly because the loop in `pmpCheck` doesn't unfold.
-Adding this is at least consistent, since the left-hand side has no actual value. -/
+/-- Store-side PMP check is a no-op under SP1's kernel configuration.
+Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths).
+Reason axiomatised: `pmpCheck` walks `for i in [0..sys_pmp_count) ... readReg pmpaddr_n / pmpcfg_n`
+and dispatches on per-entry attributes; the loop doesn't reduce without per-entry facts about
+each `pmpaddr` / `pmpcfg` register.
+Discharge condition: add a `SailState.isValidPmpConfig` precondition (e.g. all `pmpcfg_n` A-fields
+= OFF) and unfold the bounded loop.
+Consistent because: SP1 is configured with no PMP entries enabled, so the LHS denotes a fixed
+"allow" outcome regardless of how the unmodelled platform state is filled in. -/
 axiom pmp_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ) :
     pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
       width (MemoryAccessType.Store mem_payload.Data) Privilege.Machine s =
         EStateM.Result.ok none s
 
-/-- We can't prove this directly because the loop in `pmpCheck` doesn't unfold.
-Adding this is at least consistent, since the left-hand side has no actual value. -/
+/-- Load counterpart of `pmp_check_machine`. Same justification.
+Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths). -/
 axiom pmp_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ) :
     pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
       width (MemoryAccessType.Load mem_payload.Data) Privilege.Machine s =
         EStateM.Result.ok none s
 
-/-- Companion to `pmp_check_machine` for the PMA half of `phys_access_check`.
-`pmaCheck` walks `pma_regions` and dispatches on per-region attributes; in our
-kernel configuration no fault is raised. Axiomatising is consistent since the
-left-hand side has no actual value. -/
+/-- Store-side PMA check is a no-op under SP1's kernel configuration.
+Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths).
+Reason axiomatised: `pmaCheck` calls `matching_pma_region (← readReg pma_regions)` and dispatches
+on per-region attributes; nothing in `SailState.isInitialized` constrains `pma_regions`.
+Discharge condition: add a `SailState.isValidPmaConfig` precondition (e.g. `pma_regions = []`).
+Consistent because: SP1 has no PMA regions configured, so the LHS denotes a fixed "allow" outcome. -/
 axiom pma_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
     (pbmt : page_based_mem_type) (res_or_con : Bool) :
@@ -117,7 +128,8 @@ axiom pma_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
       width (MemoryAccessType.Store mem_payload.Data) pbmt res_or_con s =
         EStateM.Result.ok none s
 
-/-- Load counterpart of `pma_check_machine`. -/
+/-- Load counterpart of `pma_check_machine`. Same justification.
+Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths). -/
 axiom pma_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
     (pbmt : page_based_mem_type) (res_or_con : Bool) :
@@ -126,47 +138,3 @@ axiom pma_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
         EStateM.Result.ok none s
 
 end pmp_check
-
-section sail_v4_control_flow
-
-/-- `insert` preserves `isInitialized`: adding a register keeps every register present. -/
-@[aesop safe apply, simp]
-lemma SailState.isInitialized_insert (s : SailState) (hs : s.isInitialized)
-    (reg : Register) (v : RegisterType reg) :
-    SailState.isInitialized { s with regs := s.regs.insert reg v } := by
-  intro r
-  simp only [Std.ExtDHashMap.mem_insert]
-  exact Or.inr (hs r)
-
-/-- SP1 does not enable the Zicfilp (CFI landing-pad) extension, so
-`update_elp_state` (introduced in sail-v4) is effectively a no-op: it reads
-`cur_privilege` through `currentlyEnabled Ext_Zicfilp`, finds Zicfilp disabled,
-and returns `pure ()` without touching the `elp` register. Asserting this as
-an axiom is consistent — no downstream SP1 proof reads `elp`. -/
-axiom update_elp_state_of_isInitialized (rs1 : regidx) (s : SailState)
-    (hs : SailState.isInitialized s) :
-    EStateM.run (update_elp_state rs1) s = EStateM.Result.ok () s
-
-/-- In sail-v4, `jump_to` wraps an alignment check that gates on
-`currentlyEnabled Ext_Zca`, which reads `misa`. For a 4-byte aligned target
-the alignment-failure branch is unreachable (bit 0 and bit 1 of the target are
-both zero), so `jump_to` reduces to `writeReg nextPC target; pure RETIRE_SUCCESS`.
-Axiomatised because the Zca / misa dependency cannot be discharged from
-`isInitialized` alone. -/
-axiom jump_to_of_mod4_eq_zero (target : BitVec 64) (s : SailState)
-    (hs : SailState.isInitialized s) (h_aligned : target % 4#64 = 0) :
-    EStateM.run (jump_to target) s =
-      EStateM.Result.ok LeanRV64D.Functions.RETIRE_SUCCESS
-        { s with regs := s.regs.insert Register.nextPC target }
-
-/-- Specialisation of `jump_to_of_mod4_eq_zero` for JALR-style targets:
-JALR computes `target = (rs1 + imm) & ~1`, which Lean sail-v4 expresses as
-`BitVec.update target 0 0#1` / `18446744073709551614#64 &&& target`. When
-the raw `target` is already 4-aligned, the low-bit clear is a no-op. -/
-axiom jump_to_of_mask_mod4_eq_zero (target : BitVec 64) (s : SailState)
-    (hs : SailState.isInitialized s) (h_aligned : target % 4#64 = 0) :
-    EStateM.run (jump_to (18446744073709551614#64 &&& target)) s =
-      EStateM.Result.ok LeanRV64D.Functions.RETIRE_SUCCESS
-        { s with regs := s.regs.insert Register.nextPC target }
-
-end sail_v4_control_flow

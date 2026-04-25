@@ -172,7 +172,6 @@ theorem JALR_correct
       generalize t = u
       intro hu
       bv_decide
-  -- Apply the masked-jump axiom and proceed.
   rw [h_target_eq]
   rw [jump_to_of_mod4_eq_zero _ _ (by clear *- hs; aesop) (by simpa using h_target_mod4)]
   simp [Std.ExtDHashMap.insert_insert, EStateM.Result.map]

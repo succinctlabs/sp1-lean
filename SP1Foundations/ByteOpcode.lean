@@ -1,6 +1,6 @@
 import SP1Foundations.BitVec
 
-/-- Operations that are handled axiomatically by byte tables.
+/-- Operations that are handled manually by byte tables.
 
 dt: I think a lot would work better if and/or/xor had their own sub-inductive type -/
 inductive ByteOpcode
