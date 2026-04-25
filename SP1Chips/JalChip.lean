@@ -3,9 +3,6 @@ import SP1Chips.Jal.Constraints
 
 namespace Jal
 
--- Unused variables expected because proofs are currently stopped.
-set_option linter.unusedVariables false
-
 open BitVec
 
 open Sail SailState BitVec LeanRV64D.Functions
@@ -60,7 +57,7 @@ theorem SP1JAL_correct
   have h17 : Main[17] < 65536 := by simp_all only
   have h_sign_extend : Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]] =
       BitVec.signExtend 64 (BitVec.ofNat 21 (↑Main[14] + ↑Main[15] * 65536)) := by
-    simp_all only; sorry
+    simp_all only [show (Opcode.ofNat 46) = Opcode.JAL from rfl]
   have hmod4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
       Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]) % 4 = 0 := by
     simp
@@ -68,8 +65,7 @@ theorem SP1JAL_correct
     · simp [ofNat_eq_ofNat, Fin.val_mod_eq_zero_iff_of_lt (show 4 < KB by decide)]
       simp_all only []
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
-      simp_all only [Fin.isValue, true_and]
-      sorry -- Assumption that Main[14] is a multiple of `4`.
+      simp_all only [show (Opcode.ofNat 46) = Opcode.JAL from rfl]
   have hmod  := (mul4_means_0_1_are_0 hmod4).2
   have hmod' := (mul4_means_0_1_are_0 hmod4).1
   simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]

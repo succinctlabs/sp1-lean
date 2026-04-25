@@ -22,7 +22,7 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 - ~~`ShiftRightChip.correct_srl/srli/srlw/srliw/sra/srai/sraw/sraiw`~~ — closed.
 - `BranchChip.correct_beq/bne/blt/bge/bltu/bgeu`
 - `DivRemChip.correct_div/divu/divw/divuw/rem/remu/remw/remuw` + `correct_prologue_facts` helper
-- `JalChip.SP1JAL_correct` + `op_a_lt32_of_constraints` helper
+- ~~`JalChip.SP1JAL_correct` + `op_a_lt32_of_constraints` helper~~ — closed (the two `sorry`s shared one root cause: the `(.send (.program …))` constraint's `Opcode.ofNat 46` literal didn't reduce, leaving `Opcode.trusted_instr (Opcode.ofNat 46) …` as an opaque `match`. Closed by `simp_all only [show (Opcode.ofNat 46) = Opcode.JAL from rfl]` at each site).
 
 ### Constraints.lean helpers stubbed/stopped
 
@@ -39,7 +39,7 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 
 ### Not done — deferred
 
-- `SP1Chips/JalrChip.lean` / `SP1Chips/Jalr/Constraints.lean` — the regeneration had changes beyond the `is_trusted` removal (size went 39 → 35, a −4 shift) that need case-by-case analysis.
+- ~~`SP1Chips/JalrChip.lean` / `SP1Chips/Jalr/Constraints.lean` — the regeneration had changes beyond the `is_trusted` removal (size went 39 → 35, a −4 shift) that need case-by-case analysis.~~ — closed. The new constraints encode the JALR low-bit mask explicitly: a new `Main[34] ∈ {0, 1}` indicator and a `(Main[26] - Main[34]) % 4 = 0` alignment check on the masked low limb. The proof drops the old `h_valid_pc` precondition (now derivable) and proves `mask &&& Word.toBitVec64 #v[Main[26..29]] = Word.toBitVec64 #v[Main[26]-Main[34], Main[27], Main[28], 0]` via a case split on `Main[34]` plus `bv_decide`. Width 39 → 35 also moved `is_real` from `Main[30]` to `Main[25]`, the AddOp result from `Main[31..34]` to `Main[26..29]`, the `rd` write value from `Main[35..38]` to `Main[30..33]`, and the opcode literal from 34 to 47.
 
 ## Index shifts applied per chip
 
