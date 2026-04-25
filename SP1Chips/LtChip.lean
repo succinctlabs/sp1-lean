@@ -30,8 +30,6 @@ def sp1_slt : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
 
-set_option maxHeartbeats 1000000 in
-
 -- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_slt
   (cstrs : (constraints Main).allHold)
@@ -96,8 +94,6 @@ def sp1_slti : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
 
-set_option maxHeartbeats 1000000 in
-
 -- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_slti
   (cstrs : (constraints Main).allHold)
@@ -131,7 +127,8 @@ theorem correct_slti
     simp [execute_ITYPE_pure_w]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
-    · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    · simp_all
+      rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (c := BitVec.ofNat 5 ↑Main[6] = 0#5) (by simp [← BitVec.toNat_inj]; omega)]
       apply LtOperationSigned.spec.signed at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]
@@ -164,8 +161,6 @@ def sp1_sltu : SailM Unit := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
-
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_sltu
@@ -230,8 +225,6 @@ def sp1_sltiu : SailM Unit := do
   let op_a := sp1_op_a Main
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
-
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across slt/slti/sltu/sltiu arms
 theorem correct_sltiu

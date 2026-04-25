@@ -69,7 +69,7 @@ theorem SP1JAL_correct
       simp_all only []
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [Fin.isValue, true_and]
-      sorry
+      sorry -- Assumption that Main[14] is a multiple of `4`.
   have hmod  := (mul4_means_0_1_are_0 hmod4).2
   have hmod' := (mul4_means_0_1_are_0 hmod4).1
   simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]

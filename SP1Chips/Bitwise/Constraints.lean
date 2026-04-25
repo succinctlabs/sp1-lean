@@ -181,11 +181,10 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   clear h_bop cpu
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
   · simp only [and_assoc] at alu
-    obtain ⟨ h0, h1, h2, h3, h21, h22, h23, h24, h4, h5, b_imm, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
+    obtain ⟨ h0, h1, h2, h21, h22, h23, h24, h4, h5, b_imm, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19 ⟩ := alu
     simp_all
     clear h1
     rcases real with xor | or | and <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
-    stop
     rcases b_imm <;> simp_all <;> apply Word.isU64_of_cases <;> simp <;>
       {simp_all; clear *- h21 h22 h23 h24 h19; aesop}
   · clear alu; rcases real with xor | or | and <;> simp_all

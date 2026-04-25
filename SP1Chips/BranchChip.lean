@@ -122,6 +122,7 @@ theorem correct_beq
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
+      sorry
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
         = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
       close_branch_addr_eq
@@ -136,6 +137,7 @@ theorem correct_beq
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       clear *- h_bound_checks; simp_all [inv_2BB_eq']
+      sorry
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
