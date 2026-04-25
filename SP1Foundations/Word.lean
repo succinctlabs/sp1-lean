@@ -1307,6 +1307,19 @@ lemma lt_65536_of_mul_inv_lt' (x : Fin KB) (h : (x * (256 : Fin KB)⁻¹).val < 
   rw [h256, Nat.mod_eq_of_lt (by omega)]
   omega
 
+/-- If `x * 4⁻¹` is range-checked to `< 16384` in `Fin KB` (i.e. it fits in 14
+bits as a quarter of a 16-bit limb), then `x.val < 65536`. Companion to
+`lt_65536_of_mul_inv_lt'` for the `4⁻¹` / 14-bit case used by branch-target
+limb checks. -/
+lemma lt_65536_of_mul_inv_4_lt (x : Fin KB) (h : (x * (4 : Fin KB)⁻¹).val < 16384) :
+    x.val < 65536 := by
+  have hne : (4 : Fin KB) ≠ 0 := by decide
+  have hinv : x * (4 : Fin KB)⁻¹ * 4 = x := by field_simp
+  rw [← hinv, Fin.val_mul]
+  have h4 : ((4 : Fin KB).val = 4) := by decide
+  rw [h4, Nat.mod_eq_of_lt (by omega)]
+  omega
+
 /-- Sign-extend a byte whose MSB is 1: produces 0xFFFFFFFFFFFFFF00 | byte. -/
 lemma signExtend64_ofNat8_of_ge_128 (x : Fin KB) (hlt : x.val < 256) (hge : 128 ≤ x.val) :
     BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
