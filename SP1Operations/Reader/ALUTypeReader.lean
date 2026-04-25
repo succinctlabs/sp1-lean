@@ -6,8 +6,6 @@ namespace ALUTypeReader
 
 attribute [-simp] Opcode.trusted_instr
 
-set_option maxHeartbeats 2000000 in
-
 -- iff-characterization of ALUTypeReader constraints
 lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
@@ -58,8 +56,6 @@ lemma allHold_constraints_iff :
       aesop
     · simp [hop_a_0]
       aesop
-
-set_option maxHeartbeats 1000000 in
 
 -- is-real specialization of constraint iff
 lemma allHold_constraints_iff_is_real (h : is_real = 1) :

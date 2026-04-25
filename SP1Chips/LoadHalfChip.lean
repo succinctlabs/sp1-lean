@@ -76,7 +76,6 @@ private lemma halfword_msb (a b : Fin KB)
       have : ((2 * a - 65536 : Fin KB).val : ℤ) < 65536 := by exact_mod_cast h_hi
       omega
 
-set_option maxHeartbeats 4000000 in
 -- correct_lh unfolds Load chip + Sail 2-byte memory read
 theorem correct_lh (Main : Vector (Fin KB) 44)
     (s : SailState) (hs : SailState.isInitialized s)
@@ -299,7 +298,6 @@ theorem correct_lh (Main : Vector (Fin KB) 44)
             rw [he39, he40]; ring]
       exact hL7
 
-set_option maxHeartbeats 4000000 in
 -- correct_lhu unfolds Load chip + Sail 2-byte memory read
 theorem correct_lhu (Main : Vector (Fin KB) 44)
     (s : SailState) (hs : SailState.isInitialized s)

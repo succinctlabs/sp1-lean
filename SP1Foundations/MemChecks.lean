@@ -1219,8 +1219,6 @@ lemma run_vmem_read_of_width_4'
     BitVec.setWidth_eq]
   rfl
 
-set_option maxHeartbeats 2000000 in
-
 -- deeply nested `run_vmem_read` unfolds
 lemma run_vmem_read_of_width_8'
     (rs_addr_bv : BitVec 5)

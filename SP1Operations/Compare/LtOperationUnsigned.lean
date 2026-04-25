@@ -49,8 +49,6 @@ lemma cl_are_U16
       simp only [zero_mul, one_mul, mul_zero, mul_one, zero_add, add_zero] at h_e0 h_e1 <;>
       constructor <;> omega
 
-set_option maxHeartbeats 1000000 in
-
 -- arithmetic spec proof over Word/BitVec
 @[grind →, aesop safe forward]
 lemma spec.nat

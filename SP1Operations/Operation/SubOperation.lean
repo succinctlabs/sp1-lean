@@ -4,8 +4,6 @@ import SP1Operations.Operation.SubOperation.Constraints
 
 namespace SubOperation
 
-set_option maxHeartbeats 2000000 in
-
 -- iff-characterization of constraints
 lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : SubOperation) :
     List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔

@@ -30,8 +30,6 @@ def sp1_subw : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535])
 
-set_option maxHeartbeats 1000000 in
-
 -- correctness proof across instruction arms
 theorem correct_subw
   (cstrs : (constraints Main).allHold)

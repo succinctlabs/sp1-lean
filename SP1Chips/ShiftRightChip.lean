@@ -7,9 +7,6 @@ import SP1Chips.ShiftRight.Constraints
 open LeanRV64D.Functions
 open BitVec
 
-set_option linter.style.setOption false
-set_option maxHeartbeats 10000000
-
 namespace Srl
 
 open ShiftRight
@@ -31,7 +28,6 @@ def sp1_srl : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_srl
@@ -90,7 +86,6 @@ def sp1_srli : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_srli
@@ -149,7 +144,6 @@ def sp1_srlw : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_srlw
@@ -208,7 +202,6 @@ def sp1_srliw : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_srliw
@@ -267,7 +260,6 @@ def sp1_sra : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_sra
@@ -326,7 +318,6 @@ def sp1_srai : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_srai
@@ -385,7 +376,6 @@ def sp1_sraw : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_sraw
@@ -444,7 +434,6 @@ def sp1_sraiw : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
-set_option maxHeartbeats 1000000 in
 
 -- correctness proof across srl/sra/srlw/sraw arms
 theorem correct_sraiw

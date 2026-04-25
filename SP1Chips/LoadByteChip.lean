@@ -32,7 +32,6 @@ noncomputable def spec_lbu (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Executio
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_LOAD imm rs1 rs2 (is_unsigned := true) (width := 1)
 
-set_option maxHeartbeats 2000000 in
 -- correct_lb unfolds Load chip + Sail memory read spec
 theorem correct_lb (Main : Vector (Fin KB) 47)
     (s : SailState) (hs : SailState.isInitialized s)
@@ -264,7 +263,6 @@ theorem correct_lb (Main : Vector (Fin KB) 47)
       clear *- h_decomp h42_lt h43_lt
       omega
 
-set_option maxHeartbeats 2000000 in
 -- correct_lbu unfolds Load chip + Sail memory read spec
 theorem correct_lbu (Main : Vector (Fin KB) 47)
     (s : SailState) (hs : SailState.isInitialized s)

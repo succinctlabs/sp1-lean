@@ -6,9 +6,6 @@ import SP1Chips.Mul.Constraints
 open LeanRV64D.Functions
 open BitVec
 
-set_option linter.style.setOption false
-set_option maxHeartbeats 10000000
-
 namespace Mul
 
 open Mul

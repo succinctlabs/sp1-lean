@@ -4,9 +4,6 @@ import SP1Operations.Reader.ALUTypeReader
 
 namespace Bitwise
 
-set_option linter.style.setOption false
-set_option maxHeartbeats 100000000
-
 variable (Main : Vector (Fin KB) 51)
 def is_real : Prop := Main[48] = 1 ∨ Main[49] = 1 ∨ Main[50] = 1
 

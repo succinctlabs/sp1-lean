@@ -27,8 +27,6 @@ lemma allHold_constraints_iff
     (is_signed = 1 ∨ cols.c_msb.msb = 0)
   := by simp [constraints, sub_eq_zero]
 
-set_option maxHeartbeats 1000000 in
-
 -- spec proof with 32-bit comparison lemmas
 lemma spec.unsigned
   {b : Word (Fin KB)}
@@ -48,8 +46,6 @@ lemma spec.unsigned
     · simp_all [execute_RTYPE_pure_w, Word.toNat]
     · apply Word.isU64_of_cases <;> simp_all
     · apply Word.isU64_of_cases <;> simp_all
-
-set_option maxHeartbeats 1000000 in
 
 -- spec proof with 32-bit comparison lemmas
 lemma spec.signed

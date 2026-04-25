@@ -4,10 +4,8 @@ import SP1Operations.Reader.RTypeReader
 
 namespace Mul
 
-set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 set_option linter.style.multiGoal false
-set_option maxHeartbeats 100000000
 
 variable (Main : Vector (Fin KB) 82)
 def is_real : Prop := Main[77] = 1 ∨ Main[78] = 1 ∨ Main[79] = 1 ∨ Main[80] = 1 ∨ Main[81] = 1

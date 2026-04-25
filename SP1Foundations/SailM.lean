@@ -11,7 +11,6 @@ open LeanRV64D.Functions
 
 set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
-set_option linter.style.multiGoal false
 -- Sail-bridge `simp` and `run_*` lemmas unfold deep `SailM` monadic programs.
 set_option maxHeartbeats 10000000
 
@@ -1015,24 +1014,24 @@ lemma div_overflow {x y : ℤ} :
       (9223372036854775808 ≤ x.tdiv y ↔ x = -9223372036854775808 ∧ y = -1) := by
   intro hx hy
   constructor <;> intro hc
-  have : (x.tdiv y).sign = 1 := by rw [Int.sign_cases, if_neg (by omega), if_neg (by omega)]
-  rw [Int.sign_tdiv] at this
-  split_ifs at this with hyp <;> [ simp_all; clear hyp ]
-  · simp [Int.sign_cases] at this
-    split_ifs at this <;> simp_all
-    · suffices : -x = 9223372036854775808 ∧ -y = 1
-      · omega
-      · have eq : x.tdiv y = (-x).tdiv (-y) := by simp
-        rw [eq, Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
-        by_cases yone : -y = 1
+  · have : (x.tdiv y).sign = 1 := by rw [Int.sign_cases, if_neg (by omega), if_neg (by omega)]
+    rw [Int.sign_tdiv] at this
+    split_ifs at this with hyp <;> [ simp_all; clear hyp ]
+    · simp [Int.sign_cases] at this
+      split_ifs at this <;> simp_all
+      · suffices : -x = 9223372036854775808 ∧ -y = 1
+        · omega
+        · have eq : x.tdiv y = (-x).tdiv (-y) := by simp
+          rw [eq, Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
+          by_cases yone : -y = 1
+          · simp_all; omega
+          · have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
+            omega
+      · rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
+        by_cases yone : y = 1
         · simp_all; omega
-        · have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
+        · have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
           omega
-    · rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
-      by_cases yone : y = 1
-      · simp_all; omega
-      · have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
-        omega
   · simp_all
 
 @[simp]
@@ -1062,10 +1061,9 @@ lemma execute_DIV'_eq_execute_DIV :
   · by_cases of : 9223372036854775808 ≤ r1.toInt.tdiv r2.toInt <;>
     have of' := div_overflow range_int_r1 range_int_r2 <;>
     simp_all [to_bits_truncate, Sail.get_slice_int]
-    simp [BitVec.ofNat, BitVec.ofInt]
-    all_goals (first
-      | (congr 1; done)
-      | (rw [← BitVec.toNat_inj]; simp [BitVec.toNat_ofInt]; omega))
+    · simp [BitVec.ofNat, BitVec.ofInt]
+      congr 1
+    · rw [← BitVec.toNat_inj]; simp [BitVec.toNat_ofInt]; omega
 
 lemma divw_overflow {x y : ℤ} :
   -2147483648 ≤ x ∧ x < 2147483648 →
@@ -1073,24 +1071,24 @@ lemma divw_overflow {x y : ℤ} :
       (2147483648 ≤ x.tdiv y ↔ x = -2147483648 ∧ y = -1) := by
   intro hx hy
   constructor <;> intro hc
-  have : (x.tdiv y).sign = 1 := by rw [Int.sign_cases, if_neg (by omega), if_neg (by omega)]
-  rw [Int.sign_tdiv] at this
-  split_ifs at this with hyp <;> [ simp_all; clear hyp ]
-  · simp [Int.sign_cases] at this
-    split_ifs at this <;> simp_all
-    · suffices : -x = 2147483648 ∧ -y = 1
-      · omega
-      · have eq : x.tdiv y = (-x).tdiv (-y) := by simp
-        rw [eq, Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
-        by_cases yone : -y = 1
+  · have : (x.tdiv y).sign = 1 := by rw [Int.sign_cases, if_neg (by omega), if_neg (by omega)]
+    rw [Int.sign_tdiv] at this
+    split_ifs at this with hyp <;> [ simp_all; clear hyp ]
+    · simp [Int.sign_cases] at this
+      split_ifs at this <;> simp_all
+      · suffices : -x = 2147483648 ∧ -y = 1
+        · omega
+        · have eq : x.tdiv y = (-x).tdiv (-y) := by simp
+          rw [eq, Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
+          by_cases yone : -y = 1
+          · simp_all; omega
+          · have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
+            omega
+      · rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
+        by_cases yone : y = 1
         · simp_all; omega
-        · have := @Int.ediv_lt_self_of_pos_of_ne_one (-x) (-y) (by omega) (by omega)
+        · have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
           omega
-    · rw [Int.tdiv_eq_ediv_of_nonneg (by omega)] at hc
-      by_cases yone : y = 1
-      · simp_all; omega
-      · have := @Int.ediv_lt_self_of_pos_of_ne_one x y (by omega) (by omega)
-        omega
   · simp_all
 
 lemma BitVec.signExtend_ofInt {x : ℤ} (lb : -2147483648 ≤ x) (ub : x < 2147483648) :

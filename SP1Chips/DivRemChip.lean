@@ -14,7 +14,6 @@ open BitVec
 set_option linter.style.setOption false
 -- Unused variables expected because correct_* proofs are currently stopped.
 set_option linter.unusedVariables false
-set_option maxHeartbeats 10000000
 
 open DivRem
 
@@ -24,7 +23,6 @@ variable
   (cstrs : (constraints Main).allHold)
   (h_is_real : is_real Main)
 
-set_option maxHeartbeats 1000000 in
 
 -- bundled prologue unfolds 247-column constraint list
 set_option maxRecDepth 1000000 in
@@ -83,7 +81,6 @@ def spec_div (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_DIV rs2 rs1 rd false
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
@@ -123,7 +120,6 @@ def spec_divu (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_DIV rs2 rs1 rd true
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
@@ -163,7 +159,6 @@ def spec_divw (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_DIVW rs2 rs1 rd false
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
@@ -203,7 +198,6 @@ def spec_divuw (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_DIVW rs2 rs1 rd true
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
@@ -243,7 +237,6 @@ def spec_rem (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_REM rs2 rs1 rd false
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
@@ -283,7 +276,6 @@ def spec_remu (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_REM rs2 rs1 rd true
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
@@ -323,7 +315,6 @@ def spec_remw (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_REMW rs2 rs1 rd false
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in
@@ -363,7 +354,6 @@ def spec_remuw (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_REMW rs2 rs1 rd true
   pure ()
 
-set_option maxHeartbeats 1000000 in
 
 -- whole-chip correctness across DIV/DIVU/DIVW/etc arms
 set_option maxRecDepth 1000000 in

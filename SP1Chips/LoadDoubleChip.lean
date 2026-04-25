@@ -98,7 +98,6 @@ private lemma byteConcat8_toNat_eq_Word_toNat
   have : 2 ^ 48 = 281474976710656 := by norm_num
   omega
 
-set_option maxHeartbeats 2000000 in
 -- correct_ld unfolds Load chip + Sail 8-byte memory read
 theorem correct_ld (Main : Vector (Fin KB) 39)
     (s : SailState) (hs : SailState.isInitialized s)
