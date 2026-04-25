@@ -17,16 +17,8 @@ variable (Main : Vector (Fin KB) 31) (s : SailState)
 
 lemma op_a_lt32_of_constraints {Main : Vector (Fin KB) 31}
     (h_cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1) : Main[6].val < 32 := by
-  stop
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h_cstrs
-  have h22 : Main[22] = 1 := by
-    have h31_22 : Main[30] - Main[22] = 0 :=
-      (h_cstrs.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.1).resolve_right (by decide)
-    rw [← h_is_real]; exact (sub_eq_zero.mp h31_22).symm
-  have h : Main[6] < 32 := by simp_all only [Fin.isValue, one_ne_zero, sub_self,
-    or_true, not_false_eq_true, forall_const, true_or, true_and]
-  simp_all only [Fin.isValue, gt_iff_lt]
-  exact h
+  aesop
 
 def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1) : BitVec 5 :=
   Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
@@ -52,20 +44,13 @@ theorem SP1JAL_correct
     let op_a := sp1_op_a Main cstrs h_is_real
     let op_b := sp1_op_b Main
     (spec_jal op_b (.Regidx op_a)).run s = (sp1_jal Main).run s := by
-  have _ := state_cstrs
-  have _ := hs
-  stop
   extract_lets op_a op_b
   have h_op_a : Main[6] < 32 := op_a_lt32_of_constraints cstrs h_is_real
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
-    AddOperation.constraints, h_is_real, h_op_a] at state_cstrs
+    AddOperation.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, h⟩ := state_cstrs
-  -- specialize h (by aesop)
   simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp, sub_eq_zero,
     h_is_real, Fin.isValue, true_and] at cstrs
-  have h22 : Main[22] = 1 := by
-    exact (cstrs.2.2.2.2.2.2.2.2.2.2.2.2.1).resolve_right (by decide) |>.symm
-  simp [h22] at *
   have h3 : Main[3] < 65536 := by simp_all only
   have h4 : Main[4] < 65536 := by simp_all only
   have h5 : Main[5] < 65536 := by simp_all only
@@ -75,7 +60,7 @@ theorem SP1JAL_correct
   have h17 : Main[17] < 65536 := by simp_all only
   have h_sign_extend : Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]] =
       BitVec.signExtend 64 (BitVec.ofNat 21 (↑Main[14] + ↑Main[15] * 65536)) := by
-    simp_all only
+    simp_all only; sorry
   have hmod4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
       Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]) % 4 = 0 := by
     simp
@@ -84,6 +69,7 @@ theorem SP1JAL_correct
       simp_all only []
     · simp only [ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff]
       simp_all only [Fin.isValue, true_and]
+      sorry
   have hmod  := (mul4_means_0_1_are_0 hmod4).2
   have hmod' := (mul4_means_0_1_are_0 hmod4).1
   simp [spec_jal, sp1_jal, execute_JAL, op_a, op_b, sp1_op_b, sp1_op_a]

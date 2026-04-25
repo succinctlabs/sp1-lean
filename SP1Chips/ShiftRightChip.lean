@@ -42,8 +42,6 @@ theorem correct_srl
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   (spec_srl (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srl Main cstrs h_is_srl).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ srl, imm ⟩ := h_is_srl
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srl_real Main srl)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
@@ -103,8 +101,6 @@ theorem correct_srli
   let op_a := sp1_op_a Main cstrs (srl_real Main srl)
   (spec_srli op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srli Main cstrs h_is_srli).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ srl, imm ⟩ := h_is_srli
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srl_real Main srl)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srl_real Main srl)
@@ -164,8 +160,6 @@ theorem correct_srlw
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   (spec_srlw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srlw Main cstrs h_is_srlw).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ srlw, imm ⟩ := h_is_srlw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
@@ -225,8 +219,6 @@ theorem correct_srliw
   let op_a := sp1_op_a Main cstrs (srlw_real Main srlw)
   (spec_srliw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srliw Main cstrs h_is_srliw).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ srlw, imm ⟩ := h_is_srliw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (srlw_real Main srlw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (srlw_real Main srlw)
@@ -286,8 +278,6 @@ theorem correct_sra
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   (spec_sra (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sra Main cstrs h_is_sra).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ sra, imm ⟩ := h_is_sra
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sra_real Main sra)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
@@ -347,8 +337,6 @@ theorem correct_srai
   let op_a := sp1_op_a Main cstrs (sra_real Main sra)
   (spec_srai op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srai Main cstrs h_is_srai).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ sra, imm ⟩ := h_is_srai
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sra_real Main sra)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sra_real Main sra)
@@ -408,8 +396,6 @@ theorem correct_sraw
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   (spec_sraw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraw Main cstrs h_is_sraw).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ sraw, imm ⟩ := h_is_sraw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)
@@ -469,8 +455,6 @@ theorem correct_sraiw
   let op_a := sp1_op_a Main cstrs (sraw_real Main sraw)
   (spec_sraiw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraiw Main cstrs h_is_sraiw).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ sraw, imm ⟩ := h_is_sraiw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (sraw_real Main sraw)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (sraw_real Main sraw)

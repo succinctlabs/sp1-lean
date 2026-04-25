@@ -39,8 +39,6 @@ theorem correct_xor
   let op_a := sp1_op_a Main cstrs (xor_real Main xor)
   (spec_xor (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xor Main cstrs h_is_xor).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ xor, imm ⟩ := h_is_xor
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (xor_real Main xor)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main xor)
@@ -57,10 +55,13 @@ theorem correct_xor
     simp [spec_xor, sp1_xor, execute, execute_RTYPE']
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
-    · rw [if_neg (by simpa [← BitVec.toNat_inj])]
+    by_cases h_is_op_a_0 : Main[6] = 0
+    · simp_all
+      simp [Word.toBitVec64, ← BitVec.ofNat_add, Word.toNat]
+      refine congr_arg (BitVec.ofNat 64) ?_
+      fin_omega
+    · simp_all
+      rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_RTYPE_pure_bv_to_w _ _ _ (by omega) (by omega)]
       have := spec.xor Main ⟨ xor, imm ⟩ cstrs
@@ -100,8 +101,6 @@ theorem correct_xori
   let op_a := sp1_op_a Main cstrs (xor_real Main xor)
   (spec_xori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xori Main cstrs h_is_xori).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ xor, imm ⟩ := h_is_xori
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (xor_real Main xor)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (xor_real Main xor)
@@ -162,8 +161,6 @@ theorem correct_or
   let op_a := sp1_op_a Main cstrs (or_real Main or)
   (spec_or (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_or Main cstrs h_is_or).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ or, imm ⟩ := h_is_or
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (or_real Main or)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main or)
@@ -181,7 +178,7 @@ theorem correct_or
     rw [Sail.run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-    · simp [Word.toBitVec64, Word.toNat]
+    · simp_all [Word.toBitVec64, Word.toNat]
       exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
@@ -223,8 +220,6 @@ theorem correct_ori
   let op_a := sp1_op_a Main cstrs (or_real Main or)
   (spec_ori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_ori Main cstrs h_is_ori).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ or, imm ⟩ := h_is_ori
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (or_real Main or)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (or_real Main or)
@@ -285,8 +280,6 @@ theorem correct_and
   let op_a := sp1_op_a Main cstrs (and_real Main and)
   (spec_and (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_and Main cstrs h_is_and).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ and, imm ⟩ := h_is_and
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (and_real Main and)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main and)
@@ -346,8 +339,6 @@ theorem correct_andi
   let op_a := sp1_op_a Main cstrs (and_real Main and)
   (spec_andi op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_andi Main cstrs h_is_andi).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ and, imm ⟩ := h_is_andi
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (and_real Main and)
     have ⟨ is_U64_a, is_U64_b, is_U64_c ⟩ := ops_U64 Main cstrs (and_real Main and)

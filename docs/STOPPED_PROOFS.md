@@ -19,7 +19,7 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 - ~~`LtChip.correct_slt/slti/sltu/sltiu` (plus `sp1_op_a/b/c` defs inside the chip file)~~ — closed.
 - ~~`MulChip.correct_mul/mulh/mulhu/mulhsu/mulw`~~ — closed.
 - ~~`ShiftLeftChip.correct_sll/slli/sllw/slliw`~~ — closed.
-- `ShiftRightChip.correct_srl/srli/srlw/srliw/sra/srai/sraw/sraiw`
+- ~~`ShiftRightChip.correct_srl/srli/srlw/srliw/sra/srai/sraw/sraiw`~~ — closed.
 - `BranchChip.correct_beq/bne/blt/bge/bltu/bgeu`
 - `DivRemChip.correct_div/divu/divw/divuw/rem/remu/remw/remuw` + `correct_prologue_facts` helper
 - `JalChip.SP1JAL_correct` + `op_a_lt32_of_constraints` helper
@@ -33,7 +33,7 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 - ~~`Lt/Constraints.lean` — 4 `allHold_constraints_iff_*` lemmas stopped (simple `simp_all; intros; omega` proofs that timed out)~~ — closed (added `Main[13] = 0` clause to each iff RHS).
 - ~~`Mul/Constraints.lean` — `allHold_constraints_iff`, `single_op`, `register_bounds`, `op_a_is_0`, `ops_U64_b_c`, `sp1_op_a/b/c`, `spec.mul/mulh/mulhu/mulhsu/mulw` stopped~~ — closed (corrected `Main[81] * 47 → * 24` opcode literal and added `Main[13] = 0` clause).
 - ~~`ShiftLeft/Constraints.lean` — `allHold_constraints_iff`, `cancel_mul_65536`, `is_mod_64`, `single_op`, `sll_real`, `sllw_real`, `bounds`, `sp1_op_a/b/c/c_imm/c_imm_w`, `spec.sll/slli/sllw/slliw` stopped~~ — closed.
-- `ShiftRight/Constraints.lean` — many stops; `set_option linter.unusedVariables false` file-wide
+- ~~`ShiftRight/Constraints.lean` — many stops; `set_option linter.unusedVariables false` file-wide~~ — closed (added `Main[13] = 0` clause to iff RHS, corrected opcode literal `srlw * 42 + sraw * 43 → * 22 + * 23`).
 - `Branch/Constraints.lean` — `single_op`, `is_trusted_of_constraints`, `eq_signExtend_of_is_real`, `add_signExtend_of_constraints` stopped
 - `DivRem/Constraints.lean` — many stops; `set_option linter.unusedVariables false` file-wide
 
