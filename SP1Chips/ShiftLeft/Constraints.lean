@@ -16,208 +16,208 @@ section constraints
 
 -- Generated Lean code for chip ShiftLeftChip
 @[irreducible] def constraints (Main : Vector (Fin KB) 65) : SP1ConstraintList :=
-  let E0 : Fin KB := Main[61] + Main[62]
+  let E0 : Fin KB := Main[62] + Main[63]
   let E1 : Fin KB := E0 - 1
   let E2 : Fin KB := E0 * E1
-  let E3 : Fin KB := Main[61] - 1
-  let E4 : Fin KB := Main[61] * E3
-  let E5 : Fin KB := Main[62] - 1
-  let E6 : Fin KB := Main[62] * E5
-  let E7 : Fin KB := Main[35] - 1
-  let E8 : Fin KB := Main[35] * E7
-  let E9 : Fin KB := Main[36] - 1
-  let E10 : Fin KB := Main[36] * E9
-  let E11 : Fin KB := Main[37] - 1
-  let E12 : Fin KB := Main[37] * E11
-  let E13 : Fin KB := Main[38] - 1
-  let E14 : Fin KB := Main[38] * E13
-  let E15 : Fin KB := Main[39] - 1
-  let E16 : Fin KB := Main[39] * E15
-  let E17 : Fin KB := Main[40] - 1
-  let E18 : Fin KB := Main[40] * E17
-  let E19 : Fin KB := Main[35] * 1
+  let E3 : Fin KB := Main[62] - 1
+  let E4 : Fin KB := Main[62] * E3
+  let E5 : Fin KB := Main[63] - 1
+  let E6 : Fin KB := Main[63] * E5
+  let E7 : Fin KB := Main[36] - 1
+  let E8 : Fin KB := Main[36] * E7
+  let E9 : Fin KB := Main[37] - 1
+  let E10 : Fin KB := Main[37] * E9
+  let E11 : Fin KB := Main[38] - 1
+  let E12 : Fin KB := Main[38] * E11
+  let E13 : Fin KB := Main[39] - 1
+  let E14 : Fin KB := Main[39] * E13
+  let E15 : Fin KB := Main[40] - 1
+  let E16 : Fin KB := Main[40] * E15
+  let E17 : Fin KB := Main[41] - 1
+  let E18 : Fin KB := Main[41] * E17
+  let E19 : Fin KB := Main[36] * 1
   let E20 : Fin KB := 0 + E19
-  let E21 : Fin KB := Main[36] * 2
+  let E21 : Fin KB := Main[37] * 2
   let E22 : Fin KB := E20 + E21
-  let E23 : Fin KB := Main[37] * 4
+  let E23 : Fin KB := Main[38] * 4
   let E24 : Fin KB := E22 + E23
-  let E25 : Fin KB := Main[38] * 8
+  let E25 : Fin KB := Main[39] * 8
   let E26 : Fin KB := E24 + E25
-  let E27 : Fin KB := Main[39] * 16
+  let E27 : Fin KB := Main[40] * 16
   let E28 : Fin KB := E26 + E27
-  let E29 : Fin KB := Main[40] * 32
+  let E29 : Fin KB := Main[41] * 32
   let E30 : Fin KB := E28 + E29
   let E31 : Fin KB := Main[25] - E30
   let E32 : Fin KB := E31 * 2097414145
-  let E33 : Fin KB := Main[40] * 2
-  let E34 : Fin KB := E33 * Main[61]
-  let E35 : Fin KB := Main[39] + E34
+  let E33 : Fin KB := Main[41] * 2
+  let E34 : Fin KB := E33 * Main[62]
+  let E35 : Fin KB := Main[40] + E34
   let E36 : Fin KB := E35 - 0
-  let E37 : Fin KB := Main[44] * E36
-  let E38 : Fin KB := Main[44] - 1
-  let E39 : Fin KB := Main[44] * E38
-  let E40 : Fin KB := Main[40] * 2
-  let E41 : Fin KB := E40 * Main[61]
-  let E42 : Fin KB := Main[39] + E41
+  let E37 : Fin KB := Main[45] * E36
+  let E38 : Fin KB := Main[45] - 1
+  let E39 : Fin KB := Main[45] * E38
+  let E40 : Fin KB := Main[41] * 2
+  let E41 : Fin KB := E40 * Main[62]
+  let E42 : Fin KB := Main[40] + E41
   let E43 : Fin KB := E42 - 1
-  let E44 : Fin KB := Main[45] * E43
-  let E45 : Fin KB := Main[45] - 1
-  let E46 : Fin KB := Main[45] * E45
-  let E47 : Fin KB := Main[40] * 2
-  let E48 : Fin KB := E47 * Main[61]
-  let E49 : Fin KB := Main[39] + E48
+  let E44 : Fin KB := Main[46] * E43
+  let E45 : Fin KB := Main[46] - 1
+  let E46 : Fin KB := Main[46] * E45
+  let E47 : Fin KB := Main[41] * 2
+  let E48 : Fin KB := E47 * Main[62]
+  let E49 : Fin KB := Main[40] + E48
   let E50 : Fin KB := E49 - 2
-  let E51 : Fin KB := Main[46] * E50
-  let E52 : Fin KB := Main[46] - 1
-  let E53 : Fin KB := Main[46] * E52
-  let E54 : Fin KB := Main[40] * 2
-  let E55 : Fin KB := E54 * Main[61]
-  let E56 : Fin KB := Main[39] + E55
+  let E51 : Fin KB := Main[47] * E50
+  let E52 : Fin KB := Main[47] - 1
+  let E53 : Fin KB := Main[47] * E52
+  let E54 : Fin KB := Main[41] * 2
+  let E55 : Fin KB := E54 * Main[62]
+  let E56 : Fin KB := Main[40] + E55
   let E57 : Fin KB := E56 - 3
-  let E58 : Fin KB := Main[47] * E57
-  let E59 : Fin KB := Main[47] - 1
-  let E60 : Fin KB := Main[47] * E59
-  let E61 : Fin KB := Main[44] + Main[45]
-  let E62 : Fin KB := E61 + Main[46]
-  let E63 : Fin KB := E62 + Main[47]
+  let E58 : Fin KB := Main[48] * E57
+  let E59 : Fin KB := Main[48] - 1
+  let E60 : Fin KB := Main[48] * E59
+  let E61 : Fin KB := Main[45] + Main[46]
+  let E62 : Fin KB := E61 + Main[47]
+  let E63 : Fin KB := E62 + Main[48]
   let E64 : Fin KB := E63 - 1
   let E65 : Fin KB := E0 * E64
-  let E66 : Fin KB := Main[35] + 1
-  let E67 : Fin KB := Main[36] * 3
+  let E66 : Fin KB := Main[36] + 1
+  let E67 : Fin KB := Main[37] * 3
   let E68 : Fin KB := E67 + 1
   let E69 : Fin KB := E66 * E68
-  let E70 : Fin KB := Main[41] - E69
-  let E71 : Fin KB := Main[37] * 15
+  let E70 : Fin KB := Main[42] - E69
+  let E71 : Fin KB := Main[38] * 15
   let E72 : Fin KB := E71 + 1
-  let E73 : Fin KB := Main[41] * E72
-  let E74 : Fin KB := Main[42] - E73
-  let E75 : Fin KB := Main[38] * 255
+  let E73 : Fin KB := Main[42] * E72
+  let E74 : Fin KB := Main[43] - E73
+  let E75 : Fin KB := Main[39] * 255
   let E76 : Fin KB := E75 + 1
-  let E77 : Fin KB := Main[42] * E76
-  let E78 : Fin KB := Main[43] - E77
+  let E77 : Fin KB := Main[43] * E76
+  let E78 : Fin KB := Main[44] - E77
   let E79 : Fin KB := 16 - E26
-  let E80 : Fin KB := Main[15] * Main[43]
-  let E81 : Fin KB := Main[52] * 65536
-  let E82 : Fin KB := Main[48] * Main[43]
+  let E80 : Fin KB := Main[15] * Main[44]
+  let E81 : Fin KB := Main[53] * 65536
+  let E82 : Fin KB := Main[49] * Main[44]
   let E83 : Fin KB := E81 + E82
   let E84 : Fin KB := E80 - E83
   let E85 : Fin KB := 16 - E26
-  let E86 : Fin KB := Main[16] * Main[43]
-  let E87 : Fin KB := Main[53] * 65536
-  let E88 : Fin KB := Main[49] * Main[43]
+  let E86 : Fin KB := Main[16] * Main[44]
+  let E87 : Fin KB := Main[54] * 65536
+  let E88 : Fin KB := Main[50] * Main[44]
   let E89 : Fin KB := E87 + E88
   let E90 : Fin KB := E86 - E89
   let E91 : Fin KB := 16 - E26
-  let E92 : Fin KB := Main[17] * Main[43]
-  let E93 : Fin KB := Main[54] * 65536
-  let E94 : Fin KB := Main[50] * Main[43]
+  let E92 : Fin KB := Main[17] * Main[44]
+  let E93 : Fin KB := Main[55] * 65536
+  let E94 : Fin KB := Main[51] * Main[44]
   let E95 : Fin KB := E93 + E94
   let E96 : Fin KB := E92 - E95
   let E97 : Fin KB := 16 - E26
-  let E98 : Fin KB := Main[18] * Main[43]
-  let E99 : Fin KB := Main[55] * 65536
-  let E100 : Fin KB := Main[51] * Main[43]
+  let E98 : Fin KB := Main[18] * Main[44]
+  let E99 : Fin KB := Main[56] * 65536
+  let E100 : Fin KB := Main[52] * Main[44]
   let E101 : Fin KB := E99 + E100
   let E102 : Fin KB := E98 - E101
-  let E103 : Fin KB := Main[48] * Main[43]
-  let E104 : Fin KB := Main[56] - E103
-  let E105 : Fin KB := Main[49] * Main[43]
-  let E106 : Fin KB := E105 + Main[52]
-  let E107 : Fin KB := Main[57] - E106
-  let E108 : Fin KB := Main[50] * Main[43]
-  let E109 : Fin KB := E108 + Main[53]
-  let E110 : Fin KB := Main[58] - E109
-  let E111 : Fin KB := Main[51] * Main[43]
-  let E112 : Fin KB := E111 + Main[54]
-  let E113 : Fin KB := Main[59] - E112
-  let E114 : Fin KB := Main[32] - Main[56]
-  let E115 : Fin KB := Main[44] * E114
-  let E116 : Fin KB := Main[61] * E115
-  let E117 : Fin KB := Main[32] - Main[57]
-  let E118 : Fin KB := Main[44] * E117
-  let E119 : Fin KB := Main[61] * E118
-  let E120 : Fin KB := Main[33] - Main[58]
-  let E121 : Fin KB := Main[44] * E120
-  let E122 : Fin KB := Main[61] * E121
-  let E123 : Fin KB := Main[34] - Main[59]
-  let E124 : Fin KB := Main[44] * E123
-  let E125 : Fin KB := Main[61] * E124
-  let E126 : Fin KB := Main[45] * Main[32]
-  let E127 : Fin KB := Main[61] * E126
-  let E128 : Fin KB := Main[32] - Main[56]
-  let E129 : Fin KB := Main[45] * E128
-  let E130 : Fin KB := Main[61] * E129
-  let E131 : Fin KB := Main[33] - Main[57]
-  let E132 : Fin KB := Main[45] * E131
-  let E133 : Fin KB := Main[61] * E132
-  let E134 : Fin KB := Main[34] - Main[58]
-  let E135 : Fin KB := Main[45] * E134
-  let E136 : Fin KB := Main[61] * E135
-  let E137 : Fin KB := Main[46] * Main[32]
-  let E138 : Fin KB := Main[61] * E137
-  let E139 : Fin KB := Main[46] * Main[32]
-  let E140 : Fin KB := Main[61] * E139
-  let E141 : Fin KB := Main[33] - Main[56]
-  let E142 : Fin KB := Main[46] * E141
-  let E143 : Fin KB := Main[61] * E142
-  let E144 : Fin KB := Main[34] - Main[57]
-  let E145 : Fin KB := Main[46] * E144
-  let E146 : Fin KB := Main[61] * E145
-  let E147 : Fin KB := Main[47] * Main[32]
-  let E148 : Fin KB := Main[61] * E147
-  let E149 : Fin KB := Main[47] * Main[32]
-  let E150 : Fin KB := Main[61] * E149
-  let E151 : Fin KB := Main[47] * Main[33]
-  let E152 : Fin KB := Main[61] * E151
-  let E153 : Fin KB := Main[34] - Main[56]
-  let E154 : Fin KB := Main[47] * E153
-  let E155 : Fin KB := Main[61] * E154
-  let E156 : Fin KB := Main[32] - Main[56]
-  let E157 : Fin KB := Main[44] * E156
-  let E158 : Fin KB := Main[62] * E157
-  let E159 : Fin KB := Main[32] - Main[57]
-  let E160 : Fin KB := Main[44] * E159
-  let E161 : Fin KB := Main[62] * E160
-  let E162 : Fin KB := Main[45] * Main[32]
-  let E163 : Fin KB := Main[62] * E162
-  let E164 : Fin KB := Main[32] - Main[56]
-  let E165 : Fin KB := Main[45] * E164
-  let E166 : Fin KB := Main[62] * E165
-  let E167 : Fin KB := Main[60] * 65535
-  let E168 : Fin KB := E167 - Main[33]
-  let E169 : Fin KB := Main[62] * E168
-  let E170 : Fin KB := Main[60] * 65535
-  let E171 : Fin KB := E170 - Main[34]
-  let E172 : Fin KB := Main[62] * E171
-  let CS0 : SP1ConstraintList := U16MSBOperation.constraints Main[32] { msb := Main[60] } Main[62]
-  let E173 : Fin KB := Main[61] * 6
-  let E174 : Fin KB := Main[62] * 21
+  let E103 : Fin KB := Main[49] * Main[44]
+  let E104 : Fin KB := Main[57] - E103
+  let E105 : Fin KB := Main[50] * Main[44]
+  let E106 : Fin KB := E105 + Main[53]
+  let E107 : Fin KB := Main[58] - E106
+  let E108 : Fin KB := Main[51] * Main[44]
+  let E109 : Fin KB := E108 + Main[54]
+  let E110 : Fin KB := Main[59] - E109
+  let E111 : Fin KB := Main[52] * Main[44]
+  let E112 : Fin KB := E111 + Main[55]
+  let E113 : Fin KB := Main[60] - E112
+  let E114 : Fin KB := Main[32] - Main[57]
+  let E115 : Fin KB := Main[45] * E114
+  let E116 : Fin KB := Main[62] * E115
+  let E117 : Fin KB := Main[33] - Main[58]
+  let E118 : Fin KB := Main[45] * E117
+  let E119 : Fin KB := Main[62] * E118
+  let E120 : Fin KB := Main[34] - Main[59]
+  let E121 : Fin KB := Main[45] * E120
+  let E122 : Fin KB := Main[62] * E121
+  let E123 : Fin KB := Main[35] - Main[60]
+  let E124 : Fin KB := Main[45] * E123
+  let E125 : Fin KB := Main[62] * E124
+  let E126 : Fin KB := Main[46] * Main[32]
+  let E127 : Fin KB := Main[62] * E126
+  let E128 : Fin KB := Main[33] - Main[57]
+  let E129 : Fin KB := Main[46] * E128
+  let E130 : Fin KB := Main[62] * E129
+  let E131 : Fin KB := Main[34] - Main[58]
+  let E132 : Fin KB := Main[46] * E131
+  let E133 : Fin KB := Main[62] * E132
+  let E134 : Fin KB := Main[35] - Main[59]
+  let E135 : Fin KB := Main[46] * E134
+  let E136 : Fin KB := Main[62] * E135
+  let E137 : Fin KB := Main[47] * Main[32]
+  let E138 : Fin KB := Main[62] * E137
+  let E139 : Fin KB := Main[47] * Main[33]
+  let E140 : Fin KB := Main[62] * E139
+  let E141 : Fin KB := Main[34] - Main[57]
+  let E142 : Fin KB := Main[47] * E141
+  let E143 : Fin KB := Main[62] * E142
+  let E144 : Fin KB := Main[35] - Main[58]
+  let E145 : Fin KB := Main[47] * E144
+  let E146 : Fin KB := Main[62] * E145
+  let E147 : Fin KB := Main[48] * Main[32]
+  let E148 : Fin KB := Main[62] * E147
+  let E149 : Fin KB := Main[48] * Main[33]
+  let E150 : Fin KB := Main[62] * E149
+  let E151 : Fin KB := Main[48] * Main[34]
+  let E152 : Fin KB := Main[62] * E151
+  let E153 : Fin KB := Main[35] - Main[57]
+  let E154 : Fin KB := Main[48] * E153
+  let E155 : Fin KB := Main[62] * E154
+  let E156 : Fin KB := Main[32] - Main[57]
+  let E157 : Fin KB := Main[45] * E156
+  let E158 : Fin KB := Main[63] * E157
+  let E159 : Fin KB := Main[33] - Main[58]
+  let E160 : Fin KB := Main[45] * E159
+  let E161 : Fin KB := Main[63] * E160
+  let E162 : Fin KB := Main[46] * Main[32]
+  let E163 : Fin KB := Main[63] * E162
+  let E164 : Fin KB := Main[33] - Main[57]
+  let E165 : Fin KB := Main[46] * E164
+  let E166 : Fin KB := Main[63] * E165
+  let E167 : Fin KB := Main[61] * 65535
+  let E168 : Fin KB := E167 - Main[34]
+  let E169 : Fin KB := Main[63] * E168
+  let E170 : Fin KB := Main[61] * 65535
+  let E171 : Fin KB := E170 - Main[35]
+  let E172 : Fin KB := Main[63] * E171
+  let CS0 : SP1ConstraintList := U16MSBOperation.constraints Main[33] { msb := Main[61] } Main[63]
+  let E173 : Fin KB := Main[62] * 6
+  let E174 : Fin KB := Main[63] * 21
   let E175 : Fin KB := E173 + E174
-  let E176 : Fin KB := Main[61] * 1
-  let E177 : Fin KB := Main[62] * 1
+  let E176 : Fin KB := Main[62] * 1
+  let E177 : Fin KB := Main[63] * 1
   let E178 : Fin KB := E176 + E177
-  let E179 : Fin KB := Main[61] * 0
-  let E180 : Fin KB := Main[62] * 0
+  let E179 : Fin KB := Main[62] * 0
+  let E180 : Fin KB := Main[63] * 0
   let E181 : Fin KB := E179 + E180
-  let E182 : Fin KB := Main[61] * 51
-  let E183 : Fin KB := Main[62] * 59
+  let E182 : Fin KB := Main[62] * 51
+  let E183 : Fin KB := Main[63] * 59
   let E184 : Fin KB := E182 + E183
   let E185 : Fin KB := 32 * Main[31]
   let E186 : Fin KB := E184 - E185
-  let E187 : Fin KB := Main[62] * Main[31]
-  let E188 : Fin KB := Main[63] - E187
-  let E189 : Fin KB := Main[61] * 8
-  let E190 : Fin KB := Main[62] * 8
+  let E187 : Fin KB := Main[63] * Main[31]
+  let E188 : Fin KB := Main[64] - E187
+  let E189 : Fin KB := Main[62] * 8
+  let E190 : Fin KB := Main[63] * 8
   let E191 : Fin KB := E189 + E190
   let E192 : Fin KB := 6 * Main[31]
-  let E193 : Fin KB := 1 * Main[63]
+  let E193 : Fin KB := 1 * Main[64]
   let E194 : Fin KB := E192 + E193
   let E195 : Fin KB := E191 - E194
   let E196 : Fin KB := Main[3] + 4
   let CS1 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E196, Main[4], Main[5]] 8 E0
   let E197 : Fin KB := Main[1] * 65536
   let E198 : Fin KB := Main[2] + E197
-  let CS2 : SP1ConstraintList := ALUTypeReader.constraints Main[0] E198 #v[Main[3], Main[4], Main[5]] E175 #v[E195, E186, E178, E181] #v[Main[32], Main[32], Main[33], Main[34]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E0
+  let CS2 : SP1ConstraintList := ALUTypeReader.constraints Main[0] E198 #v[Main[3], Main[4], Main[5]] E175 #v[E195, E186, E178, E181] #v[Main[32], Main[33], Main[34], Main[35]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E0
   CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E2),
     (.assertZero E4),
@@ -241,17 +241,17 @@ section constraints
     (.assertZero E70),
     (.assertZero E74),
     (.assertZero E78),
-    (.send (.byte (ByteOpcode.ofNat 6) Main[48] E79 0) E0),
-    (.send (.byte (ByteOpcode.ofNat 6) Main[52] E26 0) E0),
-    (.assertZero E84),
-    (.send (.byte (ByteOpcode.ofNat 6) Main[49] E85 0) E0),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[49] E79 0) E0),
     (.send (.byte (ByteOpcode.ofNat 6) Main[53] E26 0) E0),
-    (.assertZero E90),
-    (.send (.byte (ByteOpcode.ofNat 6) Main[50] E91 0) E0),
+    (.assertZero E84),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[50] E85 0) E0),
     (.send (.byte (ByteOpcode.ofNat 6) Main[54] E26 0) E0),
-    (.assertZero E96),
-    (.send (.byte (ByteOpcode.ofNat 6) Main[51] E97 0) E0),
+    (.assertZero E90),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[51] E91 0) E0),
     (.send (.byte (ByteOpcode.ofNat 6) Main[55] E26 0) E0),
+    (.assertZero E96),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[52] E97 0) E0),
+    (.send (.byte (ByteOpcode.ofNat 6) Main[56] E26 0) E0),
     (.assertZero E102),
     (.assertZero E104),
     (.assertZero E107),
@@ -289,7 +289,7 @@ lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[33] { msb := Main[61] } Main[63]) ∧
     List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[62] + Main[63])) ∧
-    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[62] * 6 + Main[63] * 41) (
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[62] * 6 + Main[63] * 21) (
       #v[Main[62] * 8 + Main[63] * 8 - (6 * Main[31] + Main[64]), Main[62] * 51 + Main[63] * 59 - 32 * Main[31],
           Main[62] + Main[63], 0]
     ) #v[Main[32], Main[33], Main[34], Main[35]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } (Main[62] + Main[63])) ∧
@@ -353,23 +353,20 @@ lemma allHold_constraints_iff :
     (Main[63] = 0 ∨ Main[46] = 0 ∨ Main[33] = Main[57]) ∧
     (Main[63] = 0 ∨ Main[61] * 65535 = Main[34]) ∧
     (Main[63] = 0 ∨ Main[61] * 65535 = Main[35]) ∧
-    Main[64] = Main[63] * Main[31]
-    -- (Main[62] + Main[62] = 0 ∨ Main[63] = Main[31] * (Main[61] * 19 + Main[62] * 27) + (1 - Main[31]) * (Main[61] * 51 + Main[62] * 59))
+    Main[64] = Main[63] * Main[31] ∧
+    Main[13] = 0
    := by
-  stop
   simp [constraints, sub_eq_zero]
 
 section field_arithmetic
 
 lemma cancel_mul_65536 {a b c x : Fin KB} (h_dvd : (x : ℕ) ∣ 65536) : a * x = b * 65536 + c * x → a = b * ((65536 : ℕ) / (x : ℕ)) + c
   := by
-  stop
   obtain ⟨ z, h_eq ⟩ := h_dvd; rw [h_eq]
   have x_pos : 0 < (x : ℕ) := by nlinarith
   have xz_BB : (x : ℕ) * z < 2130706433 := by nlinarith
   have z_BB : z < 2130706433 := by nlinarith
   have h_eq_BB : 65536 = x * z := by
-    stop
     apply Fin.ext
     simp [Fin.mul_def, Nat.mod_eq_of_lt z_BB, Nat.mod_eq_of_lt xz_BB]
     have hz : ((z : Fin 2130706433) : ℕ) = z := Nat.mod_eq_of_lt z_BB
@@ -385,7 +382,6 @@ lemma cancel_mul_65536 {a b c x : Fin KB} (h_dvd : (x : ℕ) ∣ 65536) : a * x 
     Nat.mul_div_cancel_left _ x_pos]
 
 lemma is_mod_64 {c0 m : Fin KB} : m < 64 → c0 < 65536 → ((c0 - m) * 2097414145).val < 1024 → c0.val % 64 = m := by
-  stop
   simp [Fin.sub_def, Fin.mul_def, Fin.lt_def]; ring_nf
   intro hm hc hdiff
   suffices : (BitVec.ofNat 64 c0.val) % 64#64 = BitVec.ofNat 64 m.val
@@ -421,7 +417,6 @@ lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
   (Main[62] = 1 → Main[63] = 0) ∧
   (Main[63] = 1 → Main[62] = 0)
    := by
-  stop
   intro cstrs
   simp [allHold_constraints_iff] at cstrs
   obtain ⟨ h_msb, cpu, alu, one_of_ops, b_sll, b_sllw, rest ⟩ := cstrs
@@ -450,19 +445,17 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
        (Main[63] = 1 → Main[25] < 32)))) ∧
   (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0)
   := by
-  stop
   intro cstrs real
   simp [allHold_constraints_iff] at cstrs
   obtain ⟨ h_msb, cpu, alu, one_of_ops, b_sll, b_sllw, rest ⟩ := cstrs
   clear h_msb cpu rest
   simp [is_real] at real
   rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
-  · obtain ⟨ h0, h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu; simp_all
+  · obtain ⟨ h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18 ⟩ := alu; simp_all
     by_cases sll : Main[62] = 0
     · by_cases sllw : Main[63] = 0
       · clear *- real sll sllw; aesop
       · have : Main[62] = 0 := by
-          stop
           clear *- real b_sll b_sllw sll sllw one_of_ops
           aesop
         simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
@@ -473,7 +466,6 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
         · aesop
         · intro h6; exact h18.1 (by have := h5.mpr h6; omega)
     · have : Main[63] = 0 := by
-        stop
         clear *- real b_sll b_sllw sll one_of_ops
         aesop
       simp_all [Opcode.ofNat, Nat.beq, Nat.ble]
@@ -491,7 +483,6 @@ section operands
 
 @[simp]
 def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[6] ?_
   change Main[6] < 32
@@ -500,7 +491,6 @@ def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 
 @[simp]
 def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[14] ?_
   change Main[14] < 32
@@ -509,7 +499,6 @@ def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 
 @[simp]
 def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 0 → BitVec 5 := by
-  stop
   intro cstrs real imm
   refine BitVec.ofNatLT Main[21] ?_
   change Main[21] < 32
@@ -518,7 +507,6 @@ def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 
 @[simp]
 def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[62] = 1 → BitVec 6 := by
-  stop
   intro cstrs real imm nw
   refine BitVec.ofNatLT Main[21] ?_
   have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
@@ -528,7 +516,6 @@ def sp1_op_c_imm : List.Forall SP1Constraint.toProp (constraints Main) → is_re
 
 @[simp]
 def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → Main[31] = 1 → Main[63] = 1 → BitVec 5 := by
-  stop
   intro cstrs real imm nw
   refine BitVec.ofNatLT Main[21] ?_
   have ⟨ _, _, _, _, _, _, h_imm, _ ⟩ := bounds Main cstrs real
@@ -545,7 +532,6 @@ lemma spec.sll (h : is_sll Main) :
     Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLL
   := by
     have _ := h
-    stop
     intro cstrs
     obtain ⟨ eq_sll, eq_imm ⟩ := h
     have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (sll_real Main eq_sll)
@@ -563,7 +549,6 @@ lemma spec.sll (h : is_sll Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set is_trusted := Main[32]
     set a0 := Main[32]
     set a1 := Main[33]
     set a2 := Main[34]
@@ -606,17 +591,15 @@ lemma spec.sll (h : is_sll Main) :
              eq_lr0, eq_lr1, eq_lr2, eq_lr3,
              nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
              w_00, w_01, w_02, w_03, w_04, w_05,
-             eq_m64 ⟩ := cstrs
+             eq_m64, h13 ⟩ := cstrs
     clear h_msb_a1 cpu alu
     simp_all
     rw [← BitVec.toNat_inj, BitVec.toNat_shiftLeft, Nat.shiftLeft_eq]
     have : ((Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 64) = c0.val % 64 := by
-      stop
       rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
       omega
     rw [this]; clear this
     have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
-      stop
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
       · clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
         omega
@@ -656,7 +639,6 @@ lemma spec.slli (h : is_slli Main) :
     Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLL
   := by
     have _ := h
-    stop
     intro cstrs
     obtain ⟨ eq_sll, eq_imm ⟩ := h
     have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sll_real Main eq_sll)
@@ -675,7 +657,6 @@ lemma spec.slli (h : is_slli Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set is_trusted := Main[32]
     set a0 := Main[32]
     set a1 := Main[33]
     set a2 := Main[34]
@@ -723,11 +704,9 @@ lemma spec.slli (h : is_slli Main) :
     simp_all
     rw [← BitVec.toNat_inj, BitVec.toNat_shiftLeft, Nat.shiftLeft_eq]
     have : ((Word.toBitVec64 #v[c0, 0, 0, 0]).toNat % 64) = c0.val % 64 := by
-      stop
       rw [Word.toBitVec64_toNat is_U64_c]; simp [Word.toNat]
     rw [this]; clear this
     have : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
-      stop
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
       · clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
         omega
@@ -767,7 +746,6 @@ lemma spec.sllw (h : is_sllw Main) :
     Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
   := by
     have _ := h
-    stop
     intro cstrs
     obtain ⟨ eq_sllw, eq_imm ⟩ := h
     have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, h3, h4 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
@@ -785,7 +763,6 @@ lemma spec.sllw (h : is_sllw Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set is_trusted := Main[32]
     set a0 := Main[32]
     set a1 := Main[33]
     set a2 := Main[34]
@@ -834,13 +811,11 @@ lemma spec.sllw (h : is_sllw Main) :
     have is_U32_b : HWord.isU32 #v[ b0, b1 ] := by apply HWord.isU32_of_cases <;> assumption
     have is_U32_c : HWord.isU32 #v[ c0, c1 ] := by apply HWord.isU32_of_cases <;> assumption
     have : ((Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      stop
       simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat];
       omega
     rw [this]; clear this
     simp [Word.low]
     have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
-      stop
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
       · clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
         omega
@@ -850,7 +825,6 @@ lemma spec.sllw (h : is_sllw Main) :
       · exact diff
     clear diff
     have : c0.val % 32 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 := by
-      stop
       trans (c0.val % 64) % 32
       · omega
       · rw [c0_mod_64]
@@ -858,7 +832,6 @@ lemma spec.sllw (h : is_sllw Main) :
         omega
     clear c0_mod_64
     have h_isU32_a : HWord.isU32 #v[ a0, a1 ] := by
-      stop
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> simp_all <;>
       apply HWord.isU32_of_cases <;> simp_all [Fin.val_add, Fin.val_mul] <;>
@@ -866,7 +839,6 @@ lemma spec.sllw (h : is_sllw Main) :
       omega
     have ⟨ _, _ ⟩ := HWord.lt_cases_of_isU32 h_isU32_a
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
-      stop
       simp_all
       rw [← w_04] at *
       have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1
@@ -903,7 +875,6 @@ lemma spec.slliw (h : is_slliw Main) :
     Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] = execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] .SLLW
   := by
     have _ := h
-    stop
     intro cstrs
     obtain ⟨ eq_sllw, eq_imm ⟩ := h
     have ⟨ h0, h1, h2, hpc, is_U64_b, is_U64_c, imm_zeros, h3 ⟩ := bounds Main cstrs (sllw_real Main eq_sllw)
@@ -922,7 +893,6 @@ lemma spec.slliw (h : is_slliw Main) :
     set c2 := Main[27]
     set c3 := Main[28]
     set imm := Main[31]
-    set is_trusted := Main[32]
     set a0 := Main[32]
     set a1 := Main[33]
     set a2 := Main[34]
@@ -971,12 +941,10 @@ lemma spec.slliw (h : is_slliw Main) :
     have is_U32_b : HWord.isU32 #v[ b0, b1 ] := by apply HWord.isU32_of_cases <;> assumption
     have is_U32_c : HWord.isU32 #v[ c0, 0 ] := by apply HWord.isU32_of_cases <;> simp; omega
     have : ((Word.low #v[c0, 0, 0, 0]).toBitVec32.toNat % 32) = c0.val % 32 := by
-      stop
       simp [Word.low, HWord.toBitVec32_toNat is_U32_c, HWord.toNat]
     rw [this]; clear this
     simp [Word.low]
     have c0_mod_64 : c0.val % 64 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
-      stop
       rw [is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)]
       · clear *- b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
         omega
@@ -986,7 +954,6 @@ lemma spec.slliw (h : is_slliw Main) :
       · exact diff
     clear diff
     have : c0.val % 32 = cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 := by
-      stop
       trans (c0.val % 64) % 32
       · omega
       · rw [c0_mod_64]
@@ -994,7 +961,6 @@ lemma spec.slliw (h : is_slliw Main) :
         omega
     clear c0_mod_64
     have h_isU32_a : HWord.isU32 #v[ a0, a1 ] := by
-      stop
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> simp_all <;>
       apply HWord.isU32_of_cases <;> simp_all [Fin.val_add, Fin.val_mul] <;>
@@ -1002,7 +968,6 @@ lemma spec.slliw (h : is_slliw Main) :
       omega
     have ⟨ _, _ ⟩ := HWord.lt_cases_of_isU32 h_isU32_a
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
-      stop
       simp_all
       rw [← w_04] at *
       have h_msb := U16MSBOperation.spec (by assumption) h_msb_a1

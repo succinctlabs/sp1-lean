@@ -13,12 +13,12 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 
 ### Chip-level theorems stopped
 
-- `LoadDoubleChip.correct_ld`, `StoreDoubleChip.correct`, `StoreByteChip.correct`, `StoreHalfChip.correct`, `StoreWordChip.correct`
-- `LoadByteChip.correct_lb/lbu`, `LoadHalfChip.correct_lh/lhu`, `LoadWordChip.correct_lw/lwu`
+- ~~`LoadDoubleChip.correct_ld`, `StoreDoubleChip.correct`, `StoreByteChip.correct`, `StoreHalfChip.correct`, `StoreWordChip.correct`~~ — closed.
+- ~~`LoadByteChip.correct_lb/lbu`, `LoadHalfChip.correct_lh/lhu`, `LoadWordChip.correct_lw/lwu`~~ — closed.
 - `BitwiseChip.correct_xor/xori/or/ori/and/andi`
 - `LtChip.correct_slt/slti/sltu/sltiu` (plus `sp1_op_a/b/c` defs inside the chip file)
 - `MulChip.correct_mul/mulh/mulhu/mulhsu/mulw`
-- `ShiftLeftChip.correct_sll/slli/sllw/slliw`
+- ~~`ShiftLeftChip.correct_sll/slli/sllw/slliw`~~ — closed.
 - `ShiftRightChip.correct_srl/srli/srlw/srliw/sra/srai/sraw/sraiw`
 - `BranchChip.correct_beq/bne/blt/bge/bltu/bgeu`
 - `DivRemChip.correct_div/divu/divw/divuw/rem/remu/remw/remuw` + `correct_prologue_facts` helper
@@ -26,13 +26,13 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 
 ### Constraints.lean helpers stubbed/stopped
 
-- `Load/LoadByte/Constraints.lean` — `allHold_constraints_iff_of_is_lb/lbu` stubbed to `↔ True` with `stop`
-- `Load/LoadHalf/Constraints.lean` — same stubbing for `lh/lhu`
-- `Load/LoadWord/Constraints.lean` — same for `lw/lwu`
+- ~~`Load/LoadByte/Constraints.lean` — `allHold_constraints_iff_of_is_lb/lbu` stubbed to `↔ True` with `stop`~~ — restored.
+- ~~`Load/LoadHalf/Constraints.lean` — same stubbing for `lh/lhu`~~ — restored.
+- ~~`Load/LoadWord/Constraints.lean` — same for `lw/lwu`~~ — restored.
 - `Bitwise/Constraints.lean` — `allHold_constraints_iff`, `single_op`, `register_bounds`, `immediate_bounds`, `op_a_is_0`, `ops_U64_b_c`, `ops_U64_a`, `ops_U64`, `sp1_op_a/b/c/c_imm`, `spec.xor/xori/or/ori/and/andi` all have `stop`
 - `Lt/Constraints.lean` — 4 `allHold_constraints_iff_*` lemmas stopped (simple `simp_all; intros; omega` proofs that timed out)
 - `Mul/Constraints.lean` — `allHold_constraints_iff`, `single_op`, `register_bounds`, `op_a_is_0`, `ops_U64_b_c`, `sp1_op_a/b/c`, `spec.mul/mulh/mulhu/mulhsu/mulw` stopped
-- `ShiftLeft/Constraints.lean` — `allHold_constraints_iff`, `cancel_mul_65536`, `is_mod_64`, `single_op`, `sll_real`, `sllw_real`, `bounds`, `sp1_op_a/b/c/c_imm/c_imm_w`, `spec.sll/slli/sllw/slliw` stopped
+- ~~`ShiftLeft/Constraints.lean` — `allHold_constraints_iff`, `cancel_mul_65536`, `is_mod_64`, `single_op`, `sll_real`, `sllw_real`, `bounds`, `sp1_op_a/b/c/c_imm/c_imm_w`, `spec.sll/slli/sllw/slliw` stopped~~ — closed.
 - `ShiftRight/Constraints.lean` — many stops; `set_option linter.unusedVariables false` file-wide
 - `Branch/Constraints.lean` — `single_op`, `is_trusted_of_constraints`, `eq_signExtend_of_is_real`, `add_signExtend_of_constraints` stopped
 - `DivRem/Constraints.lean` — many stops; `set_option linter.unusedVariables false` file-wide
@@ -117,3 +117,11 @@ When picking up work:
 2. Note that the Reader no longer provides `cols.is_trusted = 1` — the classic extraction pattern `(h_reader.2.2.1.resolve_right (by decide))` needs to target a different conjunct.
 3. Check if the hand-written helper in the same chip's `Constraints.lean` also has a `stop` — if the chip proof depends on that helper, close the helper first.
 4. Rebuild only the touched file (`lake env lean SP1Chips/<Chip>Chip.lean`) rather than the whole package — DivRem and Branch take several minutes each.
+
+## Lessons learned from ShiftLeft (closed) and others
+
+- **Verify the `section constraints` block first.** Run `update_constraints.py` to ensure the auto-generated indices match SP1's current output. The hand-written code (iff RHS, `set` aliases, `is_real`, `sp1_op_*`) must mirror those indices. If they're off, the iff lemma's `simp [constraints, ...]` proof leaves an unsolved goal whose LHS and RHS differ in just a few `Main[k]` indices or opcode literals — that's the diagnostic signature.
+- **`Main[i] = 0` substitution and `op_a_0` aliasing.** When the constraints def includes `(.assertZero Main[13])` (i.e., op_a_0 = 0), `simp [constraints]` propagates `Main[13] = 0` into the embedded `ALUTypeReader.constraints` call's `op_a_0` field. The iff RHS still has `op_a_0 := Main[13]`. Either (a) add `Main[13] = 0` as a trailing conjunct on the RHS and discharge with `rw [h13]`, or (b) leave the RHS open and prove `Main[13] = 0` is needed too. The original `simp_all [sub_eq_zero]` doesn't bridge this gap on its own.
+- **Stale `set is_trusted := Main[i]` aliases.** With `is_trusted` removed, `Main[32]` (or wherever) is now `op_a_write_value[0]`. The proof body's `set is_trusted := Main[32]` line then collides with `set a0 := Main[32]` — both alias the same column, which confuses `omega` (it sees them as separate variables and can't substitute one for the other). Fix: delete the stale `set is_trusted := …` line in each spec.* lemma.
+- **`bounds` lemma destructure shift.** `ALUTypeReader.allHold_constraints_iff_is_real` lost the leading `cols.is_trusted = is_real` conjunct. Drop the leading `h0` from any `obtain ⟨h0, h1, …, h18⟩ := alu` pattern in chip helpers (`bounds`, `register_bounds`, etc.) — `h18.1` then catches the trailing 2-tuple `(¬op_a_0 = 0 → …) ∧ (¬imm_c = 0 → …)` correctly, restoring the original proof.
+- **`tauto` after `simp [constraints, sub_eq_zero]`.** In `allHold_constraints_iff` the simp closes most of the iff but leaves a residual `tauto`-shaped goal — the boolean disjunctions on the RHS need to be reordered against the LHS form. Adding `tauto` after the simp closes the standalone helper.

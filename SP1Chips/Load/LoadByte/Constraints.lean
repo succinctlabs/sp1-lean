@@ -122,16 +122,110 @@ def is_lb := Main[45] = 1
 def is_lbu := Main[46] = 1
 
 lemma allHold_constraints_iff_of_is_lb (h_is_lb : is_lb Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by
-  have _ := h_is_lb
-  stop
-  trivial
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    (List.Forall SP1Constraint.toProp
+      (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
+        #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
+    (Main[38] = 0 ∨ Main[38] = 1) ∧
+    (Main[39] = 0 ∨ Main[39] = 1) ∧
+    (Main[40] = 0 ∨ Main[40] = 1) ∧
+    Main[28] * (Main[26] + Main[27]) = 1 ∧
+    ↑((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * 1864368129) < 8192 ∧
+    List.Forall SP1Constraint.toProp
+      (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
+        #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
+    List.Forall SP1Constraint.toProp
+      (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 29
+        #v[4, 3, 0, 0] #v[Main[43] + 65280 * Main[44], 65535 * Main[44], 65535 * Main[44], 65535 * Main[44]]
+        { op_a := Main[6], op_a_memory :=
+        { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+          access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+          op_a_0 := Main[13], op_b := Main[14],
+          op_b_memory :=
+          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+            access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1) ∧
+    (Main[35] = 0 ∨ Main[35] = 1) ∧
+    (Main[35] = 0 ∨ Main[0] = Main[33]) ∧
+    Main[35] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[35]) * Main[0] -
+    (Main[35] * Main[34] + (1 - Main[35]) * Main[33]) - 1 = Main[36] + Main[37] * 65536 ∧
+    ↑Main[36] < 65536 ∧ Main[37] < 256 ∧
+    (SP1Constraint.send (AirInteraction.memory Main[33] Main[34]
+      (Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) Main[26] Main[27] Main[29]
+      Main[30] Main[31] Main[32]) 1).toProp ∧
+    (SP1Constraint.receive
+    (AirInteraction.memory Main[0] (Main[2] + Main[1] * 65536 + 1)
+      (Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) Main[26] Main[27] Main[29] Main[30] Main[31] Main[32])
+    1).toProp ∧
+    Main[46] = 0 ∧ Main[13] = 0 ∧
+    (Main[39] = 1 ∨ Main[40] = 1 ∨ Main[41] = Main[29]) ∧
+    (Main[39] = 0 ∨ Main[40] = 1 ∨ Main[41] = Main[30]) ∧
+    (Main[39] = 1 ∨ Main[40] = 0 ∨ Main[41] = Main[31]) ∧
+    (Main[39] = 0 ∨ Main[40] = 0 ∨ Main[41] = Main[32]) ∧
+    (Main[42] < 256 ∧ (Main[41] - Main[42]) * 2122383361 < 256) ∧
+    Main[43] = Main[38] * ((Main[41] - Main[42]) * 2122383361) + (1 - Main[38]) * Main[42] ∧
+    (Main[44] < 256 ∧ Main[43] < 256) ∧
+    (Main[44] = 0 ∨ Main[44] = 1) ∧
+    (Main[44] = 1 ↔ (128 : Fin KB) ≤ Main[43])) := by
+  have : Main[45] = 1 := h_is_lb
+  by_cases h46 : Main[46] = 0
+  · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h46]
+  · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h46]
+    by_cases h46' : Main[46] = 1
+    · simp [h46']
+    · simp [h46']
 
 lemma allHold_constraints_iff_of_is_lbu (h_is_lbu : is_lbu Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔ True := by
-  have _ := h_is_lbu
-  stop
-  trivial
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    (List.Forall SP1Constraint.toProp
+      (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
+        #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
+    (Main[38] = 0 ∨ Main[38] = 1) ∧
+    (Main[39] = 0 ∨ Main[39] = 1) ∧
+    (Main[40] = 0 ∨ Main[40] = 1) ∧
+    Main[28] * (Main[26] + Main[27]) = 1 ∧
+    ↑((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * 1864368129) < 8192 ∧
+    List.Forall SP1Constraint.toProp
+      (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
+        #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
+    List.Forall SP1Constraint.toProp
+      (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 32
+        #v[4, 3, 4, 0] #v[Main[43] + 65280 * Main[44], 65535 * Main[44], 65535 * Main[44], 65535 * Main[44]]
+        { op_a := Main[6], op_a_memory :=
+        { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+          access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+          op_a_0 := Main[13], op_b := Main[14],
+          op_b_memory :=
+          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+            access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1) ∧
+    (Main[35] = 0 ∨ Main[35] = 1) ∧
+    (Main[35] = 0 ∨ Main[0] = Main[33]) ∧
+    Main[35] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[35]) * Main[0] -
+    (Main[35] * Main[34] + (1 - Main[35]) * Main[33]) - 1 = Main[36] + Main[37] * 65536 ∧
+    ↑Main[36] < 65536 ∧ Main[37] < 256 ∧
+    (SP1Constraint.send (AirInteraction.memory Main[33] Main[34]
+      (Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) Main[26] Main[27] Main[29]
+      Main[30] Main[31] Main[32]) 1).toProp ∧
+    (SP1Constraint.receive
+    (AirInteraction.memory Main[0] (Main[2] + Main[1] * 65536 + 1)
+      (Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) Main[26] Main[27] Main[29] Main[30] Main[31] Main[32])
+    1).toProp ∧
+    Main[45] = 0 ∧ Main[13] = 0 ∧
+    (Main[39] = 1 ∨ Main[40] = 1 ∨ Main[41] = Main[29]) ∧
+    (Main[39] = 0 ∨ Main[40] = 1 ∨ Main[41] = Main[30]) ∧
+    (Main[39] = 1 ∨ Main[40] = 0 ∨ Main[41] = Main[31]) ∧
+    (Main[39] = 0 ∨ Main[40] = 0 ∨ Main[41] = Main[32]) ∧
+    (Main[42] < 256 ∧ (Main[41] - Main[42]) * 2122383361 < 256) ∧
+    Main[43] = Main[38] * ((Main[41] - Main[42]) * 2122383361) + (1 - Main[38]) * Main[42] ∧
+    (Main[44] = 0)) := by
+  have : Main[46] = 1 := h_is_lbu
+  by_cases h45 : Main[45] = 0
+  · simp [h45, constraints, AddressOperation.constraints, this, sub_eq_zero]
+  · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h45]
+    by_cases h45' : Main[45] = 1
+    · simp [h45']
+    · simp [h45']
 
 end LoadByte
 

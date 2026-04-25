@@ -56,7 +56,6 @@ theorem correct (Main : Vector (Fin KB) 39)
   extract_lets op_a op_b imm_c
   -- Extract the facts about the config registers in the state
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
-
   -- Extract the main constraints from the chip
   rw [StoreDouble.constraints] at h_cstrs
   simp [SP1ConstraintList.allHold] at h_cstrs

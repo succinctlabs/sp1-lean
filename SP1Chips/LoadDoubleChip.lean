@@ -123,7 +123,6 @@ theorem correct_ld (Main : Vector (Fin KB) 39)
     (spec_ld imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_ld Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
-
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_ld Main h_is_ld] at h_cstrs
   obtain ⟨h_addr, h29, hb,
     h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',
@@ -174,7 +173,6 @@ theorem correct_ld (Main : Vector (Fin KB) 39)
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at this
     rw [← this, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by simp [Word.toNat]; omega)]
-
   -- Get bounds on Main[26], Main[27], Main[28] for address nat arith.
   have h26_isLt : Main[26].val < KB := Main[26].isLt
   have h27_isLt : Main[27].val < KB := Main[27].isLt

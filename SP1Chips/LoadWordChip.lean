@@ -93,78 +93,65 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
     (spec_lw imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_word Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
-  have _ := h_cstrs
-  have _ := state_cstrs
-  have _ := h_is_lw
-  have _ := h_fits_in_mem
-  have _ := h_is_aligned
-  have _ := h_below_clint
-  stop
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_lw Main h_is_lw] at h_cstrs
-  obtain ⟨h_addr, h39, h29, hb,
-    h_u16msb, h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',
-    h45_zero, h13, h30, h31, h32, h33, h44_zero⟩ := h_cstrs
+  obtain ⟨h_addr, h38, h28, hb,
+    h_u16msb, h_cpu, h_reader, h35, h33', hds, h36, h37, hmem, hmem',
+    h43_zero, h13, h29, h30, h31, h32⟩ := h_cstrs
   -- Extract reader facts
   simp [ITypeReader.constraints] at h_reader
-  have h25 : Main[25] = 1 := by have := h_reader.2.2.1.resolve_right (by decide); omega
-  simp [h25, SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
+  simp [SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
   obtain ⟨h14, h21, h6, rest⟩ := h_reader
   simp [Fin.lt_def] at rest
-  have h2728 : ¬ (Main[27] = 0 ∧ Main[28] = 0) := by clear *- h29; aesop
-  -- Extract U16MSB facts: Main[42] ∈ {0,1} and (2*Main[41] - Main[42]*65536).val < 65536
+  have h2728 : ¬ (Main[26] = 0 ∧ Main[27] = 0) := by clear *- h28; aesop
+  -- Extract U16MSB facts: Main[41] ∈ {0,1} and (2*Main[40] - Main[41]*65536).val < 65536
   simp [U16MSBOperation.constraints, SP1Constraint.toProp, Opcode.ofNat, Nat.ble] at h_u16msb
-  obtain ⟨h42_01, h41_hi⟩ := h_u16msb
-  have h42_01' : Main[42] = 0 ∨ Main[42] = 1 := by
+  obtain ⟨h42_01, h40_hi⟩ := h_u16msb
+  have h42_01' : Main[41] = 0 ∨ Main[41] = 1 := by
     rcases h42_01 with h | h
     · left; exact h
     · right; rw [sub_eq_zero] at h; exact h
   -- Memory send tells us Main[30..33] < 65536.
-  have hmem_isU64 : Word.isU64 #v[Main[30], Main[31], Main[32], Main[33]] := by
+  have hmem_isU64 : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     have := hmem; simp [SP1Constraint.toProp] at this; exact this
-  have h30_lt : Main[30].val < 65536 := by have := hmem_isU64 ⟨0, by decide⟩; simpa using this
-  have h31_lt : Main[31].val < 65536 := by have := hmem_isU64 ⟨1, by decide⟩; simpa using this
-  have h32_lt : Main[32].val < 65536 := by have := hmem_isU64 ⟨2, by decide⟩; simpa using this
-  have h33_lt : Main[33].val < 65536 := by have := hmem_isU64 ⟨3, by decide⟩; simpa using this
-  -- Main[40], Main[41] equal pairs of memory halfwords based on Main[39].
-  have h40_41_eq : (Main[40] = Main[30] ∧ Main[41] = Main[31] ∧ Main[39] = 0) ∨
-                   (Main[40] = Main[32] ∧ Main[41] = Main[33] ∧ Main[39] = 1) := by
-    rcases h39 with h39 | h39
-    · left; refine ⟨?_, ?_, h39⟩
+  have h29_lt : Main[29].val < 65536 := by have := hmem_isU64 ⟨0, by decide⟩; simpa using this
+  have h30_lt : Main[30].val < 65536 := by have := hmem_isU64 ⟨1, by decide⟩; simpa using this
+  have h31_lt : Main[31].val < 65536 := by have := hmem_isU64 ⟨2, by decide⟩; simpa using this
+  have h32_lt : Main[32].val < 65536 := by have := hmem_isU64 ⟨3, by decide⟩; simpa using this
+  -- Main[39], Main[40] equal pairs of memory halfwords based on Main[38].
+  have h40_41_eq : (Main[39] = Main[29] ∧ Main[40] = Main[30] ∧ Main[38] = 0) ∨
+                   (Main[39] = Main[31] ∧ Main[40] = Main[32] ∧ Main[38] = 1) := by
+    rcases h38 with h38 | h38
+    · left; refine ⟨?_, ?_, h38⟩
+      · rcases h29 with h | h
+        · rw [h38] at h; exact absurd h (by decide)
+        · exact h
       · rcases h30 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
+        · rw [h38] at h; exact absurd h (by decide)
         · exact h
+    · right; refine ⟨?_, ?_, h38⟩
       · rcases h31 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
+        · rw [h38] at h; exact absurd h (by decide)
         · exact h
-    · right; refine ⟨?_, ?_, h39⟩
       · rcases h32 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
+        · rw [h38] at h; exact absurd h (by decide)
         · exact h
-      · rcases h33 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
-        · exact h
-  have h40_lt : Main[40].val < 65536 := by
+  have h39_lt : Main[39].val < 65536 := by
     rcases h40_41_eq with ⟨he, _, _⟩ | ⟨he, _, _⟩
+    · rw [he]; exact h29_lt
+    · rw [he]; exact h31_lt
+  have h40_lt : Main[40].val < 65536 := by
+    rcases h40_41_eq with ⟨_, he, _⟩ | ⟨_, he, _⟩
     · rw [he]; exact h30_lt
     · rw [he]; exact h32_lt
-  have h41_lt : Main[41].val < 65536 := by
-    rcases h40_41_eq with ⟨_, he, _⟩ | ⟨_, he, _⟩
-    · rw [he]; exact h31_lt
-    · rw [he]; exact h33_lt
   -- MSB characterization
-  have h42_iff : Main[42] = 1 ↔ 32768 ≤ Main[41].val := halfword_msb _ _ h41_lt h42_01' h41_hi
+  have h41_iff : Main[41] = 1 ↔ 32768 ≤ Main[40].val := halfword_msb _ _ h40_lt h42_01' h40_hi
   -- Extract initial-state facts
   simp [LoadWord.constraints, AddressOperation.constraints,
     SP1Constraint.toStateProp, AddrAddOperation.constraints,
     U16MSBOperation.constraints,
     CPUState.constraints, ITypeReader.constraints, BitVec.ofNatLT_eq_ofNat,
-    Opcode.ofNat, Nat.ble, h6, h14, h25, h2728, h_is_lw] at state_cstrs
+    Opcode.ofNat, Nat.ble, h6, h14, h2728, h43_zero, h_is_lw] at state_cstrs
   obtain ⟨h_read_pc, h6_op_a, h14_op_a, hload⟩ := state_cstrs
-  have h_not : ¬ ((1 : Fin KB) + Main[44] = 0) := by rw [h44_zero]; decide
-  specialize h_read_pc h_not
-  specialize h6_op_a h_not
-  specialize h14_op_a h_not
-  specialize hload h_not
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
   have h6 : BitVec.ofNat 5 Main[6] ≠ 0#5 := by simp [← BitVec.toNat_inj]; omega
   have hu6421 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
@@ -184,17 +171,17 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat #v[Main[26], Main[27], Main[28], 0] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], 0] := by
     have := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at this
     rw [← this, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by simp [Word.toNat]; omega)]
+  have h25_isLt : Main[25].val < KB := Main[25].isLt
   have h26_isLt : Main[26].val < KB := Main[26].isLt
   have h27_isLt : Main[27].val < KB := Main[27].isLt
-  have h28_isLt : Main[28].val < KB := Main[28].isLt
   have h_KB : KB = 2130706433 := rfl
-  -- Tight bound on Main[26] for addr arithmetic
-  have h26_small : Main[26].val + 7 < 2130706433 := by
+  -- Tight bound on Main[25] for addr arithmetic
+  have h25_small : Main[25].val + 7 < 2130706433 := by
     have hbc := h_below_clint
     simp only [sp1_imm_c, h21'] at hbc
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real, haddr_nat] at hbc
@@ -204,11 +191,11 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
     omega
   have haddr_plus :
       ∀ (k : ℕ), k < 8 →
-        Word.toNat #v[Main[26], Main[27], Main[28], 0] + k =
-        Word.toNat #v[Main[26] + (k : Fin KB), Main[27], Main[28], 0] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], 0] + k =
+        Word.toNat #v[Main[25] + (k : Fin KB), Main[26], Main[27], 0] := by
     intro k hk
     have hkcast : (k : Fin KB).val = k := Fin.val_cast_of_lt (by omega)
-    have h26k : (Main[26] + (k : Fin KB)).val = Main[26].val + k := by
+    have h26k : (Main[25] + (k : Fin KB)).val = Main[25].val + k := by
       rw [Fin.val_add, hkcast, Nat.mod_eq_of_lt (by omega)]
     simp only [Word.toNat_def, Fin.isValue, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, Fin.val_zero, mul_zero, add_zero, h26k]
@@ -221,33 +208,33 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
   rw [run_vmem_read_of_width_4' (BitVec.ofNat 5 Main[14])
     (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
     (BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val))
+    (BitVec.ofNat 8 Main[39].val)
+    (BitVec.ofNat 8 (Main[39].val >>> 8))
     (BitVec.ofNat 8 Main[40].val)
-    (BitVec.ofNat 8 (Main[40].val >>> 8))
-    (BitVec.ofNat 8 Main[41].val)
-    (BitVec.ofNat 8 (Main[41].val >>> 8))]
+    (BitVec.ofNat 8 (Main[40].val >>> 8))]
   -- Main goal: reconstruct the word and sign-extend appropriately
-  · by_cases h_neg : 32768 ≤ Main[41].val
-    · -- Main[42] = 1 (signed, MSB set)
-      have h42 : Main[42] = 1 := h42_iff.mpr h_neg
-      have hext : BitVec.signExtend 64 (BitVec.ofNat 8 (Main[41].val >>> 8) ++
-            BitVec.ofNat 8 Main[41].val ++
-            BitVec.ofNat 8 (Main[40].val >>> 8) ++ BitVec.ofNat 8 Main[40].val) =
-          Word.toBitVec64 #v[Main[40], Main[41], 65535, 65535] :=
-        signExtend64_ofNat32_concat_of_ge_32768 Main[40] Main[41] h40_lt h41_lt h_neg
+  · by_cases h_neg : 32768 ≤ Main[40].val
+    · -- Main[41] = 1 (signed, MSB set)
+      have h41 : Main[41] = 1 := h41_iff.mpr h_neg
+      have hext : BitVec.signExtend 64 (BitVec.ofNat 8 (Main[40].val >>> 8) ++
+            BitVec.ofNat 8 Main[40].val ++
+            BitVec.ofNat 8 (Main[39].val >>> 8) ++ BitVec.ofNat 8 Main[39].val) =
+          Word.toBitVec64 #v[Main[39], Main[40], 65535, 65535] :=
+        signExtend64_ofNat32_concat_of_ge_32768 Main[39] Main[40] h39_lt h40_lt h_neg
       simp [extend_value, sign_extend, Sail.BitVec.signExtend, bitVecToRegidxVal,
-        hext, h42, mul_one, h_read_pc]
+        hext, h41, mul_one, h_read_pc]
     · push Not at h_neg
-      have h42 : Main[42] = 0 := by
+      have h41 : Main[41] = 0 := by
         rcases h42_01' with h | h
         · exact h
-        · exfalso; exact absurd (h42_iff.mp h) (by omega)
-      have hext : BitVec.signExtend 64 (BitVec.ofNat 8 (Main[41].val >>> 8) ++
-            BitVec.ofNat 8 Main[41].val ++
-            BitVec.ofNat 8 (Main[40].val >>> 8) ++ BitVec.ofNat 8 Main[40].val) =
-          Word.toBitVec64 #v[Main[40], Main[41], 0, 0] :=
-        signExtend64_ofNat32_concat_of_lt_32768 Main[40] Main[41] h40_lt h41_lt h_neg
+        · exfalso; exact absurd (h41_iff.mp h) (by omega)
+      have hext : BitVec.signExtend 64 (BitVec.ofNat 8 (Main[40].val >>> 8) ++
+            BitVec.ofNat 8 Main[40].val ++
+            BitVec.ofNat 8 (Main[39].val >>> 8) ++ BitVec.ofNat 8 Main[39].val) =
+          Word.toBitVec64 #v[Main[39], Main[40], 0, 0] :=
+        signExtend64_ofNat32_concat_of_lt_32768 Main[39] Main[40] h39_lt h40_lt h_neg
       simp [extend_value, sign_extend, Sail.BitVec.signExtend, bitVecToRegidxVal,
-        hext, h42, mul_zero, h_read_pc]
+        hext, h41, mul_zero, h_read_pc]
   -- Side conditions
   · simp only [isInitialized_iff, Std.ExtDHashMap.mem_insert, beq_iff_eq, hs,
       or_true, implies_true]
@@ -263,10 +250,10 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨he40, _, he39⟩ | ⟨he40, _, he39⟩
     · rw [he40]
-      rw [show Main[26] = Main[26] - 4 * Main[39] by rw [he39]; ring]
+      rw [show Main[25] = Main[25] - 4 * Main[38] by rw [he39]; ring]
       exact hL0
     · rw [he40]
-      rw [show Main[26] = Main[26] - 4 * Main[39] + 4 by rw [he39]; ring]
+      rw [show Main[25] = Main[25] - 4 * Main[38] + 4 by rw [he39]; ring]
       exact hL4
   -- Memory byte 1: addr + 1
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
@@ -275,11 +262,11 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨he40, _, he39⟩ | ⟨he40, _, he39⟩
     · rw [he40]
-      rw [show Main[26] + ((1 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 1 by
+      rw [show Main[25] + ((1 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 1 by
         rw [he39]; show _ = _; ring]
       exact hL1
     · rw [he40]
-      rw [show Main[26] + ((1 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 5 by
+      rw [show Main[25] + ((1 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 5 by
         rw [he39]; show _ = _; ring]
       exact hL5
   -- Memory byte 2: addr + 2
@@ -289,11 +276,11 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨_, he41, he39⟩ | ⟨_, he41, he39⟩
     · rw [he41]
-      rw [show Main[26] + ((2 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 2 by
+      rw [show Main[25] + ((2 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 2 by
         rw [he39]; show _ = _; ring]
       exact hL2
     · rw [he41]
-      rw [show Main[26] + ((2 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 6 by
+      rw [show Main[25] + ((2 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 6 by
         rw [he39]; show _ = _; ring]
       exact hL6
   -- Memory byte 3: addr + 3
@@ -303,11 +290,11 @@ theorem correct_lw (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨_, he41, he39⟩ | ⟨_, he41, he39⟩
     · rw [he41]
-      rw [show Main[26] + ((3 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 3 by
+      rw [show Main[25] + ((3 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 3 by
         rw [he39]; show _ = _; ring]
       exact hL3
     · rw [he41]
-      rw [show Main[26] + ((3 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 7 by
+      rw [show Main[25] + ((3 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 7 by
         rw [he39]; show _ = _; ring]
       exact hL7
 
@@ -336,68 +323,55 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
     (spec_lwu imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_word Main).run s := by
   extract_lets op_a op_b imm_c
   obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
-  have _ := h_cstrs
-  have _ := state_cstrs
-  have _ := h_is_lwu
-  have _ := h_fits_in_mem
-  have _ := h_is_aligned
-  have _ := h_below_clint
-  stop
   rw [SP1ConstraintList.allHold, allHold_constraints_iff_of_is_lwu Main h_is_lwu] at h_cstrs
-  obtain ⟨h_addr, h39, h29, hb,
-    h_u16msb, h_cpu, h_reader, h36, h34', hds, h37, h38, hmem, hmem',
-    h45_zero, h13, h30, h31, h32, h33, h43_zero, h42_zero⟩ := h_cstrs
+  obtain ⟨h_addr, h38, h28, hb,
+    h_u16msb, h_cpu, h_reader, h35, h33', hds, h36, h37, hmem, hmem',
+    h42_zero, h13, h29, h30, h31, h32, h41_zero⟩ := h_cstrs
   -- Extract reader facts
   simp [ITypeReader.constraints] at h_reader
-  have h25 : Main[25] = 1 := by have := h_reader.2.2.1.resolve_right (by decide); omega
-  simp [h25, SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
+  simp [SP1Constraint.toProp, Opcode.ofNat, Nat.ble, and_assoc] at h_reader
   obtain ⟨h14, h21, h6, rest⟩ := h_reader
   simp [Fin.lt_def] at rest
-  have h2728 : ¬ (Main[27] = 0 ∧ Main[28] = 0) := by clear *- h29; aesop
+  have h2728 : ¬ (Main[26] = 0 ∧ Main[27] = 0) := by clear *- h28; aesop
   -- Memory bounds
-  have hmem_isU64 : Word.isU64 #v[Main[30], Main[31], Main[32], Main[33]] := by
+  have hmem_isU64 : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     have := hmem; simp [SP1Constraint.toProp] at this; exact this
-  have h30_lt : Main[30].val < 65536 := by have := hmem_isU64 ⟨0, by decide⟩; simpa using this
-  have h31_lt : Main[31].val < 65536 := by have := hmem_isU64 ⟨1, by decide⟩; simpa using this
-  have h32_lt : Main[32].val < 65536 := by have := hmem_isU64 ⟨2, by decide⟩; simpa using this
-  have h33_lt : Main[33].val < 65536 := by have := hmem_isU64 ⟨3, by decide⟩; simpa using this
-  have h40_41_eq : (Main[40] = Main[30] ∧ Main[41] = Main[31] ∧ Main[39] = 0) ∨
-                   (Main[40] = Main[32] ∧ Main[41] = Main[33] ∧ Main[39] = 1) := by
-    rcases h39 with h39 | h39
-    · left; refine ⟨?_, ?_, h39⟩
+  have h29_lt : Main[29].val < 65536 := by have := hmem_isU64 ⟨0, by decide⟩; simpa using this
+  have h30_lt : Main[30].val < 65536 := by have := hmem_isU64 ⟨1, by decide⟩; simpa using this
+  have h31_lt : Main[31].val < 65536 := by have := hmem_isU64 ⟨2, by decide⟩; simpa using this
+  have h32_lt : Main[32].val < 65536 := by have := hmem_isU64 ⟨3, by decide⟩; simpa using this
+  have h40_41_eq : (Main[39] = Main[29] ∧ Main[40] = Main[30] ∧ Main[38] = 0) ∨
+                   (Main[39] = Main[31] ∧ Main[40] = Main[32] ∧ Main[38] = 1) := by
+    rcases h38 with h38 | h38
+    · left; refine ⟨?_, ?_, h38⟩
+      · rcases h29 with h | h
+        · rw [h38] at h; exact absurd h (by decide)
+        · exact h
       · rcases h30 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
+        · rw [h38] at h; exact absurd h (by decide)
         · exact h
+    · right; refine ⟨?_, ?_, h38⟩
       · rcases h31 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
+        · rw [h38] at h; exact absurd h (by decide)
         · exact h
-    · right; refine ⟨?_, ?_, h39⟩
       · rcases h32 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
+        · rw [h38] at h; exact absurd h (by decide)
         · exact h
-      · rcases h33 with h | h
-        · rw [h39] at h; exact absurd h (by decide)
-        · exact h
-  have h40_lt : Main[40].val < 65536 := by
+  have h39_lt : Main[39].val < 65536 := by
     rcases h40_41_eq with ⟨he, _, _⟩ | ⟨he, _, _⟩
+    · rw [he]; exact h29_lt
+    · rw [he]; exact h31_lt
+  have h40_lt : Main[40].val < 65536 := by
+    rcases h40_41_eq with ⟨_, he, _⟩ | ⟨_, he, _⟩
     · rw [he]; exact h30_lt
     · rw [he]; exact h32_lt
-  have h41_lt : Main[41].val < 65536 := by
-    rcases h40_41_eq with ⟨_, he, _⟩ | ⟨_, he, _⟩
-    · rw [he]; exact h31_lt
-    · rw [he]; exact h33_lt
   -- Extract initial-state facts
   simp [LoadWord.constraints, AddressOperation.constraints,
     SP1Constraint.toStateProp, AddrAddOperation.constraints,
     U16MSBOperation.constraints,
     CPUState.constraints, ITypeReader.constraints, BitVec.ofNatLT_eq_ofNat,
-    Opcode.ofNat, Nat.ble, h6, h14, h25, h2728, h_is_lwu] at state_cstrs
+    Opcode.ofNat, Nat.ble, h6, h14, h2728, h42_zero, h_is_lwu] at state_cstrs
   obtain ⟨h_read_pc, h6_op_a, h14_op_a, hload⟩ := state_cstrs
-  have h_not : ¬ (Main[43] + (1 : Fin KB) = 0) := by rw [h43_zero]; decide
-  specialize h_read_pc h_not
-  specialize h6_op_a h_not
-  specialize h14_op_a h_not
-  specialize hload h_not
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
   have h6 : BitVec.ofNat 5 Main[6] ≠ 0#5 := by simp [← BitVec.toNat_inj]; omega
   have hu6421 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
@@ -417,16 +391,16 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat #v[Main[26], Main[27], Main[28], 0] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], 0] := by
     have := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at this
     rw [← this, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by simp [Word.toNat]; omega)]
+  have h25_isLt : Main[25].val < KB := Main[25].isLt
   have h26_isLt : Main[26].val < KB := Main[26].isLt
   have h27_isLt : Main[27].val < KB := Main[27].isLt
-  have h28_isLt : Main[28].val < KB := Main[28].isLt
   have h_KB : KB = 2130706433 := rfl
-  have h26_small : Main[26].val + 7 < 2130706433 := by
+  have h25_small : Main[25].val + 7 < 2130706433 := by
     have hbc := h_below_clint
     simp only [sp1_imm_c, h21'] at hbc
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real, haddr_nat] at hbc
@@ -436,11 +410,11 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
     omega
   have haddr_plus :
       ∀ (k : ℕ), k < 8 →
-        Word.toNat #v[Main[26], Main[27], Main[28], 0] + k =
-        Word.toNat #v[Main[26] + (k : Fin KB), Main[27], Main[28], 0] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], 0] + k =
+        Word.toNat #v[Main[25] + (k : Fin KB), Main[26], Main[27], 0] := by
     intro k hk
     have hkcast : (k : Fin KB).val = k := Fin.val_cast_of_lt (by omega)
-    have h26k : (Main[26] + (k : Fin KB)).val = Main[26].val + k := by
+    have h26k : (Main[25] + (k : Fin KB)).val = Main[25].val + k := by
       rw [Fin.val_add, hkcast, Nat.mod_eq_of_lt (by omega)]
     simp only [Word.toNat_def, Fin.isValue, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, Fin.val_zero, mul_zero, add_zero, h26k]
@@ -452,18 +426,18 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
   rw [run_vmem_read_of_width_4' (BitVec.ofNat 5 Main[14])
     (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
     (BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val))
+    (BitVec.ofNat 8 Main[39].val)
+    (BitVec.ofNat 8 (Main[39].val >>> 8))
     (BitVec.ofNat 8 Main[40].val)
-    (BitVec.ofNat 8 (Main[40].val >>> 8))
-    (BitVec.ofNat 8 Main[41].val)
-    (BitVec.ofNat 8 (Main[41].val >>> 8))]
+    (BitVec.ofNat 8 (Main[40].val >>> 8))]
   -- Main goal: zero-extend the 32-bit word to 64 bits
-  · have hext : BitVec.setWidth 64 (BitVec.ofNat 8 (Main[41].val >>> 8) ++
-          BitVec.ofNat 8 Main[41].val ++
-          BitVec.ofNat 8 (Main[40].val >>> 8) ++ BitVec.ofNat 8 Main[40].val) =
-        Word.toBitVec64 #v[Main[40], Main[41], 0, 0] :=
-      setWidth64_ofNat32_concat Main[40] Main[41] h40_lt h41_lt
+  · have hext : BitVec.setWidth 64 (BitVec.ofNat 8 (Main[40].val >>> 8) ++
+          BitVec.ofNat 8 Main[40].val ++
+          BitVec.ofNat 8 (Main[39].val >>> 8) ++ BitVec.ofNat 8 Main[39].val) =
+        Word.toBitVec64 #v[Main[39], Main[40], 0, 0] :=
+      setWidth64_ofNat32_concat Main[39] Main[40] h39_lt h40_lt
     simp [extend_value, zero_extend, Sail.BitVec.zeroExtend, bitVecToRegidxVal,
-      hext, h42_zero, mul_zero]
+      hext, h41_zero, mul_zero]
   -- Side conditions
   · simp only [isInitialized_iff, Std.ExtDHashMap.mem_insert, beq_iff_eq, hs,
       or_true, implies_true]
@@ -479,10 +453,10 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨he40, _, he39⟩ | ⟨he40, _, he39⟩
     · rw [he40]
-      rw [show Main[26] = Main[26] - 4 * Main[39] by rw [he39]; ring]
+      rw [show Main[25] = Main[25] - 4 * Main[38] by rw [he39]; ring]
       exact hL0
     · rw [he40]
-      rw [show Main[26] = Main[26] - 4 * Main[39] + 4 by rw [he39]; ring]
+      rw [show Main[25] = Main[25] - 4 * Main[38] + 4 by rw [he39]; ring]
       exact hL4
   -- Memory byte 1
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
@@ -491,11 +465,11 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨he40, _, he39⟩ | ⟨he40, _, he39⟩
     · rw [he40]
-      rw [show Main[26] + ((1 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 1 by
+      rw [show Main[25] + ((1 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 1 by
         rw [he39]; show _ = _; ring]
       exact hL1
     · rw [he40]
-      rw [show Main[26] + ((1 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 5 by
+      rw [show Main[25] + ((1 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 5 by
         rw [he39]; show _ = _; ring]
       exact hL5
   -- Memory byte 2
@@ -505,11 +479,11 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨_, he41, he39⟩ | ⟨_, he41, he39⟩
     · rw [he41]
-      rw [show Main[26] + ((2 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 2 by
+      rw [show Main[25] + ((2 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 2 by
         rw [he39]; show _ = _; ring]
       exact hL2
     · rw [he41]
-      rw [show Main[26] + ((2 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 6 by
+      rw [show Main[25] + ((2 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 6 by
         rw [he39]; show _ = _; ring]
       exact hL6
   -- Memory byte 3
@@ -519,11 +493,11 @@ theorem correct_lwu (Main : Vector (Fin KB) 44)
     obtain ⟨hL0, hL1, hL2, hL3, hL4, hL5, hL6, hL7⟩ := hload
     rcases h40_41_eq with ⟨_, he41, he39⟩ | ⟨_, he41, he39⟩
     · rw [he41]
-      rw [show Main[26] + ((3 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 3 by
+      rw [show Main[25] + ((3 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 3 by
         rw [he39]; show _ = _; ring]
       exact hL3
     · rw [he41]
-      rw [show Main[26] + ((3 : ℕ) : Fin KB) = Main[26] - 4 * Main[39] + 7 by
+      rw [show Main[25] + ((3 : ℕ) : Fin KB) = Main[25] - 4 * Main[38] + 7 by
         rw [he39]; show _ = _; ring]
       exact hL7
 
