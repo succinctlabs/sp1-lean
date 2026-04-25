@@ -55,7 +55,6 @@ lemma correct_prologue_facts
     s.get_reg? ((Main[6].val)#'ha) = some (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]) ∧
     s.get_reg? ((Main[14].val)#'hb) = some (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) ∧
     s.get_reg? ((Main[21].val)#'hc) = some (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) := by
-  stop
   have ⟨ha, hb, hc, hpc⟩ := register_bounds Main cstrs h_is_real
   have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
   have h_a0 := op_a_is_0 Main cstrs h_is_real
@@ -96,7 +95,6 @@ theorem correct_div
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -106,12 +104,12 @@ theorem correct_div
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.div Main cstrs h_is_real h_is_div]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Div
@@ -137,7 +135,6 @@ theorem correct_divu
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -147,12 +144,12 @@ theorem correct_divu
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.divu Main cstrs h_is_real h_is_divu]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Divu
@@ -178,7 +175,6 @@ theorem correct_divw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -188,12 +184,12 @@ theorem correct_divw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.divw Main cstrs h_is_real h_is_divw]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Divw
@@ -219,7 +215,6 @@ theorem correct_divuw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_divuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -229,12 +224,12 @@ theorem correct_divuw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.divuw Main cstrs h_is_real h_is_divuw]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Divuw
@@ -260,7 +255,6 @@ theorem correct_rem
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_rem (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -270,12 +264,12 @@ theorem correct_rem
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.rem Main cstrs h_is_real h_is_rem]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Rem
@@ -301,7 +295,6 @@ theorem correct_remu
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -311,12 +304,12 @@ theorem correct_remu
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.remu Main cstrs h_is_real h_is_remu]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Remu
@@ -342,7 +335,6 @@ theorem correct_remw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -352,12 +344,12 @@ theorem correct_remw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.remw Main cstrs h_is_real h_is_remw]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Remw
@@ -383,7 +375,6 @@ theorem correct_remuw
   let op_a := sp1_op_a Main cstrs h_is_real
   (spec_remuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main cstrs h_is_real).run s
   := by
-    stop
     obtain ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
       sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
       read_pc, read_op_a, read_op_b, read_op_c⟩ :=
@@ -393,12 +384,12 @@ theorem correct_remuw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       simp [spec.remuw Main cstrs h_is_real h_is_remuw]
       simp [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Remuw

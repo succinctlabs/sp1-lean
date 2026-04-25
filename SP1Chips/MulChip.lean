@@ -38,8 +38,6 @@ theorem correct_mul
   let op_a := sp1_op_a Main cstrs (mul_real Main is_mul)
   (spec_mul (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mul Main cstrs h_is_mul).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ is_mul, imm ⟩ := h_is_mul
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mul_real Main is_mul)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mul_real Main is_mul)
@@ -57,13 +55,13 @@ theorem correct_mul
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mul Main ⟨ is_mul, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mul
@@ -97,8 +95,6 @@ theorem correct_mulh
   let op_a := sp1_op_a Main cstrs (mulh_real Main is_mulh)
   (spec_mulh (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulh Main cstrs h_is_mulh).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ is_mulh, imm ⟩ := h_is_mulh
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulh_real Main is_mulh)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulh_real Main is_mulh)
@@ -116,13 +112,13 @@ theorem correct_mulh
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulh Main ⟨ is_mulh, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mulh
@@ -156,8 +152,6 @@ theorem correct_mulh
   let op_a := sp1_op_a Main cstrs (mulhu_real Main is_mulhu)
   (spec_mulhu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulhu Main cstrs h_is_mulhu).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ is_mulhu, imm ⟩ := h_is_mulhu
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulhu_real Main is_mulhu)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhu_real Main is_mulhu)
@@ -175,13 +169,13 @@ theorem correct_mulh
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulhu Main ⟨ is_mulhu, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 end Mulhu
@@ -213,8 +207,6 @@ theorem correct_mulh
   let op_a := sp1_op_a Main cstrs (mulhsu_real Main is_mulhsu)
   (spec_mulhsu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulhsu Main cstrs h_is_mulhsu).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ is_mulhsu, imm ⟩ := h_is_mulhsu
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulhsu_real Main is_mulhsu)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulhsu_real Main is_mulhsu)
@@ -231,13 +223,13 @@ theorem correct_mulh
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MUL_pure_bv_to_bw _ _ _ (by omega) (by omega)]
       have := spec.mulhsu Main ⟨ is_mulhsu, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal, mop_of_mul_op]
 
 namespace Mulhsu
@@ -271,8 +263,6 @@ theorem correct_mulw
   let op_a := sp1_op_a Main cstrs (mulw_real Main is_mulw)
   (spec_mulw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulw Main cstrs h_is_mulw).run s
   := by
-    have _ := state_cstrs
-    stop
     let ⟨ is_mulw, imm ⟩ := h_is_mulw
     have ⟨ ha, hb, hc, hpc ⟩ := register_bounds Main cstrs (mulw_real Main is_mulw)
     have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs (mulw_real Main is_mulw)
@@ -289,13 +279,13 @@ theorem correct_mulw
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
     · simp [Word.toBitVec64, Word.toNat]
-      exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
+      exact Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)
     · rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [if_neg (by simpa [← BitVec.toNat_inj])]
       rw [exec_MULW_pure_bv_to_bhw _ _ (by omega) (by omega)]
       have := spec.mulw Main ⟨ is_mulw, imm ⟩ cstrs
       simp_all [Word.toBitVec64, Word.toNat]
-      rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
+      rw [Fin.BitVec_ofNat_add_eq_add_ofNat Main[3] 4 (by decide) (by omega)]
       simp [bitVecToRegidxVal]
 
 end Mulw

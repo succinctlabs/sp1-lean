@@ -654,140 +654,140 @@ lemma allHold_constraints_iff :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp
     (MulOperation.constraints
-      #v[Main[69], Main[70], Main[71], Main[72]]
-      #v[Main[45], Main[46], Main[47], Main[48]] #v[Main[37], Main[38], Main[39], Main[40]]
+      #v[Main[68], Main[69], Main[70], Main[71]]
+      #v[Main[44], Main[45], Main[46], Main[47]] #v[Main[36], Main[37], Main[38], Main[39]]
       {
-        carry := #v[Main[77], Main[78], Main[79], Main[80], Main[81], Main[82], Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89], Main[90], Main[91], Main[92]],
-        product := #v[Main[93], Main[94], Main[95], Main[96], Main[97], Main[98], Main[99], Main[100], Main[101], Main[102], Main[103], Main[104], Main[105], Main[106], Main[107], Main[108]],
-        b_lower_byte := { low_bytes := #v[Main[109], Main[110], Main[111], Main[112]] },
-        c_lower_byte := { low_bytes := #v[Main[113], Main[114], Main[115], Main[116]] },
-        b_msb := Main[117],
-        c_msb := Main[118],
-        product_msb := { msb := Main[119] },
-        b_sign_extend := Main[120],
-        c_sign_extend := Main[121]
+        carry := #v[Main[76], Main[77], Main[78], Main[79], Main[80], Main[81], Main[82], Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89], Main[90], Main[91]],
+        product := #v[Main[92], Main[93], Main[94], Main[95], Main[96], Main[97], Main[98], Main[99], Main[100], Main[101], Main[102], Main[103], Main[104], Main[105], Main[106], Main[107]],
+        b_lower_byte := { low_bytes := #v[Main[108], Main[109], Main[110], Main[111]] },
+        c_lower_byte := { low_bytes := #v[Main[112], Main[113], Main[114], Main[115]] },
+        b_msb := Main[116],
+        c_msb := Main[117],
+        product_msb := { msb := Main[118] },
+        b_sign_extend := Main[119],
+        c_sign_extend := Main[120]
       }
-      Main[245] Main[245] 0 0 0 0) ∧
+      Main[244] Main[244] 0 0 0 0) ∧
     List.Forall SP1Constraint.toProp
     (MulOperation.constraints
-      #v[Main[73], Main[74], Main[75], Main[76]]
-      #v[Main[45], Main[46], Main[47], Main[48]]
-      #v[Main[37], Main[38], Main[39], Main[40]]
+      #v[Main[72], Main[73], Main[74], Main[75]]
+      #v[Main[44], Main[45], Main[46], Main[47]]
+      #v[Main[36], Main[37], Main[38], Main[39]]
       {
-        carry := #v[Main[122], Main[123], Main[124], Main[125], Main[126], Main[127], Main[128], Main[129], Main[130], Main[131], Main[132], Main[133], Main[134], Main[135], Main[136], Main[137]],
-        product := #v[Main[138], Main[139], Main[140], Main[141], Main[142], Main[143], Main[144], Main[145], Main[146], Main[147], Main[148], Main[149], Main[150], Main[151], Main[152], Main[153]],
-        b_lower_byte := { low_bytes := #v[Main[154], Main[155], Main[156], Main[157]] },
-        c_lower_byte := { low_bytes := #v[Main[158], Main[159], Main[160], Main[161]] },
-        b_msb := Main[162],
-        c_msb := Main[163],
-        product_msb := { msb := Main[164] },
-        b_sign_extend := Main[165],
-        c_sign_extend := Main[166]
+        carry := #v[Main[121], Main[122], Main[123], Main[124], Main[125], Main[126], Main[127], Main[128], Main[129], Main[130], Main[131], Main[132], Main[133], Main[134], Main[135], Main[136]],
+        product := #v[Main[137], Main[138], Main[139], Main[140], Main[141], Main[142], Main[143], Main[144], Main[145], Main[146], Main[147], Main[148], Main[149], Main[150], Main[151], Main[152]],
+        b_lower_byte := { low_bytes := #v[Main[153], Main[154], Main[155], Main[156]] },
+        c_lower_byte := { low_bytes := #v[Main[157], Main[158], Main[159], Main[160]] },
+        b_msb := Main[161],
+        c_msb := Main[162],
+        product_msb := { msb := Main[163] },
+        b_sign_extend := Main[164],
+        c_sign_extend := Main[165]
       }
-      Main[240] 0 (Main[202] + Main[204]) 0 (Main[203] + Main[205]) 0) ∧
+      Main[239] 0 (Main[201] + Main[203]) 0 (Main[202] + Main[204]) 0) ∧
     List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[15], Main[16], Main[17], Main[18]]
       #v[0, 0, 0, 32768]
       {
         is_diff_zero := {
-          is_zero_limb := #v[{ inverse := Main[211], result := Main[212] }, { inverse := Main[213], result := Main[214] }, { inverse := Main[215], result := Main[216] }, { inverse := Main[217], result := Main[218] }],
-          is_zero_first_half := Main[219],
-          is_zero_second_half := Main[220],
-          result := Main[221]
+          is_zero_limb := #v[{ inverse := Main[210], result := Main[211] }, { inverse := Main[212], result := Main[213] }, { inverse := Main[214], result := Main[215] }, { inverse := Main[216], result := Main[217] }],
+          is_zero_first_half := Main[218],
+          is_zero_second_half := Main[219],
+          result := Main[220]
         }
       }
-      Main[240]) ∧
+      Main[239]) ∧
     List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[22], Main[23], Main[24], Main[25]]
       #v[65535, 65535, 65535, 65535]
       {
         is_diff_zero := {
-          is_zero_limb := #v[{ inverse := Main[222], result := Main[223] }, { inverse := Main[224], result := Main[225] }, { inverse := Main[226], result := Main[227] }, { inverse := Main[228], result := Main[229] }],
-          is_zero_first_half := Main[230],
-          is_zero_second_half := Main[231],
-          result := Main[232]
+          is_zero_limb := #v[{ inverse := Main[221], result := Main[222] }, { inverse := Main[223], result := Main[224] }, { inverse := Main[225], result := Main[226] }, { inverse := Main[227], result := Main[228] }],
+          is_zero_first_half := Main[229],
+          is_zero_second_half := Main[230],
+          result := Main[231]
         }
       }
-      Main[240]) ∧
+      Main[239]) ∧
     List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[15], Main[16], 0, 0]
       #v[0, 32768, 0, 0]
       {
         is_diff_zero := {
-          is_zero_limb := #v[{ inverse := Main[211], result := Main[212] }, { inverse := Main[213], result := Main[214] }, { inverse := Main[215], result := Main[216] }, { inverse := Main[217], result := Main[218] }],
-          is_zero_first_half := Main[219],
-          is_zero_second_half := Main[220],
-          result := Main[221]
+          is_zero_limb := #v[{ inverse := Main[210], result := Main[211] }, { inverse := Main[212], result := Main[213] }, { inverse := Main[214], result := Main[215] }, { inverse := Main[216], result := Main[217] }],
+          is_zero_first_half := Main[218],
+          is_zero_second_half := Main[219],
+          result := Main[220]
         }
       }
-      (Main[206] + Main[207] + Main[208] + Main[209])) ∧
+      (Main[205] + Main[206] + Main[207] + Main[208])) ∧
     List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[22], Main[23], 0, 0]
       #v[65535, 65535, 0, 0]
       {
         is_diff_zero := {
-          is_zero_limb := #v[{ inverse := Main[222], result := Main[223] }, { inverse := Main[224], result := Main[225] }, { inverse := Main[226], result := Main[227] }, { inverse := Main[228], result := Main[229] }],
-          is_zero_first_half := Main[230],
-          is_zero_second_half := Main[231],
-          result := Main[232]
+          is_zero_limb := #v[{ inverse := Main[221], result := Main[222] }, { inverse := Main[223], result := Main[224] }, { inverse := Main[225], result := Main[226] }, { inverse := Main[227], result := Main[228] }],
+          is_zero_first_half := Main[229],
+          is_zero_second_half := Main[230],
+          result := Main[231]
         }
       }
-      (Main[206] + Main[207] + Main[208] + Main[209])) ∧
+      (Main[205] + Main[206] + Main[207] + Main[208])) ∧
     List.Forall SP1Constraint.toProp
     (IsZeroWordOperation.constraints
-      #v[Main[37], Main[38], Main[39], Main[40]]
+      #v[Main[36], Main[37], Main[38], Main[39]]
       {
-        is_zero_limb := #v[{ inverse := Main[191], result := Main[192] }, { inverse := Main[193], result := Main[194] }, { inverse := Main[195], result := Main[196] }, { inverse := Main[197], result := Main[198] }],
-        is_zero_first_half := Main[199],
-        is_zero_second_half := Main[200],
-        result := Main[201]
+        is_zero_limb := #v[{ inverse := Main[190], result := Main[191] }, { inverse := Main[192], result := Main[193] }, { inverse := Main[194], result := Main[195] }, { inverse := Main[196], result := Main[197] }],
+        is_zero_first_half := Main[198],
+        is_zero_second_half := Main[199],
+        result := Main[200]
       }
-      Main[245]) ∧
-    List.Forall SP1Constraint.toProp
-    (AddOperation.constraints
-      #v[Main[37], Main[38], Main[39], Main[40]]
-      #v[Main[61], Main[62], Main[63], Main[64]]
-      { value := #v[Main[167], Main[168], Main[169], Main[170]] }
-      Main[243]) ∧
-    List.Forall SP1Constraint.toProp
-    (AddOperation.constraints
-      #v[Main[49], Main[50], Main[51], Main[52]]
-      #v[Main[57], Main[58], Main[59], Main[60]]
-      { value := #v[Main[171], Main[172], Main[173], Main[174]] }
       Main[244]) ∧
     List.Forall SP1Constraint.toProp
+    (AddOperation.constraints
+      #v[Main[36], Main[37], Main[38], Main[39]]
+      #v[Main[60], Main[61], Main[62], Main[63]]
+      { value := #v[Main[166], Main[167], Main[168], Main[169]] }
+      Main[242]) ∧
+    List.Forall SP1Constraint.toProp
+    (AddOperation.constraints
+      #v[Main[48], Main[49], Main[50], Main[51]]
+      #v[Main[56], Main[57], Main[58], Main[59]]
+      { value := #v[Main[170], Main[171], Main[172], Main[173]] }
+      Main[243]) ∧
+    List.Forall SP1Constraint.toProp
     (LtOperationUnsigned.constraints
-      #v[Main[57], Main[58], Main[59], Main[60]]
-      #v[Main[65], Main[66], Main[67], Main[68]]
+      #v[Main[56], Main[57], Main[58], Main[59]]
+      #v[Main[64], Main[65], Main[66], Main[67]]
       {
-          u16_compare_operation := { bit := Main[175] },
-          u16_flags := #v[Main[176], Main[177], Main[178], Main[179]]
-          not_eq_inv := Main[180],
-          comparison_limbs := #v[Main[181], Main[182]]
+          u16_compare_operation := { bit := Main[174] },
+          u16_flags := #v[Main[175], Main[176], Main[177], Main[178]]
+          not_eq_inv := Main[179],
+          comparison_limbs := #v[Main[180], Main[181]]
       }
       Main[245]) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[18] { msb := Main[233] } Main[240]) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[25] { msb := Main[235] } Main[240]) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[56] { msb := Main[234] } Main[240]) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[16] { msb := Main[233] } (Main[206] + Main[207] + Main[208] + Main[209])) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[23] { msb := Main[235] } (Main[206] + Main[207] + Main[208] + Main[209])) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[54] { msb := Main[234] } (Main[206] + Main[207] + Main[208] + Main[209])) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[42] { msb := Main[236] } (Main[206] + Main[207] + Main[208] + Main[209])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[18] { msb := Main[232] } Main[239]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[25] { msb := Main[234] } Main[239]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[55] { msb := Main[233] } Main[239]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[16] { msb := Main[232] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[23] { msb := Main[234] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[53] { msb := Main[233] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[41] { msb := Main[235] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
     List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
-        #v[Main[3] + 4, Main[4], Main[5]] 8 Main[245]) ∧
+        #v[Main[3] + 4, Main[4], Main[5]] 8 Main[244]) ∧
     List.Forall SP1Constraint.toProp
         (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]]
-          (Main[203] * 16 + Main[205] * 18 + Main[202] * 15 + Main[204] * 17 + Main[206] * 48 + Main[207] * 50 + Main[208] * 49 + Main[209] * 51)
-          #v[Main[203] * 8 + Main[205] * 8 + Main[202] * 8 + Main[204] * 8 + Main[206] * 8 + Main[207] * 8 + Main[208] * 8,
-            Main[203] * 51 + Main[205] * 51 + Main[202] * 51 + Main[204] * 51 + Main[206] * 59 + Main[207] * 59 + Main[208] * 59 + Main[209] * 59,
-            Main[203] * 5 + Main[205] * 7 + Main[202] * 4 + Main[204] * 6 + Main[206] * 4 + Main[207] * 6 + Main[208] * 5 + Main[209] * 7,
-            Main[203] + Main[205] + Main[202] + Main[204] + Main[206] + Main[207] + Main[208] + Main[209]]
-          #v[Main[29], Main[30], Main[31], Main[32]]
+          (Main[202] * 16 + Main[204] * 18 + Main[201] * 15 + Main[203] * 17 + Main[205] * 25 + Main[206] * 27 + Main[207] * 26 + Main[208] * 28)
+          #v[Main[202] * 8 + Main[204] * 8 + Main[201] * 8 + Main[203] * 8 + Main[205] * 8 + Main[206] * 8 + Main[207] * 8 + Main[208] * 8,
+            Main[202] * 51 + Main[204] * 51 + Main[201] * 51 + Main[203] * 51 + Main[205] * 59 + Main[206] * 59 + Main[207] * 59 + Main[208] * 59,
+            Main[202] * 5 + Main[204] * 7 + Main[201] * 4 + Main[203] * 6 + Main[205] * 4 + Main[206] * 6 + Main[207] * 5 + Main[208] * 7,
+            Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208]]
+          #v[Main[28], Main[29], Main[30], Main[31]]
           { op_a := Main[6],
             op_a_memory :=
               { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -800,124 +800,125 @@ lemma allHold_constraints_iff :
             op_c_memory :=
               { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
                 access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
-          Main[245]) ∧
-    Main[240] = Main[245] * (1 - (Main[206] + Main[207] + Main[208] + Main[209])) ∧
-    Main[237] = Main[233] * (Main[202] + Main[204] + Main[206] + Main[207]) ∧
-    Main[241] = Main[234] * (Main[202] + Main[204] + Main[206] + Main[207]) ∧
-    Main[242] = Main[235] * (Main[202] + Main[204] + Main[206] + Main[207]) ∧
-    Main[15] = Main[33] ∧
-    Main[22] = Main[37] ∧
-    Main[16] = Main[34] ∧
-    Main[23] = Main[38] ∧
-    Main[35] = Main[17] * (1 - (Main[206] + Main[207] + Main[208] + Main[209])) + Main[237] * (Main[206] + Main[207] + Main[208] + Main[209]) * 65535 ∧
-    Main[39] = Main[24] * (1 - (Main[206] + Main[207] + Main[208] + Main[209])) + Main[242] * (Main[206] + Main[207] + Main[208] + Main[209]) * 65535 ∧
-    Main[36] = Main[18] * (1 - (Main[206] + Main[207] + Main[208] + Main[209])) + Main[237] * (Main[206] + Main[207] + Main[208] + Main[209]) * 65535 ∧
-    Main[40] = Main[25] * (1 - (Main[206] + Main[207] + Main[208] + Main[209])) + Main[242] * (Main[206] + Main[207] + Main[208] + Main[209]) * 65535 ∧
+          Main[244]) ∧
+    Main[239] = Main[244] * (1 - (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    Main[236] = Main[232] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧
+    Main[240] = Main[233] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧
+    Main[241] = Main[234] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧
+    Main[15] = Main[32] ∧
+    Main[22] = Main[36] ∧
+    Main[16] = Main[33] ∧
+    Main[23] = Main[37] ∧
+    Main[34] = Main[17] * (1 - (Main[205] + Main[206] + Main[207] + Main[208])) + Main[236] * (Main[205] + Main[206] + Main[207] + Main[208]) * 65535 ∧
+    Main[38] = Main[24] * (1 - (Main[205] + Main[206] + Main[207] + Main[208])) + Main[241] * (Main[205] + Main[206] + Main[207] + Main[208]) * 65535 ∧
+    Main[35] = Main[18] * (1 - (Main[205] + Main[206] + Main[207] + Main[208])) + Main[236] * (Main[205] + Main[206] + Main[207] + Main[208]) * 65535 ∧
+    Main[39] = Main[25] * (1 - (Main[205] + Main[206] + Main[207] + Main[208])) + Main[241] * (Main[205] + Main[206] + Main[207] + Main[208]) * 65535 ∧
+    Main[44] = Main[40] ∧
     Main[45] = Main[41] ∧
-    Main[46] = Main[42] ∧
-    (Main[208] + Main[209] = 0 ∨ Main[47] = 0) ∧
-    (Main[206] + Main[207] = 0 ∨ Main[47] = Main[236] * 65535) ∧
-    (Main[206] + Main[207] + Main[208] + Main[209] = 0 ∨ Main[43] = Main[236] * 65535) ∧
-    (Main[203] + Main[205] + Main[202] + Main[204] = 0 ∨ Main[47] = Main[43]) ∧
-    (Main[208] + Main[209] = 0 ∨ Main[48] = 0) ∧
-    (Main[206] + Main[207] = 0 ∨ Main[48] = Main[236] * 65535) ∧
-    (Main[206] + Main[207] + Main[208] + Main[209] = 0 ∨ Main[44] = Main[236] * 65535) ∧
-    (Main[203] + Main[205] + Main[202] + Main[204] = 0 ∨ Main[48] = Main[44]) ∧
+    (Main[207] + Main[208] = 0 ∨ Main[46] = 0) ∧
+    (Main[205] + Main[206] = 0 ∨ Main[46] = Main[235] * 65535) ∧
+    (Main[205] + Main[206] + Main[207] + Main[208] = 0 ∨ Main[42] = Main[235] * 65535) ∧
+    (Main[202] + Main[204] + Main[201] + Main[203] = 0 ∨ Main[46] = Main[42]) ∧
+    (Main[207] + Main[208] = 0 ∨ Main[47] = 0) ∧
+    (Main[205] + Main[206] = 0 ∨ Main[47] = Main[235] * 65535) ∧
+    (Main[205] + Main[206] + Main[207] + Main[208] = 0 ∨ Main[43] = Main[235] * 65535) ∧
+    (Main[202] + Main[204] + Main[201] + Main[203] = 0 ∨ Main[47] = Main[43]) ∧
+    Main[48] = Main[52] ∧
     Main[49] = Main[53] ∧
-    Main[50] = Main[54] ∧
-    (Main[208] + Main[209] = 0 ∨ Main[51] = 0) ∧
-    (Main[206] + Main[207] = 0 ∨ Main[51] = Main[234] * 65535) ∧
-    (Main[206] + Main[207] + Main[208] + Main[209] = 0 ∨ Main[55] = Main[234] * 65535) ∧
-    (Main[203] + Main[205] + Main[202] + Main[204] = 0 ∨ Main[51] = Main[55]) ∧
-    (Main[208] + Main[209] = 0 ∨ Main[52] = 0) ∧
-    (Main[206] + Main[207] = 0 ∨ Main[52] = Main[234] * 65535) ∧
-    (Main[206] + Main[207] + Main[208] + Main[209] = 0 ∨ Main[56] = Main[234] * 65535) ∧
-    (Main[203] + Main[205] + Main[202] + Main[204] = 0 ∨ Main[52] = Main[56]) ∧
-    Main[210] = Main[221] * Main[232] * (Main[202] + Main[204] + Main[206] + Main[207]) ∧
-    Main[238] = Main[237] * (1 - Main[210]) ∧
-    Main[239] = (1 - Main[237]) * (1 - Main[210]) ∧
-    (Main[210] = 0 ∨ Main[41] = Main[33]) ∧
-    (Main[210] = 0 ∨ Main[53] = 0) ∧
-    (Main[210] = 0 ∨ Main[42] = Main[34]) ∧
-    (Main[210] = 0 ∨ Main[54] = 0) ∧
-    (Main[210] = 0 ∨ Main[43] = Main[35]) ∧
-    (Main[210] = 0 ∨ Main[55] = 0) ∧
-    (Main[210] = 0 ∨ Main[44] = Main[36]) ∧
-    (Main[210] = 0 ∨ Main[56] = 0) ∧
-    (Main[210] = 1 ∨ Main[33] = Main[69] + Main[49] - Main[183] * 65536) ∧
-    (Main[210] = 1 ∨ Main[34] = Main[70] + Main[50] - Main[184] * 65536 + Main[183]) ∧
-    (Main[210] = 1 ∨ Main[35] = Main[71] + Main[51] - Main[185] * 65536 + Main[184]) ∧
-    (Main[210] = 1 ∨ Main[36] = Main[72] + Main[52] - Main[186] * 65536 + Main[185]) ∧
-    (Main[210] = 1 ∨ Main[237] * 65535 = Main[73] + Main[241] * 65535 - Main[187] * 65536 + Main[186]) ∧
-    (Main[210] = 1 ∨ Main[237] * 65535 = Main[74] + Main[241] * 65535 - Main[188] * 65536 + Main[187]) ∧
-    (Main[210] = 1 ∨ Main[237] * 65535 =  Main[75] + Main[241] * 65535 - Main[189] * 65536 + Main[188]) ∧
-    (Main[210] = 1 ∨ Main[237] * 65535 = Main[76] + Main[241] * 65535 - Main[190] * 65536 + Main[189]) ∧
-    (¬Main[245] = 0 → (Main[69] + Main[49] - Main[183] * 65536).val < 65536) ∧
-    (¬Main[245] = 0 → (Main[70] + Main[50] - Main[184] * 65536 + Main[183]).val < 65536) ∧
-    (¬Main[245] = 0 → (Main[71] + Main[51] - Main[185] * 65536 + Main[184]).val < 65536) ∧
-    (¬Main[245] = 0 → (Main[72] + Main[52] - Main[186] * 65536 + Main[185]).val < 65536) ∧
-    (¬Main[245] = 0 → (Main[73] + Main[241] * 65535 - Main[187] * 65536 + Main[186]).val < 65536) ∧
-    (¬Main[245] = 0 → (Main[74] + Main[241] * 65535 - Main[188] * 65536 + Main[187]).val < 65536) ∧
-    (¬Main[245] = 0 → (Main[75] + Main[241] * 65535 - Main[189] * 65536 + Main[188]).val < 65536) ∧
-    (¬Main[245] = 0 → (Main[76] + Main[241] * 65535 - Main[190] * 65536 + Main[189]).val < 65536) ∧
-    (Main[203] + Main[202] + Main[206] + Main[208] = 0 ∨ Main[41] = Main[29]) ∧
-    (Main[205] + Main[204] + Main[207] + Main[209] = 0 ∨ Main[53] = Main[29]) ∧
-    (Main[203] + Main[202] + Main[206] + Main[208] = 0 ∨ Main[42] = Main[30]) ∧
-    (Main[205] + Main[204] + Main[207] + Main[209] = 0 ∨ Main[54] = Main[30]) ∧
-    (Main[203] + Main[202] + Main[206] + Main[208] = 0 ∨ Main[43] = Main[31]) ∧
-    (Main[205] + Main[204] + Main[207] + Main[209] = 0 ∨ Main[55] = Main[31]) ∧
-    (Main[203] + Main[202] + Main[206] + Main[208] = 0 ∨ Main[44] = Main[32]) ∧
-    (Main[205] + Main[204] + Main[207] + Main[209] = 0 ∨ Main[56] = Main[32]) ∧
-    (Main[241] = 0 ∨ Main[237] = 1) ∧
-    (Main[53] + Main[54] + Main[55] + Main[56] = 0 ∨ Main[241] = 1 ∨ Main[237] = 0) ∧
-    (Main[201] = 0 ∨ Main[41] = 65535) ∧
-    (Main[201] = 0 ∨ Main[42] = 65535) ∧
-    (Main[201] = 0 ∨ Main[43] = 65535) ∧
-    (Main[201] = 0 ∨ Main[44] = 65535) ∧
-    (Main[201] = 0 ∨ Main[49] = Main[33]) ∧
-    (Main[201] = 0 ∨ Main[50] = Main[34]) ∧
-    (Main[201] = 0 ∨ Main[51] = Main[35]) ∧
-    (Main[201] = 0 ∨ Main[52] = Main[36]) ∧
-    (Main[242] = 1 ∨ Main[37] = Main[61]) ∧
-    (Main[241] = 1 ∨ Main[49] = Main[57]) ∧
-    (Main[242] = 1 ∨ Main[38] = Main[62]) ∧
-    (Main[241] = 1 ∨ Main[50] = Main[58]) ∧
-    (Main[242] = 1 ∨ Main[39] = Main[63]) ∧
-    (Main[241] = 1 ∨ Main[51] = Main[59]) ∧
-    (Main[242] = 1 ∨ Main[40] = Main[64]) ∧
-    (Main[241] = 1 ∨ Main[52] = Main[60]) ∧
-    (¬Main[245] = 0 → Main[61].val < 65536) ∧
-    (¬Main[245] = 0 → Main[62].val < 65536) ∧
-    (¬Main[245] = 0 → Main[63].val < 65536) ∧
-    (¬Main[245] = 0 → Main[64].val < 65536) ∧
-    (Main[243] = 0 ∨ Main[167] = 0) ∧
-    (Main[243] = 0 ∨ Main[168] = 0) ∧
-    (Main[243] = 0 ∨ Main[169] = 0) ∧
+    (Main[207] + Main[208] = 0 ∨ Main[50] = 0) ∧
+    (Main[205] + Main[206] = 0 ∨ Main[50] = Main[233] * 65535) ∧
+    (Main[205] + Main[206] + Main[207] + Main[208] = 0 ∨ Main[54] = Main[233] * 65535) ∧
+    (Main[202] + Main[204] + Main[201] + Main[203] = 0 ∨ Main[50] = Main[54]) ∧
+    (Main[207] + Main[208] = 0 ∨ Main[51] = 0) ∧
+    (Main[205] + Main[206] = 0 ∨ Main[51] = Main[233] * 65535) ∧
+    (Main[205] + Main[206] + Main[207] + Main[208] = 0 ∨ Main[55] = Main[233] * 65535) ∧
+    (Main[202] + Main[204] + Main[201] + Main[203] = 0 ∨ Main[51] = Main[55]) ∧
+    Main[209] = Main[220] * Main[231] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧
+    Main[237] = Main[236] * (1 - Main[209]) ∧
+    Main[238] = (1 - Main[236]) * (1 - Main[209]) ∧
+    (Main[209] = 0 ∨ Main[40] = Main[32]) ∧
+    (Main[209] = 0 ∨ Main[52] = 0) ∧
+    (Main[209] = 0 ∨ Main[41] = Main[33]) ∧
+    (Main[209] = 0 ∨ Main[53] = 0) ∧
+    (Main[209] = 0 ∨ Main[42] = Main[34]) ∧
+    (Main[209] = 0 ∨ Main[54] = 0) ∧
+    (Main[209] = 0 ∨ Main[43] = Main[35]) ∧
+    (Main[209] = 0 ∨ Main[55] = 0) ∧
+    (Main[209] = 1 ∨ Main[32] = Main[68] + Main[48] - Main[182] * 65536) ∧
+    (Main[209] = 1 ∨ Main[33] = Main[69] + Main[49] - Main[183] * 65536 + Main[182]) ∧
+    (Main[209] = 1 ∨ Main[34] = Main[70] + Main[50] - Main[184] * 65536 + Main[183]) ∧
+    (Main[209] = 1 ∨ Main[35] = Main[71] + Main[51] - Main[185] * 65536 + Main[184]) ∧
+    (Main[209] = 1 ∨ Main[236] * 65535 = Main[72] + Main[240] * 65535 - Main[186] * 65536 + Main[185]) ∧
+    (Main[209] = 1 ∨ Main[236] * 65535 = Main[73] + Main[240] * 65535 - Main[187] * 65536 + Main[186]) ∧
+    (Main[209] = 1 ∨ Main[236] * 65535 =  Main[74] + Main[240] * 65535 - Main[188] * 65536 + Main[187]) ∧
+    (Main[209] = 1 ∨ Main[236] * 65535 = Main[75] + Main[240] * 65535 - Main[189] * 65536 + Main[188]) ∧
+    (¬Main[244] = 0 → (Main[68] + Main[48] - Main[182] * 65536).val < 65536) ∧
+    (¬Main[244] = 0 → (Main[69] + Main[49] - Main[183] * 65536 + Main[182]).val < 65536) ∧
+    (¬Main[244] = 0 → (Main[70] + Main[50] - Main[184] * 65536 + Main[183]).val < 65536) ∧
+    (¬Main[244] = 0 → (Main[71] + Main[51] - Main[185] * 65536 + Main[184]).val < 65536) ∧
+    (¬Main[244] = 0 → (Main[72] + Main[240] * 65535 - Main[186] * 65536 + Main[185]).val < 65536) ∧
+    (¬Main[244] = 0 → (Main[73] + Main[240] * 65535 - Main[187] * 65536 + Main[186]).val < 65536) ∧
+    (¬Main[244] = 0 → (Main[74] + Main[240] * 65535 - Main[188] * 65536 + Main[187]).val < 65536) ∧
+    (¬Main[244] = 0 → (Main[75] + Main[240] * 65535 - Main[189] * 65536 + Main[188]).val < 65536) ∧
+    (Main[202] + Main[201] + Main[205] + Main[207] = 0 ∨ Main[40] = Main[28]) ∧
+    (Main[204] + Main[203] + Main[206] + Main[208] = 0 ∨ Main[52] = Main[28]) ∧
+    (Main[202] + Main[201] + Main[205] + Main[207] = 0 ∨ Main[41] = Main[29]) ∧
+    (Main[204] + Main[203] + Main[206] + Main[208] = 0 ∨ Main[53] = Main[29]) ∧
+    (Main[202] + Main[201] + Main[205] + Main[207] = 0 ∨ Main[42] = Main[30]) ∧
+    (Main[204] + Main[203] + Main[206] + Main[208] = 0 ∨ Main[54] = Main[30]) ∧
+    (Main[202] + Main[201] + Main[205] + Main[207] = 0 ∨ Main[43] = Main[31]) ∧
+    (Main[204] + Main[203] + Main[206] + Main[208] = 0 ∨ Main[55] = Main[31]) ∧
+    (Main[240] = 0 ∨ Main[236] = 1) ∧
+    (Main[52] + Main[53] + Main[54] + Main[55] = 0 ∨ Main[240] = 1 ∨ Main[236] = 0) ∧
+    (Main[200] = 0 ∨ Main[40] = 65535) ∧
+    (Main[200] = 0 ∨ Main[41] = 65535) ∧
+    (Main[200] = 0 ∨ Main[42] = 65535) ∧
+    (Main[200] = 0 ∨ Main[43] = 65535) ∧
+    (Main[200] = 0 ∨ Main[48] = Main[32]) ∧
+    (Main[200] = 0 ∨ Main[49] = Main[33]) ∧
+    (Main[200] = 0 ∨ Main[50] = Main[34]) ∧
+    (Main[200] = 0 ∨ Main[51] = Main[35]) ∧
+    (Main[241] = 1 ∨ Main[36] = Main[60]) ∧
+    (Main[240] = 1 ∨ Main[48] = Main[56]) ∧
+    (Main[241] = 1 ∨ Main[37] = Main[61]) ∧
+    (Main[240] = 1 ∨ Main[49] = Main[57]) ∧
+    (Main[241] = 1 ∨ Main[38] = Main[62]) ∧
+    (Main[240] = 1 ∨ Main[50] = Main[58]) ∧
+    (Main[241] = 1 ∨ Main[39] = Main[63]) ∧
+    (Main[240] = 1 ∨ Main[51] = Main[59]) ∧
+    (¬Main[244] = 0 → Main[60].val < 65536) ∧
+    (¬Main[244] = 0 → Main[61].val < 65536) ∧
+    (¬Main[244] = 0 → Main[62].val < 65536) ∧
+    (¬Main[244] = 0 → Main[63].val < 65536) ∧
+    (Main[242] = 0 ∨ Main[166] = 0) ∧
+    (Main[242] = 0 ∨ Main[167] = 0) ∧
+    (Main[242] = 0 ∨ Main[168] = 0) ∧
+    (Main[242] = 0 ∨ Main[169] = 0) ∧
+    (¬Main[244] = 0 → Main[56].val < 65536) ∧
+    (¬Main[244] = 0 → Main[57].val < 65536) ∧
+    (¬Main[244] = 0 → Main[58].val < 65536) ∧
+    (¬Main[244] = 0 → Main[59].val < 65536) ∧
     (Main[243] = 0 ∨ Main[170] = 0) ∧
-    (¬Main[245] = 0 → Main[57].val < 65536) ∧
-    (¬Main[245] = 0 → Main[58].val < 65536) ∧
-    (¬Main[245] = 0 → Main[59].val < 65536) ∧
-    (¬Main[245] = 0 → Main[60].val < 65536) ∧
-    (Main[244] = 0 ∨ Main[171] = 0) ∧
-    (Main[244] = 0 ∨ Main[172] = 0) ∧
-    (Main[244] = 0 ∨ Main[173] = 0) ∧
-    (Main[244] = 0 ∨ Main[174] = 0) ∧
-    Main[243] = Main[242] * Main[245] ∧
-    Main[244] = Main[241] * Main[245] ∧
-    Main[65] = Main[201] + (1 - Main[201]) * Main[61] ∧
-    Main[66] = (1 - Main[201]) * Main[62] ∧
-    Main[67] = (1 - Main[201]) * Main[63] ∧
-    Main[68] = (1 - Main[201]) * Main[64] ∧
-    Main[245] = (1 - Main[201]) * Main[245] ∧
-    (Main[245] = 0 ∨ Main[175] = 1) ∧
-    (¬Main[245] = 0 → Main[41].val < 65536) ∧
-    (¬Main[245] = 0 → Main[42].val < 65536) ∧
-    (¬Main[245] = 0 → Main[43].val < 65536) ∧
-    (¬Main[245] = 0 → Main[44].val < 65536) ∧
-    (¬Main[245] = 0 → Main[53].val < 65536) ∧
-    (¬Main[245] = 0 → Main[54].val < 65536) ∧
-    (¬Main[245] = 0 → Main[55].val < 65536) ∧
-    (¬Main[245] = 0 → Main[56].val < 65536) ∧
+    (Main[243] = 0 ∨ Main[171] = 0) ∧
+    (Main[243] = 0 ∨ Main[172] = 0) ∧
+    (Main[243] = 0 ∨ Main[173] = 0) ∧
+    Main[242] = Main[241] * Main[244] ∧
+    Main[243] = Main[240] * Main[244] ∧
+    Main[64] = Main[200] + (1 - Main[200]) * Main[60] ∧
+    Main[65] = (1 - Main[200]) * Main[61] ∧
+    Main[66] = (1 - Main[200]) * Main[62] ∧
+    Main[67] = (1 - Main[200]) * Main[63] ∧
+    Main[245] = (1 - Main[200]) * Main[244] ∧
+    (Main[245] = 0 ∨ Main[174] = 1) ∧
+    (¬Main[244] = 0 → Main[40].val < 65536) ∧
+    (¬Main[244] = 0 → Main[41].val < 65536) ∧
+    (¬Main[244] = 0 → Main[42].val < 65536) ∧
+    (¬Main[244] = 0 → Main[43].val < 65536) ∧
+    (¬Main[244] = 0 → Main[52].val < 65536) ∧
+    (¬Main[244] = 0 → Main[53].val < 65536) ∧
+    (¬Main[244] = 0 → Main[54].val < 65536) ∧
+    (¬Main[244] = 0 → Main[55].val < 65536) ∧
+    (Main[182] = 0 ∨ Main[182] = 1) ∧
     (Main[183] = 0 ∨ Main[183] = 1) ∧
     (Main[184] = 0 ∨ Main[184] = 1) ∧
     (Main[185] = 0 ∨ Main[185] = 1) ∧
@@ -925,15 +926,15 @@ lemma allHold_constraints_iff :
     (Main[187] = 0 ∨ Main[187] = 1) ∧
     (Main[188] = 0 ∨ Main[188] = 1) ∧
     (Main[189] = 0 ∨ Main[189] = 1) ∧
-    (Main[190] = 0 ∨ Main[190] = 1) ∧
-    (¬Main[245] = 0 → Main[69].val < 65536) ∧
-    (¬Main[245] = 0 → Main[70].val < 65536) ∧
-    (¬Main[245] = 0 → Main[71].val < 65536) ∧
-    (¬Main[245] = 0 → Main[72].val < 65536) ∧
-    (¬Main[245] = 0 → Main[73].val < 65536) ∧
-    (¬Main[245] = 0 → Main[74].val < 65536) ∧
-    (¬Main[245] = 0 → Main[75].val < 65536) ∧
-    (¬Main[245] = 0 → Main[76].val < 65536) ∧
+    (¬Main[244] = 0 → Main[68].val < 65536) ∧
+    (¬Main[244] = 0 → Main[69].val < 65536) ∧
+    (¬Main[244] = 0 → Main[70].val < 65536) ∧
+    (¬Main[244] = 0 → Main[71].val < 65536) ∧
+    (¬Main[244] = 0 → Main[72].val < 65536) ∧
+    (¬Main[244] = 0 → Main[73].val < 65536) ∧
+    (¬Main[244] = 0 → Main[74].val < 65536) ∧
+    (¬Main[244] = 0 → Main[75].val < 65536) ∧
+    (Main[201] = 0 ∨ Main[201] = 1) ∧
     (Main[202] = 0 ∨ Main[202] = 1) ∧
     (Main[203] = 0 ∨ Main[203] = 1) ∧
     (Main[204] = 0 ∨ Main[204] = 1) ∧
@@ -942,24 +943,24 @@ lemma allHold_constraints_iff :
     (Main[207] = 0 ∨ Main[207] = 1) ∧
     (Main[208] = 0 ∨ Main[208] = 1) ∧
     (Main[209] = 0 ∨ Main[209] = 1) ∧
-    (Main[210] = 0 ∨ Main[210] = 1) ∧
-    (Main[240] = 0 ∨ Main[240] = 1) ∧
+    (Main[239] = 0 ∨ Main[239] = 1) ∧
+    (Main[236] = 0 ∨ Main[236] = 1) ∧
     (Main[237] = 0 ∨ Main[237] = 1) ∧
     (Main[238] = 0 ∨ Main[238] = 1) ∧
-    (Main[239] = 0 ∨ Main[239] = 1) ∧
+    (Main[240] = 0 ∨ Main[240] = 1) ∧
     (Main[241] = 0 ∨ Main[241] = 1) ∧
-    (Main[242] = 0 ∨ Main[242] = 1) ∧
-    (Main[245] = 0 ∨ Main[245] = 1) ∧
-    (Main[243] = 0 ∨ Main[243] = 1) ∧
     (Main[244] = 0 ∨ Main[244] = 1) ∧
-    Main[203] + Main[205] + Main[202] + Main[204] + Main[206] + Main[207] + Main[208] + Main[209] = 1
+    (Main[242] = 0 ∨ Main[242] = 1) ∧
+    (Main[243] = 0 ∨ Main[243] = 1) ∧
+    Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208] = 1 ∧
+    Main[13] = 0
   := by
-    stop
     simp [constraints, sub_eq_zero, and_assoc]
-    iterate 3 rw [eq_comm (a := _ * (Main[202] + Main[204] + Main[206] + Main[207]))]
+    iterate 3 rw [eq_comm (a := _ * (Main[201] + Main[203] + Main[205] + Main[206]))]
     iterate 3 rw [eq_comm (a := (1 : Fin KB))]
     rw [eq_comm (a := _ * _) (b := Main[245])]
-    simp
+    simp [neg_eq_zero]
+    intros
     repeat (first | (congr! 1; exact neg_eq_zero) | (congr! 1))
 
 set_option maxRecDepth 1000000 in
@@ -967,12 +968,12 @@ lemma allHold_constraints_alu_ops :
   List.Forall SP1Constraint.toProp (constraints Main) →
   List.Forall SP1Constraint.toProp
     (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]]
-      (Main[203] * 16 + Main[205] * 18 + Main[202] * 15 + Main[204] * 17 + Main[206] * 48 + Main[207] * 50 + Main[208] * 49 + Main[209] * 51)
-      #v[Main[203] * 8 + Main[205] * 8 + Main[202] * 8 + Main[204] * 8 + Main[206] * 8 + Main[207] * 8 + Main[208] * 8,
-        Main[203] * 51 + Main[205] * 51 + Main[202] * 51 + Main[204] * 51 + Main[206] * 59 + Main[207] * 59 + Main[208] * 59 + Main[209] * 59,
-        Main[203] * 5 + Main[205] * 7 + Main[202] * 4 + Main[204] * 6 + Main[206] * 4 + Main[207] * 6 + Main[208] * 5 + Main[209] * 7,
-        Main[203] + Main[205] + Main[202] + Main[204] + Main[206] + Main[207] + Main[208] + Main[209]]
-      #v[Main[29], Main[30], Main[31], Main[32]]
+      (Main[202] * 16 + Main[204] * 18 + Main[201] * 15 + Main[203] * 17 + Main[205] * 25 + Main[206] * 27 + Main[207] * 26 + Main[208] * 28)
+      #v[Main[202] * 8 + Main[204] * 8 + Main[201] * 8 + Main[203] * 8 + Main[205] * 8 + Main[206] * 8 + Main[207] * 8 + Main[208] * 8,
+        Main[202] * 51 + Main[204] * 51 + Main[201] * 51 + Main[203] * 51 + Main[205] * 59 + Main[206] * 59 + Main[207] * 59 + Main[208] * 59,
+        Main[202] * 5 + Main[204] * 7 + Main[201] * 4 + Main[203] * 6 + Main[205] * 4 + Main[206] * 6 + Main[207] * 5 + Main[208] * 7,
+        Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208]]
+      #v[Main[28], Main[29], Main[30], Main[31]]
       { op_a := Main[6],
         op_a_memory :=
           { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -985,7 +986,8 @@ lemma allHold_constraints_alu_ops :
         op_c_memory :=
           { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
             access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
-      Main[245]) ∧
+      Main[244]) ∧
+    (Main[201] = 0 ∨ Main[201] = 1) ∧
     (Main[202] = 0 ∨ Main[202] = 1) ∧
     (Main[203] = 0 ∨ Main[203] = 1) ∧
     (Main[204] = 0 ∨ Main[204] = 1) ∧
@@ -993,10 +995,8 @@ lemma allHold_constraints_alu_ops :
     (Main[206] = 0 ∨ Main[206] = 1) ∧
     (Main[207] = 0 ∨ Main[207] = 1) ∧
     (Main[208] = 0 ∨ Main[208] = 1) ∧
-    (Main[209] = 0 ∨ Main[209] = 1) ∧
-    Main[203] + Main[205] + Main[202] + Main[204] + Main[206] + Main[207] + Main[208] + Main[209] = 1
+    Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208] = 1
   := by
-    stop
     intro cstrs; rw [allHold_constraints_iff] at cstrs
     simp_all only [Fin.isValue, Nat.cast_ofNat, Nat.cast_one, and_self, and_true]
     simp_all only [Nat.cast_one, Fin.isValue, mul_eq_zero, not_false_eq_true, implies_true, and_true, true_and]
@@ -1009,28 +1009,27 @@ end field_arithmetic
 
 section opcodes
 
-@[simp] def is_real := Main[245] = 1
+@[simp] def is_real := Main[244] = 1
 
-@[simp] def is_div := Main[202] = 1
-@[simp] def is_divu := Main[203] = 1
-@[simp] def is_rem := Main[204] = 1
-@[simp] def is_remu := Main[205] = 1
-@[simp] def is_divw := Main[206] = 1
-@[simp] def is_remw := Main[207] = 1
-@[simp] def is_divuw := Main[208] = 1
-@[simp] def is_remuw := Main[209] = 1
+@[simp] def is_div := Main[201] = 1
+@[simp] def is_divu := Main[202] = 1
+@[simp] def is_rem := Main[203] = 1
+@[simp] def is_remu := Main[204] = 1
+@[simp] def is_divw := Main[205] = 1
+@[simp] def is_remw := Main[206] = 1
+@[simp] def is_divuw := Main[207] = 1
+@[simp] def is_remuw := Main[208] = 1
 
 lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
-  (Main[202] = 1 → Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-  (Main[203] = 1 → Main[202] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-  (Main[204] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-  (Main[205] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-  (Main[206] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-  (Main[207] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0 ∧ Main[209] = 0) ∧
-  (Main[208] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[209] = 0) ∧
-  (Main[209] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0)
+  (Main[201] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[202] = 1 → Main[201] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[203] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[204] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[205] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[206] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[207] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0) ∧
+  (Main[208] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0)
    := by
-  stop
   intro cstrs
   have := allHold_constraints_alu_ops Main cstrs
   obtain ⟨ alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops ⟩ := this
@@ -1047,14 +1046,13 @@ lemma register_bounds :
     is_real Main →
       Main[6] < 32 ∧ Main[14] < 32 ∧ Main[21] < 32 ∧ Main[3] < 65536
     := by
-  stop
   intro cstrs is_real
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨ alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops ⟩ := cstrs
   simp_all only [DivRem.is_real, Fin.isValue, Nat.cast_ofNat]
   rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
-  obtain ⟨ h0, h1, h2, h3, h4, h5, h6, h7, h8, rest ⟩ := alu; clear rest
+  obtain ⟨ h1, h2, h3, h4, h5, h6, h7, h8, rest ⟩ := alu; clear rest
   simp_all
   rcases b_is_div; rcases b_is_divu; rcases b_is_rem; rcases b_is_remu
   rcases b_is_divw; rcases b_is_divuw; rcases b_is_remw; rcases b_is_remuw
@@ -1064,13 +1062,12 @@ lemma register_bounds :
 lemma op_a_is_0 :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main →
-      Main[6] = 0 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 := by
-  stop
+      Main[6] = 0 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 := by
   intro cstrs is_real is_zero
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
   rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
-  obtain ⟨ h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 ⟩ := alu
+  obtain ⟨ h1, h2, h3, h4, h5, h6, h7, h8, h9 ⟩ := alu
   simp_all
 
 lemma ops_U64_b_c :
@@ -1078,12 +1075,11 @@ lemma ops_U64_b_c :
     is_real Main →
       Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
       Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] := by
-  stop
   intro cstrs is_real
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨ alu, rest ⟩ := cstrs; clear rest; simp_all
   rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
-  obtain ⟨ h0, h1, h2, h3, h4, h5, b_imm, h7, h8 ⟩ := alu
+  obtain ⟨ h1, h2, h3, h4, h5, b_imm, h7, h8 ⟩ := alu
   simp_all
 
 end entailed_constraints
@@ -1092,7 +1088,6 @@ section operands
 
 @[simp]
 def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[6] ?_
   change Main[6] < 32
@@ -1101,7 +1096,6 @@ def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 
 @[simp]
 def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[14] ?_
   change Main[14] < 32
@@ -1110,7 +1104,6 @@ def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 
 @[simp]
 def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  stop
   intro cstrs real
   refine BitVec.ofNatLT Main[21] ?_
   change Main[21] < 32
@@ -1123,13 +1116,11 @@ section auxiliaries
 
 lemma div_mod_decomposition_w {a b c : Fin KB} :
   a.val < 65536 → c.val < 2130706433 / 65536 → (a = b - c * 65536 ↔ a = b % 65536 ∧ c = b / 65536) := by
-  stop
   intro ub_a ub_c
   constructor
   · intro eq_a
     simp [Fin.lt_def, Fin.ext_iff] at *
     have lb_b : c * 65536 ≤ b := by
-      stop
       by_contra lb_b
       simp [Fin.lt_def, Fin.sub_def, Fin.mul_def] at *
       rw [Nat.mod_eq_of_lt (a := (c : ℕ) * 65536) (by omega)] at eq_a lb_b
@@ -1150,7 +1141,6 @@ lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
   b = q * c + r ∧
   |r| < |c| ∧
   (r = 0 ∨ r.sign = b.sign) := by
-  stop
   have hmod1 := @Int.tdiv_tmod_unique b c r q
   have hmod2 := @Int.tdiv_tmod_unique' b c r q
   rw [@eq_comm (a := q), @eq_comm (a := r), @eq_comm (a := b), add_comm, mul_comm]
@@ -1193,7 +1183,6 @@ lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
 lemma tdiv_tmod_unique_full_nat {b c q r : ℕ} (hcnz : c ≠ 0) :
   q = ((b : ℤ).tdiv c).toNat ∧ r = ((b : ℤ).tmod c).toNat ↔
   b = q * c + r ∧ r < c := by
-  stop
   have hmod := @Int.tdiv_tmod_unique b c r q
   simp_all [Int.tmod_eq_emod]
   rw [@eq_comm (a := q), @eq_comm (a := r), @eq_comm (a := b), add_comm, mul_comm]
@@ -1208,7 +1197,6 @@ lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : 
     Word.toBitVec64 #v[0, 0, 0, 0] = Word.toBitVec64 wx + Word.toBitVec64 wy →
     (wx.toInt = -2^63 → wy.toInt = -2^63) ∧
     (¬ wx.toInt = -2^63 → wy.toInt = |wx.toInt|) := by
-  stop
   intro neg_wx sum_zero
   rw [Word.isNegative_toInt is64_wx] at neg_wx
   rw [Int.abs_cases, if_neg (by omega)]
@@ -1224,7 +1212,6 @@ lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : 
 
 lemma extractLsb_is_toInt {x : BitVec 128} (hlb : -9223372036854775808 ≤ x.toInt) (hub : x.toInt < 9223372036854775808) :
   (BitVec.extractLsb 63 0 x).toInt = x.toInt := by
-    stop
     by_cases case : 0 ≤ x.toInt <;> simp at case
     · simp [BitVec.toInt] at *; split_ifs at * <;> omega
     · trans (BitVec.signExtend 128 (BitVec.extractLsb 63 0 x)).toInt
@@ -1422,10 +1409,8 @@ lemma div_rem
     is_div + is_rem = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRS
       := by
-    stop
     intro div_rem
     obtain ⟨ z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw ⟩ : is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
-      stop
       clear *- div_rem sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_div <;> rcases b_is_rem <;> simp_all
     simp [z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw, div_rem] at *
@@ -1461,13 +1446,11 @@ lemma div_rem
           rw [if_neg]; rotate_left
           · intro ⟨ h_eq_b, h_eq_c ⟩
             have : (#v[b0, b1, b2, b3] : Word (Fin KB)) = #v[0, 0, 0, 32768] := by
-              stop
               rw [Word.eq_toInt_eq is_U64_b, h_eq_b]
               simp [Word.toInt, Word.isNegative, Word.toNat]
               apply Word.isU64_of_cases <;> simp
             simp at this; rw [if_pos (by exact this)] at overflow_b; simp [overflow_b] at *; clear this
             have : (#v[c0, c1, c2, c3] : Word (Fin KB)) = #v[65535, 65535, 65535, 65535] := by
-              stop
               rw [Word.eq_toInt_eq is_U64_c, h_eq_c]
               simp [Word.toInt, Word.isNegative, Word.toNat]
               apply Word.isU64_of_cases <;> simp
@@ -1486,27 +1469,22 @@ lemma div_rem
             · have is_U64_ar : Word.isU64 #v[ar0, ar1, ar2, ar3] := by apply Word.isU64_of_cases <;> simpa
               have is_U64_ac : Word.isU64 #v[ac0, ac1, ac2, ac3] := by apply Word.isU64_of_cases <;> simpa
               have sgn_msb_b : msb_b = 1 → (Word.toInt #v[b0, b1, b2, b3]).sign = -1 := by
-                stop
                 intro h_msb_b; rw [Word.sign_cases is_U64_b]; simp [h_msb_b] at *
                 intro hneg; simp [Word.isNegative] at hneg
                 omega
               have sgn_msb_c : msb_c = 1 → (Word.toInt #v[c0, c1, c2, c3]).sign = -1 := by
-                stop
                 intro h_msb_c; rw [Word.sign_cases is_U64_c]; simp [h_msb_c] at *
                 intro hneg; simp [Word.isNegative] at hneg
                 omega
               have sgn_msb_rem : msb_rem = 1 → (Word.toInt #v[r0, r1, r2, r3]).sign = -1 := by
-                stop
                 intro h_msb_b; rw [Word.sign_cases is_U64_r]; simp [h_msb_b] at *
                 intro hneg; simp [Word.isNegative] at hneg
                 omega
               have cnz : Word.toInt #v[c0, c1, c2, c3] ≠ 0 := by
-                stop
                 intro zc; apply Word.toInt_nneg_reconstruct is_U64_c (by simp) at zc
                 simp at zc; apply nzc; exact zc
               -- First condition
               have h_prod : Word.toInt #v[b0, b1, b2, b3] = Word.toInt #v[q0, q1, q2, q3] * Word.toInt #v[c0, c1, c2, c3] + Word.toInt #v[r0, r1, r2, r3] := by
-                stop
                 clear *- is_U64_b is_U64_c is_U64_q is_U64_r
                         u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3 u16_ctqpr4 u16_ctqpr5 u16_ctqpr6 u16_ctqpr7
                         b_cry0 b_cry1 b_cry2 b_cry3 b_cry4 b_cry5 b_cry6 b_cry7
@@ -1518,12 +1496,10 @@ lemma div_rem
                 have ctq := combine_MUL_MULH is_U64_ctql is_U64_ctqh is_U64_q is_U64_c ctq_low ctq_high
                 simp at ctq
                 have eq_eb : (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535, msb_b * 65535, msb_b * 65535] : DWord (Fin KB)) = Word.extend #v[b0, b1, b2, b3] true := by
-                  stop
                   clear *- is_U64_b eq_msb_b
                   simp [Word.extend, Word.isNegative]
                   aesop
                 have eq_er : (#v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535] : DWord (Fin KB)) = Word.extend #v[r0, r1, r2, r3] true := by
-                  stop
                   clear *- is_U64_r eq_msb_rem
                   simp [Word.extend, Word.isNegative]
                   aesop
@@ -1569,10 +1545,8 @@ lemma div_rem
                   simp [Fin.val_add]
                   iterate 8 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                   have joins : forall (i : Fin 8) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-                    stop
                     clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                   have divs : forall (i : Fin 8) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-                    stop
                     clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                   have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
                   have j4 := joins 4; have j5 := joins 5; have j6 := joins 6; have j7 := joins 7
@@ -1587,7 +1561,6 @@ lemma div_rem
                   simp [DWord.toNat]; ring_nf
               -- Second condition
               have h_abs : |Word.toInt #v[r0, r1, r2, r3]| < |Word.toInt #v[c0, c1, c2, c3]| := by
-                stop
                 clear *- is_U64_c is_U64_r is_U64_ac is_U64_ar b_c_neg b_rem_neg eq_msb_c eq_msb_rem
                         rem_neg_sum_zero c_neg_sum_zero sgn_msb_c sgn_msb_rem abs_check cnz
                         rn_ar0 rn_ar1 rn_ar2 rn_ar3 cn_ac0 cn_ac1 cn_ac2 cn_ac3
@@ -1663,7 +1636,6 @@ lemma div_rem
                     · simp_all [Word.isNegative_toInt is_U64_ar]
               -- Third condition
               have h_sign : (Word.toInt #v[r0, r1, r2, r3] = 0 ∨ (Word.toInt #v[r0, r1, r2, r3]).sign = (Word.toInt #v[b0, b1, b2, b3]).sign) := by
-                stop
                 rcases b_b_neg with b_msb_nneg | b_msb_neg
                 · simp [b_msb_nneg] at *
                   simp [r_neg_b_neg] at *
@@ -1695,18 +1667,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.div :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_div Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).1
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).1
   := by
-  stop
   intro cstrs h_is_real h_is_div
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_div] at h_is_div
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -1715,92 +1686,92 @@ lemma spec.div :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -1833,7 +1804,7 @@ lemma spec.div :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -1907,18 +1878,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.rem :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_rem Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).2
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRS).2
   := by
-  stop
   intro cstrs h_is_real h_is_rem
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_rem] at h_is_rem
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -1927,92 +1897,92 @@ lemma spec.rem :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -2045,7 +2015,7 @@ lemma spec.rem :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -2300,10 +2270,8 @@ lemma divu_remu
     is_divu + is_remu = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRU
       := by
-    stop
     intro divu_remu
     obtain ⟨ z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
-      stop
       clear *- divu_remu sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divu <;> rcases b_is_remu <;> simp_all
     simp [z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw, divu_remu] at *
@@ -2338,7 +2306,6 @@ lemma divu_remu
           rw [Nat.mod_eq_of_lt (by apply Word.toNat_lt_of_isU64 is_U64_r)]
           trivial
         · have cnz : Word.toNat #v[c0, c1, c2, c3] ≠ 0 := by
-            stop
             intro zc; apply Word.toNat_reconstruct is_U64_c at zc
             simp at zc; apply nzc; exact zc
           rw [tdiv_tmod_unique_full_nat cnz]
@@ -2393,10 +2360,8 @@ lemma divu_remu
             simp [Fin.val_add]
             iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
             have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-              stop
               clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
             have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-              stop
               clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
             have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
             have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
@@ -2439,18 +2404,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.divu :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_divu Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).1
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).1
   := by
-  stop
   intro cstrs h_is_real h_is_divu
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divu] at h_is_divu
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -2459,92 +2423,92 @@ lemma spec.divu :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -2577,7 +2541,7 @@ lemma spec.divu :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -2651,18 +2615,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.remu :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_remu Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).2
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).2
   := by
-  stop
   intro cstrs h_is_real h_is_remu
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remu] at h_is_remu
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -2671,92 +2634,92 @@ lemma spec.remu :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -2789,7 +2752,7 @@ lemma spec.remu :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -3044,10 +3007,8 @@ lemma divw_remw
     is_divw + is_remw = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWS
       := by
-    stop
     intro divw_remw
     obtain ⟨ z_div, z_rem, z_divu, z_remu, z_divuw, z_remuw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
-      stop
       clear *- divw_remw sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divw <;> rcases b_is_remw <;> simp_all
     simp [z_div, z_rem, z_divu, z_remu, z_divuw, z_remuw, divw_remw] at *
@@ -3096,14 +3057,12 @@ lemma divw_remw
           rw [if_neg]; rotate_left
           · intro ⟨ h_eq_b, h_eq_c ⟩
             have : (#v[b0, b1] : HWord (Fin KB)) = #v[0, 32768] := by
-              stop
               rw [HWord.eq_toInt_eq is_U32_bl, h_eq_b]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
               apply HWord.isU32_of_cases <;> simp
             simp at this
             rw [if_pos (by exact this)] at w_overflow_b; simp [w_overflow_b] at *; clear this
             have : (#v[c0, c1] : HWord (Fin KB)) = #v[65535, 65535] := by
-              stop
               rw [HWord.eq_toInt_eq is_U32_cl, h_eq_c]
               simp [HWord.toInt, HWord.isNegative, HWord.toNat]
               apply HWord.isU32_of_cases <;> simp
@@ -3123,28 +3082,23 @@ lemma divw_remw
               iterate 2 rw [Int.bmod_eq_of_le (by omega) (by omega)]
               trivial
             · have sgn_msb_b : msb_b = 1 → (HWord.toInt #v[b0, b1]).sign = -1 := by
-                stop
                 intro h_msb_b; rw [HWord.sign_cases is_U32_bl]; simp [h_msb_b] at *
                 intro hneg; simp [HWord.isNegative] at hneg
                 omega
               have sgn_msb_c : msb_c = 1 → (HWord.toInt #v[c0, c1]).sign = -1 := by
-                stop
                 intro h_msb_c; rw [HWord.sign_cases is_U32_cl]; simp [h_msb_c] at *
                 intro hneg; simp [HWord.isNegative] at hneg
                 omega
               have sgn_msb_rem : msb_rem = 1 → (HWord.toInt #v[r0, r1]).sign = -1 := by
-                stop
                 intro h_msb_b; rw [HWord.sign_cases is_U32_rl]; simp [h_msb_b] at *
                 intro hneg; simp [HWord.isNegative] at hneg
                 omega
               have cnz : HWord.toInt #v[c0, c1] ≠ 0 := by
-                stop
                 intro zc; apply nzc; apply HWord.lt_cases_of_isU32 at is_U32_cl
                 clear *- zc is_U32_cl; simp [HWord.toInt, HWord.isNegative, HWord.toNat] at *
                 split_ifs at zc <;> omega
               -- First condition
               have h_prod : HWord.toInt #v[b0, b1] = HWord.toInt #v[q0, q1] * HWord.toInt #v[c0, c1] + HWord.toInt #v[r0, r1] := by
-                stop
                 clear *- is_U32_bl is_U32_cl is_U32_ql is_U32_rl
                          u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3
                          b_cry0 b_cry1 b_cry2 b_cry3
@@ -3168,7 +3122,6 @@ lemma divw_remw
                   rw [this] at ctq_low; clear this
                   simp only [← BitVec.toInt_inj] at ctq_low
                   have : ((HWord.extend #v[q0, q1] true).toBitVec64.extend 128 True * (HWord.extend #v[c0, c1] true).toBitVec64.extend 128 True).toInt = HWord.toInt #v[q0, q1] * HWord.toInt #v[c0, c1] := by
-                    stop
                     iterate 2 rw [HWord.extend_true_is_signExtend (by assumption)]
                     simp [BitVec.extend, BitVec.toInt_signExtend_of_le]
                     iterate 2 rw [HWord.toBitVec32_toInt (by assumption)]
@@ -3195,10 +3148,8 @@ lemma divw_remw
                     simp [Fin.val_add]
                     iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                     have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-                      stop
                       clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                     have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-                      stop
                       clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                     have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
                     have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
@@ -3211,7 +3162,6 @@ lemma divw_remw
                     simp [Word.toNat]; ring_nf
               -- Second condition
               have h_abs : |HWord.toInt #v[r0, r1]| < |HWord.toInt #v[c0, c1]| := by
-                stop
                 have is_U64_ar : Word.isU64 #v[ar0, ar1, ar2, ar3] := by apply Word.isU64_of_cases <;> simpa
                 have is_U64_ac : Word.isU64 #v[ac0, ac1, ac2, ac3] := by apply Word.isU64_of_cases <;> simpa
                 have h_eq_nmax : - 2^31 = HWord.toInt #v[0, 32768] := by simp [HWord.toInt, HWord.isNegative, HWord.toNat]
@@ -3243,7 +3193,6 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz
                   obtain ⟨ hc_lb, hc_nlb ⟩ := heqz
                   have : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
-                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
@@ -3265,7 +3214,6 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz
                   obtain ⟨ hr_lb, hr_nlb ⟩ := heqz
                   have : Word.toInt #v[r0, r1, 65535, 65535] = HWord.toInt #v[r0, r1] := by
-                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
@@ -3287,13 +3235,11 @@ lemma divw_remw
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ac (by simp [Word.isNegative]) at heqz_c
                   apply sum_zero_abs (by apply Word.isU64_of_cases <;> simp <;> omega) is_U64_ar (by simp [Word.isNegative]) at heqz_rem
                   have eqc : Word.toInt #v[c0, c1, 65535, 65535] = HWord.toInt #v[c0, c1] := by
-                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
                     simp [if_pos w_eq_msb_c]; omega
                   have eqr : Word.toInt #v[r0, r1, 65535, 65535] = HWord.toInt #v[r0, r1] := by
-                    stop
                     rw [Word.toInt, Word.toNat_def, HWord.toInt, HWord.toNat]
                     unfold Word.isNegative HWord.isNegative
                     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ, List.getElem_cons_zero]
@@ -3314,7 +3260,6 @@ lemma divw_remw
                       · simp_all [Word.isNegative_toInt is_U64_ar]
               -- Third condition
               have h_sign : HWord.toInt #v[r0, r1] = 0 ∨ (HWord.toInt #v[r0, r1]).sign = (HWord.toInt #v[b0, b1]).sign := by
-                stop
                 rcases b_b_neg with b_msb_nneg | b_msb_neg
                 · simp [b_msb_nneg] at *
                   simp [r_neg_b_neg] at *
@@ -3346,18 +3291,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.divw :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_divw Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).1
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).1
   := by
-  stop
   intro cstrs h_is_real h_is_divw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divw] at h_is_divw
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -3366,92 +3310,92 @@ lemma spec.divw :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -3484,7 +3428,7 @@ lemma spec.divw :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -3558,18 +3502,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.remw :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_remw Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).2
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).2
   := by
-  stop
   intro cstrs h_is_real h_is_remw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remw] at h_is_remw
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -3578,92 +3521,92 @@ lemma spec.remw :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -3696,7 +3639,7 @@ lemma spec.remw :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -3951,10 +3894,8 @@ lemma divuw_remuw
     is_divuw + is_remuw = 1 →
     ⟨ Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWU
       := by
-    stop
     intro divuw_remuw
     obtain ⟨ z_div, z_rem, z_divu, z_remu, z_divw, z_remw ⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 := by
-      stop
       clear *- divuw_remuw sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops
       rcases b_is_divuw <;> rcases b_is_remuw <;> simp_all
     simp [z_div, z_rem, z_divu, z_remu, z_divw, z_remw, divuw_remuw] at *
@@ -3998,7 +3939,6 @@ lemma divuw_remuw
             rw [Nat.mod_eq_of_lt (by apply HWord.toNat_lt_of_isU32 is_U32_r)]
             simp
           · have cnz : HWord.toNat #v[c0, c1] ≠ 0 := by
-              stop
               intro zc; simp [HWord.toNat] at zc; omega
             rw [tdiv_tmod_unique_full_nat cnz]
             split_ands <;> [ skip; (simp [HWord.toNat]; simp [Word.toNat] at abs_check; exact abs_check) ]
@@ -4023,7 +3963,6 @@ lemma divuw_remuw
               trans (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat
               · rw [Word.low_toNat is_U32_b]
               · have : (Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3]).toNat = HWord.toNat #v[q0, q1] * HWord.toNat #v[c0, c1] := by
-                  stop
                   simp only [ctq_low, execute_MUL_pure, ↓reduceIte, reduceCtorEq, or_self]
                   simp only [BitVec.extend, ↓reduceIte]
                   simp only [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
@@ -4048,10 +3987,8 @@ lemma divuw_remuw
                 simp [Fin.val_add]
                 iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
                 have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-                  stop
                   clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                 have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-                  stop
                   clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
                 have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
                 have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
@@ -4067,18 +4004,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.divuw :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_divuw Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).1
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).1
   := by
-  stop
   intro cstrs h_is_real h_is_divuw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_divuw] at h_is_divuw
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -4087,92 +4023,92 @@ lemma spec.divuw :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -4205,7 +4141,7 @@ lemma spec.divuw :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -4279,18 +4215,17 @@ set_option maxRecDepth 1000000 in
 lemma spec.remuw :
   List.Forall SP1Constraint.toProp (constraints Main) →
     is_real Main → is_remuw Main →
-      Word.toBitVec64 #v[Main[29], Main[30], Main[31], Main[32]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).2
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] = (execute_DIV_REM_pure (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).2
   := by
-  stop
   intro cstrs h_is_real h_is_remuw
   have ⟨ sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8 ⟩ := single_op Main cstrs
   have ⟨ is_U64_b, is_U64_c ⟩ := ops_U64_b_c Main cstrs h_is_real
   replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
   simp [is_remuw] at h_is_remuw
-  set a0 := Main[29]
-  set a1 := Main[30]
-  set a2 := Main[31]
-  set a3 := Main[32]
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -4299,92 +4234,92 @@ lemma spec.remuw :
   set c1 := Main[23]
   set c2 := Main[24]
   set c3 := Main[25]
-  set lb0 := Main[33]
-  set lb1 := Main[34]
-  set lb2 := Main[35]
-  set lb3 := Main[36]
-  set lc0 := Main[37]
-  set lc1 := Main[38]
-  set lc2 := Main[39]
-  set lc3 := Main[40]
-  set q0 := Main[41]
-  set q1 := Main[42]
-  set q2 := Main[43]
-  set q3 := Main[44]
-  set qbc0 := Main[45]
-  set qbc1 := Main[46]
-  set qbc2 := Main[47]
-  set qbc3 := Main[48]
-  set rbc0 := Main[49]
-  set rbc1 := Main[50]
-  set rbc2 := Main[51]
-  set rbc3 := Main[52]
-  set r0 := Main[53]
-  set r1 := Main[54]
-  set r2 := Main[55]
-  set r3 := Main[56]
-  set ar0 := Main[57]
-  set ar1 := Main[58]
-  set ar2 := Main[59]
-  set ar3 := Main[60]
-  set ac0 := Main[61]
-  set ac1 := Main[62]
-  set ac2 := Main[63]
-  set ac3 := Main[64]
-  set maco10 := Main[65]
-  set maco11 := Main[66]
-  set maco12 := Main[67]
-  set maco13 := Main[68]
-  set ctq0 := Main[69]
-  set ctq1 := Main[70]
-  set ctq2 := Main[71]
-  set ctq3 := Main[72]
-  set ctq4 := Main[73]
-  set ctq5 := Main[74]
-  set ctq6 := Main[75]
-  set ctq7 := Main[76]
-  set cnop0 := Main[167]
-  set cnop1 := Main[168]
-  set cnop2 := Main[169]
-  set cnop3 := Main[170]
-  set rnop0 := Main[171]
-  set rnop1 := Main[172]
-  set rnop2 := Main[173]
-  set rnop3 := Main[174]
-  set arlt := Main[175]
-  set cry0 := Main[183]
-  set cry1 := Main[184]
-  set cry2 := Main[185]
-  set cry3 := Main[186]
-  set cry4 := Main[187]
-  set cry5 := Main[188]
-  set cry6 := Main[189]
-  set cry7 := Main[190]
-  set is_c_0 := Main[201]
-  set is_div := Main[202]
-  set is_divu := Main[203]
-  set is_rem := Main[204]
-  set is_remu := Main[205]
-  set is_divw := Main[206]
-  set is_remw := Main[207]
-  set is_divuw := Main[208]
-  set is_remuw := Main[209]
-  set is_overflow := Main[210]
-  set is_overflow_b := Main[221]
-  set is_overflow_c := Main[232]
-  set msb_b := Main[233]
-  set msb_rem := Main[234]
-  set msb_c := Main[235]
-  set msb_quot := Main[236]
-  set b_neg := Main[237]
-  set b_neg_not_overflow := Main[238]
-  set b_not_neg_not_overflow := Main[239]
-  set is_real_not_word := Main[240]
-  set rem_neg := Main[241]
-  set c_neg := Main[242]
-  set abs_c_alu_event := Main[243]
-  set abs_rem_alu_event := Main[244]
-  set is_real := Main[245]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
   set remainder_check_multiplicity := Main[245]
   obtain ⟨ main_mul_low, main_mul_high,
            overflow_b, overflow_c, w_overflow_b, w_overflow_c,
@@ -4417,7 +4352,7 @@ lemma spec.remuw :
   obtain ⟨
            b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
            b_is_overflow, b_is_real_not_word, b_b_neg, b_b_neg_not_overflow, b_b_not_neg_not_overflow,
-           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops ⟩ := rest4
+           b_rem_neg, b_c_neg, b_is_real, b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0 ⟩ := rest4
   clear cpu alu
   symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
   rw [eq_comm (a := b_neg * ↑(65535 : ℕ))] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7

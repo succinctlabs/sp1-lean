@@ -16,8 +16,8 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 - ~~`LoadDoubleChip.correct_ld`, `StoreDoubleChip.correct`, `StoreByteChip.correct`, `StoreHalfChip.correct`, `StoreWordChip.correct`~~ — closed.
 - ~~`LoadByteChip.correct_lb/lbu`, `LoadHalfChip.correct_lh/lhu`, `LoadWordChip.correct_lw/lwu`~~ — closed.
 - `BitwiseChip.correct_xor/xori/or/ori/and/andi`
-- `LtChip.correct_slt/slti/sltu/sltiu` (plus `sp1_op_a/b/c` defs inside the chip file)
-- `MulChip.correct_mul/mulh/mulhu/mulhsu/mulw`
+- ~~`LtChip.correct_slt/slti/sltu/sltiu` (plus `sp1_op_a/b/c` defs inside the chip file)~~ — closed.
+- ~~`MulChip.correct_mul/mulh/mulhu/mulhsu/mulw`~~ — closed.
 - ~~`ShiftLeftChip.correct_sll/slli/sllw/slliw`~~ — closed.
 - `ShiftRightChip.correct_srl/srli/srlw/srliw/sra/srai/sraw/sraiw`
 - `BranchChip.correct_beq/bne/blt/bge/bltu/bgeu`
@@ -30,8 +30,8 @@ A follow-up session applied mechanical index shifts and `stop` markers to make t
 - ~~`Load/LoadHalf/Constraints.lean` — same stubbing for `lh/lhu`~~ — restored.
 - ~~`Load/LoadWord/Constraints.lean` — same for `lw/lwu`~~ — restored.
 - `Bitwise/Constraints.lean` — `allHold_constraints_iff`, `single_op`, `register_bounds`, `immediate_bounds`, `op_a_is_0`, `ops_U64_b_c`, `ops_U64_a`, `ops_U64`, `sp1_op_a/b/c/c_imm`, `spec.xor/xori/or/ori/and/andi` all have `stop`
-- `Lt/Constraints.lean` — 4 `allHold_constraints_iff_*` lemmas stopped (simple `simp_all; intros; omega` proofs that timed out)
-- `Mul/Constraints.lean` — `allHold_constraints_iff`, `single_op`, `register_bounds`, `op_a_is_0`, `ops_U64_b_c`, `sp1_op_a/b/c`, `spec.mul/mulh/mulhu/mulhsu/mulw` stopped
+- ~~`Lt/Constraints.lean` — 4 `allHold_constraints_iff_*` lemmas stopped (simple `simp_all; intros; omega` proofs that timed out)~~ — closed (added `Main[13] = 0` clause to each iff RHS).
+- ~~`Mul/Constraints.lean` — `allHold_constraints_iff`, `single_op`, `register_bounds`, `op_a_is_0`, `ops_U64_b_c`, `sp1_op_a/b/c`, `spec.mul/mulh/mulhu/mulhsu/mulw` stopped~~ — closed (corrected `Main[81] * 47 → * 24` opcode literal and added `Main[13] = 0` clause).
 - ~~`ShiftLeft/Constraints.lean` — `allHold_constraints_iff`, `cancel_mul_65536`, `is_mod_64`, `single_op`, `sll_real`, `sllw_real`, `bounds`, `sp1_op_a/b/c/c_imm/c_imm_w`, `spec.sll/slli/sllw/slliw` stopped~~ — closed.
 - `ShiftRight/Constraints.lean` — many stops; `set_option linter.unusedVariables false` file-wide
 - `Branch/Constraints.lean` — `single_op`, `is_trusted_of_constraints`, `eq_signExtend_of_is_real`, `add_signExtend_of_constraints` stopped
