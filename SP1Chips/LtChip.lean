@@ -122,16 +122,16 @@ theorem correct_slti
     have is_U64_c : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]]
       := by apply Word.isU64_of_cases c0 c1 c2 c3
     obtain ⟨ h_f, h_imm_c ⟩ := trusted_instr_prop
+    -- Now the monadic manipulation
     simp [spec_slti, sp1_slti, execute, execute_ITYPE']
     rw [Sail.run_readReg, read_pc]
-    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_a]
-    simp [← h_imm_c]
+    simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
+    rw [← h_imm_c]
     rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     simp [execute_ITYPE_pure_w]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
-    · simp_all
-      rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+    · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (c := BitVec.ofNat 5 ↑Main[6] = 0#5) (by simp [← BitVec.toNat_inj]; omega)]
       apply LtOperationSigned.spec.signed at lt_op_cstrs <;>
       [ simp_all; exact is_U64_b; exact is_U64_c ]

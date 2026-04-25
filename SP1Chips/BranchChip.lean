@@ -45,7 +45,7 @@ noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   execute_BTYPE imm rs2 rs1 bop.BEQ
 
 set_option debug.skipKernelTC true in
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 8000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_beq
     (Main : Vector (Fin KB) 45)
@@ -57,11 +57,8 @@ theorem correct_beq
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_beq imm op_b op_a).run s = (sp1_branch Main).run s := by
-  have _ := state_cstrs
-  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_beq]
-  have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
   have h_sign_extend := eq_signExtend_of_is_real Main cstrs h_is_real
   have h_next_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
     BitVec.signExtend 64 imm) % 4 = 0 := add_signExtend_of_constraints Main cstrs h_is_real
@@ -69,10 +66,9 @@ theorem correct_beq
   obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := (single_op Main cstrs).1 h_is_beq
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-  simp_all only [h25]
   -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
-    h_is_beq, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+    h_is_beq, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at reader_cstrs
   -- Introduce bounds on values
   have op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
@@ -101,7 +97,7 @@ theorem correct_beq
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints,
     LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints,
-    h_is_beq, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    h_is_beq, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at state_cstrs
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
@@ -165,11 +161,8 @@ theorem correct_bne
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bne imm op_b op_a).run s = (sp1_branch Main).run s := by
-  have _ := state_cstrs
-  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bne]
-  have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
   have h_sign_extend := eq_signExtend_of_is_real Main cstrs h_is_real
   have h_next_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
     BitVec.signExtend 64 imm) % 4 = 0 := add_signExtend_of_constraints Main cstrs h_is_real
@@ -177,10 +170,9 @@ theorem correct_bne
   obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := (single_op Main cstrs).2.1 h_is_bne
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-  simp_all only [h25]
   -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
-    h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+    h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at reader_cstrs
   -- Introduce bounds on values
   have op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
@@ -209,7 +201,7 @@ theorem correct_bne
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints,
     LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints,
-    h_is_bne, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    h_is_bne, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at state_cstrs
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
@@ -273,11 +265,8 @@ theorem correct_blt
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_blt imm op_b op_a).run s = (sp1_branch Main).run s := by
-  have _ := state_cstrs
-  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_blt]
-  have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
   have h_sign_extend := eq_signExtend_of_is_real Main cstrs h_is_real
   have h_next_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
     BitVec.signExtend 64 imm) % 4 = 0 := add_signExtend_of_constraints Main cstrs h_is_real
@@ -285,10 +274,9 @@ theorem correct_blt
   obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := (single_op Main cstrs).2.2.1 h_is_blt
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-  simp_all only [h25]
   -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
-    h_is_blt, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+    h_is_blt, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at reader_cstrs
   -- Introduce bounds on values
   have op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
@@ -317,7 +305,7 @@ theorem correct_blt
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints,
     LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints,
-    h_is_blt, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    h_is_blt, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at state_cstrs
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
@@ -382,11 +370,8 @@ theorem correct_bge
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bge imm op_b op_a).run s = (sp1_branch Main).run s := by
-  have _ := state_cstrs
-  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bge]
-  have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
   have h_sign_extend := eq_signExtend_of_is_real Main cstrs h_is_real
   have h_next_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
     BitVec.signExtend 64 imm) % 4 = 0 := add_signExtend_of_constraints Main cstrs h_is_real
@@ -394,10 +379,9 @@ theorem correct_bge
   obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := (single_op Main cstrs).2.2.2.1 h_is_bge
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-  simp_all only [h25]
   -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
-    h_is_bge, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+    h_is_bge, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at reader_cstrs
   -- Introduce bounds on values
   have op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
@@ -426,7 +410,7 @@ theorem correct_bge
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints,
     LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints,
-    h_is_bge, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    h_is_bge, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at state_cstrs
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
@@ -494,11 +478,8 @@ theorem correct_bltu
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bltu imm op_b op_a).run s = (sp1_branch Main).run s := by
-  have _ := state_cstrs
-  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bltu]
-  have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
   have h_sign_extend := eq_signExtend_of_is_real Main cstrs h_is_real
   have h_next_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
     BitVec.signExtend 64 imm) % 4 = 0 := add_signExtend_of_constraints Main cstrs h_is_real
@@ -506,10 +487,9 @@ theorem correct_bltu
   obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := (single_op Main cstrs).2.2.2.2.1 h_is_bltu
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-  simp_all only [h25]
   -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
-    h_is_bltu, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+    h_is_bltu, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at reader_cstrs
   -- Introduce bounds on values
   have op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
@@ -538,7 +518,7 @@ theorem correct_bltu
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints,
     LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints,
-    h_is_bltu, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    h_is_bltu, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at state_cstrs
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
@@ -606,11 +586,8 @@ theorem correct_bgeu
     let op_b := .Regidx (sp1_op_b Main)
     let op_a := .Regidx (sp1_op_a Main)
     (spec_bgeu imm op_b op_a).run s = (sp1_branch Main).run s := by
-  have _ := state_cstrs
-  stop
   extract_lets imm op_b op_a
   have h_is_real : is_real Main := by simp [is_real, h_is_bgeu]
-  have h25 : Main[25] = 1 := is_trusted_of_constraints Main cstrs h_is_real
   have h_sign_extend := eq_signExtend_of_is_real Main cstrs h_is_real
   have h_next_pc_is_mul4 : (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] +
     BitVec.signExtend 64 imm) % 4 = 0 := add_signExtend_of_constraints Main cstrs h_is_real
@@ -618,10 +595,9 @@ theorem correct_bgeu
   obtain ⟨h_28, h_30, h_31, h_32, h_33⟩ := (single_op Main cstrs).2.2.2.2.2 h_is_bgeu
   simp [SP1ConstraintList.allHold, Branch.constraints] at cstrs
   obtain ⟨_, reader_cstrs, lt_cstrs, chip_cstrs⟩ := cstrs
-  simp_all only [h25]
   -- simplify reader constraints
   simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
-    h_is_bgeu, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at reader_cstrs
+    h_is_bgeu, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at reader_cstrs
   -- Introduce bounds on values
   have op_a_is_u64 : Word.isU64 #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
@@ -650,7 +626,7 @@ theorem correct_bgeu
   simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp, List.Forall,
     CPUState.constraints, ITypeReaderImmutable.constraints, LtOperationSigned.constraints,
     LtOperationUnsigned.constraints, U16MSBOperation.constraints, U16CompareOperation.constraints,
-    h_is_bgeu, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, Nat.beq] at state_cstrs
+    h_is_bgeu, h6, h14, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble] at state_cstrs
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
