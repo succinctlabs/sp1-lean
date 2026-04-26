@@ -11,6 +11,26 @@ set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 set_option linter.style.multiGoal false
 
+-- The `core_mul` and `core_mulw` proofs each re-prove the same `joins`/`divs`
+-- lemma over `Fin N` (base 256). Lifting to file-level proves once.
+private lemma joins_byte_fin16 : ∀ (i : Fin 16) (a b : ℕ),
+    a % (256 ^ i.val) + (b + a / (256 ^ i.val)) % 256 * (256 ^ i.val) =
+      (a + b * (256 ^ i.val)) % (256 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
+private lemma divs_byte_fin16 : ∀ (i : Fin 16) (a b : ℕ),
+    (a + b / (256 ^ i.val)) / 256 = (b + a * (256 ^ i.val)) / (256 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
+private lemma joins_byte_fin4 : ∀ (i : Fin 4) (a b : ℕ),
+    a % (256 ^ i.val) + (b + a / (256 ^ i.val)) % 256 * (256 ^ i.val) =
+      (a + b * (256 ^ i.val)) % (256 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
+private lemma divs_byte_fin4 : ∀ (i : Fin 4) (a b : ℕ),
+    (a + b / (256 ^ i.val)) / 256 = (b + a * (256 ^ i.val)) / (256 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
 section field_operations
 
 lemma div_mod_decomposition {a b c : Fin KB} :
@@ -166,25 +186,33 @@ lemma core_mul
   clear eqc00 eqc01 eqc02 eqc03 eqc04 eqc05 eqc06 eqc07 eqc08 eqc09 eqc10 eqc11 eqc12 eqc13 eqc14 eqc15
   clear p00 p01 p02 p03 p04 p05 p06 p07 p08 p09 p10 p11 p12 p13 p14 p15
   clear c00 c01 c02 c03 c04 c05 c06 c07 c08 c09 c10 c11 c12 c13 c14 c15
-  iterate 15 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+  iterate 15 rw [Nat.mod_eq_of_lt (b := 2130706433)
+    (by clear * - bw00 bw01 bw02 bw03 bw04 bw05 bw06 bw07
+                    bw08 bw09 bw10 bw11 bw12 bw13 bw14 bw15
+                    cw00 cw01 cw02 cw03 cw04 cw05 cw06 cw07
+                    cw08 cw09 cw10 cw11 cw12 cw13 cw14 cw15
+                    lt_cp00 lt_cp01 lt_cp02 lt_cp03 lt_cp04 lt_cp05 lt_cp06 lt_cp07
+                    lt_cp08 lt_cp09 lt_cp10 lt_cp11 lt_cp12 lt_cp13 lt_cp14 lt_cp15; omega)]
   clear lt_cp00 lt_cp01 lt_cp02 lt_cp03 lt_cp04 lt_cp05 lt_cp06 lt_cp07 lt_cp08 lt_cp09 lt_cp10 lt_cp11 lt_cp12 lt_cp13 lt_cp14 lt_cp15
-  have joins : forall (i : Fin 16) (a b : ℕ), a % (256 ^ i.val) + (b + a / (256 ^ i.val)) % 256 * (256 ^ i.val) = (a + b * (256 ^ i.val)) % (256 ^ (i.val + 1)) := by
-    clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-  have divs : forall (i : Fin 16) (a b : ℕ), (a + b / (256 ^ i.val)) / 256 = (b + a * (256 ^ i.val)) / (256 ^ (i.val + 1)) := by
-    clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-  have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
-  have j4 := joins 4; have j5 := joins 5; have j6 := joins 6; have j7 := joins 7;
-  have j8 := joins 8; have j9 := joins 9; have j10 := joins 10; have j11 := joins 11;
-  have j12 := joins 12; have j13 := joins 13; have j14 := joins 14; have j15 := joins 15;
-  have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
-  have d4 := divs 4; have d5 := divs 5; have d6 := divs 6; have d7 := divs 7;
-  have d8 := divs 8; have d9 := divs 9; have d10 := divs 10; have d11 := divs 11;
-  have d12 := divs 12; have d13 := divs 13; have d14 := divs 14; have d15 := divs 15;
+  have j1 := joins_byte_fin16 1; have j2 := joins_byte_fin16 2; have j3 := joins_byte_fin16 3
+  have j4 := joins_byte_fin16 4; have j5 := joins_byte_fin16 5
+  have j6 := joins_byte_fin16 6; have j7 := joins_byte_fin16 7
+  have j8 := joins_byte_fin16 8; have j9 := joins_byte_fin16 9
+  have j10 := joins_byte_fin16 10; have j11 := joins_byte_fin16 11
+  have j12 := joins_byte_fin16 12; have j13 := joins_byte_fin16 13
+  have j14 := joins_byte_fin16 14; have j15 := joins_byte_fin16 15
+  have d1 := divs_byte_fin16 1; have d2 := divs_byte_fin16 2; have d3 := divs_byte_fin16 3
+  have d4 := divs_byte_fin16 4; have d5 := divs_byte_fin16 5
+  have d6 := divs_byte_fin16 6; have d7 := divs_byte_fin16 7
+  have d8 := divs_byte_fin16 8; have d9 := divs_byte_fin16 9
+  have d10 := divs_byte_fin16 10; have d11 := divs_byte_fin16 11
+  have d12 := divs_byte_fin16 12; have d13 := divs_byte_fin16 13
+  have d14 := divs_byte_fin16 14; have d15 := divs_byte_fin16 15
   simp at *
   rw [j1, d1, j2, d2, j3, d3, j4, d4, j5, d5, j6, d6, j7, d7, j8, d8,
       j9, d9, j10, d10, j11, d11, j12, d12, j13, d13, j14, d14, j15]
-  clear j1 j2 j3 j4 j5 j6 j7 j8 j9 j10 j11 j12 j13 j14 j15 joins
-  clear d1 d2 d3 d4 d5 d6 d7 d8 d9 d10 d11 d12 d13 d14 d15 divs
+  clear j1 j2 j3 j4 j5 j6 j7 j8 j9 j10 j11 j12 j13 j14 j15
+  clear d1 d2 d3 d4 d5 d6 d7 d8 d9 d10 d11 d12 d13 d14 d15
   simp [cp, Vector.ofFn, Vector.get] at *
   simp [Fin.val_add, Fin.val_mul]
   repeat rw [Nat.mod_eq_of_lt (b := 2130706433)]
@@ -238,17 +266,15 @@ lemma core_mulw
   simp [eqp00, eqp01, eqp02, eqp03, eqc00, eqc01, eqc02, eqc03, Fin.val_add]
   clear eqp00 eqp01 eqp02 eqp03 eqc00 eqc01 eqc02 eqc03
   clear p00 p01 p02 p03 c00 c01 c02 c03
-  iterate 3 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+  iterate 3 rw [Nat.mod_eq_of_lt (b := 2130706433)
+    (by clear * - bw00 bw01 bw02 bw03 cw00 cw01 cw02 cw03
+                    lt_cp00 lt_cp01 lt_cp02 lt_cp03; omega)]
   clear lt_cp00 lt_cp01 lt_cp02 lt_cp03
-  have joins : forall (i : Fin 4) (a b : ℕ), a % (256 ^ i.val) + (b + a / (256 ^ i.val)) % 256 * (256 ^ i.val) = (a + b * (256 ^ i.val)) % (256 ^ (i.val + 1)) := by
-    clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-  have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (256 ^ i.val)) / 256 = (b + a * (256 ^ i.val)) / (256 ^ (i.val + 1)) := by
-    clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-  have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
-  have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
+  have j1 := joins_byte_fin4 1; have j2 := joins_byte_fin4 2; have j3 := joins_byte_fin4 3
+  have d1 := divs_byte_fin4 1; have d2 := divs_byte_fin4 2; have d3 := divs_byte_fin4 3
   simp at *
   rw [j1, d1, j2, d2, j3]
-  clear j1 j2 j3 joins d1 d2 d3 divs
+  clear j1 j2 j3 d1 d2 d3
   simp [cp, Vector.ofFn, Vector.get] at *
   simp [Fin.val_add, Fin.val_mul]
   repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by clear eq_p00 eq_p01 eq_p02 eq_p03; grind)]

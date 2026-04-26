@@ -623,10 +623,14 @@ lemma spec.sll (h : is_sll Main) :
       rw [Word.toBitVec64_toNat]
       · simp [Word.toNat]
         try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-        repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+        repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+          (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                          lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]
         omega
       · apply Word.isU64_of_cases <;> simp [Fin.val_add, Fin.val_mul] <;>
-        (repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]) <;>
+        (repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+          (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                          lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]) <;>
         omega
     }
 
@@ -730,10 +734,14 @@ lemma spec.slli (h : is_slli Main) :
       rw [Word.toBitVec64_toNat]
       · simp [Word.toNat]
         try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-        repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+        repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+          (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                          lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]
         omega
       · apply Word.isU64_of_cases <;> simp [Fin.val_add, Fin.val_mul] <;>
-        (repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]) <;>
+        (repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+          (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                          lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]) <;>
         omega
     }
 
@@ -835,7 +843,9 @@ lemma spec.sllw (h : is_sllw Main) :
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> simp_all <;>
       apply HWord.isU32_of_cases <;> simp_all [Fin.val_add, Fin.val_mul] <;>
-      (repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]) <;>
+      (repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+        (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                        lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]) <;>
       omega
     have ⟨_, _⟩ := HWord.lt_cases_of_isU32 h_isU32_a
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
@@ -862,7 +872,9 @@ lemma spec.sllw (h : is_sllw Main) :
           (try apply cancel_mul_65536 (by simp) at h_b3_dec)
           simp_all [HWord.toNat]
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+            (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                            lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]
           omega
         }
 
@@ -964,7 +976,9 @@ lemma spec.slliw (h : is_slliw Main) :
       rcases b_cb0 <;> rcases b_cb1 <;> rcases b_cb2 <;>
       rcases b_cb3 <;> rcases b_cb4 <;> simp_all <;>
       apply HWord.isU32_of_cases <;> simp_all [Fin.val_add, Fin.val_mul] <;>
-      (repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]) <;>
+      (repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+        (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                        lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]) <;>
       omega
     have ⟨_, _⟩ := HWord.lt_cases_of_isU32 h_isU32_a
     have h_a3 : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then 65535 else 0 := by
@@ -991,7 +1005,9 @@ lemma spec.slliw (h : is_slliw Main) :
           (try apply cancel_mul_65536 (by simp) at h_b3_dec)
           simp_all [HWord.toNat]
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+            (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                            lt_lh0 lt_lh1 lt_lh2 lt_lh3; omega)]
           omega
         }
 

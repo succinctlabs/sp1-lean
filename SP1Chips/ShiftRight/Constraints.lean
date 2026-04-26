@@ -1029,7 +1029,9 @@ private lemma spec.srl_common
     simp_all
     all_goals {
       try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-      repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+      repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+        (by clear * - b0_16 b1_16 b2_16 b3_16 lt_ll0 lt_ll1 lt_ll2 lt_ll3
+                        lt_hl0 lt_hl1 lt_hl2 lt_hl3; omega)]
       try omega
     }
 
@@ -1186,7 +1188,8 @@ private lemma spec.srlw_common
           (try apply cancel_mul_65536_v1 (by simp) at h_b1_dec)
           simp_all [HWord.toNat]
           try simp [Fin.val_add, Fin.val_mul] at b0_16 b1_16 b2_16 b3_16 ⊢
-          repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+          repeat rw [Nat.mod_eq_of_lt (b := 2130706433)
+            (by clear * - b0_16 b1_16 lt_ll0 lt_ll1 lt_hl0 lt_hl1; omega)]
           omega
         }
 

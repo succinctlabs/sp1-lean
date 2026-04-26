@@ -17,6 +17,28 @@ set_option maxHeartbeats 100000000
 -- reasoning the linter can't see; keep the existing structure.
 set_option linter.style.multiGoal false
 
+-- The post-`iterate N rw [Nat.mod_eq_of_lt …]` proofs at sites 1543, 2358,
+-- 3146, 3985 each re-prove the same `joins`/`divs` over `Fin N`. Lifting them
+-- here proves each once at file elaboration time, isolating the `fin_cases <;>
+-- norm_num <;> omega` cost.
+private lemma joins_fin4 : ∀ (i : Fin 4) (a b : ℕ),
+    a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) =
+      (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
+private lemma divs_fin4 : ∀ (i : Fin 4) (a b : ℕ),
+    (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
+private lemma joins_fin8 : ∀ (i : Fin 8) (a b : ℕ),
+    a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) =
+      (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
+private lemma divs_fin8 : ∀ (i : Fin 8) (a b : ℕ),
+    (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
+  intro i a b; fin_cases i <;> norm_num <;> omega
+
 variable (Main : Vector (Fin KB) 246)
 
 section constraints
@@ -1541,17 +1563,15 @@ lemma div_rem
                     simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2, nof_eq_ctqpr4.2, nof_eq_ctqpr5.2, nof_eq_ctqpr6.2, nof_eq_ctqpr7.2]
                   simp [Fin.val_add]
                   iterate 8 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-                  have joins : forall (i : Fin 8) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-                    clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-                  have divs : forall (i : Fin 8) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-                    clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-                  have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
-                  have j4 := joins 4; have j5 := joins 5; have j6 := joins 6; have j7 := joins 7
-                  have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
-                  have d4 := divs 4; have d5 := divs 5; have d6 := divs 6; have d7 := divs 7
+                  have j1 := joins_fin8 1; have j2 := joins_fin8 2; have j3 := joins_fin8 3
+                  have j4 := joins_fin8 4; have j5 := joins_fin8 5
+                  have j6 := joins_fin8 6; have j7 := joins_fin8 7
+                  have d1 := divs_fin8 1; have d2 := divs_fin8 2; have d3 := divs_fin8 3
+                  have d4 := divs_fin8 4; have d5 := divs_fin8 5
+                  have d6 := divs_fin8 6; have d7 := divs_fin8 7
                   simp at *
                   rw [j1, d1, j2, d2, j3, d3, j4, d4, j5, d5, j6, d6, j7]
-                  clear j1 j2 j3 j4 j5 j6 j7 d1 d2 d3 d4 d5 d6 d7 joins divs
+                  clear j1 j2 j3 j4 j5 j6 j7 d1 d2 d3 d4 d5 d6 d7
                   simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
                   repeat rw [BitVec.toNat_add]
                   iterate 2 rw [DWord.toBitVec128_toNat (by apply DWord.isU128_of_cases <;> simp <;> omega)]
@@ -2356,15 +2376,11 @@ lemma divu_remu
               simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2, nof_eq_ctqpr4.2, nof_eq_ctqpr5.2, nof_eq_ctqpr6.2, nof_eq_ctqpr7.2]
             simp [Fin.val_add]
             iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-            have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-              clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-            have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-              clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-            have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
-            have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
+            have j1 := joins_fin4 1; have j2 := joins_fin4 2; have j3 := joins_fin4 3
+            have d1 := divs_fin4 1; have d2 := divs_fin4 2; have d3 := divs_fin4 3
             simp at *
             rw [j1, d1, j2, d2, j3]
-            clear j1 j2 j3 d1 d2 d3 joins divs
+            clear j1 j2 j3 d1 d2 d3
             simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
             repeat rw [BitVec.toNat_add]
             iterate 2 rw [DWord.toBitVec128_toNat (by apply DWord.isU128_of_cases <;> simp <;> omega)]
@@ -3144,15 +3160,11 @@ lemma divw_remw
                             simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2]
                     simp [Fin.val_add]
                     iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-                    have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-                      clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-                    have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-                      clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-                    have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
-                    have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
+                    have j1 := joins_fin4 1; have j2 := joins_fin4 2; have j3 := joins_fin4 3
+                    have d1 := divs_fin4 1; have d2 := divs_fin4 2; have d3 := divs_fin4 3
                     simp at *
                     rw [j1, d1, j2, d2, j3]
-                    clear j1 j2 j3 d1 d2 d3 joins divs
+                    clear j1 j2 j3 d1 d2 d3
                     simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
                     repeat rw [BitVec.toNat_add]
                     iterate 2 rw [Word.toBitVec64_toNat (by apply Word.isU64_of_cases <;> simp <;> try omega)]
@@ -3983,15 +3995,11 @@ lemma divuw_remuw
                         simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2]
                 simp [Fin.val_add]
                 iterate 4 rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
-                have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
-                  clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-                have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
-                  clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
-                have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
-                have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
+                have j1 := joins_fin4 1; have j2 := joins_fin4 2; have j3 := joins_fin4 3
+                have d1 := divs_fin4 1; have d2 := divs_fin4 2; have d3 := divs_fin4 3
                 simp at *
                 rw [j1, d1, j2, d2, j3]
-                clear j1 j2 j3 d1 d2 d3 joins divs
+                clear j1 j2 j3 d1 d2 d3
                 simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
                 repeat rw [BitVec.toNat_add]
                 iterate 2 rw [Word.toBitVec64_toNat (by apply Word.isU64_of_cases <;> simp <;> omega)]

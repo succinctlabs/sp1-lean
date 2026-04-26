@@ -9,6 +9,22 @@ set_option maxHeartbeats 10000000
 
 namespace BitwiseU16Operation
 
+private lemma mod_KB_collapse
+    {r0 r1 r2 r3 r4 r5 r6 r7 : ℕ}
+    (hr0 : r0 < 256) (hr1 : r1 < 256) (hr2 : r2 < 256) (hr3 : r3 < 256)
+    (hr4 : r4 < 256) (hr5 : r5 < 256) (hr6 : r6 < 256) (hr7 : r7 < 256) :
+    (r0 + r1 * 256) % 2130706433 +
+          (r2 + r3 * 256) % 2130706433 * 65536 +
+        (r4 + r5 * 256) % 2130706433 * 4294967296 +
+      (r6 + r7 * 256) % 2130706433 * 281474976710656 =
+    r0 + r1 * 256 + (r2 + r3 * 256) * 65536 +
+      (r4 + r5 * 256) * 4294967296 +
+        (r6 + r7 * 256) * 281474976710656 := by
+  rw [Nat.mod_eq_of_lt (a := r0 + r1 * 256) (by omega)]
+  rw [Nat.mod_eq_of_lt (a := r2 + r3 * 256) (by omega)]
+  rw [Nat.mod_eq_of_lt (a := r4 + r5 * 256) (by omega)]
+  rw [Nat.mod_eq_of_lt (a := r6 + r7 * 256) (by omega)]
+
 lemma spec.and {b cc : Word (Fin KB)} {cols : BitwiseU16Operation}
     (h_isU64_b : b.isU64) (h_isU64_cc : cc.isU64) :
     List.Forall SP1Constraint.toProp (constraints b cc cols 0 1).2 →
@@ -37,7 +53,7 @@ lemma spec.and {b cc : Word (Fin KB)} {cols : BitwiseU16Operation}
   rw [Word.and_toBWord h_isU64_b h_isU64_cc]
   simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
   simp [Fin.val_add, Fin.val_mul]
-  repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+  rw [mod_KB_collapse hr0 hr1 hr2 hr3 hr4 hr5 hr6 hr7]
   rw [Fin.lt_def, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
   rw [Fin.lt_def, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
   simp_all
@@ -81,7 +97,7 @@ lemma spec.or
     rw [Word.or_toBWord h_isU64_b h_isU64_cc]
     simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
     simp [Fin.val_add, Fin.val_mul]
-    repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+    rw [mod_KB_collapse hr0 hr1 hr2 hr3 hr4 hr5 hr6 hr7]
     rw [Fin.lt_def, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
     rw [Fin.lt_def, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
     simp_all
@@ -125,7 +141,7 @@ lemma spec.xor
     rw [Word.xor_toBWord h_isU64_b h_isU64_cc]
     simp [Word.toBitVec64, Word.toNat, Word.toBWord, BWord.toBitVec64, BWord.toNat]
     simp [Fin.val_add, Fin.val_mul]
-    repeat rw [Nat.mod_eq_of_lt (b := 2130706433) (by omega)]
+    rw [mod_KB_collapse hr0 hr1 hr2 hr3 hr4 hr5 hr6 hr7]
     rw [Fin.lt_def, Fin.mod_val] at hb0 hc0 hb2 hc2 hb4 hc4 hb6 hc6
     rw [Fin.lt_def, Fin.div_val] at hb1 hc1 hb3 hc3 hb5 hc5 hb7 hc7
     simp_all
