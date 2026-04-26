@@ -10,7 +10,7 @@ section constraints
   (cc : (Word (Fin KB)))
   (cols : LtOperationUnsigned)
   (is_real : (Fin KB))
-  : SP1ConstraintList :=
+  : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := is_real - 1
   let E1 : Fin KB := is_real * E0
   let E2 : Fin KB := cols.u16_flags[0] + cols.u16_flags[1]
@@ -66,7 +66,7 @@ section constraints
   let E52 : Fin KB := cols.not_eq_inv * E51
   let E53 : Fin KB := E52 - is_real
   let E54 : Fin KB := E50 * E53
-  let CS0 : SP1ConstraintList := U16CompareOperation.constraints cols.comparison_limbs[0] cols.comparison_limbs[1] { bit := cols.u16_compare_operation.bit } is_real
+  let CS0 : SP1ConstraintList (Fin KB) := U16CompareOperation.constraints cols.comparison_limbs[0] cols.comparison_limbs[1] { bit := cols.u16_compare_operation.bit } is_real
   CS0 ++ [
     (.assertZero E1),
     (.assertZero E6),

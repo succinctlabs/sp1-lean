@@ -22,7 +22,7 @@ variable (Main : Vector (Fin KB) 246)
 section constraints
 
 -- Generated Lean code for chip DivRemChip
-@[irreducible] def constraints (Main : Vector (Fin KB) 246) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin KB) 246) : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := Main[205] + Main[206]
   let E1 : Fin KB := E0 + Main[207]
   let E2 : Fin KB := E1 + Main[208]
@@ -115,14 +115,14 @@ section constraints
   let E89 : Fin KB := E2 * E88
   let E90 : Fin KB := Main[51] - Main[55]
   let E91 : Fin KB := E5 * E90
-  let CS0 : SP1ConstraintList := MulOperation.constraints #v[Main[68], Main[69], Main[70], Main[71]] #v[Main[44], Main[45], Main[46], Main[47]] #v[Main[36], Main[37], Main[38], Main[39]] { carry := #v[Main[76], Main[77], Main[78], Main[79], Main[80], Main[81], Main[82], Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89], Main[90], Main[91]], product := #v[Main[92], Main[93], Main[94], Main[95], Main[96], Main[97], Main[98], Main[99], Main[100], Main[101], Main[102], Main[103], Main[104], Main[105], Main[106], Main[107]], b_lower_byte := { low_bytes := #v[Main[108], Main[109], Main[110], Main[111]] }, c_lower_byte := { low_bytes := #v[Main[112], Main[113], Main[114], Main[115]] }, b_msb := Main[116], c_msb := Main[117], product_msb := { msb := Main[118] }, b_sign_extend := Main[119], c_sign_extend := Main[120] } Main[244] Main[244] 0 0 0 0
+  let CS0 : SP1ConstraintList (Fin KB) := MulOperation.constraints #v[Main[68], Main[69], Main[70], Main[71]] #v[Main[44], Main[45], Main[46], Main[47]] #v[Main[36], Main[37], Main[38], Main[39]] { carry := #v[Main[76], Main[77], Main[78], Main[79], Main[80], Main[81], Main[82], Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89], Main[90], Main[91]], product := #v[Main[92], Main[93], Main[94], Main[95], Main[96], Main[97], Main[98], Main[99], Main[100], Main[101], Main[102], Main[103], Main[104], Main[105], Main[106], Main[107]], b_lower_byte := { low_bytes := #v[Main[108], Main[109], Main[110], Main[111]] }, c_lower_byte := { low_bytes := #v[Main[112], Main[113], Main[114], Main[115]] }, b_msb := Main[116], c_msb := Main[117], product_msb := { msb := Main[118] }, b_sign_extend := Main[119], c_sign_extend := Main[120] } Main[244] Main[244] 0 0 0 0
   let E92 : Fin KB := Main[201] + Main[203]
   let E93 : Fin KB := Main[202] + Main[204]
-  let CS1 : SP1ConstraintList := MulOperation.constraints #v[Main[72], Main[73], Main[74], Main[75]] #v[Main[44], Main[45], Main[46], Main[47]] #v[Main[36], Main[37], Main[38], Main[39]] { carry := #v[Main[121], Main[122], Main[123], Main[124], Main[125], Main[126], Main[127], Main[128], Main[129], Main[130], Main[131], Main[132], Main[133], Main[134], Main[135], Main[136]], product := #v[Main[137], Main[138], Main[139], Main[140], Main[141], Main[142], Main[143], Main[144], Main[145], Main[146], Main[147], Main[148], Main[149], Main[150], Main[151], Main[152]], b_lower_byte := { low_bytes := #v[Main[153], Main[154], Main[155], Main[156]] }, c_lower_byte := { low_bytes := #v[Main[157], Main[158], Main[159], Main[160]] }, b_msb := Main[161], c_msb := Main[162], product_msb := { msb := Main[163] }, b_sign_extend := Main[164], c_sign_extend := Main[165] } Main[239] 0 E92 0 E93 0
-  let CS2 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[0, 0, 0, 32768] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[210], result := Main[211] }, { inverse := Main[212], result := Main[213] }, { inverse := Main[214], result := Main[215] }, { inverse := Main[216], result := Main[217] }], is_zero_first_half := Main[218], is_zero_second_half := Main[219], result := Main[220] } } Main[239]
-  let CS3 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[22], Main[23], Main[24], Main[25]] #v[65535, 65535, 65535, 65535] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[221], result := Main[222] }, { inverse := Main[223], result := Main[224] }, { inverse := Main[225], result := Main[226] }, { inverse := Main[227], result := Main[228] }], is_zero_first_half := Main[229], is_zero_second_half := Main[230], result := Main[231] } } Main[239]
-  let CS4 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[15], Main[16], 0, 0] #v[0, 32768, 0, 0] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[210], result := Main[211] }, { inverse := Main[212], result := Main[213] }, { inverse := Main[214], result := Main[215] }, { inverse := Main[216], result := Main[217] }], is_zero_first_half := Main[218], is_zero_second_half := Main[219], result := Main[220] } } E2
-  let CS5 : SP1ConstraintList := IsEqualWordOperation.constraints #v[Main[22], Main[23], 0, 0] #v[65535, 65535, 0, 0] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[221], result := Main[222] }, { inverse := Main[223], result := Main[224] }, { inverse := Main[225], result := Main[226] }, { inverse := Main[227], result := Main[228] }], is_zero_first_half := Main[229], is_zero_second_half := Main[230], result := Main[231] } } E2
+  let CS1 : SP1ConstraintList (Fin KB) := MulOperation.constraints #v[Main[72], Main[73], Main[74], Main[75]] #v[Main[44], Main[45], Main[46], Main[47]] #v[Main[36], Main[37], Main[38], Main[39]] { carry := #v[Main[121], Main[122], Main[123], Main[124], Main[125], Main[126], Main[127], Main[128], Main[129], Main[130], Main[131], Main[132], Main[133], Main[134], Main[135], Main[136]], product := #v[Main[137], Main[138], Main[139], Main[140], Main[141], Main[142], Main[143], Main[144], Main[145], Main[146], Main[147], Main[148], Main[149], Main[150], Main[151], Main[152]], b_lower_byte := { low_bytes := #v[Main[153], Main[154], Main[155], Main[156]] }, c_lower_byte := { low_bytes := #v[Main[157], Main[158], Main[159], Main[160]] }, b_msb := Main[161], c_msb := Main[162], product_msb := { msb := Main[163] }, b_sign_extend := Main[164], c_sign_extend := Main[165] } Main[239] 0 E92 0 E93 0
+  let CS2 : SP1ConstraintList (Fin KB) := IsEqualWordOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[0, 0, 0, 32768] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[210], result := Main[211] }, { inverse := Main[212], result := Main[213] }, { inverse := Main[214], result := Main[215] }, { inverse := Main[216], result := Main[217] }], is_zero_first_half := Main[218], is_zero_second_half := Main[219], result := Main[220] } } Main[239]
+  let CS3 : SP1ConstraintList (Fin KB) := IsEqualWordOperation.constraints #v[Main[22], Main[23], Main[24], Main[25]] #v[65535, 65535, 65535, 65535] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[221], result := Main[222] }, { inverse := Main[223], result := Main[224] }, { inverse := Main[225], result := Main[226] }, { inverse := Main[227], result := Main[228] }], is_zero_first_half := Main[229], is_zero_second_half := Main[230], result := Main[231] } } Main[239]
+  let CS4 : SP1ConstraintList (Fin KB) := IsEqualWordOperation.constraints #v[Main[15], Main[16], 0, 0] #v[0, 32768, 0, 0] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[210], result := Main[211] }, { inverse := Main[212], result := Main[213] }, { inverse := Main[214], result := Main[215] }, { inverse := Main[216], result := Main[217] }], is_zero_first_half := Main[218], is_zero_second_half := Main[219], result := Main[220] } } E2
+  let CS5 : SP1ConstraintList (Fin KB) := IsEqualWordOperation.constraints #v[Main[22], Main[23], 0, 0] #v[65535, 65535, 0, 0] { is_diff_zero := { is_zero_limb := #v[{ inverse := Main[221], result := Main[222] }, { inverse := Main[223], result := Main[224] }, { inverse := Main[225], result := Main[226] }, { inverse := Main[227], result := Main[228] }], is_zero_first_half := Main[229], is_zero_second_half := Main[230], result := Main[231] } } E2
   let E94 : Fin KB := Main[220] * Main[231]
   let E95 : Fin KB := E94 * E10
   let E96 : Fin KB := Main[209] - E95
@@ -258,7 +258,7 @@ section constraints
   let E226 : Fin KB := 1 - Main[240]
   let E227 : Fin KB := E226 * Main[236]
   let E228 : Fin KB := E223 * E227
-  let CS6 : SP1ConstraintList := IsZeroWordOperation.constraints #v[Main[36], Main[37], Main[38], Main[39]] { is_zero_limb := #v[{ inverse := Main[190], result := Main[191] }, { inverse := Main[192], result := Main[193] }, { inverse := Main[194], result := Main[195] }, { inverse := Main[196], result := Main[197] }], is_zero_first_half := Main[198], is_zero_second_half := Main[199], result := Main[200] } Main[244]
+  let CS6 : SP1ConstraintList (Fin KB) := IsZeroWordOperation.constraints #v[Main[36], Main[37], Main[38], Main[39]] { is_zero_limb := #v[{ inverse := Main[190], result := Main[191] }, { inverse := Main[192], result := Main[193] }, { inverse := Main[194], result := Main[195] }, { inverse := Main[196], result := Main[197] }], is_zero_first_half := Main[198], is_zero_second_half := Main[199], result := Main[200] } Main[244]
   let E229 : Fin KB := Main[40] - 65535
   let E230 : Fin KB := Main[200] * E229
   let E231 : Fin KB := Main[41] - 65535
@@ -299,7 +299,7 @@ section constraints
   let E266 : Fin KB := Main[240] - 1
   let E267 : Fin KB := Main[51] - Main[59]
   let E268 : Fin KB := E266 * E267
-  let CS7 : SP1ConstraintList := AddOperation.constraints #v[Main[36], Main[37], Main[38], Main[39]] #v[Main[60], Main[61], Main[62], Main[63]] { value := #v[Main[166], Main[167], Main[168], Main[169]] } Main[242]
+  let CS7 : SP1ConstraintList (Fin KB) := AddOperation.constraints #v[Main[36], Main[37], Main[38], Main[39]] #v[Main[60], Main[61], Main[62], Main[63]] { value := #v[Main[166], Main[167], Main[168], Main[169]] } Main[242]
   let E269 : Fin KB := 0 - Main[166]
   let E270 : Fin KB := Main[242] * E269
   let E271 : Fin KB := 0 - Main[167]
@@ -308,7 +308,7 @@ section constraints
   let E274 : Fin KB := Main[242] * E273
   let E275 : Fin KB := 0 - Main[169]
   let E276 : Fin KB := Main[242] * E275
-  let CS8 : SP1ConstraintList := AddOperation.constraints #v[Main[48], Main[49], Main[50], Main[51]] #v[Main[56], Main[57], Main[58], Main[59]] { value := #v[Main[170], Main[171], Main[172], Main[173]] } Main[243]
+  let CS8 : SP1ConstraintList (Fin KB) := AddOperation.constraints #v[Main[48], Main[49], Main[50], Main[51]] #v[Main[56], Main[57], Main[58], Main[59]] { value := #v[Main[170], Main[171], Main[172], Main[173]] } Main[243]
   let E277 : Fin KB := 0 - Main[170]
   let E278 : Fin KB := Main[243] * E277
   let E279 : Fin KB := 0 - Main[171]
@@ -338,16 +338,16 @@ section constraints
   let E303 : Fin KB := 1 - Main[200]
   let E304 : Fin KB := E303 * Main[244]
   let E305 : Fin KB := E304 - Main[245]
-  let CS9 : SP1ConstraintList := LtOperationUnsigned.constraints #v[Main[56], Main[57], Main[58], Main[59]] #v[Main[64], Main[65], Main[66], Main[67]] { u16_compare_operation := { bit := Main[174] }, u16_flags := #v[Main[175], Main[176], Main[177], Main[178]], not_eq_inv := Main[179], comparison_limbs := #v[Main[180], Main[181]] } Main[245]
+  let CS9 : SP1ConstraintList (Fin KB) := LtOperationUnsigned.constraints #v[Main[56], Main[57], Main[58], Main[59]] #v[Main[64], Main[65], Main[66], Main[67]] { u16_compare_operation := { bit := Main[174] }, u16_flags := #v[Main[175], Main[176], Main[177], Main[178]], not_eq_inv := Main[179], comparison_limbs := #v[Main[180], Main[181]] } Main[245]
   let E306 : Fin KB := 1 - Main[174]
   let E307 : Fin KB := Main[245] * E306
-  let CS10 : SP1ConstraintList := U16MSBOperation.constraints Main[18] { msb := Main[232] } Main[239]
-  let CS11 : SP1ConstraintList := U16MSBOperation.constraints Main[25] { msb := Main[234] } Main[239]
-  let CS12 : SP1ConstraintList := U16MSBOperation.constraints Main[55] { msb := Main[233] } Main[239]
-  let CS13 : SP1ConstraintList := U16MSBOperation.constraints Main[16] { msb := Main[232] } E2
-  let CS14 : SP1ConstraintList := U16MSBOperation.constraints Main[23] { msb := Main[234] } E2
-  let CS15 : SP1ConstraintList := U16MSBOperation.constraints Main[53] { msb := Main[233] } E2
-  let CS16 : SP1ConstraintList := U16MSBOperation.constraints Main[41] { msb := Main[235] } E2
+  let CS10 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints Main[18] { msb := Main[232] } Main[239]
+  let CS11 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints Main[25] { msb := Main[234] } Main[239]
+  let CS12 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints Main[55] { msb := Main[233] } Main[239]
+  let CS13 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints Main[16] { msb := Main[232] } E2
+  let CS14 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints Main[23] { msb := Main[234] } E2
+  let CS15 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints Main[53] { msb := Main[233] } E2
+  let CS16 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints Main[41] { msb := Main[235] } E2
   let E308 : Fin KB := Main[182] - 1
   let E309 : Fin KB := Main[182] * E308
   let E310 : Fin KB := Main[183] - 1
@@ -484,10 +484,10 @@ section constraints
   let E441 : Fin KB := Main[208] * 8
   let E442 : Fin KB := E440 + E441
   let E443 : Fin KB := Main[3] + 4
-  let CS17 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E443, Main[4], Main[5]] 8 Main[244]
+  let CS17 : SP1ConstraintList (Fin KB) := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E443, Main[4], Main[5]] 8 Main[244]
   let E444 : Fin KB := Main[1] * 65536
   let E445 : Fin KB := Main[2] + E444
-  let CS18 : SP1ConstraintList := RTypeReader.constraints Main[0] E445 #v[Main[3], Main[4], Main[5]] E382 #v[E442, E427, E397, E412] #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[244]
+  let CS18 : SP1ConstraintList (Fin KB) := RTypeReader.constraints Main[0] E445 #v[Main[3], Main[4], Main[5]] E382 #v[E442, E427, E397, E412] #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[244]
   CS0 ++ CS1 ++ CS2 ++ CS3 ++ CS4 ++ CS5 ++ CS6 ++ CS7 ++ CS8 ++ CS9 ++ CS10 ++ CS11 ++ CS12 ++ CS13 ++ CS14 ++ CS15 ++ CS16 ++ CS17 ++ CS18 ++ [
     (.assertZero E13),
     (.assertZero E15),

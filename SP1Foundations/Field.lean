@@ -1,5 +1,28 @@
 import SP1Foundations.Misc
 
+/-!
+# KoalaBear field setup and bridges to a generic prime field
+
+This file plays two roles:
+
+1. **Concrete field instances on `Fin KB`** (`namespace KoalaBear`): primality,
+   `Field`, `NoZeroDivisors`, and a block of high-priority arithmetic instances
+   that are perf-critical (see `docs/PERF_PATTERNS.md`).
+2. **KB-specific bridges** (free-floating lemmas below the namespace): `rfl`-only
+   facts like `(2130673921 : Fin KB) = 65536⁻¹` that translate the literal
+   inverse-of-`2^k` values that the SP1 constraint compiler emits into
+   `Field`-generic forms (`(2^k : F)⁻¹`). These are inherently KB-specific
+   because the literal value is the modular inverse computed in `Fin KB`. They
+   are the "instantiation-time bridge" — generic operation lemmas (Phase 3 of
+   `docs/FIELD_GENERIC.md`) state their RHS in terms of `(2^k : F)⁻¹` so the
+   only KB-coupling is whether the simp set includes the matching bridge.
+
+A second concrete field (e.g. BabyBear) would need its own copies of these
+bridges with its own literal values; the constraint compiler would emit a
+different literal for `(2^16)⁻¹` mod that prime. See Phase 5 of
+`docs/FIELD_GENERIC.md` for the BabyBear instantiation recipe.
+-/
+
 notation "KB" => 2130706433
 @[simp] lemma BB_eq : KB = 2130706433 := rfl
 
@@ -50,9 +73,21 @@ instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp 
 
 end KoalaBear
 
+/-! ### Generic field helpers (not KB-specific) -/
+
 @[aesop safe forward]
 lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
     a * (b - c) = 1 → b ≠ c := by aesop
+
+/-! ### KB ↔ generic-form bridges
+
+Lemmas below are KB-specific because the LHS is a concrete numeric literal
+that equals `(2^k)⁻¹` mod KB. They translate the SP1 constraint compiler's
+literal output into the `Field`-generic `(2^k : F)⁻¹` form that operation
+lemmas state their RHS in. Naming convention: `<op>_<2^k>BB[_eq[_one[_iff[']]]]`
+where `BB` is short for "BabyBear-class small prime" (a misnomer kept for
+historical reasons; KB is KoalaBear, not BabyBear).
+-/
 
 @[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin KB) <<< 2 = 1 := rfl
 @[simp] lemma shiftl_3BB_eq_one : (1864368129 : Fin KB) <<< 3 = 1 := rfl
@@ -103,6 +138,8 @@ lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := eq_inv_of_mul_eq_one_
 
 @[simp] lemma inv_16BB_zero_or_one {x : Fin KB} : x * 65536⁻¹ = 0 ∨ x * 65536⁻¹ = 1 ↔ x = 0 ∨ x = 65536
   := by aesop
+
+/-! ### Integer helpers (not field-related; lives here for historical reasons) -/
 
 namespace Int
 

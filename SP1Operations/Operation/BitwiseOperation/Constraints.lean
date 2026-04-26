@@ -11,7 +11,7 @@ section constraints
   (cols : BitwiseOperation)
   (opcode : (Fin KB))
   (is_real : (Fin KB))
-  : SP1ConstraintList :=
+  : SP1ConstraintList (Fin KB) :=
   [
     (.send (.byte (ByteOpcode.ofNat opcode) cols.result[0] a[0] b[0]) is_real),
     (.send (.byte (ByteOpcode.ofNat opcode) cols.result[1] a[1] b[1]) is_real),

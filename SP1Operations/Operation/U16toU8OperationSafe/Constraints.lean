@@ -9,7 +9,7 @@ section constraints
   (u16_values : (Vector (Fin KB) 4))
   (cols : U16toU8Operation)
   (is_real : (Fin KB))
-  : (Vector (Fin KB) 8) × SP1ConstraintList :=
+  : (Vector (Fin KB) 8) × SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := u16_values[0] - cols.low_bytes[0]
   let E1 : Fin KB := E0 * 2122383361
   let E2 : Fin KB := u16_values[1] - cols.low_bytes[1]

@@ -14,7 +14,7 @@ section constraints
   (offset_bit2 : (Fin KB))
   (is_real : (Fin KB))
   (cols : AddressOperation)
-  : (Vector (Fin KB) 3) × SP1ConstraintList :=
+  : (Vector (Fin KB) 3) × SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := is_real - 1
   let E1 : Fin KB := is_real * E0
   let E2 : Fin KB := offset_bit0 - 1
@@ -23,7 +23,7 @@ section constraints
   let E5 : Fin KB := offset_bit1 * E4
   let E6 : Fin KB := offset_bit2 - 1
   let E7 : Fin KB := offset_bit2 * E6
-  let CS0 : SP1ConstraintList := AddrAddOperation.constraints #v[b[0], b[1], b[2], b[3]] #v[cc[0], cc[1], cc[2], cc[3]] { value := #v[cols.addr_operation.value[0], cols.addr_operation.value[1], cols.addr_operation.value[2]] } is_real
+  let CS0 : SP1ConstraintList (Fin KB) := AddrAddOperation.constraints #v[b[0], b[1], b[2], b[3]] #v[cc[0], cc[1], cc[2], cc[3]] { value := #v[cols.addr_operation.value[0], cols.addr_operation.value[1], cols.addr_operation.value[2]] } is_real
   let E8 : Fin KB := cols.addr_operation.value[1] + cols.addr_operation.value[2]
   let E9 : Fin KB := cols.top_two_limb_inv * E8
   let E10 : Fin KB := E9 - is_real

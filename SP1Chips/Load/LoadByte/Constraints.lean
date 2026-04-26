@@ -10,7 +10,7 @@ namespace LoadByte
 section constraints
 
 -- Generated Lean code for chip LoadByteChip
-@[irreducible] def constraints (Main : Vector (Fin KB) 47) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin KB) 47) : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := Main[1] * 65536
   let E1 : Fin KB := Main[2] + E0
   let E2 : Fin KB := 29 * Main[45]
@@ -84,13 +84,13 @@ section constraints
   let E72 : Fin KB := Main[43] - E71
   let E73 : Fin KB := Main[46] * Main[44]
   let E74 : Fin KB := Main[3] + 4
-  let CS1 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E74, Main[4], Main[5]] 8 E17
+  let CS1 : SP1ConstraintList (Fin KB) := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E74, Main[4], Main[5]] 8 E17
   let E75 : Fin KB := 65280 * Main[44]
   let E76 : Fin KB := Main[43] + E75
   let E77 : Fin KB := 65535 * Main[44]
   let E78 : Fin KB := 65535 * Main[44]
   let E79 : Fin KB := 65535 * Main[44]
-  let CS2 : SP1ConstraintList := ITypeReader.constraints Main[0] E1 #v[Main[3], Main[4], Main[5]] E4 #v[E16, E13, E7, E10] #v[E76, E77, E78, E79] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } E17
+  let CS2 : SP1ConstraintList (Fin KB) := ITypeReader.constraints Main[0] E1 #v[Main[3], Main[4], Main[5]] E4 #v[E16, E13, E7, E10] #v[E76, E77, E78, E79] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } E17
   CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E19),
     (.assertZero E21),

@@ -5,10 +5,10 @@ namespace Jal
 section constraints
 
 -- Generated Lean code for chip JalChip
-@[irreducible] def constraints (Main : Vector (Fin KB) 31) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin KB) 31) : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := Main[30] - 1
   let E1 : Fin KB := Main[30] * E0
-  let CS0 : SP1ConstraintList := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]] { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]
+  let CS0 : SP1ConstraintList (Fin KB) := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]] { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]
   let E2 : Fin KB := Main[22] * 1598029825
   let E3 : Fin KB := Main[1] * 65536
   let E4 : Fin KB := Main[2] + E3
@@ -20,7 +20,7 @@ section constraints
   let E10 : Fin KB := Main[30] - 1
   let E11 : Fin KB := E10 * Main[13]
   let E12 : Fin KB := Main[30] - Main[13]
-  let CS1 : SP1ConstraintList := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0] { value := #v[Main[26], Main[27], Main[28], Main[29]] } E12
+  let CS1 : SP1ConstraintList (Fin KB) := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0] { value := #v[Main[26], Main[27], Main[28], Main[29]] } E12
   let E13 : Fin KB := Main[13] * Main[26]
   let E14 : Fin KB := Main[13] * Main[27]
   let E15 : Fin KB := Main[13] * Main[28]

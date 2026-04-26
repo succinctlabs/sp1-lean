@@ -8,7 +8,7 @@ namespace Branch
 section constraints
 
 -- Generated Lean code for chip BranchChip
-@[irreducible] def constraints (Main : Vector (Fin KB) 45) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin KB) 45) : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := Main[28] - 1
   let E1 : Fin KB := Main[28] * E0
   let E2 : Fin KB := Main[29] - 1
@@ -83,12 +83,12 @@ section constraints
   let E71 : Fin KB := E69 + E70
   let E72 : Fin KB := Main[33] * 32
   let E73 : Fin KB := E71 + E72
-  let CS0 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[25], Main[26], Main[27]] 8 E16
+  let CS0 : SP1ConstraintList (Fin KB) := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[25], Main[26], Main[27]] 8 E16
   let E74 : Fin KB := Main[1] * 65536
   let E75 : Fin KB := Main[2] + E74
-  let CS1 : SP1ConstraintList := ITypeReaderImmutable.constraints Main[0] E75 #v[Main[3], Main[4], Main[5]] E29 #v[E73, E62, E40, E51] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } E16
+  let CS1 : SP1ConstraintList (Fin KB) := ITypeReaderImmutable.constraints Main[0] E75 #v[Main[3], Main[4], Main[5]] E29 #v[E73, E62, E40, E51] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } E16
   let E76 : Fin KB := Main[30] + Main[31]
-  let CS2 : SP1ConstraintList := LtOperationSigned.constraints #v[Main[7], Main[8], Main[9], Main[10]] #v[Main[15], Main[16], Main[17], Main[18]] { result := { u16_compare_operation := { bit := Main[35] }, u16_flags := #v[Main[36], Main[37], Main[38], Main[39]], not_eq_inv := Main[40], comparison_limbs := #v[Main[41], Main[42]] }, b_msb := { msb := Main[43] }, c_msb := { msb := Main[44] } } E76 E16
+  let CS2 : SP1ConstraintList (Fin KB) := LtOperationSigned.constraints #v[Main[7], Main[8], Main[9], Main[10]] #v[Main[15], Main[16], Main[17], Main[18]] { result := { u16_compare_operation := { bit := Main[35] }, u16_flags := #v[Main[36], Main[37], Main[38], Main[39]], not_eq_inv := Main[40], comparison_limbs := #v[Main[41], Main[42]] }, b_msb := { msb := Main[43] }, c_msb := { msb := Main[44] } } E76 E16
   let E77 : Fin KB := Main[36] + Main[37]
   let E78 : Fin KB := E77 + Main[38]
   let E79 : Fin KB := E78 + Main[39]

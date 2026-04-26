@@ -10,7 +10,7 @@ section constraints
   (b : (Word (Fin KB)))
   (cols : SubOperation)
   (is_real : (Fin KB))
-  : SP1ConstraintList :=
+  : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := is_real - 1
   let E1 : Fin KB := is_real * E0
   let E2 : Fin KB := a[0] + 65536

@@ -10,7 +10,7 @@ def is_real : Prop := Main[48] = 1 ∨ Main[49] = 1 ∨ Main[50] = 1
 section constraints
 
 -- Generated Lean code for chip BitwiseChip
-@[irreducible] def constraints (Main : Vector (Fin KB) 51) : SP1ConstraintList :=
+@[irreducible] def constraints (Main : Vector (Fin KB) 51) : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := Main[48] + Main[49]
   let E1 : Fin KB := E0 + Main[50]
   let E2 : Fin KB := Main[48] - 1
@@ -57,10 +57,10 @@ section constraints
   let E43 : Fin KB := E41 - E42
   let ⟨⟨⟨[E44, E45, E46, E47]⟩, _⟩, CS0⟩ := BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } E14 E1
   let E48 : Fin KB := Main[3] + 4
-  let CS1 : SP1ConstraintList := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E48, Main[4], Main[5]] 8 E1
+  let CS1 : SP1ConstraintList (Fin KB) := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E48, Main[4], Main[5]] 8 E1
   let E49 : Fin KB := Main[1] * 65536
   let E50 : Fin KB := Main[2] + E49
-  let CS2 : SP1ConstraintList := ALUTypeReader.constraints Main[0] E50 #v[Main[3], Main[4], Main[5]] E19 #v[E43, E36, E24, E29] #v[E44, E45, E46, E47] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E1
+  let CS2 : SP1ConstraintList (Fin KB) := ALUTypeReader.constraints Main[0] E50 #v[Main[3], Main[4], Main[5]] E19 #v[E43, E36, E24, E29] #v[E44, E45, E46, E47] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E1
   CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E3),
     (.assertZero E5),

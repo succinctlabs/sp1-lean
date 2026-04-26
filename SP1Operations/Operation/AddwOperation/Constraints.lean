@@ -11,7 +11,7 @@ section constraints
   (b : (Word (Fin KB)))
   (cols : AddwOperation)
   (is_real : (Fin KB))
-  : SP1ConstraintList :=
+  : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := is_real - 1
   let E1 : Fin KB := is_real * E0
   let E2 : Fin KB := a[0] + b[0]
@@ -28,7 +28,7 @@ section constraints
   let E13 : Fin KB := E12 - 1
   let E14 : Fin KB := E12 * E13
   let E15 : Fin KB := is_real * E14
-  let CS0 : SP1ConstraintList := U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } is_real
+  let CS0 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } is_real
   CS0 ++ [
     (.assertZero E1),
     (.assertZero E8),

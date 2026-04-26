@@ -9,11 +9,11 @@ section constraints
   (a : (Word (Fin KB)))
   (cols : IsZeroWordOperation)
   (is_real : (Fin KB))
-  : SP1ConstraintList :=
-  let CS0 : SP1ConstraintList := IsZeroOperation.constraints a[0] { inverse := cols.is_zero_limb[0].inverse, result := cols.is_zero_limb[0].result } is_real
-  let CS1 : SP1ConstraintList := IsZeroOperation.constraints a[1] { inverse := cols.is_zero_limb[1].inverse, result := cols.is_zero_limb[1].result } is_real
-  let CS2 : SP1ConstraintList := IsZeroOperation.constraints a[2] { inverse := cols.is_zero_limb[2].inverse, result := cols.is_zero_limb[2].result } is_real
-  let CS3 : SP1ConstraintList := IsZeroOperation.constraints a[3] { inverse := cols.is_zero_limb[3].inverse, result := cols.is_zero_limb[3].result } is_real
+  : SP1ConstraintList (Fin KB) :=
+  let CS0 : SP1ConstraintList (Fin KB) := IsZeroOperation.constraints a[0] { inverse := cols.is_zero_limb[0].inverse, result := cols.is_zero_limb[0].result } is_real
+  let CS1 : SP1ConstraintList (Fin KB) := IsZeroOperation.constraints a[1] { inverse := cols.is_zero_limb[1].inverse, result := cols.is_zero_limb[1].result } is_real
+  let CS2 : SP1ConstraintList (Fin KB) := IsZeroOperation.constraints a[2] { inverse := cols.is_zero_limb[2].inverse, result := cols.is_zero_limb[2].result } is_real
+  let CS3 : SP1ConstraintList (Fin KB) := IsZeroOperation.constraints a[3] { inverse := cols.is_zero_limb[3].inverse, result := cols.is_zero_limb[3].result } is_real
   let E0 : Fin KB := is_real - 1
   let E1 : Fin KB := is_real * E0
   let E2 : Fin KB := cols.result - 1

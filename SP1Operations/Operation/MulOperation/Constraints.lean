@@ -273,10 +273,10 @@ section constraints
   (is_mulw : (Fin KB))
   (is_mulhu : (Fin KB))
   (is_mulhsu : (Fin KB))
-  : SP1ConstraintList :=
+  : SP1ConstraintList (Fin KB) :=
   let ⟨⟨⟨[E0, E1, E2, E3, E4, E5, E6, E7]⟩, _⟩, CS0⟩ := U16toU8OperationSafe.constraints #v[b_word[0], b_word[1], b_word[2], b_word[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } is_real
   let ⟨⟨⟨[E8, E9, E10, E11, E12, E13, E14, E15]⟩, _⟩, CS1⟩ := U16toU8OperationSafe.constraints #v[c_word[0], c_word[1], c_word[2], c_word[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } is_real
-  let CS2 : SP1ConstraintList := U16MSBOperation.constraints a_word[1] { msb := cols.product_msb.msb } is_mulw
+  let CS2 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints a_word[1] { msb := cols.product_msb.msb } is_mulw
   let E16 : Fin KB := is_mulh + is_mulhsu
   let E17 : Fin KB := E16 * cols.b_msb
   let E18 : Fin KB := cols.b_sign_extend - E17

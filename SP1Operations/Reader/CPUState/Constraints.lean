@@ -9,7 +9,7 @@ section constraints
   (next_pc : (Vector (Fin KB) 3))
   (clk_increment : (Fin KB))
   (is_real : (Fin KB))
-  : SP1ConstraintList :=
+  : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := cols.clk_16_24 * 65536
   let E1 : Fin KB := cols.clk_0_16 + E0
   let E2 : Fin KB := is_real - 1

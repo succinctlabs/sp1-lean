@@ -9,7 +9,7 @@ section constraints
   (a : (Fin KB))
   (cols : IsZeroOperation)
   (is_real : (Fin KB))
-  : SP1ConstraintList :=
+  : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := cols.inverse * a
   let E1 : Fin KB := 1 - E0
   let E2 : Fin KB := E1 - cols.result
