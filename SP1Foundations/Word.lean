@@ -498,6 +498,12 @@ def low_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) : HWord (ZMod p) := #v[w[0
 
 lemma isU64_low_isU32 {w : Word (Fin KB)} (hw : w.isU64) : w.low.isU32 := by aesop
 
+/-- Polymorphic counterpart of `Word.isU64_low_isU32`. -/
+lemma isU64_poly_low_poly_isU32_poly {p : ℕ} [NeZero p]
+    {w : Word (ZMod p)} (hw : w.isU64_poly) : w.low_poly.isU32_poly := by
+  have ⟨h0, h1, _, _⟩ := lt_cases_of_isU64_poly hw
+  intro i; fin_cases i <;> simp [low_poly, HWord.isU32_poly] <;> assumption
+
 lemma low_toNat (hw : HWord.isU32 #v[b0, b1]) : (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat = HWord.toNat #v[b0, b1] := by
   rw [Word.toBitVec64_toNat]
   · simp [Word.toNat, HWord.toNat]
@@ -510,6 +516,16 @@ lemma setWidth_eq_low {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     simp [toBitVec64, ← BitVec.toNat_inj, low, Word.toNat, HWord.toBitVec32, HWord.toNat]
     omega
 
+/-- Polymorphic counterpart of `Word.setWidth_eq_low`. -/
+lemma setWidth_eq_low_poly {p : ℕ} [NeZero p]
+    {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
+    BitVec.setWidth 32 w.toBitVec64_poly = w.low_poly.toBitVec32_poly
+  := by
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly h_w_isU64
+    simp [toBitVec64_poly, ← BitVec.toNat_inj, low_poly, Word.toNat_poly,
+          HWord.toBitVec32_poly, HWord.toNat_poly]
+    omega
+
 /-- Obtain the high 32 bits of a `Word` -/
 def high (w : Word (Fin KB)) : HWord (Fin KB) := #v[w[2], w[3]]
 
@@ -518,11 +534,27 @@ def high_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) : HWord (ZMod p) := #v[w[
 
 lemma isU64_high_isU32 {w : Word (Fin KB)} (hw : w.isU64) : w.high.isU32 := by aesop
 
+/-- Polymorphic counterpart of `Word.isU64_high_isU32`. -/
+lemma isU64_poly_high_poly_isU32_poly {p : ℕ} [NeZero p]
+    {w : Word (ZMod p)} (hw : w.isU64_poly) : w.high_poly.isU32_poly := by
+  have ⟨_, _, h2, h3⟩ := lt_cases_of_isU64_poly hw
+  intro i; fin_cases i <;> simp [high_poly, HWord.isU32_poly] <;> assumption
+
 lemma setWidth_rshift_eq_high {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     BitVec.setWidth 32 (w.toBitVec64 >>> 32) = w.high.toBitVec32
   := by
     have ⟨_, _, _, _⟩ := lt_cases_of_isU64 h_w_isU64
     simp_all [toBitVec64, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow, high, Word.toNat, HWord.toBitVec32, HWord.toNat]
+    omega
+
+/-- Polymorphic counterpart of `Word.setWidth_rshift_eq_high`. -/
+lemma setWidth_rshift_eq_high_poly {p : ℕ} [NeZero p]
+    {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
+    BitVec.setWidth 32 (w.toBitVec64_poly >>> 32) = w.high_poly.toBitVec32_poly
+  := by
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly h_w_isU64
+    simp_all [toBitVec64_poly, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow,
+              high_poly, Word.toNat_poly, HWord.toBitVec32_poly, HWord.toNat_poly]
     omega
 
 /-- Convert a `Word` to a `BitVec 64` by shifting and adding the limbs, supplying a proof . -/
