@@ -6,7 +6,7 @@ namespace U16MSBOperation
 
 lemma allHold_constraints_iff
   {a : Fin KB}
-  {cols : U16MSBOperation}
+  {cols : U16MSBOperation (Fin KB)}
   {is_real : Fin KB} :
   List.Forall SP1Constraint.toProp (constraints a cols is_real) ↔
     (is_real = 0 ∨ is_real = 1) ∧
@@ -17,7 +17,7 @@ lemma allHold_constraints_iff
 @[grind →, aesop safe forward]
 lemma spec
   {a : Fin KB}
-  {cols : U16MSBOperation}
+  {cols : U16MSBOperation (Fin KB)}
   (h_a_isU16 : a < 65536) :
   List.Forall SP1Constraint.toProp (constraints a cols 1) →
     cols.msb = if a >= 32768 then 1 else 0
@@ -25,7 +25,7 @@ lemma spec
 
 lemma spec.U64
   {w : Word (Fin KB)}
-  {cols : U16MSBOperation}
+  {cols : U16MSBOperation (Fin KB)}
   (h_w_isU64 : w.isU64) :
   List.Forall SP1Constraint.toProp (constraints w[3] cols 1) →
     cols.msb = if w.isNegative then 1 else 0
@@ -36,7 +36,7 @@ section gen
 
 lemma spec.gen
   {a : Fin KB}
-  {cols : U16MSBOperation}
+  {cols : U16MSBOperation (Fin KB)}
   {is_real : Fin KB}
   (h_a_isU16 : a < 65536) :
   List.Forall SP1Constraint.toProp (constraints a cols is_real) →

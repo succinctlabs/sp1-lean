@@ -8,6 +8,6 @@ import SP1Operations.Operation.U16MSBOperation
     c_lower_byte: U16toU8Operation
     b_msb : Fin KB
     c_msb : Fin KB
-    product_msb : U16MSBOperation
+    product_msb : U16MSBOperation (Fin KB)
     b_sign_extend : Fin KB
     c_sign_extend : Fin KB

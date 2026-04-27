@@ -1,4 +1,4 @@
 import SP1Foundations
 
-structure U16CompareOperation where
-  bit : Fin KB
+structure U16CompareOperation (F : Type*) where
+  bit : F

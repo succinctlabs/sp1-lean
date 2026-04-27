@@ -43,22 +43,28 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Mul", "MulOperation", "Operation"),
     ("Sub", "SubOperation", "Operation"),
     ("Subw", "SubwOperation", "Operation"),
-    ("Mul", "U16MSBOperation", "Operation"),
+    # U16MSBOperation: Sub-phase B.5 cascade (auto-gen hand-edited to be
+    # {F : Type*} [Field F]-parametric).
+    # ("Mul", "U16MSBOperation", "Operation"),
     ("Mul", "U16toU8OperationSafe", "Operation"),
     ("Bitwise", "U16toU8OperationUnsafe", "Operation"),
     ("LoadByte", "AddrAddOperation", "Operation"),
     ("LoadByte", "AddressOperation", "Operation"),
 
     # Compare operations
-    ("DivRem", "IsEqualWordOperation", "Compare"),
-    ("DivRem", "IsZeroWordOperation", "Compare"),
+    # IsEqualWordOperation, IsZeroWordOperation: Sub-phase B.5 cascade
+    # (auto-gen hand-edited to be {F : Type*} [Field F]-parametric).
+    # ("DivRem", "IsEqualWordOperation", "Compare"),
+    # ("DivRem", "IsZeroWordOperation", "Compare"),
     # IsZeroOperation: Sub-phase B.3 pilot (auto-gen hand-edited to be {F : Type*}
     # [Field F]-parametric). Re-add to the regen list once the upstream constraint
     # compiler emits matching parametric output for operation-level constraints.
     # ("DivRem", "IsZeroOperation", "Compare"),
     ("Lt", "LtOperationSigned", "Compare"),
     ("Lt", "LtOperationUnsigned", "Compare"),
-    ("Lt", "U16CompareOperation", "Compare"),
+    # U16CompareOperation: Sub-phase B.5 cascade (auto-gen hand-edited to be
+    # {F : Type*} [Field F]-parametric). See IsZeroOperation note above.
+    # ("Lt", "U16CompareOperation", "Compare"),
 
     # Adapters/readers
     ("Add", "RTypeReader", "Reader"),

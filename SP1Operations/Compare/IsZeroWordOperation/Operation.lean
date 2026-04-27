@@ -1,7 +1,7 @@
 import SP1Operations.Compare.IsZeroOperation
 
-structure IsZeroWordOperation where
-  is_zero_limb : Vector (IsZeroOperation (Fin KB)) 4
-  is_zero_first_half : Fin KB
-  is_zero_second_half : Fin KB
-  result : Fin KB
+structure IsZeroWordOperation (F : Type) where
+  is_zero_limb : Vector (IsZeroOperation F) 4
+  is_zero_first_half : F
+  is_zero_second_half : F
+  result : F

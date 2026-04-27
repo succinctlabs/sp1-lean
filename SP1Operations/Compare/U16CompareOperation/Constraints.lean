@@ -5,19 +5,19 @@ namespace U16CompareOperation
 
 section constraints
 
-@[irreducible] def constraints
-  (a : (Fin KB))
-  (b : (Fin KB))
-  (cols : U16CompareOperation)
-  (is_real : (Fin KB))
-  : SP1ConstraintList (Fin KB) :=
-  let E0 : Fin KB := is_real - 1
-  let E1 : Fin KB := is_real * E0
-  let E2 : Fin KB := cols.bit - 1
-  let E3 : Fin KB := cols.bit * E2
-  let E4 : Fin KB := a - b
-  let E5 : Fin KB := cols.bit * 65536
-  let E6 : Fin KB := E4 + E5
+@[irreducible] def constraints {F : Type*} [Field F]
+  (a : F)
+  (b : F)
+  (cols : U16CompareOperation F)
+  (is_real : F)
+  : SP1ConstraintList F :=
+  let E0 : F := is_real - 1
+  let E1 : F := is_real * E0
+  let E2 : F := cols.bit - 1
+  let E3 : F := cols.bit * E2
+  let E4 : F := a - b
+  let E5 : F := cols.bit * 65536
+  let E6 : F := E4 + E5
   [
     (.assertZero E1),
     (.assertZero E3),
