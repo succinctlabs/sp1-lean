@@ -55,6 +55,8 @@ definitionally and these instances agree with `Fin.instLT` / `Fin.instMod`. -/
 namespace ZMod
 instance instLT (p : ℕ) [NeZero p] : LT (ZMod p) where
   lt x y := x.val < y.val
+instance instLE (p : ℕ) [NeZero p] : LE (ZMod p) where
+  le x y := x.val ≤ y.val
 instance instMod (p : ℕ) [NeZero p] : Mod (ZMod p) where
   mod x y := ((x.val % y.val : ℕ) : ZMod p)
 end ZMod

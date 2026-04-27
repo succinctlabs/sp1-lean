@@ -52,7 +52,10 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     # Compare operations
     ("DivRem", "IsEqualWordOperation", "Compare"),
     ("DivRem", "IsZeroWordOperation", "Compare"),
-    ("DivRem", "IsZeroOperation", "Compare"),
+    # IsZeroOperation: Sub-phase B.3 pilot (auto-gen hand-edited to be {F : Type*}
+    # [Field F]-parametric). Re-add to the regen list once the upstream constraint
+    # compiler emits matching parametric output for operation-level constraints.
+    # ("DivRem", "IsZeroOperation", "Compare"),
     ("Lt", "LtOperationSigned", "Compare"),
     ("Lt", "LtOperationUnsigned", "Compare"),
     ("Lt", "U16CompareOperation", "Compare"),

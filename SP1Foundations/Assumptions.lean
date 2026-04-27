@@ -50,6 +50,52 @@ def b_type_constraints (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 o
 
 end reader_constraints
 
+/-! ### Polymorphic `*_type_constraints_poly` over `ZMod p`
+
+Mirror the `Fin KB` versions above but parametric over a prime field
+`ZMod p`. Used by `Opcode.trusted_instr_poly` and
+`SP1Constraint.toProp_poly`. The existing `Fin KB` versions stay
+load-bearing for chip code; these `_poly` variants exist so the
+operation iff lemmas and the polymorphic `toProp` body can refer to
+generic-field constraints. -/
+section reader_constraints_poly
+
+variable {p : ℕ} [NeZero p]
+
+@[simp] def i_type_constraints_poly
+    (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
+  (imm_b = 0 ∧ imm_c = 1)
+  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
+  ∧ Word.toBitVec64_poly #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0.val)
+
+@[simp] def shift_i_type_constraints_poly
+    (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
+  (imm_b = 0 ∧ imm_c = 1)
+  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
+  ∧ op_c_0 < 2^6 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
+
+@[simp]
+def w_shift_i_type_constraints_poly
+    (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
+  (imm_b = 0 ∧ imm_c = 1)
+  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
+  ∧ op_c_0 < 2^5 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
+
+@[simp] def r_type_constraints_poly
+    (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
+  (imm_b = 0 ∧ imm_c = 0)
+  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
+  ∧ op_c_0 < 32 ∧ op_c_1 = 0 ∧ op_c_2 = 0 ∧ op_c_3 = 0
+
+@[simp]
+def b_type_constraints_poly (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
+  (imm_b = 0 ∧ imm_c = 1)
+  ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
+  ∧ Word.toBitVec64_poly #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 13 op_c_0.val)
+  ∧ (Word.toBitVec64_poly #v[op_c_0, op_c_1, op_c_2, op_c_3] % 4#64 = 0)
+
+end reader_constraints_poly
+
 namespace Opcode
 
 /-- Assumptions we make about the inputs to instructions. -/
@@ -85,6 +131,42 @@ namespace Opcode
       ∧ (imm_c = 1 → w_shift_i_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
   | MUL | MULW | MULH | MULHU | MULHSU | DIV | DIVU | DIVW | DIVUW | REM | REMU | REMW | REMUW =>
       r_type_constraints op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+  | UNIMP | ECALL | EBREAK => True
+
+/-- Polymorphic counterpart of `trusted_instr` over `ZMod p`. Used by
+`SP1Constraint.toProp_poly`. -/
+@[simp] def trusted_instr_poly {p : ℕ} [NeZero p] (opcode : Opcode)
+  (op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
+  match opcode with
+  | ADD | SUB | SUBW =>
+      r_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+  | ADDI | JALR =>
+      i_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+  | AND | OR | XOR | SLT | SLTU | ADDW =>
+      (imm_c = 0 → r_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
+      ∧ (imm_c = 1 → i_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
+  | BEQ | BNE | BLT | BGE | BLTU | BGEU =>
+      b_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+  | SLL | SRL | SRA =>
+      (imm_c = 0 → r_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
+      ∧ (imm_c = 1 → shift_i_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
+  | LUI | AUIPC =>
+      (imm_b = 1 ∧ imm_c = 1)
+      ∧ op_b_0.val % 2 ^ 12 = 0
+      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64_poly #v[op_b_0, op_b_1, op_b_2, op_b_3]
+  | JAL =>
+      (imm_b = 1 ∧ imm_c = 1) ∧
+      Word.toBitVec64_poly #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val * 65536)) ∧
+      (Word.toBitVec64_poly #v[op_b_0, op_b_1, op_b_2, op_b_3]) % 4#64 = 0
+  | LB | LH | LW | LD | LBU | LHU | LWU =>
+      i_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+  | SB | SH | SW | SD =>
+      i_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+  | SLLW | SRLW | SRAW =>
+      (imm_c = 0 → r_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
+      ∧ (imm_c = 1 → w_shift_i_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c)
+  | MUL | MULW | MULH | MULHU | MULHSU | DIV | DIVU | DIVW | DIVUW | REM | REMU | REMW | REMUW =>
+      r_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
   | UNIMP | ECALL | EBREAK => True
 
 end Opcode

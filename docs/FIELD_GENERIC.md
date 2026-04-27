@@ -7,10 +7,201 @@ phase boundary. The implementation roadmap is in
 
 ## Next session pickup
 
-**Status as of 2026-04-27**: Phases 0-5 + Sub-phase A + **Sub-phase B.2
-(syntactic-inverse emission) complete**. Sub-phase B Steps 1-2 (`.val`
-rephrase, parametric Word.lean lift) attempted in earlier session, both
-reverted. `lake build` clean (0 errors, 0 warnings, 8508 jobs).
+**Status as of 2026-04-27**: Phases 0-5 + Sub-phase A + Sub-phase B.2 +
+B.3 + **Sub-phase B.4 (`toProp_poly` foundation + IsZeroOperation
+spec_poly pilot)** complete. Sub-phase B Steps 1-2 (`.val` rephrase,
+parametric Word.lean lift) attempted in earlier session, both reverted.
+`lake build` clean (0 errors, 0 warnings, 8508 jobs).
+
+**What landed in Sub-phase B.4 (this session)**:
+
+- **Additive `_poly` strategy chosen over signature replacement.** The
+  original plan (in `~/.claude/plans/make-a-plan-to-scalable-emerson.md`)
+  proposed lifting `toProp` etc. in place + `_KB` wrappers for chip
+  compatibility. Surface-area scoping showed ~1000 chip-side call sites
+  to `Word.isU64`/`toBitVec64`/`toNat` — the unifier-failure mitigation
+  via `_KB` wrappers would have required churning all of them. Instead,
+  added polymorphic `_poly` companions alongside existing `Fin KB`
+  versions: zero chip-side churn, the polymorphic surface exists for
+  proof reuse, and the existing `Fin KB` instance graph + bridges in
+  `SP1Foundations/Field.lean` stay load-bearing.
+- `SP1Foundations/Field.lean`: added `instance ZMod.instLE (p : ℕ) [NeZero p]`
+  alongside the existing `instLT`/`instMod` — needed for the `b >= 128`
+  clause in `ByteOpcode.constrain`.
+- `SP1Foundations/ByteOpcode.lean`: added `ByteOpcode.constrain_poly` +
+  7 polymorphic `constrain_poly_*` simp iff lemmas under
+  `{p : ℕ} [NeZero p]`.
+- `SP1Foundations/Word.lean`: added `Word.isU64_poly`, `Word.toNat_poly`,
+  `Word.toBitVec64_poly` under `{p : ℕ} [NeZero p]`. Definitions only
+  (no companion lemmas yet) — minimum surface to support `toProp_poly`
+  and `toStateProp_poly`.
+- `SP1Foundations/Assumptions.lean`: added 5 polymorphic
+  `*_type_constraints_poly` (i, shift_i, w_shift_i, r, b) +
+  `Opcode.trusted_instr_poly`.
+- `SP1Foundations/Constraint.lean`: added `SP1Constraint.toProp_poly`,
+  `SP1Constraint.toStateProp_poly`,
+  `SP1ConstraintList.allHold_poly`,
+  `SP1ConstraintList.initialState_poly` over `{p : ℕ} [NeZero p]`.
+  Plus polymorphic simp lemmas `toProp_poly_assertZero`,
+  `toProp_poly_send_byte`. The `toStateProp_poly` clause for memory
+  uses `addr0.val < 32` (Nat-level) rather than `addr0 < 32`
+  (field-level) so the `BitVec.ofNatLT` proof witness is directly
+  available regardless of `p`'s value.
+- `SP1Operations/Compare/IsZeroOperation.lean`: added `spec_poly`
+  alongside the existing `Fin KB` `spec`. Both use
+  `simp [constraints]; grind` and close cleanly. Smoke-tested at
+  `ZMod 7` (a small prime distinct from KB) — elaborates without proof
+  changes.
+- **No call-site changes anywhere.** All 57 chip `correct_*` theorems
+  unchanged. The `_poly` surface is parallel-additive.
+
+**Smoke-test verification** (via `lean_run_code` on the live LSP):
+
+```lean
+example {p : ℕ} [Fact (Nat.Prime p)] [NeZero p] (x : ZMod p) :
+    (SP1Constraint.assertZero x).toProp_poly ↔ x = 0 := by simp
+
+example (x : ZMod 7) : (haveI : Fact (Nat.Prime 7) := ⟨by decide⟩;
+    (SP1Constraint.assertZero x).toProp_poly) ↔ x = 0 := by simp
+```
+
+Both close. `IsZeroOperation.spec_poly` applies at the same shape.
+
+**Outstanding work** (deferred — natural cascade now that the
+foundation is in place):
+
+1. **Cascade `_poly` to remaining 13 operation iff lemmas.** Per the
+   Phase 3 audit (line 412), the candidates are
+   `IsZeroWordOperation`, `IsEqualWordOperation`, `U16CompareOperation`,
+   `BitwiseU16Operation`, `U16MSBOperation`, `LtSigned`, `LtUnsigned`,
+   `Add`, `AddrAdd`, `Addw`, `Sub`, `Subw`, `U16toU8Safe`. Each needs:
+   - Struct lift to `(F : Type*)` mirroring `IsZeroOperation` (B.3
+     pilot).
+   - Auto-gen `Constraints.lean` lift to `{F : Type*} [Field F]`
+     (mirroring `IsZeroOperation/Constraints.lean`).
+   - `_poly` iff lemma + `_poly` spec lemma where present.
+   - Add to `update_constraints.py`'s exclusion list (mirroring the
+     `IsZeroOperation` exclusion at lines 55-58).
+   - The 5 ops using `inv_*BB_eq'` bridges (`Add`, `AddrAdd`, `Addw`,
+     `Sub`, `Subw`, `U16toU8Safe`) need polymorphic bridge equivalents
+     in `Field.lean` — likely via `mul_inv_cancel₀` + `(2^16 : ZMod p) ≠ 0`
+     hypothesis from `[Fact (Nat.Prime p)]` + `Nat.Prime.two_le`.
+2. **Cascade `_poly` to 5 reader iff lemmas.** `RType`, `IType`,
+   `JType`, `ALUType`, `CPUState` — these consume the polymorphic
+   `*_type_constraints_poly` and `trusted_instr_poly` already in place.
+3. **Upstream parametric emission** (cross-repo). The auto-gen
+   `Constraints.lean` currently emits `Fin KB`. To productionalize the
+   `_poly` cascade, change `~/Documents/sp1`'s emitter to take a
+   `field_param: bool` flag and emit `{F : Type*} [Field F]` + `F`-typed
+   locals when set. This is the path to a clean BabyBear instantiation.
+
+**Recommendation**: pick up with item 1 (operation iff lemma cascade).
+The IsZeroOperation pattern is a few lines of mechanical change per
+operation. Start with the bridge-free ones
+(`IsZeroWord`, `IsEqualWord`, `U16Compare`, `BitwiseU16`, `U16MSB`,
+`LtSigned`, `LtUnsigned`) before the bridge-coupled ones (`Add`,
+`Sub`, etc.). Each operation is independent; the cascade can run in
+parallel if useful.
+
+**Cascade recipe per operation** (use IsZeroOperation as the canonical
+template — its files are the diff template):
+
+1. **Struct** (`SP1Operations/<Group>/<Op>/Operation.lean`): change
+   `structure <Op>Operation where … : Fin KB` to
+   `structure <Op>Operation (F : Type*) where … : F`. For composite
+   fields (e.g. `is_zero_limb : Vector (IsZeroOperation (Fin KB)) 4`),
+   propagate to the parameter: `Vector (IsZeroOperation F) 4`.
+2. **Auto-gen `Constraints.lean`**: change the def signature from
+   `(a : Word (Fin KB)) (cols : <Op>Operation) (is_real : Fin KB)
+    : SP1ConstraintList (Fin KB)` to
+   `{F : Type*} [Field F] (a : Word F) (cols : <Op>Operation F)
+    (is_real : F) : SP1ConstraintList F`, retype all `let CSi`/`let Ei`
+   bindings from `Fin KB` to `F`, and update the constructor calls
+   (`{ inverse := … }` etc.) to use the parametric struct fields.
+3. **Iff lemma** (`SP1Operations/<Group>/<Op>Operation.lean`): add a
+   `<lemma>_poly` variant alongside the existing `Fin KB` version,
+   parameterized over `{p : ℕ} [Fact (Nat.Prime p)] [NeZero p]` with
+   types switched to `ZMod p`. Replace `SP1Constraint.toProp` with
+   `SP1Constraint.toProp_poly` in the hypothesis. Keep the proof body
+   identical; the same `simp [constraints]; grind` (or
+   `simp [constraints]; intros; subst_vars; grind` for `.gen` forms —
+   see `feedback_grind_ring_finkb.md`) closes it.
+4. **`update_constraints.py` exclusion**: comment out the operation's
+   row in the regen list (lines 55-58 region) with a note pointing to
+   this doc. Ensures future regens preserve the parametric form.
+
+**Bridge-coupled operations** (`Add`, `Sub`, `Addw`, `Subw`,
+`AddrAdd`, `U16toU8Safe`): the iff lemma's RHS uses literals
+like `(2^16 : Fin KB)⁻¹` (now `((65536 : Fin KB)⁻¹)` post-B.2). The
+poly variant's RHS would have `((65536 : ZMod p)⁻¹)`. The proof
+needs `(65536 : ZMod p) ≠ 0` — derivable from `[Fact (Nat.Prime p)]`
+when `p > 65536`. Add a polymorphic bridge near `Field.lean`'s
+existing `inv_*BB_eq'` lemmas:
+
+```lean
+lemma inv_16_eq_inv_65536 {p : ℕ} [Fact (Nat.Prime p)] [hp : Fact (65536 < p)]
+    : ((1/65536 : ZMod p) : ZMod p) = (65536 : ZMod p)⁻¹ := by
+  rw [one_div]
+```
+
+(Or whatever shape the proofs actually need; investigate at the first
+bridge-coupled operation.) The `[Fact (65536 < p)]` hypothesis is
+synthesized at `p := KB` since `65536 < KB = 2130706433` decides; for
+BabyBear etc. the same fact decides on the concrete prime.
+
+**What landed in Sub-phase B.3 (IsZeroOperation pilot, Lean side)**:
+
+- `SP1Operations/Compare/IsZeroOperation/Operation.lean`: struct lifted to
+  `structure IsZeroOperation (F : Type*) where inverse : F; result : F`.
+- `SP1Operations/Compare/IsZeroOperation/Constraints.lean` (auto-gen):
+  `constraints` def lifted to `{F : Type*} [Field F]` with all locals retyped
+  `F`.
+- `SP1Operations/Compare/IsZeroOperation.lean`: `spec` iff lemma kept at
+  `Fin KB` (see "B.3 partial — iff-lemma blocker" below).
+- `SP1Operations/Compare/IsZeroWordOperation/Operation.lean`: pinned the
+  embedded struct to `Vector (IsZeroOperation (Fin KB)) 4` (one-line change).
+- `update_constraints.py`: removed `IsZeroOperation` from the regen list (with
+  a comment explaining the manual generic state) so the pilot survives
+  future regens until upstream emits parametric output.
+
+**B.3 partial — iff-lemma blocker.** Lifting `IsZeroOperation.spec` to
+`{F : Type*} [Field F]` failed at elaboration with "argument `a` has type
+`F` but expected `Fin 2130706433`". Root cause: the iff lemma uses
+`List.Forall SP1Constraint.toProp (constraints a cols 1)`, and
+`SP1Constraint.toProp : SP1Constraint (Fin KB) → Prop` is still
+KB-instantiated by Phase 1 design (`SP1Foundations/Constraint.lean:41`).
+That fixes the constraint list type to `Fin KB`, which in turn fixes the
+operation `constraints` call's `F := Fin KB`, which mismatches `a : F`.
+**Implication**: lifting iff lemmas requires lifting `toProp` /
+`toStateProp` first. That pulls in:
+
+- `Word.isU64` (parametric Word.lean lift, blocked on dot-notation
+  unification — see "Sub-phase B — Step 1/2 attempt" below).
+- `Opcode.trusted_instr` (currently `Fin KB`-typed).
+- `ByteOpcode.constrain` (currently `Fin KB`-typed).
+- `< 32` / `< 65536` / `% 4 = 0` literal comparisons (the ad-hoc
+  `LT (ZMod p)` / `Mod (ZMod p)` instances landed in Sub-phase B Step 1/2
+  cover these for `ZMod p`; for generic `[Field F]` they need typeclass
+  extras).
+
+Recommendation: the IsZeroOperation pilot demonstrated that the auto-gen
+`constraints` def + struct can be made parametric without disturbing
+chip proofs (the `IsZeroWordOperation` consumer pins `F := Fin KB` and
+DivRemChip — which uses IsZero/IsZeroWord deeply — built clean). To
+productionalize, the next two milestones are:
+
+1. **Upstream parametric emission** (cross-repo, mirrors Sub-phase A and
+   B.2): change `~/Documents/sp1`'s operation-level Lean emitter
+   (`crates/core/compiler/src/main.rs:172` + `crates/core/compiler/src/ir/ast.rs:454-685, 921-1142`)
+   to emit `{F : Type*} [Field F]` parameter and `F`-typed args/locals.
+   This propagates to all operation structs at once, so it should be
+   coupled with cascading the struct lift to all 19 operations
+   (per `Phase 3 audit` table).
+2. **`toProp` / `toStateProp` lift** to enable iff-lemma genericization.
+   Bigger surface — pulls in `Word.isU64`, `Opcode.trusted_instr`,
+   `ByteOpcode.constrain`. Either uses the ad-hoc `ZMod p`
+   `LT`/`Mod` instances (Sub-phase B Step 1/2 landed these) or introduces
+   a typeclass for `.val : F → ℕ` projection.
 
 **What landed in Sub-phase B.2** (the focus of this session):
 

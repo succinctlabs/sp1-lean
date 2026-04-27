@@ -75,6 +75,51 @@ def constrain (op : ByteOpcode) (a b c : Fin KB) : Prop :=
 
 end constrain
 
+/-! ### Polymorphic `constrain_poly` over `ZMod p`
+
+Mirrors `constrain` (Fin KB) above but takes `ZMod p` parameters under
+`[NeZero p]`. The two are propositionally equal at `p := KB` via
+`ZMod KB = Fin KB` definitional equality. Used by `SP1Constraint.toProp_poly`
+for sub-phase B.4 of the field-genericization effort
+(`docs/FIELD_GENERIC.md`); the existing `Fin KB` version stays load-bearing
+for chip code that calls `op.constrain` on `Fin KB`-typed terms. -/
+section constrain_poly
+
+variable {p : ℕ} [NeZero p]
+
+def constrain_poly (op : ByteOpcode) (a b c : ZMod p) : Prop :=
+  match op with
+  | AND => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val &&& c.val
+  | OR  => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val ||| c.val
+  | XOR => (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val ^^^ c.val
+  | U8Range => a < 256 ∧ b < 256 ∧ c < 256
+  | LTU => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c)
+  | Range => a.val < 2 ^ b.val
+  | MSB => (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 128)
+
+@[simp] lemma constrain_poly_AND (a b c : ZMod p) :
+    ByteOpcode.AND.constrain_poly a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val &&& c.val := Iff.rfl
+
+@[simp] lemma constrain_poly_OR (a b c : ZMod p) :
+    ByteOpcode.OR.constrain_poly a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val ||| c.val := Iff.rfl
+
+@[simp] lemma constrain_poly_XOR (a b c : ZMod p) :
+    ByteOpcode.XOR.constrain_poly a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ a.val = b.val ^^^ c.val := Iff.rfl
+
+@[simp] lemma constrain_poly_U8Range (a b c : ZMod p) :
+    ByteOpcode.U8Range.constrain_poly a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) := Iff.rfl
+
+@[simp] lemma constrain_poly_LTU (a b c : ZMod p) :
+    ByteOpcode.LTU.constrain_poly a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b < c) := Iff.rfl
+
+@[simp] lemma constrain_poly_MSB (a b c : ZMod p) :
+    ByteOpcode.MSB.constrain_poly a b c ↔ (a < 256 ∧ b < 256 ∧ c < 256) ∧ (a = 0 ∨ a = 1) ∧ (a = 1 ↔ b >= 128) := Iff.rfl
+
+@[simp] lemma constrain_poly_Range (a b c : ZMod p) :
+    ByteOpcode.Range.constrain_poly a b c ↔ (a.val < 2 ^ b.val) := Iff.rfl
+
+end constrain_poly
+
 /-- Perform induction on `ByteOpcode` with all the non-bitwise operations consolidated.
 Useful when you want to ignore non-bitwise operations (or treat them as some defualt). -/
 @[elab_as_elim]

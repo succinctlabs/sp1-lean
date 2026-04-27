@@ -199,6 +199,15 @@ section U64
 /-- `isU64 w` means that each limb of the `Word` is properly bounded. -/
 def isU64 (w : Word (Fin KB)) : Prop := ∀ i : Fin WORD_SIZE, w[i].val < 2 ^ 16
 
+/-- Polymorphic counterpart of `Word.isU64` over `Word (ZMod p)`. Used by
+`SP1Constraint.toProp_poly` (sub-phase B.4 of the field-genericization
+effort, `docs/FIELD_GENERIC.md`). The Fin-KB-typed `isU64` above is kept
+load-bearing for the ~50 internal Word.lean lemmas that the 2026-04-26
+parametric lift attempt revealed. At `p := KB`, `ZMod KB = Fin KB`
+definitionally, so `isU64_poly` and `isU64` agree on the same value. -/
+def isU64_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) : Prop :=
+  ∀ i : Fin WORD_SIZE, w[i].val < 2 ^ 16
+
 @[aesop unsafe apply]
 lemma isU64_of_cases {w : Word (Fin KB)}
     (h0 : w[0].val < 2 ^ 16) (h1 : w[1].val < 2 ^ 16)
@@ -231,6 +240,14 @@ def toNat (w : Word (Fin KB)) : ℕ := toNat_aux.1 w --w[0] + w[1] * 2 ^ 16 + w[
 -- /-- Convert a `Word` to a `Nat` by shifting and adding the limbs. -/
 -- def toNat (w : Word (Fin KB)) : ℕ := w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48
 
+/-- Polymorphic counterpart of `Word.toNat` over `Word (ZMod p)`. Companion
+to `isU64_poly`; used by `SP1Constraint.toStateProp_poly`. Defined
+directly (without the `toNat_aux` opaque wrapper) since the polymorphic
+proof obligations live at the operation iff layer, where the unfolded
+form is preferred. -/
+def toNat_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) : ℕ :=
+  w[0].val + w[1].val * 2 ^ 16 + w[2].val * 2 ^ 32 + w[3].val * 2 ^ 48
+
 @[aesop unsafe forward]
 lemma toNat_def (w : Word (Fin KB)) : w.toNat = w[0] + w[1] * 2 ^ 16 + w[2] * 2 ^ 32 + w[3] * 2 ^ 48 :=
   toNat_aux.2 w
@@ -260,6 +277,11 @@ lemma toNat_reconstruct {w : Word (Fin KB)} {x : ℕ} (is64_w : Word.isU64 w) :
 
 /-- Convert a `Word` to a `BitVec 64` by shifting and adding the limbs. -/
 def toBitVec64 (w : Word (Fin KB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
+
+/-- Polymorphic counterpart of `Word.toBitVec64` over `Word (ZMod p)`.
+Companion to `toNat_poly`; used by `SP1Constraint.toStateProp_poly`. -/
+def toBitVec64_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) : BitVec 64 :=
+  BitVec.ofNat 64 (toNat_poly w)
 
 lemma toBitVec64_toNat {w : Word (Fin KB)} (hw : w.isU64) :
     w.toBitVec64.toNat = w.toNat := by
