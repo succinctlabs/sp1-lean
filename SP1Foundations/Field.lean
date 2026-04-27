@@ -96,65 +96,48 @@ end KoalaBear
 lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
     a * (b - c) = 1 → b ≠ c := by aesop
 
-/-! ### KB ↔ generic-form bridges
+/-! ### KB-specific simp lemmas operating on the symbolic `(N : Fin KB)⁻¹` form
 
-Lemmas below are KB-specific because the LHS is a concrete numeric literal
-that equals `(2^k)⁻¹` mod KB. They translate the SP1 constraint compiler's
-literal output into the `Field`-generic `(2^k : F)⁻¹` form that operation
-lemmas state their RHS in. Naming convention: `<op>_<2^k>BB[_eq[_one[_iff[']]]]`
-where `BB` is short for "BabyBear-class small prime" (a misnomer kept for
-historical reasons; KB is KoalaBear, not BabyBear).
+The constraint compiler now emits inverses symbolically (e.g. `(65536 : Fin KB)⁻¹`
+instead of the literal `2130673921`). These lemmas help simp/omega/norm_num
+reduce expressions involving those symbolic inverses. The earlier
+literal-side bridges (`inv_*BB_eq[']`, `shiftl_*BB_eq_one`, etc.) were
+removed when sub-phase B.2 landed — see `docs/FIELD_GENERIC.md`. Naming
+convention: `<op>_<N>BB` where `BB` is short for "BabyBear-class small prime"
+(historical misnomer kept in place; KB is KoalaBear, not BabyBear).
 -/
 
-@[simp] lemma shiftl_2BB_eq_one : (1598029825 : Fin KB) <<< 2 = 1 := rfl
-@[simp] lemma shiftl_3BB_eq_one : (1864368129 : Fin KB) <<< 3 = 1 := rfl
-@[simp] lemma shiftl_8BB_eq_one : (2122383361 : Fin KB) <<< 8 = 1 := rfl
-@[simp] lemma shiftl_16BB_eq_one : (2130673921 : Fin KB) <<< 16 = 1 := rfl
+-- Symbolic↔literal Fin KB bridges, with literal on the LHS (so `← `-rewrites
+-- normalize symbolic `(N : Fin KB)⁻¹` back to its precomputed Fin KB literal
+-- — needed for omega/Fin-arithmetic proofs that expect ground constants).
+-- NOT `@[simp]`: they're invoked explicitly in proofs that need omega to see
+-- concrete numbers, typically via `simp only [← inv_*BB_eq'] at h ...`.
+lemma inv_4BB_eq' : (1598029825 : Fin KB) = ((4 : Fin KB)⁻¹) := rfl
+lemma inv_8BB_eq' : (1864368129 : Fin KB) = ((8 : Fin KB)⁻¹) := rfl
+lemma inv_256BB_eq' : (2122383361 : Fin KB) = ((256 : Fin KB)⁻¹) := rfl
+lemma inv_65536BB_eq' : (2130673921 : Fin KB) = ((65536 : Fin KB)⁻¹) := rfl
 
-lemma inv_2BB_eq : (1598029825 : Fin KB)⁻¹ = 4 := inv_eq_of_mul_eq_one_right (by rfl)
-lemma inv_3BB_eq : (1864368129 : Fin KB)⁻¹ = 8 := inv_eq_of_mul_eq_one_right (by rfl)
-lemma inv_8BB_eq : (2122383361 : Fin KB)⁻¹ = 256 := inv_eq_of_mul_eq_one_right (by rfl)
-lemma inv_16BB_eq : (2130673921 : Fin KB)⁻¹ = 65536 := inv_eq_of_mul_eq_one_right (by rfl)
-
-lemma inv_2BB_eq' : (1598029825 : Fin KB) = 4⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
-lemma inv_3BB_eq' : (1864368129 : Fin KB) = 8⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
-lemma inv_8BB_eq' : (2122383361 : Fin KB) = 256⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
-lemma inv_16BB_eq' : (2130673921 : Fin KB) = 65536⁻¹ := eq_inv_of_mul_eq_one_left (by rfl)
-
-@[simp] lemma inv_mul_2BB_eq_one : (1598029825 : Fin KB) * 4 = 1 := by rfl
-@[simp] lemma inv_mul_3BB_eq_one : (1864368129 : Fin KB) * 8 = 1 := by rfl
-@[simp] lemma inv_mul_8BB_eq_one : (2122383361 : Fin KB) * 256 = 1 := by rfl
-@[simp] lemma inv_mul_16BB_eq_one : (2130673921 : Fin KB) * 65536 = 1 := by rfl
-
-@[simp] lemma mul_inv_2BB_eq_one : 4 * (1598029825 : Fin KB) = 1 := by rfl
-@[simp] lemma mul_inv_3BB_eq_one : 8 * (1864368129 : Fin KB) = 1 := by rfl
-@[simp] lemma mul_inv_8BB_eq_one : 256 * (2122383361 : Fin KB) = 1 := by rfl
-@[simp] lemma mul_inv_16BB_eq_one : 65536 * (2130673921 : Fin KB) = 1 := by rfl
-
-@[simp] lemma inv_mul_2BB_eq_iff : (1598029825 : Fin KB) * x = 1 ↔ x = 4 := by
-  rw [inv_2BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
-@[simp] lemma inv_mul_3BB_eq_iff : (1864368129 : Fin KB) * x = 1 ↔ x = 8 := by
-  rw [inv_3BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
-@[simp] lemma inv_mul_8BB_eq_iff : (2122383361 : Fin KB) * x = 1 ↔ x = 256 := by
-  rw [inv_8BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
-@[simp] lemma inv_mul_16BB_eq_iff : (2130673921 : Fin KB) * x = 1 ↔ x = 65536 := by
-  rw [inv_16BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
-
-@[simp] lemma inv_mul_2BB_eq_iff' : x * (1598029825 : Fin KB) = 1 ↔ x = 4 := by
-  rw [mul_comm, inv_mul_2BB_eq_iff]
-@[simp] lemma inv_mul_3BB_eq_iff' : x * (1864368129 : Fin KB) = 1 ↔ x = 8 := by
-  rw [mul_comm, inv_mul_3BB_eq_iff]
-@[simp] lemma inv_mul_8BB_eq_iff' : x * (2122383361 : Fin KB) = 1 ↔ x = 256 := by
-  rw [mul_comm, inv_mul_8BB_eq_iff]
-@[simp] lemma inv_mul_16BB_eq_iff' : x * (2130673921 : Fin KB) = 1 ↔ x = 65536 := by
-  rw [mul_comm, inv_mul_16BB_eq_iff]
-
--- dt: remaining versions of these
 @[simp] lemma mul_inv_16BB_eq_one_iff : x * (65536 : Fin KB)⁻¹ = 1 ↔ x = 65536 := by
   rw [mul_inv_eq_one₀ (by trivial)]
 
 @[simp] lemma inv_16BB_zero_or_one {x : Fin KB} : x * 65536⁻¹ = 0 ∨ x * 65536⁻¹ = 1 ↔ x = 0 ∨ x = 65536
   := by aesop
+
+-- Literal-side @[simp] iff bridges. These were originally planned for
+-- deletion when sub-phase B.2 landed, but several chip proofs (Sub*, Branch,
+-- LoadByte) rely on omega's ability to reason about a chain of
+-- `* (literal : Fin KB)` operations. Without these, simp leaves the chain
+-- in `* 65536⁻¹` form and omega gives up. We keep them as `@[simp]`,
+-- preceded by an explicit `← inv_*BB_eq'` rewrite in the proof, so the
+-- literal form is available exactly where it's needed.
+@[simp] lemma inv_mul_2BB_eq_iff' : x * (1598029825 : Fin KB) = 1 ↔ x = 4 := by
+  rw [show (1598029825 : Fin KB) = (4 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
+@[simp] lemma inv_mul_3BB_eq_iff' : x * (1864368129 : Fin KB) = 1 ↔ x = 8 := by
+  rw [show (1864368129 : Fin KB) = (8 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
+@[simp] lemma inv_mul_8BB_eq_iff' : x * (2122383361 : Fin KB) = 1 ↔ x = 256 := by
+  rw [show (2122383361 : Fin KB) = (256 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
+@[simp] lemma inv_mul_16BB_eq_iff' : x * (2130673921 : Fin KB) = 1 ↔ x = 65536 := by
+  rw [show (2130673921 : Fin KB) = (65536 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
 
 /-! ### Integer helpers (not field-related; lives here for historical reasons) -/
 

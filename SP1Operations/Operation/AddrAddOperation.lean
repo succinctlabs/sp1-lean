@@ -17,7 +17,7 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddrAddOperation) :
       (cols.value[0].val < 65536) ∧
       (cols.value[1].val < 65536) ∧
       (cols.value[2].val < 65536) := by
-  simp [constraints, sub_eq_zero, inv_16BB_eq']
+  simp [constraints, sub_eq_zero]
 
 theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fin KB)
     (h_is_real : is_real = 1)
@@ -28,7 +28,6 @@ theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fi
       simp [SP1ConstraintList.allHold, h_is_real] at cstrs
       simp only [allHold_constraints_iff a b cols] at cstrs
       obtain ⟨h0, h1, h2, h3, hbd0, hbd1, hbd2⟩ := cstrs
-      simp [← inv_16BB_eq'] at *
       have ha' := Word.lt_cases_of_isU64 ha
       have hb' := Word.lt_cases_of_isU64 hb
       simp at ha' hb'
@@ -59,7 +58,6 @@ theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real
       simp [SP1ConstraintList.allHold, h_is_real] at cstrs
       simp [allHold_constraints_iff a b cols] at cstrs
       obtain ⟨h0, h1, h2, h3, hbd0, hbd1, hbd2⟩ := cstrs
-      simp [← inv_16BB_eq'] at *
       have ha' := Word.lt_cases_of_isU64 ha
       have hb' := Word.lt_cases_of_isU64 hb
       simp at ha' hb'

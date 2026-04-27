@@ -16,7 +16,7 @@ section constraints
   let E3 : Fin KB := is_real * E2
   let E4 : Fin KB := E1 + clk_increment
   let E5 : Fin KB := cols.clk_0_16 - 1
-  let E6 : Fin KB := E5 * 1864368129
+  let E6 : Fin KB := E5 * ((8 : Fin KB)⁻¹)
   [
     (.assertZero E3),
     (.receive (.state cols.clk_high E1 cols.pc[0] cols.pc[1] cols.pc[2]) is_real),

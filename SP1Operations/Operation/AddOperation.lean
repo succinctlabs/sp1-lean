@@ -19,7 +19,7 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddOperation) :
       (cols.value[1].val < 65536) ∧
       (cols.value[2].val < 65536) ∧
       (cols.value[3].val < 65536) := by
-  simp [constraints, sub_eq_zero, inv_16BB_eq']
+  simp [constraints, sub_eq_zero]
 
 set_option maxHeartbeats 1000000 in
 

@@ -7,10 +7,64 @@ phase boundary. The implementation roadmap is in
 
 ## Next session pickup
 
-**Status as of 2026-04-26**: Phases 0-5 + Sub-phase A complete + sub-phase B
-**partial: ad-hoc instances landed**. Sub-phase B Steps 1-2 attempted with
-key empirical findings (see "Sub-phase B — Step 1/2 attempt" below). `lake
-build` clean.
+**Status as of 2026-04-27**: Phases 0-5 + Sub-phase A + **Sub-phase B.2
+(syntactic-inverse emission) complete**. Sub-phase B Steps 1-2 (`.val`
+rephrase, parametric Word.lean lift) attempted in earlier session, both
+reverted. `lake build` clean (0 errors, 0 warnings, 8508 jobs).
+
+**What landed in Sub-phase B.2** (the focus of this session):
+
+- **Upstream constraint compiler now emits `((N : Fin KB)⁻¹)` instead of
+  the precomputed numeric inverse** — e.g. `* ((65536 : Fin KB)⁻¹)` instead
+  of `* 2130673921`. Same for the four KB inverse literals (`(2^k)⁻¹` at
+  `k ∈ {2, 3, 8, 16}`).
+  - `crates/hypercube/src/ir/var.rs`: added `IrVar::InverseConstant
+    { base: u32, value: F }` variant + Display + `to_lean`.
+  - `crates/hypercube/src/ir/expr.rs`: added `to_lean_string` case.
+  - `crates/hypercube/src/ir/expr_impl.rs`: `From<F> for Expr` checks if
+    the field value is one of the four known KB inverse literals; if so,
+    tags it as `InverseConstant`. The optimizer keeps seeing the eagerly
+    computed numeric value; only the Lean output changes.
+  - `crates/core/compiler/src/ir/ast.rs`: mirrored variant in the parallel
+    AST tree (per Sub-phase A, both trees stay in sync).
+- **48 auto-gen `*/Constraints.lean` files regenerated.** Diff is uniform:
+  `* 2130673921` → `* ((65536 : Fin KB)⁻¹)` (and analogues for 4/8/256).
+- **Hand-written iff lemmas migrated to symbolic form**: Reader files
+  (`{RType,ALUType,IType,JType}Reader.lean`, `CPUState.lean`),
+  `U16toU8OperationSafe.lean` (kept BV-level decomposition lemmas with
+  literal `2122383361` since they prove the inverse value at the BitVec
+  layer), and the Load{Byte,Half,Word,Double}/Constraints iff RHSes.
+- **Chip proofs migrated**: `BranchChip` (12 `rw [← inv_2BB_eq']` calls
+  removed; the `close_branch_addr_eq` macro and inline `simp + omega`
+  patterns now apply `simp only [← inv_*BB_eq'] at <hyps>` to convert
+  symbolic inverses back to literals before omega), `JalrChip` (literal
+  `1598029825` references rewritten to `(4 : Fin KB)⁻¹`,
+  `inv_mul_2BB_eq_one` replaced with `inv_mul_cancel₀`), `LoadByteChip`
+  (30 occurrences of `2122383361` rewritten to `(256 : Fin KB)⁻¹`).
+- **`SP1Foundations/Field.lean` bridges trimmed but not fully removed.**
+  Original plan was "delete literal-side bridges, keep symbolic-side simp
+  lemmas". In practice, the literal-side `inv_mul_*BB_eq_iff'` family
+  (4 lemmas) had to stay `@[simp]` because chip omega proofs need to
+  reason about `* (literal : Fin KB) = 1 ↔ ... = 65536` after the
+  `← inv_*BB_eq'` symbolic→literal rewrite step. Other literal-side
+  bridges (`shiftl_*BB_eq_one`, `inv_mul_*BB_eq_one`, `inv_mul_*BB_eq_iff`,
+  `mul_inv_*BB_eq_one`, `inv_*BB_eq`, `inv_*BB_eq[']` for non-16BB) are
+  gone. The `inv_*BB_eq'` family is renamed to `inv_*BB_eq'` with the
+  same `(literal : Fin KB) = (N : Fin KB)⁻¹` shape (NOT `@[simp]`;
+  invoked explicitly via `← inv_*BB_eq'` in proofs).
+- **Symbolic-side `@[simp]` lemmas kept**: `mul_inv_16BB_eq_one_iff`,
+  `inv_16BB_zero_or_one` (operate on `* (65536)⁻¹` form).
+
+**End state**: zero hand-written occurrences of the four inverse literals
+outside `SP1Foundations/Field.lean` (where they appear in the bridge
+lemma bodies) and `SP1Operations/Operation/U16toU8OperationSafe.lean` (BV
+decomposition lemmas, internal). Auto-gen produces `((N : Fin KB)⁻¹)`
+syntactically. Switching to a different prime field would now only
+require new bridge lemmas matching the new prime's inverse values; the
+auto-gen output is unchanged at the Lean source level.
+
+**Earlier sub-phase B notes** (preserved below for context but superseded
+by the B.2 work above):
 
 **Concrete sub-phase B progress this session**:
 

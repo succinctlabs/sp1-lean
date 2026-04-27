@@ -32,7 +32,7 @@ section constraints
   let E13 : Fin KB := 2 * offset_bit1
   let E14 : Fin KB := E12 - E13
   let E15 : Fin KB := E14 - offset_bit0
-  let E16 : Fin KB := E15 * 1864368129
+  let E16 : Fin KB := E15 * ((8 : Fin KB)⁻¹)
   let E17 : Fin KB := 4 * offset_bit2
   let E18 : Fin KB := cols.addr_operation.value[0] - E17
   let E19 : Fin KB := 2 * offset_bit1

@@ -34,21 +34,21 @@ section constraints
   let E15 : Fin KB := E12 - cols.op_a_memory.access_timestamp.prev_low
   let E16 : Fin KB := E15 - 1
   let E17 : Fin KB := E16 - cols.op_a_memory.access_timestamp.diff_low_limb
-  let E18 : Fin KB := E17 * 2130673921
+  let E18 : Fin KB := E17 * ((65536 : Fin KB)⁻¹)
   let E19 : Fin KB := clk_low + 3
   let E20 : Fin KB := is_real - 1
   let E21 : Fin KB := is_real * E20
   let E22 : Fin KB := E19 - cols.op_b_memory.access_timestamp.prev_low
   let E23 : Fin KB := E22 - 1
   let E24 : Fin KB := E23 - cols.op_b_memory.access_timestamp.diff_low_limb
-  let E25 : Fin KB := E24 * 2130673921
+  let E25 : Fin KB := E24 * ((65536 : Fin KB)⁻¹)
   let E26 : Fin KB := clk_low + 2
   let E27 : Fin KB := is_real - 1
   let E28 : Fin KB := is_real * E27
   let E29 : Fin KB := E26 - cols.op_c_memory.access_timestamp.prev_low
   let E30 : Fin KB := E29 - 1
   let E31 : Fin KB := E30 - cols.op_c_memory.access_timestamp.diff_low_limb
-  let E32 : Fin KB := E31 * 2130673921
+  let E32 : Fin KB := E31 * ((65536 : Fin KB)⁻¹)
   [
     (.assertZero E1),
     (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E2 0 0 0 E3 0 0 0 cols.op_a_0 0 0) is_real),

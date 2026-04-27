@@ -76,7 +76,7 @@ section constraints
   let E64 : Fin KB := Main[40] * E63
   let E65 : Fin KB := Main[39] * E64
   let E66 : Fin KB := Main[41] - Main[42]
-  let E67 : Fin KB := E66 * 2122383361
+  let E67 : Fin KB := E66 * ((256 : Fin KB)⁻¹)
   let E68 : Fin KB := Main[38] * E67
   let E69 : Fin KB := 1 - Main[38]
   let E70 : Fin KB := E69 * Main[42]
@@ -130,7 +130,7 @@ lemma allHold_constraints_iff_of_is_lb (h_is_lb : is_lb Main) :
     (Main[39] = 0 ∨ Main[39] = 1) ∧
     (Main[40] = 0 ∨ Main[40] = 1) ∧
     Main[28] * (Main[26] + Main[27]) = 1 ∧
-    ↑((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * 1864368129) < 8192 ∧
+    ↑((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * (8 : Fin KB)⁻¹) < 8192 ∧
     List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
@@ -162,8 +162,8 @@ lemma allHold_constraints_iff_of_is_lb (h_is_lb : is_lb Main) :
     (Main[39] = 0 ∨ Main[40] = 1 ∨ Main[41] = Main[30]) ∧
     (Main[39] = 1 ∨ Main[40] = 0 ∨ Main[41] = Main[31]) ∧
     (Main[39] = 0 ∨ Main[40] = 0 ∨ Main[41] = Main[32]) ∧
-    (Main[42] < 256 ∧ (Main[41] - Main[42]) * 2122383361 < 256) ∧
-    Main[43] = Main[38] * ((Main[41] - Main[42]) * 2122383361) + (1 - Main[38]) * Main[42] ∧
+    (Main[42] < 256 ∧ (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ < 256) ∧
+    Main[43] = Main[38] * ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹) + (1 - Main[38]) * Main[42] ∧
     (Main[44] < 256 ∧ Main[43] < 256) ∧
     (Main[44] = 0 ∨ Main[44] = 1) ∧
     (Main[44] = 1 ↔ (128 : Fin KB) ≤ Main[43])) := by
@@ -184,7 +184,7 @@ lemma allHold_constraints_iff_of_is_lbu (h_is_lbu : is_lbu Main) :
     (Main[39] = 0 ∨ Main[39] = 1) ∧
     (Main[40] = 0 ∨ Main[40] = 1) ∧
     Main[28] * (Main[26] + Main[27]) = 1 ∧
-    ↑((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * 1864368129) < 8192 ∧
+    ↑((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * (8 : Fin KB)⁻¹) < 8192 ∧
     List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
@@ -216,8 +216,8 @@ lemma allHold_constraints_iff_of_is_lbu (h_is_lbu : is_lbu Main) :
     (Main[39] = 0 ∨ Main[40] = 1 ∨ Main[41] = Main[30]) ∧
     (Main[39] = 1 ∨ Main[40] = 0 ∨ Main[41] = Main[31]) ∧
     (Main[39] = 0 ∨ Main[40] = 0 ∨ Main[41] = Main[32]) ∧
-    (Main[42] < 256 ∧ (Main[41] - Main[42]) * 2122383361 < 256) ∧
-    Main[43] = Main[38] * ((Main[41] - Main[42]) * 2122383361) + (1 - Main[38]) * Main[42] ∧
+    (Main[42] < 256 ∧ (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ < 256) ∧
+    Main[43] = Main[38] * ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹) + (1 - Main[38]) * Main[42] ∧
     (Main[44] = 0)) := by
   have : Main[46] = 1 := h_is_lbu
   by_cases h45 : Main[45] = 0

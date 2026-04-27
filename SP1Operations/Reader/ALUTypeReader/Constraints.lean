@@ -37,14 +37,14 @@ section constraints
   let E17 : Fin KB := E14 - cols.op_a_memory.access_timestamp.prev_low
   let E18 : Fin KB := E17 - 1
   let E19 : Fin KB := E18 - cols.op_a_memory.access_timestamp.diff_low_limb
-  let E20 : Fin KB := E19 * 2130673921
+  let E20 : Fin KB := E19 * ((65536 : Fin KB)⁻¹)
   let E21 : Fin KB := clk_low + 3
   let E22 : Fin KB := is_real - 1
   let E23 : Fin KB := is_real * E22
   let E24 : Fin KB := E21 - cols.op_b_memory.access_timestamp.prev_low
   let E25 : Fin KB := E24 - 1
   let E26 : Fin KB := E25 - cols.op_b_memory.access_timestamp.diff_low_limb
-  let E27 : Fin KB := E26 * 2130673921
+  let E27 : Fin KB := E26 * ((65536 : Fin KB)⁻¹)
   let E28 : Fin KB := clk_low + 2
   let E29 : Fin KB := is_real - cols.imm_c
   let E30 : Fin KB := E29 - 1
@@ -52,7 +52,7 @@ section constraints
   let E32 : Fin KB := E28 - cols.op_c_memory.access_timestamp.prev_low
   let E33 : Fin KB := E32 - 1
   let E34 : Fin KB := E33 - cols.op_c_memory.access_timestamp.diff_low_limb
-  let E35 : Fin KB := E34 * 2130673921
+  let E35 : Fin KB := E34 * ((65536 : Fin KB)⁻¹)
   let E36 : Fin KB := cols.op_c_memory.prev_value[0] - cols.op_c[0]
   let E37 : Fin KB := cols.imm_c * E36
   let E38 : Fin KB := cols.op_c_memory.prev_value[1] - cols.op_c[1]

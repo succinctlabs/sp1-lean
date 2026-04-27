@@ -18,6 +18,7 @@ set_option hygiene false in
 local macro "close_branch_addr_eq" : tactic => `(tactic| (
   unfold imm
   rw [sp1_imm, ← reader_cstrs.1.1.1]
+  simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
   simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
   clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
     h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
@@ -119,7 +120,6 @@ theorem correct_beq
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
         = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
@@ -135,8 +135,8 @@ theorem correct_beq
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
+    simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
@@ -227,7 +227,6 @@ theorem correct_bne
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
         = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
@@ -243,8 +242,8 @@ theorem correct_bne
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
+    simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
@@ -338,7 +337,6 @@ theorem correct_blt
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
         = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
@@ -352,8 +350,8 @@ theorem correct_blt
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
+    simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
@@ -447,7 +445,6 @@ theorem correct_bge
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
         = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
@@ -464,8 +461,8 @@ theorem correct_bge
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
+    simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
@@ -559,7 +556,6 @@ theorem correct_bltu
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
         = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
@@ -576,8 +572,8 @@ theorem correct_bltu
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
+    simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega
@@ -671,7 +667,6 @@ theorem correct_bgeu
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
     have h_addr_eq : Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + BitVec.signExtend 64 imm
         = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
@@ -688,8 +683,8 @@ theorem correct_bgeu
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h26 : Main[25].val < 65536 := by
       apply lt_65536_of_mul_inv_4_lt
-      rw [← inv_2BB_eq']
       exact h_bound_checks.1
+    simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
     clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
     omega

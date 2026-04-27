@@ -19,7 +19,7 @@ section constraints
   let E4 : Fin KB := E3 - b[0]
   let E5 : Fin KB := E4 - cols.value[0]
   let E6 : Fin KB := E5 + 1
-  let E7 : Fin KB := E6 * 2130673921
+  let E7 : Fin KB := E6 * ((65536 : Fin KB)⁻¹)
   let E8 : Fin KB := E7 - 1
   let E9 : Fin KB := E7 * E8
   let E10 : Fin KB := is_real * E9
@@ -28,7 +28,7 @@ section constraints
   let E13 : Fin KB := E12 - b[1]
   let E14 : Fin KB := E13 - cols.value[1]
   let E15 : Fin KB := E14 + E7
-  let E16 : Fin KB := E15 * 2130673921
+  let E16 : Fin KB := E15 * ((65536 : Fin KB)⁻¹)
   let E17 : Fin KB := E16 - 1
   let E18 : Fin KB := E16 * E17
   let E19 : Fin KB := is_real * E18

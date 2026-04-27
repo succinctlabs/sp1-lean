@@ -9,14 +9,14 @@ section constraints
   let E0 : Fin KB := Main[30] - 1
   let E1 : Fin KB := Main[30] * E0
   let CS0 : SP1ConstraintList (Fin KB) := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]] { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]
-  let E2 : Fin KB := Main[22] * 1598029825
+  let E2 : Fin KB := Main[22] * ((4 : Fin KB)⁻¹)
   let E3 : Fin KB := Main[1] * 65536
   let E4 : Fin KB := Main[2] + E3
   let E5 : Fin KB := Main[30] - 1
   let E6 : Fin KB := Main[30] * E5
   let E7 : Fin KB := E4 + 8
   let E8 : Fin KB := Main[2] - 1
-  let E9 : Fin KB := E8 * 1864368129
+  let E9 : Fin KB := E8 * ((8 : Fin KB)⁻¹)
   let E10 : Fin KB := Main[30] - 1
   let E11 : Fin KB := E10 * Main[13]
   let E12 : Fin KB := Main[30] - Main[13]
@@ -42,7 +42,7 @@ section constraints
   let E31 : Fin KB := E28 - Main[11]
   let E32 : Fin KB := E31 - 1
   let E33 : Fin KB := E32 - Main[12]
-  let E34 : Fin KB := E33 * 2130673921
+  let E34 : Fin KB := E33 * ((65536 : Fin KB)⁻¹)
   CS0 ++ CS1 ++ [
     (.assertZero E1),
     (.assertZero Main[25]),

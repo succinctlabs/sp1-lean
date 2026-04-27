@@ -14,7 +14,7 @@ section constraints
   let E2 : Fin KB := Main[34] - 1
   let E3 : Fin KB := Main[34] * E2
   let E4 : Fin KB := Main[26] - Main[34]
-  let E5 : Fin KB := E4 * 1598029825
+  let E5 : Fin KB := E4 * ((4 : Fin KB)⁻¹)
   let E6 : Fin KB := Main[26] - Main[34]
   let CS1 : SP1ConstraintList (Fin KB) := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E6, Main[27], Main[28]] 8 Main[25]
   let E7 : Fin KB := Main[1] * 65536

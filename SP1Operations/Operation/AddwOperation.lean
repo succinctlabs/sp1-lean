@@ -15,7 +15,7 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddwOperation) :
       (carry1 = 0 ∨ carry1 = 1) ∧
       (cols.value[0] < 65536) ∧
       (cols.value[1] < 65536)) := by
-  simp [constraints, U16MSBOperation.constraints, sub_eq_zero, inv_16BB_eq']
+  simp [constraints, U16MSBOperation.constraints, sub_eq_zero]
   tauto
 
 theorem spec

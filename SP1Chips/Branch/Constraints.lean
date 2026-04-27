@@ -112,35 +112,35 @@ section constraints
   let E97 : Fin KB := 0 + Main[3]
   let E98 : Fin KB := E97 + Main[21]
   let E99 : Fin KB := E98 - Main[25]
-  let E100 : Fin KB := E99 * 2130673921
+  let E100 : Fin KB := E99 * ((65536 : Fin KB)⁻¹)
   let E101 : Fin KB := E100 - 1
   let E102 : Fin KB := E100 * E101
   let E103 : Fin KB := Main[34] * E102
   let E104 : Fin KB := E100 + Main[4]
   let E105 : Fin KB := E104 + Main[22]
   let E106 : Fin KB := E105 - Main[26]
-  let E107 : Fin KB := E106 * 2130673921
+  let E107 : Fin KB := E106 * ((65536 : Fin KB)⁻¹)
   let E108 : Fin KB := E107 - 1
   let E109 : Fin KB := E107 * E108
   let E110 : Fin KB := Main[34] * E109
   let E111 : Fin KB := E107 + Main[5]
   let E112 : Fin KB := E111 + Main[23]
   let E113 : Fin KB := E112 - Main[27]
-  let E114 : Fin KB := E113 * 2130673921
+  let E114 : Fin KB := E113 * ((65536 : Fin KB)⁻¹)
   let E115 : Fin KB := E114 - 1
   let E116 : Fin KB := E114 * E115
   let E117 : Fin KB := Main[34] * E116
   let E118 : Fin KB := E114 + 0
   let E119 : Fin KB := E118 + Main[24]
   let E120 : Fin KB := E119 - 0
-  let E121 : Fin KB := E120 * 2130673921
+  let E121 : Fin KB := E120 * ((65536 : Fin KB)⁻¹)
   let E122 : Fin KB := E121 - 1
   let E123 : Fin KB := E121 * E122
   let E124 : Fin KB := Main[34] * E123
   let E125 : Fin KB := 0 + Main[3]
   let E126 : Fin KB := E125 + 4
   let E127 : Fin KB := E126 - Main[25]
-  let E128 : Fin KB := E127 * 2130673921
+  let E128 : Fin KB := E127 * ((65536 : Fin KB)⁻¹)
   let E129 : Fin KB := E16 - Main[34]
   let E130 : Fin KB := E128 - 1
   let E131 : Fin KB := E128 * E130
@@ -148,7 +148,7 @@ section constraints
   let E133 : Fin KB := E128 + Main[4]
   let E134 : Fin KB := E133 + 0
   let E135 : Fin KB := E134 - Main[26]
-  let E136 : Fin KB := E135 * 2130673921
+  let E136 : Fin KB := E135 * ((65536 : Fin KB)⁻¹)
   let E137 : Fin KB := E16 - Main[34]
   let E138 : Fin KB := E136 - 1
   let E139 : Fin KB := E136 * E138
@@ -156,7 +156,7 @@ section constraints
   let E141 : Fin KB := E136 + Main[5]
   let E142 : Fin KB := E141 + 0
   let E143 : Fin KB := E142 - Main[27]
-  let E144 : Fin KB := E143 * 2130673921
+  let E144 : Fin KB := E143 * ((65536 : Fin KB)⁻¹)
   let E145 : Fin KB := E16 - Main[34]
   let E146 : Fin KB := E144 - 1
   let E147 : Fin KB := E144 * E146
@@ -164,12 +164,12 @@ section constraints
   let E149 : Fin KB := E144 + 0
   let E150 : Fin KB := E149 + 0
   let E151 : Fin KB := E150 - 0
-  let E152 : Fin KB := E151 * 2130673921
+  let E152 : Fin KB := E151 * ((65536 : Fin KB)⁻¹)
   let E153 : Fin KB := E16 - Main[34]
   let E154 : Fin KB := E152 - 1
   let E155 : Fin KB := E152 * E154
   let E156 : Fin KB := E153 * E155
-  let E157 : Fin KB := Main[25] * 1598029825
+  let E157 : Fin KB := Main[25] * ((4 : Fin KB)⁻¹)
   CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E1),
     (.assertZero E3),

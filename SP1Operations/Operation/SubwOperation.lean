@@ -13,7 +13,7 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : SubwOperation) :
       (carry1 = 0 ∨ carry1 = 1) ∧
       (cols.value[0] < 65536) ∧
       (cols.value[1] < 65536)) := by
-  simp [constraints, ← inv_16BB_eq', sub_eq_zero]
+  simp [constraints, ← inv_65536BB_eq', sub_eq_zero]
   omega
 
 theorem spec

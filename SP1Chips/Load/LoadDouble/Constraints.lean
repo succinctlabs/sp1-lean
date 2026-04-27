@@ -67,7 +67,7 @@ lemma allHold_constraints_iff_of_is_ld (h_is_ld : is_ld Main) :
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
     Main[28] * (Main[26] + Main[27]) = 1 ∧
-    ↑(Main[25] * 1864368129) < 8192 ∧
+    ↑(Main[25] * (8 : Fin KB)⁻¹) < 8192 ∧
     List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧

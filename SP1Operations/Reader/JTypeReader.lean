@@ -21,7 +21,7 @@ lemma allHold_constraints_iff :
       pc[0] % 4 = 0 ∧
       pc[0] < 65536 ∧ pc[1] < 65536 ∧ pc[2] < 65536 ∧
       cols.op_a_memory.access_timestamp.diff_low_limb < 65536 ∧
-      (clk_low + 4 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
+      (clk_low + 4 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * (65536 : Fin KB)⁻¹ < 256 ∧
       Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]]) ∧
     (cols.op_a_0 ≠ 0 →
       op_a_write_value[0] = 0 ∧
@@ -56,7 +56,7 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
     pc[0] % 4 = 0 ∧
     pc[0] < 65536 ∧ pc[1] < 65536 ∧ pc[2] < 65536 ∧
     cols.op_a_memory.access_timestamp.diff_low_limb < 65536 ∧
-    (clk_low + 4 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * 2130673921 < 256 ∧
+    (clk_low + 4 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * (65536 : Fin KB)⁻¹ < 256 ∧
     Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
     (cols.op_a_0 ≠ 0 →
       op_a_write_value[0] = 0 ∧

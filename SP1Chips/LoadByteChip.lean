@@ -80,15 +80,15 @@ theorem correct_lb (Main : Vector (Fin KB) 47)
     apply Word.isU64_of_cases <;> {clear *- rest; simp_all}
   -- Key bounds
   have h42_lt : Main[42].val < 256 := by exact_mod_cast h34.1
-  have h42hi_lt : ((Main[41] - Main[42]) * 2122383361).val < 256 := by exact_mod_cast h34.2
+  have h42hi_lt : ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val < 256 := by exact_mod_cast h34.2
   -- Byte decomposition: Main[42] + high_byte * 256 = Main[41] in Fin KB, hence in Nat.
-  have h_limb_fin : Main[42] + ((Main[41] - Main[42]) * 2122383361) * (2 ^ 8 : Fin KB) = Main[41] := by
+  have h_limb_fin : Main[42] + ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹) * (2 ^ 8 : Fin KB) = Main[41] := by
     clear *- h34
-    have h1 : (Main[41] - Main[42]) * 2122383361 * (2 ^ 8 : Fin KB) =
-              (Main[41] - Main[42]) * ((2122383361 : Fin KB) * (2 ^ 8 : Fin KB)) := by ring
-    have h2 : ((2122383361 : Fin KB) * (2 ^ 8 : Fin KB)) = 1 := by decide
+    have h1 : (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ * (2 ^ 8 : Fin KB) =
+              (Main[41] - Main[42]) * (((256 : Fin KB)⁻¹) * (2 ^ 8 : Fin KB)) := by ring
+    have h2 : (((256 : Fin KB)⁻¹) * (2 ^ 8 : Fin KB)) = 1 := by decide
     rw [h1, h2, mul_one]; ring
-  have h_decomp : Main[41].val = Main[42].val + ((Main[41] - Main[42]) * 2122383361).val * 256 :=
+  have h_decomp : Main[41].val = Main[42].val + ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val * 256 :=
     nat_decomp_of_inv8_decomp _ _ _ h_limb_fin h42_lt h42hi_lt
   -- We need to know that the address fits.
   have h21' : BitVec.signExtend 64 (BitVec.ofNat 12 (Main[21] : ℕ)) =
@@ -205,9 +205,9 @@ theorem correct_lb (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h30eq : Main[41].val = Main[29].val := congr_arg Fin.val h29
       rw [Nat.shiftRight_eq_div_pow]
@@ -221,9 +221,9 @@ theorem correct_lb (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h32eq : Main[41].val = Main[31].val := congr_arg Fin.val h31
       rw [Nat.shiftRight_eq_div_pow]
@@ -237,9 +237,9 @@ theorem correct_lb (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h31eq : Main[41].val = Main[30].val := congr_arg Fin.val h30
       rw [Nat.shiftRight_eq_div_pow]
@@ -253,9 +253,9 @@ theorem correct_lb (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h33eq : Main[41].val = Main[32].val := congr_arg Fin.val h32
       rw [Nat.shiftRight_eq_div_pow]
@@ -307,7 +307,7 @@ theorem correct_lbu (Main : Vector (Fin KB) 47)
   have hu6421 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
     apply Word.isU64_of_cases <;> {clear *- rest; simp_all}
   have h42_lt : Main[42].val < 256 := by exact_mod_cast h34.1
-  have h42hi_lt : ((Main[41] - Main[42]) * 2122383361).val < 256 := by exact_mod_cast h34.2
+  have h42hi_lt : ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val < 256 := by exact_mod_cast h34.2
   -- Main[43] < 256: derived from byte equation + h38 disjunction
   have h43_lt : Main[43].val < 256 := by
     rcases h38 with h38 | h38
@@ -315,17 +315,17 @@ theorem correct_lbu (Main : Vector (Fin KB) 47)
       have heq : Main[43] = Main[42] := by
         have := h_offset.1; rw [h38] at this; simpa using this
       rw [heq]; exact h42_lt
-    · -- Main[38] = 1 ⇒ Main[43] = (Main[41] - Main[42]) * 2122383361
-      have heq : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+    · -- Main[38] = 1 ⇒ Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹
+      have heq : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         have := h_offset.1; rw [h38] at this; simpa using this
       rw [heq]; exact h42hi_lt
-  have h_limb_fin : Main[42] + ((Main[41] - Main[42]) * 2122383361) * (2 ^ 8 : Fin KB) = Main[41] := by
+  have h_limb_fin : Main[42] + ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹) * (2 ^ 8 : Fin KB) = Main[41] := by
     clear *- h34
-    have h1 : (Main[41] - Main[42]) * 2122383361 * (2 ^ 8 : Fin KB) =
-              (Main[41] - Main[42]) * ((2122383361 : Fin KB) * (2 ^ 8 : Fin KB)) := by ring
-    have h2 : ((2122383361 : Fin KB) * (2 ^ 8 : Fin KB)) = 1 := by decide
+    have h1 : (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ * (2 ^ 8 : Fin KB) =
+              (Main[41] - Main[42]) * (((256 : Fin KB)⁻¹) * (2 ^ 8 : Fin KB)) := by ring
+    have h2 : (((256 : Fin KB)⁻¹) * (2 ^ 8 : Fin KB)) = 1 := by decide
     rw [h1, h2, mul_one]; ring
-  have h_decomp : Main[41].val = Main[42].val + ((Main[41] - Main[42]) * 2122383361).val * 256 :=
+  have h_decomp : Main[41].val = Main[42].val + ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val * 256 :=
     nat_decomp_of_inv8_decomp _ _ _ h_limb_fin h42_lt h42hi_lt
   have h21' : BitVec.signExtend 64 (BitVec.ofNat 12 (Main[21] : ℕ)) =
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] := h21.symm
@@ -419,9 +419,9 @@ theorem correct_lbu (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h30eq : Main[41].val = Main[29].val := congr_arg Fin.val h29
       rw [Nat.shiftRight_eq_div_pow]
@@ -435,9 +435,9 @@ theorem correct_lbu (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h32eq : Main[41].val = Main[31].val := congr_arg Fin.val h31
       rw [Nat.shiftRight_eq_div_pow]
@@ -451,9 +451,9 @@ theorem correct_lbu (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h31eq : Main[41].val = Main[30].val := congr_arg Fin.val h30
       rw [Nat.shiftRight_eq_div_pow]
@@ -467,9 +467,9 @@ theorem correct_lbu (Main : Vector (Fin KB) 47)
         change (0 : Fin KB) * Main[42] = 0; rw [zero_mul]
       have hsub : (Main[41] + -Main[42] : Fin KB) = Main[41] - Main[42] :=
         (sub_eq_add_neg Main[41] Main[42]).symm
-      have h43_high : Main[43] = (Main[41] - Main[42]) * 2122383361 := by
+      have h43_high : Main[43] = (Main[41] - Main[42]) * (256 : Fin KB)⁻¹ := by
         rw [h_offset.1, hsub, hzero, add_zero]
-      have h44val : Main[43].val = ((Main[41] - Main[42]) * 2122383361).val :=
+      have h44val : Main[43].val = ((Main[41] - Main[42]) * (256 : Fin KB)⁻¹).val :=
         congr_arg Fin.val h43_high
       have h33eq : Main[41].val = Main[32].val := congr_arg Fin.val h32
       rw [Nat.shiftRight_eq_div_pow]

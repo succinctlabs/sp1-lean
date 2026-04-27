@@ -56,9 +56,9 @@ section constraints
   let E44 : Fin KB := Main[40] * E43
   let E45 : Fin KB := Main[39] * E44
   let E46 : Fin KB := Main[7] - Main[43]
-  let E47 : Fin KB := E46 * 2122383361
+  let E47 : Fin KB := E46 * ((256 : Fin KB)⁻¹)
   let E48 : Fin KB := Main[41] - Main[42]
-  let E49 : Fin KB := E48 * 2122383361
+  let E49 : Fin KB := E48 * ((256 : Fin KB)⁻¹)
   let E50 : Fin KB := Main[43] - Main[42]
   let E51 : Fin KB := 1 - Main[38]
   let E52 : Fin KB := E50 * E51

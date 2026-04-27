@@ -119,7 +119,7 @@ lemma allHold_constraints_iff_of_is_lh (h_is_lh : is_lh Main) :
     (Main[38] = 0 ∨ Main[38] = 1) ∧
     (Main[39] = 0 ∨ Main[39] = 1) ∧
     (Main[28] * (Main[26] + Main[27]) = 1) ∧
-    ↑((Main[25] - 4 * Main[39] - 2 * Main[38]) * 1864368129) < 8192 ∧
+    ↑((Main[25] - 4 * Main[39] - 2 * Main[38]) * (8 : Fin KB)⁻¹) < 8192 ∧
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[40] { msb := Main[41] } 1) ∧
     List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
@@ -169,7 +169,7 @@ lemma allHold_constraints_iff_of_is_lhu (h_is_lhu : is_lhu Main) :
     (Main[38] = 0 ∨ Main[38] = 1) ∧
     (Main[39] = 0 ∨ Main[39] = 1) ∧
     (Main[28] * (Main[26] + Main[27]) = 1) ∧
-    ↑((Main[25] - 4 * Main[39] - 2 * Main[38]) * 1864368129) < 8192 ∧
+    ↑((Main[25] - 4 * Main[39] - 2 * Main[38]) * (8 : Fin KB)⁻¹) < 8192 ∧
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[40] { msb := Main[41] } 0) ∧
     List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }

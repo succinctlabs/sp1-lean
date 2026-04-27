@@ -19,7 +19,7 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : SubOperation) :
     (cols.value[1].val < 65536) ∧
     (cols.value[2].val < 65536) ∧
     (cols.value[3].val < 65536) := by
-  simp [constraints, ← inv_16BB_eq', sub_eq_zero]
+  simp [constraints, ← inv_65536BB_eq', sub_eq_zero]
   constructor <;> intro ⟨h0, h1, h2, h3, r0, r1, r2, r3⟩ <;> split_ands <;>
   [ clear *- h0; clear *- h1; clear *- h2; clear *- h3; exact r0; exact r1; exact r2; exact r3;
     clear *- h0; clear *- h1; clear *- h2; clear *- h3; exact r0; exact r1; exact r2; exact r3 ] <;>

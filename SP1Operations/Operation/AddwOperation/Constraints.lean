@@ -17,14 +17,14 @@ section constraints
   let E2 : Fin KB := a[0] + b[0]
   let E3 : Fin KB := E2 - cols.value[0]
   let E4 : Fin KB := E3 + 0
-  let E5 : Fin KB := E4 * 2130673921
+  let E5 : Fin KB := E4 * ((65536 : Fin KB)⁻¹)
   let E6 : Fin KB := E5 - 1
   let E7 : Fin KB := E5 * E6
   let E8 : Fin KB := is_real * E7
   let E9 : Fin KB := a[1] + b[1]
   let E10 : Fin KB := E9 - cols.value[1]
   let E11 : Fin KB := E10 + E5
-  let E12 : Fin KB := E11 * 2130673921
+  let E12 : Fin KB := E11 * ((65536 : Fin KB)⁻¹)
   let E13 : Fin KB := E12 - 1
   let E14 : Fin KB := E12 * E13
   let E15 : Fin KB := is_real * E14

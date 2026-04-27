@@ -83,12 +83,12 @@ theorem JALR_correct
     -- Replace the BitVec sum (rs1 + signExt imm) with the chip's #v[Main[26..29]]
     rw [← h_add]
     -- The chip's masked next_pc low limb is < 65536 and a multiple of 4.
-    -- 1598029825 = 4⁻¹ in KB, so (M[26]-M[34]) = ((M[26]-M[34]) * 1598029825) * 4,
-    -- and `((M[26]-M[34]) * 1598029825).val < 16384` makes the .val × 4 product strictly < 65536.
-    set k : Fin KB := (Main[26] - Main[34]) * 1598029825 with hk_def
+    -- (M[26]-M[34]) = ((M[26]-M[34]) * 4⁻¹) * 4, and the auto-gen guarantees
+    -- `((M[26]-M[34]) * (4 : Fin KB)⁻¹).val < 16384`, so .val × 4 is strictly < 65536.
+    set k : Fin KB := (Main[26] - Main[34]) * (4 : Fin KB)⁻¹ with hk_def
     have hk_lt : k.val < 16384 := h_low_align
     have h_masked_eq : Main[26] - Main[34] = k * 4 := by
-      rw [hk_def, mul_assoc, inv_mul_2BB_eq_one, mul_one]
+      rw [hk_def, mul_assoc, inv_mul_cancel₀ (by decide), mul_one]
     have h_kx4_val : (k * 4).val = k.val * 4 := by
       rw [Fin.val_mul]; exact Nat.mod_eq_of_lt (by omega)
     have h_masked_lt : (Main[26] - Main[34]).val < 65536 := by
