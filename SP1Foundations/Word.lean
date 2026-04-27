@@ -1241,11 +1241,20 @@ lemma toNat_toWord
   simp [Fin.add_def, Fin.mul_def]
   omega
 
+-- Note: `toNat_poly_toWord_poly` (poly counterpart of `toNat_toWord`) is
+-- deferred. The proof requires combining `[Fact (Nat.Prime p)]` with
+-- `[Fact (65536 < p)]` and per-limb `ZMod.val_add` / `ZMod.val_mul`
+-- decomposition; the `aux` helper had unification issues during simp.
+-- Add when first consumer needs it.
+
 lemma toWord_U64 {w : BWord (Fin KB)} (h_w_isU64 : w.isU64) : w.toWord.isU64
   := by
     have := lt_cases_of_isU64 h_w_isU64
     simp [toWord]
     apply Word.isU64_of_cases <;> simp <;> grind
+
+-- Note: `toWord_poly_U64_poly` (poly counterpart of `toWord_U64`) is
+-- deferred for the same reason as `toNat_poly_toWord_poly`.
 
 /-- Convert a `BWord` to a `BitVec 64` by shifting and adding the limbs. -/
 def toBitVec64 (w : BWord (Fin KB)) : BitVec 64 := BitVec.ofNat 64 w.toNat
