@@ -9,9 +9,12 @@ phase boundary. The implementation roadmap is in
 
 **Status as of 2026-04-27**: Phases 0-5 + Sub-phase A + Sub-phase B.2 +
 B.3 + B.4 + **B.5b (4-op cascade)** + **B.5c (polymorphic `.val` helpers)**
-+ **MemoryConsistency lift** complete. Sub-phase B Steps 1-2 (`.val`
-rephrase, parametric Word.lean lift) attempted in earlier session, both
-reverted. `lake build` clean (0 errors, 0 warnings, 8508 jobs).
++ **MemoryConsistency lift** + **Word.lean `_poly` def cascade across
+all 6 namespaces (HWord, Word, DWord, BHWord, BWord, BDWord)** + **BitVec
+Word section `_poly` lemma counterparts** + **SailM `_poly` execute_*_pure_w
+defs** complete. Sub-phase B Steps 1-2 (`.val` rephrase, parametric
+Word.lean lift) attempted in earlier session, both reverted. `lake build`
+clean (0 errors, 0 warnings, 8508 jobs).
 
 **Stated end goal (2026-04-27)**: everything in `SP1Foundations/*` should
 be agnostic to the prime field — either generic over `ZMod p` (with
@@ -23,28 +26,35 @@ strategy, with scope expanded as needed.
 
 **Remaining work toward that goal** (order = recommended priority):
 
-1. **Word.lean `_poly` companions** (~30+ lemmas, ~3-5 hr). The widest
-   surface in `SP1Foundations` not yet polymorphic. Existing
-   `_poly` defs: `isU64_poly`, `toNat_poly`, `toBitVec64_poly`. Missing:
-   ~30 lemmas including `toNat_def`, `toNat_lt_of_isU64`,
-   `toNat_reconstruct`, `toBitVec64_toNat`, `eq_pointwise` (already
-   generic), `low`, `high`, `setWidth_eq_low`, `setWidth_rshift_eq_high`,
-   `isNegative_msb`, the entire HWord namespace duplicate, and the
-   BHWord/BWord/BDWord byte-sized variants.
-2. **BitVec.lean `_poly` companions** (~9 lemmas, ~1-2 hr). The `Word`
-   namespace section in `BitVec.lean` has 7 `Word.toBitVec64`-based mod
-   lemmas + 2 `useless_signExtend*` theorems. Bodies use `bv_decide`
-   so `_poly` versions should be similarly tractable.
-3. **SailM.lean `_poly` companions** (~23 lemmas, ~3-4 hr). The
-   `execute_*_pure_*` family — bridges between Sail BitVec and our
-   `Word (Fin KB)` representation. Higher complexity; some may need
-   custom proof work.
+1. **Word.lean: complete `_poly` lemma cascade**. ~25 of the foundational
+   lemmas now have `_poly` companions across all 6 namespaces. The
+   `_poly` defs are complete (isU{32,64,128}, toNat, toBitVec{32,64,128},
+   isNegative, toInt, low, high). What's still missing: lemmas with
+   substantial proof bodies that don't carry verbatim from `Fin KB`,
+   notably `eq_toNat_eq` (needs `ZMod.val_injective` per limb),
+   `toNat_reconstruct` (limb decomposition over ZMod p), `setWidth_eq_low`
+   / `setWidth_rshift_eq_high` (need polymorphic Word↔HWord conversion
+   lemmas first). Estimate ~2-3 hr for the remaining lemmas.
+2. **SailM.lean: complete `_poly` bridge lemma cascade**. 6 of the
+   `execute_*_pure_w` defs now have `_poly` companions
+   (`RTYPE`/`RTYPEW`/`ITYPE`/`SHIFTIOP`/`SHIFTIWOP`). The
+   `exec_*_pure_bv_to_w` bridge lemmas are NOT yet `_poly`-fied —
+   `exec_RTYPE_pure_bv_to_w_poly` was attempted and hit a kernel "deep
+   recursion" during `aesop` expansion (needs a tighter proof avoiding
+   `aesop`). The `combine_MUL_*` lemmas, `execute_MUL_pure_*` and
+   `execute_MULW_pure_*` family also need `_poly` versions. Estimate
+   ~3-4 hr.
+3. **BitVec.lean `useless_signExtend*` theorems**. Two theorems still at
+   `Fin KB` because their proofs use `x.isLt` (Fin's structural bound).
+   Lifting needs a `[Fact (p < 2^64)]` precondition to bound `x.val < 2^64`.
+   Low priority (the name "useless" suggests they're rarely used).
 4. **Migrate Foundation consumers and delete `Fin KB` versions**
    (~3-5 hr). For each function with both `Fin KB` and `_poly` versions
-   in `Constraint.lean`, `ByteOpcode.lean`, `Assumptions.lean`, change
-   chip/op callers to use the generic version, then remove the `Fin KB`
-   version. End state: those four files reach the user's "fully
-   agnostic" goal. ~57 chips to touch (mechanical but bulk).
+   in `Constraint.lean`, `ByteOpcode.lean`, `Assumptions.lean`,
+   `Word.lean`, etc., change chip/op callers to use the generic version,
+   then remove the `Fin KB` version. End state: those files reach the
+   user's "fully agnostic" goal. ~57 chips to touch (mechanical but
+   bulk).
 5. **Operation/chip `_poly` cascade for ops with byte-opcode `Range`
    constraints** — blocked on a polymorphic `(a-b).val` arithmetic
    helper. Even with the `[Fact (2 ^ 17 < p)]` and `.val`-helper simp
@@ -53,7 +63,7 @@ strategy, with scope expanded as needed.
    `(a-b).val ≥ p - 65535` when `a.val < b.val` over `ZMod p`. Mathlib
    has `ZMod.val_sub` (under `b.val ≤ a.val`) and
    `ZMod.val_neg_of_ne_zero`, so a custom `val_sub_cases` lemma is
-   needed. Defer to its own sub-phase once Word.lean is lifted.
+   needed. Defer to its own sub-phase.
 6. **Cross-repo upstream parametric emission** (~2 hr, orthogonal).
    Independent of items 1-5; can run any time.
 
@@ -64,6 +74,12 @@ sessions to avoid re-discovering):
   (U16Compare, U16MSB, etc.) do not close with `simp [constraints];
   grind` even after the `.val` helpers landed. The remaining blocker
   is `(a-b).val` arithmetic. See item 5 above.
+- `exec_RTYPE_pure_bv_to_w_poly` direct port hits kernel deep recursion
+  during `aesop`. Recorded as deferred in `SailM.lean`.
+- `Word.eq_toNat_poly_eq` (poly counterpart of `eq_toNat_eq`) requires
+  `ZMod.val_injective` per limb plus the bound combination — not a
+  drop-in port from the Fin KB `omega` proof. Recorded as deferred in
+  `Word.lean`.
 
 **Critical finding from B.5b** (revises the prior claim that the cascade
 is "mechanical" with proofs that "carry verbatim"):
