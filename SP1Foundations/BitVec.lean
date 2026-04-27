@@ -137,6 +137,53 @@ lemma toBitVec64_mod_of_lt (w : Word (Fin KB)) (n : Fin 8) :
   simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
   omega
 
+/-! ### Polymorphic counterparts -/
+
+lemma toBitVec64_poly_mod_of_lt {p : ℕ} [NeZero p] (w : Word (ZMod p)) (n : Fin 8) :
+    (Word.toBitVec64_poly w) % BitVec.twoPow 64 n.val =
+      (BitVec.ofNat 64 w[0].val) % BitVec.twoPow 64 n.val := by
+  simp [Word.toBitVec64_poly, Word.toNat_poly]
+  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
+  simp [BitVec.twoPow]
+  set k := BitVec.ofNat 64 w[0].val
+  fin_cases n
+  · simp only [shiftLeft_zero, umod_one]
+  all_goals {simp only [reduceHShiftLeft]; bv_decide}
+
+@[simp] lemma toBitVec64_poly_mod2 {p : ℕ} [NeZero p] (w : Word (ZMod p)) :
+    (Word.toBitVec64_poly w) % 2#64 = (BitVec.ofNat 64 w[0].val) % 2#64 :=
+  toBitVec64_poly_mod_of_lt w 1
+
+@[simp] lemma toBitVec64_poly_mod4 {p : ℕ} [NeZero p] (w : Word (ZMod p)) :
+    (Word.toBitVec64_poly w) % 4#64 = (BitVec.ofNat 64 w[0].val) % 4#64 :=
+  toBitVec64_poly_mod_of_lt w 2
+
+@[simp] lemma toBitVec64_poly_mod8 {p : ℕ} [NeZero p] (w : Word (ZMod p)) :
+    (Word.toBitVec64_poly w) % 8#64 = (BitVec.ofNat 64 w[0].val) % 8#64 :=
+  toBitVec64_poly_mod_of_lt w 3
+
+@[simp] lemma toBitVec64_poly_add_mod4 {p : ℕ} [NeZero p]
+    (w : Word (ZMod p)) (x : BitVec 64) :
+    (Word.toBitVec64_poly w + x) % 4#64 = (BitVec.ofNat 64 w[0].val + x) % 4#64 := by
+  simp [Word.toBitVec64_poly, Word.toNat_poly]
+  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
+  set k := BitVec.ofNat 64 w[0].val
+  bv_decide
+
+@[simp] lemma add_toBitVec64_poly_mod4 {p : ℕ} [NeZero p]
+    (w : Word (ZMod p)) (x : BitVec 64) :
+    (x + Word.toBitVec64_poly w) % 4#64 = (x + BitVec.ofNat 64 w[0].val) % 4#64 := by
+  simp [Word.toBitVec64_poly, Word.toNat_poly]
+  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
+  set k := BitVec.ofNat 64 w[0].val
+  bv_decide
+
+@[simp] lemma setWidth8_toBitVec64_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) :
+    BitVec.setWidth 8 w.toBitVec64_poly = BitVec.ofNat 8 w[0].val := by
+  simp [Word.toBitVec64_poly, Word.toNat_poly]
+  simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
+  omega
+
 end Word
 
 namespace BitVec
