@@ -1007,6 +1007,13 @@ lemma toNat_lt_of_isU32 {w : BHWord (Fin KB)} (hw : w.isU32) : w.toNat < 2 ^ 32 
   unfold toNat
   aesop (add 50% tactic (by omega))
 
+/-- Polymorphic counterpart of `BHWord.toNat_lt_of_isU32`. -/
+lemma toNat_poly_lt_of_isU32_poly {p : ℕ} [NeZero p]
+    {w : BHWord (ZMod p)} (hw : w.isU32_poly) : w.toNat_poly < 2 ^ 32 := by
+  have := lt_cases_of_isU32_poly hw
+  unfold toNat_poly
+  omega
+
 /-- Convert a `BHWord` to a `BitVec 32` by shifting and adding the limbs. -/
 def toBitVec32 (w : BHWord (Fin KB)) : BitVec 32 := BitVec.ofNat 32 w.toNat
 
@@ -1019,6 +1026,14 @@ lemma toBitVec32_toNat {w : BHWord (Fin KB)} (hw : w.isU32) :
   simp only [toBitVec32, toNat, BB_eq, Nat.reducePow, BitVec.toNat_ofNat,
     Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
   have := lt_cases_of_isU32 hw
+  omega
+
+/-- Polymorphic counterpart of `BHWord.toBitVec32_toNat`. -/
+lemma toBitVec32_poly_toNat_poly {p : ℕ} [NeZero p]
+    {w : BHWord (ZMod p)} (hw : w.isU32_poly) :
+    w.toBitVec32_poly.toNat = w.toNat_poly := by
+  simp only [toBitVec32_poly, BitVec.toNat_ofNat, toNat_poly]
+  have := lt_cases_of_isU32_poly hw
   omega
 
 /-- A 32-bit integer is negative if its msb equals one -/
@@ -1039,6 +1054,14 @@ lemma isNegative_msb
   simp [isNegative, BHWord.toBitVec32, BHWord.toNat, BitVec.msb_eq_decide]
   omega
 
+/-- Polymorphic counterpart of `BHWord.isNegative_msb`. -/
+lemma isNegative_poly_msb {p : ℕ} [NeZero p]
+    {w : BHWord (ZMod p)} (h_w_isU32 : w.isU32_poly) :
+    w.isNegative_poly ↔ (w.toBitVec32_poly.msb = true) := by
+  have := lt_cases_of_isU32_poly h_w_isU32
+  simp [isNegative_poly, BHWord.toBitVec32_poly, BHWord.toNat_poly, BitVec.msb_eq_decide]
+  omega
+
 lemma isNegative_BitVec.toInt
   {w : BHWord (Fin KB)}
   (h_w_isU32 : w.isU32) :
@@ -1046,6 +1069,17 @@ lemma isNegative_BitVec.toInt
   rw [isNegative_msb h_w_isU32]
   simp [BitVec.msb_eq_decide]
   rw [toBitVec32_toNat h_w_isU32]
+  omega
+
+/-- Polymorphic counterpart of `BHWord.isNegative_BitVec.toInt`. -/
+lemma isNegative_poly_BitVec.toInt
+  {p : ℕ} [NeZero p]
+  {w : BHWord (ZMod p)}
+  (h_w_isU32 : w.isU32_poly) :
+    w.isNegative_poly ↔ ¬ 2 * w.toNat_poly < 2 ^ 32 := by
+  rw [isNegative_poly_msb h_w_isU32]
+  simp [BitVec.msb_eq_decide]
+  rw [toBitVec32_poly_toNat_poly h_w_isU32]
   omega
 
 /-- Convert a `BHWord` to an `Int` by shifting and adding the limbs, with sign correction. -/
@@ -1063,6 +1097,16 @@ lemma toBitVec32_toInt {w : BHWord (Fin KB)} (h_w_isU32 : w.isU32) :
     have : w.toNat < 2 ^ 32 := by unfold BHWord.toNat; omega
     simp_all [toBitVec32, toInt, BitVec.toInt]
     split_ifs <;> rw [isNegative_BitVec.toInt h_w_isU32] at * <;> omega
+
+/-- Polymorphic counterpart of `BHWord.toBitVec32_toInt`. -/
+lemma toBitVec32_poly_toInt_poly {p : ℕ} [NeZero p]
+    {w : BHWord (ZMod p)} (h_w_isU32 : w.isU32_poly) :
+    w.toBitVec32_poly.toInt = w.toInt_poly
+  := by
+    have := lt_cases_of_isU32_poly h_w_isU32
+    have : w.toNat_poly < 2 ^ 32 := toNat_poly_lt_of_isU32_poly h_w_isU32
+    simp_all [toBitVec32_poly, toInt_poly, BitVec.toInt]
+    split_ifs <;> rw [isNegative_poly_BitVec.toInt h_w_isU32] at * <;> omega
 
 end conversions
 
@@ -1185,6 +1229,14 @@ lemma toBitVec64_toNat {w : BWord (Fin KB)} (hw : w.isU64) :
   have := lt_cases_of_isU64 hw
   omega
 
+/-- Polymorphic counterpart of `BWord.toBitVec64_toNat`. -/
+lemma toBitVec64_poly_toNat_poly {p : ℕ} [NeZero p]
+    {w : BWord (ZMod p)} (hw : w.isU64_poly) :
+    w.toBitVec64_poly.toNat = w.toNat_poly := by
+  simp only [BWord.toBitVec64_poly, BitVec.toNat_ofNat, toNat_poly]
+  have := lt_cases_of_isU64_poly hw
+  omega
+
 lemma toWord_toBitVec64 {w : BWord (Fin KB)} (h_w_isU64 : w.isU64) :
     w.toWord.toBitVec64 = w.toBitVec64
   := by
@@ -1220,6 +1272,14 @@ lemma isNegative_msb
   simp [isNegative, BWord.toBitVec64, BWord.toNat, BitVec.msb_eq_decide]
   omega
 
+/-- Polymorphic counterpart of `BWord.isNegative_msb`. -/
+lemma isNegative_poly_msb {p : ℕ} [NeZero p]
+    {w : BWord (ZMod p)} (h_w_isU64 : w.isU64_poly) :
+    w.isNegative_poly ↔ (w.toBitVec64_poly.msb = true) := by
+  have := lt_cases_of_isU64_poly h_w_isU64
+  simp [isNegative_poly, BWord.toBitVec64_poly, BWord.toNat_poly, BitVec.msb_eq_decide]
+  omega
+
 /-- Convert a `BWord` to an `Int` by shifting and adding the limbs, with sign correction. -/
 def toInt (w : BWord (Fin KB)) : ℤ :=
   if (isNegative w) then w.toNat - 2 ^ 64 else w.toNat
@@ -1245,6 +1305,18 @@ lemma toBitVec64_toInt {w : BWord (Fin KB)} (h_w_isU64 : w.isU64) :
     rw [isNegative_msb h_w_isU64] at * <;>
     simp [BitVec.msb_eq_decide] at * <;>
     rw [toBitVec64_toNat h_w_isU64] at * <;>
+    omega
+
+/-- Polymorphic counterpart of `BWord.toBitVec64_toInt`. -/
+lemma toBitVec64_poly_toInt_poly {p : ℕ} [NeZero p]
+    {w : BWord (ZMod p)} (h_w_isU64 : w.isU64_poly) :
+    w.toBitVec64_poly.toInt = w.toInt_poly
+  := by
+    rw [BitVec.toInt, BWord.toInt_poly]
+    split_ifs <;>
+    rw [isNegative_poly_msb h_w_isU64] at * <;>
+    simp [BitVec.msb_eq_decide] at * <;>
+    rw [toBitVec64_poly_toNat_poly h_w_isU64] at * <;>
     omega
 
 /-- Obtain the low 32 bits of a `BWord` -/
