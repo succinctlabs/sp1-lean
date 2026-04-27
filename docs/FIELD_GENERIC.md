@@ -566,6 +566,108 @@ callers stay at `Fin KB`; rely on `ZMod KB = Fin KB` definitional equality
   are unaffected by the `ZMod` instances and continue to dominate dispatch
   for `Fin KB`-typed expressions.
 
+## Sub-phase B — Step 3 attempt: global `Fin KB` → `ZMod KB` rename (2026-04-26, REVERTED)
+
+**Outcome: rename is structurally infeasible as a pure surface-level
+substitution.** The "achieves nothing semantically — it's a rename" framing
+above (line 549–552) was wrong. `Fin KB` and `ZMod KB` have **different
+typeclass instance graphs in mathlib**, and the difference breaks `simp`
+and `rw` discrimination-tree matching even though the underlying types are
+definitionally equal.
+
+### What was attempted
+
+Atomic rename of `Fin KB` → `ZMod KB` in three files (lockstep, since the
+high-priority `Fin KB` instances at `Field.lean:80-89` intercept literal
+elaboration and produce `HAdd (ZMod KB) (Fin KB)` mismatches if Constraint
+moves alone):
+
+1. `SP1Foundations/Constraint.lean` — all `Fin KB` → `ZMod KB` in
+   `toProp`/`toStateProp`/`allHold`/`initialState` signatures + 2 simp
+   lemmas.
+2. `SP1Foundations/Field.lean` — 12 instances + 38 bridge lemmas + docstring.
+3. `SP1Operations/Compare/IsZeroOperation/Operation.lean` — pilot file.
+
+### What broke and why
+
+**Issue 1: Missing `HShiftLeft (ZMod KB)` instance.** Lean core registers
+`Fin.instHShiftLeft : HShiftLeft (Fin n) Nat (Fin n)` but no analogue on
+`ZMod`. The 4 `shiftl_*BB_eq_one` lemmas (`Field.lean:108-111`) — which use
+`(literal : Fin KB) <<< n = 1` — fail to elaborate after the rename
+(`failed to synthesize instance of type class HShiftLeft (ZMod KB) ℕ ?m`).
+
+These 4 lemmas have **zero callers** (no chip auto-gen produces `<<<` on
+field elements; `<<<` only appears on `Nat`/`BitVec` in `LoadDoubleChip`
+and `ShiftLeft/Constraints.lean`). They could be deleted, but that's
+papering over the underlying instance-graph divergence.
+
+**Issue 2 (the showstopper): `inv_mul_eq_one₀` doesn't unify on `ZMod p`.**
+The 4 `inv_mul_*BB_eq_iff` proofs (`Field.lean:134-141`) all do:
+
+```
+rw [inv_*BB_eq', inv_mul_eq_one₀ (by decide), eq_comm]
+```
+
+After the first rewrite the goal is `4⁻¹ * x = 1 ↔ x = 4`. The pattern
+`?a⁻¹ * ?b = 1` from `inv_mul_eq_one₀` then **fails to match** with error
+"Did not find an occurrence of the pattern". Confirmed via `lean_run_code`
+on raw mathlib — the failure is **not specific to our custom instances**.
+Root cause from the error message:
+
+- `(4 : ZMod p) ≠ 0` elaborates with `Zero` from
+  `MulZeroClass.toZero` of `NonUnitalNonAssocSemiring` of `NonUnitalCommRing`
+  of `CommRing`.
+- `inv_mul_eq_one₀` expects `Zero` from `MulZeroClass.toZero` of
+  `MulZeroOneClass` of `MonoidWithZero` of `GroupWithZero`.
+- These are two different paths to the same `Zero (ZMod p)` synthesized
+  value. They are *not* unifiable by Lean's discrimination tree.
+
+The same lemmas worked on `Fin KB` because the registered
+`Field (Fin KB) := ZMod.instField KB` routes the `Fin KB` instance
+synthesis through the `ZMod` instance graph, but the consumer reaches
+`Inv`/`Zero` through the `Field`-derived path that *does* match
+`GroupWithZero`'s normal form. When the type is nominally `ZMod p`,
+mathlib's `CommRing`-first instance graph wins for `OfNat (ZMod p) n`
+and routes `Zero` through the wrong path.
+
+**Issue 3: `aesop` can't close `inv_16BB_zero_or_one`.** The lemma
+(`Field.lean:155`) closes by `aesop` on `Fin KB` but the same tactic
+can't close it on `ZMod KB` — same instance-graph divergence makes the
+internal lemmas aesop reaches for non-applicable.
+
+### Conclusion
+
+The current `Fin KB`-as-canonical-surface architecture is actually
+well-designed for the typeclass-graph concerns. `Field (Fin KB) :=
+ZMod.instField KB` threads the `ZMod p` algebraic structure through the
+`Fin n` carrier in a way that aligns with mathlib lemma normal forms.
+Switching the carrier to `ZMod KB` directly hits mathlib's dual-path
+problem on every bridge lemma and likely on hundreds of chip proofs.
+
+**Recommendation: do not pursue the rename.** For a future BabyBear
+instantiation, follow the existing recipe (parallel `Fin <NewPrime>`
+instance block + bridges per "How to instantiate at a different prime
+field" near the bottom of this doc). Don't try to switch to `ZMod` as
+the surface type.
+
+### Verified-fact correction
+
+The 2026-04-26 fact "lift only signatures from Fin KB to ZMod KB ... works
+but achieves nothing semantically — it's a rename" (line 549–552) is
+**incorrect**. The rename does NOT type-check end-to-end because the
+mathlib instance graph for `ZMod p` reaches `Zero`/`MulZeroClass` through
+a different path than the `Field`-derived one that bridge lemmas like
+`inv_mul_eq_one₀` use. Future sessions: ignore that line; consult this
+section instead.
+
+### Path forward (if anyone revisits)
+
+The only viable rename strategy would be to define every bridge lemma
+with explicit `Field`-instance routing (not via mathlib's `inv_mul_eq_one₀`
+etc.) so that the discriminator path is uniform. That's a from-scratch
+rewrite of all 14+ bridges and any chip simp call that depends on them.
+Cost dominates the value. Recommend not doing it.
+
 ## Sub-phase B — Design (deferred; not implemented this session)
 
 Sub-phase B would lift the auto-gen output from `Fin KB`-typed to fully
