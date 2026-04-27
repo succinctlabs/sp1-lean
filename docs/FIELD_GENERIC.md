@@ -8,10 +8,101 @@ phase boundary. The implementation roadmap is in
 ## Next session pickup
 
 **Status as of 2026-04-27**: Phases 0-5 + Sub-phase A + Sub-phase B.2 +
-B.3 + **Sub-phase B.4 (`toProp_poly` foundation + IsZeroOperation
-spec_poly pilot)** complete. Sub-phase B Steps 1-2 (`.val` rephrase,
+B.3 + B.4 + **Sub-phase B.5b (partial cascade: U16Compare, U16MSB,
+IsZeroWord, IsEqualWord lifted; `spec_poly` only for the two pure
+field-equality ops)** complete. Sub-phase B Steps 1-2 (`.val` rephrase,
 parametric Word.lean lift) attempted in earlier session, both reverted.
 `lake build` clean (0 errors, 0 warnings, 8508 jobs).
+
+**Critical finding from B.5b** (revises the prior claim that the cascade
+is "mechanical" with proofs that "carry verbatim"):
+
+The B.4 pilot succeeded specifically because `IsZeroOperation` does only
+**pure field-equality reasoning**. For ops whose iff lemmas reference
+byte-opcode `Range` constraints (`a.val < 2^b.val`) — including
+`U16CompareOperation`, `U16MSBOperation`, `LtOperationSigned`,
+`BitwiseU16Operation`, and the bridge-coupled arithmetic ops
+(`Add{,w}`/`Sub{,w}`/`AddrAdd`/`U16toU8Safe`) — the `_poly` proof
+**does not** carry verbatim from `Fin KB` to `ZMod p`. The blocker:
+
+1. `(16 : ZMod p).val = 16` only when `p > 16`. For small `p`, `2^16.val`
+   collapses, and `grind` cannot reason about the bound.
+2. `(a - b).val` over `ZMod p` requires case-split on `a.val ≥ b.val`
+   (mathlib's `ZMod.val_sub` only fires under that hypothesis); the
+   `Fin KB` proof never has to do this case-split because grind has
+   `KB`'s concrete value baked in.
+3. Even with a strong precondition like `[Fact (131072 < p)]`, the
+   `_poly` proof needs custom case analysis using `ZMod.val_sub`,
+   `ZMod.val_natCast_of_lt`, etc., and is ~20–40 lines per op rather
+   than `simp [constraints]; grind`.
+
+What B.5b actually delivered:
+
+- Struct + auto-gen lift for 4 ops (`U16CompareOperation`,
+  `U16MSBOperation`, `IsZeroWordOperation`, `IsEqualWordOperation`)
+  to `(F : Type)` / `(F : Type*)` parametric form, mirroring the B.4
+  IsZeroOperation pilot template.
+- `spec_poly` companions for `IsZeroWordOperation` and
+  `IsEqualWordOperation` only (pure field-equality, `simp; grind`
+  closes).
+- All downstream consumers (`LtOperationUnsigned`, `LtOperationSigned`,
+  `MulOperation`, `AddwOperation`, `SubwOperation`) pinned to
+  `(Fin KB)` per the IsZeroWord pilot pattern.
+- `update_constraints.py` exclusions for the 4 lifted ops, mirroring
+  the IsZeroOperation exclusion. Future regens preserve the cascade.
+
+What B.5b explicitly skipped (deferred):
+
+- `spec_poly` for `U16CompareOperation`/`U16MSBOperation` — Range
+  constraint `.val`-arithmetic blocker.
+- Structural lift for `LtOperationSigned`, `BitwiseU16Operation`,
+  `LtOperationUnsigned`, `AddwOperation`, `SubwOperation`,
+  `MulOperation`, `U16toU8OperationSafe` — composite ops that embed
+  the leaf ops. Lifting them requires either (a) lifting all transitive
+  embedded ops simultaneously (high churn), or (b) keeping their
+  structs at `Fin KB` while their auto-gen still calls leaf-op
+  `constraints` with `F = Fin KB` inferred (the B.5b strategy).
+- Bridge-coupled arithmetic op cascade (`Add`, `Sub`, `Addw`, `Subw`,
+  `AddrAdd`) — the bridge-free finding above implies the bridge-coupled
+  proofs would have the same `.val`-arithmetic blocker.
+- All 5 reader `_poly` iff lemmas — same blocker (readers consume the
+  Range/program-interaction predicates).
+
+**Outstanding work** for a future session that wants to push this further:
+
+1. **Structural-only lift for remaining ops.** Mechanical, just bigger
+   in scope (each leaf op like `AddOperation`, `SubOperation`,
+   `AddrAddOperation` is a clean lift; composite ops like `MulOperation`
+   need the embedded-op pinning pattern). Delivers fully polymorphic
+   auto-gen layer; chip side stays at `Fin KB`. Budget: ~30 min/op × 9
+   ops = ~5 hr.
+2. **Polymorphic `.val`-arithmetic helpers.** Add to `Field.lean` (or
+   a new `Field.Polymorphic.lean`):
+   - `(N : ZMod p).val = N` simp lemmas under `[Fact (N < p)]` for
+     N ∈ {2, 4, 8, 16, 32, 256, 65536}.
+   - `(2^k : ZMod p).val = 2^k` analogues.
+   - `ZMod.val_sub` case-split helper packaged as a tactic or
+     `aesop`-safe forward rule.
+   - Likely `[Fact (2^17 < p)]` is sufficient for everything in scope
+     (KB and BabyBear both ≥ 2^31).
+
+   With these in place, the deferred `spec_poly` lemmas become tractable
+   (~10–20 lines each instead of ~40).
+
+3. **Cross-repo upstream parametric emission.** `~/Documents/sp1`
+   constraint compiler change to emit `{F : Type*} [Field F]` directly
+   for operation-level constraints. Eliminates the
+   `update_constraints.py` exclusion list and makes the cascade durable
+   without manual re-edits after every regen.
+
+4. **Reader `_poly` iff lemma cascade.** Blocked on item 2 (same
+   `.val`-arithmetic issue). Once unblocked, mechanical: 5 readers ×
+   one iff lemma each.
+
+**Recommendation**: pick up with item 2 (`.val`-arithmetic helpers in
+`Field.lean`). Item 1 is mechanical but doesn't unblock anything for
+the polymorphism story; item 2 is the missing primitive that the rest
+of the `_poly` cascade depends on. Item 3 is cross-repo and orthogonal.
 
 **What landed in Sub-phase B.4 (this session)**:
 
