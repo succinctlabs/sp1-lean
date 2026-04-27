@@ -5,6 +5,58 @@ A running document for the multi-phase effort to lift this formalization off the
 phase boundary. The implementation roadmap is in
 `~/.claude/plans/make-a-plan-to-soft-aho.md`.
 
+## Next session pickup
+
+**Status as of 2026-04-26**: Phases 0-5 + Sub-phase A complete + sub-phase B
+**partial: ad-hoc instances landed**. Sub-phase B Steps 1-2 attempted with
+key empirical findings (see "Sub-phase B — Step 1/2 attempt" below). `lake
+build` clean.
+
+**Concrete sub-phase B progress this session**:
+
+- Added `instance ZMod.instLT (p : ℕ) [NeZero p]` and `instance ZMod.instMod`
+  to `SP1Foundations/Field.lean`. These let constraint semantics use `<` /
+  `%` syntax on `ZMod p` field elements (gated by `[NeZero p]`) and
+  definitionally agree with `Fin.instLT` / `Fin.instMod` at `p := KB`. They
+  are the foundation that future lifts of `toProp` / `toStateProp` to
+  `SP1Constraint (ZMod p)` will build on.
+
+**Findings that change the plan from the original design (B.1)**:
+
+- **Original design Step 1 (`.val`-rephrase)** is unworkable. Rephrasing
+  `pc0 % 4 = 0` → `pc0.val % 4 = 0` in `toProp` causes the four Store chips
+  to time out (>10 min vs ~5s baseline) due to a pathological simp expansion
+  in chip-side `simp [SP1Constraint.toProp, ...]`. **Reverted.** The design
+  doc's "Alternative" path (ad-hoc `LT`/`Mod` instances on `ZMod p`) is the
+  way forward — and now landed.
+- **Original design Step 2 (parametric `{p : ℕ} [NeZero p]` lift of Word.lean)**
+  fails dot-notation unification pervasively. When chip code calls `w.isU64`
+  on `w : Word (Fin KB)` and `Word.isU64` expects `Word (ZMod ?p)`, Lean's
+  unifier does not solve `?p := KB` from `Fin KB ≟ ZMod ?p`, even though
+  `ZMod KB = Fin KB` definitionally. **Tested** via partial Word.lean lift —
+  ~50 internal lemmas broke. **Reverted.**
+  - Direct (non-parametric) ZMod KB calls work fine via dot notation
+    (verified via `lean_run_code`), but that's just a rename, not a
+    polymorphism win.
+  - Workarounds for the parametric case would need explicit `@`
+    annotations at every call site, or replacement of dot notation with
+    explicit `Word.isU64 (p := KB) w` form. Neither is acceptable scope.
+
+**To continue sub-phase B**, the recommended next session sequence:
+
+1. Read "Sub-phase B — Step 1/2 attempt" findings below.
+2. Decide: do you want to push harder on the parametric Word.lean lift
+   (will likely require either a `class HasNatVal F` typeclass with
+   `outParam` to force unification, or a wholesale rewrite to use explicit
+   `@` annotations)? Or accept the more limited scope: the `LT`/`Mod`
+   instances are landed, and full Word.lean lift is deferred to a future
+   effort (perhaps coupled with the upstream compiler change in step 3).
+3. If pushing harder: investigate `outParam` and `instance` resolution
+   tactics. The Sail bridge in `SP1Foundations/SailM.lean` is field-agnostic
+   and unaffected.
+4. **Step 3+** (cross-repo, deferred): Update upstream constraint compiler
+   to emit `ZMod p` and symbolic `(2^k : ZMod p)⁻¹`.
+
 ## Goal
 
 Make the SP1 AIR formalization parameterizable over `{F : Type*} [Field F]`
@@ -13,18 +65,25 @@ Make the SP1 AIR formalization parameterizable over `{F : Type*} [Field F]`
 deployment over a different STARK field (BabyBear, Mersenne31, etc.) can reuse
 the proof scaffold instead of forking it.
 
-## Non-goals (this round)
+## Scope (as of 2026-04-26 — Phases 0-5 + Sub-phase A done)
 
-- **Auto-generated `*/Constraints.lean` blocks stay `Fin KB`-typed.** The Rust
-  `sp1-constraint-compiler` keeps emitting `Fin KB` and the literal
-  `2130673921` (`= (65536 : Fin KB)⁻¹`). We do not modify the upstream
-  compiler.
-- **Top-level `correct_*` chip theorems stay instantiated at `Fin KB`.** We are
-  not (yet) producing `correct_<chip>_generic` variants. The win is that any
-  future generic variant has dramatically less to redo.
-- **No second concrete field.** Success criterion is the type checker, not a
-  parallel BabyBear instantiation. (BabyBear is a stretch goal documented in
-  Phase 5 as forward guidance.)
+- **Datatypes (`SP1Constraint`, `AirInteraction`, `SP1ConstraintList`) are
+  parameterized** over `(F : Type*)` (no typeclass requirements at the
+  inductive level).
+- **Auto-generated `*/Constraints.lean` blocks emit `(Fin KB)` annotations
+  directly** from the upstream constraint compiler (sub-phase A; the
+  post-splice rewrite was removed). The upstream still emits the inverse
+  literal `2130673921` (KB-specific). Sub-phase B would change both.
+- **Top-level `correct_*` chip theorems stay instantiated at `Fin KB`.** Not
+  (yet) producing `correct_<chip>_generic` variants.
+- **No second concrete field instantiated yet.** Success criterion is the
+  type checker, not a parallel BabyBear instantiation. (BabyBear is a
+  stretch goal documented in "How to instantiate at a different prime
+  field" as forward guidance.)
+- **Sub-phase B (full `F`/`ZMod p` parameterization with chip-side
+  variable declaration) is designed but not implemented.** See
+  "Sub-phase B — Design" below and the "Next session pickup" pointer at
+  the top of this doc.
 
 ## Layer map (target end state)
 
@@ -155,7 +214,8 @@ grep -rno "^theorem correct_\|^lemma correct_" SP1Chips | wc -l   # expect 57
 - [x] `update_constraints.py` post-splice rewrite added: rewrites bare
   `SP1ConstraintList` → `SP1ConstraintList (Fin KB)` after the constraint
   compiler emits Lean. Future regen produces field-typed annotations
-  automatically.
+  automatically. **(Removed in Sub-phase A — see below; the upstream now
+  emits the annotation directly.)**
 - [x] 48 auto-gen `*/Constraints.lean` files updated mechanically (one-shot
   perl rewrite, same regex as the regen post-splice).
 - [x] All 57 `correct_*` theorems still close. `lake build` clean
@@ -388,6 +448,348 @@ with the KB-coupling cleanly localized to `Field.lean`'s bridge lemmas and the
 auto-gen literal output.
 
 **`lake build` final:** clean, 0 errors, 0 warnings (matches baseline).
+
+## Sub-phase A — Upstream emits `(Fin KB)` directly (complete, 2026-04-26)
+
+Followup to Phase 1 after the user reversed the original "keep auto-gen
+KB-bound by leaving the upstream alone" decision. The `update_constraints.py`
+post-splice rewrite was a workaround; this sub-phase moves the `(Fin KB)`
+annotation into the upstream so the rewrite is unnecessary.
+
+**Changes in `../sp1`** (branch `dtumad/constraint-extractor-update`):
+
+| File | Change |
+|---|---|
+| `crates/core/compiler/src/main.rs:101` | Chip-level outer signature: `: SP1ConstraintList :=` → `: SP1ConstraintList (Fin KB) :=` |
+| `crates/core/compiler/src/ir/ast.rs:454-469` | Operation-level `to_output_lean_type()`: KoalaBear → `Fin KB`; bare `SP1ConstraintList` → `SP1ConstraintList (Fin KB)` |
+| `crates/core/compiler/src/ir/ast.rs:660-679` | Operation-level `to_lean_type()` for `Ty::Expr`/`Ty::Word`/`Ty::ArrWordSize`/`Ty::ArrWordByteSize`: KoalaBear → `(Fin KB)` |
+| `crates/core/compiler/src/ir/ast.rs:910/939/957` | Let-binding type annotations in operation bodies: `KoalaBear` → `Fin KB` |
+| `crates/core/compiler/src/ir/ast.rs:1131` | `let CS{i} : SP1ConstraintList := ` → `let CS{i} : SP1ConstraintList (Fin KB) := ` (operation call sites in operation bodies) |
+| `crates/hypercube/src/ir/ast.rs:251` | `let CS{i} : SP1ConstraintList := ` → `let CS{i} : SP1ConstraintList (Fin KB) := ` (operation call sites in chip bodies — separate `FuncDecl` shape) |
+| `crates/hypercube/src/ir/func.rs:75-79` | `to_output_lean_type()` (the live one for chip-level emission): `SP1ConstraintList` → `SP1ConstraintList (Fin KB)` for both `Shape::Unit` and tuple cases |
+
+**Changes in this repo**: removed the post-splice regex rewrite from
+`update_constraints.py`. The upstream is now self-sufficient.
+
+**Verification**: full regen across all 48 `Constraints.lean` files via
+`SP1_DIR=… python3 update_constraints.py` produces **zero byte diff** against
+the existing tree (compared via `md5sum`). `lake build` clean.
+
+**Discovery during execution**: there are **two** `FuncDecl` types in the SP1
+upstream — `compiler/src/ir/ast.rs` (operations) and an unnamed analogous
+struct in `hypercube/src/ir/` (chips). The compiler's `to_output_lean_type`
+and `to_lean_type` are dead-coded for our chip path; the hypercube versions
+are the live ones. Updated both for safety so future operation paths that
+exercise the compiler's strings don't silently emit broken Lean.
+
+## Sub-phase B — Step 1/2 attempt (2026-04-26)
+
+**Outcome**: ad-hoc `ZMod` instances landed; `.val` rephrase and parametric
+Word.lean lift attempted and reverted. Detailed below for future sessions.
+
+### What landed
+
+`SP1Foundations/Field.lean`:
+```lean
+namespace ZMod
+instance instLT (p : ℕ) [NeZero p] : LT (ZMod p) where
+  lt x y := x.val < y.val
+instance instMod (p : ℕ) [NeZero p] : Mod (ZMod p) where
+  mod x y := ((x.val % y.val : ℕ) : ZMod p)
+end ZMod
+```
+
+These instances dispatch via `.val` projection. At `p := KB`,
+`ZMod KB = Fin KB` definitionally, and these instances agree with
+`Fin.instLT` / `Fin.instMod`. They unblock the future lift of
+`toProp`/`toStateProp` to `SP1Constraint (ZMod p)` from needing the `.val`
+rephrase that the original design called for.
+
+### What failed and why
+
+**Attempt 1**: `.val`-rephrase in `Constraint.lean` (the design's "Step 1").
+Edited `toProp` line 68 from `pc0 % 4 = 0` to `pc0.val % 4 = 0`. Updated
+matching Reader iff RHS in 4 reader files, plus `Branch/Constraints.lean:248`
+and `JalChip.lean:65` to consume the new shape. Build attempted.
+
+- `Branch/Constraints.lean`, `JalChip.lean` and the 4 readers built clean.
+- All four Store chips (`StoreByteChip`, `StoreDoubleChip`, `StoreHalfChip`,
+  `StoreWordChip`) **failed to elaborate within 10 minutes** (vs ~5s
+  baseline). The slowdown came from chip-side `simp [SP1Constraint.toProp,
+  ITypeReaderImmutable.constraints, ...]` calls (e.g. `StoreByteChip.lean:60`)
+  that consume the program-interaction predicate. Some downstream simp lemma
+  reacts pathologically to the `.val % 4 = 0` shape.
+- Resource impact: each Store chip consumed ~18 GB RAM and 96% CPU during
+  the spin. Parallel `lake build` exhausted system memory.
+- **Reverted.** Adopted the design doc's "Alternative" path: ad-hoc instances
+  on `ZMod p` (above).
+
+**Attempt 2**: Parametric Word.lean lift — change `Word.isU64` from
+`Word (Fin KB) → Prop` to `{p : ℕ} [NeZero p] (Word (ZMod p)) → Prop`. Other
+callers stay at `Fin KB`; rely on `ZMod KB = Fin KB` definitional equality
++ unification to solve `?p := KB`.
+
+- ~50 internal Word.lean lemmas broke with errors like
+  `Application type mismatch: argument w has type Word (Fin 2130706433) but
+  is expected to have type Word (ZMod ?m.3)`.
+- Lean's unifier does **not** solve `Fin KB ≟ ZMod ?p` for `?p` even though
+  `ZMod KB = Fin KB` definitionally. The unifier treats this as a
+  higher-order pattern it can't invert without a hint. Direct annotation
+  `@Word.isU64 KB _ w` works but every call site would need this.
+- Symmetric test: `lean_run_code` confirmed that direct application
+  `Vector_isU16 w` (no dot notation) DOES unify `?p := KB` from `w : Vector
+  (Fin KB) 4`. The failure is specific to dot notation in lemma proofs that
+  call other dot-notation lemmas in chains.
+- **Reverted.**
+- Workarounds for a future session:
+  - Rewrite all dot-notation uses as explicit `@` calls (high churn).
+  - Introduce `class HasNatVal (F : Type*)` with `outParam` and instances
+    for `Fin n` and `ZMod p`, generalize Word.lean over the class instead
+    of `ZMod p`. Adds typeclass resolution cost.
+  - Lift only signatures from `Fin KB` to `ZMod KB` (specific, not
+    parametric). This works but achieves nothing semantically — it's a
+    rename. Worth doing only if it improves discoverability for future
+    BabyBear instantiation.
+
+### Verified facts to preserve for future sessions
+
+- `ZMod KB = Fin KB` is a **reducible** definitional equality (mathlib's
+  `ZMod` is `def ZMod : ℕ → Type | 0 => ℤ | n+1 => Fin (n+1)`).
+- `KoalaBear.Fact_BBPrime` (`Field.lean:51`) and `KoalaBear : NeZero KB`
+  (`Field.lean:52`) are root-scope, so `[Fact (Nat.Prime KB)]` and
+  `[NeZero KB]` synthesize automatically.
+- The `LT`/`Mod` instances above don't conflict with `Fin.instLT`/`Fin.instMod`
+  at `p := KB` because they're on different (but definitionally equal)
+  types — synthesis dispatches to `Fin.*` for `Fin n` queries and to the
+  new `ZMod.*` for `ZMod n` queries.
+- The 11 high-priority `Fin KB` arithmetic instances at `Field.lean:63-72`
+  are unaffected by the `ZMod` instances and continue to dominate dispatch
+  for `Fin KB`-typed expressions.
+
+## Sub-phase B — Design (deferred; not implemented this session)
+
+Sub-phase B would lift the auto-gen output from `Fin KB`-typed to fully
+`F`-typed, with chip and operation files declaring `variable {F : Type*}
+[Field F]` (plus extras) and instantiating `F := Fin KB` at the top-level
+`correct_*` theorem layer. This would deliver true field-genericity at the
+auto-gen layer, completing what the hybrid scope deferred.
+
+The work breaks into three independent design questions, each of which has a
+recommended answer below.
+
+### B.1: Use `ZMod p` directly (mathlib-canonical)
+
+Investigated 2026-04-26. The right abstraction is mathlib's `ZMod p`, not a
+new `PrimeFieldFin` typeclass. `Field.lean:54` already carries the TODO
+comment `-- dt: Wouldn't need this if ZMod was the fundamental object for us`,
+and `instance : Field (Fin KB) := ZMod.instField KB` is already routing
+through `ZMod`. Sub-phase B can complete that direction.
+
+**What `ZMod p` gives us out-of-the-box**:
+
+- `ZMod p = Fin p` *definitionally* when `p > 0` (mathlib's definition).
+- `Field (ZMod p)` via `ZMod.instField` with `[Fact (Nat.Prime p)]`.
+- `CharP (ZMod p) p`, `Fintype (ZMod p)` (with `NeZero`), `DecidableEq`,
+  `NeZero`, `NoZeroDivisors` (via `Field → IsDomain → NoZeroDivisors`).
+- `ZMod.val : ZMod p → ℕ` (the natural-number representative, replaces `Fin.val`).
+- `ZMod.val_lt : ∀ x, x.val < p` (requires `[NeZero p]`).
+- `ZMod.val_injective`, `ZMod.cast`, etc.
+
+**What's missing and how to fix it** (verified via `lean_run_code`):
+
+- `LT (ZMod p)` and `Mod (ZMod p)` do **not** synthesize for generic `p`.
+  Mathlib intentionally omits these because `ZMod 0 = ℤ` and `ZMod (n+1) =
+  Fin (n+1)` have different ordering semantics, so a uniform instance would
+  be misleading.
+
+  **Fix (preferred): rephrase `toProp`/`toStateProp` to use `.val`-level
+  comparisons.** The current `op_a < 32` and `pc0 % 4 = 0` checks are
+  semantically about the *natural-number representation* of the field
+  element, not about a field-level order (which doesn't exist meaningfully on
+  a finite field). Replace:
+
+  ```lean
+  -- Before (Fin KB-level)
+  ∧ op_a < 32
+  ∧ pc0 % 4 = 0
+
+  -- After (Nat-level via ZMod.val)
+  ∧ op_a.val < 32
+  ∧ pc0.val % 4 = 0
+  ```
+
+  Mathematically equivalent (both check the natural representation), but more
+  explicit and avoids any non-canonical typeclass instance. Verified via
+  `lean_run_code`: this form elaborates over generic `[NeZero p]` `ZMod p`
+  with no extra instances needed.
+
+  **Alternative (if proof-tactic compatibility forces it): ad-hoc instances**.
+  Only consider if the rephrasing breaks too many existing chip proofs:
+
+  ```lean
+  namespace ZMod
+  instance instLT (p : ℕ) [NeZero p] : LT (ZMod p) where
+    lt x y := x.val < y.val
+  instance instMod (p : ℕ) [NeZero p] : Mod (ZMod p) where
+    mod x y := ((x.val % y.val : ℕ) : ZMod p)
+  end ZMod
+  ```
+
+  Both options preserve `Fin KB` semantics at the `p := KB` instantiation,
+  since `ZMod KB = Fin KB` definitionally and `(x : Fin KB).val = (x : ZMod KB).val`.
+
+**Recommended parameterization shape**:
+
+```lean
+section
+variable {p : ℕ} [hp : Fact (Nat.Prime p)] [NeZero p]
+
+-- Auto-gen lives here, references ZMod p as the field type
+@[irreducible] def constraints (Main : Vector (ZMod p) N) :
+    SP1ConstraintList (ZMod p) := ...
+
+end
+```
+
+`toStateProp` uses `ZMod.val` directly (instead of `.val`):
+
+```lean
+def toStateProp (cstr : SP1Constraint (ZMod p)) (s : SailState) : Prop :=
+  match cstr with
+  | .send (.memory _ _ addr0 ...) mult => mult ≠ 0 →
+      if h_addrs : addr0.val < 32 ∧ ... then  -- ZMod.val, not Fin.val
+        s.get_reg? (BitVec.ofNatLT addr0.val ...) = ...
+      else ...
+  ...
+```
+
+Top-level `correct_*` instantiates at `p := KB`:
+
+```lean
+theorem correct_add (Main : Vector (ZMod KB) 33) ... := by ...
+```
+
+Since `ZMod KB = Fin KB` definitionally, all existing proofs that use
+`Fin KB` syntax still elaborate after the migration — the type-checker treats
+them as identical.
+
+**No new typeclass needed.** `[Fact (Nat.Prime p)] + [NeZero p]` is sufficient
+for the field instance; the ad-hoc `LT` + `Mod` are the only additions.
+
+`ByteOpcode.constrain` and `Opcode.trusted_instr` would need to be lifted to
+`ZMod p` too (currently `Fin KB`-typed). This is a mechanical change since
+their bodies are typically just `<`, `=`, `Bool` checks — all of which work
+generically once the `LT`/`Mod` instances are in place.
+
+### B.2: Compiler emits symbolic `(2^k : F)⁻¹` instead of literal
+
+Current behavior: compiler emits `2130673921` for `(2^16 : Fin KB)⁻¹`.
+**Decision (chosen by user)**: change the compiler to emit `(65536 : F)⁻¹`
+(or equivalently `(2^16 : F)⁻¹`) symbolically.
+
+Implementation in `../sp1`:
+
+- In `crates/core/compiler/src/ir/builder.rs` (or wherever the inverse-of-`2^k`
+  values are computed), replace the literal-emission path with a symbolic
+  emission. Something like emitting `"((2 ^ 16 : F)⁻¹)"` instead of the
+  precomputed numeric value.
+- The 4 inverse families currently used: `(2^2)⁻¹`, `(2^3)⁻¹`, `(2^8)⁻¹`,
+  `(2^16)⁻¹`. The compiler probably has a switch over the `k`. Update each.
+
+Implementation in this repo:
+
+- The 14 KB-literal bridges in `Field.lean` (`inv_16BB_eq'` etc.) become the
+  per-field simp normal-form lemmas: at the `Fin KB` instantiation, simp
+  rewrites `(65536 : Fin KB)⁻¹` to `2130673921` (or vice versa) so existing
+  proof tactics keep working.
+- The 5 operation files that use `simp [..., inv_16BB_eq']` no longer need
+  the bridge — the auto-gen and the iff lemma RHS would both use `(65536)⁻¹`
+  directly.
+
+Performance caveat: every `(65536 : F)⁻¹` reference in the auto-gen will
+require simp to dispatch. The performance impact depends on how often the
+inverse appears (the audit shows ~150 places use literals across the
+`Constraints.lean` files). May want to mark the bridge lemmas with high simp
+priority to avoid regressions in the slow-built chips (ShiftLeft 307s,
+ShiftRight 363s, DivRem 268s).
+
+### B.3: Chip files declare `variable {F : Type*} [Field F]`
+
+Each `<Chip>Chip.lean` and `<Operation>.lean` file would add a section-level
+`variable {F : Type*} [PrimeFieldFin F]` (or `[Field F]` + extras), and the
+`@[irreducible] def constraints` from the auto-gen lives inside that section.
+
+The top-level `correct_*` theorems instantiate at `F = Fin KB`:
+
+```lean
+theorem correct_add (Main : Vector (Fin KB) 33) ... := by ...
+```
+
+The body of `correct_*` would invoke the field-generic operation iff lemmas
+(e.g. `AddOperation.allHold_constraints_iff` now stated `∀ {F} [Field F] ...`)
+which the type system would unify at `F = Fin KB`.
+
+**Risk**: the operation iff lemmas currently rely on KB-specific simp
+behavior implicitly. After lifting, the proofs may need typeclass annotations
+sprinkled in (e.g. `[Fact (Nat.Prime p)]` for invertibility). This is the
+"per-operation tactical fixup" cost — likely 30-60 min per operation × 19
+operations = roughly a week of work, plus the per-chip fixup which is
+similar.
+
+### Migration plan for sub-phase B
+
+1. **Set up the typeclass.** Add `class PrimeFieldFin` to
+   `SP1Foundations/Field.lean`, instance it for `Fin KB`, prove the projection
+   lemmas (mostly `rfl`).
+2. **Lift `toProp`/`toStateProp`/`allHold`/`initialState`** to take
+   `[PrimeFieldFin F]`, restating the math via `PrimeFieldFin.toNat`. Verify
+   `lake build` clean (existing chips unchanged because they instantiate at
+   `Fin KB`).
+3. **Update upstream** to emit `F`-typed annotations and symbolic inverses.
+   Drop the `Fin KB` strings from `main.rs` / `ast.rs` / `func.rs`. Regen +
+   verify byte-diff is exactly the type-annotation change (with a
+   `s/Fin KB/F/g`-style substitution).
+4. **Add `variable {F : Type*} [PrimeFieldFin F]`** to one operation file as
+   a pilot (e.g. `IsZeroOperation.lean` — already structurally generic, no
+   KB bridges per Phase 3 audit). Verify `correct_<chips that use IsZero>`
+   still close.
+5. **Sweep remaining operations**, simplest-first (per Phase 3 audit:
+   `IsZero` → `IsZeroWord` → `IsEqualWord` → `U16Compare` → `BitwiseU16` →
+   `U16MSB` → `LtUnsigned` → `LtSigned` → `Add` → `Sub` → `AddrAdd` →
+   `Addw` → `Subw` → `U16toU8Safe`).
+6. **Sweep chips**, simplest-first. Most should "just work" if their
+   operations are now generic; the three KB-bridge-using chips
+   (`BranchChip`, `JalrChip`, `LoadByteChip`) need targeted attention.
+7. **Audit residual `Fin KB` references** in hand-written code. Anything
+   left should be in `correct_*` statements (intentional KB instantiation)
+   or in `Field.lean` instances (intentional concrete-field surface).
+
+**Estimated cost**: ~1 week of focused work, with `lake build` checkpoints
+after each operation/chip migration. Risk-mitigated by the type system —
+either it elaborates or it doesn't.
+
+**Open questions to resolve before starting B**:
+
+- ~~**Q1**: Does mathlib already have a class equivalent to
+  `PrimeFieldFin`?~~ **Resolved 2026-04-26**: yes, `ZMod p` with
+  `[Fact (Nat.Prime p)] + [NeZero p]` is sufficient. No new class needed.
+  Rephrase `<`/`%` uses to `.val < c` / `.val % c = 0` (Nat-level) to avoid
+  non-canonical `LT (ZMod p)` instance.
+- **Q2**: How does the `[OfNat F n]` instance interact with the
+  high-priority `Fin KB` instances in `Field.lean:46`? The perf-critical
+  instances must keep firing for `Fin KB` (= `ZMod KB` definitionally), so
+  the existing block should still apply at `p := KB`. Generic `OfNat (ZMod p) n`
+  comes from mathlib via the field's `Nat`-cast — should not compete with
+  the high-priority `Fin KB` ones at the concrete instantiation, but worth
+  re-running the perf profile during the migration to confirm no regression
+  in `ShiftRight` (current 363 s, the worst).
+- **Q3**: ~~For the `pc0 % 4 = 0` modular check, what's the right
+  generalization?~~ **Resolved 2026-04-26**: rephrase as `pc0.val % 4 = 0`
+  (Nat-level), per Q1's resolution.
+- **Q4 (new)**: Should `ByteOpcode.constrain` and `Opcode.trusted_instr` be
+  lifted from `Fin KB` to `ZMod p`? Their bodies are `<`, `=`, `Bool` checks
+  — mechanical to lift once the parameterization is in place. Add to the
+  migration sequence between steps 2 and 3 of the plan above.
 
 ## How to instantiate at a different prime field
 

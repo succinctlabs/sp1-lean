@@ -42,6 +42,23 @@ lemma Fin.val_mod_eq_zero_iff_of_lt {n : ℕ} [NeZero n] {x : Fin n} {m : ℕ} (
   conv_lhs => rw [show m = (Fin.ofNat n m).val from (Nat.mod_eq_of_lt hm).symm]
   exact Fin.val_mod_eq_zero_iff x (Fin.ofNat n m)
 
+/-! ### Ad-hoc `LT` and `Mod` instances on `ZMod p`
+
+Mathlib intentionally omits `LT (ZMod p)` and `Mod (ZMod p)` because `ZMod 0 = ℤ`
+and `ZMod (n+1) = Fin (n+1)` have different ordering semantics. With `[NeZero p]`
+we are in the `Fin (n+1)` case, where `.val`-level `Nat`-comparison and modulo are
+the natural choices. These let the field-genericity work (sub-phase B) reuse
+`<` / `%` syntax in `toProp` / `toStateProp` without rephrasing to `.val`-form
+(which empirically caused chip proofs to time out). At `p := KB`, `ZMod KB = Fin KB`
+definitionally and these instances agree with `Fin.instLT` / `Fin.instMod`. -/
+
+namespace ZMod
+instance instLT (p : ℕ) [NeZero p] : LT (ZMod p) where
+  lt x y := x.val < y.val
+instance instMod (p : ℕ) [NeZero p] : Mod (ZMod p) where
+  mod x y := ((x.val % y.val : ℕ) : ZMod p)
+end ZMod
+
 namespace KoalaBear
 
 -- dt: Need `#eval`-level `native_decide` strength to make this work on all OS

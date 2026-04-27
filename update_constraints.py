@@ -107,14 +107,6 @@ def update_constraints_in_file(file_path: str, new_constraints: str):
     if new_constraints and not new_constraints.endswith('\n'):
         new_constraints += '\n'
 
-    # The constraint compiler emits `SP1ConstraintList` (no field arg). Since the
-    # datatype was parameterized over the field type (see docs/FIELD_GENERIC.md
-    # Phase 1), every bare reference needs to be re-typed at `Fin KB` so it
-    # elaborates. The compiler stays KB-bound by design; this rewrite is the
-    # bridge.
-    new_constraints = re.sub(r'\bSP1ConstraintList\b(?![\.\(])',
-                             'SP1ConstraintList (Fin KB)', new_constraints)
-
     # Reconstruct the file with new constraints
     new_lines = lines[:start_idx + 1] + [new_constraints] + lines[end_idx:]
 
