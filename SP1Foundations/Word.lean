@@ -1577,6 +1577,17 @@ lemma isNegative_BitVec.toInt
   rw [toBitVec128_toNat h_w_isU128]
   omega
 
+/-- Polymorphic counterpart of `BDWord.isNegative_BitVec.toInt`. -/
+lemma isNegative_poly_BitVec.toInt
+  {p : ℕ} [NeZero p]
+  {w : BDWord (ZMod p)}
+  (h_w_isU128 : w.isU128_poly) :
+    w.isNegative_poly ↔ ¬ 2 * w.toNat_poly < 2 ^ 128 := by
+  rw [isNegative_poly_msb h_w_isU128]
+  simp [BitVec.msb_eq_decide]
+  rw [toBitVec128_poly_toNat_poly h_w_isU128]
+  omega
+
 /-- Convert a bytedword to an `Int` by shifting and adding the limbs, with sign correction. -/
 def toInt (w : BDWord (Fin KB)) : ℤ :=
   if (isNegative w) then w.toNat - 2 ^ 128 else w.toNat
@@ -1594,6 +1605,17 @@ lemma toBitVec128_toInt {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
     simp_all [toBitVec128, toInt, BitVec.toInt]
     split_ifs <;> rw [isNegative_BitVec.toInt h_w_isU128] at * <;> omega
 
+set_option maxRecDepth 200000 in
+-- Polymorphic counterpart of `BDWord.toBitVec128_toInt`.
+lemma toBitVec128_poly_toInt_poly {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (h_w_isU128 : w.isU128_poly) :
+    w.toBitVec128_poly.toInt = w.toInt_poly
+  := by
+    have := lt_cases_of_isU128_poly h_w_isU128
+    have : w.toNat_poly < 2 ^ 128 := toNat_poly_lt_of_isU128_poly h_w_isU128
+    simp_all [toBitVec128_poly, toInt_poly, BitVec.toInt]
+    split_ifs <;> rw [isNegative_poly_BitVec.toInt h_w_isU128] at * <;> omega
+
 lemma low_as_extract {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
   (w.low).toBitVec64 = BitVec.extractLsb 63 0 (w.toBitVec128) := by
   have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ := lt_cases_of_isU128 h_w_isU128
@@ -1601,11 +1623,31 @@ lemma low_as_extract {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
   simp [← BitVec.toNat_inj, BWord.toNat, BDWord.toNat]
   omega
 
+/-- Polymorphic counterpart of `BDWord.low_as_extract`. -/
+lemma low_as_extract_poly {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (h_w_isU128 : w.isU128_poly) :
+    (w.low_poly).toBitVec64_poly = BitVec.extractLsb 63 0 (w.toBitVec128_poly) := by
+  have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ :=
+    lt_cases_of_isU128_poly h_w_isU128
+  simp [BDWord.low_poly, BWord.toBitVec64_poly, BDWord.toBitVec128_poly]
+  simp [← BitVec.toNat_inj, BWord.toNat_poly, BDWord.toNat_poly]
+  omega
+
 lemma high_as_extract {w : BDWord (Fin KB)} (h_w_isU128 : w.isU128) :
   (w.high).toBitVec64 = BitVec.extractLsb 127 64 (w.toBitVec128) := by
   have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ := lt_cases_of_isU128 h_w_isU128
   simp [BDWord.high, BWord.toBitVec64, BDWord.toBitVec128]
   simp [← BitVec.toNat_inj, BWord.toNat, BDWord.toNat]
+  omega
+
+/-- Polymorphic counterpart of `BDWord.high_as_extract`. -/
+lemma high_as_extract_poly {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (h_w_isU128 : w.isU128_poly) :
+    (w.high_poly).toBitVec64_poly = BitVec.extractLsb 127 64 (w.toBitVec128_poly) := by
+  have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ :=
+    lt_cases_of_isU128_poly h_w_isU128
+  simp [BDWord.high_poly, BWord.toBitVec64_poly, BDWord.toBitVec128_poly]
+  simp [← BitVec.toNat_inj, BWord.toNat_poly, BDWord.toNat_poly]
   omega
 
 end conversions
