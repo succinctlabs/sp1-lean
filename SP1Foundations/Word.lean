@@ -178,11 +178,25 @@ lemma toInt_lb {w : HWord (Fin KB)} (is_U32_w : w.isU32) :
   simp [HWord.toInt, HWord.isNegative, HWord.toNat] at *
   omega
 
+/-- Polymorphic counterpart of `HWord.toInt_lb`. -/
+lemma toInt_poly_lb {p : ℕ} [NeZero p] {w : HWord (ZMod p)} (is_U32_w : w.isU32_poly) :
+  -2147483648 ≤ w.toInt_poly := by
+  have ⟨h0, h1⟩ := lt_cases_of_isU32_poly is_U32_w
+  unfold HWord.toInt_poly HWord.isNegative_poly HWord.toNat_poly
+  split_ifs <;> push_cast <;> omega
+
 lemma toInt_ub {w : HWord (Fin KB)} (is_U32_w : w.isU32) :
   w.toInt < 2147483648 := by
   apply HWord.lt_cases_of_isU32 at is_U32_w
   simp [HWord.toInt, HWord.isNegative, HWord.toNat] at *
   omega
+
+/-- Polymorphic counterpart of `HWord.toInt_ub`. -/
+lemma toInt_poly_ub {p : ℕ} [NeZero p] {w : HWord (ZMod p)} (is_U32_w : w.isU32_poly) :
+  w.toInt_poly < 2147483648 := by
+  have ⟨h0, h1⟩ := lt_cases_of_isU32_poly is_U32_w
+  unfold HWord.toInt_poly HWord.isNegative_poly HWord.toNat_poly
+  split_ifs <;> push_cast <;> omega
 
 lemma eq_toInt_eq {wx wy : HWord (Fin KB)} (is32_wx : HWord.isU32 wx) (is32_wy : HWord.isU32 wy) :
   wx = wy ↔ wx.toInt = wy.toInt := by
@@ -193,6 +207,21 @@ lemma eq_toInt_eq {wx wy : HWord (Fin KB)} (is32_wx : HWord.isU32 wx) (is32_wy :
     unfold HWord.toInt HWord.isNegative HWord.toNat; intro heq
     rw [← HWord.eq_pointwise]
     omega
+
+/-- Polymorphic counterpart of `HWord.eq_toInt_eq`. The reverse direction
+is structured similarly to the `Fin KB` version but uses
+`ZMod.val_injective` per limb to recover pointwise equality from the
+`.val`-bound facts. -/
+lemma eq_toInt_poly_eq {p : ℕ} [NeZero p] {wx wy : HWord (ZMod p)}
+    (is32_wx : wx.isU32_poly) (is32_wy : wy.isU32_poly) :
+  wx = wy ↔ wx.toInt_poly = wy.toInt_poly := by
+  constructor
+  · simp_all
+  · apply HWord.lt_cases_of_isU32_poly at is32_wx
+    apply HWord.lt_cases_of_isU32_poly at is32_wy
+    unfold HWord.toInt_poly HWord.isNegative_poly HWord.toNat_poly; intro heq
+    rw [← HWord.eq_pointwise]
+    refine ⟨?_, ?_⟩ <;> apply ZMod.val_injective <;> omega
 
 lemma toBitVec32_toInt {w : HWord (Fin KB)} (h_w_isU64 : w.isU32) :
     w.toBitVec32.toInt = w.toInt
@@ -352,12 +381,17 @@ lemma eq_toNat_eq {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : W
     rw [← Word.eq_pointwise]
     omega
 
--- Note: `eq_toNat_poly_eq` (poly counterpart of `eq_toNat_eq`) is deferred.
--- Recovering pointwise equality from `toNat_poly` equality requires
--- combining ZMod.val injectivity with the limb-decomposition bound. The
--- Fin KB proof closes by `omega` over `Fin.val`'s direct projection;
--- the polymorphic version needs an explicit `ZMod.val_injective` step
--- per limb. Add when first consumer needs it.
+/-- Polymorphic counterpart of `eq_toNat_eq`. -/
+lemma eq_toNat_poly_eq {p : ℕ} [NeZero p] {wx wy : Word (ZMod p)}
+    (is64_wx : wx.isU64_poly) (is64_wy : wy.isU64_poly) :
+    wx = wy ↔ wx.toNat_poly = wy.toNat_poly := by
+  constructor
+  · simp_all
+  · have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly is64_wx
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly is64_wy
+    unfold toNat_poly; intro heq
+    rw [← Word.eq_pointwise]
+    refine ⟨?_, ?_, ?_, ?_⟩ <;> apply ZMod.val_injective <;> omega
 
 lemma toNat_reconstruct {w : Word (Fin KB)} {x : ℕ} (is64_w : Word.isU64 w) :
   w.toNat = x →
@@ -481,11 +515,32 @@ lemma eq_toInt_eq {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : W
     rw [← Word.eq_pointwise]
     omega
 
+/-- Polymorphic counterpart of `Word.eq_toInt_eq`. -/
+lemma eq_toInt_poly_eq {p : ℕ} [NeZero p] {wx wy : Word (ZMod p)}
+    (is64_wx : Word.isU64_poly wx) (is64_wy : Word.isU64_poly wy) :
+    wx = wy ↔ wx.toInt_poly = wy.toInt_poly := by
+  constructor
+  · simp_all
+  · have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly is64_wx
+    have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly is64_wy
+    unfold Word.toInt_poly Word.isNegative_poly Word.toNat_poly; intro heq
+    rw [← Word.eq_pointwise]
+    refine ⟨?_, ?_, ?_, ?_⟩ <;>
+      apply ZMod.val_injective <;>
+      (push_cast at heq; split_ifs at heq <;> omega)
+
 lemma toInt_lb {w : Word (Fin KB)} (is_U64_w : w.isU64) :
   -9223372036854775808 ≤ w.toInt := by
   apply Word.lt_cases_of_isU64 at is_U64_w
   simp [Word.toInt, Word.isNegative, Word.toNat] at *
   omega
+
+/-- Polymorphic counterpart of `Word.toInt_lb`. -/
+lemma toInt_poly_lb {p : ℕ} [NeZero p] {w : Word (ZMod p)} (is_U64_w : w.isU64_poly) :
+  -9223372036854775808 ≤ w.toInt_poly := by
+  have ⟨h0, h1, h2, h3⟩ := lt_cases_of_isU64_poly is_U64_w
+  unfold Word.toInt_poly Word.isNegative_poly Word.toNat_poly
+  split_ifs <;> push_cast <;> omega
 
 lemma toInt_ub {w : Word (Fin KB)} (is_U64_w : w.isU64) :
   w.toInt < 9223372036854775808 := by
@@ -493,9 +548,24 @@ lemma toInt_ub {w : Word (Fin KB)} (is_U64_w : w.isU64) :
   simp [Word.toInt, Word.isNegative, Word.toNat] at *
   omega
 
+/-- Polymorphic counterpart of `Word.toInt_ub`. -/
+lemma toInt_poly_ub {p : ℕ} [NeZero p] {w : Word (ZMod p)} (is_U64_w : w.isU64_poly) :
+  w.toInt_poly < 9223372036854775808 := by
+  have ⟨h0, h1, h2, h3⟩ := lt_cases_of_isU64_poly is_U64_w
+  unfold Word.toInt_poly Word.isNegative_poly Word.toNat_poly
+  split_ifs <;> push_cast <;> omega
+
 lemma isU64_toInt {w : Word (Fin KB)} (is64_w : Word.isU64 w) : - 2 ^ 63 ≤ w.toInt ∧ w.toInt < 2 ^ 63 := by
   unfold Word.toInt Word.isNegative Word.toNat
   grind
+
+/-- Polymorphic counterpart of `Word.isU64_toInt`. -/
+lemma isU64_poly_toInt_poly {p : ℕ} [NeZero p] {w : Word (ZMod p)}
+    (is64_w : Word.isU64_poly w) :
+    - 2 ^ 63 ≤ w.toInt_poly ∧ w.toInt_poly < 2 ^ 63 := by
+  have ⟨h0, h1, h2, h3⟩ := lt_cases_of_isU64_poly is64_w
+  unfold Word.toInt_poly Word.isNegative_poly Word.toNat_poly
+  split_ifs <;> push_cast <;> omega
 
 lemma toBitVec64_toInt {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     w.toBitVec64.toInt = w.toInt
@@ -507,11 +577,31 @@ lemma toBitVec64_toInt {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     rw [toBitVec64_toNat h_w_isU64] at * <;>
     omega
 
+/-- Polymorphic counterpart of `toBitVec64_toInt`. -/
+lemma toBitVec64_poly_toInt_poly {p : ℕ} [NeZero p]
+    {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
+    w.toBitVec64_poly.toInt = w.toInt_poly
+  := by
+    rw [BitVec.toInt, Word.toInt_poly]
+    split_ifs <;>
+    rw [isNegative_poly_msb h_w_isU64] at * <;>
+    simp [BitVec.msb_eq_decide] at * <;>
+    rw [toBitVec64_poly_toNat_poly h_w_isU64] at * <;>
+    omega
+
 lemma isNegative_toInt {w : Word (Fin KB)} (is64_w : Word.isU64 w) :
   w.isNegative ↔ w.toInt < 0
     := by
   unfold Word.toInt Word.isNegative Word.toNat
   grind
+
+/-- Polymorphic counterpart of `Word.isNegative_toInt`. -/
+lemma isNegative_poly_toInt_poly {p : ℕ} [NeZero p] {w : Word (ZMod p)}
+    (is64_w : Word.isU64_poly w) :
+    w.isNegative_poly ↔ w.toInt_poly < 0 := by
+  have ⟨h0, h1, h2, h3⟩ := lt_cases_of_isU64_poly is64_w
+  unfold Word.toInt_poly Word.isNegative_poly Word.toNat_poly
+  split_ifs <;> push_cast <;> omega
 
 lemma toInt_nneg_reconstruct {w : Word (Fin KB)} {x : ℤ} (is64_w : Word.isU64 w) (nneg : 0 ≤ x) :
   w.toInt = x →
@@ -584,6 +674,13 @@ lemma lt_cases_of_isU128 {w : DWord (Fin KB)} (hw : w.isU128) :
     w[4].val < 2 ^ 16 ∧ w[5].val < 2 ^ 16 ∧ w[6].val < 2 ^ 16 ∧ w[7].val < 2 ^ 16 :=
   ⟨hw 0, hw 1, hw 2, hw 3, hw 4, hw 5, hw 6, hw 7⟩
 
+/-- Polymorphic counterpart of `lt_cases_of_isU128`. -/
+@[aesop unsafe forward, grind →]
+lemma lt_cases_of_isU128_poly {p : ℕ} [NeZero p] {w : DWord (ZMod p)} (hw : w.isU128_poly) :
+    w[0].val < 2 ^ 16 ∧ w[1].val < 2 ^ 16 ∧ w[2].val < 2 ^ 16 ∧ w[3].val < 2 ^ 16 ∧
+    w[4].val < 2 ^ 16 ∧ w[5].val < 2 ^ 16 ∧ w[6].val < 2 ^ 16 ∧ w[7].val < 2 ^ 16 :=
+  ⟨hw 0, hw 1, hw 2, hw 3, hw 4, hw 5, hw 6, hw 7⟩
+
 end U128
 
 section conversions
@@ -622,6 +719,14 @@ lemma toBitVec128_toNat {w : DWord (Fin KB)} (hw : w.isU128) :
   have := lt_cases_of_isU128 hw
   omega
 
+/-- Polymorphic counterpart of `DWord.toBitVec128_toNat`. -/
+lemma toBitVec128_poly_toNat_poly {p : ℕ} [NeZero p]
+    {w : DWord (ZMod p)} (hw : w.isU128_poly) :
+    w.toBitVec128_poly.toNat = w.toNat_poly := by
+  simp only [DWord.toBitVec128_poly, BitVec.toNat_ofNat, toNat_poly]
+  have := lt_cases_of_isU128_poly hw
+  omega
+
 /-- A 128-bit integer is negative if its msb equals one -/
 @[grind] def isNegative (w : DWord (Fin KB)) : Prop := w[7] ≥ 32768
 instance : Decidable (isNegative w) := by unfold isNegative; infer_instance
@@ -638,6 +743,14 @@ lemma isNegative_msb
     w.isNegative ↔ (w.toBitVec128.msb = true) := by
   have := lt_cases_of_isU128 h_w_isU128
   simp [isNegative, toBitVec128, toNat, BitVec.msb_eq_decide]
+  omega
+
+/-- Polymorphic counterpart of `DWord.isNegative_msb`. -/
+lemma isNegative_poly_msb {p : ℕ} [NeZero p]
+    {w : DWord (ZMod p)} (h_w_isU128 : w.isU128_poly) :
+    w.isNegative_poly ↔ (w.toBitVec128_poly.msb = true) := by
+  have := lt_cases_of_isU128_poly h_w_isU128
+  simp [isNegative_poly, toBitVec128_poly, toNat_poly, BitVec.msb_eq_decide]
   omega
 
 /-- Obtain the low 64 bits of a `DWord` -/
@@ -695,6 +808,14 @@ lemma isU128_toInt {w : DWord (Fin KB)} (is128_w : DWord.isU128 w) : - 2 ^ 127 �
   apply DWord.lt_cases_of_isU128 at is128_w
   omega
 
+/-- Polymorphic counterpart of `DWord.isU128_toInt`. -/
+lemma isU128_poly_toInt_poly {p : ℕ} [NeZero p] {w : DWord (ZMod p)}
+    (is128_w : DWord.isU128_poly w) :
+    - 2 ^ 127 ≤ w.toInt_poly ∧ w.toInt_poly < 2 ^ 127 := by
+  have := DWord.lt_cases_of_isU128_poly is128_w
+  unfold DWord.toInt_poly DWord.isNegative_poly DWord.toNat_poly
+  split_ifs <;> push_cast <;> omega
+
 lemma toBitVec128_toInt {w : DWord (Fin KB)} (h_w_isU128 : w.isU128) :
     w.toBitVec128.toInt = w.toInt
   := by
@@ -711,6 +832,14 @@ lemma isNegative_toInt {w : DWord (Fin KB)} (is128_w : DWord.isU128 w) :
   unfold DWord.toInt DWord.isNegative DWord.toNat
   apply DWord.lt_cases_of_isU128 at is128_w
   omega
+
+/-- Polymorphic counterpart of `DWord.isNegative_toInt`. -/
+lemma isNegative_poly_toInt_poly {p : ℕ} [NeZero p] {w : DWord (ZMod p)}
+    (is128_w : DWord.isU128_poly w) :
+    w.isNegative_poly ↔ w.toInt_poly < 0 := by
+  have := DWord.lt_cases_of_isU128_poly is128_w
+  unfold DWord.toInt_poly DWord.isNegative_poly DWord.toNat_poly
+  split_ifs <;> push_cast <;> omega
 
 lemma sign_cases {w : DWord (Fin KB)} (is128_w : DWord.isU128 w) : w.toInt.sign = if w.isNegative then -1 else if w.toInt = 0 then 0 else 1 := by
   simp [DWord.isNegative_toInt is128_w]
