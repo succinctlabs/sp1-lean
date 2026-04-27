@@ -457,6 +457,12 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : 
   · simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
     congr 1
 
+-- Note: `exec_RTYPE_pure_bv_to_w_poly` (poly counterpart) is deferred. The
+-- direct port hits a kernel "deep recursion detected" — likely the
+-- aesop calls in scope expand against polymorphic Word lemmas in a way
+-- the kernel can't reduce. Add when first consumer needs it; a tighter
+-- proof (avoiding aesop) should work.
+
 set_option debug.skipKernelTC true in
 lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : rop) :
   op1.isU64 → op2.isU64 →
