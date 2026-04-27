@@ -410,6 +410,21 @@ match op with
   | .SUB => op1.toBitVec64 - op2.toBitVec64
   | .SRA => op1.toBitVec64.sshiftRight (BitVec.setWidth 6 op2.toBitVec64).toNat
 
+/-- Polymorphic counterpart of `execute_RTYPE_pure_w`. -/
+@[simp] def execute_RTYPE_pure_w_poly {p : ℕ} [NeZero p]
+    (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : rop) :=
+match op with
+  | .ADD => op1.toBitVec64_poly + op2.toBitVec64_poly
+  | .SLT => if op1.toInt_poly < op2.toInt_poly then 1#64 else 0#64
+  | .SLTU => if op1.toNat_poly < op2.toNat_poly then 1#64 else 0#64
+  | .AND => op1.toBitVec64_poly &&& op2.toBitVec64_poly
+  | .OR => op1.toBitVec64_poly ||| op2.toBitVec64_poly
+  | .XOR => op1.toBitVec64_poly ^^^ op2.toBitVec64_poly
+  | .SLL => op1.toBitVec64_poly <<< (BitVec.setWidth 6 op2.toBitVec64_poly)
+  | .SRL => op1.toBitVec64_poly >>> (BitVec.setWidth 6 op2.toBitVec64_poly)
+  | .SUB => op1.toBitVec64_poly - op2.toBitVec64_poly
+  | .SRA => op1.toBitVec64_poly.sshiftRight (BitVec.setWidth 6 op2.toBitVec64_poly).toNat
+
 /-- `execute_RTYPE` pure part for `BWord` arguments -/
 @[simp] def execute_RTYPE_pure_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : rop) :=
 match op with
@@ -497,6 +512,18 @@ section RTYPEW
   | .SRLW => op1.toBitVec32 >>> (BitVec.setWidth 5 op2.toBitVec32)
   | .SRAW => op1.toBitVec32.sshiftRight (BitVec.setWidth 5 op2.toBitVec32).toNat
 
+/-- Polymorphic counterpart of `execute_RTYPEW_pure_32_w`. -/
+@[simp] def execute_RTYPEW_pure_32_w_poly {p : ℕ} [NeZero p]
+    (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :=
+  let op1 := op1.low_poly
+  let op2 := op2.low_poly
+  match op with
+  | .ADDW => op1.toBitVec32_poly + op2.toBitVec32_poly
+  | .SUBW => op1.toBitVec32_poly - op2.toBitVec32_poly
+  | .SLLW => op1.toBitVec32_poly <<< (BitVec.setWidth 5 op2.toBitVec32_poly)
+  | .SRLW => op1.toBitVec32_poly >>> (BitVec.setWidth 5 op2.toBitVec32_poly)
+  | .SRAW => op1.toBitVec32_poly.sshiftRight (BitVec.setWidth 5 op2.toBitVec32_poly).toNat
+
 /-- `execute_RTYPEW` pure part - 64-bit -/
 def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
   let op1 := BitVec.setWidth 32 op1
@@ -506,6 +533,11 @@ def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
 /-- `execute_RTYPEW` pure part - 64-bit for `Word` arguments -/
 @[simp] def execute_RTYPEW_pure_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : ropw) :=
   sign_extend (m := 64) (execute_RTYPEW_pure_32_w op1 op2 op)
+
+/-- Polymorphic counterpart of `execute_RTYPEW_pure_w`. -/
+@[simp] def execute_RTYPEW_pure_w_poly {p : ℕ} [NeZero p]
+    (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :=
+  sign_extend (m := 64) (execute_RTYPEW_pure_32_w_poly op1 op2 op)
 
 lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : ropw) :
   op1.isU64 → op2.isU64 →
@@ -580,6 +612,11 @@ def execute_ITYPE_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : iop) :=
 def execute_ITYPE_pure_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : iop) :=
   execute_RTYPE_pure_w op1 op2 (rop_of_iop op)
 
+/-- Polymorphic counterpart of `execute_ITYPE_pure_w`. -/
+def execute_ITYPE_pure_w_poly {p : ℕ} [NeZero p]
+    (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : iop) :=
+  execute_RTYPE_pure_w_poly op1 op2 (rop_of_iop op)
+
 /-- `execute_ITYPE` pure part for `BWord` arguments -/
 def execute_ITYPE_pure_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : iop) :=
   execute_RTYPE_pure_bw op1 op2 (rop_of_iop op)
@@ -641,6 +678,12 @@ def rop_of_sop (op : sop) : rop :=
   let shamtBB : Fin KB := ⟨shamt.toNat, by omega⟩
   execute_RTYPE_pure_w op1 #v[shamtBB, 0, 0, 0] (rop_of_sop op)
 
+/-- Polymorphic counterpart of `execute_SHIFTIOP_pure_w`. -/
+@[simp] def execute_SHIFTIOP_pure_w_poly {p : ℕ} [NeZero p]
+    (op1 : Word (ZMod p)) (shamt : BitVec 6) (op : sop) :=
+  let shamtZ : ZMod p := (shamt.toNat : ZMod p)
+  execute_RTYPE_pure_w_poly op1 #v[shamtZ, 0, 0, 0] (rop_of_sop op)
+
 def execute_SHIFTIOP_pure (op1 : BitVec 64) (shamt : BitVec 6) (op : sop) :=
   let shamt64 : BitVec 64 := shamt
   execute_RTYPE_pure op1 shamt64 (rop_of_sop op)
@@ -686,6 +729,12 @@ def ropw_of_sopw (op : sopw) : ropw :=
 @[simp] def execute_SHIFTIWOP_pure_w (op1 : Word (Fin KB)) (shamt : BitVec 5) (op : sopw) :=
   let shamtBB : Fin KB := ⟨shamt.toNat, by omega⟩
   execute_RTYPEW_pure_w op1 #v[shamtBB, 0, 0, 0] (ropw_of_sopw op)
+
+/-- Polymorphic counterpart of `execute_SHIFTIWOP_pure_w`. -/
+@[simp] def execute_SHIFTIWOP_pure_w_poly {p : ℕ} [NeZero p]
+    (op1 : Word (ZMod p)) (shamt : BitVec 5) (op : sopw) :=
+  let shamtZ : ZMod p := (shamt.toNat : ZMod p)
+  execute_RTYPEW_pure_w_poly op1 #v[shamtZ, 0, 0, 0] (ropw_of_sopw op)
 
 def execute_SHIFTIWOP_pure (op1 : BitVec 64) (shamt : BitVec 5) (op : sopw) :=
   let shamt64 : BitVec 64 := shamt
