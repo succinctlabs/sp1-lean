@@ -98,6 +98,71 @@ end KoalaBear
 lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
     a * (b - c) = 1 → b ≠ c := by aesop
 
+/-! ### Polymorphic `.val` helpers over `ZMod p`
+
+These let `_poly` operation iff lemmas reduce `(N : ZMod p).val` to `N` for
+the literal values that appear in our auto-gen constraint definitions
+(`16` from byte-opcode `Range`, `32` for register-index bounds, `256` /
+`65536` for U16/U8 boundaries). Under `[Fact (2 ^ 17 < p)]` (which decides
+at `p := KB` and at any prime ≥ 2^17, including BabyBear), every literal
+≤ 65536 satisfies the bound mathlib's `ZMod.val_natCast_of_lt` needs.
+
+Naming: `val_<N>_zmod_p` to avoid collision with mathlib's `ZMod.val_*`
+namespace conventions. -/
+
+section Polymorphic
+
+variable {p : ℕ} [hp : Fact (2 ^ 17 < p)]
+
+@[simp] lemma val_2_zmod_p : (2 : ZMod p).val = 2 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (2 : ℕ) < p by omega)
+
+@[simp] lemma val_4_zmod_p : (4 : ZMod p).val = 4 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (4 : ℕ) < p by omega)
+
+@[simp] lemma val_8_zmod_p : (8 : ZMod p).val = 8 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (8 : ℕ) < p by omega)
+
+@[simp] lemma val_16_zmod_p : (16 : ZMod p).val = 16 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
+
+@[simp] lemma val_32_zmod_p : (32 : ZMod p).val = 32 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (32 : ℕ) < p by omega)
+
+@[simp] lemma val_256_zmod_p : (256 : ZMod p).val = 256 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (256 : ℕ) < p by omega)
+
+@[simp] lemma val_65536_zmod_p : (65536 : ZMod p).val = 65536 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (65536 : ℕ) < p by omega)
+
+/-- Polymorphic non-zero bridge: `(65536 : ZMod p) ≠ 0` whenever `p > 65536`.
+Used by bridge-coupled operation iff lemmas (`AddOperation`, `SubOperation`,
+etc.) when `mul_inv_eq_one₀` needs the `(literal : ZMod p) ≠ 0` side
+condition. -/
+lemma val_65536_ne_zero : (65536 : ZMod p) ≠ 0 := by
+  have h : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  intro hz; rw [hz] at h; simp at h
+
+/-- Polymorphic non-zero bridge for `(256 : ZMod p)`. -/
+lemma val_256_ne_zero : (256 : ZMod p) ≠ 0 := by
+  have h : (256 : ZMod p).val = 256 := val_256_zmod_p
+  intro hz; rw [hz] at h; simp at h
+
+end Polymorphic
+
+/-- At `p := KB`, the strong-prime fact decides. Other concrete primes ≥ 2^17
+(BabyBear, Mersenne31) similarly decide. Registered as an instance so chip
+code that pins `F := Fin KB = ZMod KB` synthesizes the polymorphic helpers
+automatically. -/
+instance KoalaBear.Fact_2pow17_lt_KB : Fact (2 ^ 17 < KB) := ⟨by decide⟩
+
 /-! ### KB-specific simp lemmas operating on the symbolic `(N : Fin KB)⁻¹` form
 
 The constraint compiler now emits inverses symbolically (e.g. `(65536 : Fin KB)⁻¹`
