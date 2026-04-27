@@ -8,11 +8,62 @@ phase boundary. The implementation roadmap is in
 ## Next session pickup
 
 **Status as of 2026-04-27**: Phases 0-5 + Sub-phase A + Sub-phase B.2 +
-B.3 + B.4 + **Sub-phase B.5b (partial cascade: U16Compare, U16MSB,
-IsZeroWord, IsEqualWord lifted; `spec_poly` only for the two pure
-field-equality ops)** complete. Sub-phase B Steps 1-2 (`.val` rephrase,
-parametric Word.lean lift) attempted in earlier session, both reverted.
-`lake build` clean (0 errors, 0 warnings, 8508 jobs).
+B.3 + B.4 + **B.5b (4-op cascade)** + **B.5c (polymorphic `.val` helpers)**
++ **MemoryConsistency lift** complete. Sub-phase B Steps 1-2 (`.val`
+rephrase, parametric Word.lean lift) attempted in earlier session, both
+reverted. `lake build` clean (0 errors, 0 warnings, 8508 jobs).
+
+**Stated end goal (2026-04-27)**: everything in `SP1Foundations/*` should
+be agnostic to the prime field — either generic over `ZMod p` (with
+specific `Fact` preconditions) or generic over `(F : Type*) [Field F]`
+per lemma. `SP1Operations/*` and `SP1Chips/*` make minimal instantiations
+needed (typically `F := Fin KB` or `p := KB`). The user explicitly
+selected path (a) — parallel-additive `_poly` companions — as the
+strategy, with scope expanded as needed.
+
+**Remaining work toward that goal** (order = recommended priority):
+
+1. **Word.lean `_poly` companions** (~30+ lemmas, ~3-5 hr). The widest
+   surface in `SP1Foundations` not yet polymorphic. Existing
+   `_poly` defs: `isU64_poly`, `toNat_poly`, `toBitVec64_poly`. Missing:
+   ~30 lemmas including `toNat_def`, `toNat_lt_of_isU64`,
+   `toNat_reconstruct`, `toBitVec64_toNat`, `eq_pointwise` (already
+   generic), `low`, `high`, `setWidth_eq_low`, `setWidth_rshift_eq_high`,
+   `isNegative_msb`, the entire HWord namespace duplicate, and the
+   BHWord/BWord/BDWord byte-sized variants.
+2. **BitVec.lean `_poly` companions** (~9 lemmas, ~1-2 hr). The `Word`
+   namespace section in `BitVec.lean` has 7 `Word.toBitVec64`-based mod
+   lemmas + 2 `useless_signExtend*` theorems. Bodies use `bv_decide`
+   so `_poly` versions should be similarly tractable.
+3. **SailM.lean `_poly` companions** (~23 lemmas, ~3-4 hr). The
+   `execute_*_pure_*` family — bridges between Sail BitVec and our
+   `Word (Fin KB)` representation. Higher complexity; some may need
+   custom proof work.
+4. **Migrate Foundation consumers and delete `Fin KB` versions**
+   (~3-5 hr). For each function with both `Fin KB` and `_poly` versions
+   in `Constraint.lean`, `ByteOpcode.lean`, `Assumptions.lean`, change
+   chip/op callers to use the generic version, then remove the `Fin KB`
+   version. End state: those four files reach the user's "fully
+   agnostic" goal. ~57 chips to touch (mechanical but bulk).
+5. **Operation/chip `_poly` cascade for ops with byte-opcode `Range`
+   constraints** — blocked on a polymorphic `(a-b).val` arithmetic
+   helper. Even with the `[Fact (2 ^ 17 < p)]` and `.val`-helper simp
+   lemmas from B.5c, `grind` doesn't close `spec_poly` for U16Compare /
+   U16MSB / Add / etc. The blocker: grind doesn't know
+   `(a-b).val ≥ p - 65535` when `a.val < b.val` over `ZMod p`. Mathlib
+   has `ZMod.val_sub` (under `b.val ≤ a.val`) and
+   `ZMod.val_neg_of_ne_zero`, so a custom `val_sub_cases` lemma is
+   needed. Defer to its own sub-phase once Word.lean is lifted.
+6. **Cross-repo upstream parametric emission** (~2 hr, orthogonal).
+   Independent of items 1-5; can run any time.
+
+**What was attempted but doesn't currently work** (recorded for future
+sessions to avoid re-discovering):
+
+- `_poly` proofs for ops with byte-opcode `Range` constraints
+  (U16Compare, U16MSB, etc.) do not close with `simp [constraints];
+  grind` even after the `.val` helpers landed. The remaining blocker
+  is `(a-b).val` arithmetic. See item 5 above.
 
 **Critical finding from B.5b** (revises the prior claim that the cascade
 is "mechanical" with proofs that "carry verbatim"):
