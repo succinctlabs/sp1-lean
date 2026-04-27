@@ -1453,6 +1453,16 @@ lemma lt_cases_of_isU128 {w : BDWord (Fin KB)} (hbdw : w.isU128) :
     :=
   ⟨hbdw 0, hbdw 1, hbdw 2, hbdw 3, hbdw 4, hbdw 5, hbdw 6, hbdw 7, hbdw 8, hbdw 9, hbdw 10, hbdw 11, hbdw 12, hbdw 13, hbdw 14, hbdw 15⟩
 
+/-- Polymorphic counterpart of `BDWord.lt_cases_of_isU128`. -/
+@[aesop unsafe forward]
+lemma lt_cases_of_isU128_poly {p : ℕ} [NeZero p] {w : BDWord (ZMod p)} (hbdw : w.isU128_poly) :
+    w[0].val < 256 ∧ w[1].val < 256 ∧ w[2].val < 256 ∧ w[3].val < 256 ∧
+    w[4].val < 256 ∧ w[5].val < 256 ∧ w[6].val < 256 ∧ w[7].val < 256 ∧
+    w[8].val < 256 ∧ w[9].val < 256 ∧ w[10].val < 256 ∧ w[11].val < 256 ∧
+    w[12].val < 256 ∧ w[13].val < 256 ∧ w[14].val < 256 ∧ w[15].val < 256
+    :=
+  ⟨hbdw 0, hbdw 1, hbdw 2, hbdw 3, hbdw 4, hbdw 5, hbdw 6, hbdw 7, hbdw 8, hbdw 9, hbdw 10, hbdw 11, hbdw 12, hbdw 13, hbdw 14, hbdw 15⟩
+
 end U128
 
 section conversions
@@ -1466,6 +1476,12 @@ def low_poly {p : ℕ} [NeZero p] (w : BDWord (ZMod p)) : BWord (ZMod p) :=
 
 lemma isU128_low_isU64 {w : BDWord (Fin KB)} (hw : w.isU128) : w.low.isU64 := by aesop
 
+/-- Polymorphic counterpart of `BDWord.isU128_low_isU64`. -/
+lemma isU128_poly_low_poly_isU64_poly {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (hw : w.isU128_poly) : w.low_poly.isU64_poly := by
+  have ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := lt_cases_of_isU128_poly hw
+  intro i; fin_cases i <;> simp [low_poly, BWord.isU64_poly] <;> omega
+
 /-- Obtain the high 64 bits of a `BDWord` -/
 def high (w : BDWord (Fin KB)) : BWord (Fin KB) := #v[w[8], w[9], w[10], w[11], w[12], w[13], w[14], w[15]]
 
@@ -1474,6 +1490,12 @@ def high_poly {p : ℕ} [NeZero p] (w : BDWord (ZMod p)) : BWord (ZMod p) :=
   #v[w[8], w[9], w[10], w[11], w[12], w[13], w[14], w[15]]
 
 lemma isU128_high_isU64 {w : BDWord (Fin KB)} (hw : w.isU128) : w.high.isU64 := by aesop
+
+/-- Polymorphic counterpart of `BDWord.isU128_high_isU64`. -/
+lemma isU128_poly_high_poly_isU64_poly {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (hw : w.isU128_poly) : w.high_poly.isU64_poly := by
+  have ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := lt_cases_of_isU128_poly hw
+  intro i; fin_cases i <;> simp [high_poly, BWord.isU64_poly] <;> omega
 
 /-- Convert a bytedword to a `Nat` by shifting and adding the limbs. -/
 def toNat (w : BDWord (Fin KB)) : ℕ :=
@@ -1491,6 +1513,13 @@ lemma toNat_lt_of_isU128 {w : BDWord (Fin KB)} (hw : w.isU128) : w.toNat < 2 ^ 1
   unfold toNat
   aesop (add 50% tactic (by omega))
 
+/-- Polymorphic counterpart of `BDWord.toNat_lt_of_isU128`. -/
+lemma toNat_poly_lt_of_isU128_poly {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (hw : w.isU128_poly) : w.toNat_poly < 2 ^ 128 := by
+  have := lt_cases_of_isU128_poly hw
+  unfold toNat_poly
+  omega
+
 /-- Convert a bytedword to a `BitVec 128` by shifting and adding the limbs. -/
 def toBitVec128 (w : BDWord (Fin KB)) : BitVec 128 := BitVec.ofNat 128 w.toNat
 
@@ -1503,6 +1532,14 @@ lemma toBitVec128_toNat {w : BDWord (Fin KB)} (hw : w.isU128) :
   simp only [toBitVec128, toNat, BB_eq, Nat.reducePow, BitVec.toNat_ofNat,
     Nat.mod_succ_eq_iff_lt, Nat.succ_eq_add_one, Nat.reduceAdd]
   have := lt_cases_of_isU128 hw
+  omega
+
+/-- Polymorphic counterpart of `BDWord.toBitVec128_toNat`. -/
+lemma toBitVec128_poly_toNat_poly {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (hw : w.isU128_poly) :
+    w.toBitVec128_poly.toNat = w.toNat_poly := by
+  simp only [BDWord.toBitVec128_poly, BitVec.toNat_ofNat, toNat_poly]
+  have := lt_cases_of_isU128_poly hw
   omega
 
 /-- A 128-bit integer is negative if its msb equals one -/
@@ -1521,6 +1558,14 @@ lemma isNegative_msb
     w.isNegative ↔ (w.toBitVec128.msb = true) := by
   have := lt_cases_of_isU128 h_w_isU128
   simp [isNegative, BDWord.toBitVec128, BDWord.toNat, BitVec.msb_eq_decide]
+  omega
+
+/-- Polymorphic counterpart of `BDWord.isNegative_msb`. -/
+lemma isNegative_poly_msb {p : ℕ} [NeZero p]
+    {w : BDWord (ZMod p)} (h_w_isU128 : w.isU128_poly) :
+    w.isNegative_poly ↔ (w.toBitVec128_poly.msb = true) := by
+  have := lt_cases_of_isU128_poly h_w_isU128
+  simp [isNegative_poly, BDWord.toBitVec128_poly, BDWord.toNat_poly, BitVec.msb_eq_decide]
   omega
 
 lemma isNegative_BitVec.toInt
