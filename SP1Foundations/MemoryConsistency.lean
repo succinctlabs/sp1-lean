@@ -1,9 +1,9 @@
 import SP1Foundations.Word
 
-structure MemoryAccessInShardTimestamp where
-  prev_low : Fin KB
-  diff_low_limb : Fin KB
+structure MemoryAccessInShardTimestamp (F : Type) where
+  prev_low : F
+  diff_low_limb : F
 
-structure MemoryAccessInSharedCols where
-  prev_value : Word (Fin KB)
-  access_timestamp : MemoryAccessInShardTimestamp
+structure MemoryAccessInSharedCols (F : Type) where
+  prev_value : Word F
+  access_timestamp : MemoryAccessInShardTimestamp F
