@@ -155,6 +155,34 @@ lemma val_256_ne_zero : (256 : ZMod p) ≠ 0 := by
   have h : (256 : ZMod p).val = 256 := val_256_zmod_p
   intro hz; rw [hz] at h; simp at h
 
+/-- Polymorphic non-zero bridge for `(4 : ZMod p)`. -/
+lemma val_4_ne_zero : (4 : ZMod p) ≠ 0 := by
+  have h : (4 : ZMod p).val = 4 := val_4_zmod_p
+  intro hz; rw [hz] at h; simp at h
+
+/-- Polymorphic non-zero bridge for `(8 : ZMod p)`. -/
+lemma val_8_ne_zero : (8 : ZMod p) ≠ 0 := by
+  have h : (8 : ZMod p).val = 8 := val_8_zmod_p
+  intro hz; rw [hz] at h; simp at h
+
+/-- Case-split helper for `(a - b).val` over `ZMod p`. The positive branch
+matches mathlib's `ZMod.val_sub`; the wrap-around branch follows from
+`a - b = -(b - a)` plus `ZMod.neg_val`. The `if`-shape is `omega`-friendly,
+making this the missing primitive for `_poly` proofs of operations whose
+RHS contains subtraction over `ZMod p` (`AddOperation`, `SubOperation`,
+`U16CompareOperation`, etc.). -/
+lemma val_sub_cases {p : ℕ} [NeZero p] (a b : ZMod p) :
+    (a - b).val = if b.val ≤ a.val then a.val - b.val else p - (b.val - a.val) := by
+  by_cases h : b.val ≤ a.val
+  · rw [if_pos h, ZMod.val_sub h]
+  · rw [Nat.not_le] at h
+    rw [if_neg (Nat.not_le.mpr h)]
+    have hab_eq : a - b = -(b - a) := by ring
+    rw [hab_eq, ZMod.neg_val]
+    have hba : b - a ≠ 0 := by
+      rw [sub_ne_zero]; intro hba; rw [hba] at h; exact lt_irrefl _ h
+    rw [if_neg hba, ZMod.val_sub (le_of_lt h)]
+
 end Polymorphic
 
 /-- At `p := KB`, the strong-prime fact decides. Other concrete primes ≥ 2^17
