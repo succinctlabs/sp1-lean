@@ -50,7 +50,7 @@ end decomposition
 
 lemma allHold_constraints_iff
   (u16_values : (Vector (Fin KB) 4))
-  (cols : U16toU8Operation)
+  (cols : U16toU8Operation (Fin KB))
   (is_real : Fin KB) :
   List.Forall SP1Constraint.toProp (constraints u16_values cols is_real).2 ↔
     (¬is_real = 0 → cols.low_bytes[0] < 256 ∧ ((u16_values[0] - cols.low_bytes[0]) * (256 : Fin KB)⁻¹) < 256) ∧
@@ -61,7 +61,7 @@ lemma allHold_constraints_iff
 
 lemma spec.cstrs
   {u16_values : (Vector (Fin KB) 4)}
-  {cols : U16toU8Operation} :
+  {cols : U16toU8Operation (Fin KB)} :
   List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     cols.low_bytes[0] = u16_values[0]! % 256 ∧ ((u16_values[0] - cols.low_bytes[0]!) * (256 : Fin KB)⁻¹) = u16_values[0] / 256 ∧
     cols.low_bytes[1] = u16_values[1]! % 256 ∧ ((u16_values[1] - cols.low_bytes[1]!) * (256 : Fin KB)⁻¹) = u16_values[1] / 256 ∧
@@ -71,7 +71,7 @@ lemma spec.cstrs
 
 lemma spec.return
   {u16_values : (Vector (Fin KB) 4)}
-  {cols : U16toU8Operation} :
+  {cols : U16toU8Operation (Fin KB)} :
   List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     (constraints u16_values cols is_real).1 = Word.toBWord u16_values
   := by
@@ -80,7 +80,7 @@ lemma spec.return
 
 lemma spec.unsafe.return
   {u16_values : (Vector (Fin KB) 4)}
-  {cols : U16toU8Operation} :
+  {cols : U16toU8Operation (Fin KB)} :
   List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     (U16toU8OperationUnsafe.constraints u16_values cols).1 = Word.toBWord u16_values
   := by

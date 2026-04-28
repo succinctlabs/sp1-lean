@@ -9,7 +9,7 @@ set_option maxHeartbeats 10000000
 
 namespace BitwiseU16Operation
 
-lemma spec.and {b cc : Word (Fin KB)} {cols : BitwiseU16Operation}
+lemma spec.and {b cc : Word (Fin KB)} {cols : BitwiseU16Operation (Fin KB)}
     (h_isU64_b : b.isU64) (h_isU64_cc : cc.isU64) :
     List.Forall SP1Constraint.toProp (constraints b cc cols 0 1).2 →
       Word.toBitVec64 (constraints b cc cols 0 1).1 = execute_RTYPE_pure_w b cc .AND
@@ -52,7 +52,7 @@ lemma spec.and {b cc : Word (Fin KB)} {cols : BitwiseU16Operation}
 
 lemma spec.or
   {b cc : Word (Fin KB)}
-  {cols : BitwiseU16Operation}
+  {cols : BitwiseU16Operation (Fin KB)}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :
   List.Forall SP1Constraint.toProp (constraints b cc cols 1 1).2 →
@@ -96,7 +96,7 @@ lemma spec.or
 
 lemma spec.xor
   {b cc : Word (Fin KB)}
-  {cols : BitwiseU16Operation}
+  {cols : BitwiseU16Operation (Fin KB)}
   (h_isU64_b : b.isU64)
   (h_isU64_cc : cc.isU64) :
   List.Forall SP1Constraint.toProp (constraints b cc cols 2 1).2 →

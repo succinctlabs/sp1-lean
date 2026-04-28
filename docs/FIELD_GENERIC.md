@@ -25,9 +25,97 @@ so `PARAMETRIC_OPS` is now durable across regens — exclusion list gone)**
 companion lifted; struct + auto-gen lifted to `(F : Type*) [Field F]`;
 both `allHold_constraints_iff_poly` + `_is_real_poly` close cleanly with
 the canonical `simp [constraints, toProp_poly, sub_eq_zero, h13,
-h0_lt_256, imp_and]`)** complete. Sub-phase B Steps 1-2 (`.val`
-rephrase, parametric Word.lean lift) attempted in earlier session, both
-reverted. `lake build` clean (0 errors, 0 warnings, 8508 jobs).
+h0_lt_256, imp_and]`)** + **Sub-phase B.9 (bridge-free op struct +
+Constraints lift cascade — `LtOperationUnsigned`, `LtOperationSigned`,
+`U16toU8Operation`, `BitwiseOperation`, `BitwiseU16Operation` all lifted
+to `(F : Type)` parametric form; `U16MSBOperation.allHold_constraints_iff_poly`
+added)** complete. Sub-phase B Steps 1-2 (`.val` rephrase, parametric
+Word.lean lift) attempted in earlier session, both reverted. `lake build`
+clean (0 errors, 0 warnings, 8508 jobs).
+
+**Sub-phase B.9 landed (2026-04-28)** — bridge-free op cascade
+(struct + Constraints lifts; mechanical-only `_poly` lemmas):
+
+Per the plan, scope was the 5 bridge-free ops (`U16Compare`, `U16MSB`,
+`LtUnsigned`, `LtSigned`, `BitwiseU16`) under "mechanical first, defer
+tricky" stance — try `simp [constraints]; grind` for `_poly` lemmas;
+defer per-lemma if the `(a-b).val` / `(2*a).val` Range-constraint
+case-split blocks `grind`.
+
+**What lifted (struct + Constraints to `(F : Type)` parametric form)**:
+
+- `LtOperationUnsigned` — struct + auto-gen Constraints lifted; `Operation.lean`
+  embeds `U16CompareOperation F`, `Word F`, `Vector F 2`. Iff lemmas
+  ascribed `LtOperationUnsigned (Fin KB)` (no `_poly` companions added —
+  proofs depend on `U16CompareOperation.spec_poly`, which gaps mechanically).
+- `LtOperationSigned` — struct + auto-gen lifted; embeds
+  `LtOperationUnsigned F` and `U16MSBOperation F`. Iff lemmas (`spec.unsigned`,
+  `spec.signed`, `spec.branch` plus `spec.branch.def`) ascribed
+  `LtOperationSigned (Fin KB)`. No `_poly` companions (depend on
+  bridge-coupled `LtUnsigned` / `U16MSB.spec_poly`).
+- `U16toU8Operation` (in `U16toU8OperationUnsafe/Operation.lean`) +
+  `U16toU8OperationUnsafe/Constraints.lean` — leaf-op lift required for
+  `BitwiseU16Operation`. `MulOperation` / `U16toU8OperationSafe` consumers
+  pinned to `U16toU8Operation (Fin KB)`.
+- `BitwiseOperation` + `BitwiseOperation/Constraints.lean` — leaf-op lift.
+  `BitwiseChip` / `Bitwise/Constraints.lean` consume via call-site
+  inference (no struct ascription needed).
+- `BitwiseU16Operation` + auto-gen — embeds the 2 lifted leafs.
+  `BitwiseU16Operation.lean` iff lemmas (`spec.and`, `spec.or`, `spec.xor`)
+  ascribed `BitwiseU16Operation (Fin KB)`. No `_poly` companions
+  (proofs use `bv_decide` over `Fin KB`-specific carry / shift arithmetic).
+
+**`update_constraints.py` `PARAMETRIC_OPS` extended** with 5 entries:
+`("Lt", "LtOperationUnsigned"): ("Type", False)`,
+`("Lt", "LtOperationSigned"): ("Type", False)`,
+`("Bitwise", "U16toU8OperationUnsafe"): ("Type", False)`,
+`("Bitwise", "BitwiseOperation"): ("Type", True)`,
+`("Bitwise", "BitwiseU16Operation"): ("Type", True)`. Future regens
+preserve all lifts. `BitwiseOperation` / `BitwiseU16Operation` need
+`[CoeHead F ℕ]` for `ByteOpcode.ofNat opcode` (mirroring the
+program-using readers' precedent).
+
+**`_poly` lemma companions added** (1 lemma):
+
+- `U16MSBOperation.allHold_constraints_iff_poly` — landed. The Range
+  constraint emits `.val < 65536` shape via `SP1Constraint.toProp_poly`,
+  so the iff RHS states `(2 * a - cols.msb * 65536).val < 65536` at the
+  `ℕ` level. Closes mechanically with `simp [constraints]; grind`.
+
+**`_poly` lemmas attempted and deferred** (mechanical close blocked):
+
+- `U16CompareOperation.spec_poly` — `simp [constraints]; grind` gaps on
+  `(a - b + cols.bit * 65536).val ≤ 65535` Range case-split. Adding
+  `val_sub_cases` to the simp set doesn't help — `grind` doesn't
+  unfold the `if`-shape and apply the wrap-around branch. ~25 lines
+  of structured `.val`-arithmetic + omega would close it.
+- `U16MSBOperation.spec_poly` / `spec.U64_poly` / `spec.gen_poly` —
+  same blocker on `(2 * a - cols.msb * 65536).val ≤ 65535`. Needs
+  `ZMod.val_mul_of_lt` + `val_65536_ne_zero` plus case analysis on
+  `cols.msb ∈ {0, 1}` to close.
+- All 5 `LtOperationUnsigned` `_poly` lemmas — depend on
+  `U16CompareOperation.spec_poly` (above) plus custom `.val` arithmetic
+  for `cl_are_U16_poly`.
+- All 4 `LtOperationSigned` `_poly` lemmas — depend on `LtUnsigned` /
+  `U16MSB` `_poly` lemmas above.
+- All 3 `BitwiseU16Operation.spec_*_poly` lemmas — proofs end in
+  `bv_decide` over `Fin KB`-specific arithmetic; `_poly` form needs
+  `_poly` versions of `Word.toBitVec64_toNat`, `Nat.lift_lt`, plus
+  the `BitVec.ofNat_*` simp family already exists for both. Material
+  work, not mechanical.
+
+**Outstanding work** (priority order):
+
+1. **Bridge-coupled op cascade** (6 ops: `Add`, `Sub`, `Addw`, `Subw`,
+   `AddrAdd`, `U16toU8Safe`). Need polymorphic `inv_4BB_eq'` /
+   `inv_65536BB_eq'` analogues in `Field.lean` first — likely
+   `mul_inv_cancel₀ (h : (2^k : ZMod p) ≠ 0)` from `[Fact (Nat.Prime p)]`
+   + the existing `val_*_ne_zero` family. Then struct + Constraints lift.
+2. **Push the 14 deferred `_poly` lemmas** (U16Compare/U16MSB/LtSigned/
+   LtUnsigned/BitwiseU16). Each is 20-40 lines of custom `.val`
+   arithmetic; not mechanical.
+3. **Foundation `Fin KB` deletion sweep** — 4-6 sessions per the
+   2026-04-28 investigation block.
 
 **Sub-phase B.8 landed (2026-04-28)** — all 5 reader iff_poly companions:
 

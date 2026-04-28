@@ -7,7 +7,7 @@ section constraints
 
 @[irreducible] def constraints
   (u16_values : (Vector (Fin KB) 4))
-  (cols : U16toU8Operation)
+  (cols : U16toU8Operation (Fin KB))
   (is_real : (Fin KB))
   : (Vector (Fin KB) 8) × SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := u16_values[0] - cols.low_bytes[0]

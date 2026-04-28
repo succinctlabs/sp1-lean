@@ -5,7 +5,7 @@ namespace LtOperationUnsigned
 lemma allHold_constraints_iff
   (b : Word (Fin KB))
   (d : Word (Fin KB))
-  (cols : LtOperationUnsigned)
+  (cols : LtOperationUnsigned (Fin KB))
   (is_real : Fin KB) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_real) ↔
     List.Forall SP1Constraint.toProp (U16CompareOperation.constraints cols.comparison_limbs[0] cols.comparison_limbs[1] cols.u16_compare_operation is_real) ∧
@@ -29,7 +29,7 @@ lemma allHold_constraints_iff
 lemma cl_are_U16
   {b : Word (Fin KB)}
   {d : Word (Fin KB)}
-  {cols : LtOperationUnsigned}
+  {cols : LtOperationUnsigned (Fin KB)}
   {is_real : Fin KB}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
@@ -53,7 +53,7 @@ lemma cl_are_U16
 @[grind →, aesop safe forward]
 lemma spec.nat
   {b d : Word (Fin KB)}
-  {cols : LtOperationUnsigned}
+  {cols : LtOperationUnsigned (Fin KB)}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1) →
@@ -71,7 +71,7 @@ lemma spec.nat
 
 lemma spec
   {b d : Word (Fin KB)}
-  {cols : LtOperationUnsigned}
+  {cols : LtOperationUnsigned (Fin KB)}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1) →
@@ -82,7 +82,7 @@ section gen
 
 lemma spec.nat.gen
   {b d : Word (Fin KB)}
-  {cols : LtOperationUnsigned}
+  {cols : LtOperationUnsigned (Fin KB)}
   {is_real : Fin KB}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :

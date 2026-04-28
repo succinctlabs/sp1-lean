@@ -5,18 +5,18 @@ namespace U16toU8OperationUnsafe
 
 section constraints
 
-@[irreducible] def constraints
-  (u16_values : (Vector (Fin KB) 4))
-  (cols : U16toU8Operation)
-  : (Vector (Fin KB) 8) × SP1ConstraintList (Fin KB) :=
-  let E0 : Fin KB := u16_values[0] - cols.low_bytes[0]
-  let E1 : Fin KB := E0 * ((256 : Fin KB)⁻¹)
-  let E2 : Fin KB := u16_values[1] - cols.low_bytes[1]
-  let E3 : Fin KB := E2 * ((256 : Fin KB)⁻¹)
-  let E4 : Fin KB := u16_values[2] - cols.low_bytes[2]
-  let E5 : Fin KB := E4 * ((256 : Fin KB)⁻¹)
-  let E6 : Fin KB := u16_values[3] - cols.low_bytes[3]
-  let E7 : Fin KB := E6 * ((256 : Fin KB)⁻¹)
+@[irreducible] def constraints {F : Type} [Field F]
+  (u16_values : (Vector F 4))
+  (cols : U16toU8Operation F)
+  : (Vector F 8) × SP1ConstraintList F :=
+  let E0 : F := u16_values[0] - cols.low_bytes[0]
+  let E1 : F := E0 * ((256 : F)⁻¹)
+  let E2 : F := u16_values[1] - cols.low_bytes[1]
+  let E3 : F := E2 * ((256 : F)⁻¹)
+  let E4 : F := u16_values[2] - cols.low_bytes[2]
+  let E5 : F := E4 * ((256 : F)⁻¹)
+  let E6 : F := u16_values[3] - cols.low_bytes[3]
+  let E7 : F := E6 * ((256 : F)⁻¹)
   ⟨#v[cols.low_bytes[0], E1, cols.low_bytes[1], E3, cols.low_bytes[2], E5, cols.low_bytes[3], E7], [
   ]⟩
 

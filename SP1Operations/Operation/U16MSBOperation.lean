@@ -14,6 +14,21 @@ lemma allHold_constraints_iff
     (¬is_real = 0 → 2 * a - cols.msb * 65536 < 65536)
   := by simp [constraints]; grind
 
+/-- Polymorphic counterpart of `allHold_constraints_iff` over `ZMod p`.
+The `Range` constraint emits a `.val < 65536` shape via
+`SP1Constraint.toProp_poly`, so this iff states the bound at the `ℕ`
+level rather than the field level. -/
+lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
+    [Fact (2 ^ 17 < p)]
+  {a : ZMod p}
+  {cols : U16MSBOperation (ZMod p)}
+  {is_real : ZMod p} :
+  List.Forall SP1Constraint.toProp_poly (constraints a cols is_real) ↔
+    (is_real = 0 ∨ is_real = 1) ∧
+    (cols.msb = 0 ∨ cols.msb = 1) ∧
+    (¬is_real = 0 → (2 * a - cols.msb * 65536).val < 65536)
+  := by simp [constraints]; grind
+
 @[grind →, aesop safe forward]
 lemma spec
   {a : Fin KB}

@@ -9,7 +9,7 @@ set_option linter.style.multiGoal false in
 lemma allHold_constraints_iff
   {b : Word (Fin KB)}
   {d : Word (Fin KB)}
-  {cols : LtOperationSigned}
+  {cols : LtOperationSigned (Fin KB)}
   {is_signed : Fin KB} :
   List.Forall SP1Constraint.toProp (constraints b d cols is_signed 1) ↔
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints b[3] cols.b_msb is_signed) ∧
@@ -31,7 +31,7 @@ lemma allHold_constraints_iff
 lemma spec.unsigned
   {b : Word (Fin KB)}
   {d : Word (Fin KB)}
-  {cols : LtOperationSigned}
+  {cols : LtOperationSigned (Fin KB)}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 0 1) →
@@ -51,7 +51,7 @@ lemma spec.unsigned
 lemma spec.signed
   {b : Word (Fin KB)}
   {d : Word (Fin KB)}
-  {cols : LtOperationSigned}
+  {cols : LtOperationSigned (Fin KB)}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1 1) →
@@ -84,7 +84,7 @@ lemma spec.signed
 def spec.branch.def
   (b : (Word (Fin KB)))
   (c : (Word (Fin KB)))
-  (cols : LtOperationSigned)
+  (cols : LtOperationSigned (Fin KB))
   (is_signed : (Fin KB))
   : Prop :=
   let bv := b.toBitVec64
@@ -124,7 +124,7 @@ set_option linter.style.multiGoal false in
 lemma spec.branch
   {b : (Word (Fin KB))}
   {d : (Word (Fin KB))}
-  {cols : LtOperationSigned}
+  {cols : LtOperationSigned (Fin KB)}
   {is_signed : (Fin KB)}
   (h_b_isU64 : Word.isU64 b)
   (h_d_isU64 : Word.isU64 d) :

@@ -5,13 +5,13 @@ namespace BitwiseOperation
 
 section constraints
 
-@[irreducible] def constraints
-  (a : (Vector (Fin KB) 8))
-  (b : (Vector (Fin KB) 8))
-  (cols : BitwiseOperation)
-  (opcode : (Fin KB))
-  (is_real : (Fin KB))
-  : SP1ConstraintList (Fin KB) :=
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
+  (a : (Vector F 8))
+  (b : (Vector F 8))
+  (cols : BitwiseOperation F)
+  (opcode : F)
+  (is_real : F)
+  : SP1ConstraintList F :=
   [
     (.send (.byte (ByteOpcode.ofNat opcode) cols.result[0] a[0] b[0]) is_real),
     (.send (.byte (ByteOpcode.ofNat opcode) cols.result[1] a[1] b[1]) is_real),
