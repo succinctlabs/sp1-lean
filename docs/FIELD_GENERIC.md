@@ -21,9 +21,213 @@ exec_MUL/MULW_pure_bv_to_*_poly)** + **low-hanging-fruit sweep
 `inv_{8,256}BB_eq'` bridges in Field.lean, moved parametric emission for
 the 5 hand-edited operations into `update_constraints.py`'s post-processor
 so `PARAMETRIC_OPS` is now durable across regens — exclusion list gone)**
-complete. Sub-phase B Steps 1-2 (`.val` rephrase, parametric Word.lean
-lift) attempted in earlier session, both reverted. `lake build` clean
-(0 errors, 0 warnings, 8508 jobs).
++ **Sub-phase B.8 (CPUState reader iff_poly pilot — first reader iff
+companion lifted; struct + auto-gen lifted to `(F : Type*) [Field F]`;
+both `allHold_constraints_iff_poly` + `_is_real_poly` close cleanly with
+the canonical `simp [constraints, toProp_poly, sub_eq_zero, h13,
+h0_lt_256, imp_and]`)** complete. Sub-phase B Steps 1-2 (`.val`
+rephrase, parametric Word.lean lift) attempted in earlier session, both
+reverted. `lake build` clean (0 errors, 0 warnings, 8508 jobs).
+
+**Sub-phase B.8 landed (2026-04-28)** — all 5 reader iff_poly companions:
+
+CPUState (the simple no-`program`/`memory`/`Word` reader) plus the four
+`program`/`memory`/`Word`-bearing readers (RTypeReader, ITypeReader,
+JTypeReader, ALUTypeReader). Closes the doc's "5 missing reader
+iff_poly companions" gap.
+
+**Per-file changes:**
+
+- **CPUState** struct lifted to `(F : Type*)`. Auto-gen + 2 iff_poly
+  lemmas. Closes via the simple `simp [..., h13, h0_lt_256, imp_and]`.
+- **RTypeReader / ITypeReader / JTypeReader / ALUTypeReader** structs
+  lifted to `(F : Type)` (Type, not Type*, because they carry `Word F`
+  and `MemoryAccessInSharedCols F` which are `Type 0`-bound). Auto-gens
+  hand-ported to `{F : Type} [Field F] [CoeHead F ℕ]`. Each `.lean` got
+  one `allHold_constraints_iff_poly` companion (no `_is_real_poly`
+  variant — the `Fin KB` versions of those use `simp_all` / `aesop` over
+  the iff and we don't need separate `_poly` corollaries until a chip
+  consumer demands them).
+- **`SP1Foundations/Field.lean`**: added `CoeHead (Fin n) ℕ` and
+  `CoeHead (ZMod p) ℕ` instances, plus `coeHead_zmod_eq_val` /
+  `coeHead_fin_eq_val` simp lemmas. These let `Opcode.ofNat opcode`
+  (which expects `ℕ`) elaborate against generic `F` for readers with
+  `program` clauses, and let simp normalize `CoeHead.coe x` → `x.val`
+  inside the iff_poly proof goals.
+- **`update_constraints.py`**: PARAMETRIC_OPS schema extended to
+  `Tuple[universe, needs_coe_head]`. Readers with `program` clauses
+  get `[CoeHead F ℕ]` injected into the auto-gen def signature
+  during regen.
+- **`SP1Operations/Reader/ITypeReaderImmutable/Constraints.lean`**:
+  added `(cols : ITypeReader (Fin KB))` ascription (was bare
+  `ITypeReader`). Required because `ITypeReader` is now parameterized;
+  consumer pinned to `Fin KB`. ITypeReaderImmutable itself is not
+  lifted (no `_poly` consumer needed).
+- **Zero chip-side fallout** in any of the 23 chip files. Chip-level
+  `Vector (Fin KB) N` Main rows propagate `F := Fin KB` through reader
+  `constraints` calls via type inference. The `[CoeHead (Fin n) ℕ]`
+  instance synthesizes for `F := Fin KB` and `[CoeHead (ZMod p) ℕ]`
+  synthesizes for `F := ZMod p` with `[NeZero p]`.
+- **Smoke tests**: all 6 `_poly` lemmas (CPUState ×2 + RType + IType +
+  JType + ALUType ×1 each) elaborate at `p := KB` and at
+  `p := 131101` (smallest prime > 2^17, primality via `native_decide`).
+
+**Two canonical reader iff_poly proof shapes** (from B.8):
+
+**Shape A** — for simple readers (CPUState only, no `program`/`memory`
+clauses): pure `simp` close.
+```
+lemma allHold_constraints_iff_poly ... := by
+  have hN : (N : ZMod p).val = N := ZMod.val_natCast_of_lt (by ...)
+  have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
+    change (0 : ZMod p).val < (256 : ZMod p).val; simp
+  simp [constraints, SP1Constraint.toProp_poly, sub_eq_zero,
+    hN, h0_lt_256, imp_and]
+```
+
+**Shape B** — for readers with `program`/`memory` clauses (RType, IType,
+JType, ALUType): structured proof mirroring the original `Fin KB`
+version. The pure `simp; tauto` doesn't close in lake build (despite
+appearing to in `lean_run_code` due to env discrepancies — the test
+harness is more lenient).
+
+```
+lemma allHold_constraints_iff_poly ... := by
+  have h16 : (16 : ZMod p).val = 16 := ...
+  have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := ...
+  have h0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := ...
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly,
+    h16, h0_lt_256, h0_lt_65536]
+  intros h_is_real
+  rcases h_is_real with h | h
+  · simp [h]
+    by_cases ha0 : cols.op_a_0 = 0
+    · simp [ha0]
+    · tauto
+  · simp [h]
+    by_cases hop_a_0 : cols.op_a_0 = 0
+    · simp [hop_a_0]; aesop
+    · simp [hop_a_0]; aesop
+```
+
+Notes for fan-out / future readers:
+- **RHS-shape convention**: `Range`-opcode bounds appear as
+  `.val`-level Nat comparisons after simp (since `constrain_poly_Range`
+  produces `a.val < 2 ^ b.val`); state these in `.val < N` form.
+  `U8Range`-opcode bounds and `program`-clause bounds (`< 32`,
+  `< 65536`) stay field-level (since `constrain_poly_U8Range` and
+  `toProp_poly`'s program arm yield field `<`).
+- **`(1 : ZMod p)` ascription needed** in the iff RHS to avoid
+  `HSub (ZMod p) ℕ` synthesis failure when literals back-propagate.
+- **`hN`-style helpers**: `(N : ZMod p).val = N` for any small literal
+  `N` not in `Field.lean`'s `val_*_zmod_p` family (currently 2, 4, 8,
+  16, 32, 256, 65536). The 4 program-using readers all use `16`.
+  CPUState uses `13`.
+- **`attribute [-simp] Opcode.trusted_instr_poly`** required at
+  module level for the 4 program-using readers — otherwise simp
+  unfolds the giant `match`-on-Opcode body and the proof times out.
+  CPUState doesn't use `program` so doesn't need this.
+- **`imp_and` simp lemma**: only used in Shape A. Shape B's structured
+  proof handles the implication shape via `intros` + `rcases`.
+
+**2026-04-28 investigation (no code landed)**: piloted the Foundation
+consumer migration toward "delete `Fin KB` versions" (item 2 in the
+priority list below). Findings that re-shape the remaining work:
+
+1. **Cleaner ascription idiom found.** The doc's verbose form
+   `SP1ConstraintList.allHold_poly (p := KB) (constraints Main : SP1ConstraintList (ZMod KB))`
+   is unnecessary. Dot notation with named arg works:
+   `(constraints Main).allHold_poly (p := KB)` and similarly
+   `(constraints Main).initialState_poly (p := KB) s`. The named arg fixes
+   `p := KB` before the unifier sees the dot-notation argument, so the
+   `Fin KB ≟ ZMod ?p` step succeeds via definitional `ZMod KB = Fin KB`.
+   Verified at the LSP level via `lean_run_code` against `SP1Chips.Sub.Constraints`.
+
+2. **Missing iff-lemma layer in `SP1Operations`.** Of 19 hand-written
+   iff lemmas (Phase 3 audit), only 3 have `_poly` companions
+   (`IsZeroOperation.spec_poly`, `IsZeroWordOperation.spec_poly`,
+   `IsEqualWordOperation.spec_poly`). The remaining **16** must be added
+   before chip-side migration is possible:
+   - 5 Reader iff lemmas: `RTypeReader`, `ITypeReader`, `ALUTypeReader`,
+     `JTypeReader`, `CPUState`.
+   - 11 Operation iff lemmas: `LtOperationSigned`, `LtOperationUnsigned`,
+     `U16CompareOperation`, `U16MSBOperation`, `BitwiseU16Operation`,
+     `AddOperation`, `SubOperation`, `AddwOperation`, `SubwOperation`,
+     `AddrAddOperation`, `U16toU8OperationSafe`.
+
+3. **Iff-lemma RHS shape divergence.** The naive port (substitute
+   `SP1Constraint.toProp_poly` for `SP1Constraint.toProp` in the LHS,
+   keep RHS verbatim) does NOT close with the original `simp + tauto`.
+   `simp [..., toProp_poly]` reduces to `.val`-level Nat comparisons
+   (e.g. `ZMod.val ((cols.clk_0_16 - 1) * 8⁻¹) < 2 ^ ZMod.val 13`)
+   while the original iff RHS uses field-level comparisons
+   (e.g. `(cols.clk_0_16 - 1) * 8⁻¹ < 8192` with `Fin.instLT`/`ZMod.instLT`).
+   These are definitionally equal at `p := KB` but not syntactically;
+   `tauto` cannot close. **Confirmed on `CPUState.allHold_constraints_iff_poly`**:
+   the simplest possible iff_poly attempt; `tauto` gap requires
+   per-case `.val`-arithmetic massage. Each iff_poly is therefore
+   a non-trivial proof, not a mechanical port.
+
+4. **Keystone bridge `toProp_poly (p := KB) = toProp` requires recursive
+   bridges.** Attempting a single Foundation-level lemma to identify the
+   two `toProp` flavors at `p := KB` gets stuck in the `program` case:
+   `trusted_instr_poly` and `trusted_instr` are different functions
+   sharing structure, so `cases` + `rfl` doesn't close. The recursion
+   continues: `trusted_instr_poly = trusted_instr` needs
+   `*_type_constraints_poly = *_type_constraints` for each of 5 readers,
+   and the `Word.isU64_poly = Word.isU64`, `Word.toBitVec64_poly = Word.toBitVec64`
+   leaves. The "leaves" eventually bottom out in the `Fin.instLT`/`ZMod.instLT`
+   discrepancy from finding 3, so even the leaves aren't pure `rfl`.
+   Conclusion: there's no shortcut bridge that obviates per-iff work.
+
+5. **Cross-repo chip auto-gen still `Fin KB`-bound.** The auto-gen
+   `SP1Chips/<Chip>/Constraints.lean` files return
+   `SP1ConstraintList (Fin KB)` (no parametric emission for chips —
+   only operations got it via `update_constraints.py`'s post-process).
+   The chip-side migration tolerates this via `(p := KB)` named arg
+   (finding 1), but a strict reading of "Foundation agnostic, chips
+   instantiate" would also lift the chip auto-gen. That requires
+   either upstream Rust changes (the path Sub-phase A took for the
+   `(Fin KB)` annotation, or B.2 took for inverse literals) or an
+   extension of the Python post-processor to handle chip-level structs
+   (currently `PARAMETRIC_OPS` is operation-keyed). Neither is in scope
+   per existing decisions.
+
+**Implication for the migration plan.** The original 3-5 hr estimate
+in `~/.claude/plans/make-a-plan-to-shiny-biscuit.md` (Phase B alone
+"~220 ascription rewrites") materially undercounted because:
+
+- **Per-iff_poly cost ≈ 1-3 hr** for non-trivial readers/ops (per
+  finding 3) × 16 = **16-48 hr**, not minutes per chip.
+- **Per-chip migration cost** depends on how many internal lemmas the
+  chip's proof body invokes; each one (e.g. `RTypeReader.allHold_constraints_iff_is_real`,
+  `CPUState.allHold_constraints_iff_is_real`, `SubOperation.spec`)
+  needs its `_poly` companion present.
+- **Bridge-coupled operations** (`Add`/`Sub`/`Addw`/`Subw`/`AddrAdd`/`U16toU8Safe`)
+  also need polymorphic `inv_*BB_eq'` analogues: e.g.
+  `(65536 : ZMod p) ≠ 0` from `[Fact (Nat.Prime p)]` + `[Fact (65536 < p)]`,
+  and the corresponding `ZMod`-side simp lemmas mirroring `inv_4BB_eq'`
+  / `inv_65536BB_eq'`. B.6 added the *primitives* (`val_4_ne_zero`,
+  `val_65536_ne_zero`, `val_sub_cases`); the bridge lemmas using them
+  are not yet written.
+
+**Revised effort estimate**: 4-6 sessions to complete consumer
+migration + Fin KB deletion across `SP1Foundations/` (vs the prior
+1-session plan).
+
+**Recommended sequencing for the next session**:
+
+1. Pick ONE simple reader (CPUState — only 2 facts in RHS, no
+   bridge-coupled inverses) and write `allHold_constraints_iff_poly` +
+   `allHold_constraints_iff_is_real_poly` with explicit `.val`-level
+   RHS shape (matching simp's output). Land green build.
+2. Pick ONE simple chip that uses ONLY CPUState (e.g. UTypeChip's
+   simpler `correct_*` if any) — migrate it end-to-end as the canonical
+   chip-side migration template. Note any extra simp dispatch needed.
+3. Write up the canonical template patterns in this doc (chip
+   prologue ascription pattern, iff_poly RHS-shape conventions,
+   downstream destructure pattern) so subsequent sessions can fan out
+   the cascade mechanically.
 
 **Stated end goal (2026-04-27)**: everything in `SP1Foundations/*` should
 be agnostic to the prime field — either generic over `ZMod p` (with

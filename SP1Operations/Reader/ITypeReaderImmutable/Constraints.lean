@@ -13,7 +13,7 @@ section constraints
   (pc : (Vector (Fin KB) 3))
   (opcode : (Fin KB))
   (instr_field_consts : (Vector (Fin KB) 4))
-  (cols : ITypeReader)
+  (cols : ITypeReader (Fin KB))
   (is_real : (Fin KB))
   : SP1ConstraintList (Fin KB) :=
   let E0 : Fin KB := is_real - 1

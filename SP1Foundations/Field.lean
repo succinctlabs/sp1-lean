@@ -61,6 +61,25 @@ instance instMod (p : ℕ) [NeZero p] : Mod (ZMod p) where
   mod x y := ((x.val % y.val : ℕ) : ZMod p)
 end ZMod
 
+/-- `Opcode.ofNat` in the auto-gen `program` interactions reads the opcode
+field as a `ℕ`. At `F := Fin n` and `F := ZMod p` the `.val` projection
+provides this; the typeclass `CoeHead F ℕ` is the generic surface that
+the `_poly` cascade uses to lift readers with `program` clauses
+(RTypeReader, ITypeReader, JTypeReader, ALUTypeReader). -/
+instance Fin.coeHeadNat {n : ℕ} : CoeHead (Fin n) ℕ := ⟨Fin.val⟩
+instance ZMod.coeHeadNat {p : ℕ} [NeZero p] : CoeHead (ZMod p) ℕ := ⟨ZMod.val⟩
+
+/-- Reduces `CoeHead.coe (x : ZMod p)` to `x.val` so simp normalizes the
+`Opcode.ofNat` argument inside `program`-clause auto-gen output to match
+the iff_poly RHS `Opcode.ofNat opcode.val` form. -/
+@[simp] lemma coeHead_zmod_eq_val {p : ℕ} [NeZero p] (x : ZMod p) :
+    @CoeHead.coe (ZMod p) ℕ _ x = x.val := rfl
+
+/-- Reduces `CoeHead.coe (x : Fin n)` to `x.val` (sibling of
+`coeHead_zmod_eq_val`). -/
+@[simp] lemma coeHead_fin_eq_val {n : ℕ} (x : Fin n) :
+    @CoeHead.coe (Fin n) ℕ _ x = x.val := rfl
+
 namespace KoalaBear
 
 -- dt: Need `#eval`-level `native_decide` strength to make this work on all OS

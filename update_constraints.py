@@ -5,19 +5,28 @@ import subprocess
 import re
 from typing import Dict, List, Tuple, Optional
 
-# Operations whose `Constraints.lean` is emitted as `{F : <universe>} [Field F]`
-# parametric instead of `Fin KB`-bound. The struct files for these (in
-# `<op>/Operation.lean`) are hand-written and parameterized over `(F : <universe>)`
-# already; this post-processor rewrites the upstream's `Fin KB` output to match.
-# Two universes occur because `Word T` is defined over `T : Type 0`, so any
-# operation taking a `Word` parameter must use `Type` (not `Type*`).
-# Keyed by `(chip, operation)`. Value is the universe annotation.
-PARAMETRIC_OPS: Dict[Tuple[str, str], str] = {
-    ("DivRem", "IsZeroOperation"): "Type*",
-    ("DivRem", "IsZeroWordOperation"): "Type",
-    ("DivRem", "IsEqualWordOperation"): "Type",
-    ("Lt", "U16CompareOperation"): "Type*",
-    ("Mul", "U16MSBOperation"): "Type*",
+# Operations/readers whose `Constraints.lean` is emitted as parametric over
+# `{F : <universe>} [Field F]` instead of `Fin KB`-bound. The struct files
+# (in `<op>/Operation.lean`) are hand-written and parameterized over
+# `(F : <universe>)` already; this post-processor rewrites the upstream's
+# `Fin KB` output to match. Two universes occur because `Word T` is defined
+# over `T : Type 0`, so any operation taking a `Word` parameter must use
+# `Type` (not `Type*`).
+# Readers with `program` clauses also need `[CoeHead F ℕ]` so
+# `Opcode.ofNat opcode` (which takes `ℕ`) elaborates against generic `F`;
+# `Coe (Fin n) ℕ` and `Coe (ZMod p) ℕ` instances live in `Field.lean`.
+# Keyed by `(chip, operation)`. Value is `(universe, needs_coe_head)`.
+PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
+    ("DivRem", "IsZeroOperation"): ("Type*", False),
+    ("DivRem", "IsZeroWordOperation"): ("Type", False),
+    ("DivRem", "IsEqualWordOperation"): ("Type", False),
+    ("Lt", "U16CompareOperation"): ("Type*", False),
+    ("Mul", "U16MSBOperation"): ("Type*", False),
+    ("Add", "CPUState"): ("Type*", False),
+    ("Add", "RTypeReader"): ("Type", True),
+    ("Addi", "ITypeReader"): ("Type", True),
+    ("UType", "JTypeReader"): ("Type", True),
+    ("Bitwise", "ALUTypeReader"): ("Type", True),
 }
 
 # List of (chip_name, optional_operation_name, prefix_path)
@@ -95,27 +104,33 @@ def run_constraint_compiler(sp1_dir: str, chip: str, operation: Optional[str] = 
 
     return result.stdout
 
-def apply_parametric_post_process(text: str, op_name: str, universe: str) -> str:
+def apply_parametric_post_process(
+    text: str, op_name: str, universe: str, needs_coe_head: bool
+) -> str:
     """Rewrite Fin KB-typed upstream output into `{F : universe} [Field F]`-parametric form.
 
-    The 5 operations in `PARAMETRIC_OPS` have hand-written struct files declared
-    over `(F : <universe>)`. The upstream emitter still produces `Fin KB`-bound
-    Lean for them (parametric emission lives here, not upstream, until upstream
-    grows a corresponding flag). Substitutions:
+    The operations/readers in `PARAMETRIC_OPS` have hand-written struct files
+    declared over `(F : <universe>)`. The upstream emitter still produces
+    `Fin KB`-bound Lean for them (parametric emission lives here, not upstream,
+    until upstream grows a corresponding flag). Substitutions:
 
     1. `(Fin KB)` → `F` — covers `Word (Fin KB)`, `Vector (Fin KB) N`,
        `SP1ConstraintList (Fin KB)`, and parenthesized field-type uses.
     2. `Fin KB` → `F` — covers bare `let X : Fin KB := ...` annotations after
        step 1 has handled all parenthesized forms.
-    3. Add `{F : <universe>} [Field F]` to the `def constraints` line.
+    3. Add `{F : <universe>} [Field F]` (and `[CoeHead F ℕ]` for readers
+       with `program` clauses) to the `def constraints` line.
     4. Add ` F` to the cols struct parameter so `cols : <op_name>` becomes
        `cols : <op_name> F`.
     """
     text = text.replace("(Fin KB)", "F")
     text = text.replace("Fin KB", "F")
+    sig_extras = f"{{F : {universe}}} [Field F]"
+    if needs_coe_head:
+        sig_extras += " [CoeHead F ℕ]"
     text = text.replace(
         "@[irreducible] def constraints",
-        f"@[irreducible] def constraints {{F : {universe}}} [Field F]",
+        f"@[irreducible] def constraints {sig_extras}",
     )
     text = text.replace(
         f"(cols : {op_name})",
@@ -169,12 +184,13 @@ def main():
             # Run the constraint compiler
             constraints_output = run_constraint_compiler(sp1_dir, chip, operation)
 
-            # Apply field-parametric post-process for the 5 ops in PARAMETRIC_OPS
+            # Apply field-parametric post-process for ops/readers in PARAMETRIC_OPS
             if operation is not None:
-                universe = PARAMETRIC_OPS.get((chip, operation))
-                if universe is not None:
+                entry = PARAMETRIC_OPS.get((chip, operation))
+                if entry is not None:
+                    universe, needs_coe_head = entry
                     constraints_output = apply_parametric_post_process(
-                        constraints_output, operation, universe
+                        constraints_output, operation, universe, needs_coe_head
                     )
 
             # Determine the output file path
