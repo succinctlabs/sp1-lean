@@ -188,55 +188,6 @@ end Word
 
 namespace BitVec
 
-theorem useless_signExtend {x : Fin KB} {hx : x.val < 2 ^ 12}
-  : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
-  bx64 % 4 = (BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4
-  := by
-    extract_lets bx64
-    have hx_bb : x.val < KB := x.isLt
-    have hx_64 : x.val < 2 ^ 64 := by omega
-    -- Now prove using bit representation
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_umod, BitVec.toNat_ofNat]
-    have h_bx64 : bx64.toNat = x.val := by
-      simp [bx64, BitVec.toNat_ofNatLT]
-    let bx12 : BitVec 12 := BitVec.ofNatLT x.val hx
-    have h_bx12 : bx12.toNat = x.val := by
-      simp [bx12, BitVec.toNat_ofNatLT]
-    have h_sign_ext : (BitVec.signExtend 64 bx12).toNat % 4 = x.val % 4 := by
-      simp only [BitVec.toNat_signExtend, BitVec.toNat_setWidth]
-      split_ifs with hmsb
-      · have hsub_mod : (2 ^ 64 - 2 ^ 12) % 4 = 0 := by norm_num
-        rw [Nat.add_mod, hsub_mod, Nat.add_zero]
-        have : bx12.toNat < 2 ^ 64 := by
-          rw [h_bx12]
-          exact hx_64
-        rw [Nat.mod_eq_of_lt this, h_bx12, Nat.mod_mod_of_dvd]
-        norm_num
-      · simp [Nat.add_zero]
-        have : bx12.toNat < 2 ^ 64 := by
-          rw [h_bx12]
-          exact hx_64
-        rw [h_bx12]
-    have h4 : (4 : BitVec 64).toNat = 4 := by simp
-    rw [h4]
-    rw [h_bx64]
-    have : bx12 = BitVec.ofNatLT (w := 12) x.val hx := rfl
-    rw [← this, ← h_sign_ext]
-
-theorem useless_signExtend_add {x : Fin KB} {hx : x.val < 2 ^ 12} {y : BitVec 64}
-  : let bx64 : BitVec 64 := BitVec.ofNatLT x (by linarith)
-  (y + bx64) % 4 = (y + BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x (by linarith))) % 4
-  := by
-    extract_lets bx64
-    have h_base := useless_signExtend (x := x) (hx := hx)
-    simp [bx64] at h_base
-    let sx := BitVec.signExtend 64 (BitVec.ofNatLT (w := 12) x.val hx)
-    suffices h_suff : ∀ (a b c : BitVec 64), a % 4 = b % 4 → (c + a) % 4 = (c + b) % 4 by
-      exact h_suff bx64 sx y h_base
-    intro a b c h_ab
-    bv_decide
-
 lemma toInt_toInt_as_toNat_128 {r1 r2 : BitVec 64} :
   (r1.toInt * r2.toInt % 340282366920938463463374607431768211456).toNat =
     (BitVec.signExtend 128 r1 * BitVec.signExtend 128 r2).toNat

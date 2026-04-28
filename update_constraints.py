@@ -3,7 +3,22 @@
 import os
 import subprocess
 import re
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
+
+# Operations whose `Constraints.lean` is emitted as `{F : <universe>} [Field F]`
+# parametric instead of `Fin KB`-bound. The struct files for these (in
+# `<op>/Operation.lean`) are hand-written and parameterized over `(F : <universe>)`
+# already; this post-processor rewrites the upstream's `Fin KB` output to match.
+# Two universes occur because `Word T` is defined over `T : Type 0`, so any
+# operation taking a `Word` parameter must use `Type` (not `Type*`).
+# Keyed by `(chip, operation)`. Value is the universe annotation.
+PARAMETRIC_OPS: Dict[Tuple[str, str], str] = {
+    ("DivRem", "IsZeroOperation"): "Type*",
+    ("DivRem", "IsZeroWordOperation"): "Type",
+    ("DivRem", "IsEqualWordOperation"): "Type",
+    ("Lt", "U16CompareOperation"): "Type*",
+    ("Mul", "U16MSBOperation"): "Type*",
+}
 
 # List of (chip_name, optional_operation_name, prefix_path)
 CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
@@ -43,28 +58,19 @@ CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     ("Mul", "MulOperation", "Operation"),
     ("Sub", "SubOperation", "Operation"),
     ("Subw", "SubwOperation", "Operation"),
-    # U16MSBOperation: Sub-phase B.5 cascade (auto-gen hand-edited to be
-    # {F : Type*} [Field F]-parametric).
-    # ("Mul", "U16MSBOperation", "Operation"),
+    ("Mul", "U16MSBOperation", "Operation"),
     ("Mul", "U16toU8OperationSafe", "Operation"),
     ("Bitwise", "U16toU8OperationUnsafe", "Operation"),
     ("LoadByte", "AddrAddOperation", "Operation"),
     ("LoadByte", "AddressOperation", "Operation"),
 
     # Compare operations
-    # IsEqualWordOperation, IsZeroWordOperation: Sub-phase B.5 cascade
-    # (auto-gen hand-edited to be {F : Type*} [Field F]-parametric).
-    # ("DivRem", "IsEqualWordOperation", "Compare"),
-    # ("DivRem", "IsZeroWordOperation", "Compare"),
-    # IsZeroOperation: Sub-phase B.3 pilot (auto-gen hand-edited to be {F : Type*}
-    # [Field F]-parametric). Re-add to the regen list once the upstream constraint
-    # compiler emits matching parametric output for operation-level constraints.
-    # ("DivRem", "IsZeroOperation", "Compare"),
+    ("DivRem", "IsEqualWordOperation", "Compare"),
+    ("DivRem", "IsZeroWordOperation", "Compare"),
+    ("DivRem", "IsZeroOperation", "Compare"),
     ("Lt", "LtOperationSigned", "Compare"),
     ("Lt", "LtOperationUnsigned", "Compare"),
-    # U16CompareOperation: Sub-phase B.5 cascade (auto-gen hand-edited to be
-    # {F : Type*} [Field F]-parametric). See IsZeroOperation note above.
-    # ("Lt", "U16CompareOperation", "Compare"),
+    ("Lt", "U16CompareOperation", "Compare"),
 
     # Adapters/readers
     ("Add", "RTypeReader", "Reader"),
@@ -88,6 +94,34 @@ def run_constraint_compiler(sp1_dir: str, chip: str, operation: Optional[str] = 
         raise RuntimeError(f"Command failed: {result.stderr}")
 
     return result.stdout
+
+def apply_parametric_post_process(text: str, op_name: str, universe: str) -> str:
+    """Rewrite Fin KB-typed upstream output into `{F : universe} [Field F]`-parametric form.
+
+    The 5 operations in `PARAMETRIC_OPS` have hand-written struct files declared
+    over `(F : <universe>)`. The upstream emitter still produces `Fin KB`-bound
+    Lean for them (parametric emission lives here, not upstream, until upstream
+    grows a corresponding flag). Substitutions:
+
+    1. `(Fin KB)` → `F` — covers `Word (Fin KB)`, `Vector (Fin KB) N`,
+       `SP1ConstraintList (Fin KB)`, and parenthesized field-type uses.
+    2. `Fin KB` → `F` — covers bare `let X : Fin KB := ...` annotations after
+       step 1 has handled all parenthesized forms.
+    3. Add `{F : <universe>} [Field F]` to the `def constraints` line.
+    4. Add ` F` to the cols struct parameter so `cols : <op_name>` becomes
+       `cols : <op_name> F`.
+    """
+    text = text.replace("(Fin KB)", "F")
+    text = text.replace("Fin KB", "F")
+    text = text.replace(
+        "@[irreducible] def constraints",
+        f"@[irreducible] def constraints {{F : {universe}}} [Field F]",
+    )
+    text = text.replace(
+        f"(cols : {op_name})",
+        f"(cols : {op_name} F)",
+    )
+    return text
 
 def update_constraints_in_file(file_path: str, new_constraints: str):
     """Replace content between 'section constraints' and 'end constraints' markers."""
@@ -134,6 +168,14 @@ def main():
         try:
             # Run the constraint compiler
             constraints_output = run_constraint_compiler(sp1_dir, chip, operation)
+
+            # Apply field-parametric post-process for the 5 ops in PARAMETRIC_OPS
+            if operation is not None:
+                universe = PARAMETRIC_OPS.get((chip, operation))
+                if universe is not None:
+                    constraints_output = apply_parametric_post_process(
+                        constraints_output, operation, universe
+                    )
 
             # Determine the output file path
             if operation is None:

@@ -16,9 +16,14 @@ counterparts** + **SailM `_poly` execute_*_pure_w defs** + **Sub-phase B.6
 (Foundation `_poly` cascade except MUL/MULW)** + **Sub-phase B.7
 (MUL/MULW `_poly` cascade — Word/BWord extend_poly, Word.toBWord_poly,
 combine_MUL_*_poly, execute_MUL_pure_bw_poly, execute_MULW_pure_bhw_poly,
-exec_MUL/MULW_pure_bv_to_*_poly)** complete. Sub-phase B Steps 1-2
-(`.val` rephrase, parametric Word.lean lift) attempted in earlier session,
-both reverted. `lake build` clean (0 errors, 0 warnings, 8508 jobs).
+exec_MUL/MULW_pure_bv_to_*_poly)** + **low-hanging-fruit sweep
+(2026-04-28: removed orphaned `useless_signExtend{,_add}`, dropped unused
+`inv_{8,256}BB_eq'` bridges in Field.lean, moved parametric emission for
+the 5 hand-edited operations into `update_constraints.py`'s post-processor
+so `PARAMETRIC_OPS` is now durable across regens — exclusion list gone)**
+complete. Sub-phase B Steps 1-2 (`.val` rephrase, parametric Word.lean
+lift) attempted in earlier session, both reverted. `lake build` clean
+(0 errors, 0 warnings, 8508 jobs).
 
 **Stated end goal (2026-04-27)**: everything in `SP1Foundations/*` should
 be agnostic to the prime field — either generic over `ZMod p` (with
@@ -105,10 +110,9 @@ strategy, with scope expanded as needed.
 
 **Remaining work toward that goal** (order = recommended priority):
 
-1. **BitVec.lean `useless_signExtend*` theorems**. Two theorems still at
-   `Fin KB` because their proofs use `x.isLt` (Fin's structural bound).
-   Lifting needs a `[Fact (p < 2^64)]` precondition to bound `x.val < 2^64`.
-   Low priority (the name "useless" suggests they're rarely used).
+1. ~~**BitVec.lean `useless_signExtend*` theorems**.~~ **Done
+   (2026-04-28)** — both deleted; zero external call sites confirmed
+   pre-deletion.
 2. **Migrate Foundation consumers and delete `Fin KB` versions**
    (~3-5 hr). For each function with both `Fin KB` and `_poly` versions
    in `Constraint.lean`, `ByteOpcode.lean`, `Assumptions.lean`,
@@ -127,8 +131,30 @@ strategy, with scope expanded as needed.
    `val_sub_cases` + the existing `val_*_zmod_p` simp family. If `grind`
    still gaps, add a tactic-friendly forward rule (`from
    (a - b).val < N with N < p/2 derive b.val ≤ a.val ∧ a.val - b.val < N`).
-4. **Cross-repo upstream parametric emission** (~2 hr, orthogonal).
-   Independent of items 1-3; can run any time.
+4. ~~**Cross-repo upstream parametric emission**.~~ **Done (2026-04-28)**
+   — implemented in `update_constraints.py` instead of upstream Rust. The
+   script now ships a `PARAMETRIC_OPS` map keyed by `(chip, operation)`
+   with universe annotation, plus an `apply_parametric_post_process`
+   helper that rewrites `Fin KB` → `F`, injects `{F : <universe>} [Field F]`
+   on the `def constraints` line, and parameterizes the `cols` struct
+   type. Verified byte-zero diff vs the 5 hand-edited
+   `Constraints.lean` files on `IsZeroOperation`, `IsZeroWordOperation`
+   (`Type`), `IsEqualWordOperation` (`Type`), `U16CompareOperation`,
+   `U16MSBOperation`. The `update_constraints.py` exclusion list is
+   gone. `Type` vs `Type*` split is structural — `IsZeroWord` /
+   `IsEqualWord` carry `Word F` parameters and `Word T` is defined
+   over `T : Type 0`, so they cannot be lifted to `Type*` without
+   first lifting `Word`. Harmonization to `Type*` was attempted and
+   reverted.
+
+**Low-hanging-fruit cleanup also landed (2026-04-28)**:
+
+- `Field.lean` `inv_8BB_eq'` and `inv_256BB_eq'` deleted — both had
+  zero external call sites. `inv_4BB_eq'` (7 uses in BranchChip) and
+  `inv_65536BB_eq'` (9 uses in BranchChip / Sub / Subw) kept. The
+  `@[simp]` family (`mul_inv_16BB_eq_one_iff`, `inv_16BB_zero_or_one`,
+  `inv_mul_{2,3,8,16}BB_eq_iff'`) kept — load-bearing for chip omega
+  proofs per the file's own comment block.
 
 **What was attempted but doesn't currently work** (recorded for future
 sessions to avoid re-discovering):

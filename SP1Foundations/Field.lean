@@ -208,8 +208,6 @@ convention: `<op>_<N>BB` where `BB` is short for "BabyBear-class small prime"
 -- NOT `@[simp]`: they're invoked explicitly in proofs that need omega to see
 -- concrete numbers, typically via `simp only [← inv_*BB_eq'] at h ...`.
 lemma inv_4BB_eq' : (1598029825 : Fin KB) = ((4 : Fin KB)⁻¹) := rfl
-lemma inv_8BB_eq' : (1864368129 : Fin KB) = ((8 : Fin KB)⁻¹) := rfl
-lemma inv_256BB_eq' : (2122383361 : Fin KB) = ((256 : Fin KB)⁻¹) := rfl
 lemma inv_65536BB_eq' : (2130673921 : Fin KB) = ((65536 : Fin KB)⁻¹) := rfl
 
 @[simp] lemma mul_inv_16BB_eq_one_iff : x * (65536 : Fin KB)⁻¹ = 1 ↔ x = 65536 := by
