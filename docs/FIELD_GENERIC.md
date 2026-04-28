@@ -10,11 +10,12 @@ phase boundary. The implementation roadmap is in
 **Status as of 2026-04-27**: Phases 0-5 + Sub-phase A + Sub-phase B.2 +
 B.3 + B.4 + **B.5b (4-op cascade)** + **B.5c (polymorphic `.val` helpers)**
 + **MemoryConsistency lift** + **Word.lean `_poly` def cascade across
-all 6 namespaces (HWord, Word, DWord, BHWord, BWord, BDWord)** + **BitVec
-Word section `_poly` lemma counterparts** + **SailM `_poly` execute_*_pure_w
-defs** complete. Sub-phase B Steps 1-2 (`.val` rephrase, parametric
-Word.lean lift) attempted in earlier session, both reverted. `lake build`
-clean (0 errors, 0 warnings, 8508 jobs).
+all 6 namespaces (HWord, Word, DWord, BHWord, BWord, BDWord)** + **Word.lean
+~50 `_poly` lemma companions** + **BitVec Word section `_poly` lemma
+counterparts** + **SailM `_poly` execute_*_pure_w defs** complete.
+Sub-phase B Steps 1-2 (`.val` rephrase, parametric Word.lean lift)
+attempted in earlier session, both reverted. `lake build` clean (0 errors,
+0 warnings, 8508 jobs).
 
 **Stated end goal (2026-04-27)**: everything in `SP1Foundations/*` should
 be agnostic to the prime field — either generic over `ZMod p` (with
@@ -76,10 +77,27 @@ sessions to avoid re-discovering):
   is `(a-b).val` arithmetic. See item 5 above.
 - `exec_RTYPE_pure_bv_to_w_poly` direct port hits kernel deep recursion
   during `aesop`. Recorded as deferred in `SailM.lean`.
-- `Word.eq_toNat_poly_eq` (poly counterpart of `eq_toNat_eq`) requires
-  `ZMod.val_injective` per limb plus the bound combination — not a
-  drop-in port from the Fin KB `omega` proof. Recorded as deferred in
-  `Word.lean`.
+- `BWord.toNat_poly_toWord_poly` / `BWord.toWord_poly_U64_poly`
+  (BWord→Word cross-namespace conversions) need per-limb
+  `ZMod.val_add` / `ZMod.val_mul` decomposition under
+  `[Fact (65536 < p)]`. An inlined `aux` helper had unification
+  issues during `simp`. Recorded as deferred in `Word.lean`.
+- **Chip-side migration to `_poly` versions**: Tested in this session.
+  Lean's unifier *does* solve `Fin KB ≟ ZMod ?p ⇒ ?p := KB` in
+  isolation (e.g. `(cs : SP1ConstraintList (Fin KB)) →
+  SP1ConstraintList.allHold_poly cs` elaborates), but **fails when
+  applied to chip-side complex terms** like
+  `(constraints Main).allHold_poly` for
+  `Main : Vector (Fin KB) 33`. The fix that works is an explicit
+  ascription: `SP1ConstraintList.allHold_poly (p := KB)
+  (constraints Main : SP1ConstraintList (ZMod KB))`. This ascription
+  is verbose, and replacing it triggers cascading type mismatches in
+  the chip proof body (since downstream lemmas like `spec`,
+  `allHold_constraints_iff_is_real` are still `Fin KB`-typed).
+  **Conclusion**: migration is technically feasible but non-trivial —
+  each chip needs both signature ascription AND a poly-companion
+  cascade for every internal lemma it consumes. Recorded as item 4 in
+  the recommended next-step list.
 
 **Critical finding from B.5b** (revises the prior claim that the cascade
 is "mechanical" with proofs that "carry verbatim"):
