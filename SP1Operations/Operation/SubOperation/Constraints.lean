@@ -5,50 +5,50 @@ namespace SubOperation
 
 section constraints
 
-@[irreducible] def constraints
-  (a : (Word (Fin KB)))
-  (b : (Word (Fin KB)))
-  (cols : SubOperation)
-  (is_real : (Fin KB))
-  : SP1ConstraintList (Fin KB) :=
-  let E0 : Fin KB := is_real - 1
-  let E1 : Fin KB := is_real * E0
-  let E2 : Fin KB := a[0] + 65536
-  let E3 : Fin KB := E2 - 1
-  let E4 : Fin KB := E3 - b[0]
-  let E5 : Fin KB := E4 - cols.value[0]
-  let E6 : Fin KB := E5 + 1
-  let E7 : Fin KB := E6 * ((65536 : Fin KB)⁻¹)
-  let E8 : Fin KB := E7 - 1
-  let E9 : Fin KB := E7 * E8
-  let E10 : Fin KB := is_real * E9
-  let E11 : Fin KB := a[1] + 65536
-  let E12 : Fin KB := E11 - 1
-  let E13 : Fin KB := E12 - b[1]
-  let E14 : Fin KB := E13 - cols.value[1]
-  let E15 : Fin KB := E14 + E7
-  let E16 : Fin KB := E15 * ((65536 : Fin KB)⁻¹)
-  let E17 : Fin KB := E16 - 1
-  let E18 : Fin KB := E16 * E17
-  let E19 : Fin KB := is_real * E18
-  let E20 : Fin KB := a[2] + 65536
-  let E21 : Fin KB := E20 - 1
-  let E22 : Fin KB := E21 - b[2]
-  let E23 : Fin KB := E22 - cols.value[2]
-  let E24 : Fin KB := E23 + E16
-  let E25 : Fin KB := E24 * ((65536 : Fin KB)⁻¹)
-  let E26 : Fin KB := E25 - 1
-  let E27 : Fin KB := E25 * E26
-  let E28 : Fin KB := is_real * E27
-  let E29 : Fin KB := a[3] + 65536
-  let E30 : Fin KB := E29 - 1
-  let E31 : Fin KB := E30 - b[3]
-  let E32 : Fin KB := E31 - cols.value[3]
-  let E33 : Fin KB := E32 + E25
-  let E34 : Fin KB := E33 * ((65536 : Fin KB)⁻¹)
-  let E35 : Fin KB := E34 - 1
-  let E36 : Fin KB := E34 * E35
-  let E37 : Fin KB := is_real * E36
+@[irreducible] def constraints {F : Type} [Field F]
+  (a : (Word F))
+  (b : (Word F))
+  (cols : SubOperation F)
+  (is_real : F)
+  : SP1ConstraintList F :=
+  let E0 : F := is_real - 1
+  let E1 : F := is_real * E0
+  let E2 : F := a[0] + 65536
+  let E3 : F := E2 - 1
+  let E4 : F := E3 - b[0]
+  let E5 : F := E4 - cols.value[0]
+  let E6 : F := E5 + 1
+  let E7 : F := E6 * ((65536 : F)⁻¹)
+  let E8 : F := E7 - 1
+  let E9 : F := E7 * E8
+  let E10 : F := is_real * E9
+  let E11 : F := a[1] + 65536
+  let E12 : F := E11 - 1
+  let E13 : F := E12 - b[1]
+  let E14 : F := E13 - cols.value[1]
+  let E15 : F := E14 + E7
+  let E16 : F := E15 * ((65536 : F)⁻¹)
+  let E17 : F := E16 - 1
+  let E18 : F := E16 * E17
+  let E19 : F := is_real * E18
+  let E20 : F := a[2] + 65536
+  let E21 : F := E20 - 1
+  let E22 : F := E21 - b[2]
+  let E23 : F := E22 - cols.value[2]
+  let E24 : F := E23 + E16
+  let E25 : F := E24 * ((65536 : F)⁻¹)
+  let E26 : F := E25 - 1
+  let E27 : F := E25 * E26
+  let E28 : F := is_real * E27
+  let E29 : F := a[3] + 65536
+  let E30 : F := E29 - 1
+  let E31 : F := E30 - b[3]
+  let E32 : F := E31 - cols.value[3]
+  let E33 : F := E32 + E25
+  let E34 : F := E33 * ((65536 : F)⁻¹)
+  let E35 : F := E34 - 1
+  let E36 : F := E34 * E35
+  let E37 : F := is_real * E36
   [
     (.assertZero E1),
     (.assertZero E10),

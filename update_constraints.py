@@ -32,6 +32,15 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
     ("Addi", "ITypeReader"): ("Type", True),
     ("UType", "JTypeReader"): ("Type", True),
     ("Bitwise", "ALUTypeReader"): ("Type", True),
+    # Bridge-coupled ops (B.10): struct + Constraints lifted; iff_poly
+    # lemmas land where the simp recipe closes mechanically (Add only at
+    # this point — Sub deferred per docs/FIELD_GENERIC.md).
+    ("Add", "AddOperation"): ("Type", False),
+    ("Sub", "SubOperation"): ("Type", False),
+    ("Addw", "AddwOperation"): ("Type", False),
+    ("Subw", "SubwOperation"): ("Type", False),
+    ("LoadByte", "AddrAddOperation"): ("Type", False),
+    ("Mul", "U16toU8OperationSafe"): ("Type", False),
 }
 
 # List of (chip_name, optional_operation_name, prefix_path)

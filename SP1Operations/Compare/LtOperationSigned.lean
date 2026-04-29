@@ -27,6 +27,29 @@ lemma allHold_constraints_iff
     (is_signed = 1 ∨ cols.c_msb.msb = 0)
   := by simp [constraints, sub_eq_zero]
 
+/-- Polymorphic companion of `allHold_constraints_iff` over `ZMod p`. -/
+lemma allHold_constraints_iff_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  {b : Word (ZMod p)}
+  {d : Word (ZMod p)}
+  {cols : LtOperationSigned (ZMod p)}
+  {is_signed : ZMod p} :
+  List.Forall SP1Constraint.toProp_poly (constraints b d cols is_signed 1) ↔
+    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints b[3] cols.b_msb is_signed) ∧
+    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints d[3] cols.c_msb is_signed) ∧
+    List.Forall SP1Constraint.toProp_poly (LtOperationUnsigned.constraints
+      #v[b[0], b[1], b[2], b[3] + is_signed * 32768 - 65536 * cols.b_msb.msb]
+      #v[d[0], d[1], d[2], d[3] + is_signed * 32768 - 65536 * cols.c_msb.msb]
+      { u16_compare_operation := cols.result.u16_compare_operation,
+        u16_flags := #v[cols.result.u16_flags[0], cols.result.u16_flags[1], cols.result.u16_flags[2], cols.result.u16_flags[3]],
+        not_eq_inv := cols.result.not_eq_inv,
+        comparison_limbs := #v[cols.result.comparison_limbs[0], cols.result.comparison_limbs[1]] }
+      1) ∧
+    (is_signed = 0 ∨ is_signed = 1) ∧
+    (is_signed = 1 ∨ cols.b_msb.msb = 0) ∧
+    (is_signed = 1 ∨ cols.c_msb.msb = 0)
+  := by simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
+
 -- spec proof with 32-bit comparison lemmas
 lemma spec.unsigned
   {b : Word (Fin KB)}
@@ -46,6 +69,30 @@ lemma spec.unsigned
     · simp_all [execute_RTYPE_pure_w, Word.toNat]
     · apply Word.isU64_of_cases <;> simp_all
     · apply Word.isU64_of_cases <;> simp_all
+
+/-- Polymorphic companion of `spec.unsigned` (natural-form, not BitVec).
+With `is_signed = 0`, the msb constraints force `cols.{b,c}_msb.msb = 0`,
+so the `LtOperationUnsigned` sub-proof on the same b, d applies. -/
+lemma spec.unsigned_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  {b : Word (ZMod p)}
+  {d : Word (ZMod p)}
+  {cols : LtOperationSigned (ZMod p)}
+  (h_b_isU64 : Word.isU64_poly b)
+  (h_d_isU64 : Word.isU64_poly d) :
+  List.Forall SP1Constraint.toProp_poly (constraints b d cols 0 1) →
+    cols.result.u16_compare_operation.bit =
+      if b.toNat_poly < d.toNat_poly then (1 : ZMod p) else (0 : ZMod p)
+  := by
+    intro cstrs
+    rw [allHold_constraints_iff_poly] at cstrs
+    rcases cstrs with ⟨h_b_msb, h_c_msb, h_lt, h_is_signed_bool, h_is_signed_b_msb, h_is_signed_c_msb⟩
+    apply Word.lt_cases_of_isU64_poly at h_b_isU64
+    apply Word.lt_cases_of_isU64_poly at h_d_isU64
+    apply LtOperationUnsigned.spec.nat_poly at h_lt
+    · simp_all [Word.toNat_poly]
+    · apply Word.isU64_of_cases_poly <;> simp_all
+    · apply Word.isU64_of_cases_poly <;> simp_all
 
 -- spec proof with 32-bit comparison lemmas
 lemma spec.signed

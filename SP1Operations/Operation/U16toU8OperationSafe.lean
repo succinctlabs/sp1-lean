@@ -59,6 +59,26 @@ lemma allHold_constraints_iff
     (¬is_real = 0 → cols.low_bytes[3] < 256 ∧ ((u16_values[3] - cols.low_bytes[3]) * (256 : Fin KB)⁻¹) < 256)
   := by simp [constraints]
 
+/-- Polymorphic companion of `allHold_constraints_iff` over `ZMod p`. The
+auto-gen U8Range opcode produces field-level `<` (per the B.8 finding
+on `constrain_poly_U8Range`); the only delta vs the `Fin KB` proof is
+that we need to provide `(0 : ZMod p) < (256 : ZMod p)` explicitly
+(the `Fin KB` version sees this `decide`-true). -/
+lemma allHold_constraints_iff_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (u16_values : (Vector (ZMod p) 4))
+  (cols : U16toU8Operation (ZMod p))
+  (is_real : ZMod p) :
+  List.Forall SP1Constraint.toProp_poly (constraints u16_values cols is_real).2 ↔
+    (¬is_real = 0 → cols.low_bytes[0] < 256 ∧ ((u16_values[0] - cols.low_bytes[0]) * (256 : ZMod p)⁻¹) < 256) ∧
+    (¬is_real = 0 → cols.low_bytes[1] < 256 ∧ ((u16_values[1] - cols.low_bytes[1]) * (256 : ZMod p)⁻¹) < 256) ∧
+    (¬is_real = 0 → cols.low_bytes[2] < 256 ∧ ((u16_values[2] - cols.low_bytes[2]) * (256 : ZMod p)⁻¹) < 256) ∧
+    (¬is_real = 0 → cols.low_bytes[3] < 256 ∧ ((u16_values[3] - cols.low_bytes[3]) * (256 : ZMod p)⁻¹) < 256)
+  := by
+  have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
+    change (0 : ZMod p).val < (256 : ZMod p).val; simp
+  simp [constraints, SP1Constraint.toProp_poly, h0_lt_256]
+
 lemma spec.cstrs
   {u16_values : (Vector (Fin KB) 4)}
   {cols : U16toU8Operation (Fin KB)} :

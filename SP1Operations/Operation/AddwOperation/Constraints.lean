@@ -6,29 +6,29 @@ namespace AddwOperation
 
 section constraints
 
-@[irreducible] def constraints
-  (a : (Word (Fin KB)))
-  (b : (Word (Fin KB)))
-  (cols : AddwOperation)
-  (is_real : (Fin KB))
-  : SP1ConstraintList (Fin KB) :=
-  let E0 : Fin KB := is_real - 1
-  let E1 : Fin KB := is_real * E0
-  let E2 : Fin KB := a[0] + b[0]
-  let E3 : Fin KB := E2 - cols.value[0]
-  let E4 : Fin KB := E3 + 0
-  let E5 : Fin KB := E4 * ((65536 : Fin KB)⁻¹)
-  let E6 : Fin KB := E5 - 1
-  let E7 : Fin KB := E5 * E6
-  let E8 : Fin KB := is_real * E7
-  let E9 : Fin KB := a[1] + b[1]
-  let E10 : Fin KB := E9 - cols.value[1]
-  let E11 : Fin KB := E10 + E5
-  let E12 : Fin KB := E11 * ((65536 : Fin KB)⁻¹)
-  let E13 : Fin KB := E12 - 1
-  let E14 : Fin KB := E12 * E13
-  let E15 : Fin KB := is_real * E14
-  let CS0 : SP1ConstraintList (Fin KB) := U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } is_real
+@[irreducible] def constraints {F : Type} [Field F]
+  (a : (Word F))
+  (b : (Word F))
+  (cols : AddwOperation F)
+  (is_real : F)
+  : SP1ConstraintList F :=
+  let E0 : F := is_real - 1
+  let E1 : F := is_real * E0
+  let E2 : F := a[0] + b[0]
+  let E3 : F := E2 - cols.value[0]
+  let E4 : F := E3 + 0
+  let E5 : F := E4 * ((65536 : F)⁻¹)
+  let E6 : F := E5 - 1
+  let E7 : F := E5 * E6
+  let E8 : F := is_real * E7
+  let E9 : F := a[1] + b[1]
+  let E10 : F := E9 - cols.value[1]
+  let E11 : F := E10 + E5
+  let E12 : F := E11 * ((65536 : F)⁻¹)
+  let E13 : F := E12 - 1
+  let E14 : F := E12 * E13
+  let E15 : F := is_real * E14
+  let CS0 : SP1ConstraintList F := U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } is_real
   CS0 ++ [
     (.assertZero E1),
     (.assertZero E8),

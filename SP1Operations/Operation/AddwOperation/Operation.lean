@@ -1,6 +1,6 @@
 import SP1Foundations
 import SP1Operations.Operation.U16MSBOperation
 
-structure AddwOperation where
-  value : Vector (Fin KB) 2
-  msb : U16MSBOperation (Fin KB)
+structure AddwOperation (F : Type) where
+  value : Vector F 2
+  msb : U16MSBOperation F

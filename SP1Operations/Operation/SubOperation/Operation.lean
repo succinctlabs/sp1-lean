@@ -1,4 +1,4 @@
 import SP1Foundations
 
-structure SubOperation where
-  value : Word (Fin KB)
+structure SubOperation (F : Type) where
+  value : Word F

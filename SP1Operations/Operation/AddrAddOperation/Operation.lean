@@ -1,4 +1,4 @@
 import SP1Foundations
 
-structure AddrAddOperation where
-  value : Vector (Fin KB) 3
+structure AddrAddOperation (F : Type) where
+  value : Vector F 3

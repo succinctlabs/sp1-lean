@@ -4,7 +4,7 @@ import SP1Operations.Operation.AddrAddOperation.Constraints
 
 namespace AddrAddOperation
 
-lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddrAddOperation) :
+lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) :
     (constraints a b cols 1).allHold ↔
       let carry0 : Fin KB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
       let carry1 : Fin KB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
@@ -19,7 +19,27 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddrAddOperation) :
       (cols.value[2].val < 65536) := by
   simp [constraints, sub_eq_zero]
 
-theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fin KB)
+/-- Polymorphic companion of `allHold_constraints_iff` over `ZMod p`. Same
+Add-style carry shape as `AddOperation` (no borrow form), so bare `simp`
+closes. -/
+lemma allHold_constraints_iff_poly
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (a b : Word (ZMod p)) (cols : AddrAddOperation (ZMod p)) :
+    SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
+      let carry0 : ZMod p := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
+      let carry1 : ZMod p := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
+      let carry2 : ZMod p := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
+      let carry3 : ZMod p := (a[3] + b[3] - 0 + carry2) * 65536⁻¹
+      (carry0 = 0 ∨ carry0 = 1) ∧
+      (carry1 = 0 ∨ carry1 = 1) ∧
+      (carry2 = 0 ∨ carry2 = 1) ∧
+      (carry3 = 0 ∨ carry3 = 1) ∧
+      (cols.value[0].val < 65536) ∧
+      (cols.value[1].val < 65536) ∧
+      (cols.value[2].val < 65536) := by
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
+
+theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) (is_real : Fin KB)
     (h_is_real : is_real = 1)
     (cstrs : (constraints a b cols is_real).allHold)
     (ha : a.isU64)
@@ -46,7 +66,7 @@ theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fi
       <;> omega
 
 -- address-add correctness with U64 unfolding
-theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real : Fin KB)
+theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) (is_real : Fin KB)
     (h_is_real : is_real = 1)
     (cstrs : (constraints a b cols is_real).allHold)
     (ha : a.isU64)
@@ -75,13 +95,13 @@ theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation) (is_real
       <;> simp [sub_eq_zero] at h3
       <;> omega
 
-def spec (a b : Word (Fin KB)) (cols : AddrAddOperation) : Prop :=
+def spec (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) : Prop :=
   let cols_word : Word (Fin KB) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
   cols_word.isU64 ∧ cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
 lemma spec_of_constraints (a : Word (Fin KB)) (b : Word (Fin KB))
     (ha : a.isU64) (hb : b.isU64)
-    (cols : AddrAddOperation)
+    (cols : AddrAddOperation (Fin KB))
     (h : SP1ConstraintList.allHold (AddrAddOperation.constraints a b cols 1)) :
     (spec a b cols) := by
   have h_sum_u48 := is_u48_sum _ _ _ _ rfl h ha hb

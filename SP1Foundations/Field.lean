@@ -184,6 +184,77 @@ lemma val_8_ne_zero : (8 : ZMod p) ≠ 0 := by
   have h : (8 : ZMod p).val = 8 := val_8_zmod_p
   intro hz; rw [hz] at h; simp at h
 
+/-- Polymorphic non-zero bridge for `(2 : ZMod p)`. -/
+lemma val_2_ne_zero : (2 : ZMod p) ≠ 0 := by
+  have h : (2 : ZMod p).val = 2 := val_2_zmod_p
+  intro hz; rw [hz] at h; simp at h
+
+/-- Polymorphic non-zero bridge for `(3 : ZMod p)`. Used in
+`LtOperationUnsigned/Signed` `_poly` proofs to discharge impossible
+flag-sum combinations (sum = 3 case). -/
+lemma val_3_ne_zero : (3 : ZMod p) ≠ 0 := by
+  have h : (3 : ZMod p).val = 3 := by
+    have hp : 2 ^ 17 < p := hp.out
+    rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
+    apply ZMod.val_natCast_of_lt
+    omega
+  intro hz; rw [hz] at h; simp at h
+
+/-- Polymorphic analogue of `mul_inv_16BB_eq_one_iff`. The carry-binary
+clauses in the bridge-coupled op iff lemmas (`AddOperation`, `SubOperation`,
+`Addw`, `Subw`, `AddrAdd`) have shape `x * 65536⁻¹ = 1`; this rewrites it
+to `x = 65536`. The prime hypothesis is needed for the `GroupWithZero`
+instance via `Field (ZMod p)`. NOT `@[simp]`: would fire on `Fin KB`
+shapes (since `Fin KB = ZMod KB` definitionally) and shadow the existing
+`mul_inv_16BB_eq_one_iff`, breaking `Fin KB`-side proofs that depend on
+its specific `(by trivial)` proof shape. Invoked explicitly in `_poly`
+iff proofs. -/
+lemma mul_inv_65536_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+    x * (65536 : ZMod p)⁻¹ = 1 ↔ x = 65536 := by
+  rw [mul_inv_eq_one₀ val_65536_ne_zero]
+
+/-- Polymorphic analogue for `(4 : ZMod p)⁻¹` — used by AddrAdd/Branch-style
+ops where `(2^2)⁻¹` appears (PC alignment carries). NOT `@[simp]`; see
+`mul_inv_65536_eq_one_iff_poly` for the rationale. -/
+lemma mul_inv_4_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+    x * (4 : ZMod p)⁻¹ = 1 ↔ x = 4 := by
+  rw [mul_inv_eq_one₀ val_4_ne_zero]
+
+/-- Polymorphic analogue of `inv_16BB_zero_or_one`. Carry binarity in
+Add/Sub iff lemmas factors through this disjunction. NOT `@[simp]`. -/
+lemma inv_65536_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+    x * (65536 : ZMod p)⁻¹ = 0 ∨ x * (65536 : ZMod p)⁻¹ = 1 ↔
+      x = 0 ∨ x = 65536 := by
+  have h1 : (65536 : ZMod p)⁻¹ ≠ 0 := inv_ne_zero val_65536_ne_zero
+  rw [mul_inv_eq_one₀ val_65536_ne_zero, mul_eq_zero]
+  aesop
+
+/-- Polymorphic analogue for `(4 : ZMod p)⁻¹` carry binarity. NOT `@[simp]`. -/
+lemma inv_4_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+    x * (4 : ZMod p)⁻¹ = 0 ∨ x * (4 : ZMod p)⁻¹ = 1 ↔
+      x = 0 ∨ x = 4 := by
+  have h1 : (4 : ZMod p)⁻¹ ≠ 0 := inv_ne_zero val_4_ne_zero
+  rw [mul_inv_eq_one₀ val_4_ne_zero, mul_eq_zero]
+  aesop
+
+/-- Small-literal inequality bridge for `ZMod p` under `[Fact (2^17 < p)]`.
+Converts `(n : ZMod p) = (m : ZMod p)` to `n = m` (Nat-level) for any
+`n, m < 2^17`. Polymorphic version of the `decide`-style discharge that
+`Fin KB` proofs use for facts like `(4 : Fin KB) ≠ 0`. Used in the
+LtOperationUnsigned/Signed `_poly` proofs to handle impossible cases
+where multiple flag bits are 1 simultaneously. -/
+lemma small_nat_eq_zmod {n m : ℕ} (hn : n < 2 ^ 17) (hm : m < 2 ^ 17) :
+    ((n : ZMod p) = (m : ZMod p)) ↔ n = m := by
+  have hp : 2 ^ 17 < p := hp.out
+  haveI : NeZero p := ⟨by omega⟩
+  constructor
+  · intro h
+    have hn' : (n : ZMod p).val = n := ZMod.val_natCast_of_lt (by omega)
+    have hm' : (m : ZMod p).val = m := ZMod.val_natCast_of_lt (by omega)
+    apply_fun ZMod.val at h
+    omega
+  · intro h; rw [h]
+
 /-- Case-split helper for `(a - b).val` over `ZMod p`. The positive branch
 matches mathlib's `ZMod.val_sub`; the wrap-around branch follows from
 `a - b = -(b - a)` plus `ZMod.neg_val`. The `if`-shape is `omega`-friendly,

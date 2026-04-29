@@ -5,7 +5,7 @@ import SP1Operations.Operation.AddOperation.Constraints
 namespace AddOperation
 
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
-lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddOperation) :
+lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddOperation (Fin KB)) :
     List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
       let carry0 : Fin KB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
       let carry1 : Fin KB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
@@ -21,12 +21,35 @@ lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddOperation) :
       (cols.value[3].val < 65536) := by
   simp [constraints, sub_eq_zero]
 
+/-- Polymorphic companion to `allHold_constraints_iff`, stated over a generic
+prime field `ZMod p` with `[Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]`. The
+proof closes via the same `simp` recipe as the `Fin KB` version, with the
+new `mul_inv_65536_eq_one_iff_poly` / `inv_65536_zero_or_one_poly` simp
+lemmas in `Field.lean` discharging the carry-binary clauses. -/
+lemma allHold_constraints_iff_poly
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (a b : Word (ZMod p)) (cols : AddOperation (ZMod p)) :
+    SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
+      let carry0 : ZMod p := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
+      let carry1 : ZMod p := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
+      let carry2 : ZMod p := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
+      let carry3 : ZMod p := (a[3] + b[3] - cols.value[3] + carry2) * 65536⁻¹
+      (carry0 = 0 ∨ carry0 = 1) ∧
+      (carry1 = 0 ∨ carry1 = 1) ∧
+      (carry2 = 0 ∨ carry2 = 1) ∧
+      (carry3 = 0 ∨ carry3 = 1) ∧
+      (cols.value[0].val < 65536) ∧
+      (cols.value[1].val < 65536) ∧
+      (cols.value[2].val < 65536) ∧
+      (cols.value[3].val < 65536) := by
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
+
 set_option maxHeartbeats 1000000 in
 
 -- arithmetic spec proof over Word/BitVec
 theorem spec
   {a b : Word (Fin KB)}
-  {cols : AddOperation}
+  {cols : AddOperation (Fin KB)}
   (h_isU64_a : a.isU64)
   (h_isU64_b : b.isU64) :
   List.Forall SP1Constraint.toProp (constraints a b cols 1) →
@@ -48,7 +71,7 @@ section gen
 
 theorem spec.gen
   {a b : Word (Fin KB)}
-  {cols : AddOperation}
+  {cols : AddOperation (Fin KB)}
   {is_real : Fin KB}
   (h_isU64_a : a.isU64)
   (h_isU64_b : b.isU64) :

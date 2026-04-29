@@ -29,9 +29,212 @@ h0_lt_256, imp_and]`)** + **Sub-phase B.9 (bridge-free op struct +
 Constraints lift cascade — `LtOperationUnsigned`, `LtOperationSigned`,
 `U16toU8Operation`, `BitwiseOperation`, `BitwiseU16Operation` all lifted
 to `(F : Type)` parametric form; `U16MSBOperation.allHold_constraints_iff_poly`
-added)** complete. Sub-phase B Steps 1-2 (`.val` rephrase, parametric
-Word.lean lift) attempted in earlier session, both reverted. `lake build`
-clean (0 errors, 0 warnings, 8508 jobs).
+added)** + **Sub-phase B.10 (bridge-coupled op struct + Constraints lift
+cascade — `Add`, `Sub`, `Addw`, `Subw`, `AddrAdd`, `U16toU8Safe` all
+lifted to `(F : Type)` parametric form; polymorphic inverse-bridge
+lemmas added in `Field.lean`; `AddOperation.allHold_constraints_iff_poly`
++ `SubOperation.allHold_constraints_iff_poly`
++ `SubwOperation.allHold_constraints_iff_poly`
++ `AddwOperation.allHold_constraints_iff_poly`
++ `AddrAddOperation.allHold_constraints_iff_poly`
++ `U16toU8OperationSafe.allHold_constraints_iff_poly` landed —
+all 6 bridge-coupled iff_polys complete)** + **Sub-phase B.11
+(deferred `_poly` cascade — 6 lemmas closed: `U16CompareOperation.spec_poly`,
+`U16MSBOperation.{spec_poly, spec.U64_poly, spec.gen_poly}`,
+`LtOperationUnsigned.{allHold_constraints_iff_poly, cl_are_U16_poly}`;
+plus `Field.lean` primitives `small_nat_eq_zmod`, `val_2_ne_zero`,
+`val_3_ne_zero`. Failure point: `LtOperationUnsigned.spec.nat_poly`
+needs structured 16-case `.val`-level proof; aesop / linear_combination
+recipes don't close it. 7 dependent lemmas deferred)** complete.
+Sub-phase B Steps 1-2 (`.val` rephrase, parametric Word.lean lift)
+attempted in earlier session, both reverted. `lake build` clean
+(0 errors, 0 warnings, 8508 jobs).
+
+**Sub-phase B.11 landed (2026-04-28)** — partial deferred `_poly` lemma
+cascade (6 of 14 lemmas closed; 1 failed and 7 deferred):
+
+**Closed (6 lemmas)**:
+
+- `U16CompareOperation.spec_poly` — closes via case-split on
+  `cols.bit ∈ {0, 1}` plus `val_sub_cases` for the wrap-around branch
+  in `(a - b).val` (impossible when `a.val, b.val < 65536` and
+  `p > 2^17`). The `cols.bit = 1` branch uses `ZMod.val_add_of_lt` for
+  `(a - b + 65536).val`. Heartbeats elevated to 4M.
+- `U16MSBOperation.spec_poly` / `spec.U64_poly` / `spec.gen_poly` —
+  same case-split recipe as `U16CompareOperation.spec_poly`, with
+  `(2 * a - cols.msb * 65536).val` analyzed via `ZMod.val_mul_of_lt`
+  + `val_sub_cases`. The U64 / gen variants are short corollaries.
+- `LtOperationUnsigned.allHold_constraints_iff_poly` — closes via the
+  same `simp [..., toProp_poly]` recipe as the `Fin KB` version;
+  mechanical port.
+- `LtOperationUnsigned.cl_are_U16_poly` — 16-way case split on the 4
+  boolean flags; the "sum ≤ 1" constraint discards 14 of 16 cases
+  via `linear_combination + val_*_ne_zero` (see "Failed" finding below).
+  Valid cases (0 or 1 flag = 1) close by `rw [← h_e0]; omega` /
+  `rw [← h_e1]; omega`. Heartbeats elevated to 8M.
+
+**Field.lean primitives added** to support this cascade:
+
+- `small_nat_eq_zmod {n m : ℕ} (hn : n < 2^17) (hm : m < 2^17)` —
+  `((n : ZMod p) = (m : ZMod p)) ↔ n = m`. Bridges field-level
+  small-literal equalities to `ℕ`-level for `omega`.
+- `val_2_ne_zero` / `val_3_ne_zero` — siblings of the existing
+  `val_4_ne_zero` / `val_8_ne_zero` family, needed for the
+  `(2/3 : ZMod p) ≠ 0` discharges in `cl_are_U16_poly`.
+
+**Retry with `grind` + helper lemmas landed (2026-04-28)**: replaced
+`aesop` with `grind` and added a `val_ne_of_inv_mul_eq` helper
+(`not_eq_inv * (a - b) = 1 → a.val ≠ b.val`) to bridge the
+field-level inequality from the constraint encoding to the Nat-level
+inequality `grind` can use. The proof closes via 32-way case split
+(16 flag combos × 2 sum-disjuncts × 2 inv-disjuncts), with
+`grind` handling all valid cases. The `linear_combination + val_k_ne_zero`
+recipe still discharges impossible flag-sum cases.
+
+**Cascade landed via the unblocked `spec.nat_poly`**:
+
+- `LtOperationUnsigned.spec.nat_poly` — 32-way case split, grind +
+  optional `val_ne_of_inv_mul_eq` hint.
+- `LtOperationUnsigned.spec.nat.gen_poly` — short corollary
+  (`subst is_real; exact spec.nat_poly`).
+- `LtOperationSigned.allHold_constraints_iff_poly` — mechanical port
+  via `simp [..., toProp_poly]`.
+- `LtOperationSigned.spec.unsigned_poly` (natural form, not BitVec) —
+  with `is_signed = 0`, the msb constraints force
+  `cols.{b,c}_msb.msb = 0`, so the `LtOperationUnsigned.spec.nat_poly`
+  applies on the same `b, d` (zero msb-adjustment).
+
+**Still failed mechanically (1)**:
+
+- `LtOperationSigned.spec.signed_poly` (natural form, not BitVec) —
+  the proof requires structured `.val` arithmetic for
+  `(b[3] + 32768 - 65536 * cols.b_msb.msb).val < 65536` boundary cases:
+  when `b` is negative (`b[3].val ≥ 32768`), the adjusted limb's val
+  is `b[3].val + 32768 - 65536 ∈ [0, 32767]`; when positive, the val
+  is `b[3].val + 32768 ∈ [32768, 98303]` — but neither case is
+  decidable by `grind` without explicit `ZMod.val_add_of_lt` /
+  `val_sub_cases` invocations. Estimated ~50–80 lines of manual proof.
+
+**Deferred (5 lemmas)**:
+
+- `LtOperationUnsigned.spec_poly` (BitVec form): bridges from the
+  natural-form `spec.nat_poly` to BitVec via
+  `BitVec.ofNat 64 cols.bit.val = execute_RTYPE_pure_w b d .SLTU`;
+  needs polymorphic execute_RTYPE bridges.
+- `LtOperationSigned.spec.branch_poly`: depends on `spec.signed_poly`
+  (failed) and uses heavy BitVec rcases over flag combinations.
+- `BitwiseU16Operation.spec.{and,or,xor}_poly` (3): proofs end in
+  `bv_decide` after extensive setup using `Fin.val_add`, `Fin.val_mul`,
+  `Nat.mod_eq_of_lt (b := 2130706433)` (KB literal!), `Fin.div_val`,
+  etc. The `bv_decide` itself works on BitVec, but the setup requires
+  polymorphic Fin → ZMod migration of the val arithmetic.
+
+**Final B.11 tally**: 10 lemmas closed (was 6 in the initial round,
+added 4 in the retry), 1 failed (spec.signed_poly), 5 deferred. The
+critical insight that unblocked progress was using `grind` instead of
+`aesop` plus the `val_ne_of_inv_mul_eq` helper to bridge field-level
+inequality to Nat-level.
+
+**Sub-phase B.10 landed (2026-04-28)** — bridge-coupled op cascade
+(struct + Constraints lifts for all 6 ops; first bridge-coupled
+`_poly` iff lemma landed):
+
+**`Field.lean` polymorphic inverse bridges added** (under
+`{p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]`):
+
+- `mul_inv_65536_eq_one_iff_poly` — `x * (65536 : ZMod p)⁻¹ = 1 ↔ x = 65536`,
+  via `mul_inv_eq_one₀ val_65536_ne_zero`.
+- `mul_inv_4_eq_one_iff_poly` — same for `(4 : ZMod p)⁻¹`.
+- `inv_65536_zero_or_one_poly` — disjunctive form for carry binarity.
+- `inv_4_zero_or_one_poly` — disjunctive form for `(4 : ZMod p)⁻¹` carries.
+
+**Critical**: NOT `@[simp]`. The polymorphic versions would fire on
+`Fin KB` shapes (since `Fin KB = ZMod KB` definitionally) and shadow
+the existing `mul_inv_16BB_eq_one_iff` family, breaking `Fin KB`-side
+proofs that depend on the specific `(by trivial)` proof shape (confirmed
+by SubOperation timing out under `@[simp]` poly attribute). Invoked
+explicitly in `_poly` proof bodies instead.
+
+**Lifted (struct + Constraints to `(F : Type)` parametric form)** — all
+6 bridge-coupled ops:
+
+- `AddOperation` — `value : Word F`. Iff lemmas ascribed
+  `AddOperation (Fin KB)`. **`_poly` iff companion landed**
+  (`allHold_constraints_iff_poly` closes via bare
+  `simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]` — the
+  shape happens to be syntactically equal after simp normalization).
+- `SubOperation` — same struct shape. **`_poly` iff companion landed**
+  via a structured carry-bridging proof: pose both the borrow-form
+  carries `d_i` (matching auto-gen) and the natural-form carries `c_i`
+  (matching the iff RHS), prove `d_i = 1 - c_i` inductively via
+  `linear_combination` against `inv_mul_cancel₀ val_65536_ne_zero`,
+  show the borrow-form iff via bare `simp` (the `d_i` shape matches
+  auto-gen verbatim), then bridge each carry-binary clause via the
+  private `carry_swap_iff_poly` helper (`x = 1 - y → (x ∈ {0,1} ↔ y ∈ {0,1})`).
+  Heartbeats elevated to 4M; well below the maximum.
+- `AddwOperation` — embeds `U16MSBOperation F` (already lifted in B.9).
+  Iff lemma ascribed `AddwOperation (Fin KB)`. **`_poly` iff companion
+  landed** via bare `simp + tauto` — Add-style carries, U16MSB chain
+  preserved verbatim in iff RHS via `List.Forall SP1Constraint.toProp_poly`.
+- `SubwOperation` — same composite shape (2 carry limbs + embedded
+  `U16MSBOperation` chain). **`_poly` iff companion landed** via the
+  same carry-bridging recipe as Sub: `linear_combination` over
+  `inv_mul_cancel₀ val_65536_ne_zero` for `d_i = 1 - c_i`, bare-simp
+  borrow-form iff, then `carry_swap_iff_poly` per clause. Embedded
+  `U16MSBOperation.constraints` chain is preserved verbatim in the
+  iff RHS (uses `List.Forall SP1Constraint.toProp_poly` to mirror the
+  `Fin KB` version's `List.Forall SP1Constraint.toProp`).
+- `AddrAddOperation` — `value : Vector F 3`. Iff lemma ascribed
+  `AddrAddOperation (Fin KB)`. **`_poly` iff companion landed** via
+  bare `simp` — Add-style carries; the auto-gen carry shape matches
+  the iff RHS verbatim. (`is_u48_sum` / `cols_is_a_sum_b` poly variants
+  are not yet needed; the iff_poly suffices for chip-side migration
+  when ready.)
+- `U16toU8OperationSafe` — Constraints-only lift (no struct of its own;
+  uses `U16toU8Operation F` from B.9). The hand-written iff lemma in
+  `U16toU8OperationSafe.lean` consumes Constraints at `Fin KB`. The
+  BV-decomposition lemmas (`u16_to_u8_decomposition_*` family) stay
+  intentionally `Fin KB`-bound by design. **`_poly` iff companion
+  landed** via `simp` plus a `(0 : ZMod p) < 256` helper (the U8Range
+  opcode produces field-level `<`, the `0 < 256` term needs to be
+  discharged explicitly because the `Fin KB` version sees it as
+  `decide`-true automatically).
+
+**`update_constraints.py` `PARAMETRIC_OPS` extended** with 6 entries
+(all `("Type", False)` — no auto-gen call to `Opcode.ofNat` /
+`ByteOpcode.ofNat`, so no `[CoeHead F ℕ]` injection needed).
+
+**Downstream consumer pinning**: `AddressOperation.Operation.lean` had
+`addr_operation : AddrAddOperation` → patched to
+`addr_operation : AddrAddOperation (Fin KB)`. No other chip-side
+fallout — chip auto-gen propagates `F := Fin KB` via constructor
+inference on `Vector (Fin KB) N` Main rows.
+
+**Verification**:
+
+- `lake build` clean (0 errors, 0 warnings, 8508 jobs) post-cascade.
+- `AddOperation.allHold_constraints_iff_poly` smoke-tested at `p := KB`
+  and `p := 131101` (smallest prime > 2^17, primality via
+  `native_decide`); both close via the same proof body.
+
+**Outstanding work** (priority order, post-B.10):
+
+1. ~~**Bridge-coupled `_poly` iff lemmas**~~ — all 6 landed (Add, Sub,
+   Addw, Subw, AddrAdd, U16toU8Safe). Add/Addw/AddrAdd/U16toU8Safe
+   close via bare `simp` (Add-style carries match auto-gen verbatim);
+   Sub/Subw need the structured carry-bridging recipe
+   (`linear_combination` + `carry_swap_iff_poly` helper) for the
+   borrow-form ↔ natural-form sign-flip. U16toU8Safe needs an explicit
+   `(0 : ZMod p) < 256` helper for the U8Range opcode's first arg.
+2. **8 deferred `_poly` lemmas from B.5b/B.9** (was 14 — see B.11
+   below). The remaining 8 are: `LtOperationUnsigned.spec.nat_poly` /
+   `spec_poly` / `spec.nat.gen_poly`, all 4 `LtOperationSigned` `_poly`,
+   and all 3 `BitwiseU16Operation.spec_*_poly`. Each requires
+   structured `.val`-level case analysis that doesn't close via
+   mechanical `aesop` or `linear_combination`. `val_sub_cases` from B.6 isn't
+   yet exercised in a closed `_poly` proof.
+3. **Foundation `Fin KB` deletion sweep** — 4-6 sessions per the
+   2026-04-28 investigation block.
 
 **Sub-phase B.9 landed (2026-04-28)** — bridge-free op cascade
 (struct + Constraints lifts; mechanical-only `_poly` lemmas):
