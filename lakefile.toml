@@ -22,7 +22,7 @@ rev = "v4.29.0"
 [[require]]
 name = "Lean_RV64D"
 git = "https://github.com/opencompl/sail-riscv-lean"
-rev = "main"
+rev = "14a8dfdf3ca99115633c3a61a0e52ba6ac5a577f"
 
 [[lean_lib]]
 name = "SP1Foundations"
