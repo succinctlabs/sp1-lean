@@ -64,6 +64,7 @@ Topical guides live in `docs/`. Skim the relevant one when you hit a matching su
 - `docs/LEAN_4_29_AND_SAIL_V4.md` — Lean 4.29 quirks (instance priority, `simp_all` regression, `BitVec.ofNat` ordering) plus the Sail v4 rename/removal table and new platform-read axioms.
 - `docs/CONSTRAINT_REGEN.md` — playbook to follow the next time the constraint compiler adds or drops a column. Reusable across "is_trusted"-style cascades.
 - `docs/PERF_PATTERNS.md` — proof-perf wins from this PR (high-priority `Fin KB` instances, breaking large `obtain` chains, dedicated shift lemmas).
+- `docs/GOTCHAS.md` — running collection of non-obvious failure modes (e.g. kernel deep-recursion on `2 ^ N` inside `Int.toNat (... % ...)`) with the recipe that worked. Add to it whenever a landmine takes more than an hour to diagnose.
 
 ## Constraint-shape cascades
 

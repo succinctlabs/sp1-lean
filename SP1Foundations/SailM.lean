@@ -442,7 +442,7 @@ match op with
 -- Bare-`BitVec 64` reductions of the `.SLT` / `.SLTU` arms of `execute_RTYPE_pure`.
 -- Lifted out so the polymorphic / 8-limb-BWord variants below don't carry the
 -- `aesop`-built `zero_extend` normalization in their kernel-rechecked proof
--- term (the structural trigger documented in `docs/SKIP_KERNEL_TC.md`).
+-- term (the structural trigger documented in `docs/GOTCHAS.md`).
 private lemma zero_extend_zopz0zI_s_eq (a b : BitVec 64) :
     zero_extend (bool_to_bit (zopz0zI_s a b)) =
       if a.toInt < b.toInt then (1#64 : BitVec 64) else 0#64 := by
@@ -572,7 +572,7 @@ def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
 -- Polymorphic counterpart of `exec_RTYPEW_pure_bv_to_w`. The SRAW arm's
 -- `((↑b : ℤ) % n).toNat = b % n` step is discharged by
 -- `Int.toNat_natCast_emod_natCast` (`SP1Foundations/Misc.lean`) instead of
--- `omega` so the Category-0 trigger from `docs/SKIP_KERNEL_TC.md` doesn't
+-- `omega` so the Category-0 trigger from `docs/GOTCHAS.md` doesn't
 -- land in the kernel-rechecked proof term.
 lemma exec_RTYPEW_pure_bv_to_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :

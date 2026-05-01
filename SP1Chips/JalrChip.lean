@@ -32,7 +32,7 @@ noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := 
 -- Sub-lemma 1: chip's masked next-PC low limb is mod-4 aligned as a `BitVec 64`.
 -- Routed through the bundled `Word.toBitVec64_mod4` simp lemma so
 -- `Word.toBitVec64` stays opaque to the kernel re-check (avoids the historical
--- `% 2^64` trigger documented in `docs/SKIP_KERNEL_TC.md`).
+-- `% 2^64` trigger documented in `docs/GOTCHAS.md`).
 lemma jalr_target_mod4 (Main : Vector (Fin KB) 35)
     (h_masked_mod4 : (Main[26] - Main[34]).val % 4 = 0) :
     (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0]) % 4#64 = 0#64 := by

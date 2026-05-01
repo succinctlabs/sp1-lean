@@ -17,8 +17,8 @@ attribute [simp] jump_to assert PreSail.assert ofBool
 -- abstract `Word.toNat` (handled by `@[simp] toNat_aux_def`) plus
 -- `BitVec.add_def` instead of `Word.toNat_def` + `BitVec.toNat_add` avoids the
 -- `_ % 2^64`-bearing proof-term shape that previously required
--- `set_option debug.skipKernelTC true in` (Category 0 trigger documented in
--- `docs/SKIP_KERNEL_TC.md`).
+-- `set_option debug.skipKernelTC true in` (kernel deep-recursion gotcha
+-- documented in `docs/GOTCHAS.md`).
 set_option maxHeartbeats 4000000 in
 -- Trailing `omega` over the per-limb constraints + the inverse-bridge rewrites
 -- routinely needs more than the default budget.

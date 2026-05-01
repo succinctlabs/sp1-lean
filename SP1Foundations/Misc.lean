@@ -18,7 +18,7 @@ namespace Int
 -- Kernel-rfl-safe normalization for `((↑b : ℤ) % ↑n).toNat = b % n`. The
 -- kernel's defeq check on this shape unfolds `2^N` definitionally and blows
 -- the stack once `N ≥ 15`; routing through `Int.toNat_emod` + `Int.toNat_natCast`
--- keeps the proof term shallow. See `docs/SKIP_KERNEL_TC.md` for the full story.
+-- keeps the proof term shallow. See `docs/GOTCHAS.md` for the full story.
 lemma toNat_natCast_emod_natCast (b n : ℕ) :
     ((b : ℤ) % (n : ℤ)).toNat = b % n := by
   rw [Int.toNat_emod (by positivity) (by positivity), Int.toNat_natCast, Int.toNat_natCast]

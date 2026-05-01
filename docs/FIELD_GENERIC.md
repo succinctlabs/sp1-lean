@@ -562,9 +562,13 @@ strategy, with scope expanded as needed.
      extraction. The polymorphic `toBWord_poly` lifts to `ℕ` via `.val`,
      does the arithmetic in `ℕ`, then casts back to `ZMod p`.
   3. Cross-namespace BV↔Word conversion lemmas (the
-     `exec_*_pure_bv_to_*_poly` family) need
+     `exec_*_pure_bv_to_*_poly` family) originally needed
      `set_option debug.skipKernelTC true in` to bypass kernel deep
-     recursion, matching the precedent from B.6.
+     recursion, matching the precedent from B.6. **Superseded
+     2026-04-30**: cleared in pass 3 of the kernel-TC audit by lifting
+     SLT/SLTU/SRA arms to bare-`BitVec 64` private helpers in
+     `SP1Foundations/SailM.lean`. See `docs/GOTCHAS.md` for the
+     remediation playbook.
 
 **Smoke tests passed** at `p := KB` for all six SailM bridge lemmas:
 `combine_MUL_MULH_poly`, `combine_MUL_MULHU_poly`,
@@ -595,10 +599,13 @@ strategy, with scope expanded as needed.
 - **`SailM.lean` bridge cascade**: all 5 `exec_*_pure_bv_to_w_poly`
   bridge lemmas landed (`RTYPE`, `RTYPEW`, `ITYPE`, `SHIFTIOP`,
   `SHIFTIWOP`). The kernel "deep recursion" blocker on RTYPE/RTYPEW
-  was resolved via `set_option debug.skipKernelTC true in` (matching
-  the existing `exec_RTYPE_pure_bv_to_bw` precedent). SHIFTIOP/SHIFTIWOP
-  use `Word.isU64_of_cases_poly` + `Nat.mod_eq_of_lt` to discharge
-  the `(shamt.toNat : ZMod p).val < 2^16` side condition.
+  was initially worked around via `set_option debug.skipKernelTC true
+  in` (matching the existing `exec_RTYPE_pure_bv_to_bw` precedent);
+  this guard was retired in pass 3 of the kernel-TC audit
+  (2026-04-30) by lifting the SLT/SLTU/SRA arms to bare-`BitVec 64`
+  private helpers — see `docs/GOTCHAS.md`. SHIFTIOP/SHIFTIWOP use
+  `Word.isU64_of_cases_poly` + `Nat.mod_eq_of_lt` to discharge the
+  `(shamt.toNat : ZMod p).val < 2^16` side condition.
 - **Smoke tests passed** at `p := KB` and `p := 7` (small-prime
   wrap-around branch of `val_sub_cases`). All five new SailM bridge
   lemmas elaborate at `ZMod KB`.
@@ -661,11 +668,15 @@ sessions to avoid re-discovering):
   `val_sub_cases`** (Field.lean). Next attempt should retry one of the
   deferred ops with `val_sub_cases` rewriting + `omega`.
 - ~~`exec_RTYPE_pure_bv_to_w_poly` direct port hits kernel deep recursion
-  during `aesop`.~~ **Resolved in B.6**: `set_option
-  debug.skipKernelTC true in` prefix (matching the `_bv_to_bw` BWord
-  precedent) bypasses the kernel issue. All 5 `exec_*_pure_bv_to_w_poly`
-  bridges now land. Same workaround pattern is available for any future
-  cross-namespace bridge that hits the same kernel issue.
+  during `aesop`.~~ **Resolved in B.6**, then cleaned up in pass 3 of
+  the kernel-TC audit (2026-04-30): the original `set_option
+  debug.skipKernelTC true in` prefix was retired by lifting SLT/SLTU/SRA
+  arms to bare-`BitVec 64` private helpers, so the polymorphic instance
+  graph never appears in the proof term. All 5
+  `exec_*_pure_bv_to_w_poly` bridges land without the option. **For any
+  future cross-namespace bridge that hits the same kernel issue, follow
+  the playbook in `docs/GOTCHAS.md`** — `skipKernelTC` is no longer the
+  recommended workaround and is not present in the build.
 - ~~`BWord.toNat_poly_toWord_poly` / `BWord.toWord_poly_U64_poly`
   (BWord→Word cross-namespace conversions) need per-limb
   `ZMod.val_add` / `ZMod.val_mul` decomposition under
