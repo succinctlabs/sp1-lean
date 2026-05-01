@@ -12,6 +12,20 @@ lemma bitVec_sshiftright_eq (bv : BitVec w) (shift : ℕ) :
 
 namespace BitVec
 
+-- `BitVec.ofInt` of a non-negative `↑b` collapses to `b % 2^n`. This is the
+-- shape that lands in proof terms downstream of `BitVec.toNat_signExtend`
+-- and is the proximate trigger for several historical `skipKernelTC` sites.
+-- See `docs/SKIP_KERNEL_TC.md`. The underlying `Int.toNat_natCast_emod_natCast`
+-- helper lives in `SP1Foundations/Misc.lean` so `Word.lean` can reach it too.
+lemma toNat_ofInt_natCast (n b : ℕ) :
+    (BitVec.ofInt n (b : ℤ)).toNat = b % 2 ^ n := by
+  rw [BitVec.toNat_ofInt]
+  exact Int.toNat_natCast_emod_natCast _ _
+
+end BitVec
+
+namespace BitVec
+
 attribute [simp] LeanRV64D.Functions.sign_extend Sail.BitVec.signExtend Sail.BitVec.extractLsb
 attribute [simp] extractLsb extractLsb'
 

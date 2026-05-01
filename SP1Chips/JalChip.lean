@@ -32,7 +32,6 @@ noncomputable def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let _ ← execute_JAL imm rd
 
-set_option debug.skipKernelTC true in
 theorem SP1JAL_correct
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)

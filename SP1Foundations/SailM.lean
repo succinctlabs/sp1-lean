@@ -439,6 +439,26 @@ match op with
   | .SUB => op1.toBitVec64 - op2.toBitVec64
   | .SRA => op1.toBitVec64.sshiftRight (BitVec.setWidth 6 op2.toBitVec64).toNat
 
+-- Bare-`BitVec 64` reductions of the `.SLT` / `.SLTU` arms of `execute_RTYPE_pure`.
+-- Lifted out so the polymorphic / 8-limb-BWord variants below don't carry the
+-- `aesop`-built `zero_extend` normalization in their kernel-rechecked proof
+-- term (the structural trigger documented in `docs/SKIP_KERNEL_TC.md`).
+private lemma zero_extend_zopz0zI_s_eq (a b : BitVec 64) :
+    zero_extend (bool_to_bit (zopz0zI_s a b)) =
+      if a.toInt < b.toInt then (1#64 : BitVec 64) else 0#64 := by
+  simp [zopz0zI_s, bool_to_bit]; split_ifs <;> rfl
+
+private lemma zero_extend_zopz0zI_u_eq (a b : BitVec 64) :
+    zero_extend (bool_to_bit (zopz0zI_u a b)) =
+      if a.toNat < b.toNat then (1#64 : BitVec 64) else 0#64 := by
+  simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]; split_ifs <;> rfl
+
+private lemma shift_bits_right_arith_setWidth_6_eq (a b : BitVec 64) :
+    shift_bits_right_arith a (BitVec.setWidth 6 b)
+      = a.sshiftRight (b.toNat % 64) := by
+  simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
+  congr 1
+
 lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : rop) :
   op1.isU64 → op2.isU64 →
   execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_w op1 op2 op := by
@@ -446,21 +466,14 @@ lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : 
   cases op <;> simp [execute_RTYPE_pure, LeanRV64D.Functions.log2_xlen]
   · rw [Sail.shift_bits_left]
     simp [Word.toBitVec64_toNat h_op2_isU64]
-  · simp [zopz0zI_s, bool_to_bit]
-    repeat rw [Word.toBitVec64_toInt (by assumption)]
-    aesop
-  · simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]
-    repeat rw [Word.toBitVec64_toNat (by assumption)]
-    aesop
+  · rw [zero_extend_zopz0zI_s_eq, Word.toBitVec64_toInt h_op1_isU64,
+        Word.toBitVec64_toInt h_op2_isU64]
+  · rw [zero_extend_zopz0zI_u_eq, Word.toBitVec64_toNat h_op1_isU64,
+        Word.toBitVec64_toNat h_op2_isU64]
   · rw [Sail.shift_bits_right]
     simp [Word.toBitVec64_toNat h_op2_isU64]
-  · simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
-    congr 1
+  · exact shift_bits_right_arith_setWidth_6_eq _ _
 
--- Polymorphic counterpart of `exec_RTYPE_pure_bv_to_w`. Uses
--- `skipKernelTC` (matching the BWord variant below) to avoid kernel
--- "deep recursion" during type-check of the elaborated term.
-set_option debug.skipKernelTC true in
 lemma exec_RTYPE_pure_bv_to_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : rop) :
   op1.isU64_poly → op2.isU64_poly →
@@ -470,18 +483,14 @@ lemma exec_RTYPE_pure_bv_to_w_poly {p : ℕ} [NeZero p]
   cases op <;> simp [execute_RTYPE_pure, LeanRV64D.Functions.log2_xlen]
   · rw [Sail.shift_bits_left]
     simp [Word.toBitVec64_poly_toNat_poly h_op2_isU64]
-  · simp [zopz0zI_s, bool_to_bit]
-    repeat rw [Word.toBitVec64_poly_toInt_poly (by assumption)]
-    aesop
-  · simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]
-    repeat rw [Word.toBitVec64_poly_toNat_poly (by assumption)]
-    aesop
+  · rw [zero_extend_zopz0zI_s_eq, Word.toBitVec64_poly_toInt_poly h_op1_isU64,
+        Word.toBitVec64_poly_toInt_poly h_op2_isU64]
+  · rw [zero_extend_zopz0zI_u_eq, Word.toBitVec64_poly_toNat_poly h_op1_isU64,
+        Word.toBitVec64_poly_toNat_poly h_op2_isU64]
   · rw [Sail.shift_bits_right]
     simp [Word.toBitVec64_poly_toNat_poly h_op2_isU64]
-  · simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
-    congr 1
+  · exact shift_bits_right_arith_setWidth_6_eq _ _
 
-set_option debug.skipKernelTC true in
 lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : rop) :
   op1.isU64 → op2.isU64 →
   execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_bw op1 op2 op := by
@@ -489,16 +498,13 @@ lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op
   cases op <;> simp [execute_RTYPE_pure, LeanRV64D.Functions.log2_xlen]
   · rw [Sail.shift_bits_left]
     simp [BWord.toBitVec64_toNat h_op2_isU64]
-  · simp [zopz0zI_s, bool_to_bit]
-    repeat rw [BWord.toBitVec64_toInt (by assumption)]
-    aesop
-  · simp [zopz0zI_u, bool_to_bit, Sail.BitVec.toNatInt]
-    repeat rw [BWord.toBitVec64_toNat (by assumption)]
-    aesop
+  · rw [zero_extend_zopz0zI_s_eq, BWord.toBitVec64_toInt h_op1_isU64,
+        BWord.toBitVec64_toInt h_op2_isU64]
+  · rw [zero_extend_zopz0zI_u_eq, BWord.toBitVec64_toNat h_op1_isU64,
+        BWord.toBitVec64_toNat h_op2_isU64]
   · rw [Sail.shift_bits_right]
     simp [BWord.toBitVec64_toNat h_op2_isU64]
-  · simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
-    congr 1
+  · exact shift_bits_right_arith_setWidth_6_eq _ _
 
 /-- `execute_RTYPE` with isolated pure part -/
 def execute_RTYPE' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : rop) : SailM ExecutionResult := do
@@ -563,9 +569,11 @@ def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :=
   sign_extend (m := 64) (execute_RTYPEW_pure_32_w_poly op1 op2 op)
 
--- Polymorphic counterpart of `exec_RTYPEW_pure_bv_to_w`. Uses
--- `skipKernelTC` to avoid kernel deep-recursion on the elaborated term.
-set_option debug.skipKernelTC true in
+-- Polymorphic counterpart of `exec_RTYPEW_pure_bv_to_w`. The SRAW arm's
+-- `((↑b : ℤ) % n).toNat = b % n` step is discharged by
+-- `Int.toNat_natCast_emod_natCast` (`SP1Foundations/Misc.lean`) instead of
+-- `omega` so the Category-0 trigger from `docs/SKIP_KERNEL_TC.md` doesn't
+-- land in the kernel-rechecked proof term.
 lemma exec_RTYPEW_pure_bv_to_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :
   op1.isU64_poly → op2.isU64_poly →
@@ -596,7 +604,8 @@ lemma exec_RTYPEW_pure_bv_to_w_poly {p : ℕ} [NeZero p]
     rw [Word.setWidth_eq_low_poly h_op1_isU64]
     simp [bitVec_sshiftright_eq]
     simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
-    have htoNat : (↑op2.toBitVec64_poly.toNat % (32:ℤ)).toNat = op2.toBitVec64_poly.toNat % 32 := by omega
+    have htoNat : (↑op2.toBitVec64_poly.toNat % (32:ℤ)).toNat = op2.toBitVec64_poly.toNat % 32 :=
+      Int.toNat_natCast_emod_natCast _ _
     rw [htoNat]
     have hlow : op2.toBitVec64_poly.toNat % 32 = op2.low_poly.toBitVec32_poly.toNat % 32 := by
       simp [Word.toBitVec64_poly, Word.toNat_poly, Word.low_poly, HWord.toBitVec32_poly, HWord.toNat_poly]
@@ -969,7 +978,6 @@ lemma combine_MUL_MULHU {pl ph op1 op2 : Word (Fin KB)}
   · bv_decide
 
 -- Polymorphic counterpart of `combine_MUL_MULH`.
-set_option debug.skipKernelTC true in
 lemma combine_MUL_MULH_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   {pl ph op1 op2 : Word (ZMod p)}
   (isU64_pl : pl.isU64_poly) (isU64_ph : ph.isU64_poly)
@@ -1004,7 +1012,6 @@ lemma combine_MUL_MULH_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   · bv_decide
 
 -- Polymorphic counterpart of `combine_MUL_MULHU`.
-set_option debug.skipKernelTC true in
 lemma combine_MUL_MULHU_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   {pl ph op1 op2 : Word (ZMod p)}
   (isU64_pl : pl.isU64_poly) (isU64_ph : ph.isU64_poly)
@@ -1066,7 +1073,6 @@ def execute_MUL_pure_bw_poly {p : ℕ} [NeZero p]
     else (Sail.BitVec.extractLsb result_wide 127 64))
 
 -- Polymorphic counterpart of `exec_MUL_pure_bv_to_bw`.
-set_option debug.skipKernelTC true in
 lemma exec_MUL_pure_bv_to_bw_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : mop) :
   op1.isU64_poly → op2.isU64_poly →
@@ -1175,7 +1181,6 @@ def execute_MULW_pure_bhw_poly {p : ℕ} [NeZero p]
   prod.extend 64 true
 
 -- Polymorphic counterpart of `exec_MULW_pure_bv_to_bhw`.
-set_option debug.skipKernelTC true in
 lemma exec_MULW_pure_bv_to_bhw_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) :
   op1.isU64_poly → op2.isU64_poly →

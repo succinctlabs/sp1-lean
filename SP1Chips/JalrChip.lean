@@ -29,10 +29,61 @@ noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := 
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let _ ← execute_JALR imm rs1 rd
 
+-- Sub-lemma 1: chip's masked next-PC low limb is mod-4 aligned as a `BitVec 64`.
+-- Routed through the bundled `Word.toBitVec64_mod4` simp lemma so
+-- `Word.toBitVec64` stays opaque to the kernel re-check (avoids the historical
+-- `% 2^64` trigger documented in `docs/SKIP_KERNEL_TC.md`).
+lemma jalr_target_mod4 (Main : Vector (Fin KB) 35)
+    (h_masked_mod4 : (Main[26] - Main[34]).val % 4 = 0) :
+    (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0]) % 4#64 = 0#64 := by
+  simp [Word.toBitVec64_mod4, ofNat64_mod_4_eq_zero_iff, h_masked_mod4]
+
+-- Sub-lemma 2: the unmasked next-PC sum equals the masked sum plus `Main[34]` at bit 0.
+lemma jalr_unmasked_eq_masked_plus (Main : Vector (Fin KB) 35)
+    (h29 : Main[29] = 0)
+    (h_sub_val : (Main[26] - Main[34]).val = Main[26].val - Main[34].val)
+    (h27_lt : Main[27].val < 65536)
+    (h28_lt : Main[28].val < 65536) :
+    Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
+      Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0]
+        + BitVec.ofNat 64 Main[34].val := by
+  simp [Word.toBitVec64, Word.toNat_def, h29]; bv_omega
+
+-- Sub-lemma 3: masking bit 0 of the unmasked sum gives back the masked sum.
+-- This one elaborates clean — `bv_decide` here doesn't trip the kernel because
+-- the `generalize t = u` collapses the symbolic state before `bv_decide` fires.
+lemma jalr_target_eq (Main : Vector (Fin KB) 35)
+    (h_unmasked_eq_masked_plus :
+      Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
+        Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0]
+          + BitVec.ofNat 64 Main[34].val)
+    (h_target_mod4 :
+      (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0]) % 4#64 = 0#64)
+    (h34_bit : Main[34] = 0 ∨ Main[34] - 1 = 0) :
+    18446744073709551614#64 &&& Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
+      Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0] := by
+  rw [h_unmasked_eq_masked_plus]
+  set t : BitVec 64 := Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0] with ht
+  rcases h34_bit with h0 | h1
+  · rw [h0]
+    have h0n : (BitVec.ofNat 64 (0 : Fin KB).val) = 0#64 := rfl
+    rw [h0n, BitVec.add_zero]
+    have ht_mod4 : t % 4#64 = 0#64 := h_target_mod4
+    revert ht_mod4; generalize t = u; intro hu
+    bv_decide
+  · have h34_one : Main[34] = 1 := sub_eq_zero.mp h1
+    rw [h34_one]
+    have h1n : (BitVec.ofNat 64 (1 : Fin KB).val) = 1#64 := rfl
+    rw [h1n]
+    have ht_mod4 : t % 4#64 = 0#64 := h_target_mod4
+    revert ht_mod4
+    generalize t = u
+    intro hu
+    bv_decide
+
 set_option maxHeartbeats 10000000 in
 -- JALR's proof has to discharge BitVec equalities for the low-bit mask plus the
 -- AddOp specifications, which routinely exceed default heartbeats.
-set_option debug.skipKernelTC true in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[25] = 1)
@@ -122,57 +173,15 @@ theorem JALR_correct
         rw [show (KB - Main[34].val + Main[26].val) % KB =
             (Main[26].val - Main[34].val + KB) % KB by congr 1; omega,
           Nat.add_mod_right, Nat.mod_eq_of_lt h26_sub]
-    -- The chip's masked next_pc is mod-4 aligned as a 64-bit BitVec.
-    have h_target_mod4 :
-        (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0]) % 4#64 = 0#64 := by
-      simp only [Word.toBitVec64, Word.toNat_def,
-        Fin.getElem_fin, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, Fin.val_zero, Nat.zero_mul, Nat.add_zero,
-        ofNat64_mod_4_eq_zero_iff]
-      -- (a + b*2^16 + c*2^32) % 4: 2^16 and 2^32 are multiples of 4.
-      rw [show ((2 : Nat) ^ 16) = 16384 * 4 from rfl,
-        show ((2 : Nat) ^ 32) = 1073741824 * 4 from rfl,
-        ← Nat.mul_assoc, ← Nat.mul_assoc, Nat.add_mul_mod_self_right, Nat.add_mul_mod_self_right]
-      exact h_masked_mod4
-    -- The unmasked sum is the masked sum plus Main[34] at bit 0.
-    have h_unmasked_eq_masked_plus :
-        Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
-          Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0]
-            + BitVec.ofNat 64 Main[34].val := by
-      rw [← BitVec.toNat_inj]
-      simp only [Word.toBitVec64, Word.toNat_def, BitVec.toNat_add, BitVec.toNat_ofNat,
-        Fin.getElem_fin, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, Fin.val_zero, Nat.zero_mul, Nat.add_zero, h29, h_sub_val]
-      rw [Nat.mod_eq_of_lt (by have := h27_lt; have := h28_lt; omega :
-          Main[26].val - Main[34].val + Main[27].val * 2^16 + Main[28].val * 2^32 < 2^64)]
-      rw [Nat.mod_eq_of_lt (by omega : Main[34].val < 2^64)]
-      rw [Nat.mod_eq_of_lt (by have := h27_lt; have := h28_lt; omega :
-          Main[26].val + Main[27].val * 2^16 + Main[28].val * 2^32 < 2^64)]
-      omega
-    -- Key identity: masking bit 0 of the unmasked sum gives back the masked sum.
-    have h_target_eq :
-        18446744073709551614#64 &&& Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
-          Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0] := by
-      rw [h_unmasked_eq_masked_plus]
-      set t : BitVec 64 := Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0] with ht
-      rcases h34_bit with h0 | h1
-      · -- Main[34] = 0: t + 0 = t, mask is no-op since t % 4 = 0
-        rw [h0]
-        have h0n : (BitVec.ofNat 64 (0 : Fin KB).val) = 0#64 := rfl
-        rw [h0n, BitVec.add_zero]
-        have ht_mod4 : t % 4#64 = 0#64 := h_target_mod4
-        revert ht_mod4; generalize t = u; intro hu
-        bv_decide
-      · -- Main[34] = 1: mask &&& (t + 1) = t, since t has bit 0 = 0 (t % 4 = 0)
-        have h34_one : Main[34] = 1 := sub_eq_zero.mp h1
-        rw [h34_one]
-        have h1n : (BitVec.ofNat 64 (1 : Fin KB).val) = 1#64 := rfl
-        rw [h1n]
-        have ht_mod4 : t % 4#64 = 0#64 := h_target_mod4
-        revert ht_mod4
-        generalize t = u
-        intro hu
-        bv_decide
+    -- The 3 sub-derivations below were lifted to top-level helpers above. The
+    -- inline forms remained guarded by `skipKernelTC`; the helper-call form
+    -- contains the trigger to the helper terms only, allowing `JALR_correct`
+    -- itself to drop the option.
+    have h_target_mod4 := jalr_target_mod4 Main h_masked_mod4
+    have h_unmasked_eq_masked_plus :=
+      jalr_unmasked_eq_masked_plus Main h29 h_sub_val h27_lt h28_lt
+    have h_target_eq :=
+      jalr_target_eq Main h_unmasked_eq_masked_plus h_target_mod4 h34_bit
     rw [h_target_eq]
     rw [jump_to_of_mod4_eq_zero _ _ (by clear *- hs; aesop) (by simpa using h_target_mod4)]
     simp [Std.ExtDHashMap.insert_insert, EStateM.Result.map]

@@ -8,21 +8,64 @@ open Sail SailState BitVec LeanRV64D.Functions
 attribute [simp] jump_to assert PreSail.assert ofBool
   zopz0zI_s zopz0zKzJ_s zopz0zKzJ_u zopz0zI_u
 
--- Close the branching-case address equation `PC + signExtend imm = #v[Main[26..28], 0]`
--- by converting sign-extended immediate to its limb form (via `reader_cstrs`), pushing the
--- BitVec equality down to `Nat` arithmetic, and discharging with `omega` over the PC, immediate,
--- and chip-output limb bounds plus the `h_limb0..h_limb3, h_bound_checks` chip constraints.
--- The macro expects the ambient setup from each `correct_b*` proof: local `imm` let-binding,
--- `reader_cstrs`, `h_pc_0..h_pc_2`, `h_imm_0..h_imm_3`, `h_limb0..h_limb3`, `h_bound_checks`, `h26`.
+-- Top-level lift of the `close_branch_addr_eq` macro: closes the branching-case
+-- address equation `PC + signExtend imm = #v[Main[25..27], 0]` from the per-limb
+-- chip constraints. Lifting it to a single lemma means the kernel walks the
+-- 4-limb-add proof term **once** instead of being re-inlined into each of the
+-- 6 `correct_b*` chip bodies. The simp set `[BitVec.add_def, Word.toBitVec64,
+-- Word.toNat, ← BitVec.toNat_inj]` is the kernel-clean variant — using the
+-- abstract `Word.toNat` (handled by `@[simp] toNat_aux_def`) plus
+-- `BitVec.add_def` instead of `Word.toNat_def` + `BitVec.toNat_add` avoids the
+-- `_ % 2^64`-bearing proof-term shape that previously required
+-- `set_option debug.skipKernelTC true in` (Category 0 trigger documented in
+-- `docs/SKIP_KERNEL_TC.md`).
+set_option maxHeartbeats 4000000 in
+-- Trailing `omega` over the per-limb constraints + the inverse-bridge rewrites
+-- routinely needs more than the default budget.
+lemma branch_addr_eq
+    (Main : Vector (Fin KB) 45)
+    (h_imm_signExtend :
+      Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
+        = BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21]))
+    (h_pc_0 : Main[3].val < 65536) (h_pc_1 : Main[4].val < 65536)
+    (h_pc_2 : Main[5].val < 65536)
+    (h_imm_0 : Main[21].val < 65536) (h_imm_1 : Main[22].val < 65536)
+    (h_imm_2 : Main[23].val < 65536) (h_imm_3 : Main[24].val < 65536)
+    (h26 : Main[25].val < 65536)
+    (h_limb0 : Main[3] + Main[21] = Main[25]
+        ∨ Main[3] + Main[21] - Main[25] = (65536 : Fin KB))
+    (h_limb1 : (Main[3] + Main[21] - Main[25]) * (65536 : Fin KB)⁻¹ + Main[4] + Main[22] = Main[26]
+        ∨ (Main[3] + Main[21] - Main[25]) * (65536 : Fin KB)⁻¹ + Main[4] + Main[22] - Main[26]
+            = (65536 : Fin KB))
+    (h_limb2 : ((Main[3] + Main[21] - Main[25]) * (65536 : Fin KB)⁻¹ + Main[4] + Main[22] - Main[26])
+              * (65536 : Fin KB)⁻¹ + Main[5] + Main[23] = Main[27]
+        ∨ ((Main[3] + Main[21] - Main[25]) * (65536 : Fin KB)⁻¹ + Main[4] + Main[22] - Main[26])
+              * (65536 : Fin KB)⁻¹ + Main[5] + Main[23] - Main[27] = (65536 : Fin KB))
+    (h_limb3 : (((Main[3] + Main[21] - Main[25]) * (65536 : Fin KB)⁻¹ + Main[4] + Main[22] - Main[26])
+              * (65536 : Fin KB)⁻¹ + Main[5] + Main[23] - Main[27]) * (65536 : Fin KB)⁻¹
+              + Main[24] = 0
+        ∨ (((Main[3] + Main[21] - Main[25]) * (65536 : Fin KB)⁻¹ + Main[4] + Main[22] - Main[26])
+              * (65536 : Fin KB)⁻¹ + Main[5] + Main[23] - Main[27]) * (65536 : Fin KB)⁻¹
+              + Main[24] = (65536 : Fin KB))
+    (h_bound_checks : (Main[25] * (4 : Fin KB)⁻¹).val < 16384
+        ∧ Main[26].val < 65536 ∧ Main[27].val < 65536) :
+    Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0]
+        + BitVec.signExtend 64 (BitVec.ofNat 13 ↑Main[21])
+      = Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0] := by
+  rw [← h_imm_signExtend]
+  simp only [← inv_4BB_eq', ← inv_65536BB_eq']
+    at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
+  simp [BitVec.add_def, Word.toBitVec64, Word.toNat, ← BitVec.toNat_inj]
+  omega
+
+-- Thin macro wrapper so the 6 `correct_b*` proofs keep their existing call site;
+-- expands to a single `exact branch_addr_eq …` term application.
 set_option hygiene false in
 local macro "close_branch_addr_eq" : tactic => `(tactic| (
   unfold imm
-  rw [sp1_imm, ← reader_cstrs.1.1.1]
-  simp only [← inv_4BB_eq', ← inv_65536BB_eq'] at h_bound_checks h_limb0 h_limb1 h_limb2 h_limb3
-  simp [Word.toBitVec64, Word.toNat_def, ← BitVec.toNat_inj]
-  clear * - h26 h_pc_0 h_pc_1 h_pc_2 h_imm_0 h_imm_1 h_imm_2 h_imm_3
-    h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks
-  omega))
+  rw [sp1_imm]
+  exact branch_addr_eq Main reader_cstrs.1.1.1 h_pc_0 h_pc_1 h_pc_2
+    h_imm_0 h_imm_1 h_imm_2 h_imm_3 h26 h_limb0 h_limb1 h_limb2 h_limb3 h_bound_checks))
 
 variable (Main : Vector (Fin KB) 45)
 
@@ -42,7 +85,6 @@ noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BEQ
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 8000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_beq
@@ -149,7 +191,6 @@ noncomputable def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BNE
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bne
@@ -256,7 +297,6 @@ noncomputable def spec_blt (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BLT
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_blt
@@ -364,7 +404,6 @@ noncomputable def spec_bge (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BGE
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bge
@@ -475,7 +514,6 @@ noncomputable def spec_bltu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BLTU
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bltu
@@ -586,7 +624,6 @@ noncomputable def spec_bgeu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BGEU
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 2000000 in
 -- correctness proof across all 6 branch-opcode cases
 theorem correct_bgeu
