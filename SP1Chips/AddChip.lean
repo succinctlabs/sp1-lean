@@ -1,75 +1,96 @@
+import SP1Foundations
+import SP1Operations.Operation.AddOperation
+import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.RTypeReader
+
 import SP1Chips.Add.Constraints
 
-open LeanRV64D.Functions
+open LeanRV64D.Functions BitVec
 
 namespace Add
 
-variable (Main : Vector (Fin KB) 33)
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 33)
+  (s : SailState)
 
--- The input and output values in the SP1 implementation
-def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6]
-def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14]
-def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21]
-
-/-- Specification of the ADD operation in sail, while setting the next program counter. -/
-def spec_add (rs2 rs1 rd : regidx) : SailM ExecutionResult := do
+noncomputable def spec_add (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
-  execute_RTYPE rs2 rs1 rd rop.ADD
+  _ ← execute_RTYPE rs2 rs1 rd rop.ADD
+  pure ()
 
-/-- Behavior of the ADD operation in SP1, writing the given values to registers. -/
-def sp1_add : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg (sp1_op_a Main) (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
-  return RETIRE_SUCCESS
+def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
+
+def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
+
+def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
+
+def sp1_add : SailM Unit := do
+  let op_a := sp1_op_a Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]])
 
 open Sail
 
-/-- Given that all the constraints hold for the input `Main`, `s` is a machine state with
-registers initialized to appropriate values, and the column is a real column,
-the Sail spec and SP1 implementation behave the same. -/
 theorem correct_add
-    (Main : Vector (Fin KB) 33)
-    (s : SailState)
-    (h_cstrs : (constraints Main).allHold)
-    (h_is_real : Main[32] = 1)
-    (state_cstrs : (constraints Main).initialState s) :
-    let op_c := .Regidx (sp1_op_c Main)
-    let op_b := .Regidx (sp1_op_b Main)
-    let op_a := .Regidx (sp1_op_a Main)
-    (spec_add op_c op_b op_a).run s = (sp1_add Main).run s := by
-  -- Simplify the main constraints and split them into parts
-  simp [constraints] at h_cstrs
-  obtain ⟨add_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := h_cstrs
-  rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real h_is_real] at reader_cstrs
-  simp [Opcode.ofNat, Nat.ble] at reader_cstrs
-  -- Show the write values are all register values (i.e. are 5-bit)
-  have h6 : Main[6] < 32 := by aesop
-  have h14 : Main[14] < 32 := by aesop
-  have h21 : Main[21] < 32 := by aesop
-  -- Extract constraints about the initial register states
-  simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
-    List.Forall, AddOperation.constraints, CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
-    RTypeReader.constraints, h6, h14, h21, h_is_real] at state_cstrs
-  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
-  rw [h_is_real] at *
-  apply AddOperation.spec (by aesop) (by aesop) at add_op_cstrs
-  obtain ⟨is_U64_val, is_add⟩ := add_op_cstrs
-  -- Simplify the monadic operations
-  simp [spec_add, sp1_add, execute_RTYPE']
-  rw [run_readReg, read_pc]
-  simp [sp1_op_b, read_op_b, sp1_op_c, read_op_c, sp1_op_a]
-  -- Simplify the expressions using the arithmetic constraints
-  clear rest
-  by_cases h_is_op_a_0 : Main[6] = 0 <;> simp_all
-  · rw [← is_add]
-    simp [Word.toBitVec64, Word.toNat]
-    exact Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)
-  · rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
-    rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
-    simp [Word.toBitVec64, Word.toNat]
-    rw [Fin.BitVec_ofNat_add_eq_add_ofNat _ 4 (by decide) (by omega)]
-    simp
-    rfl
+  (cstrs : (constraints Main).allHold_poly)
+  (h_is_real : Main[32] = 1)
+  (state_cstrs : (constraints Main).initialState_poly s) :
+  let op_c := sp1_op_c Main
+  let op_b := sp1_op_b Main
+  let op_a := sp1_op_a Main
+  (spec_add (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_add Main).run s
+  := by
+    simp [constraints] at cstrs
+    obtain ⟨add_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
+    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
+    simp [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real,
+      Opcode.ofNat, Nat.ble] at reader_cstrs
+    obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _, ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := reader_cstrs
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+    have h6 : Main[6].val < 32 := by
+      have : Main[6].val < (32 : ZMod p).val := h_op_a_lt
+      rwa [h32] at this
+    have h14 : Main[14].val < 32 := by
+      have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1
+      rwa [h32] at this
+    have h21 : Main[21].val < 32 := by
+      have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
+      rwa [h32] at this
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+      List.Forall, AddOperation.constraints, CPUState.constraints, RTypeReader.constraints,
+      h6, h14, h21, h_is_real] at state_cstrs
+    obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+    rw [h_is_real] at *
+    apply AddOperation.spec_poly is_U64_b is_U64_c at add_op_cstrs
+    obtain ⟨is_U64_val, is_add⟩ := add_op_cstrs
+    simp [BitVec.ofNatLT_eq_ofNat] at *
+    -- Now the monadic manipulation
+    simp [spec_add, sp1_add, execute_RTYPE']
+    rw [run_readReg, read_pc]
+    simp [sp1_op_b, read_op_b]
+    simp [sp1_op_c, read_op_c]
+    simp [sp1_op_a]
+    by_cases h_is_op_a_0 : Main[6] = 0
+    · simp_all
+    · simp_all
+      have h6_val : Main[6].val ≠ 0 := by
+        intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+      rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+      rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
+      -- Bridge `execute_RTYPE_pure` to the toBitVec64_poly addition form
+      rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
+      simp only [execute_RTYPE_pure_w_poly]
+      -- Bridge `+ 4#64` to limb-0 addition via the generic helper.
+      have hp_lt : 2 ^ 17 < p := Fact.out
+      have h_pc3 : Main[3].val < 65536 := by
+        have h3 : Main[3] < (65536 : ZMod p) := by simp_all
+        have : Main[3].val < (65536 : ZMod p).val := h3
+        rwa [val_65536_zmod_p] at this
+      rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl, ← is_add]
+      simp [bitVecToRegidxVal]
 
 end Add
