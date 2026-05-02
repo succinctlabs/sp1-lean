@@ -222,6 +222,25 @@ lemma spec
     BitVec.ofNat 64 cols.u16_compare_operation.bit = execute_RTYPE_pure_w b d .SLTU
   := by aesop
 
+/-- Polymorphic companion of `spec` (BitVec form). Bridges `spec.nat_poly`
+to the BitVec form via `execute_RTYPE_pure_w_poly`'s SLTU arm, which is
+`if b.toNat_poly < d.toNat_poly then 1#64 else 0#64`. -/
+lemma spec_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  {b d : Word (ZMod p)}
+  {cols : LtOperationUnsigned (ZMod p)}
+  (h_b_isU64 : Word.isU64_poly b)
+  (h_d_isU64 : Word.isU64_poly d) :
+  List.Forall SP1Constraint.toProp_poly (constraints b d cols 1) →
+    BitVec.ofNat 64 cols.u16_compare_operation.bit.val = execute_RTYPE_pure_w_poly b d .SLTU
+  := by
+    intro cstrs
+    have h := spec.nat_poly h_b_isU64 h_d_isU64 cstrs
+    simp only [execute_RTYPE_pure_w_poly]
+    rw [h]
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    split_ifs <;> simp [ZMod.val_one, ZMod.val_zero]
+
 section gen
 
 lemma spec.nat.gen

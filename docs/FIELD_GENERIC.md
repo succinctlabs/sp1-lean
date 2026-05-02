@@ -5,7 +5,194 @@ A running document for the multi-phase effort to lift this formalization off the
 phase boundary. The implementation roadmap is in
 `~/.claude/plans/make-a-plan-to-soft-aho.md`.
 
+## Current state — 2026-05-01 (post-Track-A all-but-BitwiseU16)
+
+The additive `_poly` strategy is the chosen architecture: keep the existing
+`Fin KB` definitions/lemmas in place and add `_poly` siblings parameterized
+over `{p : ℕ} [Fact (Nat.Prime p)]` (often plus `[Fact (2^17 < p)]`). Zero
+chip-side churn; the polymorphic surface exists for future reuse. Foundation
+is complete; operations layer has **3 of 5 outstanding `_poly` lemmas
+closed** (the LtUnsigned/LtSigned cluster), with only the 3 BitwiseU16
+lemmas remaining. The chip layer has not been migrated. No second concrete
+prime field has been instantiated yet — BabyBear / Mersenne31 remain
+forward-guidance.
+
+**Track A progress (2026-05-01)**:
+- ✅ `LtOperationUnsigned.spec_poly` (BitVec form) — closes via
+  `spec.nat_poly` + `execute_RTYPE_pure_w_poly` (already in `SailM.lean`)
+  with explicit `ZMod.val_one` / `ZMod.val_zero` discharge for
+  `BitVec.ofNat 64 (1:ZMod p).val = 1#64` etc.
+- ✅ `LtOperationSigned.spec.signed_poly` (the formerly "failed"
+  natural-form lemma) — landed via structured `.val` arithmetic. Two
+  helper lemmas inside the proof: (1) `(b3 + 32768 - 65536 * msb).val < 65536`
+  case-split on `b3.val ≥ 32768` using `val_sub_cases` + `ZMod.val_add_of_lt`,
+  (2) `((b3 + 32768 - 65536 * msb).val : ℤ) = b3.val + 32768 - (if b3.val ≥ 32768 then 65536 else 0)`.
+  Then bridge `shifted_b.toNat_poly < shifted_d.toNat_poly ↔
+  b.toInt_poly < d.toInt_poly` via the algebraic identity
+  `shifted_w.toNat_poly = w.toInt_poly + 32768 * 2^48`. Heartbeats 4M.
+- ✅ `LtOperationSigned.spec.branch_poly` — landed via two private
+  helpers (`branch_helper_eq_iff_unsigned_poly` / `branch_helper_eq_iff_signed_poly`)
+  that prove the `b = d ↔ all flags 0` iff for `is_signed = 0` and
+  `is_signed = 1` separately. The `is_signed = 0` helper uses the fact
+  that `h_msb_b_eq` / `h_msb_d_eq` force `cols.{b,c}_msb.msb = 0` so all
+  shifts vanish; the proof then reduces to the standard 16-way flag-bool
+  case-split with `linear_combination + val_k_ne_zero` discharging impossible
+  cases. The `is_signed = 1` helper additionally handles the limb-3 shift
+  case-split on `b[3].isNegative_poly`/`d[3].isNegative_poly` (4 sub-cases:
+  2 give `b[3] = d[3]` directly via `linear_combination`, 2 are contradictions
+  discharged via `val_sub_cases` + `ZMod.val_add_of_lt`). The `b ≠ d ↔
+  flag-sum = 1` iff is derived contrapositively from the eq-iff plus the
+  sum constraint. The if-then-else conclusion comes from `spec.unsigned_poly`
+  / `spec.signed_poly`. Heartbeats 16M / 32M.
+- ⚠️ `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — **deferred**.
+  Requires a polymorphic helper cascade not yet in place:
+  - `Word.{and,or,xor}_toBWord_poly` (mirror of `Word.lean`'s Fin KB
+    versions, line 2298–2317).
+  - `U16toU8OperationSafe.spec.cstrs_poly` and `spec.unsafe.return_poly`
+    (currently only `Fin KB` versions exist).
+  - `u16_to_u8_decomposition_bb_poly` (the Fin KB version uses `bv_decide`
+    after `Fin.val`/`Nat.mod_eq_of_lt` setup; polymorphic version needs
+    ZMod p byte-extraction reasoning).
+  Estimate: 1 session of focused work to land all three after the
+  helper cascade is in place.
+
+### What is done
+
+**Foundation (`SP1Foundations/`) — complete.** 736 `_poly` occurrences
+across 7 files. Every signature consumed by the generic side has a `_poly`
+sibling.
+
+- `Constraint.lean`: `toProp_poly`, `toStateProp_poly`, `allHold_poly`,
+  `initialState_poly`.
+- `ByteOpcode.lean`: `constrain_poly` + 7 simp lemmas.
+- `Assumptions.lean`: 5 `*_type_constraints_poly` + `Opcode.trusted_instr_poly`.
+- `Word.lean`: `_poly` defs + ~50 `_poly` lemma companions across all 6
+  namespaces (HWord/Word/DWord/BHWord/BWord/BDWord).
+- `BitVec.lean`: Word-section `_poly` lemma counterparts.
+- `SailM.lean`: 18 `_poly` execute/exec bridge lemmas (RTYPE, RTYPEW, ITYPE,
+  SHIFTIOP, SHIFTIWOP, MUL, MULW + the `combine_*` helpers).
+- `Field.lean`: polymorphic inverse-bridge primitives —
+  `mul_inv_{4,65536}_eq_one_iff_poly`, `inv_{4,65536}_zero_or_one_poly`,
+  `val_{2,3,4,8,256,65536}_ne_zero`, `val_sub_cases`, `small_nat_eq_zmod`,
+  `val_ne_of_inv_mul_eq`, `CoeHead (Fin n) ℕ` / `CoeHead (ZMod p) ℕ` instances.
+
+**Operations (`SP1Operations/`) — substantially complete.** All 21 ops in
+`update_constraints.py`'s `PARAMETRIC_OPS` dict have **struct + auto-gen
+Constraints** lifted to `(F : Type)` / `(F : Type*)`; the post-processor
+preserves the lift across regens. Hand-written iff_poly companions landed
+for:
+
+- 5 reader iff_poly: `CPUState`, `RTypeReader`, `ITypeReader`, `JTypeReader`,
+  `ALUTypeReader` (CPUState also has `_is_real_poly`).
+- 6 bridge-coupled iff_poly: `AddOperation`, `SubOperation`, `AddwOperation`,
+  `SubwOperation`, `AddrAddOperation`, `U16toU8OperationSafe`.
+- 5 spec_poly: `IsZeroOperation`, `IsZeroWordOperation`,
+  `IsEqualWordOperation`, `U16CompareOperation`, `U16MSBOperation` (+
+  `spec.U64_poly`, `spec.gen_poly`).
+- `LtOperationUnsigned`: `allHold_constraints_iff_poly`, `cl_are_U16_poly`,
+  `spec.nat_poly`, `spec.nat.gen_poly`.
+- `LtOperationSigned`: `allHold_constraints_iff_poly`, `spec.unsigned_poly`.
+
+**Build health.** No `sorry`, no `stop`, no TODO/FIXME comments in
+`SP1Foundations/`, `SP1Operations/`, or `SP1Chips/`. `lake build` was clean
+(0 errors, 0 warnings, 8508 jobs) at the B.11 boundary 2026-04-28.
+
+### What is not done
+
+**3 deferred `_poly` lemmas** (was 5 pre-Track-A; the LtUnsigned/LtSigned
+cluster — `spec_poly`, `spec.signed_poly`, `spec.branch_poly` — all landed):
+
+- `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — needs polymorphic
+  `Word.{and,or,xor}_toBWord_poly` + `U16toU8OperationSafe.spec.cstrs_poly` /
+  `spec.unsafe.return_poly` + `u16_to_u8_decomposition_bb_poly` cascade
+  before the final `bv_decide`.
+
+**0 chips migrated to `_poly`.** All 47 chip files still consume
+`Fin KB`-side iff/spec lemmas. No `correct_*` theorem has been re-stated.
+The 2026-04-28 investigation revised this from a 1-session task to **4–6
+sessions** and flagged that chip-level auto-gen `<Chip>/Constraints.lean`
+remains `SP1ConstraintList (Fin KB)`-bound (chip-level parametric emission
+was deemed out of scope).
+
+**No second concrete field instantiated.** BabyBear / Mersenne31
+instantiation remains stretch-goal forward guidance — see "How to
+instantiate at a different prime field" near the bottom of this doc.
+
+**`Fin KB` deletion sweep not started.** The original "fully agnostic" goal
+was to delete the `Fin KB` versions in `SP1Foundations/` after migrating
+consumers. Per the 2026-04-28 investigation, this is the same 4–6 session
+blocker: each iff_poly migration is non-mechanical because of RHS-shape
+divergence between `SP1Constraint.toProp` and `toProp_poly` post-simp.
+
+### Recommended next steps
+
+Three independent tracks, ordered by effort/value:
+
+**Track A — Close the small `_poly` gaps (was 1–2 sessions; landed
+2026-05-01 except BitwiseU16).** 3 of 5 lemmas closed; 3 remain (all
+BitwiseU16):
+
+1. ✅ `LtOperationUnsigned.spec_poly` (BitVec form) — landed.
+2. ✅ `LtOperationSigned.spec.signed_poly` — landed (structured `.val`
+   arithmetic via `val_sub_cases` + `ZMod.val_add_of_lt`).
+3. ✅ `LtOperationSigned.spec.branch_poly` — landed (16-way flag-bool +
+   4-way msb sub-case-split via two private helpers).
+4. ⚠️ `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — deferred.
+   Need polymorphic Word bitwise + U16toU8 helper cascade.
+
+Estimate to complete BitwiseU16: 1 session for the cascade (5–6 helper
+lemmas + 3 `spec.*_poly` lemmas).
+
+End state: zero deferred op `_poly` lemmas. Foundation + Operations are
+**fully complete**.
+
+**Track B — Pilot chip-side migration (2–3 sessions, validates the design).**
+Migrate ONE simple chip end-to-end to `_poly` consumption:
+
+1. Pick `SubChip` (smallest, uses one bridge-coupled op with iff_poly
+   landed) or `AddiChip`.
+2. Use the cleaner ascription idiom from the 2026-04-28 investigation:
+   `(constraints Main).allHold_poly (p := KB)` instead of the verbose
+   `(constraints Main : SP1ConstraintList (ZMod KB))` form.
+3. Document the canonical migration template in this doc.
+
+Outcome decides Track C scope: if mechanical given the iff_poly foundation,
+fan out to all 23 chips. If the chip auto-gen `(Fin KB)` shape forces
+ascription gymnastics in every proof, pivot to upstream chip-level
+parametric emission or acknowledge the strategic shift.
+
+**Track C — Strategic decisions to defer until A+B inform them.**
+
+- **Foundation `Fin KB` deletion sweep** (4–6 sessions): only worth doing
+  after Track B confirms the migration recipe.
+- **Chip-level parametric emission** (cross-repo): extend
+  `update_constraints.py`'s post-processor to chip-level structs, mirroring
+  the operation-level treatment. Consider only if Track B finds chip
+  auto-gen binding is the dominant friction.
+- **BabyBear / Mersenne31 instantiation**: with the `_poly` foundation now
+  in place, re-evaluate whether the existing `Fin <NewPrime>`-recipe should
+  be replaced with a `ZMod <NewPrime>`-based one leveraging the polymorphic
+  surface directly.
+
+### Long-term goal
+
+Everything in `SP1Foundations/*` should be agnostic to the prime field —
+either generic over `ZMod p` (with specific `Fact` preconditions) or
+generic over `(F : Type*) [Field F]` per lemma. `SP1Operations/*` and
+`SP1Chips/*` make minimal instantiations needed (typically `F := Fin KB`
+or `p := KB`). The user explicitly selected the parallel-additive `_poly`
+companion strategy as the path; with Tracks A and B complete, the deletion
+sweep in Track C is the final mile to that end state.
+
+The chronological sub-phase log below (Sub-phase A through B.11) is the
+historical record of what was tried, what failed, and why. Refer to it for
+context on specific blockers; refer to the section above for the current
+plan.
+
 ## Next session pickup
+
+See "Current state — 2026-05-01" above for the canonical summary. The
+chronological log below is preserved for historical context.
 
 **Status as of 2026-04-28**: Phases 0-5 + Sub-phase A + Sub-phase B.2 +
 B.3 + B.4 + **B.5b (4-op cascade)** + **B.5c (polymorphic `.val` helpers)**
