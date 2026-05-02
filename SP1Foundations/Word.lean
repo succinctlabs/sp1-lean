@@ -486,6 +486,27 @@ lemma toBitVec64_poly_toNat_poly {p : ℕ} [NeZero p]
   have := lt_cases_of_isU64_poly hw
   omega
 
+/-- Adding a small Nat constant `k` to a Word's BitVec representation is the
+same as adding `k` to the low limb, provided the low limb plus `k` fits in
+17 bits (so the ZMod-level `(a + k).val = a.val + k` lift is clean). The
+other limbs are unconstrained — BitVec arithmetic associativity handles the
+mod 2^64 carries regardless. Used by chip-side `correct_*` proofs to bridge
+`Word.toBitVec64_poly #v[..] + 4#64 = Word.toBitVec64_poly #v[low+4, ..]`
+when normalizing `+ 4` between the BitVec and limb forms (e.g. PC update). -/
+lemma toBitVec64_poly_lowLimb_add_nat
+    {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]--[Fact (2 ^ 17 < p)]
+    (a b c d : ZMod p) (k : ℕ) (hak : a.val + k < p) :
+    Word.toBitVec64_poly #v[a, b, c, d] + BitVec.ofNat 64 k =
+      Word.toBitVec64_poly #v[a + (k : ZMod p), b, c, d] := by
+  have hk_val : (k : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
+  have hak_val : (a + (k : ZMod p)).val = a.val + k := by
+    rw [ZMod.val_add_of_lt (by rw [hk_val]; omega), hk_val]
+  simp [Word.toBitVec64_poly, Word.toNat_poly_def]
+  rw [← BitVec.toNat_inj, BitVec.toNat_add,
+      BitVec.toNat_ofNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat,
+      hak_val, ← Nat.add_mod]
+  congr 1; ring
+
 /-- A 64-bit integer is negative if its msb equals one -/
 @[grind] def isNegative (w : Word (Fin KB)) : Prop := w[3] ≥ 32768
 instance : Decidable (isNegative w) := by unfold isNegative; infer_instance

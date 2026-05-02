@@ -43,6 +43,20 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
     ("Mul", "U16toU8OperationSafe"): ("Type", False),
 }
 
+# Chips whose top-level `<Chip>/Constraints.lean` is emitted as parametric
+# over `{F : <universe>} [Field F]` (and `[CoeHead F ℕ]` when the chip body
+# calls a reader's `constraints` function — most chips do, transitively, since
+# every R/I/J/ALU-type reader needs the coercion for `Opcode.ofNat`). This is
+# the chip-level analogue of `PARAMETRIC_OPS`. Empty by default — add chips
+# to this dict as they're migrated to `_poly` consumption (Track C1 in
+# `docs/FIELD_GENERIC.md`). Once a chip is here, its `correct_*` proof body
+# can use `_poly` lemmas without the `(p := KB)` ascription friction
+# documented in `docs/FIELD_GENERIC.md` "Track B pilot — SubChip attempt".
+# Keyed by chip name. Value is `(universe, needs_coe_head)`.
+PARAMETRIC_CHIPS: Dict[str, Tuple[str, bool]] = {
+    "Sub": ("Type", True),
+}
+
 # List of (chip_name, optional_operation_name, prefix_path)
 CONSTRAINTS_LIST: List[Tuple[str, Optional[str], str]] = [
     # Add your chips and operations here
@@ -152,6 +166,33 @@ def apply_parametric_post_process(
     )
     return text
 
+def apply_parametric_chip_post_process(
+    text: str, universe: str, needs_coe_head: bool
+) -> str:
+    """Rewrite a chip-level `Constraints.lean` into `{F : universe} [Field F]`
+    parametric form. Same substitution recipe as `apply_parametric_post_process`
+    minus the `cols : <op_name>` rewrite (chip-level constraints don't take a
+    cols struct — they pass `Main : Vector F N` and call into op-level
+    `constraints` defs).
+
+    Used for chip-level migration to `_poly` consumption (Track C1 in
+    `docs/FIELD_GENERIC.md`). After this rewrite, the chip's
+    `(constraints (F := ZMod KB) Main).allHold_poly` destructures cleanly
+    via `simp [constraints]` because the underlying list is at
+    `SP1Constraint (ZMod KB)`, not `(Fin KB)` — eliminating the defeq gap
+    that blocked the original Track B SubChip pilot.
+    """
+    text = text.replace("(Fin KB)", "F")
+    text = text.replace("Fin KB", "F")
+    sig_extras = f"{{F : {universe}}} [Field F]"
+    if needs_coe_head:
+        sig_extras += " [CoeHead F ℕ]"
+    text = text.replace(
+        "@[irreducible] def constraints",
+        f"@[irreducible] def constraints {sig_extras}",
+    )
+    return text
+
 def update_constraints_in_file(file_path: str, new_constraints: str):
     """Replace content between 'section constraints' and 'end constraints' markers."""
     with open(file_path, 'r') as f:
@@ -205,6 +246,14 @@ def main():
                     universe, needs_coe_head = entry
                     constraints_output = apply_parametric_post_process(
                         constraints_output, operation, universe, needs_coe_head
+                    )
+            else:
+                # Chip-level parametric emission for chips in PARAMETRIC_CHIPS
+                chip_entry = PARAMETRIC_CHIPS.get(chip)
+                if chip_entry is not None:
+                    universe, needs_coe_head = chip_entry
+                    constraints_output = apply_parametric_chip_post_process(
+                        constraints_output, universe, needs_coe_head
                     )
 
             # Determine the output file path

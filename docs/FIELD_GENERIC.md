@@ -237,6 +237,258 @@ bridge-coupled `SubOperation` consumer). Successful pilot would touch:
 If the pilot is mechanical (~2–3 hr), fan out. If it requires substantial
 new infrastructure, re-evaluate whether to lift chip auto-gen too.
 
+### Track B pilot — SubChip attempt 2026-05-01 (BLOCKED, recommend Track C pivot)
+
+Attempted the SubChip migration end-to-end. Result: **chip-side `correct_*`
+migration is blocked at the constraint destructuring step**, validating
+"Friction signal #1" (heavy ascription noise) but in a stronger form than
+anticipated. Recommend pivoting to Track C (chip-level parametric emission)
+before any chip-layer fan-out.
+
+**What landed (kept on disk, useful inventory regardless of B/C decision):**
+
+- `SubOperation.spec_poly` (`SP1Operations/Operation/SubOperation.lean`).
+  Bridges from `allHold_constraints_iff_poly` to the BitVec form
+  `cols.value.toBitVec64_poly = execute_RTYPE_pure_w_poly a b .SUB`. The
+  `Fin KB` `spec` closes via `simp_all <;> omega` after carry rcases —
+  that recipe doesn't generalize because `inv_65536BB_eq'` (the literal
+  inverse simp lemma) doesn't have a polymorphic analogue. The `_poly`
+  recipe instead:
+  1. `linear_combination`-rearranges each carry from
+     `(b[i] + v[i] - a[i] + prev) * 65536⁻¹ = c_i` to
+     `b[i] + v[i] + prev = a[i] + c_i * 65536` (clearing the inverse via
+     `mul_inv_cancel₀ val_65536_ne_zero`).
+  2. Applies a per-limb `limb_lift` helper (private lemma in the same
+     file) that converts each ZMod equation to a Nat equation via
+     `apply_fun ZMod.val` + `ZMod.val_add_of_lt` (with the bounds
+     `b[i].val, v[i].val, a[i].val < 2^16` and `prev.val, c_i.val ≤ 1`,
+     all sums fit in `< 2^17 < p`).
+  3. Closes with `omega` over the 4 lifted Nat equations + carry bounds.
+  Heartbeats elevated to 16M; ~80 lines of proof. The same recipe
+  generalizes to `AddOperation.spec_poly`, `AddwOperation.spec_poly`,
+  `SubwOperation.spec_poly`, and (with minor tweaks for `(4 : ZMod p)⁻¹`)
+  `AddrAddOperation.spec_poly`.
+
+- `RTypeReader.allHold_constraints_iff_is_real_poly`
+  (`SP1Operations/Reader/RTypeReader.lean`). Short corollary of the
+  existing `iff_poly`: `simp [allHold_constraints_iff_poly, h, and_assoc]`.
+  Mirrors the Fin KB `_is_real` derivation.
+
+These two `_poly` lemmas brought the operations layer's chip-facing
+inventory closer to complete; they're independently useful for any future
+chip-side migration and shouldn't be reverted.
+
+**Why the chip migration blocked.** The chip's `Sub/Constraints.lean`
+auto-gen returns `def constraints (Main : Vector (Fin KB) 33) :
+SP1ConstraintList (Fin KB) := ...`. The migrated `correct_sub`'s
+hypothesis was restated as `cstrs : (constraints Main).allHold_poly
+(p := KB)`. Lean accepts this via `Fin KB = ZMod KB` definitional
+equality. After `simp [SP1ConstraintList.allHold_poly, constraints]`,
+the hypothesis displays as
+```
+cstrs : List.Forall SP1Constraint.toProp_poly
+  (SubOperation.constraints ... +++ CPUState.constraints ... +++
+   RTypeReader.constraints ... +++ [.assertZero ..., .assertZero ...])
+```
+which looks ready to destructure via `obtain ⟨..., ..., ..., ...⟩`. **It
+isn't.** Inspecting with `set_option pp.explicit true` reveals:
+```
+@List.Forall (SP1Constraint (ZMod KB)) toProp_poly
+  (@HAppend.hAppend (List (SP1Constraint (Fin KB))) ... ...)
+```
+The outer `List.Forall` is at `SP1Constraint (ZMod KB)`; the `HAppend`
+chain inside is at `List (SP1Constraint (Fin KB))`. `List.forall_append`
+(the simp lemma `List.Forall p (xs ++ ys) ↔ List.Forall p xs ∧
+List.Forall p ys`) cannot match because the `?xs +++ ?ys` pattern's
+`α` parameter unifies to `SP1Constraint (Fin KB)` from the
+`HAppend.hAppend`'s instance, while the surrounding `List.Forall` has
+`α := SP1Constraint (ZMod KB)`. These are definitionally equal but not
+syntactically equal, and simp's pattern matcher only does
+defeq-modulo-reducibility, which doesn't bridge `Fin KB ↔ ZMod KB` at
+the `SP1Constraint` parameter position.
+
+This blocks every approach tried (the full list, for posterity):
+
+1. `simp [constraints, SP1ConstraintList.allHold_poly]` — leaves
+   `+++` un-distributed.
+2. `simp [..., List.forall_append, List.Forall]` — same.
+3. `unfold SP1ConstraintList.allHold_poly + unfold constraints + rw
+   [List.forall_append]` — `rw` errors with "Did not find an occurrence
+   of the pattern `@List.Forall ?m ?p (?xs +++ ?ys)`".
+4. `with_unfolding_all (simp [...])` — same.
+5. `let xs : SP1ConstraintList (ZMod KB) := constraints Main; have
+   cstrs2 : SP1ConstraintList.allHold_poly xs := cstrs` — re-elaborates
+   the binding but the inner `+++` instance keeps `Fin KB` types.
+6. `change List.Forall (SP1Constraint.toProp_poly (p := KB)) (constraints
+   Main) at cstrs` — succeeds, but doesn't change the underlying type
+   propagation; subsequent `simp` still leaves `+++` un-distributed.
+7. Manual `List.forall_append.mp` application — fails the same way; `cstrs`
+   has type `List.Forall toProp_poly (constraints Main)`, not
+   `List.Forall toProp_poly (xs +++ ys)`, because `constraints Main`
+   doesn't reduce structurally without `simp [constraints]` first.
+
+**The friction is structural, not tactical.** The 2026-04-28 `lean_run_code`
+verification of the `(p := KB)` ascription idiom only checked that the
+hypothesis *type-checks*, not that the destructure step succeeds. A
+post-mortem verification across the doc's three friction signals:
+
+- **Signal #1 (heavy `(p := KB)` ascription noise)**: ✅ Confirmed,
+  in stronger form. Not just verbosity — it's an outright blocker for
+  destructuring.
+- **Signal #2 (`simp_all` cascades stripping instances)**: Not reached.
+- **Signal #3 (chip auto-gen literals needing symbolic-inverse bridges)**:
+  Not reached.
+
+The pilot stopped at Signal #1 before Signals #2/#3 could be tested.
+
+**Track C is now the recommended path forward.** Two routes:
+
+- **C1 (preferred): chip-level parametric emission.** Extend
+  `update_constraints.py`'s post-processor to chip-level `<Chip>/Constraints.lean`
+  files, mirroring the operation-level treatment in `PARAMETRIC_OPS`. The
+  emitted def becomes `def constraints (Main : Vector F N) :
+  SP1ConstraintList F := ...` parameterized over `(F : Type)`, with
+  `[Field F]` etc. as needed. Chip-side `correct_*` proofs then take
+  `cstrs : (constraints (F := ZMod KB) Main).allHold_poly` directly,
+  no `Fin KB ↔ ZMod KB` defeq bridge needed for destructuring. **This
+  is the ONLY route that resolves the structural friction**; B-style
+  ascription cannot.
+
+- **C2: custom destructure lemma per chip.** Write
+  `<Chip>.constraints_split_poly` lemmas that prove the conjunction
+  manually, using direct `List.Forall_cons.mp` / `List.Forall.cons.mp`
+  steps over the explicit list construction. Each chip needs a bespoke
+  helper. ~25–50 lines per chip × 23 chips = ~600–1100 lines of
+  pure plumbing, not gainful. Skip in favor of C1.
+
+**Estimated C1 effort.** Touching `update_constraints.py`'s post-processor
+to handle chip-level structs is similar in scope to the operation-level
+extension that landed in B.10 (the `PARAMETRIC_OPS` dict): one new
+chip-keyed dict + a renamed regen pass that injects `(F : Type)
+[Field F]` headers and walks the chip body to replace `(Fin KB)` with
+`F`. Estimated **2–3 sessions** to validate on SubChip + Add/AddiChip,
+then mechanical fan-out across the remaining 20 chips.
+
+**Status of Track B handoff inventory.** The "Available iff_poly inventory"
+list above (5 readers + 6 bridge-coupled ops + compare cluster) plus
+`SubOperation.spec_poly` (this pilot) + `RTypeReader._is_real_poly` (this
+pilot) is **complete enough** that once C1 lands, the chip-side migration
+is mechanical with the recipe sketched in steps 2–5 of "Recommended
+starting chip" above. The `_poly` foundation work was correct; the
+blocker is purely the chip auto-gen layer.
+
+**Reverted in this pilot.** `SP1Chips/SubChip.lean` was restored to its
+pre-pilot `Fin KB`-typed `correct_sub` because the migrated form does
+not elaborate. The `_poly` companion lemmas in `SubOperation.lean` and
+`RTypeReader.lean` are kept (they cost nothing extra and unblock C1's
+chip migrations).
+
+### Track C1 — SubChip migration landed 2026-05-01
+
+After Track B confirmed the structural friction, immediately ran Track C1
+on SubChip. **Result: SubChip's `correct_sub` is now fully migrated to
+`_poly` consumption, with `lake build` clean (8508 jobs, 0 errors, 0
+warnings) and only the standard axioms (`propext`, `Classical.choice`,
+`Quot.sound`).**
+
+**`update_constraints.py` extension (`PARAMETRIC_CHIPS` dict).** Mirrors
+`PARAMETRIC_OPS`: keyed by chip name, value is `(universe, needs_coe_head)`.
+The `apply_parametric_chip_post_process` helper applies the `(Fin KB) → F`
+substitutions and adds `{F : <universe>} [Field F] [CoeHead F ℕ]` to the
+chip's `def constraints` line. Same recipe as ops, minus the `cols :
+<op_name>` rewrite (chip-level constraints don't take a cols struct).
+
+Per-chip opt-in. Currently `PARAMETRIC_CHIPS = {"Sub": ("Type", True)}`.
+Add new chips here as they're actively migrated; the script's behavior
+on chips NOT in this dict is unchanged (Fin KB-bound). The user
+explicitly chose this incremental migration strategy over a global
+flip — minimizes blast radius if any chip needs special handling.
+
+**`Sub/Constraints.lean` regen (manual this session, scripted future).**
+The chip-level constraints def is now:
+```lean
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
+    (Main : Vector F 33) : SP1ConstraintList F :=
+  let E0 : F := Main[32] - 1
+  ...
+```
+At `F := ZMod KB`, the entire constraint chain (including the inner
+`SubOperation.constraints`, `CPUState.constraints`, `RTypeReader.constraints`
+calls — all already parametric in F) is at `SP1Constraint (ZMod KB)`.
+`simp [constraints]` distributes `List.Forall` over `++` cleanly because
+the outer `List.Forall` and the inner `+++` agree on the element type.
+The Track B blocker dissolves.
+
+**`SubChip.lean` restated parametrically.** Hypotheses + helpers
+parameterized over `{p : ℕ} [Fact (Nat.Prime p)] [Fact (2^17 < p)]`,
+`Main : Vector (ZMod p) 33`. Specifically:
+- `sp1_op_a/b/c`: `BitVec.ofNat 5 Main[i].val` (was `Main[i]` for Fin KB
+  with Fin → Nat coercion).
+- `sp1_sub`: uses `Word.toBitVec64_poly` (was `Word.toBitVec64`).
+- `correct_sub`: takes `(constraints Main).allHold_poly` and
+  `initialState_poly` (no `(p := KB)` ascription needed — the universe
+  is in scope).
+
+**Proof body recipe** (transferable to all 22 remaining chips after their
+own C1 regen + restatement):
+
+1. `simp [constraints] at cstrs; obtain ⟨..., ..., ..., ...⟩ := cstrs` —
+   destructure the conjunction. Now works.
+2. `rw [<Reader>.allHold_constraints_iff_is_real_poly h_is_real]` and
+   `simp [<Reader>.allHold_constraints_iff_is_real_poly h_is_real,
+   Opcode.ofNat, Nat.ble]` — apply reader iff_polys.
+3. Extract field-level bounds (`Main[i] < 32`, etc.) and convert to
+   `.val < 32` via the `(N : ZMod p).val = N` `val_*_zmod_p` simp lemmas.
+4. `simp [SP1ConstraintList.initialState_poly, constraints,
+   SP1Constraint.toStateProp_poly, ...]` to extract initial state facts.
+5. Apply the bridge-coupled op's `spec_poly` to get U64-ness +
+   BitVec equation.
+6. Monadic manipulation: same simp set as Fin KB version but with `_poly`
+   replacements (`Word.toBitVec64_poly`, `Word.toNat_poly`, etc.).
+7. For PC `+ 4` arithmetic: build a small bridge lemma showing
+   `Word.toBitVec64_poly #v[a, b, c, 0] + 4#64 =
+   Word.toBitVec64_poly #v[a + 4, b, c, 0]` via
+   `(a + 4).val = a.val + 4` (using `ZMod.val_add_of_lt`) and `BitVec.toNat`
+   reasoning + omega.
+8. `rw [exec_RTYPE_pure_bv_to_w_poly]` to bridge `execute_RTYPE_pure` to
+   `execute_RTYPE_pure_w_poly`, then close via the spec_poly's `is_sub`
+   and `simp [bitVecToRegidxVal]`.
+
+**Five `_poly` proof patterns observed** (matches
+`feedback_poly_proof_patterns.md`):
+1. ✅ `simp_all` doesn't strip Facts in the SubChip case (the proof
+   doesn't lean on Facts after `simp_all`).
+2. ✅ No cstrs shadowing needed (single-shot destructure suffices).
+3. ✅ Anonymous-constructor projections needed `show ... from rfl` chains
+   for `#v[...][i]` reduction inside `simp only`.
+4. ✅ Field-level `<` to `.val <` conversion via `val_*_zmod_p` lemmas
+   (used 4× for h6/h14/h21/h_pc_bounds).
+5. ✅ `(N : ZMod p).val = N` helpers re-derived after bounds extraction
+   (h_pc_bounds case-split).
+
+**Estimated cost per remaining chip** (all 22 except SubChip):
+- ~15–30 minutes per chip for the regen + restatement + proof body
+  migration, assuming the proof body follows the recipe above.
+- Bridge-coupled chips (Add/Addw/Sub/Subw/AddrAdd) need their `spec_poly`
+  added first (only Sub has it; the others reuse the recipe from
+  `SubOperation.spec_poly`).
+- Compare-op chips (LtSigned/LtUnsigned/Branch) already have `spec_poly`
+  — the chip migration should be smoother.
+- BitwiseChip uses `BitwiseU16Operation.spec.{and,or,xor}_poly` (Track A)
+  — also smoother.
+
+**Recommended sequencing** (per the user's "regenerate as we go"
+directive):
+1. Pick one chip at a time, prioritized by simplicity (next: AddiChip
+   uses ITypeReader + AddOperation; ITypeReader has `_poly` but
+   AddOperation needs `spec_poly` — moderate effort).
+2. Add chip name to `PARAMETRIC_CHIPS` dict.
+3. Run `update_constraints.py` (or manually apply the substitutions if
+   SP1_DIR is unavailable).
+4. Restate the chip's `correct_*` over `ZMod p`.
+5. Apply the proof recipe.
+6. `lake build` clean → commit. Otherwise iterate.
+
 **Track C — Strategic decisions to defer until A+B inform them.**
 
 - **Foundation `Fin KB` deletion sweep** (4–6 sessions): only worth doing
