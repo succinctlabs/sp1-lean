@@ -1873,6 +1873,46 @@ lemma extend_false_is_setWidth {w : HWord (Fin KB)} :
   rw [HWord.toBitVec32_toNat is_U32_w]
   simp [sw, Word.toNat, extend, HWord.toNat]
 
+/-- Polymorphic companion of `sign_extend_32_to_64_msb`. The 32-bit
+sign extension of `HWord` `w` (viewed as `BitVec 64`) is the `Word`
+whose two high limbs are `65535` if `w`'s top bit is set, else `0`. -/
+lemma sign_extend_32_to_64_msb_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {w : HWord (ZMod p)} :
+    w.isU32_poly →
+    BitVec.signExtend 64 w.toBitVec32_poly = Word.toBitVec64_poly
+      #v[w[0], w[1],
+         if w.toBitVec32_poly.msb = true then 65535 else 0,
+         if w.toBitVec32_poly.msb = true then 65535 else 0] := by
+  intro is_U32_w
+  have ⟨hw0, hw1⟩ := lt_cases_of_isU32_poly is_U32_w
+  have hp : 2 ^ 17 < p := Fact.out
+  have h_w32 : w.toBitVec32_poly.toNat = w[0].val + w[1].val * 2 ^ 16 := by
+    rw [HWord.toBitVec32_poly_toNat_poly is_U32_w]; simp [HWord.toNat_poly]
+  have h_w32_lt : w.toBitVec32_poly.toNat < 2 ^ 32 := by rw [h_w32]; omega
+  have h_msb_decide : w.toBitVec32_poly.msb = decide (2 ^ 31 ≤ w.toBitVec32_poly.toNat) := by
+    simp [BitVec.msb_eq_decide]
+  have h65535_val : (65535 : ZMod p).val = 65535 := by
+    rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) from by push_cast; rfl]
+    rw [ZMod.val_natCast_of_lt (by omega)]
+  have h0_val : (0 : ZMod p).val = 0 := ZMod.val_zero
+  rw [← BitVec.toNat_inj, BitVec.toNat_signExtend, Word.toBitVec64_poly]
+  simp only [BitVec.toNat_ofNat, if_pos (show (32 : ℕ) ≤ 64 from by omega),
+    BitVec.toNat_setWidth, Word.toNat_poly_def, Vector.getElem_mk,
+    List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
+  rw [Nat.mod_eq_of_lt (show w.toBitVec32_poly.toNat < 2 ^ 64 from by omega), h_w32]
+  by_cases h_msb : w.toBitVec32_poly.msb = true
+  · have h_msb_nat : (2 ^ 31 : ℕ) ≤ w[0].val + w[1].val * 2 ^ 16 := by
+      rw [h_msb_decide] at h_msb; rw [h_w32] at h_msb; simpa using h_msb
+    simp only [h_msb, if_true, h65535_val]
+    rw [Nat.mod_eq_of_lt (by omega)]
+    omega
+  · simp only [Bool.not_eq_true] at h_msb
+    have h_msb_nat : w[0].val + w[1].val * 2 ^ 16 < 2 ^ 31 := by
+      rw [h_msb_decide] at h_msb; rw [h_w32] at h_msb; simpa using h_msb
+    simp only [h_msb, Bool.false_eq_true, if_false, h0_val]
+    rw [Nat.mod_eq_of_lt (by omega)]
+    omega
+
 end HWord
 
 namespace Word

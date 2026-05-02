@@ -56,6 +56,7 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
 PARAMETRIC_CHIPS: Dict[str, Tuple[str, bool]] = {
     "Add": ("Type", True),
     "Sub": ("Type", True),
+    "Subw": ("Type", True),
 }
 
 # List of (chip_name, optional_operation_name, prefix_path)
