@@ -55,6 +55,7 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
 # Keyed by chip name. Value is `(universe, needs_coe_head)`.
 PARAMETRIC_CHIPS: Dict[str, Tuple[str, bool]] = {
     "Add": ("Type", True),
+    "Addi": ("Type", True),
     "Sub": ("Type", True),
     "Subw": ("Type", True),
 }
