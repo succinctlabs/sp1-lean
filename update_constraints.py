@@ -59,6 +59,7 @@ PARAMETRIC_CHIPS: Dict[str, Tuple[str, bool]] = {
     "Addw": ("Type", True),
     "Sub": ("Type", True),
     "Subw": ("Type", True),
+    "UType": ("Type", True),
 }
 
 # List of (chip_name, optional_operation_name, prefix_path)
