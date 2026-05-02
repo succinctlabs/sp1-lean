@@ -2316,6 +2316,30 @@ lemma xor_toBWord {a b : Word (Fin KB)} : a.isU64 → b.isU64 →
   simp [Word.toBitVec64, BWord.toBitVec64]
   rw [Word.toNat_toBWord h_a_64, Word.toNat_toBWord h_b_64]
 
+/-- Polymorphic counterpart of `Word.and_toBWord`. -/
+lemma and_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {a b : Word (ZMod p)} : a.isU64_poly → b.isU64_poly →
+    a.toBitVec64_poly &&& b.toBitVec64_poly =
+      a.toBWord_poly.toBitVec64_poly &&& b.toBWord_poly.toBitVec64_poly := by
+  intro h_a_64 h_b_64
+  rw [Word.toBitVec64_poly_toBWord_poly h_a_64, Word.toBitVec64_poly_toBWord_poly h_b_64]
+
+/-- Polymorphic counterpart of `Word.or_toBWord`. -/
+lemma or_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {a b : Word (ZMod p)} : a.isU64_poly → b.isU64_poly →
+    a.toBitVec64_poly ||| b.toBitVec64_poly =
+      a.toBWord_poly.toBitVec64_poly ||| b.toBWord_poly.toBitVec64_poly := by
+  intro h_a_64 h_b_64
+  rw [Word.toBitVec64_poly_toBWord_poly h_a_64, Word.toBitVec64_poly_toBWord_poly h_b_64]
+
+/-- Polymorphic counterpart of `Word.xor_toBWord`. -/
+lemma xor_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {a b : Word (ZMod p)} : a.isU64_poly → b.isU64_poly →
+    a.toBitVec64_poly ^^^ b.toBitVec64_poly =
+      a.toBWord_poly.toBitVec64_poly ^^^ b.toBWord_poly.toBitVec64_poly := by
+  intro h_a_64 h_b_64
+  rw [Word.toBitVec64_poly_toBWord_poly h_a_64, Word.toBitVec64_poly_toBWord_poly h_b_64]
+
 end Word
 
 end Bitwise

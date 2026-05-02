@@ -5,17 +5,16 @@ A running document for the multi-phase effort to lift this formalization off the
 phase boundary. The implementation roadmap is in
 `~/.claude/plans/make-a-plan-to-soft-aho.md`.
 
-## Current state — 2026-05-01 (post-Track-A all-but-BitwiseU16)
+## Current state — 2026-05-01 (Track A complete)
 
 The additive `_poly` strategy is the chosen architecture: keep the existing
 `Fin KB` definitions/lemmas in place and add `_poly` siblings parameterized
 over `{p : ℕ} [Fact (Nat.Prime p)]` (often plus `[Fact (2^17 < p)]`). Zero
 chip-side churn; the polymorphic surface exists for future reuse. Foundation
-is complete; operations layer has **3 of 5 outstanding `_poly` lemmas
-closed** (the LtUnsigned/LtSigned cluster), with only the 3 BitwiseU16
-lemmas remaining. The chip layer has not been migrated. No second concrete
-prime field has been instantiated yet — BabyBear / Mersenne31 remain
-forward-guidance.
+is complete; **operations layer is complete** — all 5 outstanding `_poly`
+lemmas have landed (LtUnsigned/LtSigned cluster + BitwiseU16 cluster). The
+chip layer has not been migrated. No second concrete prime field has been
+instantiated yet — BabyBear / Mersenne31 remain forward-guidance.
 
 **Track A progress (2026-05-01)**:
 - ✅ `LtOperationUnsigned.spec_poly` (BitVec form) — closes via
@@ -44,17 +43,24 @@ forward-guidance.
   flag-sum = 1` iff is derived contrapositively from the eq-iff plus the
   sum constraint. The if-then-else conclusion comes from `spec.unsigned_poly`
   / `spec.signed_poly`. Heartbeats 16M / 32M.
-- ⚠️ `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — **deferred**.
-  Requires a polymorphic helper cascade not yet in place:
-  - `Word.{and,or,xor}_toBWord_poly` (mirror of `Word.lean`'s Fin KB
-    versions, line 2298–2317).
-  - `U16toU8OperationSafe.spec.cstrs_poly` and `spec.unsafe.return_poly`
-    (currently only `Fin KB` versions exist).
-  - `u16_to_u8_decomposition_bb_poly` (the Fin KB version uses `bv_decide`
-    after `Fin.val`/`Nat.mod_eq_of_lt` setup; polymorphic version needs
-    ZMod p byte-extraction reasoning).
-  Estimate: 1 session of focused work to land all three after the
-  helper cascade is in place.
+- ✅ `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — **landed**.
+  Required helper cascade landed in `SP1Foundations/Word.lean` and
+  `SP1Operations/Operation/U16toU8OperationSafe.lean`:
+  - `Word.{and,or,xor}_toBWord_poly` — trivial via
+    `Word.toBitVec64_poly_toBWord_poly`.
+  - `U16toU8OperationSafe.u16_to_u8_decomposition_poly` (private helper)
+    + `spec.unsafe.return_poly` — closes via `mul_inv_cancel₀ val_256_ne_zero`
+    + `ZMod.val_add_of_lt`/`val_mul_of_lt` for the byte-decomposition,
+    then `(ZMod.natCast_zmod_val _).symm` to bridge byte vector equality.
+  - The 3 spec lemmas follow the same recipe as the `Fin KB` versions:
+    extract byte vectors via `spec.unsafe.return_poly`, peel off the 8
+    byte-AND/OR/XOR equations, normalize byte values via
+    `Nat.mod_eq_of_lt` (no Fin wrapping needed for ZMod p), set byte
+    abbreviations, push through `BitVec.ofNat_{add,mul,and,or,xor}` simps,
+    and close with `bv_decide`. OR/XOR additionally need
+    `(1 : ZMod p).val = 1` / `(2 : ZMod p).val = 2` helpers (re-derived
+    after `simp_all` strips the Fact instances). Heartbeats elevated to
+    64M for each of the 3 spec lemmas.
 
 ### What is done
 
@@ -99,13 +105,12 @@ for:
 
 ### What is not done
 
-**3 deferred `_poly` lemmas** (was 5 pre-Track-A; the LtUnsigned/LtSigned
-cluster — `spec_poly`, `spec.signed_poly`, `spec.branch_poly` — all landed):
+**0 deferred `_poly` lemmas remain** — all 5 outstanding ones from the
+pre-Track-A list landed (LtUnsigned/LtSigned cluster + BitwiseU16 cluster).
+Foundation + Operations are **complete**.
 
-- `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — needs polymorphic
-  `Word.{and,or,xor}_toBWord_poly` + `U16toU8OperationSafe.spec.cstrs_poly` /
-  `spec.unsafe.return_poly` + `u16_to_u8_decomposition_bb_poly` cascade
-  before the final `bv_decide`.
+**Chip layer not migrated.** All 47 chip files still consume `Fin KB`-side
+iff/spec lemmas. This is Track B — see "Recommended next steps" below.
 
 **0 chips migrated to `_poly`.** All 47 chip files still consume
 `Fin KB`-side iff/spec lemmas. No `correct_*` theorem has been re-stated.
@@ -128,23 +133,21 @@ divergence between `SP1Constraint.toProp` and `toProp_poly` post-simp.
 
 Three independent tracks, ordered by effort/value:
 
-**Track A — Close the small `_poly` gaps (was 1–2 sessions; landed
-2026-05-01 except BitwiseU16).** 3 of 5 lemmas closed; 3 remain (all
-BitwiseU16):
+**Track A — Complete (landed 2026-05-01).** All 5 outstanding `_poly`
+lemmas closed:
 
-1. ✅ `LtOperationUnsigned.spec_poly` (BitVec form) — landed.
-2. ✅ `LtOperationSigned.spec.signed_poly` — landed (structured `.val`
-   arithmetic via `val_sub_cases` + `ZMod.val_add_of_lt`).
-3. ✅ `LtOperationSigned.spec.branch_poly` — landed (16-way flag-bool +
-   4-way msb sub-case-split via two private helpers).
-4. ⚠️ `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — deferred.
-   Need polymorphic Word bitwise + U16toU8 helper cascade.
+1. ✅ `LtOperationUnsigned.spec_poly` (BitVec form).
+2. ✅ `LtOperationSigned.spec.signed_poly` (structured `.val` arithmetic
+   via `val_sub_cases` + `ZMod.val_add_of_lt`).
+3. ✅ `LtOperationSigned.spec.branch_poly` (16-way flag-bool + 4-way
+   msb sub-case-split via two private helpers).
+4. ✅ `BitwiseU16Operation.spec.{and,or,xor}_poly` (3 lemmas) — closed
+   via `Word.{and,or,xor}_toBWord_poly` + `U16toU8OperationSafe.spec.unsafe.return_poly`
+   + `u16_to_u8_decomposition_poly` helper cascade, then `bv_decide`
+   over byte abbreviations.
 
-Estimate to complete BitwiseU16: 1 session for the cascade (5–6 helper
-lemmas + 3 `spec.*_poly` lemmas).
-
-End state: zero deferred op `_poly` lemmas. Foundation + Operations are
-**fully complete**.
+End state achieved: zero deferred op `_poly` lemmas. Foundation +
+Operations are **fully complete**.
 
 **Track B — Pilot chip-side migration (2–3 sessions, validates the design).**
 Migrate ONE simple chip end-to-end to `_poly` consumption:

@@ -107,4 +107,70 @@ lemma spec.unsafe.return
     intro cstrs; apply spec.cstrs at cstrs
     simp [U16toU8OperationUnsafe.constraints, Word.toBWord]; aesop
 
+/-- Polymorphic counterpart of `u16_to_u8_decomposition_bb`. Given the
+two `< 256` bounds (low byte and high byte after dividing by `256⁻¹`)
+in field-level form (matching the iff_poly RHS shape), derives
+`a.val < 65536` plus the byte decomposition at the `.val` level. -/
+private lemma u16_to_u8_decomposition_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] {a b : ZMod p} :
+  b < 256 → ((a - b) * (256 : ZMod p)⁻¹) < 256 →
+    a.val < 65536 ∧ a.val % 256 = b.val ∧ ((a - b) * (256 : ZMod p)⁻¹).val = a.val / 256
+  := by
+    intro h_b h_diff
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    have hp : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    -- Convert field-level `<` to Nat-level `.val <`
+    have h_b' : b.val < 256 := by
+      have : b.val < (256 : ZMod p).val := h_b
+      rw [val_256_zmod_p] at this; exact this
+    have h_diff' : ((a - b) * (256 : ZMod p)⁻¹).val < 256 := by
+      have : ((a - b) * (256 : ZMod p)⁻¹).val < (256 : ZMod p).val := h_diff
+      rw [val_256_zmod_p] at this; exact this
+    set high : ZMod p := (a - b) * (256 : ZMod p)⁻¹ with h_high_def
+    have h_high_mul : high * 256 = a - b := by
+      rw [h_high_def, mul_assoc, inv_mul_cancel₀ val_256_ne_zero, mul_one]
+    have h_a_eq : a = b + high * 256 := by linear_combination -h_high_mul
+    have h_high_val_mul : (high * 256).val = high.val * 256 := by
+      rw [ZMod.val_mul_of_lt (by rw [val_256_zmod_p]; nlinarith), val_256_zmod_p]
+    have h_a_val : a.val = b.val + high.val * 256 := by
+      rw [h_a_eq]
+      rw [ZMod.val_add_of_lt (by rw [h_high_val_mul]; nlinarith), h_high_val_mul]
+    exact ⟨by omega, by omega, by omega⟩
+
+/-- Polymorphic counterpart of `spec.unsafe.return`. Bridges from the
+constraint list (each limb decomposes into a low byte `< 256` and a high
+byte `< 256` derived via the `256⁻¹` multiplication) to a concrete
+`Word.toBWord_poly` byte vector. The 8 byte-level equations follow from
+applying `u16_to_u8_decomposition_poly` per limb. -/
+lemma spec.unsafe.return_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  {u16_values : (Vector (ZMod p) 4)}
+  {cols : U16toU8Operation (ZMod p)} :
+  List.Forall SP1Constraint.toProp_poly (constraints u16_values cols 1).2 →
+    (U16toU8OperationUnsafe.constraints u16_values cols).1 = Word.toBWord_poly u16_values
+  := by
+    intro cstrs
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    rw [allHold_constraints_iff_poly] at cstrs
+    rcases cstrs with ⟨c0, c1, c2, c3⟩
+    obtain ⟨h_b0_lt, h_diff0_lt⟩ := c0 one_ne_zero
+    obtain ⟨h_b1_lt, h_diff1_lt⟩ := c1 one_ne_zero
+    obtain ⟨h_b2_lt, h_diff2_lt⟩ := c2 one_ne_zero
+    obtain ⟨h_b3_lt, h_diff3_lt⟩ := c3 one_ne_zero
+    obtain ⟨_, hmod0, hdiv0⟩ := u16_to_u8_decomposition_poly h_b0_lt h_diff0_lt
+    obtain ⟨_, hmod1, hdiv1⟩ := u16_to_u8_decomposition_poly h_b1_lt h_diff1_lt
+    obtain ⟨_, hmod2, hdiv2⟩ := u16_to_u8_decomposition_poly h_b2_lt h_diff2_lt
+    obtain ⟨_, hmod3, hdiv3⟩ := u16_to_u8_decomposition_poly h_b3_lt h_diff3_lt
+    simp [U16toU8OperationUnsafe.constraints, Word.toBWord_poly]
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    all_goals first
+      | (rw [hmod0]; exact (ZMod.natCast_zmod_val _).symm)
+      | (rw [hmod1]; exact (ZMod.natCast_zmod_val _).symm)
+      | (rw [hmod2]; exact (ZMod.natCast_zmod_val _).symm)
+      | (rw [hmod3]; exact (ZMod.natCast_zmod_val _).symm)
+      | (rw [← hdiv0]; exact (ZMod.natCast_zmod_val _).symm)
+      | (rw [← hdiv1]; exact (ZMod.natCast_zmod_val _).symm)
+      | (rw [← hdiv2]; exact (ZMod.natCast_zmod_val _).symm)
+      | (rw [← hdiv3]; exact (ZMod.natCast_zmod_val _).symm)
+
 end U16toU8OperationSafe
