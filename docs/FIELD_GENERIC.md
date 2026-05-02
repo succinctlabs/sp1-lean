@@ -164,6 +164,79 @@ fan out to all 23 chips. If the chip auto-gen `(Fin KB)` shape forces
 ascription gymnastics in every proof, pivot to upstream chip-level
 parametric emission or acknowledge the strategic shift.
 
+### Track B preparation notes (handoff from Track A — 2026-05-01)
+
+**Available iff_poly inventory** (everything chip proofs would consume):
+
+- **Reader iff_poly**: `CPUState.allHold_constraints_iff{,_is_real}_poly`,
+  `RTypeReader.allHold_constraints_iff_poly`,
+  `ITypeReader.allHold_constraints_iff_poly`,
+  `JTypeReader.allHold_constraints_iff_poly`,
+  `ALUTypeReader.allHold_constraints_iff_poly`.
+- **Bridge-coupled op iff_poly**: `AddOperation`, `SubOperation`,
+  `AddwOperation`, `SubwOperation`, `AddrAddOperation`,
+  `U16toU8OperationSafe` — all `allHold_constraints_iff_poly`.
+- **Compare op spec_poly / iff_poly**: `IsZeroOperation.spec_poly`,
+  `IsZeroWordOperation.spec_poly`, `IsEqualWordOperation.spec_poly`,
+  `U16CompareOperation.{allHold_constraints_iff,spec}_poly`,
+  `U16MSBOperation.{allHold_constraints_iff,spec,spec.U64,spec.gen}_poly`.
+- **Lt op spec_poly cluster**: `LtOperationUnsigned.{allHold_constraints_iff,
+  cl_are_U16,spec.nat,spec.nat.gen,spec}_poly` (BitVec form),
+  `LtOperationSigned.{allHold_constraints_iff,spec.unsigned,spec.signed,
+  spec.branch}_poly`.
+- **Bitwise op spec_poly**: `BitwiseU16Operation.spec.{and,or,xor}_poly`.
+- **U16toU8Safe spec helper**: `U16toU8OperationSafe.spec.unsafe.return_poly`.
+- **SailM bridges**: 18 `_poly` execute/exec for
+  RTYPE/RTYPEW/ITYPE/SHIFTIOP/SHIFTIWOP/MUL/MULW + combine helpers.
+
+**Ascription pattern** (verified 2026-04-28 via `lean_run_code`):
+
+```lean
+-- Goal in chip proof: invoke the polymorphic allHold/initialState entry
+have h_allHold : (constraints Main).allHold_poly (p := KB) := ...
+have h_init : (constraints Main).initialState_poly (p := KB) s := ...
+-- Then destructure h_allHold the same way h_cstrs.allHold gets used today
+```
+
+The named `(p := KB)` argument is what bridges `Vector (Fin KB) N` Main
+rows to `(constraints Main : SP1ConstraintList (Fin KB))` consumed at
+`p := KB` (since `Fin KB = ZMod KB` definitionally). Without it, Lean's
+unifier doesn't solve `Fin KB ≟ ZMod ?p`.
+
+**Chip auto-gen still `Fin KB`-bound.** `<Chip>/Constraints.lean` returns
+`SP1ConstraintList (Fin KB)`. Track B works *around* this via the
+`(p := KB)` ascription; it does NOT lift chip auto-gen. Lifting chip
+auto-gen would require either upstream Rust changes or extending the
+Python post-processor in `update_constraints.py` to handle chip-level
+parametric emission — defer to Track C if needed.
+
+**Recommended starting chip:** `SubChip` (76 lines, single
+bridge-coupled `SubOperation` consumer). Successful pilot would touch:
+
+1. Add `(constraints Main).allHold_poly (p := KB)` ascription in the
+   `correct_*` proof body, replacing the current `h_cstrs.allHold` reference.
+2. Destructure the polymorphic form, then specialize `SubOperation.allHold_constraints_iff_poly`
+   to extract the carry/bit constraints.
+3. Apply `CPUState.allHold_constraints_iff_is_real_poly` and the relevant
+   reader iff_poly for the register/PC bookkeeping.
+4. Bridge through `execute_RTYPE_pure_w_poly` (already in `SailM.lean`)
+   for the SUB arm.
+5. Watch for the 5 patterns in `feedback_poly_proof_patterns.md`
+   (auto-memory): `simp_all` strips Facts; cstrs shadowing for
+   `intro x; have x := x`; struct projection `simp only`; field-`<` to
+   `.val <` conversion; `(N : ZMod p).val = N` helpers for `ByteOpcode.ofNat`
+   reduction.
+
+**Friction signals to watch for** (would suggest pivoting to Track C):
+- Heavy `(p := KB)` ascription noise that bloats every proof line.
+- `simp_all` cascades that strip critical instances and require manual
+  re-derivation in 5+ places per proof.
+- Chip auto-gen literals (e.g. `(2130673921 : Fin KB)`) requiring
+  symbolic-inverse bridges in many places.
+
+If the pilot is mechanical (~2–3 hr), fan out. If it requires substantial
+new infrastructure, re-evaluate whether to lift chip auto-gen too.
+
 **Track C — Strategic decisions to defer until A+B inform them.**
 
 - **Foundation `Fin KB` deletion sweep** (4–6 sessions): only worth doing
