@@ -337,6 +337,45 @@ lemma single_op_poly (Main : Vector (ZMod p) 45)
     h4_ne_zero, h4_ne_one, h5_ne_zero, h5_ne_one,
     h6_ne_zero, h6_ne_one]
 
+set_option maxHeartbeats 1600000 in
+-- Polymorphic counterpart of `eq_signExtend_of_is_real`. The 6-arm
+-- case-split over `is_real` extracts the trusted_instr signExtend
+-- bridge from the active variant's reader constraint. Each variant
+-- pins the opcode to a specific small constant (40-45 for branch
+-- variants); supply `(k : ZMod p).val = k` simp lemmas explicitly.
+lemma eq_signExtend_of_is_real_poly (Main : Vector (ZMod p) 45)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (is_real : is_real_poly Main) :
+    Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
+      BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h40_lt : (40 : ℕ) < p := by omega
+  have h41_lt : (41 : ℕ) < p := by omega
+  have h42_lt : (42 : ℕ) < p := by omega
+  have h43_lt : (43 : ℕ) < p := by omega
+  have h44_lt : (44 : ℕ) < p := by omega
+  have h45_lt : (45 : ℕ) < p := by omega
+  have h40_val : (40 : ZMod p).val = 40 := ZMod.val_natCast_of_lt h40_lt
+  have h41_val : (41 : ZMod p).val = 41 := ZMod.val_natCast_of_lt h41_lt
+  have h42_val : (42 : ZMod p).val = 42 := ZMod.val_natCast_of_lt h42_lt
+  have h43_val : (43 : ZMod p).val = 43 := ZMod.val_natCast_of_lt h43_lt
+  have h44_val : (44 : ZMod p).val = 44 := ZMod.val_natCast_of_lt h44_lt
+  have h45_val : (45 : ZMod p).val = 45 := ZMod.val_natCast_of_lt h45_lt
+  have := single_op_poly Main cstrs
+  rcases is_real with h | h | h | h | h | h
+  all_goals
+  · simp_all [constraints, ITypeReaderImmutable.constraints,
+      SP1Constraint.toProp_poly, Opcode.ofNat, Nat.ble,
+      h40_val, h41_val, h42_val, h43_val, h44_val, h45_val]
+
+-- TODO: `add_signExtend_of_constraints_poly` deferred — the Fin KB version
+-- uses `Fin.mod_def, ← Fin.val_inj` to convert `Main[3] % 4 = 0` (ZMod-side)
+-- to `Main[3].val % 4 = 0` (Nat-side). The ZMod p version needs a
+-- `(x : ZMod p) % 4 = 0 ↔ x.val % 4 = 0` bridge (with `Fact (4 < p)`)
+-- which doesn't have a clean Mathlib counterpart at the time of writing.
+-- Blocking the Branch chip-arm migrations until this bridge lands.
+
 end poly_helpers
 
 end Branch
