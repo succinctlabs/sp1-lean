@@ -365,6 +365,20 @@ lemma lt_cases_of_isU64_poly {p : ℕ} [NeZero p] {w : Word (ZMod p)} (hw : w.is
 @[simp] -- common enough to want a lemma
 lemma four_isU64 : Word.isU64 #v[4, 0, 0, 0] := by aesop
 
+/-- Polymorphic counterpart of `four_isU64`. -/
+@[simp]
+lemma four_isU64_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] :
+    Word.isU64_poly (#v[4, 0, 0, 0] : Word (ZMod p)) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  apply Word.isU64_of_cases_poly <;>
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ]
+  · have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    have h4_val : ((4 : ℕ) : ZMod p).val = 4 := ZMod.val_natCast_of_lt (by omega)
+    rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl]
+    rw [h4_val]; omega
+  all_goals (rw [ZMod.val_zero]; omega)
+
 end U64
 
 section conversions
