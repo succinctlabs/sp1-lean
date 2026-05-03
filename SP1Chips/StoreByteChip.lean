@@ -45,12 +45,7 @@ theorem correct (Main : Vector (ZMod p) 50)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
-      reg_val + offset + 1 < 2 ^ 64)
-    (h_in_range :
-      let reg_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
-      let offset := BitVec.signExtend 64 (sp1_imm_c Main)
-      range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
-        (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
+      reg_val + offset + 1 < 2 ^ 64) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
@@ -104,6 +99,38 @@ theorem correct (Main : Vector (ZMod p) 50)
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt_zmod; rwa [h65] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt_zmod; rwa [h65] at this
   have haddr_add := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_add_addr
+  -- Derive `h_in_range` from the chip's address-bounds constraints.
+  obtain ⟨h25_lt, h26_lt, h27_lt, _⟩ := Word.lt_cases_of_isU64_poly haddr_add.1
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ] at h25_lt h26_lt h27_lt
+  obtain ⟨h_addr_lo, h_addr_hi⟩ :=
+    AddressOperation.addr_limbs_bounds Main[25] Main[26] Main[27] Main[28]
+      h25_lt h26_lt h27_lt h40
+  -- (b + c).toNat agrees with the limb sum via haddr_add.2 + toBitVec64_poly_toNat_poly
+  have h_addr_eq :
+      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+        Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
+        Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
+    rw [← haddr_add.2, Word.toBitVec64_poly_toNat_poly haddr_add.1,
+      Word.toNat_poly_def]
+    simp
+  have h_offset_eq :
+      Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
+        BitVec.signExtend 64 (sp1_imm_c Main) := by
+    rw [h_imm_c, sp1_imm_c]
+    congr 1
+    apply BitVec.eq_of_toNat_eq
+    simp [Word.toNat_poly_def]
+    omega
+  have h_in_range :
+      range_subset (zero_extend (BitVec.addInt
+          (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+            BitVec.signExtend 64 (sp1_imm_c Main)) 0))
+        (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true := by
+    rw [← h_offset_eq]
+    exact range_subset_sp1_pma _ 1 (by omega)
+      (by rw [h_addr_eq]; exact h_addr_lo)
+      (by rw [h_addr_eq]; omega)
   simp [spec_sb]
   simp [run_readReg_of_isInitialized s _ hs]
   simp [h_read_pc]

@@ -49,4 +49,33 @@ section constraints
 
 end constraints
 
+section bounds
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The top-two-limb-inverse trick used by `AddressOperation` (`E10` of the
+constraint list, `top_two_limb_inv * (addr[1] + addr[2]) = is_real`) plus u16
+bounds on the three address limbs gives the SP1 PMA window
+`[2^16, 2^48)` on the limb-encoded address. Used by chip-side `correct_*`
+proofs to discharge the `range_subset` precondition of `run_vmem_*`. -/
+lemma addr_limbs_bounds
+    (a₀ a₁ a₂ inv : ZMod p)
+    (ha₀ : a₀.val < 2 ^ 16) (ha₁ : a₁.val < 2 ^ 16) (ha₂ : a₂.val < 2 ^ 16)
+    (h_top : inv * (a₁ + a₂) = 1) :
+    2 ^ 16 ≤ a₀.val + a₁.val * 2 ^ 16 + a₂.val * 2 ^ 32 ∧
+      a₀.val + a₁.val * 2 ^ 16 + a₂.val * 2 ^ 32 < 2 ^ 48 := by
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  refine ⟨?_, by nlinarith⟩
+  by_contra hzero
+  push Not at hzero
+  have h₁ : a₁.val = 0 := by nlinarith
+  have h₂ : a₂.val = 0 := by nlinarith
+  have e₁ : a₁ = 0 := (ZMod.val_eq_zero _).mp h₁
+  have e₂ : a₂ = 0 := (ZMod.val_eq_zero _).mp h₂
+  rw [e₁, e₂, add_zero, mul_zero] at h_top
+  exact one_ne_zero h_top.symm
+
+end bounds
+
 end AddressOperation

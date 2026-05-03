@@ -184,11 +184,7 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
       (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 8 = true)
-    (h_in_range :
-      let reg_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
-      let offset := BitVec.signExtend 64 (sp1_imm_c Main)
-      range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
-        (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
+    :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
@@ -306,6 +302,37 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
   have h25_lt : Main[25].val < 65536 := haddr_isU64 0
   have h26_lt : Main[26].val < 65536 := haddr_isU64 1
   have h27_lt : Main[27].val < 65536 := haddr_isU64 2
+  -- Derive `h_in_range` from `h28_inv` (top-two-limb-inv) + addr bounds + alignment.
+  -- LoadX0's `h28_inv` is parameterised on the 7-way is_real sum; collapse to 1.
+  have h28_inv' : Main[28] * (Main[26] + Main[27]) = 1 := by
+    rw [h28_inv, h_sum_eq_one]
+  obtain ⟨h_addr_lo, h_addr_hi⟩ :=
+    AddressOperation.addr_limbs_bounds Main[25] Main[26] Main[27] Main[28]
+      h25_lt h26_lt h27_lt h28_inv'
+  have h_addr_eq :
+      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+        Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
+        Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
+    rw [← haddr_eq, Word.toBitVec64_poly_toNat_poly haddr_isU64,
+      Word.toNat_poly_def]; simp
+  have h_offset_eq :
+      Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
+        BitVec.signExtend 64 (sp1_imm_c Main) := by
+    rw [h_imm_se]; rfl
+  have h_align : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+        Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]).toNat % 8 = 0 := by
+    have h := h_is_aligned
+    rw [← h_imm_se, is_aligned_vaddr_iff_mod] at h
+    exact h
+  have h_in_range :
+      range_subset (zero_extend (BitVec.addInt
+          (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+            BitVec.signExtend 64 (sp1_imm_c Main)) 0))
+        (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true := by
+    rw [← h_offset_eq]
+    refine range_subset_sp1_pma _ 8 (by omega) ?_ ?_
+    · rw [h_addr_eq]; exact h_addr_lo
+    · omega
   have h_mem0_lt : Main[29].val < 65536 := h_mem_isU64' 0
   have h_mem1_lt : Main[30].val < 65536 := h_mem_isU64' 1
   have h_mem2_lt : Main[31].val < 65536 := h_mem_isU64' 2

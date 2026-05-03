@@ -592,6 +592,37 @@ lemma run_mem_read_eight_bytes_of_isInitialized
 --   simp [h_plat_ram_base, h_plat_rom_base]
 --   split_ifs with h1 <;> simp; omega
 
+/-- Convert the Sail-level alignment check to a plain `Nat`-mod fact. -/
+lemma is_aligned_vaddr_iff_mod (addr : BitVec 64) (N : ℕ) :
+    is_aligned_vaddr (virtaddr.Virtaddr addr) N = true ↔ addr.toNat % N = 0 := by
+  rw [is_aligned_vaddr]
+  simp only [Sail.BitVec.toNatInt, beq_iff_eq]
+  rw [show (Int.ofNat addr.toNat : ℤ) = ((addr.toNat : ℕ) : ℤ) from rfl,
+      show (N : ℤ) = ((N : ℕ) : ℤ) from rfl, ← Int.ofNat_tmod, Nat.cast_eq_zero]
+
+/-- Bridge: every access whose `addr` lives in `[2^16, 2^48 - N]` falls inside
+the SP1 PMA window `[2^16, 2^48)`. Chip-side proofs derive `addr ≥ 2^16` from
+the `AddressOperation` top-two-limb inverse trick and `addr.toNat + N ≤ 2^48`
+from the AddrAddOperation u48 bound (plus per-width alignment), then call this
+to satisfy the `h_in_range` precondition of every `run_vmem_*_of_width_*'`. -/
+lemma range_subset_sp1_pma (addr : BitVec 64) (N : ℕ) (hN_pos : 0 < N)
+    (h_lo : 2 ^ 16 ≤ addr.toNat) (h_hi : addr.toNat + N ≤ 2 ^ 48) :
+    range_subset (zero_extend (BitVec.addInt addr 0) : BitVec 64)
+      (to_bits N : BitVec 64) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true := by
+  have hzext : (zero_extend (BitVec.addInt addr 0) : BitVec 64) = addr := by
+    simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend, BitVec.ofInt]
+  rw [hzext]
+  have h_to_bits : (to_bits N : BitVec 64).toNat = N := by
+    simp [to_bits, get_slice_int, BitVec.toNat_ofInt]; omega
+  have h_p16 : (2#64 ^ 16).toNat = 65536 := by decide
+  have h_p48 : (2#64 ^ 48).toNat = 281474976710656 := by decide
+  have h_eq : ∀ x y : BitVec 64, (zopz0zIzJ_u x y = true) ↔ (x.toNat ≤ y.toNat) :=
+    fun _ _ => by simp [zopz0zIzJ_u, BitVec.toNatInt]
+  unfold range_subset
+  rw [Bool.and_eq_true, Bool.and_eq_true, h_eq, h_eq, h_eq]
+  refine ⟨?_, ?_, ?_⟩ <;>
+    simp only [BitVec.toNat_sub, BitVec.toNat_add, h_to_bits, h_p16, h_p48] <;> omega
+
 lemma run_vmem_write_of_width_1'
     (rs_addr_bv : BitVec 5)
     (reg_val : BitVec 64) -- thing inside `rs_addr_bv`
