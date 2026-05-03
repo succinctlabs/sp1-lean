@@ -58,6 +58,7 @@ PARAMETRIC_CHIPS: Dict[str, Tuple[str, bool]] = {
     "Addi": ("Type", True),
     "Addw": ("Type", True),
     "Bitwise": ("Type", True),
+    "Branch": ("Type", True),
     "LoadDouble": ("Type", True),
     "Lt": ("Type", True),
     "ShiftLeft": ("Type", True),
