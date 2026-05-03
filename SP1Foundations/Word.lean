@@ -2487,6 +2487,99 @@ lemma bitVec_ofNat8_eq_of_mod (a b : ℕ) (h : a % 256 = b % 256) :
   rw [← BitVec.toNat_inj, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
   simpa using h
 
+/-- Polymorphic counterpart of `signExtend64_ofNat8_of_ge_128`. -/
+lemma signExtend64_ofNat8_of_ge_128_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    (x : ZMod p) (hlt : x.val < 256) (hge : 128 ≤ x.val) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x + 65280, (65535 : ZMod p), (65535 : ZMod p), (65535 : ZMod p)] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb : BitVec.msb (BitVec.ofNat 8 x.val) = true := by
+    rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]
+    rw [Nat.mod_eq_of_lt (by omega)]; omega
+  simp [hmsb, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat]
+  rw [Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  have hp : 131072 < p := by
+    have := Fact.out (p := 2 ^ 17 < p)
+    have h17 : (2 : ℕ) ^ 17 = 131072 := by decide
+    omega
+  have h65280 : (65280 : ZMod p).val = 65280 := by
+    have : (65280 : ZMod p).val = 65280 % p := by
+      rw [show (65280 : ZMod p) = ((65280 : ℕ) : ZMod p) from by norm_cast,
+          ZMod.val_natCast]
+    rw [this, Nat.mod_eq_of_lt (by omega)]
+  have h65535 : (65535 : ZMod p).val = 65535 := by
+    have : (65535 : ZMod p).val = 65535 % p := by
+      rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) from by norm_cast,
+          ZMod.val_natCast]
+    rw [this, Nat.mod_eq_of_lt (by omega)]
+  have hxk_lt : x.val + (65280 : ZMod p).val < p := by rw [h65280]; omega
+  have hxk_val : (x + 65280 : ZMod p).val = x.val + 65280 := by
+    rw [ZMod.val_add_of_lt hxk_lt, h65280]
+  rw [hxk_val, h65535]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  omega
+
+/-- Polymorphic counterpart of `nat_decomp_of_inv8_decomp`. -/
+lemma nat_decomp_of_inv8_decomp_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    (lo hi x : ZMod p)
+    (h : lo + hi * (2 ^ 8 : ZMod p) = x)
+    (hlo : lo.val < 256) (hhi : hi.val < 256) :
+    x.val = lo.val + hi.val * 256 := by
+  have hp : 131072 < p := by
+    have := Fact.out (p := 2 ^ 17 < p)
+    have h17 : (2 : ℕ) ^ 17 = 131072 := by decide
+    omega
+  have h256 : ((2 ^ 8 : ZMod p).val = 256) := by
+    have h1 : (2 ^ 8 : ZMod p) = ((256 : ℕ) : ZMod p) := by norm_cast
+    rw [h1, ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
+  have hmul : (hi * (2 ^ 8 : ZMod p)).val = hi.val * 256 := by
+    rw [ZMod.val_mul, h256, Nat.mod_eq_of_lt (by
+      have : hi.val * 256 < 256 * 256 := by
+        have : hi.val * 256 ≤ 255 * 256 := Nat.mul_le_mul_right _ (by omega); omega
+      omega)]
+  have hadd : (lo + hi * (2 ^ 8 : ZMod p)).val = lo.val + hi.val * 256 := by
+    rw [ZMod.val_add_of_lt (by rw [hmul]; omega), hmul]
+  rw [← h, hadd]
+
+/-- Polymorphic counterpart of `setWidth64_ofNat8`. -/
+lemma setWidth64_ofNat8_poly {p : ℕ} [NeZero p]
+    (x : ZMod p) (hlt : x.val < 256) :
+    BitVec.setWidth 64 (BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, (0 : ZMod p), (0 : ZMod p), (0 : ZMod p)] := by
+  apply BitVec.toNat_inj.mp
+  simp [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat]
+  rw [Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, ZMod.val_zero]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  omega
+
+/-- Polymorphic counterpart of `signExtend64_ofNat8_of_lt_128`. -/
+lemma signExtend64_ofNat8_of_lt_128_poly {p : ℕ} [NeZero p]
+    (x : ZMod p) (hlt : x.val < 256) (hge : x.val < 128) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, (0 : ZMod p), (0 : ZMod p), (0 : ZMod p)] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb : BitVec.msb (BitVec.ofNat 8 x.val) = false := by
+    rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]
+    rw [Nat.mod_eq_of_lt (by omega)]; omega
+  simp [hmsb, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat]
+  rw [Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, ZMod.val_zero]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  omega
+
 /-- Zero-extend a byte: always produces just the byte (upper zeros). -/
 lemma setWidth64_ofNat8 (x : Fin KB) (hlt : x.val < 256) :
     BitVec.setWidth 64 (BitVec.ofNat 8 x.val) =
