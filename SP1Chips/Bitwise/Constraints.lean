@@ -389,7 +389,7 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 /-- From `a = 1` and `b, c ∈ {0,1}` with `a + b + c ∈ {0, 1}`, conclude
 `a + b + c = 1`. Used by chip arms to derive `is_real = 1` from the variant
 hypothesis plus the iff_poly's bool/sum disjunctions. -/
-private lemma sum_eq_one_of_eq_one_left
+lemma sum_eq_one_of_eq_one_left
     {a b c : ZMod p}
     (h_a : a = 1)
     (b_b : b = 0 ∨ b = 1) (b_c : c = 0 ∨ c = 1)
@@ -425,7 +425,7 @@ private lemma sum_eq_one_of_eq_one_left
   · linear_combination h
 
 /-- Variant of `sum_eq_one_of_eq_one_left` with the `1`-valued column in the middle position. -/
-private lemma sum_eq_one_of_eq_one_mid
+lemma sum_eq_one_of_eq_one_mid
     {a b c : ZMod p}
     (h_b : b = 1)
     (b_a : a = 0 ∨ a = 1) (b_c : c = 0 ∨ c = 1)
@@ -438,7 +438,7 @@ private lemma sum_eq_one_of_eq_one_mid
   linear_combination heq
 
 /-- Variant of `sum_eq_one_of_eq_one_left` with the `1`-valued column in the right position. -/
-private lemma sum_eq_one_of_eq_one_right
+lemma sum_eq_one_of_eq_one_right
     {a b c : ZMod p}
     (h_c : c = 1)
     (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
@@ -453,7 +453,7 @@ private lemma sum_eq_one_of_eq_one_right
 /-- Mutual exclusion: from the `b ∈ {0,1}` disjunctions plus `is_real = 1`, the three
 opcode columns are mutually exclusive (only one can be `1`). Polymorphic counterpart of
 the chip-local `single_op` lemma in this file (line 101). -/
-private lemma single_op_poly (Main : Vector (ZMod p) 51)
+lemma single_op_poly (Main : Vector (ZMod p) 51)
     (b_xor : Main[48] = 0 ∨ Main[48] = 1)
     (b_or : Main[49] = 0 ∨ Main[49] = 1)
     (b_and : Main[50] = 0 ∨ Main[50] = 1)
