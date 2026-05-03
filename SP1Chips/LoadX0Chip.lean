@@ -161,29 +161,267 @@ private lemma seven_collapse_M47
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
   · apply (ZMod.val_eq_zero _).mp; omega
 
-/-
-Per-sub-opcode `correct_loadX0_*` theorems are next-step work. The
-LoadX0 chip lacks a single-flag iff lemma analogous to
-`Load.LoadDouble.allHold_constraints_iff_of_is_ld_poly` because the
-chip's constraint list interleaves all 7 sub-opcode flags via the
-`E72 = Main[41] + … + Main[47]` umbrella gate. The required pieces
-have all landed in this commit:
-
-- `sp1_loadX0` advances PC only — the spec's `wX_bits 0 _` step is
-  a no-op (`Lean_RV64D/Regs.lean:663`).
-- `seven_collapse_M47` discharges the 7-way collapse from the
-  mutual-exclusion + sum-equals-one constraints; an analog
-  `seven_collapse_<flag>` for each of the other six sub-opcodes is
-  a one-line permutation.
-- For LD specifically (`Main[47] = 1`), byte-routing constraints
-  `E92`/`E95`/`E100` then force `Main[38..40] = 0`, collapsing the
-  AddressOperation offsets and matching LoadDouble's 8-byte aligned
-  read structure exactly. The proof can then mirror
-  `Load.LoadDouble.correct_ld` line-for-line, swapping
-  `ITypeReader.allHold_constraints_iff_is_real_poly` for
-  `ITypeReaderImmutable.allHold_constraints_iff_is_real_poly` and
-  dropping the result-write step on the SP1 side.
--/
+set_option maxHeartbeats 1600000 in
+-- LoadX0 LD sub-opcode correct proof. Mirrors `Load.LoadDouble.correct_ld`
+-- with three structural differences:
+-- - No register write — `op_a = x0` makes `wX_bits 0 _` a no-op, so
+--   `sp1_loadX0` only advances PC.
+-- - Reader is `ITypeReaderImmutable` (rather than `ITypeReader`).
+-- - 7-way sub-opcode flags `Main[41..47]` collapse via `seven_collapse_M47`
+--   to give `Main[41..46] = 0`. Byte-routing constraints `E92`/`E95`/`E100`
+--   then force `Main[38..40] = 0` (8-byte aligned read).
+set_option debug.skipKernelTC true in
+theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
+    (s : SailState) (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
+    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_is_loadX0_ld : Main[47] = 1)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
+      reg_val + offset + 8 < 2 ^ 64)
+    (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 8 = true)
+    (h_below_clint :
+      let reg_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+      let offset := BitVec.signExtend 64 (sp1_imm_c Main)
+      BitVec.toNat (reg_val + offset) + 8 ≤ 33554432) :
+    let op_a := sp1_op_a Main
+    let op_b := sp1_ob_b Main
+    let imm_c := sp1_imm_c Main
+    (spec_loadX0_ld imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_loadX0 Main).run s := by
+  extract_lets op_a op_b imm_c
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  -- Inline constraint flattening via simp; LoadX0 has no per-sub-opcode
+  -- iff lemma, so we destructure the 29-conjunct simp normal form directly.
+  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+    AddressOperation.constraints, sub_eq_zero,
+    SP1Constraint.toProp_poly] at h_cstrs
+  obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
+    h_cpu, h_reader,
+    h_M41_or, h_M42_or, h_M43_or, h_M44_or, h_M45_or, h_M46_or, _h_M47_or,
+    h_sum_or, h_E92, h_E95, h_E100, _h_sum_or3,
+    _h_E106, _h_E109, _h_E123, _h_M36_lt, _h_byte3, h_mem_isU64,
+    h_E125, _h_E127⟩ := h_cstrs
+  -- Use seven_collapse_M47 to derive Main[41..46] = 0.
+  have ⟨hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero⟩ :=
+    seven_collapse_M47 h_M41_or h_M42_or h_M43_or h_M44_or h_M45_or h_M46_or
+      h_is_loadX0_ld (by
+        rcases h_sum_or with h | h
+        · rw [h, mul_zero]
+        · rw [show (Main[41] + Main[42] + Main[43] + Main[44] + Main[45] + Main[46] +
+            Main[47]) - 1 = 0 from by linear_combination h, zero_mul])
+  -- Sum-equals-one is now derivable.
+  have h_sum_eq_one : Main[41] + Main[42] + Main[43] + Main[44] + Main[45] + Main[46] +
+      Main[47] = 1 := by
+    rw [hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero, h_is_loadX0_ld]
+    ring
+  -- Derive Main[38..40] = 0 from byte-routing constraints.
+  have hM40_zero : Main[40] = 0 := by
+    rcases h_E92 with h | h
+    · exfalso; rw [h_is_loadX0_ld] at h; exact one_ne_zero h
+    · exact h
+  have hM39_zero : Main[39] = 0 := by
+    rcases h_E95 with h | h
+    · exfalso
+      rw [hM45_zero, hM46_zero, h_is_loadX0_ld, zero_add, zero_add] at h
+      exact one_ne_zero h
+    · exact h
+  have hM38_zero : Main[38] = 0 := by
+    rcases h_E100 with h | h
+    · exfalso
+      rw [hM43_zero, hM44_zero, hM45_zero, hM46_zero, h_is_loadX0_ld,
+        zero_add, zero_add, zero_add, zero_add] at h
+      exact one_ne_zero h
+    · exact h
+  -- Derive Main[13] = 1 from h_E125 (sum = 0 ∨ Main[13] = 1) + sum = 1.
+  have hM13 : Main[13] = 1 := by
+    rcases h_E125 with h | h
+    · exfalso; rw [h_sum_eq_one] at h; exact one_ne_zero h
+    · exact h
+  -- AddrAdd's `is_real` argument collapses to 1 via h_sum_eq_one.
+  rw [h_sum_eq_one] at h_addr
+  -- Reader's `is_real` argument collapses to 1 via h_sum_eq_one.
+  -- Also `Main[13] = 1` collapses the op_a_0-related clauses.
+  rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero,
+    h_is_loadX0_ld] at h_reader
+  -- Reader extraction via the iff_is_real_poly specialization.
+  have h_reader' :=
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+  obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
+    _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
+    _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
+    _h_op_a_zero_implies⟩ := h_reader'
+  -- Bounds + h_imm_se via opcode trusted_instr.
+  have hp_lt : 131072 < p := by
+    have := Fact.out (p := 2 ^ 17 < p)
+    have h17 : (2 : ℕ) ^ 17 = 131072 := by decide
+    omega
+  have h32val : (32 : ZMod p).val = 32 := val_32_zmod_p
+  have h65val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  have h35_lt_p : (35 : ℕ) < p := by omega
+  have h35_val : (35 : ZMod p).val = 35 := ZMod.val_natCast_of_lt h35_lt_p
+  -- The opcode argument simp-reduces to 35 since only Main[47] is non-zero.
+  -- Reduce h_trusted (Opcode.trusted_instr_poly) to extract h_imm_se.
+  -- The opcode value `35*Main[47]` collapses to `35`.
+  -- We need: Word.toBitVec64_poly Main[21..24] = signExtend 64 (BitVec.ofNat 12 Main[21].val).
+  -- h_trusted reduces to i_type_constraints_poly for opcode 35 (LD).
+  -- Reduce it to extract `Main[14] < 32` and `h_imm_se`.
+  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
+    h35_val, i_type_constraints_poly] at h_trusted
+  -- h_trusted now: Main[14] < 32 ∧ h_imm_se (after collapse).
+  have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
+  have h_imm_se : Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
+      BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
+    clear *- h_trusted; simp_all only
+  have h6 : Main[6].val < 32 := by
+    have : Main[6].val < (32 : ZMod p).val := h6_lt; rwa [h32val] at this
+  have h14 : Main[14].val < 32 := by
+    have : Main[14].val < (32 : ZMod p).val := h14_lt_zmod; rwa [h32val] at this
+  have h6_eq_zero : Main[6] = 0 := h13_iff_op_a_zero.mp hM13
+  have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
+  have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
+    rw [h6_val_eq_zero]
+  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases_poly <;>
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ]
+    · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
+    · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
+    · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
+    · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
+  -- Memory result Word.isU64_poly.
+  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+    apply h_mem_isU64
+    rw [h_sum_eq_one]; exact one_ne_zero
+  -- AddrAdd spec
+  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ] at haddr_isU64 haddr_eq
+  have h25_lt : Main[25].val < 65536 := haddr_isU64 0
+  have h26_lt : Main[26].val < 65536 := haddr_isU64 1
+  have h27_lt : Main[27].val < 65536 := haddr_isU64 2
+  have h_mem0_lt : Main[29].val < 65536 := h_mem_isU64' 0
+  have h_mem1_lt : Main[30].val < 65536 := h_mem_isU64' 1
+  have h_mem2_lt : Main[31].val < 65536 := h_mem_isU64' 2
+  have h_mem3_lt : Main[32].val < 65536 := h_mem_isU64' 3
+  -- Initial-state extraction. Mirror LoadDouble: simp + obtain.
+  have h2728 : ¬ (Main[26] = 0 ∧ Main[27] = 0) := by
+    intro ⟨hm26, hm27⟩
+    rw [hm26, hm27, add_zero, mul_zero] at h28_inv
+    rw [h_sum_eq_one] at h28_inv
+    exact zero_ne_one h28_inv
+  -- AddressOperation's E89/E90/E91 collapse: bit shifts are 0, so
+  -- E89 = Main[25], E90 = Main[26], E91 = Main[27].
+  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+    AddressOperation.constraints, SP1Constraint.toStateProp_poly,
+    AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
+    CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
+    Opcode.ofNat, Nat.ble, h6, h14, h35_val, h_is_loadX0_ld,
+    hM38_zero, hM39_zero, hM40_zero, hM41_zero, hM42_zero, hM43_zero,
+    hM44_zero, hM45_zero, hM46_zero, h2728] at state_cstrs
+  obtain ⟨h_read_pc, _h6_op_a, h14_op_a, hload⟩ := state_cstrs
+  rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
+  -- Address fits + haddr_nat + haddr_plus mirrors LoadDouble exactly.
+  have h_fits_real : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
+      (Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]).toNat < 2 ^ 64 := by
+    have := h_fits_in_mem
+    simp only [sp1_imm_c] at this
+    rw [← h_imm_se] at this
+    omega
+  have haddr_nat : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
+          (Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
+        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+    have heq := congr_arg BitVec.toNat haddr_eq
+    rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
+    rw [← heq, Word.toBitVec64_poly, BitVec.toNat_ofNat,
+      Nat.mod_eq_of_lt (by
+        rw [Word.toNat_poly_def]
+        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+        have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
+        rw [hpow]
+        have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
+          have : Main[26].val ≤ 65535 := by omega
+          exact Nat.mul_le_mul_right _ this
+        have h27m : Main[27].val * 4294967296 ≤ 65535 * 4294967296 := by
+          have : Main[27].val ≤ 65535 := by omega
+          exact Nat.mul_le_mul_right _ this
+        omega)]
+  have haddr_plus : ∀ (k : ℕ), k < 8 →
+      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+    intro k hk
+    have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
+    have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
+    have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
+      rw [ZMod.val_add_of_lt h25k_lt, hk_val]
+    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
+      Nat.add_zero, h25k_val]
+    omega
+  -- Simplify the spec side; the `wX_bits 0 _` step is a no-op.
+  simp [spec_loadX0_ld, sp1_loadX0,
+    sp1_op_a, sp1_ob_b, sp1_imm_c,
+    op_a, op_b, imm_c, run_readReg_of_isInitialized _ _ hs,
+    EStateM.Result.map, execute_LOAD, h_read_pc, h_op_a_zero]
+  rw [run_vmem_read_of_width_8' (BitVec.ofNat 5 Main[14].val)
+    (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
+    (BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val))
+    (BitVec.ofNat 8 Main[29].val)
+    (BitVec.ofNat 8 (Main[29].val >>> 8))
+    (BitVec.ofNat 8 Main[30].val)
+    (BitVec.ofNat 8 (Main[30].val >>> 8))
+    (BitVec.ofNat 8 Main[31].val)
+    (BitVec.ofNat 8 (Main[31].val >>> 8))
+    (BitVec.ofNat 8 Main[32].val)
+    (BitVec.ofNat 8 (Main[32].val >>> 8))]
+  · -- Main goal: write_reg 0 (extend_value true data) is no-op since op_a = 0;
+    -- the spec and sp1 sides both reduce to the same writeReg + RETIRE_SUCCESS.
+    simp
+  · simp only [isInitialized_iff, Std.ExtDHashMap.mem_insert, beq_iff_eq, hs, or_true, implies_true]
+  · simpa [BitVec.ofNatLT_eq_ofNat] using h14_op_a
+  · exact h_is_aligned
+  · constructor <;> simpa [Std.ExtDHashMap.get_insert]
+  · exact h_fits_in_mem
+  · exact h_below_clint
+  -- 8 memory side-conditions for bytes 0..7 (mirror LoadDouble).
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat]
+    simpa using hload.1
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat, haddr_plus 1 (by omega)]
+    simpa using hload.2.1
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat, haddr_plus 2 (by omega)]
+    simpa using hload.2.2.1
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat, haddr_plus 3 (by omega)]
+    simpa using hload.2.2.2.1
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat, haddr_plus 4 (by omega)]
+    simpa using hload.2.2.2.2.1
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat, haddr_plus 5 (by omega)]
+    simpa using hload.2.2.2.2.2.1
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat, haddr_plus 6 (by omega)]
+    simpa using hload.2.2.2.2.2.2.1
+  · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
+            Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
+        haddr_nat, haddr_plus 7 (by omega)]
+    simpa using hload.2.2.2.2.2.2.2
 
 end LoadX0
 
