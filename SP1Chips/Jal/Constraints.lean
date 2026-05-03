@@ -5,44 +5,44 @@ namespace Jal
 section constraints
 
 -- Generated Lean code for chip JalChip
-@[irreducible] def constraints (Main : Vector (Fin KB) 31) : SP1ConstraintList (Fin KB) :=
-  let E0 : Fin KB := Main[30] - 1
-  let E1 : Fin KB := Main[30] * E0
-  let CS0 : SP1ConstraintList (Fin KB) := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]] { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]
-  let E2 : Fin KB := Main[22] * ((4 : Fin KB)⁻¹)
-  let E3 : Fin KB := Main[1] * 65536
-  let E4 : Fin KB := Main[2] + E3
-  let E5 : Fin KB := Main[30] - 1
-  let E6 : Fin KB := Main[30] * E5
-  let E7 : Fin KB := E4 + 8
-  let E8 : Fin KB := Main[2] - 1
-  let E9 : Fin KB := E8 * ((8 : Fin KB)⁻¹)
-  let E10 : Fin KB := Main[30] - 1
-  let E11 : Fin KB := E10 * Main[13]
-  let E12 : Fin KB := Main[30] - Main[13]
-  let CS1 : SP1ConstraintList (Fin KB) := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0] { value := #v[Main[26], Main[27], Main[28], Main[29]] } E12
-  let E13 : Fin KB := Main[13] * Main[26]
-  let E14 : Fin KB := Main[13] * Main[27]
-  let E15 : Fin KB := Main[13] * Main[28]
-  let E16 : Fin KB := Main[1] * 65536
-  let E17 : Fin KB := Main[2] + E16
-  let E18 : Fin KB := Main[30] - 1
-  let E19 : Fin KB := Main[30] * E18
-  let E20 : Fin KB := Main[26] - 0
-  let E21 : Fin KB := Main[13] * E20
-  let E22 : Fin KB := Main[27] - 0
-  let E23 : Fin KB := Main[13] * E22
-  let E24 : Fin KB := Main[28] - 0
-  let E25 : Fin KB := Main[13] * E24
-  let E26 : Fin KB := Main[29] - 0
-  let E27 : Fin KB := Main[13] * E26
-  let E28 : Fin KB := E17 + 4
-  let E29 : Fin KB := Main[30] - 1
-  let E30 : Fin KB := Main[30] * E29
-  let E31 : Fin KB := E28 - Main[11]
-  let E32 : Fin KB := E31 - 1
-  let E33 : Fin KB := E32 - Main[12]
-  let E34 : Fin KB := E33 * ((65536 : Fin KB)⁻¹)
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ] (Main : Vector F 31) : SP1ConstraintList F :=
+  let E0 : F := Main[30] - 1
+  let E1 : F := Main[30] * E0
+  let CS0 : SP1ConstraintList F := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[Main[14], Main[15], Main[16], Main[17]] { value := #v[Main[22], Main[23], Main[24], Main[25]] } Main[30]
+  let E2 : F := Main[22] * ((4 : F)⁻¹)
+  let E3 : F := Main[1] * 65536
+  let E4 : F := Main[2] + E3
+  let E5 : F := Main[30] - 1
+  let E6 : F := Main[30] * E5
+  let E7 : F := E4 + 8
+  let E8 : F := Main[2] - 1
+  let E9 : F := E8 * ((8 : F)⁻¹)
+  let E10 : F := Main[30] - 1
+  let E11 : F := E10 * Main[13]
+  let E12 : F := Main[30] - Main[13]
+  let CS1 : SP1ConstraintList F := AddOperation.constraints #v[Main[3], Main[4], Main[5], 0] #v[4, 0, 0, 0] { value := #v[Main[26], Main[27], Main[28], Main[29]] } E12
+  let E13 : F := Main[13] * Main[26]
+  let E14 : F := Main[13] * Main[27]
+  let E15 : F := Main[13] * Main[28]
+  let E16 : F := Main[1] * 65536
+  let E17 : F := Main[2] + E16
+  let E18 : F := Main[30] - 1
+  let E19 : F := Main[30] * E18
+  let E20 : F := Main[26] - 0
+  let E21 : F := Main[13] * E20
+  let E22 : F := Main[27] - 0
+  let E23 : F := Main[13] * E22
+  let E24 : F := Main[28] - 0
+  let E25 : F := Main[13] * E24
+  let E26 : F := Main[29] - 0
+  let E27 : F := Main[13] * E26
+  let E28 : F := E17 + 4
+  let E29 : F := Main[30] - 1
+  let E30 : F := Main[30] * E29
+  let E31 : F := E28 - Main[11]
+  let E32 : F := E31 - 1
+  let E33 : F := E32 - Main[12]
+  let E34 : F := E33 * ((65536 : F)⁻¹)
   CS0 ++ CS1 ++ [
     (.assertZero E1),
     (.assertZero Main[25]),
@@ -71,5 +71,13 @@ section constraints
   ]
 
 end constraints
+
+section poly_helpers
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+@[simp] def is_real_poly (Main : Vector (ZMod p) 31) : Prop := Main[30] = 1
+
+end poly_helpers
 
 end Jal
