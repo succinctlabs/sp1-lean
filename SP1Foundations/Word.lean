@@ -2776,6 +2776,113 @@ lemma signExtend64_ofNat32_concat_of_ge_32768
        x.val + y.val * 2 ^ 16 + 65535 * 2 ^ 32 + 65535 * 2 ^ 48
   omega
 
+private lemma toNat_concat_word_bytes_poly {p : ℕ} [NeZero p]
+    (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) :
+    (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val).toNat =
+      x.val + y.val * 65536 := by
+  have hx_hi : x.val >>> 8 < 256 := by rw [Nat.shiftRight_eq_div_pow]; omega
+  have hy_hi : y.val >>> 8 < 256 := by rw [Nat.shiftRight_eq_div_pow]; omega
+  have hx_decomp : x.val % 256 + (x.val >>> 8) * 256 = x.val := by
+    rw [Nat.shiftRight_eq_div_pow]; omega
+  have hy_decomp : y.val % 256 + (y.val >>> 8) * 256 = y.val := by
+    rw [Nat.shiftRight_eq_div_pow]; omega
+  simp only [BitVec.toNat_append, BitVec.toNat_ofNat,
+    show (2 ^ 8 : ℕ) = 256 from rfl]
+  have hx_hi_mod : x.val >>> 8 % 256 = x.val >>> 8 := Nat.mod_eq_of_lt hx_hi
+  have hy_hi_mod : y.val >>> 8 % 256 = y.val >>> 8 := Nat.mod_eq_of_lt hy_hi
+  rw [hx_hi_mod, hy_hi_mod]
+  rw [show y.val >>> 8 <<< 8 ||| y.val % 256 = y.val by
+    rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) (by omega), Nat.shiftLeft_eq]; omega]
+  rw [show y.val <<< 8 ||| x.val >>> 8 = y.val * 256 + x.val >>> 8 by
+    rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) hx_hi, Nat.shiftLeft_eq]]
+  rw [show (y.val * 256 + x.val >>> 8) <<< 8 ||| x.val % 256 =
+      (y.val * 256 + x.val >>> 8) * 256 + x.val % 256 by
+    rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) (by omega), Nat.shiftLeft_eq]]
+  have := hx_decomp
+  omega
+
+/-- Polymorphic counterpart of `setWidth64_ofNat32_concat`. -/
+lemma setWidth64_ofNat32_concat_poly {p : ℕ} [NeZero p]
+    (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) :
+    BitVec.setWidth 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, y, (0 : ZMod p), (0 : ZMod p)] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_setWidth, toNat_concat_word_bytes_poly x y hx hy]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, ZMod.val_zero]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Polymorphic counterpart of `signExtend64_ofNat32_concat_of_lt_32768`. -/
+lemma signExtend64_ofNat32_concat_of_lt_32768_poly {p : ℕ} [NeZero p]
+    (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) (hmsb : y.val < 32768) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, y, (0 : ZMod p), (0 : ZMod p)] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_false : BitVec.msb
+      (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+       BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = false := by
+    rw [BitVec.msb_eq_decide, toNat_concat_word_bytes_poly x y hx hy]
+    simp only [decide_eq_false_iff_not, not_le]
+    change _ < 2 ^ 31
+    omega
+  rw [hmsb_false]
+  simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
+  rw [BitVec.toNat_setWidth, toNat_concat_word_bytes_poly x y hx hy]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, ZMod.val_zero]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Polymorphic counterpart of `signExtend64_ofNat32_concat_of_ge_32768`. -/
+lemma signExtend64_ofNat32_concat_of_ge_32768_poly {p : ℕ} [NeZero p]
+    [Fact (2 ^ 17 < p)]
+    (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) (hmsb : 32768 ≤ y.val) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+      BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, y, (65535 : ZMod p), (65535 : ZMod p)] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_true : BitVec.msb
+      (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
+       BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = true := by
+    rw [BitVec.msb_eq_decide, toNat_concat_word_bytes_poly x y hx hy]
+    simp only [decide_eq_true_eq]
+    change 2 ^ 31 ≤ _
+    omega
+  rw [hmsb_true]
+  simp only [↓reduceIte]
+  rw [BitVec.toNat_setWidth, toNat_concat_word_bytes_poly x y hx hy]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  have hp : 131072 < p := by
+    have := Fact.out (p := 2 ^ 17 < p)
+    have h17 : (2 : ℕ) ^ 17 = 131072 := by decide
+    omega
+  have h65535 : (65535 : ZMod p).val = 65535 := by
+    have : (65535 : ZMod p).val = 65535 % p := by
+      rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) from by norm_cast,
+          ZMod.val_natCast]
+    rw [this, Nat.mod_eq_of_lt (by omega)]
+  rw [h65535]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  change x.val + y.val * 2 ^ 16 + (2 ^ 64 - 2^(8 + 8 + 8 + 8)) =
+       x.val + y.val * 2 ^ 16 + 65535 * 2 ^ 32 + 65535 * 2 ^ 48
+  omega
+
 section getByte
 
 namespace BitVec
