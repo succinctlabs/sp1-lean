@@ -369,12 +369,66 @@ lemma eq_signExtend_of_is_real_poly (Main : Vector (ZMod p) 45)
       SP1Constraint.toProp_poly, Opcode.ofNat, Nat.ble,
       h40_val, h41_val, h42_val, h43_val, h44_val, h45_val]
 
--- TODO: `add_signExtend_of_constraints_poly` deferred — the Fin KB version
--- uses `Fin.mod_def, ← Fin.val_inj` to convert `Main[3] % 4 = 0` (ZMod-side)
--- to `Main[3].val % 4 = 0` (Nat-side). The ZMod p version needs a
--- `(x : ZMod p) % 4 = 0 ↔ x.val % 4 = 0` bridge (with `Fact (4 < p)`)
--- which doesn't have a clean Mathlib counterpart at the time of writing.
--- Blocking the Branch chip-arm migrations until this bridge lands.
+set_option maxHeartbeats 1600000 in
+-- Polymorphic counterpart of `add_signExtend_of_constraints`. Uses the
+-- ZMod %4 → Nat %4 bridge (`val_mod_4_eq_zero_iff_zmod` in Field.lean)
+-- to convert `Main[3] % 4 = 0` from the iff_poly's pc-alignment clause
+-- into `Main[3].val % 4 = 0`, then closes via the field-agnostic
+-- `BitVec.add_mod4_eq_zero_of_mod4_eq_zero` + `BitVec.ofNat64_mod_4_eq_zero_iff`.
+-- `skipKernelTC` for the same reason as AddrAddOperation.spec_of_constraints_poly:
+-- BitVec.toNat_add's `% 2^64` triggers kernel deep recursion.
+set_option debug.skipKernelTC true in
+lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (is_real : is_real_poly Main) :
+    (Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
+      BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val)) % 4 = 0 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_signExt := eq_signExtend_of_is_real_poly Main cstrs is_real
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h40_lt : (40 : ℕ) < p := by omega
+  have h41_lt : (41 : ℕ) < p := by omega
+  have h42_lt : (42 : ℕ) < p := by omega
+  have h43_lt : (43 : ℕ) < p := by omega
+  have h44_lt : (44 : ℕ) < p := by omega
+  have h45_lt : (45 : ℕ) < p := by omega
+  have h40_val : (40 : ZMod p).val = 40 := ZMod.val_natCast_of_lt h40_lt
+  have h41_val : (41 : ZMod p).val = 41 := ZMod.val_natCast_of_lt h41_lt
+  have h42_val : (42 : ZMod p).val = 42 := ZMod.val_natCast_of_lt h42_lt
+  have h43_val : (43 : ZMod p).val = 43 := ZMod.val_natCast_of_lt h43_lt
+  have h44_val : (44 : ZMod p).val = 44 := ZMod.val_natCast_of_lt h44_lt
+  have h45_val : (45 : ZMod p).val = 45 := ZMod.val_natCast_of_lt h45_lt
+  -- Extract Main[3] % 4 = 0 from the active variant's reader iff (as ZMod equation).
+  have h_pc_mod_zmod : Main[3] % (4 : ZMod p) = (0 : ZMod p) := by
+    have := single_op_poly Main cstrs
+    rcases is_real with h | h | h | h | h | h
+    all_goals
+    · simp_all [constraints, ITypeReaderImmutable.constraints,
+        SP1Constraint.toProp_poly, Opcode.ofNat, Nat.ble,
+        h40_val, h41_val, h42_val, h43_val, h44_val, h45_val]
+  have h_pc_mod : Main[3].val % 4 = 0 := (val_mod_4_eq_zero_iff_zmod _).mp h_pc_mod_zmod
+  -- pc[0] limb bound for the Word.toNat decomposition.
+  -- Extract the alignment fact from the active variant's trusted_instr (b_type's 4th clause).
+  have h_imm_aligned :
+      Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] % 4#64 = 0#64 := by
+    have := single_op_poly Main cstrs
+    rcases is_real with h | h | h | h | h | h
+    all_goals
+    · simp_all [constraints, ITypeReaderImmutable.constraints,
+        SP1Constraint.toProp_poly, Opcode.ofNat, Nat.ble,
+        h40_val, h41_val, h42_val, h43_val, h44_val, h45_val]
+  apply BitVec.add_mod4_eq_zero_of_mod4_eq_zero
+  · -- pc[0]'s BitVec form is mod-4-zero.
+    change _ % 4#64 = 0#64
+    simp only [Word.toBitVec64_poly]
+    rw [BitVec.ofNat64_mod_4_eq_zero_iff]
+    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero,
+      Nat.zero_mul, Nat.add_zero]
+    omega
+  · -- signExtend(imm) is mod-4-zero: bridge via h_signExt to the imm's toBitVec64_poly form.
+    rw [← h_signExt]
+    exact h_imm_aligned
 
 end poly_helpers
 

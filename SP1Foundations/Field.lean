@@ -255,6 +255,43 @@ lemma small_nat_eq_zmod {n m : ℕ} (hn : n < 2 ^ 17) (hm : m < 2 ^ 17) :
     omega
   · intro h; rw [h]
 
+/-- ZMod p `% k = 0` ↔ `x.val % k = 0` (as naturals), given `0 < k < p`.
+The project's `instMod (p : ℕ) [NeZero p] : Mod (ZMod p)` is defined as
+`x % y := ((x.val % y.val : ℕ) : ZMod p)`. So `(x : ZMod p) % (k : ZMod p) = 0`
+unfolds to `((x.val % k.val : ℕ) : ZMod p) = (0 : ZMod p)`, which (since
+`x.val % k.val < k < p`) lifts to `x.val % k.val = 0` via `small_nat_eq_zmod`-
+style cast injection. The PC-alignment `(pc : ZMod p) % 4 = 0` and analogous
+checks in Branch / Jal / Jalr chip migrations consume this bridge. -/
+lemma val_mod_eq_zero_iff_zmod_mod_eq_zero
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (x : ZMod p) (k : ℕ) (hk_pos : 0 < k) (hk_lt : k < p) :
+    (x % ((k : ℕ) : ZMod p) = (0 : ZMod p)) ↔ x.val % k = 0 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt hk_lt
+  -- Unfold the project-defined `instMod`.
+  change (((x.val % ((k : ℕ) : ZMod p).val : ℕ) : ZMod p) = (0 : ZMod p)) ↔ x.val % k = 0
+  rw [hk_val]
+  -- Bridge `((x.val % k : ℕ) : ZMod p) = 0` ↔ `x.val % k = 0` via cast injection.
+  have h_lt : x.val % k < p := Nat.lt_of_lt_of_le (Nat.mod_lt _ hk_pos) hk_lt.le
+  constructor
+  · intro h
+    have hv : ((x.val % k : ℕ) : ZMod p).val = x.val % k :=
+      ZMod.val_natCast_of_lt h_lt
+    apply_fun ZMod.val at h
+    rw [hv, ZMod.val_zero] at h
+    exact h
+  · intro h; rw [h]; push_cast; rfl
+
+/-- Specialization of `val_mod_eq_zero_iff_zmod_mod_eq_zero` for `k = 4`,
+the common PC-alignment case. -/
+lemma val_mod_4_eq_zero_iff_zmod
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] (x : ZMod p) :
+    (x % (4 : ZMod p) = (0 : ZMod p)) ↔ x.val % 4 = 0 := by
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h := val_mod_eq_zero_iff_zmod_mod_eq_zero x 4 (by omega) (by omega)
+  rw [show ((4 : ℕ) : ZMod p) = (4 : ZMod p) from by push_cast; rfl] at h
+  exact h
+
 /-- Case-split helper for `(a - b).val` over `ZMod p`. The positive branch
 matches mathlib's `ZMod.val_sub`; the wrap-around branch follows from
 `a - b = -(b - a)` plus `ZMod.neg_val`. The `if`-shape is `omega`-friendly,
