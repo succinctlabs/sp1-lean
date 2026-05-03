@@ -2595,6 +2595,87 @@ lemma signExtend64_ofNat16_concat_of_ge_32768
   change x.val + (2 ^ 64 - 2^(8 + 8)) = x.val + 65535 * 2 ^ 16 + 65535 * 2 ^ 32 + 65535 * 2 ^ 48
   omega
 
+private lemma toNat_concat_halfword_bytes_poly {p : ℕ} [NeZero p]
+    (x : ZMod p) (hlt : x.val < 65536) :
+    (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val).toNat = x.val := by
+  rw [toNat_append_bytes, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
+  have h256 : (2 ^ 8 : ℕ) = 256 := rfl
+  rw [h256]
+  omega
+
+/-- Polymorphic counterpart of `setWidth64_ofNat16_concat`. -/
+lemma setWidth64_ofNat16_concat_poly {p : ℕ} [NeZero p]
+    (x : ZMod p) (hlt : x.val < 65536) :
+    BitVec.setWidth 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, 0, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes_poly x hlt]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, ZMod.val_zero]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Polymorphic counterpart of `signExtend64_ofNat16_concat_of_lt_32768`. -/
+lemma signExtend64_ofNat16_concat_of_lt_32768_poly {p : ℕ} [NeZero p]
+    (x : ZMod p) (hlt : x.val < 65536) (hmsb : x.val < 32768) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, 0, 0, 0] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_false : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = false := by
+    rw [BitVec.msb_eq_decide, toNat_concat_halfword_bytes_poly x hlt]
+    simp only [decide_eq_false_iff_not, not_le]
+    change _ < 2 ^ 15
+    omega
+  rw [hmsb_false]
+  simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
+  rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes_poly x hlt]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, ZMod.val_zero]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  ring
+
+/-- Polymorphic counterpart of `signExtend64_ofNat16_concat_of_ge_32768`. -/
+lemma signExtend64_ofNat16_concat_of_ge_32768_poly {p : ℕ} [NeZero p]
+    [Fact (2 ^ 17 < p)]
+    (x : ZMod p) (hlt : x.val < 65536) (hmsb : 32768 ≤ x.val) :
+    BitVec.signExtend 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
+      Word.toBitVec64_poly #v[x, (65535 : ZMod p), (65535 : ZMod p), (65535 : ZMod p)] := by
+  apply BitVec.toNat_inj.mp
+  rw [BitVec.toNat_signExtend]
+  have hmsb_true : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = true := by
+    rw [BitVec.msb_eq_decide, toNat_concat_halfword_bytes_poly x hlt]
+    simp only [decide_eq_true_eq]
+    change 2 ^ 15 ≤ _
+    omega
+  rw [hmsb_true]
+  simp only [↓reduceIte]
+  rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes_poly x hlt]
+  unfold Word.toBitVec64_poly
+  rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  have h65535 : (65535 : ZMod p).val = 65535 := by
+    have hp : 131072 < p := by
+      have := Fact.out (p := 2 ^ 17 < p)
+      have h17 : (2 : ℕ) ^ 17 = 131072 := by decide
+      omega
+    have : (65535 : ZMod p).val = 65535 % p := by
+      rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) from by norm_cast,
+          ZMod.val_natCast]
+    rw [this, Nat.mod_eq_of_lt (by omega)]
+  rw [h65535]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.mod_eq_of_lt (by omega)]
+  change x.val + (2 ^ 64 - 2^(8 + 8)) = x.val + 65535 * 2 ^ 16 + 65535 * 2 ^ 32 + 65535 * 2 ^ 48
+  omega
+
 /-- toNat of a 4-byte (32-bit word) concat equals `x.val + y.val * 65536` when each halfword
     fits in 16 bits. Left-associative concat matches `run_vmem_read_of_width_4'` output. -/
 private lemma toNat_concat_word_bytes (x y : Fin KB)
