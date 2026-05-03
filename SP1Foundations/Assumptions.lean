@@ -5,12 +5,49 @@ open LeanRV64D.Functions Sail SailState
 
 section isValidMemConfig
 
+/-- `plat_have_clint` is manually set in our fork of sail in the `PlatformConfig.lean` file. -/
+@[simp] lemma plat_have_clint_eq_false : plat_have_clint = false := rfl
+
+/-- `plat_have_sig` is manually set in our fork of sail in the `PlatformConfig.lean` file. -/
+@[simp] lemma plat_have_sig_eq_false : plat_have_sig = false := rfl
+
+/-- Memory access setting for all of memory in our model. -/
+@[reducible]
+def SP1_PMA : PMA where
+  mem_type := MemoryRegionType.MainMemory
+  cacheable := false
+  coherent := true
+  executable := true
+  readable := true
+  writable := true
+  read_idempotent := false
+  write_idempotent := false
+  misaligned_exceptions := {
+    load_store := none
+    vector := none
+    amo := .AlignmentException
+  }
+  atomic_support := AtomicSupport.AMONone
+  reservability := Reservability.RsrvNone
+  supports_cbo_zero := false
+  supports_pte_read := false
+  supports_pte_write := false
+
+/-- Single memory region with uniform access across all memory. -/
+@[reducible]
+def SP1_PMA_Region : PMA_Region where
+  base := 2 ^ 16
+  size := 2 ^ 48 - 2 ^ 16
+  attributes := SP1_PMA
+  include_in_device_tree := false
+
 /-- All the registers needed for memory ops are set appropriately. -/
 structure SailState.isValidMemConfig (s : SailState) (hs : SailState.isInitialized s) where
   h_cur_privilege : s.regs.get Register.cur_privilege (hs _) = Privilege.Machine
   h_mprv_disabled : BitVec.ofNat 1 ((s.regs.get Register.mstatus (hs _)).toNat >>> 17) = 0#1
   h_mseccfg_disabled : BitVec.ofNat 1 ((s.regs.get Register.mseccfg (hs _)).toNat >>> 10) = 0#1
   h_htif_disabled : s.regs.get Register.htif_tohost_base (hs _) = none
+  h_pma_regions : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region]
 
 end isValidMemConfig
 
@@ -184,38 +221,38 @@ Consistent because: SP1 is configured with no PMP entries enabled, so the LHS de
 "allow" outcome regardless of how the unmodelled platform state is filled in. -/
 axiom pmp_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ) :
-    pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
-      width (MemoryAccessType.Store mem_payload.Data) Privilege.Machine s =
+    (pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+      width (MemoryAccessType.Store mem_payload.Data) Privilege.Machine).run s =
         EStateM.Result.ok none s
 
 /-- Load counterpart of `pmp_check_machine`. Same justification.
 Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths). -/
 axiom pmp_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ) :
-    pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
-      width (MemoryAccessType.Load mem_payload.Data) Privilege.Machine s =
+    (pmpCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+      width (MemoryAccessType.Load mem_payload.Data) Privilege.Machine).run s =
         EStateM.Result.ok none s
 
-/-- Store-side PMA check is a no-op under SP1's kernel configuration.
-Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths).
-Reason axiomatised: `pmaCheck` calls `matching_pma_region (← readReg pma_regions)` and dispatches
-on per-region attributes; nothing in `SailState.isInitialized` constrains `pma_regions`.
-Discharge condition: add a `SailState.isValidPmaConfig` precondition (e.g. `pma_regions = []`).
-Consistent because: SP1 has no PMA regions configured, so the LHS denotes a fixed "allow" outcome. -/
-axiom pma_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
-    (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
-    (pbmt : page_based_mem_type) (res_or_con : Bool) :
-    pmaCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
-      width (MemoryAccessType.Store mem_payload.Data) pbmt res_or_con s =
-        EStateM.Result.ok none s
+-- /-- Store-side PMA check is a no-op under SP1's kernel configuration.
+-- Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths).
+-- Reason axiomatised: `pmaCheck` calls `matching_pma_region (← readReg pma_regions)` and dispatches
+-- on per-region attributes; nothing in `SailState.isInitialized` constrains `pma_regions`.
+-- Discharge condition: add a `SailState.isValidPmaConfig` precondition (e.g. `pma_regions = []`).
+-- Consistent because: SP1 has no PMA regions configured, so the LHS denotes a fixed "allow" outcome. -/
+-- axiom pma_check_machine (reg_val : BitVec 64) (offset : BitVec 64)
+--     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
+--     (pbmt : page_based_mem_type) (res_or_con : Bool) :
+--     (pmaCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+--       width (MemoryAccessType.Store mem_payload.Data) pbmt res_or_con).run s =
+--         EStateM.Result.ok none s
 
-/-- Load counterpart of `pma_check_machine`. Same justification.
-Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths). -/
-axiom pma_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
-    (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
-    (pbmt : page_based_mem_type) (res_or_con : Bool) :
-    pmaCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
-      width (MemoryAccessType.Load mem_payload.Data) pbmt res_or_con s =
-        EStateM.Result.ok none s
+-- /-- Load counterpart of `pma_check_machine`. Same justification.
+-- Used by: `MemChecks.lean` (4 sites, byte/half/word/double widths). -/
+-- axiom pma_check_machine' (reg_val : BitVec 64) (offset : BitVec 64)
+--     (s : SailState) (hs : SailState.isInitialized s) (width : ℕ)
+--     (pbmt : page_based_mem_type) (res_or_con : Bool) :
+--     (pmaCheck (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0)))
+--       width (MemoryAccessType.Load mem_payload.Data) pbmt res_or_con).run s =
+--         EStateM.Result.ok none s
 
 end pmp_check
