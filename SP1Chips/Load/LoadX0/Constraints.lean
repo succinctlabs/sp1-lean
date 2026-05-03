@@ -166,6 +166,26 @@ section constraints
 
 end constraints
 
+section poly_helpers
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+/-- Umbrella "is real" gate for LoadX0. The chip covers all 7 load
+sub-opcodes (LB/LBU/LH/LHU/LW/LWU/LD when `op_a = x0`); each is selected
+by exactly one of `Main[41..47]` being 1, and the sum is the chip-wide
+"is real" flag.
+
+A full iff lemma analogous to `allHold_constraints_iff_of_is_ld_poly`
+is deferred until a top-level `LoadX0Chip.lean` is written; consumers
+can either destructure the constraints directly or specialize on a
+single sub-opcode (the `Main[41..47]` mutual-exclusion / sum-equals-one
+constraints are part of the chip's own constraint list and discharge
+the case analysis). -/
+@[simp] def is_loadX0_poly (Main : Vector (ZMod p) 48) : Prop :=
+  Main[41] + Main[42] + Main[43] + Main[44] + Main[45] + Main[46] + Main[47] = 1
+
+end poly_helpers
+
 end LoadX0
 
 end Load
