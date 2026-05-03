@@ -7,40 +7,40 @@ set_option linter.unusedVariables false
 
 section constraints
 
-@[irreducible] def constraints
-  (clk_high : (Fin KB))
-  (clk_low : (Fin KB))
-  (pc : (Vector (Fin KB) 3))
-  (opcode : (Fin KB))
-  (instr_field_consts : (Vector (Fin KB) 4))
-  (cols : ITypeReader (Fin KB))
-  (is_real : (Fin KB))
-  : SP1ConstraintList (Fin KB) :=
-  let E0 : Fin KB := is_real - 1
-  let E1 : Fin KB := is_real * E0
-  let E2 : Fin KB := 0 + cols.op_b
-  let E3 : Fin KB := cols.op_a_memory.prev_value[0] - 0
-  let E4 : Fin KB := cols.op_a_0 * E3
-  let E5 : Fin KB := cols.op_a_memory.prev_value[1] - 0
-  let E6 : Fin KB := cols.op_a_0 * E5
-  let E7 : Fin KB := cols.op_a_memory.prev_value[2] - 0
-  let E8 : Fin KB := cols.op_a_0 * E7
-  let E9 : Fin KB := cols.op_a_memory.prev_value[3] - 0
-  let E10 : Fin KB := cols.op_a_0 * E9
-  let E11 : Fin KB := clk_low + 4
-  let E12 : Fin KB := is_real - 1
-  let E13 : Fin KB := is_real * E12
-  let E14 : Fin KB := E11 - cols.op_a_memory.access_timestamp.prev_low
-  let E15 : Fin KB := E14 - 1
-  let E16 : Fin KB := E15 - cols.op_a_memory.access_timestamp.diff_low_limb
-  let E17 : Fin KB := E16 * ((65536 : Fin KB)⁻¹)
-  let E18 : Fin KB := clk_low + 3
-  let E19 : Fin KB := is_real - 1
-  let E20 : Fin KB := is_real * E19
-  let E21 : Fin KB := E18 - cols.op_b_memory.access_timestamp.prev_low
-  let E22 : Fin KB := E21 - 1
-  let E23 : Fin KB := E22 - cols.op_b_memory.access_timestamp.diff_low_limb
-  let E24 : Fin KB := E23 * ((65536 : Fin KB)⁻¹)
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
+  (clk_high : F)
+  (clk_low : F)
+  (pc : (Vector F 3))
+  (opcode : F)
+  (instr_field_consts : (Vector F 4))
+  (cols : ITypeReader F)
+  (is_real : F)
+  : SP1ConstraintList F :=
+  let E0 : F := is_real - 1
+  let E1 : F := is_real * E0
+  let E2 : F := 0 + cols.op_b
+  let E3 : F := cols.op_a_memory.prev_value[0] - 0
+  let E4 : F := cols.op_a_0 * E3
+  let E5 : F := cols.op_a_memory.prev_value[1] - 0
+  let E6 : F := cols.op_a_0 * E5
+  let E7 : F := cols.op_a_memory.prev_value[2] - 0
+  let E8 : F := cols.op_a_0 * E7
+  let E9 : F := cols.op_a_memory.prev_value[3] - 0
+  let E10 : F := cols.op_a_0 * E9
+  let E11 : F := clk_low + 4
+  let E12 : F := is_real - 1
+  let E13 : F := is_real * E12
+  let E14 : F := E11 - cols.op_a_memory.access_timestamp.prev_low
+  let E15 : F := E14 - 1
+  let E16 : F := E15 - cols.op_a_memory.access_timestamp.diff_low_limb
+  let E17 : F := E16 * ((65536 : F)⁻¹)
+  let E18 : F := clk_low + 3
+  let E19 : F := is_real - 1
+  let E20 : F := is_real * E19
+  let E21 : F := E18 - cols.op_b_memory.access_timestamp.prev_low
+  let E22 : F := E21 - 1
+  let E23 : F := E22 - cols.op_b_memory.access_timestamp.diff_low_limb
+  let E24 : F := E23 * ((65536 : F)⁻¹)
   [
     (.assertZero E1),
     (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E2 0 0 0 cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] cols.op_a_0 0 1) is_real),
