@@ -54,10 +54,11 @@ theorem correct (Main : Vector (ZMod p) 39)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
       (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])))) 8 = true)
-    (h_below_clint :
+    (h_in_range :
       let reg_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
       let offset := BitVec.signExtend 64 (sp1_imm_c Main)
-      BitVec.toNat (reg_val + offset) + 8 ≤ 33554432) :
+      range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+        (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
@@ -65,7 +66,7 @@ theorem correct (Main : Vector (ZMod p) 39)
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   -- Extract the facts about the config registers in the state.
-  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  obtain ⟨_, _, _, _, _⟩ := hs_config
   -- Extract the main constraints from the chip via direct simp expansion,
   -- mirroring the Fin KB recipe.
   rw [StoreDouble.constraints] at h_cstrs
@@ -156,7 +157,7 @@ theorem correct (Main : Vector (ZMod p) 39)
   · simpa [imm_c, sp1_imm_c] using h_is_aligned
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · simpa [Std.ExtDHashMap.get_insert]
-  · simpa [imm_c, sp1_imm_c] using h_below_clint
+  · simpa [imm_c, sp1_imm_c] using h_in_range
 
 end StoreDouble
 

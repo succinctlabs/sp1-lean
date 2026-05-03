@@ -306,7 +306,7 @@ theorem JALR_correct
       rw [h_four] at h_add_pc'
       simp [if_neg h6', read_pc, ← h_add_pc']
   · clear *- hv
-    obtain ⟨h1, h2, h3, h4⟩ := hv
+    obtain ⟨h1, h2, h3, h4, h5⟩ := hv
     constructor <;> simpa [Std.ExtDHashMap.get_insert]
 
 end Jalr

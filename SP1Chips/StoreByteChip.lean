@@ -46,17 +46,18 @@ theorem correct (Main : Vector (ZMod p) 50)
       let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64)
-    (h_below_clint :
+    (h_in_range :
       let reg_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
       let offset := BitVec.signExtend 64 (sp1_imm_c Main)
-      BitVec.toNat (reg_val + offset) + 1 ≤ 33554432) :
+      range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+        (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
     (spec_sb imm_c (.Regidx op_a) (.Regidx op_b)).run s = (sp1_sb Main).run s := by
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  obtain ⟨_, _, _, _, _⟩ := hs_config
   rw [StoreByte.constraints] at h_cstrs
   simp [SP1ConstraintList.allHold_poly] at h_cstrs
   simp [AddressOperation.constraints, sub_eq_zero, SP1Constraint.toProp_poly,
@@ -138,7 +139,7 @@ theorem correct (Main : Vector (ZMod p) 50)
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · simp
     simpa [Std.ExtDHashMap.get_insert]
-  · simpa [imm_c, sp1_imm_c] using h_below_clint
+  · simpa [imm_c, sp1_imm_c] using h_in_range
 
 end StoreByte
 

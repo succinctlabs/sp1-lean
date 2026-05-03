@@ -48,17 +48,18 @@ theorem correct_lb (Main : Vector (ZMod p) 47)
       let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64)
-    (h_below_clint :
+    (h_in_range :
       let reg_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
       let offset := BitVec.signExtend 64 (sp1_imm_c Main)
-      BitVec.toNat (reg_val + offset) + 1 ≤ 33554432) :
+      range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+        (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
     (spec_lb imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_byte Main).run s := by
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  obtain ⟨_, _, _, _, _⟩ := hs_config
   rw [SP1ConstraintList.allHold_poly,
     Load.LoadByte.allHold_constraints_iff_of_is_lb_poly Main h_is_lb] at h_cstrs
   obtain ⟨h_addr, h38, h39, h40, h28_inv, _h_low_align, h_cpu, h_reader,
@@ -275,7 +276,7 @@ theorem correct_lb (Main : Vector (ZMod p) 47)
   · exact h_is_aligned
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · exact h_fits_in_mem
-  · exact h_below_clint
+  · exact h_in_range
   -- Memory byte (single byte for LB)
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
             Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,
@@ -404,17 +405,18 @@ theorem correct_lbu (Main : Vector (ZMod p) 47)
       let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64)
-    (h_below_clint :
+    (h_in_range :
       let reg_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
       let offset := BitVec.signExtend 64 (sp1_imm_c Main)
-      BitVec.toNat (reg_val + offset) + 1 ≤ 33554432) :
+      range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+        (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
     let imm_c := sp1_imm_c Main
     (spec_lbu imm_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_load_byte Main).run s := by
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  obtain ⟨h_mprv_disabled, h_cur_privilege⟩ := hs_config
+  obtain ⟨_, _, _, _, _⟩ := hs_config
   rw [SP1ConstraintList.allHold_poly,
     Load.LoadByte.allHold_constraints_iff_of_is_lbu_poly Main h_is_lbu] at h_cstrs
   obtain ⟨h_addr, h38, h39, h40, h28_inv, _h_low_align, h_cpu, h_reader,
@@ -591,7 +593,7 @@ theorem correct_lbu (Main : Vector (ZMod p) 47)
   · exact h_is_aligned
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · exact h_fits_in_mem
-  · exact h_below_clint
+  · exact h_in_range
   -- Memory byte (single byte for LBU; same 8-case fan-out as LB)
   · rw [show BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) =
             Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] from h_imm_se.symm,

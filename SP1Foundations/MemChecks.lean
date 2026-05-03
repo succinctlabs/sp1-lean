@@ -93,8 +93,7 @@ lemma run_checked_mem_write_one_byte_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA Privilege.Machine () false false false).run s
       = .ok (.Ok true) { s with mem := s.mem.insert paddr_nat data } := by
-  simp [checked_mem_write, phys_access_check]
-  erw [pmp_check_machine reg_val offset s hs 1]
+  simp [checked_mem_write, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
   simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
   simp [matching_pma_region, matching_pma_region_bits_range]
   erw [h_in_range]
@@ -135,7 +134,10 @@ bytes of `data : BitVec 16`. -/
 lemma run_checked_mem_write_two_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 16)
     (s : SailState) (hs : SailState.isInitialized s)
-    (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region]) :
     let paddr_nat :=
       BitVec.toNat ((zero_extend (BitVec.addInt (reg_val + offset) 0)) : BitVec 64)
     let new_mem := (s.mem.insert paddr_nat (BitVec.ofNat 8 data.toNat)).insert
@@ -145,34 +147,27 @@ lemma run_checked_mem_write_two_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA Privilege.Machine () false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  simp only [checked_mem_write, phys_access_check,
-    LeanRV64D.Functions.sys_pmp_count,
-    write_kind_of_flags, LeanRV64D.Functions.write_ram,
-    Sail.ConcurrencyInterfaceV1.sail_mem_write,
-    PreSail.ConcurrencyInterfaceV1.sail_mem_write,
-    PreSail.writeBytes, PreSail.writeByte,
-    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
-    pure, Pure.pure, Functor.map]
-  rw [pmp_check_machine reg_val offset s hs 2]
-  dsimp only [EStateM.pure]
-  rw [pma_check_machine reg_val offset s hs 2
-    page_based_mem_type.PBMT_PMA false]
-  dsimp only [EStateM.pure, EStateM.bind]
-  rw [show (within_mmio_writable (physaddr.Physaddr
-        (zero_extend (BitVec.addInt (reg_val + offset) 0))) 2) s = .ok false s from
-      run_within_mmio_writable_mmio reg_val offset 2 s hs h_htif]
-  dsimp only
-  simp [EStateM.bind, EStateM.pure, EStateM.map, modify, EStateM.modifyGet,
-    MonadStateOf.modifyGet, MonadState.modifyGet, bind, Bind.bind, pure, Pure.pure,
-    Functor.map, List.ofFn, List.forM, Fin.foldr, Fin.foldr.loop,
+  simp [checked_mem_write, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_writable_mmio reg_val offset 2 s hs h_htif]
+  simp [write_kind_of_flags, write_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_write, PreSail.ConcurrencyInterfaceV1.sail_mem_write]
+  simp [PreSail.writeBytes, PreSail.writeByte,
+    List.ofFn, List.forM, Fin.foldr, Fin.foldr.loop,
     BitVec.extractLsb', BitVec.toNat_setWidth]
 
 /-- Two-byte `mem_write_value` under kernel config. -/
 lemma run_mem_write_value_two_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 16)
     (s : SailState) (hs : SailState.isInitialized s)
-    (hconfig : SailState.isValidMemConfig s hs)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 2 ≤ 33554432) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (hconfig : SailState.isValidMemConfig s hs) :
     let paddr_nat :=
       BitVec.toNat ((zero_extend (BitVec.addInt (reg_val + offset) 0)) : BitVec 64)
     let new_mem := (s.mem.insert paddr_nat (BitVec.ofNat 8 data.toNat)).insert
@@ -182,39 +177,21 @@ lemma run_mem_write_value_two_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
-  have hfetch : (MemoryAccessType.Store mem_payload.Data !=
-      MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp only [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
-    effectivePrivilege,
-    bind, Bind.bind, EStateM.bind, EStateM.run, EStateM.pure,
-    pure, Pure.pure]
-  rw [show (Sail.readReg Register.mstatus : SailM _) s = .ok
-        (s.regs.get Register.mstatus (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  rw [show (Sail.readReg Register.cur_privilege : SailM _) s = .ok
-        (s.regs.get Register.cur_privilege (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  simp only [hfetch, h_mprv_disabled, h_cur_privilege, _get_Mstatus_MPRV,
-    Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.setWidth, BitVec.extractLsb',
-    BitVec.toNat_setWidth, Bool.and_false, Bool.false_and, Bool.or_false,
-    Bool.false_or, ite_false, if_false, beq_self_eq_true, reduceIte,
-    show (0#1 == 1#1) = false from rfl, Bool.true_and, Bool.and_true,
-    show ((false : Bool) = true) = False from by decide,
-    EStateM.pure, EStateM.bind, EStateM.run]
-  have h := run_checked_mem_write_two_bytes_of_isInitialized reg_val offset data s hs h_htif
-    h_below_clint
-  simp only [EStateM.run] at h
-  rw [h]
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  simp [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
+    run_readReg_of_isInitialized s _ hs,
+    h_mprv_disabled, h_cur_privilege]
+  apply run_checked_mem_write_two_bytes_of_isInitialized reg_val offset data
+    s hs h_in_range h_htif h_pma
 
 /-- Four-byte `checked_mem_write` under kernel config. -/
 lemma run_checked_mem_write_four_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 32)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 4 ≤ 33554432) :
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region]) :
     let paddr_nat :=
       BitVec.toNat ((zero_extend (BitVec.addInt (reg_val + offset) 0)) : BitVec 64)
     let new_mem := ((((s.mem.insert paddr_nat
@@ -227,34 +204,27 @@ lemma run_checked_mem_write_four_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA Privilege.Machine () false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  simp only [checked_mem_write, phys_access_check,
-    LeanRV64D.Functions.sys_pmp_count,
-    write_kind_of_flags, LeanRV64D.Functions.write_ram,
-    Sail.ConcurrencyInterfaceV1.sail_mem_write,
-    PreSail.ConcurrencyInterfaceV1.sail_mem_write,
-    PreSail.writeBytes, PreSail.writeByte,
-    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
-    pure, Pure.pure, Functor.map]
-  rw [pmp_check_machine reg_val offset s hs 4]
-  dsimp only [EStateM.pure]
-  rw [pma_check_machine reg_val offset s hs 4
-    page_based_mem_type.PBMT_PMA false]
-  dsimp only [EStateM.pure, EStateM.bind]
-  rw [show (within_mmio_writable (physaddr.Physaddr
-        (zero_extend (BitVec.addInt (reg_val + offset) 0))) 4) s = .ok false s from
-      run_within_mmio_writable_mmio reg_val offset 4 (by omega) s hs h_htif h_below_clint]
-  dsimp only
-  simp [EStateM.bind, EStateM.pure, EStateM.map, modify, EStateM.modifyGet,
-    MonadStateOf.modifyGet, MonadState.modifyGet, bind, Bind.bind, pure, Pure.pure,
-    Functor.map, List.ofFn, List.forM, Fin.foldr, Fin.foldr.loop,
+  simp [checked_mem_write, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_writable_mmio reg_val offset 4 s hs h_htif]
+  simp [write_kind_of_flags, write_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_write, PreSail.ConcurrencyInterfaceV1.sail_mem_write]
+  simp [PreSail.writeBytes, PreSail.writeByte,
+    List.ofFn, List.forM, Fin.foldr, Fin.foldr.loop,
     BitVec.extractLsb', BitVec.toNat_setWidth]
 
 /-- Four-byte `mem_write_value` under kernel config. -/
 lemma run_mem_write_value_four_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 32)
     (s : SailState) (hs : SailState.isInitialized s)
-    (hconfig : SailState.isValidMemConfig s hs)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 4 ≤ 33554432) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (hconfig : SailState.isValidMemConfig s hs) :
     let paddr_nat :=
       BitVec.toNat ((zero_extend (BitVec.addInt (reg_val + offset) 0)) : BitVec 64)
     let new_mem := ((((s.mem.insert paddr_nat
@@ -267,39 +237,21 @@ lemma run_mem_write_value_four_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
-  have hfetch : (MemoryAccessType.Store mem_payload.Data !=
-      MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp only [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
-    effectivePrivilege,
-    bind, Bind.bind, EStateM.bind, EStateM.run, EStateM.pure,
-    pure, Pure.pure]
-  rw [show (Sail.readReg Register.mstatus : SailM _) s = .ok
-        (s.regs.get Register.mstatus (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  rw [show (Sail.readReg Register.cur_privilege : SailM _) s = .ok
-        (s.regs.get Register.cur_privilege (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  simp only [hfetch, h_mprv_disabled, h_cur_privilege, _get_Mstatus_MPRV,
-    Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.setWidth, BitVec.extractLsb',
-    BitVec.toNat_setWidth, Bool.and_false, Bool.false_and, Bool.or_false,
-    Bool.false_or, ite_false, if_false, beq_self_eq_true, reduceIte,
-    show (0#1 == 1#1) = false from rfl, Bool.true_and, Bool.and_true,
-    show ((false : Bool) = true) = False from by decide,
-    EStateM.pure, EStateM.bind, EStateM.run]
-  have h := run_checked_mem_write_four_bytes_of_isInitialized reg_val offset data s hs h_htif
-    h_below_clint
-  simp only [EStateM.run] at h
-  rw [h]
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  simp [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
+    run_readReg_of_isInitialized s _ hs,
+    h_mprv_disabled, h_cur_privilege]
+  apply run_checked_mem_write_four_bytes_of_isInitialized reg_val offset data
+    s hs h_in_range h_htif h_pma
 
 /-- Eight-byte `checked_mem_write` under kernel config. -/
 lemma run_checked_mem_write_eight_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 8 ≤ 33554432) :
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region]) :
     let paddr_nat :=
       BitVec.toNat ((zero_extend (BitVec.addInt (reg_val + offset) 0)) : BitVec 64)
     let new_mem := ((((((((s.mem.insert paddr_nat
@@ -316,34 +268,27 @@ lemma run_checked_mem_write_eight_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA Privilege.Machine () false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  simp only [checked_mem_write, phys_access_check,
-    LeanRV64D.Functions.sys_pmp_count,
-    write_kind_of_flags, LeanRV64D.Functions.write_ram,
-    Sail.ConcurrencyInterfaceV1.sail_mem_write,
-    PreSail.ConcurrencyInterfaceV1.sail_mem_write,
-    PreSail.writeBytes, PreSail.writeByte,
-    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
-    pure, Pure.pure, Functor.map]
-  rw [pmp_check_machine reg_val offset s hs 8]
-  dsimp only [EStateM.pure]
-  rw [pma_check_machine reg_val offset s hs 8
-    page_based_mem_type.PBMT_PMA false]
-  dsimp only [EStateM.pure, EStateM.bind]
-  rw [show (within_mmio_writable (physaddr.Physaddr
-        (zero_extend (BitVec.addInt (reg_val + offset) 0))) 8) s = .ok false s from
-      run_within_mmio_writable_mmio reg_val offset 8 (by omega) s hs h_htif h_below_clint]
-  dsimp only
-  simp [EStateM.bind, EStateM.pure, EStateM.map, modify, EStateM.modifyGet,
-    MonadStateOf.modifyGet, MonadState.modifyGet, bind, Bind.bind, pure, Pure.pure,
-    Functor.map, List.ofFn, List.forM, Fin.foldr, Fin.foldr.loop,
+  simp [checked_mem_write, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_writable_mmio reg_val offset 8 s hs h_htif]
+  simp [write_kind_of_flags, write_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_write, PreSail.ConcurrencyInterfaceV1.sail_mem_write]
+  simp [PreSail.writeBytes, PreSail.writeByte,
+    List.ofFn, List.forM, Fin.foldr, Fin.foldr.loop,
     BitVec.extractLsb', BitVec.toNat_setWidth]
 
 /-- Eight-byte `mem_write_value` under kernel config. -/
 lemma run_mem_write_value_eight_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s)
-    (hconfig : SailState.isValidMemConfig s hs)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 8 ≤ 33554432) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
+    (hconfig : SailState.isValidMemConfig s hs) :
     let paddr_nat :=
       BitVec.toNat ((zero_extend (BitVec.addInt (reg_val + offset) 0)) : BitVec 64)
     let new_mem := ((((((((s.mem.insert paddr_nat
@@ -360,68 +305,44 @@ lemma run_mem_write_value_eight_bytes_of_isInitialized
         data (MemoryAccessType.Store mem_payload.Data)
         page_based_mem_type.PBMT_PMA false false false).run s
       = .ok (.Ok true) { s with mem := new_mem } := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
-  have hfetch : (MemoryAccessType.Store mem_payload.Data !=
-      MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp only [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
-    effectivePrivilege,
-    bind, Bind.bind, EStateM.bind, EStateM.run, EStateM.pure,
-    pure, Pure.pure]
-  rw [show (Sail.readReg Register.mstatus : SailM _) s = .ok
-        (s.regs.get Register.mstatus (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  rw [show (Sail.readReg Register.cur_privilege : SailM _) s = .ok
-        (s.regs.get Register.cur_privilege (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  simp only [hfetch, h_mprv_disabled, h_cur_privilege, _get_Mstatus_MPRV,
-    Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.setWidth, BitVec.extractLsb',
-    BitVec.toNat_setWidth, Bool.and_false, Bool.false_and, Bool.or_false,
-    Bool.false_or, ite_false, if_false, beq_self_eq_true, reduceIte,
-    show (0#1 == 1#1) = false from rfl, Bool.true_and, Bool.and_true,
-    show ((false : Bool) = true) = False from by decide,
-    EStateM.pure, EStateM.bind, EStateM.run]
-  have h := run_checked_mem_write_eight_bytes_of_isInitialized reg_val offset data s hs h_htif
-    h_below_clint
-  simp only [EStateM.run] at h
-  rw [h]
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  simp [mem_write_value, mem_write_value_meta, mem_write_value_priv_meta,
+    run_readReg_of_isInitialized s _ hs,
+    h_mprv_disabled, h_cur_privilege]
+  apply run_checked_mem_write_eight_bytes_of_isInitialized reg_val offset data
+    s hs h_in_range h_htif h_pma
 
 /-- One-byte `checked_mem_read` under kernel config. Assumes the byte lives in
 memory at `paddr`. -/
 lemma run_checked_mem_read_one_byte_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 1 ≤ 33554432)
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region])
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data) :
     (checked_mem_read (MemoryAccessType.Load mem_payload.Data)
         page_based_mem_type.PBMT_PMA Privilege.Machine
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 1
         false false false false).run s = .ok (.Ok (data, ())) s := by
-  simp only [checked_mem_read, phys_access_check,
-    LeanRV64D.Functions.sys_pmp_count,
-    read_kind_of_flags, LeanRV64D.Functions.read_ram,
-    Sail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.readBytes, PreSail.readByte,
-    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
-    pure, Pure.pure, Functor.map]
-  rw [pmp_check_machine' reg_val offset s hs 1]
-  dsimp only [EStateM.pure]
-  rw [pma_check_machine' reg_val offset s hs 1
-    page_based_mem_type.PBMT_PMA false]
-  dsimp only [EStateM.pure, EStateM.bind]
-  rw [show (within_mmio_readable (physaddr.Physaddr
-        (zero_extend (BitVec.addInt (reg_val + offset) 0))) 1) s = .ok false s from
-      run_within_mmio_readable_mmio reg_val offset 1 (by omega) s hs h_htif h_below_clint]
-  dsimp only
+  simp [checked_mem_read, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_readable_mmio reg_val offset 1 s hs h_htif]
+  simp [read_kind_of_flags, read_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_read, PreSail.ConcurrencyInterfaceV1.sail_mem_read]
   simp only [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
   have hmem₀' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616]? = some data := by
     rw [show (reg_val.toNat + offset.toNat) % 18446744073709551616 = (reg_val + offset).toNat from
       (BitVec.toNat_add reg_val offset).symm]
     exact hmem₀
-  simp [hmem₀', bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
+  simp [PreSail.readBytes, PreSail.readByte, hmem₀',
+    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
     pure, Pure.pure, Functor.map, getThe, MonadStateOf.get, MonadState.get, get,
     EStateM.get, MemoryOpResult_add_meta]
 
@@ -430,46 +351,29 @@ then chains to `run_checked_mem_read_one_byte_of_isInitialized`. -/
 lemma run_mem_read_one_byte_of_isInitialized
     (reg_val offset : BitVec 64) (data : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 1 ≤ 33554432)
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data) :
     (mem_read (MemoryAccessType.Load mem_payload.Data)
         page_based_mem_type.PBMT_PMA
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 1
         false false false).run s = .ok (.Ok data) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
-  have hfetch : (MemoryAccessType.Load mem_payload.Data !=
-      MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
-    MemoryOpResult_drop_meta,
-    bind, Bind.bind, EStateM.bind, EStateM.run, EStateM.pure,
-    pure, Pure.pure]
-  rw [show (Sail.readReg Register.mstatus : SailM _) s = .ok
-        (s.regs.get Register.mstatus (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  rw [show (Sail.readReg Register.cur_privilege : SailM _) s = .ok
-        (s.regs.get Register.cur_privilege (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  simp only [hfetch, h_mprv_disabled, h_cur_privilege, _get_Mstatus_MPRV,
-    Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.setWidth, BitVec.extractLsb',
-    BitVec.toNat_setWidth, Bool.and_false, Bool.false_and, Bool.or_false,
-    Bool.false_or, ite_false, if_false, beq_self_eq_true, reduceIte,
-    show (0#1 == 1#1) = false from rfl, Bool.true_and, Bool.and_true,
-    show ((false : Bool) = true) = False from by decide,
-    EStateM.pure, EStateM.bind, EStateM.run]
-  have h := run_checked_mem_read_one_byte_of_isInitialized reg_val offset data s hs h_htif
-    h_below_clint hmem₀
-  simp only [EStateM.run] at h
-  rw [h]
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  simp [mem_read, mem_read_priv, mem_read_priv_meta, MemoryOpResult_drop_meta,
+    run_readReg_of_isInitialized s _ hs,
+    h_mprv_disabled, h_cur_privilege]
+  exact ⟨_, run_checked_mem_read_one_byte_of_isInitialized reg_val offset data
+    s hs h_in_range h_htif h_pma hmem₀, rfl⟩
 
 /-- Two-byte `checked_mem_read` under kernel config. -/
 lemma run_checked_mem_read_two_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data₀ data₁ : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 2 ≤ 33554432)
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region])
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁) :
     (checked_mem_read (MemoryAccessType.Load mem_payload.Data)
@@ -477,23 +381,16 @@ lemma run_checked_mem_read_two_bytes_of_isInitialized
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 2
         false false false false).run s
       = .ok (.Ok (data₁ ++ data₀, ())) s := by
-  simp only [checked_mem_read, phys_access_check,
-    LeanRV64D.Functions.sys_pmp_count,
-    read_kind_of_flags, LeanRV64D.Functions.read_ram,
-    Sail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.readBytes, PreSail.readByte,
-    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
-    pure, Pure.pure, Functor.map]
-  rw [pmp_check_machine' reg_val offset s hs 2]
-  dsimp only [EStateM.pure]
-  rw [pma_check_machine' reg_val offset s hs 2
-    page_based_mem_type.PBMT_PMA false]
-  dsimp only [EStateM.pure, EStateM.bind]
-  rw [show (within_mmio_readable (physaddr.Physaddr
-        (zero_extend (BitVec.addInt (reg_val + offset) 0))) 2) s = .ok false s from
-      run_within_mmio_readable_mmio reg_val offset 2 (by omega) s hs h_htif h_below_clint]
-  dsimp only
+  simp [checked_mem_read, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_readable_mmio reg_val offset 2 s hs h_htif]
+  simp [read_kind_of_flags, read_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_read, PreSail.ConcurrencyInterfaceV1.sail_mem_read]
   simp only [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
   -- Need `s.mem[...]? = some data₀` and `s.mem[...+1]? = some data₁` matching
   -- the exact form after zero_extend normalization.
@@ -503,7 +400,8 @@ lemma run_checked_mem_read_two_bytes_of_isInitialized
     rw [← hmod]; exact hmem₀
   have hmem₁' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616 + 1]? = some data₁ := by
     rw [← hmod]; exact hmem₁
-  simp [hmem₀', hmem₁', bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure,
+  simp [PreSail.readBytes, PreSail.readByte, hmem₀', hmem₁',
+    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure,
     EStateM.run, pure, Pure.pure, Functor.map, getThe, MonadStateOf.get, MonadState.get,
     get, EStateM.get, MemoryOpResult_add_meta]
 
@@ -511,47 +409,30 @@ lemma run_checked_mem_read_two_bytes_of_isInitialized
 lemma run_mem_read_two_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data₀ data₁ : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 2 ≤ 33554432)
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁) :
     (mem_read (MemoryAccessType.Load mem_payload.Data)
         page_based_mem_type.PBMT_PMA
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 2
         false false false).run s = .ok (.Ok (data₁ ++ data₀)) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
-  have hfetch : (MemoryAccessType.Load mem_payload.Data !=
-      MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
-    MemoryOpResult_drop_meta,
-    bind, Bind.bind, EStateM.bind, EStateM.run, EStateM.pure,
-    pure, Pure.pure]
-  rw [show (Sail.readReg Register.mstatus : SailM _) s = .ok
-        (s.regs.get Register.mstatus (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  rw [show (Sail.readReg Register.cur_privilege : SailM _) s = .ok
-        (s.regs.get Register.cur_privilege (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  simp only [hfetch, h_mprv_disabled, h_cur_privilege, _get_Mstatus_MPRV,
-    Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.setWidth, BitVec.extractLsb',
-    BitVec.toNat_setWidth, Bool.and_false, Bool.false_and, Bool.or_false,
-    Bool.false_or, ite_false, if_false, beq_self_eq_true, reduceIte,
-    show (0#1 == 1#1) = false from rfl, Bool.true_and, Bool.and_true,
-    show ((false : Bool) = true) = False from by decide,
-    EStateM.pure, EStateM.bind, EStateM.run]
-  have h := run_checked_mem_read_two_bytes_of_isInitialized reg_val offset data₀ data₁ s hs h_htif
-    h_below_clint hmem₀ hmem₁
-  simp only [EStateM.run] at h
-  rw [h]
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  simp [mem_read, mem_read_priv, mem_read_priv_meta, MemoryOpResult_drop_meta,
+    run_readReg_of_isInitialized s _ hs,
+    h_mprv_disabled, h_cur_privilege]
+  exact ⟨_, run_checked_mem_read_two_bytes_of_isInitialized reg_val offset data₀ data₁
+    s hs h_in_range h_htif h_pma hmem₀ hmem₁, rfl⟩
 
 /-- Four-byte `checked_mem_read` under kernel config. -/
 lemma run_checked_mem_read_four_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 4 ≤ 33554432)
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region])
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
     (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
@@ -561,23 +442,16 @@ lemma run_checked_mem_read_four_bytes_of_isInitialized
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 4
         false false false false).run s
       = .ok (.Ok (data₃ ++ data₂ ++ data₁ ++ data₀, ())) s := by
-  simp only [checked_mem_read, phys_access_check,
-    LeanRV64D.Functions.sys_pmp_count,
-    read_kind_of_flags, LeanRV64D.Functions.read_ram,
-    Sail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.readBytes, PreSail.readByte,
-    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
-    pure, Pure.pure, Functor.map]
-  rw [pmp_check_machine' reg_val offset s hs 4]
-  dsimp only [EStateM.pure]
-  rw [pma_check_machine' reg_val offset s hs 4
-    page_based_mem_type.PBMT_PMA false]
-  dsimp only [EStateM.pure, EStateM.bind]
-  rw [show (within_mmio_readable (physaddr.Physaddr
-        (zero_extend (BitVec.addInt (reg_val + offset) 0))) 4) s = .ok false s from
-      run_within_mmio_readable_mmio reg_val offset 4 (by omega) s hs h_htif h_below_clint]
-  dsimp only
+  simp [checked_mem_read, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_readable_mmio reg_val offset 4 s hs h_htif]
+  simp [read_kind_of_flags, read_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_read, PreSail.ConcurrencyInterfaceV1.sail_mem_read]
   simp only [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
   have hmod : (reg_val + offset).toNat = (reg_val.toNat + offset.toNat) % 18446744073709551616 :=
     BitVec.toNat_add reg_val offset
@@ -589,7 +463,7 @@ lemma run_checked_mem_read_four_bytes_of_isInitialized
     rw [← hmod]; exact hmem₂
   have hmem₃' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616 + 3]? = some data₃ := by
     rw [← hmod]; exact hmem₃
-  simp [hmem₀', hmem₁', hmem₂', hmem₃',
+  simp [PreSail.readBytes, PreSail.readByte, hmem₀', hmem₁', hmem₂', hmem₃',
     bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure,
     EStateM.run, pure, Pure.pure, Functor.map, getThe, MonadStateOf.get, MonadState.get,
     get, EStateM.get, MemoryOpResult_add_meta]
@@ -598,8 +472,9 @@ lemma run_checked_mem_read_four_bytes_of_isInitialized
 lemma run_mem_read_four_bytes_of_isInitialized
     (reg_val offset : BitVec 64) (data₀ data₁ data₂ data₃ : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 4 ≤ 33554432)
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
     (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
@@ -609,40 +484,22 @@ lemma run_mem_read_four_bytes_of_isInitialized
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 4
         false false false).run s
       = .ok (.Ok (data₃ ++ data₂ ++ data₁ ++ data₀)) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
-  have hfetch : (MemoryAccessType.Load mem_payload.Data !=
-      MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
-    MemoryOpResult_drop_meta,
-    bind, Bind.bind, EStateM.bind, EStateM.run, EStateM.pure,
-    pure, Pure.pure]
-  rw [show (Sail.readReg Register.mstatus : SailM _) s = .ok
-        (s.regs.get Register.mstatus (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  rw [show (Sail.readReg Register.cur_privilege : SailM _) s = .ok
-        (s.regs.get Register.cur_privilege (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  simp only [hfetch, h_mprv_disabled, h_cur_privilege, _get_Mstatus_MPRV,
-    Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.setWidth, BitVec.extractLsb',
-    BitVec.toNat_setWidth, Bool.and_false, Bool.false_and, Bool.or_false,
-    Bool.false_or, ite_false, if_false, beq_self_eq_true, reduceIte,
-    show (0#1 == 1#1) = false from rfl, Bool.true_and, Bool.and_true,
-    show ((false : Bool) = true) = False from by decide,
-    EStateM.pure, EStateM.bind, EStateM.run]
-  have h := run_checked_mem_read_four_bytes_of_isInitialized reg_val offset
-    data₀ data₁ data₂ data₃ s hs h_htif h_below_clint hmem₀ hmem₁ hmem₂ hmem₃
-  simp only [EStateM.run] at h
-  rw [h]
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  simp [mem_read, mem_read_priv, mem_read_priv_meta, MemoryOpResult_drop_meta,
+    run_readReg_of_isInitialized s _ hs,
+    h_mprv_disabled, h_cur_privilege]
+  exact ⟨_, run_checked_mem_read_four_bytes_of_isInitialized reg_val offset
+    data₀ data₁ data₂ data₃ s hs h_in_range h_htif h_pma hmem₀ hmem₁ hmem₂ hmem₃, rfl⟩
 
 /-- Eight-byte `checked_mem_read` under kernel config. -/
 lemma run_checked_mem_read_eight_bytes_of_isInitialized
     (reg_val offset : BitVec 64)
     (data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (h_htif : s.regs.get Register.htif_tohost_base (hs _) = none)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 8 ≤ 33554432)
+    (h_pma : s.regs.get Register.pma_regions (hs _) = [SP1_PMA_Region])
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
     (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
@@ -656,23 +513,16 @@ lemma run_checked_mem_read_eight_bytes_of_isInitialized
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 8
         false false false false).run s
       = .ok (.Ok (data₇ ++ data₆ ++ data₅ ++ data₄ ++ data₃ ++ data₂ ++ data₁ ++ data₀, ())) s := by
-  simp only [checked_mem_read, phys_access_check,
-    LeanRV64D.Functions.sys_pmp_count,
-    read_kind_of_flags, LeanRV64D.Functions.read_ram,
-    Sail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.ConcurrencyInterfaceV1.sail_mem_read,
-    PreSail.readBytes, PreSail.readByte,
-    bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure, EStateM.run,
-    pure, Pure.pure, Functor.map]
-  rw [pmp_check_machine' reg_val offset s hs 8]
-  dsimp only [EStateM.pure]
-  rw [pma_check_machine' reg_val offset s hs 8
-    page_based_mem_type.PBMT_PMA false]
-  dsimp only [EStateM.pure, EStateM.bind]
-  rw [show (within_mmio_readable (physaddr.Physaddr
-        (zero_extend (BitVec.addInt (reg_val + offset) 0))) 8) s = .ok false s from
-      run_within_mmio_readable_mmio reg_val offset 8 (by omega) s hs h_htif h_below_clint]
-  dsimp only
+  simp [checked_mem_read, phys_access_check, pmpCheck, SailME.run, PreSail.PreSailME.run]
+  simp [pmaCheck, run_readReg_of_isInitialized s _ hs, h_pma]
+  simp [matching_pma_region, matching_pma_region_bits_range]
+  erw [h_in_range]
+  simp [EStateM.Result.map, accessFaultFromAccessType,
+    pma_misaligned_exception, SP1_PMA]
+  simp [is_aligned_paddr, override_PMA, - EStateM.run_bind]
+  erw [EStateM.run_bind, run_within_mmio_readable_mmio reg_val offset 8 s hs h_htif]
+  simp [read_kind_of_flags, read_ram]
+  simp [ConcurrencyInterfaceV1.sail_mem_read, PreSail.ConcurrencyInterfaceV1.sail_mem_read]
   simp only [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend]
   have hmod : (reg_val + offset).toNat = (reg_val.toNat + offset.toNat) % 18446744073709551616 :=
     BitVec.toNat_add reg_val offset
@@ -692,7 +542,8 @@ lemma run_checked_mem_read_eight_bytes_of_isInitialized
     rw [← hmod]; exact hmem₆
   have hmem₇' : s.mem[(reg_val.toNat + offset.toNat) % 18446744073709551616 + 7]? = some data₇ := by
     rw [← hmod]; exact hmem₇
-  simp [hmem₀', hmem₁', hmem₂', hmem₃', hmem₄', hmem₅', hmem₆', hmem₇',
+  simp [PreSail.readBytes, PreSail.readByte,
+    hmem₀', hmem₁', hmem₂', hmem₃', hmem₄', hmem₅', hmem₆', hmem₇',
     bind, Bind.bind, EStateM.bind, EStateM.map, EStateM.pure,
     EStateM.run, pure, Pure.pure, Functor.map, getThe, MonadStateOf.get, MonadState.get,
     get, EStateM.get, MemoryOpResult_add_meta]
@@ -702,8 +553,9 @@ lemma run_mem_read_eight_bytes_of_isInitialized
     (reg_val offset : BitVec 64)
     (data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ : BitVec 8)
     (s : SailState) (hs : SailState.isInitialized s)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hconfig : SailState.isValidMemConfig s hs)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 8 ≤ 33554432)
     (hmem₀ : s.mem[(reg_val + offset).toNat]? = some data₀)
     (hmem₁ : s.mem[(reg_val + offset).toNat + 1]? = some data₁)
     (hmem₂ : s.mem[(reg_val + offset).toNat + 2]? = some data₂)
@@ -717,33 +569,13 @@ lemma run_mem_read_eight_bytes_of_isInitialized
         (physaddr.Physaddr (zero_extend (BitVec.addInt (reg_val + offset) 0))) 8
         false false false).run s
       = .ok (.Ok (data₇ ++ data₆ ++ data₅ ++ data₄ ++ data₃ ++ data₂ ++ data₁ ++ data₀)) s := by
-  obtain ⟨h_mprv_disabled, h_cur_privilege, _, h_htif⟩ := hconfig
-  have hfetch : (MemoryAccessType.Load mem_payload.Data !=
-      MemoryAccessType.InstructionFetch ()) = true := rfl
-  simp only [mem_read, mem_read_priv, mem_read_priv_meta, effectivePrivilege,
-    MemoryOpResult_drop_meta,
-    bind, Bind.bind, EStateM.bind, EStateM.run, EStateM.pure,
-    pure, Pure.pure]
-  rw [show (Sail.readReg Register.mstatus : SailM _) s = .ok
-        (s.regs.get Register.mstatus (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  rw [show (Sail.readReg Register.cur_privilege : SailM _) s = .ok
-        (s.regs.get Register.cur_privilege (hs _)) s from
-      run_readReg_of_isInitialized s _ hs]
-  dsimp only
-  simp only [hfetch, h_mprv_disabled, h_cur_privilege, _get_Mstatus_MPRV,
-    Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.setWidth, BitVec.extractLsb',
-    BitVec.toNat_setWidth, Bool.and_false, Bool.false_and, Bool.or_false,
-    Bool.false_or, ite_false, if_false, beq_self_eq_true, reduceIte,
-    show (0#1 == 1#1) = false from rfl, Bool.true_and, Bool.and_true,
-    show ((false : Bool) = true) = False from by decide,
-    EStateM.pure, EStateM.bind, EStateM.run]
-  have h := run_checked_mem_read_eight_bytes_of_isInitialized reg_val offset
-    data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ s hs h_htif h_below_clint
-    hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇
-  simp only [EStateM.run] at h
-  rw [h]
+  obtain ⟨h_cur_privilege, h_mprv_disabled, _, h_htif, h_pma⟩ := hconfig
+  simp [mem_read, mem_read_priv, mem_read_priv_meta, MemoryOpResult_drop_meta,
+    run_readReg_of_isInitialized s _ hs,
+    h_mprv_disabled, h_cur_privilege]
+  exact ⟨_, run_checked_mem_read_eight_bytes_of_isInitialized reg_val offset
+    data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ s hs h_in_range h_htif h_pma
+    hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇, rfl⟩
 
 -- /-- For good states there is not `phys_mem` bound on size. -/
 -- lemma run_within_phys_mem (reg_val : BitVec 64) (offset : BitVec 64)
@@ -771,11 +603,12 @@ lemma run_vmem_write_of_width_1'
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true)
     (hconfig : SailState.isValidMemConfig s hs)
     (_h_does_fit : reg_val.toNat + offset.toNat + 1 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 1 ≤ 33554432) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 1 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
         { s with mem := s.mem.insert (reg_val + offset).toNat data } := by
-  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data != MemoryAccessType.InstructionFetch ()) = true := rfl
@@ -821,9 +654,9 @@ lemma run_vmem_write_of_width_1'
   -- lemma. It handles `effectivePrivilege → Machine` plus
   -- `checked_mem_write → mem.insert` in one shot.
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
-  have h := run_mem_write_value_one_byte_of_isInitialized reg_val offset data s hs hconfig
-    h_below_clint
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩
+  have h := run_mem_write_value_one_byte_of_isInitialized reg_val offset data s hs h_in_range
+    hconfig
   simp only [EStateM.run] at h
   -- Normalize `zero_extend (BitVec.addInt (reg_val + offset) 0)` → `reg_val + offset`
   -- in both the goal and `h` so they match syntactically.
@@ -844,13 +677,14 @@ lemma run_vmem_write_of_width_2'
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true)
     (hconfig : SailState.isValidMemConfig s hs)
     (_h_does_fit : reg_val.toNat + offset.toNat + 2 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 2 ≤ 33554432) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 2 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((s.mem.insert
           (reg_val + offset).toNat (BitVec.ofNat 8 data.toNat)).insert
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))) } := by
-  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
@@ -884,9 +718,9 @@ lemma run_vmem_write_of_width_2'
     bind, Bind.bind, pure, Pure.pure, Functor.map,
     ExceptT.bindCont, ExceptT.pure, ExceptT.bind]
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
-  have h := run_mem_write_value_two_bytes_of_isInitialized reg_val offset data s hs hconfig
-    h_below_clint
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩
+  have h := run_mem_write_value_two_bytes_of_isInitialized reg_val offset data s hs h_in_range
+    hconfig
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -903,7 +737,8 @@ lemma run_vmem_write_of_width_4
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true)
     (hconfig : SailState.isValidMemConfig s hs)
     (_h_does_fit : reg_val.toNat + offset.toNat + 4 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 4 ≤ 33554432) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 4 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((((s.mem.insert
@@ -911,7 +746,7 @@ lemma run_vmem_write_of_width_4
           ((reg_val + offset).toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
           ((reg_val + offset).toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
           ((reg_val + offset).toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) } := by
-  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
@@ -945,9 +780,9 @@ lemma run_vmem_write_of_width_4
     bind, Bind.bind, pure, Pure.pure, Functor.map,
     ExceptT.bindCont, ExceptT.pure, ExceptT.bind]
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
-  have h := run_mem_write_value_four_bytes_of_isInitialized reg_val offset data s hs hconfig
-    h_below_clint
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩
+  have h := run_mem_write_value_four_bytes_of_isInitialized reg_val offset data s hs h_in_range
+    hconfig
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -964,7 +799,8 @@ lemma run_vmem_write_of_width_8
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true)
     (hconfig : SailState.isValidMemConfig s hs)
     (_h_does_fit : reg_val.toNat + offset.toNat + 8 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 8 ≤ 33554432) :
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true) :
     (vmem_write (.Regidx rs_addr_bv) offset 8 data
       (MemoryAccessType.Store mem_payload.Data) false false false).run s = .ok (.Ok true)
         { s with mem := ((((((((s.mem.insert
@@ -976,7 +812,7 @@ lemma run_vmem_write_of_width_8
           ((reg_val + offset).toNat + 5) (BitVec.ofNat 8 (data.toNat >>> 40))).insert
           ((reg_val + offset).toNat + 6) (BitVec.ofNat 8 (data.toNat >>> 48))).insert
           ((reg_val + offset).toNat + 7) (BitVec.ofNat 8 (data.toNat >>> 56))) } := by
-  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩ := hconfig
+  obtain ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩ := hconfig
   have hmachine : (Privilege.Machine == Privilege.Machine) = true := rfl
   have hsatp_bare : (SATPMode.Bare == SATPMode.Bare) = true := rfl
   have hfetch : (MemoryAccessType.Store mem_payload.Data !=
@@ -1010,9 +846,9 @@ lemma run_vmem_write_of_width_8
     bind, Bind.bind, pure, Pure.pure, Functor.map,
     ExceptT.bindCont, ExceptT.pure, ExceptT.bind]
   have hconfig : SailState.isValidMemConfig s hs :=
-    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif⟩
-  have h := run_mem_write_value_eight_bytes_of_isInitialized reg_val offset data s hs hconfig
-    h_below_clint
+    ⟨h_cur_privilege, h_mprv_disabled, h_mseccfg_disabled, h_htif, h_pma⟩
+  have h := run_mem_write_value_eight_bytes_of_isInitialized reg_val offset data s hs h_in_range
+    hconfig
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -1029,7 +865,8 @@ lemma run_vmem_read_of_width_1'
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 1 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
     (h_does_fit : reg_val.toNat + offset.toNat + 1 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 1 ≤ 33554432)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 1) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data)
       :
     let width := 1
@@ -1068,8 +905,8 @@ lemma run_vmem_read_of_width_1'
     privLevel_bits_backwards, privLevel_bits_forwards,
     h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare,
     hfetch, is_shadow_stack_access]
-  have h := run_mem_read_one_byte_of_isInitialized reg_val offset data s hs hconfig
-    h_below_clint hmem₀'
+  have h := run_mem_read_one_byte_of_isInitialized reg_val offset data s hs h_in_range
+    hconfig hmem₀'
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -1088,7 +925,8 @@ lemma run_vmem_read_of_width_2'
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 2 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
     (h_does_fit : reg_val.toNat + offset.toNat + 2 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 2 ≤ 33554432)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data₀)
     (hmem₁ : s.mem[reg_val.toNat + offset.toNat + 1]? = some data₁) :
     let width := 2
@@ -1129,8 +967,8 @@ lemma run_vmem_read_of_width_2'
     privLevel_bits_backwards, privLevel_bits_forwards,
     h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare,
     hfetch, is_shadow_stack_access]
-  have h := run_mem_read_two_bytes_of_isInitialized reg_val offset data₀ data₁ s hs hconfig
-    h_below_clint hmem₀' hmem₁'
+  have h := run_mem_read_two_bytes_of_isInitialized reg_val offset data₀ data₁ s hs h_in_range
+    hconfig hmem₀' hmem₁'
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -1149,7 +987,8 @@ lemma run_vmem_read_of_width_4'
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 4 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
     (h_does_fit : reg_val.toNat + offset.toNat + 4 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 4 ≤ 33554432)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 4) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data₀)
     (hmem₁ : s.mem[reg_val.toNat + offset.toNat + 1]? = some data₁)
     (hmem₂ : s.mem[reg_val.toNat + offset.toNat + 2]? = some data₂)
@@ -1195,7 +1034,7 @@ lemma run_vmem_read_of_width_4'
     h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare,
     hfetch, is_shadow_stack_access]
   have h := run_mem_read_four_bytes_of_isInitialized reg_val offset
-    data₀ data₁ data₂ data₃ s hs hconfig h_below_clint hmem₀' hmem₁' hmem₂' hmem₃'
+    data₀ data₁ data₂ data₃ s hs h_in_range hconfig hmem₀' hmem₁' hmem₂' hmem₃'
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
   conv_lhs => rw [h]
@@ -1215,7 +1054,8 @@ lemma run_vmem_read_of_width_8'
     (h_aligned : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + offset)) 8 = true) ---width
     (hconfig : SailState.isValidMemConfig s hs)
     (h_does_fit : reg_val.toNat + offset.toNat + 8 < 2 ^ 64)
-    (h_below_clint : BitVec.toNat (reg_val + offset) + 8 ≤ 33554432)
+    (h_in_range : range_subset (zero_extend (BitVec.addInt (reg_val + offset) 0))
+      (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true)
     (hmem₀ : s.mem[reg_val.toNat + offset.toNat]? = some data₀)
     (hmem₁ : s.mem[reg_val.toNat + offset.toNat + 1]? = some data₁)
     (hmem₂ : s.mem[reg_val.toNat + offset.toNat + 2]? = some data₂)
@@ -1269,7 +1109,7 @@ lemma run_vmem_read_of_width_8'
     h_mprv_disabled, h_cur_privilege, hmachine, hsatp_bare,
     hfetch, is_shadow_stack_access]
   have h := run_mem_read_eight_bytes_of_isInitialized reg_val offset
-    data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ s hs hconfig h_below_clint
+    data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ s hs h_in_range hconfig
     hmem₀' hmem₁' hmem₂' hmem₃' hmem₄' hmem₅' hmem₆' hmem₇'
   simp only [EStateM.run] at h
   simp [zero_extend, BitVec.addInt, Sail.BitVec.zeroExtend] at h ⊢
