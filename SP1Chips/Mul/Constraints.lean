@@ -307,4 +307,123 @@ lemma spec.mulw (h : is_mulw Main) :
 
 end mulw
 
+section poly_helpers
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+@[simp] def is_real_poly (Main : Vector (ZMod p) 82) : Prop :=
+  Main[77] = 1 ∨ Main[78] = 1 ∨ Main[79] = 1 ∨ Main[80] = 1 ∨ Main[81] = 1
+
+@[simp] def is_mul_poly (Main : Vector (ZMod p) 82) : Prop :=
+  Main[77] = 1 ∧ Main[30] = 0
+@[simp] def is_mulh_poly (Main : Vector (ZMod p) 82) : Prop :=
+  Main[78] = 1 ∧ Main[30] = 0
+@[simp] def is_mulhu_poly (Main : Vector (ZMod p) 82) : Prop :=
+  Main[79] = 1 ∧ Main[30] = 0
+@[simp] def is_mulhsu_poly (Main : Vector (ZMod p) 82) : Prop :=
+  Main[80] = 1 ∧ Main[30] = 0
+@[simp] def is_mulw_poly (Main : Vector (ZMod p) 82) : Prop :=
+  Main[81] = 1 ∧ Main[30] = 0
+
+/-- From `a = 1` and the four other 5-arm flags `∈ {0,1}` and the sum-disjunction
+`Σ = 0 ∨ Σ - 1 = 0`, conclude `Σ = 1`. Mirrors `Bitwise.sum_eq_one_of_eq_one_*`
+extended to the 5-arm Mul shape. The `_left` variant assumes `a` (the first
+slot) is the active variant. -/
+lemma sum_eq_one_of_eq_one_left
+    {a b c d e : ZMod p}
+    (h_a : a = 1)
+    (b_b : b = 0 ∨ b = 1) (b_c : c = 0 ∨ c = 1)
+    (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    a + b + c + d + e = 1 := by
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  haveI : NeZero p := ⟨by omega⟩
+  have h2lt : (2 : ℕ) < p := by omega
+  have h3lt : (3 : ℕ) < p := by omega
+  have h4lt : (4 : ℕ) < p := by omega
+  have h5lt : (5 : ℕ) < p := by omega
+  have h1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
+  have h2_val : (2 : ZMod p).val = 2 := ZMod.val_natCast_of_lt h2lt
+  have h3_val : (3 : ZMod p).val = 3 := ZMod.val_natCast_of_lt h3lt
+  have h4_val : (4 : ZMod p).val = 4 := ZMod.val_natCast_of_lt h4lt
+  have h5_val : (5 : ZMod p).val = 5 := ZMod.val_natCast_of_lt h5lt
+  have h1_ne : (1 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h1_val, ZMod.val_zero] at this; omega
+  have h2_ne : (2 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h2_val, ZMod.val_zero] at this; omega
+  have h3_ne : (3 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h3_val, ZMod.val_zero] at this; omega
+  have h4_ne : (4 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h4_val, ZMod.val_zero] at this; omega
+  have h5_ne : (5 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h5_val, ZMod.val_zero] at this; omega
+  rcases one_of with h | h
+  · exfalso
+    rcases b_b with rfl | rfl <;> rcases b_c with rfl | rfl <;>
+      rcases b_d with rfl | rfl <;> rcases b_e with rfl | rfl <;>
+      rw [h_a] at h <;>
+      first
+        | exact h1_ne (by linear_combination h)
+        | exact h2_ne (by linear_combination h)
+        | exact h3_ne (by linear_combination h)
+        | exact h4_ne (by linear_combination h)
+        | exact h5_ne (by linear_combination h)
+  · linear_combination h
+
+/-- Mid-position variants of `sum_eq_one_of_eq_one_left`. The active flag occupies the
+2nd, 3rd, 4th, or 5th slot of the sum. -/
+lemma sum_eq_one_of_eq_one_2
+    {a b c d e : ZMod p}
+    (h_b : b = 1)
+    (b_a : a = 0 ∨ a = 1) (b_c : c = 0 ∨ c = 1)
+    (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    a + b + c + d + e = 1 := by
+  have heq : b + a + c + d + e = 1 := sum_eq_one_of_eq_one_left h_b b_a b_c b_d b_e
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+lemma sum_eq_one_of_eq_one_3
+    {a b c d e : ZMod p}
+    (h_c : c = 1)
+    (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
+    (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    a + b + c + d + e = 1 := by
+  have heq : c + a + b + d + e = 1 := sum_eq_one_of_eq_one_left h_c b_a b_b b_d b_e
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+lemma sum_eq_one_of_eq_one_4
+    {a b c d e : ZMod p}
+    (h_d : d = 1)
+    (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
+    (b_c : c = 0 ∨ c = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    a + b + c + d + e = 1 := by
+  have heq : d + a + b + c + e = 1 := sum_eq_one_of_eq_one_left h_d b_a b_b b_c b_e
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+lemma sum_eq_one_of_eq_one_5
+    {a b c d e : ZMod p}
+    (h_e : e = 1)
+    (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
+    (b_c : c = 0 ∨ c = 1) (b_d : d = 0 ∨ d = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    a + b + c + d + e = 1 := by
+  have heq : e + a + b + c + d = 1 := sum_eq_one_of_eq_one_left h_e b_a b_b b_c b_d
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+end poly_helpers
+
 end Mul
