@@ -432,8 +432,11 @@ lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
 
 /-- Per-limb Nat lift: same as `AddrAddOperation.limb_lift`. Converts a ZMod
 equation `bb + vv + prev = aa + cc * 65536` (where prev/cc are carry bits and
-the other three limbs are < 2^16) to the corresponding Nat equation. -/
-private lemma limb_lift_branch
+the other three limbs are < 2^16) to the corresponding Nat equation. Public
+so the chip-level `correct_b*_poly` proofs can lift the post-simp ZMod
+limb equations directly without round-tripping through `pc_plus_4_eq_poly`'s
+strict carry-disjunction shape. -/
+lemma limb_lift_branch
     (bb vv aa prev cc : ZMod p)
     (hbb : bb.val < 2 ^ 16) (hvv : vv.val < 2 ^ 16) (haa : aa.val < 2 ^ 16)
     (hprev : prev = 0 ∨ prev = 1) (hcc : cc = 0 ∨ cc = 1)
@@ -690,6 +693,160 @@ lemma pc_plus_4_eq_poly
     rcases hc2 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   have hc3_lt : c3.val ≤ 1 := by
     rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
+  omega
+
+set_option maxHeartbeats 16000000 in
+-- Variant of `pc_plus_4_eq_poly` accepting the chip's *natural* post-simp
+-- limb form: each carry hypothesis is the simp-fragmented disjunction
+-- `((a = b ∨ 65536 = 0) ∨ (a - b) * 65536⁻¹ = 1)` from default simp's
+-- `mul_eq_zero` + `inv_eq_zero` + `sub_eq_zero` firing on the assertZero
+-- constraint `((a - b) * 65536⁻¹) * (((a - b) * 65536⁻¹) - 1) = 0`. The chip
+-- proof passes `chip_cstrs.h_limb0..3` directly without any pre-bridge step.
+-- Internally bridges to canonical form, then mirrors `pc_plus_4_eq_poly`'s
+-- `limb_lift_branch` chain. Heartbeats elevated for the bridges + chain.
+-- `skipKernelTC` for `BitVec.toNat_add`'s `% 2^64` deep-recursion gotcha
+-- (per `docs/GOTCHAS.md`).
+set_option debug.skipKernelTC true in
+lemma pc_plus_4_eq_poly_chip
+    (Main : Vector (ZMod p) 45)
+    (h_pc_0 : Main[3].val < 65536) (h_pc_1 : Main[4].val < 65536)
+    (h_pc_2 : Main[5].val < 65536)
+    (h25 : Main[25].val < 65536) (h26 : Main[26].val < 65536)
+    (h27 : Main[27].val < 65536)
+    (hc0 : (Main[3] + 4 = Main[25] ∨ (65536 : ZMod p) = 0)
+        ∨ (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ = 1)
+    (hc1 : (((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] = Main[26]
+              ∨ (65536 : ZMod p) = 0)
+        ∨ ((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26]) *
+              (65536 : ZMod p)⁻¹ = 1))
+    (hc2 : ((((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26]) *
+              (65536 : ZMod p)⁻¹ + Main[5] = Main[27] ∨ (65536 : ZMod p) = 0)
+        ∨ (((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26]) *
+              (65536 : ZMod p)⁻¹ + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹ = 1))
+    (hc3 : ((((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26]) *
+              (65536 : ZMod p)⁻¹ + Main[5] = Main[27] ∨ (65536 : ZMod p) = 0)
+        ∨ (((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26]) *
+              (65536 : ZMod p)⁻¹ + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹ *
+                (65536 : ZMod p)⁻¹ = 1)) :
+    Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64
+      = Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_65_ne : (65536 : ZMod p) ≠ 0 := val_65536_ne_zero
+  -- Bridge each carry from the chip's messy form to canonical `c = 0 ∨ c = 1`.
+  have hc0' : (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ = 0
+      ∨ (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ = 1 := by
+    rcases hc0 with (h | h) | h
+    · left; rw [show Main[3] + 4 - Main[25] = 0 from by linear_combination h, zero_mul]
+    · exact absurd h h_65_ne
+    · right; exact h
+  have hc1' : ((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ = 0
+      ∨ ((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ = 1 := by
+    rcases hc1 with (h | h) | h
+    · left
+      rw [show (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26] = 0
+          from by linear_combination h, zero_mul]
+    · exact absurd h h_65_ne
+    · right; exact h
+  have hc2' :
+      (((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹ = 0
+      ∨ (((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹ = 1 := by
+    rcases hc2 with (h | h) | h
+    · left
+      rw [show ((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ + Main[5] - Main[27] = 0 from by linear_combination h,
+          zero_mul]
+    · exact absurd h h_65_ne
+    · right; exact h
+  have hc3' :
+      (((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹
+                * (65536 : ZMod p)⁻¹ = 0
+      ∨ (((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹
+                * (65536 : ZMod p)⁻¹ = 1 := by
+    rcases hc3 with (h | h) | h
+    · left
+      rw [show ((Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] - Main[26])
+                  * (65536 : ZMod p)⁻¹ + Main[5] - Main[27] = 0 from by linear_combination h,
+          zero_mul, zero_mul]
+    · exact absurd h h_65_ne
+    · right; exact h
+  -- Now mirror pc_plus_4_eq_poly's body using the canonical-form carries.
+  have h_zero_val : ((0 : ZMod p)).val = 0 := ZMod.val_zero
+  have hzero_lt : ((0 : ZMod p)).val < 2 ^ 16 := by rw [h_zero_val]; omega
+  have h_pc_isU64 : Word.isU64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases_poly <;>
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ]
+    · exact h_pc_0
+    · exact h_pc_1
+    · exact h_pc_2
+    · rw [h_zero_val]; omega
+  have h_npc_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases_poly <;>
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ]
+    · exact h25
+    · exact h26
+    · exact h27
+    · rw [h_zero_val]; omega
+  have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
+    mul_inv_cancel₀ val_65536_ne_zero
+  rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+      ← BitVec.toNat_inj, BitVec.toNat_add,
+      Word.toBitVec64_poly_toNat_poly h_npc_isU64,
+      Word.toBitVec64_poly_toNat_poly h_pc_isU64,
+      Word.toNat_poly_def, Word.toNat_poly_def, BitVec.toNat_ofNat]
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ, h_zero_val, Nat.zero_mul, Nat.add_zero]
+  set c0 : ZMod p := (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ with hc0_def
+  set c1 : ZMod p := (c0 + Main[4] - Main[26]) * (65536 : ZMod p)⁻¹ with hc1_def
+  set c2 : ZMod p := (c1 + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹ with hc2_def
+  set c3 : ZMod p := c2 * (65536 : ZMod p)⁻¹ with hc3_def
+  have e0 : Main[3] + (4 : ZMod p) + (0 : ZMod p) = Main[25] + c0 * 65536 := by
+    rw [hc0_def]; linear_combination -1 * (Main[3] + 4 - Main[25]) * h65inv
+  have e1 : Main[4] + (0 : ZMod p) + c0 = Main[26] + c1 * 65536 := by
+    rw [hc1_def]
+    linear_combination -1 * (c0 + Main[4] - Main[26]) * h65inv
+  have e2 : Main[5] + (0 : ZMod p) + c1 = Main[27] + c2 * 65536 := by
+    rw [hc2_def]
+    linear_combination -1 * (c1 + Main[5] - Main[27]) * h65inv
+  have e3 : (0 : ZMod p) + (0 : ZMod p) + c2 = (0 : ZMod p) + c3 * 65536 := by
+    rw [hc3_def]
+    linear_combination -1 * c2 * h65inv
+  have hc_zero : (0 : ZMod p) = 0 ∨ (0 : ZMod p) = 1 := Or.inl rfl
+  have h_pc_0_lt : Main[3].val < 2 ^ 16 := by simpa using h_pc_0
+  have h_pc_1_lt : Main[4].val < 2 ^ 16 := by simpa using h_pc_1
+  have h_pc_2_lt : Main[5].val < 2 ^ 16 := by simpa using h_pc_2
+  have h25_lt : Main[25].val < 2 ^ 16 := by simpa using h25
+  have h26_lt : Main[26].val < 2 ^ 16 := by simpa using h26
+  have h27_lt : Main[27].val < 2 ^ 16 := by simpa using h27
+  have h4_val : ((4 : ℕ) : ZMod p).val = 4 := by
+    have hp : 2 ^ 17 < p := Fact.out
+    exact ZMod.val_natCast_of_lt (by omega)
+  have h4_lt : ((4 : ZMod p)).val < 2 ^ 16 := by
+    rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl, h4_val]
+    omega
+  have n0 := limb_lift_branch _ _ _ _ _ h_pc_0_lt h4_lt h25_lt hc_zero hc0' e0
+  have n1 := limb_lift_branch _ _ _ _ _ h_pc_1_lt hzero_lt h26_lt hc0' hc1' e1
+  have n2 := limb_lift_branch _ _ _ _ _ h_pc_2_lt hzero_lt h27_lt hc1' hc2' e2
+  have n3 := limb_lift_branch _ _ _ _ _ hzero_lt hzero_lt hzero_lt hc2' hc3' e3
+  have h4val_eq : ((4 : ZMod p)).val = 4 := by
+    rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl, h4_val]
+  rw [h4val_eq] at n0
+  simp only [ZMod.val_zero, add_zero, zero_add] at n1 n2 n3
+  have hc0_lt : c0.val ≤ 1 := by
+    rcases hc0' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
+  have hc1_lt : c1.val ≤ 1 := by
+    rcases hc1' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
+  have hc2_lt : c2.val ≤ 1 := by
+    rcases hc2' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
+  have hc3_lt : c3.val ≤ 1 := by
+    rcases hc3' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   omega
 
 end poly_helpers

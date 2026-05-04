@@ -2445,6 +2445,26 @@ lemma lt_65536_of_mul_inv_4_lt (x : Fin KB) (h : (x * (4 : Fin KB)⁻¹).val < 1
   rw [h4, Nat.mod_eq_of_lt (by omega)]
   omega
 
+/-- Polymorphic counterpart of `lt_65536_of_mul_inv_4_lt`: branch-target limb
+range check `(x * 4⁻¹).val < 16384` in `ZMod p` lifts to `x.val < 65536`. -/
+lemma lt_65536_of_mul_inv_4_lt_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (x : ZMod p) (h : (x * (4 : ZMod p)⁻¹).val < 16384) :
+    x.val < 65536 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h4ne : (4 : ZMod p) ≠ 0 := by
+    have : (4 : ZMod p).val = 4 := val_4_zmod_p
+    intro hz; rw [hz, ZMod.val_zero] at this; omega
+  have hinv : x * (4 : ZMod p)⁻¹ * 4 = x := by field_simp
+  have h4 : (4 : ZMod p).val = 4 := val_4_zmod_p
+  apply_fun ZMod.val at hinv
+  rw [ZMod.val_mul, h4] at hinv
+  have hp : 2 ^ 17 < p := Fact.out
+  have hbound : (x * (4 : ZMod p)⁻¹).val * 4 < 65536 := by omega
+  have : (x * (4 : ZMod p)⁻¹).val * 4 % p = (x * (4 : ZMod p)⁻¹).val * 4 :=
+    Nat.mod_eq_of_lt (by omega)
+  rw [this] at hinv
+  omega
+
 /-- Sign-extend a byte whose MSB is 1: produces 0xFFFFFFFFFFFFFF00 | byte. -/
 lemma signExtend64_ofNat8_of_ge_128 (x : Fin KB) (hlt : x.val < 256) (hge : 128 ≤ x.val) :
     BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
