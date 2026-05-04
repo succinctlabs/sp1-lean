@@ -334,7 +334,7 @@ lemma sum_eq_one_of_eq_one_left
     (h_a : a = 1)
     (b_b : b = 0 ∨ b = 1) (b_c : c = 0 ∨ c = 1)
     (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
-    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
     a + b + c + d + e = 1 := by
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   haveI : NeZero p := ⟨by omega⟩
@@ -377,7 +377,7 @@ lemma sum_eq_one_of_eq_one_2
     (h_b : b = 1)
     (b_a : a = 0 ∨ a = 1) (b_c : c = 0 ∨ c = 1)
     (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
-    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
     a + b + c + d + e = 1 := by
   have heq : b + a + c + d + e = 1 := sum_eq_one_of_eq_one_left h_b b_a b_c b_d b_e
     (by rcases one_of with h | h
@@ -390,7 +390,7 @@ lemma sum_eq_one_of_eq_one_3
     (h_c : c = 1)
     (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
     (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
-    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
     a + b + c + d + e = 1 := by
   have heq : c + a + b + d + e = 1 := sum_eq_one_of_eq_one_left h_c b_a b_b b_d b_e
     (by rcases one_of with h | h
@@ -403,7 +403,7 @@ lemma sum_eq_one_of_eq_one_4
     (h_d : d = 1)
     (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
     (b_c : c = 0 ∨ c = 1) (b_e : e = 0 ∨ e = 1)
-    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
     a + b + c + d + e = 1 := by
   have heq : d + a + b + c + e = 1 := sum_eq_one_of_eq_one_left h_d b_a b_b b_c b_e
     (by rcases one_of with h | h
@@ -416,13 +416,60 @@ lemma sum_eq_one_of_eq_one_5
     (h_e : e = 1)
     (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
     (b_c : c = 0 ∨ c = 1) (b_d : d = 0 ∨ d = 1)
-    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e - 1 = 0) :
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
     a + b + c + d + e = 1 := by
   have heq : e + a + b + c + d = 1 := sum_eq_one_of_eq_one_left h_e b_a b_b b_c b_d
     (by rcases one_of with h | h
         · left; linear_combination h
         · right; linear_combination h)
   linear_combination heq
+
+set_option maxHeartbeats 4000000 in
+-- Polymorphic mirror of `single_op` (line 118): from the chip-level constraints,
+-- only one of `Main[77..81]` can be `1`. Mirrors the KB proof pattern but
+-- destructures the constraint list directly via simp+List.forall_append rather
+-- than going through a chip-level `iff_poly` lemma. Note constraint compiler
+-- emits the boolean assertions in the order `77, 78, 79, 81, 80` (mulw before
+-- mulhsu), matching the existing KB iff at line 100-105.
+lemma single_op_poly (Main : Vector (ZMod p) 82)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main)) :
+    (Main[77] = 1 → Main[78] = 0 ∧ Main[79] = 0 ∧ Main[80] = 0 ∧ Main[81] = 0) ∧
+    (Main[78] = 1 → Main[77] = 0 ∧ Main[79] = 0 ∧ Main[80] = 0 ∧ Main[81] = 0) ∧
+    (Main[79] = 1 → Main[77] = 0 ∧ Main[78] = 0 ∧ Main[80] = 0 ∧ Main[81] = 0) ∧
+    (Main[80] = 1 → Main[77] = 0 ∧ Main[78] = 0 ∧ Main[79] = 0 ∧ Main[81] = 0) ∧
+    (Main[81] = 1 → Main[77] = 0 ∧ Main[78] = 0 ∧ Main[79] = 0 ∧ Main[80] = 0) := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨_h_mop, _h_cpu⟩, _h_alu⟩, b_77, b_78, b_79, b_81, b_80, sum_disj, _h_M13⟩ := cstrs
+  -- Map Main[77..81] to is_mul/is_mulh/is_mulhu/is_mulhsu/is_mulw and apply
+  -- MulOperation.single_op_poly. Note the slot mapping per the constraint
+  -- compiler: 77=mul, 78=mulh, 79=mulhu, 80=mulhsu, 81=mulw.
+  have h_77 := fun h_77_one => sum_eq_one_of_eq_one_left h_77_one b_78 b_79 b_80 b_81 sum_disj
+  have h_78 := fun h_78_one => sum_eq_one_of_eq_one_2 h_78_one b_77 b_79 b_80 b_81 sum_disj
+  have h_79 := fun h_79_one => sum_eq_one_of_eq_one_3 h_79_one b_77 b_78 b_80 b_81 sum_disj
+  have h_80 := fun h_80_one => sum_eq_one_of_eq_one_4 h_80_one b_77 b_78 b_79 b_81 sum_disj
+  have h_81 := fun h_81_one => sum_eq_one_of_eq_one_5 h_81_one b_77 b_78 b_79 b_80 sum_disj
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;> intro h_one
+  · have h_sum : Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := h_77 h_one
+    have ⟨h78, h81, h79, h80⟩ :=
+      (MulOperation.single_op_poly b_77 b_78 b_79 b_80 b_81 h_sum).1 h_one
+    exact ⟨h78, h79, h80, h81⟩
+  · have h_sum : Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := h_78 h_one
+    have ⟨h77, h81, h79, h80⟩ :=
+      (MulOperation.single_op_poly b_77 b_78 b_79 b_80 b_81 h_sum).2.1 h_one
+    exact ⟨h77, h79, h80, h81⟩
+  · have h_sum : Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := h_79 h_one
+    have ⟨h77, h78, h81, h80⟩ :=
+      (MulOperation.single_op_poly b_77 b_78 b_79 b_80 b_81 h_sum).2.2.2.1 h_one
+    exact ⟨h77, h78, h80, h81⟩
+  · have h_sum : Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := h_80 h_one
+    have ⟨h77, h78, h81, h79⟩ :=
+      (MulOperation.single_op_poly b_77 b_78 b_79 b_80 b_81 h_sum).2.2.2.2 h_one
+    exact ⟨h77, h78, h79, h81⟩
+  · have h_sum : Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := h_81 h_one
+    have ⟨h77, h78, h79, h80⟩ :=
+      (MulOperation.single_op_poly b_77 b_78 b_79 b_80 b_81 h_sum).2.2.1 h_one
+    exact ⟨h77, h78, h79, h80⟩
 
 end poly_helpers
 
