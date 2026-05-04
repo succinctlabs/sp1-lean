@@ -3037,4 +3037,10 @@ def cp {n : ℕ} (a b : Vector (Fin KB) n) (k : ℕ) (hk : k < n) : Fin KB :=
                      omega⟩)) : Vector (Fin KB) (k + 1)).toList
   product.foldl (· + ·) 0
 
+def cp_poly {p : ℕ} [NeZero p] {n : ℕ} (a b : Vector (ZMod p) n) (k : ℕ) (hk : k < n) : ZMod p :=
+  let product := ((Vector.ofFn (fun i => a.get ⟨i.val, by omega⟩ * b.get ⟨k - i.val, by
+                     have h : i.val < (k + 1) := i.isLt
+                     omega⟩)) : Vector (ZMod p) (k + 1)).toList
+  product.foldl (· + ·) 0
+
 end cross_product
