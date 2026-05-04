@@ -471,6 +471,34 @@ lemma single_op_poly (Main : Vector (ZMod p) 82)
       (MulOperation.single_op_poly b_77 b_78 b_79 b_80 b_81 h_sum).2.2.1 h_one
     exact ⟨h77, h78, h79, h80⟩
 
+@[simp] def sp1_op_a_poly (Main : Vector (ZMod p) 82) : BitVec 5 :=
+  BitVec.ofNat 5 Main[6].val
+@[simp] def sp1_op_b_poly (Main : Vector (ZMod p) 82) : BitVec 5 :=
+  BitVec.ofNat 5 Main[14].val
+@[simp] def sp1_op_c_poly (Main : Vector (ZMod p) 82) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+
+set_option maxHeartbeats 4000000 in
+-- Polymorphic mirror of `ops_U64_b_c` (line 176): both `b` and `c` operands
+-- are 64-bit values. Uses `RTypeReader.allHold_constraints_iff_is_real_poly`
+-- after extracting the ALU sub-constraints from `cstrs`. Takes the
+-- specialized `is_real = 1` (sum of the 5 variant flags = 1) as input,
+-- since deriving it requires the boolean disjunctions which the chip-level
+-- `correct_*_poly` proofs extract once via `sum_eq_one_of_eq_one_*`.
+lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 82)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (h_is_real_eq_one :
+      Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1) :
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨_h_mop, _h_cpu⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at h_alu
+  obtain ⟨_, _, _, _, _, _, _, h_complex, _⟩ := h_alu
+  obtain ⟨_, _, _, h_isU64_b, h_isU64_c⟩ := h_complex
+  exact ⟨h_isU64_b, h_isU64_c⟩
+
 end poly_helpers
 
 end Mul
