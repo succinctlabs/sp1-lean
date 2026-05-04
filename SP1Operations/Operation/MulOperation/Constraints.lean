@@ -1280,4 +1280,96 @@ lemma spec.mulh.gen {aw bw cw cols is_real is_mul is_mulw is_mulhu is_mulhsu}
 
 end gen
 
+section poly_helpers
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+/-- Helper: 4 boolean ZMod values summing to 0 in `ZMod p` are all zero.
+Holds because the Nat-side sum is ≤ 4 < p, so the ZMod equality lifts
+losslessly. The 15 contradiction cases (where at least one of a,b,c,d is
+1) all reduce to `(k : ZMod p) = 0` for `k ∈ {1,2,3,4}` via
+`linear_combination`, then `ZMod.val` injection + omega finishes. -/
+private lemma four_bools_sum_zero
+    {a b c d : ZMod p}
+    (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
+    (b_c : c = 0 ∨ c = 1) (b_d : d = 0 ∨ d = 1)
+    (h_sum : a + b + c + d = 0) :
+    a = 0 ∧ b = 0 ∧ c = 0 ∧ d = 0 := by
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  haveI : NeZero p := ⟨by omega⟩
+  have h2lt : (2 : ℕ) < p := by omega
+  have h3lt : (3 : ℕ) < p := by omega
+  have h4lt : (4 : ℕ) < p := by omega
+  have h1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
+  have h2_val : (2 : ZMod p).val = 2 := ZMod.val_natCast_of_lt h2lt
+  have h3_val : (3 : ZMod p).val = 3 := ZMod.val_natCast_of_lt h3lt
+  have h4_val : (4 : ZMod p).val = 4 := ZMod.val_natCast_of_lt h4lt
+  -- For k ∈ {1, 2, 3, 4}, `(k : ZMod p) ≠ 0`.
+  have h1_ne : (1 : ZMod p) ≠ 0 := by
+    intro h; have := congrArg ZMod.val h; rw [h1_val, ZMod.val_zero] at this; omega
+  have h2_ne : (2 : ZMod p) ≠ 0 := by
+    intro h; have := congrArg ZMod.val h; rw [h2_val, ZMod.val_zero] at this; omega
+  have h3_ne : (3 : ZMod p) ≠ 0 := by
+    intro h; have := congrArg ZMod.val h; rw [h3_val, ZMod.val_zero] at this; omega
+  have h4_ne : (4 : ZMod p) ≠ 0 := by
+    intro h; have := congrArg ZMod.val h; rw [h4_val, ZMod.val_zero] at this; omega
+  rcases b_a with rfl | rfl <;> rcases b_b with rfl | rfl <;>
+    rcases b_c with rfl | rfl <;> rcases b_d with rfl | rfl
+  -- 16 cases: one passes (all zero), 15 contradict.
+  · exact ⟨rfl, rfl, rfl, rfl⟩
+  · exact absurd (by linear_combination h_sum : (1 : ZMod p) = 0) h1_ne
+  · exact absurd (by linear_combination h_sum : (1 : ZMod p) = 0) h1_ne
+  · exact absurd (by linear_combination h_sum : (2 : ZMod p) = 0) h2_ne
+  · exact absurd (by linear_combination h_sum : (1 : ZMod p) = 0) h1_ne
+  · exact absurd (by linear_combination h_sum : (2 : ZMod p) = 0) h2_ne
+  · exact absurd (by linear_combination h_sum : (2 : ZMod p) = 0) h2_ne
+  · exact absurd (by linear_combination h_sum : (3 : ZMod p) = 0) h3_ne
+  · exact absurd (by linear_combination h_sum : (1 : ZMod p) = 0) h1_ne
+  · exact absurd (by linear_combination h_sum : (2 : ZMod p) = 0) h2_ne
+  · exact absurd (by linear_combination h_sum : (2 : ZMod p) = 0) h2_ne
+  · exact absurd (by linear_combination h_sum : (3 : ZMod p) = 0) h3_ne
+  · exact absurd (by linear_combination h_sum : (2 : ZMod p) = 0) h2_ne
+  · exact absurd (by linear_combination h_sum : (3 : ZMod p) = 0) h3_ne
+  · exact absurd (by linear_combination h_sum : (3 : ZMod p) = 0) h3_ne
+  · exact absurd (by linear_combination h_sum : (4 : ZMod p) = 0) h4_ne
+
+/-- 5-arm boolean cascade: from `is_X = 1` for one variant plus the
+`is_Y ∈ {0,1}` disjunctions for the other four and the specialized sum
+constraint `sum = 1`, the other four flags must be 0. Mirrors
+`Bitwise.single_op_poly` (3-arm version) extended to 5 arms by reducing
+to `four_bools_sum_zero` via `linear_combination`. The chip-level proof
+extracts `sum = 1` from `(sum_disj : sum = 0 ∨ sum = 1)` and the active
+`is_X = 1` via separate `sum_eq_one_of_eq_one_*` helpers. -/
+lemma single_op_poly
+    {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
+    (b_mul : is_mul = 0 ∨ is_mul = 1)
+    (b_mulh : is_mulh = 0 ∨ is_mulh = 1)
+    (b_mulhu : is_mulhu = 0 ∨ is_mulhu = 1)
+    (b_mulhsu : is_mulhsu = 0 ∨ is_mulhsu = 1)
+    (b_mulw : is_mulw = 0 ∨ is_mulw = 1)
+    (h_sum : is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1) :
+    (is_mul = 1 → is_mulh = 0 ∧ is_mulw = 0 ∧ is_mulhu = 0 ∧ is_mulhsu = 0) ∧
+    (is_mulh = 1 → is_mul = 0 ∧ is_mulw = 0 ∧ is_mulhu = 0 ∧ is_mulhsu = 0) ∧
+    (is_mulw = 1 → is_mul = 0 ∧ is_mulh = 0 ∧ is_mulhu = 0 ∧ is_mulhsu = 0) ∧
+    (is_mulhu = 1 → is_mul = 0 ∧ is_mulh = 0 ∧ is_mulw = 0 ∧ is_mulhsu = 0) ∧
+    (is_mulhsu = 1 → is_mul = 0 ∧ is_mulh = 0 ∧ is_mulw = 0 ∧ is_mulhu = 0) := by
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;> intro h_X
+  · have ⟨h1, h2, h3, h4⟩ := four_bools_sum_zero b_mulh b_mulhu b_mulhsu b_mulw
+      (by linear_combination h_sum - h_X)
+    exact ⟨h1, h4, h2, h3⟩
+  · have ⟨h1, h2, h3, h4⟩ := four_bools_sum_zero b_mul b_mulhu b_mulhsu b_mulw
+      (by linear_combination h_sum - h_X)
+    exact ⟨h1, h4, h2, h3⟩
+  · have ⟨h1, h2, h3, h4⟩ := four_bools_sum_zero b_mul b_mulh b_mulhu b_mulhsu
+      (by linear_combination h_sum - h_X)
+    exact ⟨h1, h2, h3, h4⟩
+  · have ⟨h1, h2, h3, h4⟩ := four_bools_sum_zero b_mul b_mulh b_mulhsu b_mulw
+      (by linear_combination h_sum - h_X)
+    exact ⟨h1, h2, h4, h3⟩
+  · have ⟨h1, h2, h3, h4⟩ := four_bools_sum_zero b_mul b_mulh b_mulhu b_mulw
+      (by linear_combination h_sum - h_X)
+    exact ⟨h1, h2, h4, h3⟩
+
+end poly_helpers
+
 end MulOperation
