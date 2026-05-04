@@ -79,6 +79,23 @@ def sp1_branch : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
+section poly_defs
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 45)
+
+def sp1_op_a_poly : BitVec 5 := BitVec.ofNat 5 Main[6].val
+
+def sp1_op_b_poly : BitVec 5 := BitVec.ofNat 5 Main[14].val
+
+def sp1_imm_poly : BitVec 13 := BitVec.ofNat 13 Main[21].val
+
+def sp1_branch_poly : SailM ExecutionResult := do
+  writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], 0])
+  pure RETIRE_SUCCESS
+
+end poly_defs
+
 namespace BEQ
 
 noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : SailM ExecutionResult := do
