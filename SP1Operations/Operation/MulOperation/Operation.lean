@@ -1,13 +1,13 @@
 import SP1Operations.Operation.U16toU8OperationSafe
 import SP1Operations.Operation.U16MSBOperation
 
-@[ext] structure MulOperation where
-    carry : Vector (Fin KB) 16
-    product : Vector (Fin KB) 16
-    b_lower_byte: U16toU8Operation (Fin KB)
-    c_lower_byte: U16toU8Operation (Fin KB)
-    b_msb : Fin KB
-    c_msb : Fin KB
-    product_msb : U16MSBOperation (Fin KB)
-    b_sign_extend : Fin KB
-    c_sign_extend : Fin KB
+@[ext] structure MulOperation (F : Type) where
+    carry : Vector F 16
+    product : Vector F 16
+    b_lower_byte: U16toU8Operation F
+    c_lower_byte: U16toU8Operation F
+    b_msb : F
+    c_msb : F
+    product_msb : U16MSBOperation F
+    b_sign_extend : F
+    c_sign_extend : F

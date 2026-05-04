@@ -41,6 +41,7 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
     ("Subw", "SubwOperation"): ("Type", False),
     ("LoadByte", "AddrAddOperation"): ("Type", False),
     ("Mul", "U16toU8OperationSafe"): ("Type", False),
+    ("Mul", "MulOperation"): ("Type", False),
 }
 
 # Chips whose top-level `<Chip>/Constraints.lean` is emitted as parametric
@@ -67,6 +68,7 @@ PARAMETRIC_CHIPS: Dict[str, Tuple[str, bool]] = {
     "LoadWord": ("Type", True),
     "LoadX0": ("Type", True),
     "Lt": ("Type", True),
+    "Mul": ("Type", True),
     "ShiftLeft": ("Type", True),
     "ShiftRight": ("Type", True),
     "StoreByte": ("Type", True),
