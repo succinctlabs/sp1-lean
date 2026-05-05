@@ -2372,6 +2372,255 @@ lemma single_op_poly
       (by linear_combination h_sum - h_X)
     exact ⟨h1, h2, h4, h3⟩
 
+/-- From `a = 1`, the four other 5-arm flags `∈ {0, 1}`, and the sum
+disjunction `Σ = 0 ∨ Σ = 1`, conclude `Σ = 1`. The `_left` slot has `a`
+in position 1. Mirrors `Mul.sum_eq_one_of_eq_one_left` (chip-level
+helper at `SP1Chips/Mul/Constraints.lean:332`) ported to op-level so
+the spec.<variant>_poly lemmas can derive `sum = 1` from raw cstrs. -/
+private lemma sum_eq_one_of_eq_one_left
+    {a b c d e : ZMod p}
+    (h_a : a = 1)
+    (b_b : b = 0 ∨ b = 1) (b_c : c = 0 ∨ c = 1)
+    (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
+    a + b + c + d + e = 1 := by
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  haveI : NeZero p := ⟨by omega⟩
+  have h2lt : (2 : ℕ) < p := by omega
+  have h3lt : (3 : ℕ) < p := by omega
+  have h4lt : (4 : ℕ) < p := by omega
+  have h5lt : (5 : ℕ) < p := by omega
+  have h1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
+  have h2_val : (2 : ZMod p).val = 2 := ZMod.val_natCast_of_lt h2lt
+  have h3_val : (3 : ZMod p).val = 3 := ZMod.val_natCast_of_lt h3lt
+  have h4_val : (4 : ZMod p).val = 4 := ZMod.val_natCast_of_lt h4lt
+  have h5_val : (5 : ZMod p).val = 5 := ZMod.val_natCast_of_lt h5lt
+  have h1_ne : (1 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h1_val, ZMod.val_zero] at this; omega
+  have h2_ne : (2 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h2_val, ZMod.val_zero] at this; omega
+  have h3_ne : (3 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h3_val, ZMod.val_zero] at this; omega
+  have h4_ne : (4 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h4_val, ZMod.val_zero] at this; omega
+  have h5_ne : (5 : ZMod p) ≠ 0 := by
+    intro h0; have := congrArg ZMod.val h0; rw [h5_val, ZMod.val_zero] at this; omega
+  rcases one_of with h | h
+  · exfalso
+    rcases b_b with rfl | rfl <;> rcases b_c with rfl | rfl <;>
+      rcases b_d with rfl | rfl <;> rcases b_e with rfl | rfl <;>
+      rw [h_a] at h <;>
+      first
+        | exact h1_ne (by linear_combination h)
+        | exact h2_ne (by linear_combination h)
+        | exact h3_ne (by linear_combination h)
+        | exact h4_ne (by linear_combination h)
+        | exact h5_ne (by linear_combination h)
+  · linear_combination h
+
+private lemma sum_eq_one_of_eq_one_2
+    {a b c d e : ZMod p}
+    (h_b : b = 1)
+    (b_a : a = 0 ∨ a = 1) (b_c : c = 0 ∨ c = 1)
+    (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
+    a + b + c + d + e = 1 := by
+  have heq : b + a + c + d + e = 1 := sum_eq_one_of_eq_one_left h_b b_a b_c b_d b_e
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+private lemma sum_eq_one_of_eq_one_3
+    {a b c d e : ZMod p}
+    (h_c : c = 1)
+    (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
+    (b_d : d = 0 ∨ d = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
+    a + b + c + d + e = 1 := by
+  have heq : c + a + b + d + e = 1 := sum_eq_one_of_eq_one_left h_c b_a b_b b_d b_e
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+private lemma sum_eq_one_of_eq_one_4
+    {a b c d e : ZMod p}
+    (h_d : d = 1)
+    (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
+    (b_c : c = 0 ∨ c = 1) (b_e : e = 0 ∨ e = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
+    a + b + c + d + e = 1 := by
+  have heq : d + a + b + c + e = 1 := sum_eq_one_of_eq_one_left h_d b_a b_b b_c b_e
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+private lemma sum_eq_one_of_eq_one_5
+    {a b c d e : ZMod p}
+    (h_e : e = 1)
+    (b_a : a = 0 ∨ a = 1) (b_b : b = 0 ∨ b = 1)
+    (b_c : c = 0 ∨ c = 1) (b_d : d = 0 ∨ d = 1)
+    (one_of : a + b + c + d + e = 0 ∨ a + b + c + d + e = 1) :
+    a + b + c + d + e = 1 := by
+  have heq : e + a + b + c + d = 1 := sum_eq_one_of_eq_one_left h_e b_a b_b b_c b_d
+    (by rcases one_of with h | h
+        · left; linear_combination h
+        · right; linear_combination h)
+  linear_combination heq
+
+set_option maxHeartbeats 32000000 in
+-- Polymorphic counterpart of `spec.mul`. Mirrors the Fin KB proof at
+-- line 1923, swapping `single_op` for `single_op_poly` (op-level) +
+-- `sum_eq_one_of_eq_one_left` to derive `is_mul = 1 → variant zeros`,
+-- and using `core_mul_poly` (16-byte carry chain) plus the byte-level
+-- bridges (`U16toU8OperationSafe.spec.return_poly`,
+-- `BWord.toWord_poly_toBitVec64_poly`, `BDWord.low_as_extract_poly`).
+lemma spec.mul_poly [Fact (2 ^ 24 < p)]
+    {aw bw cw : Word (ZMod p)} {cols : MulOperation (ZMod p)}
+    {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
+    (isU64_bw : bw.isU64_poly)
+    (isU64_cw : cw.isU64_poly)
+    (cstrs : List.Forall SP1Constraint.toProp_poly
+      (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
+    is_mul = 1 →
+      aw.isU64_poly ∧ aw.toBitVec64_poly =
+        execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MUL := by
+  intro h_one
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [allHold_constraints_iff_is_real_poly] at cstrs
+  set bbw := (U16toU8OperationSafe.constraints
+      #v[bw[0], bw[1], bw[2], bw[3]]
+      { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1],
+                         cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).1
+  set cbw := (U16toU8OperationSafe.constraints
+      #v[cw[0], cw[1], cw[2], cw[3]]
+      { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1],
+                         cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).1
+  set bbwe : Vector (ZMod p) 16 := #v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7],
+    cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255,
+    cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255]
+  set cbwe : Vector (ZMod p) 16 := #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7],
+    cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255,
+    cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255]
+  obtain ⟨u16_b_cstrs, u16_c_cstrs, _msb_op, _b_msb_constr, _c_msb_constr,
+          b_sgn_ext, c_sgn_ext,
+          p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15,
+          _aw0_w, aw0_m, _aw0_h, _aw1_w, aw1_m, _aw1_h,
+          _aw2_w, aw2_m, _aw2_h, _aw3_w, aw3_m, _aw3_h,
+          _b_msb_d, _c_msb_d, _b_sgn_d, _c_sgn_d,
+          b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, sum_d,
+          _b_sgn_b_msb, _c_sgn_c_msb,
+          c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15,
+          pp0, pp1, pp2, pp3, pp4, pp5, pp6, pp7, pp8, pp9, pp10, pp11, pp12, pp13, pp14, pp15⟩ := cstrs
+  -- Variant zeros via single_op_poly
+  have h_sum : is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1 :=
+    sum_eq_one_of_eq_one_left h_one b_mulh b_mulhu b_mulhsu b_mulw sum_d
+  have ⟨h_mulh, h_mulw, h_mulhu, h_mulhsu⟩ :=
+    (single_op_poly b_mul b_mulh b_mulhu b_mulhsu b_mulw h_sum).1 h_one
+  -- Resolve aw_*_m disjuncts (RHS arms, since is_mul = 1 ≠ 0)
+  have h_aw0 : aw[0] = cols.product[0] + cols.product[1] * 256 :=
+    aw0_m.resolve_left (by rw [h_one]; exact one_ne_zero)
+  have h_aw1 : aw[1] = cols.product[2] + cols.product[3] * 256 :=
+    aw1_m.resolve_left (by rw [h_one]; exact one_ne_zero)
+  have h_aw2 : aw[2] = cols.product[4] + cols.product[5] * 256 :=
+    aw2_m.resolve_left (by rw [h_one]; exact one_ne_zero)
+  have h_aw3 : aw[3] = cols.product[6] + cols.product[7] * 256 :=
+    aw3_m.resolve_left (by rw [h_one]; exact one_ne_zero)
+  have h_b_sgn : cols.b_sign_extend = 0 := by
+    rw [b_sgn_ext, h_mulh, h_mulhsu]; ring
+  have h_c_sgn : cols.c_sign_extend = 0 := by
+    rw [c_sgn_ext, h_mulh]; ring
+  have eq_bbw : bbw = bw.toBWord_poly :=
+    U16toU8OperationSafe.spec.return_poly (1 : ZMod p) u16_b_cstrs
+  have eq_cbw : cbw = cw.toBWord_poly :=
+    U16toU8OperationSafe.spec.return_poly (1 : ZMod p) u16_c_cstrs
+  have eq_bbwe : bbwe = BWord.extend_poly bbw false := by
+    simp [bbwe, BWord.extend_poly, h_b_sgn]
+  have eq_cbwe : cbwe = BWord.extend_poly cbw false := by
+    simp [cbwe, BWord.extend_poly, h_c_sgn]
+  have isU64_bbw : BWord.isU64_poly bbw := by
+    rw [eq_bbw]; exact Word.toBWord_poly_toU64 isU64_bw
+  have isU64_cbw : BWord.isU64_poly cbw := by
+    rw [eq_cbw]; exact Word.toBWord_poly_toU64 isU64_cw
+  -- Substitute sign-extend zeros in p0..p15. We avoid `simp [zero_mul]` so that
+  -- the residual `0 * 255` matches `BWord.extend_poly bbw false`'s definitional
+  -- reduction (its `let ext := (if false then ... else 0) * 255` does not auto-reduce).
+  rw [h_b_sgn, h_c_sgn] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+  -- Convert product bounds (`< 256` over `ZMod p`) to Nat form so they can
+  -- feed `core_mul_poly`'s `prod[i].val < 256` premises and `omega`.
+  have pp0' : cols.product[0].val < 256 := by
+    have h : cols.product[0].val < (256 : ZMod p).val := pp0
+    rwa [val_256_zmod_p] at h
+  have pp1' : cols.product[1].val < 256 := by
+    have h : cols.product[1].val < (256 : ZMod p).val := pp1
+    rwa [val_256_zmod_p] at h
+  have pp2' : cols.product[2].val < 256 := by
+    have h : cols.product[2].val < (256 : ZMod p).val := pp2
+    rwa [val_256_zmod_p] at h
+  have pp3' : cols.product[3].val < 256 := by
+    have h : cols.product[3].val < (256 : ZMod p).val := pp3
+    rwa [val_256_zmod_p] at h
+  have pp4' : cols.product[4].val < 256 := by
+    have h : cols.product[4].val < (256 : ZMod p).val := pp4
+    rwa [val_256_zmod_p] at h
+  have pp5' : cols.product[5].val < 256 := by
+    have h : cols.product[5].val < (256 : ZMod p).val := pp5
+    rwa [val_256_zmod_p] at h
+  have pp6' : cols.product[6].val < 256 := by
+    have h : cols.product[6].val < (256 : ZMod p).val := pp6
+    rwa [val_256_zmod_p] at h
+  have pp7' : cols.product[7].val < 256 := by
+    have h : cols.product[7].val < (256 : ZMod p).val := pp7
+    rwa [val_256_zmod_p] at h
+  have pp8' : cols.product[8].val < 256 := by
+    have h : cols.product[8].val < (256 : ZMod p).val := pp8
+    rwa [val_256_zmod_p] at h
+  have pp9' : cols.product[9].val < 256 := by
+    have h : cols.product[9].val < (256 : ZMod p).val := pp9
+    rwa [val_256_zmod_p] at h
+  have pp10' : cols.product[10].val < 256 := by
+    have h : cols.product[10].val < (256 : ZMod p).val := pp10
+    rwa [val_256_zmod_p] at h
+  have pp11' : cols.product[11].val < 256 := by
+    have h : cols.product[11].val < (256 : ZMod p).val := pp11
+    rwa [val_256_zmod_p] at h
+  have pp12' : cols.product[12].val < 256 := by
+    have h : cols.product[12].val < (256 : ZMod p).val := pp12
+    rwa [val_256_zmod_p] at h
+  have pp13' : cols.product[13].val < 256 := by
+    have h : cols.product[13].val < (256 : ZMod p).val := pp13
+    rwa [val_256_zmod_p] at h
+  have pp14' : cols.product[14].val < 256 := by
+    have h : cols.product[14].val < (256 : ZMod p).val := pp14
+    rwa [val_256_zmod_p] at h
+  have pp15' : cols.product[15].val < 256 := by
+    have h : cols.product[15].val < (256 : ZMod p).val := pp15
+    rwa [val_256_zmod_p] at h
+  have mul_spec :=
+    core_mul_poly bbw cbw isU64_bbw isU64_cbw false false cols.product cols.carry
+             p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+             c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+             pp0' pp1' pp2' pp3' pp4' pp5' pp6' pp7' pp8' pp9' pp10' pp11' pp12' pp13' pp14' pp15'
+  have isU128_prod : BDWord.isU128_poly cols.product := by
+    apply BDWord.isU128_of_cases_poly <;> omega
+  have isU64_prod_low : (BDWord.low_poly cols.product).isU64_poly :=
+    BDWord.isU128_poly_low_poly_isU64_poly isU128_prod
+  have aw_eq : aw = BWord.toWord_poly (BDWord.low_poly cols.product) := by
+    rw [BDWord.low_poly, BWord.toWord_poly, ← Word.eq_pointwise]
+    refine ⟨?_, ?_, ?_, ?_⟩ <;> simp [h_aw0, h_aw1, h_aw2, h_aw3]
+  have is_U64_aw : aw.isU64_poly := by
+    rw [aw_eq]; exact BWord.toWord_poly_U64_poly isU64_prod_low
+  refine ⟨is_U64_aw, ?_⟩
+  rw [exec_MUL_pure_bv_to_bw_poly _ _ .MUL isU64_bw isU64_cw]
+  simp only [execute_MUL_pure_bw_poly, ← eq_bbw, ← eq_cbw,
+             show ((mop.MUL = mop.MULH ∨ mop.MUL = mop.MULHSU) : Bool) = false from rfl,
+             show ((mop.MUL = mop.MULH ∨ mop.MUL = mop.MULHUS) : Bool) = false from rfl,
+             if_pos (rfl : mop.MUL = mop.MUL), if_true]
+  rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_low, ← mul_spec]
+  exact BDWord.low_as_extract_poly isU128_prod
+
 end poly_helpers
 
 end MulOperation

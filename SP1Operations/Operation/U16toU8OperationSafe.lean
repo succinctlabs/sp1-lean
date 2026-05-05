@@ -173,4 +173,22 @@ lemma spec.unsafe.return_poly
       | (rw [← hdiv2]; exact (ZMod.natCast_zmod_val _).symm)
       | (rw [← hdiv3]; exact (ZMod.natCast_zmod_val _).symm)
 
+/-- Polymorphic counterpart of `spec.return`. The `.1` projection of
+`U16toU8OperationSafe.constraints` is definitionally the same byte
+vector as `U16toU8OperationUnsafe.constraints.1` (only the trailing
+constraint list differs), so we can dispatch to `spec.unsafe.return_poly`
+after a definitional bridge. -/
+lemma spec.return_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  {u16_values : (Vector (ZMod p) 4)}
+  {cols : U16toU8Operation (ZMod p)}
+  (is_real : ZMod p) :
+  List.Forall SP1Constraint.toProp_poly (constraints u16_values cols 1).2 →
+    (constraints u16_values cols is_real).1 = Word.toBWord_poly u16_values
+  := by
+    intro cstrs
+    have h_unsafe := spec.unsafe.return_poly cstrs
+    simp [constraints, U16toU8OperationUnsafe.constraints] at h_unsafe ⊢
+    exact h_unsafe
+
 end U16toU8OperationSafe
