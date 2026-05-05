@@ -4421,4 +4421,35 @@ lemma spec.remuw :
 
 end divuw_remuw
 
+section poly_helpers
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+/-- Polymorphic counterpart of `is_real`. -/
+@[simp] def is_real_poly (Main : Vector (ZMod p) 246) : Prop :=
+  Main[244] = 1
+
+@[simp] def is_div_poly   (Main : Vector (ZMod p) 246) : Prop := Main[201] = 1
+@[simp] def is_divu_poly  (Main : Vector (ZMod p) 246) : Prop := Main[202] = 1
+@[simp] def is_rem_poly   (Main : Vector (ZMod p) 246) : Prop := Main[203] = 1
+@[simp] def is_remu_poly  (Main : Vector (ZMod p) 246) : Prop := Main[204] = 1
+@[simp] def is_divw_poly  (Main : Vector (ZMod p) 246) : Prop := Main[205] = 1
+@[simp] def is_remw_poly  (Main : Vector (ZMod p) 246) : Prop := Main[206] = 1
+@[simp] def is_divuw_poly (Main : Vector (ZMod p) 246) : Prop := Main[207] = 1
+@[simp] def is_remuw_poly (Main : Vector (ZMod p) 246) : Prop := Main[208] = 1
+
+/-- Polymorphic counterpart of `sp1_op_a`. -/
+@[simp] def sp1_op_a_poly (Main : Vector (ZMod p) 246) : BitVec 5 :=
+  BitVec.ofNat 5 Main[6].val
+
+/-- Polymorphic counterpart of `sp1_op_b`. -/
+@[simp] def sp1_op_b_poly (Main : Vector (ZMod p) 246) : BitVec 5 :=
+  BitVec.ofNat 5 Main[14].val
+
+/-- Polymorphic counterpart of `sp1_op_c`. -/
+@[simp] def sp1_op_c_poly (Main : Vector (ZMod p) 246) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+
+end poly_helpers
+
 end DivRem
