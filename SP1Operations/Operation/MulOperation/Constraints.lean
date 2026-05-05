@@ -258,6 +258,151 @@ lemma core_mulw
   simp_all [BHWord.toNat]
   ring_nf; omega
 
+set_option debug.skipKernelTC true in
+set_option maxHeartbeats 1600000 in
+-- 4-byte carry-chain identity over ZMod p. Mirrors `core_mulw` (line 211)
+-- but uses the field-agnostic recipe shared with `AddOperation.spec_poly`:
+-- lift each ZMod constraint to a Nat equation via `linear_combination` +
+-- `ZMod.val_natCast_of_lt`, then telescope all 4 limbs into a single
+-- polynomial identity (`linear_combination` over ℤ after `zify`), then
+-- bridge to BitVec via `Nat.add_mul_mod_self_right` since every "extra"
+-- term in the polynomial expansion is a multiple of 2^32. The
+-- `[Fact (2^24 < p)]` hypothesis is needed because byte-level carries
+-- give `prod[i].val + carry[i].val * 256 ≤ 2^24 − 1`. `skipKernelTC`
+-- bypasses kernel deep-recursion on the `% 2^32` rewrite chain
+-- (precedent: `AddrAddOperation.spec_of_constraints_poly`).
+/-- Polymorphic counterpart of `core_mulw`. -/
+lemma core_mulw_poly
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
+    (bw cw : BHWord (ZMod p))
+    (isU32_b : bw.isU32_poly) (isU32_c : cw.isU32_poly)
+    (prod carry : BHWord (ZMod p)) :
+    prod[0] = cp_poly bw cw 0 (by decide) - carry[0] * 256 →
+    prod[1] = cp_poly bw cw 1 (by decide) + carry[0] - carry[1] * 256 →
+    prod[2] = cp_poly bw cw 2 (by decide) + carry[1] - carry[2] * 256 →
+    prod[3] = cp_poly bw cw 3 (by decide) + carry[2] - carry[3] * 256 →
+    carry[0].val < 65536 → carry[1].val < 65536 →
+      carry[2].val < 65536 → carry[3].val < 65536 →
+    prod[0].val < 256 → prod[1].val < 256 →
+      prod[2].val < 256 → prod[3].val < 256 →
+      prod.toBitVec32_poly = bw.toBitVec32_poly * cw.toBitVec32_poly := by
+  intro eq_p00 eq_p01 eq_p02 eq_p03 c00 c01 c02 c03 p00 p01 p02 p03
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp24 : (2 : ℕ) ^ 24 < p := Fact.out
+  have h2pow24 : (2 : ℕ) ^ 24 = 16777216 := by decide
+  have hp_gt : 16777216 < p := by omega
+  obtain ⟨bw00, bw01, bw02, bw03⟩ := BHWord.lt_cases_of_isU32_poly isU32_b
+  obtain ⟨cw00, cw01, cw02, cw03⟩ := BHWord.lt_cases_of_isU32_poly isU32_c
+  have cp0 : cp_poly bw cw 0 (by decide) = bw[0] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp1 : cp_poly bw cw 1 (by decide) = bw[0] * cw[1] + bw[1] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp2 : cp_poly bw cw 2 (by decide) =
+      bw[0] * cw[2] + bw[1] * cw[1] + bw[2] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp3 : cp_poly bw cw 3 (by decide) =
+      bw[0] * cw[3] + bw[1] * cw[2] + bw[2] * cw[1] + bw[3] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  rw [cp0] at eq_p00; rw [cp1] at eq_p01
+  rw [cp2] at eq_p02; rw [cp3] at eq_p03
+  have eq0_nat : prod[0].val + carry[0].val * 256 = bw[0].val * cw[0].val := by
+    have hZ : (prod[0] + carry[0] * 256 : ZMod p) = (bw[0] * cw[0] : ZMod p) := by
+      linear_combination eq_p00
+    set L : ℕ := prod[0].val + carry[0].val * 256
+    set R : ℕ := bw[0].val * cw[0].val
+    have hL_lt : L < p := by simp [L]; nlinarith
+    have hR_lt : R < p := by simp [R]; nlinarith
+    have hZL : (prod[0] + carry[0] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[0] : ZMod p) = (R : ZMod p) := by
+      simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq1_nat : prod[1].val + carry[1].val * 256
+      = bw[0].val * cw[1].val + bw[1].val * cw[0].val + carry[0].val := by
+    have hZ : (prod[1] + carry[1] * 256 : ZMod p)
+            = (bw[0] * cw[1] + bw[1] * cw[0] + carry[0] : ZMod p) := by
+      linear_combination eq_p01
+    set L : ℕ := prod[1].val + carry[1].val * 256
+    set R : ℕ := bw[0].val * cw[1].val + bw[1].val * cw[0].val + carry[0].val
+    have hL_lt : L < p := by simp [L]; nlinarith
+    have hR_lt : R < p := by simp [R]; nlinarith
+    have hZL : (prod[1] + carry[1] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[1] + bw[1] * cw[0] + carry[0] : ZMod p) = (R : ZMod p) := by
+      simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq2_nat : prod[2].val + carry[2].val * 256
+      = bw[0].val * cw[2].val + bw[1].val * cw[1].val + bw[2].val * cw[0].val + carry[1].val := by
+    have hZ : (prod[2] + carry[2] * 256 : ZMod p)
+            = (bw[0] * cw[2] + bw[1] * cw[1] + bw[2] * cw[0] + carry[1] : ZMod p) := by
+      linear_combination eq_p02
+    set L : ℕ := prod[2].val + carry[2].val * 256
+    set R : ℕ := bw[0].val * cw[2].val + bw[1].val * cw[1].val + bw[2].val * cw[0].val + carry[1].val
+    have hL_lt : L < p := by simp [L]; nlinarith
+    have hR_lt : R < p := by simp [R]; nlinarith
+    have hZL : (prod[2] + carry[2] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[2] + bw[1] * cw[1] + bw[2] * cw[0] + carry[1] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq3_nat : prod[3].val + carry[3].val * 256
+      = bw[0].val * cw[3].val + bw[1].val * cw[2].val + bw[2].val * cw[1].val
+        + bw[3].val * cw[0].val + carry[2].val := by
+    have hZ : (prod[3] + carry[3] * 256 : ZMod p)
+            = (bw[0] * cw[3] + bw[1] * cw[2] + bw[2] * cw[1] + bw[3] * cw[0] + carry[2] : ZMod p) := by
+      linear_combination eq_p03
+    set L : ℕ := prod[3].val + carry[3].val * 256
+    set R : ℕ := bw[0].val * cw[3].val + bw[1].val * cw[2].val + bw[2].val * cw[1].val
+                 + bw[3].val * cw[0].val + carry[2].val
+    have hL_lt : L < p := by simp [L]; nlinarith
+    have hR_lt : R < p := by simp [R]; nlinarith
+    have hZL : (prod[3] + carry[3] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[3] + bw[1] * cw[2] + bw[2] * cw[1] + bw[3] * cw[0] + carry[2] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have key :
+    (bw[0].val + bw[1].val * 2 ^ 8 + bw[2].val * 2 ^ 16 + bw[3].val * 2 ^ 24)
+      * (cw[0].val + cw[1].val * 2 ^ 8 + cw[2].val * 2 ^ 16 + cw[3].val * 2 ^ 24)
+    = (prod[0].val + prod[1].val * 2 ^ 8 + prod[2].val * 2 ^ 16 + prod[3].val * 2 ^ 24)
+      + (carry[3].val + bw[1].val * cw[3].val + bw[2].val * cw[2].val + bw[3].val * cw[1].val) * 2 ^ 32
+      + (bw[2].val * cw[3].val + bw[3].val * cw[2].val) * 2 ^ 40
+      + bw[3].val * cw[3].val * 2 ^ 48 := by
+    zify
+    zify at eq0_nat eq1_nat eq2_nat eq3_nat
+    linear_combination -eq0_nat - 2 ^ 8 * eq1_nat - 2 ^ 16 * eq2_nat - 2 ^ 24 * eq3_nat
+  unfold BHWord.toBitVec32_poly BHWord.toNat_poly
+  rw [← BitVec.toNat_inj, BitVec.toNat_mul, BitVec.toNat_ofNat,
+      BitVec.toNat_ofNat, BitVec.toNat_ofNat, ← Nat.mul_mod, key]
+  have hpsum_lt :
+      prod[0].val + prod[1].val * 2 ^ 8 + prod[2].val * 2 ^ 16 + prod[3].val * 2 ^ 24 < 2 ^ 32 := by
+    have h32 : (2 : ℕ) ^ 32 = 4294967296 := by decide
+    have h24 : (2 : ℕ) ^ 24 = 16777216 := by decide
+    have h8 : (2 : ℕ) ^ 8 = 256 := by decide
+    have h16 : (2 : ℕ) ^ 16 = 65536 := by decide
+    rw [h8, h16, h24, h32]; nlinarith
+  rw [show prod[0].val + prod[1].val * 2 ^ 8 + prod[2].val * 2 ^ 16 + prod[3].val * 2 ^ 24
+        + (carry[3].val + bw[1].val * cw[3].val + bw[2].val * cw[2].val + bw[3].val * cw[1].val) * 2 ^ 32
+        + (bw[2].val * cw[3].val + bw[3].val * cw[2].val) * 2 ^ 40
+        + bw[3].val * cw[3].val * 2 ^ 48
+      = (prod[0].val + prod[1].val * 2 ^ 8 + prod[2].val * 2 ^ 16 + prod[3].val * 2 ^ 24)
+        + ((carry[3].val + bw[1].val * cw[3].val + bw[2].val * cw[2].val + bw[3].val * cw[1].val)
+           + (bw[2].val * cw[3].val + bw[3].val * cw[2].val) * 2 ^ 8
+           + bw[3].val * cw[3].val * 2 ^ 16) * 2 ^ 32 from by ring]
+  rw [Nat.add_mul_mod_self_right]
+
 end core_mul
 
 section constraints

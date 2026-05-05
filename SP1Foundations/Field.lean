@@ -318,6 +318,14 @@ code that pins `F := Fin KB = ZMod KB` synthesizes the polymorphic helpers
 automatically. -/
 instance KoalaBear.Fact_2pow17_lt_KB : Fact (2 ^ 17 < KB) := ⟨by decide⟩
 
+/-- Strengthened version of the polymorphic prime-size hypothesis used by the
+Mul `_poly` operation lemmas (`core_mul_poly` / `core_mulw_poly` and the
+five `MulOperation.spec.<variant>_poly` lemmas). The byte-level carry chain
+needs `prod[i].val + carry[i].val * 256 < p` (max ≤ 2 ^ 24 − 1) to lift
+the ZMod constraints to Nat equations cleanly. KB ≈ 2^31 satisfies this
+trivially; BabyBear and Mersenne31 do as well. -/
+instance KoalaBear.Fact_2pow24_lt_KB : Fact (2 ^ 24 < KB) := ⟨by decide⟩
+
 /-! ### KB-specific simp lemmas operating on the symbolic `(N : Fin KB)⁻¹` form
 
 The constraint compiler now emits inverses symbolically (e.g. `(65536 : Fin KB)⁻¹`
