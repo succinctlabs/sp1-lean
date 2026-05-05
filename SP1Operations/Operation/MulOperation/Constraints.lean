@@ -3070,6 +3070,190 @@ lemma spec.mulhsu_poly [Fact (2 ^ 24 < p)]
   rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_high, ← mul_spec]
   exact BDWord.high_as_extract_poly isU128_prod
 
+set_option maxHeartbeats 32000000 in
+-- Polymorphic counterpart of `spec.mulw`. 32-bit signed multiplication
+-- with sign-extension to 64 bits. Uses `core_mulw_poly` (4-byte carry chain)
+-- and `BHWord.extend_true_is_signExtend_poly` for the final sign-extend
+-- bridge. The aw[2], aw[3] upper limbs come from `cols.product_msb.msb`
+-- (the MSB of the 32-bit product) via `U16MSBOperation.spec_poly`.
+lemma spec.mulw_poly [Fact (2 ^ 24 < p)]
+    {aw bw cw : Word (ZMod p)} {cols : MulOperation (ZMod p)}
+    {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
+    (isU64_bw : bw.isU64_poly)
+    (isU64_cw : cw.isU64_poly)
+    (cstrs : List.Forall SP1Constraint.toProp_poly
+      (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
+    is_mulw = 1 →
+      aw.isU64_poly ∧ aw.toBitVec64_poly =
+        execute_MULW_pure bw.toBitVec64_poly cw.toBitVec64_poly := by
+  intro h_one
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h65536_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  rw [allHold_constraints_iff_is_real_poly] at cstrs
+  set bbw := (U16toU8OperationSafe.constraints
+      #v[bw[0], bw[1], bw[2], bw[3]]
+      { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1],
+                         cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).1
+  set cbw := (U16toU8OperationSafe.constraints
+      #v[cw[0], cw[1], cw[2], cw[3]]
+      { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1],
+                         cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).1
+  obtain ⟨u16_b_cstrs, u16_c_cstrs, u16_msb, _b_msb_constr, _c_msb_constr,
+          _b_sgn_ext, _c_sgn_ext,
+          p0, p1, p2, p3, _p4, _p5, _p6, _p7, _p8, _p9, _p10, _p11, _p12, _p13, _p14, _p15,
+          aw0_w, _aw0_m, _aw0_h, aw1_w, _aw1_m, _aw1_h,
+          aw2_w, _aw2_m, _aw2_h, aw3_w, _aw3_m, _aw3_h,
+          _b_msb_d, _c_msb_d, _b_sgn_d, _c_sgn_d,
+          b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, sum_d,
+          _b_sgn_b_msb, _c_sgn_c_msb,
+          _c0, _c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12, _c13, _c14, _c15,
+          pp0, pp1, pp2, pp3, _pp4, _pp5, _pp6, _pp7, _pp8, _pp9, _pp10, _pp11, _pp12, _pp13, _pp14, _pp15⟩ := cstrs
+  -- Variant zeros via single_op_poly (mulw is slot 5 → use sum_eq_one_of_eq_one_5
+  -- and `.2.2.1` arm).
+  have h_sum : is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1 :=
+    sum_eq_one_of_eq_one_5 h_one b_mul b_mulh b_mulhu b_mulhsu sum_d
+  have ⟨h_mul, h_mulh, h_mulhu, h_mulhsu⟩ :=
+    (single_op_poly b_mul b_mulh b_mulhu b_mulhsu b_mulw h_sum).2.2.1 h_one
+  -- Resolve aw_*_w disjuncts via h_one : is_mulw = 1 ≠ 0
+  have h_aw0 : aw[0] = cols.product[0] + cols.product[1] * 256 :=
+    aw0_w.resolve_left (by rw [h_one]; exact one_ne_zero)
+  have h_aw1 : aw[1] = cols.product[2] + cols.product[3] * 256 :=
+    aw1_w.resolve_left (by rw [h_one]; exact one_ne_zero)
+  have h_aw2 : aw[2] = cols.product_msb.msb * 65535 :=
+    aw2_w.resolve_left (by rw [h_one]; exact one_ne_zero)
+  have h_aw3 : aw[3] = cols.product_msb.msb * 65535 :=
+    aw3_w.resolve_left (by rw [h_one]; exact one_ne_zero)
+  -- Identify bbw/cbw with toBWord_poly via U16toU8 spec.
+  have eq_bbw : bbw = bw.toBWord_poly :=
+    U16toU8OperationSafe.spec.return_poly (1 : ZMod p) u16_b_cstrs
+  have eq_cbw : cbw = cw.toBWord_poly :=
+    U16toU8OperationSafe.spec.return_poly (1 : ZMod p) u16_c_cstrs
+  have isU64_bbw : BWord.isU64_poly bbw := by
+    rw [eq_bbw]; exact Word.toBWord_poly_toU64 isU64_bw
+  have isU64_cbw : BWord.isU64_poly cbw := by
+    rw [eq_cbw]; exact Word.toBWord_poly_toU64 isU64_cw
+  -- Define BHWord views: hbw, hcw are low-32-bits of bbw, cbw; ahw is the
+  -- 32-bit product (low 4 bytes of cols.product).
+  set hbw : BHWord (ZMod p) := #v[bbw[0], bbw[1], bbw[2], bbw[3]]
+  set hcw : BHWord (ZMod p) := #v[cbw[0], cbw[1], cbw[2], cbw[3]]
+  set ahw : BHWord (ZMod p) := #v[cols.product[0], cols.product[1], cols.product[2], cols.product[3]]
+  -- Convert pp0..pp3 to Nat-form bounds.
+  have pp0' : cols.product[0].val < 256 := by
+    have h : cols.product[0].val < (256 : ZMod p).val := pp0
+    rwa [val_256_zmod_p] at h
+  have pp1' : cols.product[1].val < 256 := by
+    have h : cols.product[1].val < (256 : ZMod p).val := pp1
+    rwa [val_256_zmod_p] at h
+  have pp2' : cols.product[2].val < 256 := by
+    have h : cols.product[2].val < (256 : ZMod p).val := pp2
+    rwa [val_256_zmod_p] at h
+  have pp3' : cols.product[3].val < 256 := by
+    have h : cols.product[3].val < (256 : ZMod p).val := pp3
+    rwa [val_256_zmod_p] at h
+  have isU32_ahw : BHWord.isU32_poly ahw := by
+    apply BHWord.isU32_of_cases_poly <;> simp [ahw] <;> omega
+  have isU32_hbw : BHWord.isU32_poly hbw := by
+    have := BWord.isU64_low_isU32_poly isU64_bbw
+    simp [hbw, BWord.low_poly] at *
+    exact this
+  have isU32_hcw : BHWord.isU32_poly hcw := by
+    have := BWord.isU64_low_isU32_poly isU64_cbw
+    simp [hcw, BWord.low_poly] at *
+    exact this
+  -- The U16MSB constraint on aw[1] tells us cols.product_msb.msb = if (aw[1].val ≥ 32768) then 1 else 0.
+  -- After substituting h_aw1, aw[1] = product[2] + product[3]*256. We need to show this is < 65536.
+  have h_aw1_isU16 : aw[1].val < 65536 := by
+    rw [h_aw1]
+    have h_p2 : cols.product[2].val < 256 := pp2'
+    have h_p3 : cols.product[3].val < 256 := pp3'
+    have h_p3_256_val : (cols.product[3] * 256).val = cols.product[3].val * 256 := by
+      rw [ZMod.val_mul_of_lt (by rw [val_256_zmod_p]; nlinarith), val_256_zmod_p]
+    rw [ZMod.val_add_of_lt (by rw [h_p3_256_val]; omega), h_p3_256_val]
+    omega
+  rw [h_one] at u16_msb
+  have msb_spec : cols.product_msb.msb = if aw[1].val ≥ 32768 then 1 else 0 :=
+    U16MSBOperation.spec_poly h_aw1_isU16 u16_msb
+  -- Show ahw is the low half of the product, and aw equals BWord.toWord_poly (BHWord.extend_poly ahw true).
+  have eq_ahw_isNeg : ahw.isNegative_poly ↔ aw[1].val ≥ 32768 := by
+    -- ahw = #v[product[0], product[1], product[2], product[3]]
+    -- ahw.isNegative_poly := ahw[3].val ≥ 128 := product[3].val ≥ 128
+    -- aw[1].val = product[2].val + product[3].val * 256
+    -- aw[1].val ≥ 32768 ↔ product[3].val ≥ 128 (given product[2].val < 256)
+    simp only [BHWord.isNegative_poly, ahw, Vector.getElem_mk, List.getElem_toArray,
+               List.getElem_cons_succ, List.getElem_cons_zero]
+    rw [h_aw1]
+    have h_p3_256_val : (cols.product[3] * 256).val = cols.product[3].val * 256 := by
+      rw [ZMod.val_mul_of_lt (by rw [val_256_zmod_p]; nlinarith), val_256_zmod_p]
+    rw [ZMod.val_add_of_lt (by rw [h_p3_256_val]; nlinarith [pp2', pp3']), h_p3_256_val]
+    constructor <;> intro h <;> [nlinarith [pp2']; omega]
+  have eq_aw : aw = BWord.toWord_poly (BHWord.extend_poly ahw true) := by
+    rw [BWord.toWord_poly]
+    apply (Word.eq_pointwise.mp _).symm
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · -- aw[0] = byte_combine(product[0], product[1])
+      simp [BHWord.extend_poly, ahw, h_aw0]
+    · simp [BHWord.extend_poly, ahw, h_aw1]
+    · -- aw[2] = product_msb.msb * 65535 = ext + ext * 256 where ext = (if isNeg then 1 else 0) * 255.
+      simp [BHWord.extend_poly, BWord.toWord_poly, h_aw2, msb_spec]
+      by_cases h : aw[1].val ≥ 32768
+      · have hneg : ahw.isNegative_poly := eq_ahw_isNeg.mpr h
+        simp [h, hneg]; norm_num
+      · have hneg : ¬ ahw.isNegative_poly := fun h' => h (eq_ahw_isNeg.mp h')
+        simp [h, hneg]
+    · simp [BHWord.extend_poly, BWord.toWord_poly, h_aw3, msb_spec]
+      by_cases h : aw[1].val ≥ 32768
+      · have hneg : ahw.isNegative_poly := eq_ahw_isNeg.mpr h
+        simp [h, hneg]; norm_num
+      · have hneg : ¬ ahw.isNegative_poly := fun h' => h (eq_ahw_isNeg.mp h')
+        simp [h, hneg]
+  have is_U64_aw : aw.isU64_poly := by
+    rw [eq_aw]
+    apply BWord.toWord_poly_U64_poly
+    exact BHWord.extend_U32_U64_poly isU32_ahw true
+  refine ⟨is_U64_aw, ?_⟩
+  -- Bridge to BitVec form via exec_MULW + BHWord.extend_true_is_signExtend_poly + core_mulw_poly.
+  rw [eq_aw, BWord.toWord_poly_toBitVec64_poly (BHWord.extend_U32_U64_poly isU32_ahw true)]
+  rw [BHWord.extend_true_is_signExtend_poly isU32_ahw]
+  rw [exec_MULW_pure_bv_to_bhw_poly _ _ isU64_bw isU64_cw]
+  simp only [execute_MULW_pure_bhw_poly, BitVec.extend]
+  -- Goal now: signExtend 64 ahw.toBitVec32_poly = signExtend 64 (low_bbw * low_cbw)
+  -- Need: ahw.toBitVec32_poly = low_bbw * low_cbw
+  -- Use core_mulw_poly.
+  congr 1
+  -- First bridge `BWord.low_poly bw.toBWord_poly` to `hbw` and similarly for c.
+  have eq_hbw : BWord.low_poly bw.toBWord_poly = hbw := by
+    simp [hbw, BWord.low_poly, ← eq_bbw]
+  have eq_hcw : BWord.low_poly cw.toBWord_poly = hcw := by
+    simp [hcw, BWord.low_poly, ← eq_cbw]
+  rw [eq_hbw, eq_hcw]
+  -- Now apply core_mulw_poly.
+  -- p0..p3 use `cp_poly bbwe cbwe i` form (16-vector). For mulw, we need
+  -- `cp_poly hbw hcw i` (4-vector). Bridge: cp_poly bbwe cbwe i = cp_poly hbw hcw i for i ∈ {0,1,2,3}.
+  -- Since bbwe[0..3] = bbw[0..3] = hbw[0..3] and same for c, the cross-product values agree.
+  have eq_cp : ∀ i (h : i < 4),
+      cp_poly (#v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7],
+                  cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255,
+                  cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255,
+                  cols.b_sign_extend * 255, cols.b_sign_extend * 255] : Vector (ZMod p) 16)
+              #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7],
+                 cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255,
+                 cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255,
+                 cols.c_sign_extend * 255, cols.c_sign_extend * 255] i (by omega) =
+      cp_poly hbw hcw i h := by
+    intro i hi
+    interval_cases i <;>
+      simp [cp_poly, hbw, hcw, Vector.ofFn, Vector.get]
+  rw [eq_cp 0 (by decide)] at p0
+  rw [eq_cp 1 (by decide)] at p1
+  rw [eq_cp 2 (by decide)] at p2
+  rw [eq_cp 3 (by decide)] at p3
+  apply core_mulw_poly hbw hcw isU32_hbw isU32_hcw
+                    #v[cols.product[0], cols.product[1], cols.product[2], cols.product[3]]
+                    #v[cols.carry[0], cols.carry[1], cols.carry[2], cols.carry[3]]
+                    p0 p1 p2 p3
+                    _c0 _c1 _c2 _c3 pp0' pp1' pp2' pp3'
+
 end poly_helpers
 
 end MulOperation
