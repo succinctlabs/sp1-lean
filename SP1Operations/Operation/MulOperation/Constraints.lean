@@ -2640,9 +2640,9 @@ private lemma msb_to_isNegative_eq
   by_cases h_neg : w[7].val ≥ 128
   · rw [if_pos h_neg]
     apply b_msb_iff.mpr
-    show (128 : ZMod p).val ≤ w[7].val
+    change (128 : ZMod p).val ≤ w[7].val
     rw [h128_val]; exact h_neg
-  · push_neg at h_neg
+  · push Not at h_neg
     rw [if_neg (by omega : ¬ w[7].val ≥ 128)]
     rcases b_msb_disj with h0 | h1
     · exact h0
