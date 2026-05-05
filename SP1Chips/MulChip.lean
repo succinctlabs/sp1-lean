@@ -394,3 +394,94 @@ theorem correct_mul_poly
     simp [bitVecToRegidxVal]
 
 end Mul.Poly
+
+namespace Mulh.Poly
+
+open Mul
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
+  (Main : Vector (ZMod p) 82)
+  (s : SailState)
+
+noncomputable def spec_mulh_poly (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_MUL rs2 rs1 rd { result_part := .High, signed_rs1 := .Signed, signed_rs2 := .Signed }
+  pure ()
+
+def sp1_mulh_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]])
+
+open Sail
+
+set_option maxHeartbeats 8000000 in
+-- 8M heartbeats: see correct_mul_poly comment.
+theorem correct_mulh_poly
+    (cstrs : (Mul.constraints Main).allHold_poly)
+    (h_is_mulh : Mul.is_mulh_poly Main)
+    (state_cstrs : (Mul.constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_mulh_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_mulh_poly Main).run s := by
+  obtain ⟨h_78, h_M30⟩ := h_is_mulh
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have ⟨h_77, h_79, h_80, h_81⟩ := (Mul.single_op_poly Main cstrs).2.1 h_78
+  have h_is_real_eq_one := Mul.is_real_eq_one_of_mulh Main cstrs h_78
+  have ⟨is_U64_b, is_U64_c⟩ := Mul.ops_U64_b_c_poly Main cstrs h_is_real_eq_one
+  have h12_val : (12 : ZMod p).val = 12 :=
+    ZMod.val_natCast_of_lt (by omega : (12 : ℕ) < p)
+  simp only [SP1ConstraintList.allHold_poly, Mul.constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨mul_op_cstrs, cpu_cstrs⟩, reader_cstrs⟩, _, _, _, _, _, _, _⟩ := cstrs
+  rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at cpu_cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at reader_cstrs
+  simp [h_77, h_78, h_79, h_80, h_81, Opcode.ofNat, Nat.ble, h12_val] at reader_cstrs
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b', is_U64_c'⟩⟩, _⟩⟩ := reader_cstrs
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  have h6 : Main[6].val < 32 := by
+    have : Main[6].val < (32 : ZMod p).val := h_op_a_lt
+    rwa [h32] at this
+  have h14 : Main[14].val < 32 := by
+    have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1
+    rwa [h32] at this
+  have h21 : Main[21].val < 32 := by
+    have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
+    rwa [h32] at this
+  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp_poly,
+    List.Forall, MulOperation.constraints, U16toU8OperationSafe.constraints,
+    U16MSBOperation.constraints, CPUState.constraints, RTypeReader.constraints,
+    h6, h14, h21, h_77, h_78, h_79, h_80, h_81, h_M30, h_is_real_eq_one] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  rw [h_is_real_eq_one] at mul_op_cstrs
+  have ⟨is_U64_aw, aw_eq⟩ :=
+    MulOperation.spec.mulh_poly is_U64_b is_U64_c mul_op_cstrs h_78
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [spec_mulh_poly, sp1_mulh_poly, execute, execute_MUL']
+  rw [run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  rw [show mop_of_mul_op { result_part := .High, signed_rs1 := .Signed, signed_rs2 := .Signed }
+      = mop.MULH from rfl]
+  rw [← aw_eq]
+  have h17 : 2 ^ 17 < p := Fact.out
+  have h_pc3 : Main[3].val < 65536 := by
+    have h3 : Main[3] < (65536 : ZMod p) := by simp_all
+    have : Main[3].val < (65536 : ZMod p).val := h3
+    rwa [val_65536_zmod_p] at this
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · simp_all
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
+
+end Mulh.Poly
