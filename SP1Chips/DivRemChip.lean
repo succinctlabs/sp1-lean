@@ -63,6 +63,45 @@ lemma correct_prologue_facts
     sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8,
     read_pc, read_op_a, read_op_b, read_op_c⟩
 
+section poly_prologue
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 246)
+
+/-- Polymorphic counterpart of `correct_prologue_facts` covering the
+variant-INDEPENDENT facts available without the active variant flag in scope:
+register bounds (`op_a < 32`, `op_b/op_c/pc[0] < 65536`), the U64 shapes for
+`op_b`/`op_c`, the `op_a = 0 → result = 0` implication, and the eight
+`sop_i` mutual-exclusion implications. The op_b/op_c bounds at `< 32` and
+the four state-side reads remain variant-dependent and are derived per-arm
+in each `correct_<v>_poly`. -/
+lemma correct_prologue_facts_poly
+  (cstrs : (constraints Main).allHold_poly)
+  (h_is_real : is_real_poly Main) :
+  Main[6].val < 32 ∧
+  Main[14].val < 65536 ∧
+  Main[21].val < 65536 ∧
+  Main[3].val < 65536 ∧
+  Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+  Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] ∧
+  (Main[6] = 0 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0) ∧
+  (Main[201] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[202] = 1 → Main[201] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[203] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[204] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[205] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[206] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+  (Main[207] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0) ∧
+  (Main[208] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0) := by
+  obtain ⟨ha, hb, hc, hpc⟩ := register_bounds_poly Main cstrs h_is_real
+  obtain ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_is_real
+  have h_a0 := op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op_poly Main cstrs
+  exact ⟨ha, hb, hc, hpc, is_U64_b, is_U64_c, h_a0,
+    sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩
+
+end poly_prologue
+
 def sp1_op : SailM Unit := do
   let op_a := sp1_op_a Main cstrs h_is_real
   Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
