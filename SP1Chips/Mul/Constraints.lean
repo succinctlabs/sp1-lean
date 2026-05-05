@@ -499,6 +499,55 @@ lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 82)
   obtain ⟨_, _, _, h_isU64_b, h_isU64_c⟩ := h_complex
   exact ⟨h_isU64_b, h_isU64_c⟩
 
+/-- Derive `Main[77] + ... + Main[81] = 1` from cstrs + `Main[77] = 1`.
+Used by chip-level `correct_mul_poly` so that downstream helpers
+(`ops_U64_b_c_poly`, `register_bounds_poly`) can be invoked with raw
+cstrs + this single derived fact. -/
+lemma is_real_eq_one_of_mul (Main : Vector (ZMod p) 82)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (h_77 : Main[77] = 1) :
+    Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨_, _b_77, b_78, b_79, b_81, b_80, sum_disj, _⟩ := cstrs
+  exact sum_eq_one_of_eq_one_left h_77 b_78 b_79 b_80 b_81 sum_disj
+
+lemma is_real_eq_one_of_mulh (Main : Vector (ZMod p) 82)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (h_78 : Main[78] = 1) :
+    Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨_, b_77, _b_78, b_79, b_81, b_80, sum_disj, _⟩ := cstrs
+  exact sum_eq_one_of_eq_one_2 h_78 b_77 b_79 b_80 b_81 sum_disj
+
+lemma is_real_eq_one_of_mulhu (Main : Vector (ZMod p) 82)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (h_79 : Main[79] = 1) :
+    Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨_, b_77, b_78, _b_79, b_81, b_80, sum_disj, _⟩ := cstrs
+  exact sum_eq_one_of_eq_one_3 h_79 b_77 b_78 b_80 b_81 sum_disj
+
+lemma is_real_eq_one_of_mulhsu (Main : Vector (ZMod p) 82)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (h_80 : Main[80] = 1) :
+    Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨_, b_77, b_78, b_79, b_81, _b_80, sum_disj, _⟩ := cstrs
+  exact sum_eq_one_of_eq_one_4 h_80 b_77 b_78 b_79 b_81 sum_disj
+
+lemma is_real_eq_one_of_mulw (Main : Vector (ZMod p) 82)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (h_81 : Main[81] = 1) :
+    Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1 := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨_, b_77, b_78, b_79, _b_81, b_80, sum_disj, _⟩ := cstrs
+  exact sum_eq_one_of_eq_one_5 h_81 b_77 b_78 b_79 b_80 sum_disj
+
 end poly_helpers
 
 end Mul
