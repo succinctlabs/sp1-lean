@@ -4508,6 +4508,139 @@ lemma register_bounds_poly (Main : Vector (ZMod p) 246)
   · have : Main[3].val < ((65536 : ℕ) : ZMod p).val := h_pc0_lt
     rwa [h65536_val] at this
 
+/-- 8-way mutual exclusion: from 8 boolean disjunctions and their left-associated
+sum equaling 1, with the leftmost flag active, derive that all others are 0.
+The proof bridges to `Nat` via `ZMod.val` chained through 7 `ZMod.val_add_of_lt`
+steps (each running sum `< 8 < p` since `Fact (2 ^ 17 < p)`), then closes via
+`omega` on the resulting Nat-arithmetic constraint. -/
+private lemma eight_mutex_left
+    {a₁ a₂ a₃ a₄ a₅ a₆ a₇ a₈ : ZMod p}
+    (b1 : a₁ = 0 ∨ a₁ = 1) (b2 : a₂ = 0 ∨ a₂ = 1) (b3 : a₃ = 0 ∨ a₃ = 1)
+    (b4 : a₄ = 0 ∨ a₄ = 1) (b5 : a₅ = 0 ∨ a₅ = 1) (b6 : a₆ = 0 ∨ a₆ = 1)
+    (b7 : a₇ = 0 ∨ a₇ = 1) (b8 : a₈ = 0 ∨ a₈ = 1)
+    (sum : a₁ + a₂ + a₃ + a₄ + a₅ + a₆ + a₇ + a₈ = 1)
+    (h : a₁ = 1) :
+    a₂ = 0 ∧ a₃ = 0 ∧ a₄ = 0 ∧ a₅ = 0 ∧ a₆ = 0 ∧ a₇ = 0 ∧ a₈ = 0 := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h_p : 8 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have val_le_one : ∀ (x : ZMod p), x = 0 ∨ x = 1 → x.val ≤ 1 := fun x b => by
+    rcases b with rfl | rfl
+    · simp
+    · rw [ZMod.val_one]
+  have v1 := val_le_one _ b1
+  have v2 := val_le_one _ b2
+  have v3 := val_le_one _ b3
+  have v4 := val_le_one _ b4
+  have v5 := val_le_one _ b5
+  have v6 := val_le_one _ b6
+  have v7 := val_le_one _ b7
+  have v8 := val_le_one _ b8
+  have h_a1_val : a₁.val = 1 := by rw [h]; exact ZMod.val_one p
+  have h12 : (a₁ + a₂).val = a₁.val + a₂.val :=
+    ZMod.val_add_of_lt (by omega)
+  have h123 : (a₁ + a₂ + a₃).val = a₁.val + a₂.val + a₃.val := by
+    rw [show a₁ + a₂ + a₃ = (a₁ + a₂) + a₃ from rfl,
+        ZMod.val_add_of_lt (by omega), h12]
+  have h1234 : (a₁ + a₂ + a₃ + a₄).val = a₁.val + a₂.val + a₃.val + a₄.val := by
+    rw [show a₁ + a₂ + a₃ + a₄ = (a₁ + a₂ + a₃) + a₄ from rfl,
+        ZMod.val_add_of_lt (by omega), h123]
+  have h12345 : (a₁ + a₂ + a₃ + a₄ + a₅).val =
+      a₁.val + a₂.val + a₃.val + a₄.val + a₅.val := by
+    rw [show a₁ + a₂ + a₃ + a₄ + a₅ = (a₁ + a₂ + a₃ + a₄) + a₅ from rfl,
+        ZMod.val_add_of_lt (by omega), h1234]
+  have h123456 : (a₁ + a₂ + a₃ + a₄ + a₅ + a₆).val =
+      a₁.val + a₂.val + a₃.val + a₄.val + a₅.val + a₆.val := by
+    rw [show a₁ + a₂ + a₃ + a₄ + a₅ + a₆ = (a₁ + a₂ + a₃ + a₄ + a₅) + a₆ from rfl,
+        ZMod.val_add_of_lt (by omega), h12345]
+  have h1234567 : (a₁ + a₂ + a₃ + a₄ + a₅ + a₆ + a₇).val =
+      a₁.val + a₂.val + a₃.val + a₄.val + a₅.val + a₆.val + a₇.val := by
+    rw [show a₁ + a₂ + a₃ + a₄ + a₅ + a₆ + a₇ = (a₁ + a₂ + a₃ + a₄ + a₅ + a₆) + a₇ from rfl,
+        ZMod.val_add_of_lt (by omega), h123456]
+  have h_sum : (a₁ + a₂ + a₃ + a₄ + a₅ + a₆ + a₇ + a₈).val =
+      a₁.val + a₂.val + a₃.val + a₄.val + a₅.val + a₆.val + a₇.val + a₈.val := by
+    rw [show a₁ + a₂ + a₃ + a₄ + a₅ + a₆ + a₇ + a₈ =
+        (a₁ + a₂ + a₃ + a₄ + a₅ + a₆ + a₇) + a₈ from rfl,
+        ZMod.val_add_of_lt (by omega), h1234567]
+  have h_sum_val : (a₁ + a₂ + a₃ + a₄ + a₅ + a₆ + a₇ + a₈).val = 1 := by
+    rw [sum]; exact ZMod.val_one p
+  rw [h_sum] at h_sum_val
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+    apply (ZMod.val_eq_zero _).mp <;> omega
+
+/-- Polymorphic counterpart of `single_op` (line 1020). 8-way mutual exclusion:
+exactly one variant flag among `Main[201..208]` is active per real row. The
+proof destructures the chip's `allHold_poly` over its 19-CS-entry constraint
+list + 153-item trailing list (positions 134-141 carry the boolean
+disjunctions for `Main[201..208]`, position 152 carries the `1 = sum`
+constraint), then applies `eight_mutex_left` for each variant after
+permuting the sum to put the active flag first via `linear_combination`. -/
+lemma single_op_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly) :
+    (Main[201] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧
+        Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[202] = 1 → Main[201] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧
+        Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[203] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[204] = 0 ∧
+        Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[204] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧
+        Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[205] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧
+        Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[206] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧
+        Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
+    (Main[207] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧
+        Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0) ∧
+    (Main[208] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧
+        Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0) := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩,
+    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    _, _, _, _, _,
+    b201, b202, b203, b204, b205, b206, b207, b208,
+    _, _, _, _, _, _, _, _, _, _,
+    sum_disj, _h_M13⟩ := cstrs
+  -- sum_disj : 1 = Main[202] + Main[204] + Main[201] + Main[203] + Main[205]
+  --                + Main[206] + Main[207] + Main[208]
+  -- Permute to put each active flag first, then apply eight_mutex_left.
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intro h
+  · have hsum : Main[201] + Main[202] + Main[203] + Main[204] +
+        Main[205] + Main[206] + Main[207] + Main[208] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b201 b202 b203 b204 b205 b206 b207 b208 hsum h
+  · have hsum : Main[202] + Main[201] + Main[203] + Main[204] +
+        Main[205] + Main[206] + Main[207] + Main[208] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b202 b201 b203 b204 b205 b206 b207 b208 hsum h
+  · have hsum : Main[203] + Main[201] + Main[202] + Main[204] +
+        Main[205] + Main[206] + Main[207] + Main[208] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b203 b201 b202 b204 b205 b206 b207 b208 hsum h
+  · have hsum : Main[204] + Main[201] + Main[202] + Main[203] +
+        Main[205] + Main[206] + Main[207] + Main[208] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b204 b201 b202 b203 b205 b206 b207 b208 hsum h
+  · have hsum : Main[205] + Main[201] + Main[202] + Main[203] +
+        Main[204] + Main[206] + Main[207] + Main[208] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b205 b201 b202 b203 b204 b206 b207 b208 hsum h
+  · have hsum : Main[206] + Main[201] + Main[202] + Main[203] +
+        Main[204] + Main[205] + Main[207] + Main[208] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b206 b201 b202 b203 b204 b205 b207 b208 hsum h
+  · have hsum : Main[207] + Main[201] + Main[202] + Main[203] +
+        Main[204] + Main[205] + Main[206] + Main[208] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b207 b201 b202 b203 b204 b205 b206 b208 hsum h
+  · have hsum : Main[208] + Main[201] + Main[202] + Main[203] +
+        Main[204] + Main[205] + Main[206] + Main[207] = 1 := by
+      linear_combination -sum_disj
+    exact eight_mutex_left b208 b201 b202 b203 b204 b205 b206 b207 hsum h
+
 /-- Polymorphic counterpart of `op_a_is_0` (line 1059). When `Main[6] = 0`
 (i.e. the destination register is `x0`), the four limbs of `op_a_write_value`
 (Main[28..31]) must be zero. -/
