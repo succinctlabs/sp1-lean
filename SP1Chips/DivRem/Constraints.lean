@@ -1133,6 +1133,50 @@ lemma div_mod_decomposition_w {a b c : Fin KB} :
     simp [Fin.ext_iff, Fin.mul_def, Fin.add_def, Fin.mod_def]
     omega
 
+/-- Polymorphic counterpart of `div_mod_decomposition_w`. Statement is
+phrased at the `.val` level since `ZMod p` lacks native `% / /` operators.
+The KB-specific bound `c.val < 2130706433 / 65536` is replaced by
+`c.val < 2` since at every use site `c` is a carry bit (the
+`b_cry0..b_cry7 : cry = 0 ∨ cry = 1` family). The wrap-around branch
+of `val_sub_cases` is ruled out via `Fact (2 ^ 17 < p)` (else
+`a.val ≥ p - 65536 > 65536`, contradicting `a.val < 65536`). -/
+lemma div_mod_decomposition_w_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b c : ZMod p} :
+    a.val < 65536 → c.val < 2 →
+    (a = b - c * 65536 ↔ a.val = b.val % 65536 ∧ c.val = b.val / 65536) := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  have h65536_val : ((65536 : ℕ) : ZMod p).val = 65536 :=
+    ZMod.val_natCast_of_lt (by omega)
+  have h65536_eq : (65536 : ZMod p) = ((65536 : ℕ) : ZMod p) := by push_cast; rfl
+  intro ub_a ub_c
+  have hcm_val : (c * 65536).val = c.val * 65536 := by
+    rw [h65536_eq, ZMod.val_mul, h65536_val, Nat.mod_eq_of_lt (by omega)]
+  have hbv_lt : b.val < p := ZMod.val_lt b
+  constructor
+  · intro eq_a
+    have eq_a_val : a.val = (b - c * 65536).val := by rw [eq_a]
+    rw [val_sub_cases] at eq_a_val
+    by_cases h_le : (c * 65536).val ≤ b.val
+    · rw [if_pos h_le, hcm_val] at eq_a_val
+      rw [hcm_val] at h_le
+      have hb_eq : b.val = a.val + c.val * 65536 := by omega
+      have hdm := Nat.div_add_mod b.val 65536
+      have hmod_lt : b.val % 65536 < 65536 := Nat.mod_lt _ (by omega)
+      refine ⟨by omega, by omega⟩
+    · exfalso
+      rw [if_neg h_le, hcm_val] at eq_a_val
+      rw [Nat.not_le, hcm_val] at h_le
+      omega
+  · intro ⟨eq_a_val, eq_c_val⟩
+    have hb_decomp : b.val = c.val * 65536 + a.val := by
+      have hdm := Nat.div_add_mod b.val 65536
+      omega
+    have h_le : (c * 65536).val ≤ b.val := by rw [hcm_val]; omega
+    apply ZMod.val_injective
+    rw [val_sub_cases, if_pos h_le, hcm_val]
+    omega
+
 lemma tdiv_tmod_unique_full {b c q r : ℤ} (hcnz : c ≠ 0) :
   q = b.tdiv c ∧ r = b.tmod c ↔
   b = q * c + r ∧
