@@ -259,6 +259,762 @@ lemma core_mulw
   ring_nf; omega
 
 set_option debug.skipKernelTC true in
+set_option maxHeartbeats 8000000 in
+-- 16-byte carry-chain identity over `ZMod p` (companion to `core_mul`,
+-- line 90). Same recipe as `core_mulw_poly` (the 4-byte variant below)
+-- scaled to 16 limbs:
+-- (1) lift each of the 16 ZMod constraints to a Nat equation via
+--     `linear_combination` + the `set L, R; ZMod.val_natCast_of_lt`
+--     bridge — each lift uses explicit `Nat.mul_le_mul` byte-product
+--     bounds + `omega` (instead of `nlinarith`, which scales poorly
+--     past 4 limbs);
+-- (2) telescope the 16 Nat eqs into a single polynomial identity in
+--     **factored form** via `linear_combination` over ℤ after `zify`
+--     (the 120 cross-product terms with `i + j ≥ 16` are factored
+--     directly under the `* 2 ^ 128` since each is a multiple of
+--     `256 ^ 16 = 2 ^ 128`); avoids the heavyweight final `ring` rewrite;
+-- (3) bridge to BitVec via `Nat.add_mul_mod_self_right` directly.
+-- The `[Fact (2 ^ 24 < p)]` hypothesis is needed because byte-level
+-- carries give `prod[i].val + carry[i].val * 256 ≤ 2 ^ 24 − 1`.
+-- `skipKernelTC` bypasses kernel deep-recursion on the `% 2 ^ 128`
+-- rewrite chain (precedent: `AddrAddOperation.spec_of_constraints_poly`).
+/-- Polymorphic counterpart of `core_mul`. -/
+lemma core_mul_poly
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
+    (b c : BWord (ZMod p))
+    (isU64_b : b.isU64_poly) (isU64_c : c.isU64_poly)
+    (sgn_b sgn_c : Bool)
+    (prod carry : BDWord (ZMod p)) :
+    let bw := b.extend_poly sgn_b
+    let cw := c.extend_poly sgn_c
+    prod[0] = cp_poly bw cw 0 (by decide) - carry[0] * 256 →
+    prod[1] = cp_poly bw cw 1 (by decide) + carry[0] - carry[1] * 256 →
+    prod[2] = cp_poly bw cw 2 (by decide) + carry[1] - carry[2] * 256 →
+    prod[3] = cp_poly bw cw 3 (by decide) + carry[2] - carry[3] * 256 →
+    prod[4] = cp_poly bw cw 4 (by decide) + carry[3] - carry[4] * 256 →
+    prod[5] = cp_poly bw cw 5 (by decide) + carry[4] - carry[5] * 256 →
+    prod[6] = cp_poly bw cw 6 (by decide) + carry[5] - carry[6] * 256 →
+    prod[7] = cp_poly bw cw 7 (by decide) + carry[6] - carry[7] * 256 →
+    prod[8] = cp_poly bw cw 8 (by decide) + carry[7] - carry[8] * 256 →
+    prod[9] = cp_poly bw cw 9 (by decide) + carry[8] - carry[9] * 256 →
+    prod[10] = cp_poly bw cw 10 (by decide) + carry[9] - carry[10] * 256 →
+    prod[11] = cp_poly bw cw 11 (by decide) + carry[10] - carry[11] * 256 →
+    prod[12] = cp_poly bw cw 12 (by decide) + carry[11] - carry[12] * 256 →
+    prod[13] = cp_poly bw cw 13 (by decide) + carry[12] - carry[13] * 256 →
+    prod[14] = cp_poly bw cw 14 (by decide) + carry[13] - carry[14] * 256 →
+    prod[15] = cp_poly bw cw 15 (by decide) + carry[14] - carry[15] * 256 →
+    carry[0].val < 65536 → carry[1].val < 65536 →
+    carry[2].val < 65536 → carry[3].val < 65536 →
+    carry[4].val < 65536 → carry[5].val < 65536 →
+    carry[6].val < 65536 → carry[7].val < 65536 →
+    carry[8].val < 65536 → carry[9].val < 65536 →
+    carry[10].val < 65536 → carry[11].val < 65536 →
+    carry[12].val < 65536 → carry[13].val < 65536 →
+    carry[14].val < 65536 → carry[15].val < 65536 →
+    prod[0].val < 256 → prod[1].val < 256 →
+    prod[2].val < 256 → prod[3].val < 256 →
+    prod[4].val < 256 → prod[5].val < 256 →
+    prod[6].val < 256 → prod[7].val < 256 →
+    prod[8].val < 256 → prod[9].val < 256 →
+    prod[10].val < 256 → prod[11].val < 256 →
+    prod[12].val < 256 → prod[13].val < 256 →
+    prod[14].val < 256 → prod[15].val < 256 →
+      prod.toBitVec128_poly = bw.toBitVec128_poly * cw.toBitVec128_poly := by
+  intro bw cw
+        eq_p00 eq_p01 eq_p02 eq_p03 eq_p04 eq_p05 eq_p06 eq_p07
+        eq_p08 eq_p09 eq_p10 eq_p11 eq_p12 eq_p13 eq_p14 eq_p15
+        c00 c01 c02 c03 c04 c05 c06 c07 c08 c09 c10 c11 c12 c13 c14 c15
+        p00 p01 p02 p03 p04 p05 p06 p07 p08 p09 p10 p11 p12 p13 p14 p15
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp24 : (2 : ℕ) ^ 24 < p := Fact.out
+  have h2pow24 : (2 : ℕ) ^ 24 = 16777216 := by decide
+  have hp_gt : 16777216 < p := by omega
+  have isU128_bw : bw.isU128_poly := BWord.extend_U64_U128_poly isU64_b sgn_b
+  have isU128_cw : cw.isU128_poly := BWord.extend_U64_U128_poly isU64_c sgn_c
+  obtain ⟨bw00, bw01, bw02, bw03, bw04, bw05, bw06, bw07,
+          bw08, bw09, bw10, bw11, bw12, bw13, bw14, bw15⟩ :=
+    BDWord.lt_cases_of_isU128_poly isU128_bw
+  obtain ⟨cw00, cw01, cw02, cw03, cw04, cw05, cw06, cw07,
+          cw08, cw09, cw10, cw11, cw12, cw13, cw14, cw15⟩ :=
+    BDWord.lt_cases_of_isU128_poly isU128_cw
+  have cp0 : cp_poly bw cw 0 (by decide) = bw[0] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp1 : cp_poly bw cw 1 (by decide) = bw[0] * cw[1] + bw[1] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp2 : cp_poly bw cw 2 (by decide) =
+      bw[0] * cw[2] + bw[1] * cw[1] + bw[2] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp3 : cp_poly bw cw 3 (by decide) =
+      bw[0] * cw[3] + bw[1] * cw[2] + bw[2] * cw[1] + bw[3] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp4 : cp_poly bw cw 4 (by decide) =
+      bw[0] * cw[4] + bw[1] * cw[3] + bw[2] * cw[2] + bw[3] * cw[1] + bw[4] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp5 : cp_poly bw cw 5 (by decide) =
+      bw[0] * cw[5] + bw[1] * cw[4] + bw[2] * cw[3] + bw[3] * cw[2]
+      + bw[4] * cw[1] + bw[5] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp6 : cp_poly bw cw 6 (by decide) =
+      bw[0] * cw[6] + bw[1] * cw[5] + bw[2] * cw[4] + bw[3] * cw[3]
+      + bw[4] * cw[2] + bw[5] * cw[1] + bw[6] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp7 : cp_poly bw cw 7 (by decide) =
+      bw[0] * cw[7] + bw[1] * cw[6] + bw[2] * cw[5] + bw[3] * cw[4]
+      + bw[4] * cw[3] + bw[5] * cw[2] + bw[6] * cw[1] + bw[7] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp8 : cp_poly bw cw 8 (by decide) =
+      bw[0] * cw[8] + bw[1] * cw[7] + bw[2] * cw[6] + bw[3] * cw[5]
+      + bw[4] * cw[4] + bw[5] * cw[3] + bw[6] * cw[2] + bw[7] * cw[1] + bw[8] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp9 : cp_poly bw cw 9 (by decide) =
+      bw[0] * cw[9] + bw[1] * cw[8] + bw[2] * cw[7] + bw[3] * cw[6] + bw[4] * cw[5]
+      + bw[5] * cw[4] + bw[6] * cw[3] + bw[7] * cw[2] + bw[8] * cw[1] + bw[9] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp10 : cp_poly bw cw 10 (by decide) =
+      bw[0] * cw[10] + bw[1] * cw[9] + bw[2] * cw[8] + bw[3] * cw[7]
+      + bw[4] * cw[6] + bw[5] * cw[5] + bw[6] * cw[4] + bw[7] * cw[3]
+      + bw[8] * cw[2] + bw[9] * cw[1] + bw[10] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp11 : cp_poly bw cw 11 (by decide) =
+      bw[0] * cw[11] + bw[1] * cw[10] + bw[2] * cw[9] + bw[3] * cw[8]
+      + bw[4] * cw[7] + bw[5] * cw[6] + bw[6] * cw[5] + bw[7] * cw[4]
+      + bw[8] * cw[3] + bw[9] * cw[2] + bw[10] * cw[1] + bw[11] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp12 : cp_poly bw cw 12 (by decide) =
+      bw[0] * cw[12] + bw[1] * cw[11] + bw[2] * cw[10] + bw[3] * cw[9]
+      + bw[4] * cw[8] + bw[5] * cw[7] + bw[6] * cw[6] + bw[7] * cw[5]
+      + bw[8] * cw[4] + bw[9] * cw[3] + bw[10] * cw[2] + bw[11] * cw[1]
+      + bw[12] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp13 : cp_poly bw cw 13 (by decide) =
+      bw[0] * cw[13] + bw[1] * cw[12] + bw[2] * cw[11] + bw[3] * cw[10]
+      + bw[4] * cw[9] + bw[5] * cw[8] + bw[6] * cw[7] + bw[7] * cw[6]
+      + bw[8] * cw[5] + bw[9] * cw[4] + bw[10] * cw[3] + bw[11] * cw[2]
+      + bw[12] * cw[1] + bw[13] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp14 : cp_poly bw cw 14 (by decide) =
+      bw[0] * cw[14] + bw[1] * cw[13] + bw[2] * cw[12] + bw[3] * cw[11]
+      + bw[4] * cw[10] + bw[5] * cw[9] + bw[6] * cw[8] + bw[7] * cw[7]
+      + bw[8] * cw[6] + bw[9] * cw[5] + bw[10] * cw[4] + bw[11] * cw[3]
+      + bw[12] * cw[2] + bw[13] * cw[1] + bw[14] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  have cp15 : cp_poly bw cw 15 (by decide) =
+      bw[0] * cw[15] + bw[1] * cw[14] + bw[2] * cw[13] + bw[3] * cw[12]
+      + bw[4] * cw[11] + bw[5] * cw[10] + bw[6] * cw[9] + bw[7] * cw[8]
+      + bw[8] * cw[7] + bw[9] * cw[6] + bw[10] * cw[5] + bw[11] * cw[4]
+      + bw[12] * cw[3] + bw[13] * cw[2] + bw[14] * cw[1] + bw[15] * cw[0] := by
+    simp [cp_poly, Vector.ofFn, Vector.get]
+  rw [cp0] at eq_p00; rw [cp1] at eq_p01; rw [cp2] at eq_p02; rw [cp3] at eq_p03
+  rw [cp4] at eq_p04; rw [cp5] at eq_p05; rw [cp6] at eq_p06; rw [cp7] at eq_p07
+  rw [cp8] at eq_p08; rw [cp9] at eq_p09; rw [cp10] at eq_p10; rw [cp11] at eq_p11
+  rw [cp12] at eq_p12; rw [cp13] at eq_p13; rw [cp14] at eq_p14; rw [cp15] at eq_p15
+  -- Per-limb Nat lift; byte-product bounds inline via `Nat.mul_le_mul` +
+  -- `omega` (much faster than `nlinarith` at 16-limb scale).
+  have eq0_nat : prod[0].val + carry[0].val * 256 = bw[0].val * cw[0].val := by
+    have hZ : (prod[0] + carry[0] * 256 : ZMod p) = (bw[0] * cw[0] : ZMod p) := by
+      linear_combination eq_p00
+    have hb0 : bw[0].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[0].val + carry[0].val * 256
+    set R : ℕ := bw[0].val * cw[0].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[0] + carry[0] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[0] : ZMod p) = (R : ZMod p) := by
+      simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq1_nat : prod[1].val + carry[1].val * 256
+      = bw[0].val * cw[1].val + bw[1].val * cw[0].val + carry[0].val := by
+    have hZ : (prod[1] + carry[1] * 256 : ZMod p)
+            = (bw[0] * cw[1] + bw[1] * cw[0] + carry[0] : ZMod p) := by
+      linear_combination eq_p01
+    have hb01 : bw[0].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb10 : bw[1].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[1].val + carry[1].val * 256
+    set R : ℕ := bw[0].val * cw[1].val + bw[1].val * cw[0].val + carry[0].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[1] + carry[1] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[1] + bw[1] * cw[0] + carry[0] : ZMod p) = (R : ZMod p) := by
+      simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq2_nat : prod[2].val + carry[2].val * 256
+      = bw[0].val * cw[2].val + bw[1].val * cw[1].val + bw[2].val * cw[0].val + carry[1].val := by
+    have hZ : (prod[2] + carry[2] * 256 : ZMod p)
+            = (bw[0] * cw[2] + bw[1] * cw[1] + bw[2] * cw[0] + carry[1] : ZMod p) := by
+      linear_combination eq_p02
+    have hb02 : bw[0].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb11 : bw[1].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb20 : bw[2].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[2].val + carry[2].val * 256
+    set R : ℕ := bw[0].val * cw[2].val + bw[1].val * cw[1].val + bw[2].val * cw[0].val + carry[1].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[2] + carry[2] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[2] + bw[1] * cw[1] + bw[2] * cw[0] + carry[1] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq3_nat : prod[3].val + carry[3].val * 256
+      = bw[0].val * cw[3].val + bw[1].val * cw[2].val + bw[2].val * cw[1].val
+        + bw[3].val * cw[0].val + carry[2].val := by
+    have hZ : (prod[3] + carry[3] * 256 : ZMod p)
+            = (bw[0] * cw[3] + bw[1] * cw[2] + bw[2] * cw[1] + bw[3] * cw[0] + carry[2] : ZMod p) := by
+      linear_combination eq_p03
+    have hb03 : bw[0].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb12 : bw[1].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb21 : bw[2].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb30 : bw[3].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[3].val + carry[3].val * 256
+    set R : ℕ := bw[0].val * cw[3].val + bw[1].val * cw[2].val + bw[2].val * cw[1].val
+                 + bw[3].val * cw[0].val + carry[2].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[3] + carry[3] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[3] + bw[1] * cw[2] + bw[2] * cw[1] + bw[3] * cw[0] + carry[2] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq4_nat : prod[4].val + carry[4].val * 256
+      = bw[0].val * cw[4].val + bw[1].val * cw[3].val + bw[2].val * cw[2].val
+        + bw[3].val * cw[1].val + bw[4].val * cw[0].val + carry[3].val := by
+    have hZ : (prod[4] + carry[4] * 256 : ZMod p)
+            = (bw[0] * cw[4] + bw[1] * cw[3] + bw[2] * cw[2] + bw[3] * cw[1]
+               + bw[4] * cw[0] + carry[3] : ZMod p) := by
+      linear_combination eq_p04
+    have hb04 : bw[0].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb13 : bw[1].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb22 : bw[2].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb31 : bw[3].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb40 : bw[4].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[4].val + carry[4].val * 256
+    set R : ℕ := bw[0].val * cw[4].val + bw[1].val * cw[3].val + bw[2].val * cw[2].val
+                 + bw[3].val * cw[1].val + bw[4].val * cw[0].val + carry[3].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[4] + carry[4] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[4] + bw[1] * cw[3] + bw[2] * cw[2] + bw[3] * cw[1]
+                + bw[4] * cw[0] + carry[3] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq5_nat : prod[5].val + carry[5].val * 256
+      = bw[0].val * cw[5].val + bw[1].val * cw[4].val + bw[2].val * cw[3].val
+        + bw[3].val * cw[2].val + bw[4].val * cw[1].val + bw[5].val * cw[0].val + carry[4].val := by
+    have hZ : (prod[5] + carry[5] * 256 : ZMod p)
+            = (bw[0] * cw[5] + bw[1] * cw[4] + bw[2] * cw[3] + bw[3] * cw[2]
+               + bw[4] * cw[1] + bw[5] * cw[0] + carry[4] : ZMod p) := by
+      linear_combination eq_p05
+    have hb05 : bw[0].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb14 : bw[1].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb23 : bw[2].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb32 : bw[3].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb41 : bw[4].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb50 : bw[5].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[5].val + carry[5].val * 256
+    set R : ℕ := bw[0].val * cw[5].val + bw[1].val * cw[4].val + bw[2].val * cw[3].val
+                 + bw[3].val * cw[2].val + bw[4].val * cw[1].val + bw[5].val * cw[0].val + carry[4].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[5] + carry[5] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[5] + bw[1] * cw[4] + bw[2] * cw[3] + bw[3] * cw[2]
+                + bw[4] * cw[1] + bw[5] * cw[0] + carry[4] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq6_nat : prod[6].val + carry[6].val * 256
+      = bw[0].val * cw[6].val + bw[1].val * cw[5].val + bw[2].val * cw[4].val
+        + bw[3].val * cw[3].val + bw[4].val * cw[2].val + bw[5].val * cw[1].val
+        + bw[6].val * cw[0].val + carry[5].val := by
+    have hZ : (prod[6] + carry[6] * 256 : ZMod p)
+            = (bw[0] * cw[6] + bw[1] * cw[5] + bw[2] * cw[4] + bw[3] * cw[3]
+               + bw[4] * cw[2] + bw[5] * cw[1] + bw[6] * cw[0] + carry[5] : ZMod p) := by
+      linear_combination eq_p06
+    have hb06 : bw[0].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb15 : bw[1].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb24 : bw[2].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb33 : bw[3].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb42 : bw[4].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb51 : bw[5].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb60 : bw[6].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[6].val + carry[6].val * 256
+    set R : ℕ := bw[0].val * cw[6].val + bw[1].val * cw[5].val + bw[2].val * cw[4].val
+                 + bw[3].val * cw[3].val + bw[4].val * cw[2].val + bw[5].val * cw[1].val
+                 + bw[6].val * cw[0].val + carry[5].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[6] + carry[6] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[6] + bw[1] * cw[5] + bw[2] * cw[4] + bw[3] * cw[3]
+                + bw[4] * cw[2] + bw[5] * cw[1] + bw[6] * cw[0] + carry[5] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq7_nat : prod[7].val + carry[7].val * 256
+      = bw[0].val * cw[7].val + bw[1].val * cw[6].val + bw[2].val * cw[5].val
+        + bw[3].val * cw[4].val + bw[4].val * cw[3].val + bw[5].val * cw[2].val
+        + bw[6].val * cw[1].val + bw[7].val * cw[0].val + carry[6].val := by
+    have hZ : (prod[7] + carry[7] * 256 : ZMod p)
+            = (bw[0] * cw[7] + bw[1] * cw[6] + bw[2] * cw[5] + bw[3] * cw[4]
+               + bw[4] * cw[3] + bw[5] * cw[2] + bw[6] * cw[1] + bw[7] * cw[0] + carry[6] : ZMod p) := by
+      linear_combination eq_p07
+    have hb07 : bw[0].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb16 : bw[1].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb25 : bw[2].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb34 : bw[3].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb43 : bw[4].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb52 : bw[5].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb61 : bw[6].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb70 : bw[7].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[7].val + carry[7].val * 256
+    set R : ℕ := bw[0].val * cw[7].val + bw[1].val * cw[6].val + bw[2].val * cw[5].val
+                 + bw[3].val * cw[4].val + bw[4].val * cw[3].val + bw[5].val * cw[2].val
+                 + bw[6].val * cw[1].val + bw[7].val * cw[0].val + carry[6].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[7] + carry[7] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[7] + bw[1] * cw[6] + bw[2] * cw[5] + bw[3] * cw[4]
+                + bw[4] * cw[3] + bw[5] * cw[2] + bw[6] * cw[1] + bw[7] * cw[0] + carry[6] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq8_nat : prod[8].val + carry[8].val * 256
+      = bw[0].val * cw[8].val + bw[1].val * cw[7].val + bw[2].val * cw[6].val
+        + bw[3].val * cw[5].val + bw[4].val * cw[4].val + bw[5].val * cw[3].val
+        + bw[6].val * cw[2].val + bw[7].val * cw[1].val + bw[8].val * cw[0].val + carry[7].val := by
+    have hZ : (prod[8] + carry[8] * 256 : ZMod p)
+            = (bw[0] * cw[8] + bw[1] * cw[7] + bw[2] * cw[6] + bw[3] * cw[5]
+               + bw[4] * cw[4] + bw[5] * cw[3] + bw[6] * cw[2] + bw[7] * cw[1]
+               + bw[8] * cw[0] + carry[7] : ZMod p) := by
+      linear_combination eq_p08
+    have hb08 : bw[0].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb17 : bw[1].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb26 : bw[2].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb35 : bw[3].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb44 : bw[4].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb53 : bw[5].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb62 : bw[6].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb71 : bw[7].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb80 : bw[8].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[8].val + carry[8].val * 256
+    set R : ℕ := bw[0].val * cw[8].val + bw[1].val * cw[7].val + bw[2].val * cw[6].val
+                 + bw[3].val * cw[5].val + bw[4].val * cw[4].val + bw[5].val * cw[3].val
+                 + bw[6].val * cw[2].val + bw[7].val * cw[1].val + bw[8].val * cw[0].val + carry[7].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[8] + carry[8] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[8] + bw[1] * cw[7] + bw[2] * cw[6] + bw[3] * cw[5]
+                + bw[4] * cw[4] + bw[5] * cw[3] + bw[6] * cw[2] + bw[7] * cw[1]
+                + bw[8] * cw[0] + carry[7] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq9_nat : prod[9].val + carry[9].val * 256
+      = bw[0].val * cw[9].val + bw[1].val * cw[8].val + bw[2].val * cw[7].val
+        + bw[3].val * cw[6].val + bw[4].val * cw[5].val + bw[5].val * cw[4].val
+        + bw[6].val * cw[3].val + bw[7].val * cw[2].val + bw[8].val * cw[1].val
+        + bw[9].val * cw[0].val + carry[8].val := by
+    have hZ : (prod[9] + carry[9] * 256 : ZMod p)
+            = (bw[0] * cw[9] + bw[1] * cw[8] + bw[2] * cw[7] + bw[3] * cw[6]
+               + bw[4] * cw[5] + bw[5] * cw[4] + bw[6] * cw[3] + bw[7] * cw[2]
+               + bw[8] * cw[1] + bw[9] * cw[0] + carry[8] : ZMod p) := by
+      linear_combination eq_p09
+    have hb09 : bw[0].val * cw[9].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb18 : bw[1].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb27 : bw[2].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb36 : bw[3].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb45 : bw[4].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb54 : bw[5].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb63 : bw[6].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb72 : bw[7].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb81 : bw[8].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb90 : bw[9].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[9].val + carry[9].val * 256
+    set R : ℕ := bw[0].val * cw[9].val + bw[1].val * cw[8].val + bw[2].val * cw[7].val
+                 + bw[3].val * cw[6].val + bw[4].val * cw[5].val + bw[5].val * cw[4].val
+                 + bw[6].val * cw[3].val + bw[7].val * cw[2].val + bw[8].val * cw[1].val
+                 + bw[9].val * cw[0].val + carry[8].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[9] + carry[9] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[9] + bw[1] * cw[8] + bw[2] * cw[7] + bw[3] * cw[6]
+                + bw[4] * cw[5] + bw[5] * cw[4] + bw[6] * cw[3] + bw[7] * cw[2]
+                + bw[8] * cw[1] + bw[9] * cw[0] + carry[8] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq10_nat : prod[10].val + carry[10].val * 256
+      = bw[0].val * cw[10].val + bw[1].val * cw[9].val + bw[2].val * cw[8].val
+        + bw[3].val * cw[7].val + bw[4].val * cw[6].val + bw[5].val * cw[5].val
+        + bw[6].val * cw[4].val + bw[7].val * cw[3].val + bw[8].val * cw[2].val
+        + bw[9].val * cw[1].val + bw[10].val * cw[0].val + carry[9].val := by
+    have hZ : (prod[10] + carry[10] * 256 : ZMod p)
+            = (bw[0] * cw[10] + bw[1] * cw[9] + bw[2] * cw[8] + bw[3] * cw[7]
+               + bw[4] * cw[6] + bw[5] * cw[5] + bw[6] * cw[4] + bw[7] * cw[3]
+               + bw[8] * cw[2] + bw[9] * cw[1] + bw[10] * cw[0] + carry[9] : ZMod p) := by
+      linear_combination eq_p10
+    have hb010 : bw[0].val * cw[10].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb19 : bw[1].val * cw[9].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb28 : bw[2].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb37 : bw[3].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb46 : bw[4].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb55 : bw[5].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb64 : bw[6].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb73 : bw[7].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb82 : bw[8].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb91 : bw[9].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb100 : bw[10].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[10].val + carry[10].val * 256
+    set R : ℕ := bw[0].val * cw[10].val + bw[1].val * cw[9].val + bw[2].val * cw[8].val
+                 + bw[3].val * cw[7].val + bw[4].val * cw[6].val + bw[5].val * cw[5].val
+                 + bw[6].val * cw[4].val + bw[7].val * cw[3].val + bw[8].val * cw[2].val
+                 + bw[9].val * cw[1].val + bw[10].val * cw[0].val + carry[9].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[10] + carry[10] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[10] + bw[1] * cw[9] + bw[2] * cw[8] + bw[3] * cw[7]
+                + bw[4] * cw[6] + bw[5] * cw[5] + bw[6] * cw[4] + bw[7] * cw[3]
+                + bw[8] * cw[2] + bw[9] * cw[1] + bw[10] * cw[0] + carry[9] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq11_nat : prod[11].val + carry[11].val * 256
+      = bw[0].val * cw[11].val + bw[1].val * cw[10].val + bw[2].val * cw[9].val
+        + bw[3].val * cw[8].val + bw[4].val * cw[7].val + bw[5].val * cw[6].val
+        + bw[6].val * cw[5].val + bw[7].val * cw[4].val + bw[8].val * cw[3].val
+        + bw[9].val * cw[2].val + bw[10].val * cw[1].val + bw[11].val * cw[0].val
+        + carry[10].val := by
+    have hZ : (prod[11] + carry[11] * 256 : ZMod p)
+            = (bw[0] * cw[11] + bw[1] * cw[10] + bw[2] * cw[9] + bw[3] * cw[8]
+               + bw[4] * cw[7] + bw[5] * cw[6] + bw[6] * cw[5] + bw[7] * cw[4]
+               + bw[8] * cw[3] + bw[9] * cw[2] + bw[10] * cw[1] + bw[11] * cw[0]
+               + carry[10] : ZMod p) := by
+      linear_combination eq_p11
+    have hb011 : bw[0].val * cw[11].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb110 : bw[1].val * cw[10].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb29 : bw[2].val * cw[9].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb38 : bw[3].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb47 : bw[4].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb56 : bw[5].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb65 : bw[6].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb74 : bw[7].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb83 : bw[8].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb92 : bw[9].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb101 : bw[10].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb111 : bw[11].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[11].val + carry[11].val * 256
+    set R : ℕ := bw[0].val * cw[11].val + bw[1].val * cw[10].val + bw[2].val * cw[9].val
+                 + bw[3].val * cw[8].val + bw[4].val * cw[7].val + bw[5].val * cw[6].val
+                 + bw[6].val * cw[5].val + bw[7].val * cw[4].val + bw[8].val * cw[3].val
+                 + bw[9].val * cw[2].val + bw[10].val * cw[1].val + bw[11].val * cw[0].val
+                 + carry[10].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[11] + carry[11] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[11] + bw[1] * cw[10] + bw[2] * cw[9] + bw[3] * cw[8]
+                + bw[4] * cw[7] + bw[5] * cw[6] + bw[6] * cw[5] + bw[7] * cw[4]
+                + bw[8] * cw[3] + bw[9] * cw[2] + bw[10] * cw[1] + bw[11] * cw[0]
+                + carry[10] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq12_nat : prod[12].val + carry[12].val * 256
+      = bw[0].val * cw[12].val + bw[1].val * cw[11].val + bw[2].val * cw[10].val
+        + bw[3].val * cw[9].val + bw[4].val * cw[8].val + bw[5].val * cw[7].val
+        + bw[6].val * cw[6].val + bw[7].val * cw[5].val + bw[8].val * cw[4].val
+        + bw[9].val * cw[3].val + bw[10].val * cw[2].val + bw[11].val * cw[1].val
+        + bw[12].val * cw[0].val + carry[11].val := by
+    have hZ : (prod[12] + carry[12] * 256 : ZMod p)
+            = (bw[0] * cw[12] + bw[1] * cw[11] + bw[2] * cw[10] + bw[3] * cw[9]
+               + bw[4] * cw[8] + bw[5] * cw[7] + bw[6] * cw[6] + bw[7] * cw[5]
+               + bw[8] * cw[4] + bw[9] * cw[3] + bw[10] * cw[2] + bw[11] * cw[1]
+               + bw[12] * cw[0] + carry[11] : ZMod p) := by
+      linear_combination eq_p12
+    have hb012 : bw[0].val * cw[12].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb111' : bw[1].val * cw[11].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb210 : bw[2].val * cw[10].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb39 : bw[3].val * cw[9].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb48 : bw[4].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb57 : bw[5].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb66 : bw[6].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb75 : bw[7].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb84 : bw[8].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb93 : bw[9].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb102 : bw[10].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb111'' : bw[11].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb120 : bw[12].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[12].val + carry[12].val * 256
+    set R : ℕ := bw[0].val * cw[12].val + bw[1].val * cw[11].val + bw[2].val * cw[10].val
+                 + bw[3].val * cw[9].val + bw[4].val * cw[8].val + bw[5].val * cw[7].val
+                 + bw[6].val * cw[6].val + bw[7].val * cw[5].val + bw[8].val * cw[4].val
+                 + bw[9].val * cw[3].val + bw[10].val * cw[2].val + bw[11].val * cw[1].val
+                 + bw[12].val * cw[0].val + carry[11].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[12] + carry[12] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[12] + bw[1] * cw[11] + bw[2] * cw[10] + bw[3] * cw[9]
+                + bw[4] * cw[8] + bw[5] * cw[7] + bw[6] * cw[6] + bw[7] * cw[5]
+                + bw[8] * cw[4] + bw[9] * cw[3] + bw[10] * cw[2] + bw[11] * cw[1]
+                + bw[12] * cw[0] + carry[11] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq13_nat : prod[13].val + carry[13].val * 256
+      = bw[0].val * cw[13].val + bw[1].val * cw[12].val + bw[2].val * cw[11].val
+        + bw[3].val * cw[10].val + bw[4].val * cw[9].val + bw[5].val * cw[8].val
+        + bw[6].val * cw[7].val + bw[7].val * cw[6].val + bw[8].val * cw[5].val
+        + bw[9].val * cw[4].val + bw[10].val * cw[3].val + bw[11].val * cw[2].val
+        + bw[12].val * cw[1].val + bw[13].val * cw[0].val + carry[12].val := by
+    have hZ : (prod[13] + carry[13] * 256 : ZMod p)
+            = (bw[0] * cw[13] + bw[1] * cw[12] + bw[2] * cw[11] + bw[3] * cw[10]
+               + bw[4] * cw[9] + bw[5] * cw[8] + bw[6] * cw[7] + bw[7] * cw[6]
+               + bw[8] * cw[5] + bw[9] * cw[4] + bw[10] * cw[3] + bw[11] * cw[2]
+               + bw[12] * cw[1] + bw[13] * cw[0] + carry[12] : ZMod p) := by
+      linear_combination eq_p13
+    have hb013 : bw[0].val * cw[13].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb112 : bw[1].val * cw[12].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb211 : bw[2].val * cw[11].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb310 : bw[3].val * cw[10].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb49 : bw[4].val * cw[9].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb58 : bw[5].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb67 : bw[6].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb76 : bw[7].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb85 : bw[8].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb94 : bw[9].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb103 : bw[10].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb112' : bw[11].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb121 : bw[12].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb130 : bw[13].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[13].val + carry[13].val * 256
+    set R : ℕ := bw[0].val * cw[13].val + bw[1].val * cw[12].val + bw[2].val * cw[11].val
+                 + bw[3].val * cw[10].val + bw[4].val * cw[9].val + bw[5].val * cw[8].val
+                 + bw[6].val * cw[7].val + bw[7].val * cw[6].val + bw[8].val * cw[5].val
+                 + bw[9].val * cw[4].val + bw[10].val * cw[3].val + bw[11].val * cw[2].val
+                 + bw[12].val * cw[1].val + bw[13].val * cw[0].val + carry[12].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[13] + carry[13] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[13] + bw[1] * cw[12] + bw[2] * cw[11] + bw[3] * cw[10]
+                + bw[4] * cw[9] + bw[5] * cw[8] + bw[6] * cw[7] + bw[7] * cw[6]
+                + bw[8] * cw[5] + bw[9] * cw[4] + bw[10] * cw[3] + bw[11] * cw[2]
+                + bw[12] * cw[1] + bw[13] * cw[0] + carry[12] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq14_nat : prod[14].val + carry[14].val * 256
+      = bw[0].val * cw[14].val + bw[1].val * cw[13].val + bw[2].val * cw[12].val
+        + bw[3].val * cw[11].val + bw[4].val * cw[10].val + bw[5].val * cw[9].val
+        + bw[6].val * cw[8].val + bw[7].val * cw[7].val + bw[8].val * cw[6].val
+        + bw[9].val * cw[5].val + bw[10].val * cw[4].val + bw[11].val * cw[3].val
+        + bw[12].val * cw[2].val + bw[13].val * cw[1].val + bw[14].val * cw[0].val
+        + carry[13].val := by
+    have hZ : (prod[14] + carry[14] * 256 : ZMod p)
+            = (bw[0] * cw[14] + bw[1] * cw[13] + bw[2] * cw[12] + bw[3] * cw[11]
+               + bw[4] * cw[10] + bw[5] * cw[9] + bw[6] * cw[8] + bw[7] * cw[7]
+               + bw[8] * cw[6] + bw[9] * cw[5] + bw[10] * cw[4] + bw[11] * cw[3]
+               + bw[12] * cw[2] + bw[13] * cw[1] + bw[14] * cw[0] + carry[13] : ZMod p) := by
+      linear_combination eq_p14
+    have hb014 : bw[0].val * cw[14].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb113 : bw[1].val * cw[13].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb212 : bw[2].val * cw[12].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb311 : bw[3].val * cw[11].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb410 : bw[4].val * cw[10].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb59 : bw[5].val * cw[9].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb68 : bw[6].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb77 : bw[7].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb86 : bw[8].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb95 : bw[9].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb104 : bw[10].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb113' : bw[11].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb122 : bw[12].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb131 : bw[13].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb140 : bw[14].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[14].val + carry[14].val * 256
+    set R : ℕ := bw[0].val * cw[14].val + bw[1].val * cw[13].val + bw[2].val * cw[12].val
+                 + bw[3].val * cw[11].val + bw[4].val * cw[10].val + bw[5].val * cw[9].val
+                 + bw[6].val * cw[8].val + bw[7].val * cw[7].val + bw[8].val * cw[6].val
+                 + bw[9].val * cw[5].val + bw[10].val * cw[4].val + bw[11].val * cw[3].val
+                 + bw[12].val * cw[2].val + bw[13].val * cw[1].val + bw[14].val * cw[0].val
+                 + carry[13].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[14] + carry[14] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[14] + bw[1] * cw[13] + bw[2] * cw[12] + bw[3] * cw[11]
+                + bw[4] * cw[10] + bw[5] * cw[9] + bw[6] * cw[8] + bw[7] * cw[7]
+                + bw[8] * cw[6] + bw[9] * cw[5] + bw[10] * cw[4] + bw[11] * cw[3]
+                + bw[12] * cw[2] + bw[13] * cw[1] + bw[14] * cw[0] + carry[13] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  have eq15_nat : prod[15].val + carry[15].val * 256
+      = bw[0].val * cw[15].val + bw[1].val * cw[14].val + bw[2].val * cw[13].val
+        + bw[3].val * cw[12].val + bw[4].val * cw[11].val + bw[5].val * cw[10].val
+        + bw[6].val * cw[9].val + bw[7].val * cw[8].val + bw[8].val * cw[7].val
+        + bw[9].val * cw[6].val + bw[10].val * cw[5].val + bw[11].val * cw[4].val
+        + bw[12].val * cw[3].val + bw[13].val * cw[2].val + bw[14].val * cw[1].val
+        + bw[15].val * cw[0].val + carry[14].val := by
+    have hZ : (prod[15] + carry[15] * 256 : ZMod p)
+            = (bw[0] * cw[15] + bw[1] * cw[14] + bw[2] * cw[13] + bw[3] * cw[12]
+               + bw[4] * cw[11] + bw[5] * cw[10] + bw[6] * cw[9] + bw[7] * cw[8]
+               + bw[8] * cw[7] + bw[9] * cw[6] + bw[10] * cw[5] + bw[11] * cw[4]
+               + bw[12] * cw[3] + bw[13] * cw[2] + bw[14] * cw[1] + bw[15] * cw[0]
+               + carry[14] : ZMod p) := by
+      linear_combination eq_p15
+    have hb015 : bw[0].val * cw[15].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb114 : bw[1].val * cw[14].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb213 : bw[2].val * cw[13].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb312 : bw[3].val * cw[12].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb411 : bw[4].val * cw[11].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb510 : bw[5].val * cw[10].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb69 : bw[6].val * cw[9].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb78 : bw[7].val * cw[8].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb87 : bw[8].val * cw[7].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb96 : bw[9].val * cw[6].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb105 : bw[10].val * cw[5].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb114' : bw[11].val * cw[4].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb123 : bw[12].val * cw[3].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb132 : bw[13].val * cw[2].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb141 : bw[14].val * cw[1].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    have hb150 : bw[15].val * cw[0].val ≤ 255 * 255 := Nat.mul_le_mul (by omega) (by omega)
+    set L : ℕ := prod[15].val + carry[15].val * 256
+    set R : ℕ := bw[0].val * cw[15].val + bw[1].val * cw[14].val + bw[2].val * cw[13].val
+                 + bw[3].val * cw[12].val + bw[4].val * cw[11].val + bw[5].val * cw[10].val
+                 + bw[6].val * cw[9].val + bw[7].val * cw[8].val + bw[8].val * cw[7].val
+                 + bw[9].val * cw[6].val + bw[10].val * cw[5].val + bw[11].val * cw[4].val
+                 + bw[12].val * cw[3].val + bw[13].val * cw[2].val + bw[14].val * cw[1].val
+                 + bw[15].val * cw[0].val + carry[14].val
+    have hL_lt : L < p := by simp [L]; omega
+    have hR_lt : R < p := by simp [R]; omega
+    have hZL : (prod[15] + carry[15] * 256 : ZMod p) = (L : ZMod p) := by
+      simp [L, ZMod.natCast_val]
+    have hZR : (bw[0] * cw[15] + bw[1] * cw[14] + bw[2] * cw[13] + bw[3] * cw[12]
+                + bw[4] * cw[11] + bw[5] * cw[10] + bw[6] * cw[9] + bw[7] * cw[8]
+                + bw[8] * cw[7] + bw[9] * cw[6] + bw[10] * cw[5] + bw[11] * cw[4]
+                + bw[12] * cw[3] + bw[13] * cw[2] + bw[14] * cw[1] + bw[15] * cw[0]
+                + carry[14] : ZMod p)
+             = (R : ZMod p) := by simp [R, ZMod.natCast_val]
+    rw [hZL, hZR] at hZ
+    have := congrArg ZMod.val hZ
+    rw [ZMod.val_natCast_of_lt hL_lt, ZMod.val_natCast_of_lt hR_lt] at this
+    exact this
+  -- Polynomial identity in **factored form** (avoids the heavyweight `ring`).
+  have key :
+    (bw[0].val + bw[1].val * 2 ^ 8 + bw[2].val * 2 ^ 16 + bw[3].val * 2 ^ 24
+     + bw[4].val * 2 ^ 32 + bw[5].val * 2 ^ 40 + bw[6].val * 2 ^ 48 + bw[7].val * 2 ^ 56
+     + bw[8].val * 2 ^ 64 + bw[9].val * 2 ^ 72 + bw[10].val * 2 ^ 80 + bw[11].val * 2 ^ 88
+     + bw[12].val * 2 ^ 96 + bw[13].val * 2 ^ 104 + bw[14].val * 2 ^ 112 + bw[15].val * 2 ^ 120)
+    * (cw[0].val + cw[1].val * 2 ^ 8 + cw[2].val * 2 ^ 16 + cw[3].val * 2 ^ 24
+       + cw[4].val * 2 ^ 32 + cw[5].val * 2 ^ 40 + cw[6].val * 2 ^ 48 + cw[7].val * 2 ^ 56
+       + cw[8].val * 2 ^ 64 + cw[9].val * 2 ^ 72 + cw[10].val * 2 ^ 80 + cw[11].val * 2 ^ 88
+       + cw[12].val * 2 ^ 96 + cw[13].val * 2 ^ 104 + cw[14].val * 2 ^ 112 + cw[15].val * 2 ^ 120)
+    = (prod[0].val + prod[1].val * 2 ^ 8 + prod[2].val * 2 ^ 16 + prod[3].val * 2 ^ 24
+       + prod[4].val * 2 ^ 32 + prod[5].val * 2 ^ 40 + prod[6].val * 2 ^ 48 + prod[7].val * 2 ^ 56
+       + prod[8].val * 2 ^ 64 + prod[9].val * 2 ^ 72 + prod[10].val * 2 ^ 80 + prod[11].val * 2 ^ 88
+       + prod[12].val * 2 ^ 96 + prod[13].val * 2 ^ 104 + prod[14].val * 2 ^ 112 + prod[15].val * 2 ^ 120)
+      + (carry[15].val
+         + (bw[1].val * cw[15].val + bw[2].val * cw[14].val + bw[3].val * cw[13].val
+            + bw[4].val * cw[12].val + bw[5].val * cw[11].val + bw[6].val * cw[10].val
+            + bw[7].val * cw[9].val + bw[8].val * cw[8].val + bw[9].val * cw[7].val
+            + bw[10].val * cw[6].val + bw[11].val * cw[5].val + bw[12].val * cw[4].val
+            + bw[13].val * cw[3].val + bw[14].val * cw[2].val + bw[15].val * cw[1].val)
+         + (bw[2].val * cw[15].val + bw[3].val * cw[14].val + bw[4].val * cw[13].val
+            + bw[5].val * cw[12].val + bw[6].val * cw[11].val + bw[7].val * cw[10].val
+            + bw[8].val * cw[9].val + bw[9].val * cw[8].val + bw[10].val * cw[7].val
+            + bw[11].val * cw[6].val + bw[12].val * cw[5].val + bw[13].val * cw[4].val
+            + bw[14].val * cw[3].val + bw[15].val * cw[2].val) * 2 ^ 8
+         + (bw[3].val * cw[15].val + bw[4].val * cw[14].val + bw[5].val * cw[13].val
+            + bw[6].val * cw[12].val + bw[7].val * cw[11].val + bw[8].val * cw[10].val
+            + bw[9].val * cw[9].val + bw[10].val * cw[8].val + bw[11].val * cw[7].val
+            + bw[12].val * cw[6].val + bw[13].val * cw[5].val + bw[14].val * cw[4].val
+            + bw[15].val * cw[3].val) * 2 ^ 16
+         + (bw[4].val * cw[15].val + bw[5].val * cw[14].val + bw[6].val * cw[13].val
+            + bw[7].val * cw[12].val + bw[8].val * cw[11].val + bw[9].val * cw[10].val
+            + bw[10].val * cw[9].val + bw[11].val * cw[8].val + bw[12].val * cw[7].val
+            + bw[13].val * cw[6].val + bw[14].val * cw[5].val + bw[15].val * cw[4].val) * 2 ^ 24
+         + (bw[5].val * cw[15].val + bw[6].val * cw[14].val + bw[7].val * cw[13].val
+            + bw[8].val * cw[12].val + bw[9].val * cw[11].val + bw[10].val * cw[10].val
+            + bw[11].val * cw[9].val + bw[12].val * cw[8].val + bw[13].val * cw[7].val
+            + bw[14].val * cw[6].val + bw[15].val * cw[5].val) * 2 ^ 32
+         + (bw[6].val * cw[15].val + bw[7].val * cw[14].val + bw[8].val * cw[13].val
+            + bw[9].val * cw[12].val + bw[10].val * cw[11].val + bw[11].val * cw[10].val
+            + bw[12].val * cw[9].val + bw[13].val * cw[8].val + bw[14].val * cw[7].val
+            + bw[15].val * cw[6].val) * 2 ^ 40
+         + (bw[7].val * cw[15].val + bw[8].val * cw[14].val + bw[9].val * cw[13].val
+            + bw[10].val * cw[12].val + bw[11].val * cw[11].val + bw[12].val * cw[10].val
+            + bw[13].val * cw[9].val + bw[14].val * cw[8].val + bw[15].val * cw[7].val) * 2 ^ 48
+         + (bw[8].val * cw[15].val + bw[9].val * cw[14].val + bw[10].val * cw[13].val
+            + bw[11].val * cw[12].val + bw[12].val * cw[11].val + bw[13].val * cw[10].val
+            + bw[14].val * cw[9].val + bw[15].val * cw[8].val) * 2 ^ 56
+         + (bw[9].val * cw[15].val + bw[10].val * cw[14].val + bw[11].val * cw[13].val
+            + bw[12].val * cw[12].val + bw[13].val * cw[11].val + bw[14].val * cw[10].val
+            + bw[15].val * cw[9].val) * 2 ^ 64
+         + (bw[10].val * cw[15].val + bw[11].val * cw[14].val + bw[12].val * cw[13].val
+            + bw[13].val * cw[12].val + bw[14].val * cw[11].val + bw[15].val * cw[10].val) * 2 ^ 72
+         + (bw[11].val * cw[15].val + bw[12].val * cw[14].val + bw[13].val * cw[13].val
+            + bw[14].val * cw[12].val + bw[15].val * cw[11].val) * 2 ^ 80
+         + (bw[12].val * cw[15].val + bw[13].val * cw[14].val + bw[14].val * cw[13].val
+            + bw[15].val * cw[12].val) * 2 ^ 88
+         + (bw[13].val * cw[15].val + bw[14].val * cw[14].val + bw[15].val * cw[13].val) * 2 ^ 96
+         + (bw[14].val * cw[15].val + bw[15].val * cw[14].val) * 2 ^ 104
+         + bw[15].val * cw[15].val * 2 ^ 112) * 2 ^ 128 := by
+    zify
+    zify at eq0_nat eq1_nat eq2_nat eq3_nat eq4_nat eq5_nat eq6_nat eq7_nat
+            eq8_nat eq9_nat eq10_nat eq11_nat eq12_nat eq13_nat eq14_nat eq15_nat
+    linear_combination -eq0_nat - 2 ^ 8 * eq1_nat - 2 ^ 16 * eq2_nat - 2 ^ 24 * eq3_nat
+      - 2 ^ 32 * eq4_nat - 2 ^ 40 * eq5_nat - 2 ^ 48 * eq6_nat - 2 ^ 56 * eq7_nat
+      - 2 ^ 64 * eq8_nat - 2 ^ 72 * eq9_nat - 2 ^ 80 * eq10_nat - 2 ^ 88 * eq11_nat
+      - 2 ^ 96 * eq12_nat - 2 ^ 104 * eq13_nat - 2 ^ 112 * eq14_nat - 2 ^ 120 * eq15_nat
+  unfold BDWord.toBitVec128_poly BDWord.toNat_poly
+  rw [← BitVec.toNat_inj, BitVec.toNat_mul, BitVec.toNat_ofNat,
+      BitVec.toNat_ofNat, BitVec.toNat_ofNat, ← Nat.mul_mod, key,
+      Nat.add_mul_mod_self_right]
+
+set_option debug.skipKernelTC true in
 set_option maxHeartbeats 1600000 in
 -- 4-byte carry-chain identity over ZMod p. Mirrors `core_mulw` (line 211)
 -- but uses the field-agnostic recipe shared with `AddOperation.spec_poly`:
