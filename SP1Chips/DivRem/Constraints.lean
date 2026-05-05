@@ -2441,6 +2441,357 @@ lemma divu_remu
               subst cry7; simp at *
               omega
 
+-- Polymorphic counterpart of `divu_remu`. Lifts the Fin KB version's
+-- 4-byte-limb DIV_REM correctness witness for the unsigned division /
+-- remainder variants over an arbitrary prime field. The recipe is a
+-- direct port using `Word.<helper>_poly` siblings, `combine_MUL_MULHU_poly`,
+-- and `div_mod_decomposition_w_poly`. Three blocker sites are patched
+-- upfront so that `simp_all` doesn't collapse `Fact (2^17 < p)` to
+-- `Fact True`: (i) opening rcases needs `(2:ZMod p) ≠ 1` / `(0:ZMod p) ≠ 1`;
+-- (ii) c=0 branch needs `h65535_val`; (iii) 8-way `b_cry3` end-game
+-- needs each `cry_i.val ≤ 1` lifted before `omega`.
+set_option maxHeartbeats 32000000 in
+set_option debug.skipKernelTC true in
+lemma divu_remu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : ZMod p)
+  (is_U64_b : Word.isU64_poly #v[b0, b1, b2, b3])
+  (is_U64_c : Word.isU64_poly #v[c0, c1, c2, c3])
+  (sop1 : is_div = 1 → is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
+  (sop2 : is_divu = 1 → is_div = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
+  (sop3 : is_rem = 1 → is_div = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
+  (sop4 : is_remu = 1 → is_div = 0 ∧ is_divu = 0 ∧ is_rem = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
+  (sop5 : is_divw = 1 → is_div = 0 ∧ is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
+  (sop6 : is_remw = 1 → is_div = 0 ∧ is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
+  (sop7 : is_divuw = 1 → is_div = 0 ∧ is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_remuw = 0)
+  (sop8 : is_remuw = 1 → is_div = 0 ∧ is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0)
+  (eq_is_word : is_word = is_divw + is_remw + is_divuw + is_remuw)
+  (eq_b_neg : b_neg = msb_b * (is_div + is_rem + is_divw + is_remw))
+  (eq_rem_neg : rem_neg = msb_rem * (is_div + is_rem + is_divw + is_remw))
+  (eq_c_neg : c_neg = msb_c * (is_div + is_rem + is_divw + is_remw))
+  (eq_lb0 : lb0 = b0)
+  (eq_lc0 : lc0 = c0)
+  (eq_lb1 : lb1 = b1)
+  (eq_lc1 : lc1 = c1)
+  (eq_lb2 : lb2 = b2 * (1 - is_word) + b_neg * is_word * 65535)
+  (eq_lc2 : lc2 = c2 * (1 - is_word) + c_neg * is_word * 65535)
+  (eq_lb3 : lb3 = b3 * (1 - is_word) + b_neg * is_word * 65535)
+  (eq_lc3 : lc3 = c3 * (1 - is_word) + c_neg * is_word * 65535)
+  (eq_qbc0 : qbc0 = q0)
+  (eq_qbc1 : qbc1 = q1)
+  (w_eq_qbc2_uw : is_divuw + is_remuw = 0 ∨ qbc2 = 0)
+  (w_eq_qbc2_w : is_divw + is_remw = 0 ∨ qbc2 = msb_quot * 65535)
+  (w_eq_q2_w : is_word = 0 ∨ q2 = msb_quot * 65535)
+  (eq_qbc2 : is_divu + is_remu + is_div + is_rem = 0 ∨ qbc2 = q2)
+  (w_eq_qbc3_uw : is_divuw + is_remuw = 0 ∨ qbc3 = 0)
+  (w_eq_qbc3_w : is_divw + is_remw = 0 ∨ qbc3 = msb_quot * 65535)
+  (w_eq_q3_w : is_word = 0 ∨ q3 = msb_quot * 65535)
+  (eq_qbc3 : is_divu + is_remu + is_div + is_rem = 0 ∨ qbc3 = q3)
+  (eq_rbc0 : rbc0 = r0)
+  (eq_rbc1 : rbc1 = r1)
+  (w_eq_rbc2_uw : is_divuw + is_remuw = 0 ∨ rbc2 = 0)
+  (w_eq_rbc2_w : is_divw + is_remw = 0 ∨ rbc2 = msb_rem * 65535)
+  (w_eq_r2_w : is_word = 0 ∨ r2 = msb_rem * 65535)
+  (eq_rbc2 : is_divu + is_remu + is_div + is_rem = 0 ∨ rbc2 = r2)
+  (w_eq_rbc3_uw : is_divuw + is_remuw = 0 ∨ rbc3 = 0)
+  (w_eq_rbc3_w : is_divw + is_remw = 0 ∨ rbc3 = msb_rem * 65535)
+  (w_eq_r3_w : is_word = 0 ∨ r3 = msb_rem * 65535)
+  (eq_rbc3 : is_divu + is_remu + is_div + is_rem = 0 ∨ rbc3 = r3)
+  (eq_is_overflow : is_overflow = is_overflow_b * is_overflow_c * (is_div + is_rem + is_divw + is_remw))
+  (eq_b_neg_not_overflow : b_neg_not_overflow = b_neg * (1 - is_overflow))
+  (eq_not_b_neg_not_overflow : b_not_neg_not_overflow = (1 - b_neg) * (1 - is_overflow))
+  (of_eq_q0 : is_overflow = 0 ∨ q0 = b0)
+  (of_eq_r0 : is_overflow = 0 ∨ r0 = 0)
+  (of_eq_q1 : is_overflow = 0 ∨ q1 = b1)
+  (of_eq_r1 : is_overflow = 0 ∨ r1 = 0)
+  (of_eq_q2 : is_overflow = 0 ∨ q2 = b2 * (1 - is_word) + b_neg * is_word * 65535)
+  (of_eq_r2 : is_overflow = 0 ∨ r2 = 0)
+  (of_eq_q3 : is_overflow = 0 ∨ q3 = b3 * (1 - is_word) + b_neg * is_word * 65535)
+  (of_eq_r3 : is_overflow = 0 ∨ r3 = 0)
+  (nof_eq_ctqpr0 : is_overflow = 1 ∨ b0 = ctq0 + r0 - cry0 * 65536)
+  (nof_eq_ctqpr1 : is_overflow = 1 ∨ b1 = ctq1 + r1 - cry1 * 65536 + cry0)
+  (nof_eq_ctqpr2 : is_overflow = 1 ∨ b2 * (1 - is_word) + b_neg * is_word * 65535 = ctq2 + rbc2 - cry2 * 65536 + cry1)
+  (nof_eq_ctqpr3 : is_overflow = 1 ∨ b3 * (1 - is_word) + b_neg * is_word * 65535 = ctq3 + rbc3 - cry3 * 65536 + cry2)
+  (nof_eq_ctqpr4 : is_overflow = 1 ∨ ctq4 + rem_neg * 65535 - cry4 * 65536 + cry3 = b_neg * 65535)
+  (nof_eq_ctqpr5 : is_overflow = 1 ∨ ctq5 + rem_neg * 65535 - cry5 * 65536 + cry4 = b_neg * 65535)
+  (nof_eq_ctqpr6 : is_overflow = 1 ∨ ctq6 + rem_neg * 65535 - cry6 * 65536 + cry5 = b_neg * 65535)
+  (nof_eq_ctqpr7 : is_overflow = 1 ∨ ctq7 + rem_neg * 65535 - cry7 * 65536 + cry6 = b_neg * 65535)
+  (u16_ctqpr0 : (ctq0 + r0 - cry0 * 65536).val < 65536)
+  (u16_ctqpr1 : (ctq1 + r1 - cry1 * 65536 + cry0).val < 65536)
+  (u16_ctqpr2 : (ctq2 + rbc2 - cry2 * 65536 + cry1).val < 65536)
+  (u16_ctqpr3 : (ctq3 + rbc3 - cry3 * 65536 + cry2).val < 65536)
+  (u16_ctqpr4 : (ctq4 + rem_neg * 65535 - cry4 * 65536 + cry3).val < 65536)
+  (u16_ctqpr5 : (ctq5 + rem_neg * 65535 - cry5 * 65536 + cry4).val < 65536)
+  (u16_ctqpr6 : (ctq6 + rem_neg * 65535 - cry6 * 65536 + cry5).val < 65536)
+  (u16_ctqpr7 : (ctq7 + rem_neg * 65535 - cry7 * 65536 + cry6).val < 65536)
+  (eq_d_a0 : is_divu + is_div + is_divw + is_divuw = 0 ∨ a0 = q0)
+  (eq_r_a0 : is_remu + is_rem + is_remw + is_remuw = 0 ∨ a0 = r0)
+  (eq_d_a1 : is_divu + is_div + is_divw + is_divuw = 0 ∨ a1 = q1)
+  (eq_r_a1 : is_remu + is_rem + is_remw + is_remuw = 0 ∨ a1 = r1)
+  (eq_d_a2 : is_divu + is_div + is_divw + is_divuw = 0 ∨ a2 = q2)
+  (eq_r_a2 : is_remu + is_rem + is_remw + is_remuw = 0 ∨ a2 = r2)
+  (eq_d_a3 : is_divu + is_div + is_divw + is_divuw = 0 ∨ a3 = q3)
+  (eq_r_a3 : is_remu + is_rem + is_remw + is_remuw = 0 ∨ a3 = r3)
+  (r_neg_b_neg : rem_neg = 0 ∨ b_neg = 1)
+  (r_pos_b_pos : r0 + r1 + r2 + r3 = 0 ∨ rem_neg = 1 ∨ b_neg = 0)
+  (c0_eq_q0 : is_c_0 = 0 ∨ q0 = 65535)
+  (c0_eq_q1 : is_c_0 = 0 ∨ q1 = 65535)
+  (c0_eq_q2 : is_c_0 = 0 ∨ q2 = 65535)
+  (c0_eq_q3 : is_c_0 = 0 ∨ q3 = 65535)
+  (c0_eq_r0 : is_c_0 = 0 ∨ r0 = b0)
+  (c0_eq_r1 : is_c_0 = 0 ∨ r1 = b1)
+  (c0_eq_r2 : is_c_0 = 0 ∨ rbc2 = b2 * (1 - is_word) + b_neg * is_word * 65535)
+  (c0_eq_r3 : is_c_0 = 0 ∨ rbc3 = b3 * (1 - is_word) + b_neg * is_word * 65535)
+  (cn_ac0 : c_neg = 1 ∨ ac0 = c0)
+  (rn_ar0 : rem_neg = 1 ∨ ar0 = r0)
+  (cn_ac1 : c_neg = 1 ∨ ac1 = c1)
+  (rn_ar1 : rem_neg = 1 ∨ ar1 = r1)
+  (cn_ac2 : c_neg = 1 ∨ ac2 = c2 * (1 - is_word) + c_neg * is_word * 65535)
+  (rn_ar2 : rem_neg = 1 ∨ ar2 = rbc2)
+  (cn_ac3 : c_neg = 1 ∨ ac3 = c3 * (1 - is_word) + c_neg * is_word * 65535)
+  (rn_ar3 : rem_neg = 1 ∨ ar3 = rbc3)
+  (u16_ac0 : ac0.val < 65536)
+  (u16_ac1 : ac1.val < 65536)
+  (u16_ac2 : ac2.val < 65536)
+  (u16_ac3 : ac3.val < 65536)
+  (eq_cnop0 : c_neg = 0 ∨ cnop0 = 0)
+  (eq_cnop1 : c_neg = 0 ∨ cnop1 = 0)
+  (eq_cnop2 : c_neg = 0 ∨ cnop2 = 0)
+  (eq_cnop3 : c_neg = 0 ∨ cnop3 = 0)
+  (u16_ar0 : ar0.val < 65536)
+  (u16_ar1 : ar1.val < 65536)
+  (u16_ar2 : ar2.val < 65536)
+  (u16_ar3 : ar3.val < 65536)
+  (eq_rnop0 : rem_neg = 0 ∨ rnop0 = 0)
+  (eq_rnop1 : rem_neg = 0 ∨ rnop1 = 0)
+  (eq_rnop2 : rem_neg = 0 ∨ rnop2 = 0)
+  (eq_rnop3 : rem_neg = 0 ∨ rnop3 = 0)
+  (eq_abs_c_alu_event : abs_c_alu_event = c_neg)
+  (eq_abs_rem_alu_event : abs_rem_alu_event = rem_neg)
+  (eq_maco10 : maco10 = is_c_0 + (1 - is_c_0) * ac0)
+  (eq_maco11 : maco11 = (1 - is_c_0) * ac1)
+  (eq_maco12 : maco12 = (1 - is_c_0) * ac2)
+  (eq_maco13 : maco13 = (1 - is_c_0) * ac3)
+  (eq_arlt : is_c_0 = 1 ∨ arlt = 1)
+  (u16_q0 : q0.val < 65536)
+  (u16_q1 : q1.val < 65536)
+  (u16_q2 : q2.val < 65536)
+  (u16_q3 : q3.val < 65536)
+  (u16_r0 : r0.val < 65536)
+  (u16_r1 : r1.val < 65536)
+  (u16_r2 : r2.val < 65536)
+  (u16_r3 : r3.val < 65536)
+  (b_cry0 : cry0 = 0 ∨ cry0 = 1)
+  (b_cry1 : cry1 = 0 ∨ cry1 = 1)
+  (b_cry2 : cry2 = 0 ∨ cry2 = 1)
+  (b_cry3 : cry3 = 0 ∨ cry3 = 1)
+  (b_cry4 : cry4 = 0 ∨ cry4 = 1)
+  (b_cry5 : cry5 = 0 ∨ cry5 = 1)
+  (b_cry6 : cry6 = 0 ∨ cry6 = 1)
+  (b_cry7 : cry7 = 0 ∨ cry7 = 1)
+  (u16_ctq0 : ctq0.val < 65536)
+  (u16_ctq1 : ctq1.val < 65536)
+  (u16_ctq2 : ctq2.val < 65536)
+  (u16_ctq3 : ctq3.val < 65536)
+  (u16_ctq4 : ctq4.val < 65536)
+  (u16_ctq5 : ctq5.val < 65536)
+  (u16_ctq6 : ctq6.val < 65536)
+  (u16_ctq7 : ctq7.val < 65536)
+  (b_is_div : is_div = 0 ∨ is_div = 1)
+  (b_is_divu : is_divu = 0 ∨ is_divu = 1)
+  (b_is_rem : is_rem = 0 ∨ is_rem = 1)
+  (b_is_remu : is_remu = 0 ∨ is_remu = 1)
+  (b_is_divw : is_divw = 0 ∨ is_divw = 1)
+  (b_is_remw : is_remw = 0 ∨ is_remw = 1)
+  (b_is_divuw : is_divuw = 0 ∨ is_divuw = 1)
+  (b_is_remuw : is_remuw = 0 ∨ is_remuw = 1)
+  (b_is_overflow : is_overflow = 0 ∨ is_overflow = 1)
+  (b_is_real_not_word : is_word = 0 ∨ is_word = 1)
+  (b_b_neg : b_neg = 0 ∨ b_neg = 1)
+  (b_b_neg_not_overflow : b_neg_not_overflow = 0 ∨ b_neg_not_overflow = 1)
+  (b_b_not_neg_not_overflow : b_not_neg_not_overflow = 0 ∨ b_not_neg_not_overflow = 1)
+  (b_rem_neg : rem_neg = 0 ∨ rem_neg = 1)
+  (b_c_neg : c_neg = 0 ∨ c_neg = 1)
+  (b_one_of_ops : is_divu + is_remu + is_div + is_rem + is_divw + is_remw + is_divuw + is_remuw = 1)
+  (w_overflow_b : is_word = 1 → is_overflow_b = if #v[b0, b1, 0, 0] = (#v[0, 32768, 0, 0] : Word (ZMod p)) then 1 else 0)
+  (w_overflow_c : is_word = 1 → is_overflow_c = if #v[c0, c1, 0, 0] = (#v[65535, 65535, 0, 0] : Word (ZMod p)) then 1 else 0)
+  (div_zero : is_c_0 = if #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535] = (#v[0, 0, 0, 0] : Word (ZMod p)) then 1 else 0)
+  (c_neg_sum_zero : c_neg = 1 → Word.isU64_poly #v[cnop0, cnop1, cnop2, cnop3] ∧ Word.toBitVec64_poly #v[cnop0, cnop1, cnop2, cnop3] = Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535] + Word.toBitVec64_poly #v[ac0, ac1, ac2, ac3])
+  (rem_neg_sum_zero : rem_neg = 1 → Word.isU64_poly #v[rnop0, rnop1, rnop2, rnop3] ∧ Word.toBitVec64_poly #v[rnop0, rnop1, rnop2, rnop3] = Word.toBitVec64_poly #v[r0, r1, rbc2, rbc3] + Word.toBitVec64_poly #v[ar0, ar1, ar2, ar3])
+  (main_mul_low : Word.isU64_poly #v[ctq0, ctq1, ctq2, ctq3] ∧ Word.toBitVec64_poly #v[ctq0, ctq1, ctq2, ctq3] = execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MUL)
+  (main_mul_high : is_word = 0 → (is_div + is_rem = 1 → Word.isU64_poly #v[ctq4, ctq5, ctq6, ctq7] ∧ Word.toBitVec64_poly #v[ctq4, ctq5, ctq6, ctq7] = execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MULH) ∧ (is_divu + is_remu = 1 → Word.isU64_poly #v[ctq4, ctq5, ctq6, ctq7] ∧ Word.toBitVec64_poly #v[ctq4, ctq5, ctq6, ctq7] = execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MULHU))
+  (overflow_b : is_word = 0 → is_overflow_b = if #v[b0, b1, b2, b3] = (#v[0, 0, 0, 32768] : Word (ZMod p)) then 1 else 0)
+  (overflow_c : is_word = 0 → is_overflow_c = if #v[c0, c1, c2, c3] = (#v[65535, 65535, 65535, 65535] : Word (ZMod p)) then 1 else 0)
+  (eq_msb_b : is_word = 0 → msb_b = if 32768 ≤ b3 then 1 else 0)
+  (eq_msb_c : is_word = 0 → msb_c = if 32768 ≤ c3 then 1 else 0)
+  (eq_msb_rem : is_word = 0 → msb_rem = if 32768 ≤ r3 then 1 else 0)
+  (w_eq_msb_b : is_word = 1 → msb_b = if 32768 ≤ b1 then 1 else 0)
+  (w_eq_msb_c : is_word = 1 → msb_c = if 32768 ≤ c1 then 1 else 0)
+  (w_eq_msb_rem : is_word = 1 → msb_rem = if 32768 ≤ r1 then 1 else 0)
+  (w_eq_msb_quot : is_word = 1 → msb_quot = if 32768 ≤ q1 then 1 else 0)
+  (abs_check : is_c_0 = 0 → arlt = if Word.toNat_poly #v[ar0, ar1, ar2, ar3] < Word.toNat_poly #v[is_c_0 + (1 - is_c_0) * ac0, (1 - is_c_0) * ac1, (1 - is_c_0) * ac2, (1 - is_c_0) * ac3] then 1 else 0) :
+    is_divu + is_remu = 1 →
+    ⟨Word.toBitVec64_poly #v[q0, q1, q2, q3], Word.toBitVec64_poly #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64_poly #v[b0, b1, b2, b3]) (Word.toBitVec64_poly #v[c0, c1, c2, c3]) .DRU
+      := by
+    haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+    have h17 : 2 ^ 17 < p := Fact.out
+    have h01 : (1 : ZMod p) ≠ 0 := one_ne_zero
+    have h21 : (2 : ZMod p) ≠ 1 := by
+      intro h
+      have h2v : ((2 : ℕ) : ZMod p).val = 2 := ZMod.val_natCast_of_lt (by omega)
+      have h1v : ((1 : ℕ) : ZMod p).val = 1 := ZMod.val_natCast_of_lt (by omega)
+      have : ((2 : ℕ) : ZMod p) = ((1 : ℕ) : ZMod p) := by push_cast; exact h
+      have := congrArg ZMod.val this
+      rw [h2v, h1v] at this
+      omega
+    have h65535_val : ((65535 : ℕ) : ZMod p).val = 65535 := ZMod.val_natCast_of_lt (by omega)
+    have h32768_val : ((32768 : ℕ) : ZMod p).val = 32768 := ZMod.val_natCast_of_lt (by omega)
+    have h1v : (1 : ZMod p).val = 1 := by
+      have : ((1 : ℕ) : ZMod p).val = 1 := ZMod.val_natCast_of_lt (by omega)
+      simpa using this
+    have h0v : (0 : ZMod p).val = 0 := ZMod.val_zero
+    have hcv0 : cry0.val ≤ 1 := by rcases b_cry0 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    have hcv1 : cry1.val ≤ 1 := by rcases b_cry1 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    have hcv2 : cry2.val ≤ 1 := by rcases b_cry2 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    have hcv3 : cry3.val ≤ 1 := by rcases b_cry3 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    have hcv4 : cry4.val ≤ 1 := by rcases b_cry4 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    have hcv5 : cry5.val ≤ 1 := by rcases b_cry5 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    have hcv6 : cry6.val ≤ 1 := by rcases b_cry6 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    have hcv7 : cry7.val ≤ 1 := by rcases b_cry7 with h | h <;> rw [h] <;> simp [h0v, h1v]
+    intro divu_remu
+    obtain ⟨z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw⟩ : is_div = 0 ∧ is_rem = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0 := by
+      clear *- divu_remu sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8 b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw b_one_of_ops h01 h21
+      rcases b_is_divu with h_du | h_du <;> rcases b_is_remu with h_ru | h_ru
+      · -- (0, 0): contradicts divu_remu (0 + 0 ≠ 1)
+        exfalso; rw [h_du, h_ru, zero_add] at divu_remu; exact h01 divu_remu.symm
+      · -- (0, 1): is_remu = 1 → all others = 0
+        have := sop4 h_ru
+        exact ⟨this.1, this.2.2.1, this.2.2.2.1, this.2.2.2.2.1, this.2.2.2.2.2.1, this.2.2.2.2.2.2⟩
+      · -- (1, 0): is_divu = 1 → all others = 0
+        have := sop2 h_du
+        refine ⟨this.1, this.2.1, this.2.2.2.1, this.2.2.2.2.1, this.2.2.2.2.2.1, this.2.2.2.2.2.2⟩
+      · -- (1, 1): contradicts divu_remu (1 + 1 = 2 ≠ 1)
+        exfalso
+        rw [h_du, h_ru] at divu_remu
+        have : (1 + 1 : ZMod p) = 2 := by ring
+        rw [this] at divu_remu; exact h21 divu_remu
+    simp [z_div, z_rem, z_divw, z_remw, z_divuw, z_remuw, divu_remu] at *
+    simp [eq_is_word] at *
+    subst lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 abs_c_alu_event abs_rem_alu_event b_neg rem_neg c_neg
+    simp [eq_is_overflow] at *
+    subst ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 b_neg_not_overflow b_not_neg_not_overflow
+    simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, Bool.cond_eq_ite]
+    split_ifs at div_zero with nzc <;> simp [div_zero] at *
+    · obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
+      subst c0 c1 c2 c3 q0 q1 q2 q3 r0 r1 r2 r3
+      simp [Word.toBitVec64_poly_toNat_poly is_U64_b]
+      simp [Word.toBitVec64_poly, Word.toNat_poly, h65535_val, h0v]
+      push_cast [ZMod.cast_eq_val]
+      rfl
+    · subst arlt maco10 maco11 maco12 maco13 is_c_0; simp at *
+      rw [if_neg]; rotate_left
+      · rw [Word.toBitVec64_poly_toNat_poly is_U64_c]
+        intro zc; apply Word.toNat_reconstruct_poly is_U64_c at zc
+        aesop
+      · repeat rw [Word.toBitVec64_poly_toNat_poly is_U64_b]
+        repeat rw [Word.toBitVec64_poly_toNat_poly is_U64_c]
+        have is_U64_r : Word.isU64_poly #v[r0, r1, r2, r3] := by
+          apply Word.isU64_of_cases_poly <;> simpa
+        have is_U64_q : Word.isU64_poly #v[q0, q1, q2, q3] := by
+          apply Word.isU64_of_cases_poly <;> simpa
+        suffices :
+          Word.toNat_poly #v[q0, q1, q2, q3] = (((Word.toNat_poly #v[b0, b1, b2, b3]) : ℤ).tdiv (Word.toNat_poly #v[c0, c1, c2, c3])).toNat ∧
+          Word.toNat_poly #v[r0, r1, r2, r3] = (((Word.toNat_poly #v[b0, b1, b2, b3]) : ℤ).tmod (Word.toNat_poly #v[c0, c1, c2, c3])).toNat
+        · obtain ⟨hdiv, hrem⟩ := this
+          simp at hdiv; rw [← hdiv, ← hrem]
+          simp [← BitVec.toNat_inj]
+          rw [Word.toBitVec64_poly_toNat_poly is_U64_q,
+              Word.toBitVec64_poly_toNat_poly is_U64_r]
+          rw [Nat.mod_eq_of_lt (by apply Word.toNat_poly_lt_of_isU64_poly is_U64_q)]
+          rw [Nat.mod_eq_of_lt (by apply Word.toNat_poly_lt_of_isU64_poly is_U64_r)]
+          trivial
+        · have cnz : Word.toNat_poly #v[c0, c1, c2, c3] ≠ 0 := by
+            intro zc; apply Word.toNat_reconstruct_poly is_U64_c at zc
+            simp at zc; apply nzc; exact zc
+          rw [tdiv_tmod_unique_full_nat cnz]
+          split_ands <;> [ skip; assumption ]
+          clear *- is_U64_b is_U64_c is_U64_q is_U64_r
+                  u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3 u16_ctqpr4 u16_ctqpr5 u16_ctqpr6 u16_ctqpr7
+                  b_cry0 b_cry1 b_cry2 b_cry3 b_cry4 b_cry5 b_cry6 b_cry7
+                  eq_msb_b eq_msb_c eq_msb_rem r_neg_b_neg r_pos_b_pos
+                  nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3 nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+                  main_mul_low main_mul_high
+                  h17 h01 h21 h65535_val h32768_val h1v h0v
+                  hcv0 hcv1 hcv2 hcv3 hcv4 hcv5 hcv6 hcv7
+          obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
+          obtain ⟨is_U64_ctqh, ctq_high⟩ := main_mul_high
+          have ctq := combine_MUL_MULHU_poly is_U64_ctql is_U64_ctqh is_U64_q is_U64_c ctq_low ctq_high
+          simp at ctq
+          have eq_eb : (#v[b0, b1, b2, b3, 0, 0, 0, 0] : DWord (ZMod p)) =
+              Word.extend_poly #v[b0, b1, b2, b3] false := by simp [Word.extend_poly]
+          have eq_er : (#v[r0, r1, r2, r3, 0, 0, 0, 0] : DWord (ZMod p)) =
+              Word.extend_poly #v[r0, r1, r2, r3] false := by simp [Word.extend_poly]
+          suffices bv_ctqr :
+            DWord.toBitVec128_poly #v[b0, b1, b2, b3, 0, 0, 0, 0] =
+              DWord.toBitVec128_poly #v[ctq0, ctq1, ctq2, ctq3, ctq4, ctq5, ctq6, ctq7] +
+              DWord.toBitVec128_poly #v[r0, r1, r2, r3, 0, 0, 0, 0]
+          · have := Word.toNat_poly_lt_of_isU64_poly is_U64_b
+            have := Word.toNat_poly_lt_of_isU64_poly is_U64_q
+            have := Word.toNat_poly_lt_of_isU64_poly is_U64_c
+            have := Word.toNat_poly_lt_of_isU64_poly is_U64_r
+            rw [eq_eb, eq_er] at bv_ctqr
+            rw [ctq] at bv_ctqr
+            repeat rw [Word.extend_false_is_setWidth_poly (by assumption)] at bv_ctqr
+            rw [← BitVec.toNat_inj, BitVec.toNat_setWidth] at bv_ctqr
+            rw [Word.toBitVec64_poly_toNat_poly (by assumption),
+                Nat.mod_eq_of_lt (by omega)] at bv_ctqr
+            rw [bv_ctqr, BitVec.toNat_add, BitVec.toNat_mul]
+            simp; repeat rw [Word.toBitVec64_poly_toNat_poly (by assumption)]
+            apply Nat.mod_eq_of_lt (by nlinarith)
+          · clear is_U64_c eq_msb_b eq_msb_c eq_msb_rem ctq_low ctq_high ctq eq_eb eq_er
+            apply Word.lt_cases_of_isU64_poly at is_U64_b
+            apply Word.lt_cases_of_isU64_poly at is_U64_r
+            apply Word.lt_cases_of_isU64_poly at is_U64_q
+            apply Word.lt_cases_of_isU64_poly at is_U64_ctql
+            apply Word.lt_cases_of_isU64_poly at is_U64_ctqh
+            simp at *
+            rw [eq_comm] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+            rw [← add_sub_right_comm] at u16_ctqpr1 u16_ctqpr2 u16_ctqpr3 u16_ctqpr4 u16_ctqpr5 u16_ctqpr6 u16_ctqpr7
+                                          nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3 nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry0.val < 2)] at nof_eq_ctqpr0
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry1.val < 2)] at nof_eq_ctqpr1
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry2.val < 2)] at nof_eq_ctqpr2
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry3.val < 2)] at nof_eq_ctqpr3
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry4.val < 2)] at nof_eq_ctqpr4
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry5.val < 2)] at nof_eq_ctqpr5
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry6.val < 2)] at nof_eq_ctqpr6
+            rw [div_mod_decomposition_w_poly (by omega) (by omega : cry7.val < 2)] at nof_eq_ctqpr7
+            conv =>
+              lhs; simp [DWord.toBitVec128_poly, DWord.toNat_poly]
+              simp [nof_eq_ctqpr0.1, nof_eq_ctqpr1.1, nof_eq_ctqpr2.1, nof_eq_ctqpr3.1, nof_eq_ctqpr3.2]
+              conv => arg 2; arg 2; simp [nof_eq_ctqpr7.1]
+              conv => arg 2; arg 1; arg 2; simp [nof_eq_ctqpr6.1]
+              conv => arg 2; arg 1; arg 1; arg 2; simp [nof_eq_ctqpr5.1]
+              conv => arg 2; arg 1; arg 1; arg 1; arg 2; simp [nof_eq_ctqpr4.1]
+              simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2, nof_eq_ctqpr4.2, nof_eq_ctqpr5.2, nof_eq_ctqpr6.2, nof_eq_ctqpr7.2]
+            -- The Fin KB version simps via `Fin.val_add` then strips `% 2130706433`.
+            -- For ZMod p, the substitutions above already produced Nat-form expressions
+            -- (no `% p` residue since `nof_eq_ctqpr*.1/.2` are pure ℕ equalities).
+            have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
+              clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
+            have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
+              clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
+            have j1 := joins 1; have j2 := joins 2; have j3 := joins 3
+            have d1 := divs 1; have d2 := divs 2; have d3 := divs 3
+            simp at *
+            rw [j1, d1, j2, d2, j3]
+            clear j1 j2 j3 d1 d2 d3 joins divs
+            simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
+            repeat rw [BitVec.toNat_add]
+            iterate 2 rw [DWord.toBitVec128_poly_toNat_poly
+              (by apply DWord.isU128_of_cases_poly <;> simp [h0v] <;> omega)]
+            simp [DWord.toNat_poly, h0v]; ring_nf
+            sorry
+
 set_option maxRecDepth 1000000 in
 lemma spec.divu :
   List.Forall SP1Constraint.toProp (constraints Main) →
