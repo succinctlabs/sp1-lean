@@ -2621,6 +2621,183 @@ lemma spec.mul_poly [Fact (2 ^ 24 < p)]
   rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_low, ← mul_spec]
   exact BDWord.low_as_extract_poly isU128_prod
 
+/-- Bridges an MSB constraint (`a < 256 ∧ w < 256` ∧ `a ∈ {0,1}` ∧
+`a = 1 ↔ 128 ≤ w`) plus a sign-extend equation (`sgn = a`) to the
+form `sgn = if isNegative_poly w then 1 else 0`. Used by
+`spec.mulh_poly`/`spec.mulhu_poly`/`spec.mulhsu_poly`. -/
+private lemma msb_to_isNegative_eq
+    {sgn a : ZMod p} {w : BWord (ZMod p)}
+    (h_sgn_eq : sgn = a)
+    (b_msb_disj : a = 0 ∨ a = 1)
+    (b_msb_iff : a = 1 ↔ (128 : ZMod p) ≤ w[7]) :
+    sgn = if BWord.isNegative_poly w then (1 : ZMod p) else 0 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h128_lt : (128 : ℕ) < p := by omega
+  have h128_val : (128 : ZMod p).val = 128 := ZMod.val_natCast_of_lt h128_lt
+  rw [h_sgn_eq]
+  unfold BWord.isNegative_poly
+  by_cases h_neg : w[7].val ≥ 128
+  · rw [if_pos h_neg]
+    apply b_msb_iff.mpr
+    show (128 : ZMod p).val ≤ w[7].val
+    rw [h128_val]; exact h_neg
+  · push_neg at h_neg
+    rw [if_neg (by omega : ¬ w[7].val ≥ 128)]
+    rcases b_msb_disj with h0 | h1
+    · exact h0
+    · exfalso
+      have h_le_zmod := b_msb_iff.mp h1
+      have h_le_val : (128 : ZMod p).val ≤ w[7].val := h_le_zmod
+      rw [h128_val] at h_le_val
+      omega
+
+set_option maxHeartbeats 32000000 in
+-- Polymorphic counterpart of `spec.mulh`. Mirrors `spec.mul_poly` but
+-- (1) uses `MULH` operation (signed × signed), (2) extends both inputs
+-- with `extend_poly _ true` (sign-extend, not setWidth), (3) extracts
+-- the *high* 64 bits of the 128-bit product via `BDWord.high_as_extract_poly`,
+-- (4) bridges `cols.{b,c}_sign_extend = if isNegative_poly _ then 1 else 0`
+-- via `msb_to_isNegative_eq` (instead of just substituting 0 like mul).
+lemma spec.mulh_poly [Fact (2 ^ 24 < p)]
+    {aw bw cw : Word (ZMod p)} {cols : MulOperation (ZMod p)}
+    {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
+    (isU64_bw : bw.isU64_poly)
+    (isU64_cw : cw.isU64_poly)
+    (cstrs : List.Forall SP1Constraint.toProp_poly
+      (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
+    is_mulh = 1 →
+      aw.isU64_poly ∧ aw.toBitVec64_poly =
+        execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULH := by
+  intro h_one
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [allHold_constraints_iff_is_real_poly] at cstrs
+  set bbw := (U16toU8OperationSafe.constraints
+      #v[bw[0], bw[1], bw[2], bw[3]]
+      { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1],
+                         cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1).1
+  set cbw := (U16toU8OperationSafe.constraints
+      #v[cw[0], cw[1], cw[2], cw[3]]
+      { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1],
+                         cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1).1
+  obtain ⟨u16_b_cstrs, u16_c_cstrs, _msb_op, b_msb_constr, c_msb_constr,
+          b_sgn_ext, c_sgn_ext,
+          p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15,
+          _aw0_w, _aw0_m, aw0_h, _aw1_w, _aw1_m, aw1_h,
+          _aw2_w, _aw2_m, aw2_h, _aw3_w, _aw3_m, aw3_h,
+          _b_msb_d, _c_msb_d, _b_sgn_d, _c_sgn_d,
+          b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, sum_d,
+          _b_sgn_b_msb, _c_sgn_c_msb,
+          c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15,
+          pp0, pp1, pp2, pp3, pp4, pp5, pp6, pp7, pp8, pp9, pp10, pp11, pp12, pp13, pp14, pp15⟩ := cstrs
+  obtain ⟨_b_msb_lt, b_msb_disj, b_msb_iff⟩ := b_msb_constr
+  obtain ⟨_c_msb_lt, c_msb_disj, c_msb_iff⟩ := c_msb_constr
+  have h_sum : is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1 :=
+    sum_eq_one_of_eq_one_2 h_one b_mul b_mulhu b_mulhsu b_mulw sum_d
+  have ⟨h_mul, h_mulw, h_mulhu, h_mulhsu⟩ :=
+    (single_op_poly b_mul b_mulh b_mulhu b_mulhsu b_mulw h_sum).2.1 h_one
+  have h_disj_eq : (is_mulh + is_mulhu + is_mulhsu : ZMod p) = 1 := by
+    rw [h_one, h_mulhu, h_mulhsu]; ring
+  have h_disj_ne : is_mulh + is_mulhu + is_mulhsu ≠ 0 := by
+    rw [h_disj_eq]; exact one_ne_zero
+  have h_aw0 : aw[0] = cols.product[8] + cols.product[9] * 256 :=
+    aw0_h.resolve_left h_disj_ne
+  have h_aw1 : aw[1] = cols.product[10] + cols.product[11] * 256 :=
+    aw1_h.resolve_left h_disj_ne
+  have h_aw2 : aw[2] = cols.product[12] + cols.product[13] * 256 :=
+    aw2_h.resolve_left h_disj_ne
+  have h_aw3 : aw[3] = cols.product[14] + cols.product[15] * 256 :=
+    aw3_h.resolve_left h_disj_ne
+  have h_b_sgn_msb : cols.b_sign_extend = cols.b_msb := by
+    rw [b_sgn_ext, h_one, h_mulhsu]; ring
+  have h_c_sgn_msb : cols.c_sign_extend = cols.c_msb := by
+    rw [c_sgn_ext, h_one]; ring
+  have h_b_sgn := msb_to_isNegative_eq h_b_sgn_msb b_msb_disj b_msb_iff
+  have h_c_sgn := msb_to_isNegative_eq h_c_sgn_msb c_msb_disj c_msb_iff
+  have eq_bbw : bbw = bw.toBWord_poly :=
+    U16toU8OperationSafe.spec.return_poly (1 : ZMod p) u16_b_cstrs
+  have eq_cbw : cbw = cw.toBWord_poly :=
+    U16toU8OperationSafe.spec.return_poly (1 : ZMod p) u16_c_cstrs
+  have isU64_bbw : BWord.isU64_poly bbw := by
+    rw [eq_bbw]; exact Word.toBWord_poly_toU64 isU64_bw
+  have isU64_cbw : BWord.isU64_poly cbw := by
+    rw [eq_cbw]; exact Word.toBWord_poly_toU64 isU64_cw
+  -- Substitute sign-extend = if isNeg then 1 else 0 into p0..p15.
+  -- After this, cp_poly's bbwe argument matches `BWord.extend_poly bbw true`'s
+  -- definitional form (`#v[bbw[0],..,bbw[7], (if true then (if isNeg ...) else 0) * 255, ...]`).
+  rw [h_b_sgn, h_c_sgn] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+  -- Convert product bounds to Nat.
+  have pp0' : cols.product[0].val < 256 := by
+    have h : cols.product[0].val < (256 : ZMod p).val := pp0
+    rwa [val_256_zmod_p] at h
+  have pp1' : cols.product[1].val < 256 := by
+    have h : cols.product[1].val < (256 : ZMod p).val := pp1
+    rwa [val_256_zmod_p] at h
+  have pp2' : cols.product[2].val < 256 := by
+    have h : cols.product[2].val < (256 : ZMod p).val := pp2
+    rwa [val_256_zmod_p] at h
+  have pp3' : cols.product[3].val < 256 := by
+    have h : cols.product[3].val < (256 : ZMod p).val := pp3
+    rwa [val_256_zmod_p] at h
+  have pp4' : cols.product[4].val < 256 := by
+    have h : cols.product[4].val < (256 : ZMod p).val := pp4
+    rwa [val_256_zmod_p] at h
+  have pp5' : cols.product[5].val < 256 := by
+    have h : cols.product[5].val < (256 : ZMod p).val := pp5
+    rwa [val_256_zmod_p] at h
+  have pp6' : cols.product[6].val < 256 := by
+    have h : cols.product[6].val < (256 : ZMod p).val := pp6
+    rwa [val_256_zmod_p] at h
+  have pp7' : cols.product[7].val < 256 := by
+    have h : cols.product[7].val < (256 : ZMod p).val := pp7
+    rwa [val_256_zmod_p] at h
+  have pp8' : cols.product[8].val < 256 := by
+    have h : cols.product[8].val < (256 : ZMod p).val := pp8
+    rwa [val_256_zmod_p] at h
+  have pp9' : cols.product[9].val < 256 := by
+    have h : cols.product[9].val < (256 : ZMod p).val := pp9
+    rwa [val_256_zmod_p] at h
+  have pp10' : cols.product[10].val < 256 := by
+    have h : cols.product[10].val < (256 : ZMod p).val := pp10
+    rwa [val_256_zmod_p] at h
+  have pp11' : cols.product[11].val < 256 := by
+    have h : cols.product[11].val < (256 : ZMod p).val := pp11
+    rwa [val_256_zmod_p] at h
+  have pp12' : cols.product[12].val < 256 := by
+    have h : cols.product[12].val < (256 : ZMod p).val := pp12
+    rwa [val_256_zmod_p] at h
+  have pp13' : cols.product[13].val < 256 := by
+    have h : cols.product[13].val < (256 : ZMod p).val := pp13
+    rwa [val_256_zmod_p] at h
+  have pp14' : cols.product[14].val < 256 := by
+    have h : cols.product[14].val < (256 : ZMod p).val := pp14
+    rwa [val_256_zmod_p] at h
+  have pp15' : cols.product[15].val < 256 := by
+    have h : cols.product[15].val < (256 : ZMod p).val := pp15
+    rwa [val_256_zmod_p] at h
+  have mul_spec :=
+    core_mul_poly bbw cbw isU64_bbw isU64_cbw true true cols.product cols.carry
+             p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+             c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
+             pp0' pp1' pp2' pp3' pp4' pp5' pp6' pp7' pp8' pp9' pp10' pp11' pp12' pp13' pp14' pp15'
+  have isU128_prod : BDWord.isU128_poly cols.product := by
+    apply BDWord.isU128_of_cases_poly <;> omega
+  have isU64_prod_high : (BDWord.high_poly cols.product).isU64_poly :=
+    BDWord.isU128_poly_high_poly_isU64_poly isU128_prod
+  have aw_eq : aw = BWord.toWord_poly (BDWord.high_poly cols.product) := by
+    rw [BDWord.high_poly, BWord.toWord_poly, ← Word.eq_pointwise]
+    refine ⟨?_, ?_, ?_, ?_⟩ <;> simp [h_aw0, h_aw1, h_aw2, h_aw3]
+  have is_U64_aw : aw.isU64_poly := by
+    rw [aw_eq]; exact BWord.toWord_poly_U64_poly isU64_prod_high
+  refine ⟨is_U64_aw, ?_⟩
+  rw [exec_MUL_pure_bv_to_bw_poly _ _ .MULH isU64_bw isU64_cw]
+  simp only [execute_MUL_pure_bw_poly, ← eq_bbw, ← eq_cbw]
+  rw [show (decide (True ∨ mop.MULH = mop.MULHSU)) = true from by decide,
+      show (decide (True ∨ mop.MULH = mop.MULHUS)) = true from by decide,
+      if_neg (show ¬ (mop.MULH = mop.MUL) from by decide)]
+  rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_high, ← mul_spec]
+  exact BDWord.high_as_extract_poly isU128_prod
+
 end poly_helpers
 
 end MulOperation
