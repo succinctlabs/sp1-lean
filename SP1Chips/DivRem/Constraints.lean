@@ -4429,12 +4429,12 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 @[simp] def is_real_poly (Main : Vector (ZMod p) 246) : Prop :=
   Main[244] = 1
 
-@[simp] def is_div_poly   (Main : Vector (ZMod p) 246) : Prop := Main[201] = 1
-@[simp] def is_divu_poly  (Main : Vector (ZMod p) 246) : Prop := Main[202] = 1
-@[simp] def is_rem_poly   (Main : Vector (ZMod p) 246) : Prop := Main[203] = 1
-@[simp] def is_remu_poly  (Main : Vector (ZMod p) 246) : Prop := Main[204] = 1
-@[simp] def is_divw_poly  (Main : Vector (ZMod p) 246) : Prop := Main[205] = 1
-@[simp] def is_remw_poly  (Main : Vector (ZMod p) 246) : Prop := Main[206] = 1
+@[simp] def is_div_poly (Main : Vector (ZMod p) 246) : Prop := Main[201] = 1
+@[simp] def is_divu_poly (Main : Vector (ZMod p) 246) : Prop := Main[202] = 1
+@[simp] def is_rem_poly (Main : Vector (ZMod p) 246) : Prop := Main[203] = 1
+@[simp] def is_remu_poly (Main : Vector (ZMod p) 246) : Prop := Main[204] = 1
+@[simp] def is_divw_poly (Main : Vector (ZMod p) 246) : Prop := Main[205] = 1
+@[simp] def is_remw_poly (Main : Vector (ZMod p) 246) : Prop := Main[206] = 1
 @[simp] def is_divuw_poly (Main : Vector (ZMod p) 246) : Prop := Main[207] = 1
 @[simp] def is_remuw_poly (Main : Vector (ZMod p) 246) : Prop := Main[208] = 1
 
