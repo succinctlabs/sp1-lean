@@ -2500,3 +2500,7 @@ to lift it (e.g., "needs `CharP F p` with `p > 2^16`", "needs `Fin`-specific
 - **2026-04-26** (Phase 0): Hybrid scope chosen over full polymorphism. Rationale: 17 chips with 57 `correct_*` theorems is too much surface to rewrite in one effort; keeping the chip statements KB-typed lets the auto-gen pipeline keep working unchanged.
 - **2026-04-26** (Phase 0): Compiler stays KB-bound. Rationale: avoids cross-repo coordination; the generic-field win lives at the layer above the auto-gen, where call sites force `F = Fin KB` through constructor inference.
 - **2026-04-26** (Phase 0): No second concrete field this round. Rationale: BabyBear instantiation can be done in a follow-up effort once the generic surface stabilizes; the Phase 5 forward-guidance section will document the recipe.
+
+## In-flight pilots
+
+- **ShiftLeft `spec.sll_poly`** (2026-05-05) — 1 of 64 cases closed end-to-end; remaining 63 land on `all_goals sorry`. Per-case template + close pattern + shared infrastructure documented in `docs/SHIFTLEFT_POLY_PILOT.md`. Sister lemmas `spec.slli_poly`, `spec.sllw_poly` (needs `is_mod_32_poly` first), `spec.slliw_poly` blocked on the sll completion.

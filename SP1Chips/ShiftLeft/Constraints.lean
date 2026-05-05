@@ -48,7 +48,7 @@ section constraints
   let E29 : F := Main[41] * 32
   let E30 : F := E28 + E29
   let E31 : F := Main[25] - E30
-  let E32 : F := E31 * 2097414145
+  let E32 : F := E31 * ((64 : F)⁻¹)
   let E33 : F := Main[41] * 2
   let E34 : F := E33 * Main[62]
   let E35 : F := Main[40] + E34
@@ -302,7 +302,7 @@ lemma allHold_constraints_iff :
     (Main[39] = 0 ∨ Main[39] = 1) ∧
     (Main[40] = 0 ∨ Main[40] = 1) ∧
     (Main[41] = 0 ∨ Main[41] = 1) ∧
-    (¬Main[62] + Main[63] = 0 → ((Main[25] - (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 + Main[40] * 16 + Main[41] * 32)) * 2097414145).val < 1024) ∧
+    (¬Main[62] + Main[63] = 0 → ((Main[25] - (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 + Main[40] * 16 + Main[41] * 32)) * ((64 : Fin KB)⁻¹)).val < 1024) ∧
     (Main[45] = 0 ∨ Main[40] + Main[41] * 2 * Main[62] = 0) ∧
     (Main[45] = 0 ∨ Main[45] = 1) ∧
     (Main[46] = 0 ∨ Main[40] + Main[41] * 2 * Main[62] = 1) ∧
@@ -1015,6 +1015,484 @@ lemma sll_real_poly (Main : Vector (ZMod p) 65) : Main[62] = 1 → is_real_poly 
 omit [Fact (2 ^ 17 < p)] in
 lemma sllw_real_poly (Main : Vector (ZMod p) 65) : Main[63] = 1 → is_real_poly Main := by
   intro h; exact Or.inr h
+
+-- Polymorphic counterpart of `cancel_mul_65536`. Same algebraic content
+-- (cancel `(k : ZMod p)` from both sides given `0 < k ∣ 65536`), but stays
+-- in `ZMod p` arithmetic via `mul_right_cancel₀` rather than the concrete
+-- version's `Fin.ext`/`Fin.mul_def` Nat reasoning. `(k : ZMod p) ≠ 0` holds
+-- because `k ≤ 65536 < 2^17 < p`.
+lemma cancel_mul_65536_poly {a b c : ZMod p} {k : ℕ}
+    (h_dvd : k ∣ 65536) (h_pos : 0 < k) :
+    a * (k : ZMod p) = b * 65536 + c * (k : ZMod p) →
+    a = b * ((65536 / k : ℕ) : ZMod p) + c := by
+  intro h
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 65536 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have hk_le : k ≤ 65536 := Nat.le_of_dvd (by omega) h_dvd
+  have hk_lt_p : k < p := by omega
+  obtain ⟨z, hz_eq⟩ := h_dvd
+  have hk_ne_zero : (k : ZMod p) ≠ 0 := by
+    intro h0
+    have hv : (k : ZMod p).val = 0 := by rw [h0]; exact ZMod.val_zero
+    rw [ZMod.val_natCast_of_lt hk_lt_p] at hv; omega
+  have hkz_eq_zmod : (k : ZMod p) * (z : ZMod p) = (65536 : ZMod p) := by
+    have hcast : ((k * z : ℕ) : ZMod p) = ((65536 : ℕ) : ZMod p) :=
+      congrArg ((↑) : ℕ → ZMod p) hz_eq.symm
+    push_cast at hcast; exact hcast
+  have hdiv : 65536 / k = z := by rw [hz_eq]; exact Nat.mul_div_cancel_left z h_pos
+  rw [hdiv]
+  have h2 : a * (k : ZMod p) = (b * (z : ZMod p) + c) * (k : ZMod p) := by
+    rw [add_mul, mul_assoc, mul_comm ((z : ZMod p)) ((k : ZMod p)), hkz_eq_zmod, h]
+  exact mul_right_cancel₀ hk_ne_zero h2
+
+set_option maxHeartbeats 1600000 in
+-- Polymorphic counterpart of `single_op`. Two-way mutual exclusion of the
+-- sll/sllw flags. The `Main[62]=Main[63]=1` case is ruled out by the
+-- `Main[62]+Main[63] ∈ {0,1}` binarity constraint together with
+-- `(2 : ZMod p) ∉ {0,1}` (which holds under `[Fact (2^17 < p)]`).
+lemma single_op_poly (Main : Vector (ZMod p) 65)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main)) :
+    (Main[62] = 1 → Main[63] = 0) ∧ (Main[63] = 1 → Main[62] = 0) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h2_ne : ((2 : ℕ) : ZMod p) ≠ 0 ∧ ((2 : ℕ) : ZMod p) ≠ 1 := by
+    have hv : ((2 : ℕ) : ZMod p).val = 2 := ZMod.val_natCast_of_lt (by omega)
+    refine ⟨?_, ?_⟩ <;> intro heq <;>
+      (first | rw [heq, ZMod.val_zero] at hv | rw [heq, ZMod.val_one] at hv) <;> omega
+  have h2_ne_zero : (1 + 1 : ZMod p) ≠ 0 := fun h => h2_ne.1 (by push_cast; linear_combination h)
+  have h2_ne_one  : (1 + 1 : ZMod p) ≠ 1 := fun h => h2_ne.2 (by push_cast; linear_combination h)
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly] at cstrs
+  obtain ⟨_h_msb, _cpu, _alu, one_of_ops, b_sll, b_sllw, _rest⟩ := cstrs
+  refine ⟨?_, ?_⟩ <;> intro h <;>
+    rcases b_sll with h_sll | h_sll <;> rcases b_sllw with h_sllw | h_sllw <;>
+    simp_all [h2_ne_zero, h2_ne_one]
+
+-- Polymorphic counterpart of `is_mod_64`. Same conclusion (`c0.val % 64 = m.val`),
+-- with the lookup-side bound `((c0 - m) * (64 : ZMod p)⁻¹).val < 1024` replacing
+-- the `Fin KB` form. Proof: derive `c0 = 64 * q + m` in `ZMod p`, lift to ℕ
+-- using the size budget `64 * 1023 + 63 < 2^17 < p`, then take mod 64.
+-- (Doesn't need `c0.val < 65536` — the size budget on `q` and `m` suffices.)
+lemma is_mod_64_poly {c0 m : ZMod p} (hm : m.val < 64)
+    (hdiff : ((c0 - m) * (64 : ZMod p)⁻¹).val < 1024) :
+    c0.val % 64 = m.val := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h64_val : (64 : ZMod p).val = 64 :=
+    ZMod.val_natCast_of_lt (show (64 : ℕ) < p from by omega)
+  have h64_ne : (64 : ZMod p) ≠ 0 := by
+    intro h0
+    have := congrArg ZMod.val h0
+    rw [h64_val, ZMod.val_zero] at this; omega
+  set q := (c0 - m) * (64 : ZMod p)⁻¹ with hq_def
+  have h_q_lt : q.val < 1024 := hdiff
+  have h_eq : (64 : ZMod p) * q = c0 - m := by
+    rw [hq_def, show (64 : ZMod p) * ((c0 - m) * (64 : ZMod p)⁻¹) =
+      (c0 - m) * ((64 : ZMod p) * (64 : ZMod p)⁻¹) from by ring,
+      mul_inv_cancel₀ h64_ne, mul_one]
+  have h_c0 : c0 = 64 * q + m := by linear_combination -h_eq
+  have h_64q_val : (64 * q : ZMod p).val = 64 * q.val := by
+    rw [ZMod.val_mul, h64_val, Nat.mod_eq_of_lt]; omega
+  have h_sum_val : (64 * q + m : ZMod p).val = 64 * q.val + m.val := by
+    rw [ZMod.val_add, h_64q_val, Nat.mod_eq_of_lt]; omega
+  have hc0_eq : c0.val = 64 * q.val + m.val := by rw [h_c0, h_sum_val]
+  omega
+
+set_option maxHeartbeats 4000000 in
+-- Polymorphic counterpart of the `bounds` lemma's most-load-bearing exits:
+-- `Main[3].val < 65536` (PC low limb), `Word.isU64_poly` for both op_b and
+-- op_c reads. Mirrors Mul's `ops_U64_b_c_poly` design — minimum extraction
+-- from `cstrs` to support the spec lemmas; finer-grained register bounds
+-- (`Main[6] < 32` etc.) and I-type immediate consequences are derived
+-- inline at use sites.
+lemma bounds_poly (Main : Vector (ZMod p) 65)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (real : is_real_poly Main) :
+    Main[3].val < 65536 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  obtain ⟨single_62, single_63⟩ := single_op_poly Main cstrs
+  have h_is_real_eq_one : Main[62] + Main[63] = 1 := by
+    rcases real with h62 | h63
+    · rw [h62, single_62 h62]; ring
+    · rw [h63, single_63 h63]; ring
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append,
+    List.Forall, SP1Constraint.toProp_poly_assertZero, sub_eq_zero] at cstrs
+  obtain ⟨⟨⟨_h_msb, _cpu⟩, alu⟩, _rest⟩ := cstrs
+  rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at alu
+  -- Destructure ALU iff RHS (19 conjuncts; we only need PC bound, U64_b,
+  -- and the imm_c=0 → U64_c block).
+  obtain ⟨_trusted_instr_prop, _h_op_a_lt, _h_op_b_lt, h_c_bnds,
+          _h_a0_bool, _h_a0_iff,
+          b_imm_c, _pc_mod, h3_lt, _h4_lt, _h5_lt,
+          _h12_lt, _h20_lt, _h_clk_b, _h_clk_a,
+          _is_U64_a, is_U64_b,
+          h_imm_c_zero_block, _h_op_a_0_zero, h_imm_c_one_block⟩ := alu
+  have h65536 : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  have h3_lt_nat : Main[3].val < 65536 := by
+    have : Main[3].val < (65536 : ZMod p).val := h3_lt
+    rwa [h65536] at this
+  refine ⟨h3_lt_nat, is_U64_b, ?_⟩
+  -- Word.isU64_poly #v[Main[25..28]]:
+  -- - imm_c = 0 (R-type): comes from `h_imm_c_zero_block` (U64 conjunct of
+  --   the imm_c=0 → block — op_c_memory.prev_value is loaded normally).
+  -- - imm_c = 1 (I-type-shift): `h_imm_c_one_block` says Main[25..28] copies
+  --   op_c[0..3], which are bounded by `h_c_bnds : op_c[i] < 65536`. Combine
+  --   via `Word.isU64_of_cases_poly`.
+  rcases b_imm_c with h_imm_zero | h_imm_one
+  · exact (h_imm_c_zero_block h_imm_zero).2.2
+  · obtain ⟨h25, h26, h27, h28⟩ :=
+      h_imm_c_one_block (by rw [h_imm_one]; exact one_ne_zero)
+    obtain ⟨h_c0_lt, h_c1_lt, h_c2_lt, h_c3_lt⟩ := h_c_bnds
+    apply Word.isU64_of_cases_poly
+    · rw [h25, show (2 : ℕ) ^ 16 = 65536 from rfl]
+      have : Main[21].val < (65536 : ZMod p).val := h_c0_lt
+      rwa [h65536] at this
+    · rw [h26, show (2 : ℕ) ^ 16 = 65536 from rfl]
+      have : Main[22].val < (65536 : ZMod p).val := h_c1_lt
+      rwa [h65536] at this
+    · rw [h27, show (2 : ℕ) ^ 16 = 65536 from rfl]
+      have : Main[23].val < (65536 : ZMod p).val := h_c2_lt
+      rwa [h65536] at this
+    · rw [h28, show (2 : ℕ) ^ 16 = 65536 from rfl]
+      have : Main[24].val < (65536 : ZMod p).val := h_c3_lt
+      rwa [h65536] at this
+
+@[simp] def sp1_op_a_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[6].val
+@[simp] def sp1_op_b_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[14].val
+@[simp] def sp1_op_c_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+@[simp] def sp1_op_c_imm_poly (Main : Vector (ZMod p) 65) : BitVec 6 :=
+  BitVec.ofNat 6 Main[21].val
+@[simp] def sp1_op_c_imm_w_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+
+-- Polymorphic counterpart of `spec.sll`. Mirrors the Fin KB version's
+-- structure: extract `bounds_poly` + `single_op_poly`, destructure `cstrs`
+-- directly via `simp [constraints, ..., toProp_poly]` (no master iff lemma —
+-- intractable for this chip per commit 4a60d33), reduce both sides to Nat
+-- via `Word.toBitVec64_poly_toNat_poly` + `BitVec.toNat_shiftLeft`, take the
+-- `c0.val % 64` shift amount through `is_mod_64_poly`, then 64-way case
+-- split on `cb_i ∈ {0,1}`.
+--
+-- Per-leaf close: see `_spec_sll_poly_shift0_omega_test` below for the
+-- arithmetic-core close pattern, which omega closes once the per-case
+-- bridges (`Word.isU64_poly` for the result word; `a_i.val` from the active
+-- `nw_*`; `c0.val % 64` from `is_mod_64_poly diff` with the concrete cb-sum)
+-- are in scope. Filling those bridges per case is the remaining work.
+set_option maxHeartbeats 64000000 in
+-- Heavy: 65-element row + 70-clause constraints destructure + 64-way `rcases`
+-- on cb0..cb5 + `simp only` distinctness lemmas at all hypotheses.
+lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
+    SP1ConstraintList.allHold_poly (constraints Main) →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w_poly
+          #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]]
+          .SLL := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  intro cstrs
+  obtain ⟨eq_sll, eq_imm⟩ := h
+  have ⟨hpc, is_U64_b, is_U64_c⟩ := bounds_poly Main cstrs (sll_real_poly Main eq_sll)
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+  obtain ⟨c0_16, c1_16, c2_16, c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  obtain ⟨sop_1, sop_2⟩ := single_op_poly Main cstrs
+  have h_63_zero : Main[63] = 0 := sop_1 eq_sll
+  -- Destructure cstrs without the (intractable) master iff lemma.
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly] at cstrs
+  set b0 := Main[15]
+  set b1 := Main[16]
+  set b2 := Main[17]
+  set b3 := Main[18]
+  set c0 := Main[25]
+  set c1 := Main[26]
+  set c2 := Main[27]
+  set c3 := Main[28]
+  set imm := Main[31]
+  set a0 := Main[32]
+  set a1 := Main[33]
+  set a2 := Main[34]
+  set a3 := Main[35]
+  set cb0 := Main[36]
+  set cb1 := Main[37]
+  set cb2 := Main[38]
+  set cb3 := Main[39]
+  set cb4 := Main[40]
+  set cb5 := Main[41]
+  set v01 := Main[42]
+  set v012 := Main[43]
+  set v0123 := Main[44]
+  set su160 := Main[45]
+  set su161 := Main[46]
+  set su162 := Main[47]
+  set su163 := Main[48]
+  set ll0 := Main[49]
+  set ll1 := Main[50]
+  set ll2 := Main[51]
+  set ll3 := Main[52]
+  set hl0 := Main[53]
+  set hl1 := Main[54]
+  set hl2 := Main[55]
+  set hl3 := Main[56]
+  set lr0 := Main[57]
+  set lr1 := Main[58]
+  set lr2 := Main[59]
+  set lr3 := Main[60]
+  set msb := Main[61]
+  set sll := Main[62]
+  set sllw := Main[63]
+  obtain ⟨h_msb_a1, cpu, alu, _one_of_ops,
+           _b_sll, _b_sllw,
+           b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
+           h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, one_of_su16s,
+           eq_v01, eq_v012, eq_v0123,
+           lt_ll0, lt_lh0, h_b0_dec, lt_ll1, lt_lh1, h_b1_dec,
+           lt_ll2, lt_lh2, h_b2_dec, lt_ll3, lt_lh3, h_b3_dec,
+           eq_lr0, eq_lr1, eq_lr2, eq_lr3,
+           nw_00, nw_01, nw_02, nw_03, nw_04, nw_05, nw_06, nw_07, nw_08, nw_09, nw_10, nw_11, nw_12, nw_13, nw_14, nw_15,
+           _w_00, _w_01, _w_02, _w_03, _w_04, _w_05,
+           _eq_m64, _h13⟩ := cstrs
+  clear h_msb_a1 cpu alu
+  -- Convert `2 ^ ZMod.val 10` (= 1024) so `is_mod_64_poly` can consume `diff`.
+  have h10_val : ((10 : ℕ) : ZMod p).val = 10 := ZMod.val_natCast_of_lt (by omega)
+  have h10_cast : (10 : ZMod p) = ((10 : ℕ) : ZMod p) := by push_cast; rfl
+  rw [h10_cast, h10_val] at diff
+  norm_num at diff
+  -- Distinctness facts for small ZMod literals (used to collapse the
+  -- `K = K'` second disjuncts in the `h_su16*` hypotheses).
+  have h_zmod_lit_ne : ∀ K K' : ℕ, K < 65536 → K' < 65536 → K ≠ K' →
+      ((K : ZMod p) ≠ (K' : ZMod p)) := by
+    intros K K' hK hK' hne heq
+    have := congrArg ZMod.val heq
+    rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at this
+    exact hne this
+  have h_2_ne_0 : (2 : ZMod p) ≠ 0 := by
+    have := h_zmod_lit_ne 2 0 (by omega) (by omega) (by omega); push_cast at this; exact this
+  have h_2_ne_1 : (2 : ZMod p) ≠ 1 := by
+    have := h_zmod_lit_ne 2 1 (by omega) (by omega) (by omega); push_cast at this; exact this
+  have h_2_ne_3 : (2 : ZMod p) ≠ 3 := by
+    have := h_zmod_lit_ne 2 3 (by omega) (by omega) (by omega); push_cast at this; exact this
+  have h_1_ne_0 : (1 : ZMod p) ≠ 0 := one_ne_zero
+  have h_0_ne_1 : (0 : ZMod p) ≠ 1 := h_1_ne_0.symm
+  have h_1_ne_2 : (1 : ZMod p) ≠ 2 := h_2_ne_1.symm
+  have h_1_ne_3 : (1 : ZMod p) ≠ 3 := by
+    have := h_zmod_lit_ne 1 3 (by omega) (by omega) (by omega); push_cast at this; exact this
+  have h_3_ne_0 : (3 : ZMod p) ≠ 0 := by
+    have := h_zmod_lit_ne 3 0 (by omega) (by omega) (by omega); push_cast at this; exact this
+  have h_3_ne_1 : (3 : ZMod p) ≠ 1 := h_1_ne_3.symm
+  have h_3_ne_2 : (3 : ZMod p) ≠ 2 := h_2_ne_3.symm
+  have h_0_ne_2 : (0 : ZMod p) ≠ 2 := h_2_ne_0.symm
+  have h_0_ne_3 : (0 : ZMod p) ≠ 3 := h_3_ne_0.symm
+  -- `is_real` discharges the `¬sll+sllw=0 →` prefix on `lt_lh*` and `lt_ll*`.
+  have h_real_ne : ¬(sll + sllw = 0) := by
+    rw [eq_sll, h_63_zero]; norm_num
+  have h_sll_ne_zero : sll ≠ 0 := by rw [eq_sll]; exact h_1_ne_0
+  -- Bridge RHS to nat upfront (does not depend on per-case info).
+  rw [← BitVec.toNat_inj]
+  simp only [execute_RTYPE_pure_w_poly]
+  rw [BitVec.shiftLeft_eq', BitVec.toNat_shiftLeft, Nat.shiftLeft_eq]
+  rw [Word.toBitVec64_poly_toNat_poly is_U64_b, Word.toNat_poly_def]
+  have h_setWidth :
+      (BitVec.setWidth 6
+        (Word.toBitVec64_poly (#v[Main[25], Main[26], Main[27], Main[28]]
+                                  : Word (ZMod p)))).toNat
+      = Main[25].val % 64 := by
+    rw [BitVec.toNat_setWidth, Word.toBitVec64_poly_toNat_poly is_U64_c,
+        Word.toNat_poly_def]
+    have ⟨h0, h1, h2, h3⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+               List.getElem_cons_succ] at *
+    -- 2^6 = 64; higher limbs are multiples of 2^16 hence of 64.
+    change (c0.val + c1.val * 2 ^ 16 + c2.val * 2 ^ 32 + c3.val * 2 ^ 48) % 64 = c0.val % 64
+    omega
+  rw [h_setWidth]
+  -- 64-way case split on cb0..cb5 ∈ {0,1}; `simp only` substitutes concrete
+  -- cb values, collapses the `2 = 0` etc. disjuncts in `h_su16*`, and reduces
+  -- `eq_v0123`, `lt_ll*`, `lt_lh*`, `h_b*_dec`, `eq_lr*`, `nw_*` to concrete
+  -- forms. After this, each leaf is the per-case arithmetic that closes via
+  -- the `_spec_sll_poly_shift0_omega_test` pattern below (filling in the per-
+  -- case `Word.isU64_poly`, `a_i.val`, and `c0.val % 64` bridges).
+  set_option maxRecDepth 8192 in
+  rcases b_cb0 with h_cb0 | h_cb0 <;> rcases b_cb1 with h_cb1 | h_cb1 <;>
+  rcases b_cb2 with h_cb2 | h_cb2 <;> rcases b_cb3 with h_cb3 | h_cb3 <;>
+  rcases b_cb4 with h_cb4 | h_cb4 <;> rcases b_cb5 with h_cb5 | h_cb5 <;>
+  simp only [h_cb0, h_cb1, h_cb2, h_cb3, h_cb4, h_cb5,
+             zero_mul, mul_zero, zero_add, add_zero, mul_one, one_mul,
+             h_2_ne_0, h_2_ne_1, h_2_ne_3, h_1_ne_0, h_0_ne_1, h_1_ne_2, h_1_ne_3,
+             h_3_ne_0, h_3_ne_1, h_3_ne_2, h_0_ne_2, h_0_ne_3,
+             or_false, false_or, or_true, true_or] at *
+  -- case 0/64 (shift = 0, su160 active): explicitly closed.
+  · -- Discharge the `¬sll+sllw=0 →` prefix on lt_lh*, lt_ll*.
+    have lt_lh0' := lt_lh0 h_real_ne
+    have lt_lh1' := lt_lh1 h_real_ne
+    have lt_lh2' := lt_lh2 h_real_ne
+    have lt_lh3' := lt_lh3 h_real_ne
+    have lt_ll0' := lt_ll0 h_real_ne
+    have lt_ll1' := lt_ll1 h_real_ne
+    have lt_ll2' := lt_ll2 h_real_ne
+    have lt_ll3' := lt_ll3 h_real_ne
+    have diff'  := diff h_real_ne
+    -- Reduce `2 ^ ZMod.val 0 = 1` and `(16 - 0 : ZMod p).val = 16`.
+    have hZ0 : (0 : ZMod p).val = 0 := ZMod.val_zero
+    have h16 : ((16 : ZMod p) - 0).val = 16 := by
+      rw [show ((16 : ZMod p) - 0) = ((16 : ℕ) : ZMod p) by push_cast; ring,
+          ZMod.val_natCast_of_lt (by omega)]
+    rw [hZ0] at lt_lh0' lt_lh1' lt_lh2' lt_lh3'
+    rw [h16] at lt_ll0' lt_ll1' lt_ll2' lt_ll3'
+    simp only [Nat.pow_zero, Nat.lt_one_iff] at lt_lh0' lt_lh1' lt_lh2' lt_lh3'
+    -- hl_i = 0.
+    have hl0_eq : hl0 = 0 := (ZMod.val_eq_zero hl0).mp lt_lh0'
+    have hl1_eq : hl1 = 0 := (ZMod.val_eq_zero hl1).mp lt_lh1'
+    have hl2_eq : hl2 = 0 := (ZMod.val_eq_zero hl2).mp lt_lh2'
+    have hl3_eq : hl3 = 0 := (ZMod.val_eq_zero hl3).mp lt_lh3'
+    -- Active su16 flag. After distinctness simp, h_su16{1,2,3} : su16i = 0.
+    -- Substitute into one_of_su16s, dispatch the False disjunct.
+    rw [h_su161, h_su162, h_su163] at one_of_su16s
+    have h_su160_one : su160 = 1 := by
+      have h := one_of_su16s.resolve_left h_real_ne
+      linear_combination h
+    have h_su160_ne : su160 ≠ 0 := by rw [h_su160_one]; exact h_1_ne_0
+    -- v0123 = 1 (chain v0123 = v012 = v01 = 1 after cb's = 0).
+    have h_v0123_one : v0123 = 1 := by
+      have h := eq_v0123; rw [eq_v012, eq_v01] at h; exact h
+    -- Substitute v0123 = 1 everywhere needed.
+    rw [h_v0123_one] at h_b0_dec h_b1_dec h_b2_dec h_b3_dec eq_lr0 eq_lr1 eq_lr2 eq_lr3
+    -- b_i = ll_i (from h_b_i_dec, hl_i = 0).
+    have h_b0 : b0 = ll0 := by
+      have h := h_b0_dec
+      rw [hl0_eq] at h; linear_combination h
+    have h_b1 : b1 = ll1 := by
+      have h := h_b1_dec
+      rw [hl1_eq] at h; linear_combination h
+    have h_b2 : b2 = ll2 := by
+      have h := h_b2_dec
+      rw [hl2_eq] at h; linear_combination h
+    have h_b3 : b3 = ll3 := by
+      have h := h_b3_dec
+      rw [hl3_eq] at h; linear_combination h
+    -- lr_i values (now lr0 = ll0 * 1 = ll0; lr1 = ll1 + hl0; etc.)
+    simp only [mul_one] at eq_lr0 eq_lr1 eq_lr2 eq_lr3
+    rw [hl0_eq] at eq_lr1
+    rw [hl1_eq] at eq_lr2
+    rw [hl2_eq] at eq_lr3
+    simp only [zero_add, add_zero] at eq_lr1 eq_lr2 eq_lr3
+    -- a_i values via active nw_* (3-way disjunction: `sll = 0 ∨ su160 = 0 ∨ ...`).
+    have h_a0_eq : a0 = lr0 :=
+      (nw_00.resolve_left h_sll_ne_zero).resolve_left h_su160_ne
+    have h_a1_eq : a1 = lr1 :=
+      (nw_01.resolve_left h_sll_ne_zero).resolve_left h_su160_ne
+    have h_a2_eq : a2 = lr2 :=
+      (nw_02.resolve_left h_sll_ne_zero).resolve_left h_su160_ne
+    have h_a3_eq : a3 = lr3 :=
+      (nw_03.resolve_left h_sll_ne_zero).resolve_left h_su160_ne
+    -- After the simp above, eq_lr0..eq_lr3 are now `lr_i = ll_i`.
+    -- Chain a_i = lr_i = ll_i = b_i.
+    have h_a0_val : a0.val = b0.val := by rw [h_a0_eq, eq_lr0, ← h_b0]
+    have h_a1_val : a1.val = b1.val := by rw [h_a1_eq, eq_lr1, ← h_b1]
+    have h_a2_val : a2.val = b2.val := by rw [h_a2_eq, eq_lr2, ← h_b2]
+    have h_a3_val : a3.val = b3.val := by rw [h_a3_eq, eq_lr3, ← h_b3]
+    -- Word.isU64_poly #v[a0..a3].
+    have h_a_isU64 : Word.isU64_poly (#v[a0, a1, a2, a3] : Word (ZMod p)) := by
+      apply Word.isU64_of_cases_poly
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+        rw [h_a0_val]
+        have := b0_16
+        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at this
+        exact this
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                   List.getElem_cons_succ]
+        rw [h_a1_val]
+        have := b1_16
+        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                   List.getElem_cons_succ] at this
+        exact this
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                   List.getElem_cons_succ]
+        rw [h_a2_val]
+        have := b2_16
+        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                   List.getElem_cons_succ] at this
+        exact this
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                   List.getElem_cons_succ]
+        rw [h_a3_val]
+        have := b3_16
+        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                   List.getElem_cons_succ] at this
+        exact this
+    -- c0.val % 64 = 0 from is_mod_64_poly (m = 0, since cb sum = 0 here).
+    have h_c_mod : c0.val % 64 = 0 := by
+      have hm : ((0 : ZMod p)).val < 64 := by rw [hZ0]; omega
+      have hdiff' : ((c0 - 0) * (64 : ZMod p)⁻¹).val < 1024 := by
+        simpa using diff'
+      have := is_mod_64_poly hm hdiff'
+      rw [hZ0] at this; exact this
+    -- omega close.
+    rw [Word.toBitVec64_poly_toNat_poly h_a_isU64, Word.toNat_poly_def]
+    rw [h_c_mod]
+    simp only [Nat.pow_zero, Nat.mul_one, Vector.getElem_mk, List.getElem_toArray,
+               List.getElem_cons_zero, List.getElem_cons_succ, Nat.reduceAdd]
+         at b0_16 b1_16 b2_16 b3_16 ⊢
+    omega
+  -- Remaining 63 cases: same structure (different active su16 / shift / a_i
+  -- expressions). TODO: fill following the case-0 template above.
+  all_goals sorry
+
+set_option maxHeartbeats 16000000 in
+-- Witness that omega closes the arithmetic core of each `spec.sll_poly` leaf
+-- once the per-case bridge facts (Word.isU64_poly, `a_i.val = ...`,
+-- `c0.val % 64 = ...`) are in scope. This is the shift = 0 case (cb_i = 0
+-- for all i); other cases follow the same close pattern with different
+-- a-side expressions and shift values.
+private lemma _spec_sll_poly_shift0_omega_test
+    (Main : Vector (ZMod p) 65) (h : is_sll_poly Main)
+    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
+    (_h_cb_all_zero : Main[36] = 0 ∧ Main[37] = 0 ∧ Main[38] = 0 ∧ Main[39] = 0 ∧
+                      Main[40] = 0 ∧ Main[41] = 0) :
+    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      execute_RTYPE_pure_w_poly
+        #v[Main[15], Main[16], Main[17], Main[18]]
+        #v[Main[25], Main[26], Main[27], Main[28]]
+        .SLL := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨eq_sll, _eq_imm⟩ := h
+  have ⟨_hpc, is_U64_b, is_U64_c⟩ := bounds_poly Main cstrs (sll_real_poly Main eq_sll)
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+  obtain ⟨_c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  -- The bridges (each `sorry` is per-case derivable from `cstrs`):
+  have h_a_isU64 : Word.isU64_poly (#v[Main[32], Main[33], Main[34], Main[35]]
+                                      : Word (ZMod p)) := sorry
+  have h_a0_val : Main[32].val = Main[15].val := sorry
+  have h_a1_val : Main[33].val = Main[16].val := sorry
+  have h_a2_val : Main[34].val = Main[17].val := sorry
+  have h_a3_val : Main[35].val = Main[18].val := sorry
+  have h_c_mod : Main[25].val % 64 = 0 := sorry
+  -- Bridge LHS to nat.
+  rw [← BitVec.toNat_inj]
+  rw [Word.toBitVec64_poly_toNat_poly h_a_isU64, Word.toNat_poly_def]
+  -- Bridge RHS: execute_RTYPE_pure_w_poly .SLL = op1 <<< setWidth 6 op2.
+  simp only [execute_RTYPE_pure_w_poly]
+  rw [BitVec.shiftLeft_eq', BitVec.toNat_shiftLeft, Nat.shiftLeft_eq]
+  rw [Word.toBitVec64_poly_toNat_poly is_U64_b, Word.toNat_poly_def]
+  -- Reduce setWidth shift count to c.val % 64.
+  have h_setWidth :
+      (BitVec.setWidth 6
+        (Word.toBitVec64_poly (#v[Main[25], Main[26], Main[27], Main[28]]
+                                  : Word (ZMod p)))).toNat
+      = Main[25].val % 64 := by
+    rw [BitVec.toNat_setWidth, Word.toBitVec64_poly_toNat_poly is_U64_c]
+    rw [Word.toNat_poly_def]
+    simp; omega
+  rw [h_setWidth, h_c_mod]
+  -- Now goal should be a pure Nat equation in Main[i].val terms. omega.
+  simp only [Nat.pow_zero, Nat.mul_one, Vector.getElem_mk, List.getElem_toArray,
+             List.getElem_cons_zero, List.getElem_cons_succ, Nat.reduceAdd]
+       at b0_16 b1_16 b2_16 b3_16 ⊢
+  omega
 
 end poly_helpers
 

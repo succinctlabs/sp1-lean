@@ -6,7 +6,7 @@ section constraints
 
 @[irreducible] def constraints {F : Type*} [Field F]
   (cols : CPUState F)
-  (next_pc : Vector F 3)
+  (next_pc : (Vector F 3))
   (clk_increment : F)
   (is_real : F)
   : SP1ConstraintList F :=

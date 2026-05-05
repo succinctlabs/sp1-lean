@@ -40,8 +40,23 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
     ("Addw", "AddwOperation"): ("Type", False),
     ("Subw", "SubwOperation"): ("Type", False),
     ("LoadByte", "AddrAddOperation"): ("Type", False),
+    ("LoadByte", "AddressOperation"): ("Type", True),
     ("Mul", "U16toU8OperationSafe"): ("Type", False),
     ("Mul", "MulOperation"): ("Type", False),
+    ("Branch", "ITypeReaderImmutable"): ("Type", True),
+}
+
+# Map op_name → actual `cols` struct type name when the two differ.
+# Defaults to op_name for ops not listed. Needed because the constraint
+# compiler emits `cols : <struct_name>` and that struct can be shared across
+# multiple op flavors (e.g. ITypeReader is reused by ITypeReaderImmutable;
+# U16toU8Operation is reused by both Safe and Unsafe variants). Used by
+# `apply_parametric_post_process` step 4 to rewrite `(cols : <name>)` →
+# `(cols : <name> F)`.
+COLS_TYPE_OVERRIDES: Dict[str, str] = {
+    "ITypeReaderImmutable": "ITypeReader",
+    "U16toU8OperationSafe": "U16toU8Operation",
+    "U16toU8OperationUnsafe": "U16toU8Operation",
 }
 
 # Chips whose top-level `<Chip>/Constraints.lean` is emitted as parametric
@@ -171,8 +186,10 @@ def apply_parametric_post_process(
        step 1 has handled all parenthesized forms.
     3. Add `{F : <universe>} [Field F]` (and `[CoeHead F ℕ]` for readers
        with `program` clauses) to the `def constraints` line.
-    4. Add ` F` to the cols struct parameter so `cols : <op_name>` becomes
-       `cols : <op_name> F`.
+    4. Add ` F` to the cols struct parameter so `cols : <cols_type>` becomes
+       `cols : <cols_type> F`. The cols struct name is taken from
+       `COLS_TYPE_OVERRIDES[op_name]` when present (e.g. ITypeReaderImmutable's
+       cols is the underlying `ITypeReader` struct), else defaults to op_name.
     """
     text = text.replace("(Fin KB)", "F")
     text = text.replace("Fin KB", "F")
@@ -183,9 +200,10 @@ def apply_parametric_post_process(
         "@[irreducible] def constraints",
         f"@[irreducible] def constraints {sig_extras}",
     )
+    cols_type_name = COLS_TYPE_OVERRIDES.get(op_name, op_name)
     text = text.replace(
-        f"(cols : {op_name})",
-        f"(cols : {op_name} F)",
+        f"(cols : {cols_type_name})",
+        f"(cols : {cols_type_name} F)",
     )
     return text
 

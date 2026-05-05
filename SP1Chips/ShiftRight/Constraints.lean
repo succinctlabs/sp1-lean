@@ -102,7 +102,7 @@ section constraints
   let E81 : F := Main[43] * 32
   let E82 : F := E80 + E81
   let E83 : F := Main[25] - E82
-  let E84 : F := E83 * 2097414145
+  let E84 : F := E83 * ((64 : F)⁻¹)
   let E85 : F := Main[43] * 2
   let E86 : F := E85 * E14
   let E87 : F := Main[42] + E86
@@ -436,7 +436,7 @@ lemma allHold_constraints_iff :
     (cb3 = 0 ∨ cb3 = 1) ∧
     (cb4 = 0 ∨ cb4 = 1) ∧
     (cb5 = 0 ∨ cb5 = 1) ∧
-    (¬srl + sra + srlw + sraw = 0 → ((Main[25] - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)) * 2097414145).val < 1024) ∧
+    (¬srl + sra + srlw + sraw = 0 → ((Main[25] - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)) * ((64 : Fin KB)⁻¹)).val < 1024) ∧
     (su160 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 0) ∧
     (su160 = 0 ∨ su160 = 1) ∧
     (su161 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 1) ∧

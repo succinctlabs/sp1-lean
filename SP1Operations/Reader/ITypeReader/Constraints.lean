@@ -9,10 +9,10 @@ section constraints
 @[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (clk_high : F)
   (clk_low : F)
-  (pc : Vector F 3)
+  (pc : (Vector F 3))
   (opcode : F)
-  (instr_field_consts : Vector F 4)
-  (op_a_write_value : Word F)
+  (instr_field_consts : (Vector F 4))
+  (op_a_write_value : (Word F))
   (cols : ITypeReader F)
   (is_real : F)
   : SP1ConstraintList F :=
