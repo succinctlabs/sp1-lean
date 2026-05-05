@@ -4450,6 +4450,89 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 @[simp] def sp1_op_c_poly (Main : Vector (ZMod p) 246) : BitVec 5 :=
   BitVec.ofNat 5 Main[21].val
 
+/-- Polymorphic counterpart of `ops_U64_b_c` (line 1070). Both `b` and `c`
+operands are 64-bit values. Uses `RTypeReader.allHold_constraints_iff_is_real_poly`
+after extracting CS18 (the RTypeReader sub-list) via direct destructure of
+the chip's `allHold_poly`. The 18-deep nested left-pair pattern mirrors
+`List.forall_append`'s expansion of the `CS0 ++ CS1 ++ ... ++ CS18 ++ trailing`
+constraint list (19 CS entries). -/
+lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main) :
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at h_alu
+  obtain ⟨_, _, _, _, _, _, _, h_complex, _⟩ := h_alu
+  obtain ⟨_, _, _, h_isU64_b, h_isU64_c⟩ := h_complex
+  exact ⟨h_isU64_b, h_isU64_c⟩
+
+/-- Polymorphic counterpart of `register_bounds` (line 1041), restricted to
+the variant-INDEPENDENT bounds available directly from
+`RTypeReader.allHold_constraints_iff_is_real_poly`: `op_a < 32`,
+`op_b < 65536`, `op_c < 65536`, `pc[0] < 65536`. The chip-level Fin KB
+`register_bounds` further refines `op_b < 32` and `op_c < 32` via
+per-variant opcode reduction (`Opcode.ofNat`); chip-level `correct_*_poly`
+proofs perform that refinement themselves once the variant flag is in
+scope. -/
+lemma register_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 65536 ∧ Main[21].val < 65536 ∧
+      Main[3].val < 65536 := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have hp_lt : 65536 < p := by
+    have : (2 : ℕ) ^ 17 < p := Fact.out
+    omega
+  have h32_val : ((32 : ℕ) : ZMod p).val = 32 :=
+    ZMod.val_natCast_of_lt (by omega)
+  have h65536_val : ((65536 : ℕ) : ZMod p).val = 65536 :=
+    ZMod.val_natCast_of_lt (by omega)
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at h_alu
+  obtain ⟨_, h_op_a_lt, h_op_b_lt, h_op_c_lt, _, _, h_pc, _, _⟩ := h_alu
+  obtain ⟨_, h_pc0_lt, _, _⟩ := h_pc
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · have : Main[6].val < ((32 : ℕ) : ZMod p).val := h_op_a_lt
+    rwa [h32_val] at this
+  · have : Main[14].val < ((65536 : ℕ) : ZMod p).val := h_op_b_lt
+    rwa [h65536_val] at this
+  · have : Main[21].val < ((65536 : ℕ) : ZMod p).val := h_op_c_lt
+    rwa [h65536_val] at this
+  · have : Main[3].val < ((65536 : ℕ) : ZMod p).val := h_pc0_lt
+    rwa [h65536_val] at this
+
+/-- Polymorphic counterpart of `op_a_is_0` (line 1059). When `Main[6] = 0`
+(i.e. the destination register is `x0`), the four limbs of `op_a_write_value`
+(Main[28..31]) must be zero. -/
+lemma op_a_is_0_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main) :
+    Main[6] = 0 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 := by
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at h_alu
+  obtain ⟨_, _, _, _, _, h_op_a_0_iff, _, _, h_zero⟩ := h_alu
+  intro h_op_a_eq_0
+  have h_op_a_0_eq_1 : Main[13] = 1 := h_op_a_0_iff.mpr h_op_a_eq_0
+  have h_op_a_0_ne_0 : Main[13] ≠ 0 := by
+    rw [h_op_a_0_eq_1]
+    intro h_one_eq_zero
+    haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+    have : (1 : ZMod p).val = 0 := by rw [h_one_eq_zero]; exact ZMod.val_zero
+    rw [ZMod.val_one] at this
+    omega
+  have ⟨ha28, ha29, ha30, ha31⟩ := h_zero h_op_a_0_ne_0
+  exact ⟨ha28, ha29, ha30, ha31⟩
+
 end poly_helpers
 
 end DivRem
