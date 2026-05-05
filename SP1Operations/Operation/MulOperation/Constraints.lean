@@ -1799,6 +1799,107 @@ lemma allHold_constraints_iff_is_real
         repeat rw [eq_comm (a := cols.product_msb.msb * 65535)]
         simp_all
 
+set_option maxHeartbeats 4000000 in
+-- Polymorphic counterpart of `allHold_constraints_iff_is_real`.
+lemma allHold_constraints_iff_is_real_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (aw : (Word (ZMod p)))
+  (bw : (Word (ZMod p)))
+  (cw : (Word (ZMod p)))
+  (cols : MulOperation (ZMod p))
+  (is_mul : (ZMod p))
+  (is_mulh : (ZMod p))
+  (is_mulw : (ZMod p))
+  (is_mulhu : (ZMod p))
+  (is_mulhsu : (ZMod p)) :
+  List.Forall SP1Constraint.toProp_poly (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu) ↔
+    have ⟨bbw, U16_b⟩ := U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1
+    have ⟨cbw, U16_c⟩ := U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1
+    let bbwe : Vector (ZMod p) 16 := #v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7], cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255]
+    let cbwe : Vector (ZMod p) 16 := #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7], cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255]
+    List.Forall SP1Constraint.toProp_poly U16_b ∧
+    List.Forall SP1Constraint.toProp_poly U16_c ∧
+    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints aw[1] cols.product_msb is_mulw) ∧
+    ((cols.b_msb < 256 ∧ bbw[7] < 256) ∧ (cols.b_msb = 0 ∨ cols.b_msb = 1) ∧ (cols.b_msb = 1 ↔ (128 : ZMod p) ≤ bbw[7])) ∧
+    ((cols.c_msb < 256 ∧ cbw[7] < 256) ∧ (cols.c_msb = 0 ∨ cols.c_msb = 1) ∧ (cols.c_msb = 1 ↔ (128 : ZMod p) ≤ cbw[7])) ∧
+    cols.b_sign_extend = (is_mulh + is_mulhsu) * cols.b_msb ∧
+    cols.c_sign_extend = is_mulh * cols.c_msb ∧
+    cols.product[0] = cp_poly bbwe cbwe 0 (by omega) - cols.carry[0] * 256 ∧
+    cols.product[1] = cp_poly bbwe cbwe 1 (by omega) + cols.carry[0] - cols.carry[1] * 256 ∧
+    cols.product[2] = cp_poly bbwe cbwe 2 (by omega) + cols.carry[1] - cols.carry[2] * 256 ∧
+    cols.product[3] = cp_poly bbwe cbwe 3 (by omega) + cols.carry[2] - cols.carry[3] * 256 ∧
+    cols.product[4] = cp_poly bbwe cbwe 4 (by omega) + cols.carry[3] - cols.carry[4] * 256 ∧
+    cols.product[5] = cp_poly bbwe cbwe 5 (by omega) + cols.carry[4] - cols.carry[5] * 256 ∧
+    cols.product[6] = cp_poly bbwe cbwe 6 (by omega) + cols.carry[5] - cols.carry[6] * 256 ∧
+    cols.product[7] = cp_poly bbwe cbwe 7 (by omega) + cols.carry[6] - cols.carry[7] * 256 ∧
+    cols.product[8] = cp_poly bbwe cbwe 8 (by omega) + cols.carry[7] - cols.carry[8] * 256 ∧
+    cols.product[9] = cp_poly bbwe cbwe 9 (by omega) + cols.carry[8] - cols.carry[9] * 256 ∧
+    cols.product[10] = cp_poly bbwe cbwe 10 (by omega) + cols.carry[9] - cols.carry[10] * 256 ∧
+    cols.product[11] = cp_poly bbwe cbwe 11 (by omega) + cols.carry[10] - cols.carry[11] * 256 ∧
+    cols.product[12] = cp_poly bbwe cbwe 12 (by omega) + cols.carry[11] - cols.carry[12] * 256 ∧
+    cols.product[13] = cp_poly bbwe cbwe 13 (by omega) + cols.carry[12] - cols.carry[13] * 256 ∧
+    cols.product[14] = cp_poly bbwe cbwe 14 (by omega) + cols.carry[13] - cols.carry[14] * 256 ∧
+    cols.product[15] = cp_poly bbwe cbwe 15 (by omega) + cols.carry[14] - cols.carry[15] * 256 ∧
+    (is_mulw = 0 ∨ aw[0] = cols.product[0] + cols.product[1] * 256) ∧
+    (is_mul = 0 ∨ aw[0] = cols.product[0] + cols.product[1] * 256) ∧
+    (is_mulh + is_mulhu + is_mulhsu = 0 ∨ aw[0] = cols.product[8] + cols.product[9] * 256) ∧
+    (is_mulw = 0 ∨ aw[1] = cols.product[2] + cols.product[3] * 256) ∧
+    (is_mul = 0 ∨ aw[1] = cols.product[2] + cols.product[3] * 256) ∧
+    (is_mulh + is_mulhu + is_mulhsu = 0 ∨ aw[1] = cols.product[10] + cols.product[11] * 256) ∧
+    (is_mulw = 0 ∨ aw[2] = cols.product_msb.msb * 65535) ∧
+    (is_mul = 0 ∨ aw[2] = cols.product[4] + cols.product[5] * 256) ∧
+    (is_mulh + is_mulhu + is_mulhsu = 0 ∨ aw[2] = cols.product[12] + cols.product[13] * 256) ∧
+    (is_mulw = 0 ∨ aw[3] = cols.product_msb.msb * 65535) ∧
+    (is_mul = 0 ∨ aw[3] = cols.product[6] + cols.product[7] * 256) ∧
+    (is_mulh + is_mulhu + is_mulhsu = 0 ∨ aw[3] = cols.product[14] + cols.product[15] * 256) ∧
+    (cols.b_msb = 0 ∨ cols.b_msb = 1) ∧
+    (cols.c_msb = 0 ∨ cols.c_msb = 1) ∧
+    (cols.b_sign_extend = 0 ∨ cols.b_sign_extend = 1) ∧
+    (cols.c_sign_extend = 0 ∨ cols.c_sign_extend = 1) ∧
+    (is_mul = 0 ∨ is_mul = 1) ∧
+    (is_mulh = 0 ∨ is_mulh = 1) ∧
+    (is_mulhu = 0 ∨ is_mulhu = 1) ∧
+    (is_mulhsu = 0 ∨ is_mulhsu = 1) ∧
+    (is_mulw = 0 ∨ is_mulw = 1) ∧
+    (is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 0 ∨ is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1) ∧
+    (cols.b_sign_extend = 0 ∨ cols.b_msb = 1) ∧ (cols.c_sign_extend = 0 ∨ cols.c_msb = 1) ∧
+    cols.carry[0].val < 65536 ∧
+    cols.carry[1].val < 65536 ∧
+    cols.carry[2].val < 65536 ∧
+    cols.carry[3].val < 65536 ∧
+    cols.carry[4].val < 65536 ∧
+    cols.carry[5].val < 65536 ∧
+    cols.carry[6].val < 65536 ∧
+    cols.carry[7].val < 65536 ∧
+    cols.carry[8].val < 65536 ∧
+    cols.carry[9].val < 65536 ∧
+    cols.carry[10].val < 65536 ∧
+    cols.carry[11].val < 65536 ∧
+    cols.carry[12].val < 65536 ∧
+    cols.carry[13].val < 65536 ∧
+    cols.carry[14].val < 65536 ∧
+    cols.carry[15].val < 65536 ∧
+    cols.product[0] < 256 ∧ cols.product[1] < 256 ∧
+    cols.product[2] < 256 ∧ cols.product[3] < 256 ∧
+    cols.product[4] < 256 ∧ cols.product[5] < 256 ∧
+    cols.product[6] < 256 ∧ cols.product[7] < 256 ∧
+    cols.product[8] < 256 ∧ cols.product[9] < 256 ∧
+    cols.product[10] < 256 ∧ cols.product[11] < 256 ∧
+    cols.product[12] < 256 ∧ cols.product[13] < 256 ∧
+    cols.product[14] < 256 ∧ cols.product[15] < 256
+  := by
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
+      change (0 : ZMod p).val < (256 : ZMod p).val; simp
+    simp [constraints]
+    split; case _ res_b b0 b1 b2 b3 b4 b5 b6 b7 size_b U16_b eq_b =>
+      split; case _ res_c c0 c1 c2 c3 c4 c5 c6 c7 size_c U16_c eq_c =>
+        rw [eq_b, eq_c]
+        simp [sub_eq_zero, cp_poly, Vector.ofFn, and_assoc, h0_lt_256]
+        repeat rw [eq_comm (a := (_ : ZMod p) + _ * 256)]
+        repeat rw [eq_comm (a := cols.product_msb.msb * 65535)]
+        simp_all
+
 section opcodes
 
 lemma single_op : List.Forall SP1Constraint.toProp (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu) →
