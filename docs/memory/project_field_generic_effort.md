@@ -303,18 +303,22 @@ Closed in Track A (LtUnsigned/LtSigned cluster + BitwiseU16 cluster):
   out via `Fact (2^17 < p)`. **First piece** of Phase 3b
   infrastructure for the `divu` pilot.
 
-  **`divu_remu_poly` core (Phase 3b, the heavy work)** —
-  **second attempt 2026-05-05 (mid-session, NOT yet committed)**:
-  scaffold + Stage 1 (upfront prep) + Blocker 1 (opening rcases) +
-  Blocker 2 (c=0 branch) + c≠0 "have arm" all landed in
-  `SP1Chips/DivRem/Constraints.lean` lines ~2455–2793. **Sorry
-  placeholder** at line ~2793 for the 8-way `b_cry3` end-game
-  (Blocker 3 territory — corresponds to Fin KB lines 2416–2442).
-  Detailed status in plan file
-  `/home/devontuma/.claude/plans/make-a-plan-to-memoized-mitten.md`.
-  See `feedback_divrem_core_port_blockers.md` for the resolved
-  Blocker 1+2 patterns (incl. the `Nat→ℤ` cast vs `ZMod.cast`
-  insight that closed Blocker 2).
+  **`divu_remu_poly` core LANDED 2026-05-07** (commit `bb6d325`,
+  ~440 lines including upfront prep + 8-way carry chain).
+  See `feedback_divrem_core_port_blockers.md` for the resolution
+  recipe (val-distribution + 8 Nat eqs + main_eq linear combination).
+
+  **`divuw_remuw_poly` core LANDED 2026-05-08** (~250 lines, 4-limb
+  carry chain at HWord width). Required 4 new HWord _poly companions
+  in `SP1Foundations/Word.lean` (extend_poly, extend_U32_U64_poly,
+  extend_true_is_signExtend_poly, extend_false_is_setWidth_poly +
+  low_toNat_poly). Mirrors divu_remu_poly recipe with HWord
+  adaptations: ZMod-to-Nat LE bridge for `32768 ≤ q1` ↔
+  `32768 ≤ q1.val`, smaller (2-limb) destructure for is_U32_b/r,
+  `simp only [ZMod.val_zero]` instead of `rw [h0v]` (which hits
+  max-recursion after `simp at *` collapses h0v to True),
+  cry3 * 2^64 in main_eq (don't force cry3.val = 0). Heartbeats
+  32M + maxRecDepth 1M + skipKernelTC.
 
   **Phase 3a `correct_prologue_facts_poly` LANDED 2026-05-05**
   (commit `1e4bad0`): variant-INDEPENDENT bundle in

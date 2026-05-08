@@ -14,5 +14,5 @@
 - [Mechanical Main[idx] shift + stop pattern](feedback_mechanical_shift_pattern.md) — Python script to shift `Main[k]→Main[k-1]` above a cutoff + inject `stop`, used to update chips after column removal.
 - [is_trusted removal baseline commit](reference_is_trusted_commit.md) — commit e686807 is the ground truth for old indices and what shifted.
 - [nlinarith doesn't scale past ~4 limbs](feedback_nlinarith_scaling.md) — for core_mul_poly-style proofs, replace `nlinarith` bound checks with `Nat.mul_le_mul (by omega) (by omega)` + `omega`; prove polynomial identity in factored form to avoid heavyweight final `ring`.
-- [DivRem core _poly port blockers](feedback_divrem_core_port_blockers.md) — Blockers 1+2 RESOLVED 2026-05-05 (mid-session, uncommitted in `SP1Chips/DivRem/Constraints.lean` ~2455–2793); Blocker 3 paused at sorry on 8-way `b_cry3` end-game.
+- [DivRem core _poly port blockers](feedback_divrem_core_port_blockers.md) — divu_remu_poly closed 2026-05-07; divuw_remuw_poly closed 2026-05-08 (4-limb HWord variant; needs new HWord _poly companions + ZMod-to-Nat LE bridge for split_ifs).
 - [divu_remu_poly Blocker 2 — `.cast` is Nat→ℤ not ZMod.cast](feedback_divrem_blocker2_int_cast.md) — Closer is `push_cast [ZMod.cast_eq_val]; rfl`; the `.cast` in the goal is the Int coercion inserted to type `BitVec.ofNat 64 (q : ℤ)`.

@@ -566,6 +566,15 @@ lemma low_toNat (hw : HWord.isU32 #v[b0, b1]) : (Word.toBitVec64 #v[b0, b1, 0, 0
   · simp [Word.toNat, HWord.toNat]
   · apply HWord.lt_cases_of_isU32 at hw; apply Word.isU64_of_cases <;> simp_all
 
+/-- Polymorphic counterpart of `Word.low_toNat`. -/
+lemma low_toNat_poly {p : ℕ} [NeZero p] {b0 b1 : ZMod p}
+    (hw : HWord.isU32_poly #v[b0, b1]) :
+    (Word.toBitVec64_poly #v[b0, b1, 0, 0]).toNat = HWord.toNat_poly #v[b0, b1] := by
+  rw [Word.toBitVec64_poly_toNat_poly]
+  · simp [Word.toNat_poly, HWord.toNat_poly, ZMod.val_zero]
+  · apply HWord.lt_cases_of_isU32_poly at hw
+    apply Word.isU64_of_cases_poly <;> simp_all [ZMod.val_zero]
+
 lemma setWidth_eq_low {w : Word (Fin KB)} (h_w_isU64 : w.isU64) :
     BitVec.setWidth 32 w.toBitVec64 = w.low.toBitVec32
   := by
@@ -1926,6 +1935,78 @@ lemma sign_extend_32_to_64_msb_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     simp only [h_msb, Bool.false_eq_true, if_false, h0_val]
     rw [Nat.mod_eq_of_lt (by omega)]
     omega
+
+/-- Polymorphic counterpart of `HWord.extend`. Sign-extends a 32-bit `HWord`
+to a 64-bit `Word` (when `sgn = true`); zero-extends otherwise. -/
+def extend_poly {p : ℕ} [NeZero p] (w : HWord (ZMod p)) (sgn : Bool) : Word (ZMod p) :=
+  let ext := (if sgn then (if w.isNegative_poly then (1 : ZMod p) else 0) else 0) * 65535
+  #v[w[0], w[1], ext, ext]
+
+/-- Polymorphic counterpart of `HWord.extend_U32_U64`. -/
+lemma extend_U32_U64_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {w : HWord (ZMod p)} (is_U32_w : w.isU32_poly) (sgn : Bool) :
+    (w.extend_poly sgn).isU64_poly := by
+  have ⟨_, _⟩ := lt_cases_of_isU32_poly is_U32_w
+  have h65535 : (65535 : ZMod p).val = 65535 := by
+    have hp : 131072 < p := by have := (Fact.out : 2 ^ 17 < p); omega
+    exact ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
+  have h0 : (0 : ZMod p).val = 0 := ZMod.val_zero
+  apply Word.isU64_of_cases_poly <;>
+    simp [extend_poly] <;> (try split_ifs) <;>
+    (try simp [h65535, h0]) <;> omega
+
+/-- Polymorphic counterpart of `HWord.extend_true_is_signExtend`. Mirrors
+`Word.extend_true_is_signExtend_poly` recipe at smaller dimension via
+`BitVec.toInt_inj` + `HWord.toBitVec32_poly_toInt_poly` /
+`Word.toBitVec64_poly_toInt_poly`. -/
+lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {w : HWord (ZMod p)} :
+  w.isU32_poly →
+  (w.extend_poly true).toBitVec64_poly = BitVec.signExtend 64 w.toBitVec32_poly
+    := by
+  set sw := extend_poly w true
+  intro is_U32_w
+  have ⟨_, _⟩ := lt_cases_of_isU32_poly is_U32_w
+  have h65535 : (65535 : ZMod p).val = 65535 := by
+    have hp : 131072 < p := by have := (Fact.out : 2 ^ 17 < p); omega
+    exact ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
+  have h0 : (0 : ZMod p).val = 0 := ZMod.val_zero
+  have is_U64_hw : sw.isU64_poly := by
+    subst sw; simp [extend_poly]
+    apply Word.isU64_of_cases_poly <;> split_ifs <;>
+      simp [h65535, h0] <;> omega
+  have is_neg : w.isNegative_poly ↔ sw.isNegative_poly := by
+    subst sw
+    simp [extend_poly, isNegative_poly, Word.isNegative_poly]
+    by_cases h : 32768 ≤ w[1].val <;> simp [h, h65535, h0]
+  rw [← BitVec.toInt_inj]
+  simp [BitVec.toInt_signExtend_of_le]
+  rw [HWord.toBitVec32_poly_toInt_poly is_U32_w,
+      Word.toBitVec64_poly_toInt_poly is_U64_hw]
+  rw [HWord.toInt_poly, Word.toInt_poly]
+  split_ifs <;> [ skip; tauto; tauto; skip ] <;>
+  simp [sw, extend_poly, Word.toNat_poly, HWord.toNat_poly] <;>
+  (rename_i h1 h2;
+   simp only [h2, ↓reduceIte, ZMod.cast_eq_val, h65535, h0]) <;>
+  push_cast <;> omega
+
+/-- Polymorphic counterpart of `HWord.extend_false_is_setWidth`. -/
+lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {w : HWord (ZMod p)} :
+  w.isU32_poly →
+  (w.extend_poly false).toBitVec64_poly = BitVec.setWidth 64 w.toBitVec32_poly
+    := by
+  set sw := extend_poly w false
+  intro is_U32_w
+  have ⟨_, _⟩ := lt_cases_of_isU32_poly is_U32_w
+  have is_U64_hw : sw.isU64_poly := by
+    subst sw; simp [extend_poly]
+    apply Word.isU64_of_cases_poly <;> simp <;> omega
+  rw [← BitVec.toNat_inj]
+  rw [Word.toBitVec64_poly_toNat_poly is_U64_hw]
+  rw [BitVec.setWidth_idem (by simp)]
+  rw [HWord.toBitVec32_poly_toNat_poly is_U32_w]
+  simp [sw, Word.toNat_poly, extend_poly, HWord.toNat_poly]
 
 end HWord
 
