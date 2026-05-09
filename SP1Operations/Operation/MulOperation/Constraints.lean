@@ -3254,6 +3254,29 @@ lemma spec.mulw_poly [Fact (2 ^ 24 < p)]
                     p0 p1 p2 p3
                     _c0 _c1 _c2 _c3 pp0' pp1' pp2' pp3'
 
+/-- Polymorphic counterpart of `spec.mulh.gen`. Bundles the three high-half
+multiplication conclusions (MULH/MULHU/MULHSU) gated on `is_real = 1`. -/
+lemma spec.mulh.gen_poly [Fact (2 ^ 24 < p)]
+    {aw bw cw : Word (ZMod p)} {cols : MulOperation (ZMod p)}
+    {is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
+    (isU64_bw : bw.isU64_poly)
+    (isU64_cw : cw.isU64_poly)
+    (cstrs : List.Forall SP1Constraint.toProp_poly
+      (constraints aw bw cw cols is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
+    is_real = 1 →
+      (is_mulh = 1 → aw.isU64_poly ∧
+        aw.toBitVec64_poly = execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULH) ∧
+      (is_mulhu = 1 → aw.isU64_poly ∧
+        aw.toBitVec64_poly = execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULHU) ∧
+      (is_mulhsu = 1 → aw.isU64_poly ∧
+        aw.toBitVec64_poly = execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULHSU) := by
+  intro h_is_real
+  subst h_is_real
+  refine ⟨?_, ?_, ?_⟩
+  · exact spec.mulh_poly isU64_bw isU64_cw cstrs
+  · exact spec.mulhu_poly isU64_bw isU64_cw cstrs
+  · exact spec.mulhsu_poly isU64_bw isU64_cw cstrs
+
 end poly_helpers
 
 end MulOperation

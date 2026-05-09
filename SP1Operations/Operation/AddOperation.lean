@@ -183,6 +183,22 @@ theorem spec.gen
   intro cstrs is_real; simp_all
   exact spec h_isU64_a h_isU64_b cstrs
 
+/-- Polymorphic counterpart of `spec.gen`. -/
+theorem spec.gen_poly
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  {a b : Word (ZMod p)}
+  {cols : AddOperation (ZMod p)}
+  {is_real : ZMod p}
+  (h_isU64_a : a.isU64_poly)
+  (h_isU64_b : b.isU64_poly) :
+  List.Forall SP1Constraint.toProp_poly (constraints a b cols is_real) →
+    is_real = 1 →
+      cols.value.isU64_poly ∧
+      cols.value.toBitVec64_poly = execute_RTYPE_pure_w_poly a b .ADD := by
+  intros cstrs hir
+  subst hir
+  exact spec_poly h_isU64_a h_isU64_b cstrs
+
 end gen
 
 end AddOperation
