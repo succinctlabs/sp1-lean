@@ -244,6 +244,23 @@ Closed in Track A (LtUnsigned/LtSigned cluster + BitwiseU16 cluster):
   ShiftLeft (4 arms), ShiftRight (8 arms). Constraints body sizes:
   Mul=67 lets, ShiftLeft=203, ShiftRight=325, DivRem=465.
 
+  **DivRem API scaffolding COMPLETE 2026-05-08** (this session):
+  Added `div_rem_poly` stub (signature only, body sorry) at end of
+  `section div_rem` in `SP1Chips/DivRem/Constraints.lean`; added
+  `sp1_op_poly` chip-wide def + 8 `correct_<variant>_poly` STUBS
+  (sorry bodies) inside `namespace DivRem.Poly` at end of
+  `SP1Chips/DivRemChip.lean`. The 8 chip namespaces (`Div`/`Divu`/
+  `Divw`/`Divuw`/`Rem`/`Remu`/`Remw`/`Remuw`) are referenced from
+  this single shared poly section via fully-qualified `<NS>.spec_<v>`
+  calls. The chip-level migration is now structurally COMPLETE at
+  the API surface; bodies pending. Chip count remains **21 closed**;
+  DivRem listed as "scaffolding-complete, bodies pending".
+  Per user direction: "sorry on hard blocker, continue downstream"
+  + "bottom-up cores → specs → chips" — full closure across one
+  session is impractical given 17-21 min build cycles, so the
+  scaffold-first approach prioritizes the unchanging API shape.
+  See `feedback_divrem_core_port_blockers.md` for resume points.
+
   **DivRem migration in progress (started 2026-05-05).** Pivoted from
   ShiftRight after discovering shift chips embed a KB-specific `64⁻¹`
   literal (`2097414145`); see `feedback_shift_kb_specific_literal.md`.
@@ -308,17 +325,44 @@ Closed in Track A (LtUnsigned/LtSigned cluster + BitwiseU16 cluster):
   See `feedback_divrem_core_port_blockers.md` for the resolution
   recipe (val-distribution + 8 Nat eqs + main_eq linear combination).
 
-  **`divuw_remuw_poly` core LANDED 2026-05-08** (~250 lines, 4-limb
-  carry chain at HWord width). Required 4 new HWord _poly companions
-  in `SP1Foundations/Word.lean` (extend_poly, extend_U32_U64_poly,
-  extend_true_is_signExtend_poly, extend_false_is_setWidth_poly +
-  low_toNat_poly). Mirrors divu_remu_poly recipe with HWord
-  adaptations: ZMod-to-Nat LE bridge for `32768 ≤ q1` ↔
-  `32768 ≤ q1.val`, smaller (2-limb) destructure for is_U32_b/r,
-  `simp only [ZMod.val_zero]` instead of `rw [h0v]` (which hits
-  max-recursion after `simp at *` collapses h0v to True),
+  **`divuw_remuw_poly` core LANDED 2026-05-08** (commit `596e72a`,
+  ~250 lines, 4-limb carry chain at HWord width). Required 4 new
+  HWord _poly companions in `SP1Foundations/Word.lean` (extend_poly,
+  extend_U32_U64_poly, extend_true_is_signExtend_poly,
+  extend_false_is_setWidth_poly + low_toNat_poly). Mirrors
+  divu_remu_poly recipe with HWord adaptations: ZMod-to-Nat LE bridge
+  for `32768 ≤ q1` ↔ `32768 ≤ q1.val`, smaller (2-limb) destructure
+  for is_U32_b/r, `simp only [ZMod.val_zero]` instead of `rw [h0v]`
+  (which hits max-recursion after `simp at *` collapses h0v to True),
   cry3 * 2^64 in main_eq (don't force cry3.val = 0). Heartbeats
   32M + maxRecDepth 1M + skipKernelTC.
+
+  **`divw_remw_poly` core PARTIAL 2026-05-08** (signed 32-bit,
+  ~440 lines landed; **2 sorries** remain: `h_abs`, `h_sign`).
+  Scaffold + upfront prep + 6-way sopX collapse + pre-suffices setup +
+  c=0 branch + overflow branch + `div_zero'` + `h_prod` all clean.
+  Latest landed (2026-05-08, uncommitted): `div_zero'` (direct
+  3-conjunction projection, no `Word.eq_pointwise` needed) and
+  `h_prod` (~150 lines, 4-limb signed carry chain mirroring
+  divuw_remuw_poly's hsum/eq/main_eq pattern with `msb_b * 65535`
+  upper limbs). Build verified under `lake build` (~17-21 min cycle).
+  - `h_abs`: 4-way `b_rem_neg × b_c_neg` abs witness, ~95 lines.
+    Uses **`sum_zero_abs_poly`** helper (in
+    `SP1Chips/DivRem/Constraints.lean` near line 1256). Mirrors
+    Fin KB `divw_remw` lines 3674-3770. Recommend `subst msb_rem msb_c`
+    instead of `simp [rem_nneg, c_nneg] at *` to avoid prior SO issues
+    (which were a `lake env lean` tstack artifact, but `subst` is
+    cleaner regardless).
+  - `h_sign`: sign witness, ~25 lines. b_msb_nneg branch via
+    `HWord.sign_cases_poly` + `h_prod` + `h_abs` + nlinarith;
+    b_msb_neg branch via `Int.sign_eq_neg_one_of_neg sgn_msb_b`.
+  All required helpers verified present in `SP1Foundations/Word.lean`
+  (HWord.{toBitVec32_poly_toInt_poly, toInt_lb_poly, toInt_ub_poly,
+  eq_toInt_eq_poly, sign_cases_poly, isNegative_poly_toInt_poly}).
+  Field-agnostic: `tdiv_tmod_unique_full` (line 1180),
+  `extractLsb_is_toInt` (line 1276 post-helper-insertion).
+  See `feedback_divrem_core_port_blockers.md` for the complete
+  resume guide.
 
   **Phase 3a `correct_prologue_facts_poly` LANDED 2026-05-05**
   (commit `1e4bad0`): variant-INDEPENDENT bundle in

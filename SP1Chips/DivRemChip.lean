@@ -418,3 +418,117 @@ theorem correct_remuw
       simp [bitVecToRegidxVal]
 
 end Remuw
+
+-- ============================================================================
+-- Polymorphic chip-level theorems (sorry-stubbed scaffolding).
+-- ============================================================================
+-- Each `correct_<variant>_poly` mirrors its Fin KB sibling. Bodies are `sorry`
+-- pending: (1) chip-local `spec.<variant>_poly` wrappers in
+-- `SP1Chips/DivRem/Constraints.lean` (Phase C deferred — each is ~200 lines
+-- of mechanical mirroring of the Fin KB `spec.<variant>` wrapper), and
+-- (2) closure of the in-progress sorries in `divw_remw_poly` h_abs/h_sign
+-- (line 4371/4375 of `Constraints.lean`) plus completion of the `div_rem_poly`
+-- stub body added at end of `section div_rem`.
+--
+-- `correct_prologue_facts_poly` (variant-INDEPENDENT bundle, lines 78-101)
+-- handles the prologue. Each chip arm delegates the variant-specific witness
+-- to its core (`divu_remu_poly` clean; `divuw_remuw_poly` clean; `divw_remw_poly`
+-- partial; `div_rem_poly` stub).
+
+namespace DivRem.Poly
+
+open DivRem
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 246)
+  (s : SailState)
+
+def sp1_op_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]])
+
+open Sail
+
+theorem correct_div_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_div : is_div_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Div.spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+theorem correct_divu_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_divu : is_divu_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Divu.spec_divu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+theorem correct_divw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_divw : is_divw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Divw.spec_divw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+theorem correct_divuw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_divuw : is_divuw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Divuw.spec_divuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+theorem correct_rem_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_rem : is_rem_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Rem.spec_rem (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+theorem correct_remu_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_remu : is_remu_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Remu.spec_remu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+theorem correct_remw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_remw : is_remw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Remw.spec_remw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+theorem correct_remuw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_remuw : is_remuw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (Remuw.spec_remuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+  := by sorry
+
+end DivRem.Poly
