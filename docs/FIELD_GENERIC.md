@@ -1730,6 +1730,11 @@ grep -rno "^theorem correct_\|^lemma correct_" SP1Chips | wc -l   # expect 57
   `SP1Chips.ShiftLeft.Constraints` (307 s),
   `SP1Chips.DivRem.Constraints` (268 s) — these are the auto-gen blocks that
   stay KB-bound, so genericization should not affect them.
+  (NOTE: `DivRem.Constraints` was split in 2026-05 — the autogen block + iff
+  lemmas remain in `SP1Chips.DivRem.Constraints`, while helpers and per-opcode
+  proofs moved to `SP1Chips.DivRem.{Common,DivRem,DivuRemu,DivwRemw,DivuwRemuw}`.
+  The 268 s figure no longer reflects a single job; expect ~5 sub-jobs each
+  building independently. Re-measure on the next baseline.)
 
 ## Phase progress
 
@@ -2354,7 +2359,7 @@ require simp to dispatch. The performance impact depends on how often the
 inverse appears (the audit shows ~150 places use literals across the
 `Constraints.lean` files). May want to mark the bridge lemmas with high simp
 priority to avoid regressions in the slow-built chips (ShiftLeft 307s,
-ShiftRight 363s, DivRem 268s).
+ShiftRight 363s, DivRem 268s — DivRem was split in 2026-05; re-measure).
 
 ### B.3: Chip files declare `variable {F : Type*} [Field F]`
 

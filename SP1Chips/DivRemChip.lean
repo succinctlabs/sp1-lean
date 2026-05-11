@@ -6,7 +6,10 @@ import SP1Operations.Compare.LtOperationUnsigned
 import SP1Operations.Operation.U16MSBOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.RTypeReader
-import SP1Chips.DivRem.Constraints
+import SP1Chips.DivRem.DivRem
+import SP1Chips.DivRem.DivuRemu
+import SP1Chips.DivRem.DivwRemw
+import SP1Chips.DivRem.DivuwRemuw
 
 open LeanRV64D.Functions
 open BitVec

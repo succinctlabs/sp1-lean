@@ -99,3 +99,13 @@ Once all chips compile with stops, work down the list re-closing each `correct_*
 
 - **Don't hand-edit anything inside `section constraints ... end constraints`.** The next regeneration will overwrite it. If the auto-generated block looks wrong, regenerate.
 - **Don't apply a `-1` shift to a chip without confirming what the compiler actually output.** PR #92 (and earlier) saw bugs where the iff RHS, set aliases, and constraints def all went out of sync because someone manually shifted indices without re-running `update_constraints.py`. Always regenerate first, shift second.
+
+## Note on the DivRem multi-file layout
+
+DivRem is the only chip whose `Constraints.lean` was too large to keep monolithic. Helpers and per-opcode proofs were split into siblings under `SP1Chips/DivRem/`:
+
+- `Constraints.lean` — autogen `section constraints ... end constraints` plus the closely-coupled `allHold_constraints_iff` (Fin KB) and `allHold_constraints_iff_poly` (polymorphic). **This is still the only file the regen script touches**; the script only edits content between the `section constraints` and `end constraints` markers, which all live here.
+- `Common.lean` — `is_*` flag defs, `single_op`, `register_bounds`, `op_a_is_0`, `ops_U64_b_c`, `sp1_op_{a,b,c}`, auxiliaries (`div_mod_decomposition_w`, `tdiv_tmod_unique_full*`, `sum_zero_abs*`, `extractLsb_is_toInt`, `Word_toInt_poly_neg_form_eq_HWord_toInt_poly`), plus all `_poly` variants of the above. `attribute [-simp] mul_eq_zero not_and` lives here too.
+- `DivRem.lean` / `DivuRemu.lean` / `DivwRemw.lean` / `DivuwRemuw.lean` — one opcode pair each (bare lemma + `spec.<variant>` Fin KB wrappers + `<variant>_poly` core).
+
+After a regen, the only file that should show splices is `Constraints.lean`. If the iff RHS needs a corresponding update (step 5 of the playbook above), the lemma lives in the same file. Helper updates (step 6) for `register_bounds` / `ops_U64_b_c` / `single_op` / `op_a_is_0` live in `Common.lean`. The four opcode files only need attention if a `Main[k]` index referenced by the destructured-then-renamed variables (`a0..a3`, `b0..b3`, `c0..c3`, etc.) at the head of `spec.<variant>` changes meaning — in practice the `set ... := Main[k]` block at the head of each spec wrapper is the only place where indices appear literally.
