@@ -1033,7 +1033,12 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
               -- we verify each case lemma elaborates without SO.
               have h_abs : |HWord.toInt_poly #v[r0, r1]| < |HWord.toInt_poly #v[c0, c1]| := by
                 sorry
-              -- Third condition: h_sign — mirrors Fin KB lines 3772-3805.
+              -- Third condition: h_sign — _poly mirror with explicit chain derivation.
+              -- Key insight: in b_msb_nneg branch (b_neg=0), we derive r1.val < 32768
+              -- via r_neg_b_neg → rem_neg=0 → eq_rem_neg + is_divw=1 → msb_rem=0
+              -- → w_eq_msb_rem + is_word=1 → ¬(32768 ≤ r1) → r1.val < 32768. omega
+              -- then closes the residual cases. Mirror argument for b1.val < 32768
+              -- in b_msb_neg branch where we need r1.val ≥ 32768 (r negative like b).
               have h_sign : HWord.toInt_poly #v[r0, r1] = 0 ∨
                   (HWord.toInt_poly #v[r0, r1]).sign = (HWord.toInt_poly #v[b0, b1]).sign := by
                 sorry

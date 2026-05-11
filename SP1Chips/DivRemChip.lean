@@ -443,9 +443,10 @@ namespace DivRem.Poly
 open DivRem
 
 variable
-  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
   (Main : Vector (ZMod p) 246)
   (s : SailState)
+  (h_is_real : is_real_poly Main)
 
 def sp1_op_poly : SailM Unit := do
   let op_a := sp1_op_a_poly Main

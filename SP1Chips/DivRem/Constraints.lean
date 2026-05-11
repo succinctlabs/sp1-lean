@@ -1313,7 +1313,12 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
     (Main[243] = 0 ∨ Main[243] = 1) ∧
     Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208] = 1 ∧
     Main[13] = 0
-  := by sorry
+  := by
+    simp [constraints, sub_eq_zero, and_assoc]
+    iterate 3 rw [eq_comm (a := _ * (Main[201] + Main[203] + Main[205] + Main[206]))]
+    iterate 3 rw [eq_comm (a := (1 : ZMod p))]
+    rw [eq_comm (a := _ * _) (b := Main[245])]
+    simp [neg_eq_zero]
 
 end poly_constraints_iff
 

@@ -5,6 +5,83 @@ A running document for the multi-phase effort to lift this formalization off the
 phase boundary. The implementation roadmap is in
 `~/.claude/plans/make-a-plan-to-soft-aho.md`.
 
+## Current state — 2026-05-11 (Branch + Mul collapsed to `_poly`-only)
+
+**Chip migration scoreboard:**
+
+| Status | Count | Chips |
+|---|---|---|
+| ZMod p only (done) | 19 | Add, Addi, Addw, Bitwise, Branch (this session), Jal, Jalr, 4×Load, LoadX0, Lt, Mul (this session), 4×Store, Sub, Subw, UType |
+| Hybrid (both forms, mid-migration) | 1 | DivRem (1 Fin KB theorem + 8 `_poly` stubs, 11 sorries) |
+| Fin KB only (not migrated) | 2 | ShiftLeft, ShiftRight |
+
+**This session — Track C2 (Branch + Mul hybrid collapse):**
+
+- `SP1Chips/BranchChip.lean`: 2104 → 1428 lines (−676). Deleted Fin KB
+  `branch_addr_eq` lemma, `close_branch_addr_eq` macro, Fin KB
+  `variable`/`sp1_op_a`/`sp1_op_b`/`sp1_imm`/`sp1_branch` defs, and 6
+  Fin KB `correct_b{eq,ne,lt,ge,ltu,geu}` theorems. The `_poly` siblings
+  (`correct_b*_poly` and `sp1_*_poly`) are now the only forms.
+- `SP1Chips/MulChip.lean`: 757 → 471 lines (−286). Deleted 5 Fin KB
+  namespaces `Mul`/`Mulh`/`Mulhu`/`Mulhsu`/`Mulw` (each with their
+  `spec_X`/`sp1_X`/`correct_X` triples) plus the stale "Mirror the Fin KB"
+  doc comment. The `Mul.Poly`/`Mulh.Poly`/etc. namespaces are now the only
+  content.
+- `lake build` clean: 0 errors, 10 warnings — all 10 are the pre-existing
+  DivRem sorries (no new regressions).
+- Method: `sed -i` bottom-up line-range deletion (Edit's exact-string match
+  too fragile for 6 × 100-line contiguous block deletions). No downstream
+  consumers reference the deleted Fin KB symbols (verified by `grep` across
+  `SP1Chips/`, `SP1Operations/`, `SP1Foundations/`).
+- Naming: `_poly` suffix preserved (matches `correct_b*_poly` / `correct_mul_poly`
+  style). Renaming to AddChip's no-suffix style (`correct_beq` etc.) would
+  be a separate follow-up — straightforward find-replace once committed.
+
+**Remaining work for full field-genericization:**
+
+1. **ShiftLeft migration** — 1021-line Constraints, 4 theorems, no `_poly`
+   infrastructure yet. "From scratch" migration following the AddChip pattern
+   (not the Branch/Mul collapse pattern, which only applies to hybrids).
+2. **ShiftRight migration** — 1566-line Constraints, 8 theorems. Same pattern
+   as ShiftLeft.
+3. **DivRem completion** — 11 sorries, ~1500-2000 LoC remaining. Three sub-tasks:
+   - 8 chip stubs in `DivRemChip.lean`: blocked by the qbc/lc intermediate-column
+     bridge (`MulOperation.constraints` in DivRem is invoked on `qbc`/`lc`
+     columns, not raw `b`/`c`, so `MulOperation.spec.mul_poly` needs derived
+     `is_U64_qbc_poly`/`is_U64_lc_poly` from `eq_qbc*`/`eq_lb*`/`eq_lc*` +
+     u16 bounds via `Word.isU64_of_cases_poly`). Build one reusable bridge
+     lemma first; chip stubs then become ~100 lines each, not 250-400.
+   - 2 witness sorries in `DivwRemw.lean:1035` (h_abs) and `:1044` (h_sign):
+     translatable from Fin KB lines 354-476, ~150 lines combined. All required
+     `_poly` helpers exist (`sum_zero_abs_poly`,
+     `Word_toInt_poly_neg_form_eq_HWord_toInt_poly`, `HWord.sign_cases_poly`,
+     etc.). Best attempted as 4 separate case-witness lemmas + combiner.
+   - 1 body sorry in `DivRem.lean:1064` (`div_rem_poly` for signed 64-bit core):
+     pure-sorry placeholder. Needs ~700 lines mirroring `divu_remu_poly`
+     (DivuRemu.lean:337-669) at full Word width + signed scaffolding from
+     `divw_remw_poly`. Multi-session undertaking.
+
+**User-decided sequencing (2026-05-11):** Branch → Mul (DONE) → ShiftLeft →
+ShiftRight → DivRem last. Rationale: smaller per-iteration cost on
+ShiftLeft/ShiftRight (faster builds, simpler structure); DivRem deferred until
+it's the only remaining work, so the decision of "finish vs. accept asymmetric
+API" is cleaner.
+
+**Pivoted-away approaches (do not revisit without new info):**
+
+- ~~DivRem chip-stub `_poly` integration via `spec.divu_poly` wrappers in
+  DivuRemu.lean~~ — abandoned 2026-05-09. The Fin KB `spec.divu` recipe
+  (long `set` alias chain + `obtain` + `apply X.spec_poly at` + `simp_all`)
+  hangs Lean >12 min CPU on `apply MulOperation.spec.mul_poly at main_mul_low`
+  because the chip-level operands are intermediate columns (`qbc`/`lc`), not
+  raw `b`/`c`, and the implicit-args unifier can't synthesize
+  `is_U64_qbc`/`is_U64_lc`. Recommended replacement: build the U64-of-qbc/lc
+  bridge as a standalone helper first, then chip stubs can use it explicitly.
+- ~~Reverting DivRem `_poly` infrastructure entirely~~ — considered 2026-05-11
+  but rejected. Throwing away `divu_remu_poly` (332 lines) + `divuw_remuw_poly`
+  (~250 lines) + `allHold_constraints_iff_poly` would discard substantial
+  working math. The blocker is integration glue, not the math.
+
 ## Current state — 2026-05-01 (Track A complete)
 
 The additive `_poly` strategy is the chosen architecture: keep the existing
