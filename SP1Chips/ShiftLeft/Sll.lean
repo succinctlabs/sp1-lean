@@ -174,7 +174,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
   obtain ⟨_h_msb_a1, _cpu, _alu, _one_of_ops,
            _b_sll, _b_sllw,
            b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
-           h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, _one_of_su16s,
+           h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, one_of_su16s,
            eq_v01, eq_v012, eq_v0123,
            lt_ll0', lt_lh0', h_b0_dec, lt_ll1', lt_lh1', h_b1_dec,
            lt_ll2', lt_lh2', h_b2_dec, lt_ll3', lt_lh3', h_b3_dec,
@@ -298,10 +298,70 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
   have lt_lh2 := lt_lh2' h_sum_ne
   have lt_ll3 := lt_ll3' h_sum_ne
   have lt_lh3 := lt_lh3' h_sum_ne
-  -- For the SLL case, h_no_sllw : Main[63] = 0. The su16 selection happens via
-  -- the cb4+cb5*2 byte-offset. With Main[62] = 1 (eq_sll), the su16_i selectors
-  -- pick the correct shift offset.
-  sorry
+  -- Step A: pre-process `rest` to eliminate Main[62]=0 (false) and Main[63]=0 (true) disjuncts.
+  have h_1_ne_0 : (1 : ZMod p) ≠ 0 := by
+    intro h; rw [h] at h_v1_val; rw [h_v0_val] at h_v1_val; exact zero_ne_one h_v1_val
+  rw [eq_sll] at rest
+  rw [h_no_sllw] at rest
+  simp only [h_1_ne_0, false_or, true_or, or_true] at rest
+  -- Drop Main[62] from h_su16i selectors via eq_sll.
+  rw [eq_sll] at h_su160 h_su161 h_su162 h_su163
+  simp only [mul_one] at h_su160 h_su161 h_su162 h_su163
+  -- Specialize one_of_su16s.
+  have h_su_sum : Main[45] + Main[46] + Main[47] + Main[48] = 1 := one_of_su16s.resolve_left h_sum_ne
+  -- Case-split on cb4 and cb5 (the byte-shift selectors).
+  rcases b_cb4 with hcb4 | hcb4 <;> rcases b_cb5 with hcb5 | hcb5
+  · -- cb4 = 0, cb5 = 0: byte_shift = 0, so Main[45] = 1.
+    rw [hcb4, hcb5] at h_su160 h_su161 h_su162 h_su163
+    simp only [zero_add, zero_mul, mul_zero, add_zero] at h_su160 h_su161 h_su162 h_su163
+    -- Now derive Main[46] = Main[47] = Main[48] = 0.
+    have h_46_eq : Main[46] = 0 := by
+      rcases h_su161 with h | h
+      · exact h
+      · exfalso
+        have : (1 : ZMod p) = 0 := by linear_combination -h
+        exact h_1_ne_0 this
+    have h_47_eq : Main[47] = 0 := by
+      rcases h_su162 with h | h
+      · exact h
+      · exfalso
+        have : (2 : ZMod p) = 0 := by linear_combination -h
+        exact val_2_ne_zero this
+    have h_48_eq : Main[48] = 0 := by
+      rcases h_su163 with h | h
+      · exact h
+      · exfalso
+        have : (3 : ZMod p) = 0 := by linear_combination -h
+        exact val_3_ne_zero this
+    have h_45_eq : Main[45] = 1 := by
+      have := h_su_sum
+      rw [h_46_eq, h_47_eq, h_48_eq] at this
+      linear_combination this
+    -- Now extract the 4 equations from rest. With Main[45] = 1, the first 4 conjuncts give a_j = lr_j.
+    obtain ⟨h_a0_eq', h_a1_eq', h_a2_eq', h_a3_eq', _rest_other⟩ := rest
+    have h_a0_eq : a0 = lr0 := by
+      rcases h_a0_eq' with h | h
+      · exfalso; rw [h_45_eq] at h; exact h_1_ne_0 h
+      · exact h
+    have h_a1_eq : a1 = lr1 := by
+      rcases h_a1_eq' with h | h
+      · exfalso; rw [h_45_eq] at h; exact h_1_ne_0 h
+      · exact h
+    have h_a2_eq : a2 = lr2 := by
+      rcases h_a2_eq' with h | h
+      · exfalso; rw [h_45_eq] at h; exact h_1_ne_0 h
+      · exact h
+    have h_a3_eq : a3 = lr3 := by
+      rcases h_a3_eq' with h | h
+      · exfalso; rw [h_45_eq] at h; exact h_1_ne_0 h
+      · exact h
+    -- Substitute a_j = lr_j in the goal.
+    rw [h_a0_eq, h_a1_eq, h_a2_eq, h_a3_eq, eq_lr0, eq_lr1, eq_lr2, eq_lr3]
+    -- Now goal: (toBitVec64 #v[ll0*v0123, ll1*v0123 + hl0, ll2*v0123 + hl1, ll3*v0123 + hl2]).toNat
+    --   = (toBitVec64 #v[b0, b1, b2, b3]).toNat <<< cb_sum.val % 2^64
+    -- With cb4 = cb5 = 0, cb_sum = cb0 + cb1*2 + cb2*4 + cb3*8 (range 0..15).
+    sorry
+  all_goals sorry
 
 lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
     (constraints Main).allHold_poly →
