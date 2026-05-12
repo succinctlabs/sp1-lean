@@ -387,6 +387,8 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
       rw [h_cb_sum_zero]
       simp only [Nat.shiftLeft_zero]
       rw [Nat.mod_eq_of_lt (BitVec.isLt _)]
+    -- Remaining 15 cb0..3 sub-cases for cb4=cb5=0: each requires its own
+    -- cancel_mul_65536_poly application with case-specific divisibility proof.
     all_goals sorry
   all_goals sorry
 
