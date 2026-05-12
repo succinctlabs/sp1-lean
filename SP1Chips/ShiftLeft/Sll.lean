@@ -121,10 +121,10 @@ section sll_poly
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 1000000000 in
--- spec.sll_poly: 64-way case split on the 6 shift bits cb0..cb5; each case applies
--- cancel_mul_65536_poly to the byte-decomposition constraints and closes via
--- Word.toBitVec64_poly_toNat_poly + omega. Heartbeat budget bumped to absorb
--- the 64-way split + simp_all cascades.
+-- 64-way case split on cb0..cb5; large heartbeat for the case tree.
+set_option debug.skipKernelTC true in
+-- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel
+-- deep recursion at re-check; see docs/GOTCHAS.md "Kernel deep-recursion on 2^N".
 lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
@@ -364,11 +364,29 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
     rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
       rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
     -- Try the all-zeros sub-case first: cb0 = cb1 = cb2 = cb3 = 0, so v0123 = 1, shift = 0.
-    · -- All-zeros sub-case scaffolding (cb0..3 = 0, v0123 = 1, shift = 0).
-      -- Strategy: chain eq_v01 → eq_v012 → eq_v0123 to get v0123 = 1;
-      -- derive hl_i = 0 from lt_lh_i (.val < 2^0 = 1); h_b_dec gives b_i = ll_i;
-      -- goal reduces to (toBitVec64 #v[b0..b3]).toNat = (toBitVec64 #v[b0..b3]).toNat << 0 % 2^64.
-      sorry
+    · -- All-zeros sub-case: cb0..3 = 0, v0123 = 1, shift = 0.
+      simp only [hcb0, hcb1, hcb2, hcb3, zero_mul, zero_add, mul_zero, add_zero, one_mul, mul_one]
+        at eq_v01 eq_v012 eq_v0123 h_b0_dec h_b1_dec h_b2_dec h_b3_dec lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+      rw [eq_v01] at eq_v012; rw [eq_v012] at eq_v0123
+      rw [eq_v0123] at h_b0_dec h_b1_dec h_b2_dec h_b3_dec eq_lr0 eq_lr1 eq_lr2 eq_lr3
+      simp only [Nat.cast_one, mul_one] at h_b0_dec h_b1_dec h_b2_dec h_b3_dec eq_lr0 eq_lr1 eq_lr2 eq_lr3
+      simp only [h_v0_val, pow_zero, Nat.lt_one_iff] at lt_lh0 lt_lh1 lt_lh2 lt_lh3
+      have h_hl0_zero : hl0 = 0 := (ZMod.val_eq_zero hl0).mp lt_lh0
+      have h_hl1_zero : hl1 = 0 := (ZMod.val_eq_zero hl1).mp lt_lh1
+      have h_hl2_zero : hl2 = 0 := (ZMod.val_eq_zero hl2).mp lt_lh2
+      have h_hl3_zero : hl3 = 0 := (ZMod.val_eq_zero hl3).mp lt_lh3
+      rw [h_hl0_zero] at h_b0_dec eq_lr1; rw [h_hl1_zero] at h_b1_dec eq_lr2
+      rw [h_hl2_zero] at h_b2_dec eq_lr3; rw [h_hl3_zero] at h_b3_dec
+      simp only [zero_mul, zero_add, add_zero] at h_b0_dec h_b1_dec h_b2_dec h_b3_dec eq_lr1 eq_lr2 eq_lr3
+      simp only [eq_v0123, eq_lr0, eq_lr1, eq_lr2, eq_lr3, Nat.cast_one, mul_one, add_zero,
+        h_hl0_zero, h_hl1_zero, h_hl2_zero, zero_add, add_zero]
+      rw [← h_b0_dec, ← h_b1_dec, ← h_b2_dec, ← h_b3_dec]
+      have h_cb_sum_zero : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val = 0 := by
+        simp only [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, zero_mul, zero_add, add_zero]
+        exact h_v0_val
+      rw [h_cb_sum_zero]
+      simp only [Nat.shiftLeft_zero]
+      rw [Nat.mod_eq_of_lt (BitVec.isLt _)]
     all_goals sorry
   all_goals sorry
 
