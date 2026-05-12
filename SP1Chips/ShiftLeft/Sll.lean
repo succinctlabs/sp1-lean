@@ -387,8 +387,14 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
       rw [h_cb_sum_zero]
       simp only [Nat.shiftLeft_zero]
       rw [Nat.mod_eq_of_lt (BitVec.isLt _)]
-    -- Remaining 15 cb0..3 sub-cases for cb4=cb5=0: each requires its own
-    -- cancel_mul_65536_poly application with case-specific divisibility proof.
+    -- Remaining 15 cb0..3 sub-cases (cb_sum_low ∈ {1..15}, v0123 = 2^cb_sum_low).
+    -- Each case follows the same pattern as all-zeros, with:
+    --   - eq_v01 → eq_v012 → eq_v0123 chain gives v0123 = 2^cb_sum_low
+    --   - For hl_i ≠ 0 in general: at the Nat level, derive
+    --     b_i.val = ll_i.val + (65536/v0123.val) * hl_i.val
+    --     via h_b_dec + ZMod.val_*_of_lt + omega (no need for cancel_mul_65536_poly
+    --     when working in Nat throughout — the bounds make ZMod val computation tight)
+    --   - Goal a_j.val = byte-shifted b expressions; close via omega.
     all_goals sorry
   all_goals sorry
 
