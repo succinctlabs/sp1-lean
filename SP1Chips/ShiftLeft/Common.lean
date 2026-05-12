@@ -340,7 +340,7 @@ lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 65)
           List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
 
 set_option maxHeartbeats 16000000 in
--- bounds_poly threads the ALU iff and trusted_instr decomposition across 4 opcode paths; 16M needed for the full case split.
+-- bounds_poly threads the ALU iff and trusted_instr decomposition across the SLL vs SLLW opcode paths.
 lemma bounds_poly (Main : Vector (ZMod p) 65)
     (cstrs : (constraints Main).allHold_poly)
     (h_real : Main[62] + Main[63] = 1) :
@@ -354,7 +354,125 @@ lemma bounds_poly (Main : Vector (ZMod p) 65)
         ((Main[62] = 1 → Main[25].val < 64) ∧
          (Main[63] = 1 → Main[25].val < 32)))) ∧
     (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0) := by
-  sorry
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  have h_p_lt : 131072 < p := by omega
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  have h65536 : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  -- Get isU64 facts up front via ops_U64_b_c_poly.
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
+  -- Get the opcode disjunction.
+  have h_disj := sll_or_sllw_of_real Main cstrs h_real
+  -- Open chip iff. Take only what we need.
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, alu, rest⟩ := cstrs
+  -- Main[13] = 0 is the very last conjunct in the rest tuple. Extract by `And.right` chain via tauto/rfl.
+  have h_M13 : Main[13] = 0 := by
+    -- The structure of `rest` ends in `... ∧ Main[64] = Main[63] * Main[31] ∧ Main[13] = 0`.
+    -- Use right_assoc projection.
+    exact rest.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2
+  rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_real rfl] at alu
+  dsimp only at alu
+  obtain ⟨h_trusted, h_op_a_lt, _h_op_b_lt, _h_op_c_lts, _, h_op_a_0_iff, b_imm, _,
+          h_pc0_lt, _, _, _, _, _, _, _, _, h_imm0, h_op_a_0_zeros, h_imm1_op_c⟩ := alu
+  -- Item 1: Main[6].val < 32
+  have h_a_lt : Main[6].val < 32 := by
+    have : Main[6].val < (32 : ZMod p).val := h_op_a_lt
+    rwa [h32] at this
+  -- Item 4: Main[3].val < 65536
+  have h_pc_lt : Main[3].val < 65536 := by
+    have : Main[3].val < (65536 : ZMod p).val := h_pc0_lt
+    rwa [h65536] at this
+  -- Items 2, 3, 7 need the opcode case-split.
+  rcases h_disj with ⟨h_sll, h_no_sllw⟩ | ⟨h_no_sll, h_sllw⟩
+  · -- SLL case: opcode = 6
+    have h_opc : ((Main[62] * 6 + Main[63] * 21 : ZMod p)).val = 6 := by
+      rw [h_sll, h_no_sllw]
+      have key : (1 * ((6 : ℕ) : ZMod p) + 0 * 21) = ((6 : ℕ) : ZMod p) := by push_cast; ring
+      rw [key, ZMod.val_natCast_of_lt (show (6 : ℕ) < p by omega)]
+    simp only [h_opc, show Opcode.ofNat 6 = .SLL from rfl,
+      Opcode.trusted_instr_poly] at h_trusted
+    -- For each goal, expose the right branch of h_trusted via b_imm
+    refine ⟨h_a_lt, ?_, ?_, h_pc_lt, is_U64_b, is_U64_c, ?_, ?_⟩
+    · -- Main[14].val < 32 from trusted_instr (either r_type or shift_i_type both give it)
+      rcases b_imm with h_imm | h_imm
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.1 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.2 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · -- imm = 0 → Main[21].val < 32 from r_type's op_c[0] < 32
+      intro h_imm0_eq
+      have ⟨_, _, h_lt, _⟩ := h_trusted.1 h_imm0_eq
+      have : Main[21].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · -- imm = 1 → ...
+      intro h_imm1_eq
+      have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+      have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+      have ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_trusted.2 h_imm1_eq
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at h_c1 h_c2 h_c3
+      refine ⟨e_25.symm, e_26.trans h_c1, e_27.trans h_c2, e_28.trans h_c3, ?_, ?_⟩
+      · intro _h_62_one
+        rw [e_25]
+        have h64_pow : (2 ^ 6 : ZMod p).val = 64 := by
+          rw [show (2 ^ 6 : ZMod p) = ((64 : ℕ) : ZMod p) from by push_cast; ring]
+          exact ZMod.val_natCast_of_lt (by omega)
+        have : Main[21].val < (2 ^ 6 : ZMod p).val := h_c0_lt
+        rw [h64_pow] at this; omega
+      · intro h_63_one
+        exfalso
+        rw [h_no_sllw] at h_63_one
+        exact zero_ne_one h_63_one
+    · -- Main[6] = 0 → zeros. Use h_op_a_0_iff and h_M13.
+      intro h_a0_eq
+      exfalso
+      have h13_eq_one : Main[13] = 1 := h_op_a_0_iff.mpr h_a0_eq
+      rw [h_M13] at h13_eq_one
+      exact zero_ne_one h13_eq_one
+  · -- SLLW case: opcode = 21
+    have h_opc : ((Main[62] * 6 + Main[63] * 21 : ZMod p)).val = 21 := by
+      rw [h_no_sll, h_sllw]
+      have key : (0 * ((6 : ℕ) : ZMod p) + 1 * 21) = ((21 : ℕ) : ZMod p) := by push_cast; ring
+      rw [key, ZMod.val_natCast_of_lt (show (21 : ℕ) < p by omega)]
+    simp only [h_opc, show Opcode.ofNat 21 = .SLLW from rfl,
+      Opcode.trusted_instr_poly] at h_trusted
+    refine ⟨h_a_lt, ?_, ?_, h_pc_lt, is_U64_b, is_U64_c, ?_, ?_⟩
+    · rcases b_imm with h_imm | h_imm
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.1 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.2 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm0_eq
+      have ⟨_, _, h_lt, _⟩ := h_trusted.1 h_imm0_eq
+      have : Main[21].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm1_eq
+      have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+      have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+      have ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_trusted.2 h_imm1_eq
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at h_c1 h_c2 h_c3
+      refine ⟨e_25.symm, e_26.trans h_c1, e_27.trans h_c2, e_28.trans h_c3, ?_, ?_⟩
+      · intro h_62_one
+        exfalso
+        rw [h_no_sll] at h_62_one
+        exact zero_ne_one h_62_one
+      · intro _h_63_one
+        rw [e_25]
+        have h32_pow : (2 ^ 5 : ZMod p).val = 32 := by
+          rw [show (2 ^ 5 : ZMod p) = ((32 : ℕ) : ZMod p) from by push_cast; ring]
+          exact ZMod.val_natCast_of_lt (by omega)
+        have : Main[21].val < (2 ^ 5 : ZMod p).val := h_c0_lt
+        rw [h32_pow] at this; omega
+    · intro h_a0_eq
+      exfalso
+      have h13_eq_one : Main[13] = 1 := h_op_a_0_iff.mpr h_a0_eq
+      rw [h_M13] at h13_eq_one
+      exact zero_ne_one h13_eq_one
 
 lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let imm := Main[31]
