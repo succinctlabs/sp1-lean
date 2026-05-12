@@ -157,9 +157,22 @@ variable {p : ℕ} [hp : Fact (2 ^ 17 < p)]
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (256 : ℕ) < p by omega)
 
+@[simp] lemma val_64_zmod_p : (64 : ZMod p).val = 64 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (64 : ℕ) < p by omega)
+
+@[simp] lemma val_1024_zmod_p : (1024 : ZMod p).val = 1024 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (1024 : ℕ) < p by omega)
+
 @[simp] lemma val_65536_zmod_p : (65536 : ZMod p).val = 65536 := by
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (65536 : ℕ) < p by omega)
+
+/-- Polymorphic non-zero bridge for `(64 : ZMod p)`. -/
+lemma val_64_ne_zero : (64 : ZMod p) ≠ 0 := by
+  have h : (64 : ZMod p).val = 64 := val_64_zmod_p
+  intro hz; rw [hz] at h; simp at h
 
 /-- Polymorphic non-zero bridge: `(65536 : ZMod p) ≠ 0` whenever `p > 65536`.
 Used by bridge-coupled operation iff lemmas (`AddOperation`, `SubOperation`,

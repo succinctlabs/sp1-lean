@@ -64,6 +64,79 @@ lemma is_mod_64 {c0 m : Fin KB} : m < 64 → c0 < 65536 → ((c0 - m) * 20974141
         assumption
       · omega
 
+/-- Polymorphic version of `is_mod_64`. From `((c0 - m) * 64⁻¹).val < 1024`, conclude c0 ≡ m (mod 64).
+Cleaner than Fin KB because no wrap to undo. -/
+lemma is_mod_64_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {c0 m : ZMod p}
+    (h_m_lt : m.val < 64) (_h_c0_lt : c0.val < 65536)
+    (h_diff : ((c0 - m) * (64 : ZMod p)⁻¹).val < 1024) :
+    c0.val % 64 = m.val := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  -- Let k = (c0 - m) * 64⁻¹. Then k.val < 1024.
+  set k := (c0 - m) * (64 : ZMod p)⁻¹ with k_def
+  have h_k_lt : k.val < 1024 := h_diff
+  -- Multiply both sides by 64: c0 - m = k * 64, so c0 = m + k * 64.
+  have h_64_ne : (64 : ZMod p) ≠ 0 := val_64_ne_zero
+  have h_diff_eq : c0 - m = k * 64 := by
+    rw [k_def]
+    field_simp
+  have h_c0_eq : c0 = m + k * 64 := by linear_combination h_diff_eq
+  -- (m + k * 64).val = m.val + k.val * 64 (no wrap since m.val + k.val * 64 < 64 + 1024 * 64 = 65600 < p)
+  have h_k64_val : (k * 64).val = k.val * 64 := by
+    rw [show (64 : ZMod p) = ((64 : ℕ) : ZMod p) from by push_cast; rfl]
+    rw [ZMod.val_mul_of_lt]
+    · rw [show ((64 : ℕ) : ZMod p).val = 64 from val_64_zmod_p]
+    · rw [show ((64 : ℕ) : ZMod p).val = 64 from val_64_zmod_p]
+      -- k.val < 1024, so k.val * 64 < 65536 < p
+      have h_k_lt' : k.val < 1024 := h_k_lt
+      have : k.val * 64 < 1024 * 64 := by
+        exact Nat.mul_lt_mul_of_lt_of_le h_k_lt' (le_refl 64) (by omega)
+      omega
+  have h_c0_val : c0.val = m.val + k.val * 64 := by
+    have : c0.val = (m + k * 64).val := by rw [h_c0_eq]
+    rw [this, ZMod.val_add_of_lt]
+    · rw [h_k64_val]
+    · rw [h_k64_val]
+      omega
+  rw [h_c0_val]
+  omega
+
+/-- Polymorphic version of `cancel_mul_65536`. Cleaner than Fin KB because `ZMod p` (`p > 2^17`)
+has no wrap to undo for products up to 65536^2 < 2^32 < p. -/
+lemma cancel_mul_65536_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b c x : ZMod p}
+    (h_x_dvd : x.val ∣ 65536) (h_x_pos : 0 < x.val) :
+    a * x = b * 65536 + c * x → a = b * (((65536 / x.val : ℕ) : ZMod p)) + c := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  intro h_eq
+  -- Let z = 65536 / x.val. Then x.val * z = 65536, so as ZMod p elements: x * (z : ZMod p) = 65536.
+  set z : ℕ := 65536 / x.val with z_def
+  have h_x_le : x.val ≤ 65536 := Nat.le_of_dvd (by omega) h_x_dvd
+  have h_z_pos : 0 < z := Nat.div_pos h_x_le h_x_pos
+  have h_z_lt : z ≤ 65536 := by
+    rw [z_def]; exact Nat.div_le_self _ _
+  have h_xz : x.val * z = 65536 := by
+    rw [z_def, Nat.mul_div_cancel' h_x_dvd]
+  -- Cast x.val * z = 65536 to ZMod p.
+  have h_xz_zmod : x * ((z : ℕ) : ZMod p) = 65536 := by
+    have : ((x.val : ZMod p)) * ((z : ℕ) : ZMod p) = ((x.val * z : ℕ) : ZMod p) := by push_cast; ring
+    rw [ZMod.natCast_zmod_val] at this
+    rw [this, h_xz]
+    push_cast; rfl
+  -- Rewrite the hypothesis using h_xz_zmod: b * 65536 = b * (x * z) = (b * z) * x.
+  have h_eq2 : a * x = (b * ((z : ℕ) : ZMod p) + c) * x := by
+    rw [← h_xz_zmod] at h_eq
+    linear_combination h_eq
+  -- Need x ≠ 0 in ZMod p to cancel.
+  have h_x_ne : x ≠ 0 := by
+    intro h
+    have : x.val = 0 := by rw [h]; exact ZMod.val_zero
+    omega
+  -- Cancel x.
+  exact mul_right_cancel₀ h_x_ne h_eq2
+
 end field_arithmetic
 
 section opcodes
@@ -155,13 +228,116 @@ end is_real
 
 section bounds
 
-/-- Just the U64 bounds, what `spec.*_poly` needs. Cheaper than the full `bounds_poly`. -/
+/-- Determine which opcode flag is set, given the sum constraint. -/
+lemma sll_or_sllw_of_real (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[62] + Main[63] = 1) :
+    Main[62] = 1 ∧ Main[63] = 0 ∨ Main[62] = 0 ∧ Main[63] = 1 := by
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, _, _, b_62, b_63, _⟩ := cstrs
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  have h_one_val : (1 : ZMod p).val = 1 := ZMod.val_one p
+  rcases b_62 with h62 | h62
+  · -- Main[62] = 0, so Main[63] = 1
+    have h63 : Main[63] = 1 := by
+      have h := h_real; rw [h62, zero_add] at h; exact h
+    exact Or.inr ⟨h62, h63⟩
+  · -- Main[62] = 1
+    have h63 : Main[63] = 0 := by
+      rcases b_63 with h | h
+      · exact h
+      · exfalso
+        have h_two_eq_one : (1 : ZMod p) + 1 = 1 := by
+          have hh := h_real; rw [h62, h] at hh; exact hh
+        have h_one_eq_zero : (1 : ZMod p) = 0 := by linear_combination h_two_eq_one
+        rw [h_one_eq_zero, ZMod.val_zero] at h_one_val
+        exact absurd h_one_val (by omega)
+    exact Or.inl ⟨h62, h63⟩
+
+set_option maxHeartbeats 8000000 in
+-- ops_U64_b_c_poly: ALU iff for op_b, case-splits SLL vs SLLW for op_c's bound under imm=1.
 lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 65)
     (cstrs : (constraints Main).allHold_poly)
     (h_real : Main[62] + Main[63] = 1) :
     Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
     Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
-  sorry
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  have h_disj := sll_or_sllw_of_real Main cstrs h_real
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, alu, _⟩ := cstrs
+  rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_real rfl] at alu
+  -- Force projection reduction on the cols struct literal so destructure sees Main[i].
+  dsimp only at alu
+  obtain ⟨h_trusted, _, _, _, _, _, b_imm, _, _, _, _, _, _, _, _,
+          _, h_is_U64_b, h_imm0, _, h_imm1_op_c⟩ := alu
+  refine ⟨h_is_U64_b, ?_⟩
+  rcases b_imm with h_imm0_eq | h_imm1_eq
+  · exact (h_imm0 h_imm0_eq).2.2
+  · -- imm = 1: op_c_memory.prev_value = op_c; trusted_instr gives c0 < 2^k, c1..c3 = 0
+    have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+    have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+    rw [e_25, e_26, e_27, e_28]
+    -- Convert the imm=1 hypothesis to the form ALU iff uses.
+    rcases h_disj with ⟨h_sll, h_no_sllw⟩ | ⟨h_no_sll, h_sllw⟩
+    · -- SLL: opcode .val = 6
+      have h_opc : ((Main[62] * 6 + Main[63] * 21 : ZMod p)).val = 6 := by
+        rw [h_sll, h_no_sllw]
+        have hp_lt : 131072 < p := by have := hp; omega
+        have key : (1 * ((6 : ℕ) : ZMod p) + 0 * 21) = ((6 : ℕ) : ZMod p) := by push_cast; ring
+        rw [key, ZMod.val_natCast_of_lt (show (6 : ℕ) < p by omega)]
+      simp only [h_opc, show Opcode.ofNat 6 = .SLL from rfl,
+        Opcode.trusted_instr_poly] at h_trusted
+      have h_si : shift_i_type_constraints_poly Main[6] Main[14] 0 0 0 Main[21] Main[22] Main[23] Main[24] 0 Main[31] := by
+        exact h_trusted.2 h_imm1_eq
+      simp only [shift_i_type_constraints_poly] at h_si
+      obtain ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_si
+      apply Word.isU64_of_cases_poly
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+        have hp_lt : 131072 < p := by have := hp; omega
+        have h64_pow : (2 ^ 6 : ZMod p).val = 64 := by
+          rw [show (2 ^ 6 : ZMod p) = ((64 : ℕ) : ZMod p) from by push_cast; ring]
+          exact ZMod.val_natCast_of_lt (by omega)
+        have : Main[21].val < (2 ^ 6 : ZMod p).val := h_c0_lt
+        rw [h64_pow] at this; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c1, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c2, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
+    · -- SLLW: opcode .val = 21
+      have h_opc : ((Main[62] * 6 + Main[63] * 21 : ZMod p)).val = 21 := by
+        rw [h_no_sll, h_sllw]
+        have hp_lt : 131072 < p := by have := hp; omega
+        have key : (0 * ((6 : ℕ) : ZMod p) + 1 * 21) = ((21 : ℕ) : ZMod p) := by push_cast; ring
+        rw [key, ZMod.val_natCast_of_lt (show (21 : ℕ) < p by omega)]
+      simp only [h_opc, show Opcode.ofNat 21 = .SLLW from rfl,
+        Opcode.trusted_instr_poly] at h_trusted
+      have h_wsi : w_shift_i_type_constraints_poly Main[6] Main[14] 0 0 0 Main[21] Main[22] Main[23] Main[24] 0 Main[31] := by
+        exact h_trusted.2 h_imm1_eq
+      simp only [w_shift_i_type_constraints_poly] at h_wsi
+      obtain ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_wsi
+      apply Word.isU64_of_cases_poly
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+        have hp_lt : 131072 < p := by have := hp; omega
+        have h32_pow : (2 ^ 5 : ZMod p).val = 32 := by
+          rw [show (2 ^ 5 : ZMod p) = ((32 : ℕ) : ZMod p) from by push_cast; ring]
+          exact ZMod.val_natCast_of_lt (by omega)
+        have : Main[21].val < (2 ^ 5 : ZMod p).val := h_c0_lt
+        rw [h32_pow] at this; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c1, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c2, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
 
 set_option maxHeartbeats 16000000 in
 -- bounds_poly threads the ALU iff and trusted_instr decomposition across 4 opcode paths; 16M needed for the full case split.
