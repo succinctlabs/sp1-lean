@@ -9,12 +9,12 @@ section constraints
 @[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (clk_high : F)
   (clk_low : F)
-  (pc : Vector F 3)
+  (pc : (Vector F 3))
   (opcode : F)
-  (instr_field_consts : Vector F 4)
-  (op_a_write_value : Word F)
+  (op_a_write_value : (Word F))
   (cols : JTypeReader F)
   (is_real : F)
+  (is_trusted : F)
   : SP1ConstraintList F :=
   let E0 : F := is_real - 1
   let E1 : F := is_real * E0
@@ -35,7 +35,7 @@ section constraints
   let E16 : F := E15 * ((65536 : F)⁻¹)
   [
     (.assertZero E1),
-    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a cols.op_b_imm[0] cols.op_b_imm[1] cols.op_b_imm[2] cols.op_b_imm[3] cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] cols.op_a_0 1 1) is_real),
+    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a cols.op_b_imm[0] cols.op_b_imm[1] cols.op_b_imm[2] cols.op_b_imm[3] cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] cols.op_a_0 1 1) is_trusted),
     (.assertZero E3),
     (.assertZero E5),
     (.assertZero E7),

@@ -47,7 +47,7 @@ theorem correct_addi
     haveI hp1 : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [ITypeReader.allHold_constraints_iff_is_real_poly h_is_real,
+    simp [ITypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real,
       Opcode.ofNat, Nat.ble, h1_val] at reader_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, c0, c1, c2, c3,
             _h_a0_bool, h_a0_iff,

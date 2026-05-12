@@ -16,7 +16,10 @@ from typing import Dict, List, Tuple, Optional
 # `Opcode.ofNat opcode` (which takes `ℕ`) elaborates against generic `F`;
 # `Coe (Fin n) ℕ` and `Coe (ZMod p) ℕ` instances live in `Field.lean`.
 # Keyed by `(chip, operation)`. Value is `(universe, needs_coe_head)`.
-PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
+# Value is `(universe, needs_coe_head)` OR `(universe, needs_coe_head, struct_name)`
+# when the cols-struct name differs from the operation name (e.g.
+# `U16toU8OperationSafe`/`Unsafe` share the struct `U16toU8Operation`).
+PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple] = {
     ("DivRem", "IsZeroOperation"): ("Type*", False),
     ("DivRem", "IsZeroWordOperation"): ("Type", False),
     ("DivRem", "IsEqualWordOperation"): ("Type", False),
@@ -24,7 +27,7 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
     ("Lt", "LtOperationUnsigned"): ("Type", False),
     ("Lt", "LtOperationSigned"): ("Type", False),
     ("Mul", "U16MSBOperation"): ("Type*", False),
-    ("Bitwise", "U16toU8OperationUnsafe"): ("Type", False),
+    ("Bitwise", "U16toU8OperationUnsafe"): ("Type", False, "U16toU8Operation"),
     ("Bitwise", "BitwiseOperation"): ("Type", True),
     ("Bitwise", "BitwiseU16Operation"): ("Type", True),
     ("Add", "CPUState"): ("Type*", False),
@@ -32,6 +35,7 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
     ("Addi", "ITypeReader"): ("Type", True),
     ("UType", "JTypeReader"): ("Type", True),
     ("Bitwise", "ALUTypeReader"): ("Type", True),
+    ("Branch", "ITypeReaderImmutable"): ("Type", True, "ITypeReader"),
     # Bridge-coupled ops (B.10): struct + Constraints lifted; iff_poly
     # lemmas land where the simp recipe closes mechanically (Add only at
     # this point — Sub deferred per docs/FIELD_GENERIC.md).
@@ -40,7 +44,8 @@ PARAMETRIC_OPS: Dict[Tuple[str, str], Tuple[str, bool]] = {
     ("Addw", "AddwOperation"): ("Type", False),
     ("Subw", "SubwOperation"): ("Type", False),
     ("LoadByte", "AddrAddOperation"): ("Type", False),
-    ("Mul", "U16toU8OperationSafe"): ("Type", False),
+    ("LoadByte", "AddressOperation"): ("Type", False),
+    ("Mul", "U16toU8OperationSafe"): ("Type", False, "U16toU8Operation"),
     ("Mul", "MulOperation"): ("Type", False),
 }
 
@@ -157,7 +162,8 @@ def run_constraint_compiler(sp1_dir: str, chip: str, operation: Optional[str] = 
     return result.stdout
 
 def apply_parametric_post_process(
-    text: str, op_name: str, universe: str, needs_coe_head: bool
+    text: str, op_name: str, universe: str, needs_coe_head: bool,
+    struct_name: Optional[str] = None,
 ) -> str:
     """Rewrite Fin KB-typed upstream output into `{F : universe} [Field F]`-parametric form.
 
@@ -172,9 +178,13 @@ def apply_parametric_post_process(
        step 1 has handled all parenthesized forms.
     3. Add `{F : <universe>} [Field F]` (and `[CoeHead F ℕ]` for readers
        with `program` clauses) to the `def constraints` line.
-    4. Add ` F` to the cols struct parameter so `cols : <op_name>` becomes
-       `cols : <op_name> F`.
+    4. Add ` F` to the cols struct parameter so `cols : <struct_name>` becomes
+       `cols : <struct_name> F`. `struct_name` defaults to `op_name`; override
+       when the cols-struct's Lean name differs (e.g. `U16toU8OperationSafe`
+       and `U16toU8OperationUnsafe` both use the struct `U16toU8Operation`).
     """
+    if struct_name is None:
+        struct_name = op_name
     text = text.replace("(Fin KB)", "F")
     text = text.replace("Fin KB", "F")
     sig_extras = f"{{F : {universe}}} [Field F]"
@@ -185,8 +195,8 @@ def apply_parametric_post_process(
         f"@[irreducible] def constraints {sig_extras}",
     )
     text = text.replace(
-        f"(cols : {op_name})",
-        f"(cols : {op_name} F)",
+        f"(cols : {struct_name})",
+        f"(cols : {struct_name} F)",
     )
     return text
 
@@ -267,9 +277,14 @@ def main():
             if operation is not None:
                 entry = PARAMETRIC_OPS.get((chip, operation))
                 if entry is not None:
-                    universe, needs_coe_head = entry
+                    if len(entry) == 3:
+                        universe, needs_coe_head, struct_name = entry
+                    else:
+                        universe, needs_coe_head = entry
+                        struct_name = None
                     constraints_output = apply_parametric_post_process(
-                        constraints_output, operation, universe, needs_coe_head
+                        constraints_output, operation, universe, needs_coe_head,
+                        struct_name=struct_name,
                     )
             else:
                 # Chip-level parametric emission for chips in PARAMETRIC_CHIPS

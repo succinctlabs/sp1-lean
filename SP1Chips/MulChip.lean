@@ -53,7 +53,7 @@ theorem correct_mul_poly
   obtain ⟨⟨⟨mul_op_cstrs, cpu_cstrs⟩, reader_cstrs⟩, _, _, _, _, _, _, _⟩ := cstrs
   -- Reader bounds via iff_is_real_poly + opcode reduction.
   rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at cpu_cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at reader_cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one h_is_real_eq_one] at reader_cstrs
   simp [h_77, h_78, h_79, h_80, h_81, Opcode.ofNat, Nat.ble, h11_val] at reader_cstrs
   obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
           ⟨⟨_, _, ⟨_, is_U64_b', is_U64_c'⟩⟩, _⟩⟩ := reader_cstrs
@@ -151,7 +151,7 @@ theorem correct_mulh_poly
     SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
   obtain ⟨⟨⟨mul_op_cstrs, cpu_cstrs⟩, reader_cstrs⟩, _, _, _, _, _, _, _⟩ := cstrs
   rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at cpu_cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at reader_cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one h_is_real_eq_one] at reader_cstrs
   simp [h_77, h_78, h_79, h_80, h_81, Opcode.ofNat, Nat.ble, h12_val] at reader_cstrs
   obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
           ⟨⟨_, _, ⟨_, is_U64_b', is_U64_c'⟩⟩, _⟩⟩ := reader_cstrs
@@ -242,7 +242,7 @@ theorem correct_mulhu_poly
     SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
   obtain ⟨⟨⟨mul_op_cstrs, cpu_cstrs⟩, reader_cstrs⟩, _, _, _, _, _, _, _⟩ := cstrs
   rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at cpu_cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at reader_cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one h_is_real_eq_one] at reader_cstrs
   simp [h_77, h_78, h_79, h_80, h_81, Opcode.ofNat, Nat.ble, h13_val] at reader_cstrs
   obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
           ⟨⟨_, _, ⟨_, is_U64_b', is_U64_c'⟩⟩, _⟩⟩ := reader_cstrs
@@ -333,7 +333,7 @@ theorem correct_mulhsu_poly
     SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
   obtain ⟨⟨⟨mul_op_cstrs, cpu_cstrs⟩, reader_cstrs⟩, _, _, _, _, _, _, _⟩ := cstrs
   rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at cpu_cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at reader_cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one h_is_real_eq_one] at reader_cstrs
   simp [h_77, h_78, h_79, h_80, h_81, Opcode.ofNat, Nat.ble, h14_val] at reader_cstrs
   obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
           ⟨⟨_, _, ⟨_, is_U64_b', is_U64_c'⟩⟩, _⟩⟩ := reader_cstrs
@@ -424,7 +424,7 @@ theorem correct_mulw_poly
     SP1Constraint.toProp_poly_assertZero, sub_eq_zero, mul_eq_zero] at cstrs
   obtain ⟨⟨⟨mul_op_cstrs, cpu_cstrs⟩, reader_cstrs⟩, _, _, _, _, _, _, _⟩ := cstrs
   rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at cpu_cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one] at reader_cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real_eq_one h_is_real_eq_one] at reader_cstrs
   simp [h_77, h_78, h_79, h_80, h_81, Opcode.ofNat, Nat.ble, h24_val] at reader_cstrs
   obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
           ⟨⟨_, _, ⟨_, is_U64_b', is_U64_c'⟩⟩, _⟩⟩ := reader_cstrs

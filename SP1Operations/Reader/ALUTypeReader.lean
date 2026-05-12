@@ -6,9 +6,13 @@ namespace ALUTypeReader
 
 attribute [-simp] Opcode.trusted_instr Opcode.trusted_instr_poly
 
+set_option linter.style.setOption false
+set_option maxHeartbeats 2000000
+set_option maxRecDepth 2000
+
 -- iff-characterization of ALUTypeReader constraints
-lemma allHold_constraints_iff :
-  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+lemma allHold_constraints_iff (h_eq : is_trusted = is_real) :
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (is_real = 0 → cols.imm_c = 0) ∧
     (¬is_real = 0 →
@@ -43,6 +47,7 @@ lemma allHold_constraints_iff :
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
    := by
+  subst h_eq
   simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_def]
   intros h_is_real
   rcases h_is_real with h | h
@@ -65,11 +70,11 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     {clk_high clk_low : ZMod p}
     {pc : Vector (ZMod p) 3}
     {opcode : ZMod p}
-    {instr_field_consts : Vector (ZMod p) 4}
     {op_a_write_value : Word (ZMod p)}
     {cols : ALUTypeReader (ZMod p)}
-    {is_real : ZMod p} :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+    {is_real is_trusted : ZMod p}
+    (h_eq : is_trusted = is_real) :
+  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (is_real = 0 → cols.imm_c = 0) ∧
     (¬is_real = 0 →
@@ -104,6 +109,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
    := by
+  subst h_eq
   have h16 : (16 : ZMod p).val = 16 := by
     have := (Fact.out : 2 ^ 17 < p)
     exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
@@ -132,12 +138,11 @@ lemma allHold_constraints_iff_is_real_poly
     {clk_high clk_low : ZMod p}
     {pc : Vector (ZMod p) 3}
     {opcode : ZMod p}
-    {instr_field_consts : Vector (ZMod p) 4}
     {op_a_write_value : Word (ZMod p)}
     {cols : ALUTypeReader (ZMod p)}
-    {is_real : ZMod p}
-    (h : is_real = 1) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+    {is_real is_trusted : ZMod p}
+    (h : is_real = 1) (h_trusted : is_trusted = is_real) :
+  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
     cols.op_a < (32 : ZMod p) ∧
     cols.op_b < (65536 : ZMod p) ∧
@@ -167,11 +172,12 @@ lemma allHold_constraints_iff_is_real_poly
       cols.op_c_memory.prev_value[1] = cols.op_c[1] ∧
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3]) := by
-  aesop (add safe (by simp [allHold_constraints_iff_poly]))
+  subst h_trusted; subst h
+  aesop (add safe (by simp [allHold_constraints_iff_poly rfl]))
 
 -- is-real specialization of constraint iff
-lemma allHold_constraints_iff_is_real (h : is_real = 1) :
-  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+lemma allHold_constraints_iff_is_real (h : is_real = 1) (h_trusted : is_trusted = is_real) :
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
     cols.op_a < 32 ∧
     cols.op_b < 65536 ∧
@@ -201,6 +207,8 @@ lemma allHold_constraints_iff_is_real (h : is_real = 1) :
       cols.op_c_memory.prev_value[1] = cols.op_c[1] ∧
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3])
-   := by aesop (add safe (by simp [allHold_constraints_iff]))
+   := by
+    subst h_trusted; subst h
+    aesop (add safe (by simp [allHold_constraints_iff rfl]))
 
 end ALUTypeReader

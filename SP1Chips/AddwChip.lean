@@ -53,7 +53,7 @@ theorem correct_addw
       omega
     have h19_val : (19 : ZMod p).val = 19 := ZMod.val_natCast_of_lt h19_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real,
+    simp [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl,
       Opcode.ofNat, Nat.ble, h19_val] at alu_cstrs
     -- ADDW arm: imm_c = 0, so r_type clause activates and op_c memory clause applies
     have h_imm_c : Main[31] = 0 := h_is_addw
@@ -166,7 +166,7 @@ theorem correct_addw
       omega
     have h19_val : (19 : ZMod p).val = 19 := ZMod.val_natCast_of_lt h19_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real,
+    simp [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl,
       Opcode.ofNat, Nat.ble, h19_val] at alu_cstrs
     -- ADDIW arm: imm_c = 1, so i_type clause activates and op_c memory ≡ op_c imm
     have h_imm_c : Main[31] = 1 := h_is_addiw

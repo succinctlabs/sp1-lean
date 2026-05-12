@@ -12,9 +12,9 @@ section constraints
   (clk_low : F)
   (pc : (Vector F 3))
   (opcode : F)
-  (instr_field_consts : (Vector F 4))
   (cols : ITypeReader F)
   (is_real : F)
+  (is_trusted : F)
   : SP1ConstraintList F :=
   let E0 : F := is_real - 1
   let E1 : F := is_real * E0
@@ -43,7 +43,7 @@ section constraints
   let E24 : F := E23 * ((65536 : F)⁻¹)
   [
     (.assertZero E1),
-    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E2 0 0 0 cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] cols.op_a_0 0 1) is_real),
+    (.send (.program pc[0] pc[1] pc[2] (Opcode.ofNat opcode) cols.op_a E2 0 0 0 cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] cols.op_a_0 0 1) is_trusted),
     (.assertZero E4),
     (.assertZero E6),
     (.assertZero E8),

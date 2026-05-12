@@ -7,9 +7,9 @@ attribute [-simp] Opcode.trusted_instr Opcode.trusted_instr_poly
 
 -- iff-characterization of RTypeReader constraints
 lemma allHold_constraints_iff :
-  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
-    (¬is_real = 0 →
+    (¬is_trusted = 0 →
       Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
       cols.op_a < 32 ∧
       cols.op_b < 65536 ∧
@@ -17,7 +17,8 @@ lemma allHold_constraints_iff :
       (cols.op_a_0 = 0 ∨ cols.op_a_0 = 1) ∧
       (cols.op_a_0 = 1 ↔ cols.op_a = 0) ∧
       pc[0] % 4 = 0 ∧
-      pc[0] < 65536 ∧ pc[1] < 65536 ∧ pc[2] < 65536 ∧
+      pc[0] < 65536 ∧ pc[1] < 65536 ∧ pc[2] < 65536) ∧
+    (¬is_real = 0 →
       cols.op_a_memory.access_timestamp.diff_low_limb < 65536 ∧
       cols.op_b_memory.access_timestamp.diff_low_limb < 65536 ∧
       cols.op_c_memory.access_timestamp.diff_low_limb < 65536 ∧
@@ -46,8 +47,8 @@ lemma allHold_constraints_iff :
         aesop
 
 lemma allHold_constraints_iff_is_real
-    (h : is_real = 1) :
-  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+    (h : is_real = 1) (h_trusted : is_trusted = 1) :
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
     cols.op_a < 32 ∧
     cols.op_b < 65536 ∧
@@ -70,7 +71,7 @@ lemma allHold_constraints_iff_is_real
       op_a_write_value[1] = 0 ∧
       op_a_write_value[2] = 0 ∧
       op_a_write_value[3] = 0) := by
-  simp [allHold_constraints_iff, h, and_assoc]
+  simp [allHold_constraints_iff, h, h_trusted, and_assoc]
 
 /-- Polymorphic companion of `allHold_constraints_iff`. RHS uses `.val`-level
 Nat-arithmetic for `Range`-opcode-derived bounds (diff_low_limb.val < 65536);
@@ -80,13 +81,12 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     {clk_high clk_low : ZMod p}
     {pc : Vector (ZMod p) 3}
     {opcode : ZMod p}
-    {instr_field_consts : Vector (ZMod p) 4}
     {op_a_write_value : Word (ZMod p)}
     {cols : RTypeReader (ZMod p)}
-    {is_real : ZMod p} :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+    {is_real is_trusted : ZMod p} :
+  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
-    (¬is_real = 0 →
+    (¬is_trusted = 0 →
       Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
       cols.op_a < (32 : ZMod p) ∧
       cols.op_b < (65536 : ZMod p) ∧
@@ -94,7 +94,8 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
       (cols.op_a_0 = 0 ∨ cols.op_a_0 = 1) ∧
       (cols.op_a_0 = 1 ↔ cols.op_a = 0) ∧
       pc[0] % 4 = 0 ∧
-      pc[0] < (65536 : ZMod p) ∧ pc[1] < (65536 : ZMod p) ∧ pc[2] < (65536 : ZMod p) ∧
+      pc[0] < (65536 : ZMod p) ∧ pc[1] < (65536 : ZMod p) ∧ pc[2] < (65536 : ZMod p)) ∧
+    (¬is_real = 0 →
       cols.op_a_memory.access_timestamp.diff_low_limb.val < 65536 ∧
       cols.op_b_memory.access_timestamp.diff_low_limb.val < 65536 ∧
       cols.op_c_memory.access_timestamp.diff_low_limb.val < 65536 ∧
@@ -135,12 +136,11 @@ lemma allHold_constraints_iff_is_real_poly
     {clk_high clk_low : ZMod p}
     {pc : Vector (ZMod p) 3}
     {opcode : ZMod p}
-    {instr_field_consts : Vector (ZMod p) 4}
     {op_a_write_value : Word (ZMod p)}
     {cols : RTypeReader (ZMod p)}
-    {is_real : ZMod p}
-    (h : is_real = 1) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode instr_field_consts op_a_write_value cols is_real) ↔
+    {is_real is_trusted : ZMod p}
+    (h : is_real = 1) (h_trusted : is_trusted = 1) :
+  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
     cols.op_a < (32 : ZMod p) ∧
     cols.op_b < (65536 : ZMod p) ∧
@@ -163,6 +163,6 @@ lemma allHold_constraints_iff_is_real_poly
       op_a_write_value[1] = 0 ∧
       op_a_write_value[2] = 0 ∧
       op_a_write_value[3] = 0) := by
-  simp [allHold_constraints_iff_poly, h, and_assoc]
+  simp [allHold_constraints_iff_poly, h, h_trusted, and_assoc]
 
 end RTypeReader

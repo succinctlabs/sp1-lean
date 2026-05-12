@@ -75,7 +75,7 @@ theorem correct_lui
   simp [constraints] at cstrs
   obtain ⟨_, add_op_cstrs, reader_cstrs, rest⟩ := cstrs
   -- Apply JTypeReader iff_poly.
-  rw [JTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at reader_cstrs
+  rw [JTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at reader_cstrs
   -- Specialize the addend to LUI's 0 word and reduce the opcode to LUI.
   have h49_lt : (49 : ℕ) < p := by
     have h := Fact.out (p := 2 ^ 17 < p)
@@ -170,7 +170,7 @@ theorem correct_auipc
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp [constraints] at cstrs
   obtain ⟨_, add_op_cstrs, reader_cstrs, rest⟩ := cstrs
-  rw [JTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at reader_cstrs
+  rw [JTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at reader_cstrs
   have h48_lt : (48 : ℕ) < p := by
     have h := Fact.out (p := 2 ^ 17 < p)
     have : (48 : ℕ) < 2 ^ 17 := by decide

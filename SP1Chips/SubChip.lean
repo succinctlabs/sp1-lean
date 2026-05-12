@@ -44,7 +44,7 @@ theorem correct_sub
     simp [constraints] at cstrs
     obtain ⟨sub_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real,
+    simp [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real,
       Opcode.ofNat, Nat.ble] at reader_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _, ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := reader_cstrs
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩

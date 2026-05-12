@@ -246,7 +246,7 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
     h_is_loadX0_ld] at h_reader
   -- Reader extraction via the iff_is_real_poly specialization.
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -532,7 +532,7 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM47_zero,
     h_is_loadX0_lwu] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -836,7 +836,7 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lw] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -1134,7 +1134,7 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lhu] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -1472,7 +1472,7 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM44_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lh] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -1807,7 +1807,7 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lbu] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -2202,7 +2202,7 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lb] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,

@@ -62,7 +62,7 @@ lemma register_bounds :
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops⟩ := cstrs
   simp_all only [DivRem.is_real, Fin.isValue, Nat.cast_ofNat]
-  rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
+  rw [RTypeReader.allHold_constraints_iff_is_real] at alu
   obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, rest⟩ := alu; clear rest
   -- simp_all
   rcases b_is_div; rcases b_is_divu; rcases b_is_rem; rcases b_is_remu
@@ -77,7 +77,7 @@ lemma op_a_is_0 :
   intro cstrs is_real is_zero
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨alu, rest⟩ := cstrs; clear rest; simp_all
-  rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
+  rw [RTypeReader.allHold_constraints_iff_is_real rfl rfl] at alu
   obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := alu
   simp_all
 
@@ -89,7 +89,7 @@ lemma ops_U64_b_c :
   intro cstrs is_real
   apply allHold_constraints_alu_ops at cstrs
   obtain ⟨alu, rest⟩ := cstrs; clear rest; simp_all
-  rw [RTypeReader.allHold_constraints_iff_is_real (by simp)] at alu
+  rw [RTypeReader.allHold_constraints_iff_is_real rfl rfl] at alu
   obtain ⟨h1, h2, h3, h4, h5, b_imm, h7, h8⟩ := alu
   simp_all
 
@@ -370,7 +370,7 @@ lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 246)
     SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
     sub_eq_zero, mul_eq_zero] at cstrs
   obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at h_alu
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
   obtain ⟨_, _, _, _, _, _, _, h_complex, _⟩ := h_alu
   obtain ⟨_, _, _, h_isU64_b, h_isU64_c⟩ := h_complex
   exact ⟨h_isU64_b, h_isU64_c⟩
@@ -400,7 +400,7 @@ lemma register_bounds_poly (Main : Vector (ZMod p) 246)
     SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
     sub_eq_zero, mul_eq_zero] at cstrs
   obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at h_alu
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
   obtain ⟨_, h_op_a_lt, h_op_b_lt, h_op_c_lt, _, _, h_pc, _, _⟩ := h_alu
   obtain ⟨_, h_pc0_lt, _, _⟩ := h_pc
   refine ⟨?_, ?_, ?_, ?_⟩
@@ -557,7 +557,7 @@ lemma op_a_is_0_poly (Main : Vector (ZMod p) 246)
     SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
     sub_eq_zero, mul_eq_zero] at cstrs
   obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
-  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at h_alu
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
   obtain ⟨_, _, _, _, _, h_op_a_0_iff, _, _, h_zero⟩ := h_alu
   intro h_op_a_eq_0
   have h_op_a_0_eq_1 : Main[13] = 1 := h_op_a_0_iff.mpr h_op_a_eq_0

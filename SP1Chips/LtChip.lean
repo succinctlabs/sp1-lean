@@ -60,7 +60,7 @@ theorem correct_slt
       omega
     have h9_val : (9 : ZMod p).val = 9 := ZMod.val_natCast_of_lt h9_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M32, h_M33, Opcode.ofNat, Nat.ble, h9_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -177,7 +177,7 @@ theorem correct_sltu
       omega
     have h10_val : (10 : ZMod p).val = 10 := ZMod.val_natCast_of_lt h10_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M32, h_M33, Opcode.ofNat, Nat.ble, h10_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -291,7 +291,7 @@ theorem correct_slti
       omega
     have h9_val : (9 : ZMod p).val = 9 := ZMod.val_natCast_of_lt h9_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M32, h_M33, Opcode.ofNat, Nat.ble, h9_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,
@@ -422,7 +422,7 @@ theorem correct_sltiu
       omega
     have h10_val : (10 : ZMod p).val = 10 := ZMod.val_natCast_of_lt h10_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M32, h_M33, Opcode.ofNat, Nat.ble, h10_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,

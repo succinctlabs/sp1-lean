@@ -193,7 +193,7 @@ lemma register_bounds : List.Forall SP1Constraint.toProp (constraints Main) → 
   obtain ⟨h0, h1, h2, h3, alu,
             b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4⟩ := cstrs
   clear h0 h1 h2 h3 h4
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (h_trusted := rfl)] at alu
   · obtain ⟨h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18⟩ := alu
     rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
     rcases b_imm <;> simp_all
@@ -212,7 +212,7 @@ lemma immediate_bounds : List.Forall SP1Constraint.toProp (constraints Main) →
   obtain ⟨h0, h1, h2, h3, alu,
             b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4⟩ := cstrs
   clear h0 h1 h2 h3 h4
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (h_trusted := rfl)] at alu
   · obtain ⟨h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19⟩ := alu
     rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
       intro h31 <;> exact (h0.2 h31).2.1
@@ -228,7 +228,7 @@ lemma op_a_is_0 : List.Forall SP1Constraint.toProp (constraints Main) → is_rea
   obtain ⟨h0, h1, h2, h3, alu,
             b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4⟩ := cstrs
   clear h0 h1 h2 h3 h4
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (h_trusted := rfl)] at alu
   · obtain ⟨h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18⟩ := alu
     clear *- h4 h5 h18; simp_all; aesop
   · clear alu; rcases real with srl | sra | srlw | sraw <;> simp_all
@@ -243,7 +243,7 @@ lemma ops_U64_b_c : List.Forall SP1Constraint.toProp (constraints Main) → is_r
   obtain ⟨h0, h1, h2, h3, alu,
           b_srl, b_sra, b_srlw, b_sraw, one_of_ops, h4⟩ := cstrs
   clear h0 h1 h2 h3 h4
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (h_trusted := rfl)] at alu
   · obtain ⟨h0, h1, h2, h3, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18⟩ := alu
     rcases real with srl | sra | srlw | sraw <;> simp_all [Opcode.ofNat, Nat.ble, Nat.beq] <;>
     rcases b_imm <;> simp_all <;> apply Word.isU64_of_cases <;> simp <;> omega

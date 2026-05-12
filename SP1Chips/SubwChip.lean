@@ -52,7 +52,7 @@ theorem correct_subw
       omega
     have h20_val : (20 : ZMod p).val = 20 := ZMod.val_natCast_of_lt h20_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real,
+    simp [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real,
       Opcode.ofNat, Nat.ble, h20_val] at reader_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _, ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := reader_cstrs
     have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p

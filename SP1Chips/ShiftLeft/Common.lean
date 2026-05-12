@@ -128,7 +128,7 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
   obtain ⟨h_msb, cpu, alu, one_of_ops, b_sll, b_sllw, rest⟩ := cstrs
   clear h_msb cpu rest
   simp [is_real] at real
-  rw [ALUTypeReader.allHold_constraints_iff_is_real] at alu
+  rw [ALUTypeReader.allHold_constraints_iff_is_real (h_trusted := rfl)] at alu
   · obtain ⟨h1, h2, h3, _, h4, h5, b_imm, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18⟩ := alu; simp_all
     by_cases sll : Main[62] = 0
     · by_cases sllw : Main[63] = 0

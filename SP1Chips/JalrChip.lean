@@ -117,7 +117,7 @@ theorem JALR_correct
   simp [constraints] at cstrs
   obtain ⟨res_cstrs, pc_cstrs, reader_cstrs, inc_pc_cstrs, rest_cstrs⟩ := cstrs
   -- Apply ITypeReader iff with h_is_real
-  rw [ITypeReader.allHold_constraints_iff_is_real_poly h_is_real] at reader_cstrs
+  rw [ITypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at reader_cstrs
   -- Reduce opcode literal and unfold trusted_instr_poly for JALR.
   have h47_lt : (47 : ℕ) < p := by
     have h := Fact.out (p := 2 ^ 17 < p)

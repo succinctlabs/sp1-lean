@@ -487,7 +487,7 @@ section constraints
   let CS17 : SP1ConstraintList F := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E443, Main[4], Main[5]] 8 Main[244]
   let E444 : F := Main[1] * 65536
   let E445 : F := Main[2] + E444
-  let CS18 : SP1ConstraintList F := RTypeReader.constraints Main[0] E445 #v[Main[3], Main[4], Main[5]] E382 #v[E442, E427, E397, E412] #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[244]
+  let CS18 : SP1ConstraintList F := RTypeReader.constraints Main[0] E445 #v[Main[3], Main[4], Main[5]] E382 #v[Main[28], Main[29], Main[30], Main[31]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := Main[21], op_c_memory := { prev_value := #v[Main[22], Main[23], Main[24], Main[25]], access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } } Main[244] Main[244]
   CS0 ++ CS1 ++ CS2 ++ CS3 ++ CS4 ++ CS5 ++ CS6 ++ CS7 ++ CS8 ++ CS9 ++ CS10 ++ CS11 ++ CS12 ++ CS13 ++ CS14 ++ CS15 ++ CS16 ++ CS17 ++ CS18 ++ [
     (.assertZero E13),
     (.assertZero E15),
@@ -780,11 +780,7 @@ lemma allHold_constraints_iff :
     List.Forall SP1Constraint.toProp
         (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]]
           (Main[202] * 16 + Main[204] * 18 + Main[201] * 15 + Main[203] * 17 + Main[205] * 25 + Main[206] * 27 + Main[207] * 26 + Main[208] * 28)
-          #v[Main[202] * 8 + Main[204] * 8 + Main[201] * 8 + Main[203] * 8 + Main[205] * 8 + Main[206] * 8 + Main[207] * 8 + Main[208] * 8,
-            Main[202] * 51 + Main[204] * 51 + Main[201] * 51 + Main[203] * 51 + Main[205] * 59 + Main[206] * 59 + Main[207] * 59 + Main[208] * 59,
-            Main[202] * 5 + Main[204] * 7 + Main[201] * 4 + Main[203] * 6 + Main[205] * 4 + Main[206] * 6 + Main[207] * 5 + Main[208] * 7,
-            Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208]]
-          #v[Main[28], Main[29], Main[30], Main[31]]
+      #v[Main[28], Main[29], Main[30], Main[31]]
           { op_a := Main[6],
             op_a_memory :=
               { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -797,7 +793,7 @@ lemma allHold_constraints_iff :
             op_c_memory :=
               { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
                 access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
-          Main[244]) ∧
+          Main[244] Main[244]) ∧
     Main[239] = Main[244] * (1 - (Main[205] + Main[206] + Main[207] + Main[208])) ∧
     Main[236] = Main[232] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧
     Main[240] = Main[233] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧
@@ -966,10 +962,6 @@ lemma allHold_constraints_alu_ops :
   List.Forall SP1Constraint.toProp
     (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]]
       (Main[202] * 16 + Main[204] * 18 + Main[201] * 15 + Main[203] * 17 + Main[205] * 25 + Main[206] * 27 + Main[207] * 26 + Main[208] * 28)
-      #v[Main[202] * 8 + Main[204] * 8 + Main[201] * 8 + Main[203] * 8 + Main[205] * 8 + Main[206] * 8 + Main[207] * 8 + Main[208] * 8,
-        Main[202] * 51 + Main[204] * 51 + Main[201] * 51 + Main[203] * 51 + Main[205] * 59 + Main[206] * 59 + Main[207] * 59 + Main[208] * 59,
-        Main[202] * 5 + Main[204] * 7 + Main[201] * 4 + Main[203] * 6 + Main[205] * 4 + Main[206] * 6 + Main[207] * 5 + Main[208] * 7,
-        Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208]]
       #v[Main[28], Main[29], Main[30], Main[31]]
       { op_a := Main[6],
         op_a_memory :=
@@ -983,7 +975,7 @@ lemma allHold_constraints_alu_ops :
         op_c_memory :=
           { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
             access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
-      Main[244]) ∧
+      Main[244] Main[244]) ∧
     (Main[201] = 0 ∨ Main[201] = 1) ∧
     (Main[202] = 0 ∨ Main[202] = 1) ∧
     (Main[203] = 0 ∨ Main[203] = 1) ∧
@@ -1142,11 +1134,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
     List.Forall SP1Constraint.toProp_poly
         (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]]
           (Main[202] * 16 + Main[204] * 18 + Main[201] * 15 + Main[203] * 17 + Main[205] * 25 + Main[206] * 27 + Main[207] * 26 + Main[208] * 28)
-          #v[Main[202] * 8 + Main[204] * 8 + Main[201] * 8 + Main[203] * 8 + Main[205] * 8 + Main[206] * 8 + Main[207] * 8 + Main[208] * 8,
-            Main[202] * 51 + Main[204] * 51 + Main[201] * 51 + Main[203] * 51 + Main[205] * 59 + Main[206] * 59 + Main[207] * 59 + Main[208] * 59,
-            Main[202] * 5 + Main[204] * 7 + Main[201] * 4 + Main[203] * 6 + Main[205] * 4 + Main[206] * 6 + Main[207] * 5 + Main[208] * 7,
-            Main[202] + Main[204] + Main[201] + Main[203] + Main[205] + Main[206] + Main[207] + Main[208]]
-          #v[Main[28], Main[29], Main[30], Main[31]]
+      #v[Main[28], Main[29], Main[30], Main[31]]
           { op_a := Main[6],
             op_a_memory :=
               { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -1159,7 +1147,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
             op_c_memory :=
               { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
                 access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
-          Main[244]) ∧
+          Main[244] Main[244]) ∧
     Main[239] = Main[244] * (1 - (Main[205] + Main[206] + Main[207] + Main[208])) ∧
     Main[236] = Main[232] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧
     Main[240] = Main[233] * (Main[201] + Main[203] + Main[205] + Main[206]) ∧

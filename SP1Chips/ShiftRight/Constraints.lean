@@ -101,7 +101,7 @@ section constraints
   let E81 : F := Main[43] * 32
   let E82 : F := E80 + E81
   let E83 : F := Main[25] - E82
-  let E84 : F := E83 * 2097414145
+  let E84 : F := E83 * ((64 : F)⁻¹)
   let E85 : F := Main[43] * 2
   let E86 : F := E85 * E14
   let E87 : F := Main[42] + E86
@@ -293,7 +293,7 @@ section constraints
   let CS3 : SP1ConstraintList F := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E269, Main[4], Main[5]] 8 E2
   let E270 : F := Main[1] * 65536
   let E271 : F := Main[2] + E270
-  let CS4 : SP1ConstraintList F := ALUTypeReader.constraints Main[0] E271 #v[Main[3], Main[4], Main[5]] E21 #v[E58, E44, E28, E35] #v[Main[32], Main[33], Main[34], Main[35]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E2
+  let CS4 : SP1ConstraintList F := ALUTypeReader.constraints Main[0] E271 #v[Main[3], Main[4], Main[5]] E21 #v[Main[32], Main[33], Main[34], Main[35]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } E2 E2
   CS0 ++ CS1 ++ CS2 ++ CS3 ++ CS4 ++ [
     (.assertZero E4),
     (.assertZero E6),
@@ -418,11 +418,8 @@ lemma allHold_constraints_iff :
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints b1 { msb := msb_b } sraw) ∧
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints a1 { msb := msb_srw } (srlw + sraw)) ∧
     List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (srl + sra + srlw + sraw)) ∧
-    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (srl * 7 + sra * 8 + srlw * 22 + sraw * 23) (
-      #v[Main[64] * 8 + Main[65] * 8 + Main[66] * 8 + Main[67] * 8 - (6 * Main[31] + Main[68]),
-        Main[64] * 51 + Main[65] * 51 + Main[66] * 59 + Main[67] * 59 - 32 * Main[31],
-        Main[64] * 5 + Main[65] * 5 + Main[66] * 5 + Main[67] * 5, Main[65] * 32 + Main[67] * 32]
-    ) #v[a0, a1, a2, a3] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[c0, c1, c2, c3], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := imm } (srl + sra + srlw + sraw)) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (srl * 7 + sra * 8 + srlw * 22 + sraw * 23)
+      #v[a0, a1, a2, a3] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[c0, c1, c2, c3], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := imm } (srl + sra + srlw + sraw) (srl + sra + srlw + sraw)) ∧
     (srl = 0 ∨ srl = 1) ∧
     (sra = 0 ∨ sra = 1) ∧
     (srlw = 0 ∨ srlw = 1) ∧
@@ -435,7 +432,7 @@ lemma allHold_constraints_iff :
     (cb3 = 0 ∨ cb3 = 1) ∧
     (cb4 = 0 ∨ cb4 = 1) ∧
     (cb5 = 0 ∨ cb5 = 1) ∧
-    (¬srl + sra + srlw + sraw = 0 → ((Main[25] - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)) * 2097414145).val < 1024) ∧
+    (¬srl + sra + srlw + sraw = 0 → ((Main[25] - (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)) * ((64 : Fin KB)⁻¹)).val < 1024) ∧
     (su160 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 0) ∧
     (su160 = 0 ∨ su160 = 1) ∧
     (su161 = 0 ∨ cb4 + cb5 * 2 * (srl + sra) = 1) ∧

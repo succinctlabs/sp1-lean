@@ -83,7 +83,7 @@ section constraints
   let E68 : F := 65535 * Main[41]
   let E69 : F := 65535 * Main[41]
   let E70 : F := 65535 * Main[41]
-  let CS3 : SP1ConstraintList F := ITypeReader.constraints Main[0] E1 #v[Main[3], Main[4], Main[5]] E4 #v[E16, E13, E7, E10] #v[Main[40], E68, E69, E70] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } E17
+  let CS3 : SP1ConstraintList F := ITypeReader.constraints Main[0] E1 #v[Main[3], Main[4], Main[5]] E4 #v[Main[40], E68, E69, E70] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } E17 E17
   CS0 ++ CS1 ++ CS2 ++ CS3 ++ [
     (.assertZero E19),
     (.assertZero E21),
@@ -126,7 +126,7 @@ lemma allHold_constraints_iff_of_is_lh (h_is_lh : is_lh Main) :
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
     List.Forall SP1Constraint.toProp
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 30
-        #v[4, 3, 1, 0] #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
+        #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
         { op_a := Main[6],
           op_a_memory :=
             { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -135,7 +135,7 @@ lemma allHold_constraints_iff_of_is_lh (h_is_lh : is_lh Main) :
           op_b_memory :=
             { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
               access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
-          op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1) ∧
+          op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1 1) ∧
     (Main[35] = 0 ∨ Main[35] = 1) ∧
     (Main[35] = 0 ∨ Main[0] = Main[33]) ∧
     Main[35] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[35]) * Main[0] -
@@ -176,7 +176,7 @@ lemma allHold_constraints_iff_of_is_lhu (h_is_lhu : is_lhu Main) :
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
     List.Forall SP1Constraint.toProp
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 33
-        #v[4, 3, 5, 0] #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
+        #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
         { op_a := Main[6],
           op_a_memory :=
             { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -185,7 +185,7 @@ lemma allHold_constraints_iff_of_is_lhu (h_is_lhu : is_lhu Main) :
           op_b_memory :=
             { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
               access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
-          op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1) ∧
+          op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1 1) ∧
     (Main[35] = 0 ∨ Main[35] = 1) ∧
     (Main[35] = 0 ∨ Main[0] = Main[33]) ∧
     Main[35] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[35]) * Main[0] -
@@ -240,7 +240,7 @@ lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
     List.Forall SP1Constraint.toProp_poly
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
-        #v[Main[3], Main[4], Main[5]] 30 #v[4, 3, 1, 0]
+        #v[Main[3], Main[4], Main[5]] 30
         #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
         { op_a := Main[6], op_a_memory :=
         { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -249,7 +249,7 @@ lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
           op_b_memory :=
           { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
             access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
-            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1) ∧
+            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1 1) ∧
     (Main[35] = 0 ∨ Main[35] = 1) ∧
     (Main[35] = 0 ∨ Main[0] = Main[33]) ∧
     Main[35] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[35]) * Main[0] -
@@ -295,7 +295,7 @@ lemma allHold_constraints_iff_of_is_lhu_poly (Main : Vector (ZMod p) 44)
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
     List.Forall SP1Constraint.toProp_poly
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
-        #v[Main[3], Main[4], Main[5]] 33 #v[4, 3, 5, 0]
+        #v[Main[3], Main[4], Main[5]] 33
         #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
         { op_a := Main[6], op_a_memory :=
         { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
@@ -304,7 +304,7 @@ lemma allHold_constraints_iff_of_is_lhu_poly (Main : Vector (ZMod p) 44)
           op_b_memory :=
           { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
             access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
-            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1) ∧
+            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1 1) ∧
     (Main[35] = 0 ∨ Main[35] = 1) ∧
     (Main[35] = 0 ∨ Main[0] = Main[33]) ∧
     Main[35] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[35]) * Main[0] -

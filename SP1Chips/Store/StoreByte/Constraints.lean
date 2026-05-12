@@ -89,7 +89,7 @@ section constraints
   let E77 : F := Main[48] - E76
   let E78 : F := Main[3] + 4
   let CS1 : SP1ConstraintList F := CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[E78, Main[4], Main[5]] 8 Main[49]
-  let CS2 : SP1ConstraintList F := ITypeReaderImmutable.constraints Main[0] E1 #v[Main[3], Main[4], Main[5]] 36 #v[64, 35, 0, 0] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } Main[49]
+  let CS2 : SP1ConstraintList F := ITypeReaderImmutable.constraints Main[0] E1 #v[Main[3], Main[4], Main[5]] 36 { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } Main[49] Main[49]
   CS0 ++ CS1 ++ CS2 ++ [
     (.assertZero E3),
     (.assertZero E9),

@@ -59,7 +59,7 @@ theorem correct_xor
     have h3_lt : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h3_val : (3 : ZMod p).val = 3 := ZMod.val_natCast_of_lt h3_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h3_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -167,7 +167,7 @@ theorem correct_or
     have h4_lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h4_val : (4 : ZMod p).val = 4 := ZMod.val_natCast_of_lt h4_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h4_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -273,7 +273,7 @@ theorem correct_and
     have h5_lt : (5 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h5_val : (5 : ZMod p).val = 5 := ZMod.val_natCast_of_lt h5_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h5_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -379,7 +379,7 @@ theorem correct_xori
     have h3_lt : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h3_val : (3 : ZMod p).val = 3 := ZMod.val_natCast_of_lt h3_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h3_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,
@@ -503,7 +503,7 @@ theorem correct_ori
     have h4_lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h4_val : (4 : ZMod p).val = 4 := ZMod.val_natCast_of_lt h4_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h4_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,
@@ -627,7 +627,7 @@ theorem correct_andi
     have h5_lt : (5 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h5_val : (5 : ZMod p).val = 5 := ZMod.val_natCast_of_lt h5_lt
     rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real] at alu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h5_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,
