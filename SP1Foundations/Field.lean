@@ -161,9 +161,37 @@ variable {p : ℕ} [hp : Fact (2 ^ 17 < p)]
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (64 : ℕ) < p by omega)
 
+@[simp] lemma val_128_zmod_p : (128 : ZMod p).val = 128 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (128 : ℕ) < p by omega)
+
+@[simp] lemma val_512_zmod_p : (512 : ZMod p).val = 512 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (512 : ℕ) < p by omega)
+
 @[simp] lemma val_1024_zmod_p : (1024 : ZMod p).val = 1024 := by
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (1024 : ℕ) < p by omega)
+
+@[simp] lemma val_2048_zmod_p : (2048 : ZMod p).val = 2048 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (2048 : ℕ) < p by omega)
+
+@[simp] lemma val_4096_zmod_p : (4096 : ZMod p).val = 4096 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (4096 : ℕ) < p by omega)
+
+@[simp] lemma val_8192_zmod_p : (8192 : ZMod p).val = 8192 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (8192 : ℕ) < p by omega)
+
+@[simp] lemma val_16384_zmod_p : (16384 : ZMod p).val = 16384 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (16384 : ℕ) < p by omega)
+
+@[simp] lemma val_32768_zmod_p : (32768 : ZMod p).val = 32768 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (32768 : ℕ) < p by omega)
 
 @[simp] lemma val_65536_zmod_p : (65536 : ZMod p).val = 65536 := by
   have : 131072 < p := by have := hp.out; omega

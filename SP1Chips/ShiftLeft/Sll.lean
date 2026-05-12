@@ -175,9 +175,9 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
            _b_sll, _b_sllw,
            b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
            h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163, _one_of_su16s,
-           _eq_v01, _eq_v012, eq_v0123,
-           _lt_ll0, _lt_lh0, h_b0_dec, _lt_ll1, _lt_lh1, h_b1_dec,
-           _lt_ll2, _lt_lh2, h_b2_dec, _lt_ll3, _lt_lh3, h_b3_dec,
+           eq_v01, eq_v012, eq_v0123,
+           lt_ll0', lt_lh0', h_b0_dec, lt_ll1', lt_lh1', h_b1_dec,
+           lt_ll2', lt_lh2', h_b2_dec, lt_ll3', lt_lh3', h_b3_dec,
            eq_lr0, eq_lr1, eq_lr2, eq_lr3,
            rest⟩ := cstrs
   -- Specialize diff (which has ¬sum = 0 hypothesis) using h_real = 1.
@@ -289,10 +289,18 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
         convert this using 1
       exact h_diff_eq
   rw [h_c_mod_64]
-  -- Remaining: a.toBitVec64.toNat = b.toBitVec64.toNat <<< (cb_sum).val % 2^64
-  -- This requires the 64-way case-split on b_cb0..5 + cancel_mul_65536_poly applications
-  -- to each byte-decomposition constraint h_b0..3_dec, then closing via
-  -- Word.toBitVec64_poly_toNat_poly + omega per case.
+  -- Specialize the ¬sum=0-gated bounds.
+  have lt_ll0 := lt_ll0' h_sum_ne
+  have lt_lh0 := lt_lh0' h_sum_ne
+  have lt_ll1 := lt_ll1' h_sum_ne
+  have lt_lh1 := lt_lh1' h_sum_ne
+  have lt_ll2 := lt_ll2' h_sum_ne
+  have lt_lh2 := lt_lh2' h_sum_ne
+  have lt_ll3 := lt_ll3' h_sum_ne
+  have lt_lh3 := lt_lh3' h_sum_ne
+  -- For the SLL case, h_no_sllw : Main[63] = 0. The su16 selection happens via
+  -- the cb4+cb5*2 byte-offset. With Main[62] = 1 (eq_sll), the su16_i selectors
+  -- pick the correct shift offset.
   sorry
 
 lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
