@@ -9,6 +9,26 @@ set_option maxHeartbeats 100000000
 
 variable (Main : Vector (Fin KB) 65)
 
+section sllw_poly
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+lemma spec.sllw_poly (Main : Vector (ZMod p) 65) (h : is_sllw_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SLLW := by
+  sorry
+
+lemma spec.slliw_poly (Main : Vector (ZMod p) 65) (h : is_slliw_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SLLW := by
+  sorry
+
+end sllw_poly
+
 section sllw
 
 lemma spec.sllw (h : is_sllw Main) :

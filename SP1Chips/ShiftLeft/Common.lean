@@ -94,6 +94,49 @@ lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
   clear *- b_sll b_sllw one_of_ops
   aesop
 
+lemma single_op_poly (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold_poly) :
+    (Main[62] = 1 → Main[63] = 0) ∧ (Main[63] = 1 → Main[62] = 0) := by
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, _, sum_disj, b_sll, b_sllw, _⟩ := cstrs
+  have h_one_ne_zero : (1 : ZMod p) ≠ 0 := by
+    have hp : 2 ^ 17 < p := Fact.out
+    haveI : Fact (1 < p) := ⟨by omega⟩
+    have h1 : (1 : ZMod p).val = 1 := ZMod.val_one p
+    intro h; rw [h, ZMod.val_zero] at h1; exact one_ne_zero h1.symm
+  have h_two_ne_zero : (2 : ZMod p) ≠ 0 := val_2_ne_zero
+  refine ⟨fun h_sll => ?_, fun h_sllw => ?_⟩
+  · rcases b_sllw with h | h
+    · exact h
+    · exfalso
+      have : Main[62] + Main[63] = 2 := by rw [h_sll, h]; ring
+      rcases sum_disj with hs | hs
+      · apply h_two_ne_zero; linear_combination hs - this
+      · apply h_one_ne_zero; linear_combination hs - this
+  · rcases b_sll with h | h
+    · exact h
+    · exfalso
+      have : Main[62] + Main[63] = 2 := by rw [h, h_sllw]; ring
+      rcases sum_disj with hs | hs
+      · apply h_two_ne_zero; linear_combination hs - this
+      · apply h_one_ne_zero; linear_combination hs - this
+
+/-- Derive `Main[62] + Main[63] = 1` from cstrs + `Main[62] = 1`. -/
+lemma is_real_eq_one_of_sll (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold_poly) (h_sll : Main[62] = 1) :
+    Main[62] + Main[63] = 1 := by
+  have ⟨hno_sllw, _⟩ := single_op_poly Main cstrs
+  rw [h_sll, hno_sllw h_sll]; ring
+
+/-- Derive `Main[62] + Main[63] = 1` from cstrs + `Main[63] = 1`. -/
+lemma is_real_eq_one_of_sllw (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold_poly) (h_sllw : Main[63] = 1) :
+    Main[62] + Main[63] = 1 := by
+  have ⟨_, hno_sll⟩ := single_op_poly Main cstrs
+  rw [hno_sll h_sllw, h_sllw]; ring
+
 end opcodes
 
 section is_real
@@ -111,6 +154,31 @@ lemma sllw_real_poly (Main : Vector (ZMod p) 65) : Main[63] = 1 → is_real_poly
 end is_real
 
 section bounds
+
+/-- Just the U64 bounds, what `spec.*_poly` needs. Cheaper than the full `bounds_poly`. -/
+lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[62] + Main[63] = 1) :
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+  sorry
+
+set_option maxHeartbeats 16000000 in
+-- bounds_poly threads the ALU iff and trusted_instr decomposition across 4 opcode paths; 16M needed for the full case split.
+lemma bounds_poly (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[62] + Main[63] = 1) :
+    let imm := Main[31]
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ (imm = 0 → Main[21].val < 32) ∧
+    Main[3].val < 65536 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] ∧
+    (imm = 1 →
+      (Main[21] = Main[25] ∧ Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
+        ((Main[62] = 1 → Main[25].val < 64) ∧
+         (Main[63] = 1 → Main[25].val < 32)))) ∧
+    (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0) := by
+  sorry
 
 lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main →
   let imm := Main[31]
@@ -158,6 +226,17 @@ lemma bounds : List.Forall SP1Constraint.toProp (constraints Main) → is_real M
 end bounds
 
 section operands
+
+@[simp] def sp1_op_a_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[6].val
+@[simp] def sp1_op_b_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[14].val
+@[simp] def sp1_op_c_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+@[simp] def sp1_op_c_imm_poly (Main : Vector (ZMod p) 65) : BitVec 6 :=
+  BitVec.ofNat 6 Main[21].val
+@[simp] def sp1_op_c_imm_w_poly (Main : Vector (ZMod p) 65) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
 
 @[simp]
 def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by

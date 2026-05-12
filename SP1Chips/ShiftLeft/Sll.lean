@@ -116,6 +116,26 @@ lemma spec.sll (h : is_sll Main) :
 
 end sll
 
+section sll_poly
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SLL := by
+  sorry
+
+lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SLL := by
+  sorry
+
+end sll_poly
+
 section slli
 
 lemma spec.slli (h : is_slli Main) :
