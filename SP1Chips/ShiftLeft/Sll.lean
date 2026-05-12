@@ -357,10 +357,19 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
       · exact h
     -- Substitute a_j = lr_j in the goal.
     rw [h_a0_eq, h_a1_eq, h_a2_eq, h_a3_eq, eq_lr0, eq_lr1, eq_lr2, eq_lr3]
-    -- Now goal: (toBitVec64 #v[ll0*v0123, ll1*v0123 + hl0, ll2*v0123 + hl1, ll3*v0123 + hl2]).toNat
-    --   = (toBitVec64 #v[b0, b1, b2, b3]).toNat <<< cb_sum.val % 2^64
+    -- Now: (toBitVec64 #v[ll0*v0123, ll1*v0123+hl0, ll2*v0123+hl1, ll3*v0123+hl2]).toNat
+    --       = (toBitVec64 #v[b0..b3]).toNat <<< (cb_sum_low).val % 2^64
     -- With cb4 = cb5 = 0, cb_sum = cb0 + cb1*2 + cb2*4 + cb3*8 (range 0..15).
-    sorry
+    -- 16-way case split on cb0..cb3.
+    rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+      rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+    -- Try the all-zeros sub-case first: cb0 = cb1 = cb2 = cb3 = 0, so v0123 = 1, shift = 0.
+    · -- All-zeros sub-case scaffolding (cb0..3 = 0, v0123 = 1, shift = 0).
+      -- Strategy: chain eq_v01 → eq_v012 → eq_v0123 to get v0123 = 1;
+      -- derive hl_i = 0 from lt_lh_i (.val < 2^0 = 1); h_b_dec gives b_i = ll_i;
+      -- goal reduces to (toBitVec64 #v[b0..b3]).toNat = (toBitVec64 #v[b0..b3]).toNat << 0 % 2^64.
+      sorry
+    all_goals sorry
   all_goals sorry
 
 lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
