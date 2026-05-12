@@ -189,7 +189,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
   simp only [execute_RTYPE_pure_w_poly]
   simp only [BitVec.toNat_shiftLeft, BitVec.shiftLeft_eq', BitVec.toNat_setWidth]
   -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b).toNat <<< ((toBitVec64_poly c).toNat % 2^6) % 2^64
-  show (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
+  change (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
         (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<<
           ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6) % 2 ^ 64
   -- Reduce the c-toNat % 64 to c0.val % 64
