@@ -311,9 +311,192 @@ private lemma spec.sllw_poly_cb4_one (Main : Vector (ZMod p) 65)
     Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
       BitVec.signExtend 64 (HWord.toBitVec32_poly #v[Main[15], Main[16]] <<<
         BitVec.setWidth 5 (HWord.toBitVec32_poly #v[Main[25], Main[26]])) := by
-  -- TODO: derive h_45_eq, h_46_eq, h_a0_eq (a0 = 0), h_a1_eq (a1 = lr0);
-  -- substitute in goal + h_msb_a1; 16-way cb0..3 split + sllw_subcase_cb4_one apps.
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_v0_val : (0 : ZMod p).val = 0 := ZMod.val_zero
+  have h_v1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
+  have h_1_ne_0 : (1 : ZMod p) ≠ 0 := by
+    intro h; rw [h] at h_v1_val; rw [h_v0_val] at h_v1_val; exact zero_ne_one h_v1_val
+  -- Derive h_45_eq from h_su160 (cb4 = 1 forces left disjunct).
+  rw [hcb4] at h_su160
+  simp only [one_mul, mul_one, mul_zero, add_zero] at h_su160
+  have h_45_eq : Main[45] = 0 := by
+    rcases h_su160 with h | h
+    · exact h
+    · exfalso; exact h_1_ne_0 h
+  -- Derive h_46_eq.
+  have h_46_eq : Main[46] = 1 := by
+    have := h_su45_46_sum; rw [h_45_eq] at this; linear_combination this
+  -- Extract a0 = 0, a1 = lr0 from w_02', w_03'.
+  have h_46_ne_0 : Main[46] ≠ 0 := by rw [h_46_eq]; exact h_1_ne_0
+  have h_a0_eq : Main[32] = 0 := w_02'.resolve_left h_46_ne_0
+  have h_a1_eq : Main[33] = Main[57] := w_03'.resolve_left h_46_ne_0
+  -- Substitute a0, a1 in goal and h_msb_a1.
+  rw [h_a0_eq, h_a1_eq, eq_lr0]
+  rw [h_a1_eq, eq_lr0] at h_msb_a1
+  -- 16-way cb0..3 split + per-sub-case helper application.
+  rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+    rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+  · -- (0,0,0,0): S=0, M=1, N=65536, total shift = 16
+    have hv0123_val : Main[44].val = 1 := by
+      have h : Main[44] = 1 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact h_v1_val
+    exact sllw_subcase_cb4_one 0 (by omega) 1 65536 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (0,0,0,1): S=8, M=256, N=256, total shift = 24
+    have hv0123_val : Main[44].val = 256 := by
+      have h : Main[44] = 256 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_256_zmod_p
+    exact sllw_subcase_cb4_one 8 (by omega) 256 256 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (0,0,1,0): S=4, M=16, N=4096
+    have hv0123_val : Main[44].val = 16 := by
+      have h : Main[44] = 16 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_16_zmod_p
+    exact sllw_subcase_cb4_one 4 (by omega) 16 4096 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (0,0,1,1): S=12, M=4096, N=16
+    have hv0123_val : Main[44].val = 4096 := by
+      have h : Main[44] = 4096 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_4096_zmod_p
+    exact sllw_subcase_cb4_one 12 (by omega) 4096 16 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (0,1,0,0): S=2, M=4, N=16384
+    have hv0123_val : Main[44].val = 4 := by
+      have h : Main[44] = 4 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_4_zmod_p
+    exact sllw_subcase_cb4_one 2 (by omega) 4 16384 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (0,1,0,1): S=10, M=1024, N=64
+    have hv0123_val : Main[44].val = 1024 := by
+      have h : Main[44] = 1024 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_1024_zmod_p
+    exact sllw_subcase_cb4_one 10 (by omega) 1024 64 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (0,1,1,0): S=6, M=64, N=1024
+    have hv0123_val : Main[44].val = 64 := by
+      have h : Main[44] = 64 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_64_zmod_p
+    exact sllw_subcase_cb4_one 6 (by omega) 64 1024 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (0,1,1,1): S=14, M=16384, N=4
+    have hv0123_val : Main[44].val = 16384 := by
+      have h : Main[44] = 16384 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_16384_zmod_p
+    exact sllw_subcase_cb4_one 14 (by omega) 16384 4 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,0,0,0): S=1, M=2, N=32768
+    have hv0123_val : Main[44].val = 2 := by
+      have h : Main[44] = 2 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_2_zmod_p
+    exact sllw_subcase_cb4_one 1 (by omega) 2 32768 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,0,0,1): S=9, M=512, N=128
+    have hv0123_val : Main[44].val = 512 := by
+      have h : Main[44] = 512 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_512_zmod_p
+    exact sllw_subcase_cb4_one 9 (by omega) 512 128 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,0,1,0): S=5, M=32, N=2048
+    have hv0123_val : Main[44].val = 32 := by
+      have h : Main[44] = 32 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_32_zmod_p
+    exact sllw_subcase_cb4_one 5 (by omega) 32 2048 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,0,1,1): S=13, M=8192, N=8
+    have hv0123_val : Main[44].val = 8192 := by
+      have h : Main[44] = 8192 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_8192_zmod_p
+    exact sllw_subcase_cb4_one 13 (by omega) 8192 8 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,1,0,0): S=3, M=8, N=8192
+    have hv0123_val : Main[44].val = 8 := by
+      have h : Main[44] = 8 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_8_zmod_p
+    exact sllw_subcase_cb4_one 3 (by omega) 8 8192 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,1,0,1): S=11, M=2048, N=32
+    have hv0123_val : Main[44].val = 2048 := by
+      have h : Main[44] = 2048 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_2048_zmod_p
+    exact sllw_subcase_cb4_one 11 (by omega) 2048 32 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,1,1,0): S=7, M=128, N=512
+    have hv0123_val : Main[44].val = 128 := by
+      have h : Main[44] = 128 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_128_zmod_p
+    exact sllw_subcase_cb4_one 7 (by omega) 128 512 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
+  · -- (1,1,1,1): S=15, M=32768, N=2
+    have hv0123_val : Main[44].val = 32768 := by
+      have h : Main[44] = 32768 := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
+      rw [h]; exact val_32768_zmod_p
+    exact sllw_subcase_cb4_one 15 (by omega) 32768 2 (by decide) (by omega) rfl rfl
+      hv0123_val
+      (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+      (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+      lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+      b0_16 b1_16 c0_16 c1_16 h_msb_a1 h_a2_eq h_a3_eq h_c_mod_32
 
 /-- Outer `spec.sllw_poly`: destructure cstrs, derive bounds, h_c_mod_32, w_*'
 resolution; manually unfold `Word.low_poly` (avoiding the expensive `change`
