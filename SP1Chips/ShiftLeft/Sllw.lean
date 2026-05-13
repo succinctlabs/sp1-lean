@@ -13,11 +13,143 @@ section sllw_poly
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
+-- ============================================================================
+-- RESTRUCTURE SKETCH for spec.sllw_poly (see /home/dtumad/.claude/plans/
+--   sllw_poly_restructure_sketch.md for the design rationale).
+--
+-- The naive inline approach to spec.sllw_poly hangs past 17 min during
+-- elaboration (vs. spec.sll_poly's ~80s baseline for 64 sub-cases). The
+-- bottleneck is the goal-manipulation chain (`simp only [execute_RTYPEW_pure_w_poly,
+-- ..., sign_extend, signExtend]` followed by `change ...`) compounding inside
+-- one lemma with the 32 sub-case helper applications.
+--
+-- The plan: split into 3 lemmas. The two private branch lemmas elaborate
+-- within their own heartbeat budgets without compounding.
+-- ============================================================================
+
+/-- Branch lemma for `spec.sllw_poly`'s `cb4 = 0` (byte_shift=0) case.
+Takes destructured cstrs facts as flat arguments; runs the 16-way cb0..3
+split internally; concludes the post-`simp [execute_RTYPEW_pure_w_poly,
+execute_RTYPEW_pure_32_w_poly, sign_extend, signExtend]` form of the goal
+(with `Word.low_poly` already reduced to the 2-limb HWord form). -/
+private lemma spec.sllw_poly_cb4_zero (Main : Vector (ZMod p) 65)
+    (eq_sllw : Main[63] = 1) (h_no_sll : Main[62] = 0)
+    (b0_16 : Main[15].val < 65536) (b1_16 : Main[16].val < 65536)
+    (c0_16 : Main[25].val < 65536) (c1_16 : Main[26].val < 65536)
+    (b_cb0 : Main[36] = 0 ∨ Main[36] = 1)
+    (b_cb1 : Main[37] = 0 ∨ Main[37] = 1)
+    (b_cb2 : Main[38] = 0 ∨ Main[38] = 1)
+    (b_cb3 : Main[39] = 0 ∨ Main[39] = 1)
+    (hcb4 : Main[40] = 0)
+    (h_su161 : Main[46] = 0 ∨ Main[40] + Main[41] * 2 * 0 = 1)
+    (h_su45_46_sum : Main[45] + Main[46] = 1)
+    (eq_v01 : Main[42] = (Main[36] + 1) * (Main[37] * 3 + 1))
+    (eq_v012 : Main[43] = Main[42] * (Main[38] * 15 + 1))
+    (eq_v0123 : Main[44] = Main[43] * (Main[39] * 255 + 1))
+    (lt_ll0 : Main[49].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh0 : Main[53].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (lt_ll1 : Main[50].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh1 : Main[54].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (lt_ll2 : Main[51].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh2 : Main[55].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (lt_ll3 : Main[52].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh3 : Main[56].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (h_b0_dec : Main[15] * Main[44] = Main[53] * 65536 + Main[49] * Main[44])
+    (h_b1_dec : Main[16] * Main[44] = Main[54] * 65536 + Main[50] * Main[44])
+    (h_b2_dec : Main[17] * Main[44] = Main[55] * 65536 + Main[51] * Main[44])
+    (h_b3_dec : Main[18] * Main[44] = Main[56] * 65536 + Main[52] * Main[44])
+    (eq_lr0 : Main[57] = Main[49] * Main[44])
+    (eq_lr1 : Main[58] = Main[50] * Main[44] + Main[53])
+    (eq_lr2 : Main[59] = Main[51] * Main[44] + Main[54])
+    (eq_lr3 : Main[60] = Main[52] * Main[44] + Main[55])
+    (w_00' : Main[45] = 0 ∨ Main[32] = Main[57])
+    (w_01' : Main[45] = 0 ∨ Main[33] = Main[58])
+    (h_a2_eq : Main[61] * 65535 = Main[34])
+    (h_a3_eq : Main[61] * 65535 = Main[35])
+    (h_msb_a1 : List.Forall SP1Constraint.toProp_poly
+      (U16MSBOperation.constraints Main[33] { msb := Main[61] } 1))
+    (h_c_mod_32 : Main[25].val % 32 =
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 + Main[40] * 16).val) :
+    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      BitVec.signExtend 64 (HWord.toBitVec32_poly #v[Main[15], Main[16]] <<<
+        BitVec.setWidth 5 (HWord.toBitVec32_poly #v[Main[25], Main[26]])) := by
+  -- TODO: derive h_46_eq, h_45_eq, h_a0_eq, h_a1_eq;
+  -- substitute in goal + h_msb_a1; 16-way cb0..3 split + sllw_subcase_cb4_zero apps.
+  sorry
+
+/-- Mirror of `spec.sllw_poly_cb4_zero` for the `cb4 = 1` (byte_shift=1) branch.
+a0 substitutes to 0, a1 substitutes to lr0 = ll0 * v0123. -/
+private lemma spec.sllw_poly_cb4_one (Main : Vector (ZMod p) 65)
+    (eq_sllw : Main[63] = 1) (h_no_sll : Main[62] = 0)
+    (b0_16 : Main[15].val < 65536) (b1_16 : Main[16].val < 65536)
+    (c0_16 : Main[25].val < 65536) (c1_16 : Main[26].val < 65536)
+    (b_cb0 : Main[36] = 0 ∨ Main[36] = 1)
+    (b_cb1 : Main[37] = 0 ∨ Main[37] = 1)
+    (b_cb2 : Main[38] = 0 ∨ Main[38] = 1)
+    (b_cb3 : Main[39] = 0 ∨ Main[39] = 1)
+    (hcb4 : Main[40] = 1)
+    (h_su160 : Main[45] = 0 ∨ Main[40] + Main[41] * 2 * 0 = 0)
+    (h_su45_46_sum : Main[45] + Main[46] = 1)
+    (eq_v01 : Main[42] = (Main[36] + 1) * (Main[37] * 3 + 1))
+    (eq_v012 : Main[43] = Main[42] * (Main[38] * 15 + 1))
+    (eq_v0123 : Main[44] = Main[43] * (Main[39] * 255 + 1))
+    (lt_ll0 : Main[49].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh0 : Main[53].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (lt_ll1 : Main[50].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh1 : Main[54].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (lt_ll2 : Main[51].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh2 : Main[55].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (lt_ll3 : Main[52].val < 2 ^ ((16 : ZMod p) -
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val)
+    (lt_lh3 : Main[56].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 : ZMod p).val)
+    (h_b0_dec : Main[15] * Main[44] = Main[53] * 65536 + Main[49] * Main[44])
+    (h_b1_dec : Main[16] * Main[44] = Main[54] * 65536 + Main[50] * Main[44])
+    (h_b2_dec : Main[17] * Main[44] = Main[55] * 65536 + Main[51] * Main[44])
+    (h_b3_dec : Main[18] * Main[44] = Main[56] * 65536 + Main[52] * Main[44])
+    (eq_lr0 : Main[57] = Main[49] * Main[44])
+    (eq_lr1 : Main[58] = Main[50] * Main[44] + Main[53])
+    (eq_lr2 : Main[59] = Main[51] * Main[44] + Main[54])
+    (eq_lr3 : Main[60] = Main[52] * Main[44] + Main[55])
+    (w_02' : Main[46] = 0 ∨ Main[32] = 0)
+    (w_03' : Main[46] = 0 ∨ Main[33] = Main[57])
+    (h_a2_eq : Main[61] * 65535 = Main[34])
+    (h_a3_eq : Main[61] * 65535 = Main[35])
+    (h_msb_a1 : List.Forall SP1Constraint.toProp_poly
+      (U16MSBOperation.constraints Main[33] { msb := Main[61] } 1))
+    (h_c_mod_32 : Main[25].val % 32 =
+      (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 + Main[40] * 16).val) :
+    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      BitVec.signExtend 64 (HWord.toBitVec32_poly #v[Main[15], Main[16]] <<<
+        BitVec.setWidth 5 (HWord.toBitVec32_poly #v[Main[25], Main[26]])) := by
+  -- TODO: derive h_45_eq, h_46_eq, h_a0_eq (a0 = 0), h_a1_eq (a1 = lr0);
+  -- substitute in goal + h_msb_a1; 16-way cb0..3 split + sllw_subcase_cb4_one apps.
+  sorry
+
+/-- Outer `spec.sllw_poly`: destructure cstrs, derive bounds, h_c_mod_32, w_*'
+resolution; manually unfold `Word.low_poly` (avoiding the expensive `change`
+tactic from the failed inline approach); dispatch on `cb4` to the two branch
+lemmas above. -/
 lemma spec.sllw_poly (Main : Vector (ZMod p) 65) (h : is_sllw_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLLW := by
+  -- TODO: outer setup (~250 lines) replicating the gathered facts the branch
+  -- lemmas need, then:
+  --   simp only [execute_RTYPEW_pure_w_poly, execute_RTYPEW_pure_32_w_poly,
+  --     LeanRV64D.Functions.sign_extend, Sail.BitVec.signExtend]
+  --   rw [show #v[Main[15], Main[16], Main[17], Main[18]].low_poly = #v[Main[15], Main[16]] from rfl,
+  --       show #v[Main[25], Main[26], Main[27], Main[28]].low_poly = #v[Main[25], Main[26]] from rfl]
+  --   rcases b_cb4 with hcb4 | hcb4
+  --   · exact spec.sllw_poly_cb4_zero ... (35 args)
+  --   · exact spec.sllw_poly_cb4_one  ... (35 args)
   sorry
 
 lemma spec.slliw_poly (Main : Vector (ZMod p) 65) (h : is_slliw_poly Main) :
@@ -25,6 +157,9 @@ lemma spec.slliw_poly (Main : Vector (ZMod p) 65) (h : is_slliw_poly Main) :
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLLW := by
+  -- TODO: structurally same as spec.sllw_poly but with imm_zeros substitution
+  -- (Main[26..28] = 0, Main[21] = Main[25] from bounds_poly's imm = 1 path).
+  -- Branch lemmas should be reusable once Main[26..28] are substituted away.
   sorry
 
 end sllw_poly
