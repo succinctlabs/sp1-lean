@@ -541,9 +541,9 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     simp [Word.low_poly] at *
     rw [HWord.toBitVec32_poly_toNat_poly is_U32_bl, HWord.toBitVec32_poly_toNat_poly is_U32_cl]
     have heq32_q1 : (32768 : ZMod p) ≤ q1 ↔ 32768 ≤ q1.val := by
-      change (32768 : ZMod p).val ≤ q1.val ↔ _; rw [h32768_val]
+      change (32768 : ZMod p).val ≤ q1.val ↔ _; rw [val_32768_zmod_p]
     have heq32_r1 : (32768 : ZMod p) ≤ r1 ↔ 32768 ≤ r1.val := by
-      change (32768 : ZMod p).val ≤ r1.val ↔ _; rw [h32768_val]
+      change (32768 : ZMod p).val ≤ r1.val ↔ _; rw [val_32768_zmod_p]
     have ext_q : (#v[q0, q1, q2, q3] : Word (ZMod p)) = HWord.extend_poly #v[q0, q1] true := by
       subst q2 q3 msb_quot
       simp [HWord.extend_poly, HWord.isNegative_poly, heq32_q1]

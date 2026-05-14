@@ -713,7 +713,7 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
         intro hc1
         rw [w_eq_msb_c, hc1]; rw [if_neg]
         intro h; change (32768 : ZMod p).val ≤ (0 : ZMod p).val at h
-        rw [h32768_val, ZMod.val_zero] at h; omega
+        rw [val_32768_zmod_p, ZMod.val_zero] at h; omega
       by_cases hzc : c0 = 0 ∧ c1 = 0
       · rw [if_pos hzc, if_pos]
         obtain ⟨h0, h1⟩ := hzc
@@ -729,9 +729,9 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     simp [Word.low_poly] at *
     rw [HWord.toBitVec32_poly_toInt_poly is_U32_bl, HWord.toBitVec32_poly_toInt_poly is_U32_cl]
     have heq32_q1 : (32768 : ZMod p) ≤ q1 ↔ 32768 ≤ q1.val := by
-      change (32768 : ZMod p).val ≤ q1.val ↔ _; rw [h32768_val]
+      change (32768 : ZMod p).val ≤ q1.val ↔ _; rw [val_32768_zmod_p]
     have heq32_r1 : (32768 : ZMod p) ≤ r1 ↔ 32768 ≤ r1.val := by
-      change (32768 : ZMod p).val ≤ r1.val ↔ _; rw [h32768_val]
+      change (32768 : ZMod p).val ≤ r1.val ↔ _; rw [val_32768_zmod_p]
     have ext_q : (#v[q0, q1, q2, q3] : Word (ZMod p)) = HWord.extend_poly #v[q0, q1] true := by
       subst q2 q3 msb_quot
       simp [HWord.extend_poly, HWord.isNegative_poly, heq32_q1]
@@ -833,7 +833,7 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
                 have hb1 : b1.val ≥ 32768 := by
                   rw [w_eq_msb_b] at h_msb_b
                   split_ifs at h_msb_b with h
-                  · change (32768 : ZMod p).val ≤ b1.val at h; rwa [h32768_val] at h
+                  · change (32768 : ZMod p).val ≤ b1.val at h; rwa [val_32768_zmod_p] at h
                   · simp at h_msb_b
                 rw [HWord.sign_cases_poly is_U32_bl]
                 rw [if_pos (by simp [HWord.isNegative_poly]; omega)]
@@ -842,7 +842,7 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
                 have hc1 : c1.val ≥ 32768 := by
                   rw [w_eq_msb_c] at h_msb_c
                   split_ifs at h_msb_c with h
-                  · change (32768 : ZMod p).val ≤ c1.val at h; rwa [h32768_val] at h
+                  · change (32768 : ZMod p).val ≤ c1.val at h; rwa [val_32768_zmod_p] at h
                   · simp at h_msb_c
                 rw [HWord.sign_cases_poly is_U32_cl]
                 rw [if_pos (by simp [HWord.isNegative_poly]; omega)]
@@ -851,7 +851,7 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
                 have hr1 : r1.val ≥ 32768 := by
                   rw [w_eq_msb_rem] at h_msb_rem
                   split_ifs at h_msb_rem with h
-                  · change (32768 : ZMod p).val ≤ r1.val at h; rwa [h32768_val] at h
+                  · change (32768 : ZMod p).val ≤ r1.val at h; rwa [val_32768_zmod_p] at h
                   · simp at h_msb_rem
                 rw [HWord.sign_cases_poly is_U32_rl]
                 rw [if_pos (by simp [HWord.isNegative_poly]; omega)]
@@ -888,9 +888,9 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
                 have u16_msb_quot_v : (msb_quot * 65535).val < 65536 := by
                   rw [w_eq_msb_quot]; split_ifs <;> simp [h0v, h65535_val]
                 have heq32_b1 : (32768 : ZMod p) ≤ b1 ↔ 32768 ≤ b1.val := by
-                  change (32768 : ZMod p).val ≤ b1.val ↔ _; rw [h32768_val]
+                  change (32768 : ZMod p).val ≤ b1.val ↔ _; rw [val_32768_zmod_p]
                 have heq32_c1 : (32768 : ZMod p) ≤ c1 ↔ 32768 ≤ c1.val := by
-                  change (32768 : ZMod p).val ≤ c1.val ↔ _; rw [h32768_val]
+                  change (32768 : ZMod p).val ≤ c1.val ↔ _; rw [val_32768_zmod_p]
                 obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
                 -- 4-limb sign-extended forms of b, c, q, r as HWord.extend_poly _ true.
                 have eq_eb : (#v[b0, b1, msb_b * 65535, msb_b * 65535] : Word (ZMod p)) =
