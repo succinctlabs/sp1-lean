@@ -477,4 +477,119 @@ def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_
 
 end operands
 
+-- ============================================================================
+-- _poly skeleton (Phase 1). Bodies stubbed with `sorry`; closed in later phases.
+-- The `is_*_poly` opcode predicates already exist from the earlier groundwork
+-- commit `3fc39ba`; see the `opcodes` section above.
+-- ============================================================================
+
+section poly_helpers
+
+/-- Mutual-exclusion of the four opcode flags. -/
+lemma single_op_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly) :
+    (Main[64] = 1 → Main[65] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0) ∧
+    (Main[65] = 1 → Main[64] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0) ∧
+    (Main[66] = 1 → Main[64] = 0 ∧ Main[65] = 0 ∧ Main[67] = 0) ∧
+    (Main[67] = 1 → Main[64] = 0 ∧ Main[65] = 0 ∧ Main[66] = 0) := by
+  sorry
+
+/-- Mutual-exclusion of the four su16-flag columns. -/
+lemma single_su16_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    (Main[60] = 1 → Main[61] = 0 ∧ Main[62] = 0 ∧ Main[63] = 0) ∧
+    (Main[61] = 1 → Main[60] = 0 ∧ Main[62] = 0 ∧ Main[63] = 0) ∧
+    (Main[62] = 1 → Main[60] = 0 ∧ Main[61] = 0 ∧ Main[63] = 0) ∧
+    (Main[63] = 1 → Main[60] = 0 ∧ Main[61] = 0 ∧ Main[62] = 0) := by
+  sorry
+
+lemma is_real_eq_one_of_srl (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly) (h_srl : Main[64] = 1) :
+    Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
+  sorry
+
+lemma is_real_eq_one_of_sra (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly) (h_sra : Main[65] = 1) :
+    Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
+  sorry
+
+lemma is_real_eq_one_of_srlw (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly) (h_srlw : Main[66] = 1) :
+    Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
+  sorry
+
+lemma is_real_eq_one_of_sraw (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly) (h_sraw : Main[67] = 1) :
+    Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
+  sorry
+
+/-- 4-way opcode disjunction from the sum constraint. -/
+lemma srl_or_sra_or_srlw_or_sraw_of_real (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    (Main[64] = 1 ∧ Main[65] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0) ∨
+    (Main[64] = 0 ∧ Main[65] = 1 ∧ Main[66] = 0 ∧ Main[67] = 0) ∨
+    (Main[64] = 0 ∧ Main[65] = 0 ∧ Main[66] = 1 ∧ Main[67] = 0) ∨
+    (Main[64] = 0 ∧ Main[65] = 0 ∧ Main[66] = 0 ∧ Main[67] = 1) := by
+  sorry
+
+end poly_helpers
+
+section poly_bounds
+
+lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+  sorry
+
+lemma ops_U64_a_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    Word.isU64_poly #v[Main[32], Main[33], Main[34], Main[35]] := by
+  sorry
+
+lemma ops_U64_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    Word.isU64_poly #v[Main[32], Main[33], Main[34], Main[35]] ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] :=
+  ⟨ops_U64_a_poly Main cstrs h_real, ops_U64_b_c_poly Main cstrs h_real⟩
+
+/-- Combined register/immediate-bound bundle threaded through every spec proof. -/
+lemma bounds_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧
+    (Main[31] = 0 → Main[21].val < 32) ∧
+    Main[3].val < 65536 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] ∧
+    (Main[31] = 1 →
+      (Main[21] = Main[25] ∧ Main[26] = 0 ∧ Main[27] = 0 ∧ Main[28] = 0 ∧
+        ((Main[64] = 1 ∨ Main[65] = 1 → Main[25].val < 64) ∧
+         (Main[66] = 1 ∨ Main[67] = 1 → Main[25].val < 32)))) ∧
+    (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0) := by
+  sorry
+
+end poly_bounds
+
+section poly_operands
+
+@[simp] def sp1_op_a_poly (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[6].val
+@[simp] def sp1_op_b_poly (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[14].val
+@[simp] def sp1_op_c_poly (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+@[simp] def sp1_op_c_imm_poly (Main : Vector (ZMod p) 69) : BitVec 6 :=
+  BitVec.ofNat 6 Main[21].val
+@[simp] def sp1_op_c_imm_w_poly (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+
+end poly_operands
+
 end ShiftRight

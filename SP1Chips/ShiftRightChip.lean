@@ -473,3 +473,256 @@ theorem correct_sraiw
       simp [bitVecToRegidxVal]
 
 end Sraiw
+
+-- ============================================================================
+-- _poly chip-level theorems (Phase 1 skeleton). Bodies stubbed with `sorry`;
+-- closed in Phase 7 after spec.*_poly lands.
+-- ============================================================================
+
+namespace Srl.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_srl_poly (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_RTYPE rs2 rs1 rd rop.SRL
+  pure ()
+
+def sp1_srl_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_srl_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_srl : is_srl_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_srl_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srl_poly Main).run s := by
+  sorry
+
+end Srl.Poly
+
+namespace Srli.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_srli_poly (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_SHIFTIOP shamt rs1 rd sop.SRLI
+  pure ()
+
+def sp1_srli_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_srli_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_srli : is_srli_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_imm_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_srli_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srli_poly Main).run s := by
+  sorry
+
+end Srli.Poly
+
+namespace Sra.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_sra_poly (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_RTYPE rs2 rs1 rd rop.SRA
+  pure ()
+
+def sp1_sra_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_sra_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_sra : is_sra_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_sra_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sra_poly Main).run s := by
+  sorry
+
+end Sra.Poly
+
+namespace Srai.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_srai_poly (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_SHIFTIOP shamt rs1 rd sop.SRAI
+  pure ()
+
+def sp1_srai_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_srai_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_srai : is_srai_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_imm_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_srai_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srai_poly Main).run s := by
+  sorry
+
+end Srai.Poly
+
+namespace Srlw.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_srlw_poly (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_RTYPEW rs2 rs1 rd ropw.SRLW
+  pure ()
+
+def sp1_srlw_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_srlw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_srlw : is_srlw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_srlw_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srlw_poly Main).run s := by
+  sorry
+
+end Srlw.Poly
+
+namespace Srliw.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_srliw_poly (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_SHIFTIWOP shamt rs1 rd sopw.SRLIW
+  pure ()
+
+def sp1_srliw_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_srliw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_srliw : is_srliw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_imm_w_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_srliw_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srliw_poly Main).run s := by
+  sorry
+
+end Srliw.Poly
+
+namespace Sraw.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_sraw_poly (rs2 rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_RTYPEW rs2 rs1 rd ropw.SRAW
+  pure ()
+
+def sp1_sraw_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_sraw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_sraw : is_sraw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_sraw_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraw_poly Main).run s := by
+  sorry
+
+end Sraw.Poly
+
+namespace Sraiw.Poly
+
+open ShiftRight
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 69)
+  (s : SailState)
+
+noncomputable def spec_sraiw_poly (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
+  Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
+  _ ← execute_SHIFTIWOP shamt rs1 rd sopw.SRAIW
+  pure ()
+
+def sp1_sraiw_poly : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+theorem correct_sraiw_poly
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_sraiw : is_sraiw_poly Main)
+    (state_cstrs : (constraints Main).initialState_poly s) :
+    let op_c := sp1_op_c_imm_w_poly Main
+    let op_b := sp1_op_b_poly Main
+    let op_a := sp1_op_a_poly Main
+    (spec_sraiw_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraiw_poly Main).run s := by
+  sorry
+
+end Sraiw.Poly

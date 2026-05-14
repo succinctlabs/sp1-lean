@@ -162,4 +162,24 @@ lemma spec.srai (h : is_srai Main) :
 
 end srai
 
+section sra_poly
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+lemma spec.sra_poly (Main : Vector (ZMod p) 69) (h : is_sra_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRA := by
+  sorry
+
+lemma spec.srai_poly (Main : Vector (ZMod p) 69) (h : is_srai_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRA := by
+  sorry
+
+end sra_poly
+
 end ShiftRight

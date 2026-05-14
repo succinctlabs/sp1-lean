@@ -168,4 +168,24 @@ lemma spec.srliw (h : is_srliw Main) :
 
 end srliw
 
+section srlw_poly
+
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+lemma spec.srlw_poly (Main : Vector (ZMod p) 69) (h : is_srlw_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRLW := by
+  sorry
+
+lemma spec.srliw_poly (Main : Vector (ZMod p) 69) (h : is_srliw_poly Main) :
+    (constraints Main).allHold_poly →
+      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRLW := by
+  sorry
+
+end srlw_poly
+
 end ShiftRight
