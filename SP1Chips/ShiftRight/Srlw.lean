@@ -172,24 +172,37 @@ section srlw_poly
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 400000000 in
--- 400M heartbeats: 2-way byte_shift × 16-way cb0..cb3 rcases on top of the
--- SRLW prologue (deriving msb_srw, sign_extend bridge, hl2/ll2/hl3/ll3 = 0).
-set_option debug.skipKernelTC true in
--- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N`
--- re-checks (mirrors `spec.srl_common_poly`'s use).
-
 set_option maxHeartbeats 800000000 in
 -- 800M heartbeats: 4-way arm × 4-way byte_shift × 16-way cb sub-cases.
 set_option debug.skipKernelTC true in
 -- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel.
--- Bound each `Main[32+k].val < 65536` by dispatching on arm and byte_shift,
--- then identifying each `a_k` with `lr_?` or `0` (or `msb_b * 65535` for SR/SRW
--- with correction). For SRL/SRLW, the corrections vanish (msb_b = 0 / msb_srw = 0).
--- For SRA/SRAW with msb_b = 1, the corrections are bounded via `bool_mul_65535_lt_poly`.
--- TODO: Full per-arm + per-byte_shift + per-cb case analysis. Currently stubbed.
--- Lives here (Srlw.lean) rather than Common.lean because `spec.srlw_common_poly` is the
--- only consumer; the closure work is sequenced in Phase 3 of the ShiftRight cleanup plan.
+/-- U64-bound on the SRLW output word `a`. Lives in `Srlw.lean` rather than `Common.lean`
+because `spec.srlw_common_poly` is the only consumer. STILL OPEN.
+
+**Recommended closure path** (not yet executed):
+1. **Tighten the precondition** from `h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1`
+   to `eq_srlw : Main[66] = 1`. This collapses the 4-arm dispatch in the original
+   plan to just the SRLW arm (the consumer's only call site already proves `eq_srlw`
+   first). Three call-site lines move from `... Main cstrs h_real` to `... Main cstrs eq_srlw`.
+
+2. **Derive `h_real`, `h_no_srl`, `h_no_sra`, `h_no_sraw` internally** via
+   `is_real_eq_one_of_srlw` and the SRLW projection of `single_op_poly`.
+
+3. **Reuse the 16-way `cb_aux` pattern** that the consumer (`spec.srlw_common_poly`,
+   in this file) already uses to force `hl2 = ll2 = hl3 = ll3 = 0`. Apply it twice
+   more (for `a0` and `a1`) using `eq_lr0`/`eq_lr1` + `limb_16_lt_aux_poly` to bound
+   `(hl_j + ll_{j+1} * v0123).val < 65536`.
+
+4. **For `a2` and `a3`**, use `srw_w2`/`srw_w3` (which give `a_j = msb_srw * 65535`
+   under SRLW after rewriting `eq_srlw, h_no_sraw` and resolving the `1 = 0 ∨ ...`
+   disjunction) and bound via `bool_mul_65535_lt_poly`.
+
+**Even better** (worth considering before closing): the helper proves the same
+case-blast that `spec.srlw_common_poly` already does inline for `hl2/ll2/hl3/ll3 = 0`.
+Deleting the helper entirely and inlining the `a0/a1` bounds into the consumer
+(extending the `cb_aux` dispatch with two more variants) would avoid duplicating
+~200 LOC of 16-way blast. The downside is `bounds_poly`-like structure becomes
+longer; the upside is one less helper to maintain. -/
 private lemma ops_U64_a_poly_local (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly)
     (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
@@ -207,12 +220,14 @@ private lemma ops_U64_a_poly_local (Main : Vector (ZMod p) 69)
   have ⟨h_su_1, h_su_2, h_su_3, h_su_4⟩ := single_su16_poly Main cstrs h_real
   have h_sum_ne : ¬ Main[64] + Main[65] + Main[66] + Main[67] = 0 := by
     intro h; rw [h] at h_real; exact zero_ne_one h_real
-  -- Apply isU64_of_cases_poly: 4 sub-goals for a_0, a_1, a_2, a_3.
-  -- Each sub-goal needs: arm split (4-way) × byte_shift split (4-way for SR, 2 for SRW)
-  -- × per-cb 16-way to derive M, N for limb_16_lt_aux_poly.
-  -- TODO: Full case analysis.
   sorry
 
+set_option maxHeartbeats 400000000 in
+-- 400M heartbeats: 2-way byte_shift × 16-way cb0..cb3 rcases on top of the
+-- SRLW prologue (deriving msb_srw, sign_extend bridge, hl2/ll2/hl3/ll3 = 0).
+set_option debug.skipKernelTC true in
+-- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N`
+-- re-checks (mirrors `spec.srl_common_poly`'s use).
 /-- Shared proof body for `spec.srlw_poly` and `spec.srliw_poly`. Structure
 mirrors `spec.srl_common_poly` but for 32-bit operands:
 - Forces `hl2 = ll2 = hl3 = ll3 = 0` via `cancel_mul_65536_zero_poly` (since
