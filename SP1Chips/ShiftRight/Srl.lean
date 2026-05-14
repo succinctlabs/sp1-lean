@@ -158,6 +158,9 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   -- Normalize Vector index forms: #v[a, b, c, d][0] → a, etc.
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
              List.getElem_cons_succ] at b0_16 b1_16 b2_16 b3_16 c0_16
+  -- Extract single_op facts (Main[65], Main[66], Main[67] = 0 since Main[64] = 1).
+  obtain ⟨sop_1, _, _, _⟩ := single_op_poly Main cstrs
+  have ⟨h_no_sra, h_no_srlw, h_no_sraw⟩ := sop_1 eq_srl
   -- Open the iff_poly.
   change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
@@ -166,12 +169,22 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   obtain ⟨_, _, _, _, _,
            _, _, _, _, _, _,
            b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
-           _, _, _, _, _, _, _, _, _,
-           _, _, _,
-           _, _, h_b0_dec, _, _, h_b1_dec,
-           _, _, h_b2_dec, _, _, h_b3_dec,
-           _, _, _, _,
-           _, _, _, _⟩ := cstrs
+           h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163,
+           one_of_su16s,
+           eq_v01, eq_v012, eq_v0123,
+           lt_ll0, lt_hl0, h_b0_dec, lt_ll1, lt_hl1, h_b1_dec,
+           lt_ll2, lt_hl2, h_b2_dec, lt_ll3, lt_hl3, h_b3_dec,
+           eq_lr0, eq_lr1, eq_lr2, eq_lr3,
+           w_msb_b, eq_smv, _w_msb_srv,
+           sr_00, sr_01, sr_02, sr_03,
+           sr_10, sr_11, sr_12, sr_13,
+           sr_20, sr_21, sr_22, sr_23,
+           sr_30, sr_31, sr_32, sr_33,
+           srw_00, srw_01, srw_10, srw_11,
+           srw_w2, srw_w3,
+           _h_M13⟩ := cstrs
+  -- SRL is selected: Main[65] = 0, Main[66] = 0, Main[67] = 0 — already in scope
+  -- as h_no_sra, h_no_srlw, h_no_sraw. Use these to simplify the SR-arm constraints.
   -- Goal manipulation: reduce to nat arithmetic.
   rw [← BitVec.toNat_inj]
   simp only [execute_RTYPE_pure_w_poly, BitVec.ushiftRight_eq', BitVec.toNat_ushiftRight,
@@ -230,11 +243,18 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   simp only [Word.toBitVec64_poly, Word.toNat_poly_def, BitVec.toNat_ofNat,
              Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
              List.getElem_cons_succ]
-  -- Goal is now (approximately):
-  --   (Main[32].val + Main[33].val * 65536 + Main[34].val * 2^32 + Main[35].val * 2^48) % 2^64
-  --     = (Main[15].val + Main[16].val * 65536 + ... ) / 2 ^ (cb-sum-val)
-  -- Phase 3a stop: 64-way `rcases b_cb0..b_cb5` + `cancel_mul_65536_poly` per case
-  -- + omega close remains. Each cb-sum substitution yields a specific 2^N divisor.
+  -- Goal now: (a-toNat-poly) % 2^64 = (b-toNat-poly) / 2^cb_sum
+  -- where cb_sum is in val-of-cb form. The Fin KB blast applies a 64-way
+  -- rcases on cb0..cb5 with simp_all + cancel_mul_65536_v1 + omega.
+  -- The poly equivalent attempted in this session (rcases <;> simp_all
+  -- <;> try cancel_mul_65536_poly <;> simp_all + all_goals omega) hits
+  -- "simp_all made no progress" in many of the 64 sub-cases, because
+  -- after cb_i substitution + sr-arm gating, some cases need targeted
+  -- lr_j rewrites that simp_all doesn't find without further direction.
+  -- The path forward: replace `simp_all` with manually-controlled
+  -- substitution per sub-case (substitute h_no_sra/srlw/sraw + use
+  -- eq_v01..eq_v0123 to compute v0123's concrete value, then use the
+  -- su16 + sr-arm constraints to pick the right a_j = lr_? equation).
   sorry
 
 lemma spec.srl_poly (Main : Vector (ZMod p) 69) (h : is_srl_poly Main) :
