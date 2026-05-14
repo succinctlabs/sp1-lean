@@ -1282,11 +1282,228 @@ lemma div_rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^
                        (ZMod.val_eq_zero c1).mp hc1v,
                        (ZMod.val_eq_zero c2).mp hc2v,
                        (ZMod.val_eq_zero c3).mp hc3v⟩
-            -- First condition: h_prod
+            -- First condition: h_prod — hybrid of divw_remw_poly h_prod's signed framing
+            -- (sign-extension via Word.extend_true_is_signExtend_poly + BitVec.toInt + bmod)
+            -- and divu_remu_poly h_prod's 8-limb DWord carry chain (ZMod.val_add_of_lt +
+            -- Nat eq chain + linear-combination main_eq + ← BitVec.toNat_inj).
             have h_prod : Word.toInt_poly #v[b0, b1, b2, b3] =
                 Word.toInt_poly #v[q0, q1, q2, q3] * Word.toInt_poly #v[c0, c1, c2, c3] +
                 Word.toInt_poly #v[r0, r1, r2, r3] := by
-              sorry
+              -- Bounds for sign-extension constants (msb_* ∈ {0,1}, * 65535 < 65536).
+              have u16_msb_b_v : (msb_b * 65535).val < 65536 := by
+                rw [eq_msb_b]; split_ifs <;> simp [h0v, h65535_val]
+              have u16_msb_rem_v : (msb_rem * 65535).val < 65536 := by
+                rw [eq_msb_rem]; split_ifs <;> simp [h0v, h65535_val]
+              have heq32_b3 : (32768 : ZMod p) ≤ b3 ↔ 32768 ≤ b3.val := by
+                change (32768 : ZMod p).val ≤ b3.val ↔ _; rw [val_32768_zmod_p]
+              have heq32_r3 : (32768 : ZMod p) ≤ r3 ↔ 32768 ≤ r3.val := by
+                change (32768 : ZMod p).val ≤ r3.val ↔ _; rw [val_32768_zmod_p]
+              obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
+              obtain ⟨is_U64_ctqh, ctq_high⟩ := main_mul_high
+              have ctq := combine_MUL_MULH_poly is_U64_ctql is_U64_ctqh is_U64_q is_U64_c
+                ctq_low ctq_high
+              simp at ctq
+              -- 8-limb sign-extended forms of b, r as Word.extend_poly _ true.
+              -- (q and c sign-extension is internal to combine_MUL_MULH_poly's conclusion.)
+              have eq_eb : (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535,
+                    msb_b * 65535, msb_b * 65535] : DWord (ZMod p)) =
+                  Word.extend_poly #v[b0, b1, b2, b3] true := by
+                simp [Word.extend_poly, Word.isNegative_poly, eq_msb_b, heq32_b3]
+              have eq_er : (#v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535,
+                    msb_rem * 65535, msb_rem * 65535] : DWord (ZMod p)) =
+                  Word.extend_poly #v[r0, r1, r2, r3] true := by
+                simp [Word.extend_poly, Word.isNegative_poly, eq_msb_rem, heq32_r3]
+              -- Stage B suffices: the 8-limb BitVec128 carry-chain equality.
+              suffices bv_ctqr :
+                DWord.toBitVec128_poly (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535,
+                    msb_b * 65535, msb_b * 65535] : DWord (ZMod p)) =
+                  DWord.toBitVec128_poly (#v[ctq0, ctq1, ctq2, ctq3,
+                    ctq4, ctq5, ctq6, ctq7] : DWord (ZMod p)) +
+                  DWord.toBitVec128_poly (#v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535,
+                    msb_rem * 65535, msb_rem * 65535] : DWord (ZMod p)) by
+                -- Stage A: derive h_prod from bv_ctqr via signed multiplication framing.
+                rw [eq_eb, eq_er] at bv_ctqr
+                rw [ctq] at bv_ctqr
+                repeat rw [Word.extend_true_is_signExtend_poly (by assumption)] at bv_ctqr
+                simp [← BitVec.toInt_inj] at bv_ctqr
+                repeat rw [BitVec.toInt_signExtend_of_le (by simp)] at bv_ctqr
+                repeat rw [Word.toBitVec64_poly_toInt_poly (by assumption)] at bv_ctqr
+                have lbq := Word.toInt_poly_lb is_U64_q
+                have ubq := Word.toInt_poly_ub is_U64_q
+                have lbr := Word.toInt_poly_lb is_U64_r
+                have ubr := Word.toInt_poly_ub is_U64_r
+                have lbc := Word.toInt_poly_lb is_U64_c
+                have ubc := Word.toInt_poly_ub is_U64_c
+                rw [bv_ctqr]
+                apply Int.bmod_eq_of_le <;> simp <;> nlinarith
+              · -- Stage B: prove bv_ctqr via 8-limb carry chain. Mirror divu_remu_poly's
+                -- (hsum/eq/main_eq/lhs_b/dctq/dr) pattern with msb_b * 65535 / msb_rem * 65535
+                -- in upper limbs (instead of 0).
+                clear is_U64_c eq_msb_b eq_msb_c eq_msb_rem ctq_low ctq_high ctq
+                      eq_eb eq_er
+                apply Word.lt_cases_of_isU64_poly at is_U64_b
+                apply Word.lt_cases_of_isU64_poly at is_U64_r
+                apply Word.lt_cases_of_isU64_poly at is_U64_q
+                apply Word.lt_cases_of_isU64_poly at is_U64_ctql
+                apply Word.lt_cases_of_isU64_poly at is_U64_ctqh
+                simp at *
+                rw [eq_comm] at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+                rw [← add_sub_right_comm] at u16_ctqpr1 u16_ctqpr2 u16_ctqpr3
+                                             u16_ctqpr4 u16_ctqpr5 u16_ctqpr6 u16_ctqpr7
+                                             nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
+                                             nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6
+                                             nof_eq_ctqpr7
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry0.val < 2)]
+                  at nof_eq_ctqpr0
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry1.val < 2)]
+                  at nof_eq_ctqpr1
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry2.val < 2)]
+                  at nof_eq_ctqpr2
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry3.val < 2)]
+                  at nof_eq_ctqpr3
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry4.val < 2)]
+                  at nof_eq_ctqpr4
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry5.val < 2)]
+                  at nof_eq_ctqpr5
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry6.val < 2)]
+                  at nof_eq_ctqpr6
+                rw [div_mod_decomposition_w_poly (by omega) (by omega : cry7.val < 2)]
+                  at nof_eq_ctqpr7
+                obtain ⟨b0_lt, b1_lt, b2_lt, b3_lt⟩ := is_U64_b
+                obtain ⟨r0_lt, r1_lt, r2_lt, r3_lt⟩ := is_U64_r
+                obtain ⟨ctq0_lt, ctq1_lt, ctq2_lt, ctq3_lt⟩ := is_U64_ctql
+                obtain ⟨ctq4_lt, ctq5_lt, ctq6_lt, ctq7_lt⟩ := is_U64_ctqh
+                -- Distribute .val over + for lower-limb (ctq + r + cry) sums.
+                have hsum01 : (ctq0 + r0).val = ctq0.val + r0.val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum1' : (ctq1 + r1).val = ctq1.val + r1.val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum1 : (ctq1 + r1 + cry0).val = ctq1.val + r1.val + cry0.val := by
+                  rw [show (ctq1 + r1 + cry0) = (ctq1 + r1) + cry0 from rfl,
+                      ZMod.val_add_of_lt (by rw [hsum1']; omega), hsum1']
+                have hsum2' : (ctq2 + r2).val = ctq2.val + r2.val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum2 : (ctq2 + r2 + cry1).val = ctq2.val + r2.val + cry1.val := by
+                  rw [show (ctq2 + r2 + cry1) = (ctq2 + r2) + cry1 from rfl,
+                      ZMod.val_add_of_lt (by rw [hsum2']; omega), hsum2']
+                have hsum3' : (ctq3 + r3).val = ctq3.val + r3.val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum3 : (ctq3 + r3 + cry2).val = ctq3.val + r3.val + cry2.val := by
+                  rw [show (ctq3 + r3 + cry2) = (ctq3 + r3) + cry2 from rfl,
+                      ZMod.val_add_of_lt (by rw [hsum3']; omega), hsum3']
+                -- Upper-limb (ctq + msb_rem * 65535 + cry) sums.
+                have hsum4' : (ctq4 + msb_rem * 65535).val =
+                    ctq4.val + (msb_rem * 65535).val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum4 : (ctq4 + msb_rem * 65535 + cry3).val =
+                    ctq4.val + (msb_rem * 65535).val + cry3.val := by
+                  rw [show (ctq4 + msb_rem * 65535 + cry3) =
+                        (ctq4 + msb_rem * 65535) + cry3 from rfl,
+                      ZMod.val_add_of_lt (by rw [hsum4']; omega), hsum4']
+                have hsum5' : (ctq5 + msb_rem * 65535).val =
+                    ctq5.val + (msb_rem * 65535).val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum5 : (ctq5 + msb_rem * 65535 + cry4).val =
+                    ctq5.val + (msb_rem * 65535).val + cry4.val := by
+                  rw [show (ctq5 + msb_rem * 65535 + cry4) =
+                        (ctq5 + msb_rem * 65535) + cry4 from rfl,
+                      ZMod.val_add_of_lt (by rw [hsum5']; omega), hsum5']
+                have hsum6' : (ctq6 + msb_rem * 65535).val =
+                    ctq6.val + (msb_rem * 65535).val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum6 : (ctq6 + msb_rem * 65535 + cry5).val =
+                    ctq6.val + (msb_rem * 65535).val + cry5.val := by
+                  rw [show (ctq6 + msb_rem * 65535 + cry5) =
+                        (ctq6 + msb_rem * 65535) + cry5 from rfl,
+                      ZMod.val_add_of_lt (by rw [hsum6']; omega), hsum6']
+                have hsum7' : (ctq7 + msb_rem * 65535).val =
+                    ctq7.val + (msb_rem * 65535).val :=
+                  ZMod.val_add_of_lt (by omega)
+                have hsum7 : (ctq7 + msb_rem * 65535 + cry6).val =
+                    ctq7.val + (msb_rem * 65535).val + cry6.val := by
+                  rw [show (ctq7 + msb_rem * 65535 + cry6) =
+                        (ctq7 + msb_rem * 65535) + cry6 from rfl,
+                      ZMod.val_add_of_lt (by rw [hsum7']; omega), hsum7']
+                -- 8 clean Nat-side carry equations.
+                have eq0 : b0.val + cry0.val * 65536 = ctq0.val + r0.val := by
+                  obtain ⟨h1, h2⟩ := nof_eq_ctqpr0; rw [hsum01] at h1 h2; omega
+                have eq1 : b1.val + cry1.val * 65536 = ctq1.val + r1.val + cry0.val := by
+                  obtain ⟨h1, h2⟩ := nof_eq_ctqpr1; rw [hsum1] at h1 h2; omega
+                have eq2 : b2.val + cry2.val * 65536 = ctq2.val + r2.val + cry1.val := by
+                  obtain ⟨h1, h2⟩ := nof_eq_ctqpr2; rw [hsum2] at h1 h2; omega
+                have eq3 : b3.val + cry3.val * 65536 = ctq3.val + r3.val + cry2.val := by
+                  obtain ⟨h1, h2⟩ := nof_eq_ctqpr3; rw [hsum3] at h1 h2; omega
+                have eq4 : (msb_b * 65535).val + cry4.val * 65536 =
+                    ctq4.val + (msb_rem * 65535).val + cry3.val := by
+                  have h1 := nof_eq_ctqpr4.1; have h2 := nof_eq_ctqpr4.2
+                  rw [hsum4] at h1 h2; omega
+                have eq5 : (msb_b * 65535).val + cry5.val * 65536 =
+                    ctq5.val + (msb_rem * 65535).val + cry4.val := by
+                  have h1 := nof_eq_ctqpr5.1; have h2 := nof_eq_ctqpr5.2
+                  rw [hsum5] at h1 h2; omega
+                have eq6 : (msb_b * 65535).val + cry6.val * 65536 =
+                    ctq6.val + (msb_rem * 65535).val + cry5.val := by
+                  have h1 := nof_eq_ctqpr6.1; have h2 := nof_eq_ctqpr6.2
+                  rw [hsum6] at h1 h2; omega
+                have eq7 : (msb_b * 65535).val + cry7.val * 65536 =
+                    ctq7.val + (msb_rem * 65535).val + cry6.val := by
+                  have h1 := nof_eq_ctqpr7.1; have h2 := nof_eq_ctqpr7.2
+                  rw [hsum7] at h1 h2; omega
+                -- Step A: linear combination of eq0..eq7 weighted by 2^(16i).
+                have main_eq :
+                    b0.val + b1.val * 65536 + b2.val * 4294967296 + b3.val * 281474976710656 +
+                      (msb_b * 65535).val * 18446744073709551616 +
+                      (msb_b * 65535).val * 1208925819614629174706176 +
+                      (msb_b * 65535).val * 79228162514264337593543950336 +
+                      (msb_b * 65535).val * 5192296858534827628530496329220096 +
+                      cry7.val * 340282366920938463463374607431768211456 =
+                    ctq0.val + ctq1.val * 65536 + ctq2.val * 4294967296 +
+                      ctq3.val * 281474976710656 + ctq4.val * 18446744073709551616 +
+                      ctq5.val * 1208925819614629174706176 +
+                      ctq6.val * 79228162514264337593543950336 +
+                      ctq7.val * 5192296858534827628530496329220096 +
+                    (r0.val + r1.val * 65536 + r2.val * 4294967296 +
+                      r3.val * 281474976710656 +
+                      (msb_rem * 65535).val * 18446744073709551616 +
+                      (msb_rem * 65535).val * 1208925819614629174706176 +
+                      (msb_rem * 65535).val * 79228162514264337593543950336 +
+                      (msb_rem * 65535).val * 5192296858534827628530496329220096) := by
+                  omega
+                -- Step B: reduce DWord.toBitVec128_poly to BitVec.ofNat 128 forms.
+                have dctq : DWord.toBitVec128_poly
+                    (#v[ctq0, ctq1, ctq2, ctq3, ctq4, ctq5, ctq6, ctq7] : DWord (ZMod p)) =
+                  BitVec.ofNat 128
+                    (ctq0.val + ctq1.val * 65536 + ctq2.val * 4294967296 +
+                      ctq3.val * 281474976710656 + ctq4.val * 18446744073709551616 +
+                      ctq5.val * 1208925819614629174706176 +
+                      ctq6.val * 79228162514264337593543950336 +
+                      ctq7.val * 5192296858534827628530496329220096) := by
+                  simp [DWord.toBitVec128_poly, DWord.toNat_poly]
+                have db : DWord.toBitVec128_poly
+                    (#v[b0, b1, b2, b3, msb_b * 65535, msb_b * 65535, msb_b * 65535,
+                        msb_b * 65535] : DWord (ZMod p)) =
+                  BitVec.ofNat 128
+                    (b0.val + b1.val * 65536 + b2.val * 4294967296 +
+                      b3.val * 281474976710656 +
+                      (msb_b * 65535).val * 18446744073709551616 +
+                      (msb_b * 65535).val * 1208925819614629174706176 +
+                      (msb_b * 65535).val * 79228162514264337593543950336 +
+                      (msb_b * 65535).val * 5192296858534827628530496329220096) := by
+                  simp [DWord.toBitVec128_poly, DWord.toNat_poly]
+                have dr : DWord.toBitVec128_poly
+                    (#v[r0, r1, r2, r3, msb_rem * 65535, msb_rem * 65535, msb_rem * 65535,
+                        msb_rem * 65535] : DWord (ZMod p)) =
+                  BitVec.ofNat 128
+                    (r0.val + r1.val * 65536 + r2.val * 4294967296 +
+                      r3.val * 281474976710656 +
+                      (msb_rem * 65535).val * 18446744073709551616 +
+                      (msb_rem * 65535).val * 1208925819614629174706176 +
+                      (msb_rem * 65535).val * 79228162514264337593543950336 +
+                      (msb_rem * 65535).val * 5192296858534827628530496329220096) := by
+                  simp [DWord.toBitVec128_poly, DWord.toNat_poly]
+                rw [db, dctq, dr]
+                simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat, BitVec.toNat_add]
+                omega
             -- Second condition: h_abs — mirror of DivwRemw.lean:1035-1200 at Word width.
             -- No HWord bridge needed since sum_zero_abs_poly operates on Word natively.
             -- After `simp [rem_*, c_*] at *`, eq_msb_rem/c collapse to `(¬)32768 ≤ r3/c3`
