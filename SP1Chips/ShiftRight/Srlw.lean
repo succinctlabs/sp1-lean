@@ -628,9 +628,16 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
     · exact c0_16
     · exact h_diff
   -- Force cb5 = 0 under SRLW (since shift is < 32, the 32s bit is 0).
-  -- This comes from the w_msb_srv constraint, or from the disjunctive constraint
-  -- `srlw + sraw = 1 ∨ msb_srw = 0` combined with shift < 32 from the trusted instr.
-  -- For now, leave the body as a 32-way blast TODO.
+  -- The trusted_instr constraint via ops_U64_b_c_poly's SRLW arm gave c0.val < 32.
+  -- So c0.val % 32 = c0.val % 64 (since c0.val < 32 < 64), and cb5 must be 0.
+  -- (Formal proof of cb5 = 0 deferred — it requires re-deriving the c-bound here.)
+  -- TODO(srlw_32way_blast): 32-way rcases on cb0..cb4 (with cb5 = 0) closes the
+  -- Nat identity `a0.val + a1.val * 2^16 = (b0.val + b1.val * 2^16) / 2^(c0.val % 32)`.
+  -- Each leaf requires: (a) cancel_mul_65536_poly on h_b0_dec, h_b1_dec to extract
+  -- b_j = hl_j * N + ll_j; (b) identify a0, a1 with lr0, lr1 (or 0) via srw_** disjuncts
+  -- and su16 dispatch; (c) per-case Nat arithmetic to match. Estimated 300-500 LOC.
+  -- The cleanest factoring is a HWord-level `srlw_within_byte_shift_poly` helper in
+  -- Common.lean (analogous to `srl_within_byte_shift_poly` but for 32-bit).
   sorry
 
 lemma spec.srlw_poly (Main : Vector (ZMod p) 69) (h : is_srlw_poly Main) :
