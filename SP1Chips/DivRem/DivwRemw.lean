@@ -1718,6 +1718,559 @@ lemma spec.remw :
   · apply Word.isU64_of_cases <;> simp <;> omega
   · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
 
+-- Polymorphic counterpart of `spec.divw`. Signed-32-bit variant: `.DRWS` op,
+-- threads through `divw_remw_poly` (HWord signed core). Trailing closer chain
+-- ends with localized sorries for stubborn rbc/qbc arms (see Phase 1.2 note).
+set_option debug.skipKernelTC true in
+set_option maxHeartbeats 32000000 in
+set_option linter.unusedVariables false in
+set_option maxRecDepth 1000000 in
+lemma spec.divw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
+    (Main : Vector (ZMod p) 246) :
+  List.Forall SP1Constraint.toProp_poly (constraints Main) →
+    is_real_poly Main → is_divw_poly Main →
+      Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]] =
+      (execute_DIV_REM_pure
+        (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
+        (Word.toBitVec64_poly #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).1
+  := by
+  intro cstrs h_is_real h_is_divw
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op_poly Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_is_real
+  replace cstrs := (allHold_constraints_iff_poly Main).mp cstrs; simp at h_is_real
+  simp [is_divw_poly] at h_is_divw
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
+  set b0 := Main[15]
+  set b1 := Main[16]
+  set b2 := Main[17]
+  set b3 := Main[18]
+  set c0 := Main[22]
+  set c1 := Main[23]
+  set c2 := Main[24]
+  set c3 := Main[25]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
+  set remainder_check_multiplicity := Main[245]
+  obtain ⟨main_mul_low, main_mul_high,
+           overflow_b, overflow_c, w_overflow_b, w_overflow_c,
+           div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
+           eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
+           cpu, alu,
+           eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
+           eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
+           eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2,
+           w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
+           eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2,
+           w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
+           eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
+           of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
+           nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
+           nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
+           u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3,
+           u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           r_neg_b_neg, r_pos_b_pos,
+           c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
+           cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
+           u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
+           u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
+           eq_abs_c_alu_event, eq_abs_rem_alu_event,
+           eq_maco10, eq_maco11, eq_maco12, eq_maco13,
+           eq_rcm, eq_arlt,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3,
+           u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
+  obtain ⟨
+           b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
+           b_is_overflow, b_is_real_not_word, b_b_neg,
+           b_b_neg_not_overflow, b_b_not_neg_not_overflow,
+           b_rem_neg, b_c_neg, b_is_real,
+           b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
+  clear cpu alu
+  symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))]
+    at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
+  rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
+  rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
+  rw [eq_comm (b := a3)] at eq_d_a3 eq_r_a3
+  rw [eq_comm (b := ac0)] at cn_ac0; rw [eq_comm (b := ar0)] at rn_ar0
+  rw [eq_comm (b := ac1)] at cn_ac1; rw [eq_comm (b := ar1)] at rn_ar1
+  rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
+  rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
+  simp_all [-h_is_divw]
+  apply MulOperation.spec.mul_poly at main_mul_low
+  apply MulOperation.spec.mulh.gen_poly at main_mul_high
+  apply IsEqualWordOperation.spec.gen_poly at overflow_b
+  apply IsEqualWordOperation.spec.gen_poly at overflow_c
+  apply IsEqualWordOperation.spec.gen_poly at w_overflow_b
+  apply IsEqualWordOperation.spec.gen_poly at w_overflow_c
+  apply IsZeroWordOperation.spec_poly at div_zero
+  apply U16MSBOperation.spec.gen_poly at eq_msb_b
+  apply U16MSBOperation.spec.gen_poly at eq_msb_c
+  apply U16MSBOperation.spec.gen_poly at eq_msb_rem
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_b
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_c
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_rem
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_quot
+  apply AddOperation.spec.gen_poly at c_neg_sum_zero
+  apply AddOperation.spec.gen_poly at rem_neg_sum_zero
+  apply LtOperationUnsigned.spec.nat.gen_poly at abs_check
+  simp [-Vector.eq_mk, -Vector.mk_eq, -Vector.mk.injEq]
+    at main_mul_low main_mul_high overflow_b overflow_c w_overflow_b w_overflow_c
+       div_zero eq_msb_b eq_msb_c eq_msb_rem
+       w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
+       c_neg_sum_zero rem_neg_sum_zero abs_check
+  have msb_bridge_eq : ∀ (a : ZMod p),
+      ((32768 : ZMod p) ≤ a) = (a.val ≥ 32768) := by
+    intro a; apply propext
+    change (32768 : ZMod p).val ≤ a.val ↔ _
+    rw [val_32768_zmod_p]
+  simp only [← msb_bridge_eq] at eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
+  set is_word := is_divw + is_remw + is_divuw + is_remuw
+  have eq_is_word : is_word = is_divw + is_remw + is_divuw + is_remuw := by
+    subst is_word; rfl
+  have := divw_remw_poly a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3
+    q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3
+    ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7
+    cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7
+    is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow
+    is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow
+    b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event
+    is_U64_b is_U64_c sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8
+    eq_is_word eq_b_neg eq_rem_neg eq_c_neg
+  simp only [eq_b_neg, eq_c_neg, eq_rem_neg] at *
+  specialize this eq_lb0 eq_lc0 eq_lb1 eq_lc1
+    (by exact_mod_cast eq_lb2) (by exact_mod_cast eq_lc2)
+    (by exact_mod_cast eq_lb3) (by exact_mod_cast eq_lc3)
+    eq_qbc0 eq_qbc1 w_eq_qbc2_uw w_eq_qbc2_w w_eq_q2_w eq_qbc2
+    w_eq_qbc3_uw w_eq_qbc3_w w_eq_q3_w eq_qbc3
+    eq_rbc0 eq_rbc1 w_eq_rbc2_uw w_eq_rbc2_w w_eq_r2_w eq_rbc2
+    w_eq_rbc3_uw w_eq_rbc3_w w_eq_r3_w eq_rbc3 eq_is_overflow
+  simp only [eq_is_overflow] at *
+  specialize this (by exact_mod_cast eq_b_neg_not_overflow)
+    (by exact_mod_cast eq_not_b_neg_not_overflow)
+    of_eq_q0 of_eq_r0 of_eq_q1 of_eq_r1 of_eq_q2 of_eq_r2 of_eq_q3 of_eq_r3
+    nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
+    nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+    u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3
+    u16_ctqpr4 u16_ctqpr5 u16_ctqpr6 u16_ctqpr7
+    eq_d_a0 eq_r_a0 eq_d_a1 eq_r_a1 eq_d_a2 eq_r_a2 eq_d_a3 eq_r_a3
+    r_neg_b_neg r_pos_b_pos
+    c0_eq_q0 c0_eq_q1 c0_eq_q2 c0_eq_q3 c0_eq_r0 c0_eq_r1 c0_eq_r2 c0_eq_r3
+    cn_ac0 rn_ar0 cn_ac1 rn_ar1 cn_ac2 rn_ar2 cn_ac3 rn_ar3
+    u16_ac0 u16_ac1 u16_ac2 u16_ac3 eq_cnop0 eq_cnop1 eq_cnop2 eq_cnop3
+    u16_ar0 u16_ar1 u16_ar2 u16_ar3 eq_rnop0 eq_rnop1 eq_rnop2 eq_rnop3
+    eq_abs_c_alu_event eq_abs_rem_alu_event eq_maco10 eq_maco11 eq_maco12 eq_maco13
+  have eq_arlt' : is_c_0 = 1 ∨ arlt = 1 := by
+    clear *- eq_arlt div_zero; split_ifs at div_zero <;> simp_all
+  have b_is_real_not_word' : is_word = 0 ∨ is_word = 1 := by
+    rcases b_is_real_not_word with h | h <;>
+      first
+        | (left; linear_combination h)
+        | (right; linear_combination h)
+        | (left; linear_combination -h)
+        | (right; linear_combination -h)
+  specialize this eq_arlt' u16_q0 u16_q1 u16_q2 u16_q3 u16_r0 u16_r1 u16_r2 u16_r3
+    b_cry0 b_cry1 b_cry2 b_cry3 b_cry4 b_cry5 b_cry6 b_cry7
+    u16_ctq0 u16_ctq1 u16_ctq2 u16_ctq3 u16_ctq4 u16_ctq5 u16_ctq6 u16_ctq7
+    b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw
+    b_is_overflow b_is_real_not_word' b_b_neg
+  simp only [eq_b_neg_not_overflow, eq_not_b_neg_not_overflow] at *
+  specialize this b_b_neg_not_overflow b_b_not_neg_not_overflow
+    b_rem_neg b_c_neg b_one_of_ops w_overflow_b w_overflow_c
+  simp only [eq_is_word] at *
+  specialize this div_zero c_neg_sum_zero rem_neg_sum_zero
+    main_mul_low main_mul_high overflow_b overflow_c
+    eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
+  all_goals
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop5 h_is_divw
+    simp [h_is_divw, z0, z1, z2, z3, z4, z5, z6] at *
+  all_goals first
+    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
+    | omega
+    | (apply Word.isU64_of_cases_poly <;> simp_all; done)
+    | (apply Word.isU64_of_cases_poly <;> simp <;> omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_c
+       apply Word.isU64_of_cases_poly <;> simp at is_U64_c ⊢ <;> omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_b
+       apply Word.isU64_of_cases_poly <;> simp at is_U64_b ⊢ <;> omega)
+    | (rcases b_b_neg with hbn | hbn <;>
+       (apply Word.isU64_of_cases_poly <;> simp_all [hbn] <;> omega))
+    | (apply maco_arm_closer_poly u16_ac0 u16_ac1 u16_ac2 u16_ac3
+        (by split_ifs at div_zero
+            · right; exact div_zero
+            · left; exact div_zero))
+    | sorry
+
+-- Polymorphic counterpart of `spec.remw`. Twin of `spec.divw_poly` with
+-- `.2` projection, `is_remw_poly` flag, `sop6` mutex, `eq_r_*` writeback.
+set_option debug.skipKernelTC true in
+set_option maxHeartbeats 32000000 in
+set_option linter.unusedVariables false in
+set_option maxRecDepth 1000000 in
+lemma spec.remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
+    (Main : Vector (ZMod p) 246) :
+  List.Forall SP1Constraint.toProp_poly (constraints Main) →
+    is_real_poly Main → is_remw_poly Main →
+      Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]] =
+      (execute_DIV_REM_pure
+        (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
+        (Word.toBitVec64_poly #v[Main[22], Main[23], Main[24], Main[25]]) .DRWS).2
+  := by
+  intro cstrs h_is_real h_is_remw
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op_poly Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_is_real
+  replace cstrs := (allHold_constraints_iff_poly Main).mp cstrs; simp at h_is_real
+  simp [is_remw_poly] at h_is_remw
+  set a0 := Main[28]
+  set a1 := Main[29]
+  set a2 := Main[30]
+  set a3 := Main[31]
+  set b0 := Main[15]
+  set b1 := Main[16]
+  set b2 := Main[17]
+  set b3 := Main[18]
+  set c0 := Main[22]
+  set c1 := Main[23]
+  set c2 := Main[24]
+  set c3 := Main[25]
+  set lb0 := Main[32]
+  set lb1 := Main[33]
+  set lb2 := Main[34]
+  set lb3 := Main[35]
+  set lc0 := Main[36]
+  set lc1 := Main[37]
+  set lc2 := Main[38]
+  set lc3 := Main[39]
+  set q0 := Main[40]
+  set q1 := Main[41]
+  set q2 := Main[42]
+  set q3 := Main[43]
+  set qbc0 := Main[44]
+  set qbc1 := Main[45]
+  set qbc2 := Main[46]
+  set qbc3 := Main[47]
+  set rbc0 := Main[48]
+  set rbc1 := Main[49]
+  set rbc2 := Main[50]
+  set rbc3 := Main[51]
+  set r0 := Main[52]
+  set r1 := Main[53]
+  set r2 := Main[54]
+  set r3 := Main[55]
+  set ar0 := Main[56]
+  set ar1 := Main[57]
+  set ar2 := Main[58]
+  set ar3 := Main[59]
+  set ac0 := Main[60]
+  set ac1 := Main[61]
+  set ac2 := Main[62]
+  set ac3 := Main[63]
+  set maco10 := Main[64]
+  set maco11 := Main[65]
+  set maco12 := Main[66]
+  set maco13 := Main[67]
+  set ctq0 := Main[68]
+  set ctq1 := Main[69]
+  set ctq2 := Main[70]
+  set ctq3 := Main[71]
+  set ctq4 := Main[72]
+  set ctq5 := Main[73]
+  set ctq6 := Main[74]
+  set ctq7 := Main[75]
+  set cnop0 := Main[166]
+  set cnop1 := Main[167]
+  set cnop2 := Main[168]
+  set cnop3 := Main[169]
+  set rnop0 := Main[170]
+  set rnop1 := Main[171]
+  set rnop2 := Main[172]
+  set rnop3 := Main[173]
+  set arlt := Main[174]
+  set cry0 := Main[182]
+  set cry1 := Main[183]
+  set cry2 := Main[184]
+  set cry3 := Main[185]
+  set cry4 := Main[186]
+  set cry5 := Main[187]
+  set cry6 := Main[188]
+  set cry7 := Main[189]
+  set is_c_0 := Main[200]
+  set is_div := Main[201]
+  set is_divu := Main[202]
+  set is_rem := Main[203]
+  set is_remu := Main[204]
+  set is_divw := Main[205]
+  set is_remw := Main[206]
+  set is_divuw := Main[207]
+  set is_remuw := Main[208]
+  set is_overflow := Main[209]
+  set is_overflow_b := Main[220]
+  set is_overflow_c := Main[231]
+  set msb_b := Main[232]
+  set msb_rem := Main[233]
+  set msb_c := Main[234]
+  set msb_quot := Main[235]
+  set b_neg := Main[236]
+  set b_neg_not_overflow := Main[237]
+  set b_not_neg_not_overflow := Main[238]
+  set is_real_not_word := Main[239]
+  set rem_neg := Main[240]
+  set c_neg := Main[241]
+  set abs_c_alu_event := Main[242]
+  set abs_rem_alu_event := Main[243]
+  set is_real := Main[244]
+  set remainder_check_multiplicity := Main[245]
+  obtain ⟨main_mul_low, main_mul_high,
+           overflow_b, overflow_c, w_overflow_b, w_overflow_c,
+           div_zero, c_neg_sum_zero, rem_neg_sum_zero, abs_check,
+           eq_msb_b, eq_msb_c, eq_msb_rem, w_eq_msb_b, w_eq_msb_c, w_eq_msb_rem, w_eq_msb_quot,
+           cpu, alu,
+           eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
+           eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
+           eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2,
+           w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
+           eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2,
+           w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
+           eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
+           of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
+           nof_eq_ctqpr0, nof_eq_ctqpr1, nof_eq_ctqpr2, nof_eq_ctqpr3,
+           nof_eq_ctqpr4, nof_eq_ctqpr5, nof_eq_ctqpr6, nof_eq_ctqpr7,
+           u16_ctqpr0, u16_ctqpr1, u16_ctqpr2, u16_ctqpr3,
+           u16_ctqpr4, u16_ctqpr5, u16_ctqpr6, u16_ctqpr7,
+           rest2⟩ := cstrs
+  obtain ⟨eq_d_a0, eq_r_a0, eq_d_a1, eq_r_a1, eq_d_a2, eq_r_a2, eq_d_a3, eq_r_a3,
+           r_neg_b_neg, r_pos_b_pos,
+           c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3, c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3,
+           cn_ac0, rn_ar0, cn_ac1, rn_ar1, cn_ac2, rn_ar2, cn_ac3, rn_ar3,
+           u16_ac0, u16_ac1, u16_ac2, u16_ac3, eq_cnop0, eq_cnop1, eq_cnop2, eq_cnop3,
+           u16_ar0, u16_ar1, u16_ar2, u16_ar3, eq_rnop0, eq_rnop1, eq_rnop2, eq_rnop3,
+           eq_abs_c_alu_event, eq_abs_rem_alu_event,
+           eq_maco10, eq_maco11, eq_maco12, eq_maco13,
+           eq_rcm, eq_arlt,
+           rest3⟩ := rest2
+  obtain ⟨u16_q0, u16_q1, u16_q2, u16_q3, u16_r0, u16_r1, u16_r2, u16_r3,
+           b_cry0, b_cry1, b_cry2, b_cry3, b_cry4, b_cry5, b_cry6, b_cry7,
+           u16_ctq0, u16_ctq1, u16_ctq2, u16_ctq3,
+           u16_ctq4, u16_ctq5, u16_ctq6, u16_ctq7, rest4⟩ := rest3
+  obtain ⟨
+           b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw,
+           b_is_overflow, b_is_real_not_word, b_b_neg,
+           b_b_neg_not_overflow, b_b_not_neg_not_overflow,
+           b_rem_neg, b_c_neg, b_is_real,
+           b_abs_c_alu_event, b_abs_rem_alu_event, b_one_of_ops, h_op_a_0⟩ := rest4
+  clear cpu alu
+  symm at eq_lb0 eq_lc0 eq_lb1 eq_lc1
+  rw [eq_comm (a := b_neg * ↑(65535 : ℕ))]
+    at nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+  rw [eq_comm (b := a0)] at eq_d_a0 eq_r_a0
+  rw [eq_comm (b := a1)] at eq_d_a1 eq_r_a1
+  rw [eq_comm (b := a2)] at eq_d_a2 eq_r_a2
+  rw [eq_comm (b := a3)] at eq_d_a3 eq_r_a3
+  rw [eq_comm (b := ac0)] at cn_ac0; rw [eq_comm (b := ar0)] at rn_ar0
+  rw [eq_comm (b := ac1)] at cn_ac1; rw [eq_comm (b := ar1)] at rn_ar1
+  rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
+  rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
+  simp_all [-h_is_remw]
+  apply MulOperation.spec.mul_poly at main_mul_low
+  apply MulOperation.spec.mulh.gen_poly at main_mul_high
+  apply IsEqualWordOperation.spec.gen_poly at overflow_b
+  apply IsEqualWordOperation.spec.gen_poly at overflow_c
+  apply IsEqualWordOperation.spec.gen_poly at w_overflow_b
+  apply IsEqualWordOperation.spec.gen_poly at w_overflow_c
+  apply IsZeroWordOperation.spec_poly at div_zero
+  apply U16MSBOperation.spec.gen_poly at eq_msb_b
+  apply U16MSBOperation.spec.gen_poly at eq_msb_c
+  apply U16MSBOperation.spec.gen_poly at eq_msb_rem
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_b
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_c
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_rem
+  apply U16MSBOperation.spec.gen_poly at w_eq_msb_quot
+  apply AddOperation.spec.gen_poly at c_neg_sum_zero
+  apply AddOperation.spec.gen_poly at rem_neg_sum_zero
+  apply LtOperationUnsigned.spec.nat.gen_poly at abs_check
+  simp [-Vector.eq_mk, -Vector.mk_eq, -Vector.mk.injEq]
+    at main_mul_low main_mul_high overflow_b overflow_c w_overflow_b w_overflow_c
+       div_zero eq_msb_b eq_msb_c eq_msb_rem
+       w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
+       c_neg_sum_zero rem_neg_sum_zero abs_check
+  have msb_bridge_eq : ∀ (a : ZMod p),
+      ((32768 : ZMod p) ≤ a) = (a.val ≥ 32768) := by
+    intro a; apply propext
+    change (32768 : ZMod p).val ≤ a.val ↔ _
+    rw [val_32768_zmod_p]
+  simp only [← msb_bridge_eq] at eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
+  set is_word := is_divw + is_remw + is_divuw + is_remuw
+  have eq_is_word : is_word = is_divw + is_remw + is_divuw + is_remuw := by
+    subst is_word; rfl
+  have := divw_remw_poly a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3
+    q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3
+    ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7
+    cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7
+    is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow
+    is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow
+    b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event
+    is_U64_b is_U64_c sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8
+    eq_is_word eq_b_neg eq_rem_neg eq_c_neg
+  simp only [eq_b_neg, eq_c_neg, eq_rem_neg] at *
+  specialize this eq_lb0 eq_lc0 eq_lb1 eq_lc1
+    (by exact_mod_cast eq_lb2) (by exact_mod_cast eq_lc2)
+    (by exact_mod_cast eq_lb3) (by exact_mod_cast eq_lc3)
+    eq_qbc0 eq_qbc1 w_eq_qbc2_uw w_eq_qbc2_w w_eq_q2_w eq_qbc2
+    w_eq_qbc3_uw w_eq_qbc3_w w_eq_q3_w eq_qbc3
+    eq_rbc0 eq_rbc1 w_eq_rbc2_uw w_eq_rbc2_w w_eq_r2_w eq_rbc2
+    w_eq_rbc3_uw w_eq_rbc3_w w_eq_r3_w eq_rbc3 eq_is_overflow
+  simp only [eq_is_overflow] at *
+  specialize this (by exact_mod_cast eq_b_neg_not_overflow)
+    (by exact_mod_cast eq_not_b_neg_not_overflow)
+    of_eq_q0 of_eq_r0 of_eq_q1 of_eq_r1 of_eq_q2 of_eq_r2 of_eq_q3 of_eq_r3
+    nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
+    nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
+    u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3
+    u16_ctqpr4 u16_ctqpr5 u16_ctqpr6 u16_ctqpr7
+    eq_d_a0 eq_r_a0 eq_d_a1 eq_r_a1 eq_d_a2 eq_r_a2 eq_d_a3 eq_r_a3
+    r_neg_b_neg r_pos_b_pos
+    c0_eq_q0 c0_eq_q1 c0_eq_q2 c0_eq_q3 c0_eq_r0 c0_eq_r1 c0_eq_r2 c0_eq_r3
+    cn_ac0 rn_ar0 cn_ac1 rn_ar1 cn_ac2 rn_ar2 cn_ac3 rn_ar3
+    u16_ac0 u16_ac1 u16_ac2 u16_ac3 eq_cnop0 eq_cnop1 eq_cnop2 eq_cnop3
+    u16_ar0 u16_ar1 u16_ar2 u16_ar3 eq_rnop0 eq_rnop1 eq_rnop2 eq_rnop3
+    eq_abs_c_alu_event eq_abs_rem_alu_event eq_maco10 eq_maco11 eq_maco12 eq_maco13
+  have eq_arlt' : is_c_0 = 1 ∨ arlt = 1 := by
+    clear *- eq_arlt div_zero; split_ifs at div_zero <;> simp_all
+  have b_is_real_not_word' : is_word = 0 ∨ is_word = 1 := by
+    rcases b_is_real_not_word with h | h <;>
+      first
+        | (left; linear_combination h)
+        | (right; linear_combination h)
+        | (left; linear_combination -h)
+        | (right; linear_combination -h)
+  specialize this eq_arlt' u16_q0 u16_q1 u16_q2 u16_q3 u16_r0 u16_r1 u16_r2 u16_r3
+    b_cry0 b_cry1 b_cry2 b_cry3 b_cry4 b_cry5 b_cry6 b_cry7
+    u16_ctq0 u16_ctq1 u16_ctq2 u16_ctq3 u16_ctq4 u16_ctq5 u16_ctq6 u16_ctq7
+    b_is_div b_is_divu b_is_rem b_is_remu b_is_divw b_is_remw b_is_divuw b_is_remuw
+    b_is_overflow b_is_real_not_word' b_b_neg
+  simp only [eq_b_neg_not_overflow, eq_not_b_neg_not_overflow] at *
+  specialize this b_b_neg_not_overflow b_b_not_neg_not_overflow
+    b_rem_neg b_c_neg b_one_of_ops w_overflow_b w_overflow_c
+  simp only [eq_is_word] at *
+  specialize this div_zero c_neg_sum_zero rem_neg_sum_zero
+    main_mul_low main_mul_high overflow_b overflow_c
+    eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
+  all_goals
+    obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop6 h_is_remw
+    simp [h_is_remw, z0, z1, z2, z3, z4, z5, z6] at *
+  all_goals first
+    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
+    | omega
+    | (apply Word.isU64_of_cases_poly <;> simp_all; done)
+    | (apply Word.isU64_of_cases_poly <;> simp <;> omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_c
+       apply Word.isU64_of_cases_poly <;> simp at is_U64_c ⊢ <;> omega)
+    | (apply Word.lt_cases_of_isU64_poly at is_U64_b
+       apply Word.isU64_of_cases_poly <;> simp at is_U64_b ⊢ <;> omega)
+    | (rcases b_b_neg with hbn | hbn <;>
+       (apply Word.isU64_of_cases_poly <;> simp_all [hbn] <;> omega))
+    | (apply maco_arm_closer_poly u16_ac0 u16_ac1 u16_ac2 u16_ac3
+        (by split_ifs at div_zero
+            · right; exact div_zero
+            · left; exact div_zero))
+    | sorry
+
 end divw_remw
 
 end DivRem
