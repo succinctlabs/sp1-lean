@@ -223,7 +223,7 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
   set lr0 := Main[56]; set lr1 := Main[57]; set lr2 := Main[58]; set lr3 := Main[59]
   set su160 := Main[60]; set su161 := Main[61]; set su162 := Main[62]; set su163 := Main[63]
   -- Destructure cstrs (same shape as SRL/SRA prologue).
-  obtain ⟨_, h_msb_a1, _, _, _,
+  obtain ⟨_, _h_msb_b1_sraw, h_msb_a1_srw, _, _,
            _, _, _, _, _, _,
            b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
            h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163,
@@ -518,8 +518,74 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
         (by decide) (by decide)
         (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
         (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
-  -- TODO: reduce the goal via sign_extend_32_to_64_msb_poly + the SRL byte-shift
-  -- wrappers on the low half, now that hl2 = ll2 = hl3 = ll3 = 0 are in scope.
+  -- Derive a2 = a3 = msb_srw * 65535 from srw_w2, srw_w3 (disjunctions of form
+  -- `1 = 0 ∨ a_j = msb_srw * 65535` after normalization; resolve the False disjunct).
+  rw [eq_srlw, h_no_sraw] at srw_w2 srw_w3
+  simp only [add_zero, zero_add, mul_one] at srw_w2 srw_w3
+  have h_a2_eq : a2 = msb_srw * 65535 := srw_w2.resolve_left h_one_ne_zero
+  have h_a3_eq : a3 = msb_srw * 65535 := srw_w3.resolve_left h_one_ne_zero
+  -- Relate msb_srw to the MSB of the high-u16 limb a1, via U16MSBOperation.spec_poly.
+  -- The constraint h_msb_a1_srw has multiplier `(srlw + sraw) = 1 + 0 = 1`.
+  rw [eq_srlw, h_no_sraw] at h_msb_a1_srw
+  simp only [zero_add, add_zero] at h_msb_a1_srw
+  have h_msb_srw_eq : msb_srw = if a1.val ≥ 32768 then 1 else 0 := by
+    rw [show msb_srw = ({ msb := msb_srw } : U16MSBOperation (ZMod p)).msb from rfl]
+    apply U16MSBOperation.spec_poly a1_16 h_msb_a1_srw
+  -- Bridge MSB-of-low-32 to the a1.val ≥ 32768 condition.
+  have h_isU32_a_lo : HWord.isU32_poly #v[a0, a1] := by
+    intro i; fin_cases i <;> simp [HWord.isU32_poly]
+    · exact a0_16
+    · exact a1_16
+  have h_a01_msb_eq : (HWord.toBitVec32_poly #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
+    have h_toNat : (HWord.toBitVec32_poly #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
+      rw [HWord.toBitVec32_poly_toNat_poly h_isU32_a_lo]
+      simp [HWord.toNat_poly]
+    rw [BitVec.msb_eq_decide, h_toNat]
+    have h_a0_lt : a0.val < 65536 := a0_16
+    have h_iff : (2 ^ (32 - 1) ≤ a0.val + a1.val * 2 ^ 16) ↔ (a1.val ≥ 32768) := by
+      constructor <;> (intro h; omega)
+    exact decide_eq_decide.mpr h_iff
+  -- Rewrite a2, a3 using the msb bridge: a_j = if msb then 65535 else 0.
+  have h_a2_msb : a2 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+    rw [h_a2_eq, h_msb_srw_eq]
+    by_cases h : a1.val ≥ 32768
+    · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by
+        rw [h_a01_msb_eq]; simp [h]
+      simp [h, h_msb]
+    · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by
+        rw [h_a01_msb_eq]; simp [h]
+      simp [h, h_msb]
+  have h_a3_msb : a3 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+    rw [h_a3_eq, h_msb_srw_eq]
+    by_cases h : a1.val ≥ 32768
+    · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by
+        rw [h_a01_msb_eq]; simp [h]
+      simp [h, h_msb]
+    · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by
+        rw [h_a01_msb_eq]; simp [h]
+      simp [h, h_msb]
+  -- Bridge: LHS Word.toBitVec64_poly #v[a0, a1, a2, a3] = sign_extend the low 32 bits.
+  have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
+      BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
+    rw [h_a2_msb, h_a3_msb]
+    have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
+    have h_a0_idx : (#v[a0, a1] : HWord (ZMod p))[0] = a0 := rfl
+    have h_a1_idx : (#v[a0, a1] : HWord (ZMod p))[1] = a1 := rfl
+    rw [h_a0_idx, h_a1_idx] at this
+    exact this.symm
+  rw [h_signext_bridge]
+  -- Unfold execute_RTYPEW_pure_w_poly for SRLW: it's sign_extend (m:=64) of the 32-bit shift.
+  simp only [execute_RTYPEW_pure_w_poly, execute_RTYPEW_pure_32_w_poly]
+  -- Goal: BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1])
+  --     = sign_extend (m := 64) (low_b.toBitVec32_poly >>> setWidth 5 low_c.toBitVec32_poly)
+  -- Bridge sign_extend to BitVec.signExtend by definitional unfolding.
+  change BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1])
+       = BitVec.signExtend 64 ((Word.low_poly #v[b0, b1, b2, b3]).toBitVec32_poly >>>
+          BitVec.setWidth 5 (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly)
+  -- Reduce to 32-bit equality (signExtend on BitVec 32 → 64 is injective).
+  congr 1
+  -- Goal: HWord.toBitVec32_poly #v[a0, a1]
+  --     = (Word.low_poly #v[b0,b1,b2,b3]).toBitVec32_poly >>> setWidth 5 (Word.low_poly #v[c0,c1,c2,c3]).toBitVec32_poly
   sorry
 
 lemma spec.srlw_poly (Main : Vector (ZMod p) 69) (h : is_srlw_poly Main) :
