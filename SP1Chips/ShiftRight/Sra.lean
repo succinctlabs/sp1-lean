@@ -166,19 +166,133 @@ section sra_poly
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
+set_option maxHeartbeats 400000000 in
+-- 400M heartbeats: msb_b case split × 4-way byte_shift × 16-way cb sub-cases.
+set_option debug.skipKernelTC true in
+-- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N` re-checks
+-- that trip kernel deep recursion (mirrors `spec.srl_common_poly`'s use).
+/-- Shared proof body for `spec.sra_poly` and `spec.srai_poly`. Structure mirrors
+`spec.srl_common_poly` but with two msb_b sub-cases:
+
+- **msb_b = 0**: `BitVec.sshiftRight` reduces to `ushiftRight` at the Nat level
+  (`BitVec.toNat_sshiftRight_of_msb_false`); the proof then matches SRL exactly
+  (4 byte-shift branches × 16 cb sub-cases via `srl_close_su16_{0,1,2,3}_case`).
+- **msb_b = 1**: sign-extension fills the high bits; the correction term
+  `msb_b * (65536 - v_0123)` in the a_j constraints is non-trivial. Needs new
+  sign-extension wrappers (`sra_close_su16_*_case`) — TODO.
+
+For now, the prologue is set up and msb_b case-split structure laid out;
+inner work stubbed with sorry. -/
+private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly) (eq_sra : Main[65] = 1) :
+    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+        #v[Main[25], Main[26], Main[27], Main[28]] .SRA := by
+  -- Setup.
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  have h_real := is_real_eq_one_of_sra Main cstrs eq_sra
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+             List.getElem_cons_succ] at b0_16 b1_16 b2_16 b3_16 c0_16
+  obtain ⟨_, sop_2, _, _⟩ := single_op_poly Main cstrs
+  have ⟨h_no_srl, h_no_srlw, h_no_sraw⟩ := sop_2 eq_sra
+  -- Open the iff_poly.
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  -- Set up local names for Main[i] indices (mirrors SRL).
+  set b0 := Main[15]; set b1 := Main[16]; set b2 := Main[17]; set b3 := Main[18]
+  set c0 := Main[25]; set c1 := Main[26]; set c2 := Main[27]; set c3 := Main[28]
+  set a0 := Main[32]; set a1 := Main[33]; set a2 := Main[34]; set a3 := Main[35]
+  set msb_b := Main[36]; set msb_srw := Main[37]
+  set cb0 := Main[38]; set cb1 := Main[39]; set cb2 := Main[40]
+  set cb3 := Main[41]; set cb4 := Main[42]; set cb5 := Main[43]
+  set smv := Main[44]; set v0123 := Main[45]; set v012 := Main[46]; set v01 := Main[47]
+  set ll0 := Main[48]; set ll1 := Main[49]; set ll2 := Main[50]; set ll3 := Main[51]
+  set hl0 := Main[52]; set hl1 := Main[53]; set hl2 := Main[54]; set hl3 := Main[55]
+  set lr0 := Main[56]; set lr1 := Main[57]; set lr2 := Main[58]; set lr3 := Main[59]
+  set su160 := Main[60]; set su161 := Main[61]; set su162 := Main[62]; set su163 := Main[63]
+  -- Destructure (same shape as SRL prologue; h_msb_b3 has Main[65] = 1 multiplier
+  -- which we'll use to extract msb_b via U16MSBOperation.spec_poly).
+  obtain ⟨h_msb_b3, _, _, _, _,
+           _, _, _, _, _, _,
+           b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
+           h_su160, b_su160, h_su161, b_su161, h_su162, b_su162, h_su163, b_su163,
+           one_of_su16s,
+           eq_v01, eq_v012, eq_v0123,
+           lt_ll0', lt_lh0', h_b0_dec, lt_ll1', lt_lh1', h_b1_dec,
+           lt_ll2', lt_lh2', h_b2_dec, lt_ll3', lt_lh3', h_b3_dec,
+           eq_lr0, eq_lr1, eq_lr2, eq_lr3,
+           w_msb_b, eq_smv, w_msb_srv,
+           sr_00, sr_01, sr_02, sr_03,
+           sr_10, sr_11, sr_12, sr_13,
+           sr_20, sr_21, sr_22, sr_23,
+           sr_30, sr_31, sr_32, sr_33,
+           srw_00, srw_01, srw_10, srw_11,
+           srw_w2, srw_w3,
+           _h_M13⟩ := cstrs
+  -- h_sum_ne and bound specializations.
+  have h_v0_val : (0 : ZMod p).val = 0 := ZMod.val_zero
+  have h_v1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
+  have h_one_ne_zero : (1 : ZMod p) ≠ 0 := by
+    intro h; rw [h] at h_v1_val; rw [h_v0_val] at h_v1_val; exact zero_ne_one h_v1_val
+  have h_sum_ne : ¬ Main[64] + Main[65] + Main[66] + Main[67] = 0 := by
+    intro h
+    rw [eq_sra, h_no_srl, h_no_srlw, h_no_sraw] at h
+    simp only [add_zero, zero_add] at h
+    exact h_one_ne_zero h
+  have lt_ll0 := lt_ll0' h_sum_ne
+  have lt_lh0 := lt_lh0' h_sum_ne
+  have lt_ll1 := lt_ll1' h_sum_ne
+  have lt_lh1 := lt_lh1' h_sum_ne
+  have lt_ll2 := lt_ll2' h_sum_ne
+  have lt_lh2 := lt_lh2' h_sum_ne
+  have lt_ll3 := lt_ll3' h_sum_ne
+  have lt_lh3 := lt_lh3' h_sum_ne
+  -- Derive msb_b ∈ {0, 1} from U16MSBOperation.spec_poly on h_msb_b3.
+  -- h_msb_b3 is the U16MSBOperation constraint on b3 with multiplier Main[65] = 1.
+  -- For SRA arm, Main[65] = 1 (eq_sra), so the constraint is active.
+  have h_msb_b_eq : msb_b = if b3.val ≥ 32768 then 1 else 0 := by
+    rw [show msb_b = ({ msb := msb_b } : U16MSBOperation (ZMod p)).msb from rfl]
+    apply U16MSBOperation.spec_poly b3_16
+    rw [eq_sra] at h_msb_b3
+    exact h_msb_b3
+  -- Case-split on b3.val ≥ 32768 (equivalently msb_b ∈ {0, 1}).
+  by_cases hb3 : b3.val ≥ 32768
+  · -- b3.val ≥ 32768 ⇒ msb_b = 1 ⇒ result is sign-extended.
+    have h_msb_b_one : msb_b = 1 := by rw [h_msb_b_eq, if_pos hb3]
+    -- TODO (msb_b = 1 case): apply `BitVec.toNat_sshiftRight` (msb=true arm)
+    -- to reduce sshiftRight to `2^64 - 1 - (2^64 - 1 - b.toNat) >>> shamt`;
+    -- handle sign-extension via new `sra_close_su16_*_case` wrappers that bake
+    -- in the `msb_b * (65536 - v_0123)` correction for a_3 (byte_shift=0) and the
+    -- `msb_b * 65535` fill-byte for byte_shift > 0.
+    sorry
+  · -- b3.val < 32768 ⇒ msb_b = 0 ⇒ result matches SRL.
+    have h_msb_b_zero : msb_b = 0 := by rw [h_msb_b_eq, if_neg hb3]
+    -- TODO (msb_b = 0 case): show `(Word.toBitVec64_poly b).msb = false`
+    -- from `hb3 : b3.val < 32768` (high bit of b's 64-bit form is bit 15 of b3).
+    -- Then apply `BitVec.toNat_sshiftRight_of_msb_false` to reduce sshiftRight
+    -- to ushiftRight; the remainder mirrors `spec.srl_common_poly`'s byte_shift
+    -- dispatch using `srl_close_su16_{0,1,2,3}_case` wrappers (already in
+    -- `Common.lean`). With msb_b = 0, the sr_** corrections vanish exactly like SRL.
+    sorry
+
 lemma spec.sra_poly (Main : Vector (ZMod p) 69) (h : is_sra_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
-          #v[Main[25], Main[26], Main[27], Main[28]] .SRA := by
-  sorry
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRA :=
+  fun cstrs => spec.sra_common_poly Main cstrs h.1
 
 lemma spec.srai_poly (Main : Vector (ZMod p) 69) (h : is_srai_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
-          #v[Main[25], Main[26], Main[27], Main[28]] .SRA := by
-  sorry
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRA :=
+  fun cstrs => spec.sra_common_poly Main cstrs h.1
 
 end sra_poly
 
