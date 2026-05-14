@@ -788,12 +788,131 @@ end poly_helpers
 
 section poly_bounds
 
+set_option maxHeartbeats 16000000 in
+-- ALU iff for op_b U64; 4-way SRL/SRA/SRLW/SRAW case-split for op_c bound under imm=1.
 lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly)
     (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
     Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
     Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
-  sorry
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  have h_disj := srl_or_sra_or_srlw_or_sraw_of_real Main cstrs h_real
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, _, _, alu, _⟩ := cstrs
+  rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_real rfl] at alu
+  dsimp only at alu
+  obtain ⟨h_trusted, _, _, _, _, _, b_imm, _, _, _, _, _, _, _, _,
+          _, h_is_U64_b, h_imm0, _, h_imm1_op_c⟩ := alu
+  refine ⟨h_is_U64_b, ?_⟩
+  rcases b_imm with h_imm0_eq | h_imm1_eq
+  · exact (h_imm0 h_imm0_eq).2.2
+  · -- imm = 1: op_c_memory.prev_value = op_c; trusted_instr gives c0 < 2^k, c1..c3 = 0
+    have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+    have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+    rw [e_25, e_26, e_27, e_28]
+    -- Helper: discharge the 5-bit/6-bit shamt case for any concrete opcode N ∈ {7, 8, 22, 23}.
+    have h64_pow : (2 ^ 6 : ZMod p).val = 64 := by
+      rw [show (2 ^ 6 : ZMod p) = ((64 : ℕ) : ZMod p) from by push_cast; ring]
+      exact ZMod.val_natCast_of_lt (by omega)
+    have h32_pow : (2 ^ 5 : ZMod p).val = 32 := by
+      rw [show (2 ^ 5 : ZMod p) = ((32 : ℕ) : ZMod p) from by push_cast; ring]
+      exact ZMod.val_natCast_of_lt (by omega)
+    rcases h_disj with ⟨h_srl, h_no_sra, h_no_srlw, h_no_sraw⟩ |
+                       ⟨h_no_srl, h_sra, h_no_srlw, h_no_sraw⟩ |
+                       ⟨h_no_srl, h_no_sra, h_srlw, h_no_sraw⟩ |
+                       ⟨h_no_srl, h_no_sra, h_no_srlw, h_sraw⟩
+    · -- SRL: opcode = 7
+      have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                  = ((7 : ℕ) : ZMod p) := by
+        rw [h_srl, h_no_sra, h_no_srlw, h_no_sraw]; push_cast; ring
+      have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 7 := by
+        rw [h_expr]; exact ZMod.val_natCast_of_lt (show (7 : ℕ) < p by omega)
+      simp only [h_opc, show Opcode.ofNat 7 = .SRL from rfl,
+        Opcode.trusted_instr_poly] at h_trusted
+      have h_si : shift_i_type_constraints_poly Main[6] Main[14] 0 0 0 Main[21] Main[22] Main[23] Main[24] 0 Main[31] :=
+        h_trusted.2 h_imm1_eq
+      simp only [shift_i_type_constraints_poly] at h_si
+      obtain ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_si
+      apply Word.isU64_of_cases_poly
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+        have : Main[21].val < (2 ^ 6 : ZMod p).val := h_c0_lt
+        rw [h64_pow] at this; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c1, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c2, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
+    · -- SRA: opcode = 8
+      have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                  = ((8 : ℕ) : ZMod p) := by
+        rw [h_no_srl, h_sra, h_no_srlw, h_no_sraw]; push_cast; ring
+      have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 8 := by
+        rw [h_expr]; exact ZMod.val_natCast_of_lt (show (8 : ℕ) < p by omega)
+      simp only [h_opc, show Opcode.ofNat 8 = .SRA from rfl,
+        Opcode.trusted_instr_poly] at h_trusted
+      have h_si : shift_i_type_constraints_poly Main[6] Main[14] 0 0 0 Main[21] Main[22] Main[23] Main[24] 0 Main[31] :=
+        h_trusted.2 h_imm1_eq
+      simp only [shift_i_type_constraints_poly] at h_si
+      obtain ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_si
+      apply Word.isU64_of_cases_poly
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+        have : Main[21].val < (2 ^ 6 : ZMod p).val := h_c0_lt
+        rw [h64_pow] at this; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c1, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c2, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
+    · -- SRLW: opcode = 22
+      have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                  = ((22 : ℕ) : ZMod p) := by
+        rw [h_no_srl, h_no_sra, h_srlw, h_no_sraw]; push_cast; ring
+      have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 22 := by
+        rw [h_expr]; exact ZMod.val_natCast_of_lt (show (22 : ℕ) < p by omega)
+      simp only [h_opc, show Opcode.ofNat 22 = .SRLW from rfl,
+        Opcode.trusted_instr_poly] at h_trusted
+      have h_wsi : w_shift_i_type_constraints_poly Main[6] Main[14] 0 0 0 Main[21] Main[22] Main[23] Main[24] 0 Main[31] :=
+        h_trusted.2 h_imm1_eq
+      simp only [w_shift_i_type_constraints_poly] at h_wsi
+      obtain ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_wsi
+      apply Word.isU64_of_cases_poly
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+        have : Main[21].val < (2 ^ 5 : ZMod p).val := h_c0_lt
+        rw [h32_pow] at this; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c1, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c2, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
+    · -- SRAW: opcode = 23
+      have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                  = ((23 : ℕ) : ZMod p) := by
+        rw [h_no_srl, h_no_sra, h_no_srlw, h_sraw]; push_cast; ring
+      have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 23 := by
+        rw [h_expr]; exact ZMod.val_natCast_of_lt (show (23 : ℕ) < p by omega)
+      simp only [h_opc, show Opcode.ofNat 23 = .SRAW from rfl,
+        Opcode.trusted_instr_poly] at h_trusted
+      have h_wsi : w_shift_i_type_constraints_poly Main[6] Main[14] 0 0 0 Main[21] Main[22] Main[23] Main[24] 0 Main[31] :=
+        h_trusted.2 h_imm1_eq
+      simp only [w_shift_i_type_constraints_poly] at h_wsi
+      obtain ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_wsi
+      apply Word.isU64_of_cases_poly
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+        have : Main[21].val < (2 ^ 5 : ZMod p).val := h_c0_lt
+        rw [h32_pow] at this; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c1, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c2, ZMod.val_zero]; omega
+      · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+          List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
 
 lemma ops_U64_a_poly (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly)
