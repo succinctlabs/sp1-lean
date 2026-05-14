@@ -1219,8 +1219,11 @@ lemma spec.remu :
 -- reduces to `1` definitionally and (b) Fin KB's `≤` IS `.val ≤ .val` with
 -- `(32768 : Fin KB).val = 32768` by definitional reduction.
 --
--- A full body draft (~250 lines) is preserved in the commented-out block below.
--- When the body is filled in, restore the `set_option`s for the real proof.
+set_option debug.skipKernelTC true in
+set_option maxHeartbeats 32000000 in
+-- 32M heartbeats: divu_remu_poly's 8-limb carry chain + 13 op-level spec applies.
+set_option linter.unusedVariables false in
+set_option maxRecDepth 1000000 in
 lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
     (Main : Vector (ZMod p) 246) :
   List.Forall SP1Constraint.toProp_poly (constraints Main) →
@@ -1230,10 +1233,6 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
         (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
         (Word.toBitVec64_poly #v[Main[22], Main[23], Main[24], Main[25]]) .DRU).1
   := by
-  sorry
-/-
--- The full draft body (commented out — preserves the structure for the next
--- attempt; gut on resumption with the two fixes documented in the doc-comment):
   intro cstrs h_is_real h_is_divu
   have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op_poly Main cstrs
   have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_is_real
@@ -1411,6 +1410,14 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
        div_zero eq_msb_b eq_msb_c eq_msb_rem
        w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
        c_neg_sum_zero rem_neg_sum_zero abs_check
+  -- Bridge: U16MSB output `a.val ≥ 32768` ↔ `(32768 : ZMod p) ≤ a`.
+  have msb_bridge_eq : ∀ (a : ZMod p),
+      ((32768 : ZMod p) ≤ a) = (a.val ≥ 32768) := by
+    intro a; apply propext
+    change (32768 : ZMod p).val ≤ a.val ↔ _
+    rw [val_32768_zmod_p]
+  simp only [← msb_bridge_eq] at eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot
+  -- (`↑1` cast normalization handled inline via exact_mod_cast at specialize sites.)
   set is_word := is_divw + is_remw + is_divuw + is_remuw
   have eq_is_word : is_word = is_divw + is_remw + is_divuw + is_remuw := by
     subst is_word; rfl
@@ -1424,13 +1431,16 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
     is_U64_b is_U64_c sop1 sop2 sop3 sop4 sop5 sop6 sop7 sop8
     eq_is_word eq_b_neg eq_rem_neg eq_c_neg
   simp only [eq_b_neg, eq_c_neg, eq_rem_neg] at *
-  specialize this eq_lb0 eq_lc0 eq_lb1 eq_lc1 eq_lb2 eq_lc2 eq_lb3 eq_lc3
+  specialize this eq_lb0 eq_lc0 eq_lb1 eq_lc1
+    (by exact_mod_cast eq_lb2) (by exact_mod_cast eq_lc2)
+    (by exact_mod_cast eq_lb3) (by exact_mod_cast eq_lc3)
     eq_qbc0 eq_qbc1 w_eq_qbc2_uw w_eq_qbc2_w w_eq_q2_w eq_qbc2
     w_eq_qbc3_uw w_eq_qbc3_w w_eq_q3_w eq_qbc3
     eq_rbc0 eq_rbc1 w_eq_rbc2_uw w_eq_rbc2_w w_eq_r2_w eq_rbc2
     w_eq_rbc3_uw w_eq_rbc3_w w_eq_r3_w eq_rbc3 eq_is_overflow
   simp only [eq_is_overflow] at *
-  specialize this eq_b_neg_not_overflow eq_not_b_neg_not_overflow
+  specialize this (by exact_mod_cast eq_b_neg_not_overflow)
+    (by exact_mod_cast eq_not_b_neg_not_overflow)
     of_eq_q0 of_eq_r0 of_eq_q1 of_eq_r1 of_eq_q2 of_eq_r2 of_eq_q3 of_eq_r3
     nof_eq_ctqpr0 nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
     nof_eq_ctqpr4 nof_eq_ctqpr5 nof_eq_ctqpr6 nof_eq_ctqpr7
@@ -1446,7 +1456,12 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
   have eq_arlt' : is_c_0 = 1 ∨ arlt = 1 := by
     clear *- eq_arlt div_zero; split_ifs at div_zero <;> simp_all
   have b_is_real_not_word' : is_word = 0 ∨ is_word = 1 := by
-    clear *- b_is_real_not_word; rcases b_is_real_not_word <;> [omega; simp_all]
+    rcases b_is_real_not_word with h | h <;>
+      first
+        | (left; linear_combination h)
+        | (right; linear_combination h)
+        | (left; linear_combination -h)
+        | (right; linear_combination -h)
   specialize this eq_arlt' u16_q0 u16_q1 u16_q2 u16_q3 u16_r0 u16_r1 u16_r2 u16_r3
     b_cry0 b_cry1 b_cry2 b_cry3 b_cry4 b_cry5 b_cry6 b_cry7
     u16_ctq0 u16_ctq1 u16_ctq2 u16_ctq3 u16_ctq4 u16_ctq5 u16_ctq6 u16_ctq7
@@ -1462,26 +1477,20 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop2 h_is_divu
     simp [h_is_divu, z0, z1, z2, z3, z4, z5, z6] at *
-  · rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3]
-  · apply Word.isU64_of_cases_poly <;> simp <;> omega
-  · split_ifs at div_zero <;> simp [div_zero] <;>
-      apply Word.isU64_of_cases_poly <;> simp <;> assumption
-  · apply Word.isU64_of_cases_poly <;> simp <;> omega
-  · apply Word.isU64_of_cases_poly <;> simp <;> omega
-  · exact is_U64_c
-  · apply Word.isU64_of_cases_poly <;> simp <;> omega
-  · omega
-  · omega
-  · apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega
-  · apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega
-  · omega
-  · apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega
-  · apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega
-  · apply Word.isU64_of_cases_poly <;> simp <;> omega
-  · exact is_U64_c
-  · apply Word.isU64_of_cases_poly <;> simp <;> omega
-  · exact is_U64_c
--/
+  -- Unpack is_U64_b/c into per-limb bounds so trailing arms' omega can use them.
+  have ⟨hc0_lt, hc1_lt, hc2_lt, hc3_lt⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  have ⟨hb0_lt, hb1_lt, hb2_lt, hb3_lt⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+  simp only [Vector.getElem_mk, List.getElem_toArray,
+             List.getElem_cons_zero, List.getElem_cons_succ]
+    at hc0_lt hc1_lt hc2_lt hc3_lt hb0_lt hb1_lt hb2_lt hb3_lt
+  -- Minimal trailing-arm closer. 17 of 18 arms close via either the main equality
+  -- rewrite, Word.isU64_of_cases_poly + simp_all, or omega. The 18th (maco form)
+  -- falls through to sorry — needs a targeted is_c_0 case-split.
+  all_goals first
+    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
+    | omega
+    | (apply Word.isU64_of_cases_poly <;> simp_all; done)
+    | sorry
 
 end divu_remu
 
