@@ -798,6 +798,8 @@ def sp1_srlw_poly : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
 
+set_option maxHeartbeats 8000000 in
+-- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
 theorem correct_srlw_poly
     (cstrs : (constraints Main).allHold_poly)
     (h_is_srlw : is_srlw_poly Main)
@@ -806,7 +808,44 @@ theorem correct_srlw_poly
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (spec_srlw_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srlw_poly Main).run s := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨eq_srlw, eq_imm⟩ := h_is_srlw
+  have h_real := is_real_eq_one_of_srlw Main cstrs eq_srlw
+  have ⟨h6_lt, h14_lt, h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, _h_imm1, _h_a0_zeros⟩ :=
+    bounds_poly Main cstrs h_real
+  have h21_lt : Main[21].val < 32 := h_imm0_op_c_lt eq_imm
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
+    h6_lt, h14_lt, h21_lt, h_real, eq_imm] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [spec_srlw_poly, sp1_srlw_poly, execute, execute_RTYPEW']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  have spec_eq := spec.srlw_poly Main ⟨eq_srlw, eq_imm⟩ cstrs
+  have hp : 2 ^ 17 < p := Fact.out
+  rw [exec_RTYPEW_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · simp_all
+    have h_shift_zero : BitVec.signExtend 64
+        ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly >>>
+          (((Word.low_poly (#v[Main[25], Main[26], Main[27], Main[28]] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
+      rw [← spec_eq]
+      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+    rw [if_pos h_shift_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+  · simp_all
+    have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp_all [bitVecToRegidxVal]
 
 end Srlw.Poly
 
@@ -829,6 +868,8 @@ def sp1_srliw_poly : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
 
+set_option maxHeartbeats 8000000 in
+-- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
 theorem correct_srliw_poly
     (cstrs : (constraints Main).allHold_poly)
     (h_is_srliw : is_srliw_poly Main)
@@ -837,7 +878,55 @@ theorem correct_srliw_poly
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (spec_srliw_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_srliw_poly Main).run s := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨eq_srlw, eq_imm⟩ := h_is_srliw
+  have h_real := is_real_eq_one_of_srlw Main cstrs eq_srlw
+  have ⟨h6_lt, h14_lt, _h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, h_imm1, _h_a0_zeros⟩ :=
+    bounds_poly Main cstrs h_real
+  obtain ⟨e_25, h_26, h_27, h_28, _h_25_lt_64_via_sr, h_25_lt_32_via_sw⟩ := h_imm1 eq_imm
+  have h_25_lt_32 : Main[25].val < 32 := h_25_lt_32_via_sw (Or.inl eq_srlw)
+  have h_21_lt_32 : Main[21].val < 32 := by rw [e_25]; exact h_25_lt_32
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
+    h6_lt, h14_lt, h_real, eq_imm] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
+  have spec_eq := spec.srliw_poly Main ⟨eq_srlw, eq_imm⟩ cstrs
+  have hp : 2 ^ 17 < p := Fact.out
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [spec_srliw_poly, sp1_srliw_poly, execute, execute_SHIFTIWOP']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_imm_w_poly, read_op_b]
+  have h_shamt_eq : (#v[((BitVec.ofNat 5 Main[21].val).toNat : ZMod p), 0, 0, 0] : Word (ZMod p))
+                  = #v[Main[25], Main[26], Main[27], Main[28]] := by
+    have h_21_toNat : (BitVec.ofNat 5 Main[21].val).toNat = Main[21].val := by
+      simp; omega
+    rw [h_21_toNat, ZMod.natCast_zmod_val]
+    rw [e_25, h_26, h_27, h_28]
+  rw [exec_SHIFTIWOP_pure_bv_to_w_poly _ _ _ is_U64_b]
+  simp only [execute_SHIFTIWOP_pure_w_poly]
+  rw [h_shamt_eq]
+  rw [show ropw_of_sopw sopw.SRLIW = ropw.SRLW from rfl]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · simp_all
+    have h_shift_zero : BitVec.signExtend 64
+        ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly >>>
+          (((Word.low_poly (#v[Main[25], (0 : ZMod p), 0, 0] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
+      rw [← spec_eq]
+      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+    rw [if_pos h_shift_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+  · simp_all
+    have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp_all [bitVecToRegidxVal]
 
 end Srliw.Poly
 
@@ -860,6 +949,8 @@ def sp1_sraw_poly : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
 
+set_option maxHeartbeats 8000000 in
+-- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
 theorem correct_sraw_poly
     (cstrs : (constraints Main).allHold_poly)
     (h_is_sraw : is_sraw_poly Main)
@@ -868,7 +959,44 @@ theorem correct_sraw_poly
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (spec_sraw_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraw_poly Main).run s := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨eq_sraw, eq_imm⟩ := h_is_sraw
+  have h_real := is_real_eq_one_of_sraw Main cstrs eq_sraw
+  have ⟨h6_lt, h14_lt, h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, _h_imm1, _h_a0_zeros⟩ :=
+    bounds_poly Main cstrs h_real
+  have h21_lt : Main[21].val < 32 := h_imm0_op_c_lt eq_imm
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
+    h6_lt, h14_lt, h21_lt, h_real, eq_imm] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [spec_sraw_poly, sp1_sraw_poly, execute, execute_RTYPEW']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  have spec_eq := spec.sraw_poly Main ⟨eq_sraw, eq_imm⟩ cstrs
+  have hp : 2 ^ 17 < p := Fact.out
+  rw [exec_RTYPEW_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · simp_all
+    have h_shift_zero : BitVec.signExtend 64
+        ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly.sshiftRight
+          (((Word.low_poly (#v[Main[25], Main[26], Main[27], Main[28]] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
+      rw [← spec_eq]
+      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+    rw [if_pos h_shift_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+  · simp_all
+    have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp_all [bitVecToRegidxVal]
 
 end Sraw.Poly
 
@@ -891,6 +1019,8 @@ def sp1_sraiw_poly : SailM Unit := do
   Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
 
+set_option maxHeartbeats 8000000 in
+-- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
 theorem correct_sraiw_poly
     (cstrs : (constraints Main).allHold_poly)
     (h_is_sraiw : is_sraiw_poly Main)
@@ -899,6 +1029,54 @@ theorem correct_sraiw_poly
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (spec_sraiw_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sraiw_poly Main).run s := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨eq_sraw, eq_imm⟩ := h_is_sraiw
+  have h_real := is_real_eq_one_of_sraw Main cstrs eq_sraw
+  have ⟨h6_lt, h14_lt, _h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, h_imm1, _h_a0_zeros⟩ :=
+    bounds_poly Main cstrs h_real
+  obtain ⟨e_25, h_26, h_27, h_28, _h_25_lt_64_via_sr, h_25_lt_32_via_sw⟩ := h_imm1 eq_imm
+  have h_25_lt_32 : Main[25].val < 32 := h_25_lt_32_via_sw (Or.inr eq_sraw)
+  have h_21_lt_32 : Main[21].val < 32 := by rw [e_25]; exact h_25_lt_32
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
+    h6_lt, h14_lt, h_real, eq_imm] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
+  have spec_eq := spec.sraiw_poly Main ⟨eq_sraw, eq_imm⟩ cstrs
+  have hp : 2 ^ 17 < p := Fact.out
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [spec_sraiw_poly, sp1_sraiw_poly, execute, execute_SHIFTIWOP']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_imm_w_poly, read_op_b]
+  have h_shamt_eq : (#v[((BitVec.ofNat 5 Main[21].val).toNat : ZMod p), 0, 0, 0] : Word (ZMod p))
+                  = #v[Main[25], Main[26], Main[27], Main[28]] := by
+    have h_21_toNat : (BitVec.ofNat 5 Main[21].val).toNat = Main[21].val := by
+      simp; omega
+    rw [h_21_toNat, ZMod.natCast_zmod_val]
+    rw [e_25, h_26, h_27, h_28]
+  rw [exec_SHIFTIWOP_pure_bv_to_w_poly _ _ _ is_U64_b]
+  simp only [execute_SHIFTIWOP_pure_w_poly]
+  rw [h_shamt_eq]
+  rw [show ropw_of_sopw sopw.SRAIW = ropw.SRAW from rfl]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · simp_all
+    have h_shift_zero : BitVec.signExtend 64
+        ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly.sshiftRight
+          (((Word.low_poly (#v[Main[25], (0 : ZMod p), 0, 0] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
+      rw [← spec_eq]
+      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+    rw [if_pos h_shift_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+  · simp_all
+    have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp_all [bitVecToRegidxVal]
 
 end Sraiw.Poly
