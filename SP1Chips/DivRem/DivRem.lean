@@ -1291,11 +1291,95 @@ lemma div_rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^
             have h_abs : |Word.toInt_poly #v[r0, r1, r2, r3]| <
                 |Word.toInt_poly #v[c0, c1, c2, c3]| := by
               sorry
-            -- Third condition: h_sign
+            -- Third condition: h_sign — mirror of DivwRemw.lean:1206-1297 at Word width.
             have h_sign : Word.toInt_poly #v[r0, r1, r2, r3] = 0 ∨
                 (Word.toInt_poly #v[r0, r1, r2, r3]).sign =
                   (Word.toInt_poly #v[b0, b1, b2, b3]).sign := by
-              sorry
+              rcases b_b_neg with b_msb_nneg | b_msb_neg
+              · -- msb_b = 0: derive msb_rem = 0 from r_neg_b_neg, then split on whether r = 0.
+                subst b_msb_nneg
+                have hmsb_rem_0 : msb_rem = 0 := by
+                  rcases r_neg_b_neg with h | h
+                  · exact h
+                  · exact absurd h zero_ne_one
+                subst hmsb_rem_0
+                have hr3_lt_val : r3.val < 32768 := by
+                  by_contra h; push Not at h
+                  have hge : (32768 : ZMod p) ≤ r3 := by
+                    change (32768 : ZMod p).val ≤ r3.val
+                    rw [val_32768_zmod_p]; exact h
+                  rw [if_pos hge] at eq_msb_rem
+                  exact zero_ne_one eq_msb_rem
+                have hb3_lt_val : b3.val < 32768 := by
+                  by_contra h; push Not at h
+                  have hge : (32768 : ZMod p) ≤ b3 := by
+                    change (32768 : ZMod p).val ≤ b3.val
+                    rw [val_32768_zmod_p]; exact h
+                  rw [if_pos hge] at eq_msb_b
+                  exact zero_ne_one eq_msb_b
+                by_cases rz : Word.toInt_poly #v[r0, r1, r2, r3] = 0
+                · left; exact rz
+                · right
+                  rw [Word.sign_cases_poly is_U64_b, Word.sign_cases_poly is_U64_r]
+                  unfold Word.isNegative_poly
+                  simp only [Vector.getElem_mk, List.getElem_toArray,
+                             List.getElem_cons_zero, List.getElem_cons_succ]
+                  rw [if_neg (show ¬ r3.val ≥ 32768 from by omega),
+                      if_neg (show ¬ b3.val ≥ 32768 from by omega)]
+                  have rpos : Word.toInt_poly #v[r0, r1, r2, r3] > 0 := by
+                    have rnneg : 0 ≤ Word.toInt_poly #v[r0, r1, r2, r3] := by
+                      unfold Word.toInt_poly Word.isNegative_poly Word.toNat_poly
+                      simp only [Vector.getElem_mk, List.getElem_toArray,
+                                 List.getElem_cons_zero, List.getElem_cons_succ]
+                      rw [if_neg (show ¬ r3.val ≥ 32768 from by omega)]
+                      positivity
+                    omega
+                  split_ifs with hb <;> try omega
+                  exfalso
+                  rw [h_prod] at hb
+                  set q := Word.toInt_poly #v[q0, q1, q2, q3]
+                  set c := Word.toInt_poly #v[c0, c1, c2, c3]
+                  set r := Word.toInt_poly #v[r0, r1, r2, r3]
+                  clear *- rpos h_abs hb
+                  simp [Int.abs_cases] at h_abs
+                  rw [if_pos (by omega)] at h_abs
+                  apply Int.split_nzp q <;> intro hq <;> [skip; simp_all; skip]
+                  all_goals
+                    have : c * q > r := by split_ifs at * <;> nlinarith
+                    nlinarith
+              · -- msb_b = 1: case-split on b_rem_neg.
+                have h_sgn_b : (Word.toInt_poly #v[b0, b1, b2, b3]).sign = -1 :=
+                  sgn_msb_b b_msb_neg
+                rcases b_rem_neg with rem_nneg | rem_neg
+                · -- msb_rem = 0: r_pos_b_pos collapses to r0 + r1 + r2 + r3 = 0.
+                  left
+                  have hrz : r0 + r1 + r2 + r3 = (0 : ZMod p) := by
+                    rcases r_pos_b_pos with h | h | h
+                    · exact h
+                    · exfalso; rw [rem_nneg] at h; exact zero_ne_one h
+                    · exfalso; rw [b_msb_neg] at h; exact one_ne_zero h
+                  -- 3-step `ZMod.val_add_of_lt` chain under `Fact (2^24 < p)`.
+                  have hsum01 : (r0 + r1 : ZMod p).val = r0.val + r1.val :=
+                    ZMod.val_add_of_lt (by omega)
+                  have hsum012 : (r0 + r1 + r2 : ZMod p).val = (r0 + r1).val + r2.val :=
+                    ZMod.val_add_of_lt (by rw [hsum01]; omega)
+                  have hsum0123 : (r0 + r1 + r2 + r3 : ZMod p).val =
+                      (r0 + r1 + r2).val + r3.val :=
+                    ZMod.val_add_of_lt (by rw [hsum012, hsum01]; omega)
+                  rw [hrz, ZMod.val_zero, hsum012, hsum01] at hsum0123
+                  have hr0v : r0.val = 0 := by omega
+                  have hr1v : r1.val = 0 := by omega
+                  have hr2v : r2.val = 0 := by omega
+                  have hr3v : r3.val = 0 := by omega
+                  have hr3_lt : ¬ (32768 : ZMod p) ≤ r3 := by
+                    intro h
+                    have hh : (32768 : ZMod p).val ≤ r3.val := h
+                    rw [val_32768_zmod_p] at hh; omega
+                  simp [Word.toInt_poly, Word.isNegative_poly, Word.toNat_poly,
+                        hr0v, hr1v, hr2v, hr3v]
+                · -- msb_rem = 1: use sgn_msb_rem.
+                  right
+                  rw [sgn_msb_rem rem_neg, h_sgn_b]
             rw [tdiv_tmod_unique_full cnz]
             split_ands <;> assumption
 
