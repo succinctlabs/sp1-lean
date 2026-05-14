@@ -264,18 +264,57 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
   rw [h_no_srl, h_no_sra] at h_b2_dec h_b3_dec
   simp only [add_zero, zero_add, zero_mul] at h_b2_dec h_b3_dec
   symm at h_b2_dec h_b3_dec
-  -- TODO(srlw_poly_body): the 32-way case-blast on cb0..cb4 closes by:
-  -- (a) Deriving (hl2 = ll2 = 0) and (hl3 = ll3 = 0) via 16-way cb dispatch,
-  --     each branch calling `cancel_mul_65536_zero_poly` with the specific
-  --     v0123 value (∈ {65536, 32768, ..., 2}) and concluding via bounds.
-  -- (b) Reducing the 64-bit goal to a 32-bit shift via
-  --     `Word.sign_extend_32_to_64_msb_poly` once `a2 = a3 = msb_srw * 65535`
-  --     is established from the `srw_w2`, `srw_w3` constraints.
-  -- (c) Proving `HWord.toBitVec32_poly #v[a0, a1] = HWord.toBitVec32_poly
-  --     #v[b0, b1] >>> shift_amount` via a 16-case dispatch through the
-  --     existing SRL byte-shift wrappers (cb5 forced 0, cb4 selects byte_shift).
-  -- The setup above (prologue + h_b2_dec/h_b3_dec normalization to LHS-zero
-  -- form) is reusable; the body remains.
+  -- Helper: under SRLW, given `M ∣ 65536`, `0 < M`, `v0123 = ((M : ℕ) : ZMod p)`,
+  -- and bounds `hl.val < M`, `ll.val < 65536/M`, the equation
+  -- `hl * 65536 + ll * v0123 = 0` gives `hl = 0 ∧ ll = 0`.
+  -- (Bound shape matches `lt_lh2/lt_ll2` after the cb-determined v0123 value
+  -- is fixed: lt_lh = `hl.val < 2^(16-S)` = M, lt_ll = `ll.val < 2^S` = 65536/M.)
+  have zero_aux : ∀ (M : ℕ), M ∣ 65536 → 0 < M →
+      ∀ {hl ll : ZMod p}, v0123 = ((M : ℕ) : ZMod p) →
+      hl.val < M → ll.val < 65536 / M →
+      hl * 65536 + ll * v0123 = 0 → hl = 0 ∧ ll = 0 := by
+    intro M h_dvd h_pos hl ll h_v0123_eq h_hl_lt h_ll_lt h_eq
+    have h_M_le : M ≤ 65536 := Nat.le_of_dvd (by omega) h_dvd
+    have h_M_lt_p : M < p := by omega
+    have h_v0123_val : v0123.val = M := by
+      rw [h_v0123_eq]; exact ZMod.val_natCast_of_lt h_M_lt_p
+    have h_v0123_dvd : v0123.val ∣ 65536 := by rw [h_v0123_val]; exact h_dvd
+    have h_v0123_pos : 0 < v0123.val := by rw [h_v0123_val]; exact h_pos
+    have h_cancel := cancel_mul_65536_zero_poly h_v0123_dvd h_v0123_pos h_eq
+    rw [h_v0123_val] at h_cancel
+    -- h_cancel : hl * ((65536/M : ℕ) : ZMod p) + ll = 0
+    have h_quot_pos : 0 < 65536 / M := Nat.div_pos h_M_le h_pos
+    have h_quot_le : 65536 / M ≤ 65536 := Nat.div_le_self _ _
+    have h_M_quot_eq : M * (65536 / M) = 65536 := Nat.mul_div_cancel' h_dvd
+    have h_quot_le_p : 65536 / M < p := by omega
+    have h_hl_quot_lt : hl.val * (65536 / M) < 65536 := by
+      nlinarith [h_hl_lt, h_M_quot_eq, h_pos, h_quot_pos]
+    have h_hl_quot_lt_p : hl.val * (65536 / M) < p := by omega
+    have h_hl_quot_val : (hl * ((65536 / M : ℕ) : ZMod p)).val = hl.val * (65536 / M) := by
+      rw [ZMod.val_mul_of_lt]
+      · rw [ZMod.val_natCast_of_lt h_quot_le_p]
+      · rw [ZMod.val_natCast_of_lt h_quot_le_p]; exact h_hl_quot_lt_p
+    have h_sum_lt_p : hl.val * (65536 / M) + ll.val < p := by
+      have : hl.val * (65536 / M) + ll.val < 65536 + 65536 / M := by omega
+      omega
+    have h_sum_val : (hl * ((65536 / M : ℕ) : ZMod p) + ll).val =
+                     hl.val * (65536 / M) + ll.val := by
+      rw [ZMod.val_add_of_lt]
+      · rw [h_hl_quot_val]
+      · rw [h_hl_quot_val]; exact h_sum_lt_p
+    have h_zero_val : (hl * ((65536 / M : ℕ) : ZMod p) + ll).val = 0 := by
+      rw [h_cancel]; exact ZMod.val_zero
+    rw [h_sum_val] at h_zero_val
+    -- hl.val * (65536/M) + ll.val = 0 in ℕ ⇒ both factors zero.
+    have h_hl_val_zero : hl.val = 0 := by
+      have h_prod_zero : hl.val * (65536 / M) = 0 := by omega
+      exact (Nat.mul_eq_zero.mp h_prod_zero).resolve_right (by omega)
+    have h_ll_val_zero : ll.val = 0 := by omega
+    exact ⟨(ZMod.val_eq_zero hl).mp h_hl_val_zero,
+           (ZMod.val_eq_zero ll).mp h_ll_val_zero⟩
+  -- TODO(srlw_poly_body): apply `zero_aux` in a 16-case cb dispatch for
+  -- `(hl2, ll2)` and `(hl3, ll3)`, then reduce the goal via
+  -- `sign_extend_32_to_64_msb_poly` + SRL byte-shift wrappers on the low half.
   sorry
 
 lemma spec.srlw_poly (Main : Vector (ZMod p) 69) (h : is_srlw_poly Main) :
