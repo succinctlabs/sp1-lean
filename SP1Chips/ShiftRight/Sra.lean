@@ -11,6 +11,69 @@ set_option maxHeartbeats 100000000
 
 variable (Main : Vector (Fin KB) 69)
 
+section sra_helpers
+
+/-- Nat identity: for `X < 2^64` and `K ∣ 2^64`,
+`X / K + 2^64 - 2^64/K = 2^64 - 1 - (2^64 - 1 - X) / K`.
+Used to bridge SRL's `b/K` form to SRA's `2^64-1 - (2^64-1-b)/K` form. -/
+private lemma sra_div_identity (X K : ℕ) (h_X : X < 2 ^ 64) (h_K_pos : 0 < K)
+    (h_K_dvd : K ∣ 2 ^ 64) :
+    X / K + 2 ^ 64 - 2 ^ 64 / K = 2 ^ 64 - 1 - (2 ^ 64 - 1 - X) / K := by
+  obtain ⟨Q, hQ⟩ := h_K_dvd
+  have h_div_2_64 : (2 : ℕ) ^ 64 / K = Q := by
+    rw [hQ]; exact Nat.mul_div_cancel_left Q h_K_pos
+  have h_KQ : K * Q = 2 ^ 64 := hQ.symm
+  set q := X / K with hq_def
+  set r := X % K with hr_def
+  have h_X_dec : K * q + r = X := Nat.div_add_mod X K
+  have h_r_lt : r < K := Nat.mod_lt X h_K_pos
+  have h_q_lt : q < Q := by
+    have h_qK_le_X : q * K ≤ X := Nat.div_mul_le_self X K
+    have h_X_lt_KQ : X < K * Q := by rw [← hQ]; exact h_X
+    have h_qK_lt_KQ : q * K < Q * K := by
+      calc q * K ≤ X := h_qK_le_X
+        _ < K * Q := h_X_lt_KQ
+        _ = Q * K := Nat.mul_comm _ _
+    exact Nat.lt_of_mul_lt_mul_right h_qK_lt_KQ
+  -- Use the identity K*Q = K*(q+1) + K*(Q-q-1), expand X = K*q + r.
+  have h_q_succ_le_Q : q + 1 ≤ Q := h_q_lt
+  have h_KQ_split : K * Q = K * q + K + K * (Q - q - 1) := by
+    have h_Q_decomp : Q = (q + 1) + (Q - q - 1) := by omega
+    calc K * Q = K * ((q + 1) + (Q - q - 1)) := by rw [← h_Q_decomp]
+      _ = K * (q + 1) + K * (Q - q - 1) := by rw [Nat.mul_add]
+      _ = K * q + K + K * (Q - q - 1) := by rw [Nat.mul_add, Nat.mul_one]
+  have h_alg : 2 ^ 64 - 1 - X = K * (Q - q - 1) + (K - 1 - r) := by
+    rw [← h_KQ]
+    rw [h_KQ_split, ← h_X_dec]
+    omega
+  have h_div_eq : (2 ^ 64 - 1 - X) / K = Q - q - 1 := by
+    rw [h_alg, Nat.mul_add_div h_K_pos]
+    rw [Nat.div_eq_of_lt (by omega : K - 1 - r < K)]
+    omega
+  rw [h_div_2_64, h_div_eq]
+  omega
+
+/-- Helper: K = 2^S divides 2^64 for S ≤ 64. -/
+private lemma sra_pow_dvd (S : ℕ) (h_S : S ≤ 64) : 2 ^ S ∣ 2 ^ 64 :=
+  pow_dvd_pow 2 h_S
+
+/-- Helper: 2^64 / 2^S = 2^(64-S) for S ≤ 64. -/
+private lemma sra_pow_div_pow (S : ℕ) (h_S : S ≤ 64) : (2 : ℕ) ^ 64 / 2 ^ S = 2 ^ (64 - S) := by
+  rw [show (2 : ℕ) ^ 64 = 2 ^ S * 2 ^ (64 - S) from by rw [← pow_add]; congr 1; omega]
+  exact Nat.mul_div_cancel_left _ (by positivity)
+
+-- TODO(sra_wrappers): the four `sra_close_su16_{0,1,2,3}_case` wrappers (SRA byte-shift
+-- closers mirroring `srl_close_su16_*_case`) are not yet implemented. They need to bridge
+-- SRL's `b/N` form to SRA's `2^64-1 - (2^64-1-b)/N` form via `sra_div_identity` plus
+-- limb arithmetic for the `(65536 - v0123) * 2^48` (and analogous) fill terms. An
+-- initial attempt timed out at >100M heartbeats due to redoing all SRL val arithmetic
+-- in-line; future work should delegate as much as possible to
+-- `srl_within_byte_shift_{,1,2,3}_poly` rather than re-deriving the val bridges.
+-- The Nat-level identity `sra_div_identity` and the small `sra_pow_*` helpers above
+-- are ready; the limb arithmetic is the remaining heavy lift.
+
+end sra_helpers
+
 section sra
 
 /-- Shared proof body for `spec.sra` and `spec.srai`. -/

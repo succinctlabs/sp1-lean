@@ -178,6 +178,41 @@ set_option maxHeartbeats 400000000 in
 set_option debug.skipKernelTC true in
 -- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N`
 -- re-checks (mirrors `spec.srl_common_poly`'s use).
+
+set_option maxHeartbeats 800000000 in
+-- 800M heartbeats: 4-way arm × 4-way byte_shift × 16-way cb sub-cases.
+set_option debug.skipKernelTC true in
+-- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel.
+-- Bound each `Main[32+k].val < 65536` by dispatching on arm and byte_shift,
+-- then identifying each `a_k` with `lr_?` or `0` (or `msb_b * 65535` for SR/SRW
+-- with correction). For SRL/SRLW, the corrections vanish (msb_b = 0 / msb_srw = 0).
+-- For SRA/SRAW with msb_b = 1, the corrections are bounded via `bool_mul_65535_lt_poly`.
+-- TODO: Full per-arm + per-byte_shift + per-cb case analysis. Currently stubbed.
+-- Lives here (Srlw.lean) rather than Common.lean because `spec.srlw_common_poly` is the
+-- only consumer; the closure work is sequenced in Phase 3 of the ShiftRight cleanup plan.
+private lemma ops_U64_a_poly_local (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    Word.isU64_poly #v[Main[32], Main[33], Main[34], Main[35]] := by
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  have h_disj := srl_or_sra_or_srlw_or_sraw_of_real Main cstrs h_real
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
+  have ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+  have ⟨c0_16, _, _, _⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+             List.getElem_cons_succ] at b0_16 b1_16 b2_16 b3_16 c0_16
+  obtain ⟨sop_1, sop_2, sop_3, sop_4⟩ := single_op_poly Main cstrs
+  have ⟨h_su_1, h_su_2, h_su_3, h_su_4⟩ := single_su16_poly Main cstrs h_real
+  have h_sum_ne : ¬ Main[64] + Main[65] + Main[66] + Main[67] = 0 := by
+    intro h; rw [h] at h_real; exact zero_ne_one h_real
+  -- Apply isU64_of_cases_poly: 4 sub-goals for a_0, a_1, a_2, a_3.
+  -- Each sub-goal needs: arm split (4-way) × byte_shift split (4-way for SR, 2 for SRW)
+  -- × per-cb 16-way to derive M, N for limb_16_lt_aux_poly.
+  -- TODO: Full case analysis.
+  sorry
+
 /-- Shared proof body for `spec.srlw_poly` and `spec.srliw_poly`. Structure
 mirrors `spec.srl_common_poly` but for 32-bit operands:
 - Forces `hl2 = ll2 = hl3 = ll3 = 0` via `cancel_mul_65536_zero_poly` (since
@@ -196,7 +231,7 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
   haveI : Fact (1 < p) := ⟨by omega⟩
   have h_real := is_real_eq_one_of_srlw Main cstrs eq_srlw
   have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  have is_U64_a := ops_U64_a_poly Main cstrs h_real
+  have is_U64_a := ops_U64_a_poly_local Main cstrs h_real
   have is_U32_b := Word.isU64_poly_low_poly_isU32_poly is_U64_b
   have is_U32_c := Word.isU64_poly_low_poly_isU32_poly is_U64_c
   have is_U32_a := Word.isU64_poly_low_poly_isU32_poly is_U64_a

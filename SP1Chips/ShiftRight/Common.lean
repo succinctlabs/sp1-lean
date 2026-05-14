@@ -1029,45 +1029,9 @@ lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 69)
       · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
           List.getElem_cons_zero, h_c3, ZMod.val_zero]; omega
 
-set_option maxHeartbeats 800000000 in
--- 800M heartbeats: 4-way arm × 4-way byte_shift × 16-way cb sub-cases.
-set_option debug.skipKernelTC true in
--- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel.
--- Bound each `Main[32+k].val < 65536` by dispatching on arm and byte_shift,
--- then identifying each `a_k` with `lr_?` or `0` (or `msb_b * 65535` for SR/SRW
--- with correction). For SRL/SRLW, the corrections vanish (msb_b = 0 / msb_srw = 0).
--- For SRA/SRAW with msb_b = 1, the corrections are bounded via `bool_mul_65535_lt_poly`.
--- TODO: Full per-arm + per-byte_shift + per-cb case analysis. Currently stubbed.
-lemma ops_U64_a_poly (Main : Vector (ZMod p) 69)
-    (cstrs : (constraints Main).allHold_poly)
-    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
-    Word.isU64_poly #v[Main[32], Main[33], Main[34], Main[35]] := by
-  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  have hp : 2 ^ 17 < p := Fact.out
-  haveI : Fact (1 < p) := ⟨by omega⟩
-  have h_disj := srl_or_sra_or_srlw_or_sraw_of_real Main cstrs h_real
-  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  have ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
-  have ⟨c0_16, _, _, _⟩ := Word.lt_cases_of_isU64_poly is_U64_c
-  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-             List.getElem_cons_succ] at b0_16 b1_16 b2_16 b3_16 c0_16
-  obtain ⟨sop_1, sop_2, sop_3, sop_4⟩ := single_op_poly Main cstrs
-  have ⟨h_su_1, h_su_2, h_su_3, h_su_4⟩ := single_su16_poly Main cstrs h_real
-  have h_sum_ne : ¬ Main[64] + Main[65] + Main[66] + Main[67] = 0 := by
-    intro h; rw [h] at h_real; exact zero_ne_one h_real
-  -- Apply isU64_of_cases_poly: 4 sub-goals for a_0, a_1, a_2, a_3.
-  -- Each sub-goal needs: arm split (4-way) × byte_shift split (4-way for SR, 2 for SRW)
-  -- × per-cb 16-way to derive M, N for limb_16_lt_aux_poly.
-  -- TODO: Full case analysis.
-  sorry
-
-lemma ops_U64_poly (Main : Vector (ZMod p) 69)
-    (cstrs : (constraints Main).allHold_poly)
-    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
-    Word.isU64_poly #v[Main[32], Main[33], Main[34], Main[35]] ∧
-    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
-    Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] :=
-  ⟨ops_U64_a_poly Main cstrs h_real, ops_U64_b_c_poly Main cstrs h_real⟩
+-- `ops_U64_a_poly` (the SRLW-only U64-bound for the output `a`) lives in
+-- `SP1Chips.ShiftRight.Srlw` as a private helper since it has exactly one consumer
+-- there. The tri-bundle `ops_U64_poly` was unused and has been removed.
 
 set_option maxHeartbeats 16000000 in
 -- 16M heartbeats: 4-way opcode case-split × 6 conjuncts per arm × ALU iff unfold
@@ -1959,74 +1923,5 @@ lemma srl_close_su16_3_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     h_b0' h_b1' h_b2' h_b3'
 
 end srl_close_wrappers
-
-section sra_close_wrappers
-
-variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
-
-/-- Nat identity: for `X < 2^64` and `K ∣ 2^64`,
-`X / K + 2^64 - 2^64/K = 2^64 - 1 - (2^64 - 1 - X) / K`.
-Used to bridge SRL's `b/K` form to SRA's `2^64-1 - (2^64-1-b)/K` form. -/
-private lemma sra_div_identity (X K : ℕ) (h_X : X < 2 ^ 64) (h_K_pos : 0 < K)
-    (h_K_dvd : K ∣ 2 ^ 64) :
-    X / K + 2 ^ 64 - 2 ^ 64 / K = 2 ^ 64 - 1 - (2 ^ 64 - 1 - X) / K := by
-  obtain ⟨Q, hQ⟩ := h_K_dvd
-  have h_div_2_64 : (2 : ℕ) ^ 64 / K = Q := by
-    rw [hQ]; exact Nat.mul_div_cancel_left Q h_K_pos
-  have h_KQ : K * Q = 2 ^ 64 := hQ.symm
-  set q := X / K with hq_def
-  set r := X % K with hr_def
-  have h_X_dec : K * q + r = X := Nat.div_add_mod X K
-  have h_r_lt : r < K := Nat.mod_lt X h_K_pos
-  have h_q_lt : q < Q := by
-    have h_qK_le_X : q * K ≤ X := Nat.div_mul_le_self X K
-    have h_X_lt_KQ : X < K * Q := by rw [← hQ]; exact h_X
-    have h_qK_lt_KQ : q * K < Q * K := by
-      calc q * K ≤ X := h_qK_le_X
-        _ < K * Q := h_X_lt_KQ
-        _ = Q * K := Nat.mul_comm _ _
-    exact Nat.lt_of_mul_lt_mul_right h_qK_lt_KQ
-  -- Use the identity K*Q = K*(q+1) + K*(Q-q-1), expand X = K*q + r.
-  have h_q_succ_le_Q : q + 1 ≤ Q := h_q_lt
-  have h_KQ_split : K * Q = K * q + K + K * (Q - q - 1) := by
-    have h_Q_decomp : Q = (q + 1) + (Q - q - 1) := by omega
-    calc K * Q = K * ((q + 1) + (Q - q - 1)) := by rw [← h_Q_decomp]
-      _ = K * (q + 1) + K * (Q - q - 1) := by rw [Nat.mul_add]
-      _ = K * q + K + K * (Q - q - 1) := by rw [Nat.mul_add, Nat.mul_one]
-  have h_alg : 2 ^ 64 - 1 - X = K * (Q - q - 1) + (K - 1 - r) := by
-    -- 2^64 = K*Q = K*q + K + K*(Q-q-1); X = K*q + r.
-    -- 2^64 - 1 - X = (K*q + K + K*(Q-q-1)) - 1 - (K*q + r)
-    --             = K + K*(Q-q-1) - 1 - r
-    --             = K*(Q-q-1) + (K - 1 - r) [since r < K]
-    rw [← h_KQ]
-    rw [h_KQ_split, ← h_X_dec]
-    omega
-  have h_div_eq : (2 ^ 64 - 1 - X) / K = Q - q - 1 := by
-    rw [h_alg, Nat.mul_add_div h_K_pos]
-    rw [Nat.div_eq_of_lt (by omega : K - 1 - r < K)]
-    omega
-  rw [h_div_2_64, h_div_eq]
-  omega
-
-/-- Helper: K = 2^S divides 2^64 for S ≤ 64. -/
-private lemma sra_pow_dvd (S : ℕ) (h_S : S ≤ 64) : 2 ^ S ∣ 2 ^ 64 :=
-  pow_dvd_pow 2 h_S
-
-/-- Helper: 2^64 / 2^S = 2^(64-S) for S ≤ 64. -/
-private lemma sra_pow_div_pow (S : ℕ) (h_S : S ≤ 64) : (2 : ℕ) ^ 64 / 2 ^ S = 2 ^ (64 - S) := by
-  rw [show (2 : ℕ) ^ 64 = 2 ^ S * 2 ^ (64 - S) from by rw [← pow_add]; congr 1; omega]
-  exact Nat.mul_div_cancel_left _ (by positivity)
-
--- TODO(sra_wrappers): the four `sra_close_su16_{0,1,2,3}_case` wrappers (SRA byte-shift
--- closers mirroring `srl_close_su16_*_case`) are not yet implemented. They need to bridge
--- SRL's `b/N` form to SRA's `2^64-1 - (2^64-1-b)/N` form via `sra_div_identity` plus
--- limb arithmetic for the `(65536 - v0123) * 2^48` (and analogous) fill terms. An
--- initial attempt timed out at >100M heartbeats due to redoing all SRL val arithmetic
--- in-line; future work should delegate as much as possible to
--- `srl_within_byte_shift_{,1,2,3}_poly` rather than re-deriving the val bridges.
--- The Nat-level identity `sra_div_identity` and the small `sra_pow_*` helpers above
--- are ready; the limb arithmetic is the remaining heavy lift.
-
-end sra_close_wrappers
 
 end ShiftRight
