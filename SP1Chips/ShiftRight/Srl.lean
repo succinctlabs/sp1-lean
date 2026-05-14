@@ -243,19 +243,31 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   simp only [Word.toBitVec64_poly, Word.toNat_poly_def, BitVec.toNat_ofNat,
              Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
              List.getElem_cons_succ]
-  -- Goal now: (a-toNat-poly) % 2^64 = (b-toNat-poly) / 2^cb_sum
-  -- where cb_sum is in val-of-cb form. The Fin KB blast applies a 64-way
-  -- rcases on cb0..cb5 with simp_all + cancel_mul_65536_v1 + omega.
-  -- The poly equivalent attempted in this session (rcases <;> simp_all
-  -- <;> try cancel_mul_65536_poly <;> simp_all + all_goals omega) hits
-  -- "simp_all made no progress" in many of the 64 sub-cases, because
-  -- after cb_i substitution + sr-arm gating, some cases need targeted
-  -- lr_j rewrites that simp_all doesn't find without further direction.
-  -- The path forward: replace `simp_all` with manually-controlled
-  -- substitution per sub-case (substitute h_no_sra/srlw/sraw + use
-  -- eq_v01..eq_v0123 to compute v0123's concrete value, then use the
-  -- su16 + sr-arm constraints to pick the right a_j = lr_? equation).
-  sorry
+  -- Substitute SRL-arm constants: h_no_sra/srlw/sraw = 0, so srl + sra = 1
+  -- and srlw + sraw = 0. This collapses gating disjunctions.
+  rw [h_no_sra] at h_su160 h_su161 h_su162 h_su163 sr_00 sr_01 sr_02 sr_03
+                   sr_10 sr_11 sr_12 sr_13 sr_20 sr_21 sr_22 sr_23 sr_30 sr_31 sr_32 sr_33
+                   one_of_su16s
+  rw [h_no_srlw] at srw_00 srw_01 srw_10 srw_11 srw_w2 srw_w3 w_msb_b
+  rw [h_no_sraw] at srw_00 srw_01 srw_10 srw_11 srw_w2 srw_w3
+  -- 64-way case split on cb0..cb5. Each case substitutes specific values;
+  -- simp_all then propagates cb_i = 0/1 through eq_v01..eq_v0123, ll/hl bounds,
+  -- h_b_dec, su16 + sr-arm constraints, closing many sub-cases.
+  -- Phase 3a status: simp_all closes the majority; the remaining cases need
+  -- manual per-case work (cancel_mul_65536_poly + su16-selection + lr-chain
+  -- omega). Documented as `all_goals sorry` until per-case handlers land.
+  rcases b_cb0 with h_cb0 | h_cb0 <;>
+    rcases b_cb1 with h_cb1 | h_cb1 <;>
+    rcases b_cb2 with h_cb2 | h_cb2 <;>
+    rcases b_cb3 with h_cb3 | h_cb3 <;>
+    rcases b_cb4 with h_cb4 | h_cb4 <;>
+    rcases b_cb5 with h_cb5 | h_cb5 <;>
+    (try
+      simp_all (config := {decide := false}) [ZMod.val_zero, ZMod.val_one,
+        val_2_zmod_p, val_4_zmod_p, val_8_zmod_p, val_16_zmod_p, val_32_zmod_p,
+        val_64_zmod_p, val_65536_zmod_p, val_2_ne_zero, val_4_ne_zero, val_8_ne_zero,
+        val_65536_ne_zero])
+  all_goals sorry
 
 lemma spec.srl_poly (Main : Vector (ZMod p) 69) (h : is_srl_poly Main) :
     (constraints Main).allHold_poly →
