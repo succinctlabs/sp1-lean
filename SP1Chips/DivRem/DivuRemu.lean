@@ -1483,9 +1483,11 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
   simp only [Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
     at hc0_lt hc1_lt hc2_lt hc3_lt hb0_lt hb1_lt hb2_lt hb3_lt
-  -- Minimal trailing-arm closer. 17 of 18 arms close via either the main equality
-  -- rewrite, Word.isU64_of_cases_poly + simp_all, or omega. The 18th (maco form)
-  -- falls through to sorry — needs a targeted is_c_0 case-split.
+  -- Minimal trailing-arm closer. 17 of 18 arms close; the 18th (maco form
+  -- `Word.isU64_poly #v[is_c_0 + (1-is_c_0)*c0, ...]`) falls through to sorry.
+  -- The maco arm requires a case-split on `is_c_0 = if c's all zero then 1 else 0`
+  -- combined with simp + omega; the kitchen-sink chain doesn't reach this combo
+  -- without breaking other arms (split_ifs fails on non-maco goals).
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
