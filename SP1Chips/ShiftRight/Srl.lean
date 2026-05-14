@@ -137,29 +137,27 @@ section srl_poly
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-/-- Shared proof body for `spec.srl_poly` and `spec.srli_poly`. Both prove the
-same `.SRL` equivalence from just `Main[64] = 1` (the imm bit doesn't affect
-the underlying shift computation).
-
-Mirrors the Fin KB `spec.srl_common`'s 64-way `rcases` blast, but uses
-polymorphic helpers (`is_mod_64_poly`, `cancel_mul_65536_poly`,
-`Word.toBitVec64_poly_toNat_poly`) and ZMod-aware arithmetic. The compact
-form (rather than ShiftLeft's 5-layer helper architecture) is feasible here
-because right-shift's per-byte structure is symmetric across the case split,
-unlike SLL where each cb-combination produces a different shift offset. -/
 private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (eq_srl : Main[64] = 1) :
     Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
       execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[25], Main[26], Main[27], Main[28]] .SRL := by
-  -- TODO Phase 3: port Fin KB `spec.srl_common`'s 64-way `rcases b_cb0..5 + simp_all +
-  -- cancel_mul_65536_v1 + omega` blast to ZMod p. Needs (1) `cb_sum_val_eq_poly` helper
-  -- bridging `(cb0 + cb1*2 + ... + cb5*32).val` to sum-of-vals (for `is_mod_64_poly`
-  -- premise), (2) `Word.toBitVec64_poly` LHS reduction (likely inline via toNat_poly_def
-  -- since `is_U64_a` is unavailable until `ops_U64_a_poly` lands), (3) per-case
-  -- `cancel_mul_65536_poly` application on `h_b{0,1,2,3}_dec`, (4) `omega` close after
-  -- substitution. ShiftLeft's `spec.sll_poly` is 1050 lines / 5-layer helper architecture
-  -- (see `sll_within_byte_shift_poly`, `sll_close_cb4cb5_*_case`).
+  -- TODO Phase 3: port Fin KB `spec.srl_common`'s 64-way `rcases b_cb0..5` blast.
+  -- Phase 3 attempt notes (commit 859eebd → this stub):
+  -- (1) `BitVec.ushiftRight_eq'` is needed for the `>>>` between two BitVecs to
+  --     simp through (see `BitVec/Lemmas.lean:2203`). Mirror of SLL's
+  --     `BitVec.shiftLeft_eq'`.
+  -- (2) The constraints def emits literals with mixed cast form: `Main[39] * ↑2`
+  --     and `Main[43] * 32` (some cast, some raw). The `is_mod_64_poly` premise
+  --     needs the constraint's exact `↑N` form; use `Nat.cast_ofNat` simp lemma
+  --     before applying.
+  -- (3) `Word.toBitVec64_poly_toNat_poly is_U64_c` triggers kernel deep recursion
+  --     on `2^N` re-checks. Add `set_option debug.skipKernelTC true in` for the
+  --     lemma (mirrors ShiftLeft `spec.sll_poly`).
+  -- (4) The 64-way case split closing follows the Fin KB pattern but each case
+  --     applies `cancel_mul_65536_poly` then `omega`.
+  -- ShiftLeft's spec.sll_poly is 1050 lines / 5-layer architecture; SRL should
+  -- be similarly heavy. Multi-session work.
   sorry
 
 lemma spec.srl_poly (Main : Vector (ZMod p) 69) (h : is_srl_poly Main) :
