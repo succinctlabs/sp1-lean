@@ -546,6 +546,73 @@ lemma cancel_mul_65536_zero_poly {b c x : ZMod p}
   have := cancel_mul_65536_poly h_x_dvd h_x_pos (a := 0) (b := b) (c := c)
   rw [zero_mul] at this; symm; exact this h_eq.symm
 
+/-- Computes `(cb0 + cb1*2 + cb2*4 + cb3*8 + cb4*16 + cb5*32).val` in ZMod p
+when each cb_i ∈ {0, 1}, asserting no wrap (sum ≤ 63 < p since p > 2^17). The
+RHS is the natural sum-of-vals form. Reused by every spec.*_poly to bridge
+`is_mod_64_poly`'s ZMod premise to a Nat equation. -/
+lemma cb_sum_val_eq_poly {cb0 cb1 cb2 cb3 cb4 cb5 : ZMod p}
+    (b_cb0 : cb0 = 0 ∨ cb0 = 1) (b_cb1 : cb1 = 0 ∨ cb1 = 1)
+    (b_cb2 : cb2 = 0 ∨ cb2 = 1) (b_cb3 : cb3 = 0 ∨ cb3 = 1)
+    (b_cb4 : cb4 = 0 ∨ cb4 = 1) (b_cb5 : cb5 = 0 ∨ cb5 = 1) :
+    (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val =
+      cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 + cb5.val * 32 := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  have hb0 : cb0.val ≤ 1 := by rcases b_cb0 with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
+  have hb1 : cb1.val ≤ 1 := by rcases b_cb1 with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
+  have hb2 : cb2.val ≤ 1 := by rcases b_cb2 with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
+  have hb3 : cb3.val ≤ 1 := by rcases b_cb3 with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
+  have hb4 : cb4.val ≤ 1 := by rcases b_cb4 with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
+  have hb5 : cb5.val ≤ 1 := by rcases b_cb5 with h | h <;> rw [h] <;> simp [ZMod.val_zero, ZMod.val_one]
+  have v_2 : (2 : ZMod p).val = 2 := val_2_zmod_p
+  have v_4 : (4 : ZMod p).val = 4 := val_4_zmod_p
+  have v_8 : (8 : ZMod p).val = 8 := val_8_zmod_p
+  have v_16 : (16 : ZMod p).val = 16 := val_16_zmod_p
+  have v_32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  have m1 : (cb1 * 2 : ZMod p).val = cb1.val * 2 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_2]
+    · rw [v_2]; omega
+  have m2 : (cb2 * 4 : ZMod p).val = cb2.val * 4 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_4]
+    · rw [v_4]; omega
+  have m3 : (cb3 * 8 : ZMod p).val = cb3.val * 8 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_8]
+    · rw [v_8]; omega
+  have m4 : (cb4 * 16 : ZMod p).val = cb4.val * 16 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_16]
+    · rw [v_16]; omega
+  have m5 : (cb5 * 32 : ZMod p).val = cb5.val * 32 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_32]
+    · rw [v_32]; omega
+  have a1 : (cb0 + cb1 * 2 : ZMod p).val = cb0.val + cb1.val * 2 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [m1]
+    · rw [m1]; omega
+  have a2 : (cb0 + cb1 * 2 + cb2 * 4 : ZMod p).val =
+      cb0.val + cb1.val * 2 + cb2.val * 4 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [a1, m2]
+    · rw [a1, m2]; omega
+  have a3 : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 : ZMod p).val =
+      cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [a2, m3]
+    · rw [a2, m3]; omega
+  have a4 : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 : ZMod p).val =
+      cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [a3, m4]
+    · rw [a3, m4]; omega
+  rw [ZMod.val_add_of_lt]
+  · rw [a4, m5]
+  · rw [a4, m5]; omega
+
 /-- For booleans b ∈ {0, 1}, the product b · 65535 has val < 65536. -/
 lemma bool_mul_65535_lt_poly {b : ZMod p} (hb : b = 0 ∨ b = 1) :
     (b * 65535).val < 65536 := by
