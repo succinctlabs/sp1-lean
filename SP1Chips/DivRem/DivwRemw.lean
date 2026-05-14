@@ -1976,6 +1976,10 @@ lemma spec.divw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop5 h_is_divw
     simp [h_is_divw, z0, z1, z2, z3, z4, z5, z6] at *
+  -- FIXME: divw stubborn arms require deriving `msb_quot, msb_rem ∈ {0, 1}` from
+  -- `w_eq_msb_*` constraints which have varied form across side-goals (some
+  -- post-`U16MSBOperation.spec.gen_poly`, some still raw `List.Forall ... constraints`).
+  -- Robust binary derivation across all goal contexts not yet tractable.
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
