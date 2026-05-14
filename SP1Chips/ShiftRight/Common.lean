@@ -928,7 +928,11 @@ lemma ops_U64_poly (Main : Vector (ZMod p) 69)
     Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] :=
   ⟨ops_U64_a_poly Main cstrs h_real, ops_U64_b_c_poly Main cstrs h_real⟩
 
-/-- Combined register/immediate-bound bundle threaded through every spec proof. -/
+set_option maxHeartbeats 16000000 in
+-- 16M heartbeats: 4-way opcode case-split × 6 conjuncts per arm × ALU iff unfold
+-- with simp on Opcode.ofNat reflection. ShiftLeft's 2-way analog uses 16M.
+/-- Combined register/immediate-bound bundle threaded through every spec proof.
+Mirrors `ShiftLeft.bounds_poly` with a 4-way SRL/SRA/SRLW/SRAW case-split. -/
 lemma bounds_poly (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly)
     (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
@@ -942,7 +946,174 @@ lemma bounds_poly (Main : Vector (ZMod p) 69)
         ((Main[64] = 1 ∨ Main[65] = 1 → Main[25].val < 64) ∧
          (Main[66] = 1 ∨ Main[67] = 1 → Main[25].val < 32)))) ∧
     (Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0) := by
-  sorry
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  have h65536 : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
+  have h_disj := srl_or_sra_or_srlw_or_sraw_of_real Main cstrs h_real
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  -- Helper: discharge the "x=1 ∨ y=1" contradiction when both are known 0.
+  have h_contradict_or : ∀ {x y : ZMod p}, x = 0 → y = 0 → (x = 1 ∨ y = 1) → False :=
+    fun hx hy hor => by
+      rcases hor with h | h
+      · rw [hx] at h; exact zero_ne_one h
+      · rw [hy] at h; exact zero_ne_one h
+  obtain ⟨_, _, _, _, alu, _, _, _, _, _, _, _, _, _, _, _, _, rest⟩ := cstrs
+  -- `rest` has 55 conjuncts (positions 18-72 of the iff RHS). The last is Main[13] = 0.
+  -- Destructure with 54 underscores + the named final conjunct.
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+          _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+          _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+          h_M13⟩ := rest
+  rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_real rfl] at alu
+  dsimp only at alu
+  obtain ⟨h_trusted, h_op_a_lt, _h_op_b_lt, _h_op_c_lts, _, h_op_a_0_iff, b_imm, _,
+          h_pc0_lt, _, _, _, _, _, _, _, _, h_imm0, _h_op_a_0_zeros, h_imm1_op_c⟩ := alu
+  have h_a_lt : Main[6].val < 32 := by
+    have : Main[6].val < (32 : ZMod p).val := h_op_a_lt
+    rwa [h32] at this
+  have h_pc_lt : Main[3].val < 65536 := by
+    have : Main[3].val < (65536 : ZMod p).val := h_pc0_lt
+    rwa [h65536] at this
+  have h64_pow : (2 ^ 6 : ZMod p).val = 64 := by
+    rw [show (2 ^ 6 : ZMod p) = ((64 : ℕ) : ZMod p) from by push_cast; ring]
+    exact ZMod.val_natCast_of_lt (by omega)
+  have h32_pow : (2 ^ 5 : ZMod p).val = 32 := by
+    rw [show (2 ^ 5 : ZMod p) = ((32 : ℕ) : ZMod p) from by push_cast; ring]
+    exact ZMod.val_natCast_of_lt (by omega)
+  -- The op_a=0 conjunct is vacuously true since Main[13]=0 ⇔ Main[6]≠0.
+  have h_a_zero_imp_zeros : Main[6] = 0 → Main[32] = 0 ∧ Main[33] = 0 ∧ Main[34] = 0 ∧ Main[35] = 0 := by
+    intro h_a0_eq
+    exfalso
+    have h13_eq_one : Main[13] = 1 := h_op_a_0_iff.mpr h_a0_eq
+    rw [h_M13] at h13_eq_one
+    exact zero_ne_one h13_eq_one
+  rcases h_disj with ⟨h_srl, h_no_sra, h_no_srlw, h_no_sraw⟩ |
+                     ⟨h_no_srl, h_sra, h_no_srlw, h_no_sraw⟩ |
+                     ⟨h_no_srl, h_no_sra, h_srlw, h_no_sraw⟩ |
+                     ⟨h_no_srl, h_no_sra, h_no_srlw, h_sraw⟩
+  · -- SRL case: opcode = 7, shift_i_type (6-bit shamt)
+    have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                = ((7 : ℕ) : ZMod p) := by
+      rw [h_srl, h_no_sra, h_no_srlw, h_no_sraw]; push_cast; ring
+    have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 7 := by
+      rw [h_expr]; exact ZMod.val_natCast_of_lt (by omega)
+    simp only [h_opc, show Opcode.ofNat 7 = .SRL from rfl, Opcode.trusted_instr_poly] at h_trusted
+    refine ⟨h_a_lt, ?_, ?_, h_pc_lt, is_U64_b, is_U64_c, ?_, h_a_zero_imp_zeros⟩
+    · rcases b_imm with h_imm | h_imm
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.1 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.2 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm0_eq
+      have ⟨_, _, h_lt, _⟩ := h_trusted.1 h_imm0_eq
+      have : Main[21].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm1_eq
+      have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+      have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+      have ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_trusted.2 h_imm1_eq
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at h_c1 h_c2 h_c3
+      refine ⟨e_25.symm, e_26.trans h_c1, e_27.trans h_c2, e_28.trans h_c3, ?_, ?_⟩
+      · intro _
+        rw [e_25]
+        have : Main[21].val < (2 ^ 6 : ZMod p).val := h_c0_lt
+        rw [h64_pow] at this; omega
+      · intro h; exact (h_contradict_or h_no_srlw h_no_sraw h).elim
+  · -- SRA case: opcode = 8, shift_i_type (6-bit shamt)
+    have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                = ((8 : ℕ) : ZMod p) := by
+      rw [h_no_srl, h_sra, h_no_srlw, h_no_sraw]; push_cast; ring
+    have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 8 := by
+      rw [h_expr]; exact ZMod.val_natCast_of_lt (by omega)
+    simp only [h_opc, show Opcode.ofNat 8 = .SRA from rfl, Opcode.trusted_instr_poly] at h_trusted
+    refine ⟨h_a_lt, ?_, ?_, h_pc_lt, is_U64_b, is_U64_c, ?_, h_a_zero_imp_zeros⟩
+    · rcases b_imm with h_imm | h_imm
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.1 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.2 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm0_eq
+      have ⟨_, _, h_lt, _⟩ := h_trusted.1 h_imm0_eq
+      have : Main[21].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm1_eq
+      have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+      have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+      have ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_trusted.2 h_imm1_eq
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at h_c1 h_c2 h_c3
+      refine ⟨e_25.symm, e_26.trans h_c1, e_27.trans h_c2, e_28.trans h_c3, ?_, ?_⟩
+      · intro _
+        rw [e_25]
+        have : Main[21].val < (2 ^ 6 : ZMod p).val := h_c0_lt
+        rw [h64_pow] at this; omega
+      · intro h; exact (h_contradict_or h_no_srlw h_no_sraw h).elim
+  · -- SRLW case: opcode = 22, w_shift_i_type (5-bit shamt)
+    have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                = ((22 : ℕ) : ZMod p) := by
+      rw [h_no_srl, h_no_sra, h_srlw, h_no_sraw]; push_cast; ring
+    have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 22 := by
+      rw [h_expr]; exact ZMod.val_natCast_of_lt (by omega)
+    simp only [h_opc, show Opcode.ofNat 22 = .SRLW from rfl, Opcode.trusted_instr_poly] at h_trusted
+    refine ⟨h_a_lt, ?_, ?_, h_pc_lt, is_U64_b, is_U64_c, ?_, h_a_zero_imp_zeros⟩
+    · rcases b_imm with h_imm | h_imm
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.1 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.2 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm0_eq
+      have ⟨_, _, h_lt, _⟩ := h_trusted.1 h_imm0_eq
+      have : Main[21].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm1_eq
+      have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+      have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+      have ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_trusted.2 h_imm1_eq
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at h_c1 h_c2 h_c3
+      refine ⟨e_25.symm, e_26.trans h_c1, e_27.trans h_c2, e_28.trans h_c3, ?_, ?_⟩
+      · intro h; exact (h_contradict_or h_no_srl h_no_sra h).elim
+      · intro _
+        rw [e_25]
+        have : Main[21].val < (2 ^ 5 : ZMod p).val := h_c0_lt
+        rw [h32_pow] at this; omega
+  · -- SRAW case: opcode = 23, w_shift_i_type (5-bit shamt)
+    have h_expr : (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)
+                = ((23 : ℕ) : ZMod p) := by
+      rw [h_no_srl, h_no_sra, h_no_srlw, h_sraw]; push_cast; ring
+    have h_opc : ((Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23 : ZMod p)).val = 23 := by
+      rw [h_expr]; exact ZMod.val_natCast_of_lt (by omega)
+    simp only [h_opc, show Opcode.ofNat 23 = .SRAW from rfl, Opcode.trusted_instr_poly] at h_trusted
+    refine ⟨h_a_lt, ?_, ?_, h_pc_lt, is_U64_b, is_U64_c, ?_, h_a_zero_imp_zeros⟩
+    · rcases b_imm with h_imm | h_imm
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.1 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+      · have ⟨_, ⟨h_lt, _⟩, _⟩ := h_trusted.2 h_imm
+        have : Main[14].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm0_eq
+      have ⟨_, _, h_lt, _⟩ := h_trusted.1 h_imm0_eq
+      have : Main[21].val < (32 : ZMod p).val := h_lt; rwa [h32] at this
+    · intro h_imm1_eq
+      have h_imm1_ne_0 : ¬ Main[31] = 0 := fun h0 => one_ne_zero (h_imm1_eq ▸ h0.symm).symm
+      have ⟨e_25, e_26, e_27, e_28⟩ := h_imm1_op_c h_imm1_ne_0
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at e_25 e_26 e_27 e_28
+      have ⟨_, _, h_c0_lt, h_c1, h_c2, h_c3⟩ := h_trusted.2 h_imm1_eq
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] at h_c1 h_c2 h_c3
+      refine ⟨e_25.symm, e_26.trans h_c1, e_27.trans h_c2, e_28.trans h_c3, ?_, ?_⟩
+      · intro h; exact (h_contradict_or h_no_srl h_no_sra h).elim
+      · intro _
+        rw [e_25]
+        have : Main[21].val < (2 ^ 5 : ZMod p).val := h_c0_lt
+        rw [h32_pow] at this; omega
 
 end poly_bounds
 
