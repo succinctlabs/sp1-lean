@@ -1116,8 +1116,23 @@ lemma div_rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^
     simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, Bool.cond_eq_ite]
     rw [Word.toBitVec64_poly_toInt_poly is_U64_b, Word.toBitVec64_poly_toInt_poly is_U64_c]
     split_ifs at div_zero with nzc <;> simp [div_zero] at *
-    · -- c = 0 branch
-      sorry
+    · -- c = 0 branch: c0 = c1 = c2 = c3 = 0 → q = #v[65535×4] = -1#64, r = b
+      obtain ⟨zc0, zc1, zc2, zc3⟩ := nzc
+      simp [zc0, zc1, zc2, zc3] at *
+      have hzero_int : Word.toInt_poly (#v[(0 : ZMod p), 0, 0, 0] : Word (ZMod p)) = 0 := by
+        simp [Word.toInt_poly, Word.isNegative_poly, Word.toNat_poly, h0v]
+      simp [hzero_int, c0_eq_q0, c0_eq_q1, c0_eq_q2, c0_eq_q3,
+            c0_eq_r0, c0_eq_r1, c0_eq_r2, c0_eq_r3]
+      refine ⟨?_, ?_⟩
+      · -- q side: Word.toBitVec64_poly #v[65535, 65535, 65535, 65535] = -1#64
+        simp [Word.toBitVec64_poly, Word.toNat_poly, h65535_val]
+      · -- r side: Word.toBitVec64_poly b = BitVec.ofInt 64 (Word.toInt_poly b)
+        have lb_b := Word.toInt_poly_lb is_U64_b
+        have ub_b := Word.toInt_poly_ub is_U64_b
+        simp only [← BitVec.toInt_inj]
+        rw [Word.toBitVec64_poly_toInt_poly is_U64_b]
+        rw [BitVec.toInt_ofInt]
+        rw [Int.bmod_eq_of_le (by omega) (by omega)]
     · -- c ≠ 0 branch
       subst arlt maco10 maco11 maco12 maco13
       rw [if_neg]; rotate_left
