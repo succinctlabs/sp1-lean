@@ -478,12 +478,167 @@ def sp1_op_c_imm_w : List.Forall SP1Constraint.toProp (constraints Main) → is_
 end operands
 
 -- ============================================================================
--- _poly skeleton (Phase 1). Bodies stubbed with `sorry`; closed in later phases.
+-- _poly skeleton (Phase 2). Field-arith helpers + boilerplate closures landed.
 -- The `is_*_poly` opcode predicates already exist from the earlier groundwork
 -- commit `3fc39ba`; see the `opcodes` section above.
 -- ============================================================================
 
+section poly_field_arithmetic
+
+/-- Polymorphic version of `is_mod_64`. From `((c0 - m) * 64⁻¹).val < 1024`,
+conclude `c0 ≡ m (mod 64)`. Cleaner than Fin KB because no wrap to undo. -/
+lemma is_mod_64_poly {c0 m : ZMod p}
+    (h_m_lt : m.val < 64) (_h_c0_lt : c0.val < 65536)
+    (h_diff : ((c0 - m) * (64 : ZMod p)⁻¹).val < 1024) :
+    c0.val % 64 = m.val := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  set k := (c0 - m) * (64 : ZMod p)⁻¹ with k_def
+  have h_k_lt : k.val < 1024 := h_diff
+  have h_64_ne : (64 : ZMod p) ≠ 0 := val_64_ne_zero
+  have h_diff_eq : c0 - m = k * 64 := by rw [k_def]; field_simp
+  have h_c0_eq : c0 = m + k * 64 := by linear_combination h_diff_eq
+  have h_k64_val : (k * 64).val = k.val * 64 := by
+    rw [show (64 : ZMod p) = ((64 : ℕ) : ZMod p) from by push_cast; rfl]
+    rw [ZMod.val_mul_of_lt]
+    · rw [show ((64 : ℕ) : ZMod p).val = 64 from val_64_zmod_p]
+    · rw [show ((64 : ℕ) : ZMod p).val = 64 from val_64_zmod_p]
+      have : k.val * 64 < 1024 * 64 := by
+        exact Nat.mul_lt_mul_of_lt_of_le h_k_lt (le_refl 64) (by omega)
+      omega
+  have h_c0_val : c0.val = m.val + k.val * 64 := by
+    have : c0.val = (m + k * 64).val := by rw [h_c0_eq]
+    rw [this, ZMod.val_add_of_lt]
+    · rw [h_k64_val]
+    · rw [h_k64_val]; omega
+  rw [h_c0_val]; omega
+
+/-- Polymorphic version of `cancel_mul_65536_v1`. Cleaner than Fin KB because
+ZMod p (p > 2^17) has no wrap to undo for products ≤ 65536^2 < 2^32 < p. -/
+lemma cancel_mul_65536_poly {a b c x : ZMod p}
+    (h_x_dvd : x.val ∣ 65536) (h_x_pos : 0 < x.val) :
+    a * x = b * 65536 + c * x → a = b * (((65536 / x.val : ℕ) : ZMod p)) + c := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  intro h_eq
+  set z : ℕ := 65536 / x.val with z_def
+  have h_x_le : x.val ≤ 65536 := Nat.le_of_dvd (by omega) h_x_dvd
+  have _h_z_pos : 0 < z := Nat.div_pos h_x_le h_x_pos
+  have _h_z_lt : z ≤ 65536 := by rw [z_def]; exact Nat.div_le_self _ _
+  have h_xz : x.val * z = 65536 := by rw [z_def, Nat.mul_div_cancel' h_x_dvd]
+  have h_xz_zmod : x * ((z : ℕ) : ZMod p) = 65536 := by
+    have : ((x.val : ZMod p)) * ((z : ℕ) : ZMod p) = ((x.val * z : ℕ) : ZMod p) := by
+      push_cast; ring
+    rw [ZMod.natCast_zmod_val] at this
+    rw [this, h_xz]; push_cast; rfl
+  have h_eq2 : a * x = (b * ((z : ℕ) : ZMod p) + c) * x := by
+    rw [← h_xz_zmod] at h_eq; linear_combination h_eq
+  have h_x_ne : x ≠ 0 := by
+    intro h; have : x.val = 0 := by rw [h]; exact ZMod.val_zero
+    omega
+  exact mul_right_cancel₀ h_x_ne h_eq2
+
+/-- Polymorphic version of `cancel_mul_65536_v2`: zero-RHS form. -/
+lemma cancel_mul_65536_zero_poly {b c x : ZMod p}
+    (h_x_dvd : x.val ∣ 65536) (h_x_pos : 0 < x.val) :
+    b * 65536 + c * x = 0 → b * (((65536 / x.val : ℕ) : ZMod p)) + c = 0 := by
+  intro h_eq
+  have := cancel_mul_65536_poly h_x_dvd h_x_pos (a := 0) (b := b) (c := c)
+  rw [zero_mul] at this; symm; exact this h_eq.symm
+
+/-- For booleans b ∈ {0, 1}, the product b · 65535 has val < 65536. -/
+lemma bool_mul_65535_lt_poly {b : ZMod p} (hb : b = 0 ∨ b = 1) :
+    (b * 65535).val < 65536 := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  rcases hb with h | h
+  · rw [h, zero_mul]; simp [ZMod.val_zero]
+  · rw [h, one_mul]
+    have : ((65535 : ℕ) : ZMod p).val = 65535 := ZMod.val_natCast_of_lt (by omega)
+    have h_cast : (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) := by push_cast; rfl
+    rw [h_cast, this]; omega
+
+end poly_field_arithmetic
+
 section poly_helpers
+
+private lemma val_le_one_of_bool {p : ℕ} [NeZero p] [Fact (1 < p)]
+    {k : ZMod p} (hk : k = 0 ∨ k = 1) : k.val ≤ 1 := by
+  rcases hk with h | h
+  · simp [h, ZMod.val_zero]
+  · rw [h]; have := ZMod.val_one p; omega
+
+private lemma val_eq_one_of_eq_one {p : ℕ} [NeZero p] [Fact (1 < p)]
+    {k : ZMod p} (h : k = 1) : k.val = 1 := by
+  rw [h]; exact ZMod.val_one p
+
+private lemma zero_of_bool_val_zero {p : ℕ} [NeZero p] [Fact (1 < p)]
+    {k : ZMod p} (hk : k = 0 ∨ k = 1) (hv : k.val = 0) : k = 0 := by
+  rcases hk with h | h
+  · exact h
+  · exfalso; rw [h] at hv; rw [ZMod.val_one] at hv; omega
+
+/-- 4-way boolean mutex from sum = 1. -/
+private lemma four_way_mutex_eq_one_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b c d : ZMod p}
+    (ba : a = 0 ∨ a = 1) (bb : b = 0 ∨ b = 1)
+    (bc : c = 0 ∨ c = 1) (bd : d = 0 ∨ d = 1)
+    (hs : a + b + c + d = 1) :
+    (a = 1 → b = 0 ∧ c = 0 ∧ d = 0) ∧
+    (b = 1 → a = 0 ∧ c = 0 ∧ d = 0) ∧
+    (c = 1 → a = 0 ∧ b = 0 ∧ d = 0) ∧
+    (d = 1 → a = 0 ∧ b = 0 ∧ c = 0) := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  have va := val_le_one_of_bool ba
+  have vb := val_le_one_of_bool bb
+  have vc := val_le_one_of_bool bc
+  have vd := val_le_one_of_bool bd
+  have h_ab : (a + b).val = a.val + b.val := ZMod.val_add_of_lt (by omega)
+  have h_abc : (a + b + c).val = a.val + b.val + c.val := by
+    rw [ZMod.val_add_of_lt, h_ab]; rw [h_ab]; omega
+  have h_sum_val : (a + b + c + d).val = a.val + b.val + c.val + d.val := by
+    rw [ZMod.val_add_of_lt, h_abc]; rw [h_abc]; omega
+  have h_one : (a + b + c + d).val = 1 := by rw [hs]; exact ZMod.val_one p
+  rw [h_sum_val] at h_one
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro h; have hv := val_eq_one_of_eq_one h
+    exact ⟨zero_of_bool_val_zero bb (by omega), zero_of_bool_val_zero bc (by omega),
+           zero_of_bool_val_zero bd (by omega)⟩
+  · intro h; have hv := val_eq_one_of_eq_one h
+    exact ⟨zero_of_bool_val_zero ba (by omega), zero_of_bool_val_zero bc (by omega),
+           zero_of_bool_val_zero bd (by omega)⟩
+  · intro h; have hv := val_eq_one_of_eq_one h
+    exact ⟨zero_of_bool_val_zero ba (by omega), zero_of_bool_val_zero bb (by omega),
+           zero_of_bool_val_zero bd (by omega)⟩
+  · intro h; have hv := val_eq_one_of_eq_one h
+    exact ⟨zero_of_bool_val_zero ba (by omega), zero_of_bool_val_zero bb (by omega),
+           zero_of_bool_val_zero bc (by omega)⟩
+
+/-- 4-way booleans: sum = 0 forces each to 0. -/
+private lemma four_way_all_zero_of_sum_zero_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b c d : ZMod p}
+    (ba : a = 0 ∨ a = 1) (bb : b = 0 ∨ b = 1)
+    (bc : c = 0 ∨ c = 1) (bd : d = 0 ∨ d = 1)
+    (hs : a + b + c + d = 0) :
+    a = 0 ∧ b = 0 ∧ c = 0 ∧ d = 0 := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  have va := val_le_one_of_bool ba
+  have vb := val_le_one_of_bool bb
+  have vc := val_le_one_of_bool bc
+  have vd := val_le_one_of_bool bd
+  have h_ab : (a + b).val = a.val + b.val := ZMod.val_add_of_lt (by omega)
+  have h_abc : (a + b + c).val = a.val + b.val + c.val := by
+    rw [ZMod.val_add_of_lt, h_ab]; rw [h_ab]; omega
+  have h_sum_val : (a + b + c + d).val = a.val + b.val + c.val + d.val := by
+    rw [ZMod.val_add_of_lt, h_abc]; rw [h_abc]; omega
+  have h_zero : (a + b + c + d).val = 0 := by rw [hs]; exact ZMod.val_zero
+  rw [h_sum_val] at h_zero
+  exact ⟨zero_of_bool_val_zero ba (by omega), zero_of_bool_val_zero bb (by omega),
+         zero_of_bool_val_zero bc (by omega), zero_of_bool_val_zero bd (by omega)⟩
 
 /-- Mutual-exclusion of the four opcode flags. -/
 lemma single_op_poly (Main : Vector (ZMod p) 69)
@@ -492,39 +647,106 @@ lemma single_op_poly (Main : Vector (ZMod p) 69)
     (Main[65] = 1 → Main[64] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0) ∧
     (Main[66] = 1 → Main[64] = 0 ∧ Main[65] = 0 ∧ Main[67] = 0) ∧
     (Main[67] = 1 → Main[64] = 0 ∧ Main[65] = 0 ∧ Main[66] = 0) := by
-  sorry
-
-/-- Mutual-exclusion of the four su16-flag columns. -/
-lemma single_su16_poly (Main : Vector (ZMod p) 69)
-    (cstrs : (constraints Main).allHold_poly)
-    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
-    (Main[60] = 1 → Main[61] = 0 ∧ Main[62] = 0 ∧ Main[63] = 0) ∧
-    (Main[61] = 1 → Main[60] = 0 ∧ Main[62] = 0 ∧ Main[63] = 0) ∧
-    (Main[62] = 1 → Main[60] = 0 ∧ Main[61] = 0 ∧ Main[63] = 0) ∧
-    (Main[63] = 1 → Main[60] = 0 ∧ Main[61] = 0 ∧ Main[62] = 0) := by
-  sorry
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, _, _, _, b_64, b_65, b_66, b_67, sum_disj, _⟩ := cstrs
+  refine ⟨fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_⟩ <;>
+    rcases sum_disj with h_sum0 | h_sum1
+  · -- Main[64]=1, sum=0: contradiction since sum=0 means each is 0, but Main[64]=1.
+    have := four_way_all_zero_of_sum_zero_poly b_64 b_65 b_66 b_67 h_sum0
+    exfalso; rw [h] at this; exact one_ne_zero this.1
+  · exact (four_way_mutex_eq_one_poly b_64 b_65 b_66 b_67 h_sum1).1 h
+  · have := four_way_all_zero_of_sum_zero_poly b_64 b_65 b_66 b_67 h_sum0
+    exfalso; rw [h] at this; exact one_ne_zero this.2.1
+  · exact (four_way_mutex_eq_one_poly b_64 b_65 b_66 b_67 h_sum1).2.1 h
+  · have := four_way_all_zero_of_sum_zero_poly b_64 b_65 b_66 b_67 h_sum0
+    exfalso; rw [h] at this; exact one_ne_zero this.2.2.1
+  · exact (four_way_mutex_eq_one_poly b_64 b_65 b_66 b_67 h_sum1).2.2.1 h
+  · have := four_way_all_zero_of_sum_zero_poly b_64 b_65 b_66 b_67 h_sum0
+    exfalso; rw [h] at this; exact one_ne_zero this.2.2.2
+  · exact (four_way_mutex_eq_one_poly b_64 b_65 b_66 b_67 h_sum1).2.2.2 h
 
 lemma is_real_eq_one_of_srl (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (h_srl : Main[64] = 1) :
     Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
-  sorry
+  obtain ⟨h, _, _, _⟩ := single_op_poly Main cstrs
+  have ⟨h65, h66, h67⟩ := h h_srl
+  rw [h_srl, h65, h66, h67]; ring
 
 lemma is_real_eq_one_of_sra (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (h_sra : Main[65] = 1) :
     Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
-  sorry
+  obtain ⟨_, h, _, _⟩ := single_op_poly Main cstrs
+  have ⟨h64, h66, h67⟩ := h h_sra
+  rw [h_sra, h64, h66, h67]; ring
 
 lemma is_real_eq_one_of_srlw (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (h_srlw : Main[66] = 1) :
     Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
-  sorry
+  obtain ⟨_, _, h, _⟩ := single_op_poly Main cstrs
+  have ⟨h64, h65, h67⟩ := h h_srlw
+  rw [h_srlw, h64, h65, h67]; ring
 
 lemma is_real_eq_one_of_sraw (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (h_sraw : Main[67] = 1) :
     Main[64] + Main[65] + Main[66] + Main[67] = 1 := by
-  sorry
+  obtain ⟨_, _, _, h⟩ := single_op_poly Main cstrs
+  have ⟨h64, h65, h66⟩ := h h_sraw
+  rw [h_sraw, h64, h65, h66]; ring
 
-/-- 4-way opcode disjunction from the sum constraint. -/
+/-- 4-way "which-one" lemma: given 4 booleans summing to 1, exactly one is 1.
+Pure ZMod p reasoning; reused by both opcode and su16 dispatchers. -/
+private lemma which_of_four_eq_one_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b c d : ZMod p}
+    (ba : a = 0 ∨ a = 1) (bb : b = 0 ∨ b = 1)
+    (bc : c = 0 ∨ c = 1) (bd : d = 0 ∨ d = 1)
+    (hs : a + b + c + d = 1) :
+    (a = 1 ∧ b = 0 ∧ c = 0 ∧ d = 0) ∨
+    (a = 0 ∧ b = 1 ∧ c = 0 ∧ d = 0) ∨
+    (a = 0 ∧ b = 0 ∧ c = 1 ∧ d = 0) ∨
+    (a = 0 ∧ b = 0 ∧ c = 0 ∧ d = 1) := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  -- Convert each disjunction to a .val statement (.val ∈ {0,1}, exact via rcases).
+  have to_val : ∀ {x : ZMod p}, x = 0 ∨ x = 1 → x.val = 0 ∨ x.val = 1 := fun hx =>
+    hx.imp (fun h => by rw [h]; exact ZMod.val_zero)
+           (fun h => by rw [h]; exact ZMod.val_one p)
+  have of_val : ∀ {x : ZMod p}, x = 0 ∨ x = 1 → x.val = 0 → x = 0 := fun hx hv =>
+    hx.elim id (fun h => by rw [h] at hv; rw [ZMod.val_one] at hv; omega)
+  have of_val' : ∀ {x : ZMod p}, x = 0 ∨ x = 1 → x.val = 1 → x = 1 := fun hx hv =>
+    hx.elim (fun h => by rw [h] at hv; rw [ZMod.val_zero] at hv; omega) id
+  have va := to_val ba
+  have vb := to_val bb
+  have vc := to_val bc
+  have vd := to_val bd
+  have ha_le : a.val ≤ 1 := by rcases va with h | h <;> omega
+  have hb_le : b.val ≤ 1 := by rcases vb with h | h <;> omega
+  have hc_le : c.val ≤ 1 := by rcases vc with h | h <;> omega
+  have hd_le : d.val ≤ 1 := by rcases vd with h | h <;> omega
+  have h_ab : (a + b).val = a.val + b.val :=
+    ZMod.val_add_of_lt (by omega)
+  have h_abc : (a + b + c).val = a.val + b.val + c.val := by
+    rw [ZMod.val_add_of_lt, h_ab]; rw [h_ab]; omega
+  have h_sumval : (a + b + c + d).val = a.val + b.val + c.val + d.val := by
+    rw [ZMod.val_add_of_lt, h_abc]; rw [h_abc]; omega
+  have h_one_val : a.val + b.val + c.val + d.val = 1 := by
+    have : (a + b + c + d).val = 1 := by rw [hs]; exact ZMod.val_one p
+    omega
+  -- Per .val: omega tells us exactly one of va/vb/vc/vd is the .val=1 case.
+  rcases va with ha | ha <;> rcases vb with hb | hb <;>
+    rcases vc with hc | hc <;> rcases vd with hd | hd <;>
+    first
+    | (exfalso; omega)
+    | (left;             exact ⟨of_val' ba ha, of_val bb hb, of_val bc hc, of_val bd hd⟩)
+    | (right; left;      exact ⟨of_val ba ha, of_val' bb hb, of_val bc hc, of_val bd hd⟩)
+    | (right; right; left;   exact ⟨of_val ba ha, of_val bb hb, of_val' bc hc, of_val bd hd⟩)
+    | (right; right; right;  exact ⟨of_val ba ha, of_val bb hb, of_val bc hc, of_val' bd hd⟩)
+
+/-- 4-way opcode disjunction from the sum = 1 constraint. -/
 lemma srl_or_sra_or_srlw_or_sraw_of_real (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly)
     (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
@@ -532,7 +754,35 @@ lemma srl_or_sra_or_srlw_or_sraw_of_real (Main : Vector (ZMod p) 69)
     (Main[64] = 0 ∧ Main[65] = 1 ∧ Main[66] = 0 ∧ Main[67] = 0) ∨
     (Main[64] = 0 ∧ Main[65] = 0 ∧ Main[66] = 1 ∧ Main[67] = 0) ∨
     (Main[64] = 0 ∧ Main[65] = 0 ∧ Main[66] = 0 ∧ Main[67] = 1) := by
-  sorry
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, _, _, _, b_64, b_65, b_66, b_67, _⟩ := cstrs
+  exact which_of_four_eq_one_poly b_64 b_65 b_66 b_67 h_real
+
+/-- Mutual-exclusion of the four su16-flag columns (cstrs only — needs h_real). -/
+lemma single_su16_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    (Main[60] = 1 → Main[61] = 0 ∧ Main[62] = 0 ∧ Main[63] = 0) ∧
+    (Main[61] = 1 → Main[60] = 0 ∧ Main[62] = 0 ∧ Main[63] = 0) ∧
+    (Main[62] = 1 → Main[60] = 0 ∧ Main[61] = 0 ∧ Main[63] = 0) ∧
+    (Main[63] = 1 → Main[60] = 0 ∧ Main[61] = 0 ∧ Main[62] = 0) := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  haveI : Fact (1 < p) := ⟨by omega⟩
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _,
+           _, _, _, _, _, _, _,
+           _, b_su160, _, b_su161, _, b_su162, _, b_su163, one_of_su16s, _⟩ := cstrs
+  -- one_of_su16s: opcode_sum = 0 ∨ su16_sum = 1. h_real gives opcode_sum = 1 ≠ 0.
+  have h_su16_sum : Main[60] + Main[61] + Main[62] + Main[63] = 1 := by
+    rcases one_of_su16s with hopcsum | hsu16sum
+    · exfalso
+      have : (1 : ZMod p) = 0 := by rw [← h_real]; exact hopcsum
+      exact one_ne_zero this
+    · exact hsu16sum
+  exact four_way_mutex_eq_one_poly b_su160 b_su161 b_su162 b_su163 h_su16_sum
 
 end poly_helpers
 
