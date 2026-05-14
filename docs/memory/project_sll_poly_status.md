@@ -1,70 +1,64 @@
 ---
-name: shiftleft-poly-migration-status-as-of-2026-05-12
-description: spec.sll_poly fully closed via 5-layer helper architecture; spec.slli_poly + spec.sllw_poly + spec.slliw_poly + chip-level correct_* stubs remain
-metadata: 
-  node_type: memory
+name: shiftleft-poly-migration-status-as-of-2026-05-13
+description: ShiftLeft `_poly` migration is complete. All four spec.*_poly lemmas, all four correct_*_poly chip theorems, AND the Phase 6 collapse have landed — Fin-KB versions deleted. `lake build SP1Chips.ShiftLeftChip` is fully clean (0 errors, 0 warnings).
+metadata:
   type: project
-  originSessionId: d13f597f-47d0-47b7-9a65-f20721f2701f
 ---
 
-**Current state of ShiftLeft `_poly` migration:**
+**ShiftLeft `_poly` migration is complete (as of commit `cfa6c8d`).**
 
-`spec.sll_poly` is **fully closed**. All 64 sub-cases (4 byte-shifts × 16 within-byte cb patterns) close via the helper architecture in `SP1Chips/ShiftLeft/Common.lean`.
+All `_poly` artifacts are closed, **Phase 6 collapse has landed**, and `lake build SP1Chips.ShiftLeftChip` reports **0 errors, 0 warnings**.
 
-**Helpers in place** (Common.lean, ~450 net lines added):
-- `sll_within_byte_shift_poly` (byte_shift=0 core)
-- `sll_within_byte_shift_1_poly` (byte_shift=1 core)
-- `sll_within_byte_shift_2_poly` (byte_shift=2 core)
-- `sll_within_byte_shift_3_poly` (byte_shift=3 core)
-- `sll_close_cb4cb5_zero_case` (cb4=cb5=0 wrapper)
-- `sll_close_cb4cb5_one_zero_case` (cb4=1, cb5=0 wrapper)
-- `sll_close_cb4cb5_zero_one_case` (cb4=0, cb5=1 wrapper)
-- `sll_close_cb4cb5_one_one_case` (cb4=cb5=1 wrapper)
+## What's in the codebase now
 
-**Remaining sorries in `SP1Chips/ShiftLeft/Sll.lean`** (3 of them):
-- Line 14: `spec.sll` (Fin-KB version with `stop` marker — pre-existing, intentional)
-- Line ~1177: `spec.slli` (Fin-KB version, similar)
-- Line ~1188: `spec.slli_poly` (the `_poly` immediate-shift variant — out of scope for current task)
+| Artifact | Location | Status |
+|---|---|---|
+| `spec.sll_poly` | `SP1Chips/ShiftLeft/Sll.lean` `section sll_poly` | ✅ closed |
+| `spec.slli_poly` | `SP1Chips/ShiftLeft/Sll.lean` `section sll_poly` | ✅ closed |
+| `spec.sllw_poly` | `SP1Chips/ShiftLeft/Sllw.lean` `section sllw_poly` | ✅ closed |
+| `spec.slliw_poly` | `SP1Chips/ShiftLeft/Sllw.lean` `section sllw_poly` | ✅ closed |
+| `correct_sll_poly` | `SP1Chips/ShiftLeftChip.lean` `namespace Sll.Poly` | ✅ closed |
+| `correct_slli_poly` | `SP1Chips/ShiftLeftChip.lean` `namespace Slli.Poly` | ✅ closed |
+| `correct_sllw_poly` | `SP1Chips/ShiftLeftChip.lean` `namespace Sllw.Poly` | ✅ closed |
+| `correct_slliw_poly` | `SP1Chips/ShiftLeftChip.lean` `namespace Slliw.Poly` | ✅ closed |
 
-**Pickup for next session:**
+## What's gone (Phase 6 collapse, commit `cfa6c8d`)
 
-1. **`spec.slli_poly`** — immediate-shift variant of SLL. Should mostly reuse the same 8 helpers from Common.lean. Differences from `spec.sll_poly`:
-   - `imm = 1` instead of `imm = 0` (the immediate path).
-   - `c0..c3` comes from `Main[21..24]` not `Main[25..28]` (the immediate decode path uses different limbs).
-   - The constraint structure for c0..c3 differs: `c1 = c2 = c3 = 0` and `c0` carries the shift amount.
-   - Otherwise the within-byte and byte-shift split is identical.
+Net diff: **-985 / +16** across 5 files. Deletions:
 
-2. **`SP1Chips/ShiftLeft/Sllw.lean`** — `spec.sllw_poly` and `spec.slliw_poly` (32-bit word-shift variants). 
-   - Operates on lower 32 bits only; output truncated.
-   - Within-byte and byte_shift structure is similar but with a 32-bit output mask.
-   - The 8 helpers in Common.lean may need adaptation OR new variants for the truncation.
+- **`SP1Chips/ShiftLeftChip.lean`**: `namespace Sll`, `Slli`, `Sllw`, `Slliw` (Fin-KB chip-level correctness theorems and their `spec_*` / `sp1_*` helpers).
+- **`SP1Chips/ShiftLeft/Sll.lean`**: `section sll` and `section slli` (Fin-KB `spec.sll` / `spec.slli` — both had `stop` markers).
+- **`SP1Chips/ShiftLeft/Sllw.lean`**: `section sllw` and `section slliw` (Fin-KB `spec.sllw` / `spec.slliw` — both had `stop` markers).
+- **`SP1Chips/ShiftLeft/Constraints.lean`**: `allHold_constraints_iff` (non-poly variant).
+- **`SP1Chips/ShiftLeft/Common.lean`**: Fin-KB orphans `is_real`, `cancel_mul_65536`, `is_mod_64`, `is_sll`/`is_sllw`/`is_slli`/`is_slliw`, `single_op`, `sll_real`/`sllw_real`, `bounds`, and the five `sp1_op_a`/`sp1_op_b`/`sp1_op_c`/`sp1_op_c_imm`/`sp1_op_c_imm_w` getters. Also three poly orphans that fell out: `is_real_poly`, `sll_real_poly`, `sllw_real_poly` (only the deleted Fin-KB lemmas had referenced them).
 
-3. **`SP1Chips/ShiftLeftChip.lean`** — chip-level `correct_*_poly` stubs (`correct_sll_poly`, `correct_slli_poly`, `correct_sllw_poly`, `correct_slliw_poly`). These build on `spec.*_poly` and follow the AddChip / MulChip mechanical pattern.
+Also thinned the `spec.sllw_poly_cb4_zero` / `spec.sllw_poly_cb4_one` branch lemma signatures: dropped the 10–11 unused parameters (`eq_sllw`, `h_no_sll`, `lt_ll2/3`, `lt_lh2/3`, `h_b2_dec`, `h_b3_dec`, `eq_lr1/2/3` — the sllw byte-shift cases only touch the low HWord, so high-limb hypotheses were never consumed). Updated call sites in `spec.sllw_poly` and `spec.slliw_poly` accordingly; dropped the correspondingly orphaned `have lt_ll2 := lt_ll2' h_sum_ne` lines.
 
-4. **Phase 6 collapse** — once all `_poly` variants close, delete the Fin-KB `spec.sll`, `spec.slli`, `spec.sllw`, `spec.slliw` proofs (currently still in the file with `stop` markers).
+## Reusable infrastructure (kept)
 
-**Key reusable infrastructure** (built this session):
+In `SP1Chips/ShiftLeft/Common.lean`:
 
-The 5-layer helper architecture in `Common.lean:108-757`:
-- **Within-byte helpers** (lines ~145-525): one per byte_shift k, each proving the algebraic identity `(byte_shift_k LHS).toNat = (b.toNat * M * 2^(16k)) % 2^64`. Closes via `linear_combination (... * 2^(16k)) * h_MN` + `conv_rhs => rw [Nat.mul_assoc, Nat.mod_mul_mod, ← Nat.mul_assoc]` + `Nat.add_mul_mod_self_right`.
-- **Case wrappers** (lines ~234-757): one per (cb4, cb5) selector, bridges `<<<` to `*`, applies cancel_mul_65536_poly, normalizes bounds, calls the matching within-byte helper.
+- **Within-byte helpers** (`sll_within_byte_shift_{poly,1_poly,2_poly,3_poly}`, `sllw_within_byte_shift_{poly,1_poly}`)
+- **Case wrappers** (`sll_close_cb4cb5_{zero,one_zero,zero_one,one_one}_case`, `sllw_close_cb4_{zero,one}_case`, `sllw_subcase_cb4_{zero,one}`, `sllw_a2_a3_eq_msb_byte`)
+- **Cast/bound infrastructure** (`is_mod_64_poly`, `cancel_mul_65536_poly`, `single_op_poly`, `bounds_poly`, `is_real_eq_one_of_sll`/`sllw`, `ops_U64_b_c_poly`, `sll_or_sllw_of_real`)
+- **Opcode predicates** (`is_sll_poly`, `is_sllw_poly`, `is_slli_poly`, `is_slliw_poly`)
+- **Operand getters** (`sp1_op_a_poly`, `sp1_op_b_poly`, `sp1_op_c_poly`, `sp1_op_c_imm_poly`, `sp1_op_c_imm_w_poly`)
 
-**Call-site pattern** (~10 lines per sub-case):
-```lean
-· -- cb pattern: S=<shift>, M=<2^S>, N=<2^(16-S)>
-  have hv0123_val : v0123.val = M := by
-    have h : v0123 = M := by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; ring
-    rw [h]; exact val_M_zmod_p
-  exact sll_close_cb4cb5_<branch>_case S (by omega) M N (by decide) (by omega) rfl rfl
-    hv0123_val
-    (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
-    (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
-    lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
-    h_b0_dec h_b1_dec h_b2_dec h_b3_dec
-```
+## Key landmines for the next chip migration
 
-**File line counts after this session:**
-- `Sll.lean`: 1294 lines (was 762 at session start; +532 for 3 byte-shift branches with 64 sub-cases total)
-- `Common.lean`: 1209 lines (was 757; +452 for 6 new helpers and bug fixes to existing)
+1. **Lean elaboration introduces inconsistent `↑N` Nat casts** in cb_sum bound chains. Use bridge lemmas + `simp only [...] at *` to normalize:
 
-**Build state:** Common.lean: 0 errors, 0 sorries. Sll.lean: 0 errors, 3 sorry warnings (all out-of-scope for `spec.sll_poly`).
+   ```lean
+   have h_2_cast : ((2 : ℕ) : ZMod p) = 2 := by push_cast; rfl
+   have h_4_cast : ((4 : ℕ) : ZMod p) = 4 := by push_cast; rfl
+   -- ...
+   rw [ZMod.val_add_of_lt]
+   all_goals (simp only [h_2_cast, h_4_cast, h_8_cast, h_16_cast] at *
+              have := h_prev; have := h_curr; have := hp; omega)
+   ```
+
+   The `at *` is load-bearing — normalizes both hypothesis and goal so omega sees identical terms. (Documented in `feedback_poly_proof_patterns.md`.)
+
+2. **Outer chip-level `correct_*_poly` form-bridging.** The chip-level `execute_RTYPEW_pure` (BitVec `setWidth 5 X` shamt) and the spec-level `execute_RTYPEW_pure_w_poly` (Nat `X.toNat % 32` shamt) differ syntactically. Apply `exec_RTYPEW_pure_bv_to_w_poly` **before** the `by_cases Main[6] = 0` (not after) — otherwise the positive branch keeps the un-bridged form and `rw [← spec_eq]` mismatches. For the imm variant (`correct_slliw_poly`), `simp_all` rewrites `Main[26..28]` to `0` in `spec_eq` via `h_imm1`'s outputs; the `h_shift_zero` claim must use `#v[Main[25], (0 : ZMod p), 0, 0]` (matching `spec_eq`'s post-simp form), not `#v[Main[25..28]]`.
+
+3. **3-lemma decomposition pattern** (used by sllw_poly's outer + cb4_zero/cb4_one branch lemmas): keeps each piece below elaboration heartbeat limits. Apply when the inlined 64-way split times out.
