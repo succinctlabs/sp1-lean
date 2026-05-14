@@ -262,59 +262,264 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
   -- forcing hl2 = ll2 = hl3 = ll3 = 0 via cancel_mul_65536_zero_poly (after 16
   -- cb sub-cases to identify v0123).
   rw [h_no_srl, h_no_sra] at h_b2_dec h_b3_dec
-  simp only [add_zero, zero_add, zero_mul] at h_b2_dec h_b3_dec
+  simp only [add_zero, zero_add, zero_mul, mul_zero] at h_b2_dec h_b3_dec
   symm at h_b2_dec h_b3_dec
-  -- Helper: under SRLW, given `M ∣ 65536`, `0 < M`, `v0123 = ((M : ℕ) : ZMod p)`,
-  -- and bounds `hl.val < M`, `ll.val < 65536/M`, the equation
+  push_cast at h_b2_dec h_b3_dec
+  -- Helper: given `M * N = 65536`, `0 < M`, `v0123 = ((M : ℕ) : ZMod p)`,
+  -- bounds `hl.val < M`, `ll.val < N`, the equation
   -- `hl * 65536 + ll * v0123 = 0` gives `hl = 0 ∧ ll = 0`.
-  -- (Bound shape matches `lt_lh2/lt_ll2` after the cb-determined v0123 value
-  -- is fixed: lt_lh = `hl.val < 2^(16-S)` = M, lt_ll = `ll.val < 2^S` = 65536/M.)
-  have zero_aux : ∀ (M : ℕ), M ∣ 65536 → 0 < M →
+  -- (Bound shape matches `lt_lh2/lt_ll2` after the cb-determined v0123 value:
+  -- lt_lh = `hl.val < 2^(16-S)` = M, lt_ll = `ll.val < 2^S` = N.)
+  have zero_aux : ∀ (M N : ℕ), M * N = 65536 → 0 < M →
       ∀ {hl ll : ZMod p}, v0123 = ((M : ℕ) : ZMod p) →
-      hl.val < M → ll.val < 65536 / M →
+      hl.val < M → ll.val < N →
       hl * 65536 + ll * v0123 = 0 → hl = 0 ∧ ll = 0 := by
-    intro M h_dvd h_pos hl ll h_v0123_eq h_hl_lt h_ll_lt h_eq
-    have h_M_le : M ≤ 65536 := Nat.le_of_dvd (by omega) h_dvd
+    intro M N h_MN h_M_pos hl ll h_v0123_eq h_hl_lt h_ll_lt h_eq
+    have h_N_pos : 0 < N := by nlinarith [h_MN, h_M_pos]
+    have h_M_dvd : M ∣ 65536 := ⟨N, h_MN.symm⟩
+    have h_M_le : M ≤ 65536 := Nat.le_of_dvd (by omega) h_M_dvd
+    have h_N_le : N ≤ 65536 := by nlinarith [h_MN, h_M_pos]
     have h_M_lt_p : M < p := by omega
+    have h_N_lt_p : N < p := by omega
     have h_v0123_val : v0123.val = M := by
       rw [h_v0123_eq]; exact ZMod.val_natCast_of_lt h_M_lt_p
-    have h_v0123_dvd : v0123.val ∣ 65536 := by rw [h_v0123_val]; exact h_dvd
-    have h_v0123_pos : 0 < v0123.val := by rw [h_v0123_val]; exact h_pos
+    have h_v0123_dvd : v0123.val ∣ 65536 := by rw [h_v0123_val]; exact h_M_dvd
+    have h_v0123_pos : 0 < v0123.val := by rw [h_v0123_val]; exact h_M_pos
     have h_cancel := cancel_mul_65536_zero_poly h_v0123_dvd h_v0123_pos h_eq
     rw [h_v0123_val] at h_cancel
-    -- h_cancel : hl * ((65536/M : ℕ) : ZMod p) + ll = 0
-    have h_quot_pos : 0 < 65536 / M := Nat.div_pos h_M_le h_pos
-    have h_quot_le : 65536 / M ≤ 65536 := Nat.div_le_self _ _
-    have h_M_quot_eq : M * (65536 / M) = 65536 := Nat.mul_div_cancel' h_dvd
-    have h_quot_le_p : 65536 / M < p := by omega
-    have h_hl_quot_lt : hl.val * (65536 / M) < 65536 := by
-      nlinarith [h_hl_lt, h_M_quot_eq, h_pos, h_quot_pos]
-    have h_hl_quot_lt_p : hl.val * (65536 / M) < p := by omega
-    have h_hl_quot_val : (hl * ((65536 / M : ℕ) : ZMod p)).val = hl.val * (65536 / M) := by
+    -- 65536/M = N from M * N = 65536.
+    have h_quot_eq : 65536 / M = N := by
+      rw [← h_MN]; exact Nat.mul_div_cancel_left N h_M_pos
+    rw [h_quot_eq] at h_cancel
+    -- h_cancel : hl * ((N : ℕ) : ZMod p) + ll = 0
+    have h_hl_N_lt : hl.val * N < 65536 := by nlinarith [h_hl_lt, h_MN, h_M_pos, h_N_pos]
+    have h_hl_N_lt_p : hl.val * N < p := by omega
+    have h_hl_N_val : (hl * ((N : ℕ) : ZMod p)).val = hl.val * N := by
       rw [ZMod.val_mul_of_lt]
-      · rw [ZMod.val_natCast_of_lt h_quot_le_p]
-      · rw [ZMod.val_natCast_of_lt h_quot_le_p]; exact h_hl_quot_lt_p
-    have h_sum_lt_p : hl.val * (65536 / M) + ll.val < p := by
-      have : hl.val * (65536 / M) + ll.val < 65536 + 65536 / M := by omega
-      omega
-    have h_sum_val : (hl * ((65536 / M : ℕ) : ZMod p) + ll).val =
-                     hl.val * (65536 / M) + ll.val := by
+      · rw [ZMod.val_natCast_of_lt h_N_lt_p]
+      · rw [ZMod.val_natCast_of_lt h_N_lt_p]; exact h_hl_N_lt_p
+    have h_sum_lt_p : hl.val * N + ll.val < p := by omega
+    have h_sum_val : (hl * ((N : ℕ) : ZMod p) + ll).val = hl.val * N + ll.val := by
       rw [ZMod.val_add_of_lt]
-      · rw [h_hl_quot_val]
-      · rw [h_hl_quot_val]; exact h_sum_lt_p
-    have h_zero_val : (hl * ((65536 / M : ℕ) : ZMod p) + ll).val = 0 := by
+      · rw [h_hl_N_val]
+      · rw [h_hl_N_val]; exact h_sum_lt_p
+    have h_zero_val : (hl * ((N : ℕ) : ZMod p) + ll).val = 0 := by
       rw [h_cancel]; exact ZMod.val_zero
     rw [h_sum_val] at h_zero_val
-    -- hl.val * (65536/M) + ll.val = 0 in ℕ ⇒ both factors zero.
     have h_hl_val_zero : hl.val = 0 := by
-      have h_prod_zero : hl.val * (65536 / M) = 0 := by omega
+      have h_prod_zero : hl.val * N = 0 := by omega
       exact (Nat.mul_eq_zero.mp h_prod_zero).resolve_right (by omega)
     have h_ll_val_zero : ll.val = 0 := by omega
     exact ⟨(ZMod.val_eq_zero hl).mp h_hl_val_zero,
            (ZMod.val_eq_zero ll).mp h_ll_val_zero⟩
-  -- TODO(srlw_poly_body): apply `zero_aux` in a 16-case cb dispatch for
-  -- `(hl2, ll2)` and `(hl3, ll3)`, then reduce the goal via
-  -- `sign_extend_32_to_64_msb_poly` + SRL byte-shift wrappers on the low half.
+  -- Per-cb-pattern helper: given (S, M, N) for the pattern and the cb-sum
+  -- equation in ZMod form (provable by push_cast; ring per pattern), normalize
+  -- the symbolic bounds and apply zero_aux. Position-agnostic.
+  have cb_aux : ∀ {hl ll : ZMod p}
+      (_lt_hl : hl.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) +
+                                    cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8) : ZMod p).val)
+      (_lt_ll : ll.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) +
+                              cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8 : ZMod p).val)
+      (_h_dec : hl * 65536 + ll * v0123 = 0)
+      (S M N : ℕ) (_h_S_le : S ≤ 15)
+      (_h_MN : M * N = 65536) (_h_M_pos : 0 < M)
+      (_h_M_eq : (2 : ℕ) ^ (16 - S) = M) (_h_N_eq : (2 : ℕ) ^ S = N)
+      (_h_v0123_eq : v0123 = ((M : ℕ) : ZMod p))
+      (_h_cb_sum_eq : (cb0 + cb1 * ((2 : ℕ) : ZMod p) +
+                       cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8 : ZMod p) = ((S : ℕ) : ZMod p)),
+      hl = 0 ∧ ll = 0 := by
+    intro hl ll lt_hl lt_ll h_dec S M N h_S_le h_MN h_M_pos h_M_eq h_N_eq h_v0123_eq h_cb_sum_eq
+    have h_S_lt_p : S < p := by omega
+    have h_cb_sum_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) +
+                        cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8 : ZMod p).val = S := by
+      rw [h_cb_sum_eq]; exact ZMod.val_natCast_of_lt h_S_lt_p
+    have h_S_le_16 : S ≤ 16 := by omega
+    have h_outer_val : ((16 : ZMod p) -
+                       (cb0 + cb1 * ((2 : ℕ) : ZMod p) +
+                        cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8 : ZMod p)).val = 16 - S := by
+      rw [h_cb_sum_eq]
+      rw [show ((16 : ZMod p) - ((S : ℕ) : ZMod p)) = (((16 - S) : ℕ) : ZMod p) from by
+        rw [Nat.cast_sub h_S_le_16]; push_cast; ring]
+      have hp : 2 ^ 17 < p := Fact.out
+      exact ZMod.val_natCast_of_lt (by omega)
+    rw [h_outer_val] at lt_hl
+    rw [h_cb_sum_val] at lt_ll
+    rw [h_M_eq] at lt_hl
+    rw [h_N_eq] at lt_ll
+    exact zero_aux M N h_MN h_M_pos h_v0123_eq lt_hl lt_ll h_dec
+  -- 16-case dispatch for hl2 = ll2 = 0. Each branch supplies (S, M, N) for the
+  -- specific cb-pattern: M = 2^(16-S), N = 2^S, S = cb0 + 2*cb1 + 4*cb2 + 8*cb3.
+  have ⟨eq_hl2, eq_ll2⟩ : hl2 = 0 ∧ ll2 = 0 := by
+    rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+      rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+    -- rcases binary-counter order: cb3 innermost, cb0 outermost.
+    -- (cb0, cb1, cb2, cb3) → S = cb0 + 2*cb1 + 4*cb2 + 8*cb3, M = 2^(16-S), N = 2^S.
+    · -- (0,0,0,0): S=0, M=65536, N=1
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 0 65536 1 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,0,0,1): S=8, M=256, N=256
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 8 256 256 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,0,1,0): S=4, M=4096, N=16
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 4 4096 16 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,0,1,1): S=12, M=16, N=4096
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 12 16 4096 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,0,0): S=2, M=16384, N=4
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 2 16384 4 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,0,1): S=10, M=64, N=1024
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 10 64 1024 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,1,0): S=6, M=1024, N=64
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 6 1024 64 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,1,1): S=14, M=4, N=16384
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 14 4 16384 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,0,0): S=1, M=32768, N=2
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 1 32768 2 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,0,1): S=9, M=128, N=512
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 9 128 512 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,1,0): S=5, M=2048, N=32
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 5 2048 32 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,1,1): S=13, M=8, N=8192
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 13 8 8192 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,0,0): S=3, M=8192, N=8
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 3 8192 8 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,0,1): S=11, M=32, N=2048
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 11 32 2048 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,1,0): S=7, M=512, N=128
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 7 512 128 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,1,1): S=15, M=2, N=32768
+      exact cb_aux lt_lh2 lt_ll2 h_b2_dec 15 2 32768 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+  -- Mirror dispatch for hl3 = ll3 = 0 (same 16 cb-patterns, same (S, M, N) per pattern).
+  have ⟨eq_hl3, eq_ll3⟩ : hl3 = 0 ∧ ll3 = 0 := by
+    rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+      rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+    · -- (0,0,0,0): S=0
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 0 65536 1 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,0,0,1): S=8
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 8 256 256 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,0,1,0): S=4
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 4 4096 16 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,0,1,1): S=12
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 12 16 4096 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,0,0): S=2
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 2 16384 4 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,0,1): S=10
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 10 64 1024 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,1,0): S=6
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 6 1024 64 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (0,1,1,1): S=14
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 14 4 16384 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,0,0): S=1
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 1 32768 2 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,0,1): S=9
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 9 128 512 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,1,0): S=5
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 5 2048 32 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,0,1,1): S=13
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 13 8 8192 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,0,0): S=3
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 3 8192 8 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,0,1): S=11
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 11 32 2048 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,1,0): S=7
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 7 512 128 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+    · -- (1,1,1,1): S=15
+      exact cb_aux lt_lh3 lt_ll3 h_b3_dec 15 2 32768 (by omega) (by decide) (by omega)
+        (by decide) (by decide)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+  -- TODO: reduce the goal via sign_extend_32_to_64_msb_poly + the SRL byte-shift
+  -- wrappers on the low half, now that hl2 = ll2 = hl3 = ll3 = 0 are in scope.
   sorry
 
 lemma spec.srlw_poly (Main : Vector (ZMod p) 69) (h : is_srlw_poly Main) :
