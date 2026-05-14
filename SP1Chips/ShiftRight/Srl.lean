@@ -142,22 +142,24 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
     Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
       execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[25], Main[26], Main[27], Main[28]] .SRL := by
-  -- TODO Phase 3: port Fin KB `spec.srl_common`'s 64-way `rcases b_cb0..5` blast.
-  -- Phase 3 attempt notes (commit 859eebd → this stub):
-  -- (1) `BitVec.ushiftRight_eq'` is needed for the `>>>` between two BitVecs to
-  --     simp through (see `BitVec/Lemmas.lean:2203`). Mirror of SLL's
-  --     `BitVec.shiftLeft_eq'`.
-  -- (2) The constraints def emits literals with mixed cast form: `Main[39] * ↑2`
-  --     and `Main[43] * 32` (some cast, some raw). The `is_mod_64_poly` premise
-  --     needs the constraint's exact `↑N` form; use `Nat.cast_ofNat` simp lemma
-  --     before applying.
-  -- (3) `Word.toBitVec64_poly_toNat_poly is_U64_c` triggers kernel deep recursion
-  --     on `2^N` re-checks. Add `set_option debug.skipKernelTC true in` for the
-  --     lemma (mirrors ShiftLeft `spec.sll_poly`).
-  -- (4) The 64-way case split closing follows the Fin KB pattern but each case
-  --     applies `cancel_mul_65536_poly` then `omega`.
-  -- ShiftLeft's spec.sll_poly is 1050 lines / 5-layer architecture; SRL should
-  -- be similarly heavy. Multi-session work.
+  -- TODO Phase 3: port Fin KB `spec.srl_common`'s 64-way blast.
+  -- Helpers available: `cb_sum_val_eq_poly` (Common.lean), `is_mod_64_poly`,
+  -- `cancel_mul_65536_poly`, `bool_mul_65535_lt_poly`,
+  -- `Word.toBitVec64_poly_toNat_poly`, `BitVec.ushiftRight_eq'`.
+  --
+  -- Phase 3 blocker (literal form mismatch): the constraint compiler emits
+  -- iff_poly RHS with mixed `Main[39] * ↑2 + ... + Main[43] * 32` form (some
+  -- cast, some raw). `cb_sum_val_eq_poly`'s LHS `cb1 * 2` elaborates one way
+  -- and the iff's `Main[39] * 2` elaborates another, so `rw [h_cb_sum_val_eq]`
+  -- fails on syntactic mismatch despite defeq. Need: (1) `push_cast` or
+  -- `simp [Nat.cast_ofNat]` normalization of `h_diff` AND the goal of
+  -- `h_cb_sum_lt`, AND (2) the cb_sum_val_eq_poly statement may need to
+  -- mirror the iff's exact form. ShiftLeft's `spec.sll_poly` sidesteps this
+  -- by computing the bound inline without factoring.
+  --
+  -- Direction for next session: either inline the cb_sum.val computation
+  -- (mirror SLL's lines 106-168) or restate `cb_sum_val_eq_poly` to take
+  -- cast-form parameters.
   sorry
 
 lemma spec.srl_poly (Main : Vector (ZMod p) 69) (h : is_srl_poly Main) :
