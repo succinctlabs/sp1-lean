@@ -225,9 +225,16 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
     exact hm.trans h_form_eq
   rw [h_c0_mod]; clear h_c0_mod h_diff h_cb_sum_val_eq h_cb_sum_lt
   rw [Word.toBitVec64_poly_toNat_poly is_U64_b, Word.toNat_poly_def]
-  -- Goal is now: (Word.toBitVec64_poly a).toNat = (b0.val + b1.val * 65536 + ... ) / 2^cb_sum
-  -- Phase 3a stop: 64-way case split closing remains. Each case applies
-  -- cancel_mul_65536_poly to h_b{0,1,2,3}_dec, then `omega` closes.
+  -- Unfold the LHS `Word.toBitVec64_poly` to its toNat form. Without `is_U64_a`,
+  -- the LHS toNat has a `% 2^64` we keep.
+  simp only [Word.toBitVec64_poly, Word.toNat_poly_def, BitVec.toNat_ofNat,
+             Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+             List.getElem_cons_succ]
+  -- Goal is now (approximately):
+  --   (Main[32].val + Main[33].val * 65536 + Main[34].val * 2^32 + Main[35].val * 2^48) % 2^64
+  --     = (Main[15].val + Main[16].val * 65536 + ... ) / 2 ^ (cb-sum-val)
+  -- Phase 3a stop: 64-way `rcases b_cb0..b_cb5` + `cancel_mul_65536_poly` per case
+  -- + omega close remains. Each cb-sum substitution yields a specific 2^N divisor.
   sorry
 
 lemma spec.srl_poly (Main : Vector (ZMod p) 69) (h : is_srl_poly Main) :
