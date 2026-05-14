@@ -1385,7 +1385,19 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
     eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop7 h_is_divuw
-    simp [h_is_divuw, z0, z1, z2, z3, z4, z5, z6] at *
+    -- For divuw, is_divuw + is_remuw = 1 + 0 = 1 ≠ 0, contradicting each
+    -- w_eq_*_uw disjunction's LHS. linear_combination derives the contradiction
+    -- without the simp_all hypothesis-pile blowup.
+    have h_sum_ne : (is_divuw + is_remuw : ZMod p) ≠ 0 := by
+      intro hh
+      have : (1 : ZMod p) = 0 := by linear_combination hh - h_is_divuw - z6
+      exact one_ne_zero this
+    have h_rbc2_eq : rbc2 = 0 := w_eq_rbc2_uw.resolve_left h_sum_ne
+    have h_rbc3_eq : rbc3 = 0 := w_eq_rbc3_uw.resolve_left h_sum_ne
+    have h_qbc2_eq : qbc2 = 0 := w_eq_qbc2_uw.resolve_left h_sum_ne
+    have h_qbc3_eq : qbc3 = 0 := w_eq_qbc3_uw.resolve_left h_sum_ne
+    simp [h_is_divuw, z0, z1, z2, z3, z4, z5, z6,
+          h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
   -- Trailing-arm closer. Mirrors Fin KB `spec.divuw` arm closers but in
   -- `first` form. Covers writeback, omega, isU64-via-cases (both `simp_all`
   -- and `simp+omega` variants), per-limb c/b bounds via `lt_cases_of_isU64`,
@@ -1407,11 +1419,6 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    -- FIXME: 2-3 stubborn arms `Word.isU64_poly #v[r0, r1, rbc2, rbc3]` and
-    -- `Word.isU64_poly #v[q0, q1, qbc2, qbc3]` involve rbc/qbc dependence on
-    -- `b_neg` via `eq_rbc*`/`eq_qbc*` constraint hypotheses. Field-level
-    -- substitution needed; tracked as part of Phase 1.2 follow-up.
-    | sorry
 
 -- Polymorphic counterpart of `spec.remuw`. Twin of `spec.divuw_poly` with
 -- `.2` projection, `is_remuw_poly` flag, `sop8` mutex, and `eq_r_*` writeback.
@@ -1669,7 +1676,18 @@ lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
     eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop8 h_is_remuw
-    simp [h_is_remuw, z0, z1, z2, z3, z4, z5, z6] at *
+    -- For remuw: is_remuw = 1, is_divuw = 0 (z6). Same disjunction-resolution
+    -- pattern as divuw using linear_combination to avoid simp_all blowup.
+    have h_sum_ne : (is_divuw + is_remuw : ZMod p) ≠ 0 := by
+      intro hh
+      have : (1 : ZMod p) = 0 := by linear_combination hh - h_is_remuw - z6
+      exact one_ne_zero this
+    have h_rbc2_eq : rbc2 = 0 := w_eq_rbc2_uw.resolve_left h_sum_ne
+    have h_rbc3_eq : rbc3 = 0 := w_eq_rbc3_uw.resolve_left h_sum_ne
+    have h_qbc2_eq : qbc2 = 0 := w_eq_qbc2_uw.resolve_left h_sum_ne
+    have h_qbc3_eq : qbc3 = 0 := w_eq_qbc3_uw.resolve_left h_sum_ne
+    simp [h_is_remuw, z0, z1, z2, z3, z4, z5, z6,
+          h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
   all_goals first
     | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
@@ -1687,11 +1705,6 @@ lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    -- FIXME: 2-3 stubborn arms `Word.isU64_poly #v[r0, r1, rbc2, rbc3]` and
-    -- `Word.isU64_poly #v[q0, q1, qbc2, qbc3]` involve rbc/qbc dependence on
-    -- `b_neg` via `eq_rbc*`/`eq_qbc*` constraint hypotheses. Field-level
-    -- substitution needed; tracked as part of Phase 1.2 follow-up.
-    | sorry
 
 end divuw_remuw
 
