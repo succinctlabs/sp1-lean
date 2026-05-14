@@ -586,6 +586,51 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
   congr 1
   -- Goal: HWord.toBitVec32_poly #v[a0, a1]
   --     = (Word.low_poly #v[b0,b1,b2,b3]).toBitVec32_poly >>> setWidth 5 (Word.low_poly #v[c0,c1,c2,c3]).toBitVec32_poly
+  -- Step 1: derive is_U32 for low halves.
+  have h_isU32_b_lo : (Word.low_poly #v[b0, b1, b2, b3]).isU32_poly :=
+    Word.isU64_poly_low_poly_isU32_poly is_U64_b
+  have h_isU32_c_lo : (Word.low_poly #v[c0, c1, c2, c3]).isU32_poly :=
+    Word.isU64_poly_low_poly_isU32_poly is_U64_c
+  -- Step 2: reduce the BitVec 32 equality to toNat equality + unfold the shift.
+  rw [← BitVec.toNat_inj]
+  simp only [BitVec.ushiftRight_eq', BitVec.toNat_ushiftRight, BitVec.toNat_setWidth,
+             Nat.shiftRight_eq_div_pow]
+  -- Step 4: reduce the shift count to `c0.val % 32`.
+  have h_shift_eq : (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly.toNat % 2 ^ 5
+                  = c0.val % 32 := by
+    rw [HWord.toBitVec32_poly_toNat_poly h_isU32_c_lo]
+    simp [Word.low_poly, HWord.toNat_poly]
+    omega
+  rw [h_shift_eq]; clear h_shift_eq
+  -- Step 5: reduce LHS to a0.val + a1.val * 2^16 and RHS to (b0.val + b1.val * 2^16) / 2^(c0.val % 32).
+  rw [HWord.toBitVec32_poly_toNat_poly h_isU32_a_lo, HWord.toBitVec32_poly_toNat_poly h_isU32_b_lo]
+  simp only [Word.low_poly, HWord.toNat_poly, Vector.getElem_mk, List.getElem_toArray,
+             List.getElem_cons_zero, List.getElem_cons_succ]
+  -- Goal: a0.val + a1.val * 2^16 = (b0.val + b1.val * 2^16) / 2^(c0.val % 32)
+  -- Step 6: derive c0.val % 32 = (cb0 + cb1*2 + cb2*4 + cb3*8 + cb4*16 : ZMod p).val.
+  have h_cb_sum_lt_64 : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val < 64 := by
+    have hb0 : cb0.val ≤ 1 := by rcases b_cb0 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+    have hb1 : cb1.val ≤ 1 := by rcases b_cb1 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+    have hb2 : cb2.val ≤ 1 := by rcases b_cb2 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+    have hb3 : cb3.val ≤ 1 := by rcases b_cb3 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+    have hb4 : cb4.val ≤ 1 := by rcases b_cb4 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+    have hb5 : cb5.val ≤ 1 := by rcases b_cb5 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+    have h_eq := cb_sum_val_eq_poly b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    omega
+  have h_val_10 : (10 : ZMod p).val = 10 := by
+    rw [show (10 : ZMod p) = ((10 : ℕ) : ZMod p) from by push_cast; rfl]
+    exact ZMod.val_natCast_of_lt (by omega)
+  have h_diff := diff h_sum_ne
+  rw [h_val_10] at h_diff
+  have h_c0_mod_64 : c0.val % 64 = (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val := by
+    apply is_mod_64_poly (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
+    · exact h_cb_sum_lt_64
+    · exact c0_16
+    · exact h_diff
+  -- Force cb5 = 0 under SRLW (since shift is < 32, the 32s bit is 0).
+  -- This comes from the w_msb_srv constraint, or from the disjunctive constraint
+  -- `srlw + sraw = 1 ∨ msb_srw = 0` combined with shift < 32 from the trusted instr.
+  -- For now, leave the body as a 32-way blast TODO.
   sorry
 
 lemma spec.srlw_poly (Main : Vector (ZMod p) 69) (h : is_srlw_poly Main) :
