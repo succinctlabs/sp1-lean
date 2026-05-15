@@ -2196,41 +2196,6 @@ lemma extend_U64_U128_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     simp [extend_poly] <;> (try split_ifs) <;>
     (try simp [h65535, h0]) <;> omega
 
--- Polymorphic counterpart of `Word.extend_true_is_signExtend`. Routes through
--- `BitVec.toInt_signExtend_of_le` (the `Fin KB` siblings' approach) so the
--- proof term never exposes `(... % 2^128).toNat` to kernel re-check. Each ZMod
--- arithmetic step uses `h65535` / `h0` lemmas to keep `ZMod.val` evaluable.
-lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
-    {w : Word (ZMod p)} :
-  w.isU64_poly →
-  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64_poly
-    := by
-  set sw := extend_poly w true
-  intro is_U64_w
-  have h65535 : (65535 : ZMod p).val = 65535 := by
-    have hp : 131072 < p := by have := (Fact.out : 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
-  have h0 : (0 : ZMod p).val = 0 := ZMod.val_zero
-  have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly is_U64_w
-  have is_U128_bdw : sw.isU128_poly := by
-    subst sw; simp [extend_poly]
-    apply DWord.isU128_of_cases_poly <;> split_ifs <;>
-      simp [h65535, h0] <;> omega
-  have is_neg : w.isNegative_poly ↔ sw.isNegative_poly := by
-    subst sw
-    simp [extend_poly, isNegative_poly, DWord.isNegative_poly]
-    by_cases h : 32768 ≤ w[3].val <;> simp [h, h65535, h0]
-  rw [← BitVec.toInt_inj]
-  simp [BitVec.toInt_signExtend_of_le]
-  rw [Word.toBitVec64_poly_toInt_poly is_U64_w,
-      DWord.toBitVec128_poly_toInt_poly is_U128_bdw]
-  rw [Word.toInt_poly, DWord.toInt_poly]
-  split_ifs <;> [ skip; tauto; tauto; skip ] <;>
-  simp [sw, extend_poly, DWord.toNat_poly, Word.toNat_poly] <;>
-  (rename_i h1 h2;
-   simp only [h2, ↓reduceIte, ZMod.cast_eq_val, h65535, h0]) <;>
-  push_cast <;> omega
-
 /-- Polymorphic counterpart of `Word.extend_false_is_setWidth`. -/
 lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : Word (ZMod p)} :
@@ -2248,6 +2213,52 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   rw [BitVec.setWidth_idem (by simp)]
   rw [Word.toBitVec64_poly_toNat_poly is_U64_w]
   simp [sw, DWord.toNat_poly, extend_poly, Word.toNat_poly]
+
+-- Polymorphic counterpart of `Word.extend_true_is_signExtend`.
+-- Earlier proof routed everything through `BitVec.toNat_signExtend` and a
+-- `simp only` chain over `BitVec.setWidth`, tripping the kernel's `whnf`
+-- re-check (deep recursion); the refactor below splits on
+-- `w.isNegative_poly` first and dispatches each case to one of the two
+-- structural rewrites of `BitVec.signExtend` (`signExtend_eq_setWidth_of_msb_false`
+-- / `signExtend_eq_not_setWidth_not_of_msb_true`), bringing the goal back
+-- to a `setWidth`-shaped equality that `extend_false_is_setWidth_poly` (or
+-- a parallel computation in the negative case) closes. This keeps the
+-- elaborated proof term shallow enough that the kernel re-checks without
+-- `set_option debug.skipKernelTC`. See `docs/SKIP_KERNEL_TC.md` for prior
+-- history.
+lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {w : Word (ZMod p)} :
+  w.isU64_poly →
+  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64_poly
+    := by
+  intro is_U64_w
+  have h65535 : (65535 : ZMod p).val = 65535 := by
+    have hp : 131072 < p := by have := (Fact.out : 2 ^ 17 < p); omega
+    exact ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
+  have h0 : (0 : ZMod p).val = 0 := ZMod.val_zero
+  have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly is_U64_w
+  by_cases h : w.isNegative_poly
+  · -- negative case: signExtend = ~~~ setWidth (~~~ x); compute both toNats
+    rw [BitVec.signExtend_eq_not_setWidth_not_of_msb_true
+        ((Word.isNegative_poly_msb is_U64_w).mp h)]
+    have is_U128_sw : (w.extend_poly true).isU128_poly := by
+      simp [extend_poly]
+      apply DWord.isU128_of_cases_poly <;> split_ifs <;>
+        simp [h65535, h0] <;> omega
+    rw [← BitVec.toNat_inj, DWord.toBitVec128_poly_toNat_poly is_U128_sw]
+    simp [extend_poly, DWord.toNat_poly, Word.toNat_poly, h, h65535, h0,
+          BitVec.toNat_not, BitVec.toNat_setWidth,
+          Word.toBitVec64_poly_toNat_poly is_U64_w]
+    omega
+  · -- non-negative case: extend_poly w true = extend_poly w false in this
+    -- branch, and signExtend = setWidth, so reduce to extend_false case.
+    have hmsb : w.toBitVec64_poly.msb = false :=
+      Bool.not_eq_true _ |>.mp (fun hm => h ((Word.isNegative_poly_msb is_U64_w).mpr hm))
+    rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
+    have heq : w.extend_poly true = w.extend_poly false := by
+      simp [extend_poly, h]
+    rw [heq]
+    exact extend_false_is_setWidth_poly is_U64_w
 
 end Word
 
@@ -2319,41 +2330,6 @@ lemma extend_U64_U128_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     simp [extend_poly] <;> (try split_ifs) <;>
     (try simp [h255, h0]) <;> omega
 
--- Polymorphic counterpart of `BWord.extend_true_is_signExtend`. Routes through
--- `BitVec.toInt_signExtend_of_le` (mirroring the `Fin KB` siblings + the
--- `Word (ZMod p)` version above) so the proof term never exposes
--- `(... % 2^128).toNat` to kernel re-check.
-lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
-    {w : BWord (ZMod p)} :
-  w.isU64_poly →
-  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64_poly
-    := by
-  set sw := extend_poly w true
-  intro is_U64_w
-  have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU64_poly is_U64_w
-  have h255 : (255 : ZMod p).val = 255 := by
-    have hp : 131072 < p := by have := (Fact.out : 2 ^ 17 < p); omega
-    exact ZMod.val_natCast_of_lt (show (255 : ℕ) < p by omega)
-  have h0 : (0 : ZMod p).val = 0 := ZMod.val_zero
-  have is_U128_bdw : sw.isU128_poly := by
-    subst sw; simp [extend_poly]
-    apply BDWord.isU128_of_cases_poly <;> split_ifs <;>
-      simp [h255, h0] <;> omega
-  have is_neg : w.isNegative_poly ↔ sw.isNegative_poly := by
-    subst sw
-    simp [extend_poly, isNegative_poly, BDWord.isNegative_poly]
-    by_cases h : 128 ≤ w[7].val <;> simp [h, h255, h0]
-  rw [← BitVec.toInt_inj]
-  simp [BitVec.toInt_signExtend_of_le]
-  rw [BWord.toBitVec64_poly_toInt_poly is_U64_w,
-      BDWord.toBitVec128_poly_toInt_poly is_U128_bdw]
-  rw [BWord.toInt_poly, BDWord.toInt_poly]
-  split_ifs <;> [ skip; tauto; tauto; skip ] <;>
-  simp [sw, extend_poly, BDWord.toNat_poly, BWord.toNat_poly] <;>
-  (rename_i h1 h2;
-   simp only [h2, ↓reduceIte, ZMod.cast_eq_val, h255, h0]) <;>
-  push_cast <;> omega
-
 /-- Polymorphic counterpart of `BWord.extend_false_is_setWidth`. -/
 lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : BWord (ZMod p)} :
@@ -2371,6 +2347,44 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   rw [BitVec.setWidth_idem (by simp)]
   rw [BWord.toBitVec64_poly_toNat_poly is_U64_w]
   simp [sw, BDWord.toNat_poly, extend_poly, BWord.toNat_poly]
+
+-- Polymorphic counterpart of `BWord.extend_true_is_signExtend`.
+-- Mirrors the `Word.extend_true_is_signExtend_poly` refactor: case-split on
+-- `w.isNegative_poly`, dispatch each case via `signExtend_eq_setWidth_of_msb_false`
+-- / `signExtend_eq_not_setWidth_not_of_msb_true`, and reduce the
+-- non-negative case to `extend_false_is_setWidth_poly`. Avoids the
+-- `BitVec.toNat_signExtend` chain that previously tripped the kernel
+-- "deep recursion" re-check on the 8-limb BWord structure.
+lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+    {w : BWord (ZMod p)} :
+  w.isU64_poly →
+  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64_poly
+    := by
+  intro is_U64_w
+  have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU64_poly is_U64_w
+  have h255 : (255 : ZMod p).val = 255 := by
+    have hp : 131072 < p := by have := (Fact.out : 2 ^ 17 < p); omega
+    exact ZMod.val_natCast_of_lt (show (255 : ℕ) < p by omega)
+  have h0 : (0 : ZMod p).val = 0 := ZMod.val_zero
+  by_cases h : w.isNegative_poly
+  · rw [BitVec.signExtend_eq_not_setWidth_not_of_msb_true
+        ((BWord.isNegative_poly_msb is_U64_w).mp h)]
+    have is_U128_sw : (w.extend_poly true).isU128_poly := by
+      simp [extend_poly]
+      apply BDWord.isU128_of_cases_poly <;> split_ifs <;>
+        simp [h255, h0] <;> omega
+    rw [← BitVec.toNat_inj, BDWord.toBitVec128_poly_toNat_poly is_U128_sw]
+    simp [extend_poly, BDWord.toNat_poly, BWord.toNat_poly, h, h255, h0,
+          BitVec.toNat_not, BitVec.toNat_setWidth,
+          BWord.toBitVec64_poly_toNat_poly is_U64_w]
+    omega
+  · have hmsb : w.toBitVec64_poly.msb = false :=
+      Bool.not_eq_true _ |>.mp (fun hm => h ((BWord.isNegative_poly_msb is_U64_w).mpr hm))
+    rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
+    have heq : w.extend_poly true = w.extend_poly false := by
+      simp [extend_poly, h]
+    rw [heq]
+    exact extend_false_is_setWidth_poly is_U64_w
 
 lemma low_as_setWidth {w : BWord (Fin KB)} :
   w.isU64 →
