@@ -4,18 +4,7 @@ import SP1Operations.Operation.U16MSBOperation.Constraints
 
 namespace U16MSBOperation
 
-lemma allHold_constraints_iff
-  {a : Fin KB}
-  {cols : U16MSBOperation (Fin KB)}
-  {is_real : Fin KB} :
-  List.Forall SP1Constraint.toProp (constraints a cols is_real) ↔
-    (is_real = 0 ∨ is_real = 1) ∧
-    (cols.msb = 0 ∨ cols.msb = 1) ∧
-    (¬is_real = 0 → 2 * a - cols.msb * 65536 < 65536)
-  := by simp [constraints]; grind
-
-/-- Polymorphic counterpart of `allHold_constraints_iff` over `ZMod p`.
-The `Range` constraint emits a `.val < 65536` shape via
+/-- The `Range` constraint emits a `.val < 65536` shape via
 `SP1Constraint.toProp_poly`, so this iff states the bound at the `ℕ`
 level rather than the field level. -/
 lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
@@ -29,21 +18,9 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     (¬is_real = 0 → (2 * a - cols.msb * 65536).val < 65536)
   := by simp [constraints]; grind
 
-@[grind →, aesop safe forward]
-lemma spec
-  {a : Fin KB}
-  {cols : U16MSBOperation (Fin KB)}
-  (h_a_isU16 : a < 65536) :
-  List.Forall SP1Constraint.toProp (constraints a cols 1) →
-    cols.msb = if a >= 32768 then 1 else 0
-  := by simp [constraints]; grind
-
 set_option maxHeartbeats 4000000 in
--- The polymorphic spec needs `val_sub_cases` and `ZMod.val_mul_of_lt`
--- to handle the wrap-around case manually; heartbeat budget elevated.
-/-- Polymorphic companion of `spec` over `ZMod p`. The proof case-splits
-on `cols.msb ∈ {0, 1}` and uses `val_sub_cases` for the wrap-around in
-`(2 * a - 65536).val`. -/
+-- Case-splits on `cols.msb ∈ {0, 1}` and uses `val_sub_cases` for the
+-- wrap-around in `(2 * a - 65536).val`.
 lemma spec_poly
   {p : ℕ} [Fact (Nat.Prime p)] [hp17 : Fact (2 ^ 17 < p)]
   {a : ZMod p}
@@ -78,15 +55,6 @@ lemma spec_poly
         rw [val_sub_cases, h_2a_val, h65536_val, if_neg (by omega)]
       omega
 
-lemma spec.U64
-  {w : Word (Fin KB)}
-  {cols : U16MSBOperation (Fin KB)}
-  (h_w_isU64 : w.isU64) :
-  List.Forall SP1Constraint.toProp (constraints w[3] cols 1) →
-    cols.msb = if w.isNegative then 1 else 0
-  := by simp [constraints]; grind
-
-/-- Polymorphic companion of `spec.U64` over `ZMod p`. -/
 lemma spec.U64_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {w : Word (ZMod p)}
@@ -102,18 +70,6 @@ lemma spec.U64_poly
 
 section gen
 
-
-lemma spec.gen
-  {a : Fin KB}
-  {cols : U16MSBOperation (Fin KB)}
-  {is_real : Fin KB}
-  (h_a_isU16 : a < 65536) :
-  List.Forall SP1Constraint.toProp (constraints a cols is_real) →
-    is_real = 1 →
-      cols.msb = if a >= 32768 then 1 else 0
-  := by simp [constraints]; intros; subst_vars; grind
-
-/-- Polymorphic companion of `spec.gen`. -/
 lemma spec.gen_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a : ZMod p}
