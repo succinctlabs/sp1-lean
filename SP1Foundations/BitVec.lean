@@ -108,51 +108,6 @@ end Nat
 
 namespace Word
 
-lemma toBitVec64_mod_of_lt (w : Word (Fin KB)) (n : Fin 8) :
-    (Word.toBitVec64 w) % BitVec.twoPow 64 n.val =
-      (BitVec.ofNat 64 w[0]) % BitVec.twoPow 64 n.val := by
-  simp [toBitVec64, toNat]
-  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
-  simp [BitVec.twoPow]
-  set k := BitVec.ofNat 64 w[0]
-  fin_cases n
-  · simp only [shiftLeft_zero, umod_one] -- trivial case
-  all_goals {simp only [reduceHShiftLeft]; bv_decide}
-
-@[simp] lemma toBitVec64_mod2 (w : Word (Fin KB)) :
-    (Word.toBitVec64 w) % 2#64 = (BitVec.ofNat 64 w[0]) % 2#64 :=
-  toBitVec64_mod_of_lt w 1
-
-@[simp] lemma toBitVec64_mod4 (w : Word (Fin KB)) :
-    (Word.toBitVec64 w) % 4#64 = (BitVec.ofNat 64 w[0]) % 4#64 :=
-  toBitVec64_mod_of_lt w 2
-
-@[simp] lemma toBitVec64_mod8 (w : Word (Fin KB)) :
-    (Word.toBitVec64 w) % 8#64 = (BitVec.ofNat 64 w[0]) % 8#64 :=
-  toBitVec64_mod_of_lt w 3
-
-@[simp] lemma toBitVec64_add_mod4 (w : Word (Fin KB)) (x : BitVec 64) :
-    (Word.toBitVec64 w + x) % 4#64 = (BitVec.ofNat 64 w[0] + x) % 4#64 := by
-  simp [toBitVec64, Word.toNat]
-  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
-  set k := BitVec.ofNat 64 w[0]
-  bv_decide
-
-@[simp] lemma add_toBitVec64_mod4 (w : Word (Fin KB)) (x : BitVec 64) :
-    (x + Word.toBitVec64 w) % 4#64 = (x + BitVec.ofNat 64 w[0]) % 4#64 := by
-  simp [toBitVec64, Word.toNat]
-  simp [BitVec.ofNat_add, BitVec.ofNat_mul]
-  set k := BitVec.ofNat 64 w[0]
-  bv_decide
-
-@[simp] lemma setWidth8_toBitVec64 (w : Word (Fin KB)) :
-    BitVec.setWidth 8 w.toBitVec64 = BitVec.ofNat 8 w[0] := by
-  simp [toBitVec64, Word.toNat_def]
-  simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat]
-  omega
-
-/-! ### Polymorphic counterparts -/
-
 lemma toBitVec64_poly_mod_of_lt {p : ℕ} [NeZero p] (w : Word (ZMod p)) (n : Fin 8) :
     (Word.toBitVec64_poly w) % BitVec.twoPow 64 n.val =
       (BitVec.ofNat 64 w[0].val) % BitVec.twoPow 64 n.val := by
