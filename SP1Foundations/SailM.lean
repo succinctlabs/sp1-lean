@@ -396,21 +396,6 @@ def execute_RTYPE_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : rop) :=
   | .SUB => op1 - op2
   | .SRA => shift_bits_right_arith op1 (Sail.BitVec.extractLsb op2 (LeanRV64D.Functions.log2_xlen -i 1) 0)
 
-/-- `execute_RTYPE` pure part for `Word` arguments -/
-@[simp] def execute_RTYPE_pure_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : rop) :=
-match op with
-  | .ADD => op1.toBitVec64 + op2.toBitVec64
-  | .SLT => if op1.toInt < op2.toInt then 1#64 else 0#64
-  | .SLTU => if op1.toNat < op2.toNat then 1#64 else 0#64
-  | .AND => op1.toBitVec64 &&& op2.toBitVec64
-  | .OR => op1.toBitVec64 ||| op2.toBitVec64
-  | .XOR => op1.toBitVec64 ^^^ op2.toBitVec64
-  | .SLL => op1.toBitVec64 <<< (BitVec.setWidth 6 op2.toBitVec64)
-  | .SRL => op1.toBitVec64 >>> (BitVec.setWidth 6 op2.toBitVec64)
-  | .SUB => op1.toBitVec64 - op2.toBitVec64
-  | .SRA => op1.toBitVec64.sshiftRight (BitVec.setWidth 6 op2.toBitVec64).toNat
-
-/-- Polymorphic counterpart of `execute_RTYPE_pure_w`. -/
 @[simp] def execute_RTYPE_pure_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : rop) :=
 match op with
@@ -425,24 +410,6 @@ match op with
   | .SUB => op1.toBitVec64_poly - op2.toBitVec64_poly
   | .SRA => op1.toBitVec64_poly.sshiftRight (BitVec.setWidth 6 op2.toBitVec64_poly).toNat
 
-/-- `execute_RTYPE` pure part for `BWord` arguments -/
-@[simp] def execute_RTYPE_pure_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : rop) :=
-match op with
-  | .ADD => op1.toBitVec64 + op2.toBitVec64
-  | .SLT => if op1.toInt < op2.toInt then 1#64 else 0#64
-  | .SLTU => if op1.toNat < op2.toNat then 1#64 else 0#64
-  | .AND => op1.toBitVec64 &&& op2.toBitVec64
-  | .OR => op1.toBitVec64 ||| op2.toBitVec64
-  | .XOR => op1.toBitVec64 ^^^ op2.toBitVec64
-  | .SLL => op1.toBitVec64 <<< (BitVec.setWidth 6 op2.toBitVec64)
-  | .SRL => op1.toBitVec64 >>> (BitVec.setWidth 6 op2.toBitVec64)
-  | .SUB => op1.toBitVec64 - op2.toBitVec64
-  | .SRA => op1.toBitVec64.sshiftRight (BitVec.setWidth 6 op2.toBitVec64).toNat
-
--- Bare-`BitVec 64` reductions of the `.SLT` / `.SLTU` arms of `execute_RTYPE_pure`.
--- Lifted out so the polymorphic / 8-limb-BWord variants below don't carry the
--- `aesop`-built `zero_extend` normalization in their kernel-rechecked proof
--- term (the structural trigger documented in `docs/GOTCHAS.md`).
 private lemma zero_extend_zopz0zI_s_eq (a b : BitVec 64) :
     zero_extend (bool_to_bit (zopz0zI_s a b)) =
       if a.toInt < b.toInt then (1#64 : BitVec 64) else 0#64 := by
@@ -459,21 +426,6 @@ private lemma shift_bits_right_arith_setWidth_6_eq (a b : BitVec 64) :
   simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
   congr 1
 
-lemma exec_RTYPE_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : rop) :
-  op1.isU64 → op2.isU64 →
-  execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_w op1 op2 op := by
-  intro h_op1_isU64 h_op2_isU64
-  cases op <;> simp [execute_RTYPE_pure, LeanRV64D.Functions.log2_xlen]
-  · rw [Sail.shift_bits_left]
-    simp [Word.toBitVec64_toNat h_op2_isU64]
-  · rw [zero_extend_zopz0zI_s_eq, Word.toBitVec64_toInt h_op1_isU64,
-        Word.toBitVec64_toInt h_op2_isU64]
-  · rw [zero_extend_zopz0zI_u_eq, Word.toBitVec64_toNat h_op1_isU64,
-        Word.toBitVec64_toNat h_op2_isU64]
-  · rw [Sail.shift_bits_right]
-    simp [Word.toBitVec64_toNat h_op2_isU64]
-  · exact shift_bits_right_arith_setWidth_6_eq _ _
-
 lemma exec_RTYPE_pure_bv_to_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : rop) :
   op1.isU64_poly → op2.isU64_poly →
@@ -489,21 +441,6 @@ lemma exec_RTYPE_pure_bv_to_w_poly {p : ℕ} [NeZero p]
         Word.toBitVec64_poly_toNat_poly h_op2_isU64]
   · rw [Sail.shift_bits_right]
     simp [Word.toBitVec64_poly_toNat_poly h_op2_isU64]
-  · exact shift_bits_right_arith_setWidth_6_eq _ _
-
-lemma exec_RTYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : rop) :
-  op1.isU64 → op2.isU64 →
-  execute_RTYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPE_pure_bw op1 op2 op := by
-  intro h_op1_isU64 h_op2_isU64
-  cases op <;> simp [execute_RTYPE_pure, LeanRV64D.Functions.log2_xlen]
-  · rw [Sail.shift_bits_left]
-    simp [BWord.toBitVec64_toNat h_op2_isU64]
-  · rw [zero_extend_zopz0zI_s_eq, BWord.toBitVec64_toInt h_op1_isU64,
-        BWord.toBitVec64_toInt h_op2_isU64]
-  · rw [zero_extend_zopz0zI_u_eq, BWord.toBitVec64_toNat h_op1_isU64,
-        BWord.toBitVec64_toNat h_op2_isU64]
-  · rw [Sail.shift_bits_right]
-    simp [BWord.toBitVec64_toNat h_op2_isU64]
   · exact shift_bits_right_arith_setWidth_6_eq _ _
 
 /-- `execute_RTYPE` with isolated pure part -/
@@ -531,18 +468,6 @@ section RTYPEW
   | .SRLW => Sail.shift_bits_right op1 (Sail.BitVec.extractLsb op2 4 0)
   | .SRAW => shift_bits_right_arith op1 (Sail.BitVec.extractLsb op2 4 0)
 
-/-- `execute_RTYPEW` pure part - 32-bit for `HWord` arguments -/
-@[simp] def execute_RTYPEW_pure_32_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : ropw) :=
-  let op1 := op1.low
-  let op2 := op2.low
-  match op with
-  | .ADDW => op1.toBitVec32 + op2.toBitVec32
-  | .SUBW => op1.toBitVec32 - op2.toBitVec32
-  | .SLLW => op1.toBitVec32 <<< (BitVec.setWidth 5 op2.toBitVec32)
-  | .SRLW => op1.toBitVec32 >>> (BitVec.setWidth 5 op2.toBitVec32)
-  | .SRAW => op1.toBitVec32.sshiftRight (BitVec.setWidth 5 op2.toBitVec32).toNat
-
-/-- Polymorphic counterpart of `execute_RTYPEW_pure_32_w`. -/
 @[simp] def execute_RTYPEW_pure_32_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :=
   let op1 := op1.low_poly
@@ -560,11 +485,6 @@ def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
   let op2 := BitVec.setWidth 32 op2
   sign_extend (m := 64) (execute_RTYPEW_pure_32 op1 op2 op)
 
-/-- `execute_RTYPEW` pure part - 64-bit for `Word` arguments -/
-@[simp] def execute_RTYPEW_pure_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : ropw) :=
-  sign_extend (m := 64) (execute_RTYPEW_pure_32_w op1 op2 op)
-
-/-- Polymorphic counterpart of `execute_RTYPEW_pure_w`. -/
 @[simp] def execute_RTYPEW_pure_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :=
   sign_extend (m := 64) (execute_RTYPEW_pure_32_w_poly op1 op2 op)
@@ -614,43 +534,6 @@ lemma exec_RTYPEW_pure_bv_to_w_poly {p : ℕ} [NeZero p]
     symm; rw [bitVec_sshiftright_eq]
     simp [BitVec.extractLsb, BitVec.setWidth_eq, BitVec.extractLsb', BitVec.toNat_setWidth]
 
-lemma exec_RTYPEW_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : ropw) :
-  op1.isU64 → op2.isU64 →
-  execute_RTYPEW_pure op1.toBitVec64 op2.toBitVec64 op = execute_RTYPEW_pure_w op1 op2 op := by
-  intro h_op1_isU64 h_op2_isU64
-  have ha' := Word.lt_cases_of_isU64 h_op1_isU64
-  have hb' := Word.lt_cases_of_isU64 h_op2_isU64
-  cases op <;> simp [execute_RTYPEW_pure] <;> congr
-  · apply Word.setWidth_eq_low h_op1_isU64
-  · apply Word.setWidth_eq_low h_op2_isU64
-  · apply Word.setWidth_eq_low h_op1_isU64
-  · apply Word.setWidth_eq_low h_op2_isU64
-  · rw [Sail.shift_bits_left]
-    simp [Word.toBitVec64_toNat h_op2_isU64]
-    rw [Word.setWidth_eq_low h_op1_isU64]
-    congr 1
-    simp [Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
-    omega
-  · rw [Sail.shift_bits_right]
-    simp [Word.toBitVec64_toNat h_op2_isU64]
-    rw [Word.setWidth_eq_low h_op1_isU64]
-    congr 1
-    simp [Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
-    omega
-  · have mod_lt_31: forall x : ℕ, (31 + (x : ℤ) % 32).toNat = 31 + x % 32 := by omega
-    have mod_lt_32 : forall x : ℕ, (32 + (x : ℤ) % 32).toNat = 32 + x % 32 := by omega
-    rw [Word.setWidth_eq_low h_op1_isU64]
-    simp [bitVec_sshiftright_eq]
-    simp [shift_bits_right_arith, Sail.BitVec.toNatInt]
-    have htoNat : (↑op2.toBitVec64.toNat % (32:ℤ)).toNat = op2.toBitVec64.toNat % 32 := by omega
-    rw [htoNat]
-    have hlow : op2.toBitVec64.toNat % 32 = op2.low.toBitVec32.toNat % 32 := by
-      simp [Word.toBitVec64, Word.toNat, Word.low, HWord.toBitVec32, HWord.toNat]
-      omega
-    rw [hlow]
-    symm; rw [bitVec_sshiftright_eq]
-    simp [BitVec.extractLsb, BitVec.setWidth_eq, BitVec.extractLsb', BitVec.toNat_setWidth]
-
 /-- `execute_RTYPEW` with isolated pure part -/
 def execute_RTYPEW' (rs2 : regidx) (rs1 : regidx) (rd : regidx) (op : ropw) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
@@ -683,25 +566,10 @@ def rop_of_iop (op : iop) : rop :=
 def execute_ITYPE_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : iop) :=
   execute_RTYPE_pure op1 op2 (rop_of_iop op)
 
-/-- `execute_ITYPE` pure part for `Word` arguments -/
-def execute_ITYPE_pure_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : iop) :=
-  execute_RTYPE_pure_w op1 op2 (rop_of_iop op)
-
 /-- Polymorphic counterpart of `execute_ITYPE_pure_w`. -/
 def execute_ITYPE_pure_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : iop) :=
   execute_RTYPE_pure_w_poly op1 op2 (rop_of_iop op)
-
-/-- `execute_ITYPE` pure part for `BWord` arguments -/
-def execute_ITYPE_pure_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : iop) :=
-  execute_RTYPE_pure_bw op1 op2 (rop_of_iop op)
-
-lemma exec_ITYPE_pure_bv_to_w (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : iop) :
-  op1.isU64 → op2.isU64 →
-  execute_ITYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_ITYPE_pure_w op1 op2 op := by
-  intro h_op1_isU64 h_op2_isU64
-  simp [execute_ITYPE_pure_w, execute_ITYPE_pure]
-  cases op <;> simp <;> exact exec_RTYPE_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64
 
 /-- Polymorphic counterpart of `exec_ITYPE_pure_bv_to_w`. -/
 lemma exec_ITYPE_pure_bv_to_w_poly {p : ℕ} [NeZero p]
@@ -712,13 +580,6 @@ lemma exec_ITYPE_pure_bv_to_w_poly {p : ℕ} [NeZero p]
   intro h_op1_isU64 h_op2_isU64
   simp [execute_ITYPE_pure_w_poly, execute_ITYPE_pure]
   cases op <;> simp <;> exact exec_RTYPE_pure_bv_to_w_poly _ _ _ h_op1_isU64 h_op2_isU64
-
-lemma exec_ITYPE_pure_bv_to_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : iop) :
-  op1.isU64 → op2.isU64 →
-  execute_ITYPE_pure op1.toBitVec64 op2.toBitVec64 op = execute_ITYPE_pure_bw op1 op2 op := by
-  intro h_op1_isU64 h_op2_isU64
-  simp [execute_ITYPE_pure_bw, execute_ITYPE_pure]
-  cases op <;> simp <;> exact exec_RTYPE_pure_bv_to_bw _ _ _ h_op1_isU64 h_op2_isU64
 
 /-- `execute_RTYPE` with isolated pure part -/
 def execute_ITYPE' (imm : BitVec 12) (rs1 : regidx) (rd : regidx) (op : iop) : SailM ExecutionResult := do
@@ -759,11 +620,6 @@ def rop_of_sop (op : sop) : rop :=
   | .SRLI => .SRL
   | .SRAI => .SRA
 
-@[simp] def execute_SHIFTIOP_pure_w (op1 : Word (Fin KB)) (shamt : BitVec 6) (op : sop) :=
-  let shamtBB : Fin KB := ⟨shamt.toNat, by omega⟩
-  execute_RTYPE_pure_w op1 #v[shamtBB, 0, 0, 0] (rop_of_sop op)
-
-/-- Polymorphic counterpart of `execute_SHIFTIOP_pure_w`. -/
 @[simp] def execute_SHIFTIOP_pure_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (shamt : BitVec 6) (op : sop) :=
   let shamtZ : ZMod p := (shamt.toNat : ZMod p)
@@ -772,19 +628,6 @@ def rop_of_sop (op : sop) : rop :=
 def execute_SHIFTIOP_pure (op1 : BitVec 64) (shamt : BitVec 6) (op : sop) :=
   let shamt64 : BitVec 64 := shamt
   execute_RTYPE_pure op1 shamt64 (rop_of_sop op)
-
-lemma exec_SHIFTIOP_pure_bv_to_w (op1 : Word (Fin KB)) (shamt : BitVec 6) (op : sop) :
-  op1.isU64 →
-  execute_SHIFTIOP_pure op1.toBitVec64 shamt op = execute_SHIFTIOP_pure_w op1 shamt op := by
-  intro h_op1_isU64
-  have h_op2_isU64 : Word.isU64 #v[ ⟨shamt.toNat, by omega⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
-  simp only [execute_SHIFTIOP_pure_w, execute_SHIFTIOP_pure]
-  rw [← exec_RTYPE_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
-  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨shamt.toNat, by omega⟩, 0, 0, 0]
-  · rw [this]
-  · rw [← BitVec.toNat_inj]
-    rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
-    simp; omega
 
 /-- Polymorphic counterpart of `exec_SHIFTIOP_pure_bv_to_w`. -/
 lemma exec_SHIFTIOP_pure_bv_to_w_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
@@ -836,11 +679,6 @@ def ropw_of_sopw (op : sopw) : ropw :=
   | .SRLIW => .SRLW
   | .SRAIW => .SRAW
 
-@[simp] def execute_SHIFTIWOP_pure_w (op1 : Word (Fin KB)) (shamt : BitVec 5) (op : sopw) :=
-  let shamtBB : Fin KB := ⟨shamt.toNat, by omega⟩
-  execute_RTYPEW_pure_w op1 #v[shamtBB, 0, 0, 0] (ropw_of_sopw op)
-
-/-- Polymorphic counterpart of `execute_SHIFTIWOP_pure_w`. -/
 @[simp] def execute_SHIFTIWOP_pure_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (shamt : BitVec 5) (op : sopw) :=
   let shamtZ : ZMod p := (shamt.toNat : ZMod p)
@@ -849,19 +687,6 @@ def ropw_of_sopw (op : sopw) : ropw :=
 def execute_SHIFTIWOP_pure (op1 : BitVec 64) (shamt : BitVec 5) (op : sopw) :=
   let shamt64 : BitVec 64 := shamt
   execute_RTYPEW_pure op1 shamt64 (ropw_of_sopw op)
-
-lemma exec_SHIFTIWOP_pure_bv_to_w (op1 : Word (Fin KB)) (shamt : BitVec 5) (op : sopw) :
-  op1.isU64 →
-  execute_SHIFTIWOP_pure op1.toBitVec64 shamt op = execute_SHIFTIWOP_pure_w op1 shamt op := by
-  intro h_op1_isU64
-  have h_op2_isU64 : Word.isU64 #v[ ⟨shamt.toNat, by omega⟩ , 0, 0, 0 ] := by apply Word.isU64_of_cases <;> simp; omega
-  simp only [execute_SHIFTIWOP_pure_w, execute_SHIFTIWOP_pure]
-  rw [← exec_RTYPEW_pure_bv_to_w _ _ _ h_op1_isU64 h_op2_isU64]
-  suffices : (BitVec.setWidth 64 shamt) = Word.toBitVec64 #v[ ⟨shamt.toNat, by omega⟩, 0, 0, 0]
-  · rw [this]
-  · rw [← BitVec.toNat_inj]
-    rw [Word.toBitVec64_toNat h_op2_isU64, Word.toNat]
-    simp; omega
 
 /-- Polymorphic counterpart of `exec_SHIFTIWOP_pure_bv_to_w`. -/
 lemma exec_SHIFTIWOP_pure_bv_to_w_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
@@ -927,57 +752,6 @@ def execute_MUL_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : mop) : BitVec 64 
     then (Sail.BitVec.extractLsb result_wide 63 0)
     else (Sail.BitVec.extractLsb result_wide 127 64))
 
-lemma combine_MUL_MULH {pl ph op1 op2 : Word (Fin KB)}
-  (isU64_pl : pl.isU64) (isU64_ph : ph.isU64)
-  (isU64_op1 : op1.isU64) (isU64_op2 : op2.isU64) :
-  Word.toBitVec64 pl = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MUL →
-  Word.toBitVec64 ph = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MULH →
-    DWord.toBitVec128 #v[pl[0], pl[1], pl[2], pl[3], ph[0], ph[1], ph[2], ph[3]] = (op1.extend true).toBitVec128 * (op2.extend true).toBitVec128
-   := by
-  iterate 2 rw [Word.extend_true_is_signExtend (by assumption)]
-  simp [execute_MUL_pure, -BitVec.extractLsb]
-  intro lo hi
-  have : BitVec.extractLsb 63 0 (op1.toBitVec64.extend 128 False * op2.toBitVec64.extend 128 False) = BitVec.extractLsb 63 0 (op1.toBitVec64.extend 128 True * op2.toBitVec64.extend 128 True) := by simp [BitVec.extend, -BitVec.extractLsb]; bv_decide
-  rw [this] at lo; clear this
-  simp [BitVec.extend, -BitVec.extractLsb] at *
-  set x := BitVec.signExtend 128 op1.toBitVec64 * BitVec.signExtend 128 op2.toBitVec64
-  trans BitVec.extractLsb 63 0 x + (BitVec.setWidth 128 (BitVec.extractLsb 127 64 x) <<< 64)
-  · rw [← lo, ← hi]
-    rw [← BitVec.toNat_inj]
-    rw [DWord.toBitVec128, DWord.toNat, Word.toBitVec64, Word.toBitVec64, Word.toNat, Word.toNat]
-    repeat rw [BitVec.toNat_add]
-    simp [Nat.shiftLeft_eq]
-    apply Word.lt_cases_of_isU64 at isU64_pl
-    apply Word.lt_cases_of_isU64 at isU64_ph
-    iterate 2 rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)]
-    ring_nf
-  · bv_decide
-
-lemma combine_MUL_MULHU {pl ph op1 op2 : Word (Fin KB)}
-  (isU64_pl : pl.isU64) (isU64_ph : ph.isU64)
-  (isU64_op1 : op1.isU64) (isU64_op2 : op2.isU64) :
-  Word.toBitVec64 pl = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MUL →
-  Word.toBitVec64 ph = execute_MUL_pure op1.toBitVec64 op2.toBitVec64 .MULHU →
-    DWord.toBitVec128 #v[pl[0], pl[1], pl[2], pl[3], ph[0], ph[1], ph[2], ph[3]] = (op1.extend false).toBitVec128 * (op2.extend false).toBitVec128
-   := by
-  iterate 2 rw [Word.extend_false_is_setWidth (by assumption)]
-  simp [execute_MUL_pure, -BitVec.extractLsb]
-  intro lo hi
-  simp [BitVec.extend, -BitVec.extractLsb] at *
-  set x := BitVec.setWidth 128 op1.toBitVec64 * BitVec.setWidth 128 op2.toBitVec64
-  trans BitVec.extractLsb 63 0 x + (BitVec.setWidth 128 (BitVec.extractLsb 127 64 x) <<< 64)
-  · rw [← lo, ← hi]
-    rw [← BitVec.toNat_inj]
-    rw [DWord.toBitVec128, DWord.toNat, Word.toBitVec64, Word.toBitVec64, Word.toNat, Word.toNat]
-    repeat rw [BitVec.toNat_add]
-    simp [Nat.shiftLeft_eq]
-    apply Word.lt_cases_of_isU64 at isU64_pl
-    apply Word.lt_cases_of_isU64 at isU64_ph
-    iterate 2 rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)]
-    ring_nf
-  · bv_decide
-
--- Polymorphic counterpart of `combine_MUL_MULH`.
 lemma combine_MUL_MULH_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   {pl ph op1 op2 : Word (ZMod p)}
   (isU64_pl : pl.isU64_poly) (isU64_ph : ph.isU64_poly)
@@ -1038,27 +812,6 @@ lemma combine_MUL_MULHU_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     iterate 2 rw [Nat.mod_eq_of_lt (b := 18446744073709551616) (by omega)]
     ring_nf
   · bv_decide
-
-/-- execute_MUL pure part for BWord arguments -/
-def execute_MUL_pure_bw (op1 : BWord (Fin KB)) (op2 : BWord (Fin KB)) (op : mop) : BitVec 64 :=
-  let op1_ext := op1.extend (op = .MULH ∨ op = .MULHSU)
-  let op2_ext := op2.extend (op = .MULH ∨ op = .MULHUS)
-  let result_wide := op1_ext.toBitVec128 * op2_ext.toBitVec128
-  (if (op = .MUL)
-    then (Sail.BitVec.extractLsb result_wide 63 0)
-    else (Sail.BitVec.extractLsb result_wide 127 64))
-
-lemma exec_MUL_pure_bv_to_bw (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) (op : mop) :
-  op1.isU64 → op2.isU64 →
-  execute_MUL_pure op1.toBitVec64 op2.toBitVec64 op = execute_MUL_pure_bw op1.toBWord op2.toBWord op := by
-  intro is_U64_op1 is_U64_op2
-  have := op1.toBWord_toU64 is_U64_op1
-  have := op2.toBWord_toU64 is_U64_op2
-  cases op <;> simp [execute_MUL_pure, execute_MUL_pure_bw, -BitVec.toNat_mul] <;>
-  (repeat rw [BWord.extend_true_is_signExtend (by assumption)]) <;>
-  (repeat rw [BWord.extend_false_is_setWidth (by assumption)]) <;>
-  congr <;> simp [BitVec.extend] <;>
-  rw [Word.toBitVec64_toBWord (by assumption)]
 
 /-- Polymorphic counterpart of `execute_MUL_pure_bw`. -/
 def execute_MUL_pure_bw_poly {p : ℕ} [NeZero p]
@@ -1159,20 +912,6 @@ def execute_MULW_pure (op1 : BitVec 64) (op2 : BitVec 64) : BitVec 64 :=
   let rs2_low : BitVec 32 := BitVec.extractLsb 31 0 op2
   let prod : BitVec 32 := rs1_low * rs2_low
   prod.extend 64 true
-
-/-- execute_MULW pure part for BWord arguments -/
-def execute_MULW_pure_bhw (op1 : BHWord (Fin KB)) (op2 : BHWord (Fin KB)) : BitVec 64 :=
-  let prod : BitVec 32 := op1.toBitVec32 * op2.toBitVec32
-  prod.extend 64 true
-
-lemma exec_MULW_pure_bv_to_bhw (op1 : Word (Fin KB)) (op2 : Word (Fin KB)) :
-  op1.isU64 → op2.isU64 →
-  execute_MULW_pure op1.toBitVec64 op2.toBitVec64 = execute_MULW_pure_bhw op1.toBWord.low op2.toBWord.low := by
-  intro is_U64_op1 is_U64_op2
-  have is_U64_bw1 := op1.toBWord_toU64 is_U64_op1
-  have is_U64_bw2 := op2.toBWord_toU64 is_U64_op2
-  simp [execute_MULW_pure, execute_MULW_pure_bhw, BitVec.extend]
-  iterate 2 rw [← Word.toBitVec64_toBWord (by assumption), BWord.low_as_setWidth (by assumption)]
 
 /-- Polymorphic counterpart of `execute_MULW_pure_bhw`. -/
 def execute_MULW_pure_bhw_poly {p : ℕ} [NeZero p]
