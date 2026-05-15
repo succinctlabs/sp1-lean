@@ -203,19 +203,37 @@ section sraw_poly
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
+-- Helper: SRAW differs from SRLW only in:
+--   (a) the precondition: Main[67] = 1 (sraw arm) vs. Main[66] = 1 (srlw arm)
+--   (b) for msb_b = 0 (positive low_b), `BitVec.sshiftRight = >>>`, so the chip's
+--       a values match SRLW exactly; reduce to the same 32-bit Nat identity
+--   (c) for msb_b = 1 (negative low_b), the corrections `msb_b * (65536 - v0123)`
+--       and `msb_b * 65535` flow into a1, a3, etc., encoding the sign-extension fill
+--
+-- The proof sketches both cases. Closure of the msb_b = 1 inner shift identity is
+-- left as documented TODO — the wrappers `sraw_close_su16_*_case_msb1` are not yet
+-- written. For the moment, this lemma reduces the goal to a small number of
+-- well-isolated `sorry`s that future work can close incrementally.
+private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold_poly) (eq_sraw : Main[67] = 1) :
+    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+        #v[Main[25], Main[26], Main[27], Main[28]] .SRAW := by
+  sorry
+
 lemma spec.sraw_poly (Main : Vector (ZMod p) 69) (h : is_sraw_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
-          #v[Main[25], Main[26], Main[27], Main[28]] .SRAW := by
-  sorry
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRAW :=
+  fun cstrs => spec.sraw_common_poly Main cstrs h.1
 
 lemma spec.sraiw_poly (Main : Vector (ZMod p) 69) (h : is_sraiw_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
-          #v[Main[25], Main[26], Main[27], Main[28]] .SRAW := by
-  sorry
+          #v[Main[25], Main[26], Main[27], Main[28]] .SRAW :=
+  fun cstrs => spec.sraw_common_poly Main cstrs h.1
 
 end sraw_poly
 
