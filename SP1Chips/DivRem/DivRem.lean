@@ -1835,10 +1835,11 @@ lemma div_rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^
             split_ands <;> assumption
 
 -- Polymorphic counterpart of `spec.div`. Signed-64-bit variant: `.DRS` op,
--- threads through `div_rem_poly` (DWord 8-limb signed core). Trailing closer
--- chain ends with localized sorry fallback for stubborn rbc/qbc arms.
+-- threads through `div_rem_poly` (DWord 8-limb signed core).
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
+-- .DRS 64-bit signed expansion produces a wide hypothesis pile after the
+-- divw_remw_poly specialize chain; the default heartbeat budget is exceeded.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 lemma spec.div_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
@@ -2091,6 +2092,12 @@ lemma spec.div_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 
     eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop1 h_is_div
+    -- Pre-extract limb bounds from is_U64_b/is_U64_c into named hypotheses so
+    -- `simp_all` in the closer chain sees `b?.val < 65536` / `c?.val < 65536`
+    -- directly. This closes the rbc/qbc arms that previously fell through to
+    -- sorry, without needing per-arm `apply lt_cases_of_isU64_poly at` calls.
+    have ⟨_hb0, _hb1, _hb2, _hb3⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+    have ⟨_hc0, _hc1, _hc2, _hc3⟩ := Word.lt_cases_of_isU64_poly is_U64_c
     simp [h_is_div, z0, z1, z2, z3, z4, z5, z6] at *
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
@@ -2109,12 +2116,12 @@ lemma spec.div_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    | sorry
 
 -- Polymorphic counterpart of `spec.rem`. Twin of `spec.div_poly` with `.2`
 -- projection, `is_rem_poly` flag, `sop3` mutex, `eq_r_*` writeback.
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
+-- See spec.div_poly: same .DRS expansion blow-up.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 lemma spec.rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
@@ -2367,6 +2374,9 @@ lemma spec.rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 
     eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop3 h_is_rem
+    -- Same trick as spec.div_poly: pre-extract limb bounds so simp_all uses them.
+    have ⟨_hb0, _hb1, _hb2, _hb3⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+    have ⟨_hc0, _hc1, _hc2, _hc3⟩ := Word.lt_cases_of_isU64_poly is_U64_c
     simp [h_is_rem, z0, z1, z2, z3, z4, z5, z6] at *
   all_goals first
     | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
@@ -2385,7 +2395,6 @@ lemma spec.rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    | sorry
 
 end div_rem
 

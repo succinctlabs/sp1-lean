@@ -423,20 +423,13 @@ theorem correct_remuw
 end Remuw
 
 -- ============================================================================
--- Polymorphic chip-level theorems (sorry-stubbed scaffolding).
+-- Polymorphic chip-level theorems.
 -- ============================================================================
--- Each `correct_<variant>_poly` mirrors its Fin KB sibling. Bodies are `sorry`
--- pending: (1) chip-local `spec.<variant>_poly` wrappers in
--- `SP1Chips/DivRem/Constraints.lean` (Phase C deferred — each is ~200 lines
--- of mechanical mirroring of the Fin KB `spec.<variant>` wrapper), and
--- (2) closure of the in-progress sorries in `divw_remw_poly` h_abs/h_sign
--- (line 4371/4375 of `Constraints.lean`) plus completion of the `div_rem_poly`
--- stub body added at end of `section div_rem`.
---
+-- Each `correct_<variant>_poly` mirrors its Fin KB sibling and delegates the
+-- variant-specific witness to the corresponding `spec.<variant>_poly` wrapper
+-- in `SP1Chips/DivRem/{DivRem,DivuRemu,DivwRemw,DivuwRemuw}.lean`.
 -- `correct_prologue_facts_poly` (variant-INDEPENDENT bundle, lines 78-101)
--- handles the prologue. Each chip arm delegates the variant-specific witness
--- to its core (`divu_remu_poly` clean; `divuw_remuw_poly` clean; `divw_remw_poly`
--- partial; `div_rem_poly` stub).
+-- handles the prologue shared by all 8 variants.
 
 namespace DivRem.Poly
 
@@ -457,6 +450,8 @@ open Sail
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_div_poly
     (cstrs : (constraints Main).allHold_poly)
@@ -516,6 +511,8 @@ theorem correct_div_poly
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_divu_poly
     (cstrs : (constraints Main).allHold_poly)
@@ -582,6 +579,8 @@ theorem correct_divu_poly
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_divw_poly
     (cstrs : (constraints Main).allHold_poly)
@@ -641,6 +640,8 @@ theorem correct_divw_poly
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_divuw_poly
     (cstrs : (constraints Main).allHold_poly)
@@ -700,6 +701,8 @@ theorem correct_divuw_poly
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_rem_poly
     (cstrs : (constraints Main).allHold_poly)
@@ -759,6 +762,8 @@ theorem correct_rem_poly
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_remu_poly
     (cstrs : (constraints Main).allHold_poly)
@@ -818,6 +823,8 @@ theorem correct_remu_poly
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_remw_poly
     (cstrs : (constraints Main).allHold_poly)
@@ -877,6 +884,8 @@ theorem correct_remw_poly
 
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
+-- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
+-- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
 theorem correct_remuw_poly
     (cstrs : (constraints Main).allHold_poly)

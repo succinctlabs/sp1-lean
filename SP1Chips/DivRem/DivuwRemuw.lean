@@ -1133,6 +1133,8 @@ lemma spec.remuw :
 -- and threads through `divuw_remuw_poly` (4-limb HWord core).
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
+-- DRWU expansion + 11-arm `first` closer chain on each side-goal exceeds the
+-- default heartbeat budget; matches the divu/divw spec wrapper pattern.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
@@ -1405,7 +1407,6 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
-    | (apply Word.isU64_of_cases_poly <;> simp_all; done)
     | (apply Word.isU64_of_cases_poly <;> simp <;> omega)
     | (apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega)
     | (apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega)
@@ -1413,8 +1414,6 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
        apply Word.isU64_of_cases_poly <;> simp at is_U64_c ⊢ <;> omega)
     | (apply Word.lt_cases_of_isU64_poly at is_U64_b
        apply Word.isU64_of_cases_poly <;> simp at is_U64_b ⊢ <;> omega)
-    | (rcases b_b_neg with hbn | hbn <;>
-       (apply Word.isU64_of_cases_poly <;> simp_all [hbn] <;> omega))
     | (apply maco_arm_closer_poly u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
@@ -1424,6 +1423,7 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
 -- `.2` projection, `is_remuw_poly` flag, `sop8` mutex, and `eq_r_*` writeback.
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
+-- See spec.divuw_poly: same DRWU expansion blow-up.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
@@ -1691,7 +1691,6 @@ lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   all_goals first
     | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
-    | (apply Word.isU64_of_cases_poly <;> simp_all; done)
     | (apply Word.isU64_of_cases_poly <;> simp <;> omega)
     | (apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega)
     | (apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega)
@@ -1699,8 +1698,6 @@ lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
        apply Word.isU64_of_cases_poly <;> simp at is_U64_c ⊢ <;> omega)
     | (apply Word.lt_cases_of_isU64_poly at is_U64_b
        apply Word.isU64_of_cases_poly <;> simp at is_U64_b ⊢ <;> omega)
-    | (rcases b_b_neg with hbn | hbn <;>
-       (apply Word.isU64_of_cases_poly <;> simp_all [hbn] <;> omega))
     | (apply maco_arm_closer_poly u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero

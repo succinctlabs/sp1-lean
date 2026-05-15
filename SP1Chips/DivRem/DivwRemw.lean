@@ -1719,10 +1719,11 @@ lemma spec.remw :
   · apply Word.lt_cases_of_isU64 at is_U64_c; apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> [ omega; omega; skip; skip ] <;> rcases b_c_neg with eq_msb_c | eq_msb_c <;> rw [eq_msb_c] <;> simp
 
 -- Polymorphic counterpart of `spec.divw`. Signed-32-bit variant: `.DRWS` op,
--- threads through `divw_remw_poly` (HWord signed core). Trailing closer chain
--- ends with localized sorries for stubborn rbc/qbc arms (see Phase 1.2 note).
+-- threads through `divw_remw_poly` (HWord signed core).
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
+-- DRWS sign-extension multiplies the per-side constraint expansion by an
+-- extra msb case-split (b/c/r/q), exceeding the default heartbeat budget.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 lemma spec.divw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
@@ -1975,11 +1976,66 @@ lemma spec.divw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
     eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop5 h_is_divw
-    simp [h_is_divw, z0, z1, z2, z3, z4, z5, z6] at *
-  -- FIXME: divw stubborn arms require deriving `msb_quot, msb_rem ∈ {0, 1}` from
-  -- `w_eq_msb_*` constraints which have varied form across side-goals (some
-  -- post-`U16MSBOperation.spec.gen_poly`, some still raw `List.Forall ... constraints`).
-  -- Robust binary derivation across all goal contexts not yet tractable.
+    -- For divw, is_divw + is_remw = 1 ≠ 0; resolve_left peels the RHS of
+    -- the w_eq_*_w disjunctions: rbc/qbc = msb_? * 65535.
+    have h_sum_w_ne : (is_divw + is_remw : ZMod p) ≠ 0 := by
+      intro hh
+      have : (1 : ZMod p) = 0 := by linear_combination hh - h_is_divw - z4
+      exact one_ne_zero this
+    have h_rbc2_eq : rbc2 = msb_rem * 65535 := w_eq_rbc2_w.resolve_left h_sum_w_ne
+    have h_rbc3_eq : rbc3 = msb_rem * 65535 := w_eq_rbc3_w.resolve_left h_sum_w_ne
+    have h_qbc2_eq : qbc2 = msb_quot * 65535 := w_eq_qbc2_w.resolve_left h_sum_w_ne
+    have h_qbc3_eq : qbc3 = msb_quot * 65535 := w_eq_qbc3_w.resolve_left h_sum_w_ne
+    -- is_word = is_divw + is_remw + is_divuw + is_remuw = 1 for divw.
+    have h_iw_1 : (is_divw + is_remw + is_divuw + is_remuw : ZMod p) = 1 := by
+      linear_combination h_is_divw + z4 + z5 + z6
+    -- msb_rem, msb_quot ∈ {0, 1}. The hypothesis form varies across side-goals
+    -- (per the 3-form blocker documented in commit a62938b):
+    --   (a) post-gen_poly + post-msb_bridge: `is_word = 1 → ?cols.msb = if 32768 ≤ ?x then 1 else 0`
+    --   (b) post-gen_poly only: same but `if ?x.val ≥ 32768`
+    --   (c) raw `List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints ...)`
+    have h_msb_rem_01 : msb_rem = 0 ∨ msb_rem = 1 := by
+      first
+        | (have h : msb_rem = if (32768 : ZMod p) ≤ r1 then 1 else 0 := w_eq_msb_rem h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_rem = if r1.val ≥ 32768 then 1 else 0 := w_eq_msb_rem h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_rem = if r1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly u16_r1 w_eq_msb_rem h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    have h_msb_quot_01 : msb_quot = 0 ∨ msb_quot = 1 := by
+      first
+        | (have h : msb_quot = if (32768 : ZMod p) ≤ q1 then 1 else 0 := w_eq_msb_quot h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_quot = if q1.val ≥ 32768 then 1 else 0 := w_eq_msb_quot h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_quot = if q1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly u16_q1 w_eq_msb_quot h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    -- msb_b, msb_c also need bounds — Word.isU64_poly arms for the
+    -- sign-extended b- and c-words have shape `[?, ?, msb_? * 65535, msb_? * 65535]`.
+    have ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+    have ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+    have h_msb_b_01 : msb_b = 0 ∨ msb_b = 1 := by
+      first
+        | (have h : msb_b = if (32768 : ZMod p) ≤ b1 then 1 else 0 := w_eq_msb_b h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_b = if b1.val ≥ 32768 then 1 else 0 := w_eq_msb_b h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_b = if b1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly hb1 w_eq_msb_b h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    have h_msb_c_01 : msb_c = 0 ∨ msb_c = 1 := by
+      first
+        | (have h : msb_c = if (32768 : ZMod p) ≤ c1 then 1 else 0 := w_eq_msb_c h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_c = if c1.val ≥ 32768 then 1 else 0 := w_eq_msb_c h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_c = if c1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly hc1 w_eq_msb_c h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    simp [h_is_divw, z0, z1, z2, z3, z4, z5, z6,
+          h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
@@ -1997,12 +2053,21 @@ lemma spec.divw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    | sorry
+    -- msb-bearing arms: Word.isU64_poly goals for sign-extended r/q/c words
+    -- have shape `#v[?, ?, m * 65535, m * 65535]` where m ∈ {0, 1}.
+    -- `msb_arm_closer_poly` closes each shape directly given the low-limb
+    -- u16 bounds (from `u16_r0`/`u16_q0` directly, or from `is_U64_c`).
+    -- (b-side msb arm not needed for `divw` writeback — kept derived for parity.)
+    | (apply msb_arm_closer_poly u16_r0 u16_r1 h_msb_rem_01)
+    | (apply msb_arm_closer_poly u16_q0 u16_q1 h_msb_quot_01)
+    | (apply msb_arm_closer_poly hc0 hc1 h_msb_c_01)
 
 -- Polymorphic counterpart of `spec.remw`. Twin of `spec.divw_poly` with
 -- `.2` projection, `is_remw_poly` flag, `sop6` mutex, `eq_r_*` writeback.
 set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
+-- DRWS sign-extension multiplies the per-side constraint expansion by an
+-- extra msb case-split (b/c/r/q), exceeding the default heartbeat budget.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 lemma spec.remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
@@ -2255,7 +2320,60 @@ lemma spec.remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
     eq_msb_b eq_msb_c eq_msb_rem w_eq_msb_b w_eq_msb_c w_eq_msb_rem w_eq_msb_quot abs_check
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop6 h_is_remw
-    simp [h_is_remw, z0, z1, z2, z3, z4, z5, z6] at *
+    -- For remw, is_divw + is_remw = 1 ≠ 0; resolve_left peels the w_eq_*_w
+    -- disjunctions to rbc/qbc = msb_? * 65535. Mirrors spec.divw_poly.
+    -- sop6 z* order: z0=is_div, z1=is_divu, z2=is_rem, z3=is_remu, z4=is_divw,
+    -- z5=is_divuw, z6=is_remuw (all 0). h_is_remw : is_remw = 1.
+    have h_sum_w_ne : (is_divw + is_remw : ZMod p) ≠ 0 := by
+      intro hh
+      have : (1 : ZMod p) = 0 := by linear_combination hh - h_is_remw - z4
+      exact one_ne_zero this
+    have h_rbc2_eq : rbc2 = msb_rem * 65535 := w_eq_rbc2_w.resolve_left h_sum_w_ne
+    have h_rbc3_eq : rbc3 = msb_rem * 65535 := w_eq_rbc3_w.resolve_left h_sum_w_ne
+    have h_qbc2_eq : qbc2 = msb_quot * 65535 := w_eq_qbc2_w.resolve_left h_sum_w_ne
+    have h_qbc3_eq : qbc3 = msb_quot * 65535 := w_eq_qbc3_w.resolve_left h_sum_w_ne
+    have h_iw_1 : (is_divw + is_remw + is_divuw + is_remuw : ZMod p) = 1 := by
+      linear_combination h_is_remw + z4 + z5 + z6
+    have h_msb_rem_01 : msb_rem = 0 ∨ msb_rem = 1 := by
+      first
+        | (have h : msb_rem = if (32768 : ZMod p) ≤ r1 then 1 else 0 := w_eq_msb_rem h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_rem = if r1.val ≥ 32768 then 1 else 0 := w_eq_msb_rem h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_rem = if r1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly u16_r1 w_eq_msb_rem h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    have h_msb_quot_01 : msb_quot = 0 ∨ msb_quot = 1 := by
+      first
+        | (have h : msb_quot = if (32768 : ZMod p) ≤ q1 then 1 else 0 := w_eq_msb_quot h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_quot = if q1.val ≥ 32768 then 1 else 0 := w_eq_msb_quot h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_quot = if q1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly u16_q1 w_eq_msb_quot h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    have ⟨hb0, hb1, hb2, hb3⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+    have ⟨hc0, hc1, hc2, hc3⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+    have h_msb_b_01 : msb_b = 0 ∨ msb_b = 1 := by
+      first
+        | (have h : msb_b = if (32768 : ZMod p) ≤ b1 then 1 else 0 := w_eq_msb_b h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_b = if b1.val ≥ 32768 then 1 else 0 := w_eq_msb_b h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_b = if b1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly hb1 w_eq_msb_b h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    have h_msb_c_01 : msb_c = 0 ∨ msb_c = 1 := by
+      first
+        | (have h : msb_c = if (32768 : ZMod p) ≤ c1 then 1 else 0 := w_eq_msb_c h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_c = if c1.val ≥ 32768 then 1 else 0 := w_eq_msb_c h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+        | (have h : msb_c = if c1.val ≥ 32768 then 1 else 0 :=
+             U16MSBOperation.spec.gen_poly hc1 w_eq_msb_c h_iw_1
+           rw [h]; split_ifs <;> [right; left] <;> rfl)
+    simp [h_is_remw, z0, z1, z2, z3, z4, z5, z6,
+          h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
   all_goals first
     | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
@@ -2273,7 +2391,10 @@ lemma spec.remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    | sorry
+    -- msb-bearing arms (see spec.divw_poly for shape rationale).
+    | (apply msb_arm_closer_poly u16_r0 u16_r1 h_msb_rem_01)
+    | (apply msb_arm_closer_poly u16_q0 u16_q1 h_msb_quot_01)
+    | (apply msb_arm_closer_poly hc0 hc1 h_msb_c_01)
 
 end divw_remw
 

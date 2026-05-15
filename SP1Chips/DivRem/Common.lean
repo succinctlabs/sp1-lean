@@ -571,6 +571,7 @@ lemma op_a_is_0_poly (Main : Vector (ZMod p) 246)
   have ⟨ha28, ha29, ha30, ha31⟩ := h_zero h_op_a_0_ne_0
   exact ⟨ha28, ha29, ha30, ha31⟩
 
+omit [Fact (2 ^ 17 < p)] in
 /-- Closer for the maco-form arm of `spec.<v>_poly` proofs. Extracted into a
 named lemma so the case-split on `is_c_0 ∈ {0,1}` runs in a small fresh
 context (avoiding the `simp_all` stack overflow that an inline closer hits
@@ -598,6 +599,33 @@ lemma maco_arm_closer_poly
     simp only [sub_self, zero_mul, add_zero]
     apply Word.isU64_of_cases_poly <;>
       simp [ZMod.val_one, ZMod.val_zero]
+
+/-- Closer for the divw/remw / div/rem signed sign-extension arm of
+`spec.<v>_poly` proofs. The high two limbs of the constructed word are
+`msb * 65535`; given `msb ∈ {0, 1}` they reduce to `0` or `65535`, both U16.
+Used by `spec.{divw,remw,div,rem}_poly` to close the rbc/qbc-bearing
+`Word.isU64_poly` arms. Polymorphic in the two low limbs (x, y) and in
+which msb (msb_rem or msb_quot) is bound. -/
+lemma msb_arm_closer_poly
+    {x y msb : ZMod p}
+    (u16_x : x.val < 65536) (u16_y : y.val < 65536)
+    (h_msb_01 : msb = 0 ∨ msb = 1) :
+    Word.isU64_poly (#v[x, y, msb * 65535, msb * 65535] : Word (ZMod p)) := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have hp17 : 2 ^ 17 < p := Fact.out
+  have h65535_val : (65535 : ZMod p).val = 65535 :=
+    ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
+  apply Word.isU64_of_cases_poly <;>
+    simp only [Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero, List.getElem_cons_succ]
+  · exact u16_x
+  · exact u16_y
+  · rcases h_msb_01 with h | h
+    · rw [h, zero_mul]; simp [ZMod.val_zero]
+    · rw [h, one_mul, h65535_val]; omega
+  · rcases h_msb_01 with h | h
+    · rw [h, zero_mul]; simp [ZMod.val_zero]
+    · rw [h, one_mul, h65535_val]; omega
 
 /-- Variant-specific < 32 bounds for op_a/op_b/op_c plus the U64 properties of
 operand words, derived from the chip's `allHold_poly` with the divu opcode
