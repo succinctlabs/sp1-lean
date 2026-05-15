@@ -4,28 +4,6 @@ import SP1Operations.Operation.SubOperation.Constraints
 
 namespace SubOperation
 
-set_option maxHeartbeats 1000000 in
--- iff-characterization of constraints
-lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : SubOperation (Fin KB)) :
-    List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
-    let carry0 : Fin KB := (b[0] + cols.value[0] - a[0]) * 65536⁻¹
-    let carry1 : Fin KB := (b[1] + cols.value[1] - a[1] + carry0) * 65536⁻¹
-    let carry2 : Fin KB := (b[2] + cols.value[2] - a[2] + carry1) * 65536⁻¹
-    let carry3 : Fin KB := (b[3] + cols.value[3] - a[3] + carry2) * 65536⁻¹
-    (carry0 = 0 ∨ carry0 = 1) ∧
-    (carry1 = 0 ∨ carry1 = 1) ∧
-    (carry2 = 0 ∨ carry2 = 1) ∧
-    (carry3 = 0 ∨ carry3 = 1) ∧
-    (cols.value[0].val < 65536) ∧
-    (cols.value[1].val < 65536) ∧
-    (cols.value[2].val < 65536) ∧
-    (cols.value[3].val < 65536) := by
-  simp [constraints, ← inv_65536BB_eq', sub_eq_zero]
-  constructor <;> intro ⟨h0, h1, h2, h3, r0, r1, r2, r3⟩ <;> split_ands <;>
-  [ clear *- h0; clear *- h1; clear *- h2; clear *- h3; exact r0; exact r1; exact r2; exact r3;
-    clear *- h0; clear *- h1; clear *- h2; clear *- h3; exact r0; exact r1; exact r2; exact r3 ] <;>
-  omega
-
 /-- Disjunction-shift helper: if `x = 1 - y`, then `x ∈ {0, 1} ↔ y ∈ {0, 1}`
 (the disjunction commutes). Used to bridge the borrow-form auto-gen
 carries (`d_i = (a + 65536 - 1 - b - c + d_{i-1}) * 65536⁻¹`) to the
@@ -45,13 +23,10 @@ private lemma carry_swap_iff_poly {p : ℕ} [Fact (Nat.Prime p)]
 
 set_option maxHeartbeats 4000000 in
 -- The proof's `set`-then-`linear_combination` cascade is heartbeat-heavy
--- (4 carry-swap bridges, each closing via field arithmetic); the elevated
--- limit is well below the maximum and stays in cache.
-/-- Polymorphic companion of `allHold_constraints_iff` over `ZMod p`. Unlike
-the `Fin KB` version (which drops into omega via `← inv_65536BB_eq'` over
-the literal `2130673921`), this proof bridges the borrow-form auto-gen
-carries (`d_i`) to the natural-form iff carries (`c_i`) via the relation
-`d_i = 1 - c_i` plus `carry_swap_iff_poly`. -/
+-- (4 carry-swap bridges, each closing via field arithmetic).
+/-- Bridges the borrow-form auto-gen carries (`d_i`) to the natural-form
+iff carries (`c_i`) via the relation `d_i = 1 - c_i` plus
+`carry_swap_iff_poly`. -/
 lemma allHold_constraints_iff_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p)) (cols : SubOperation (ZMod p)) :
@@ -104,29 +79,6 @@ lemma allHold_constraints_iff_poly
       carry_swap_iff_poly d2 c2 hd2_swap,
       carry_swap_iff_poly d3 c3 hd3_swap]
 
-set_option maxHeartbeats 1000000 in
-
--- arithmetic spec proof over Word/BitVec
-theorem spec
-  {a b : Word (Fin KB)}
-  {cols : SubOperation (Fin KB)}
-  (h_isU64_a : a.isU64)
-  (h_isU64_b : b.isU64) :
-  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
-    cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .SUB := by
-  intro cstrs
-  simp [allHold_constraints_iff] at cstrs
-  obtain ⟨h0, h1, h2, h3, hbds⟩ := cstrs
-  apply Word.lt_cases_of_isU64 at h_isU64_a
-  apply Word.lt_cases_of_isU64 at h_isU64_b
-  constructor
-  · clear *- hbds; aesop
-  · simp [BitVec.eq_sub_iff_add_eq]
-    simp [Word.toBitVec64, Word.toNat]
-    rw [← BitVec.toNat_inj, BitVec.toNat_add]
-    rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>
-    simp_all <;> omega
-
 /-- Per-limb Nat lift: given the ZMod-level limb equation
 `bb + vv + prev = aa + cc * 65536` (where `prev, cc ∈ {0, 1}` and the
 `bb, vv, aa` limbs are bounded by `2^16`), produce the Nat equation
@@ -162,10 +114,7 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 set_option maxHeartbeats 16000000 in
 -- The 4 `linear_combination`-based carry rearrangements plus the BitVec
 -- ↔ Nat bridge sit in the 4–8M heartbeat range; 16M leaves headroom.
-/-- Polymorphic companion of `spec`. The `Fin KB` version closes via
-`simp_all <;> omega` after carry rcases, leveraging the `inv_65536BB_eq'`
-literal-inverse simp lemma that doesn't generalize. The `_poly` recipe
-re-arranges each iff_poly carry from inverse-form to a sum equation
+/-- Re-arranges each iff_poly carry from inverse-form to a sum equation
 `b[i] + v[i] + prev = a[i] + c_i * 65536` via `linear_combination` over
 `(65536 : ZMod p) * 65536⁻¹ = 1`, then applies `limb_lift` to convert
 each to a Nat equation, and closes the BitVec goal (after
