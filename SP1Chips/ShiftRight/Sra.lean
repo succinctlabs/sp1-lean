@@ -11,69 +11,6 @@ set_option maxHeartbeats 100000000
 
 variable (Main : Vector (Fin KB) 69)
 
-section sra_helpers
-
-/-- Nat identity: for `X < 2^64` and `K ∣ 2^64`,
-`X / K + 2^64 - 2^64/K = 2^64 - 1 - (2^64 - 1 - X) / K`.
-Used to bridge SRL's `b/K` form to SRA's `2^64-1 - (2^64-1-b)/K` form. -/
-private lemma sra_div_identity (X K : ℕ) (h_X : X < 2 ^ 64) (h_K_pos : 0 < K)
-    (h_K_dvd : K ∣ 2 ^ 64) :
-    X / K + 2 ^ 64 - 2 ^ 64 / K = 2 ^ 64 - 1 - (2 ^ 64 - 1 - X) / K := by
-  obtain ⟨Q, hQ⟩ := h_K_dvd
-  have h_div_2_64 : (2 : ℕ) ^ 64 / K = Q := by
-    rw [hQ]; exact Nat.mul_div_cancel_left Q h_K_pos
-  have h_KQ : K * Q = 2 ^ 64 := hQ.symm
-  set q := X / K with hq_def
-  set r := X % K with hr_def
-  have h_X_dec : K * q + r = X := Nat.div_add_mod X K
-  have h_r_lt : r < K := Nat.mod_lt X h_K_pos
-  have h_q_lt : q < Q := by
-    have h_qK_le_X : q * K ≤ X := Nat.div_mul_le_self X K
-    have h_X_lt_KQ : X < K * Q := by rw [← hQ]; exact h_X
-    have h_qK_lt_KQ : q * K < Q * K := by
-      calc q * K ≤ X := h_qK_le_X
-        _ < K * Q := h_X_lt_KQ
-        _ = Q * K := Nat.mul_comm _ _
-    exact Nat.lt_of_mul_lt_mul_right h_qK_lt_KQ
-  -- Use the identity K*Q = K*(q+1) + K*(Q-q-1), expand X = K*q + r.
-  have h_q_succ_le_Q : q + 1 ≤ Q := h_q_lt
-  have h_KQ_split : K * Q = K * q + K + K * (Q - q - 1) := by
-    have h_Q_decomp : Q = (q + 1) + (Q - q - 1) := by omega
-    calc K * Q = K * ((q + 1) + (Q - q - 1)) := by rw [← h_Q_decomp]
-      _ = K * (q + 1) + K * (Q - q - 1) := by rw [Nat.mul_add]
-      _ = K * q + K + K * (Q - q - 1) := by rw [Nat.mul_add, Nat.mul_one]
-  have h_alg : 2 ^ 64 - 1 - X = K * (Q - q - 1) + (K - 1 - r) := by
-    rw [← h_KQ]
-    rw [h_KQ_split, ← h_X_dec]
-    omega
-  have h_div_eq : (2 ^ 64 - 1 - X) / K = Q - q - 1 := by
-    rw [h_alg, Nat.mul_add_div h_K_pos]
-    rw [Nat.div_eq_of_lt (by omega : K - 1 - r < K)]
-    omega
-  rw [h_div_2_64, h_div_eq]
-  omega
-
-/-- Helper: K = 2^S divides 2^64 for S ≤ 64. -/
-private lemma sra_pow_dvd (S : ℕ) (h_S : S ≤ 64) : 2 ^ S ∣ 2 ^ 64 :=
-  pow_dvd_pow 2 h_S
-
-/-- Helper: 2^64 / 2^S = 2^(64-S) for S ≤ 64. -/
-private lemma sra_pow_div_pow (S : ℕ) (h_S : S ≤ 64) : (2 : ℕ) ^ 64 / 2 ^ S = 2 ^ (64 - S) := by
-  rw [show (2 : ℕ) ^ 64 = 2 ^ S * 2 ^ (64 - S) from by rw [← pow_add]; congr 1; omega]
-  exact Nat.mul_div_cancel_left _ (by positivity)
-
--- TODO(sra_wrappers): the four `sra_close_su16_{0,1,2,3}_case` wrappers (SRA byte-shift
--- closers mirroring `srl_close_su16_*_case`) are not yet implemented. They need to bridge
--- SRL's `b/N` form to SRA's `2^64-1 - (2^64-1-b)/N` form via `sra_div_identity` plus
--- limb arithmetic for the `(65536 - v0123) * 2^48` (and analogous) fill terms. An
--- initial attempt timed out at >100M heartbeats due to redoing all SRL val arithmetic
--- in-line; future work should delegate as much as possible to
--- `srl_within_byte_shift_{,1,2,3}_poly` rather than re-deriving the val bridges.
--- The Nat-level identity `sra_div_identity` and the small `sra_pow_*` helpers above
--- are ready; the limb arithmetic is the remaining heavy lift.
-
-end sra_helpers
-
 section sra
 
 /-- Shared proof body for `spec.sra` and `spec.srai`. -/
@@ -327,12 +264,562 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
   by_cases hb3 : b3.val ≥ 32768
   · -- b3.val ≥ 32768 ⇒ msb_b = 1 ⇒ result is sign-extended.
     have h_msb_b_one : msb_b = 1 := by rw [h_msb_b_eq, if_pos hb3]
-    -- TODO (msb_b = 1 case): apply `BitVec.toNat_sshiftRight` (msb=true arm)
-    -- to reduce sshiftRight to `2^64 - 1 - (2^64 - 1 - b.toNat) >>> shamt`;
-    -- handle sign-extension via new `sra_close_su16_*_case` wrappers that bake
-    -- in the `msb_b * (65536 - v_0123)` correction for a_3 (byte_shift=0) and the
-    -- `msb_b * 65535` fill-byte for byte_shift > 0.
-    sorry
+    -- Establish `(Word.toBitVec64_poly b).msb = true` from `hb3`.
+    have h_neg : Word.isNegative_poly #v[b0, b1, b2, b3] := by
+      simp only [Word.isNegative_poly, Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_succ, List.getElem_cons_zero]
+      exact hb3
+    have h_msb_true : (Word.toBitVec64_poly #v[b0, b1, b2, b3]).msb = true :=
+      (Word.isNegative_poly_msb is_U64_b).mp h_neg
+    -- Reduce 64-bit goal to nat arithmetic via the signed-complement form.
+    rw [← BitVec.toNat_inj]
+    simp only [execute_RTYPE_pure_w_poly, BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
+    rw [BitVec.toNat_sshiftRight_of_msb_true h_msb_true]
+    simp only [Nat.shiftRight_eq_div_pow]
+    -- Reduce shift count to `c0.val % 64` (same as msb_b=0 arm).
+    have h_shift_eq : (Word.toBitVec64_poly #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
+      rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+      simp; omega
+    rw [h_shift_eq]; clear h_shift_eq
+    have h_cb_sum_lt : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val < 64 := by
+      have hcb0 : cb0.val ≤ 1 := by rcases b_cb0 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+      have hcb1 : cb1.val ≤ 1 := by rcases b_cb1 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+      have hcb2 : cb2.val ≤ 1 := by rcases b_cb2 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+      have hcb3 : cb3.val ≤ 1 := by rcases b_cb3 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+      have hcb4 : cb4.val ≤ 1 := by rcases b_cb4 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+      have hcb5 : cb5.val ≤ 1 := by rcases b_cb5 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+      have h_eq := cb_sum_val_eq_poly b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+      omega
+    have h_val_10 : (10 : ZMod p).val = 10 := by
+      rw [show (10 : ZMod p) = ((10 : ℕ) : ZMod p) from by push_cast; rfl]
+      exact ZMod.val_natCast_of_lt (by omega)
+    have h_diff := diff h_sum_ne
+    rw [h_val_10] at h_diff
+    have h_c0_mod : c0.val % 64 = (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val := by
+      apply is_mod_64_poly (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
+      · exact h_cb_sum_lt
+      · exact c0_16
+      · exact h_diff
+    rw [h_c0_mod]; clear h_c0_mod h_diff h_cb_sum_lt
+    -- De-gate h_b2_dec, h_b3_dec (multiplier `(srl + sra)` = 0 + 1 = 1).
+    rw [h_no_srl, eq_sra] at h_b2_dec h_b3_dec
+    simp only [zero_add, mul_one] at h_b2_dec h_b3_dec
+    -- Pre-process disjunct gates.
+    rw [h_no_srl] at sr_00 sr_01 sr_02 sr_03 sr_10 sr_11 sr_12 sr_13
+                     sr_20 sr_21 sr_22 sr_23 sr_30 sr_31 sr_32 sr_33
+                     h_su160 h_su161 h_su162 h_su163 one_of_su16s w_msb_b
+    rw [h_no_srlw] at w_msb_srv one_of_su16s
+    rw [h_no_sraw] at w_msb_srv one_of_su16s
+    rw [eq_sra] at sr_00 sr_01 sr_02 sr_03 sr_10 sr_11 sr_12 sr_13
+                    sr_20 sr_21 sr_22 sr_23 sr_30 sr_31 sr_32 sr_33
+                    h_su160 h_su161 h_su162 h_su163 one_of_su16s
+    simp only [add_zero, zero_add] at sr_00 sr_01 sr_02 sr_03 sr_10 sr_11 sr_12 sr_13
+                                       sr_20 sr_21 sr_22 sr_23 sr_30 sr_31 sr_32 sr_33
+                                       h_su160 h_su161 h_su162 h_su163 one_of_su16s w_msb_srv
+    simp only [show ((1 : ZMod p) = 0) ↔ False from ⟨h_one_ne_zero, False.elim⟩, false_or]
+      at sr_00 sr_01 sr_02 sr_03 sr_10 sr_11 sr_12 sr_13
+         sr_20 sr_21 sr_22 sr_23 sr_30 sr_31 sr_32 sr_33
+         one_of_su16s
+    have h_zero_ne_one : (0 : ZMod p) ≠ 1 := fun h => h_one_ne_zero h.symm
+    simp only [show ((0 : ZMod p) = 1) ↔ False from ⟨h_zero_ne_one, False.elim⟩, false_or]
+      at w_msb_srv
+    -- smv = v0123 (from eq_smv: smv = msb_b * v0123 with msb_b = 1).
+    rw [h_msb_b_one, one_mul] at eq_smv
+    have h_su_sum : su160 + su161 + su162 + su163 = 1 := one_of_su16s
+    simp only [mul_one] at h_su160 h_su161 h_su162 h_su163
+    -- Substitute msb_b = 1, smv = v0123 into the chip's a-form disjuncts.
+    simp only [h_msb_b_one, eq_smv, one_mul]
+      at sr_03 sr_12 sr_13 sr_21 sr_22 sr_23 sr_30 sr_31 sr_32 sr_33
+    -- 4-way case-split on cb4, cb5 → byte_shift ∈ {0, 1, 2, 3}.
+    rcases b_cb5 with hcb5 | hcb5 <;> rcases b_cb4 with hcb4 | hcb4
+    · -- byte_shift = 0: cb4 = 0, cb5 = 0. su160 = 1.
+      rw [hcb4, hcb5] at h_su160 h_su161 h_su162 h_su163
+      simp only [zero_add, zero_mul, mul_zero, add_zero] at h_su160 h_su161 h_su162 h_su163
+      have h_su161_zero : su161 = 0 :=
+        h_su161.resolve_right (fun h => h_one_ne_zero (by linear_combination -h))
+      have h_su162_zero : su162 = 0 :=
+        h_su162.resolve_right (fun h => val_2_ne_zero (by linear_combination -h))
+      have h_su163_zero : su163 = 0 :=
+        h_su163.resolve_right (fun h => val_3_ne_zero (by linear_combination -h))
+      have h_su160_eq : su160 = 1 := by
+        have := h_su_sum
+        rw [h_su161_zero, h_su162_zero, h_su163_zero] at this
+        linear_combination this
+      have h_a0_eq : a0 = lr0 :=
+        sr_00.resolve_left (fun h => h_one_ne_zero (h_su160_eq.symm.trans h))
+      have h_a1_eq : a1 = lr1 :=
+        sr_01.resolve_left (fun h => h_one_ne_zero (h_su160_eq.symm.trans h))
+      have h_a2_eq : a2 = lr2 :=
+        sr_02.resolve_left (fun h => h_one_ne_zero (h_su160_eq.symm.trans h))
+      have h_a3_eq : a3 = lr3 + (((65536 : ℕ) : ZMod p) - v0123) := by
+        have := sr_03.resolve_left (fun h => h_one_ne_zero (h_su160_eq.symm.trans h))
+        convert this using 2
+      rw [h_a0_eq, h_a1_eq, h_a2_eq, h_a3_eq, eq_lr0, eq_lr1, eq_lr2, eq_lr3]
+      rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+        rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 0 (by omega) 65536 1 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 8 (by omega) 256 256 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 4 (by omega) 4096 16 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 12 (by omega) 16 4096 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 2 (by omega) 16384 4 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 10 (by omega) 64 1024 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 6 (by omega) 1024 64 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 14 (by omega) 4 16384 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 1 (by omega) 32768 2 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 9 (by omega) 128 512 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 5 (by omega) 2048 32 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 13 (by omega) 8 8192 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 3 (by omega) 8192 8 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 11 (by omega) 32 2048 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 7 (by omega) 512 128 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_0_case (cb4 := cb4) (cb5 := cb5) 15 (by omega) 2 32768 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+    · -- byte_shift = 1: cb4 = 1, cb5 = 0. su161 = 1.
+      rw [hcb4, hcb5] at h_su160 h_su161 h_su162 h_su163
+      simp only [zero_add, zero_mul, mul_zero, add_zero, one_mul] at h_su160 h_su161 h_su162 h_su163
+      have h_su160_zero : su160 = 0 := h_su160.resolve_right h_one_ne_zero
+      have h_su162_zero : su162 = 0 :=
+        h_su162.resolve_right (fun h => h_one_ne_zero (by linear_combination -h))
+      have h_su163_zero : su163 = 0 :=
+        h_su163.resolve_right (fun h => val_2_ne_zero (by linear_combination -h))
+      have h_su161_eq : su161 = 1 := by
+        have := h_su_sum
+        rw [h_su160_zero, h_su162_zero, h_su163_zero] at this
+        linear_combination this
+      have h_a0_eq : a0 = lr1 :=
+        sr_10.resolve_left (fun h => h_one_ne_zero (h_su161_eq.symm.trans h))
+      have h_a1_eq : a1 = lr2 :=
+        sr_11.resolve_left (fun h => h_one_ne_zero (h_su161_eq.symm.trans h))
+      have h_a2_eq : a2 = lr3 + (((65536 : ℕ) : ZMod p) - v0123) := by
+        have := sr_12.resolve_left (fun h => h_one_ne_zero (h_su161_eq.symm.trans h))
+        convert this using 2
+      have h_a3_eq : a3 = ((65535 : ℕ) : ZMod p) := by
+        have := sr_13.resolve_left (fun h => h_one_ne_zero (h_su161_eq.symm.trans h))
+        convert this using 1
+      rw [h_a0_eq, h_a1_eq, h_a2_eq, h_a3_eq, eq_lr1, eq_lr2, eq_lr3]
+      rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+        rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 0 (by omega) 65536 1 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 8 (by omega) 256 256 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 4 (by omega) 4096 16 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 12 (by omega) 16 4096 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 2 (by omega) 16384 4 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 10 (by omega) 64 1024 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 6 (by omega) 1024 64 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 14 (by omega) 4 16384 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 1 (by omega) 32768 2 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 9 (by omega) 128 512 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 5 (by omega) 2048 32 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 13 (by omega) 8 8192 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 3 (by omega) 8192 8 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 11 (by omega) 32 2048 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 7 (by omega) 512 128 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_1_case (cb4 := cb4) (cb5 := cb5) 15 (by omega) 2 32768 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+    · -- byte_shift = 2: cb4 = 0, cb5 = 1. su162 = 1.
+      rw [hcb4, hcb5] at h_su160 h_su161 h_su162 h_su163
+      simp only [zero_add, zero_mul, mul_zero, add_zero, one_mul, mul_one] at h_su160 h_su161 h_su162 h_su163
+      have h_su160_zero : su160 = 0 := h_su160.resolve_right val_2_ne_zero
+      have h_su161_zero : su161 = 0 :=
+        h_su161.resolve_right (fun h => h_one_ne_zero (by linear_combination h))
+      have h_su163_zero : su163 = 0 :=
+        h_su163.resolve_right (fun h => h_one_ne_zero (by linear_combination -h))
+      have h_su162_eq : su162 = 1 := by
+        have := h_su_sum
+        rw [h_su160_zero, h_su161_zero, h_su163_zero] at this
+        linear_combination this
+      have h_a0_eq : a0 = lr2 :=
+        sr_20.resolve_left (fun h => h_one_ne_zero (h_su162_eq.symm.trans h))
+      have h_a1_eq : a1 = lr3 + (((65536 : ℕ) : ZMod p) - v0123) := by
+        have := sr_21.resolve_left (fun h => h_one_ne_zero (h_su162_eq.symm.trans h))
+        convert this using 2
+      have h_a2_eq : a2 = ((65535 : ℕ) : ZMod p) := by
+        have := sr_22.resolve_left (fun h => h_one_ne_zero (h_su162_eq.symm.trans h))
+        convert this using 1
+      have h_a3_eq : a3 = ((65535 : ℕ) : ZMod p) := by
+        have := sr_23.resolve_left (fun h => h_one_ne_zero (h_su162_eq.symm.trans h))
+        convert this using 1
+      rw [h_a0_eq, h_a1_eq, h_a2_eq, h_a3_eq, eq_lr2, eq_lr3]
+      rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+        rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 0 (by omega) 65536 1 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 8 (by omega) 256 256 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 4 (by omega) 4096 16 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 12 (by omega) 16 4096 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 2 (by omega) 16384 4 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 10 (by omega) 64 1024 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 6 (by omega) 1024 64 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 14 (by omega) 4 16384 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 1 (by omega) 32768 2 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 9 (by omega) 128 512 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 5 (by omega) 2048 32 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 13 (by omega) 8 8192 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 3 (by omega) 8192 8 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 11 (by omega) 32 2048 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 7 (by omega) 512 128 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_2_case (cb4 := cb4) (cb5 := cb5) 15 (by omega) 2 32768 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+    · -- byte_shift = 3: cb4 = 1, cb5 = 1. su163 = 1.
+      rw [hcb4, hcb5] at h_su160 h_su161 h_su162 h_su163
+      simp only [zero_add, zero_mul, mul_zero, add_zero, one_mul, mul_one] at h_su160 h_su161 h_su162 h_su163
+      have h_su160_zero : su160 = 0 :=
+        h_su160.resolve_right (fun h => val_3_ne_zero (by linear_combination h))
+      have h_su161_zero : su161 = 0 :=
+        h_su161.resolve_right (fun h => val_2_ne_zero (by linear_combination h))
+      have h_su162_zero : su162 = 0 :=
+        h_su162.resolve_right (fun h => h_one_ne_zero (by linear_combination h))
+      have h_su163_eq : su163 = 1 := by
+        have := h_su_sum
+        rw [h_su160_zero, h_su161_zero, h_su162_zero] at this
+        linear_combination this
+      have h_a0_eq : a0 = lr3 + (((65536 : ℕ) : ZMod p) - v0123) := by
+        have := sr_30.resolve_left (fun h => h_one_ne_zero (h_su163_eq.symm.trans h))
+        convert this using 2
+      have h_a1_eq : a1 = ((65535 : ℕ) : ZMod p) := by
+        have := sr_31.resolve_left (fun h => h_one_ne_zero (h_su163_eq.symm.trans h))
+        convert this using 1
+      have h_a2_eq : a2 = ((65535 : ℕ) : ZMod p) := by
+        have := sr_32.resolve_left (fun h => h_one_ne_zero (h_su163_eq.symm.trans h))
+        convert this using 1
+      have h_a3_eq : a3 = ((65535 : ℕ) : ZMod p) := by
+        have := sr_33.resolve_left (fun h => h_one_ne_zero (h_su163_eq.symm.trans h))
+        convert this using 1
+      rw [h_a0_eq, h_a1_eq, h_a2_eq, h_a3_eq, eq_lr3]
+      rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+        rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 0 (by omega) 65536 1 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 8 (by omega) 256 256 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 4 (by omega) 4096 16 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 12 (by omega) 16 4096 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 2 (by omega) 16384 4 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 10 (by omega) 64 1024 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 6 (by omega) 1024 64 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 14 (by omega) 4 16384 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 1 (by omega) 32768 2 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 9 (by omega) 128 512 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 5 (by omega) 2048 32 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 13 (by omega) 8 8192 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 3 (by omega) 8192 8 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 11 (by omega) 32 2048 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 7 (by omega) 512 128 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
+      · exact sra_close_su16_3_case (cb4 := cb4) (cb5 := cb5) 15 (by omega) 2 32768 (by decide) (by omega) rfl rfl (by omega)
+          (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+          (by rw [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5]; push_cast; ring)
+          lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
+          h_b0_dec h_b1_dec h_b2_dec h_b3_dec
   · -- b3.val < 32768 ⇒ msb_b = 0 ⇒ result matches SRL (4×16 blast via srl_close_su16_*_case).
     have h_msb_b_zero : msb_b = 0 := by rw [h_msb_b_eq, if_neg hb3]
     -- Establish (Word.toBitVec64_poly b).msb = false from hb3.
