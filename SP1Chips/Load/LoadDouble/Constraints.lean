@@ -57,47 +57,6 @@ section constraints
 
 end constraints
 
-variable (Main : Vector (Fin KB) 39)
-
-def is_ld := Main[38] = 1
-
-lemma allHold_constraints_iff_of_is_ld (h_is_ld : is_ld Main) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp
-      (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
-        #v[Main[21], Main[22], Main[23], Main[24]] { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
-    Main[28] * (Main[26] + Main[27]) = 1 ∧
-    ↑(Main[25] * (8 : Fin KB)⁻¹) < 8192 ∧
-    List.Forall SP1Constraint.toProp
-      (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
-        #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp
-      (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 35
-        #v[Main[29], Main[30], Main[31], Main[32]]
-        { op_a := Main[6], op_a_memory :=
-        { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-          access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
-          op_a_0 := Main[13], op_b := Main[14],
-          op_b_memory :=
-          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
-            access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
-            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } 1 1) ∧
-    (Main[35] = 0 ∨ Main[35] = 1) ∧
-    (Main[35] = 0 ∨ Main[0] = Main[33]) ∧
-    Main[35] * (Main[2] + Main[1] * 65536 + 1) + (1 - Main[35]) * Main[0] -
-    (Main[35] * Main[34] + (1 - Main[35]) * Main[33]) - 1 = Main[36] + Main[37] * 65536 ∧
-    ↑Main[36] < 65536 ∧ Main[37] < 256 ∧
-    (SP1Constraint.send (AirInteraction.memory Main[33] Main[34]
-      Main[25] Main[26] Main[27] Main[29]
-      Main[30] Main[31] Main[32]) 1).toProp ∧
-    (SP1Constraint.receive
-    (AirInteraction.memory Main[0] (Main[2] + Main[1] * 65536 + 1)
-      Main[25] Main[26] Main[27] Main[29] Main[30] Main[31] Main[32])
-    1).toProp ∧
-    Main[13] = 0) := by
-  have : Main[38] = 1 := h_is_ld
-  simp [constraints, AddressOperation.constraints, this, sub_eq_zero]
-
 section poly_helpers
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
