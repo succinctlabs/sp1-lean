@@ -386,7 +386,7 @@ private lemma ops_U64_a_poly_local (Main : Vector (ZMod p) 69)
   refine fun i => ?_
   fin_cases i
   · -- a0.val < 65536
-    show a0.val < 65536
+    change a0.val < 65536
     rcases b_cb4 with hcb4 | hcb4
     · -- cb4 = 0: resolve su160 = 1 → a0 = lr0
       rw [hcb4] at h_su160 h_su161 h_su162 h_su163
@@ -433,7 +433,7 @@ private lemma ops_U64_a_poly_local (Main : Vector (ZMod p) 69)
       rw [h_a0_eq, eq_lr1]
       exact lr_blast lt_lh1 lt_ll2
   · -- a1.val < 65536
-    show a1.val < 65536
+    change a1.val < 65536
     rcases b_cb4 with hcb4 | hcb4
     · -- cb4 = 0: a1 = lr1
       rw [hcb4] at h_su160 h_su161 h_su162 h_su163
