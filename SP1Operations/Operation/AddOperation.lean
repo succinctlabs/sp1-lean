@@ -5,27 +5,6 @@ import SP1Operations.Operation.AddOperation.Constraints
 namespace AddOperation
 
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
-lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddOperation (Fin KB)) :
-    List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
-      let carry0 : Fin KB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
-      let carry1 : Fin KB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
-      let carry2 : Fin KB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
-      let carry3 : Fin KB := (a[3] + b[3] - cols.value[3] + carry2) * 65536⁻¹
-      (carry0 = 0 ∨ carry0 = 1) ∧
-      (carry1 = 0 ∨ carry1 = 1) ∧
-      (carry2 = 0 ∨ carry2 = 1) ∧
-      (carry3 = 0 ∨ carry3 = 1) ∧
-      (cols.value[0].val < 65536) ∧
-      (cols.value[1].val < 65536) ∧
-      (cols.value[2].val < 65536) ∧
-      (cols.value[3].val < 65536) := by
-  simp [constraints, sub_eq_zero]
-
-/-- Polymorphic companion to `allHold_constraints_iff`, stated over a generic
-prime field `ZMod p` with `[Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]`. The
-proof closes via the same `simp` recipe as the `Fin KB` version, with the
-new `mul_inv_65536_eq_one_iff_poly` / `inv_65536_zero_or_one_poly` simp
-lemmas in `Field.lean` discharging the carry-binary clauses. -/
 lemma allHold_constraints_iff_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p)) (cols : AddOperation (ZMod p)) :
@@ -43,29 +22,6 @@ lemma allHold_constraints_iff_poly
       (cols.value[2].val < 65536) ∧
       (cols.value[3].val < 65536) := by
   simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
-
-set_option maxHeartbeats 1000000 in
-
--- arithmetic spec proof over Word/BitVec
-theorem spec
-  {a b : Word (Fin KB)}
-  {cols : AddOperation (Fin KB)}
-  (h_isU64_a : a.isU64)
-  (h_isU64_b : b.isU64) :
-  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
-    cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
-  intro cstrs
-  simp [allHold_constraints_iff] at cstrs
-  obtain ⟨h0, h1, h2, h3, hbds⟩ := cstrs
-  apply Word.lt_cases_of_isU64 at h_isU64_a
-  apply Word.lt_cases_of_isU64 at h_isU64_b
-  constructor
-  · clear *- hbds; aesop
-  · simp [BitVec.eq_sub_iff_add_eq]
-    simp [Word.toBitVec64, Word.toNat]
-    rw [← BitVec.toNat_inj, BitVec.toNat_add]
-    rcases h0 <;> rcases h1 <;> rcases h2 <;> rcases h3 <;>
-    simp_all <;> omega
 
 /-- Per-limb Nat lift: given the ZMod-level limb equation
 `bb + vv + prev = aa + cc * 65536` (where `prev, cc ∈ {0, 1}` and the
@@ -104,16 +60,11 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 set_option maxHeartbeats 16000000 in
 -- The 4 `linear_combination`-based carry rearrangements plus the BitVec
 -- ↔ Nat bridge sit in the 4–8M heartbeat range; 16M leaves headroom.
-/-- Polymorphic companion of `spec`. The `Fin KB` version closes via
-`simp_all <;> omega` after carry rcases, leveraging the `inv_65536BB_eq'`
-literal-inverse simp lemma that doesn't generalize. The `_poly` recipe
-re-arranges each iff_poly carry from inverse-form to a sum equation
+/-- Rearranges each iff_poly carry from inverse-form to a sum equation
 `a[i] + b[i] + prev = cols.value[i] + c_i * 65536` via `linear_combination`
 over `(65536 : ZMod p) * 65536⁻¹ = 1`, then applies `limb_lift` to convert
 each to a Nat equation, and closes the BitVec goal (after
-`Word.toBitVec64_poly_toNat_poly` bridges) by omega. Symmetric to
-`SubOperation.spec_poly` — Add's natural-form carries don't need the
-borrow-form bridge that Sub does. -/
+`Word.toBitVec64_poly_toNat_poly` bridges) by omega. -/
 theorem spec_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a b : Word (ZMod p)}
@@ -171,19 +122,6 @@ theorem spec_poly
 
 section gen
 
-theorem spec.gen
-  {a b : Word (Fin KB)}
-  {cols : AddOperation (Fin KB)}
-  {is_real : Fin KB}
-  (h_isU64_a : a.isU64)
-  (h_isU64_b : b.isU64) :
-  List.Forall SP1Constraint.toProp (constraints a b cols is_real) →
-    is_real = 1 →
-      cols.value.isU64 ∧ cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
-  intro cstrs is_real; simp_all
-  exact spec h_isU64_a h_isU64_b cstrs
-
-/-- Polymorphic counterpart of `spec.gen`. -/
 theorem spec.gen_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a b : Word (ZMod p)}
