@@ -149,6 +149,35 @@ variable {p : ℕ} [hp : Fact (2 ^ 17 < p)]
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
 
+-- DivRem opcode values (15-28) needed for chip-level _poly proofs' opcode reductions.
+@[simp] lemma val_15_zmod_p : (15 : ZMod p).val = 15 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (15 : ℕ) < p by omega)
+
+@[simp] lemma val_17_zmod_p : (17 : ZMod p).val = 17 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (17 : ℕ) < p by omega)
+
+@[simp] lemma val_18_zmod_p : (18 : ZMod p).val = 18 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (18 : ℕ) < p by omega)
+
+@[simp] lemma val_25_zmod_p : (25 : ZMod p).val = 25 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (25 : ℕ) < p by omega)
+
+@[simp] lemma val_26_zmod_p : (26 : ZMod p).val = 26 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (26 : ℕ) < p by omega)
+
+@[simp] lemma val_27_zmod_p : (27 : ZMod p).val = 27 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (27 : ℕ) < p by omega)
+
+@[simp] lemma val_28_zmod_p : (28 : ZMod p).val = 28 := by
+  have : 131072 < p := by have := hp.out; omega
+  exact ZMod.val_natCast_of_lt (show (28 : ℕ) < p by omega)
+
 @[simp] lemma val_32_zmod_p : (32 : ZMod p).val = 32 := by
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (32 : ℕ) < p by omega)

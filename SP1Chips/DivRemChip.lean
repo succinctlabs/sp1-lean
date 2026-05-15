@@ -455,84 +455,483 @@ def sp1_op_poly : SailM Unit := do
 
 open Sail
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_div_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_div : is_div_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Div.spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.div_chip_bounds_poly Main cstrs h_is_real h_is_div
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  simp only [DivRem.is_real_poly] at h_is_real
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Div.spec_div, sp1_op_poly, execute_DIV']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.div_poly Main cstrs h_is_real h_is_div]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_divu_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_divu : is_divu_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Divu.spec_divu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  -- Surface the prime-size bound as a Nat fact so omega can use it.
+  have h17 : 2 ^ 17 < p := Fact.out
+  -- Extract op_a/op_b/op_c < 32 bounds + U64 properties via the Common.lean helper.
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.divu_chip_bounds_poly Main cstrs h_is_real h_is_divu
+  -- op_a = 0 → writeback limbs all 0 (for the case-pos op-a-x0 collapse).
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  -- PC[0] < 65536 bound (needed by lowLimb_add_nat's carry-check side condition).
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  -- Unfold h_is_real's type so simp can use it as a Main[244] = 1 rewrite.
+  simp only [DivRem.is_real_poly] at h_is_real
+  -- State extraction in multi-pass simp to keep stack usage bounded.
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  -- Bridge BitVec↔Fin so read_op_b/c rewrites apply against the goal's BitVec form.
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Divu.spec_divu, sp1_op_poly, execute_DIV']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.divu_poly Main cstrs h_is_real h_is_divu]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_divw_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_divw : is_divw_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Divw.spec_divw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.divw_chip_bounds_poly Main cstrs h_is_real h_is_divw
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  simp only [DivRem.is_real_poly] at h_is_real
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Divw.spec_divw, sp1_op_poly, execute_DIVW']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.divw_poly Main cstrs h_is_real h_is_divw]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_divuw_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_divuw : is_divuw_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Divuw.spec_divuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.divuw_chip_bounds_poly Main cstrs h_is_real h_is_divuw
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  simp only [DivRem.is_real_poly] at h_is_real
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Divuw.spec_divuw, sp1_op_poly, execute_DIVW']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.divuw_poly Main cstrs h_is_real h_is_divuw]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_rem_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_rem : is_rem_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Rem.spec_rem (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.rem_chip_bounds_poly Main cstrs h_is_real h_is_rem
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  simp only [DivRem.is_real_poly] at h_is_real
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Rem.spec_rem, sp1_op_poly, execute_REM']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.rem_poly Main cstrs h_is_real h_is_rem]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_remu_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_remu : is_remu_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Remu.spec_remu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.remu_chip_bounds_poly Main cstrs h_is_real h_is_remu
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  simp only [DivRem.is_real_poly] at h_is_real
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Remu.spec_remu, sp1_op_poly, execute_REM']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.remu_poly Main cstrs h_is_real h_is_remu]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_remw_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_remw : is_remw_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Remw.spec_remw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.remw_chip_bounds_poly Main cstrs h_is_real h_is_remw
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  simp only [DivRem.is_real_poly] at h_is_real
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Remw.spec_remw, sp1_op_poly, execute_REMW']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.remw_poly Main cstrs h_is_real h_is_remw]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
+set_option linter.unusedSimpArgs false in
+set_option maxHeartbeats 8000000 in
+set_option maxRecDepth 2000000 in
 theorem correct_remuw_poly
     (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
     (h_is_remuw : is_remuw_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
     (Remuw.spec_remuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
-  := by sorry
+  := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have h17 : 2 ^ 17 < p := Fact.out
+  obtain ⟨h6, h14, h21, is_U64_b, is_U64_c⟩ :=
+    DivRem.remuw_chip_bounds_poly Main cstrs h_is_real h_is_remuw
+  have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
+  obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
+    correct_prologue_facts_poly Main cstrs h_is_real
+  simp only [DivRem.is_real_poly] at h_is_real
+  simp only [SP1ConstraintList.initialState_poly, constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp only [MulOperation.constraints, IsEqualWordOperation.constraints,
+    IsZeroWordOperation.constraints, U16MSBOperation.constraints,
+    AddOperation.constraints, LtOperationUnsigned.constraints,
+    U16toU8OperationSafe.constraints, U16CompareOperation.constraints,
+    IsZeroOperation.constraints,
+    CPUState.constraints, RTypeReader.constraints,
+    SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
+  simp [h6, h14, h21, h_is_real] at state_cstrs
+  obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
+  simp only [BitVec.ofNatLT_eq_ofNat] at *
+  simp [Remuw.spec_remuw, sp1_op_poly, execute_REMW']
+  rw [Sail.run_readReg, read_pc]
+  simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
+  by_cases h_is_op_a_0 : Main[6] = 0
+  · obtain ⟨ha28, ha29, ha30, ha31⟩ := h_a0 h_is_op_a_0
+    rw [ha28, ha29, ha30, ha31]
+    have h_zero : Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p)) = 0#64 := by
+      simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]
+    rw [if_pos h_zero]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    have h_bv_zero : BitVec.ofNat 5 Main[6].val = 0#5 := by
+      rw [h_is_op_a_0, ZMod.val_zero]
+    simp [h_bv_zero]
+  · have h6_val : Main[6].val ≠ 0 := by
+      intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
+    have h_bv_neq : BitVec.ofNat 5 Main[6].val ≠ 0#5 := by
+      intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
+    rw [if_neg h_bv_neq, if_neg h_bv_neq]
+    simp [DivRem.spec.remuw_poly Main cstrs h_is_real h_is_remuw]
+    rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
+        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
+    simp [bitVecToRegidxVal]
 
 end DivRem.Poly

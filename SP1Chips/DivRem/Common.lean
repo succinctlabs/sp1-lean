@@ -571,6 +571,253 @@ lemma op_a_is_0_poly (Main : Vector (ZMod p) 246)
   have ⟨ha28, ha29, ha30, ha31⟩ := h_zero h_op_a_0_ne_0
   exact ⟨ha28, ha29, ha30, ha31⟩
 
+/-- Closer for the maco-form arm of `spec.<v>_poly` proofs. Extracted into a
+named lemma so the case-split on `is_c_0 ∈ {0,1}` runs in a small fresh
+context (avoiding the `simp_all` stack overflow that an inline closer hits
+against the full spec-proof hypothesis pile). The goal arrives in expanded
+form (`maco1<i>` already substituted by the earlier `all_goals` simp). Used
+by `spec.{divu,remu,divuw,remuw,divw,remw,div,rem}_poly`. -/
+lemma maco_arm_closer_poly
+    {is_c_0 ac0 ac1 ac2 ac3 : ZMod p}
+    (u16_ac0 : ac0.val < 65536) (u16_ac1 : ac1.val < 65536)
+    (u16_ac2 : ac2.val < 65536) (u16_ac3 : ac3.val < 65536)
+    (h_bin : is_c_0 = 0 ∨ is_c_0 = 1) :
+    Word.isU64_poly (#v[is_c_0 + (1 - is_c_0) * ac0,
+                          (1 - is_c_0) * ac1,
+                          (1 - is_c_0) * ac2,
+                          (1 - is_c_0) * ac3] : Word (ZMod p)) := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  rcases h_bin with h0 | h1
+  · subst h0
+    simp only [zero_add, sub_zero, one_mul]
+    apply Word.isU64_of_cases_poly <;>
+      simp only [Vector.getElem_mk, List.getElem_toArray,
+        List.getElem_cons_zero, List.getElem_cons_succ] <;>
+      assumption
+  · subst h1
+    simp only [sub_self, zero_mul, add_zero]
+    apply Word.isU64_of_cases_poly <;>
+      simp [ZMod.val_one, ZMod.val_zero]
+
+/-- Variant-specific < 32 bounds for op_a/op_b/op_c plus the U64 properties of
+operand words, derived from the chip's `allHold_poly` with the divu opcode
+trust. Used by `correct_divu_poly` so the heavy reader destructure stays in
+this file (avoids the chip-proof body's elaborator stack overflow). -/
+lemma divu_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_divu : is_divu_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_divu_poly] at h_is_divu
+  obtain ⟨_sop1, sop2, _sop3, _sop4, _sop5, _sop6, _sop7, _sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_div, z_rem, z_remu, z_divw, z_remw, z_divuw, z_remuw⟩ := sop2 h_is_divu
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_divu, z_div, z_rem, z_remu, z_divw, z_remw, z_divuw, z_remuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
+/-- Variant-specific < 32 bounds for the `div` opcode. -/
+lemma div_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_div : is_div_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_div_poly] at h_is_div
+  obtain ⟨sop1, _sop2, _sop3, _sop4, _sop5, _sop6, _sop7, _sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_divu, z_rem, z_remu, z_divw, z_remw, z_divuw, z_remuw⟩ := sop1 h_is_div
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_div, z_divu, z_rem, z_remu, z_divw, z_remw, z_divuw, z_remuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
+/-- Variant-specific < 32 bounds for the `rem` opcode. -/
+lemma rem_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_rem : is_rem_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_rem_poly] at h_is_rem
+  obtain ⟨_sop1, _sop2, sop3, _sop4, _sop5, _sop6, _sop7, _sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_div, z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw⟩ := sop3 h_is_rem
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_rem, z_div, z_divu, z_remu, z_divw, z_remw, z_divuw, z_remuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
+/-- Variant-specific < 32 bounds for the `remu` opcode. -/
+lemma remu_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_remu : is_remu_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_remu_poly] at h_is_remu
+  obtain ⟨_sop1, _sop2, _sop3, sop4, _sop5, _sop6, _sop7, _sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_div, z_divu, z_rem, z_divw, z_remw, z_divuw, z_remuw⟩ := sop4 h_is_remu
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_remu, z_div, z_divu, z_rem, z_divw, z_remw, z_divuw, z_remuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
+/-- Variant-specific < 32 bounds for the `divw` opcode. -/
+lemma divw_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_divw : is_divw_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_divw_poly] at h_is_divw
+  obtain ⟨_sop1, _sop2, _sop3, _sop4, sop5, _sop6, _sop7, _sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_div, z_divu, z_rem, z_remu, z_remw, z_divuw, z_remuw⟩ := sop5 h_is_divw
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_divw, z_div, z_divu, z_rem, z_remu, z_remw, z_divuw, z_remuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
+/-- Variant-specific < 32 bounds for the `remw` opcode. -/
+lemma remw_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_remw : is_remw_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_remw_poly] at h_is_remw
+  obtain ⟨_sop1, _sop2, _sop3, _sop4, _sop5, sop6, _sop7, _sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_div, z_divu, z_rem, z_remu, z_divw, z_divuw, z_remuw⟩ := sop6 h_is_remw
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_remw, z_div, z_divu, z_rem, z_remu, z_divw, z_divuw, z_remuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
+/-- Variant-specific < 32 bounds for the `divuw` opcode. -/
+lemma divuw_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_divuw : is_divuw_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_divuw_poly] at h_is_divuw
+  obtain ⟨_sop1, _sop2, _sop3, _sop4, _sop5, _sop6, sop7, _sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_div, z_divu, z_rem, z_remu, z_divw, z_remw, z_remuw⟩ := sop7 h_is_divuw
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_divuw, z_div, z_divu, z_rem, z_remu, z_divw, z_remw, z_remuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
+/-- Variant-specific < 32 bounds for the `remuw` opcode. -/
+lemma remuw_chip_bounds_poly (Main : Vector (ZMod p) 246)
+    (cstrs : (constraints Main).allHold_poly)
+    (h_is_real : is_real_poly Main)
+    (h_is_remuw : is_remuw_poly Main) :
+    Main[6].val < 32 ∧ Main[14].val < 32 ∧ Main[21].val < 32 ∧
+    Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] ∧
+    Word.isU64_poly #v[Main[22], Main[23], Main[24], Main[25]] := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  simp [is_remuw_poly] at h_is_remuw
+  obtain ⟨_sop1, _sop2, _sop3, _sop4, _sop5, _sop6, _sop7, sop8⟩ := single_op_poly Main cstrs
+  obtain ⟨z_div, z_divu, z_rem, z_remu, z_divw, z_remw, z_divuw⟩ := sop8 h_is_remuw
+  simp only [SP1ConstraintList.allHold_poly, constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp_poly_assertZero, SP1Constraint.toProp_poly_send_byte,
+    sub_eq_zero, mul_eq_zero] at cstrs
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, h_alu⟩, _⟩ := cstrs
+  rw [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at h_alu
+  simp [Opcode.ofNat, Nat.ble, h_is_remuw, z_div, z_divu, z_rem, z_remu, z_divw, z_remw, z_divuw]
+    at h_alu
+  obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+          ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := h_alu
+  have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
+  refine ⟨?_, ?_, ?_, is_U64_b, is_U64_c⟩
+  · have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
+  · have : Main[14].val < (32 : ZMod p).val := trusted_instr_prop.1; rwa [h32] at this
+  · have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2; rwa [h32] at this
+
 end poly_helpers
 
 end DivRem
