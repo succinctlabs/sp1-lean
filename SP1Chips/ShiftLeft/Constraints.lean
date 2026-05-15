@@ -9,8 +9,6 @@ set_option linter.style.setOption false
 set_option linter.style.multiGoal false
 set_option maxHeartbeats 100000000
 
-variable (Main : Vector (Fin KB) 65)
-
 section constraints
 
 -- Generated Lean code for chip ShiftLeftChip

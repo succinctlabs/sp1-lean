@@ -10,150 +10,13 @@ set_option maxHeartbeats 100000000
 -- reasoning the linter can't see; keep the existing structure.
 set_option linter.style.multiGoal false
 
-variable (Main : Vector (Fin KB) 246)
-
-section field_arithmetic
-
-lemma KB_bool_to_le {x : Fin KB} : x = (0 : Fin KB) ∨ x = (1 : Fin KB) ↔ (0 : Fin KB) ≤ x ∧ x ≤ (1 : Fin KB) := by grind
-
-end field_arithmetic
-
-section opcodes
-
-@[simp] def is_real := Main[244] = 1
-
-@[simp] def is_div := Main[201] = 1
-@[simp] def is_divu := Main[202] = 1
-@[simp] def is_rem := Main[203] = 1
-@[simp] def is_remu := Main[204] = 1
-@[simp] def is_divw := Main[205] = 1
-@[simp] def is_remw := Main[206] = 1
-@[simp] def is_divuw := Main[207] = 1
-@[simp] def is_remuw := Main[208] = 1
-
-lemma single_op : List.Forall SP1Constraint.toProp (constraints Main) →
-  (Main[201] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
-  (Main[202] = 1 → Main[201] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
-  (Main[203] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
-  (Main[204] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
-  (Main[205] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
-  (Main[206] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[207] = 0 ∧ Main[208] = 0) ∧
-  (Main[207] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[208] = 0) ∧
-  (Main[208] = 1 → Main[201] = 0 ∧ Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧ Main[205] = 0 ∧ Main[206] = 0 ∧ Main[207] = 0)
-   := by
-  intro cstrs
-  have := allHold_constraints_alu_ops Main cstrs
-  obtain ⟨alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops⟩ := this
-  clear alu cstrs
-  rw [KB_bool_to_le] at *
-  split_ands <;> grind
-
-end opcodes
-
-section entailed_constraints
-
-lemma register_bounds :
-  List.Forall SP1Constraint.toProp (constraints Main) →
-    is_real Main →
-      Main[6] < 32 ∧ Main[14] < 32 ∧ Main[21] < 32 ∧ Main[3] < 65536
-    := by
-  intro cstrs is_real
-  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
-  apply allHold_constraints_alu_ops at cstrs
-  obtain ⟨alu, b_is_div, b_is_divu, b_is_rem, b_is_remu, b_is_divw, b_is_remw, b_is_divuw, b_is_remuw, b_one_of_ops⟩ := cstrs
-  simp_all only [DivRem.is_real, Fin.isValue, Nat.cast_ofNat]
-  rw [RTypeReader.allHold_constraints_iff_is_real] at alu
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, rest⟩ := alu; clear rest
-  -- simp_all
-  rcases b_is_div; rcases b_is_divu; rcases b_is_rem; rcases b_is_remu
-  rcases b_is_divw; rcases b_is_divuw; rcases b_is_remw; rcases b_is_remuw
-  all_goals
-    simp_all [Opcode.ofNat, Nat.ble, Nat.beq]
-
-lemma op_a_is_0 :
-  List.Forall SP1Constraint.toProp (constraints Main) →
-    is_real Main →
-      Main[6] = 0 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 := by
-  intro cstrs is_real is_zero
-  apply allHold_constraints_alu_ops at cstrs
-  obtain ⟨alu, rest⟩ := cstrs; clear rest; simp_all
-  rw [RTypeReader.allHold_constraints_iff_is_real rfl rfl] at alu
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := alu
-  simp_all
-
-lemma ops_U64_b_c :
-  List.Forall SP1Constraint.toProp (constraints Main) →
-    is_real Main →
-      Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] ∧
-      Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] := by
-  intro cstrs is_real
-  apply allHold_constraints_alu_ops at cstrs
-  obtain ⟨alu, rest⟩ := cstrs; clear rest; simp_all
-  rw [RTypeReader.allHold_constraints_iff_is_real rfl rfl] at alu
-  obtain ⟨h1, h2, h3, h4, h5, b_imm, h7, h8⟩ := alu
-  simp_all
-
-end entailed_constraints
-
-section operands
-
-@[simp]
-def sp1_op_a : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  intro cstrs real
-  refine BitVec.ofNatLT Main[6] ?_
-  change Main[6] < 32
-  have := register_bounds Main cstrs real
-  tauto
-
-@[simp]
-def sp1_op_b : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  intro cstrs real
-  refine BitVec.ofNatLT Main[14] ?_
-  change Main[14] < 32
-  have := register_bounds Main cstrs real
-  tauto
-
-@[simp]
-def sp1_op_c : List.Forall SP1Constraint.toProp (constraints Main) → is_real Main → BitVec 5 := by
-  intro cstrs real
-  refine BitVec.ofNatLT Main[21] ?_
-  change Main[21] < 32
-  have := register_bounds Main cstrs real
-  tauto
-
-end operands
-
 section auxiliaries
 
-lemma div_mod_decomposition_w {a b c : Fin KB} :
-  a.val < 65536 → c.val < 2130706433 / 65536 → (a = b - c * 65536 ↔ a = b % 65536 ∧ c = b / 65536) := by
-  intro ub_a ub_c
-  constructor
-  · intro eq_a
-    simp [Fin.lt_def, Fin.ext_iff] at *
-    have lb_b : c * 65536 ≤ b := by
-      by_contra lb_b
-      simp [Fin.lt_def, Fin.sub_def, Fin.mul_def] at *
-      rw [Nat.mod_eq_of_lt (a := (c : ℕ) * 65536) (by omega)] at eq_a lb_b
-      omega
-    rw [Fin.sub_val_of_le lb_b] at eq_a
-    simp [Fin.mul_def] at eq_a
-    rw [Nat.mod_eq_of_lt (by omega)] at eq_a
-    omega
-  · intro ⟨eq_a, eq_c⟩
-    simp_all
-    symm; rw [sub_eq_iff_eq_add]; symm
-    rw [mul_comm, add_comm]
-    simp [Fin.ext_iff, Fin.mul_def, Fin.add_def, Fin.mod_def]
-    omega
-
-/-- Polymorphic counterpart of `div_mod_decomposition_w`. Statement is
-phrased at the `.val` level since `ZMod p` lacks native `% / /` operators.
-The KB-specific bound `c.val < 2130706433 / 65536` is replaced by
-`c.val < 2` since at every use site `c` is a carry bit (the
-`b_cry0..b_cry7 : cry = 0 ∨ cry = 1` family). The wrap-around branch
-of `val_sub_cases` is ruled out via `Fact (2 ^ 17 < p)` (else
-`a.val ≥ p - 65536 > 65536`, contradicting `a.val < 65536`). -/
+/-- Phrased at the `.val` level since `ZMod p` lacks native `% / /`
+operators. The `c.val < 2` bound holds because at every use site `c` is a
+carry bit (the `b_cry0..b_cry7 : cry = 0 ∨ cry = 1` family). The
+wrap-around branch of `val_sub_cases` is ruled out via `Fact (2 ^ 17 < p)`
+(else `a.val ≥ p - 65536 > 65536`, contradicting `a.val < 65536`). -/
 lemma div_mod_decomposition_w_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {a b c : ZMod p} :
     a.val < 65536 → c.val < 2 →
@@ -247,26 +110,7 @@ lemma tdiv_tmod_unique_full_nat {b c q r : ℕ} (hcnz : c ≠ 0) :
     rw [Int.toNat_natCast, Int.toNat_natCast, Int.natCast_inj, Int.natCast_inj]
   · omega
 
-lemma sum_zero_abs {wx wy : Word (Fin KB)} (is64_wx : Word.isU64 wx) (is64_wy : Word.isU64 wy) :
-  wx.isNegative →
-    Word.toBitVec64 #v[0, 0, 0, 0] = Word.toBitVec64 wx + Word.toBitVec64 wy →
-    (wx.toInt = -2^63 → wy.toInt = -2^63) ∧
-    (¬ wx.toInt = -2^63 → wy.toInt = |wx.toInt|) := by
-  intro neg_wx sum_zero
-  rw [Word.isNegative_toInt is64_wx] at neg_wx
-  rw [Int.abs_cases, if_neg (by omega)]
-  simp [← BitVec.toInt_inj] at sum_zero
-  rw [Word.toBitVec64_toInt is64_wx, Word.toBitVec64_toInt is64_wy] at sum_zero
-  simp [Word.toBitVec64, Word.toNat] at sum_zero
-  apply Word.isU64_toInt at is64_wx
-  apply Word.isU64_toInt at is64_wy
-  constructor <;> intro hwx <;> [ (simp [hwx] at *; simp_all); skip ]
-  all_goals
-    rw [Int.bmod_eq_emod] at sum_zero
-    split_ifs at sum_zero with h_bmod <;> omega
-
-/-- Polymorphic counterpart of `sum_zero_abs`. Required by `divw_remw_poly`'s
-4-way `b_rem_neg × b_c_neg` h_abs block. -/
+/-- Required by `divw_remw_poly`'s 4-way `b_rem_neg × b_c_neg` h_abs block. -/
 lemma sum_zero_abs_poly {p : ℕ} [NeZero p] {wx wy : Word (ZMod p)}
     (is64_wx : Word.isU64_poly wx) (is64_wy : Word.isU64_poly wy) :
   wx.isNegative_poly →
@@ -330,7 +174,6 @@ section poly_helpers
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-/-- Polymorphic counterpart of `is_real`. -/
 @[simp] def is_real_poly (Main : Vector (ZMod p) 246) : Prop :=
   Main[244] = 1
 
@@ -343,22 +186,19 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 @[simp] def is_divuw_poly (Main : Vector (ZMod p) 246) : Prop := Main[207] = 1
 @[simp] def is_remuw_poly (Main : Vector (ZMod p) 246) : Prop := Main[208] = 1
 
-/-- Polymorphic counterpart of `sp1_op_a`. -/
 @[simp] def sp1_op_a_poly (Main : Vector (ZMod p) 246) : BitVec 5 :=
   BitVec.ofNat 5 Main[6].val
 
-/-- Polymorphic counterpart of `sp1_op_b`. -/
 @[simp] def sp1_op_b_poly (Main : Vector (ZMod p) 246) : BitVec 5 :=
   BitVec.ofNat 5 Main[14].val
 
-/-- Polymorphic counterpart of `sp1_op_c`. -/
 @[simp] def sp1_op_c_poly (Main : Vector (ZMod p) 246) : BitVec 5 :=
   BitVec.ofNat 5 Main[21].val
 
-/-- Polymorphic counterpart of `ops_U64_b_c` (line 1070). Both `b` and `c`
-operands are 64-bit values. Uses `RTypeReader.allHold_constraints_iff_is_real_poly`
-after extracting CS18 (the RTypeReader sub-list) via direct destructure of
-the chip's `allHold_poly`. The 18-deep nested left-pair pattern mirrors
+/-- Both `b` and `c` operands are 64-bit values. Uses
+`RTypeReader.allHold_constraints_iff_is_real_poly` after extracting CS18
+(the RTypeReader sub-list) via direct destructure of the chip's
+`allHold_poly`. The 18-deep nested left-pair pattern mirrors
 `List.forall_append`'s expansion of the `CS0 ++ CS1 ++ ... ++ CS18 ++ trailing`
 constraint list (19 CS entries). -/
 lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 246)
@@ -375,14 +215,12 @@ lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 246)
   obtain ⟨_, _, _, h_isU64_b, h_isU64_c⟩ := h_complex
   exact ⟨h_isU64_b, h_isU64_c⟩
 
-/-- Polymorphic counterpart of `register_bounds` (line 1041), restricted to
-the variant-INDEPENDENT bounds available directly from
+/-- Variant-INDEPENDENT bounds available directly from
 `RTypeReader.allHold_constraints_iff_is_real_poly`: `op_a < 32`,
-`op_b < 65536`, `op_c < 65536`, `pc[0] < 65536`. The chip-level Fin KB
-`register_bounds` further refines `op_b < 32` and `op_c < 32` via
-per-variant opcode reduction (`Opcode.ofNat`); chip-level `correct_*_poly`
-proofs perform that refinement themselves once the variant flag is in
-scope. -/
+`op_b < 65536`, `op_c < 65536`, `pc[0] < 65536`. Chip-level
+`correct_*_poly` proofs further refine `op_b < 32` / `op_c < 32` via
+per-variant opcode reduction (`Opcode.ofNat`) once the variant flag is
+in scope. -/
 lemma register_bounds_poly (Main : Vector (ZMod p) 246)
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main) :
@@ -472,13 +310,13 @@ private lemma eight_mutex_left
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     apply (ZMod.val_eq_zero _).mp <;> omega
 
-/-- Polymorphic counterpart of `single_op` (line 1020). 8-way mutual exclusion:
-exactly one variant flag among `Main[201..208]` is active per real row. The
-proof destructures the chip's `allHold_poly` over its 19-CS-entry constraint
-list + 153-item trailing list (positions 134-141 carry the boolean
-disjunctions for `Main[201..208]`, position 152 carries the `1 = sum`
-constraint), then applies `eight_mutex_left` for each variant after
-permuting the sum to put the active flag first via `linear_combination`. -/
+/-- 8-way mutual exclusion: exactly one variant flag among `Main[201..208]`
+is active per real row. The proof destructures the chip's `allHold_poly`
+over its 19-CS-entry constraint list + 153-item trailing list (positions
+134-141 carry the boolean disjunctions for `Main[201..208]`, position 152
+carries the `1 = sum` constraint), then applies `eight_mutex_left` for
+each variant after permuting the sum to put the active flag first via
+`linear_combination`. -/
 lemma single_op_poly (Main : Vector (ZMod p) 246)
     (cstrs : (constraints Main).allHold_poly) :
     (Main[201] = 1 → Main[202] = 0 ∧ Main[203] = 0 ∧ Main[204] = 0 ∧
@@ -546,9 +384,8 @@ lemma single_op_poly (Main : Vector (ZMod p) 246)
       linear_combination -sum_disj
     exact eight_mutex_left b208 b201 b202 b203 b204 b205 b206 b207 hsum h
 
-/-- Polymorphic counterpart of `op_a_is_0` (line 1059). When `Main[6] = 0`
-(i.e. the destination register is `x0`), the four limbs of `op_a_write_value`
-(Main[28..31]) must be zero. -/
+/-- When `Main[6] = 0` (i.e. the destination register is `x0`), the four
+limbs of `op_a_write_value` (Main[28..31]) must be zero. -/
 lemma op_a_is_0_poly (Main : Vector (ZMod p) 246)
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main) :
@@ -571,6 +408,7 @@ lemma op_a_is_0_poly (Main : Vector (ZMod p) 246)
   have ⟨ha28, ha29, ha30, ha31⟩ := h_zero h_op_a_0_ne_0
   exact ⟨ha28, ha29, ha30, ha31⟩
 
+omit [Fact (2 ^ 17 < p)] in
 /-- Closer for the maco-form arm of `spec.<v>_poly` proofs. Extracted into a
 named lemma so the case-split on `is_c_0 ∈ {0,1}` runs in a small fresh
 context (avoiding the `simp_all` stack overflow that an inline closer hits
@@ -598,6 +436,33 @@ lemma maco_arm_closer_poly
     simp only [sub_self, zero_mul, add_zero]
     apply Word.isU64_of_cases_poly <;>
       simp [ZMod.val_one, ZMod.val_zero]
+
+/-- Closer for the divw/remw / div/rem signed sign-extension arm of
+`spec.<v>_poly` proofs. The high two limbs of the constructed word are
+`msb * 65535`; given `msb ∈ {0, 1}` they reduce to `0` or `65535`, both U16.
+Used by `spec.{divw,remw,div,rem}_poly` to close the rbc/qbc-bearing
+`Word.isU64_poly` arms. Polymorphic in the two low limbs (x, y) and in
+which msb (msb_rem or msb_quot) is bound. -/
+lemma msb_arm_closer_poly
+    {x y msb : ZMod p}
+    (u16_x : x.val < 65536) (u16_y : y.val < 65536)
+    (h_msb_01 : msb = 0 ∨ msb = 1) :
+    Word.isU64_poly (#v[x, y, msb * 65535, msb * 65535] : Word (ZMod p)) := by
+  haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
+  have hp17 : 2 ^ 17 < p := Fact.out
+  have h65535_val : (65535 : ZMod p).val = 65535 :=
+    ZMod.val_natCast_of_lt (show (65535 : ℕ) < p by omega)
+  apply Word.isU64_of_cases_poly <;>
+    simp only [Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero, List.getElem_cons_succ]
+  · exact u16_x
+  · exact u16_y
+  · rcases h_msb_01 with h | h
+    · rw [h, zero_mul]; simp [ZMod.val_zero]
+    · rw [h, one_mul, h65535_val]; omega
+  · rcases h_msb_01 with h | h
+    · rw [h, zero_mul]; simp [ZMod.val_zero]
+    · rw [h, one_mul, h65535_val]; omega
 
 /-- Variant-specific < 32 bounds for op_a/op_b/op_c plus the U64 properties of
 operand words, derived from the chip's `allHold_poly` with the divu opcode

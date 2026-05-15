@@ -10,7 +10,6 @@ set_option linter.style.setOption false
 set_option linter.style.multiGoal false
 set_option maxHeartbeats 100000000
 
-variable (Main : Vector (Fin KB) 65)
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 section field_arithmetic
