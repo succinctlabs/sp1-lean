@@ -4,20 +4,8 @@ import SP1Operations.Operation.SubwOperation.Constraints
 
 namespace SubwOperation
 
-lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : SubwOperation (Fin KB)) :
-    List.Forall SP1Constraint.toProp (constraints a b cols 1) ↔
-      let carry0 : Fin KB := (b[0] + cols.value[0] - a[0]) * 65536⁻¹
-      let carry1 : Fin KB := (b[1] + cols.value[1] - a[1] + carry0) * 65536⁻¹
-      List.Forall SP1Constraint.toProp (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
-      ((carry0 = 0 ∨ carry0 = 1) ∧
-      (carry1 = 0 ∨ carry1 = 1) ∧
-      (cols.value[0] < 65536) ∧
-      (cols.value[1] < 65536)) := by
-  simp [constraints, ← inv_65536BB_eq', sub_eq_zero]
-  omega
-
 /-- Disjunction-shift helper for the Subw carry-bridging proof; mirrors
-the Sub-side `carry_swap_iff_poly` (Sub-phase B.10). -/
+the Sub-side `carry_swap_iff_poly`. -/
 private lemma carry_swap_iff_poly {p : ℕ} [Fact (Nat.Prime p)]
     (x y : ZMod p) (hxy : x = 1 - y) :
     (x = 0 ∨ x = 1) ↔ (y = 0 ∨ y = 1) := by
@@ -31,10 +19,9 @@ private lemma carry_swap_iff_poly {p : ℕ} [Fact (Nat.Prime p)]
     · exact Or.inl h.symm
 
 set_option maxHeartbeats 4000000 in
--- Carry-bridging proof needs the elevated heartbeat limit (mirrors Sub).
-/-- Polymorphic companion of `allHold_constraints_iff` over `ZMod p`. Same
-borrow-form ↔ natural-form bridging recipe as Sub: pose carries `c_i`
-(natural) and `d_i` (borrow), prove `d_i = 1 - c_i` via
+-- Carry-bridging proof needs the elevated heartbeat limit.
+/-- Borrow-form ↔ natural-form bridging recipe (mirrors Sub): pose
+carries `c_i` (natural) and `d_i` (borrow), prove `d_i = 1 - c_i` via
 `linear_combination`, close the borrow-form iff via bare simp, then
 bridge each carry-binary clause via `carry_swap_iff_poly`. -/
 lemma allHold_constraints_iff_poly
@@ -70,32 +57,6 @@ lemma allHold_constraints_iff_poly
       carry_swap_iff_poly d0 c0 hd0_swap,
       carry_swap_iff_poly d1 c1 hd1_swap]
 
-theorem spec
-  {a b : Word (Fin KB)}
-  {cols : SubwOperation (Fin KB)}
-  (h_isU64_a : a.isU64)
-  (h_isU64_b : b.isU64) :
-  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
-    HWord.isU32 (cols.value) ∧
-    HWord.toBitVec32 (cols.value) = execute_RTYPEW_pure_32_w a b .SUBW ∧
-    cols.msb.msb = if (HWord.toBitVec32 cols.value).msb then 1 else 0
-  := by
-    intro cstrs
-    simp [allHold_constraints_iff] at cstrs
-    obtain ⟨hmsb, h0, h1, hbds⟩ := cstrs
-    apply Word.lt_cases_of_isU64 at h_isU64_a
-    apply Word.lt_cases_of_isU64 at h_isU64_b
-    split_ands
-    · clear *- hbds; aesop
-    · simp [BitVec.eq_sub_iff_add_eq]
-      simp [HWord.toBitVec32, Word.low, HWord.toNat]
-      rw [← BitVec.toNat_inj, BitVec.toNat_add]
-      aesop (add safe (by omega))
-    · simp [Fin.lt_def] at hbds
-      apply U16MSBOperation.spec (by omega) at hmsb
-      simp [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat]
-      simp at hmsb; split_ifs at * <;> omega
-
 /-- Per-limb Nat lift: same as `SubOperation.limb_lift`. -/
 private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (bb vv aa prev cc : ZMod p)
@@ -124,11 +85,10 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   exact h
 
 set_option maxHeartbeats 16000000 in
--- Mirror of `SubOperation.spec_poly` adapted to the 32-bit `HWord` result
--- and the U16MSB cascade. Two carries instead of four; otherwise the same
+-- Like `SubOperation.spec_poly` adapted to the 32-bit `HWord` result and
+-- the U16MSB cascade. Two carries instead of four; the same
 -- linear_combination + limb_lift recipe closes the BitVec goal, and
 -- `U16MSBOperation.spec_poly` discharges the MSB clause.
-/-- Polymorphic companion of `spec`. -/
 theorem spec_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a b : Word (ZMod p)}
