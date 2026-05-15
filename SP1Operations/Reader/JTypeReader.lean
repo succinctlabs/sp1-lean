@@ -3,7 +3,7 @@ import SP1Operations.Reader.JTypeReader.Constraints
 
 namespace JTypeReader
 
-attribute [-simp] Opcode.trusted_instr Opcode.trusted_instr_poly
+attribute [-simp] Opcode.trusted_instr_poly
 
 /-- RHS uses `.val`-level Nat-arithmetic for `Range`-opcode-derived bounds;
 field-level `<` for U8Range bounds and program-clause bounds. -/

@@ -4,7 +4,7 @@ import SP1Operations.Reader.ALUTypeReader.Constraints
 
 namespace ALUTypeReader
 
-attribute [-simp] Opcode.trusted_instr Opcode.trusted_instr_poly
+attribute [-simp] Opcode.trusted_instr_poly
 
 set_option linter.style.setOption false
 set_option maxHeartbeats 2000000

@@ -4,7 +4,7 @@ import SP1Operations.Reader.ITypeReaderImmutable.Constraints
 
 namespace ITypeReaderImmutable
 
-attribute [-simp] Opcode.trusted_instr Opcode.trusted_instr_poly
+attribute [-simp] Opcode.trusted_instr_poly
 
 lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     [Fact (2 ^ 17 < p)]
