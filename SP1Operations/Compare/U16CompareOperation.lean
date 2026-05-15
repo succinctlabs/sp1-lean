@@ -3,25 +3,12 @@ import SP1Operations.Compare.U16CompareOperation.Constraints
 
 namespace U16CompareOperation
 
-@[grind →, aesop safe forward]
-lemma spec
-  (a b : Fin KB)
-  (cols : U16CompareOperation (Fin KB))
-  (h_a_isU16 : (a : ℕ) < 65536)
-  (h_b_isU16 : (b : ℕ) < 65536) :
-  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
-    (cols.bit = if (a : ℕ) < b then 1 else 0)
-  := by simp [constraints]; grind
-
 set_option maxHeartbeats 4000000 in
--- The polymorphic spec needs `val_sub_cases` and `ZMod.val_add_of_lt`
--- to handle the wrap-around case manually; heartbeat budget elevated
--- to absorb the case-split.
-/-- Polymorphic companion of `spec` over `ZMod p`. The proof case-splits
-on `cols.bit ∈ {0, 1}` and uses `val_sub_cases` from `Field.lean` to
-handle `(a - b).val` (the wrap-around branch is impossible when
-`a.val, b.val < 65536` and `p > 2^17`). The `cols.bit = 1` case uses
-`ZMod.val_add_of_lt` to compute `(a - b + 65536).val`. -/
+-- Case-splits on `cols.bit ∈ {0, 1}` and uses `val_sub_cases` from
+-- `Field.lean` to handle `(a - b).val` (the wrap-around branch is
+-- impossible when `a.val, b.val < 65536` and `p > 2^17`). The
+-- `cols.bit = 1` case uses `ZMod.val_add_of_lt` to compute
+-- `(a - b + 65536).val`.
 lemma spec_poly
   {p : ℕ} [Fact (Nat.Prime p)] [hp17 : Fact (2 ^ 17 < p)]
   (a b : ZMod p)
