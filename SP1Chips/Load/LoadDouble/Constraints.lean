@@ -64,10 +64,8 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 @[simp] def is_ld_poly (Main : Vector (ZMod p) 39) : Prop := Main[38] = 1
 
 set_option maxHeartbeats 800000 in
--- Polymorphic counterpart of `allHold_constraints_iff_of_is_ld`.
--- Mirrors the Fin KB simp recipe with `_poly`-versioned predicates.
--- The RHS shape uses `.val < N` (Nat-level) for what was `↑x < N` in Fin KB,
--- and `< (256 : ZMod p)` for what was `< 256` in Fin KB.
+-- Range bounds are stated as `.val < N` (Nat-level) and `< (256 : ZMod p)`
+-- (field-level) depending on which form the surrounding `_poly` predicates use.
 lemma allHold_constraints_iff_of_is_ld_poly (Main : Vector (ZMod p) 39)
     (h_is_ld : is_ld_poly Main) :
   List.Forall SP1Constraint.toProp_poly (constraints Main) ↔

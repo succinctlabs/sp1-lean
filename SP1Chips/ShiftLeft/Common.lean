@@ -14,8 +14,7 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 section field_arithmetic
 
-/-- Polymorphic version of `is_mod_64`. From `((c0 - m) * 64⁻¹).val < 1024`, conclude c0 ≡ m (mod 64).
-Cleaner than Fin KB because no wrap to undo. -/
+/-- From `((c0 - m) * 64⁻¹).val < 1024`, conclude c0 ≡ m (mod 64). -/
 lemma is_mod_64_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {c0 m : ZMod p}
     (h_m_lt : m.val < 64) (_h_c0_lt : c0.val < 65536)
@@ -52,8 +51,8 @@ lemma is_mod_64_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   rw [h_c0_val]
   omega
 
-/-- Polymorphic version of `cancel_mul_65536`. Cleaner than Fin KB because `ZMod p` (`p > 2^17`)
-has no wrap to undo for products up to 65536^2 < 2^32 < p. -/
+/-- `ZMod p` (`p > 2^17`) has no wrap to undo for products up to
+65536^2 < 2^32 < p. -/
 lemma cancel_mul_65536_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {a b c x : ZMod p}
     (h_x_dvd : x.val ∣ 65536) (h_x_pos : 0 < x.val) :

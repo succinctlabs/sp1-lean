@@ -413,7 +413,7 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
                   have hc0v : c0.val = 0 := by omega
                   have hc1v : c1.val = 0 := by omega
                   exact ⟨(ZMod.val_eq_zero c0).mp hc0v, (ZMod.val_eq_zero c1).mp hc1v⟩
-              -- First condition: h_prod — mirrors Fin KB lines 3611-3672.
+              -- First condition: h_prod.
               have h_prod : HWord.toInt_poly #v[b0, b1] = HWord.toInt_poly #v[q0, q1] * HWord.toInt_poly #v[c0, c1] + HWord.toInt_poly #v[r0, r1] := by
                 -- Bounds for sign-extension constants (msb_* ∈ {0,1}, * 65535 < 65536)
                 have u16_msb_b_v : (msb_b * 65535).val < 65536 := by
@@ -738,12 +738,12 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
                       exact_mod_cast abs_check
               -- Third condition: h_sign. Case-split b_b_neg; within msb_b=1, case-split b_rem_neg
               -- to avoid relying on a multi-limb sum bound (only the 2-limb r0 + r1 = 0 case
-              -- needs `Fact (2 ^ 17 < p)`). For msb_b=0 case, port the Fin KB strategy of using
+              -- needs `Fact (2 ^ 17 < p)`). For msb_b=0 case, use
               -- sign_cases_poly + h_prod + h_abs + nlinarith.
               have h_sign : HWord.toInt_poly #v[r0, r1] = 0 ∨
                   (HWord.toInt_poly #v[r0, r1]).sign = (HWord.toInt_poly #v[b0, b1]).sign := by
                 rcases b_b_neg with b_msb_nneg | b_msb_neg
-                · -- msb_b = 0 — port the Fin KB strategy
+                · -- msb_b = 0
                   subst b_msb_nneg
                   have hmsb_rem_0 : msb_rem = 0 := by
                     rcases r_neg_b_neg with h | h

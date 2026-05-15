@@ -341,9 +341,8 @@ lemma divu_remu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
               conv => arg 2; arg 1; arg 1; arg 2; simp [nof_eq_ctqpr5.1]
               conv => arg 2; arg 1; arg 1; arg 1; arg 2; simp [nof_eq_ctqpr4.1]
               simp [nof_eq_ctqpr0.2, nof_eq_ctqpr1.2, nof_eq_ctqpr2.2, nof_eq_ctqpr3.2, nof_eq_ctqpr4.2, nof_eq_ctqpr5.2, nof_eq_ctqpr6.2, nof_eq_ctqpr7.2]
-            -- The Fin KB version simps via `Fin.val_add` then strips `% 2130706433`.
-            -- For ZMod p, the substitutions above already produced Nat-form expressions
-            -- (no `% p` residue since `nof_eq_ctqpr*.1/.2` are pure ℕ equalities).
+            -- The substitutions above produced Nat-form expressions (no `% p`
+            -- residue since `nof_eq_ctqpr*.1/.2` are pure ℕ equalities).
             have joins : forall (i : Fin 4) (a b : ℕ), a % (65536 ^ i.val) + (b + a / (65536 ^ i.val)) % 65536 * (65536 ^ i.val) = (a + b * (65536 ^ i.val)) % (65536 ^ (i.val + 1)) := by
               clear *-; intro i a b; fin_cases i <;> norm_num <;> omega
             have divs : forall (i : Fin 4) (a b : ℕ), (a + b / (65536 ^ i.val)) / 65536 = (b + a * (65536 ^ i.val)) / (65536 ^ (i.val + 1)) := by
@@ -719,11 +718,11 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop2 h_is_divu
     simp [h_is_divu, z0, z1, z2, z3, z4, z5, z6] at *
   -- Trailing-arm closer. Options A/B/C handle writeback + omega + generic isU64
-  -- arms. Options D/E mirror the Fin KB sister's per-limb-bound closers for
-  -- arms shaped `bi.val < 65536` / `ci.val < 65536`. Option F dispatches the
-  -- maco-form arm (`Word.isU64_poly #v[is_c_0 + (1-is_c_0)*ac0, ...]`) via
-  -- the named helper `divu_poly_maco_arm_closer` (a small fresh context that
-  -- avoids the simp_all stack overflow an inline closer triggers).
+  -- arms. Options D/E discharge per-limb-bound arms shaped `bi.val < 65536`
+  -- / `ci.val < 65536`. Option F dispatches the maco-form arm
+  -- (`Word.isU64_poly #v[is_c_0 + (1-is_c_0)*ac0, ...]`) via the named helper
+  -- `divu_poly_maco_arm_closer` (a small fresh context that avoids the
+  -- simp_all stack overflow an inline closer triggers).
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega

@@ -210,8 +210,7 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 @[simp] def is_bgeu_poly (Main : Vector (ZMod p) 45) := Main[33] = 1
 
 set_option maxHeartbeats 1600000 in
--- Polymorphic counterpart of `single_op`. Same 6-way nested case split as
--- the Fin KB version, closed by `simp_all` once the disjunctions are
+-- 6-way nested case split, closed by `simp_all` once the disjunctions are
 -- destructured. Heartbeats elevated for the 64-case combinatorial closure.
 lemma single_op_poly (Main : Vector (ZMod p) 45)
     (cstrs : SP1ConstraintList.allHold_poly (constraints Main)) :

@@ -63,8 +63,7 @@ theorem correct (Main : Vector (ZMod p) 39)
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   -- Extract the facts about the config registers in the state.
   obtain ⟨_, _, _, _, _⟩ := hs_config
-  -- Extract the main constraints from the chip via direct simp expansion,
-  -- mirroring the Fin KB recipe.
+  -- Extract the main constraints from the chip via direct simp expansion.
   rw [StoreDouble.constraints] at h_cstrs
   simp [SP1ConstraintList.allHold_poly] at h_cstrs
   simp [AddressOperation.constraints, sub_eq_zero, SP1Constraint.toProp_poly,

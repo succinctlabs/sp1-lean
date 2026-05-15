@@ -649,12 +649,10 @@ section poly_constraints_iff
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxRecDepth 1000000 in
--- Polymorphic counterpart of `allHold_constraints_iff` (line 650). Mirrors
--- the Fin KB iff RHS verbatim except for replacing the outer
--- `List.Forall SP1Constraint.toProp` wrappers with `..._poly`; the inner
--- sub-constraint lists, `(...).val < N` Range bounds, and individual
+-- Inner sub-constraint lists, `(...).val < N` Range bounds, and individual
 -- `assertZero`-derived equalities/disjunctions are structurally identical
--- between the two field instantiations.
+-- across field instantiations; only the outer `List.Forall` wrapper switches
+-- to `SP1Constraint.toProp_poly`.
 lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
   List.Forall SP1Constraint.toProp_poly (constraints Main) ↔
     List.Forall SP1Constraint.toProp_poly

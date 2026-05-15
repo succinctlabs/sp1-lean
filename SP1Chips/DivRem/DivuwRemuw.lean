@@ -689,10 +689,9 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
     have h_qbc3_eq : qbc3 = 0 := w_eq_qbc3_uw.resolve_left h_sum_ne
     simp [h_is_divuw, z0, z1, z2, z3, z4, z5, z6,
           h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
-  -- Trailing-arm closer. Mirrors Fin KB `spec.divuw` arm closers but in
-  -- `first` form. Covers writeback, omega, isU64-via-cases (both `simp_all`
-  -- and `simp+omega` variants), per-limb c/b bounds via `lt_cases_of_isU64`,
-  -- 2-step c/b extractions (Fin KB line 906/916/918), and the maco arm.
+  -- Trailing-arm closer in `first` form. Covers writeback, omega,
+  -- isU64-via-cases (both `simp_all` and `simp+omega` variants), per-limb c/b
+  -- bounds via `lt_cases_of_isU64`, 2-step c/b extractions, and the maco arm.
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
