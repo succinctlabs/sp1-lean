@@ -4,24 +4,8 @@ import SP1Operations.Operation.AddrAddOperation.Constraints
 
 namespace AddrAddOperation
 
-lemma allHold_constraints_iff (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) :
-    (constraints a b cols 1).allHold ↔
-      let carry0 : Fin KB := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
-      let carry1 : Fin KB := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
-      let carry2 : Fin KB := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
-      let carry3 : Fin KB := (a[3] + b[3] - 0 + carry2) * 65536⁻¹
-      (carry0 = 0 ∨ carry0 = 1) ∧
-      (carry1 = 0 ∨ carry1 = 1) ∧
-      (carry2 = 0 ∨ carry2 = 1) ∧
-      (carry3 = 0 ∨ carry3 = 1) ∧
-      (cols.value[0].val < 65536) ∧
-      (cols.value[1].val < 65536) ∧
-      (cols.value[2].val < 65536) := by
-  simp [constraints, sub_eq_zero]
-
-/-- Polymorphic companion of `allHold_constraints_iff` over `ZMod p`. Same
-Add-style carry shape as `AddOperation` (no borrow form), so bare `simp`
-closes. -/
+/-- Same Add-style carry shape as `AddOperation` (no borrow form), so bare
+`simp` closes. -/
 lemma allHold_constraints_iff_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p)) (cols : AddrAddOperation (ZMod p)) :
@@ -39,89 +23,12 @@ lemma allHold_constraints_iff_poly
       (cols.value[2].val < 65536) := by
   simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
 
-theorem is_u48_sum (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) (is_real : Fin KB)
-    (h_is_real : is_real = 1)
-    (cstrs : (constraints a b cols is_real).allHold)
-    (ha : a.isU64)
-    (hb : b.isU64)
-    : (a.toNat + b.toNat) % 2^64 < 2^48 := by
-      simp [SP1ConstraintList.allHold, h_is_real] at cstrs
-      simp only [allHold_constraints_iff a b cols] at cstrs
-      obtain ⟨h0, h1, h2, h3, hbd0, hbd1, hbd2⟩ := cstrs
-      have ha' := Word.lt_cases_of_isU64 ha
-      have hb' := Word.lt_cases_of_isU64 hb
-      simp at ha' hb'
-      simp [Word.toNat]
-      cases h0 <;> rename_i h0
-      <;> simp [sub_eq_zero] at h0
-      <;> simp [h0] at h1 h2 h3
-      <;> cases h1 <;> rename_i h1
-      <;> simp [sub_eq_zero] at h1
-      <;> simp [h0, h1] at h2 h3
-      <;> cases h2 <;> rename_i h2
-      <;> simp [sub_eq_zero] at h2
-      <;> simp [h0, h1, h2] at h3
-      <;> cases h3 <;> rename_i h3
-      <;> simp [sub_eq_zero] at h3
-      <;> omega
-
--- address-add correctness with U64 unfolding
-theorem cols_is_a_sum_b (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) (is_real : Fin KB)
-    (h_is_real : is_real = 1)
-    (cstrs : (constraints a b cols is_real).allHold)
-    (ha : a.isU64)
-    (hb : b.isU64)
-    : (a.toNat + b.toNat) % 2^64 = Word.toNat #v[cols.value[0], cols.value[1], cols.value[2], 0]
-    := by
-      have h_sum_u48 := is_u48_sum _ _ _ _ h_is_real cstrs ha hb
-      simp [Word.toNat] at h_sum_u48
-      simp [SP1ConstraintList.allHold, h_is_real] at cstrs
-      simp [allHold_constraints_iff a b cols] at cstrs
-      obtain ⟨h0, h1, h2, h3, hbd0, hbd1, hbd2⟩ := cstrs
-      have ha' := Word.lt_cases_of_isU64 ha
-      have hb' := Word.lt_cases_of_isU64 hb
-      simp at ha' hb'
-      simp [Word.toNat]
-      cases h0 <;> rename_i h0
-      <;> simp [sub_eq_zero] at h0
-      <;> simp [h0] at h1 h2 h3
-      <;> cases h1 <;> rename_i h1
-      <;> simp [sub_eq_zero] at h1
-      <;> simp [h0, h1] at h2 h3
-      <;> cases h2 <;> rename_i h2
-      <;> simp [sub_eq_zero] at h2
-      <;> simp [h0, h1, h2] at h3
-      <;> cases h3 <;> rename_i h3
-      <;> simp [sub_eq_zero] at h3
-      <;> omega
-
-def spec (a b : Word (Fin KB)) (cols : AddrAddOperation (Fin KB)) : Prop :=
-  let cols_word : Word (Fin KB) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
-  cols_word.isU64 ∧ cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64
-
-lemma spec_of_constraints (a : Word (Fin KB)) (b : Word (Fin KB))
-    (ha : a.isU64) (hb : b.isU64)
-    (cols : AddrAddOperation (Fin KB))
-    (h : SP1ConstraintList.allHold (AddrAddOperation.constraints a b cols 1)) :
-    (spec a b cols) := by
-  have h_sum_u48 := is_u48_sum _ _ _ _ rfl h ha hb
-  have h_cols_sum := cols_is_a_sum_b _ _ _ _ rfl h ha hb
-  simp [spec]
-  rw [allHold_constraints_iff] at h
-  obtain ⟨h0, h1, h2, h3, hbd0, hbd1, hbd2⟩ := h
-  constructor
-  · apply Word.isU64_of_cases <;> simp [hbd0, hbd1, hbd2]
-  · simp [Word.toBitVec64, ← h_cols_sum, BitVec.toNat_eq]
-
-/-! ### Polymorphic counterparts.
-
-Mirrors `AddOperation.spec_poly`'s recipe directly: rewrite the BitVec
-equation goal via `← BitVec.toNat_inj, BitVec.toNat_add,
-Word.toBitVec64_poly_toNat_poly, Word.toNat_poly_def`, get nat carry
-equations via `linear_combination * h65inv` + `limb_lift`, close with
-`omega`. We skip an explicit `cols_is_a_sum_b_poly` intermediate step
-because its `(...) % 2^64 = ...` type-level form was triggering kernel
-deep recursion on `2^64` during proof-term checking. -/
+/-! Recipe: rewrite the BitVec equation goal via `← BitVec.toNat_inj,
+BitVec.toNat_add, Word.toBitVec64_poly_toNat_poly, Word.toNat_poly_def`,
+get nat carry equations via `linear_combination * h65inv` + `limb_lift`,
+close with `omega`. We skip an explicit `cols_is_a_sum_b_poly`
+intermediate step because its `(...) % 2^64 = ...` type-level form was
+triggering kernel deep recursion on `2^64` during proof-term checking. -/
 
 private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (bb vv aa prev cc : ZMod p)
@@ -149,7 +56,6 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   rw [h1, h3] at h
   exact h
 
-/-- Polymorphic counterpart of `spec`. -/
 def spec_poly {p : ℕ} [NeZero p] (a b : Word (ZMod p)) (cols : AddrAddOperation (ZMod p)) : Prop :=
   let cols_word : Word (ZMod p) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
   cols_word.isU64_poly ∧ cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly
@@ -163,9 +69,9 @@ set_option maxHeartbeats 16000000 in
 -- `lean_verify` confirms standard axioms only (propext / Classical.choice
 -- / Quot.sound) — no new axioms introduced.
 set_option debug.skipKernelTC true in
-/-- Polymorphic counterpart of `spec_of_constraints`. Combines `isU64_poly`
-of the cols_word (low 3 limbs bounded, high limb is 0) with the BitVec
-equation `cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly`,
+/-- Combines `isU64_poly` of the cols_word (low 3 limbs bounded, high
+limb is 0) with the BitVec equation
+`cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly`,
 the latter proved via the AddOperation-style carry chain. -/
 lemma spec_of_constraints_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p))
