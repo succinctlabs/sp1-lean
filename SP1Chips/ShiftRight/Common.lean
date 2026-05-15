@@ -673,6 +673,45 @@ lemma limb_16_lt_aux_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   rw [h_add_val, h_ll_v_val, h_v0123_eq]
   nlinarith [lt_hl, lt_ll, h_MN, h_M_pos]
 
+/-- Per-pattern bound for the lr_j limb form expressed in cb-shape. Used by
+`ops_U64_a_poly_local`'s `lr_blast` helper to discharge each of 16 cb-patterns
+without re-deriving bound-form conversions inside each leaf. Callers supply
+(S, M, N) plus the substituted `h_inner_eq` and `h_v0123_explicit` from the
+`hcb0..hcb3` rcases; the lemma converts the cb-shape bounds to (M, N) form and
+delegates to `limb_16_lt_aux_poly`. -/
+lemma lr_blast_per_pattern_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (S M N : ℕ) (h_S_le : S ≤ 16) (h_MN : M * N = 65536) (h_M_pos : 0 < M)
+    (h_M_eq : M = 2 ^ (16 - S)) (h_N_eq : N = 2 ^ S)
+    {cb0 cb1 cb2 cb3 v0123 hl ll : ZMod p}
+    (h_inner_eq : cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8
+                  = ((S : ℕ) : ZMod p))
+    (h_v0123_explicit : v0123 = ((M : ℕ) : ZMod p))
+    (lt_hl : hl.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                  + cb3 * 8) : ZMod p).val)
+    (lt_ll : ll.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                            + cb3 * 8 : ZMod p).val) :
+    (hl + ll * v0123).val < 65536 := by
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  have h_N_pos : 0 < N := by nlinarith [h_MN, h_M_pos]
+  have h_M_lt_p : M < p := by nlinarith [h_MN, h_N_pos, hp]
+  have h_v_val : v0123.val = M := by
+    rw [h_v0123_explicit]; exact ZMod.val_natCast_of_lt h_M_lt_p
+  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                      + cb3 * 8 : ZMod p).val = S := by
+    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                + cb3 * 8) : ZMod p).val = 16 - S := by
+    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
+      rw [h_inner_eq, Nat.cast_sub h_S_le]; push_cast; ring]
+    exact ZMod.val_natCast_of_lt (by omega)
+  rw [h_inner_val] at lt_ll
+  rw [h_inner_hi_val] at lt_hl
+  rw [← h_M_eq] at lt_hl
+  rw [← h_N_eq] at lt_ll
+  exact limb_16_lt_aux_poly M N h_MN h_M_pos h_v_val lt_hl lt_ll
+
 end poly_field_arithmetic
 
 section poly_helpers
@@ -1923,5 +1962,247 @@ lemma srl_close_su16_3_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     h_b0' h_b1' h_b2' h_b3'
 
 end srl_close_wrappers
+
+section srlw_close_wrappers
+
+/-- 32-bit HWord analog of `srl_within_byte_shift_poly`. Within-byte right-shift
+identity for the cb4=0 (byte_shift=0) case of SRLW/SRLIW. Given the byte
+decompositions `b_j = hl_j * N + ll_j` (with `hl_j < M`, `ll_j < N`, `M*N = 65536`,
+`v0123.val = M`), the 2-limb 32-bit output `[hl0 + ll1*v0123, hl1]` equals
+`(b0 + b1*2^16) / N` as 32-bit Nats. The high limb is just `hl1` (no carry-down
+from a byte 2; SRLW's hl2/ll2 are forced to 0 by the chip's `b2 = 0` constraint). -/
+lemma srlw_within_byte_shift_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (M N : ℕ) (h_MN : M * N = 65536) (h_M_pos : 0 < M)
+    {b0 b1 ll0 ll1 hl0 hl1 v0123 : ZMod p}
+    (h_v_val : v0123.val = M)
+    (lt_ll0 : ll0.val < N) (lt_ll1 : ll1.val < N)
+    (lt_lh0 : hl0.val < M) (lt_lh1 : hl1.val < M)
+    (h_b0 : b0 = hl0 * ((N : ℕ) : ZMod p) + ll0)
+    (h_b1 : b1 = hl1 * ((N : ℕ) : ZMod p) + ll1) :
+    (HWord.toBitVec32_poly #v[hl0 + ll1 * v0123, hl1]).toNat
+    = (HWord.toBitVec32_poly #v[b0, b1]).toNat / N := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  have h_N_lt_p : N < p := by nlinarith [h_MN]
+  have h_N_val : ((N : ℕ) : ZMod p).val = N := ZMod.val_natCast_of_lt h_N_lt_p
+  have h_NM : N * M = 65536 := by linarith [h_MN, Nat.mul_comm M N]
+  have h_N_pos : 0 < N := by nlinarith [h_MN, h_M_pos]
+  -- val_mul bridges
+  have h_ll1_mul : (ll1 * v0123).val = ll1.val * M := by
+    rw [ZMod.val_mul_of_lt, h_v_val]; rw [h_v_val]; nlinarith [lt_ll1, h_MN]
+  have h_hl0_mul : (hl0 * ((N : ℕ) : ZMod p)).val = hl0.val * N := by
+    rw [ZMod.val_mul_of_lt, h_N_val]; rw [h_N_val]; nlinarith [lt_lh0, h_MN, h_NM]
+  have h_hl1_mul : (hl1 * ((N : ℕ) : ZMod p)).val = hl1.val * N := by
+    rw [ZMod.val_mul_of_lt, h_N_val]; rw [h_N_val]; nlinarith [lt_lh1, h_MN, h_NM]
+  -- b_j.val = hl_j.val * N + ll_j.val
+  have h_b0_val : b0.val = hl0.val * N + ll0.val := by
+    rw [h_b0, ZMod.val_add_of_lt]
+    · rw [h_hl0_mul]
+    · rw [h_hl0_mul]; nlinarith [lt_ll0, lt_lh0, h_MN, h_NM]
+  have h_b1_val : b1.val = hl1.val * N + ll1.val := by
+    rw [h_b1, ZMod.val_add_of_lt]
+    · rw [h_hl1_mul]
+    · rw [h_hl1_mul]; nlinarith [lt_ll1, lt_lh1, h_MN, h_NM]
+  have h_compose0_val : (hl0 + ll1 * v0123).val = hl0.val + ll1.val * M := by
+    rw [ZMod.val_add_of_lt]
+    · rw [h_ll1_mul]
+    · rw [h_ll1_mul]; nlinarith [lt_lh0, lt_ll1, h_MN]
+  unfold HWord.toBitVec32_poly
+  simp only [BitVec.toNat_ofNat, HWord.toNat_poly, Vector.getElem_mk,
+    List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
+  rw [h_compose0_val, h_b0_val, h_b1_val]
+  -- Per-byte bounds.
+  have h_b0_lt : hl0.val * N + ll0.val < 65536 := by nlinarith [lt_lh0, lt_ll0, h_MN]
+  have h_b1_lt : hl1.val * N + ll1.val < 65536 := by nlinarith [lt_lh1, lt_ll1, h_MN]
+  have h_lhs0_lt : hl0.val + ll1.val * M < 65536 := by nlinarith [lt_lh0, lt_ll1, h_MN]
+  have h_lhs1_lt : hl1.val < 65536 := by nlinarith [lt_lh1, h_MN]
+  -- Both sides fit in 2^32.
+  have h_B_lt : (hl0.val * N + ll0.val) + (hl1.val * N + ll1.val) * 2 ^ 16 < 2 ^ 32 := by
+    omega
+  have h_L_lt : (hl0.val + ll1.val * M) + hl1.val * 2 ^ 16 < 2 ^ 32 := by omega
+  -- Key Nat identity: N * L + ll0 = B.
+  have h_key : N * ((hl0.val + ll1.val * M) + hl1.val * 2 ^ 16) + ll0.val
+            = (hl0.val * N + ll0.val) + (hl1.val * N + ll1.val) * 2 ^ 16 := by
+    linear_combination ll1.val * h_MN
+  rw [Nat.mod_eq_of_lt h_L_lt, Nat.mod_eq_of_lt h_B_lt, ← h_key]
+  rw [Nat.add_comm (N * _) ll0.val, Nat.mul_comm N _,
+      Nat.add_mul_div_right _ _ h_N_pos, Nat.div_eq_of_lt lt_ll0, Nat.zero_add]
+
+/-- 32-bit HWord byte_shift=1 variant. Total shift = S+16, divisor = N * 2^16.
+The output `[hl1, 0]` is `b / (N * 2^16) = hl1` when the b1 decomposition holds. -/
+lemma srlw_within_byte_shift_1_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (M N : ℕ) (h_MN : M * N = 65536) (h_M_pos : 0 < M)
+    {b0 b1 ll0 ll1 hl0 hl1 v0123 : ZMod p}
+    (h_v_val : v0123.val = M)
+    (lt_ll0 : ll0.val < N) (lt_ll1 : ll1.val < N)
+    (lt_lh0 : hl0.val < M) (lt_lh1 : hl1.val < M)
+    (h_b0 : b0 = hl0 * ((N : ℕ) : ZMod p) + ll0)
+    (h_b1 : b1 = hl1 * ((N : ℕ) : ZMod p) + ll1) :
+    (HWord.toBitVec32_poly #v[hl1, 0]).toNat
+    = (HWord.toBitVec32_poly #v[b0, b1]).toNat / (N * 2 ^ 16) := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  have h_N_lt_p : N < p := by nlinarith [h_MN]
+  have h_N_val : ((N : ℕ) : ZMod p).val = N := ZMod.val_natCast_of_lt h_N_lt_p
+  have h_NM : N * M = 65536 := by linarith [h_MN, Nat.mul_comm M N]
+  have h_N_pos : 0 < N := by nlinarith [h_MN, h_M_pos]
+  have h_hl0_mul : (hl0 * ((N : ℕ) : ZMod p)).val = hl0.val * N := by
+    rw [ZMod.val_mul_of_lt, h_N_val]; rw [h_N_val]; nlinarith [lt_lh0, h_MN, h_NM]
+  have h_hl1_mul : (hl1 * ((N : ℕ) : ZMod p)).val = hl1.val * N := by
+    rw [ZMod.val_mul_of_lt, h_N_val]; rw [h_N_val]; nlinarith [lt_lh1, h_MN, h_NM]
+  have h_b0_val : b0.val = hl0.val * N + ll0.val := by
+    rw [h_b0, ZMod.val_add_of_lt]
+    · rw [h_hl0_mul]
+    · rw [h_hl0_mul]; nlinarith [lt_ll0, lt_lh0, h_MN, h_NM]
+  have h_b1_val : b1.val = hl1.val * N + ll1.val := by
+    rw [h_b1, ZMod.val_add_of_lt]
+    · rw [h_hl1_mul]
+    · rw [h_hl1_mul]; nlinarith [lt_ll1, lt_lh1, h_MN, h_NM]
+  unfold HWord.toBitVec32_poly
+  simp only [BitVec.toNat_ofNat, HWord.toNat_poly, Vector.getElem_mk,
+    List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero,
+    zero_mul, add_zero]
+  rw [h_b0_val, h_b1_val]
+  have h_b0_lt : hl0.val * N + ll0.val < 65536 := by nlinarith [lt_lh0, lt_ll0, h_MN]
+  have h_b1_lt : hl1.val * N + ll1.val < 65536 := by nlinarith [lt_lh1, lt_ll1, h_MN]
+  have h_hl1_lt : hl1.val < 65536 := by nlinarith [lt_lh1, h_MN]
+  have h_B_lt : (hl0.val * N + ll0.val) + (hl1.val * N + ll1.val) * 2 ^ 16 < 2 ^ 32 := by
+    omega
+  have h_L_lt : hl1.val < 2 ^ 32 := by omega
+  have h_rem_lt : (hl0.val * N + ll0.val) + 2 ^ 16 * ll1.val < N * 2 ^ 16 := by
+    nlinarith [lt_lh0, lt_ll0, lt_ll1, h_MN, h_NM, h_N_pos]
+  have h_NM16_pos : 0 < N * 2 ^ 16 := Nat.mul_pos h_N_pos (by omega)
+  -- Key Nat identity: (N * 2^16) * hl1 + (b0 + 2^16 * ll1) = B.
+  have h_key : (N * 2 ^ 16) * hl1.val + ((hl0.val * N + ll0.val) + 2 ^ 16 * ll1.val)
+            = (hl0.val * N + ll0.val) + (hl1.val * N + ll1.val) * 2 ^ 16 := by
+    ring
+  rw [Nat.mod_eq_of_lt h_L_lt, Nat.mod_eq_of_lt h_B_lt, ← h_key]
+  rw [Nat.add_comm ((N * 2 ^ 16) * _) _, Nat.mul_comm (N * 2 ^ 16) _,
+      Nat.add_mul_div_right _ _ h_NM16_pos, Nat.div_eq_of_lt h_rem_lt, Nat.zero_add]
+
+/-- Wrapper for `spec.srlw_poly`/`spec.srliw_poly`'s `cb4=0` byte-shift case
+(byte_shift=0, S ≤ 15). The shift amount is the 5-bit sum `cb0+cb1*2+cb2*4+cb3*8+cb4*16`
+(no cb5 because SRLW shift is 5-bit). Combines `cancel_mul_65536_poly`, bound
+normalization, and the 32-bit shift identity. -/
+lemma srlw_close_su16_0_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (S : ℕ) (h_S_le : S ≤ 15) (M N : ℕ)
+    (h_MN : M * N = 65536) (h_M_pos : 0 < M) (h_M_eq : M = 2 ^ (16 - S))
+    (h_N_eq : N = 2 ^ S)
+    {cb0 cb1 cb2 cb3 cb4 v0123 b0 b1 ll0 ll1 hl0 hl1 : ZMod p}
+    (h_M_lt_p : M < p) (h_v0123_explicit : v0123 = ((M : ℕ) : ZMod p))
+    (h_inner_eq : cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8
+                  = ((S : ℕ) : ZMod p))
+    (h_total_eq : cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16
+                  = ((S : ℕ) : ZMod p))
+    (lt_ll0 : ll0.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                              + cb3 * 8 : ZMod p).val)
+    (lt_lh0 : hl0.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                   + cb3 * 8) : ZMod p).val)
+    (lt_ll1 : ll1.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                              + cb3 * 8 : ZMod p).val)
+    (lt_lh1 : hl1.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                   + cb3 * 8) : ZMod p).val)
+    (h_b0_dec : b0 * v0123 = hl0 * ((65536 : ℕ) : ZMod p) + ll0 * v0123)
+    (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123) :
+    (HWord.toBitVec32_poly #v[hl0 + ll1 * v0123, hl1]).toNat
+    = (HWord.toBitVec32_poly #v[b0, b1]).toNat
+        / 2 ^ (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  have h_v_val : v0123.val = M := by
+    rw [h_v0123_explicit]; exact ZMod.val_natCast_of_lt h_M_lt_p
+  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                      + cb3 * 8 : ZMod p).val = S := by
+    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                + cb3 * 8) : ZMod p).val = 16 - S := by
+    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
+      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
+    exact ZMod.val_natCast_of_lt (by omega)
+  rw [h_inner_val] at lt_ll0 lt_ll1
+  rw [h_inner_hi_val] at lt_lh0 lt_lh1
+  have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val = S := by
+    rw [h_total_eq]; exact ZMod.val_natCast_of_lt (by omega)
+  rw [h_total_val]
+  have hdvd : v0123.val ∣ 65536 := by rw [h_v_val]; exact ⟨N, h_MN.symm⟩
+  have hpos : 0 < v0123.val := by rw [h_v_val]; exact h_M_pos
+  have h_b0' := cancel_mul_65536_poly hdvd hpos h_b0_dec
+  have h_b1' := cancel_mul_65536_poly hdvd hpos h_b1_dec
+  rw [h_v_val] at h_b0' h_b1'
+  rw [show (2 : ℕ) ^ S = N from h_N_eq.symm]
+  have h_div_eq : (65536 : ℕ) / M = N := by
+    rw [← h_MN]; exact Nat.mul_div_cancel_left N h_M_pos
+  rw [h_div_eq] at h_b0' h_b1'
+  have h_lt_ll0 : ll0.val < N := by rw [h_N_eq]; exact lt_ll0
+  have h_lt_ll1 : ll1.val < N := by rw [h_N_eq]; exact lt_ll1
+  have h_lt_lh0 : hl0.val < M := by rw [h_M_eq]; exact lt_lh0
+  have h_lt_lh1 : hl1.val < M := by rw [h_M_eq]; exact lt_lh1
+  exact srlw_within_byte_shift_poly M N h_MN h_M_pos h_v_val
+    h_lt_ll0 h_lt_ll1 h_lt_lh0 h_lt_lh1 h_b0' h_b1'
+
+/-- Wrapper for `spec.srlw_poly`/`spec.srliw_poly`'s `cb4=1` byte-shift case
+(byte_shift=1, S ∈ [16, 31]). The shift amount is `S + 16`; the 32-bit output is
+`[hl1, 0]` because the high byte slides into bit position 0. -/
+lemma srlw_close_su16_1_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (S : ℕ) (h_S_le : S ≤ 15) (M N : ℕ)
+    (h_MN : M * N = 65536) (h_M_pos : 0 < M) (h_M_eq : M = 2 ^ (16 - S))
+    (h_N_eq : N = 2 ^ S)
+    {cb0 cb1 cb2 cb3 cb4 v0123 b0 b1 ll0 ll1 hl0 hl1 : ZMod p}
+    (h_M_lt_p : M < p) (h_v0123_explicit : v0123 = ((M : ℕ) : ZMod p))
+    (h_inner_eq : cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p) + cb3 * 8
+                  = ((S : ℕ) : ZMod p))
+    (h_total_eq : cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16
+                  = (((S + 16) : ℕ) : ZMod p))
+    (lt_ll0 : ll0.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                              + cb3 * 8 : ZMod p).val)
+    (lt_lh0 : hl0.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                   + cb3 * 8) : ZMod p).val)
+    (lt_ll1 : ll1.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                              + cb3 * 8 : ZMod p).val)
+    (lt_lh1 : hl1.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                   + cb3 * 8) : ZMod p).val)
+    (h_b0_dec : b0 * v0123 = hl0 * ((65536 : ℕ) : ZMod p) + ll0 * v0123)
+    (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123) :
+    (HWord.toBitVec32_poly #v[hl1, 0]).toNat
+    = (HWord.toBitVec32_poly #v[b0, b1]).toNat
+        / 2 ^ (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val := by
+  have hp : 2 ^ 17 < p := Fact.out
+  haveI : NeZero p := ⟨by omega⟩
+  have h_v_val : v0123.val = M := by
+    rw [h_v0123_explicit]; exact ZMod.val_natCast_of_lt h_M_lt_p
+  have h_inner_val : (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                      + cb3 * 8 : ZMod p).val = S := by
+    rw [h_inner_eq]; exact ZMod.val_natCast_of_lt (by omega)
+  have h_inner_hi_val : (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                + cb3 * 8) : ZMod p).val = 16 - S := by
+    rw [show (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+              + cb3 * 8) : ZMod p) = (((16 - S) : ℕ) : ZMod p) from by
+      rw [h_inner_eq, Nat.cast_sub (by omega : S ≤ 16)]; push_cast; ring]
+    exact ZMod.val_natCast_of_lt (by omega)
+  rw [h_inner_val] at lt_ll0 lt_ll1
+  rw [h_inner_hi_val] at lt_lh0 lt_lh1
+  have h_total_val : (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val
+                      = S + 16 := by
+    rw [h_total_eq]; exact ZMod.val_natCast_of_lt (by omega)
+  rw [h_total_val]
+  have hdvd : v0123.val ∣ 65536 := by rw [h_v_val]; exact ⟨N, h_MN.symm⟩
+  have hpos : 0 < v0123.val := by rw [h_v_val]; exact h_M_pos
+  have h_b0' := cancel_mul_65536_poly hdvd hpos h_b0_dec
+  have h_b1' := cancel_mul_65536_poly hdvd hpos h_b1_dec
+  rw [h_v_val] at h_b0' h_b1'
+  rw [show (2 : ℕ) ^ (S + 16) = N * 2 ^ 16 from by rw [pow_add, h_N_eq]]
+  have h_div_eq : (65536 : ℕ) / M = N := by
+    rw [← h_MN]; exact Nat.mul_div_cancel_left N h_M_pos
+  rw [h_div_eq] at h_b0' h_b1'
+  have h_lt_ll0 : ll0.val < N := by rw [h_N_eq]; exact lt_ll0
+  have h_lt_ll1 : ll1.val < N := by rw [h_N_eq]; exact lt_ll1
+  have h_lt_lh0 : hl0.val < M := by rw [h_M_eq]; exact lt_lh0
+  have h_lt_lh1 : hl1.val < M := by rw [h_M_eq]; exact lt_lh1
+  exact srlw_within_byte_shift_1_poly M N h_MN h_M_pos h_v_val
+    h_lt_ll0 h_lt_ll1 h_lt_lh0 h_lt_lh1 h_b0' h_b1'
+
+end srlw_close_wrappers
+
 
 end ShiftRight

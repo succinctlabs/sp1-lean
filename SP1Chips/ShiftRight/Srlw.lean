@@ -173,58 +173,322 @@ section srlw_poly
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 800000000 in
--- 800M heartbeats: 4-way arm × 4-way byte_shift × 16-way cb sub-cases.
+-- 800M heartbeats: cb4 split + 16-way cb-blast for a0/a1 bounds.
 set_option debug.skipKernelTC true in
 -- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel.
 /-- U64-bound on the SRLW output word `a`. Lives in `Srlw.lean` rather than `Common.lean`
-because `spec.srlw_common_poly` is the only consumer. STILL OPEN.
+because `spec.srlw_common_poly` is the only consumer.
 
-**Recommended closure path** (not yet executed):
-1. **Tighten the precondition** from `h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1`
-   to `eq_srlw : Main[66] = 1`. This collapses the 4-arm dispatch in the original
-   plan to just the SRLW arm (the consumer's only call site already proves `eq_srlw`
-   first). Three call-site lines move from `... Main cstrs h_real` to `... Main cstrs eq_srlw`.
-
-2. **Derive `h_real`, `h_no_srl`, `h_no_sra`, `h_no_sraw` internally** via
-   `is_real_eq_one_of_srlw` and the SRLW projection of `single_op_poly`.
-
-3. **Reuse the 16-way `cb_aux` pattern** that the consumer (`spec.srlw_common_poly`,
-   in this file) already uses to force `hl2 = ll2 = hl3 = ll3 = 0`. Apply it twice
-   more (for `a0` and `a1`) using `eq_lr0`/`eq_lr1` + `limb_16_lt_aux_poly` to bound
-   `(hl_j + ll_{j+1} * v0123).val < 65536`.
-
-4. **For `a2` and `a3`**, use `srw_w2`/`srw_w3` (which give `a_j = msb_srw * 65535`
-   under SRLW after rewriting `eq_srlw, h_no_sraw` and resolving the `1 = 0 ∨ ...`
-   disjunction) and bound via `bool_mul_65535_lt_poly`.
-
-**Even better** (worth considering before closing): the helper proves the same
-case-blast that `spec.srlw_common_poly` already does inline for `hl2/ll2/hl3/ll3 = 0`.
-Deleting the helper entirely and inlining the `a0/a1` bounds into the consumer
-(extending the `cb_aux` dispatch with two more variants) would avoid duplicating
-~200 LOC of 16-way blast. The downside is `bounds_poly`-like structure becomes
-longer; the upside is one less helper to maintain. -/
+Tightened precondition: takes `eq_srlw : Main[66] = 1` directly (SRLW arm only).
+The proof: derive h_real and the SRLW-arm projection internally; bound a2, a3 via
+the `srw_w2`/`srw_w3` constraints (a_j = msb_srw * 65535) using
+`bool_mul_65535_lt_poly`; case-split on `cb4` (∈ {0, 1}) and inside each branch
+bound a0, a1 via the chip's lr_j form `hl_j + ll_{j+1} * v0123` together with the
+`limb_16_lt_aux_poly` per-pattern bound. -/
 private lemma ops_U64_a_poly_local (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly)
-    (h_real : Main[64] + Main[65] + Main[66] + Main[67] = 1) :
+    (eq_srlw : Main[66] = 1) :
     Word.isU64_poly #v[Main[32], Main[33], Main[34], Main[35]] := by
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   have hp : 2 ^ 17 < p := Fact.out
   haveI : Fact (1 < p) := ⟨by omega⟩
-  have h_disj := srl_or_sra_or_srlw_or_sraw_of_real Main cstrs h_real
+  have h_real := is_real_eq_one_of_srlw Main cstrs eq_srlw
+  obtain ⟨_, _, sop_3, _⟩ := single_op_poly Main cstrs
+  have ⟨h_no_srl, h_no_sra, h_no_sraw⟩ := sop_3 eq_srlw
   have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  have ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
-  have ⟨c0_16, _, _, _⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
+  obtain ⟨c0_16, _, _, _⟩ := Word.lt_cases_of_isU64_poly is_U64_c
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
              List.getElem_cons_succ] at b0_16 b1_16 b2_16 b3_16 c0_16
-  obtain ⟨sop_1, sop_2, sop_3, sop_4⟩ := single_op_poly Main cstrs
-  have ⟨h_su_1, h_su_2, h_su_3, h_su_4⟩ := single_su16_poly Main cstrs h_real
+  -- Open cstrs to get individual conjuncts.
+  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  rw [allHold_constraints_iff_poly] at cstrs
+  -- Set local names.
+  set b0 := Main[15]; set b1 := Main[16]; set b2 := Main[17]; set b3 := Main[18]
+  set a0 := Main[32]; set a1 := Main[33]; set a2 := Main[34]; set a3 := Main[35]
+  set msb_b := Main[36]; set msb_srw := Main[37]
+  set cb0 := Main[38]; set cb1 := Main[39]; set cb2 := Main[40]
+  set cb3 := Main[41]; set cb4 := Main[42]; set cb5 := Main[43]
+  set smv := Main[44]; set v0123 := Main[45]; set v012 := Main[46]; set v01 := Main[47]
+  set ll0 := Main[48]; set ll1 := Main[49]; set ll2 := Main[50]; set ll3 := Main[51]
+  set hl0 := Main[52]; set hl1 := Main[53]; set hl2 := Main[54]; set hl3 := Main[55]
+  set lr0 := Main[56]; set lr1 := Main[57]; set lr2 := Main[58]; set lr3 := Main[59]
+  set su160 := Main[60]; set su161 := Main[61]; set su162 := Main[62]; set su163 := Main[63]
+  -- Destructure cstrs.
+  obtain ⟨_, _h_msb_b1_sraw, h_msb_a1_srw, _, _,
+           _, _, _, _, _, _,
+           b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, _b_cb5, _,
+           h_su160, _b_su160, h_su161, _b_su161, h_su162, _b_su162, h_su163, _b_su163,
+           one_of_su16s,
+           eq_v01, eq_v012, eq_v0123,
+           lt_ll0', lt_lh0', _, lt_ll1', lt_lh1', _,
+           lt_ll2', lt_lh2', _, _lt_ll3', _lt_lh3', _,
+           eq_lr0, eq_lr1, _eq_lr2, _eq_lr3,
+           w_msb_b, eq_smv, _w_msb_srv,
+           _sr_00, _sr_01, _sr_02, _sr_03,
+           _sr_10, _sr_11, _sr_12, _sr_13,
+           _sr_20, _sr_21, _sr_22, _sr_23,
+           _sr_30, _sr_31, _sr_32, _sr_33,
+           srw_00, srw_01, srw_10, srw_11,
+           srw_w2, srw_w3,
+           _⟩ := cstrs
+  have h_v0_val : (0 : ZMod p).val = 0 := ZMod.val_zero
+  have h_v1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
+  have h_one_ne_zero : (1 : ZMod p) ≠ 0 := by
+    intro h; rw [h] at h_v1_val; rw [h_v0_val] at h_v1_val; exact zero_ne_one h_v1_val
   have h_sum_ne : ¬ Main[64] + Main[65] + Main[66] + Main[67] = 0 := by
-    intro h; rw [h] at h_real; exact zero_ne_one h_real
-  sorry
+    intro h
+    rw [h_no_srl, h_no_sra, eq_srlw, h_no_sraw] at h
+    simp only [add_zero, zero_add] at h
+    exact h_one_ne_zero h
+  have lt_ll0 := lt_ll0' h_sum_ne
+  have lt_lh0 := lt_lh0' h_sum_ne
+  have lt_ll1 := lt_ll1' h_sum_ne
+  have lt_lh1 := lt_lh1' h_sum_ne
+  have lt_ll2 := lt_ll2' h_sum_ne
+  have lt_lh2 := lt_lh2' h_sum_ne
+  -- Resolve gates under SRLW (srlw + sraw = 1, srl + sra = 0).
+  rw [h_no_sraw, eq_srlw] at srw_00 srw_01 srw_10 srw_11 srw_w2 srw_w3
+  simp only [add_zero, mul_one] at srw_w2 srw_w3
+  simp only [add_zero,
+             show ((1 : ZMod p) = 0) ↔ False from ⟨h_one_ne_zero, False.elim⟩, false_or]
+    at srw_00 srw_01 srw_10 srw_11
+  -- Derive msb_b = 0 from w_msb_b under SRLW.
+  rw [h_no_srl, eq_srlw] at w_msb_b
+  simp only [zero_add,
+             show ((1 : ZMod p) = 0) ↔ False from ⟨h_one_ne_zero, False.elim⟩, false_or]
+    at w_msb_b
+  have h_msb_b_zero : msb_b = 0 := w_msb_b
+  rw [h_msb_b_zero, zero_mul] at eq_smv
+  -- Simplify correction terms in srw_01, srw_10, srw_11.
+  simp only [h_msb_b_zero, eq_smv, zero_mul, add_zero, sub_self] at srw_01 srw_10 srw_11
+  -- Derive msb_srw ∈ {0, 1} from h_msb_a1_srw (U16MSBOperation constraint on a1).
+  -- The multiplier is `srlw + sraw`; under SRLW, this is 1.
+  rw [h_no_sraw, eq_srlw] at h_msb_a1_srw
+  simp only [add_zero] at h_msb_a1_srw
+  have h_msb_srw_bool : msb_srw = 0 ∨ msb_srw = 1 := by
+    rw [U16MSBOperation.allHold_constraints_iff_poly] at h_msb_a1_srw
+    exact h_msb_a1_srw.2.1
+  -- Bound a2 = msb_srw * 65535 < 65536 and a3 similarly.
+  have h_a2_eq : a2 = msb_srw * 65535 := srw_w2.resolve_left h_one_ne_zero
+  have h_a3_eq : a3 = msb_srw * 65535 := srw_w3.resolve_left h_one_ne_zero
+  have h_a2_lt : a2.val < 65536 := by
+    rw [h_a2_eq]
+    have h_eq : msb_srw * (65535 : ZMod p) = msb_srw * (((65535 : ℕ) : ZMod p)) := by
+      norm_cast
+    rw [h_eq]
+    exact bool_mul_65535_lt_poly h_msb_srw_bool
+  have h_a3_lt : a3.val < 65536 := by
+    rw [h_a3_eq]
+    have h_eq : msb_srw * (65535 : ZMod p) = msb_srw * (((65535 : ℕ) : ZMod p)) := by
+      norm_cast
+    rw [h_eq]
+    exact bool_mul_65535_lt_poly h_msb_srw_bool
+  -- Resolve su16 dispatch under SRLW (srl+sra=0; cb4 + cb5*2*(srl+sra) = cb4).
+  rw [h_no_srl, h_no_sra] at h_su160 h_su161 h_su162 h_su163 one_of_su16s
+  simp only [add_zero, zero_add, mul_zero] at h_su160 h_su161 h_su162 h_su163 one_of_su16s
+  rw [h_no_sraw, eq_srlw] at one_of_su16s
+  simp only [add_zero,
+             show ((1 : ZMod p) = 0) ↔ False from ⟨h_one_ne_zero, False.elim⟩, false_or]
+    at one_of_su16s
+  -- cb4 case-split; bound a0, a1 in each branch.
+  -- Goal-form helper for the 16-way blast.
+  have lr_blast : ∀ {hl ll : ZMod p}
+      (_lt_hl : hl.val < 2 ^ (16 - (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                                    + cb3 * 8) : ZMod p).val)
+      (_lt_ll : ll.val < 2 ^ (cb0 + cb1 * ((2 : ℕ) : ZMod p) + cb2 * ((4 : ℕ) : ZMod p)
+                              + cb3 * 8 : ZMod p).val),
+      (hl + ll * v0123).val < 65536 := by
+    intro hl ll lt_hl lt_ll
+    rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+      rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+    · -- (0,0,0,0): S=0, M=65536, N=1
+      exact lr_blast_per_pattern_poly 0 65536 1 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (0,0,0,1): S=8, M=256, N=256
+      exact lr_blast_per_pattern_poly 8 256 256 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (0,0,1,0): S=4, M=4096, N=16
+      exact lr_blast_per_pattern_poly 4 4096 16 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (0,0,1,1): S=12, M=16, N=4096
+      exact lr_blast_per_pattern_poly 12 16 4096 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (0,1,0,0): S=2, M=16384, N=4
+      exact lr_blast_per_pattern_poly 2 16384 4 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (0,1,0,1): S=10, M=64, N=1024
+      exact lr_blast_per_pattern_poly 10 64 1024 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (0,1,1,0): S=6, M=1024, N=64
+      exact lr_blast_per_pattern_poly 6 1024 64 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (0,1,1,1): S=14, M=4, N=16384
+      exact lr_blast_per_pattern_poly 14 4 16384 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,0,0,0): S=1, M=32768, N=2
+      exact lr_blast_per_pattern_poly 1 32768 2 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,0,0,1): S=9, M=128, N=512
+      exact lr_blast_per_pattern_poly 9 128 512 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,0,1,0): S=5, M=2048, N=32
+      exact lr_blast_per_pattern_poly 5 2048 32 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,0,1,1): S=13, M=8, N=8192
+      exact lr_blast_per_pattern_poly 13 8 8192 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,1,0,0): S=3, M=8192, N=8
+      exact lr_blast_per_pattern_poly 3 8192 8 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,1,0,1): S=11, M=32, N=2048
+      exact lr_blast_per_pattern_poly 11 32 2048 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,1,1,0): S=7, M=512, N=128
+      exact lr_blast_per_pattern_poly 7 512 128 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+    · -- (1,1,1,1): S=15, M=2, N=32768
+      exact lr_blast_per_pattern_poly 15 2 32768 (by omega) (by decide) (by omega) rfl rfl
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        lt_hl lt_ll
+  -- Bound a0, a1 by case-splitting on cb4 (∈ {0, 1}).
+  refine fun i => ?_
+  fin_cases i
+  · -- a0.val < 65536
+    show a0.val < 65536
+    rcases b_cb4 with hcb4 | hcb4
+    · -- cb4 = 0: resolve su160 = 1 → a0 = lr0
+      rw [hcb4] at h_su160 h_su161 h_su162 h_su163
+      have h_su161_zero : su161 = 0 :=
+        h_su161.resolve_right (fun h => h_one_ne_zero (by linear_combination -h))
+      have h_su162_zero : su162 = 0 :=
+        h_su162.resolve_right (fun h => val_2_ne_zero (by linear_combination -h))
+      have h_su163_zero : su163 = 0 :=
+        h_su163.resolve_right (fun h => val_3_ne_zero (by linear_combination -h))
+      have h_su160_eq : su160 = 1 := by
+        have := one_of_su16s
+        rw [h_su161_zero, h_su162_zero, h_su163_zero, add_zero, add_zero, add_zero] at this
+        exact this
+      have h_su160_ne_zero : su160 ≠ 0 := by rw [h_su160_eq]; exact h_one_ne_zero
+      have h_a0_eq : a0 = lr0 := srw_00.resolve_left h_su160_ne_zero
+      rw [h_a0_eq, eq_lr0]
+      exact lr_blast lt_lh0 lt_ll1
+    · -- cb4 = 1: a0 = lr1
+      rw [hcb4] at h_su160 h_su161 h_su162 h_su163
+      have h_su160_zero : su160 = 0 :=
+        h_su160.resolve_right h_one_ne_zero
+      have h_su162_zero : su162 = 0 := by
+        apply h_su162.resolve_right
+        intro h
+        have hv1 : (1 : ZMod p).val = 1 := h_v1_val
+        have hv2 : (2 : ZMod p).val = 2 := val_2_zmod_p
+        have := congrArg ZMod.val h
+        rw [hv1, hv2] at this; omega
+      have h_su163_zero : su163 = 0 := by
+        apply h_su163.resolve_right
+        intro h
+        have hv1 : (1 : ZMod p).val = 1 := h_v1_val
+        have hv3 : (3 : ZMod p).val = 3 := by
+          rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
+          exact ZMod.val_natCast_of_lt (by omega)
+        have := congrArg ZMod.val h
+        rw [hv1, hv3] at this; omega
+      have h_su161_eq : su161 = 1 := by
+        have := one_of_su16s
+        rw [h_su160_zero, h_su162_zero, h_su163_zero, zero_add, add_zero, add_zero] at this
+        exact this
+      have h_su161_ne_zero : su161 ≠ 0 := by rw [h_su161_eq]; exact h_one_ne_zero
+      have h_a0_eq : a0 = lr1 := srw_10.resolve_left h_su161_ne_zero
+      rw [h_a0_eq, eq_lr1]
+      exact lr_blast lt_lh1 lt_ll2
+  · -- a1.val < 65536
+    show a1.val < 65536
+    rcases b_cb4 with hcb4 | hcb4
+    · -- cb4 = 0: a1 = lr1
+      rw [hcb4] at h_su160 h_su161 h_su162 h_su163
+      have h_su161_zero : su161 = 0 :=
+        h_su161.resolve_right (fun h => h_one_ne_zero (by linear_combination -h))
+      have h_su162_zero : su162 = 0 :=
+        h_su162.resolve_right (fun h => val_2_ne_zero (by linear_combination -h))
+      have h_su163_zero : su163 = 0 :=
+        h_su163.resolve_right (fun h => val_3_ne_zero (by linear_combination -h))
+      have h_su160_eq : su160 = 1 := by
+        have := one_of_su16s
+        rw [h_su161_zero, h_su162_zero, h_su163_zero, add_zero, add_zero, add_zero] at this
+        exact this
+      have h_su160_ne_zero : su160 ≠ 0 := by rw [h_su160_eq]; exact h_one_ne_zero
+      have h_a1_eq : a1 = lr1 := srw_01.resolve_left h_su160_ne_zero
+      rw [h_a1_eq, eq_lr1]
+      exact lr_blast lt_lh1 lt_ll2
+    · -- cb4 = 1: a1 = msb_b * 65535 = 0
+      rw [hcb4] at h_su160 h_su161 h_su162 h_su163
+      have h_su160_zero : su160 = 0 :=
+        h_su160.resolve_right h_one_ne_zero
+      have h_su162_zero : su162 = 0 := by
+        apply h_su162.resolve_right
+        intro h
+        have hv1 : (1 : ZMod p).val = 1 := h_v1_val
+        have hv2 : (2 : ZMod p).val = 2 := val_2_zmod_p
+        have := congrArg ZMod.val h
+        rw [hv1, hv2] at this; omega
+      have h_su163_zero : su163 = 0 := by
+        apply h_su163.resolve_right
+        intro h
+        have hv1 : (1 : ZMod p).val = 1 := h_v1_val
+        have hv3 : (3 : ZMod p).val = 3 := by
+          rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
+          exact ZMod.val_natCast_of_lt (by omega)
+        have := congrArg ZMod.val h
+        rw [hv1, hv3] at this; omega
+      have h_su161_eq : su161 = 1 := by
+        have := one_of_su16s
+        rw [h_su160_zero, h_su162_zero, h_su163_zero, zero_add, add_zero, add_zero] at this
+        exact this
+      have h_su161_ne_zero : su161 ≠ 0 := by rw [h_su161_eq]; exact h_one_ne_zero
+      -- srw_11 was pre-simplified at the prologue (line ~264) using h_msb_b_zero
+      -- to collapse `a1 = msb_b * 65535` to `a1 = 0`.
+      have h_a1_eq : a1 = 0 := srw_11.resolve_left h_su161_ne_zero
+      rw [h_a1_eq]; simp [h_v0_val]
+  · -- a2.val < 65536
+    exact h_a2_lt
+  · -- a3.val < 65536
+    exact h_a3_lt
 
-set_option maxHeartbeats 400000000 in
--- 400M heartbeats: 2-way byte_shift × 16-way cb0..cb3 rcases on top of the
--- SRLW prologue (deriving msb_srw, sign_extend bridge, hl2/ll2/hl3/ll3 = 0).
+set_option maxHeartbeats 1200000000 in
+-- 1.2B heartbeats: 2-way byte_shift (cb4) × 16-way cb0..cb3 rcases = 32 leaves,
+-- on top of the SRLW prologue (deriving msb_srw, sign_extend bridge,
+-- hl2/ll2/hl3/ll3 = 0 via cb_aux dispatch).
 set_option debug.skipKernelTC true in
 -- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N`
 -- re-checks (mirrors `spec.srl_common_poly`'s use).
@@ -246,7 +510,7 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
   haveI : Fact (1 < p) := ⟨by omega⟩
   have h_real := is_real_eq_one_of_srlw Main cstrs eq_srlw
   have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  have is_U64_a := ops_U64_a_poly_local Main cstrs h_real
+  have is_U64_a := ops_U64_a_poly_local Main cstrs eq_srlw
   have is_U32_b := Word.isU64_poly_low_poly_isU32_poly is_U64_b
   have is_U32_c := Word.isU64_poly_low_poly_isU32_poly is_U64_c
   have is_U32_a := Word.isU64_poly_low_poly_isU32_poly is_U64_a
@@ -652,11 +916,14 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
     simp [Word.low_poly, HWord.toNat_poly]
     omega
   rw [h_shift_eq]; clear h_shift_eq
-  -- Step 5: reduce LHS to a0.val + a1.val * 2^16 and RHS to (b0.val + b1.val * 2^16) / 2^(c0.val % 32).
-  rw [HWord.toBitVec32_poly_toNat_poly h_isU32_a_lo, HWord.toBitVec32_poly_toNat_poly h_isU32_b_lo]
-  simp only [Word.low_poly, HWord.toNat_poly, Vector.getElem_mk, List.getElem_toArray,
+  -- Step 5: keep LHS in HWord form (avoid unfolding via HWord.toBitVec32_poly_toNat_poly).
+  -- The new helpers srlw_close_su16_{0,1}_case conclude at HWord level, so we want
+  -- to apply them directly without re-folding. Simp only unfolds Word.low_poly to
+  -- reduce #v[b0,b1,b2,b3] → #v[b0,b1].
+  simp only [Word.low_poly, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
-  -- Goal: a0.val + a1.val * 2^16 = (b0.val + b1.val * 2^16) / 2^(c0.val % 32)
+  -- Goal: (HWord.toBitVec32_poly #v[a0, a1]).toNat
+  --     = (HWord.toBitVec32_poly #v[b0, b1]).toNat / 2 ^ (c0.val % 32)
   -- Step 6: derive c0.val % 32 = (cb0 + cb1*2 + cb2*4 + cb3*8 + cb4*16 : ZMod p).val.
   have h_cb_sum_lt_64 : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val < 64 := by
     have hb0 : cb0.val ≤ 1 := by rcases b_cb0 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
@@ -677,18 +944,367 @@ private lemma spec.srlw_common_poly (Main : Vector (ZMod p) 69)
     · exact h_cb_sum_lt_64
     · exact c0_16
     · exact h_diff
-  -- Force cb5 = 0 under SRLW (since shift is < 32, the 32s bit is 0).
-  -- The trusted_instr constraint via ops_U64_b_c_poly's SRLW arm gave c0.val < 32.
-  -- So c0.val % 32 = c0.val % 64 (since c0.val < 32 < 64), and cb5 must be 0.
-  -- (Formal proof of cb5 = 0 deferred — it requires re-deriving the c-bound here.)
-  -- TODO(srlw_32way_blast): 32-way rcases on cb0..cb4 (with cb5 = 0) closes the
-  -- Nat identity `a0.val + a1.val * 2^16 = (b0.val + b1.val * 2^16) / 2^(c0.val % 32)`.
-  -- Each leaf requires: (a) cancel_mul_65536_poly on h_b0_dec, h_b1_dec to extract
-  -- b_j = hl_j * N + ll_j; (b) identify a0, a1 with lr0, lr1 (or 0) via srw_** disjuncts
-  -- and su16 dispatch; (c) per-case Nat arithmetic to match. Estimated 300-500 LOC.
-  -- The cleanest factoring is a HWord-level `srlw_within_byte_shift_poly` helper in
-  -- Common.lean (analogous to `srl_within_byte_shift_poly` but for 32-bit).
-  sorry
+  -- Bridge: c0.val % 32 = (cb0 + cb1*2 + cb2*4 + cb3*8 + cb4*16 : ZMod p).val.
+  -- We don't need cb5 = 0; instead derive % 32 from % 64 via mod-of-mod, since the
+  -- low 5 bits of c0 are what SRLW uses regardless of cb5.
+  have h_cb_sum_eq := cb_sum_val_eq_poly b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+  have hb0_le : cb0.val ≤ 1 := by rcases b_cb0 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+  have hb1_le : cb1.val ≤ 1 := by rcases b_cb1 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+  have hb2_le : cb2.val ≤ 1 := by rcases b_cb2 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+  have hb3_le : cb3.val ≤ 1 := by rcases b_cb3 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+  have hb4_le : cb4.val ≤ 1 := by rcases b_cb4 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
+  -- (cb-sum-5).val = cb0.val + cb1.val*2 + cb2.val*4 + cb3.val*8 + cb4.val*16
+  have v_2 : (2 : ZMod p).val = 2 := val_2_zmod_p
+  have v_4 : (4 : ZMod p).val = 4 := val_4_zmod_p
+  have v_8 : (8 : ZMod p).val = 8 := val_8_zmod_p
+  have v_16 : (16 : ZMod p).val = 16 := val_16_zmod_p
+  have m1 : (cb1 * 2 : ZMod p).val = cb1.val * 2 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_2]
+    · rw [v_2]; omega
+  have m2 : (cb2 * 4 : ZMod p).val = cb2.val * 4 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_4]
+    · rw [v_4]; omega
+  have m3 : (cb3 * 8 : ZMod p).val = cb3.val * 8 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_8]
+    · rw [v_8]; omega
+  have m4 : (cb4 * 16 : ZMod p).val = cb4.val * 16 := by
+    rw [ZMod.val_mul_of_lt]
+    · rw [v_16]
+    · rw [v_16]; omega
+  have a1_val : (cb0 + cb1 * 2 : ZMod p).val = cb0.val + cb1.val * 2 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [m1]
+    · rw [m1]; omega
+  have a2_val : (cb0 + cb1 * 2 + cb2 * 4 : ZMod p).val =
+      cb0.val + cb1.val * 2 + cb2.val * 4 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [a1_val, m2]
+    · rw [a1_val, m2]; omega
+  have a3_val : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 : ZMod p).val =
+      cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [a2_val, m3]
+    · rw [a2_val, m3]; omega
+  have h_cb_sum_5_val : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 : ZMod p).val =
+      cb0.val + cb1.val * 2 + cb2.val * 4 + cb3.val * 8 + cb4.val * 16 := by
+    rw [ZMod.val_add_of_lt]
+    · rw [a3_val, m4]
+    · rw [a3_val, m4]; omega
+  have h_c0_mod_32 : c0.val % 32 =
+      (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 : ZMod p).val := by
+    have h_dvd : c0.val % 32 = c0.val % 64 % 32 := by
+      rw [Nat.mod_mod_of_dvd]; exact ⟨2, rfl⟩
+    rw [h_dvd, h_c0_mod_64, h_cb_sum_eq, h_cb_sum_5_val]; omega
+  rw [h_c0_mod_32]
+  clear h_c0_mod_32 h_c0_mod_64 h_cb_sum_5_val a3_val a2_val a1_val m4 m3 m2 m1
+    v_16 v_8 v_4 v_2 hb0_le hb1_le hb2_le hb3_le hb4_le h_cb_sum_eq h_cb_sum_lt_64
+    h_diff h_val_10
+  -- Goal: (HWord.toBitVec32_poly #v[a0, a1]).toNat
+  --     = (HWord.toBitVec32_poly #v[b0, b1]).toNat
+  --         / 2 ^ (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 : ZMod p).val
+  -- Step 7: resolve srw_00, srw_01, srw_10, srw_11 disjunct gates under SRLW.
+  rw [h_no_sraw, eq_srlw] at srw_00 srw_01 srw_10 srw_11
+  simp only [add_zero] at srw_00 srw_01 srw_10 srw_11
+  simp only [show ((1 : ZMod p) = 0) ↔ False from ⟨h_one_ne_zero, False.elim⟩, false_or]
+    at srw_00 srw_01 srw_10 srw_11
+  -- srw_00 : su160 = 0 ∨ a0 = lr0
+  -- srw_01 : su160 = 0 ∨ a1 = lr1 + (msb_b * 65536 - smv)
+  -- srw_10 : su161 = 0 ∨ a0 = lr1 + (msb_b * 65536 - smv)
+  -- srw_11 : su161 = 0 ∨ a1 = msb_b * 65535
+  -- Step 8: derive msb_b = 0 from w_msb_b under SRLW (srl + srlw = 0 + 1 = 1 ≠ 0).
+  rw [h_no_srl, eq_srlw] at w_msb_b
+  simp only [zero_add,
+             show ((1 : ZMod p) = 0) ↔ False from ⟨h_one_ne_zero, False.elim⟩, false_or]
+    at w_msb_b
+  have h_msb_b_zero : msb_b = 0 := w_msb_b
+  -- eq_smv : smv = msb_b * v0123 = 0
+  rw [h_msb_b_zero, zero_mul] at eq_smv
+  -- Simplify correction terms in srw_01, srw_10, srw_11.
+  simp only [h_msb_b_zero, eq_smv, zero_mul, add_zero, sub_self]
+    at srw_01 srw_10 srw_11
+  -- srw_01 : su160 = 0 ∨ a1 = lr1
+  -- srw_10 : su161 = 0 ∨ a0 = lr1
+  -- srw_11 : su161 = 0 ∨ a1 = 0
+  -- Step 9: resolve su16 dispatch from cb4 mutex constraints under SRLW (srl+sra=0).
+  rw [h_no_srl, h_no_sra] at h_su160 h_su161 h_su162 h_su163 one_of_su16s
+  simp only [add_zero, zero_add, mul_zero]
+    at h_su160 h_su161 h_su162 h_su163 one_of_su16s
+  -- h_su160 : su160 = 0 ∨ cb4 = 0
+  -- h_su161 : su161 = 0 ∨ cb4 = 1
+  -- h_su162 : su162 = 0 ∨ cb4 = 2  -- forces su162 = 0 (cb4 ∈ {0,1})
+  -- h_su163 : su163 = 0 ∨ cb4 = 3  -- forces su163 = 0
+  -- one_of_su16s : srl + sra + srlw + sraw = 0 ∨ su160 + su161 + su162 + su163 = 1
+  rw [h_no_sraw, eq_srlw] at one_of_su16s
+  simp only [add_zero,
+             show ((1 : ZMod p) = 0) ↔ False from ⟨h_one_ne_zero, False.elim⟩, false_or]
+    at one_of_su16s
+  -- one_of_su16s : su160 + su161 + su162 + su163 = 1
+  -- Step 10: cb4 case-split with 16-leaf blast in each. Substitute cb4 INSIDE
+  -- each branch to make the constant-comparison disjuncts resolvable
+  -- (mirrors Srl.lean:287-311 pattern).
+  rcases b_cb4 with hcb4 | hcb4
+  · -- cb4 = 0: su160 = 1, others = 0.
+    rw [hcb4] at h_su160 h_su161 h_su162 h_su163
+    -- h_su160 : su160 = 0 ∨ 0 = 0   (right disjunct True; no info)
+    -- h_su161 : su161 = 0 ∨ 0 = 1   (right disjunct False)
+    -- h_su162 : su162 = 0 ∨ 0 = 2   (right disjunct False)
+    -- h_su163 : su163 = 0 ∨ 0 = 3   (right disjunct False)
+    have h_su161_zero : su161 = 0 :=
+      h_su161.resolve_right (fun h => h_one_ne_zero (by linear_combination -h))
+    have h_su162_zero : su162 = 0 :=
+      h_su162.resolve_right (fun h => val_2_ne_zero (by linear_combination -h))
+    have h_su163_zero : su163 = 0 :=
+      h_su163.resolve_right (fun h => val_3_ne_zero (by linear_combination -h))
+    have h_su160_eq : su160 = 1 := by
+      have := one_of_su16s
+      rw [h_su161_zero, h_su162_zero, h_su163_zero, add_zero, add_zero, add_zero] at this
+      exact this
+    have h_su160_ne_zero : su160 ≠ 0 := by rw [h_su160_eq]; exact h_one_ne_zero
+    have h_a0_eq : a0 = lr0 := srw_00.resolve_left h_su160_ne_zero
+    have h_a1_eq : a1 = lr1 := srw_01.resolve_left h_su160_ne_zero
+    -- Substitute a0, a1 then expand lr0, lr1 via eq_lr0, eq_lr1.
+    rw [h_a0_eq, h_a1_eq, eq_lr0, eq_lr1, eq_ll2, zero_mul, add_zero]
+    -- Goal: (HWord.toBitVec32_poly #v[hl0 + ll1*v0123, hl1]).toNat
+    --     = (HWord.toBitVec32_poly #v[b0, b1]).toNat
+    --         / 2 ^ (cb0 + cb1*2 + cb2*4 + cb3*8 + cb4*16 : ZMod p).val
+    -- 16-way rcases on cb0..cb3, apply srlw_close_su16_0_case per leaf.
+    rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+      rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+    · -- (0,0,0,0): S=0, M=65536, N=1
+      exact srlw_close_su16_0_case 0 (by omega) 65536 1 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,0,0,1): S=8, M=256, N=256
+      exact srlw_close_su16_0_case 8 (by omega) 256 256 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,0,1,0): S=4, M=4096, N=16
+      exact srlw_close_su16_0_case 4 (by omega) 4096 16 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,0,1,1): S=12, M=16, N=4096
+      exact srlw_close_su16_0_case 12 (by omega) 16 4096 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,0,0): S=2, M=16384, N=4
+      exact srlw_close_su16_0_case 2 (by omega) 16384 4 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,0,1): S=10, M=64, N=1024
+      exact srlw_close_su16_0_case 10 (by omega) 64 1024 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,1,0): S=6, M=1024, N=64
+      exact srlw_close_su16_0_case 6 (by omega) 1024 64 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,1,1): S=14, M=4, N=16384
+      exact srlw_close_su16_0_case 14 (by omega) 4 16384 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,0,0): S=1, M=32768, N=2
+      exact srlw_close_su16_0_case 1 (by omega) 32768 2 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,0,1): S=9, M=128, N=512
+      exact srlw_close_su16_0_case 9 (by omega) 128 512 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,1,0): S=5, M=2048, N=32
+      exact srlw_close_su16_0_case 5 (by omega) 2048 32 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,1,1): S=13, M=8, N=8192
+      exact srlw_close_su16_0_case 13 (by omega) 8 8192 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,0,0): S=3, M=8192, N=8
+      exact srlw_close_su16_0_case 3 (by omega) 8192 8 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,0,1): S=11, M=32, N=2048
+      exact srlw_close_su16_0_case 11 (by omega) 32 2048 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,1,0): S=7, M=512, N=128
+      exact srlw_close_su16_0_case 7 (by omega) 512 128 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,1,1): S=15, M=2, N=32768
+      exact srlw_close_su16_0_case 15 (by omega) 2 32768 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+  · -- cb4 = 1: su161 = 1, others = 0.
+    rw [hcb4] at h_su160 h_su161 h_su162 h_su163
+    -- h_su160 : su160 = 0 ∨ 1 = 0
+    -- h_su161 : su161 = 0 ∨ 1 = 1   (right disjunct True; no info)
+    -- h_su162 : su162 = 0 ∨ 1 = 2
+    -- h_su163 : su163 = 0 ∨ 1 = 3
+    have h_su160_zero : su160 = 0 :=
+      h_su160.resolve_right h_one_ne_zero
+    have h_su162_zero : su162 = 0 := by
+      apply h_su162.resolve_right
+      intro h
+      have hv1 : (1 : ZMod p).val = 1 := ZMod.val_one p
+      have hv2 : (2 : ZMod p).val = 2 := val_2_zmod_p
+      have hval := congrArg ZMod.val h
+      rw [hv1, hv2] at hval
+      omega
+    have h_su163_zero : su163 = 0 := by
+      apply h_su163.resolve_right
+      intro h
+      have hv1 : (1 : ZMod p).val = 1 := ZMod.val_one p
+      have hv3 : (3 : ZMod p).val = 3 := by
+        rw [show (3 : ZMod p) = ((3 : ℕ) : ZMod p) from by push_cast; rfl]
+        exact ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)
+      have hval := congrArg ZMod.val h
+      rw [hv1, hv3] at hval
+      omega
+    have h_su161_eq : su161 = 1 := by
+      have := one_of_su16s
+      rw [h_su160_zero, h_su162_zero, h_su163_zero, zero_add, add_zero, add_zero] at this
+      exact this
+    have h_su161_ne_zero : su161 ≠ 0 := by rw [h_su161_eq]; exact h_one_ne_zero
+    have h_a0_eq : a0 = lr1 := srw_10.resolve_left h_su161_ne_zero
+    have h_a1_eq : a1 = 0 := srw_11.resolve_left h_su161_ne_zero
+    rw [h_a0_eq, h_a1_eq, eq_lr1, eq_ll2, zero_mul, add_zero]
+    -- Goal: (HWord.toBitVec32_poly #v[hl1, 0]).toNat
+    --     = (HWord.toBitVec32_poly #v[b0, b1]).toNat
+    --         / 2 ^ (cb0 + cb1*2 + cb2*4 + cb3*8 + cb4*16 : ZMod p).val
+    -- 16-way rcases on cb0..cb3, apply srlw_close_su16_1_case per leaf.
+    rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
+      rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
+    · -- (0,0,0,0): S=0, M=65536, N=1, byte_shift=1 → total shift = 16
+      exact srlw_close_su16_1_case 0 (by omega) 65536 1 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,0,0,1): S=8 → total 24
+      exact srlw_close_su16_1_case 8 (by omega) 256 256 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,0,1,0): S=4 → total 20
+      exact srlw_close_su16_1_case 4 (by omega) 4096 16 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,0,1,1): S=12 → total 28
+      exact srlw_close_su16_1_case 12 (by omega) 16 4096 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,0,0): S=2 → total 18
+      exact srlw_close_su16_1_case 2 (by omega) 16384 4 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,0,1): S=10 → total 26
+      exact srlw_close_su16_1_case 10 (by omega) 64 1024 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,1,0): S=6 → total 22
+      exact srlw_close_su16_1_case 6 (by omega) 1024 64 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (0,1,1,1): S=14 → total 30
+      exact srlw_close_su16_1_case 14 (by omega) 4 16384 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,0,0): S=1 → total 17
+      exact srlw_close_su16_1_case 1 (by omega) 32768 2 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,0,1): S=9 → total 25
+      exact srlw_close_su16_1_case 9 (by omega) 128 512 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,1,0): S=5 → total 21
+      exact srlw_close_su16_1_case 5 (by omega) 2048 32 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,0,1,1): S=13 → total 29
+      exact srlw_close_su16_1_case 13 (by omega) 8 8192 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,0,0): S=3 → total 19
+      exact srlw_close_su16_1_case 3 (by omega) 8192 8 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,0,1): S=11 → total 27
+      exact srlw_close_su16_1_case 11 (by omega) 32 2048 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,1,0): S=7 → total 23
+      exact srlw_close_su16_1_case 7 (by omega) 512 128 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
+    · -- (1,1,1,1): S=15 → total 31
+      exact srlw_close_su16_1_case 15 (by omega) 2 32768 (by decide) (by omega) rfl rfl
+        (by omega) (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
+        (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
+        lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
 
 lemma spec.srlw_poly (Main : Vector (ZMod p) 69) (h : is_srlw_poly Main) :
     (constraints Main).allHold_poly →
