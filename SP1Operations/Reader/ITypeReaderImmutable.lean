@@ -6,53 +6,6 @@ namespace ITypeReaderImmutable
 
 attribute [-simp] Opcode.trusted_instr Opcode.trusted_instr_poly
 
-variable
-  {clk_high clk_low : Fin KB}
-  {pc : Vector (Fin KB) 3}
-  {opcode : Fin KB}
-  {cols : ITypeReader (Fin KB)}
-  {is_real is_trusted : Fin KB}
-
--- iff-characterization of ITypeReaderImmutable constraints (Fin KB).
-lemma allHold_constraints_iff :
-  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode cols is_real is_trusted) ↔
-    (is_real = 0 ∨ is_real = 1) ∧
-    (¬is_trusted = 0 →
-      Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] 0 1 ∧
-      cols.op_a < 32 ∧
-      cols.op_b < 65536 ∧
-      cols.op_c_imm[0] < 65536 ∧ cols.op_c_imm[1] < 65536 ∧ cols.op_c_imm[2] < 65536 ∧ cols.op_c_imm[3] < 65536 ∧
-      (cols.op_a_0 = 0 ∨ cols.op_a_0 = 1) ∧
-      (cols.op_a_0 = 1 ↔ cols.op_a = 0) ∧
-      pc[0] % 4 = 0 ∧
-      pc[0] < 65536 ∧ pc[1] < 65536 ∧ pc[2] < 65536) ∧
-    (¬is_real = 0 →
-      cols.op_a_memory.access_timestamp.diff_low_limb < 65536 ∧
-      (clk_low + 4 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * (65536 : Fin KB)⁻¹ < 256 ∧
-      Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
-      cols.op_b_memory.access_timestamp.diff_low_limb < 65536 ∧
-      (clk_low + 3 - cols.op_b_memory.access_timestamp.prev_low - 1 - cols.op_b_memory.access_timestamp.diff_low_limb) * (65536 : Fin KB)⁻¹ < 256 ∧
-      Word.isU64 #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]]) ∧
-    (cols.op_a_0 ≠ 0 →
-      cols.op_a_memory.prev_value[0] = 0 ∧
-      cols.op_a_memory.prev_value[1] = 0 ∧
-      cols.op_a_memory.prev_value[2] = 0 ∧
-      cols.op_a_memory.prev_value[3] = 0)
-  := by
-    simp [constraints, sub_eq_zero, SP1Constraint.toProp, Fin.lt_def, and_assoc]
-    intros h_is_real
-    rcases h_is_real with h | h
-    · simp [h]
-      by_cases ha0 : cols.op_a_0 = 0
-      · simp [ha0]
-      · tauto
-    · simp [h]
-      by_cases hop_a_0 : cols.op_a_0 = 0
-      · simp [hop_a_0]
-      · simp [hop_a_0]
-        aesop
-
-/-- Polymorphic companion of `allHold_constraints_iff`. -/
 lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     [Fact (2 ^ 17 < p)]
     {clk_high clk_low : ZMod p}
