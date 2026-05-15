@@ -5,24 +5,6 @@ namespace IsEqualWordOperation
 attribute [local simp ← high] Word.eq_pointwise
 
 @[grind →, aesop safe forward]
-lemma spec
-  {a b : Word (Fin KB)}
-  {cols : IsEqualWordOperation (Fin KB)} :
-  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
-    cols.is_diff_zero.result = if a = b then 1 else 0
-  := by simp [constraints]; grind
-
-lemma spec.gen
-  {a b : Word (Fin KB)}
-  {cols : IsEqualWordOperation (Fin KB)}
-  {is_real : Fin KB} :
-  List.Forall SP1Constraint.toProp (constraints a b cols is_real) →
-    is_real = (1 : Fin KB) →
-      cols.is_diff_zero.result = if a = b then 1 else 0
-  := by simp [constraints]; grind
-
-/-- Polymorphic counterpart of `spec` over `ZMod p`. -/
-@[grind →, aesop safe forward]
 lemma spec_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
   {a b : Word (ZMod p)}
   {cols : IsEqualWordOperation (ZMod p)} :
@@ -30,7 +12,6 @@ lemma spec_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     cols.is_diff_zero.result = if a = b then 1 else 0
   := by simp [constraints]; grind
 
-/-- Polymorphic counterpart of `spec.gen` over `ZMod p`. -/
 lemma spec.gen_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
   {a b : Word (ZMod p)}
   {cols : IsEqualWordOperation (ZMod p)}
