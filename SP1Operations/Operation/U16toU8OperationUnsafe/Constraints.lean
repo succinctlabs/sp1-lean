@@ -5,7 +5,7 @@ namespace U16toU8OperationUnsafe
 
 section constraints
 
-@[irreducible] def constraints {F : Type} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (u16_values : (Vector F 4))
   (cols : U16toU8Operation F)
   : (Vector F 8) × SP1ConstraintList F :=

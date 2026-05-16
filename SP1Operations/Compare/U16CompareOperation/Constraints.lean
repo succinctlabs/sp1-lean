@@ -5,7 +5,7 @@ namespace U16CompareOperation
 
 section constraints
 
-@[irreducible] def constraints {F : Type*} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (b : F)
   (cols : U16CompareOperation F)

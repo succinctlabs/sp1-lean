@@ -5,7 +5,7 @@ namespace LtOperationUnsigned
 
 section constraints
 
-@[irreducible] def constraints {F : Type} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (b : (Word F))
   (cc : (Word F))
   (cols : LtOperationUnsigned F)

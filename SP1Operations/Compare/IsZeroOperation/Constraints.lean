@@ -5,7 +5,7 @@ namespace IsZeroOperation
 
 section constraints
 
-@[irreducible] def constraints {F : Type*} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (cols : IsZeroOperation F)
   (is_real : F)

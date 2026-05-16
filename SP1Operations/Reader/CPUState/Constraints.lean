@@ -4,7 +4,7 @@ namespace CPUState
 
 section constraints
 
-@[irreducible] def constraints {F : Type*} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (cols : CPUState F)
   (next_pc : (Vector F 3))
   (clk_increment : F)

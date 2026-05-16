@@ -5,7 +5,7 @@ namespace SubOperation
 
 section constraints
 
-@[irreducible] def constraints {F : Type} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (a : (Word F))
   (b : (Word F))
   (cols : SubOperation F)
