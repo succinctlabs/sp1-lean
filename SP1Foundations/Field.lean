@@ -270,28 +270,21 @@ lemma val_3_ne_zero : (3 : ZMod p) ≠ 0 := by
     omega
   intro hz; rw [hz] at h; simp at h
 
-/-- Polymorphic analogue of `mul_inv_16BB_eq_one_iff`. The carry-binary
-clauses in the bridge-coupled op iff lemmas (`AddOperation`, `SubOperation`,
-`Addw`, `Subw`, `AddrAdd`) have shape `x * 65536⁻¹ = 1`; this rewrites it
-to `x = 65536`. The prime hypothesis is needed for the `GroupWithZero`
-instance via `Field (ZMod p)`. NOT `@[simp]`: would fire on `Fin KB`
-shapes (since `Fin KB = ZMod KB` definitionally) and shadow the existing
-`mul_inv_16BB_eq_one_iff`, breaking `Fin KB`-side proofs that depend on
-its specific `(by trivial)` proof shape. Invoked explicitly in `_poly`
-iff proofs. -/
+/-- The carry-binary clauses in the bridge-coupled op iff lemmas
+(`AddOperation`, `SubOperation`, `Addw`, `Subw`, `AddrAdd`) have shape
+`x * 65536⁻¹ = 1`; this rewrites it to `x = 65536`. The prime hypothesis
+is needed for the `GroupWithZero` instance via `Field (ZMod p)`. -/
 lemma mul_inv_65536_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (65536 : ZMod p)⁻¹ = 1 ↔ x = 65536 := by
   rw [mul_inv_eq_one₀ val_65536_ne_zero]
 
-/-- Polymorphic analogue for `(4 : ZMod p)⁻¹` — used by AddrAdd/Branch-style
-ops where `(2^2)⁻¹` appears (PC alignment carries). NOT `@[simp]`; see
-`mul_inv_65536_eq_one_iff_poly` for the rationale. -/
+/-- Used by AddrAdd/Branch-style ops where `(2^2)⁻¹` appears (PC alignment
+carries). -/
 lemma mul_inv_4_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (4 : ZMod p)⁻¹ = 1 ↔ x = 4 := by
   rw [mul_inv_eq_one₀ val_4_ne_zero]
 
-/-- Polymorphic analogue of `inv_16BB_zero_or_one`. Carry binarity in
-Add/Sub iff lemmas factors through this disjunction. NOT `@[simp]`. -/
+/-- Carry binarity in Add/Sub iff lemmas factors through this disjunction. -/
 lemma inv_65536_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (65536 : ZMod p)⁻¹ = 0 ∨ x * (65536 : ZMod p)⁻¹ = 1 ↔
       x = 0 ∨ x = 65536 := by
@@ -299,7 +292,7 @@ lemma inv_65536_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
   rw [mul_inv_eq_one₀ val_65536_ne_zero, mul_eq_zero]
   aesop
 
-/-- Polymorphic analogue for `(4 : ZMod p)⁻¹` carry binarity. NOT `@[simp]`. -/
+/-- Carry binarity for `(4 : ZMod p)⁻¹`. -/
 lemma inv_4_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (4 : ZMod p)⁻¹ = 0 ∨ x * (4 : ZMod p)⁻¹ = 1 ↔
       x = 0 ∨ x = 4 := by
@@ -307,12 +300,10 @@ lemma inv_4_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
   rw [mul_inv_eq_one₀ val_4_ne_zero, mul_eq_zero]
   aesop
 
-/-- Small-literal inequality bridge for `ZMod p` under `[Fact (2^17 < p)]`.
+/-- Small-literal equality bridge for `ZMod p` under `[Fact (2^17 < p)]`.
 Converts `(n : ZMod p) = (m : ZMod p)` to `n = m` (Nat-level) for any
-`n, m < 2^17`. Polymorphic version of the `decide`-style discharge that
-`Fin KB` proofs use for facts like `(4 : Fin KB) ≠ 0`. Used in the
-LtOperationUnsigned/Signed `_poly` proofs to handle impossible cases
-where multiple flag bits are 1 simultaneously. -/
+`n, m < 2^17`. Used in the LtOperationUnsigned/Signed `_poly` proofs to
+handle impossible cases where multiple flag bits are 1 simultaneously. -/
 lemma small_nat_eq_zmod {n m : ℕ} (hn : n < 2 ^ 17) (hm : m < 2 ^ 17) :
     ((n : ZMod p) = (m : ZMod p)) ↔ n = m := by
   have hp : 2 ^ 17 < p := hp.out
@@ -395,47 +386,6 @@ needs `prod[i].val + carry[i].val * 256 < p` (max ≤ 2 ^ 24 − 1) to lift
 the ZMod constraints to Nat equations cleanly. KB ≈ 2^31 satisfies this
 trivially; BabyBear and Mersenne31 do as well. -/
 instance KoalaBear.Fact_2pow24_lt_KB : Fact (2 ^ 24 < KB) := ⟨by decide⟩
-
-/-! ### KB-specific simp lemmas operating on the symbolic `(N : Fin KB)⁻¹` form
-
-The constraint compiler now emits inverses symbolically (e.g. `(65536 : Fin KB)⁻¹`
-instead of the literal `2130673921`). These lemmas help simp/omega/norm_num
-reduce expressions involving those symbolic inverses. The earlier
-literal-side bridges (`inv_*BB_eq[']`, `shiftl_*BB_eq_one`, etc.) were
-removed when sub-phase B.2 landed — see `docs/FIELD_GENERIC.md`. Naming
-convention: `<op>_<N>BB` where `BB` is short for "BabyBear-class small prime"
-(historical misnomer kept in place; KB is KoalaBear, not BabyBear).
--/
-
--- Symbolic↔literal Fin KB bridges, with literal on the LHS (so `← `-rewrites
--- normalize symbolic `(N : Fin KB)⁻¹` back to its precomputed Fin KB literal
--- — needed for omega/Fin-arithmetic proofs that expect ground constants).
--- NOT `@[simp]`: they're invoked explicitly in proofs that need omega to see
--- concrete numbers, typically via `simp only [← inv_*BB_eq'] at h ...`.
-lemma inv_4BB_eq' : (1598029825 : Fin KB) = ((4 : Fin KB)⁻¹) := rfl
-lemma inv_65536BB_eq' : (2130673921 : Fin KB) = ((65536 : Fin KB)⁻¹) := rfl
-
-@[simp] lemma mul_inv_16BB_eq_one_iff : x * (65536 : Fin KB)⁻¹ = 1 ↔ x = 65536 := by
-  rw [mul_inv_eq_one₀ (by trivial)]
-
-@[simp] lemma inv_16BB_zero_or_one {x : Fin KB} : x * 65536⁻¹ = 0 ∨ x * 65536⁻¹ = 1 ↔ x = 0 ∨ x = 65536
-  := by aesop
-
--- Literal-side @[simp] iff bridges. These were originally planned for
--- deletion when sub-phase B.2 landed, but several chip proofs (Sub*, Branch,
--- LoadByte) rely on omega's ability to reason about a chain of
--- `* (literal : Fin KB)` operations. Without these, simp leaves the chain
--- in `* 65536⁻¹` form and omega gives up. We keep them as `@[simp]`,
--- preceded by an explicit `← inv_*BB_eq'` rewrite in the proof, so the
--- literal form is available exactly where it's needed.
-@[simp] lemma inv_mul_2BB_eq_iff' : x * (1598029825 : Fin KB) = 1 ↔ x = 4 := by
-  rw [show (1598029825 : Fin KB) = (4 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
-@[simp] lemma inv_mul_3BB_eq_iff' : x * (1864368129 : Fin KB) = 1 ↔ x = 8 := by
-  rw [show (1864368129 : Fin KB) = (8 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
-@[simp] lemma inv_mul_8BB_eq_iff' : x * (2122383361 : Fin KB) = 1 ↔ x = 256 := by
-  rw [show (2122383361 : Fin KB) = (256 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
-@[simp] lemma inv_mul_16BB_eq_iff' : x * (2130673921 : Fin KB) = 1 ↔ x = 65536 := by
-  rw [show (2130673921 : Fin KB) = (65536 : Fin KB)⁻¹ from rfl, mul_inv_eq_one₀ (by decide)]
 
 /-! ### Integer helpers (not field-related; lives here for historical reasons) -/
 
