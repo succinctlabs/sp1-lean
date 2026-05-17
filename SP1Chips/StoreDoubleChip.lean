@@ -36,10 +36,10 @@ def sp1_sb (Main : Vector (ZMod p) 39) : SailM ExecutionResult := do
 
 set_option maxHeartbeats 1600000 in
 -- Memory-write monadic chain plus AddrAdd / signExtend bridges run heavy
--- under the default 200K budget. `skipKernelTC` for the same reason as
--- `AddrAddOperation.spec_of_constraints_poly` (BitVec.toNat_add's `% 2^64`
--- combined with the 4-limb carry chain — see `docs/GOTCHAS.md`
--- "Kernel deep-recursion on `2^N`"). Standard axioms only per `lean_verify`.
+-- under the default 200K budget. `skipKernelTC` for residual kernel
+-- deep-recursion in the long chain of default-`simp` calls handling the
+-- monadic write expansion (each simp implicitly includes Nat.zero_mul /
+-- Nat.add_zero / similar).
 set_option debug.skipKernelTC true in
 theorem correct (Main : Vector (ZMod p) 39)
     (s : SailState) (hs : SailState.isInitialized s)

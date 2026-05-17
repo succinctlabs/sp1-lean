@@ -41,9 +41,23 @@ noncomputable def spec_jal (imm : BitVec 21) (rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let _ ← execute_JAL imm rd
 
+/-- The Word `#v[4, 0, 0, 0]` is exactly the BitVec `4#64`. Lifted out of
+`SP1JAL_correct` so the `Nat.zero_mul + Nat.add_zero` simp pass that produces
+the kernel-tripping proof term sits in its own decl. -/
+private lemma word_four_eq_bitvec_four {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] :
+    Word.toBitVec64_poly (#v[4, 0, 0, 0] : Word (ZMod p)) = (4#64 : BitVec 64) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h4_val : ((4 : ℕ) : ZMod p).val = 4 := ZMod.val_natCast_of_lt (by omega)
+  rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl]
+  simp only [Word.toBitVec64_poly, Word.toNat_poly_def, Vector.getElem_mk,
+    List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
+    h4_val, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+
 set_option maxHeartbeats 1600000 in
 -- Sail-state JAL semantics + AddOperation chain + PC alignment via the
--- ZMod %4 bridge. `skipKernelTC` for the same reason as the Stores.
+-- ZMod %4 bridge. `skipKernelTC` for residual kernel deep-recursion;
+-- triggers in the monadic spec/sp1 unification beyond the carry-chain.
 set_option debug.skipKernelTC true in
 theorem SP1JAL_correct
     (cstrs : (constraints Main).allHold_poly)
@@ -96,7 +110,7 @@ theorem SP1JAL_correct
     · -- pc % 4 = 0 from chip cstrs (active is_real → pc[0] % 4 = 0 via val_mod_4 bridge)
       simp only [Word.toBitVec64_poly, BitVec.ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff,
         Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+        List.getElem_cons_succ, ZMod.val_zero]
       have h_pc_mod_zmod : Main[3] % (4 : ZMod p) = 0 := by simp_all only
       have h_pc_mod : Main[3].val % 4 = 0 :=
         (val_mod_4_eq_zero_iff_zmod _).mp h_pc_mod_zmod
@@ -152,14 +166,7 @@ theorem SP1JAL_correct
       {value := #v[Main[26], Main[27], Main[28], Main[29]]} 1) := by aesop
     have h_add_pc' := (AddOperation.spec_poly pc_isU64 Word.four_isU64_poly h_add_pc).2
     simp at h_add_pc'
-    have h_four : Word.toBitVec64_poly (#v[4, 0, 0, 0] : Word (ZMod p)) = (4#64 : BitVec 64) := by
-      have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-      have h4_val : ((4 : ℕ) : ZMod p).val = 4 := ZMod.val_natCast_of_lt (by omega)
-      rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl] at *
-      simp only [Word.toBitVec64_poly, Word.toNat_poly_def, Vector.getElem_mk,
-        List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
-        h4_val, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
-    rw [h_four] at h_add_pc'
+    rw [word_four_eq_bitvec_four] at h_add_pc'
     simp only [BitVec.ofNatLT_eq_ofNat, if_neg h6', ← h_add_pc']
     simp
     congr 1 <;> rw [BitVec.ofNatLT_eq_ofNat]

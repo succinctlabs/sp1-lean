@@ -31,6 +31,19 @@ noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := 
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   let _ ← execute_JALR imm rs1 rd
 
+/-- The Word `#v[4, 0, 0, 0]` is exactly the BitVec `4#64`. Lifted out of
+`JALR_correct` so the `Nat.zero_mul + Nat.add_zero` simp pass that produces
+the kernel-tripping proof term sits in its own decl. -/
+private lemma word_four_eq_bitvec_four_jalr :
+    Word.toBitVec64_poly (#v[(4 : ZMod p), 0, 0, 0]) = (4#64 : BitVec 64) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  have h4v : ((4 : ℕ) : ZMod p).val = 4 := ZMod.val_natCast_of_lt (by omega)
+  rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl]
+  simp only [Word.toBitVec64_poly, Word.toNat_poly_def, Vector.getElem_mk,
+    List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
+    h4v, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+
 -- Sub-lemma 1 (poly): chip's masked next-PC low limb is mod-4 aligned as a `BitVec 64`.
 omit [Fact (2 ^ 17 < p)] in
 lemma jalr_target_mod4_poly (Main : Vector (ZMod p) 35)
@@ -95,6 +108,7 @@ lemma jalr_target_eq_poly (Main : Vector (ZMod p) 35)
 set_option maxHeartbeats 10000000 in
 -- JALR's proof has to discharge BitVec equalities for the low-bit mask plus the
 -- AddOp specifications, which routinely exceed default heartbeats.
+-- `skipKernelTC` for residual kernel deep-recursion in the BitVec masking + AddOp body.
 set_option debug.skipKernelTC true in
 theorem JALR_correct
     (cstrs : (constraints Main).allHold_poly)
@@ -296,14 +310,7 @@ theorem JALR_correct
       have h_add_pc' :=
         (AddOperation.spec_poly hpc_isU64 Word.four_isU64_poly h_inc_pc').2
       simp at h_add_pc'
-      have h_four : Word.toBitVec64_poly (#v[(4 : ZMod p), 0, 0, 0]) = (4#64 : BitVec 64) := by
-        have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-        have h4v : ((4 : ℕ) : ZMod p).val = 4 := ZMod.val_natCast_of_lt (by omega)
-        rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl]
-        simp only [Word.toBitVec64_poly, Word.toNat_poly_def, Vector.getElem_mk,
-          List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
-          h4v, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
-      rw [h_four] at h_add_pc'
+      rw [word_four_eq_bitvec_four_jalr] at h_add_pc'
       simp [if_neg h6', read_pc, ← h_add_pc']
   · clear *- hv
     obtain ⟨h1, h2, h3, h4, h5⟩ := hv

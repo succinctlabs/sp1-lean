@@ -38,15 +38,26 @@ as is any `Sail.BitVec.toNatInt`-derived shape with a literal modulus.
 **Historical workaround**: `set_option debug.skipKernelTC true in
 <decl>` disables the kernel re-check for that declaration. Does **not**
 introduce new axioms (`lean_verify` confirms the standard axiom set
-unchanged), but removes a verification layer. As of 2026-05-01 the
-build is `skipKernelTC`-free; treat the option as a last resort, not a
-production fix.
+unchanged), but removes a verification layer. The build was
+`skipKernelTC`-free as of 2026-05-01; the `_poly` migration reintroduced
+~52 sites at peak. A 2026-05-17 batch removed 26 of them via three
+distinct recipes — see steps 5–7 below for the playbook. 26 sites still
+remain, 6 of them in-scope (Store* chips ×4, JalChip, JalrChip).
+Treat the option as a last resort.
 
 **Diagnostic**: if you suspect a kernel trip, grep the failing proof
 term for `Int.toNat`, `BitVec.signExtend`, or `Sail.BitVec.toNatInt`.
 Any one is enough to instantiate the substrate. The repo helper
 `lean_profile_proof` (MCP) will localize which sub-call carries the
 expensive term once the option is added back temporarily.
+
+**CRITICAL test caveat**: `lake env lean <file>` does NOT trigger the
+final kernel TC re-check that `lake build` runs. A `skipKernelTC` line
+deleted in error will let `lake env lean` report green while `lake
+build` reports `(kernel) deep recursion detected`. Always confirm
+removal with `lake build <module>` (or full-project `lake build`),
+never `lake env lean`. Verified 2026-05-17 on
+`AddrAddOperation.spec_of_constraints_poly`.
 
 ### Remediation playbook (try in order)
 
@@ -97,6 +108,51 @@ expensive term once the option is added back temporarily.
      `simp [BitVec.add_def, Word.toBitVec64, Word.toNat,
      ← BitVec.toNat_inj]`.
 
+5. **Drop `Nat.zero_mul, Nat.add_zero` from simp_only after the limb
+   expansion + extract `omega` into a bare-`ℕ` helper** — this is the
+   primary recipe that cleared 21 of 26 sites in the 2026-05-17 batch.
+   For `_poly` carry-chain proofs in `Word (ZMod p)` carriers (AddrAdd,
+   Branch helpers, Load* chip downstreams), the spec body typically has:
+   ```
+   rw [← BitVec.toNat_inj, BitVec.toNat_add,
+       Word.toBitVec64_poly_toNat_poly _, Word.toNat_poly_def, ...]
+   simp only [..., h_zero_val, Nat.zero_mul, Nat.add_zero]  -- <-- drop these
+   ...
+   omega                                                     -- <-- extract
+   ```
+   The `Nat.zero_mul + Nat.add_zero` simp rewrites add `Eq.mpr` operations
+   that compound with the omega certificate's `% 2 ^ 64` exposure, pushing
+   the kernel re-check over its stack limit. Drop them from the simp_only,
+   then move `omega` into a `private` helper at the bare-`ℕ` level whose
+   conclusion accepts the un-simplified `+ 0 * 2 ^ 48` form. The helper's
+   `omega` certificate sees `% 2 ^ 64` *in isolation* (no polymorphic
+   `ZMod p` instances surrounding it) and the kernel passes. Canonical
+   examples: `AddrAddOperation.close_addr_add_nat` and `Branch.close_branch_addr_nat`
+   / `close_pc_plus_4_nat`. Often the spec body's `omega` becomes
+   `exact close_*_nat _ _ ... hv0' hv1' hv2' n0 n1 n2 n3` (or its `.symm`).
+   For chip-level `correct_*` theorems with no helper-lift available
+   (e.g. LoadDoubleChip, LoadX0Chip), the in-place simp_only edit alone
+   suffices because the trigger is the simp_only itself, not surrounding
+   omega.
+
+6. **Quick "stale comment" check — try just removing the line first.**
+   Many `skipKernelTC` lines were added defensively and stayed after the
+   underlying issue was fixed elsewhere. Both `MulOperation.core_mul_poly`
+   and `core_mulw_poly` cleared in the 2026-05-17 batch this way: just
+   delete the `set_option` line and rebuild. Cost: one build cycle per
+   site (11min for MulOperation). Cheap to test, often the right answer.
+
+7. **Replace `omega` over `BitVec.toInt` with explicit Int lemmas.** When
+   the kernel-tripping `omega` is closing a `BitVec.toInt` inequality
+   (the omega certificate brings in `2 ^ 64` via `Int.toNat ((... % 2^64)...)`),
+   substitute the explicit lemma directly:
+   - `Int.not_lt.mpr : b ≤ a → ¬ a < b`
+   - `Int.not_le.mp : ¬ a ≤ b → b < a`
+   - `Int.not_le.mpr : b < a → ¬ a ≤ b`
+
+   The function-application proof term is shallow; the kernel passes.
+   Canonical fix: `correct_bge_poly` in `SP1Chips/BranchChip.lean`.
+
 ### Cross-references
 
 - Helpers:
@@ -118,7 +174,15 @@ expensive term once the option is added back temporarily.
 
 If a future Lean toolchain bump is suspected to have fixed the kernel's
 `2 ^ N` reduction, the cheapest re-test is to delete every
-`set_option debug.skipKernelTC true in` line, run `lake build`, and
-re-add only the lines whose declarations newly fail. As of writing,
-there are zero such lines; this section becomes a regression check
-rather than an active workaround index.
+`set_option debug.skipKernelTC true in` line, run **`lake build`** (not
+`lake env lean` — see caveat above), and re-add only the lines whose
+declarations newly fail. As of 2026-05-17 there are ~16 such lines:
+- `SP1Operations/Operation/AddrAddOperation.lean` (1)
+- `SP1Operations/Operation/MulOperation/Constraints.lean` (2)
+- `SP1Chips/Branch/Constraints.lean` (4)
+- `SP1Chips/JalrChip.lean` (1)
+- `SP1Chips/LoadDoubleChip.lean` (1)
+- `SP1Chips/Store{Byte,Half,Word,Double}Chip.lean` (4)
+- `SP1Chips/ShiftLeft/Sll.lean`, `ShiftRight/{Srl,Sra,Srlw,Sraw}.lean`,
+  `DivRem/*` (~13, blocked by the in-progress `_poly` migration with 11
+  sorries — out of scope until that lands)

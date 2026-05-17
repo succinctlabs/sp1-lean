@@ -36,6 +36,7 @@ def sp1_sb (Main : Vector (ZMod p) 45) : SailM ExecutionResult := do
 
 set_option maxHeartbeats 1600000 in
 -- Memory-write monadic chain plus AddrAdd / signExtend bridges (StoreDouble pattern).
+-- `skipKernelTC` for residual kernel deep-recursion in the default-`simp` chain.
 set_option debug.skipKernelTC true in
 theorem correct (Main : Vector (ZMod p) 45)
     (s : SailState) (hs : SailState.isInitialized s)

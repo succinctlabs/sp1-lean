@@ -33,9 +33,7 @@ set_option maxHeartbeats 16000000 in
 -- `add_signExtend_of_constraints_poly`, `branch_addr_eq_poly`, and
 -- `pc_plus_4_eq_poly` through the same skeleton. Heartbeats elevated
 -- for the post-state-cstrs `simp_all` chain (ZMod cast normalization
--- runs ~3× the concrete budget). `skipKernelTC` for `BitVec.toNat_add`
--- kernel deep-recursion in branch_addr_eq_poly's body.
-set_option debug.skipKernelTC true in
+-- runs ~3× the concrete budget).
 theorem correct_beq_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
@@ -305,7 +303,6 @@ set_option maxHeartbeats 16000000 in
 -- Polymorphic counterpart of `correct_bne`. Same structure as
 -- `correct_beq_poly` but with NEQ/EQ polarity flipped: branching arm
 -- corresponds to NEQ (sum = 1), non-branching to EQ (sum = 0).
-set_option debug.skipKernelTC true in
 theorem correct_bne_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
@@ -560,7 +557,6 @@ set_option maxHeartbeats 16000000 in
 -- Polymorphic counterpart of `correct_blt`. is_signed = 1 (signed
 -- comparison via spec_lt.2). For BLT chip, Main[34] = Main[35]: branching
 -- when lt holds, non-branching when not.
-set_option debug.skipKernelTC true in
 theorem correct_blt_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
@@ -775,7 +771,6 @@ set_option maxHeartbeats 16000000 in
 -- Polymorphic counterpart of `correct_bge`. is_signed = 1 (signed via
 -- spec_lt.2). For BGE chip, Main[34] = 1 - Main[35]: branching when ≥
 -- holds (Main[35] = 0), non-branching when < holds (Main[35] = 1).
-set_option debug.skipKernelTC true in
 theorem correct_bge_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
@@ -867,8 +862,8 @@ theorem correct_bge_poly
   by_cases h_ge : op_a_val.toInt ≥ op_b_val.toInt <;> simp only [op_a_val, op_b_val] at h_ge
   · -- branching arm: ge holds, so lt fails
     have h_not_lt : ¬ ((Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
-                       (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt) := by
-      omega
+                       (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt) :=
+      Int.not_lt.mpr h_ge
     rw [if_neg h_not_lt] at h_lt_ite
     have h35 : Main[35] = 0 := h_lt_ite
     -- The goal's BGE if is `if b.toInt ≤ a.toInt then writeReg else pure_RETIRE` (GE form).
@@ -956,13 +951,13 @@ theorem correct_bge_poly
     rw [h_addr_eq]
   · -- non-branching arm: ¬ge, so lt holds
     have h_lt : (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
-                (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt := by
-      omega
+                (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt :=
+      Int.not_le.mp h_ge
     rw [if_pos h_lt] at h_lt_ite
     have h35 : Main[35] = 1 := h_lt_ite
     have h_not_le : ¬ ((Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt ≤
-                       (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt) := by
-      omega
+                       (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt) :=
+      Int.not_le.mpr h_lt
     simp [h_not_le]
     have h_is_branching : Main[34] = 0 := by
       clear *- h35 chip_cstrs h_is_bge h_28 h_29 h_30 h_32 h_33
@@ -999,7 +994,6 @@ set_option maxHeartbeats 16000000 in
 -- Polymorphic counterpart of `correct_bltu`. Unsigned variant of BLT:
 -- is_signed = 0 (spec_lt.1), uses Word.toNat_poly / BitVec.toNat for
 -- ordering. For BLTU chip, Main[34] = Main[35] (same as BLT).
-set_option debug.skipKernelTC true in
 theorem correct_bltu_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
@@ -1211,7 +1205,6 @@ set_option maxHeartbeats 16000000 in
 -- Polymorphic counterpart of `correct_bgeu`. Unsigned BGE variant:
 -- is_signed = 0 (spec_lt.1), Word.toNat_poly ordering. Branching when
 -- ≥ holds (Main[35] = 0, Main[34] = 1), non-branching when < holds.
-set_option debug.skipKernelTC true in
 theorem correct_bgeu_poly
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
