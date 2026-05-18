@@ -8,6 +8,22 @@ import SP1Chips.ShiftLeft.Sllw
 open LeanRV64D.Functions
 open BitVec
 
+namespace ShiftLeft
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 65)
+
+-- Unified SP1 implementation for the ShiftLeft chip. The four variants (sll, slli,
+-- sllw, slliw) all write the same Main columns to the destination register; the
+-- chip's constraints determine which Sail spec those columns implement.
+def sp1_shift_left : SailM Unit := do
+  let op_a := sp1_op_a_poly Main
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+
+end ShiftLeft
+
 namespace Sll.Poly
 
 open ShiftLeft
@@ -17,26 +33,21 @@ variable
   (Main : Vector (ZMod p) 65)
   (s : SailState)
 
-noncomputable def spec_sll_poly (rs2 rs1 rd : regidx) : SailM Unit := do
+noncomputable def spec_sll (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute_RTYPE rs2 rs1 rd rop.SLL
   pure ()
 
-def sp1_sll_poly : SailM Unit := do
-  let op_a := sp1_op_a_poly Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
-
 set_option maxHeartbeats 8000000 in
 -- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
-theorem correct_sll_poly
+theorem correct_sll
     (cstrs : (constraints Main).allHold_poly)
     (h_is_sll : is_sll_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (spec_sll_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sll_poly Main).run s := by
+    (spec_sll (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_shift_left Main).run s := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨eq_sll, eq_imm⟩ := h_is_sll
   have h_real := is_real_eq_one_of_sll Main cstrs eq_sll
@@ -51,7 +62,7 @@ theorem correct_sll_poly
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   -- Monadic chain.
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [spec_sll_poly, sp1_sll_poly, execute, execute_RTYPE']
+  simp [spec_sll, sp1_shift_left, execute, execute_RTYPE']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   have spec_eq := spec.sll_poly Main ⟨eq_sll, eq_imm⟩ cstrs
@@ -90,26 +101,21 @@ variable
   (Main : Vector (ZMod p) 65)
   (s : SailState)
 
-noncomputable def spec_slli_poly (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
+noncomputable def spec_slli (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute_SHIFTIOP shamt rs1 rd sop.SLLI
   pure ()
 
-def sp1_slli_poly : SailM Unit := do
-  let op_a := sp1_op_a_poly Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
-
 set_option maxHeartbeats 8000000 in
 -- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
-theorem correct_slli_poly
+theorem correct_slli
     (cstrs : (constraints Main).allHold_poly)
     (h_is_slli : is_slli_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_imm_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (spec_slli_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slli_poly Main).run s := by
+    (spec_slli op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_shift_left Main).run s := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨eq_sll, eq_imm⟩ := h_is_slli
   have h_real := is_real_eq_one_of_sll Main cstrs eq_sll
@@ -127,7 +133,7 @@ theorem correct_slli_poly
   have hp : 2 ^ 17 < p := Fact.out
   -- Monadic chain.
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [spec_slli_poly, sp1_slli_poly, execute, execute_SHIFTIOP']
+  simp [spec_slli, sp1_shift_left, execute, execute_SHIFTIOP']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_imm_poly, read_op_b]
   -- Bridge: shamt vector matches #v[Main[25..28]] (used in both branches).
@@ -175,26 +181,21 @@ variable
   (Main : Vector (ZMod p) 65)
   (s : SailState)
 
-noncomputable def spec_sllw_poly (rs2 rs1 rd : regidx) : SailM Unit := do
+noncomputable def spec_sllw (rs2 rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute_RTYPEW rs2 rs1 rd ropw.SLLW
   pure ()
 
-def sp1_sllw_poly : SailM Unit := do
-  let op_a := sp1_op_a_poly Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
-
 set_option maxHeartbeats 8000000 in
 -- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
-theorem correct_sllw_poly
+theorem correct_sllw
     (cstrs : (constraints Main).allHold_poly)
     (h_is_sllw : is_sllw_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (spec_sllw_poly (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_sllw_poly Main).run s := by
+    (spec_sllw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_shift_left Main).run s := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨eq_sllw, eq_imm⟩ := h_is_sllw
   have h_real := is_real_eq_one_of_sllw Main cstrs eq_sllw
@@ -208,7 +209,7 @@ theorem correct_sllw_poly
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   -- Monadic chain.
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [spec_sllw_poly, sp1_sllw_poly, execute, execute_RTYPEW']
+  simp [spec_sllw, sp1_shift_left, execute, execute_RTYPEW']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   have spec_eq := spec.sllw_poly Main ⟨eq_sllw, eq_imm⟩ cstrs
@@ -250,26 +251,21 @@ variable
   (Main : Vector (ZMod p) 65)
   (s : SailState)
 
-noncomputable def spec_slliw_poly (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
+noncomputable def spec_slliw (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   _ ← execute_SHIFTIWOP shamt rs1 rd sopw.SLLIW
   pure ()
 
-def sp1_slliw_poly : SailM Unit := do
-  let op_a := sp1_op_a_poly Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
-
 set_option maxHeartbeats 8000000 in
 -- 8M heartbeats: chip cstrs flatten + ALU iff_poly + state simp + spec.*_poly application chains; mirrors MulChip pattern.
-theorem correct_slliw_poly
+theorem correct_slliw
     (cstrs : (constraints Main).allHold_poly)
     (h_is_slliw : is_slliw_poly Main)
     (state_cstrs : (constraints Main).initialState_poly s) :
     let op_c := sp1_op_c_imm_w_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (spec_slliw_poly op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_slliw_poly Main).run s := by
+    (spec_slliw op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_shift_left Main).run s := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨eq_slliw, eq_imm⟩ := h_is_slliw
   have h_real := is_real_eq_one_of_sllw Main cstrs eq_slliw
@@ -287,7 +283,7 @@ theorem correct_slliw_poly
   have hp : 2 ^ 17 < p := Fact.out
   -- Monadic chain.
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [spec_slliw_poly, sp1_slliw_poly, execute, execute_SHIFTIWOP']
+  simp [spec_slliw, sp1_shift_left, execute, execute_SHIFTIWOP']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_imm_w_poly, read_op_b]
   -- Bridge: shamt vector matches #v[Main[25..28]] (5-bit shamt for sllw).
