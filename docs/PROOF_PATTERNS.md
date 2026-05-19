@@ -619,20 +619,17 @@ As of the **2026-05-17 evening sweep** there were 11 such lines. The
 **2026-05-18 sweep** cleared 3 (Sll's `spec.sll_poly` +
 `spec.slli_poly` and Srl's `spec.srl_common_poly`) via two new
 patterns documented below. The **2026-05-19 sweep** cleared all 4
-Store sites via the recipe-2 helpers in `SP1Foundations/MemChecks.lean`
-(`run_write_ram_of_width_{1,2,4,8}` + `store_{byte,half,word,double}
-_post_vmem_eq`) plus a bullet-4 swap of `simp [is_aligned_vaddr]` for
-`is_aligned_vaddr_iff_mod` / `h_is_aligned`. Current count: **4
-load-bearing sites in 3 files**. The earlier recipe-6 (stale-comment
-delete + rebuild) remains fully exhausted on this branch — all 4
-surviving sites reproduce `(kernel) deep recursion detected` on
-plain deletion.
+Store sites + JalChip + JalrChip via recipe-2 helpers (full-equation
+lift to bare `BitVec`) — see "Cleared during the 2026-05-19 sweep"
+sections below for the recipe and helper names. Current count: **2
+load-bearing sites in 2 files**, both DivRem cores. The earlier
+recipe-6 (stale-comment delete + rebuild) remains fully exhausted on
+this branch — both surviving sites reproduce `(kernel) deep
+recursion detected` on plain deletion.
 
 - `SP1Chips/DivRem/DivRem.lean` — `div_rem_poly` core (signed 64-bit
   DWord 8-limb)
 - `SP1Chips/DivRem/DivuRemu.lean` — `divu_remu_poly` core
-- `SP1Chips/JalChip.lean` — `SP1JAL_correct`
-- `SP1Chips/JalrChip.lean` — `JALR_correct`
 
 Cleared during the 2026-05-17 sweep (kept removed):
 `AddrAddOperation.spec_of_constraints_poly`,
@@ -673,6 +670,67 @@ carry the hypothesis).
 Build time per chip dropped from ~32s to ~5s. Axioms unchanged
 (standard Sail + Lean axioms, no `sorryAx`). Verified via direct
 `#print axioms Store.<Variant>.correct`.
+
+**Jal/Jalr cleared the same day** via the same recipe at a higher
+abstraction level: rather than write a helper that captures a single
+inner step, lift the *entire* monadic spec/sp1 equation to bare
+`BitVec`. Helpers added:
+
+- `jal_spec_eq_sp1` in `SP1Chips/JalChip.lean` (`private lemma`,
+  adjacent to `word_four_eq_bitvec_four`) — proves `(spec_jal imm
+  (.Regidx rd)).run s = (do writeReg .nextPC target; wX_bits (.Regidx
+  rd) link).run s` given `h_pc, h_target = pc + signExt imm,
+  h_target_mod4, h_link : rd ≠ 0#5 → link = pc + 4#64`. The
+  conditional `h_link` is essential — the chip's `h_add_pc'` (which
+  gives the link equality) only holds when `Main[6] ≠ 0`; when rd =
+  0, `wX_bits` short-circuits and the link value doesn't matter.
+
+- `jalr_spec_eq_sp1` in `SP1Chips/JalrChip.lean` (same structure).
+  Three Jalr-specific adaptations:
+  1. `h_rs1 : SailState.get_reg? s rs1_bv = some rs1_val` (uses the
+     chip's `get_reg?` abbreviation, which returns `Option (BitVec
+     64)`, instead of `s.regs.get? (reg_idx_to_Register rs1_bv)`
+     which has a dependent `RegisterType (reg_idx_to_Register
+     rs1_bv)` return type that triggers an `isDefEq` synthesis
+     timeout on `CoeT (Option (RegisterType …))`).
+  2. `h_target : 18446744073709551614#64 &&& (rs1_val + signExtend
+     64 imm) = target` — this is the `BitVec.update _ 0 0#1` masked
+     form *after* `update`/`updateSubrange'` simp unfolding (the
+     `attribute [simp] update updateSubrange'` at the top of
+     `JalrChip.lean` controls this). Don't `subst h_target`; the
+     `rw [h_target]` step after `jump_to` substitution swaps the
+     unfolded `&&&` form back to abstract `target`.
+  3. `update_elp_state_of_isInitialized` needs all 4 args (rs1, s,
+     hs, hs'); supply via two `by aesop` blocks for the
+     `isInitialized` and `isValidMemConfig` proofs on the inserted
+     state.
+
+Chip-side template (both JAL and JALR):
+1. Drop `set_option debug.skipKernelTC true in` and any
+   `maxHeartbeats` bump.
+2. Keep the existing hypothesis-derivation prelude verbatim (the
+   AddOperation.spec_poly calls, the `h_pc_mod4` / `h_mod4` /
+   `h_target_eq` derivations).
+3. **Derive `h_link_cond` BEFORE applying the helper** — by-cases on
+   `rd = 0#5`, in the nonzero branch use the chip's existing
+   `h_add_pc'` (from `inc_pc_cstrs`'s second AddOperation
+   constraint).
+4. `refine helper_name s hs … read_pc_q … h_target_mod4 rd link
+   h_link_cond` with one residual `?_` for `h_target`, closed by a
+   trans through `h_add`/`h_imm_signExtend`/`h_target_eq` (the chip
+   already has these lemmas).
+
+Build time on Jal/Jalr drops to ~7s (helper olean ~50 lines).
+Axioms unchanged.
+
+Status after 2026-05-19 sweep: **2 load-bearing skipKernelTC sites
+remain** (DivRem cores `div_rem_poly` and `divu_remu_poly`), down
+from 11 at the start of the day. Both DivRem cores have a
+structurally different trigger (`% 2^128` in the chip's goal type
+via `BitVec.toNat_ofNat` on `BitVec.ofNat 128 _`) that this
+recipe-2 approach can't directly attack; see the 2026-05-19 evening
+"DivRem core: every `2^128 ↔ 340...` bridge mechanism tried trips"
+note above.
 
 #### Empirical findings (2026-05-17 evening)
 
