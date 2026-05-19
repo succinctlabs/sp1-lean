@@ -14,12 +14,12 @@ attribute [-simp] mul_eq_zero not_and
 
 section divu_remu
 
-set_option debug.skipKernelTC true in
 set_option linter.unusedVariables false in
 set_option maxHeartbeats 32000000 in
 -- The bv_ctqr arm uses `ZMod.val_add_of_lt`-distribution + Nat carry-eqs.
 -- 32M heartbeats + skipKernelTC match the Mul precedent for similar 8-way
 -- carry decompositions.
+set_option debug.skipKernelTC true in
 lemma divu_remu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : ZMod p)
   (is_U64_b : Word.isU64_poly #v[b0, b1, b2, b3])
@@ -459,7 +459,6 @@ lemma divu_remu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
             -- Use main_eq to bridge.
             omega
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- 32M heartbeats: divu_remu_poly's 8-limb carry chain + 13 op-level spec applies.
 set_option linter.unusedVariables false in
@@ -737,7 +736,6 @@ lemma spec.divu_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
 -- Twin of `spec.divu_poly`; differs only in: `is_remu_poly` flag, `.2`
 -- projection (remainder output), `sop4` mutex implication (instead of
 -- `sop2`), and `eq_r_*` writeback equations.
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- 32M heartbeats: divu_remu_poly's 8-limb carry chain + 13 op-level spec applies.
 set_option linter.unusedVariables false in

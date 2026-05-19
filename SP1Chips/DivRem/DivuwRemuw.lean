@@ -14,7 +14,6 @@ attribute [-simp] mul_eq_zero not_and
 
 section divuw_remuw
 
-set_option debug.skipKernelTC true in
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 set_option maxHeartbeats 32000000 in
@@ -420,7 +419,6 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 -- Mirrors `spec.divu_poly` recipe but with `.DRWU` instruction,
 -- `is_divuw_poly` flag, `sop7` mutex implication, and threads through
 -- `divuw_remuw_poly` (4-limb HWord core).
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- DRWU expansion + 11-arm `first` closer chain on each side-goal exceeds the
 -- default heartbeat budget; matches the divu/divw spec wrapper pattern.
@@ -709,7 +707,6 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
 
 -- Twin of `spec.divuw_poly` with `.2` projection, `is_remuw_poly` flag,
 -- `sop8` mutex, and `eq_r_*` writeback.
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- See spec.divuw_poly: same DRWU expansion blow-up.
 set_option linter.unusedVariables false in

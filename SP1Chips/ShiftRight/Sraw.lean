@@ -15,9 +15,6 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 2000000000 in
 -- 2B heartbeats: cb-blast for hl2=ll2=hl3=ll3=0 + msb_b case split + 2x32-leaf inner blasts.
-set_option debug.skipKernelTC true in
--- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N`
--- re-checks (mirrors `spec.srlw_common_poly`'s use).
 /-- Shared proof body for `spec.sraw_poly` and `spec.sraiw_poly`. Structure
 mirrors `spec.srlw_common_poly` with an msb_b case split (since under SRAW,
 `w_msb_b` doesn't force msb_b = 0; msb_b is determined by U16MSBOperation on b1). -/

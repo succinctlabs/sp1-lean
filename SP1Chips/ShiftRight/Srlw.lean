@@ -15,8 +15,6 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 800000000 in
 -- 800M heartbeats: cb4 split + 16-way cb-blast for a0/a1 bounds.
-set_option debug.skipKernelTC true in
--- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel.
 /-- U64-bound on the SRLW output word `a`. Lives in `Srlw.lean` rather than `Common.lean`
 because `spec.srlw_common_poly` is the only consumer.
 
@@ -330,9 +328,6 @@ set_option maxHeartbeats 1200000000 in
 -- 1.2B heartbeats: 2-way byte_shift (cb4) × 16-way cb0..cb3 rcases = 32 leaves,
 -- on top of the SRLW prologue (deriving msb_srw, sign_extend bridge,
 -- hl2/ll2/hl3/ll3 = 0 via cb_aux dispatch).
-set_option debug.skipKernelTC true in
--- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N`
--- re-checks (mirrors `spec.srl_common_poly`'s use).
 /-- Shared proof body for `spec.srlw_poly` and `spec.srliw_poly`. Structure
 mirrors `spec.srl_common_poly` but for 32-bit operands:
 - Forces `hl2 = ll2 = hl3 = ll3 = 0` via `cancel_mul_65536_zero_poly` (since

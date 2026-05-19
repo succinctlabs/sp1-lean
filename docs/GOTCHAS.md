@@ -176,13 +176,96 @@ If a future Lean toolchain bump is suspected to have fixed the kernel's
 `2 ^ N` reduction, the cheapest re-test is to delete every
 `set_option debug.skipKernelTC true in` line, run **`lake build`** (not
 `lake env lean` — see caveat above), and re-add only the lines whose
-declarations newly fail. As of 2026-05-17 there are ~16 such lines:
-- `SP1Operations/Operation/AddrAddOperation.lean` (1)
-- `SP1Operations/Operation/MulOperation/Constraints.lean` (2)
-- `SP1Chips/Branch/Constraints.lean` (4)
-- `SP1Chips/JalrChip.lean` (1)
-- `SP1Chips/LoadDoubleChip.lean` (1)
-- `SP1Chips/Store{Byte,Half,Word,Double}Chip.lean` (4)
-- `SP1Chips/ShiftLeft/Sll.lean`, `ShiftRight/{Srl,Sra,Srlw,Sraw}.lean`,
-  `DivRem/*` (~13, blocked by the in-progress `_poly` migration with 11
-  sorries — out of scope until that lands)
+declarations newly fail.
+
+As of **2026-05-17 evening sweep** there are **11** such lines (down from
+~22 after a fresh per-site verification — see
+`docs/memory/feedback_skipkerneltc_per_site_status_2026_05_17.md` if
+present). The 11 still load-bearing:
+
+- `SP1Operations/Operation/AddrAddOperation.lean` — already cleared 2026-05-17 morning
+- `SP1Operations/Operation/MulOperation/Constraints.lean` — already cleared 2026-05-17 morning
+- `SP1Chips/Branch/Constraints.lean` — already cleared 2026-05-17 morning
+- `SP1Chips/Load*.lean` — already cleared 2026-05-17 morning
+- `SP1Chips/DivRem/DivRem.lean` — `div_rem_poly` core (signed 64-bit DWord 8-limb)
+- `SP1Chips/DivRem/DivuRemu.lean` — `divu_remu_poly` core
+- `SP1Chips/ShiftLeft/Sll.lean` — `spec.sll_poly` **and** `spec.slli_poly`
+- `SP1Chips/ShiftRight/Srl.lean` — `spec.srl_common_poly`
+- `SP1Chips/Store{Byte,Half,Word,Double}Chip.lean` — all 4 `correct` theorems
+- `SP1Chips/JalChip.lean` — `SP1JAL_correct`
+- `SP1Chips/JalrChip.lean` — `JALR_correct`
+
+**Sites where cheap removal WORKED in the 2026-05-17 evening sweep (kept removed):**
+- `DivRem.lean` ×3: the redundant section-level + `spec.div_poly` + `spec.rem_poly`
+  (only the core `div_rem_poly` needs the option — the wrappers don't)
+- `DivuRemu.lean` ×2: `spec.divu_poly` + `spec.remu_poly`
+- `DivuwRemuw.lean` ×3 and `DivwRemw.lean` ×3: all cores + wrappers cleared
+- `ShiftRight/{Sra,Sraw,Srlw}.lean`: all common-bodies cleared
+- `ShiftRight/Srlw.lean` ×2: the local `Word.isU64`-style helper too
+
+**Key empirical finding (2026-05-17 evening):** for the DivRem and DivuRemu
+*64-bit cores*, the `*_poly` core lemma trips the kernel but the thinner
+`spec.*_poly` wrappers that `specialize` into the core do NOT. The wrapper's
+proof term is just a function application referencing the core's already-checked
+olean — kernel sees a shallow term. Lesson: don't assume "if the core needs
+`skipKernelTC`, the wrappers do too." Test each independently.
+
+**Empirical finding on Store* (2026-05-17 evening):** Lifting `h_addr_eq`
+(the `(reg + signExt(imm)).toNat = addr_low_limbs` bridge) into a
+`Word.toBitVec64_poly_addr3_toNat_eq` top-level helper in `SP1Foundations/Word.lean`
+roughly halves elaboration time (~103s → ~51s on StoreByteChip) but **kernel
+still trips** — there are *multiple* compounding triggers (h_offset_eq,
+h_in_range, `Word.toBitVec64_poly_lowLimb_add_nat`, default-`simp`-via-write_ram).
+A single lift is not enough; recipe 2 (bare-`BitVec` helper covering the *whole*
+addr-bridge + width-specific write monadic chain) is the documented path but
+costs 2–3h per chip with no single-lift shortcut.
+
+**Empirical finding on Sll/Srl 64-bit shifts:** The `spec.sll_poly`,
+`spec.slli_poly`, and `spec.srl_common_poly` proofs are structurally identical
+to the passing `spec.sra/sraw/srlw_common_poly` proofs — same prologue, same
+4-way byte-shift split, same close-helpers. The differentiator is invisible at
+the tactic-source level. The passing Sra has an outer `rcases h_msb_b` that
+splits the proof term into two arms; the failing Sll/Srl have no analogous
+outer split. Hypothesis: adding an outer split (recipe 3 applied at the byte_shift
+level — lift each of the 4 byte_shift branches into a separate helper, dispatcher
+just does `rcases b_cb5 ... ; rcases b_cb4 ...`) may break the kernel walk into
+shallower chunks. Not yet verified.
+
+**Empirical finding on Jal/Jalr:** The `word_four_eq_bitvec_four` helper
+extracted in commit `62b65cf` (recipe 3 inline-derivation lift) is insufficient
+on its own. Remaining triggers are likely `hmod4` (15-line block with
+`Word.toBitVec64_poly` chains), the `AddOperation.spec_poly` results
+(`h_add'` / `h_add_pc'` — whose body contains `BitVec.toNat_add`), and the
+multiple default `simp [spec_jal, sp1_jal, execute_JAL, ...]` calls. Each is a
+candidate for further recipe-3 lifting.
+
+**JalrChip deep-dive findings (sorry-bisection, 5 build cycles):** The trigger
+is the single `simp [spec_jalr, sp1_jalr, run_readReg_of_isInitialized _ _ hs,
+EStateM.Result.map, cond, execute_JALR, op_a, op_b, op_c, sp1_op_a, sp1_op_b,
+sp1_op_c, read_op_a, read_op_b, ← h_imm_signExtend]` call at
+`SP1Chips/JalrChip.lean:258-261`. Verified via sorry-truncation:
+- truncating BEFORE this simp passes kernel TC;
+- truncating AFTER this simp still trips.
+
+Fixes tried that **don't** work:
+- Splitting into chained `simp only` (second simp can't apply its lemmas
+  because default simp's implicit monad lemmas are needed).
+- Moving `← h_imm_signExtend` to a separate `rw` (trigger shifts but still trips).
+- Replacing `simp` with `simp only [explicit list]` (can't reproduce default
+  simp's monad-bind normalization with explicit lemma list).
+- `--tstack=2000000` (5× current; still trips — **not borderline depth**, this
+  is pathologically deep recursion).
+
+**The proof term produced by this `simp [...]` is pathologically deep** — the
+combination of unfolding `execute_JALR` (Sail spec, multi-step do-block),
+applying monad bind normalizations, and rewriting `← h_imm_signExtend` produces
+a term whose kernel re-check unfolds beyond any reasonable stack. Fix path:
+write a `JALR_correct`-shaped helper at the `EStateM`/Sail level that produces
+the same post-simp goal form WITHOUT relying on the default simp set, or lift
+the entire post-simp goal manipulation chain (lines 256–317) into a helper
+whose conclusion is the original theorem statement. Both are multi-hour
+investments per chip.
+
+Same pattern almost certainly applies to `SP1JAL_correct` in `JalChip.lean`
+since it uses the analogous `simp [spec_jal, sp1_jal, execute_JAL, ...]` at
+line 124.
