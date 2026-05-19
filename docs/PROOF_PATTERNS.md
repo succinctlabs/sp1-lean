@@ -511,6 +511,53 @@ back temporarily.
    (decide trips), polymorphic-`n` helper with `native_decide`
    bridge (chip still trips). Open problem.
 
+#### Empirical findings (2026-05-19 evening)
+
+**Store* and Jal/Jalr triggers are the default simp set.** Sorry-
+bisect of `StoreByteChip.correct` (~31s/cycle) pinpointed the trigger
+to the first bullet after `rw [run_vmem_write_of_width_1' ...]` at
+line 152: `simp [sp1_sb, h_imm_c, imm_c, Sail.ConcurrencyInterfaceV1.
+write_ram, PreSail.write_ram, PreSail.writeBytes, PreSail.writeByte]`.
+The bisect narrowed further: `simp only [imm_c]` (no defaults) *passes*
+kernel; `simp [imm_c]` (with defaults) *trips*. Even default `simp`
+alone (no added lemmas) trips on this goal. So the trigger is not any
+particular added lemma — it's the default simp set running on a
+BitVec-heavy EStateM goal. Same pattern in `SP1JAL_correct` at line
+154 (`simp [Std.ExtDHashMap.get_insert, read_pc]`). The goal at these
+points has dozens of `Word.toBitVec64_poly` instances and the default
+simp set's `BitVec.toNat_*` / monadic normalization lemmas compound
+into a kernel-tripping proof term.
+
+**Why `simp only` alone isn't enough as a fix.** Replacing
+`simp [...]` with `simp only [...]` clears the kernel trip but
+under-normalizes the goal, so downstream `constructor` /
+`rw [jump_to_of_mod4_eq_zero ...]` fail to apply. The default simp
+does work the chip's structure depends on (e.g., reducing
+`Register.nextPC == Register.PC` to `false` via the `BEq` decidable
+instance, monadic bind/pure rewrites, BitVec literal evaluation).
+
+**What didn't work for Jal (2026-05-19):**
+- `simp (config := { decide := true }) only [...]` — same downstream
+  rewrite failure as plain `simp only`. The decide-config doesn't
+  trigger the needed match-on-decidable reduction.
+- `simp only [...]; dsimp only` — `dsimp` makes no progress; the
+  if/dite reductions aren't pure definitional.
+- Adding `have h_pc_ne : (Register.nextPC == Register.PC) = false :=
+  by decide` and including `h_pc_ne, dite_false, reduceCtorEq` in
+  the `simp only` set — re-trips kernel. The `by decide` proof term
+  itself trips (the `BEq` on `Register` walks through BitVec).
+
+**Recipe-4 swap is the documented path but unverified for these.**
+The full chip body (~120 lines for SP1JAL_correct, ~200 for
+JALR_correct, ~120 each for Store*) has many `simp` calls; each
+contributes to the cumulative proof term. A bare-`simp only` swap on
+the single triggering call isn't enough — the chip's surrounding
+simps may *also* contribute. A complete recipe-4 swap would replace
+every `simp [...]` in the body with a hand-tuned `simp only [...]`
+plus targeted `rw` / `dsimp` chains, matching what default simp does
+*minus* the kernel-tripping rewrites. Each chip is a multi-hour
+investment with no proven shortcut.
+
 #### Cross-references
 
 - Helpers:
