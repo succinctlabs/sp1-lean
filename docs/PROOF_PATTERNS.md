@@ -558,6 +558,37 @@ plus targeted `rw` / `dsimp` chains, matching what default simp does
 *minus* the kernel-tripping rewrites. Each chip is a multi-hour
 investment with no proven shortcut.
 
+**DivRem core: every `2^128 ↔ 340...` bridge mechanism tried trips.**
+The cumulative attempts on `divu_remu_poly`:
+- `omega` directly (original) — trips.
+- Bare-ℕ helper with `omega` body — helper olean trips.
+- Bare-ℕ helper using only `Nat.add_mod` + `Nat.add_mul_mod_self_right`
+  with conclusion at literal `% 340...` form — helper compiles. Then
+  the chip needs a bridge `2^128 ↔ 340...` to match the chip's goal
+  shape against the helper's conclusion.
+- Polymorphic-`n` helper (conclusion at `% n`, body uses `Nat.add_mod`
+  + `Nat.add_mul_mod_self_right`) — helper compiles. The chip calls
+  with `n := 2 ^ 128` and provides `main_eq` directly.
+- Chip-side bridge via `by rfl` on `2^128 = 340...` — trips.
+- Chip-side bridge via `by native_decide` on `2^128 = 340...` — trips.
+  Even though `native_decide`'s proof term is small (just a
+  `Lean.ofReduceBool ⟨..., rfl⟩` wrapper), the subsequent
+  `rw [this]` in `main_eq` generates an `Eq.mpr` term whose motive
+  walks `2 ^ 128`.
+- Chip-side factor via `2^128 = 2^64 * 2^64` (`pow_add` + Nat-literal
+  rfl on `128 = 64+64`) — also trips. The kernel still walks
+  `2^64 * 2^64` somewhere during the helper's substituted proof
+  term.
+
+The root cause is that the chip's goal at the close site carries
+`% 2^128` syntactically (via `BitVec.toNat_ofNat` on `BitVec.ofNat 128
+_`), and ANY transformation away from `2^128` requires a `rw` whose
+motive forces the kernel to walk it. A clean solution likely
+requires either: (a) avoiding `BitVec.toNat_ofNat`'s `2^128`
+exposure entirely by staying at BitVec equality level (no `.toNat`),
+which requires rewriting the chip's tactic chain; or (b) a Lean
+toolchain upgrade where `2^128` def-reduction handles deeper stacks.
+
 #### Cross-references
 
 - Helpers:
