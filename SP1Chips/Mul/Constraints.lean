@@ -280,7 +280,7 @@ lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 82)
   exact ⟨h_isU64_b, h_isU64_c⟩
 
 /-- Derive `Main[77] + ... + Main[81] = 1` from cstrs + `Main[77] = 1`.
-Used by chip-level `correct_mul_poly` so that downstream helpers
+Used by chip-level `correct_mul` so that downstream helpers
 (`ops_U64_b_c_poly`, `register_bounds_poly`) can be invoked with raw
 cstrs + this single derived fact. -/
 lemma is_real_eq_one_of_mul (Main : Vector (ZMod p) 82)

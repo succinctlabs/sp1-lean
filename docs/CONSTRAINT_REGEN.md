@@ -20,7 +20,7 @@ These sites all need manual updates after a column-shape change:
 3. `set` aliases in `<Chip>/Constraints.lean` outside the markers (e.g. `set is_real := Main[N-1]`).
 4. `def sp1_op_a / sp1_op_b / sp1_op_c` projections in `<Chip>Chip.lean`.
 5. `is_real` location: if the last column moved, `h_is_real : Main[N-1] = 1` needs the new index.
-6. The `Vector (Fin KB) N` width if the total column count changed.
+6. The `Vector F N` / `Vector (ZMod p) N` width if the total column count changed.
 7. Any `by_cases` chains in Reader proofs that case-split on a column you removed (they collapse to fewer cases).
 
 ## Prerequisites
@@ -55,7 +55,7 @@ Run from repo root: `SP1_DIR=/path/to/sp1 python3 update_constraints.py`.
    ```
    For an inserted column, `shift` is negative and the comparison flips to `>= insert_idx`.
 
-4. **Adjust the `Vector (Fin KB) N` width** in any signature that mentions it explicitly (chip helpers, theorem statements). `sed -i 's/Vector (Fin KB) <old>/Vector (Fin KB) <new>/g'` over the chip's two files.
+4. **Adjust the `Vector F N` / `Vector (ZMod p) N` width** in any signature that mentions it explicitly (chip helpers, theorem statements). `sed -i 's/Vector F <old>/Vector F <new>/g; s/Vector (ZMod p) <old>/Vector (ZMod p) <new>/g'` over the chip's two files.
 
 5. **Update the iff-lemma RHS** in the Reader files (`SP1Operations/Reader/<Reader>.lean`):
    - Remove (or add) the column's conjunct from `allHold_constraints_iff`.
@@ -100,12 +100,108 @@ Once all chips compile with stops, work down the list re-closing each `correct_*
 - **Don't hand-edit anything inside `section constraints ... end constraints`.** The next regeneration will overwrite it. If the auto-generated block looks wrong, regenerate.
 - **Don't apply a `-1` shift to a chip without confirming what the compiler actually output.** PR #92 (and earlier) saw bugs where the iff RHS, set aliases, and constraints def all went out of sync because someone manually shifted indices without re-running `update_constraints.py`. Always regenerate first, shift second.
 
+## Fin-KB deletion-sweep template
+
+Once a chip has a sorry-free `correct_*_poly` companion (see
+`FIELD_GENERIC.md`), the parallel `Fin KB` layer is dead weight and
+can be dropped. The sweep was executed on 2026-05-15 across every
+chip; the recipe below is what generalized cleanly.
+
+### Order: top-down per chip
+
+For each chip, delete in this order so each commit's per-module build
+stays clean:
+
+1. Chip-level `<Chip>Chip.lean`: Fin KB `correct_<v>`, `sp1_op_*`,
+   top-level `variable (Main : Vector (Fin KB) N)`, prologue helpers
+   (`correct_prologue_facts` if it exists).
+2. Sail-level `spec_<v>` defs in the chip file: **keep** them. They
+   have no field dependence and are referenced by `correct_*_poly`.
+3. Per-opcode files (`DivRem/DivRem.lean`, `DivRem/DivuRemu.lean`,
+   etc.): bare cores (`div_rem`, `divu_remu`, …) + `spec.<v>` wrappers.
+4. Helper file (`<Chip>/Common.lean`): Fin KB sections
+   (`field_arithmetic`, `opcodes`, `entailed_constraints`, `operands`)
+   + chip-local lemmas like `div_mod_decomposition_w`, `sum_zero_abs`.
+5. Constraints file (`<Chip>/Constraints.lean`): hand-written iff
+   lemmas (`allHold_constraints_iff`, `allHold_constraints_alu_ops`).
+   **Leave the autogen parametric `def constraints` block alone.**
+6. Re-check doc comments. Strings like
+   `/-- Polymorphic counterpart of `X`. -/` become self-referential
+   once `X` is gone; grep `Polymorphic counterpart` after each
+   deletion and edit each docstring to drop the lead sentence.
+
+### Inventory caveats
+
+Pre-deletion inventory can wrongly flag field-agnostic lemmas as
+"unused Fin KB" because they live in a `Fin KB`-scoped section. Watch
+for these specifically:
+
+- If the lemma's signature has `{x : Fin KB}` or
+  `{v : Vector (Fin KB) N}` *in the binder list*, it is Fin KB-
+  specific. Delete.
+- If the signature is in `ℤ` / `ℕ` / `BitVec` and the only Fin KB
+  connection is the enclosing `variable` block, it's field-agnostic.
+  **Keep** and move it outside the section if needed. Examples caught
+  during the DivRem sweep: `tdiv_tmod_unique_full` (pure ℤ, used by
+  `div_rem_poly` + `divw_remw_poly`), `tdiv_tmod_unique_full_nat`,
+  `extractLsb_is_toInt` (pure BitVec, used by `divw_remw_poly`).
+
+When in doubt, `rg '\b<lemma_name>\b' SP1Chips/ SP1Operations/
+SP1Foundations/` before deleting.
+
+### Pattern: self-contained `_poly` cluster
+
+Each chip's helper files typically end with a `section poly_helpers`
+(or just a `_poly` cluster at the end of the file) that is self-
+contained — it defines its own `is_real_poly`, `is_<op>_poly`,
+`allHold_constraints_iff_<...>_poly`, `single_op_poly`, etc. The
+deletion sweep is then "remove everything between `end constraints`
+and `section poly_helpers` plus the leading `variable (Main : Vector
+(Fin KB) N)` + `def is_real` block".
+
+### Verification
+
+After every per-file deletion commit:
+
+1. `lake build SP1Chips` clean: 0 errors, 0 warnings.
+2. `rg 'Vector \(Fin KB\)' SP1Chips/` should shrink monotonically.
+3. `rg '\.allHold\b' SP1Chips/` likewise (the field-agnostic
+   `.allHold_poly` projection has a different name).
+4. `rg 'Fin KB' SP1Chips/` will still show hits inside `--` doc
+   comments referencing the old recipe — these are fine. Grep `--`-
+   excluded for the structural check.
+5. `lean_verify` on every `correct_<v>_poly` to confirm no `sorryAx`
+   slipped in. Standard axioms only (`propext`,
+   `Classical.choice`, `Quot.sound`).
+
+The 2026-05-15 sweep deleted ~3290 lines from DivRem alone and ~1660
+lines from ShiftRight; the cumulative SP1Chips/ deletion was ~7000
+lines net. See `git log --grep="drop Fin KB"` for the per-commit
+trail.
+
+### KB-specific literal pre-check
+
+Before committing to a chip's full `_poly` migration *and* later
+deletion, run the field-genericness check from
+`FIELD_GENERIC.md`'s "KB-specific literal blockers" section:
+
+```bash
+grep -oE ' \* [0-9]{8,}' SP1Chips/<Chip>/Constraints.lean | sort -u
+```
+
+If the chip's constraint body uses an 8+-digit literal that's
+field-specific (e.g. `2097414145 = 64⁻¹ mod KB`), the `_poly`
+companion either needs an extra typeclass hypothesis or the upstream
+compiler needs a refactor — see the linked doc for the trade-offs.
+Don't start the migration until that question is settled, or the
+deletion sweep at the end becomes impossible.
+
 ## Note on the DivRem multi-file layout
 
 DivRem is the only chip whose `Constraints.lean` was too large to keep monolithic. Helpers and per-opcode proofs were split into siblings under `SP1Chips/DivRem/`:
 
-- `Constraints.lean` — autogen `section constraints ... end constraints` plus the closely-coupled `allHold_constraints_iff` (Fin KB) and `allHold_constraints_iff_poly` (polymorphic). **This is still the only file the regen script touches**; the script only edits content between the `section constraints` and `end constraints` markers, which all live here.
-- `Common.lean` — `is_*` flag defs, `single_op`, `register_bounds`, `op_a_is_0`, `ops_U64_b_c`, `sp1_op_{a,b,c}`, auxiliaries (`div_mod_decomposition_w`, `tdiv_tmod_unique_full*`, `sum_zero_abs*`, `extractLsb_is_toInt`, `Word_toInt_poly_neg_form_eq_HWord_toInt_poly`), plus all `_poly` variants of the above. `attribute [-simp] mul_eq_zero not_and` lives here too.
-- `DivRem.lean` / `DivuRemu.lean` / `DivwRemw.lean` / `DivuwRemuw.lean` — one opcode pair each (bare lemma + `spec.<variant>` Fin KB wrappers + `<variant>_poly` core).
+- `Constraints.lean` — autogen `section constraints ... end constraints` plus the closely-coupled `allHold_constraints_iff_poly`. **This is still the only file the regen script touches**; the script only edits content between the `section constraints` and `end constraints` markers, which all live here.
+- `Common.lean` — `is_*_poly` flag defs, `single_op_poly`, `register_bounds_poly`, `op_a_is_0_poly`, `ops_U64_b_c_poly`, `sp1_op_{a,b,c}_poly`, and shared auxiliaries (`div_mod_decomposition_w`, `tdiv_tmod_unique_full*`, `sum_zero_abs_poly`, `Word_toInt_poly_neg_form_eq_HWord_toInt_poly`).
+- `DivRem.lean` / `DivuRemu.lean` / `DivwRemw.lean` / `DivuwRemuw.lean` — one opcode pair each (`<variant>_poly` core).
 
 After a regen, the only file that should show splices is `Constraints.lean`. If the iff RHS needs a corresponding update (step 5 of the playbook above), the lemma lives in the same file. Helper updates (step 6) for `register_bounds` / `ops_U64_b_c` / `single_op` / `op_a_is_0` live in `Common.lean`. The four opcode files only need attention if a `Main[k]` index referenced by the destructured-then-renamed variables (`a0..a3`, `b0..b3`, `c0..c3`, etc.) at the head of `spec.<variant>` changes meaning — in practice the `set ... := Main[k]` block at the head of each spec wrapper is the only place where indices appear literally.

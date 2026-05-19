@@ -13,7 +13,7 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [hp : Fact (2 ^ 17 < p)]
 
 set_option debug.skipKernelTC true in
 -- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel
--- deep recursion at re-check; see docs/GOTCHAS.md "Kernel deep-recursion on 2^N".
+-- deep recursion at re-check; see docs/PROOF_PATTERNS.md "Kernel deep-recursion on 2^N".
 lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
@@ -1066,7 +1066,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
 
 set_option debug.skipKernelTC true in
 -- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel
--- deep recursion at re-check; see docs/GOTCHAS.md "Kernel deep-recursion on 2^N".
+-- deep recursion at re-check; see docs/PROOF_PATTERNS.md "Kernel deep-recursion on 2^N".
 lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =

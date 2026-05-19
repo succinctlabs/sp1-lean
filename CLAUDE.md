@@ -12,7 +12,7 @@ Formal verification in Lean 4 that SP1 Hypercube's AIR constraints correctly imp
 - Single library: `lake build SP1Chips` / `lake build SP1Foundations` / `lake build SP1Operations`.
 - Single file: `lake env lean SP1Chips/AddChip.lean` (builds deps via cache, then elaborates the file).
 - **Build concurrency.** `lake build` jobs on heavy chips (`SP1Chips.DivRem.Constraints` etc.) take 17–40 min and consume 5–15 GB RSS each. Before starting any new `lake build`, **either let the running build finish or kill it explicitly** (`pkill -f "lake build"` / `pkill -f "lake env lean SP1Chips"`). Hard cap: **2–3 builds at once, full stop** — never start a fourth speculative build. A `run_in_background` build whose parent shell died gets reparented to init and survives session boundaries; check with `ps -ef | grep -E "lake|lean" | grep -v lsp` before spawning a new one. See `docs/memory/feedback_extra_shells_slow_compile.md` for the why.
-- Toolchain is pinned in `lean-toolchain` (`leanprover/lean4:v4.29.0`). Matching Mathlib pin (`v4.29.0`) is in `lakefile.toml`. The `Lean_RV64D` dep now tracks `opencompl/sail-riscv-lean` `main` (moved upstream from the old `succinctlabs/sail-riscv-lean @ sp1-lean-air-verification` fork during this PR). Sail v4 renamed/removed many v2 helpers — see `docs/LEAN_4_29_AND_SAIL_V4.md` for the full list and the new platform-read axioms (`update_elp_state_of_isInitialized`, `jump_to_of_mod4_eq_zero`, `jump_to_of_mask_mod4_eq_zero`). Common touchpoints: `bool_to_bits` → `bool_to_bit`, `bool_bits_forwards` → `bool_bit_forwards`; `shift_right_arith`, `check_misaligned`, `default_write_acc`, `force_pc_eq` are gone; `Sail.BitVec.toNatInt` now appears explicitly in goals — add it to the `simp [...]` list whenever you see `↑BitVec.toNat` residue.
+- Toolchain is pinned in `lean-toolchain` (`leanprover/lean4:v4.29.0`). Matching Mathlib pin (`v4.29.0`) is in `lakefile.toml`. The `Lean_RV64D` dep now tracks `opencompl/sail-riscv-lean` `main` (moved upstream from the old `succinctlabs/sail-riscv-lean @ sp1-lean-air-verification` fork during this PR). Sail v4 renamed/removed many v2 helpers — see `docs/LEAN_AND_SAIL_NOTES.md` for the full list and the new platform-read axioms (`update_elp_state_of_isInitialized`, `jump_to_of_mod4_eq_zero`, `jump_to_of_mask_mod4_eq_zero`). Common touchpoints: `bool_to_bits` → `bool_to_bit`, `bool_bits_forwards` → `bool_bit_forwards`; `shift_right_arith`, `check_misaligned`, `default_write_acc`, `force_pc_eq` are gone; `Sail.BitVec.toNatInt` now appears explicitly in goals — add it to the `simp [...]` list whenever you see `↑BitVec.toNat` residue.
 - `--tstack=400000` and `synthInstance.maxHeartbeats = 1000000` are already set in `lakefile.toml` — some proofs legitimately need this. If you see instance-synth or stack failures, that's expected scale, not a bug to fix.
 - There are no unit tests; correctness lives in the `correct_*` theorems themselves. "Test" = it elaborates.
 - **`lake build` is considered "passing" only when both `^error:` and `^warning:` counts are zero** (`grep -cE '^(error|warning):' build.log`). The mathlib standard linter set is enabled via `weak.linter.mathlibStandardSet = true` and the repo has driven warnings to zero; a green build that emits new warnings is a regression. Common fix patterns used in the repo:
@@ -59,17 +59,16 @@ The body of every `constraints` definition between `section constraints` and `en
 
 ## docs/ pointers
 
-Topical guides live in `docs/`. Skim the relevant one when you hit a matching surface:
+Topical guides live in `docs/`. See `docs/README.md` for the index. Skim the relevant one when you hit a matching surface:
 
-- `docs/AUDIT_PR92.md` — what landed in the v6.1.0 / Lean 4.29 / Sail v4 update beyond the PR description.
-- `docs/LEAN_4_29_AND_SAIL_V4.md` — Lean 4.29 quirks (instance priority, `simp_all` regression, `BitVec.ofNat` ordering) plus the Sail v4 rename/removal table and new platform-read axioms.
-- `docs/CONSTRAINT_REGEN.md` — playbook to follow the next time the constraint compiler adds or drops a column. Reusable across "is_trusted"-style cascades.
-- `docs/PERF_PATTERNS.md` — proof-perf wins from this PR (high-priority `Fin KB` instances, breaking large `obtain` chains, dedicated shift lemmas).
-- `docs/GOTCHAS.md` — running collection of non-obvious failure modes (e.g. kernel deep-recursion on `2 ^ N` inside `Int.toNat (... % ...)`) with the recipe that worked. Add to it whenever a landmine takes more than an hour to diagnose.
+- `docs/LEAN_AND_SAIL_NOTES.md` — Lean 4.29 quirks (instance priority, `simp_all` regression, `BitVec.ofNat` ordering) plus the Sail v4 rename/removal table and new platform-read axioms. Ends with a "what to look for on the next upgrade" rubric.
+- `docs/CONSTRAINT_REGEN.md` — playbook to follow the next time the constraint compiler adds or drops a column. Reusable across "is_trusted"-style cascades. Includes the Fin-KB deletion-sweep template used after `_poly` migrations.
+- `docs/FIELD_GENERIC.md` — current state of the field-genericization effort, polymorphic proof patterns, KB-specific literal blockers, the DivRem worked example, and the recipe for instantiating at a different prime field (e.g. BabyBear). Includes the compressed timeline + decisions log.
+- `docs/PROOF_PATTERNS.md` — performance wins, tactic anti-patterns (`nlinarith` past ~4 limbs, `simp_all` leakage, etc.), kernel + elaboration landmines (deep recursion on `2^N`, `bitVec_sshiftright_eq` normalization), and build-validation gotchas (`lake env lean` silent-success bug). Add new entries when a landmine takes more than an hour to diagnose.
 
 ## Constraint-shape cascades
 
-The `is_trusted` cleanup is complete: zero `stop` markers remain in `SP1Chips/`, every `correct_*` theorem closes (including `correct_JALR`), and the old `docs/STOPPED_PROOFS.md` was deleted. If another column is ever added or removed by the SP1 constraint compiler, follow `docs/CONSTRAINT_REGEN.md` for the regen + index-shift + iff-lemma update sequence used here.
+If the SP1 constraint compiler ever adds or drops a column, follow `docs/CONSTRAINT_REGEN.md` for the regen + index-shift + iff-lemma update sequence.
 
 ## Custom tactics (`SP1Foundations/Tactics.lean`)
 

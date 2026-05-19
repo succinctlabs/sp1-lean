@@ -27,7 +27,7 @@ register bounds (`op_a < 32`, `op_b/op_c/pc[0] < 65536`), the U64 shapes for
 `sop_i` mutual-exclusion implications. The op_b/op_c bounds at `< 32` and
 the four state-side reads remain variant-dependent and are derived per-arm
 in each `correct_<v>_poly`. -/
-lemma correct_prologue_facts_poly
+lemma correct_prologue_facts
   (cstrs : (constraints Main).allHold_poly)
   (h_is_real : is_real_poly Main) :
   Main[6].val < 32 ∧
@@ -148,7 +148,7 @@ end Remuw
 -- Each `correct_<variant>_poly` delegates the variant-specific witness to the
 -- corresponding `spec.<variant>_poly` wrapper in
 -- `SP1Chips/DivRem/{DivRem,DivuRemu,DivwRemw,DivuwRemuw}.lean`.
--- `correct_prologue_facts_poly` handles the prologue shared by all 8 variants.
+-- `correct_prologue_facts` handles the prologue shared by all 8 variants.
 
 namespace DivRem.Poly
 
@@ -160,7 +160,7 @@ variable
   (s : SailState)
   (h_is_real : is_real_poly Main)
 
-def sp1_op_poly : SailM Unit := do
+def sp1_op : SailM Unit := do
   let op_a := sp1_op_a_poly Main
   Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]])
@@ -172,7 +172,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_div_poly
+theorem correct_div
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_div : is_div_poly Main)
@@ -180,7 +180,7 @@ theorem correct_div_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Div.spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Div.spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   have h17 : 2 ^ 17 < p := Fact.out
@@ -188,7 +188,7 @@ theorem correct_div_poly
     DivRem.div_chip_bounds_poly Main cstrs h_is_real h_is_div
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   simp only [DivRem.is_real_poly] at h_is_real
   simp only [SP1ConstraintList.initialState_poly, constraints,
     SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
@@ -202,7 +202,7 @@ theorem correct_div_poly
   simp [h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Div.spec_div, sp1_op_poly, execute_DIV']
+  simp [Div.spec_div, sp1_op, execute_DIV']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0
@@ -233,7 +233,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_divu_poly
+theorem correct_divu
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_divu : is_divu_poly Main)
@@ -241,7 +241,7 @@ theorem correct_divu_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Divu.spec_divu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Divu.spec_divu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   -- Surface the prime-size bound as a Nat fact so omega can use it.
@@ -253,7 +253,7 @@ theorem correct_divu_poly
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   -- PC[0] < 65536 bound (needed by lowLimb_add_nat's carry-check side condition).
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   -- Unfold h_is_real's type so simp can use it as a Main[244] = 1 rewrite.
   simp only [DivRem.is_real_poly] at h_is_real
   -- State extraction in multi-pass simp to keep stack usage bounded.
@@ -270,7 +270,7 @@ theorem correct_divu_poly
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   -- Bridge BitVec↔Fin so read_op_b/c rewrites apply against the goal's BitVec form.
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Divu.spec_divu, sp1_op_poly, execute_DIV']
+  simp [Divu.spec_divu, sp1_op, execute_DIV']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0
@@ -301,7 +301,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_divw_poly
+theorem correct_divw
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_divw : is_divw_poly Main)
@@ -309,7 +309,7 @@ theorem correct_divw_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Divw.spec_divw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Divw.spec_divw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   have h17 : 2 ^ 17 < p := Fact.out
@@ -317,7 +317,7 @@ theorem correct_divw_poly
     DivRem.divw_chip_bounds_poly Main cstrs h_is_real h_is_divw
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   simp only [DivRem.is_real_poly] at h_is_real
   simp only [SP1ConstraintList.initialState_poly, constraints,
     SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
@@ -331,7 +331,7 @@ theorem correct_divw_poly
   simp [h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Divw.spec_divw, sp1_op_poly, execute_DIVW']
+  simp [Divw.spec_divw, sp1_op, execute_DIVW']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0
@@ -362,7 +362,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_divuw_poly
+theorem correct_divuw
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_divuw : is_divuw_poly Main)
@@ -370,7 +370,7 @@ theorem correct_divuw_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Divuw.spec_divuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Divuw.spec_divuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   have h17 : 2 ^ 17 < p := Fact.out
@@ -378,7 +378,7 @@ theorem correct_divuw_poly
     DivRem.divuw_chip_bounds_poly Main cstrs h_is_real h_is_divuw
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   simp only [DivRem.is_real_poly] at h_is_real
   simp only [SP1ConstraintList.initialState_poly, constraints,
     SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
@@ -392,7 +392,7 @@ theorem correct_divuw_poly
   simp [h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Divuw.spec_divuw, sp1_op_poly, execute_DIVW']
+  simp [Divuw.spec_divuw, sp1_op, execute_DIVW']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0
@@ -423,7 +423,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_rem_poly
+theorem correct_rem
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_rem : is_rem_poly Main)
@@ -431,7 +431,7 @@ theorem correct_rem_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Rem.spec_rem (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Rem.spec_rem (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   have h17 : 2 ^ 17 < p := Fact.out
@@ -439,7 +439,7 @@ theorem correct_rem_poly
     DivRem.rem_chip_bounds_poly Main cstrs h_is_real h_is_rem
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   simp only [DivRem.is_real_poly] at h_is_real
   simp only [SP1ConstraintList.initialState_poly, constraints,
     SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
@@ -453,7 +453,7 @@ theorem correct_rem_poly
   simp [h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Rem.spec_rem, sp1_op_poly, execute_REM']
+  simp [Rem.spec_rem, sp1_op, execute_REM']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0
@@ -484,7 +484,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_remu_poly
+theorem correct_remu
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_remu : is_remu_poly Main)
@@ -492,7 +492,7 @@ theorem correct_remu_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Remu.spec_remu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Remu.spec_remu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   have h17 : 2 ^ 17 < p := Fact.out
@@ -500,7 +500,7 @@ theorem correct_remu_poly
     DivRem.remu_chip_bounds_poly Main cstrs h_is_real h_is_remu
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   simp only [DivRem.is_real_poly] at h_is_real
   simp only [SP1ConstraintList.initialState_poly, constraints,
     SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
@@ -514,7 +514,7 @@ theorem correct_remu_poly
   simp [h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Remu.spec_remu, sp1_op_poly, execute_REM']
+  simp [Remu.spec_remu, sp1_op, execute_REM']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0
@@ -545,7 +545,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_remw_poly
+theorem correct_remw
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_remw : is_remw_poly Main)
@@ -553,7 +553,7 @@ theorem correct_remw_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Remw.spec_remw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Remw.spec_remw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   have h17 : 2 ^ 17 < p := Fact.out
@@ -561,7 +561,7 @@ theorem correct_remw_poly
     DivRem.remw_chip_bounds_poly Main cstrs h_is_real h_is_remw
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   simp only [DivRem.is_real_poly] at h_is_real
   simp only [SP1ConstraintList.initialState_poly, constraints,
     SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
@@ -575,7 +575,7 @@ theorem correct_remw_poly
   simp [h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Remw.spec_remw, sp1_op_poly, execute_REMW']
+  simp [Remw.spec_remw, sp1_op, execute_REMW']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0
@@ -606,7 +606,7 @@ set_option maxHeartbeats 8000000 in
 -- Heavy reader/state-cstrs destructure + spec.<v>_poly delegate exceeds the
 -- default budget on every chip-level correct_<v>_poly variant.
 set_option maxRecDepth 2000000 in
-theorem correct_remuw_poly
+theorem correct_remuw
     (cstrs : (constraints Main).allHold_poly)
     (h_is_real : is_real_poly Main)
     (h_is_remuw : is_remuw_poly Main)
@@ -614,7 +614,7 @@ theorem correct_remuw_poly
     let op_c := sp1_op_c_poly Main
     let op_b := sp1_op_b_poly Main
     let op_a := sp1_op_a_poly Main
-    (Remuw.spec_remuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op_poly Main).run s
+    (Remuw.spec_remuw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_op Main).run s
   := by
   haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
   have h17 : 2 ^ 17 < p := Fact.out
@@ -622,7 +622,7 @@ theorem correct_remuw_poly
     DivRem.remuw_chip_bounds_poly Main cstrs h_is_real h_is_remuw
   have h_a0 := DivRem.op_a_is_0_poly Main cstrs h_is_real
   obtain ⟨_, _, _, h_pc3, _, _, _, _, _, _, _, _, _, _, _⟩ :=
-    correct_prologue_facts_poly Main cstrs h_is_real
+    correct_prologue_facts Main cstrs h_is_real
   simp only [DivRem.is_real_poly] at h_is_real
   simp only [SP1ConstraintList.initialState_poly, constraints,
     SP1Constraint.toStateProp_poly, List.Forall] at state_cstrs
@@ -636,7 +636,7 @@ theorem correct_remuw_poly
   simp [h6, h14, h21, h_is_real] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
   simp only [BitVec.ofNatLT_eq_ofNat] at *
-  simp [Remuw.spec_remuw, sp1_op_poly, execute_REMW']
+  simp [Remuw.spec_remuw, sp1_op, execute_REMW']
   rw [Sail.run_readReg, read_pc]
   simp [sp1_op_a_poly, sp1_op_b_poly, sp1_op_c_poly, read_op_b, read_op_c]
   by_cases h_is_op_a_0 : Main[6] = 0

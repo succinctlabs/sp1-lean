@@ -11,13 +11,13 @@ attribute [simp] jump_to assert PreSail.assert ofBool
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (Main : Vector (ZMod p) 45)
 
-def sp1_op_a_poly : BitVec 5 := BitVec.ofNat 5 Main[6].val
+def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
 
-def sp1_op_b_poly : BitVec 5 := BitVec.ofNat 5 Main[14].val
+def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 
-def sp1_imm_poly : BitVec 13 := BitVec.ofNat 13 Main[21].val
+def sp1_imm : BitVec 13 := BitVec.ofNat 13 Main[21].val
 
-def sp1_branch_poly : SailM ExecutionResult := do
+def sp1_branch : SailM ExecutionResult := do
   writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
@@ -28,25 +28,21 @@ noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   execute_BTYPE imm rs2 rs1 bop.BEQ
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of `correct_beq`. Mirrors the concrete proof
--- but threads `single_op_poly`, `eq_signExtend_of_is_real_poly`,
--- `add_signExtend_of_constraints_poly`, `branch_addr_eq_poly`, and
--- `pc_plus_4_eq_poly` through the same skeleton. Heartbeats elevated
--- for the post-state-cstrs `simp_all` chain (ZMod cast normalization
--- runs ~3× the concrete budget). `skipKernelTC` for `BitVec.toNat_add`
--- kernel deep-recursion in branch_addr_eq_poly's body.
+-- Heartbeats elevated for the post-state-cstrs `simp_all` chain (ZMod cast
+-- normalization is expensive); `skipKernelTC` works around `BitVec.toNat_add`
+-- kernel deep-recursion in `branch_addr_eq_poly`'s body.
 set_option debug.skipKernelTC true in
-theorem correct_beq_poly
+theorem correct_beq
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
     (s : SailState) (hs : s.isInitialized)
     (h_is_beq : Main[28] = 1)
     (cstrs : (Branch.constraints Main).allHold_poly)
     (state_cstrs : (Branch.constraints Main).initialState_poly s) :
-    let imm := sp1_imm_poly Main
-    let op_b := regidx.Regidx (sp1_op_b_poly Main)
-    let op_a := regidx.Regidx (sp1_op_a_poly Main)
-    (spec_beq imm op_b op_a).run s = (sp1_branch_poly Main).run s := by
+    let imm := sp1_imm Main
+    let op_b := regidx.Regidx (sp1_op_b Main)
+    let op_a := regidx.Regidx (sp1_op_a Main)
+    (spec_beq imm op_b op_a).run s = (sp1_branch Main).run s := by
   extract_lets imm op_b op_a
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -124,12 +120,12 @@ theorem correct_beq_poly
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
-  -- main goal: bridge spec_beq through to sp1_branch_poly
-  simp [spec_beq, sp1_branch_poly, execute_BTYPE]
+  -- main goal: bridge spec_beq through to sp1_branch
+  simp [spec_beq, sp1_branch, execute_BTYPE]
   rw [run_readReg]
   simp [h_pc_read]
   simp only [BitVec.ofNatLT_eq_ofNat] at h_op_a_read h_op_b_read
-  simp [op_a, sp1_op_a_poly, h_op_a_read, op_b, sp1_op_b_poly, h_op_b_read]
+  simp [op_a, sp1_op_a, h_op_a_read, op_b, sp1_op_b, h_op_b_read]
   -- Local helpers used by both arms — inlined to avoid simp-leakage from the
   -- preceding `simp_all only [...]`-style steps. Word ↔ BV equality bridge
   -- under isU64_poly bounds.
@@ -302,21 +298,20 @@ noncomputable def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   execute_BTYPE imm rs2 rs1 bop.BNE
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of `correct_bne`. Same structure as
--- `correct_beq_poly` but with NEQ/EQ polarity flipped: branching arm
--- corresponds to NEQ (sum = 1), non-branching to EQ (sum = 0).
+-- NEQ/EQ polarity flipped vs `correct_beq`: branching arm is NEQ (sum = 1),
+-- non-branching is EQ (sum = 0).
 set_option debug.skipKernelTC true in
-theorem correct_bne_poly
+theorem correct_bne
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
     (s : SailState) (hs : s.isInitialized)
     (h_is_bne : Main[29] = 1)
     (cstrs : (Branch.constraints Main).allHold_poly)
     (state_cstrs : (Branch.constraints Main).initialState_poly s) :
-    let imm := sp1_imm_poly Main
-    let op_b := regidx.Regidx (sp1_op_b_poly Main)
-    let op_a := regidx.Regidx (sp1_op_a_poly Main)
-    (spec_bne imm op_b op_a).run s = (sp1_branch_poly Main).run s := by
+    let imm := sp1_imm Main
+    let op_b := regidx.Regidx (sp1_op_b Main)
+    let op_a := regidx.Regidx (sp1_op_a Main)
+    (spec_bne imm op_b op_a).run s = (sp1_branch Main).run s := by
   extract_lets imm op_b op_a
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -384,11 +379,11 @@ theorem correct_bne_poly
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
-  simp [spec_bne, sp1_branch_poly, execute_BTYPE]
+  simp [spec_bne, sp1_branch, execute_BTYPE]
   rw [run_readReg]
   simp [h_pc_read]
   simp only [BitVec.ofNatLT_eq_ofNat] at h_op_a_read h_op_b_read
-  simp [op_a, sp1_op_a_poly, h_op_a_read, op_b, sp1_op_b_poly, h_op_b_read]
+  simp [op_a, sp1_op_a, h_op_a_read, op_b, sp1_op_b, h_op_b_read]
   obtain ⟨h_eq_iff, h_neq_iff, _h_lt_ite⟩ := spec_lt_unsigned
   have h_BV_to_Word :
       Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]] =
@@ -557,21 +552,20 @@ noncomputable def spec_blt (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   execute_BTYPE imm rs2 rs1 bop.BLT
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of `correct_blt`. is_signed = 1 (signed
--- comparison via spec_lt.2). For BLT chip, Main[34] = Main[35]: branching
--- when lt holds, non-branching when not.
+-- is_signed = 1 (signed comparison via `spec_lt.2`). Main[34] = Main[35]:
+-- branching when lt holds, non-branching when not.
 set_option debug.skipKernelTC true in
-theorem correct_blt_poly
+theorem correct_blt
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
     (s : SailState) (hs : s.isInitialized)
     (h_is_blt : Main[30] = 1)
     (cstrs : (Branch.constraints Main).allHold_poly)
     (state_cstrs : (Branch.constraints Main).initialState_poly s) :
-    let imm := sp1_imm_poly Main
-    let op_b := regidx.Regidx (sp1_op_b_poly Main)
-    let op_a := regidx.Regidx (sp1_op_a_poly Main)
-    (spec_blt imm op_b op_a).run s = (sp1_branch_poly Main).run s := by
+    let imm := sp1_imm Main
+    let op_b := regidx.Regidx (sp1_op_b Main)
+    let op_a := regidx.Regidx (sp1_op_a Main)
+    (spec_blt imm op_b op_a).run s = (sp1_branch Main).run s := by
   extract_lets imm op_b op_a
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -645,11 +639,11 @@ theorem correct_blt_poly
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
-  simp [spec_blt, sp1_branch_poly, execute_BTYPE]
+  simp [spec_blt, sp1_branch, execute_BTYPE]
   rw [run_readReg]
   simp [h_pc_read]
   simp only [BitVec.ofNatLT_eq_ofNat] at h_op_a_read h_op_b_read
-  simp [op_a, sp1_op_a_poly, h_op_a_read, op_b, sp1_op_b_poly, h_op_b_read]
+  simp [op_a, sp1_op_a, h_op_a_read, op_b, sp1_op_b, h_op_b_read]
   -- Convert h_lt_ite from Word.toInt_poly form to BV.toInt form to match the goal.
   rw [← h_a_int, ← h_b_int] at h_lt_ite
   by_cases h_lt : op_a_val.toInt < op_b_val.toInt <;> simp only [op_a_val, op_b_val] at h_lt
@@ -772,21 +766,21 @@ noncomputable def spec_bge (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : S
   execute_BTYPE imm rs2 rs1 bop.BGE
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of `correct_bge`. is_signed = 1 (signed via
--- spec_lt.2). For BGE chip, Main[34] = 1 - Main[35]: branching when ≥
--- holds (Main[35] = 0), non-branching when < holds (Main[35] = 1).
+-- is_signed = 1 (signed via `spec_lt.2`). Main[34] = 1 - Main[35]:
+-- branching when ≥ holds (Main[35] = 0), non-branching when < holds
+-- (Main[35] = 1).
 set_option debug.skipKernelTC true in
-theorem correct_bge_poly
+theorem correct_bge
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
     (s : SailState) (hs : s.isInitialized)
     (h_is_bge : Main[31] = 1)
     (cstrs : (Branch.constraints Main).allHold_poly)
     (state_cstrs : (Branch.constraints Main).initialState_poly s) :
-    let imm := sp1_imm_poly Main
-    let op_b := regidx.Regidx (sp1_op_b_poly Main)
-    let op_a := regidx.Regidx (sp1_op_a_poly Main)
-    (spec_bge imm op_b op_a).run s = (sp1_branch_poly Main).run s := by
+    let imm := sp1_imm Main
+    let op_b := regidx.Regidx (sp1_op_b Main)
+    let op_a := regidx.Regidx (sp1_op_a Main)
+    (spec_bge imm op_b op_a).run s = (sp1_branch Main).run s := by
   extract_lets imm op_b op_a
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -858,11 +852,11 @@ theorem correct_bge_poly
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
-  simp [spec_bge, sp1_branch_poly, execute_BTYPE]
+  simp [spec_bge, sp1_branch, execute_BTYPE]
   rw [run_readReg]
   simp [h_pc_read]
   simp only [BitVec.ofNatLT_eq_ofNat] at h_op_a_read h_op_b_read
-  simp [op_a, sp1_op_a_poly, h_op_a_read, op_b, sp1_op_b_poly, h_op_b_read]
+  simp [op_a, sp1_op_a, h_op_a_read, op_b, sp1_op_b, h_op_b_read]
   rw [← h_a_int, ← h_b_int] at h_lt_ite
   by_cases h_ge : op_a_val.toInt ≥ op_b_val.toInt <;> simp only [op_a_val, op_b_val] at h_ge
   · -- branching arm: ge holds, so lt fails
@@ -996,21 +990,21 @@ noncomputable def spec_bltu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
   execute_BTYPE imm rs2 rs1 bop.BLTU
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of `correct_bltu`. Unsigned variant of BLT:
--- is_signed = 0 (spec_lt.1), uses Word.toNat_poly / BitVec.toNat for
--- ordering. For BLTU chip, Main[34] = Main[35] (same as BLT).
+-- Unsigned variant of BLT: is_signed = 0 (`spec_lt.1`); uses
+-- `Word.toNat_poly` / `BitVec.toNat` for ordering. Main[34] = Main[35]
+-- (same shape as BLT).
 set_option debug.skipKernelTC true in
-theorem correct_bltu_poly
+theorem correct_bltu
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
     (s : SailState) (hs : s.isInitialized)
     (h_is_bltu : Main[32] = 1)
     (cstrs : (Branch.constraints Main).allHold_poly)
     (state_cstrs : (Branch.constraints Main).initialState_poly s) :
-    let imm := sp1_imm_poly Main
-    let op_b := regidx.Regidx (sp1_op_b_poly Main)
-    let op_a := regidx.Regidx (sp1_op_a_poly Main)
-    (spec_bltu imm op_b op_a).run s = (sp1_branch_poly Main).run s := by
+    let imm := sp1_imm Main
+    let op_b := regidx.Regidx (sp1_op_b Main)
+    let op_a := regidx.Regidx (sp1_op_a Main)
+    (spec_bltu imm op_b op_a).run s = (sp1_branch Main).run s := by
   extract_lets imm op_b op_a
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -1082,11 +1076,11 @@ theorem correct_bltu_poly
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
-  simp [spec_bltu, sp1_branch_poly, execute_BTYPE]
+  simp [spec_bltu, sp1_branch, execute_BTYPE]
   rw [run_readReg]
   simp [h_pc_read]
   simp only [BitVec.ofNatLT_eq_ofNat] at h_op_a_read h_op_b_read
-  simp [op_a, sp1_op_a_poly, h_op_a_read, op_b, sp1_op_b_poly, h_op_b_read]
+  simp [op_a, sp1_op_a, h_op_a_read, op_b, sp1_op_b, h_op_b_read]
   rw [← h_a_nat, ← h_b_nat] at h_lt_ite
   by_cases h_lt : op_a_val.toNat < op_b_val.toNat <;> simp only [op_a_val, op_b_val] at h_lt
   · -- branching arm: unsigned lt holds
@@ -1208,21 +1202,21 @@ noncomputable def spec_bgeu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) : 
   execute_BTYPE imm rs2 rs1 bop.BGEU
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of `correct_bgeu`. Unsigned BGE variant:
--- is_signed = 0 (spec_lt.1), Word.toNat_poly ordering. Branching when
--- ≥ holds (Main[35] = 0, Main[34] = 1), non-branching when < holds.
+-- Unsigned BGE variant: is_signed = 0 (`spec_lt.1`), `Word.toNat_poly`
+-- ordering. Branching when ≥ holds (Main[35] = 0, Main[34] = 1),
+-- non-branching when < holds.
 set_option debug.skipKernelTC true in
-theorem correct_bgeu_poly
+theorem correct_bgeu
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
     (s : SailState) (hs : s.isInitialized)
     (h_is_bgeu : Main[33] = 1)
     (cstrs : (Branch.constraints Main).allHold_poly)
     (state_cstrs : (Branch.constraints Main).initialState_poly s) :
-    let imm := sp1_imm_poly Main
-    let op_b := regidx.Regidx (sp1_op_b_poly Main)
-    let op_a := regidx.Regidx (sp1_op_a_poly Main)
-    (spec_bgeu imm op_b op_a).run s = (sp1_branch_poly Main).run s := by
+    let imm := sp1_imm Main
+    let op_b := regidx.Regidx (sp1_op_b Main)
+    let op_a := regidx.Regidx (sp1_op_a Main)
+    (spec_bgeu imm op_b op_a).run s = (sp1_branch Main).run s := by
   extract_lets imm op_b op_a
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -1295,11 +1289,11 @@ theorem correct_bgeu_poly
   obtain ⟨h_pc_read, h_op_a_read, h_op_b_read⟩ := state_cstrs
   specialize h_op_a_read
   specialize h_op_b_read
-  simp [spec_bgeu, sp1_branch_poly, execute_BTYPE]
+  simp [spec_bgeu, sp1_branch, execute_BTYPE]
   rw [run_readReg]
   simp [h_pc_read]
   simp only [BitVec.ofNatLT_eq_ofNat] at h_op_a_read h_op_b_read
-  simp [op_a, sp1_op_a_poly, h_op_a_read, op_b, sp1_op_b_poly, h_op_b_read]
+  simp [op_a, sp1_op_a, h_op_a_read, op_b, sp1_op_b, h_op_b_read]
   rw [← h_a_nat, ← h_b_nat] at h_lt_ite
   by_cases h_ge : op_a_val.toNat ≥ op_b_val.toNat <;> simp only [op_a_val, op_b_val] at h_ge
   · -- branching arm: ge holds, so lt fails

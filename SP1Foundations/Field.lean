@@ -7,7 +7,7 @@ This file plays two roles:
 
 1. **Concrete field instances on `Fin KB`** (`namespace KoalaBear`): primality,
    `Field`, `NoZeroDivisors`, and a block of high-priority arithmetic instances
-   that are perf-critical (see `docs/PERF_PATTERNS.md`).
+   that are perf-critical (see `docs/PROOF_PATTERNS.md`).
 2. **KB-specific bridges** (free-floating lemmas below the namespace): `rfl`-only
    facts like `(2130673921 : Fin KB) = 65536⁻¹` that translate the literal
    inverse-of-`2^k` values that the SP1 constraint compiler emits into

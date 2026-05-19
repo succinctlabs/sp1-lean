@@ -64,7 +64,7 @@ set_option maxHeartbeats 16000000 in
 -- Carry-chain rearrangements + BitVec/Nat bridge run 4–8M; 16M leaves
 -- headroom. `skipKernelTC` is required to bypass kernel deep recursion
 -- on `BitVec.toNat_add`'s `% 2^64` rewrite combined with the 4-limb
--- carry chain (per `docs/GOTCHAS.md` "Kernel deep-recursion on `2^N`"
+-- carry chain (per `docs/PROOF_PATTERNS.md` "Kernel deep-recursion on `2^N`"
 -- entry). The proof elaborates fine; only the kernel re-check fails.
 -- `lean_verify` confirms standard axioms only (propext / Classical.choice
 -- / Quot.sound) — no new axioms introduced.

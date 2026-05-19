@@ -15,7 +15,7 @@ namespace BitVec
 -- `BitVec.ofInt` of a non-negative `↑b` collapses to `b % 2^n`. This is the
 -- shape that lands in proof terms downstream of `BitVec.toNat_signExtend`
 -- and is the proximate trigger for several historical `skipKernelTC` sites.
--- See `docs/GOTCHAS.md`. The underlying `Int.toNat_natCast_emod_natCast`
+-- See `docs/PROOF_PATTERNS.md`. The underlying `Int.toNat_natCast_emod_natCast`
 -- helper lives in `SP1Foundations/Misc.lean` so `Word.lean` can reach it too.
 lemma toNat_ofInt_natCast (n b : ℕ) :
     (BitVec.ofInt n (b : ℤ)).toNat = b % 2 ^ n := by

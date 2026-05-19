@@ -406,7 +406,7 @@ set_option maxHeartbeats 16000000 in
 -- `c = 0 ∨ c = 1` where `c` is the inverse-form carry expression. The high
 -- limb of the result vector is `0` (the chip pins next_pc[3] = 0 via E121's
 -- final-carry = 0 case). `skipKernelTC` for kernel deep-recursion on
--- `BitVec.toNat_add`'s `% 2^64` (per `docs/GOTCHAS.md`).
+-- `BitVec.toNat_add`'s `% 2^64` (per `docs/PROOF_PATTERNS.md`).
 set_option debug.skipKernelTC true in
 lemma branch_addr_eq_poly
     (Main : Vector (ZMod p) 45)
@@ -640,7 +640,7 @@ set_option maxHeartbeats 16000000 in
 -- Internally bridges to canonical form, then mirrors `pc_plus_4_eq_poly`'s
 -- `limb_lift_branch` chain. Heartbeats elevated for the bridges + chain.
 -- `skipKernelTC` for `BitVec.toNat_add`'s `% 2^64` deep-recursion gotcha
--- (per `docs/GOTCHAS.md`).
+-- (per `docs/PROOF_PATTERNS.md`).
 set_option debug.skipKernelTC true in
 lemma pc_plus_4_eq_poly_chip
     (Main : Vector (ZMod p) 45)

@@ -492,7 +492,7 @@ def execute_RTYPEW_pure (op1 : BitVec 64) (op2 : BitVec 64) (op : ropw) :=
 -- Polymorphic counterpart of `exec_RTYPEW_pure_bv_to_w`. The SRAW arm's
 -- `((↑b : ℤ) % n).toNat = b % n` step is discharged by
 -- `Int.toNat_natCast_emod_natCast` (`SP1Foundations/Misc.lean`) instead of
--- `omega` so the Category-0 trigger from `docs/GOTCHAS.md` doesn't
+-- `omega` so the Category-0 trigger from `docs/PROOF_PATTERNS.md` doesn't
 -- land in the kernel-rechecked proof term.
 lemma exec_RTYPEW_pure_bv_to_w_poly {p : ℕ} [NeZero p]
     (op1 : Word (ZMod p)) (op2 : Word (ZMod p)) (op : ropw) :
