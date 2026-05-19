@@ -5,7 +5,7 @@ namespace U16MSBOperation
 
 section constraints
 
-@[irreducible] def constraints {F : Type*} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (a : F)
   (cols : U16MSBOperation F)
   (is_real : F)

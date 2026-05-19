@@ -12,6 +12,22 @@ The Bitwise chip's `Constraints.lean` declares a single `allHold_constraints_iff
 covering all 6 variants; per-variant chip arms apply the iff plus `single_op_poly`
 to collapse to the active variant, then bridge through `BitwiseU16Operation.spec.{xor,or,and}_poly`. -/
 
+namespace Bitwise
+
+variable
+  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+  (Main : Vector (ZMod p) 51)
+
+-- Unified SP1 implementation for the Bitwise chip. All six variants
+-- (xor, or, and, xori, ori, andi) write the same Main result columns to op_a; the
+-- chip's constraints determine which Sail spec those columns implement.
+def sp1_bitwise : SailM Unit := do
+  let op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
+  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
+
+end Bitwise
+
 namespace Xor
 
 open Bitwise
@@ -30,11 +46,6 @@ def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
 def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
-def sp1_xor : SailM Unit := do
-  let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
-
 open Sail
 
 set_option maxHeartbeats 1600000 in
@@ -46,7 +57,7 @@ theorem correct_xor
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
-  (spec_xor (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xor Main).run s
+  (spec_xor (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
     simp [SP1ConstraintList.allHold_poly] at cstrs
     rw [allHold_constraints_iff_poly] at cstrs
@@ -94,7 +105,7 @@ theorem correct_xor
       h6, h14, h21, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp only [BitVec.ofNatLT_eq_ofNat] at *
-    simp [spec_xor, sp1_xor, execute_RTYPE']
+    simp [spec_xor, Bitwise.sp1_bitwise, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
@@ -138,11 +149,6 @@ def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
 def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
-def sp1_or : SailM Unit := do
-  let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
-
 open Sail
 
 set_option maxHeartbeats 1600000 in
@@ -154,7 +160,7 @@ theorem correct_or
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
-  (spec_or (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_or Main).run s
+  (spec_or (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
     simp [SP1ConstraintList.allHold_poly] at cstrs
     rw [allHold_constraints_iff_poly] at cstrs
@@ -200,7 +206,7 @@ theorem correct_or
       h6, h14, h21, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp only [BitVec.ofNatLT_eq_ofNat] at *
-    simp [spec_or, sp1_or, execute_RTYPE']
+    simp [spec_or, Bitwise.sp1_bitwise, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
@@ -244,11 +250,6 @@ def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
 def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
-def sp1_and : SailM Unit := do
-  let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
-
 open Sail
 
 set_option maxHeartbeats 1600000 in
@@ -260,7 +261,7 @@ theorem correct_and
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
-  (spec_and (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (sp1_and Main).run s
+  (spec_and (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
     simp [SP1ConstraintList.allHold_poly] at cstrs
     rw [allHold_constraints_iff_poly] at cstrs
@@ -306,7 +307,7 @@ theorem correct_and
       h6, h14, h21, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     simp only [BitVec.ofNatLT_eq_ofNat] at *
-    simp [spec_and, sp1_and, execute_RTYPE']
+    simp [spec_and, Bitwise.sp1_bitwise, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
     rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
@@ -350,11 +351,6 @@ def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
 def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
-def sp1_xori : SailM Unit := do
-  let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
-
 open Sail
 
 set_option maxHeartbeats 1600000 in
@@ -366,7 +362,7 @@ theorem correct_xori
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
-  (spec_xori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_xori Main).run s
+  (spec_xori op_c (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
     simp [SP1ConstraintList.allHold_poly] at cstrs
     rw [allHold_constraints_iff_poly] at cstrs
@@ -425,7 +421,7 @@ theorem correct_xori
       h6, h14, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, _read_op_a, read_op_b⟩ := state_cstrs
     simp only [BitVec.ofNatLT_eq_ofNat] at *
-    simp [spec_xori, sp1_xori, execute_ITYPE']
+    simp [spec_xori, Bitwise.sp1_bitwise, execute_ITYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
@@ -474,11 +470,6 @@ def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
 def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
-def sp1_ori : SailM Unit := do
-  let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
-
 open Sail
 
 set_option maxHeartbeats 1600000 in
@@ -490,7 +481,7 @@ theorem correct_ori
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
-  (spec_ori op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_ori Main).run s
+  (spec_ori op_c (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
     simp [SP1ConstraintList.allHold_poly] at cstrs
     rw [allHold_constraints_iff_poly] at cstrs
@@ -549,7 +540,7 @@ theorem correct_ori
       h6, h14, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, _read_op_a, read_op_b⟩ := state_cstrs
     simp only [BitVec.ofNatLT_eq_ofNat] at *
-    simp [spec_ori, sp1_ori, execute_ITYPE']
+    simp [spec_ori, Bitwise.sp1_bitwise, execute_ITYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
@@ -598,11 +589,6 @@ def sp1_op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
 def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
-def sp1_andi : SailM Unit := do
-  let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
-
 open Sail
 
 set_option maxHeartbeats 1600000 in
@@ -614,7 +600,7 @@ theorem correct_andi
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
-  (spec_andi op_c (.Regidx op_b) (.Regidx op_a)).run s = (sp1_andi Main).run s
+  (spec_andi op_c (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
     simp [SP1ConstraintList.allHold_poly] at cstrs
     rw [allHold_constraints_iff_poly] at cstrs
@@ -673,7 +659,7 @@ theorem correct_andi
       h6, h14, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, _read_op_a, read_op_b⟩ := state_cstrs
     simp only [BitVec.ofNatLT_eq_ofNat] at *
-    simp [spec_andi, sp1_andi, execute_ITYPE']
+    simp [spec_andi, Bitwise.sp1_bitwise, execute_ITYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :

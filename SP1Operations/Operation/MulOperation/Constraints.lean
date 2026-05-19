@@ -915,7 +915,7 @@ end core_mul
 
 section constraints
 
-@[irreducible] def constraints {F : Type} [Field F]
+@[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]
   (a_word : (Word F))
   (b_word : (Word F))
   (c_word : (Word F))

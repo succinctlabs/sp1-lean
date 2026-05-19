@@ -59,3 +59,4 @@ import SP1Chips.Subw.Constraints
 import SP1Chips.SubwChip
 import SP1Chips.UType.Constraints
 import SP1Chips.UTypeChip
+import SP1Chips.Soundness
