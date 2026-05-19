@@ -885,6 +885,166 @@ lemma run_vmem_write_of_width_8
   conv_lhs => rw [h]
   rfl
 
+/-- Sp1-side reduction of a 1-byte `write_ram` call at bare `BitVec`. Pairs with
+`run_vmem_write_of_width_1'` to let `Store*Chip.correct` discharge the post-`rw` bullet-1
+equation without invoking the default simp set on a `Word (ZMod p)`-carrying goal — the
+trigger documented in `docs/PROOF_PATTERNS.md` §3 (2026-05-19 sorry-bisect) for the kernel
+deep-recursion. The polymorphic instance graph never enters this helper's olean. -/
+lemma run_write_ram_of_width_1 (s : SailState) (addr : BitVec 64) (data : BitVec 8) :
+    EStateM.run (Sail.ConcurrencyInterfaceV1.write_ram 64 1 0#64 addr data) s
+    = EStateM.Result.ok () { s with mem := s.mem.insert addr.toNat data } := by
+  simp [Sail.ConcurrencyInterfaceV1.write_ram, PreSail.write_ram,
+    PreSail.writeBytes, PreSail.writeByte,
+    bind, pure, EStateM.bind, EStateM.pure, EStateM.run,
+    modify, modifyGet, MonadStateOf.modifyGet, MonadState.modifyGet,
+    EStateM.modifyGet, Functor.map, ExceptT.run, ExceptT.bind, ExceptT.pure,
+    List.forM, List.ofFn, Fin.foldr, Fin.foldr.loop, forM,
+    Functor.mapConst, Function.const]
+
+/-- Bullet-1 equation for byte stores, lifted to bare `BitVec 64`/`BitVec 8`. Pairs with
+`run_vmem_write_of_width_1'` (which reduces the spec-side `vmem_write` to a `.ok (.Ok true) S`
+form): together they collapse the bullet-1 equation produced by
+`rw [run_vmem_write_of_width_1' ...]` in a `Store*Chip.correct` proof, without needing the
+default simp set on a `Word (ZMod p)`-carrying goal — the trigger documented in
+`docs/PROOF_PATTERNS.md` §3 (2026-05-19 sorry-bisect). -/
+lemma store_byte_post_vmem_eq
+    (s : SailState) (pc addr : BitVec 64) (data : BitVec 8) :
+    (match (EStateM.Result.ok (α := Result Bool ExecutionResult)
+              (Result.Ok true)
+              { s with regs := s.regs.insert Register.nextPC pc,
+                       mem := s.mem.insert addr.toNat data }) with
+       | .ok x s' => EStateM.run (match x with
+                                  | .Ok _ => pure RETIRE_SUCCESS
+                                  | .Err e => pure e) s'
+       | .error e s' => EStateM.Result.error e s')
+    = EStateM.Result.map (fun _ : Unit => RETIRE_SUCCESS)
+        (EStateM.run
+          (Sail.ConcurrencyInterfaceV1.write_ram 64 1 0#64 addr data)
+          { s with regs := s.regs.insert Register.nextPC pc }) := by
+  rw [run_write_ram_of_width_1]
+  rfl
+
+/-- Sp1-side reduction of a 2-byte `write_ram` call at bare `BitVec`. Width-2 analogue of
+`run_write_ram_of_width_1`; see that lemma's docstring for the kernel-recursion context. -/
+lemma run_write_ram_of_width_2 (s : SailState) (addr : BitVec 64) (data : BitVec 16) :
+    EStateM.run (Sail.ConcurrencyInterfaceV1.write_ram 64 2 0#64 addr data) s
+    = EStateM.Result.ok ()
+        { s with mem :=
+            ((s.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
+              (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))) } := by
+  simp [Sail.ConcurrencyInterfaceV1.write_ram, PreSail.write_ram,
+    PreSail.writeBytes, PreSail.writeByte,
+    bind, pure, EStateM.bind, EStateM.pure, EStateM.run,
+    modify, modifyGet, MonadStateOf.modifyGet, MonadState.modifyGet,
+    EStateM.modifyGet, Functor.map, ExceptT.run, ExceptT.bind, ExceptT.pure,
+    List.forM, List.ofFn, Fin.foldr, Fin.foldr.loop, forM,
+    Functor.mapConst, Function.const]
+
+/-- Width-2 analogue of `store_byte_post_vmem_eq`. -/
+lemma store_half_post_vmem_eq
+    (s : SailState) (pc addr : BitVec 64) (data : BitVec 16) :
+    (match (EStateM.Result.ok (α := Result Bool ExecutionResult)
+              (Result.Ok true)
+              { s with regs := s.regs.insert Register.nextPC pc,
+                       mem := ((s.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
+                                (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))) }) with
+       | .ok x s' => EStateM.run (match x with
+                                  | .Ok _ => pure RETIRE_SUCCESS
+                                  | .Err e => pure e) s'
+       | .error e s' => EStateM.Result.error e s')
+    = EStateM.Result.map (fun _ : Unit => RETIRE_SUCCESS)
+        (EStateM.run
+          (Sail.ConcurrencyInterfaceV1.write_ram 64 2 0#64 addr data)
+          { s with regs := s.regs.insert Register.nextPC pc }) := by
+  rw [run_write_ram_of_width_2]
+  rfl
+
+/-- Sp1-side reduction of a 4-byte `write_ram` call at bare `BitVec`. Width-4 analogue of
+`run_write_ram_of_width_1`. -/
+lemma run_write_ram_of_width_4 (s : SailState) (addr : BitVec 64) (data : BitVec 32) :
+    EStateM.run (Sail.ConcurrencyInterfaceV1.write_ram 64 4 0#64 addr data) s
+    = EStateM.Result.ok ()
+        { s with mem :=
+            ((((s.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
+              (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
+              (addr.toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
+              (addr.toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) } := by
+  simp [Sail.ConcurrencyInterfaceV1.write_ram, PreSail.write_ram,
+    PreSail.writeBytes, PreSail.writeByte,
+    bind, pure, EStateM.bind, EStateM.pure, EStateM.run,
+    modify, modifyGet, MonadStateOf.modifyGet, MonadState.modifyGet,
+    EStateM.modifyGet, Functor.map, ExceptT.run, ExceptT.bind, ExceptT.pure,
+    List.forM, List.ofFn, Fin.foldr, Fin.foldr.loop, forM,
+    Functor.mapConst, Function.const]
+
+/-- Width-4 analogue of `store_byte_post_vmem_eq`. -/
+lemma store_word_post_vmem_eq
+    (s : SailState) (pc addr : BitVec 64) (data : BitVec 32) :
+    (match (EStateM.Result.ok (α := Result Bool ExecutionResult)
+              (Result.Ok true)
+              { s with regs := s.regs.insert Register.nextPC pc,
+                       mem := ((((s.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
+                                 (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
+                                 (addr.toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
+                                 (addr.toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))) }) with
+       | .ok x s' => EStateM.run (match x with
+                                  | .Ok _ => pure RETIRE_SUCCESS
+                                  | .Err e => pure e) s'
+       | .error e s' => EStateM.Result.error e s')
+    = EStateM.Result.map (fun _ : Unit => RETIRE_SUCCESS)
+        (EStateM.run
+          (Sail.ConcurrencyInterfaceV1.write_ram 64 4 0#64 addr data)
+          { s with regs := s.regs.insert Register.nextPC pc }) := by
+  rw [run_write_ram_of_width_4]
+  rfl
+
+/-- Sp1-side reduction of an 8-byte `write_ram` call at bare `BitVec`. Width-8 analogue of
+`run_write_ram_of_width_1`. -/
+lemma run_write_ram_of_width_8 (s : SailState) (addr : BitVec 64) (data : BitVec 64) :
+    EStateM.run (Sail.ConcurrencyInterfaceV1.write_ram 64 8 0#64 addr data) s
+    = EStateM.Result.ok ()
+        { s with mem :=
+            ((((((((s.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
+                (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
+                (addr.toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
+                (addr.toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))).insert
+                (addr.toNat + 4) (BitVec.ofNat 8 (data.toNat >>> 32))).insert
+                (addr.toNat + 5) (BitVec.ofNat 8 (data.toNat >>> 40))).insert
+                (addr.toNat + 6) (BitVec.ofNat 8 (data.toNat >>> 48))).insert
+                (addr.toNat + 7) (BitVec.ofNat 8 (data.toNat >>> 56))) } := by
+  simp [Sail.ConcurrencyInterfaceV1.write_ram, PreSail.write_ram,
+    PreSail.writeBytes, PreSail.writeByte,
+    bind, pure, EStateM.bind, EStateM.pure, EStateM.run,
+    modify, modifyGet, MonadStateOf.modifyGet, MonadState.modifyGet,
+    EStateM.modifyGet, Functor.map, ExceptT.run, ExceptT.bind, ExceptT.pure,
+    List.forM, List.ofFn, Fin.foldr, Fin.foldr.loop, forM,
+    Functor.mapConst, Function.const]
+
+/-- Width-8 analogue of `store_byte_post_vmem_eq`. -/
+lemma store_double_post_vmem_eq
+    (s : SailState) (pc addr : BitVec 64) (data : BitVec 64) :
+    (match (EStateM.Result.ok (α := Result Bool ExecutionResult)
+              (Result.Ok true)
+              { s with regs := s.regs.insert Register.nextPC pc,
+                       mem := ((((((((s.mem.insert addr.toNat (BitVec.ofNat 8 data.toNat)).insert
+                                  (addr.toNat + 1) (BitVec.ofNat 8 (data.toNat >>> 8))).insert
+                                  (addr.toNat + 2) (BitVec.ofNat 8 (data.toNat >>> 16))).insert
+                                  (addr.toNat + 3) (BitVec.ofNat 8 (data.toNat >>> 24))).insert
+                                  (addr.toNat + 4) (BitVec.ofNat 8 (data.toNat >>> 32))).insert
+                                  (addr.toNat + 5) (BitVec.ofNat 8 (data.toNat >>> 40))).insert
+                                  (addr.toNat + 6) (BitVec.ofNat 8 (data.toNat >>> 48))).insert
+                                  (addr.toNat + 7) (BitVec.ofNat 8 (data.toNat >>> 56))) }) with
+       | .ok x s' => EStateM.run (match x with
+                                  | .Ok _ => pure RETIRE_SUCCESS
+                                  | .Err e => pure e) s'
+       | .error e s' => EStateM.Result.error e s')
+    = EStateM.Result.map (fun _ : Unit => RETIRE_SUCCESS)
+        (EStateM.run
+          (Sail.ConcurrencyInterfaceV1.write_ram 64 8 0#64 addr data)
+          { s with regs := s.regs.insert Register.nextPC pc }) := by
+  rw [run_write_ram_of_width_8]
+  rfl
+
 lemma run_vmem_read_of_width_1'
     (rs_addr_bv : BitVec 5)
     (reg_val : BitVec 64) -- thing inside `rs_addr_bv`

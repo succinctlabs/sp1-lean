@@ -33,11 +33,10 @@ def sp1_sb (Main : Vector (ZMod p) 50) : SailM ExecutionResult := do
     (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]])
   return RETIRE_SUCCESS
 
-set_option maxHeartbeats 1600000 in
 -- StoreDouble pattern + single-byte data shape (uses run_vmem_write_of_width_1').
--- `skipKernelTC` for residual kernel deep-recursion in the default-`simp`
--- chain handling BitVec/Word conversions in the monadic write expansion.
-set_option debug.skipKernelTC true in
+-- The bullet-1 monadic-write equation is discharged by `store_byte_post_vmem_eq`
+-- (bare-`BitVec` recipe-2 lift, `docs/PROOF_PATTERNS.md` §3) so this proof no longer
+-- requires `set_option debug.skipKernelTC true` or the previous maxHeartbeats bump.
 theorem correct (Main : Vector (ZMod p) 50)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -149,25 +148,25 @@ theorem correct (Main : Vector (ZMod p) 50)
     (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
     (BitVec.signExtend 64 imm_c)
     (BitVec.ofNat 8 Main[7].val)]
-  · simp [sp1_sb, h_imm_c, imm_c, Sail.ConcurrencyInterfaceV1.write_ram, PreSail.write_ram,
-      PreSail.writeBytes, PreSail.writeByte]
-    constructor
-    · have h_pc3 : Main[3].val < 65536 := by
-        have h3 : Main[3] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
-        have : Main[3].val < (65536 : ZMod p).val := h3
-        rwa [h65] at this
+  · have h_pc3 : Main[3].val < 65536 := by
+      have h3 : Main[3] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
+      have : Main[3].val < (65536 : ZMod p).val := h3
+      rwa [h65] at this
+    have h_pc_lift : Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0]
+        = Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], 0] + 4#64 := by
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
           Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
-    · apply congr_arg₂ s.mem.insert
-      · simp [Word.toBitVec64_poly, Word.toNat_poly_def, sp1_imm_c]
-        congr 4
-        simp [BitVec.toNat_eq]
-        omega
-      · simp [BitVec.toNat_eq]
+    rw [h_pc_lift, show Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]
+                      = BitVec.signExtend 64 imm_c from h_offset_eq]
+    exact store_byte_post_vmem_eq s
+      (Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], 0] + 4#64)
+      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+        BitVec.signExtend 64 imm_c)
+      (BitVec.ofNat 8 Main[7].val)
   · simp [SailState.isInitialized, hs]
   · simpa using h14_op_a
-  · simp [is_aligned_vaddr]
+  · exact (is_aligned_vaddr_iff_mod _ 1).mpr (Nat.mod_one _)
   · constructor <;> simpa [Std.ExtDHashMap.get_insert]
   · simp
     simpa [Std.ExtDHashMap.get_insert]

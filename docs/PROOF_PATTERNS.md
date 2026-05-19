@@ -616,18 +616,21 @@ overflow" section), and re-add only the lines whose declarations
 newly fail.
 
 As of the **2026-05-17 evening sweep** there were 11 such lines. The
-**2026-05-18 sweep** cleared 3 of those (Sll's `spec.sll_poly` +
+**2026-05-18 sweep** cleared 3 (Sll's `spec.sll_poly` +
 `spec.slli_poly` and Srl's `spec.srl_common_poly`) via two new
-patterns documented below. Current count: **8 load-bearing sites in
-6 files**. The earlier recipe-6 (stale-comment delete + rebuild)
-remains fully exhausted on this branch — all 8 surviving sites
-reproduce `(kernel) deep recursion detected` on plain deletion.
+patterns documented below. The **2026-05-19 sweep** cleared all 4
+Store sites via the recipe-2 helpers in `SP1Foundations/MemChecks.lean`
+(`run_write_ram_of_width_{1,2,4,8}` + `store_{byte,half,word,double}
+_post_vmem_eq`) plus a bullet-4 swap of `simp [is_aligned_vaddr]` for
+`is_aligned_vaddr_iff_mod` / `h_is_aligned`. Current count: **4
+load-bearing sites in 3 files**. The earlier recipe-6 (stale-comment
+delete + rebuild) remains fully exhausted on this branch — all 4
+surviving sites reproduce `(kernel) deep recursion detected` on
+plain deletion.
 
 - `SP1Chips/DivRem/DivRem.lean` — `div_rem_poly` core (signed 64-bit
   DWord 8-limb)
 - `SP1Chips/DivRem/DivuRemu.lean` — `divu_remu_poly` core
-- `SP1Chips/Store{Byte,Half,Word,Double}Chip.lean` — all 4 `correct`
-  theorems
 - `SP1Chips/JalChip.lean` — `SP1JAL_correct`
 - `SP1Chips/JalrChip.lean` — `JALR_correct`
 
@@ -645,6 +648,31 @@ Cleared during the **2026-05-18 sweep**: `spec.sll_poly`,
 `spec.slli_poly` (`SP1Chips/ShiftLeft/Sll.lean`), and
 `spec.srl_common_poly` (`SP1Chips/ShiftRight/Srl.lean`) — see new
 recipes 8 and 9 below.
+
+Cleared during the **2026-05-19 sweep** (recipe 2 — bare-`BitVec`
+helpers): all 4 `Store{Byte,Half,Word,Double}Chip.correct` theorems
+plus their per-chip `set_option maxHeartbeats 1600000 in` bumps.
+
+Recipe used: each chip's bullet-1 equation post-`rw [run_vmem_write_of_width_N']`
+is discharged by an `exact store_<width>_post_vmem_eq …` against the
+helper family added to `SP1Foundations/MemChecks.lean`:
+`run_write_ram_of_width_{1,2,4,8}` (sp1-side `write_ram → mem.insert`
+reduction at bare `BitVec`) + `store_{byte,half,word,double}_post_vmem_eq`
+(full bullet-1 collapse, including the `match .ok (.Ok true) …` reduction).
+The chip aligns the polymorphic `Word.toBitVec64_poly` PC and addr to the
+helper's abstract `BitVec 64` arguments via two `rw`s up front
+(`Word.toBitVec64_poly_lowLimb_add_nat` for `+4#64 → low-limb form`,
+`h_offset_eq` for `Word.toBitVec64_poly #v[Main[21..24]] → signExt(imm_c)`).
+Second compounding trigger fixed: `simp [is_aligned_vaddr]` on
+bullet 4 was also kernel-tripping (the 2026-05-19 sorry-bisect notes
+only flagged bullet 1); replaced with
+`(is_aligned_vaddr_iff_mod _ 1).mpr (Nat.mod_one _)` (StoreByte) or
+`simpa using h_is_aligned` (StoreHalf/Word/Double, which already
+carry the hypothesis).
+
+Build time per chip dropped from ~32s to ~5s. Axioms unchanged
+(standard Sail + Lean axioms, no `sorryAx`). Verified via direct
+`#print axioms Store.<Variant>.correct`.
 
 #### Empirical findings (2026-05-17 evening)
 
