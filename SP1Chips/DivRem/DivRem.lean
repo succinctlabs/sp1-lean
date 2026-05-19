@@ -14,7 +14,6 @@ attribute [-simp] mul_eq_zero not_and
 
 section div_rem
 
-set_option debug.skipKernelTC true in
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 set_option maxHeartbeats 32000000 in
@@ -977,7 +976,6 @@ lemma div_rem_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^
 
 -- Signed-64-bit variant: `.DRS` op, threads through `div_rem_poly`
 -- (DWord 8-limb signed core).
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- .DRS 64-bit signed expansion produces a wide hypothesis pile after the
 -- divw_remw_poly specialize chain; the default heartbeat budget is exceeded.
@@ -1260,7 +1258,6 @@ lemma spec.div_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 
 
 -- Twin of `spec.div_poly` with `.2` projection, `is_rem_poly` flag,
 -- `sop3` mutex, `eq_r_*` writeback.
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- See spec.div_poly: same .DRS expansion blow-up.
 set_option linter.unusedVariables false in

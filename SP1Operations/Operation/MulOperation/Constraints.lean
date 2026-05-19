@@ -13,7 +13,6 @@ set_option linter.style.multiGoal false
 
 section core_mul
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 8000000 in
 -- 16-byte carry-chain identity over `ZMod p`. Same recipe as
 -- `core_mulw_poly` (the 4-byte variant below) scaled to 16 limbs:
@@ -768,7 +767,6 @@ lemma core_mul_poly
       BitVec.toNat_ofNat, BitVec.toNat_ofNat, ← Nat.mul_mod, key,
       Nat.add_mul_mod_self_right]
 
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 1600000 in
 -- 4-byte carry-chain identity over ZMod p. Uses the field-agnostic recipe
 -- shared with `AddOperation.spec_poly`: lift each ZMod constraint to a Nat

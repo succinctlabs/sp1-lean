@@ -310,9 +310,6 @@ set_option maxHeartbeats 1600000 in
 -- to convert `Main[3] % 4 = 0` from the iff_poly's pc-alignment clause
 -- into `Main[3].val % 4 = 0`, then closes via the field-agnostic
 -- `BitVec.add_mod4_eq_zero_of_mod4_eq_zero` + `BitVec.ofNat64_mod_4_eq_zero_iff`.
--- `skipKernelTC` for the same reason as AddrAddOperation.spec_of_constraints_poly:
--- BitVec.toNat_add's `% 2^64` triggers kernel deep recursion.
-set_option debug.skipKernelTC true in
 lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
     (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
     (is_real : is_real_poly Main) :
@@ -358,8 +355,7 @@ lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
     simp only [Word.toBitVec64_poly]
     rw [BitVec.ofNat64_mod_4_eq_zero_iff]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero,
-      Nat.zero_mul, Nat.add_zero]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero]
     omega
   · -- signExtend(imm) is mod-4-zero: bridge via h_signExt to the imm's toBitVec64_poly form.
     rw [← h_signExt]
@@ -397,6 +393,21 @@ lemma limb_lift_branch
   rw [h1, h3] at h
   exact h
 
+/-- Bare-`ℕ` close for `branch_addr_eq_poly`'s carry chain. Mirrors the
+`AddrAddOperation.close_addr_add_nat` recipe — extracted helper isolates the
+`% 2 ^ 64` exposure so the kernel re-check passes without `skipKernelTC`. -/
+private lemma close_branch_addr_nat
+    (a0 a1 a2 b0 b1 b2 b3 v0 v1 v2 c0 c1 c2 c3 : ℕ)
+    (hv0 : v0 < 2 ^ 16) (hv1 : v1 < 2 ^ 16) (hv2 : v2 < 2 ^ 16)
+    (n0 : a0 + b0 = v0 + c0 * 65536)
+    (n1 : a1 + b1 + c0 = v1 + c1 * 65536)
+    (n2 : a2 + b2 + c1 = v2 + c2 * 65536)
+    (n3 : b3 + c2 = c3 * 65536) :
+    v0 + v1 * 2 ^ 16 + v2 * 2 ^ 32 + 0 * 2 ^ 48 =
+      (a0 + a1 * 2 ^ 16 + a2 * 2 ^ 32 + 0 * 2 ^ 48 +
+        (b0 + b1 * 2 ^ 16 + b2 * 2 ^ 32 + b3 * 2 ^ 48)) % 2 ^ 64 := by
+  omega
+
 set_option maxHeartbeats 16000000 in
 -- Polymorphic counterpart of `branch_addr_eq`. Mirrors
 -- `AddrAddOperation.spec_of_constraints_poly`'s `linear_combination * h65inv`
@@ -405,9 +416,7 @@ set_option maxHeartbeats 16000000 in
 -- substituted), which after destructuring yield disjunctions of the form
 -- `c = 0 ∨ c = 1` where `c` is the inverse-form carry expression. The high
 -- limb of the result vector is `0` (the chip pins next_pc[3] = 0 via E121's
--- final-carry = 0 case). `skipKernelTC` for kernel deep-recursion on
--- `BitVec.toNat_add`'s `% 2^64` (per `docs/PROOF_PATTERNS.md`).
-set_option debug.skipKernelTC true in
+-- final-carry = 0 case).
 lemma branch_addr_eq_poly
     (Main : Vector (ZMod p) 45)
     (h_imm_signExtend :
@@ -474,9 +483,9 @@ lemma branch_addr_eq_poly
       Word.toBitVec64_poly_toNat_poly h_imm_isU64,
       Word.toBitVec64_poly_toNat_poly h_pc_isU64,
       Word.toNat_poly_def, Word.toNat_poly_def, Word.toNat_poly_def]
-  -- Reduce vector literal indices and the high-limb-zero terms.
+  -- Reduce vector literal indices, keep `+ 0 * 2 ^ 48` for the helper.
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-    List.getElem_cons_succ, h_zero_val, Nat.zero_mul, Nat.add_zero]
+    List.getElem_cons_succ, h_zero_val]
   -- Carry-chain rearrangement, mirroring AddrAddOperation.spec_of_constraints_poly.
   set c0 : ZMod p := (Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (c0 + Main[4] + Main[22] - Main[26]) * (65536 : ZMod p)⁻¹ with hc1_def
@@ -509,14 +518,21 @@ lemma branch_addr_eq_poly
   have n2 := limb_lift_branch _ _ _ _ _ h_pc_2_lt h_imm_2_lt h27_lt hc1 hc2 e2
   have n3 := limb_lift_branch _ _ _ _ _ hzero_lt h_imm_3_lt hzero_lt hc2 hc3 e3
   simp only [ZMod.val_zero, add_zero, zero_add] at n0 n3
-  have hc0_lt : c0.val ≤ 1 := by
-    rcases hc0 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc1_lt : c1.val ≤ 1 := by
-    rcases hc1 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc2_lt : c2.val ≤ 1 := by
-    rcases hc2 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc3_lt : c3.val ≤ 1 := by
-    rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
+  exact (close_branch_addr_nat _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    h25_lt h26_lt h27_lt n0 n1 n2 n3).symm
+
+/-- Bare-`ℕ` close for `pc_plus_4_eq_poly`'s carry chain. The `4 % 2 ^ 64`
+appears because `BitVec.toNat_ofNat` was used to unfold `4#64.toNat`; omega
+absorbs it trivially. Same isolation principle as `close_branch_addr_nat`. -/
+private lemma close_pc_plus_4_nat
+    (a0 a1 a2 v0 v1 v2 c0 c1 c2 c3 : ℕ)
+    (hv0 : v0 < 2 ^ 16) (hv1 : v1 < 2 ^ 16) (hv2 : v2 < 2 ^ 16)
+    (n0 : a0 + 4 = v0 + c0 * 65536)
+    (n1 : a1 + c0 = v1 + c1 * 65536)
+    (n2 : a2 + c1 = v2 + c2 * 65536)
+    (n3 : c2 = c3 * 65536) :
+    v0 + v1 * 2 ^ 16 + v2 * 2 ^ 32 + 0 * 2 ^ 48 =
+      (a0 + a1 * 2 ^ 16 + a2 * 2 ^ 32 + 0 * 2 ^ 48 + 4 % 2 ^ 64) % 2 ^ 64 := by
   omega
 
 set_option maxHeartbeats 16000000 in
@@ -528,7 +544,6 @@ set_option maxHeartbeats 16000000 in
 -- three limbs of the addend are 0; only the low limb gets `+4`. This is
 -- the missing companion to `branch_addr_eq_poly` for the BEQ/BNE/etc.
 -- "branch was not taken" path.
-set_option debug.skipKernelTC true in
 lemma pc_plus_4_eq_poly
     (Main : Vector (ZMod p) 45)
     (h_pc_0 : Main[3].val < 65536) (h_pc_1 : Main[4].val < 65536)
@@ -581,7 +596,7 @@ lemma pc_plus_4_eq_poly
       Word.toBitVec64_poly_toNat_poly h_pc_isU64,
       Word.toNat_poly_def, Word.toNat_poly_def, BitVec.toNat_ofNat]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-    List.getElem_cons_succ, h_zero_val, Nat.zero_mul, Nat.add_zero]
+    List.getElem_cons_succ, h_zero_val]
   set c0 : ZMod p := (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (c0 + Main[4] + 0 - Main[26]) * (65536 : ZMod p)⁻¹ with hc1_def
   set c2 : ZMod p := (c1 + Main[5] + 0 - Main[27]) * (65536 : ZMod p)⁻¹ with hc2_def
@@ -619,16 +634,9 @@ lemma pc_plus_4_eq_poly
   have h4val_eq : ((4 : ZMod p)).val = 4 := by
     rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl, h4_val]
   rw [h4val_eq] at n0
-  simp only [ZMod.val_zero, add_zero, zero_add] at n1 n2 n3
-  have hc0_lt : c0.val ≤ 1 := by
-    rcases hc0 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc1_lt : c1.val ≤ 1 := by
-    rcases hc1 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc2_lt : c2.val ≤ 1 := by
-    rcases hc2 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc3_lt : c3.val ≤ 1 := by
-    rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  omega
+  simp only [ZMod.val_zero, add_zero, zero_add] at n0 n1 n2 n3
+  exact (close_pc_plus_4_nat _ _ _ _ _ _ _ _ _ _
+    h25_lt h26_lt h27_lt n0 n1 n2 n3).symm
 
 set_option maxHeartbeats 16000000 in
 -- Variant of `pc_plus_4_eq_poly` accepting the chip's *natural* post-simp
@@ -639,9 +647,6 @@ set_option maxHeartbeats 16000000 in
 -- proof passes `chip_cstrs.h_limb0..3` directly without any pre-bridge step.
 -- Internally bridges to canonical form, then mirrors `pc_plus_4_eq_poly`'s
 -- `limb_lift_branch` chain. Heartbeats elevated for the bridges + chain.
--- `skipKernelTC` for `BitVec.toNat_add`'s `% 2^64` deep-recursion gotcha
--- (per `docs/PROOF_PATTERNS.md`).
-set_option debug.skipKernelTC true in
 lemma pc_plus_4_eq_poly_chip
     (Main : Vector (ZMod p) 45)
     (h_pc_0 : Main[3].val < 65536) (h_pc_1 : Main[4].val < 65536)
@@ -737,7 +742,7 @@ lemma pc_plus_4_eq_poly_chip
       Word.toBitVec64_poly_toNat_poly h_pc_isU64,
       Word.toNat_poly_def, Word.toNat_poly_def, BitVec.toNat_ofNat]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-    List.getElem_cons_succ, h_zero_val, Nat.zero_mul, Nat.add_zero]
+    List.getElem_cons_succ, h_zero_val]
   set c0 : ZMod p := (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (c0 + Main[4] - Main[26]) * (65536 : ZMod p)⁻¹ with hc1_def
   set c2 : ZMod p := (c1 + Main[5] - Main[27]) * (65536 : ZMod p)⁻¹ with hc2_def
@@ -773,16 +778,9 @@ lemma pc_plus_4_eq_poly_chip
   have h4val_eq : ((4 : ZMod p)).val = 4 := by
     rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl, h4_val]
   rw [h4val_eq] at n0
-  simp only [ZMod.val_zero, add_zero, zero_add] at n1 n2 n3
-  have hc0_lt : c0.val ≤ 1 := by
-    rcases hc0' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc1_lt : c1.val ≤ 1 := by
-    rcases hc1' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc2_lt : c2.val ≤ 1 := by
-    rcases hc2' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc3_lt : c3.val ≤ 1 := by
-    rcases hc3' with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  omega
+  simp only [ZMod.val_zero, add_zero, zero_add] at n0 n1 n2 n3
+  exact (close_pc_plus_4_nat _ _ _ _ _ _ _ _ _ _
+    h25_lt h26_lt h27_lt n0 n1 n2 n3).symm
 
 end poly_helpers
 

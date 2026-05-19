@@ -37,7 +37,6 @@ noncomputable def spec_lbu (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Executio
 
 set_option maxHeartbeats 1600000 in
 -- LoadByte (signed) correct proof — 8-byte fan-out via h38/h39/h40.
-set_option debug.skipKernelTC true in
 theorem correct_lb (Main : Vector (ZMod p) 47)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -230,7 +229,7 @@ theorem correct_lb (Main : Vector (ZMod p) 47)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -249,8 +248,7 @@ theorem correct_lb (Main : Vector (ZMod p) 47)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- LB (signed) is_aligned_vaddr is trivially true for width=1
   have h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
@@ -413,7 +411,6 @@ theorem correct_lb (Main : Vector (ZMod p) 47)
 
 set_option maxHeartbeats 1600000 in
 -- LoadByte (unsigned) correct proof.
-set_option debug.skipKernelTC true in
 theorem correct_lbu (Main : Vector (ZMod p) 47)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -598,7 +595,7 @@ theorem correct_lbu (Main : Vector (ZMod p) 47)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by

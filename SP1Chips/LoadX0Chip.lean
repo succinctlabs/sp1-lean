@@ -169,7 +169,6 @@ set_option maxHeartbeats 1600000 in
 -- - 7-way sub-opcode flags `Main[41..47]` collapse via `seven_collapse_M47`
 --   to give `Main[41..46] = 0`. Byte-routing constraints `E92`/`E95`/`E100`
 --   then force `Main[38..40] = 0` (8-byte aligned read).
-set_option debug.skipKernelTC true in
 theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -369,7 +368,7 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -388,8 +387,7 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- Simplify the spec side; the `wX_bits 0 _` step is a no-op.
   simp [spec_loadX0_ld, sp1_loadX0,
@@ -461,7 +459,6 @@ set_option maxHeartbeats 1600000 in
 --   (bit2=1) to `run_vmem_read_of_width_4'`.
 -- - The opcode encoding `E14` collapses to `34` (LWU) since only
 --   `Main[46] = 1`.
-set_option debug.skipKernelTC true in
 theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -641,7 +638,7 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -660,8 +657,7 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- Case-split on bit2 (Main[40]).
   rcases h_M40_or with hM40_zero | hM40_one
@@ -764,7 +760,6 @@ set_option maxHeartbeats 1600000 in
 --   `Main[45] = 1`.
 -- - Sign-extension does not matter because `rd = x0` makes `wX_bits 0`
 --   a no-op.
-set_option debug.skipKernelTC true in
 theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -945,7 +940,7 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -964,8 +959,7 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- Case-split on bit2 (Main[40]).
   rcases h_M40_or with hM40_zero | hM40_one
@@ -1068,7 +1062,6 @@ set_option maxHeartbeats 1600000 in
 --   `Main[29..32]` per case.
 -- - The opcode encoding `E14` collapses to `33` (LHU) since only
 --   `Main[44] = 1`.
-set_option debug.skipKernelTC true in
 theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -1244,7 +1237,7 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -1263,8 +1256,7 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 4-way nested case-split on (Main[40], Main[39]).
   rcases h_M40_or with hM40_zero | hM40_one
@@ -1408,7 +1400,6 @@ set_option maxHeartbeats 1600000 in
 --   `Main[43] = 1`.
 -- - Sign-extension does not matter because `rd = x0` makes `wX_bits 0`
 --   a no-op.
-set_option debug.skipKernelTC true in
 theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -1581,7 +1572,7 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -1600,8 +1591,7 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 4-way nested case-split on (Main[40], Main[39]).
   rcases h_M40_or with hM40_zero | hM40_one
@@ -1748,7 +1738,6 @@ set_option maxHeartbeats 1600000 in
 --   `Main[29..32]` per case (low byte vs high byte selected by bit0).
 -- - The opcode encoding `E14` collapses to `32` (LBU) since only
 --   `Main[42] = 1`.
-set_option debug.skipKernelTC true in
 theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -1914,7 +1903,7 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -1933,8 +1922,7 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 8-way nested case-split on (Main[40], Main[39], Main[38]).
   rcases h_M40_or with hM40_zero | hM40_one
@@ -2146,7 +2134,6 @@ set_option maxHeartbeats 1600000 in
 --   `Main[41] = 1`.
 -- - Sign-extension does not matter because `rd = x0` makes `wX_bits 0`
 --   a no-op.
-set_option debug.skipKernelTC true in
 theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -2311,7 +2298,7 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -2330,8 +2317,7 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 8-way nested case-split on (Main[40], Main[39], Main[38]).
   rcases h_M40_or with hM40_zero | hM40_one

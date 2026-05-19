@@ -14,7 +14,6 @@ attribute [-simp] mul_eq_zero not_and
 
 section divw_remw
 
-set_option debug.skipKernelTC true in
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 set_option maxHeartbeats 32000000 in
@@ -835,7 +834,6 @@ lemma divw_remw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
 
 -- Signed-32-bit variant: `.DRWS` op, threads through `divw_remw_poly`
 -- (HWord signed core).
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- DRWS sign-extension multiplies the per-side constraint expansion by an
 -- extra msb case-split (b/c/r/q), exceeding the default heartbeat budget.
@@ -1179,7 +1177,6 @@ lemma spec.divw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2
 
 -- Twin of `spec.divw_poly` with `.2` projection, `is_remw_poly` flag,
 -- `sop6` mutex, `eq_r_*` writeback.
-set_option debug.skipKernelTC true in
 set_option maxHeartbeats 32000000 in
 -- DRWS sign-extension multiplies the per-side constraint expansion by an
 -- extra msb case-split (b/c/r/q), exceeding the default heartbeat budget.

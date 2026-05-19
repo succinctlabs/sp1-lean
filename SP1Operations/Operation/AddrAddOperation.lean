@@ -60,15 +60,27 @@ def spec_poly {p : ℕ} [NeZero p] (a b : Word (ZMod p)) (cols : AddrAddOperatio
   let cols_word : Word (ZMod p) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
   cols_word.isU64_poly ∧ cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly
 
+/-- Bare-`ℕ` close for the AddrAdd carry chain: omega over Nat limb equations.
+Accepts the full 4-limb form on the RHS (with `0 * 2 ^ 48` for the high limb)
+so the spec body doesn't need a `Nat.zero_mul + Nat.add_zero` simp pass.
+Lifted out of `spec_of_constraints_poly` so the kernel re-check sees the
+`2^64`-bearing omega certificate in isolation — keeps the polymorphic `ZMod p`
+instance graph out of the certificate's proof term, sidestepping the
+deep-recursion gotcha in `docs/PROOF_PATTERNS.md`. -/
+private lemma close_addr_add_nat
+    (a0 a1 a2 a3 b0 b1 b2 b3 v0 v1 v2 c0 c1 c2 c3 : ℕ)
+    (hv0 : v0 < 2 ^ 16) (hv1 : v1 < 2 ^ 16) (hv2 : v2 < 2 ^ 16)
+    (n0 : a0 + b0 = v0 + c0 * 65536)
+    (n1 : a1 + b1 + c0 = v1 + c1 * 65536)
+    (n2 : a2 + b2 + c1 = v2 + c2 * 65536)
+    (n3 : a3 + b3 + c2 = c3 * 65536) :
+    v0 + v1 * 2 ^ 16 + v2 * 2 ^ 32 + 0 * 2 ^ 48 =
+      (a0 + a1 * 2 ^ 16 + a2 * 2 ^ 32 + a3 * 2 ^ 48 +
+        (b0 + b1 * 2 ^ 16 + b2 * 2 ^ 32 + b3 * 2 ^ 48)) % 2 ^ 64 := by
+  omega
+
 set_option maxHeartbeats 16000000 in
--- Carry-chain rearrangements + BitVec/Nat bridge run 4–8M; 16M leaves
--- headroom. `skipKernelTC` is required to bypass kernel deep recursion
--- on `BitVec.toNat_add`'s `% 2^64` rewrite combined with the 4-limb
--- carry chain (per `docs/PROOF_PATTERNS.md` "Kernel deep-recursion on `2^N`"
--- entry). The proof elaborates fine; only the kernel re-check fails.
--- `lean_verify` confirms standard axioms only (propext / Classical.choice
--- / Quot.sound) — no new axioms introduced.
-set_option debug.skipKernelTC true in
+-- Carry-chain rearrangements + BitVec/Nat bridge run 4–8M; 16M leaves headroom.
 /-- Combines `isU64_poly` of the cols_word (low 3 limbs bounded, high
 limb is 0) with the BitVec equation
 `cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly`,
@@ -107,9 +119,10 @@ lemma spec_of_constraints_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)
       Word.toBitVec64_poly_toNat_poly hb,
       Word.toBitVec64_poly_toNat_poly ha,
       Word.toNat_poly_def, Word.toNat_poly_def, Word.toNat_poly_def]
-  -- Reduce cols_word indices.
+  -- Reduce cols_word indices, but keep the `+ 0 * 2 ^ 48` term so the helper
+  -- absorbs the closure with no extra simp leakage.
   simp only [hcw_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-    List.getElem_cons_succ, h_zero_val, Nat.zero_mul, Nat.add_zero]
+    List.getElem_cons_succ, h_zero_val]
   -- Carry-chain rearrangement, mirroring AddOperation.spec_poly.
   set c0 : ZMod p := (a[0] + b[0] - cols.value[0]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (a[1] + b[1] - cols.value[1] + c0) * (65536 : ZMod p)⁻¹ with hc1_def
@@ -132,14 +145,7 @@ lemma spec_of_constraints_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)
   have n2 := limb_lift _ _ _ _ _ ha2 hbb2 hv2' hc1 hc2 e2
   have n3 := limb_lift _ _ _ _ _ ha3 hbb3 hzero_lt hc2 hc3 e3
   simp only [ZMod.val_zero, add_zero, zero_add] at n0 n3
-  have hc0_lt : c0.val ≤ 1 := by
-    rcases hc0 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc1_lt : c1.val ≤ 1 := by
-    rcases hc1 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc2_lt : c2.val ≤ 1 := by
-    rcases hc2 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  have hc3_lt : c3.val ≤ 1 := by
-    rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
-  omega
+  exact close_addr_add_nat _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    hv0' hv1' hv2' n0 n1 n2 n3
 
 end AddrAddOperation

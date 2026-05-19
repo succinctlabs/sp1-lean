@@ -15,9 +15,6 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 400000000 in
 -- 400M heartbeats: msb_b case split × 4-way byte_shift × 16-way cb sub-cases.
-set_option debug.skipKernelTC true in
--- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N` re-checks
--- that trip kernel deep recursion (mirrors `spec.srl_common_poly`'s use).
 /-- Shared proof body for `spec.sra_poly` and `spec.srai_poly`. Structure mirrors
 `spec.srl_common_poly` but with two msb_b sub-cases:
 

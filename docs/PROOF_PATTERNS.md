@@ -398,6 +398,54 @@ back temporarily.
      `simp [BitVec.add_def, Word.toBitVec64, Word.toNat,
      ← BitVec.toNat_inj]`.
 
+5. **Drop `Nat.zero_mul, Nat.add_zero` from simp_only after the limb
+   expansion + extract `omega` into a bare-`ℕ` helper** — this is the
+   primary recipe that cleared 21 of 26 sites in the 2026-05-17 batch.
+   For `_poly` carry-chain proofs in `Word (ZMod p)` carriers (AddrAdd,
+   Branch helpers, Load* chip downstreams), the spec body typically
+   has:
+   ```
+   rw [← BitVec.toNat_inj, BitVec.toNat_add,
+       Word.toBitVec64_poly_toNat_poly _, Word.toNat_poly_def, ...]
+   simp only [..., h_zero_val, Nat.zero_mul, Nat.add_zero]  -- drop these
+   ...
+   omega                                                     -- extract
+   ```
+   The `Nat.zero_mul + Nat.add_zero` simp rewrites add `Eq.mpr`
+   operations that compound with the omega certificate's `% 2 ^ 64`
+   exposure, pushing the kernel re-check over its stack limit. Drop
+   them from the simp_only, then move `omega` into a `private` helper
+   at the bare-`ℕ` level whose conclusion accepts the un-simplified
+   `+ 0 * 2 ^ 48` form. The helper's `omega` certificate sees `% 2 ^
+   64` *in isolation* (no polymorphic `ZMod p` instances surrounding
+   it) and the kernel passes. Canonical examples:
+   `AddrAddOperation.close_addr_add_nat` and
+   `Branch.close_branch_addr_nat` / `close_pc_plus_4_nat`. Often the
+   spec body's `omega` becomes `exact close_*_nat _ _ ... hv0' hv1'
+   hv2' n0 n1 n2 n3` (or its `.symm`). For chip-level `correct_*`
+   theorems with no helper-lift available (e.g. LoadDoubleChip,
+   LoadX0Chip), the in-place simp_only edit alone suffices because
+   the trigger is the simp_only itself, not surrounding omega.
+
+6. **Quick "stale comment" check — try just removing the line
+   first.** Many `skipKernelTC` lines were added defensively and
+   stayed after the underlying issue was fixed elsewhere. Both
+   `MulOperation.core_mul_poly` and `core_mulw_poly` cleared in the
+   2026-05-17 batch this way: just delete the `set_option` line and
+   rebuild. Cost: one build cycle per site (11min for MulOperation).
+   Cheap to test, often the right answer.
+
+7. **Replace `omega` over `BitVec.toInt` with explicit Int lemmas.**
+   When the kernel-tripping `omega` is closing a `BitVec.toInt`
+   inequality (the omega certificate brings in `2 ^ 64` via `Int.toNat
+   ((... % 2^64)...)`), substitute the explicit lemma directly:
+   - `Int.not_lt.mpr : b ≤ a → ¬ a < b`
+   - `Int.not_le.mp : ¬ a ≤ b → b < a`
+   - `Int.not_le.mpr : b < a → ¬ a ≤ b`
+
+   The function-application proof term is shallow; the kernel passes.
+   Canonical fix: `correct_bge` in `SP1Chips/BranchChip.lean`.
+
 #### Cross-references
 
 - Helpers:
@@ -419,8 +467,100 @@ back temporarily.
 
 If a future Lean toolchain bump is suspected to have fixed the
 kernel's `2 ^ N` reduction, the cheapest re-test is to delete every
-`set_option debug.skipKernelTC true in` line, run `lake build`, and
-re-add only the lines whose declarations newly fail.
+`set_option debug.skipKernelTC true in` line, run **`lake build`**
+(not `lake env lean` — see the "`lake env lean` exits 0 on Lean stack
+overflow" section), and re-add only the lines whose declarations
+newly fail.
+
+As of the **2026-05-17 evening sweep** there are **11** such lines
+(down from ~22 after a fresh per-site verification). The 11 still
+load-bearing:
+
+- `SP1Chips/DivRem/DivRem.lean` — `div_rem_poly` core (signed 64-bit
+  DWord 8-limb)
+- `SP1Chips/DivRem/DivuRemu.lean` — `divu_remu_poly` core
+- `SP1Chips/ShiftLeft/Sll.lean` — `spec.sll_poly` **and**
+  `spec.slli_poly`
+- `SP1Chips/ShiftRight/Srl.lean` — `spec.srl_common_poly`
+- `SP1Chips/Store{Byte,Half,Word,Double}Chip.lean` — all 4 `correct`
+  theorems
+- `SP1Chips/JalChip.lean` — `SP1JAL_correct`
+- `SP1Chips/JalrChip.lean` — `JALR_correct`
+
+Cleared during the 2026-05-17 sweep (kept removed):
+`AddrAddOperation.spec_of_constraints_poly`,
+`MulOperation.core_mul_poly` + `core_mulw_poly`, all
+`Branch/Constraints.lean` helpers, all `Load*Chip.lean` correct
+theorems, the BranchChip `correct_*` family (6 theorems), DivRem
+wrappers (`spec.div_poly`/`spec.rem_poly`/`spec.divu_poly`/etc. —
+only the *cores* still trip), all `DivuwRemuw`/`DivwRemw`
+cores+wrappers, `ShiftRight/{Sra,Sraw,Srlw}` common bodies plus
+`Srlw`'s local `Word.isU64` helper.
+
+#### Empirical findings (2026-05-17 evening)
+
+**DivRem and DivuRemu 64-bit cores vs. wrappers.** The `*_poly` core
+lemma trips the kernel but the thinner `spec.*_poly` wrappers that
+`specialize` into the core do NOT. The wrapper's proof term is just a
+function application referencing the core's already-checked olean —
+kernel sees a shallow term. Lesson: don't assume "if the core needs
+`skipKernelTC`, the wrappers do too." Test each independently.
+
+**Store* chips have multiple compounding triggers.** Lifting
+`h_addr_eq` (the `(reg + signExt(imm)).toNat = addr_low_limbs`
+bridge) into a `Word.toBitVec64_poly_addr3_toNat_eq` top-level helper
+in `SP1Foundations/Word.lean` roughly halves elaboration time (~103s
+→ ~51s on StoreByteChip) but **kernel still trips** — multiple
+compounding triggers (`h_offset_eq`, `h_in_range`,
+`Word.toBitVec64_poly_lowLimb_add_nat`, default-`simp`-via-`write_ram`).
+A single lift is not enough; recipe 2 (bare-`BitVec` helper covering
+the *whole* addr-bridge + width-specific write monadic chain) is the
+documented path but costs 2–3h per chip with no single-lift shortcut.
+
+**Sll/Srl 64-bit shifts vs. the passing Sra/Sraw/Srlw.** The
+`spec.sll_poly`, `spec.slli_poly`, and `spec.srl_common_poly` proofs
+are structurally identical to the passing
+`spec.sra/sraw/srlw_common_poly` proofs — same prologue, same 4-way
+byte-shift split, same close-helpers. The differentiator is invisible
+at the tactic-source level. The passing Sra has an outer `rcases
+h_msb_b` that splits the proof term into two arms; the failing
+Sll/Srl have no analogous outer split. Hypothesis: adding an outer
+split (recipe 3 applied at the byte_shift level — lift each of the 4
+byte_shift branches into a separate helper, dispatcher just does
+`rcases b_cb5 ... ; rcases b_cb4 ...`) may break the kernel walk into
+shallower chunks. Not yet verified.
+
+**Jal/Jalr remaining triggers.** The `word_four_eq_bitvec_four`
+helper extracted in commit `62b65cf` (recipe 3 inline-derivation
+lift) is insufficient on its own. Remaining triggers are likely
+`hmod4` (15-line block with `Word.toBitVec64_poly` chains), the
+`AddOperation.spec_poly` results (`h_add'` / `h_add_pc'` — whose body
+contains `BitVec.toNat_add`), and the multiple default `simp
+[spec_jal, sp1_jal, execute_JAL, ...]` calls. Each is a candidate for
+further recipe-3 lifting.
+
+**JalrChip deep-dive (sorry-bisection, 5 build cycles).** The trigger
+is the single `simp [spec_jalr, sp1_jalr,
+run_readReg_of_isInitialized _ _ hs, EStateM.Result.map, cond,
+execute_JALR, op_a, op_b, op_c, sp1_op_a, sp1_op_b, sp1_op_c,
+read_op_a, read_op_b, ← h_imm_signExtend]` call at
+`SP1Chips/JalrChip.lean:258-261`. Verified via sorry-truncation:
+truncating BEFORE this simp passes kernel TC; truncating AFTER still
+trips. Fixes tried that **don't** work: splitting into chained `simp
+only` (second simp can't apply its lemmas because default simp's
+implicit monad lemmas are needed); moving `← h_imm_signExtend` to a
+separate `rw` (trigger shifts but still trips); replacing `simp` with
+`simp only [explicit list]` (can't reproduce default simp's monad-
+bind normalization with explicit lemma list); `--tstack=2000000` (5×
+current — still trips, **not borderline depth**, this is
+pathologically deep recursion). Fix path: write a `JALR_correct`-
+shaped helper at the `EStateM`/Sail level that produces the same
+post-simp goal form WITHOUT relying on the default simp set, or lift
+the entire post-simp goal manipulation chain (lines 256–317) into a
+helper whose conclusion is the original theorem statement. Both are
+multi-hour investments per chip. Same pattern almost certainly
+applies to `SP1JAL_correct` in `JalChip.lean` since it uses the
+analogous `simp [spec_jal, sp1_jal, execute_JAL, ...]` at line 124.
 
 ### Fin KB ↔ ZMod KB defeq gap in `+++` distribution
 

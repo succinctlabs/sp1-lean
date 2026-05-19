@@ -68,7 +68,6 @@ private lemma halfword_msb_poly (a b : ZMod p)
 
 set_option maxHeartbeats 1600000 in
 -- LoadWord (signed) correct proof.
-set_option debug.skipKernelTC true in
 theorem correct_lw (Main : Vector (ZMod p) 44)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -243,7 +242,7 @@ theorem correct_lw (Main : Vector (ZMod p) 44)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -262,8 +261,7 @@ theorem correct_lw (Main : Vector (ZMod p) 44)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- Simplify monadic form
   simp [spec_lw, sp1_load_word,
@@ -353,7 +351,6 @@ theorem correct_lw (Main : Vector (ZMod p) 44)
 
 set_option maxHeartbeats 1600000 in
 -- LoadWord (unsigned) correct proof.
-set_option debug.skipKernelTC true in
 theorem correct_lwu (Main : Vector (ZMod p) 44)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
@@ -515,7 +512,7 @@ theorem correct_lwu (Main : Vector (ZMod p) 44)
       Nat.mod_eq_of_lt (by
         rw [Word.toNat_poly_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-          List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
+          List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
         rw [hpow]
         have h26m : Main[26].val * 65536 ≤ 65535 * 65536 := by
@@ -534,8 +531,7 @@ theorem correct_lwu (Main : Vector (ZMod p) 44)
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
     simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
-      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, Nat.zero_mul,
-      Nat.add_zero, h25k_val]
+      List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   simp [spec_lwu, sp1_load_word,
     sp1_op_a, sp1_ob_b, sp1_imm_c,

@@ -35,6 +35,8 @@ def sp1_sb (Main : Vector (ZMod p) 50) : SailM ExecutionResult := do
 
 set_option maxHeartbeats 1600000 in
 -- StoreDouble pattern + single-byte data shape (uses run_vmem_write_of_width_1').
+-- `skipKernelTC` for residual kernel deep-recursion in the default-`simp`
+-- chain handling BitVec/Word conversions in the monadic write expansion.
 set_option debug.skipKernelTC true in
 theorem correct (Main : Vector (ZMod p) 50)
     (s : SailState) (hs : SailState.isInitialized s)
@@ -113,14 +115,17 @@ theorem correct (Main : Vector (ZMod p) 50)
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
     rw [← haddr_add.2, Word.toBitVec64_poly_toNat_poly haddr_add.1,
       Word.toNat_poly_def]
-    simp
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ, ZMod.val_zero]
+    omega
   have h_offset_eq :
       Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
     rw [h_imm_c, sp1_imm_c]
     congr 1
     apply BitVec.eq_of_toNat_eq
-    simp [Word.toNat_poly_def]
+    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero, List.getElem_cons_succ, BitVec.toNat_ofNat]
     omega
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt
