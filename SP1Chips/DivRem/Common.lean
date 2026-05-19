@@ -685,4 +685,92 @@ lemma remuw_chip_bounds_poly (Main : Vector (ZMod p) 246)
 
 end poly_helpers
 
+section divrem_kernel_helpers
+
+/-- Opaque alias for `2 ^ 128` — referenced in the close-helpers' types so the kernel
+re-check at chip call sites doesn't walk the literal. The `2^128` is walked exactly
+once inside each of the custom `BitVec.toNat_*_128` lemma oleans and inside `divrem_N128_eq`. -/
+@[irreducible] def divrem_N128 : ℕ := 2 ^ 128
+
+lemma divrem_N128_eq : divrem_N128 = 2 ^ 128 := by
+  unfold divrem_N128; rfl
+
+/-- Custom `BitVec.toNat_ofNat` specialized to width 128, concluding in the opaque
+`divrem_N128` alias. Use in place of `BitVec.toNat_ofNat` inside the DivRem cores'
+simp sets to keep `2^128` out of the chip's proof term. -/
+lemma BitVec.toNat_ofNat_128 (k : ℕ) :
+    (BitVec.ofNat 128 k).toNat = k % divrem_N128 := by
+  rw [divrem_N128_eq, _root_.BitVec.toNat_ofNat]
+
+/-- Custom `BitVec.toNat_add` specialized to width 128, concluding in the opaque
+`divrem_N128` alias. -/
+lemma BitVec.toNat_add_128 (x y : BitVec 128) :
+    (x + y).toNat = (x.toNat + y.toNat) % divrem_N128 := by
+  rw [divrem_N128_eq, _root_.BitVec.toNat_add]
+
+/-- Bare-`Nat` close-helper for `divu_remu_poly`'s final mod step. Both type and proof
+body reference `divrem_N128` (opaque). Manual `Nat.add_mod` + `Nat.add_mul_mod_self_right`
+chain avoids `omega`'s `Int.toNat (… % 2^128)` certificate (which trips the kernel). -/
+lemma divu_remu_close_helper
+    (b0 b1 b2 b3 r0 r1 r2 r3 : ℕ)
+    (ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 : ℕ)
+    (cry7 : ℕ)
+    (h_main :
+      b0 + b1 * 65536 + b2 * 4294967296 + b3 * 281474976710656 +
+        cry7 * divrem_N128 =
+      ctq0 + ctq1 * 65536 + ctq2 * 4294967296 + ctq3 * 281474976710656 +
+        ctq4 * 18446744073709551616 + ctq5 * 1208925819614629174706176 +
+        ctq6 * 79228162514264337593543950336 +
+        ctq7 * 5192296858534827628530496329220096 +
+      (r0 + r1 * 65536 + r2 * 4294967296 + r3 * 281474976710656)) :
+    (b0 + b1 * 65536 + b2 * 4294967296 + b3 * 281474976710656) % divrem_N128 =
+      ((ctq0 + ctq1 * 65536 + ctq2 * 4294967296 + ctq3 * 281474976710656 +
+          ctq4 * 18446744073709551616 + ctq5 * 1208925819614629174706176 +
+          ctq6 * 79228162514264337593543950336 +
+          ctq7 * 5192296858534827628530496329220096) % divrem_N128 +
+        (r0 + r1 * 65536 + r2 * 4294967296 + r3 * 281474976710656) % divrem_N128) %
+      divrem_N128 := by
+  rw [← Nat.add_mod, ← h_main, Nat.add_mul_mod_self_right]
+
+/-- Signed-variant close-helper for `div_rem_poly` (mirrors `divu_remu_close_helper`
+but with the `msb_b * 65535` and `msb_rem * 65535` sign-extension terms in upper limbs
+of `b` and `r`). -/
+lemma div_rem_close_helper
+    (b0 b1 b2 b3 r0 r1 r2 r3 : ℕ)
+    (ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 : ℕ)
+    (msb_b_ext msb_rem_ext : ℕ)
+    (cry7 : ℕ)
+    (h_main :
+      b0 + b1 * 65536 + b2 * 4294967296 + b3 * 281474976710656 +
+        msb_b_ext * 18446744073709551616 + msb_b_ext * 1208925819614629174706176 +
+        msb_b_ext * 79228162514264337593543950336 +
+        msb_b_ext * 5192296858534827628530496329220096 +
+        cry7 * divrem_N128 =
+      ctq0 + ctq1 * 65536 + ctq2 * 4294967296 + ctq3 * 281474976710656 +
+        ctq4 * 18446744073709551616 + ctq5 * 1208925819614629174706176 +
+        ctq6 * 79228162514264337593543950336 +
+        ctq7 * 5192296858534827628530496329220096 +
+      (r0 + r1 * 65536 + r2 * 4294967296 + r3 * 281474976710656 +
+        msb_rem_ext * 18446744073709551616 +
+        msb_rem_ext * 1208925819614629174706176 +
+        msb_rem_ext * 79228162514264337593543950336 +
+        msb_rem_ext * 5192296858534827628530496329220096)) :
+    (b0 + b1 * 65536 + b2 * 4294967296 + b3 * 281474976710656 +
+        msb_b_ext * 18446744073709551616 + msb_b_ext * 1208925819614629174706176 +
+        msb_b_ext * 79228162514264337593543950336 +
+        msb_b_ext * 5192296858534827628530496329220096) % divrem_N128 =
+      ((ctq0 + ctq1 * 65536 + ctq2 * 4294967296 + ctq3 * 281474976710656 +
+          ctq4 * 18446744073709551616 + ctq5 * 1208925819614629174706176 +
+          ctq6 * 79228162514264337593543950336 +
+          ctq7 * 5192296858534827628530496329220096) % divrem_N128 +
+        (r0 + r1 * 65536 + r2 * 4294967296 + r3 * 281474976710656 +
+          msb_rem_ext * 18446744073709551616 +
+          msb_rem_ext * 1208925819614629174706176 +
+          msb_rem_ext * 79228162514264337593543950336 +
+          msb_rem_ext * 5192296858534827628530496329220096) % divrem_N128) %
+      divrem_N128 := by
+  rw [← Nat.add_mod, ← h_main, Nat.add_mul_mod_self_right]
+
+end divrem_kernel_helpers
+
 end DivRem
