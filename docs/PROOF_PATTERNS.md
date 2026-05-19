@@ -446,6 +446,71 @@ back temporarily.
    The function-application proof term is shallow; the kernel passes.
    Canonical fix: `correct_bge` in `SP1Chips/BranchChip.lean`.
 
+8. **Split a bulk `simp only` to isolate a `rfl`-based BitVec lemma.**
+   When the trigger is a single rfl-based simp lemma (e.g.
+   `BitVec.toNat_ushiftRight x i := rfl`, which at `BitVec 64` plants
+   the underlying `2 ^ 64` from `BitVec.ushiftRight`'s `@[expose]`
+   body), pull that one lemma out of the simp set and apply it as a
+   bare `rw`. The fused-simp proof term combines the rewrite's motive
+   with the surrounding context's implicit type ascription; the
+   separate `rw` produces a chain of shallow `Eq.mpr` motives that
+   the kernel walks without compounding.
+
+   Canonical fix: `spec.srl_common_poly` in
+   `SP1Chips/ShiftRight/Srl.lean` (2026-05-18). Before:
+   ```
+   simp only [execute_RTYPE_pure_w_poly, BitVec.ushiftRight_eq',
+              BitVec.toNat_ushiftRight, BitVec.toNat_setWidth,
+              Nat.shiftRight_eq_div_pow]
+   ```
+   After:
+   ```
+   simp only [execute_RTYPE_pure_w_poly]
+   rw [BitVec.ushiftRight_eq']
+   rw [BitVec.toNat_ushiftRight]
+   simp only [BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
+   ```
+   Sorry-bisect to pinpoint the rfl-trigger first — the cost is one
+   build cycle per bisect step but the fix is surgical when it lands.
+   Diagnostic: the surviving `BitVec 32` analogs (Srlw) use the same
+   simp set without tripping, so the trigger is the bit-width, not
+   the lemma.
+
+9. **Push a `% 2^w` rewrite into the chip's close-helpers.** When the
+   trigger is the cumulative `% 2 ^ 64` in N call-sites of a close-
+   helper (Sll's 4×16 case-tree calls `sll_close_cb4cb5_*_case`
+   helpers whose conclusion is `... <<< shift % 2 ^ 64`), rewrite
+   each helper's conclusion to a `% 2^w`-free shape
+   (`(... <<< shift).toNat` instead of `... <<< shift % 2^w`) and
+   move the `rw [BitVec.toNat_shiftLeft]` step into the helper's body
+   as its first tactic. The helper's olean now walks `% 2^w` once;
+   the chip's many call-sites carry a `% 2^w`-free type, so the
+   kernel walk over the chip's proof term doesn't compound.
+
+   Canonical fix: `sll_close_cb4cb5_{zero,one_one,zero_one,one_zero}_case`
+   in `SP1Chips/ShiftLeft/Common.lean` + `spec.{sll,slli}_poly` in
+   `SP1Chips/ShiftLeft/Sll.lean` (2026-05-18). The chip's prep chain
+   drops `rw [BitVec.toNat_shiftLeft]` (now lives in helper) and the
+   `change` block is restated without `% 2 ^ 64`. The shift=0 sub-case
+   needs `BitVec.shiftLeft_zero` in place of `Nat.shiftLeft_zero` plus
+   removal of the `Nat.mod_eq_of_lt` step.
+
+   When recipe 8 isn't enough: recipe 9 applies when the surviving
+   trigger is in close-helper conclusion *types*, not in a simp
+   lemma. Identify by reading each helper's conclusion — if it
+   contains `% 2 ^ w` for w ≥ 64, that's the trigger.
+
+   Recipe 9 fails for DivRem cores (2026-05-18 attempt): even with
+   the omega lifted into a polymorphic-`n` bare-ℕ helper using
+   `Nat.add_mod` + `Nat.add_mul_mod_self_right` (avoiding omega's
+   certificate), the chip's proof term containing `2 ^ 128` still
+   trips. The DivRem trigger is structurally different — the chip
+   itself carries `2 ^ 128` in its post-`simp` goal type, not in any
+   single helper conclusion. Tried: bare-ℕ helper with `omega`
+   (helper trips), explicit-rewrite helper with `decide` bridge
+   (decide trips), polymorphic-`n` helper with `native_decide`
+   bridge (chip still trips). Open problem.
+
 #### Cross-references
 
 - Helpers:
@@ -472,16 +537,17 @@ kernel's `2 ^ N` reduction, the cheapest re-test is to delete every
 overflow" section), and re-add only the lines whose declarations
 newly fail.
 
-As of the **2026-05-17 evening sweep** there are **11** such lines
-(down from ~22 after a fresh per-site verification). The 11 still
-load-bearing:
+As of the **2026-05-17 evening sweep** there were 11 such lines. The
+**2026-05-18 sweep** cleared 3 of those (Sll's `spec.sll_poly` +
+`spec.slli_poly` and Srl's `spec.srl_common_poly`) via two new
+patterns documented below. Current count: **8 load-bearing sites in
+6 files**. The earlier recipe-6 (stale-comment delete + rebuild)
+remains fully exhausted on this branch — all 8 surviving sites
+reproduce `(kernel) deep recursion detected` on plain deletion.
 
 - `SP1Chips/DivRem/DivRem.lean` — `div_rem_poly` core (signed 64-bit
   DWord 8-limb)
 - `SP1Chips/DivRem/DivuRemu.lean` — `divu_remu_poly` core
-- `SP1Chips/ShiftLeft/Sll.lean` — `spec.sll_poly` **and**
-  `spec.slli_poly`
-- `SP1Chips/ShiftRight/Srl.lean` — `spec.srl_common_poly`
 - `SP1Chips/Store{Byte,Half,Word,Double}Chip.lean` — all 4 `correct`
   theorems
 - `SP1Chips/JalChip.lean` — `SP1JAL_correct`
@@ -496,6 +562,11 @@ wrappers (`spec.div_poly`/`spec.rem_poly`/`spec.divu_poly`/etc. —
 only the *cores* still trip), all `DivuwRemuw`/`DivwRemw`
 cores+wrappers, `ShiftRight/{Sra,Sraw,Srlw}` common bodies plus
 `Srlw`'s local `Word.isU64` helper.
+
+Cleared during the **2026-05-18 sweep**: `spec.sll_poly`,
+`spec.slli_poly` (`SP1Chips/ShiftLeft/Sll.lean`), and
+`spec.srl_common_poly` (`SP1Chips/ShiftRight/Srl.lean`) — see new
+recipes 8 and 9 below.
 
 #### Empirical findings (2026-05-17 evening)
 

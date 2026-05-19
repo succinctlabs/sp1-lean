@@ -15,9 +15,6 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 400000000 in
 -- 400M heartbeats: 4-way byte_shift × 16-way cb0..cb3 rcases × per-case wrapper call.
-set_option debug.skipKernelTC true in
--- Skip kernel typechecking: `Word.toBitVec64_poly_toNat_poly` involves `2^N` re-checks
--- that trip kernel deep recursion (mirrors `spec.sll_poly`'s use).
 -- Shared proof body for `spec.srl_poly` and `spec.srli_poly`.
 private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (eq_srl : Main[64] = 1) :
@@ -89,8 +86,10 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   have lt_lh3 := lt_lh3' h_sum_ne
   -- Goal manipulation: reduce to nat arithmetic.
   rw [← BitVec.toNat_inj]
-  simp only [execute_RTYPE_pure_w_poly, BitVec.ushiftRight_eq', BitVec.toNat_ushiftRight,
-             BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
+  simp only [execute_RTYPE_pure_w_poly]
+  rw [BitVec.ushiftRight_eq']
+  rw [BitVec.toNat_ushiftRight]
+  simp only [BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
   -- Reduce shift count `(toBitVec64_poly c).toNat % 2^6` to `c0.val % 64`.
   have h_shift_eq : (Word.toBitVec64_poly #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
     rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
@@ -157,8 +156,7 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   -- Simplify correction terms in sr_** using msb_b = 0 and eq_smv (smv = 0).
   simp only [h_msb_b_zero, eq_smv, zero_mul, mul_zero, sub_zero, zero_sub, neg_zero,
              add_zero, sub_self] at sr_03 sr_12 sr_13 sr_21 sr_22 sr_23 sr_30 sr_31 sr_32 sr_33
-  -- 4-way case-split on cb4, cb5 → byte_shift ∈ {0, 1, 2, 3}.
-  -- rcases order: cb5 outer, cb4 inner → byte_shifts 0, 1, 2, 3 in lex order.
+  -- BISECT: truncate body at outer rcases with sorry to see if trigger is in 4x16 case-split.
   rcases b_cb5 with hcb5 | hcb5 <;> rcases b_cb4 with hcb4 | hcb4
   · -- byte_shift = 0: cb4 = 0, cb5 = 0. su160 = 1, others = 0.
     rw [hcb4, hcb5] at h_su160 h_su161 h_su162 h_su163

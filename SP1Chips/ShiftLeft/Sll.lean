@@ -11,9 +11,6 @@ section sll_poly
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [hp : Fact (2 ^ 17 < p)]
 
-set_option debug.skipKernelTC true in
--- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel
--- deep recursion at re-check; see docs/PROOF_PATTERNS.md "Kernel deep-recursion on 2^N".
 lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
@@ -88,11 +85,14 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
   -- Goal manipulation: reduce to nat arithmetic.
   rw [← BitVec.toNat_inj]
   simp only [execute_RTYPE_pure_w_poly]
-  simp only [BitVec.toNat_shiftLeft, BitVec.shiftLeft_eq', BitVec.toNat_setWidth]
-  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b).toNat <<< ((toBitVec64_poly c).toNat % 2^6) % 2^64
+  rw [BitVec.shiftLeft_eq']
+  simp only [BitVec.toNat_setWidth]
+  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b <<< ((toBitVec64_poly c).toNat % 2^6)).toNat
+  -- (`BitVec.toNat_shiftLeft` is pushed into each `sll_close_cb4cb5_*_case` helper to
+  -- isolate the kernel walk over `% 2^64` to a single olean.)
   change (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
-        (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<<
-          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6) % 2 ^ 64
+        (Word.toBitVec64_poly #v[b0, b1, b2, b3] <<<
+          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
   -- Reduce the c-toNat % 64 to c0.val % 64
   have h_c_mod : (Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
     rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
@@ -286,8 +286,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
         simp only [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, zero_mul, zero_add, add_zero]
         exact h_v0_val
       rw [h_cb_sum_zero]
-      simp only [Nat.shiftLeft_zero]
-      rw [Nat.mod_eq_of_lt (BitVec.isLt _)]
+      simp only [BitVec.shiftLeft_zero]
     -- Remaining 15 cb0..3 sub-cases for cb4=cb5=0, in lex order over (cb0, cb1, cb2, cb3).
     · -- cb0=0, cb1=0, cb2=0, cb3=1: shift=8. M=256, N=256.
       have hv0123_val : v0123.val = 256 := by
@@ -1064,9 +1063,6 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
         lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
         h_b0_dec h_b1_dec h_b2_dec h_b3_dec
 
-set_option debug.skipKernelTC true in
--- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel
--- deep recursion at re-check; see docs/PROOF_PATTERNS.md "Kernel deep-recursion on 2^N".
 lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
     (constraints Main).allHold_poly →
       Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
@@ -1141,11 +1137,14 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
   -- Goal manipulation: reduce to nat arithmetic.
   rw [← BitVec.toNat_inj]
   simp only [execute_RTYPE_pure_w_poly]
-  simp only [BitVec.toNat_shiftLeft, BitVec.shiftLeft_eq', BitVec.toNat_setWidth]
-  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b).toNat <<< ((toBitVec64_poly c).toNat % 2^6) % 2^64
+  rw [BitVec.shiftLeft_eq']
+  simp only [BitVec.toNat_setWidth]
+  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b <<< ((toBitVec64_poly c).toNat % 2^6)).toNat
+  -- (`BitVec.toNat_shiftLeft` is pushed into each `sll_close_cb4cb5_*_case` helper to
+  -- isolate the kernel walk over `% 2^64` to a single olean.)
   change (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
-        (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<<
-          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6) % 2 ^ 64
+        (Word.toBitVec64_poly #v[b0, b1, b2, b3] <<<
+          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
   -- Reduce the c-toNat % 64 to c0.val % 64
   have h_c_mod : (Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
     rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
@@ -1339,8 +1338,7 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
         simp only [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, zero_mul, zero_add, add_zero]
         exact h_v0_val
       rw [h_cb_sum_zero]
-      simp only [Nat.shiftLeft_zero]
-      rw [Nat.mod_eq_of_lt (BitVec.isLt _)]
+      simp only [BitVec.shiftLeft_zero]
     -- Remaining 15 cb0..3 sub-cases for cb4=cb5=0, in lex order over (cb0, cb1, cb2, cb3).
     · -- cb0=0, cb1=0, cb2=0, cb3=1: shift=8. M=256, N=256.
       have hv0123_val : v0123.val = 256 := by
