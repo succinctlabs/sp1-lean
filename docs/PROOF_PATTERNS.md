@@ -777,6 +777,22 @@ trigger sites elsewhere in its 750-line proof body that need the same treatment
 (`simp [← BitVec.toInt_inj]` at line 359 likely; potentially others). Recipe is
 mechanical but case-by-case.
 
+**2026-05-20 attempts on `div_rem_poly`:** Phase 1 mechanical chip-side
+swap (replace omega close with `exact div_rem_close_helper …`) compiles
+in isolation but the chip's kernel re-check still trips after dropping
+`skipKernelTC`. Sorry-bisect upward (Stage A + B + main_eq + dctq/db/dr
++ eq0..eq7 all together) still trips — confirms the additional trigger
+is upstream of `suffices bv_ctqr`, in h_prod's setup at
+`SP1Chips/DivRem/DivRem.lean:430-455` (`combine_MUL_MULH_poly` simp,
+`simp [Word.extend_poly, …]` for `eq_eb`/`eq_er`). **`--tstack=4000000`
+(10x default) did not help** — the "(kernel) deep recursion detected"
+here is the kernel's WHNF reduction depth, not the C-stack, and has no
+user knob. The remaining paths are either (a) lift Stage A's signExtend
+chain into Common.lean as a top-level helper (Phase 3a — bv_ctqr_stageA_chain),
+or (b) extract h_prod into a separate `private theorem` at file top level
+so its kernel check runs independently from div_rem_poly's. Path (b) is
+the lighter-weight first attempt for a future session.
+
 #### Empirical findings (2026-05-17 evening)
 
 **DivRem and DivuRemu 64-bit cores vs. wrappers.** The `*_poly` core
