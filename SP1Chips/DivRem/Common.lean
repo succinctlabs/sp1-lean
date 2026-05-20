@@ -1070,4 +1070,303 @@ lemma div_rem_h_prod_aux {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 end divrem_h_prod_helper
 
+section divrem_h_abs_helper
+
+set_option linter.unusedVariables false in
+set_option maxRecDepth 1000000 in
+set_option maxHeartbeats 32000000 in
+-- 32M heartbeats + 1M recursion: same budget as `div_rem_poly`. `skipKernelTC`
+-- localizes the kernel-trip to this helper's olean; the chip's olean references
+-- the constant and does not re-walk the body.
+set_option debug.skipKernelTC true in
+/-- Extracted `h_abs` for `div_rem_poly` (signed 64-bit DRS branch).
+
+Lifted from `SP1Chips/DivRem/DivRem.lean` so its 4-way rem_neg × c_neg
+case-split body (`simp [...] at *` per case, `subst`, `push_cast`,
+`sum_zero_abs_poly` applications) is kernel-checked independently of
+`div_rem_poly`. Together with `div_rem_h_prod_aux`, this lift is what
+allows `div_rem_poly` to compile without `debug.skipKernelTC`.
+
+Inputs are the post-`simp [z_*, div_rem, nof] at *` chip forms:
+`rem_neg` / `c_neg` substituted to `msb_rem` / `msb_c`, `is_word = 0`
+specialization applied, but disjunctions like `b_rem_neg` /
+`rn_ar*` / `eq_cnop*` left intact — the helper does its own rcases /
+simp inside each of the 4 cases. -/
+lemma div_rem_h_abs_aux {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {c0 c1 c2 c3 r0 r1 r2 r3
+     ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3
+     cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3
+     msb_rem msb_c : ZMod p}
+    (is_U64_c : Word.isU64_poly #v[c0, c1, c2, c3])
+    (is_U64_r : Word.isU64_poly #v[r0, r1, r2, r3])
+    (is_U64_ac : Word.isU64_poly #v[ac0, ac1, ac2, ac3])
+    (is_U64_ar : Word.isU64_poly #v[ar0, ar1, ar2, ar3])
+    (b_rem_neg : msb_rem = 0 ∨ msb_rem = 1)
+    (b_c_neg : msb_c = 0 ∨ msb_c = 1)
+    (eq_msb_rem : msb_rem = if 32768 ≤ r3 then 1 else 0)
+    (eq_msb_c : msb_c = if 32768 ≤ c3 then 1 else 0)
+    (rn_ar0 : msb_rem = 1 ∨ ar0 = r0) (rn_ar1 : msb_rem = 1 ∨ ar1 = r1)
+    (rn_ar2 : msb_rem = 1 ∨ ar2 = r2) (rn_ar3 : msb_rem = 1 ∨ ar3 = r3)
+    (cn_ac0 : msb_c = 1 ∨ ac0 = c0) (cn_ac1 : msb_c = 1 ∨ ac1 = c1)
+    (cn_ac2 : msb_c = 1 ∨ ac2 = c2) (cn_ac3 : msb_c = 1 ∨ ac3 = c3)
+    (eq_cnop0 : msb_c = 0 ∨ cnop0 = 0) (eq_cnop1 : msb_c = 0 ∨ cnop1 = 0)
+    (eq_cnop2 : msb_c = 0 ∨ cnop2 = 0) (eq_cnop3 : msb_c = 0 ∨ cnop3 = 0)
+    (eq_rnop0 : msb_rem = 0 ∨ rnop0 = 0) (eq_rnop1 : msb_rem = 0 ∨ rnop1 = 0)
+    (eq_rnop2 : msb_rem = 0 ∨ rnop2 = 0) (eq_rnop3 : msb_rem = 0 ∨ rnop3 = 0)
+    (c_neg_sum_zero : msb_c = 1 →
+        Word.isU64_poly #v[cnop0, cnop1, cnop2, cnop3] ∧
+        Word.toBitVec64_poly #v[cnop0, cnop1, cnop2, cnop3] =
+          Word.toBitVec64_poly #v[c0, c1, c2, c3] +
+          Word.toBitVec64_poly #v[ac0, ac1, ac2, ac3])
+    (rem_neg_sum_zero : msb_rem = 1 →
+        Word.isU64_poly #v[rnop0, rnop1, rnop2, rnop3] ∧
+        Word.toBitVec64_poly #v[rnop0, rnop1, rnop2, rnop3] =
+          Word.toBitVec64_poly #v[r0, r1, r2, r3] +
+          Word.toBitVec64_poly #v[ar0, ar1, ar2, ar3])
+    (abs_check : Word.toNat_poly #v[ar0, ar1, ar2, ar3] <
+      Word.toNat_poly #v[ac0, ac1, ac2, ac3]) :
+    |Word.toInt_poly #v[r0, r1, r2, r3]| <
+      |Word.toInt_poly #v[c0, c1, c2, c3]| := by
+  have hp17 : 2 ^ 17 < p := Fact.out
+  have ⟨hc0_lt, hc1_lt, hc2_lt, hc3_lt⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  have ⟨hr0_lt, hr1_lt, hr2_lt, hr3_lt⟩ := Word.lt_cases_of_isU64_poly is_U64_r
+  have ⟨hac0_lt, hac1_lt, hac2_lt, hac3_lt⟩ := Word.lt_cases_of_isU64_poly is_U64_ac
+  have ⟨har0_lt, har1_lt, har2_lt, har3_lt⟩ := Word.lt_cases_of_isU64_poly is_U64_ar
+  simp only [Vector.getElem_mk, List.getElem_toArray,
+             List.getElem_cons_zero, List.getElem_cons_succ]
+    at hc0_lt hc1_lt hc2_lt hc3_lt hr0_lt hr1_lt hr2_lt hr3_lt
+       hac0_lt hac1_lt hac2_lt hac3_lt har0_lt har1_lt har2_lt har3_lt
+  -- Word.toInt_poly bounds for the abs/sign reasoning (chip derives these
+  -- alongside lb_b/lb_q before the `suffices h_qr`; helper needs the c/r ones).
+  have lb_c := Word.toInt_poly_lb is_U64_c; have ub_c := Word.toInt_poly_ub is_U64_c
+  have lb_r := Word.toInt_poly_lb is_U64_r; have ub_r := Word.toInt_poly_ub is_U64_r
+  -- `abs_check` arrives already in bare Prop form (chip simps reduce the chip
+  -- param `is_c_0 = 0 → arlt = if … then 1 else 0` down to the comparison via
+  -- `ite_eq_one_iff` + `(1 : ZMod p) ≠ 0`).
+  rcases b_rem_neg with rem_nneg | rem_neg <;>
+    rcases b_c_neg with c_nneg | c_neg
+  · -- Case 1: msb_rem = 0, msb_c = 0. Both non-negative; abs_check closes directly.
+    simp [rem_nneg, c_nneg] at *
+    subst ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3
+    have hr3_lt_val : r3.val < 32768 := by
+      by_contra h; push Not at h
+      apply eq_msb_rem
+      change (32768 : ZMod p).val ≤ r3.val
+      rw [val_32768_zmod_p]; exact h
+    have hc3_lt_val : c3.val < 32768 := by
+      by_contra h; push Not at h
+      apply eq_msb_c
+      change (32768 : ZMod p).val ≤ c3.val
+      rw [val_32768_zmod_p]; exact h
+    simp only [Word.toInt_poly, Word.isNegative_poly,
+               Vector.getElem_mk, List.getElem_toArray,
+               List.getElem_cons_zero, List.getElem_cons_succ]
+    rw [if_neg (by omega), if_neg (by omega)]
+    simp [Word.toNat_poly] at abs_check
+    simp [Word.toNat_poly]
+    push_cast [ZMod.cast_eq_val]
+    rw [abs_of_nonneg (by positivity), abs_of_nonneg (by positivity)]
+    exact_mod_cast abs_check
+  · -- Case 2: msb_rem = 0, msb_c = 1. c is negative; use c_neg_sum_zero.
+    simp [rem_nneg, c_neg] at *
+    subst ar0 ar1 ar2 ar3 cnop0 cnop1 cnop2 cnop3
+    obtain ⟨_, heqz⟩ := c_neg_sum_zero
+    have hr3_lt_val : r3.val < 32768 := by
+      by_contra h; push Not at h
+      apply eq_msb_rem
+      change (32768 : ZMod p).val ≤ r3.val
+      rw [val_32768_zmod_p]; exact h
+    have hc3_ge_val : c3.val ≥ 32768 := by
+      have hh : (32768 : ZMod p).val ≤ c3.val := eq_msb_c
+      rwa [val_32768_zmod_p] at hh
+    have c_isNeg : Word.isNegative_poly #v[c0, c1, c2, c3] := by
+      unfold Word.isNegative_poly
+      simp only [Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, List.getElem_cons_succ]
+      omega
+    apply sum_zero_abs_poly is_U64_c is_U64_ac c_isNeg at heqz
+    obtain ⟨hc_lb, hc_nlb⟩ := heqz
+    have hr_nneg : ¬ Word.isNegative_poly #v[r0, r1, r2, r3] := by
+      unfold Word.isNegative_poly
+      simp only [Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, List.getElem_cons_succ]
+      omega
+    have hr_int_nneg : 0 ≤ Word.toInt_poly #v[r0, r1, r2, r3] := by
+      unfold Word.toInt_poly
+      rw [if_neg hr_nneg]
+      positivity
+    by_cases is_c_lb : Word.toInt_poly #v[c0, c1, c2, c3] = -2 ^ 63
+    · rw [is_c_lb]
+      rw [show |(-2 ^ 63 : ℤ)| = 2 ^ 63 from by norm_num]
+      rw [abs_of_nonneg hr_int_nneg]
+      exact Word.toInt_poly_ub is_U64_r
+    · apply hc_nlb at is_c_lb
+      have hac_nneg : ¬ Word.isNegative_poly #v[ac0, ac1, ac2, ac3] := by
+        rw [Word.isNegative_poly_toInt_poly is_U64_ac, is_c_lb]
+        exact not_lt.mpr (abs_nonneg _)
+      rw [← is_c_lb]
+      unfold Word.toInt_poly
+      rw [if_neg hr_nneg, if_neg hac_nneg]
+      rw [abs_of_nonneg (by positivity)]
+      simp [Word.toNat_poly]
+      simp [Word.toNat_poly] at abs_check
+      push_cast [ZMod.cast_eq_val]
+      exact_mod_cast abs_check
+  · -- Case 3: msb_rem = 1, msb_c = 0. r is negative; use rem_neg_sum_zero.
+    simp [rem_neg, c_nneg] at *
+    subst ac0 ac1 ac2 ac3 rnop0 rnop1 rnop2 rnop3
+    obtain ⟨_, heqz⟩ := rem_neg_sum_zero
+    have hc3_lt_val : c3.val < 32768 := by
+      by_contra h; push Not at h
+      apply eq_msb_c
+      change (32768 : ZMod p).val ≤ c3.val
+      rw [val_32768_zmod_p]; exact h
+    have hr3_ge_val : r3.val ≥ 32768 := by
+      have hh : (32768 : ZMod p).val ≤ r3.val := eq_msb_rem
+      rwa [val_32768_zmod_p] at hh
+    have r_isNeg : Word.isNegative_poly #v[r0, r1, r2, r3] := by
+      unfold Word.isNegative_poly
+      simp only [Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, List.getElem_cons_succ]
+      omega
+    apply sum_zero_abs_poly is_U64_r is_U64_ar r_isNeg at heqz
+    obtain ⟨hr_lb, hr_nlb⟩ := heqz
+    have hc_nneg : ¬ Word.isNegative_poly #v[c0, c1, c2, c3] := by
+      unfold Word.isNegative_poly
+      simp only [Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, List.getElem_cons_succ]
+      omega
+    have hc_int_nneg : 0 ≤ Word.toInt_poly #v[c0, c1, c2, c3] := by
+      unfold Word.toInt_poly
+      rw [if_neg hc_nneg]
+      positivity
+    by_cases is_r_lb : Word.toInt_poly #v[r0, r1, r2, r3] = -2 ^ 63
+    · -- |r| = 2^63, |c| < 2^63 contradicts abs_check
+      exfalso
+      apply hr_lb at is_r_lb
+      -- is_r_lb : Word.toInt_poly #v[ar0..3] = -2^63
+      have har_toNat : Word.toNat_poly #v[ar0, ar1, ar2, ar3] = 2 ^ 63 := by
+        have := Word.isU64_poly_toInt_poly is_U64_ar
+        unfold Word.toInt_poly at is_r_lb
+        split_ifs at is_r_lb
+        · omega
+        · omega
+      simp [Word.toNat_poly] at abs_check
+      rw [show Word.toNat_poly #v[ar0, ar1, ar2, ar3] =
+            ar0.val + ar1.val * 65536 + ar2.val * 4294967296 +
+              ar3.val * 281474976710656 from by simp [Word.toNat_poly]] at har_toNat
+      omega
+    · apply hr_nlb at is_r_lb
+      have har_nneg : ¬ Word.isNegative_poly #v[ar0, ar1, ar2, ar3] := by
+        rw [Word.isNegative_poly_toInt_poly is_U64_ar, is_r_lb]
+        exact not_lt.mpr (abs_nonneg _)
+      rw [← is_r_lb]
+      unfold Word.toInt_poly
+      rw [if_neg har_nneg, if_neg hc_nneg]
+      rw [abs_of_nonneg (by positivity)]
+      simp [Word.toNat_poly]
+      simp [Word.toNat_poly] at abs_check
+      push_cast [ZMod.cast_eq_val]
+      exact_mod_cast abs_check
+  · -- Case 4: msb_rem = 1, msb_c = 1. Both negative; two sum_zero_abs_poly applications.
+    simp [rem_neg, c_neg] at *
+    subst rnop0 rnop1 rnop2 rnop3 cnop0 cnop1 cnop2 cnop3
+    obtain ⟨_, heqz_c⟩ := c_neg_sum_zero
+    obtain ⟨_, heqz_r⟩ := rem_neg_sum_zero
+    have hr3_ge_val : r3.val ≥ 32768 := by
+      have hh : (32768 : ZMod p).val ≤ r3.val := eq_msb_rem
+      rwa [val_32768_zmod_p] at hh
+    have hc3_ge_val : c3.val ≥ 32768 := by
+      have hh : (32768 : ZMod p).val ≤ c3.val := eq_msb_c
+      rwa [val_32768_zmod_p] at hh
+    have r_isNeg : Word.isNegative_poly #v[r0, r1, r2, r3] := by
+      unfold Word.isNegative_poly
+      simp only [Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, List.getElem_cons_succ]
+      omega
+    have c_isNeg : Word.isNegative_poly #v[c0, c1, c2, c3] := by
+      unfold Word.isNegative_poly
+      simp only [Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, List.getElem_cons_succ]
+      omega
+    apply sum_zero_abs_poly is_U64_c is_U64_ac c_isNeg at heqz_c
+    apply sum_zero_abs_poly is_U64_r is_U64_ar r_isNeg at heqz_r
+    obtain ⟨hc_lb, hc_nlb⟩ := heqz_c
+    obtain ⟨hr_lb, hr_nlb⟩ := heqz_r
+    by_cases is_r_lb : Word.toInt_poly #v[r0, r1, r2, r3] = -2 ^ 63 <;>
+      by_cases is_c_lb : Word.toInt_poly #v[c0, c1, c2, c3] = -2 ^ 63
+    · -- Sub-case (r = c = -2^63): abs_check gives contradiction
+      exfalso
+      have ar_lb := hr_lb is_r_lb
+      have ac_lb := hc_lb is_c_lb
+      have har_toNat : Word.toNat_poly #v[ar0, ar1, ar2, ar3] = 2 ^ 63 := by
+        unfold Word.toInt_poly at ar_lb
+        split_ifs at ar_lb <;> omega
+      have hac_toNat : Word.toNat_poly #v[ac0, ac1, ac2, ac3] = 2 ^ 63 := by
+        unfold Word.toInt_poly at ac_lb
+        split_ifs at ac_lb <;> omega
+      simp [Word.toNat_poly] at abs_check
+      rw [show Word.toNat_poly #v[ar0, ar1, ar2, ar3] =
+            ar0.val + ar1.val * 65536 + ar2.val * 4294967296 +
+              ar3.val * 281474976710656 from by simp [Word.toNat_poly]] at har_toNat
+      rw [show Word.toNat_poly #v[ac0, ac1, ac2, ac3] =
+            ac0.val + ac1.val * 65536 + ac2.val * 4294967296 +
+              ac3.val * 281474976710656 from by simp [Word.toNat_poly]] at hac_toNat
+      omega
+    · -- Sub-case (r = -2^63, c ≠ -2^63): abs_check gives contradiction
+      exfalso
+      have ar_lb := hr_lb is_r_lb
+      have ac_eq := hc_nlb is_c_lb
+      have har_toNat : Word.toNat_poly #v[ar0, ar1, ar2, ar3] = 2 ^ 63 := by
+        unfold Word.toInt_poly at ar_lb
+        split_ifs at ar_lb <;> omega
+      -- ac.toInt = |c.toInt|, and |c.toInt| < 2^63 since c ≠ -2^63
+      have hac_nneg : ¬ Word.isNegative_poly #v[ac0, ac1, ac2, ac3] := by
+        rw [Word.isNegative_poly_toInt_poly is_U64_ac, ac_eq]
+        exact not_lt.mpr (abs_nonneg _)
+      have ub_c := Word.toInt_poly_ub is_U64_c
+      have lb_c := Word.toInt_poly_lb is_U64_c
+      have hac_toNat_lt : Word.toNat_poly #v[ac0, ac1, ac2, ac3] < 2 ^ 63 := by
+        have hac_eq_nat : (Word.toNat_poly #v[ac0, ac1, ac2, ac3] : ℤ) =
+            |Word.toInt_poly #v[c0, c1, c2, c3]| := by
+          unfold Word.toInt_poly at ac_eq
+          rw [if_neg hac_nneg] at ac_eq; exact_mod_cast ac_eq
+        have : |Word.toInt_poly #v[c0, c1, c2, c3]| < 2 ^ 63 := by
+          rw [abs_lt]; exact ⟨by omega, ub_c⟩
+        omega
+      simp [Word.toNat_poly] at abs_check
+      rw [show Word.toNat_poly #v[ar0, ar1, ar2, ar3] =
+            ar0.val + ar1.val * 65536 + ar2.val * 4294967296 +
+              ar3.val * 281474976710656 from by simp [Word.toNat_poly]] at har_toNat
+      rw [show Word.toNat_poly #v[ac0, ac1, ac2, ac3] =
+            ac0.val + ac1.val * 65536 + ac2.val * 4294967296 +
+              ac3.val * 281474976710656 from by simp [Word.toNat_poly]]
+        at hac_toNat_lt
+      omega
+    · -- Sub-case (r ≠ -2^63, c = -2^63): |r| < 2^63 = |c|
+      rw [is_c_lb]
+      rw [show |(-2 ^ 63 : ℤ)| = 2 ^ 63 from by norm_num]
+      have ub_r := Word.toInt_poly_ub is_U64_r
+      have lb_r := Word.toInt_poly_lb is_U64_r
+      rw [abs_lt]
+      exact ⟨by omega, ub_r⟩
+    · -- Sub-case (r ≠ -2^63, c ≠ -2^63): both heqz_*.2 apply
+      have ar_eq := hr_nlb is_r_lb
+      have ac_eq := hc_nlb is_c_lb
+      have har_nneg : ¬ Word.isNegative_poly #v[ar0, ar1, ar2, ar3] := by
+        rw [Word.isNegative_poly_toInt_poly is_U64_ar, ar_eq]
+        exact not_lt.mpr (abs_nonneg _)
+      have hac_nneg : ¬ Word.isNegative_poly #v[ac0, ac1, ac2, ac3] := by
+        rw [Word.isNegative_poly_toInt_poly is_U64_ac, ac_eq]
+        exact not_lt.mpr (abs_nonneg _)
+      rw [← ar_eq, ← ac_eq]
+      unfold Word.toInt_poly
+      rw [if_neg har_nneg, if_neg hac_nneg]
+      simp [Word.toNat_poly]
+      simp [Word.toNat_poly] at abs_check
+      push_cast [ZMod.cast_eq_val]
+      exact_mod_cast abs_check
+
+end divrem_h_abs_helper
+
 end DivRem
