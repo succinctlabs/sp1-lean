@@ -3,6 +3,22 @@ import SP1Clean.AddChip
 import SP1Clean.LoadByteChip
 import SP1Clean.StoreByteChip
 import SP1Clean.JalChip
+import SP1Clean.MulChip
+import SP1Clean.ShiftLeftChip
+import SP1Clean.AddwChip
+import SP1Clean.UTypeChip
+import SP1Clean.JalrChip
+import SP1Clean.LtChip
+import SP1Clean.StoreWordChip
+import SP1Clean.StoreDoubleChip
+import SP1Clean.StoreHalfChip
+import SP1Clean.LoadDoubleChip
+import SP1Clean.LoadWordChip
+import SP1Clean.LoadHalfChip
+import SP1Clean.BranchChip
+import SP1Clean.LoadX0Chip
+import SP1Clean.ShiftRightChip
+import SP1Clean.DivRemChip
 
 /-! # Trace-level OfflineMemory bridge
 
@@ -71,6 +87,22 @@ inductive ChipRow (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   | loadByte (cols : SP1Clean.LoadByte.LoadByteCols (ZMod p))
   | storeByte (cols : SP1Clean.StoreByte.StoreByteCols (ZMod p))
   | jal (cols : SP1Clean.Jal.JalCols (ZMod p))
+  | mul (cols : SP1Clean.Mul.MulCols (ZMod p))
+  | shiftLeft (cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))
+  | addw (cols : SP1Clean.Addw.AddwCols (ZMod p))
+  | uType (cols : SP1Clean.UType.UTypeCols (ZMod p))
+  | jalr (cols : SP1Clean.Jalr.JalrCols (ZMod p))
+  | lt (cols : SP1Clean.Lt.LtCols (ZMod p))
+  | storeWord (cols : SP1Clean.StoreWord.StoreWordCols (ZMod p))
+  | storeDouble (cols : SP1Clean.StoreDouble.StoreDoubleCols (ZMod p))
+  | storeHalf (cols : SP1Clean.StoreHalf.StoreHalfCols (ZMod p))
+  | loadDouble (cols : SP1Clean.LoadDouble.LoadDoubleCols (ZMod p))
+  | loadWord (cols : SP1Clean.LoadWord.LoadWordCols (ZMod p))
+  | loadHalf (cols : SP1Clean.LoadHalf.LoadHalfCols (ZMod p))
+  | branch (cols : SP1Clean.Branch.BranchCols (ZMod p))
+  | loadX0 (cols : SP1Clean.LoadX0.LoadX0Cols (ZMod p))
+  | shiftRight (cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
+  | divRem (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
 
 namespace ChipRow
 
@@ -154,6 +186,266 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
         SP1Clean.Jal.opAMemoryAccess cols
       [(op_a_mem, cols.op_a_write_value)]
+  | .mul cols =>
+      -- Three register accesses. op_a is read AND written (write_value =
+      -- op_a_write_value, holding whatever the carry-chain produced —
+      -- correctness of that value is the MulOperation surface, which the
+      -- pilot's iff-only mirror leaves at `True`). op_b and op_c are pure
+      -- reads.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c, 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .shiftLeft cols =>
+      -- Three register accesses. op_a is read AND written (write_value =
+      -- `cols.result`, the 4-limb shifted output). op_b and op_c are pure
+      -- reads.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c, 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem, cols.result),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .addw cols =>
+      -- Three register accesses. op_a is read AND written (write_value is
+      -- the 4-limb sign-extended reconstruction of the 32-bit result).
+      -- op_c uses `cols.op_c[0]` as the register-index limb; when
+      -- `imm_c = 1` (addiw) the chip Spec constrains
+      -- `op_c_memory.prev_value = op_c` so the access is harmless.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c[0], 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem,
+        #v[cols.addw_value[0], cols.addw_value[1],
+           cols.addw_msb * 65535, cols.addw_msb * 65535]),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .uType cols =>
+      -- One register access only (op_a write). U-type has no op_b/op_c
+      -- register reads — both are immediates.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.UType.opAMemoryAccess cols
+      [(op_a_mem, cols.add_result)]
+  | .jalr cols =>
+      -- Two register accesses: op_a write (return address), op_b read
+      -- (jump-target base register). op_c is an I-type immediate.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.Jalr.opAMemoryAccess cols
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.Jalr.opBMemoryAccess cols
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value)]
+  | .lt cols =>
+      -- Three register accesses. op_a writes a 1-bit boolean result
+      -- (write_value = `#v[compare_bit, 0, 0, 0]`); op_b / op_c are
+      -- pure reads (write_value = prev_value).
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.Lt.opAMemoryAccess cols
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.Lt.opBMemoryAccess cols
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.Lt.opCMemoryAccess cols
+      [(op_a_mem, #v[cols.compare_bit, 0, 0, 0]),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .storeWord cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let store_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.StoreWord.storeMemoryAccess cols
+      [(op_a_mem, cols.op_a_memory_prev_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (store_mem, SP1Clean.StoreWord.storeWriteValue cols)]
+  | .storeDouble cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let store_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.StoreDouble.storeMemoryAccess cols
+      [(op_a_mem, cols.op_a_memory_prev_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (store_mem, SP1Clean.StoreDouble.storeWriteValue cols)]
+  | .storeHalf cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let store_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.StoreHalf.storeMemoryAccess cols
+      [(op_a_mem, cols.op_a_memory_prev_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (store_mem, SP1Clean.StoreHalf.storeWriteValue cols)]
+  | .loadDouble cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.LoadDouble.loadMemoryAccess cols
+      [(op_a_mem, cols.load_prev_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (load_mem, cols.load_prev_value)]
+  | .loadWord cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.LoadWord.loadMemoryAccess cols
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (load_mem, cols.load_prev_value)]
+  | .branch cols =>
+      -- Two register reads (op_a / op_b as comparison operands); no
+      -- writes. PC chain is state-bus, trace-level.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.Branch.opAMemoryAccess cols
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.Branch.opBMemoryAccess cols
+      [(op_a_mem, cols.op_a_memory_prev_value),
+       (op_b_mem, cols.op_b_memory_prev_value)]
+  | .loadX0 cols =>
+      -- Two reg + 1 RAM read. op_a's write is absorbed (target is x0).
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.LoadX0.loadMemoryAccess cols
+      [(op_a_mem, cols.op_a_memory_prev_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (load_mem, cols.load_prev_value)]
+  | .shiftRight cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c[0], 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .divRem cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c, 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .loadHalf cols =>
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        SP1Clean.LoadHalf.loadMemoryAccess cols
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (load_mem, cols.load_prev_value)]
 
 /-- The chip-row's `clk_high` and (composed) `clk_low` for the per-access
 timestamp encoding `clk_high * 2^24 + clk_low + offset`. -/
@@ -162,6 +454,22 @@ def clockComponents : ChipRow p → ZMod p × ZMod p
   | .loadByte cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
   | .storeByte cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
   | .jal cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .mul cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .shiftLeft cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .addw cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .uType cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .jalr cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .lt cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .storeWord cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .storeDouble cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .storeHalf cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .loadDouble cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .loadWord cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .loadHalf cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .branch cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .loadX0 cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .shiftRight cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .divRem cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
 
 /-- The chip-row's natural Spec predicate (the propositional content the
 chip's FormalAssertion / iff_sp1 establishes). -/
@@ -170,6 +478,22 @@ def Spec : ChipRow p → Prop
   | .loadByte cols => SP1Clean.LoadByte.Spec cols
   | .storeByte cols => SP1Clean.StoreByte.Spec cols
   | .jal cols => SP1Clean.Jal.Spec cols
+  | .mul cols => SP1Clean.Mul.Spec cols
+  | .shiftLeft cols => SP1Clean.ShiftLeft.Spec cols
+  | .addw cols => SP1Clean.Addw.Spec cols
+  | .uType cols => SP1Clean.UType.Spec cols
+  | .jalr cols => SP1Clean.Jalr.Spec cols
+  | .lt cols => SP1Clean.Lt.Spec cols
+  | .storeWord cols => SP1Clean.StoreWord.Spec cols
+  | .storeDouble cols => SP1Clean.StoreDouble.Spec cols
+  | .storeHalf cols => SP1Clean.StoreHalf.Spec cols
+  | .loadDouble cols => SP1Clean.LoadDouble.Spec cols
+  | .loadWord cols => SP1Clean.LoadWord.Spec cols
+  | .loadHalf cols => SP1Clean.LoadHalf.Spec cols
+  | .branch cols => SP1Clean.Branch.Spec cols
+  | .loadX0 cols => SP1Clean.LoadX0.Spec cols
+  | .shiftRight cols => SP1Clean.ShiftRight.Spec cols
+  | .divRem cols => SP1Clean.DivRem.Spec cols
 
 /-- Per-row, per-access sub-clock offsets. R-type and I-type readers
 emit accesses at `clk_low + 4` (op_a), `clk_low + 3` (op_b), and
@@ -184,6 +508,24 @@ def offsets : ChipRow p → List (ZMod p)
   | .storeByte _ => [4, 3, 0]
   -- Jal: only op_a write at +4. State-bus PC chain is trace-level.
   | .jal _ => [4]
+  -- Mul and ShiftLeft: same R-type-reader pattern as Add (3 register
+  -- accesses at +4 / +3 / +2). No RAM accesses.
+  | .mul _ => [4, 3, 2]
+  | .shiftLeft _ => [4, 3, 2]
+  | .addw _ => [4, 3, 2]
+  | .uType _ => [4]
+  | .jalr _ => [4, 3]
+  | .lt _ => [4, 3, 2]
+  | .storeWord _ => [4, 3, 0]
+  | .storeDouble _ => [4, 3, 0]
+  | .storeHalf _ => [4, 3, 0]
+  | .loadDouble _ => [4, 3, 1]
+  | .loadWord _ => [4, 3, 1]
+  | .loadHalf _ => [4, 3, 1]
+  | .branch _ => [4, 3]
+  | .loadX0 _ => [4, 3, 1]
+  | .shiftRight _ => [4, 3, 2]
+  | .divRem _ => [4, 3, 2]
 
 end ChipRow
 

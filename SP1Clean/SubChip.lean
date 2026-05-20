@@ -1,6 +1,7 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Provable
 import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
 import Clean.Gadgets.Equality
 import Clean.Utils.Field
 import Clean.Utils.Tactics
@@ -192,5 +193,95 @@ theorem correct_sub
       (_root_.Sub.sp1_sub Main).run s :=
   _root_.Sub.correct_sub Main s ((iff_sp1 Main h_is_real).mpr h_spec)
     h_is_real state_cstrs
+
+/-! ## Full `FormalAssertion` promotion (Path-2 design)
+
+Wraps the chip-level constraint surface into a Clean `FormalAssertion`,
+mirroring `SP1Clean.Addw.Assertion`'s Path-2 design: drops `SubOp.main`
+from `Assertion.main` (no `SubOp.assertion` exists yet — see Phase A1 of
+the iter-4 scaling plan), so the FormalSpec covers `CPUState`,
+`ProgramTable`, and the boolean asserts only. The borrow/natural-form
+SubOp surface continues to be carried by the legacy chip-level `Spec` /
+`iff_sp1` / `correct_sub` route. -/
+
+namespace Assertion
+
+open Circuit
+
+/-- Refactored chip-level circuit using subcircuit composition. Drops
+the `SubOp.main` borrow-form carry chain (see Scope note above). -/
+@[reducible]
+def main (cols : Var SubCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
+       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c, _op_c_memory_prev_value, _op_c_memory_prev_low,
+       _op_c_memory_diff_low, _op_a_write_value, is_real⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  -- Program-bus interaction (opcode = 2 = SUB; R-type discipline).
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, 2, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) SubCols unit where
+  name := "SP1Clean.Sub"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : SubCols (ZMod p)) : Prop := True
+
+/-- The chip's Circuit-derivable spec: the clock-decomposition byte
+lookups, the program-bus existential witness, and the two trailing
+assertZero gates. The SubOp arithmetic surface and the memory-bus side
+of `rtypeReaderSpec` are deferred to the legacy chip-level `Spec` /
+`iff_sp1`. -/
+def FormalSpec (cols : SubCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := 2, op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0],
+      op_c := #v[cols.op_c, 0, 0, 0],
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_isreal
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_isreal, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_isreal
+  · exact h_op_a_0
+
+end Assertion
+
+/-- The full Clean `FormalAssertion` for the lookup-derivable subset of
+`SubChip`'s constraint surface (Path-2 design: drops the SubOp surface;
+see Scope note above). Composes `CPUState.assertion`,
+`ProgramTable.assertion`, plus two trailing assertZero gates. -/
+def assertion : FormalAssertion (ZMod p) SubCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
 
 end SP1Clean.Sub

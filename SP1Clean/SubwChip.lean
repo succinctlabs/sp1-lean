@@ -1,6 +1,7 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Provable
 import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
 import Clean.Gadgets.Equality
 import Clean.Utils.Field
 import Clean.Utils.Tactics
@@ -198,6 +199,83 @@ theorem correct_subw
       (_root_.Subw.sp1_subw Main).run s :=
   _root_.Subw.correct_subw Main s ((iff_sp1 Main h_is_real).mpr h_spec)
     h_is_real state_cstrs
+
+/-! ## Full `FormalAssertion` promotion (Path-2 design)
+
+Mirrors `SP1Clean.Addw.Assertion`: drops `SubwOp.main` from
+`Assertion.main`, so the FormalSpec covers `CPUState`, `ProgramTable`,
+and boolean asserts only. The SubwOp 32-bit-with-MSB surface continues
+to be carried by the legacy chip-level `Spec` / `iff_sp1` / `correct_subw`
+route. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var SubwCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
+       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c, _op_c_memory_prev_value, _op_c_memory_prev_low,
+       _op_c_memory_diff_low, _subw_value, _subw_msb, is_real⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  -- Program-bus interaction (opcode = 20 = SUBW; R-type discipline).
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, 20, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) SubwCols unit where
+  name := "SP1Clean.Subw"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : SubwCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := 20, op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0],
+      op_c := #v[cols.op_c, 0, 0, 0],
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_isreal
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_isreal, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_isreal
+  · exact h_op_a_0
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) SubwCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
 
 end W
 end SP1Clean.Sub

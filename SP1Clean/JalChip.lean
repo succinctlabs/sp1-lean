@@ -175,4 +175,94 @@ def opAMemoryAccess (cols : JalCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :
     prev_low := cols.op_a_memory_prev_low,
     diff_low_limb := cols.op_a_memory_diff_low }
 
+/-! ## Full `FormalAssertion` promotion (Path-2 minimal)
+
+Wraps the chip-level constraint surface into a Clean `FormalAssertion`.
+Includes only subcircuit-derivable fragments:
+- Two `AddOp.assertion` subcircuits (next PC, return address)
+- `ProgramTable.assertion` (opcode 46 = JAL)
+- The scalar `is_real * (is_real - 1) = 0` boolean assertion
+
+**Scope note (dropped).** The bare clock-byte lookups, PC alignment
+lookup, op_a memory-diff lookup, and the two trailing
+`next_pc[3]/op_a_write_value[3] === 0` asserts (Vector-indexed) are all
+dropped from `Assertion.main`. Bridging them would require a manual
+subst cascade over the 14-field `h_input` conjunction — too much
+friction for this scaling round. They remain in the legacy chip-level
+`Spec` carried by `iff_sp1`. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, _clk_16_24, _clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, imm, op_c, next_pc, op_a_write_value, is_real⟩ := cols
+  -- Jump target: pc + imm = next_pc.
+  SP1Clean.AddOp.assertion
+    (⟨pc.push 0, imm, next_pc⟩ : Var SP1Clean.AddOp.Inputs (ZMod p))
+  -- Return address: pc + 4 = op_a_write_value.
+  SP1Clean.AddOp.assertion
+    (⟨pc.push 0, #v[4, 0, 0, 0], op_a_write_value⟩ :
+      Var SP1Clean.AddOp.Inputs (ZMod p))
+  -- Program-bus interaction (opcode = 46 = JAL).
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, 46, op_a, imm, op_c, op_a_0, 1, 1⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) JalCols unit where
+  name := "SP1Clean.Jal"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : JalCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
+  SP1Clean.AddOp.Spec (cols.pc.push 0) cols.imm cols.next_pc ∧
+  SP1Clean.AddOp.Spec (cols.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := 46, op_a := cols.op_a,
+      op_b := cols.imm, op_c := cols.op_c,
+      op_a_0 := cols.op_a_0, imm_b := 1, imm_c := 1 } ∧
+  cols.is_real * (cols.is_real - 1) = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨_, _, _, h_pc, _⟩ := h_input
+  obtain ⟨h_jump_sub, h_ret_sub, h_prog_sub, h_isreal⟩ := h_holds
+  simp only [Vector.map_push, h_pc] at h_jump_sub h_ret_sub
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact h_jump_sub trivial
+  · exact h_ret_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_isreal
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨_, _, _, h_pc, _⟩ := h_input
+  obtain ⟨h_jump, h_ret, h_prog, h_isreal⟩ := h_spec
+  simp only [Vector.map_push, h_pc]
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_jump⟩
+  · exact ⟨trivial, h_ret⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_isreal
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) JalCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.Jal

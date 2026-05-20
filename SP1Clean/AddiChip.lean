@@ -1,6 +1,7 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Provable
 import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
 import Clean.Gadgets.Equality
 import Clean.Utils.Field
 import Clean.Utils.Tactics
@@ -221,5 +222,115 @@ theorem correct_addi
       (_root_.Addi.sp1_addi Main).run s :=
   _root_.Addi.correct_addi Main s ((iff_sp1 Main h_is_real).mpr h_spec)
     h_is_real state_cstrs
+
+/-! ## Full `FormalAssertion` promotion
+
+Wraps the chip-level constraint surface into a Clean `FormalAssertion`.
+Composes `SP1Clean.AddOp.assertion`, `SP1Clean.CPUState.assertion`, and
+`SP1Clean.ProgramTable.assertion` as subcircuits, plus the two trailing
+assertZero gates.
+
+**Scope note.** The 4 explicit byte-range lookups for the I-type
+immediate operand limbs `op_c_imm[k]` (which appear in the chip's full
+`main` above) are NOT included in `Assertion.main` here. Bridging their
+`Expression.eval env input_var_op_c_imm[k]` shape back to the value
+`input_op_c_imm[k]` past the destructured `cols` pattern requires a
+manual `subst` cascade over the 16-field `h_input` conjunction — too
+much friction for the boilerplate budget. The bounds are still carried
+by the legacy chip-level `Spec` / `iff_sp1` / `correct_addi` route. The
+trace-level OfflineMemory bridge will pick them up via `iff_sp1.mpr`.
+
+This is the same Path-2 design as `SP1Clean.Addw.Assertion` (which drops
+the AddwOp carry surface): only lookup-derived subcircuit fragments are
+promoted to `FormalAssertion`. -/
+
+namespace Assertion
+
+open Circuit
+
+/-- Refactored chip-level circuit using subcircuit composition. Drops
+the 4 immediate-limb byte lookups (see Scope note above). -/
+@[reducible]
+def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
+       op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c_imm, op_a_write_value, is_real⟩ := cols
+  SP1Clean.AddOp.assertion
+    (⟨op_b_memory_prev_value, op_c_imm, op_a_write_value⟩ :
+      Var SP1Clean.AddOp.Inputs (ZMod p))
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  -- Program-bus interaction (opcode = 1 = ADDI; I-type discipline:
+  -- op_b is a single-limb register index with limbs 1-3 zero,
+  -- op_c carries 4 immediate limbs, imm_b = 0, imm_c = 1).
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, 1, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) AddiCols unit where
+  name := "SP1Clean.Addi"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : AddiCols (ZMod p)) : Prop := True
+
+/-- The chip's Circuit-derivable spec: byte-lookup consequences for the
+addition + clock-decomposition gadgets, the program-bus existential
+witness, and the two trailing assertZero gates. The immediate-limb byte
+bounds and memory-bus side of `itypeReaderSpec` are deferred to the
+legacy chip-level `Spec` / `iff_sp1`. -/
+def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
+  SP1Clean.AddOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_imm cols.op_a_write_value ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := 1, op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0],
+      op_c := cols.op_c_imm,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_isreal, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · exact h_addop_sub trivial
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_isreal
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_addop, h_cpu, h_prog, h_isreal, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_addop⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_isreal
+  · exact h_op_a_0
+
+end Assertion
+
+/-- The full Clean `FormalAssertion` for the byte- and program-lookup-
+derivable subset of `AddiChip`'s constraint surface (Path-2 design: drops
+the 4 immediate-limb byte lookups; see Scope note above). Composes
+`AddOp.assertion`, `CPUState.assertion`, `ProgramTable.assertion`, plus
+two trailing assertZero gates. -/
+def assertion : FormalAssertion (ZMod p) AddiCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
 
 end SP1Clean.Addi

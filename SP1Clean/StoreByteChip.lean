@@ -222,4 +222,79 @@ compiler emits one assertZero per limb to bind each to a function of
 def storeWriteValue (cols : StoreByteCols (ZMod p)) : Word (ZMod p) :=
   cols.store_write_value
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+Drops the bare byte lookups (CPUState bytes done inline, store memory
+diff bytes, result_byte U8 range, selected_byte_alt U8 range); covers
+`CPUState`, `ProgramTable`, and the `is_real` boolean. Memory-bus
+consistency is deferred to OfflineMemory. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, op_b,
+       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
+       _store_memory_flag, _store_memory_diff_low, _store_memory_diff_high,
+       _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
+       _selected_byte, _selected_byte_alt, _result_byte,
+       _selected_combined, _store_write_value, is_real⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, 36, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) StoreByteCols unit where
+  name := "SP1Clean.StoreByte"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : StoreByteCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := 36, op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  cols.is_real * (cols.is_real - 1) = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_isreal
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_isreal⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_isreal
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) StoreByteCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.StoreByte
