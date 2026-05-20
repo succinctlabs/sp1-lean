@@ -734,6 +734,12 @@ Axioms unchanged.
 Status after 2026-05-19 sweep: **1 load-bearing skipKernelTC site
 remains** (`div_rem_poly`), down from 11 at the start of the day.
 
+After 2026-05-20 (h_prod + h_abs extraction, commits `936ff16` +
+`a3af4f5`): still **1 load-bearing site**, but now relocated from the
+chip's main lemma (`div_rem_poly`, ~1100 lines) to a focused helper
+(`div_rem_h_abs_aux` in `Common.lean`, ~232 lines). All chip files are
+now `skipKernelTC`-free.
+
 ### Recipe 10: opaque `2^N` alias for the DivRem `% 2^128` trigger (2026-05-19 evening)
 
 The DivRem cores' trigger is the `BitVec.toNat_ofNat` simp call
@@ -777,21 +783,45 @@ trigger sites elsewhere in its 750-line proof body that need the same treatment
 (`simp [← BitVec.toInt_inj]` at line 359 likely; potentially others). Recipe is
 mechanical but case-by-case.
 
-**2026-05-20 attempts on `div_rem_poly`:** Phase 1 mechanical chip-side
-swap (replace omega close with `exact div_rem_close_helper …`) compiles
-in isolation but the chip's kernel re-check still trips after dropping
-`skipKernelTC`. Sorry-bisect upward (Stage A + B + main_eq + dctq/db/dr
-+ eq0..eq7 all together) still trips — confirms the additional trigger
-is upstream of `suffices bv_ctqr`, in h_prod's setup at
-`SP1Chips/DivRem/DivRem.lean:430-455` (`combine_MUL_MULH_poly` simp,
-`simp [Word.extend_poly, …]` for `eq_eb`/`eq_er`). **`--tstack=4000000`
-(10x default) did not help** — the "(kernel) deep recursion detected"
-here is the kernel's WHNF reduction depth, not the C-stack, and has no
-user knob. The remaining paths are either (a) lift Stage A's signExtend
-chain into Common.lean as a top-level helper (Phase 3a — bv_ctqr_stageA_chain),
-or (b) extract h_prod into a separate `private theorem` at file top level
-so its kernel check runs independently from div_rem_poly's. Path (b) is
-the lighter-weight first attempt for a future session.
+**2026-05-20 — h_prod + h_abs extraction (commits `936ff16`, `a3af4f5`).**
+Path (b) — split chip-internal witnesses into top-level helpers — worked.
+Key insights:
+
+1. **`--tstack=4000000` (10x default) didn't help.** The "(kernel) deep
+   recursion detected" here is the kernel's WHNF reduction depth, not the
+   C-stack, and has no user knob. The only way past is to reduce the
+   actual proof-term walks.
+2. **Lifting `h_prod` halved chip elaboration (739s→341s)** but the
+   chip's kernel still tripped — `h_abs`'s ~232-line, ~149-tactic body
+   was a separate trigger. Sorry-bisect on h_abs with h_prod already
+   lifted confirmed the chip builds clean once h_abs is `sorry`'d.
+3. **Lifting `h_abs` too made the chip pass without `skipKernelTC`.**
+   `div_rem_h_abs_aux` itself needs `skipKernelTC` (the 4-way rcases body
+   is still too deep), but the escape is now localized to one focused
+   helper rather than the 1100-line chip lemma.
+
+Recipe for "chip's kernel walk is too deep" cases (when neither the
+opaque-`N` alias nor a bare close-helper is sufficient):
+
+1. Identify the chip-internal `have`s whose bodies contribute the kernel
+   walk (sorry-bisect each separately to localize).
+2. Lift each into a `lemma <chip>_<witness>_aux` at the top of a sibling
+   file (e.g. `Common.lean`). Inputs are the post-`simp at *` chip-side
+   hypothesis forms — destructured tuples, post-`subst` disjunctions
+   resolved to one side, `is_word = 0` / `is_overflow = 0` already
+   specialized. Pre-spec any further reductions (e.g. `(0 : ZMod p) = 0
+   → ... = 1` collapsed to the bare Prop comparison) at the helper's
+   entry to match what chip-wide simps would have produced.
+3. The helper's olean carries the deep walk; the chip's olean references
+   the constant and never re-walks. If the helper itself still trips,
+   apply `set_option debug.skipKernelTC true in` locally on the helper
+   (or split it further) — the escape stays scoped to one focused decl.
+
+Outstanding: `div_rem_h_abs_aux` could be split into 4 case helpers
+(`case_{nn,np,pn,pp}` for msb_rem × msb_c branches; each case body is
+22-56 lines, well under the kernel WHNF depth) to fully drop the
+`skipKernelTC` from the helper itself. Estimated 1-2h work + 1-2 build
+cycles. Repo's only remaining `skipKernelTC` after that.
 
 #### Empirical findings (2026-05-17 evening)
 
