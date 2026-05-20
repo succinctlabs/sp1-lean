@@ -6,6 +6,8 @@ set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 set_option linter.style.multiGoal false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
+
 
 section sllw_poly
 
@@ -57,11 +59,11 @@ private lemma spec.sllw_poly_cb4_zero (Main : Vector (ZMod p) 65)
     (w_01' : Main[45] = 0 ∨ Main[33] = Main[58])
     (h_a2_eq : Main[61] * 65535 = Main[34])
     (h_a3_eq : Main[61] * 65535 = Main[35])
-    (h_msb_a1 : List.Forall SP1Constraint.toProp_poly
+    (h_msb_a1 : List.Forall SP1Constraint.toProp
       (U16MSBOperation.constraints Main[33] { msb := Main[61] } 1))
     (h_c_mod_32 : Main[25].val % 32 =
       (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 + Main[40] * 16).val) :
-    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
       BitVec.signExtend 64 (HWord.toBitVec32_poly #v[Main[15], Main[16]] <<<
         BitVec.setWidth 5 (HWord.toBitVec32_poly #v[Main[25], Main[26]])) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -277,11 +279,11 @@ private lemma spec.sllw_poly_cb4_one (Main : Vector (ZMod p) 65)
     (w_03' : Main[46] = 0 ∨ Main[33] = Main[57])
     (h_a2_eq : Main[61] * 65535 = Main[34])
     (h_a3_eq : Main[61] * 65535 = Main[35])
-    (h_msb_a1 : List.Forall SP1Constraint.toProp_poly
+    (h_msb_a1 : List.Forall SP1Constraint.toProp
       (U16MSBOperation.constraints Main[33] { msb := Main[61] } 1))
     (h_c_mod_32 : Main[25].val % 32 =
       (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 + Main[40] * 16).val) :
-    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
       BitVec.signExtend 64 (HWord.toBitVec32_poly #v[Main[15], Main[16]] <<<
         BitVec.setWidth 5 (HWord.toBitVec32_poly #v[Main[25], Main[26]])) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -475,7 +477,7 @@ tactic from the failed inline approach); dispatch on `cb4` to the two branch
 lemmas above. -/
 lemma spec.sllw_poly (Main : Vector (ZMod p) 65) (h : is_sllw_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLLW := by
   intro cstrs
@@ -490,7 +492,7 @@ lemma spec.sllw_poly (Main : Vector (ZMod p) 65) (h : is_sllw_poly Main) :
   obtain ⟨_sop_1, sop_2⟩ := single_op_poly Main cstrs
   have h_no_sll : Main[62] = 0 := sop_2 eq_sllw
   -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   obtain ⟨h_msb_a1, _cpu, _alu, _one_of_ops,
            _b_sll, _b_sllw,
@@ -740,7 +742,7 @@ lemma spec.sllw_poly (Main : Vector (ZMod p) 65) (h : is_sllw_poly Main) :
 
 lemma spec.slliw_poly (Main : Vector (ZMod p) 65) (h : is_slliw_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLLW := by
   -- Clone of spec.sllw_poly's outer; both proofs share the same branch lemmas
@@ -756,7 +758,7 @@ lemma spec.slliw_poly (Main : Vector (ZMod p) 65) (h : is_slliw_poly Main) :
   obtain ⟨c0_16, c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
   obtain ⟨_sop_1, sop_2⟩ := single_op_poly Main cstrs
   have h_no_sll : Main[62] = 0 := sop_2 eq_slliw
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   obtain ⟨h_msb_a1, _cpu, _alu, _one_of_ops,
            _b_sll, _b_sllw,

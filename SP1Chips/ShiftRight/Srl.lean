@@ -8,6 +8,8 @@ set_option linter.style.multiGoal false
 -- Unused variables expected because many proofs are currently stopped.
 set_option linter.unusedVariables false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
+
 
 section srl_poly
 
@@ -18,7 +20,7 @@ set_option maxHeartbeats 400000000 in
 -- Shared proof body for `spec.srl_poly` and `spec.srli_poly`.
 private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (eq_srl : Main[64] = 1) :
-    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
       execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[25], Main[26], Main[27], Main[28]] .SRL := by
   -- Setup.
@@ -34,7 +36,7 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   obtain ⟨sop_1, _, _, _⟩ := single_op_poly Main cstrs
   have ⟨h_no_sra, h_no_srlw, h_no_sraw⟩ := sop_1 eq_srl
   -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   -- Set up local names for Main[i] indices.
   set b0 := Main[15]; set b1 := Main[16]; set b2 := Main[17]; set b3 := Main[18]
@@ -90,9 +92,9 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
   rw [BitVec.ushiftRight_eq']
   rw [BitVec.toNat_ushiftRight]
   simp only [BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
-  -- Reduce shift count `(toBitVec64_poly c).toNat % 2^6` to `c0.val % 64`.
-  have h_shift_eq : (Word.toBitVec64_poly #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
-    rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+  -- Reduce shift count `(toBitVec64 c).toNat % 2^6` to `c0.val % 64`.
+  have h_shift_eq : (Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
+    rw [Word.toBitVec64_toNat_poly is_U64_c, Word.toNat_poly_def]
     simp; omega
   rw [h_shift_eq]; clear h_shift_eq
   -- Reduce c0.val % 64 to (cb_sum_zmod).val via is_mod_64_poly. Val-of-sum form for wrapper compatibility.
@@ -734,14 +736,14 @@ private lemma spec.srl_common_poly (Main : Vector (ZMod p) 69)
 
 lemma spec.srl_poly (Main : Vector (ZMod p) 69) (h : is_srl_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRL :=
   fun cstrs => spec.srl_common_poly Main cstrs h.1
 
 lemma spec.srli_poly (Main : Vector (ZMod p) 69) (h : is_srli_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRL :=
   fun cstrs => spec.srl_common_poly Main cstrs h.1

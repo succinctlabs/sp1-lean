@@ -4,6 +4,9 @@ import SP1Operations.Reader.RTypeReader
 
 namespace Add
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section constraints
 
 -- Generated Lean code for chip AddChip

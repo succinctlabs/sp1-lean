@@ -2,14 +2,17 @@ import SP1Operations.Compare.LtOperationUnsigned.Constraints
 
 namespace LtOperationUnsigned
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 lemma allHold_constraints_iff_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (b : Word (ZMod p))
   (d : Word (ZMod p))
   (cols : LtOperationUnsigned (ZMod p))
   (is_real : ZMod p) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols is_real) ↔
-    List.Forall SP1Constraint.toProp_poly (U16CompareOperation.constraints cols.comparison_limbs[0] cols.comparison_limbs[1] cols.u16_compare_operation is_real) ∧
+  List.Forall SP1Constraint.toProp (constraints b d cols is_real) ↔
+    List.Forall SP1Constraint.toProp (U16CompareOperation.constraints cols.comparison_limbs[0] cols.comparison_limbs[1] cols.u16_compare_operation is_real) ∧
     ((is_real = 0 ∨ is_real = 1) ∧
     (cols.u16_flags[0] = 0 ∨ cols.u16_flags[0] = 1) ∧
     (cols.u16_flags[1] = 0 ∨ cols.u16_flags[1] = 1) ∧
@@ -24,7 +27,7 @@ lemma allHold_constraints_iff_poly
     d[3] * cols.u16_flags[3] + d[2] * cols.u16_flags[2] + d[1] * cols.u16_flags[1] + d[0] * cols.u16_flags[0] = cols.comparison_limbs[1] ∧
     (-cols.u16_flags[3] + (-cols.u16_flags[2] + (-cols.u16_flags[1] + -cols.u16_flags[0])) = 0 ∨ cols.not_eq_inv * (cols.comparison_limbs[0] - cols.comparison_limbs[1]) = is_real))
   := by
-    simp [and_assoc, constraints, sub_eq_zero, SP1Constraint.toProp_poly]
+    simp [and_assoc, constraints, sub_eq_zero, SP1Constraint.toProp]
 
 set_option maxHeartbeats 8000000 in
 -- 16-way case split on the 4 boolean flags. The "sum ≤ 1" constraint
@@ -41,7 +44,7 @@ lemma cl_are_U16_poly
   {is_real : ZMod p}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols is_real) →
+  List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
     is_real = 1 →
       cols.comparison_limbs[0].val < 65536 ∧ cols.comparison_limbs[1].val < 65536
   := by
@@ -101,7 +104,7 @@ lemma spec.nat_poly
   {cols : LtOperationUnsigned (ZMod p)}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols 1) →
+  List.Forall SP1Constraint.toProp (constraints b d cols 1) →
     cols.u16_compare_operation.bit =
       if b.toNat_poly < d.toNat_poly then (1 : ZMod p) else (0 : ZMod p)
   := by
@@ -149,7 +152,7 @@ lemma spec_poly
   {cols : LtOperationUnsigned (ZMod p)}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols 1) →
+  List.Forall SP1Constraint.toProp (constraints b d cols 1) →
     BitVec.ofNat 64 cols.u16_compare_operation.bit.val = execute_RTYPE_pure_w_poly b d .SLTU
   := by
     intro cstrs
@@ -168,7 +171,7 @@ lemma spec.nat.gen_poly
   {is_real : ZMod p}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols is_real) →
+  List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
     is_real = 1 →
       cols.u16_compare_operation.bit =
         if b.toNat_poly < d.toNat_poly then (1 : ZMod p) else (0 : ZMod p)

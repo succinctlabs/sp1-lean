@@ -3,6 +3,9 @@ import SP1Operations.Compare.IsZeroOperation
 
 namespace IsZeroWordOperation
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section constraints
 
 @[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]

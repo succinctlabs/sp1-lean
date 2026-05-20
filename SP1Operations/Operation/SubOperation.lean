@@ -71,7 +71,7 @@ lemma allHold_constraints_iff_poly
         (d0 = 0 ∨ d0 = 1) ∧ (d1 = 0 ∨ d1 = 1) ∧ (d2 = 0 ∨ d2 = 1) ∧ (d3 = 0 ∨ d3 = 1) ∧
         cols.value[0].val < 65536 ∧ cols.value[1].val < 65536 ∧
         cols.value[2].val < 65536 ∧ cols.value[3].val < 65536 := by
-    simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly,
+    simp [constraints, sub_eq_zero, SP1Constraint.toProp,
           hd0_def, hd1_def, hd2_def, hd3_def]
   rw [h_borrow,
       carry_swap_iff_poly d0 c0 hd0_swap,
@@ -118,7 +118,7 @@ set_option maxHeartbeats 16000000 in
 `b[i] + v[i] + prev = a[i] + c_i * 65536` via `linear_combination` over
 `(65536 : ZMod p) * 65536⁻¹ = 1`, then applies `limb_lift` to convert
 each to a Nat equation, and closes the BitVec goal (after
-`Word.toBitVec64_poly_toNat_poly` bridges) by omega. -/
+`Word.toBitVec64_toNat_poly` bridges) by omega. -/
 theorem spec_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a b : Word (ZMod p)}
@@ -127,7 +127,7 @@ theorem spec_poly
   (h_isU64_b : b.isU64_poly) :
   SP1ConstraintList.allHold_poly (constraints a b cols 1) →
     cols.value.isU64_poly ∧
-    cols.value.toBitVec64_poly = execute_RTYPE_pure_w_poly a b .SUB := by
+    cols.value.toBitVec64 = execute_RTYPE_pure_w_poly a b .SUB := by
   intro cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   obtain ⟨hc0, hc1, hc2, hc3, hv0, hv1, hv2, hv3⟩ := cstrs
@@ -140,11 +140,11 @@ theorem spec_poly
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   rw [show execute_RTYPE_pure_w_poly a b .SUB =
-        a.toBitVec64_poly - b.toBitVec64_poly from rfl,
+        a.toBitVec64 - b.toBitVec64 from rfl,
       BitVec.eq_sub_iff_add_eq, ← BitVec.toNat_inj, BitVec.toNat_add,
-      Word.toBitVec64_poly_toNat_poly h_isU64_v,
-      Word.toBitVec64_poly_toNat_poly h_isU64_b,
-      Word.toBitVec64_poly_toNat_poly h_isU64_a,
+      Word.toBitVec64_toNat_poly h_isU64_v,
+      Word.toBitVec64_toNat_poly h_isU64_b,
+      Word.toBitVec64_toNat_poly h_isU64_a,
       Word.toNat_poly_def, Word.toNat_poly_def, Word.toNat_poly_def]
   set c0 : ZMod p := (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (b[1] + cols.value[1] - a[1] + c0) * (65536 : ZMod p)⁻¹ with hc1_def

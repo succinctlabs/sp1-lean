@@ -9,6 +9,8 @@ set_option maxHeartbeats 100000000
 -- time. Rewriting each to `<;>` would flatten the tree but require goal-state
 -- reasoning the linter can't see; keep the existing structure.
 set_option linter.style.multiGoal false
+set_option linter.style.longLine false
+
 
 section auxiliaries
 
@@ -114,16 +116,16 @@ lemma tdiv_tmod_unique_full_nat {b c q r : ℕ} (hcnz : c ≠ 0) :
 lemma sum_zero_abs_poly {p : ℕ} [NeZero p] {wx wy : Word (ZMod p)}
     (is64_wx : Word.isU64_poly wx) (is64_wy : Word.isU64_poly wy) :
   wx.isNegative_poly →
-    Word.toBitVec64_poly (#v[0, 0, 0, 0] : Word (ZMod p))
-      = wx.toBitVec64_poly + wy.toBitVec64_poly →
+    Word.toBitVec64 (#v[0, 0, 0, 0] : Word (ZMod p))
+      = wx.toBitVec64 + wy.toBitVec64 →
     (wx.toInt_poly = -2^63 → wy.toInt_poly = -2^63) ∧
     (¬ wx.toInt_poly = -2^63 → wy.toInt_poly = |wx.toInt_poly|) := by
   intro neg_wx sum_zero
   rw [Word.isNegative_poly_toInt_poly is64_wx] at neg_wx
   rw [Int.abs_cases, if_neg (by omega)]
   simp [← BitVec.toInt_inj] at sum_zero
-  rw [Word.toBitVec64_poly_toInt_poly is64_wx, Word.toBitVec64_poly_toInt_poly is64_wy] at sum_zero
-  simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero] at sum_zero
+  rw [Word.toBitVec64_toInt_poly is64_wx, Word.toBitVec64_toInt_poly is64_wy] at sum_zero
+  simp [Word.toBitVec64, Word.toNat_poly, ZMod.val_zero] at sum_zero
   apply Word.isU64_poly_toInt_poly at is64_wx
   apply Word.isU64_poly_toInt_poly at is64_wy
   constructor <;> intro hwx <;> [ (simp [hwx] at *; simp_all); skip ]
@@ -827,13 +829,13 @@ lemma div_rem_h_prod_aux {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (u16_ctqpr6 : (ctq6 + msb_rem * 65535 - cry6 * 65536 + cry5).val < 65536)
     (u16_ctqpr7 : (ctq7 + msb_rem * 65535 - cry7 * 65536 + cry6).val < 65536)
     (main_mul_low : Word.isU64_poly #v[ctq0, ctq1, ctq2, ctq3] ∧
-        Word.toBitVec64_poly #v[ctq0, ctq1, ctq2, ctq3] =
-          execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, q2, q3])
-            (Word.toBitVec64_poly #v[c0, c1, c2, c3]) mop.MUL)
+        Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] =
+          execute_MUL_pure (Word.toBitVec64 #v[q0, q1, q2, q3])
+            (Word.toBitVec64 #v[c0, c1, c2, c3]) mop.MUL)
     (main_mul_high : Word.isU64_poly #v[ctq4, ctq5, ctq6, ctq7] ∧
-        Word.toBitVec64_poly #v[ctq4, ctq5, ctq6, ctq7] =
-          execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, q2, q3])
-            (Word.toBitVec64_poly #v[c0, c1, c2, c3]) mop.MULH) :
+        Word.toBitVec64 #v[ctq4, ctq5, ctq6, ctq7] =
+          execute_MUL_pure (Word.toBitVec64 #v[q0, q1, q2, q3])
+            (Word.toBitVec64 #v[c0, c1, c2, c3]) mop.MULH) :
     Word.toInt_poly #v[b0, b1, b2, b3] =
       Word.toInt_poly #v[q0, q1, q2, q3] * Word.toInt_poly #v[c0, c1, c2, c3] +
       Word.toInt_poly #v[r0, r1, r2, r3] := by
@@ -891,7 +893,7 @@ lemma div_rem_h_prod_aux {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     repeat rw [Word.extend_true_is_signExtend_poly (by assumption)] at bv_ctqr
     simp [← BitVec.toInt_inj] at bv_ctqr
     repeat rw [BitVec.toInt_signExtend_of_le (by simp)] at bv_ctqr
-    repeat rw [Word.toBitVec64_poly_toInt_poly (by assumption)] at bv_ctqr
+    repeat rw [Word.toBitVec64_toInt_poly (by assumption)] at bv_ctqr
     have lbq := Word.toInt_poly_lb is_U64_q
     have ubq := Word.toInt_poly_ub is_U64_q
     have lbr := Word.toInt_poly_lb is_U64_r
@@ -1117,14 +1119,14 @@ lemma div_rem_h_abs_aux {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (eq_rnop2 : msb_rem = 0 ∨ rnop2 = 0) (eq_rnop3 : msb_rem = 0 ∨ rnop3 = 0)
     (c_neg_sum_zero : msb_c = 1 →
         Word.isU64_poly #v[cnop0, cnop1, cnop2, cnop3] ∧
-        Word.toBitVec64_poly #v[cnop0, cnop1, cnop2, cnop3] =
-          Word.toBitVec64_poly #v[c0, c1, c2, c3] +
-          Word.toBitVec64_poly #v[ac0, ac1, ac2, ac3])
+        Word.toBitVec64 #v[cnop0, cnop1, cnop2, cnop3] =
+          Word.toBitVec64 #v[c0, c1, c2, c3] +
+          Word.toBitVec64 #v[ac0, ac1, ac2, ac3])
     (rem_neg_sum_zero : msb_rem = 1 →
         Word.isU64_poly #v[rnop0, rnop1, rnop2, rnop3] ∧
-        Word.toBitVec64_poly #v[rnop0, rnop1, rnop2, rnop3] =
-          Word.toBitVec64_poly #v[r0, r1, r2, r3] +
-          Word.toBitVec64_poly #v[ar0, ar1, ar2, ar3])
+        Word.toBitVec64 #v[rnop0, rnop1, rnop2, rnop3] =
+          Word.toBitVec64 #v[r0, r1, r2, r3] +
+          Word.toBitVec64 #v[ar0, ar1, ar2, ar3])
     (abs_check : Word.toNat_poly #v[ar0, ar1, ar2, ar3] <
       Word.toNat_poly #v[ac0, ac1, ac2, ac3]) :
     |Word.toInt_poly #v[r0, r1, r2, r3]| <

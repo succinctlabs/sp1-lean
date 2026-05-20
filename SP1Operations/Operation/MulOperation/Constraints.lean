@@ -8,6 +8,7 @@ namespace MulOperation
 set_option linter.unusedTactic false
 set_option linter.unreachableTactic false
 set_option linter.style.setOption false
+set_option linter.style.longLine false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 set_option linter.style.multiGoal false
 
@@ -1468,14 +1469,14 @@ lemma allHold_constraints_iff_is_real_poly
   (is_mulw : (ZMod p))
   (is_mulhu : (ZMod p))
   (is_mulhsu : (ZMod p)) :
-  List.Forall SP1Constraint.toProp_poly (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu) ↔
+  List.Forall SP1Constraint.toProp (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu) ↔
     have ⟨bbw, U16_b⟩ := U16toU8OperationSafe.constraints #v[bw[0], bw[1], bw[2], bw[3]] { low_bytes := #v[cols.b_lower_byte.low_bytes[0], cols.b_lower_byte.low_bytes[1], cols.b_lower_byte.low_bytes[2], cols.b_lower_byte.low_bytes[3]] } 1
     have ⟨cbw, U16_c⟩ := U16toU8OperationSafe.constraints #v[cw[0], cw[1], cw[2], cw[3]] { low_bytes := #v[cols.c_lower_byte.low_bytes[0], cols.c_lower_byte.low_bytes[1], cols.c_lower_byte.low_bytes[2], cols.c_lower_byte.low_bytes[3]] } 1
     let bbwe : Vector (ZMod p) 16 := #v[bbw[0], bbw[1], bbw[2], bbw[3], bbw[4], bbw[5], bbw[6], bbw[7], cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255, cols.b_sign_extend * 255]
     let cbwe : Vector (ZMod p) 16 := #v[cbw[0], cbw[1], cbw[2], cbw[3], cbw[4], cbw[5], cbw[6], cbw[7], cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255, cols.c_sign_extend * 255]
-    List.Forall SP1Constraint.toProp_poly U16_b ∧
-    List.Forall SP1Constraint.toProp_poly U16_c ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints aw[1] cols.product_msb is_mulw) ∧
+    List.Forall SP1Constraint.toProp U16_b ∧
+    List.Forall SP1Constraint.toProp U16_c ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints aw[1] cols.product_msb is_mulw) ∧
     ((cols.b_msb < 256 ∧ bbw[7] < 256) ∧ (cols.b_msb = 0 ∨ cols.b_msb = 1) ∧ (cols.b_msb = 1 ↔ (128 : ZMod p) ≤ bbw[7])) ∧
     ((cols.c_msb < 256 ∧ cbw[7] < 256) ∧ (cols.c_msb = 0 ∨ cols.c_msb = 1) ∧ (cols.c_msb = 1 ↔ (128 : ZMod p) ≤ cbw[7])) ∧
     cols.b_sign_extend = (is_mulh + is_mulhsu) * cols.b_msb ∧
@@ -1748,17 +1749,17 @@ set_option maxHeartbeats 32000000 in
 -- Uses `single_op_poly` (op-level) + `sum_eq_one_of_eq_one_left` to derive
 -- `is_mul = 1 → variant zeros`, then `core_mul_poly` (16-byte carry chain)
 -- plus byte-level bridges (`U16toU8OperationSafe.spec.return_poly`,
--- `BWord.toWord_poly_toBitVec64_poly`, `BDWord.low_as_extract_poly`).
+-- `BWord.toWord_poly_toBitVec64`, `BDWord.low_as_extract_poly`).
 lemma spec.mul_poly [Fact (2 ^ 24 < p)]
     {aw bw cw : Word (ZMod p)} {cols : MulOperation (ZMod p)}
     {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
     (isU64_bw : bw.isU64_poly)
     (isU64_cw : cw.isU64_poly)
-    (cstrs : List.Forall SP1Constraint.toProp_poly
+    (cstrs : List.Forall SP1Constraint.toProp
       (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
     is_mul = 1 →
-      aw.isU64_poly ∧ aw.toBitVec64_poly =
-        execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MUL := by
+      aw.isU64_poly ∧ aw.toBitVec64 =
+        execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MUL := by
   intro h_one
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [allHold_constraints_iff_is_real_poly] at cstrs
@@ -1890,7 +1891,7 @@ lemma spec.mul_poly [Fact (2 ^ 24 < p)]
              show ((mop.MUL = mop.MULH ∨ mop.MUL = mop.MULHSU) : Bool) = false from rfl,
              show ((mop.MUL = mop.MULH ∨ mop.MUL = mop.MULHUS) : Bool) = false from rfl,
              if_pos (rfl : mop.MUL = mop.MUL), if_true]
-  rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_low, ← mul_spec]
+  rw [aw_eq, BWord.toWord_poly_toBitVec64 isU64_prod_low, ← mul_spec]
   exact BDWord.low_as_extract_poly isU128_prod
 
 /-- Bridges an MSB constraint (`a < 256 ∧ w < 256` ∧ `a ∈ {0,1}` ∧
@@ -1936,11 +1937,11 @@ lemma spec.mulh_poly [Fact (2 ^ 24 < p)]
     {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
     (isU64_bw : bw.isU64_poly)
     (isU64_cw : cw.isU64_poly)
-    (cstrs : List.Forall SP1Constraint.toProp_poly
+    (cstrs : List.Forall SP1Constraint.toProp
       (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
     is_mulh = 1 →
-      aw.isU64_poly ∧ aw.toBitVec64_poly =
-        execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULH := by
+      aw.isU64_poly ∧ aw.toBitVec64 =
+        execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULH := by
   intro h_one
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [allHold_constraints_iff_is_real_poly] at cstrs
@@ -2067,7 +2068,7 @@ lemma spec.mulh_poly [Fact (2 ^ 24 < p)]
   rw [show (decide (True ∨ mop.MULH = mop.MULHSU)) = true from by decide,
       show (decide (True ∨ mop.MULH = mop.MULHUS)) = true from by decide,
       if_neg (show ¬ (mop.MULH = mop.MUL) from by decide)]
-  rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_high, ← mul_spec]
+  rw [aw_eq, BWord.toWord_poly_toBitVec64 isU64_prod_high, ← mul_spec]
   exact BDWord.high_as_extract_poly isU128_prod
 
 set_option maxHeartbeats 32000000 in
@@ -2079,11 +2080,11 @@ lemma spec.mulhu_poly [Fact (2 ^ 24 < p)]
     {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
     (isU64_bw : bw.isU64_poly)
     (isU64_cw : cw.isU64_poly)
-    (cstrs : List.Forall SP1Constraint.toProp_poly
+    (cstrs : List.Forall SP1Constraint.toProp
       (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
     is_mulhu = 1 →
-      aw.isU64_poly ∧ aw.toBitVec64_poly =
-        execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULHU := by
+      aw.isU64_poly ∧ aw.toBitVec64 =
+        execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHU := by
   intro h_one
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [allHold_constraints_iff_is_real_poly] at cstrs
@@ -2202,7 +2203,7 @@ lemma spec.mulhu_poly [Fact (2 ^ 24 < p)]
   rw [show (decide (mop.MULHU = mop.MULH ∨ mop.MULHU = mop.MULHSU)) = false from by decide,
       show (decide (mop.MULHU = mop.MULH ∨ mop.MULHU = mop.MULHUS)) = false from by decide,
       if_neg (show ¬ (mop.MULHU = mop.MUL) from by decide)]
-  rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_high, ← mul_spec]
+  rw [aw_eq, BWord.toWord_poly_toBitVec64 isU64_prod_high, ← mul_spec]
   exact BDWord.high_as_extract_poly isU128_prod
 
 set_option maxHeartbeats 32000000 in
@@ -2214,11 +2215,11 @@ lemma spec.mulhsu_poly [Fact (2 ^ 24 < p)]
     {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
     (isU64_bw : bw.isU64_poly)
     (isU64_cw : cw.isU64_poly)
-    (cstrs : List.Forall SP1Constraint.toProp_poly
+    (cstrs : List.Forall SP1Constraint.toProp
       (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
     is_mulhsu = 1 →
-      aw.isU64_poly ∧ aw.toBitVec64_poly =
-        execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULHSU := by
+      aw.isU64_poly ∧ aw.toBitVec64 =
+        execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHSU := by
   intro h_one
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [allHold_constraints_iff_is_real_poly] at cstrs
@@ -2339,7 +2340,7 @@ lemma spec.mulhsu_poly [Fact (2 ^ 24 < p)]
   rw [show (decide (mop.MULHSU = mop.MULH ∨ True)) = true from by decide,
       show (decide (mop.MULHSU = mop.MULH ∨ mop.MULHSU = mop.MULHUS)) = false from by decide,
       if_neg (show ¬ (mop.MULHSU = mop.MUL) from by decide)]
-  rw [aw_eq, BWord.toWord_poly_toBitVec64_poly isU64_prod_high, ← mul_spec]
+  rw [aw_eq, BWord.toWord_poly_toBitVec64 isU64_prod_high, ← mul_spec]
   exact BDWord.high_as_extract_poly isU128_prod
 
 set_option maxHeartbeats 32000000 in
@@ -2353,11 +2354,11 @@ lemma spec.mulw_poly [Fact (2 ^ 24 < p)]
     {is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
     (isU64_bw : bw.isU64_poly)
     (isU64_cw : cw.isU64_poly)
-    (cstrs : List.Forall SP1Constraint.toProp_poly
+    (cstrs : List.Forall SP1Constraint.toProp
       (constraints aw bw cw cols 1 is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
     is_mulw = 1 →
-      aw.isU64_poly ∧ aw.toBitVec64_poly =
-        execute_MULW_pure bw.toBitVec64_poly cw.toBitVec64_poly := by
+      aw.isU64_poly ∧ aw.toBitVec64 =
+        execute_MULW_pure bw.toBitVec64 cw.toBitVec64 := by
   intro h_one
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
@@ -2485,7 +2486,7 @@ lemma spec.mulw_poly [Fact (2 ^ 24 < p)]
     exact BHWord.extend_U32_U64_poly isU32_ahw true
   refine ⟨is_U64_aw, ?_⟩
   -- Bridge to BitVec form via exec_MULW + BHWord.extend_true_is_signExtend_poly + core_mulw_poly.
-  rw [eq_aw, BWord.toWord_poly_toBitVec64_poly (BHWord.extend_U32_U64_poly isU32_ahw true)]
+  rw [eq_aw, BWord.toWord_poly_toBitVec64 (BHWord.extend_U32_U64_poly isU32_ahw true)]
   rw [BHWord.extend_true_is_signExtend_poly isU32_ahw]
   rw [exec_MULW_pure_bv_to_bhw_poly _ _ isU64_bw isU64_cw]
   simp only [execute_MULW_pure_bhw_poly, BitVec.extend]
@@ -2533,15 +2534,15 @@ lemma spec.mulh.gen_poly [Fact (2 ^ 24 < p)]
     {is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu : ZMod p}
     (isU64_bw : bw.isU64_poly)
     (isU64_cw : cw.isU64_poly)
-    (cstrs : List.Forall SP1Constraint.toProp_poly
+    (cstrs : List.Forall SP1Constraint.toProp
       (constraints aw bw cw cols is_real is_mul is_mulh is_mulw is_mulhu is_mulhsu)) :
     is_real = 1 →
       (is_mulh = 1 → aw.isU64_poly ∧
-        aw.toBitVec64_poly = execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULH) ∧
+        aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULH) ∧
       (is_mulhu = 1 → aw.isU64_poly ∧
-        aw.toBitVec64_poly = execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULHU) ∧
+        aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHU) ∧
       (is_mulhsu = 1 → aw.isU64_poly ∧
-        aw.toBitVec64_poly = execute_MUL_pure bw.toBitVec64_poly cw.toBitVec64_poly .MULHSU) := by
+        aw.toBitVec64 = execute_MUL_pure bw.toBitVec64 cw.toBitVec64 .MULHSU) := by
   intro h_is_real
   subst h_is_real
   refine ⟨?_, ?_, ?_⟩

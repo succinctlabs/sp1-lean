@@ -15,13 +15,13 @@ lemma spec_poly
   (cols : U16CompareOperation (ZMod p))
   (h_a_isU16 : a.val < 65536)
   (h_b_isU16 : b.val < 65536) :
-  List.Forall SP1Constraint.toProp_poly (constraints a b cols 1) →
+  List.Forall SP1Constraint.toProp (constraints a b cols 1) →
     (cols.bit = if a.val < b.val then 1 else 0)
   := by
   have hp_lt : 2 ^ 17 < p := hp17.out
   have hp_neZero : NeZero p := ⟨by omega⟩
   have h65536_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
-  simp [constraints, SP1Constraint.toProp_poly, sub_eq_zero, mul_eq_zero]
+  simp [constraints, SP1Constraint.toProp, sub_eq_zero, mul_eq_zero]
   intro hbit hrange
   rcases hbit with hbit | hbit
   · simp [hbit] at hrange ⊢

@@ -9,7 +9,11 @@ import SP1Chips.Lt.Constraints
 
 open LeanRV64D.Functions BitVec
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Lt
+
 
 variable
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
@@ -20,8 +24,8 @@ variable
 -- constraints determine which Sail spec those columns implement.
 def sp1_lt : SailM Unit := do
   let op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[34], 0, 0, 0])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[34], 0, 0, 0])
 
 end Lt
 
@@ -90,7 +94,7 @@ theorem correct_slt
     have h21 : Main[21].val < 32 := by
       have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2.1
       rwa [h32] at this
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, LtOperationSigned.constraints, LtOperationUnsigned.constraints,
       U16MSBOperation.constraints, U16CompareOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -123,10 +127,10 @@ theorem correct_slt
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
-      -- Bridge: Word.toBitVec64_poly #v[(if cond then 1 else 0), 0, 0, 0] = if cond then 1#64 else 0#64
-      rw [show Word.toBitVec64_poly (p := p)
+      -- Bridge: Word.toBitVec64 #v[(if cond then 1 else 0), 0, 0, 0] = if cond then 1#64 else 0#64
+      rw [show Word.toBitVec64 (p := p)
               #v[(if Word.toInt_poly #v[Main[15], Main[16], Main[17], Main[18]] <
                        Word.toInt_poly #v[Main[25], Main[26], Main[27], Main[28]] then
                     (1 : ZMod p) else 0), 0, 0, 0]
@@ -134,7 +138,7 @@ theorem correct_slt
                        Word.toInt_poly #v[Main[25], Main[26], Main[27], Main[28]] then
                     1#64 else 0#64 from by
             split_ifs <;>
-              simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
+              simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
       simp [bitVecToRegidxVal]
 
 end Slt
@@ -202,7 +206,7 @@ theorem correct_sltu
     have h21 : Main[21].val < 32 := by
       have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2.1
       rwa [h32] at this
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, LtOperationSigned.constraints, LtOperationUnsigned.constraints,
       U16MSBOperation.constraints, U16CompareOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -232,9 +236,9 @@ theorem correct_sltu
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
-      rw [show Word.toBitVec64_poly (p := p)
+      rw [show Word.toBitVec64 (p := p)
               #v[(if Word.toNat_poly #v[Main[15], Main[16], Main[17], Main[18]] <
                        Word.toNat_poly #v[Main[25], Main[26], Main[27], Main[28]] then
                     (1 : ZMod p) else 0), 0, 0, 0]
@@ -242,7 +246,7 @@ theorem correct_sltu
                        Word.toNat_poly #v[Main[25], Main[26], Main[27], Main[28]] then
                     1#64 else 0#64 from by
             split_ifs <;>
-              simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
+              simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
       simp [bitVecToRegidxVal]
 
 end Sltu
@@ -324,7 +328,7 @@ theorem correct_slti
       rw [h25_eq, h26_eq, h27_eq, h28_eq]
       exact Word.isU64_of_cases_poly h21 h22 h23 h24
     obtain ⟨h_f, h_imm_c_consts⟩ := trusted_instr_prop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, LtOperationSigned.constraints, LtOperationUnsigned.constraints,
       U16MSBOperation.constraints, U16CompareOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -337,10 +341,10 @@ theorem correct_slti
     simp [spec_slti, Lt.sp1_lt, execute_ITYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    -- Bridge: signExtend 64 (BitVec.ofNat 12 op_c) = toBitVec64_poly #v[Main[25..28]]
+    -- Bridge: signExtend 64 (BitVec.ofNat 12 op_c) = toBitVec64 #v[Main[25..28]]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
     rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
@@ -359,9 +363,9 @@ theorem correct_slti
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
-      rw [show Word.toBitVec64_poly (p := p)
+      rw [show Word.toBitVec64 (p := p)
               #v[(if Word.toInt_poly #v[Main[15], Main[16], Main[17], Main[18]] <
                        Word.toInt_poly #v[Main[21], Main[22], Main[23], Main[24]] then
                     (1 : ZMod p) else 0), 0, 0, 0]
@@ -369,7 +373,7 @@ theorem correct_slti
                        Word.toInt_poly #v[Main[21], Main[22], Main[23], Main[24]] then
                     1#64 else 0#64 from by
             split_ifs <;>
-              simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
+              simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
       simp [bitVecToRegidxVal]
 
 end Slti
@@ -450,7 +454,7 @@ theorem correct_sltiu
       rw [h25_eq, h26_eq, h27_eq, h28_eq]
       exact Word.isU64_of_cases_poly h21 h22 h23 h24
     obtain ⟨h_f, h_imm_c_consts⟩ := trusted_instr_prop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, LtOperationSigned.constraints, LtOperationUnsigned.constraints,
       U16MSBOperation.constraints, U16CompareOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -465,7 +469,7 @@ theorem correct_sltiu
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
     rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
@@ -484,9 +488,9 @@ theorem correct_sltiu
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
-      rw [show Word.toBitVec64_poly (p := p)
+      rw [show Word.toBitVec64 (p := p)
               #v[(if Word.toNat_poly #v[Main[15], Main[16], Main[17], Main[18]] <
                        Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]] then
                     (1 : ZMod p) else 0), 0, 0, 0]
@@ -494,7 +498,7 @@ theorem correct_sltiu
                        Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]] then
                     1#64 else 0#64 from by
             split_ifs <;>
-              simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
+              simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_one, ZMod.val_zero]]
       simp [bitVecToRegidxVal]
 
 end Sltiu

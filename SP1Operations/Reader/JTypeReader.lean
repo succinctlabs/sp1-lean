@@ -3,6 +3,9 @@ import SP1Operations.Reader.JTypeReader.Constraints
 
 namespace JTypeReader
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 attribute [-simp] Opcode.trusted_instr_poly
 
 /-- RHS uses `.val`-level Nat-arithmetic for `Range`-opcode-derived bounds;
@@ -15,7 +18,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     {op_a_write_value : Word (ZMod p)}
     {cols : JTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p} :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (¬is_trusted = 0 →
       Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a
@@ -43,7 +46,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
       change (0 : ZMod p).val < (256 : ZMod p).val; simp
     have h0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
       change (0 : ZMod p).val < (65536 : ZMod p).val; simp
-    simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly, h16, h0_lt_256, h0_lt_65536, and_assoc]
+    simp [constraints, sub_eq_zero, SP1Constraint.toProp, h16, h0_lt_256, h0_lt_65536, and_assoc]
     intros h_is_real
     rcases h_is_real with h | h
     · simp [h]
@@ -66,7 +69,7 @@ lemma allHold_constraints_iff_is_real_poly
     {cols : JTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p}
     (h : is_real = 1) (h_trusted : is_trusted = 1) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a
       cols.op_b_imm[0] cols.op_b_imm[1] cols.op_b_imm[2] cols.op_b_imm[3]
       cols.op_c_imm[0] cols.op_c_imm[1] cols.op_c_imm[2] cols.op_c_imm[3] 1 1 ∧

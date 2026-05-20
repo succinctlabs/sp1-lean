@@ -6,6 +6,8 @@ set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 set_option linter.style.multiGoal false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
+
 
 section sll_poly
 
@@ -13,7 +15,7 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [hp : Fact (2 ^ 17 < p)]
 
 lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLL := by
   intro cstrs
@@ -27,7 +29,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
   obtain ⟨sop_1, _sop_2⟩ := single_op_poly Main cstrs
   have h_no_sllw : Main[63] = 0 := sop_1 eq_sll
   -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   set b0 := Main[15]
   set b1 := Main[16]
@@ -87,15 +89,15 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
   simp only [execute_RTYPE_pure_w_poly]
   rw [BitVec.shiftLeft_eq']
   simp only [BitVec.toNat_setWidth]
-  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b <<< ((toBitVec64_poly c).toNat % 2^6)).toNat
+  -- Goal: (toBitVec64 a).toNat = (toBitVec64 b <<< ((toBitVec64 c).toNat % 2^6)).toNat
   -- (`BitVec.toNat_shiftLeft` is pushed into each `sll_close_cb4cb5_*_case` helper to
   -- isolate the kernel walk over `% 2^64` to a single olean.)
-  change (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
-        (Word.toBitVec64_poly #v[b0, b1, b2, b3] <<<
-          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
+  change (Word.toBitVec64 #v[a0, a1, a2, a3]).toNat =
+        (Word.toBitVec64 #v[b0, b1, b2, b3] <<<
+          ((Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
   -- Reduce the c-toNat % 64 to c0.val % 64
-  have h_c_mod : (Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
-    rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+  have h_c_mod : (Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
+    rw [Word.toBitVec64_toNat_poly is_U64_c, Word.toNat_poly_def]
     simp; omega
   rw [h_c_mod]; clear h_c_mod
   -- Use is_mod_64_poly to convert c0.val % 64 to cb sum.
@@ -1065,7 +1067,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
 
 lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLL := by
   intro cstrs
@@ -1079,7 +1081,7 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
   obtain ⟨sop_1, _sop_2⟩ := single_op_poly Main cstrs
   have h_no_sllw : Main[63] = 0 := sop_1 eq_slli
   -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   set b0 := Main[15]
   set b1 := Main[16]
@@ -1139,15 +1141,15 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
   simp only [execute_RTYPE_pure_w_poly]
   rw [BitVec.shiftLeft_eq']
   simp only [BitVec.toNat_setWidth]
-  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b <<< ((toBitVec64_poly c).toNat % 2^6)).toNat
+  -- Goal: (toBitVec64 a).toNat = (toBitVec64 b <<< ((toBitVec64 c).toNat % 2^6)).toNat
   -- (`BitVec.toNat_shiftLeft` is pushed into each `sll_close_cb4cb5_*_case` helper to
   -- isolate the kernel walk over `% 2^64` to a single olean.)
-  change (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
-        (Word.toBitVec64_poly #v[b0, b1, b2, b3] <<<
-          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
+  change (Word.toBitVec64 #v[a0, a1, a2, a3]).toNat =
+        (Word.toBitVec64 #v[b0, b1, b2, b3] <<<
+          ((Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
   -- Reduce the c-toNat % 64 to c0.val % 64
-  have h_c_mod : (Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
-    rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+  have h_c_mod : (Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
+    rw [Word.toBitVec64_toNat_poly is_U64_c, Word.toNat_poly_def]
     simp; omega
   rw [h_c_mod]; clear h_c_mod
   -- Use is_mod_64_poly to convert c0.val % 64 to cb sum.

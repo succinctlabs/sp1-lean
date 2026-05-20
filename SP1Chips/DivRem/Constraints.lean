@@ -10,6 +10,7 @@ import SP1Operations.Reader.RTypeReader
 namespace DivRem
 
 set_option linter.style.setOption false
+set_option linter.style.longLine false
 set_option maxHeartbeats 100000000
 -- The chip's `correct_*` proofs drive an imbalanced goal tree via chained
 -- `apply ... at` / `specialize ... at` that operates on one focused case at a
@@ -652,10 +653,10 @@ set_option maxRecDepth 1000000 in
 -- Inner sub-constraint lists, `(...).val < N` Range bounds, and individual
 -- `assertZero`-derived equalities/disjunctions are structurally identical
 -- across field instantiations; only the outer `List.Forall` wrapper switches
--- to `SP1Constraint.toProp_poly`.
+-- to `SP1Constraint.toProp`.
 lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) ↔
-    List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp
     (MulOperation.constraints
       #v[Main[68], Main[69], Main[70], Main[71]]
       #v[Main[44], Main[45], Main[46], Main[47]] #v[Main[36], Main[37], Main[38], Main[39]]
@@ -671,7 +672,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
         c_sign_extend := Main[120]
       }
       Main[244] Main[244] 0 0 0 0) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (MulOperation.constraints
       #v[Main[72], Main[73], Main[74], Main[75]]
       #v[Main[44], Main[45], Main[46], Main[47]]
@@ -688,7 +689,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
         c_sign_extend := Main[165]
       }
       Main[239] 0 (Main[201] + Main[203]) 0 (Main[202] + Main[204]) 0) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[15], Main[16], Main[17], Main[18]]
       #v[0, 0, 0, 32768]
@@ -701,7 +702,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
         }
       }
       Main[239]) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[22], Main[23], Main[24], Main[25]]
       #v[65535, 65535, 65535, 65535]
@@ -714,7 +715,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
         }
       }
       Main[239]) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[15], Main[16], 0, 0]
       #v[0, 32768, 0, 0]
@@ -727,7 +728,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
         }
       }
       (Main[205] + Main[206] + Main[207] + Main[208])) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (IsEqualWordOperation.constraints
       #v[Main[22], Main[23], 0, 0]
       #v[65535, 65535, 0, 0]
@@ -740,7 +741,7 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
         }
       }
       (Main[205] + Main[206] + Main[207] + Main[208])) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (IsZeroWordOperation.constraints
       #v[Main[36], Main[37], Main[38], Main[39]]
       {
@@ -750,19 +751,19 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
         result := Main[200]
       }
       Main[244]) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (AddOperation.constraints
       #v[Main[36], Main[37], Main[38], Main[39]]
       #v[Main[60], Main[61], Main[62], Main[63]]
       { value := #v[Main[166], Main[167], Main[168], Main[169]] }
       Main[242]) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (AddOperation.constraints
       #v[Main[48], Main[49], Main[50], Main[51]]
       #v[Main[56], Main[57], Main[58], Main[59]]
       { value := #v[Main[170], Main[171], Main[172], Main[173]] }
       Main[243]) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
     (LtOperationUnsigned.constraints
       #v[Main[56], Main[57], Main[58], Main[59]]
       #v[Main[64], Main[65], Main[66], Main[67]]
@@ -773,17 +774,17 @@ lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
           comparison_limbs := #v[Main[180], Main[181]]
       }
       Main[245]) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints Main[18] { msb := Main[232] } Main[239]) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints Main[25] { msb := Main[234] } Main[239]) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints Main[55] { msb := Main[233] } Main[239]) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints Main[16] { msb := Main[232] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints Main[23] { msb := Main[234] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints Main[53] { msb := Main[233] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints Main[41] { msb := Main[235] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[18] { msb := Main[232] } Main[239]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[25] { msb := Main[234] } Main[239]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[55] { msb := Main[233] } Main[239]) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[16] { msb := Main[232] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[23] { msb := Main[234] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[53] { msb := Main[233] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[41] { msb := Main[235] } (Main[205] + Main[206] + Main[207] + Main[208])) ∧
+    List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 Main[244]) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
         (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]]
           (Main[202] * 16 + Main[204] * 18 + Main[201] * 15 + Main[203] * 17 + Main[205] * 25 + Main[206] * 27 + Main[207] * 26 + Main[208] * 28)
       #v[Main[28], Main[29], Main[30], Main[31]]

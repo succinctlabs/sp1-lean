@@ -3,9 +3,13 @@ import SP1Operations.Operation.AddressOperation.Constraints
 import SP1Operations.Reader.ITypeReader.Constraints
 import SP1Operations.Reader.CPUState.Constraints
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Load
 
 namespace LoadDouble
+
 
 section constraints
 
@@ -68,17 +72,17 @@ set_option maxHeartbeats 800000 in
 -- (field-level) depending on which form the surrounding `_poly` predicates use.
 lemma allHold_constraints_iff_of_is_ld_poly (Main : Vector (ZMod p) 39)
     (h_is_ld : is_ld_poly Main) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    (List.Forall SP1Constraint.toProp
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[21], Main[22], Main[23], Main[24]]
         { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
     Main[28] * (Main[26] + Main[27]) = 1 ∧
     (Main[25] * (8 : ZMod p)⁻¹).val < 2 ^ ZMod.val (13 : ZMod p) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
         #v[Main[3], Main[4], Main[5]] 35
         #v[Main[29], Main[30], Main[31], Main[32]]
@@ -100,7 +104,7 @@ lemma allHold_constraints_iff_of_is_ld_poly (Main : Vector (ZMod p) 39)
     Main[13] = 0) := by
   have : Main[38] = 1 := h_is_ld
   simp [constraints, AddressOperation.constraints, this, sub_eq_zero,
-    SP1Constraint.toProp_poly]
+    SP1Constraint.toProp]
 
 end poly_helpers
 

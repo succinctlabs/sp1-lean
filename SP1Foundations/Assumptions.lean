@@ -1,6 +1,9 @@
 import SP1Foundations.SailM
 import SP1Foundations.Opcode
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 open LeanRV64D.Functions Sail SailState
 
 section isValidMemConfig
@@ -57,7 +60,7 @@ end isValidMemConfig
 /-! ### Polymorphic `*_type_constraints_poly` over `ZMod p`
 
 Reader-type assumptions parametric over a prime field `ZMod p`. Used by
-`Opcode.trusted_instr_poly` and `SP1Constraint.toProp_poly`. -/
+`Opcode.trusted_instr_poly` and `SP1Constraint.toProp`. -/
 section reader_constraints_poly
 
 variable {p : ℕ} [NeZero p]
@@ -66,7 +69,7 @@ variable {p : ℕ} [NeZero p]
     (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
   (imm_b = 0 ∧ imm_c = 1)
   ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ Word.toBitVec64_poly #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0.val)
+  ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 12 op_c_0.val)
 
 @[simp] def shift_i_type_constraints_poly
     (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
@@ -91,8 +94,8 @@ def w_shift_i_type_constraints_poly
 def b_type_constraints_poly (_op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c : ZMod p) : Prop :=
   (imm_b = 0 ∧ imm_c = 1)
   ∧ (op_b_0 < 32 ∧ op_b_1 = 0 ∧ op_b_2 = 0 ∧ op_b_3 = 0)
-  ∧ Word.toBitVec64_poly #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 13 op_c_0.val)
-  ∧ (Word.toBitVec64_poly #v[op_c_0, op_c_1, op_c_2, op_c_3] % 4#64 = 0)
+  ∧ Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] = BitVec.signExtend 64 (BitVec.ofNat 13 op_c_0.val)
+  ∧ (Word.toBitVec64 #v[op_c_0, op_c_1, op_c_2, op_c_3] % 4#64 = 0)
 
 end reader_constraints_poly
 
@@ -117,11 +120,11 @@ namespace Opcode
   | LUI | AUIPC =>
       (imm_b = 1 ∧ imm_c = 1)
       ∧ op_b_0.val % 2 ^ 12 = 0
-      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64_poly #v[op_b_0, op_b_1, op_b_2, op_b_3]
+      ∧ BitVec.signExtend 64 (BitVec.ofNat 32 (op_b_0.val + op_b_1.val * 65536)) = Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]
   | JAL =>
       (imm_b = 1 ∧ imm_c = 1) ∧
-      Word.toBitVec64_poly #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val * 65536)) ∧
-      (Word.toBitVec64_poly #v[op_b_0, op_b_1, op_b_2, op_b_3]) % 4#64 = 0
+      Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3] = BitVec.signExtend 64 (BitVec.ofNat 21 (op_b_0.val + op_b_1.val * 65536)) ∧
+      (Word.toBitVec64 #v[op_b_0, op_b_1, op_b_2, op_b_3]) % 4#64 = 0
   | LB | LH | LW | LD | LBU | LHU | LWU =>
       i_type_constraints_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
   | SB | SH | SW | SD =>

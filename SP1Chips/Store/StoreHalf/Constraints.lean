@@ -3,9 +3,13 @@ import SP1Operations.Operation.AddressOperation.Constraints
 import SP1Operations.Reader.ITypeReaderImmutable.Constraints
 import SP1Operations.Reader.CPUState.Constraints
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Store
 
 namespace StoreHalf
+
 
 section constraints
 

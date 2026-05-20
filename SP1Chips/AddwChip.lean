@@ -26,8 +26,8 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
 def sp1_addw : SailM Unit := do
   let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
 
 open Sail
 
@@ -75,7 +75,7 @@ theorem correct_addw
     have h21 : Main[21].val < 32 := by
       have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2.1
       rwa [h32] at this
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
       U16MSBOperation.constraints, h6, h14, h21, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
@@ -113,7 +113,7 @@ theorem correct_addw
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
       simp [bitVecToRegidxVal]
 
@@ -141,8 +141,8 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_addiw : SailM Unit := do
   let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535])
 
 set_option maxHeartbeats 1600000 in
 -- Sign-extend manipulation in the non-zero op_a branch sits well above
@@ -202,7 +202,7 @@ theorem correct_addw
     have h_op_c_imm_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq]
       exact Word.isU64_of_cases_poly h21 h22 h23 h24
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, AddwOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
       U16MSBOperation.constraints, h6, h14, h_is_real, h_imm_c] at state_cstrs
     obtain ⟨read_pc, _read_op_a, read_op_b⟩ := state_cstrs
@@ -215,11 +215,11 @@ theorem correct_addw
     simp [spec_addiw, sp1_addiw, execute_ADDIW']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
-    -- Bridge: the immediate's signExtend matches Word.toBitVec64_poly of op_c_memory
+    -- Bridge: the immediate's signExtend matches Word.toBitVec64 of op_c_memory
     -- (which equals the op_c imm vector by h25_eq..h28_eq).
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
     rw [exec_RTYPEW_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
@@ -246,7 +246,7 @@ theorem correct_addw
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
       simp [bitVecToRegidxVal]
 

@@ -152,11 +152,11 @@ theorem soundness_load_double (Main : Vector (ZMod p) 39) (s : SailState)
     (state_cstrs : (Load.LoadDouble.constraints Main).initialState_poly s)
     (h_is_ld : Main[38] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadDouble.sp1_imm_c Main)).toNat
       reg_val + offset + 8 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 8 = true) :
     (Load.LoadDouble.sp1_ld Main).run s =
       (Load.LoadDouble.spec_ld (Load.LoadDouble.sp1_imm_c Main)
@@ -482,7 +482,7 @@ theorem soundness_load_byte_lb (Main : Vector (ZMod p) 47) (s : SailState)
     (state_cstrs : (Load.LoadByte.constraints Main).initialState_poly s)
     (h_is_lb : Main[45] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadByte.sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64) :
     (Load.LoadByte.sp1_load_byte Main).run s =
@@ -499,7 +499,7 @@ theorem soundness_load_byte_lbu (Main : Vector (ZMod p) 47) (s : SailState)
     (state_cstrs : (Load.LoadByte.constraints Main).initialState_poly s)
     (h_is_lbu : Main[46] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadByte.sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64) :
     (Load.LoadByte.sp1_load_byte Main).run s =
@@ -516,11 +516,11 @@ theorem soundness_load_half_lh (Main : Vector (ZMod p) 44) (s : SailState)
     (state_cstrs : (Load.LoadHalf.constraints Main).initialState_poly s)
     (h_is_lh : Main[42] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadHalf.sp1_imm_c Main)).toNat
       reg_val + offset + 2 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 2 = true) :
     (Load.LoadHalf.sp1_load_half Main).run s =
       (Load.LoadHalf.spec_lh (Load.LoadHalf.sp1_imm_c Main)
@@ -536,11 +536,11 @@ theorem soundness_load_half_lhu (Main : Vector (ZMod p) 44) (s : SailState)
     (state_cstrs : (Load.LoadHalf.constraints Main).initialState_poly s)
     (h_is_lhu : Main[43] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadHalf.sp1_imm_c Main)).toNat
       reg_val + offset + 2 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 2 = true) :
     (Load.LoadHalf.sp1_load_half Main).run s =
       (Load.LoadHalf.spec_lhu (Load.LoadHalf.sp1_imm_c Main)
@@ -556,11 +556,11 @@ theorem soundness_load_word_lw (Main : Vector (ZMod p) 44) (s : SailState)
     (state_cstrs : (Load.LoadWord.constraints Main).initialState_poly s)
     (h_is_lw : Main[42] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadWord.sp1_imm_c Main)).toNat
       reg_val + offset + 4 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 4 = true) :
     (Load.LoadWord.sp1_load_word Main).run s =
       (Load.LoadWord.spec_lw (Load.LoadWord.sp1_imm_c Main)
@@ -576,11 +576,11 @@ theorem soundness_load_word_lwu (Main : Vector (ZMod p) 44) (s : SailState)
     (state_cstrs : (Load.LoadWord.constraints Main).initialState_poly s)
     (h_is_lwu : Main[43] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadWord.sp1_imm_c Main)).toNat
       reg_val + offset + 4 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 4 = true) :
     (Load.LoadWord.sp1_load_word Main).run s =
       (Load.LoadWord.spec_lwu (Load.LoadWord.sp1_imm_c Main)
@@ -597,7 +597,7 @@ theorem soundness_store_byte (Main : Vector (ZMod p) 50) (s : SailState)
     (state_cstrs : (Store.StoreByte.constraints Main).initialState_poly s)
     (h_is_real : Main[49] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Store.StoreByte.sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64) :
     (Store.StoreByte.sp1_sb Main).run s =
@@ -614,11 +614,11 @@ theorem soundness_store_half (Main : Vector (ZMod p) 45) (s : SailState)
     (state_cstrs : (Store.StoreHalf.constraints Main).initialState_poly s)
     (h_is_real : Main[44] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Store.StoreHalf.sp1_imm_c Main)).toNat
       reg_val + offset + 2 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (Store.StoreHalf.sp1_imm_c Main))) 2 = true) :
     (Store.StoreHalf.sp1_sb Main).run s =
       (Store.StoreHalf.spec_sb (Store.StoreHalf.sp1_imm_c Main)
@@ -634,11 +634,11 @@ theorem soundness_store_word (Main : Vector (ZMod p) 44) (s : SailState)
     (state_cstrs : (Store.StoreWord.constraints Main).initialState_poly s)
     (h_is_real : Main[43] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Store.StoreWord.sp1_imm_c Main)).toNat
       reg_val + offset + 4 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])))) 4
       = true) :
     (Store.StoreWord.sp1_sb Main).run s =
@@ -655,11 +655,11 @@ theorem soundness_store_double (Main : Vector (ZMod p) 39) (s : SailState)
     (state_cstrs : (Store.StoreDouble.constraints Main).initialState_poly s)
     (h_is_real : Main[38] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Store.StoreDouble.sp1_imm_c Main)).toNat
       reg_val + offset + 8 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (Store.StoreDouble.sp1_imm_c Main))) 8 = true) :
     (Store.StoreDouble.sp1_sb Main).run s =
       (Store.StoreDouble.spec_sb (Store.StoreDouble.sp1_imm_c Main)
@@ -674,7 +674,7 @@ width and alignment requirement. -/
 private abbrev LX0_imm (Main : Vector (ZMod p) 48) : BitVec 64 :=
   BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val)
 private abbrev LX0_reg (Main : Vector (ZMod p) 48) : BitVec 64 :=
-  Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+  Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
 
 theorem soundness_load_x0_lb (Main : Vector (ZMod p) 48) (s : SailState)
     (hs : SailState.isInitialized s) (hs_config : SailState.isValidMemConfig s hs)
@@ -682,11 +682,11 @@ theorem soundness_load_x0_lb (Main : Vector (ZMod p) 48) (s : SailState)
     (state_cstrs : (Load.LoadX0.constraints Main).initialState_poly s)
     (h_is_loadX0_lb : Main[41] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadX0.sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 1 = true) :
     (Load.LoadX0.sp1_loadX0 Main).run s =
       (Load.LoadX0.spec_loadX0_lb (Load.LoadX0.sp1_imm_c Main)
@@ -701,11 +701,11 @@ theorem soundness_load_x0_lbu (Main : Vector (ZMod p) 48) (s : SailState)
     (state_cstrs : (Load.LoadX0.constraints Main).initialState_poly s)
     (h_is_loadX0_lbu : Main[42] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadX0.sp1_imm_c Main)).toNat
       reg_val + offset + 1 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 1 = true) :
     (Load.LoadX0.sp1_loadX0 Main).run s =
       (Load.LoadX0.spec_loadX0_lbu (Load.LoadX0.sp1_imm_c Main)
@@ -720,11 +720,11 @@ theorem soundness_load_x0_lh (Main : Vector (ZMod p) 48) (s : SailState)
     (state_cstrs : (Load.LoadX0.constraints Main).initialState_poly s)
     (h_is_loadX0_lh : Main[43] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadX0.sp1_imm_c Main)).toNat
       reg_val + offset + 2 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 2 = true) :
     (Load.LoadX0.sp1_loadX0 Main).run s =
       (Load.LoadX0.spec_loadX0_lh (Load.LoadX0.sp1_imm_c Main)
@@ -739,11 +739,11 @@ theorem soundness_load_x0_lhu (Main : Vector (ZMod p) 48) (s : SailState)
     (state_cstrs : (Load.LoadX0.constraints Main).initialState_poly s)
     (h_is_loadX0_lhu : Main[44] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadX0.sp1_imm_c Main)).toNat
       reg_val + offset + 2 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 2 = true) :
     (Load.LoadX0.sp1_loadX0 Main).run s =
       (Load.LoadX0.spec_loadX0_lhu (Load.LoadX0.sp1_imm_c Main)
@@ -758,11 +758,11 @@ theorem soundness_load_x0_lw (Main : Vector (ZMod p) 48) (s : SailState)
     (state_cstrs : (Load.LoadX0.constraints Main).initialState_poly s)
     (h_is_loadX0_lw : Main[45] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadX0.sp1_imm_c Main)).toNat
       reg_val + offset + 4 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 4 = true) :
     (Load.LoadX0.sp1_loadX0 Main).run s =
       (Load.LoadX0.spec_loadX0_lw (Load.LoadX0.sp1_imm_c Main)
@@ -777,11 +777,11 @@ theorem soundness_load_x0_lwu (Main : Vector (ZMod p) 48) (s : SailState)
     (state_cstrs : (Load.LoadX0.constraints Main).initialState_poly s)
     (h_is_loadX0_lwu : Main[46] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadX0.sp1_imm_c Main)).toNat
       reg_val + offset + 4 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 4 = true) :
     (Load.LoadX0.sp1_loadX0 Main).run s =
       (Load.LoadX0.spec_loadX0_lwu (Load.LoadX0.sp1_imm_c Main)
@@ -796,11 +796,11 @@ theorem soundness_load_x0_ld (Main : Vector (ZMod p) 48) (s : SailState)
     (state_cstrs : (Load.LoadX0.constraints Main).initialState_poly s)
     (h_is_loadX0_ld : Main[47] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (Load.LoadX0.sp1_imm_c Main)).toNat
       reg_val + offset + 8 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
         (BitVec.ofNat 12 Main[21].val))) 8 = true) :
     (Load.LoadX0.sp1_loadX0 Main).run s =
       (Load.LoadX0.spec_loadX0_ld (Load.LoadX0.sp1_imm_c Main)

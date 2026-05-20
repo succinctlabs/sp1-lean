@@ -12,6 +12,9 @@ import SP1Foundations.Field
 @[reducible] def Word (T : Type) := Vector T WORD_SIZE
 @[reducible] def DWord (T : Type) := Vector T DWORD_SIZE
 @[reducible] def BHWord (T : Type) := Vector T BYTE_HWORD_SIZE
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 @[reducible] def BWord (T : Type) := Vector T BYTE_WORD_SIZE
 @[reducible] def BDWord (T : Type) := Vector T BYTE_DWORD_SIZE
 
@@ -101,7 +104,7 @@ lemma toBitVec32_poly_toNat_poly {p : ℕ} [NeZero p]
   omega
 
 /-- Polymorphic counterpart of `HWord.toBitVec64`. -/
-def toBitVec64_poly {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : BitVec 64 :=
+def toBitVec64 {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : BitVec 64 :=
   BitVec.signExtend 64 (toBitVec32_poly w)
 
 /-- Polymorphic counterpart of `HWord.isNegative`. -/
@@ -163,12 +166,12 @@ lemma toBitVec32_poly_toInt_poly {p : ℕ} [NeZero p]
     unfold toNat_poly at * <;> push_cast <;> simp_all <;> omega
 
 /-- Polymorphic counterpart of `HWord.toBitVec64_toInt`. -/
-lemma toBitVec64_poly_toInt_poly {p : ℕ} [NeZero p]
+lemma toBitVec64_toInt_poly {p : ℕ} [NeZero p]
     {w : HWord (ZMod p)} (h_w_isU32 : w.isU32_poly) :
-    w.toBitVec64_poly.toInt = w.toInt_poly
+    w.toBitVec64.toInt = w.toInt_poly
   := by
     have := lt_cases_of_isU32_poly h_w_isU32
-    simp [toBitVec64_poly, BitVec.toInt_signExtend]
+    simp [toBitVec64, BitVec.toInt_signExtend]
     rw [toBitVec32_poly_toInt_poly h_w_isU32]
     unfold toInt_poly isNegative_poly toNat_poly
     refine Int.bmod_eq_of_le ?_ ?_ <;> push_cast <;> omega
@@ -221,7 +224,7 @@ lemma eq_pointwise {w w' : Word T} : (w[0] = w'[0]) ∧ (w[1] = w'[1]) ∧ (w[2]
 section U64
 
 /-- `isU64_poly w` means that each limb of the `Word` is properly bounded.
-Used by `SP1Constraint.toProp_poly`. -/
+Used by `SP1Constraint.toProp`. -/
 def isU64_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) : Prop :=
   ∀ i : Fin WORD_SIZE, w[i].val < 2 ^ 16
 
@@ -257,7 +260,7 @@ end U64
 section conversions
 
 /-- Polymorphic counterpart of `Word.toNat` over `Word (ZMod p)`. Companion
-to `isU64_poly`; used by `SP1Constraint.toStateProp_poly`. Defined
+to `isU64_poly`; used by `SP1Constraint.toStateProp`. Defined
 directly since the polymorphic
 proof obligations live at the operation iff layer, where the unfolded
 form is preferred. -/
@@ -310,15 +313,15 @@ lemma toNat_reconstruct_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     omega
 
 /-- Polymorphic counterpart of `Word.toBitVec64` over `Word (ZMod p)`.
-Companion to `toNat_poly`; used by `SP1Constraint.toStateProp_poly`. -/
-def toBitVec64_poly {p : ℕ} [NeZero p] (w : Word (ZMod p)) : BitVec 64 :=
+Companion to `toNat_poly`; used by `SP1Constraint.toStateProp`. -/
+def toBitVec64 {p : ℕ} [NeZero p] (w : Word (ZMod p)) : BitVec 64 :=
   BitVec.ofNat 64 (toNat_poly w)
 
 /-- Polymorphic counterpart of `toBitVec64_toNat`. -/
-lemma toBitVec64_poly_toNat_poly {p : ℕ} [NeZero p]
+lemma toBitVec64_toNat_poly {p : ℕ} [NeZero p]
     {w : Word (ZMod p)} (hw : w.isU64_poly) :
-    w.toBitVec64_poly.toNat = w.toNat_poly := by
-  simp only [toBitVec64_poly, BitVec.toNat_ofNat, toNat_poly]
+    w.toBitVec64.toNat = w.toNat_poly := by
+  simp only [toBitVec64, BitVec.toNat_ofNat, toNat_poly]
   have := lt_cases_of_isU64_poly hw
   omega
 
@@ -327,17 +330,17 @@ same as adding `k` to the low limb, provided the low limb plus `k` fits in
 17 bits (so the ZMod-level `(a + k).val = a.val + k` lift is clean). The
 other limbs are unconstrained — BitVec arithmetic associativity handles the
 mod 2^64 carries regardless. Used by chip-side `correct_*` proofs to bridge
-`Word.toBitVec64_poly #v[..] + 4#64 = Word.toBitVec64_poly #v[low+4, ..]`
+`Word.toBitVec64 #v[..] + 4#64 = Word.toBitVec64 #v[low+4, ..]`
 when normalizing `+ 4` between the BitVec and limb forms (e.g. PC update). -/
-lemma toBitVec64_poly_lowLimb_add_nat
+lemma toBitVec64_lowLimb_add_nat
     {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]--[Fact (2 ^ 17 < p)]
     (a b c d : ZMod p) (k : ℕ) (hak : a.val + k < p) :
-    Word.toBitVec64_poly #v[a, b, c, d] + BitVec.ofNat 64 k =
-      Word.toBitVec64_poly #v[a + (k : ZMod p), b, c, d] := by
+    Word.toBitVec64 #v[a, b, c, d] + BitVec.ofNat 64 k =
+      Word.toBitVec64 #v[a + (k : ZMod p), b, c, d] := by
   have hk_val : (k : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
   have hak_val : (a + (k : ZMod p)).val = a.val + k := by
     rw [ZMod.val_add_of_lt (by rw [hk_val]; omega), hk_val]
-  simp [Word.toBitVec64_poly, Word.toNat_poly_def]
+  simp [Word.toBitVec64, Word.toNat_poly_def]
   rw [← BitVec.toNat_inj, BitVec.toNat_add,
       BitVec.toNat_ofNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat,
       hak_val, ← Nat.add_mod]
@@ -352,9 +355,9 @@ instance {p : ℕ} [NeZero p] {w : Word (ZMod p)} : Decidable (isNegative_poly w
 /-- Polymorphic counterpart of `isNegative_msb`. -/
 lemma isNegative_poly_msb {p : ℕ} [NeZero p]
     {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    w.isNegative_poly ↔ (w.toBitVec64_poly.msb = true) := by
+    w.isNegative_poly ↔ (w.toBitVec64.msb = true) := by
   have := lt_cases_of_isU64_poly h_w_isU64
-  simp [isNegative_poly, toBitVec64_poly, toNat_poly, BitVec.msb_eq_decide]
+  simp [isNegative_poly, toBitVec64, toNat_poly, BitVec.msb_eq_decide]
   omega
 
 /-- Polymorphic counterpart of `low`. -/
@@ -368,8 +371,8 @@ lemma isU64_poly_low_poly_isU32_poly {p : ℕ} [NeZero p]
 
 lemma low_toNat_poly {p : ℕ} [NeZero p] {b0 b1 : ZMod p}
     (hw : HWord.isU32_poly #v[b0, b1]) :
-    (Word.toBitVec64_poly #v[b0, b1, 0, 0]).toNat = HWord.toNat_poly #v[b0, b1] := by
-  rw [Word.toBitVec64_poly_toNat_poly]
+    (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat = HWord.toNat_poly #v[b0, b1] := by
+  rw [Word.toBitVec64_toNat_poly]
   · simp [Word.toNat_poly, HWord.toNat_poly, ZMod.val_zero]
   · apply HWord.lt_cases_of_isU32_poly at hw
     apply Word.isU64_of_cases_poly <;> simp_all [ZMod.val_zero]
@@ -377,10 +380,10 @@ lemma low_toNat_poly {p : ℕ} [NeZero p] {b0 b1 : ZMod p}
 /-- Polymorphic counterpart of `Word.setWidth_eq_low`. -/
 lemma setWidth_eq_low_poly {p : ℕ} [NeZero p]
     {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    BitVec.setWidth 32 w.toBitVec64_poly = w.low_poly.toBitVec32_poly
+    BitVec.setWidth 32 w.toBitVec64 = w.low_poly.toBitVec32_poly
   := by
     have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly h_w_isU64
-    simp [toBitVec64_poly, ← BitVec.toNat_inj, low_poly, Word.toNat_poly,
+    simp [toBitVec64, ← BitVec.toNat_inj, low_poly, Word.toNat_poly,
           HWord.toBitVec32_poly, HWord.toNat_poly]
     omega
 
@@ -396,10 +399,10 @@ lemma isU64_poly_high_poly_isU32_poly {p : ℕ} [NeZero p]
 /-- Polymorphic counterpart of `Word.setWidth_rshift_eq_high`. -/
 lemma setWidth_rshift_eq_high_poly {p : ℕ} [NeZero p]
     {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    BitVec.setWidth 32 (w.toBitVec64_poly >>> 32) = w.high_poly.toBitVec32_poly
+    BitVec.setWidth 32 (w.toBitVec64 >>> 32) = w.high_poly.toBitVec32_poly
   := by
     have ⟨_, _, _, _⟩ := lt_cases_of_isU64_poly h_w_isU64
-    simp_all [toBitVec64_poly, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow,
+    simp_all [toBitVec64, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow,
               high_poly, Word.toNat_poly, HWord.toBitVec32_poly, HWord.toNat_poly]
     omega
 
@@ -444,15 +447,15 @@ lemma isU64_poly_toInt_poly {p : ℕ} [NeZero p] {w : Word (ZMod p)}
   split_ifs <;> push_cast <;> omega
 
 /-- Polymorphic counterpart of `toBitVec64_toInt`. -/
-lemma toBitVec64_poly_toInt_poly {p : ℕ} [NeZero p]
+lemma toBitVec64_toInt_poly {p : ℕ} [NeZero p]
     {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    w.toBitVec64_poly.toInt = w.toInt_poly
+    w.toBitVec64.toInt = w.toInt_poly
   := by
     rw [BitVec.toInt, Word.toInt_poly]
     split_ifs <;>
     rw [isNegative_poly_msb h_w_isU64] at * <;>
     simp [BitVec.msb_eq_decide] at * <;>
-    rw [toBitVec64_poly_toNat_poly h_w_isU64] at * <;>
+    rw [toBitVec64_toNat_poly h_w_isU64] at * <;>
     omega
 
 /-- Polymorphic counterpart of `Word.isNegative_toInt`. -/
@@ -846,25 +849,25 @@ lemma toWord_poly_U64_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     rw [val_byte_combine] <;> omega
 
 /-- Polymorphic counterpart of `BWord.toBitVec64`. -/
-def toBitVec64_poly {p : ℕ} [NeZero p] (w : BWord (ZMod p)) : BitVec 64 :=
+def toBitVec64 {p : ℕ} [NeZero p] (w : BWord (ZMod p)) : BitVec 64 :=
   BitVec.ofNat 64 (toNat_poly w)
 
 /-- Polymorphic counterpart of `BWord.toBitVec64_toNat`. -/
-lemma toBitVec64_poly_toNat_poly {p : ℕ} [NeZero p]
+lemma toBitVec64_toNat_poly {p : ℕ} [NeZero p]
     {w : BWord (ZMod p)} (hw : w.isU64_poly) :
-    w.toBitVec64_poly.toNat = w.toNat_poly := by
-  simp only [BWord.toBitVec64_poly, BitVec.toNat_ofNat, toNat_poly]
+    w.toBitVec64.toNat = w.toNat_poly := by
+  simp only [BWord.toBitVec64, BitVec.toNat_ofNat, toNat_poly]
   have := lt_cases_of_isU64_poly hw
   omega
 
 /-- Polymorphic counterpart of `BWord.toWord_toBitVec64`. -/
-lemma toWord_poly_toBitVec64_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+lemma toWord_poly_toBitVec64 {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : BWord (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    w.toWord_poly.toBitVec64_poly = w.toBitVec64_poly := by
+    w.toWord_poly.toBitVec64 = w.toBitVec64 := by
   have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU64_poly h_w_isU64
   rw [← BitVec.toNat_inj]
-  rw [Word.toBitVec64_poly_toNat_poly (toWord_poly_U64_poly h_w_isU64)]
-  rw [BWord.toBitVec64_poly_toNat_poly h_w_isU64]
+  rw [Word.toBitVec64_toNat_poly (toWord_poly_U64_poly h_w_isU64)]
+  rw [BWord.toBitVec64_toNat_poly h_w_isU64]
   rw [toNat_poly_toWord_poly h_w_isU64]
 
 /-- Polymorphic counterpart of `BWord.isNegative`. -/
@@ -876,9 +879,9 @@ instance {p : ℕ} [NeZero p] {w : BWord (ZMod p)} : Decidable (isNegative_poly 
 /-- Polymorphic counterpart of `BWord.isNegative_msb`. -/
 lemma isNegative_poly_msb {p : ℕ} [NeZero p]
     {w : BWord (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    w.isNegative_poly ↔ (w.toBitVec64_poly.msb = true) := by
+    w.isNegative_poly ↔ (w.toBitVec64.msb = true) := by
   have := lt_cases_of_isU64_poly h_w_isU64
-  simp [isNegative_poly, BWord.toBitVec64_poly, BWord.toNat_poly, BitVec.msb_eq_decide]
+  simp [isNegative_poly, BWord.toBitVec64, BWord.toNat_poly, BitVec.msb_eq_decide]
   omega
 
 /-- Polymorphic counterpart of `BWord.toInt`. -/
@@ -886,15 +889,15 @@ def toInt_poly {p : ℕ} [NeZero p] (w : BWord (ZMod p)) : ℤ :=
   if (isNegative_poly w) then w.toNat_poly - 2 ^ 64 else w.toNat_poly
 
 /-- Polymorphic counterpart of `BWord.toBitVec64_toInt`. -/
-lemma toBitVec64_poly_toInt_poly {p : ℕ} [NeZero p]
+lemma toBitVec64_toInt_poly {p : ℕ} [NeZero p]
     {w : BWord (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    w.toBitVec64_poly.toInt = w.toInt_poly
+    w.toBitVec64.toInt = w.toInt_poly
   := by
     rw [BitVec.toInt, BWord.toInt_poly]
     split_ifs <;>
     rw [isNegative_poly_msb h_w_isU64] at * <;>
     simp [BitVec.msb_eq_decide] at * <;>
-    rw [toBitVec64_poly_toNat_poly h_w_isU64] at * <;>
+    rw [toBitVec64_toNat_poly h_w_isU64] at * <;>
     omega
 
 /-- Polymorphic counterpart of `BWord.low`. -/
@@ -910,9 +913,9 @@ lemma isU64_low_isU32_poly {p : ℕ} [NeZero p] {w : BWord (ZMod p)}
 /-- Polymorphic counterpart of `BWord.setWidth_eq_low`. -/
 lemma setWidth_eq_low_poly {p : ℕ} [NeZero p]
     {w : BWord (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    BitVec.setWidth 32 w.toBitVec64_poly = w.low_poly.toBitVec32_poly := by
+    BitVec.setWidth 32 w.toBitVec64 = w.low_poly.toBitVec32_poly := by
   have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU64_poly h_w_isU64
-  simp [toBitVec64_poly, ← BitVec.toNat_inj, low_poly,
+  simp [toBitVec64, ← BitVec.toNat_inj, low_poly,
         BWord.toNat_poly, BHWord.toBitVec32_poly, BHWord.toNat_poly]
   omega
 
@@ -929,9 +932,9 @@ lemma isU64_high_isU32_poly {p : ℕ} [NeZero p] {w : BWord (ZMod p)}
 /-- Polymorphic counterpart of `BWord.setWidth_rshift_eq_high`. -/
 lemma setWidth_rshift_eq_high_poly {p : ℕ} [NeZero p]
     {w : BWord (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    BitVec.setWidth 32 (w.toBitVec64_poly >>> 32) = w.high_poly.toBitVec32_poly := by
+    BitVec.setWidth 32 (w.toBitVec64 >>> 32) = w.high_poly.toBitVec32_poly := by
   have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU64_poly h_w_isU64
-  simp_all [toBitVec64_poly, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow,
+  simp_all [toBitVec64, ← BitVec.toNat_inj, Nat.shiftRight_eq_div_pow,
             high_poly, BWord.toNat_poly, BHWord.toBitVec32_poly, BHWord.toNat_poly]
   omega
 
@@ -1098,20 +1101,20 @@ lemma toBitVec128_poly_toInt_poly {p : ℕ} [NeZero p]
 /-- Polymorphic counterpart of `BDWord.low_as_extract`. -/
 lemma low_as_extract_poly {p : ℕ} [NeZero p]
     {w : BDWord (ZMod p)} (h_w_isU128 : w.isU128_poly) :
-    (w.low_poly).toBitVec64_poly = BitVec.extractLsb 63 0 (w.toBitVec128_poly) := by
+    (w.low_poly).toBitVec64 = BitVec.extractLsb 63 0 (w.toBitVec128_poly) := by
   have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ :=
     lt_cases_of_isU128_poly h_w_isU128
-  simp [BDWord.low_poly, BWord.toBitVec64_poly, BDWord.toBitVec128_poly]
+  simp [BDWord.low_poly, BWord.toBitVec64, BDWord.toBitVec128_poly]
   simp [← BitVec.toNat_inj, BWord.toNat_poly, BDWord.toNat_poly]
   omega
 
 /-- Polymorphic counterpart of `BDWord.high_as_extract`. -/
 lemma high_as_extract_poly {p : ℕ} [NeZero p]
     {w : BDWord (ZMod p)} (h_w_isU128 : w.isU128_poly) :
-    (w.high_poly).toBitVec64_poly = BitVec.extractLsb 127 64 (w.toBitVec128_poly) := by
+    (w.high_poly).toBitVec64 = BitVec.extractLsb 127 64 (w.toBitVec128_poly) := by
   have ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15⟩ :=
     lt_cases_of_isU128_poly h_w_isU128
-  simp [BDWord.high_poly, BWord.toBitVec64_poly, BDWord.toBitVec128_poly]
+  simp [BDWord.high_poly, BWord.toBitVec64, BDWord.toBitVec128_poly]
   simp [← BitVec.toNat_inj, BWord.toNat_poly, BDWord.toNat_poly]
   omega
 
@@ -1127,7 +1130,7 @@ whose two high limbs are `65535` if `w`'s top bit is set, else `0`. -/
 lemma sign_extend_32_to_64_msb_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : HWord (ZMod p)} :
     w.isU32_poly →
-    BitVec.signExtend 64 w.toBitVec32_poly = Word.toBitVec64_poly
+    BitVec.signExtend 64 w.toBitVec32_poly = Word.toBitVec64
       #v[w[0], w[1],
          if w.toBitVec32_poly.msb = true then 65535 else 0,
          if w.toBitVec32_poly.msb = true then 65535 else 0] := by
@@ -1143,7 +1146,7 @@ lemma sign_extend_32_to_64_msb_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) from by push_cast; rfl]
     rw [ZMod.val_natCast_of_lt (by omega)]
   have h0_val : (0 : ZMod p).val = 0 := ZMod.val_zero
-  rw [← BitVec.toNat_inj, BitVec.toNat_signExtend, Word.toBitVec64_poly]
+  rw [← BitVec.toNat_inj, BitVec.toNat_signExtend, Word.toBitVec64]
   simp only [BitVec.toNat_ofNat, if_pos (show (32 : ℕ) ≤ 64 from by omega),
     BitVec.toNat_setWidth, Word.toNat_poly_def, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
@@ -1183,11 +1186,11 @@ lemma extend_U32_U64_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 /-- Polymorphic counterpart of `HWord.extend_true_is_signExtend`. Mirrors
 `Word.extend_true_is_signExtend_poly` recipe at smaller dimension via
 `BitVec.toInt_inj` + `HWord.toBitVec32_poly_toInt_poly` /
-`Word.toBitVec64_poly_toInt_poly`. -/
+`Word.toBitVec64_toInt_poly`. -/
 lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : HWord (ZMod p)} :
   w.isU32_poly →
-  (w.extend_poly true).toBitVec64_poly = BitVec.signExtend 64 w.toBitVec32_poly
+  (w.extend_poly true).toBitVec64 = BitVec.signExtend 64 w.toBitVec32_poly
     := by
   set sw := extend_poly w true
   intro is_U32_w
@@ -1207,7 +1210,7 @@ lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   rw [← BitVec.toInt_inj]
   simp [BitVec.toInt_signExtend_of_le]
   rw [HWord.toBitVec32_poly_toInt_poly is_U32_w,
-      Word.toBitVec64_poly_toInt_poly is_U64_hw]
+      Word.toBitVec64_toInt_poly is_U64_hw]
   rw [HWord.toInt_poly, Word.toInt_poly]
   split_ifs <;> [ skip; tauto; tauto; skip ] <;>
   simp [sw, extend_poly, Word.toNat_poly, HWord.toNat_poly] <;>
@@ -1219,7 +1222,7 @@ lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : HWord (ZMod p)} :
   w.isU32_poly →
-  (w.extend_poly false).toBitVec64_poly = BitVec.setWidth 64 w.toBitVec32_poly
+  (w.extend_poly false).toBitVec64 = BitVec.setWidth 64 w.toBitVec32_poly
     := by
   set sw := extend_poly w false
   intro is_U32_w
@@ -1228,7 +1231,7 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     subst sw; simp [extend_poly]
     apply Word.isU64_of_cases_poly <;> simp <;> omega
   rw [← BitVec.toNat_inj]
-  rw [Word.toBitVec64_poly_toNat_poly is_U64_hw]
+  rw [Word.toBitVec64_toNat_poly is_U64_hw]
   rw [BitVec.setWidth_idem (by simp)]
   rw [HWord.toBitVec32_poly_toNat_poly is_U32_w]
   simp [sw, Word.toNat_poly, extend_poly, HWord.toNat_poly]
@@ -1280,12 +1283,12 @@ lemma isNegative_poly_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   omega
 
 /-- Polymorphic counterpart of `Word.toBitVec64_toBWord`. -/
-lemma toBitVec64_poly_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
+lemma toBitVec64_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : Word (ZMod p)} (h_w_isU64 : w.isU64_poly) :
-    w.toBWord_poly.toBitVec64_poly = w.toBitVec64_poly := by
+    w.toBWord_poly.toBitVec64 = w.toBitVec64 := by
   rw [← BitVec.toNat_inj]
-  rw [BWord.toBitVec64_poly_toNat_poly (toBWord_poly_toU64 h_w_isU64)]
-  rw [Word.toBitVec64_poly_toNat_poly h_w_isU64]
+  rw [BWord.toBitVec64_toNat_poly (toBWord_poly_toU64 h_w_isU64)]
+  rw [Word.toBitVec64_toNat_poly h_w_isU64]
   rw [toNat_poly_toBWord_poly h_w_isU64]
 
 /-- Polymorphic counterpart of `Word.extend`. -/
@@ -1310,7 +1313,7 @@ lemma extend_U64_U128_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : Word (ZMod p)} :
   w.isU64_poly →
-  (w.extend_poly false).toBitVec128_poly = BitVec.setWidth 128 w.toBitVec64_poly
+  (w.extend_poly false).toBitVec128_poly = BitVec.setWidth 128 w.toBitVec64
     := by
   set sw := extend_poly w false
   intro is_U64_w
@@ -1321,7 +1324,7 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   rw [← BitVec.toNat_inj]
   rw [DWord.toBitVec128_poly_toNat_poly is_U128_bdw]
   rw [BitVec.setWidth_idem (by simp)]
-  rw [Word.toBitVec64_poly_toNat_poly is_U64_w]
+  rw [Word.toBitVec64_toNat_poly is_U64_w]
   simp [sw, DWord.toNat_poly, extend_poly, Word.toNat_poly]
 
 -- Polymorphic counterpart of `Word.extend_true_is_signExtend`.
@@ -1339,7 +1342,7 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : Word (ZMod p)} :
   w.isU64_poly →
-  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64_poly
+  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64
     := by
   intro is_U64_w
   have h65535 : (65535 : ZMod p).val = 65535 := by
@@ -1358,11 +1361,11 @@ lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     rw [← BitVec.toNat_inj, DWord.toBitVec128_poly_toNat_poly is_U128_sw]
     simp [extend_poly, DWord.toNat_poly, Word.toNat_poly, h, h65535, h0,
           BitVec.toNat_not, BitVec.toNat_setWidth,
-          Word.toBitVec64_poly_toNat_poly is_U64_w]
+          Word.toBitVec64_toNat_poly is_U64_w]
     omega
   · -- non-negative case: extend_poly w true = extend_poly w false in this
     -- branch, and signExtend = setWidth, so reduce to extend_false case.
-    have hmsb : w.toBitVec64_poly.msb = false :=
+    have hmsb : w.toBitVec64.msb = false :=
       Bool.not_eq_true _ |>.mp (fun hm => h ((Word.isNegative_poly_msb is_U64_w).mpr hm))
     rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
     have heq : w.extend_poly true = w.extend_poly false := by
@@ -1396,7 +1399,7 @@ lemma extend_U64_U128_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : BWord (ZMod p)} :
   w.isU64_poly →
-  (w.extend_poly false).toBitVec128_poly = BitVec.setWidth 128 w.toBitVec64_poly
+  (w.extend_poly false).toBitVec128_poly = BitVec.setWidth 128 w.toBitVec64
     := by
   set sw := extend_poly w false
   intro is_U64_w
@@ -1407,7 +1410,7 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   rw [← BitVec.toNat_inj]
   rw [BDWord.toBitVec128_poly_toNat_poly is_U128_bdw]
   rw [BitVec.setWidth_idem (by simp)]
-  rw [BWord.toBitVec64_poly_toNat_poly is_U64_w]
+  rw [BWord.toBitVec64_toNat_poly is_U64_w]
   simp [sw, BDWord.toNat_poly, extend_poly, BWord.toNat_poly]
 
 -- Polymorphic counterpart of `BWord.extend_true_is_signExtend`.
@@ -1420,7 +1423,7 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : BWord (ZMod p)} :
   w.isU64_poly →
-  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64_poly
+  (w.extend_poly true).toBitVec128_poly = BitVec.signExtend 128 w.toBitVec64
     := by
   intro is_U64_w
   have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU64_poly is_U64_w
@@ -1438,9 +1441,9 @@ lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     rw [← BitVec.toNat_inj, BDWord.toBitVec128_poly_toNat_poly is_U128_sw]
     simp [extend_poly, BDWord.toNat_poly, BWord.toNat_poly, h, h255, h0,
           BitVec.toNat_not, BitVec.toNat_setWidth,
-          BWord.toBitVec64_poly_toNat_poly is_U64_w]
+          BWord.toBitVec64_toNat_poly is_U64_w]
     omega
-  · have hmsb : w.toBitVec64_poly.msb = false :=
+  · have hmsb : w.toBitVec64.msb = false :=
       Bool.not_eq_true _ |>.mp (fun hm => h ((BWord.isNegative_poly_msb is_U64_w).mpr hm))
     rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
     have heq : w.extend_poly true = w.extend_poly false := by
@@ -1451,12 +1454,12 @@ lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 /-- Polymorphic counterpart of `BWord.low_as_setWidth`. -/
 lemma low_as_setWidth_poly {p : ℕ} [NeZero p] {w : BWord (ZMod p)} :
   w.isU64_poly →
-  w.low_poly.toBitVec32_poly = BitVec.setWidth 32 w.toBitVec64_poly
+  w.low_poly.toBitVec32_poly = BitVec.setWidth 32 w.toBitVec64
     := by
   intro is_U64_w
   have ⟨_, _, _, _, _, _, _, _⟩ := lt_cases_of_isU64_poly is_U64_w
   simp [BWord.low_poly, BHWord.toBitVec32_poly, BHWord.toNat_poly,
-        BWord.toBitVec64_poly, BWord.toNat_poly]
+        BWord.toBitVec64, BWord.toNat_poly]
   simp [← BitVec.toNat_inj]
   omega
 
@@ -1486,11 +1489,11 @@ lemma extend_U32_U64_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 /-- Polymorphic counterpart of `BHWord.extend_true_is_signExtend`. Mirrors
 `BWord.extend_true_is_signExtend_poly` recipe at smaller dimension via
 `BitVec.toInt_inj` + `BHWord.toBitVec32_poly_toInt_poly` /
-`BWord.toBitVec64_poly_toInt_poly`. -/
+`BWord.toBitVec64_toInt_poly`. -/
 lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : BHWord (ZMod p)} :
   w.isU32_poly →
-  (w.extend_poly true).toBitVec64_poly = BitVec.signExtend 64 w.toBitVec32_poly
+  (w.extend_poly true).toBitVec64 = BitVec.signExtend 64 w.toBitVec32_poly
     := by
   set sw := extend_poly w true
   intro is_U32_w
@@ -1510,7 +1513,7 @@ lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
   rw [← BitVec.toInt_inj]
   simp [BitVec.toInt_signExtend_of_le]
   rw [BHWord.toBitVec32_poly_toInt_poly is_U32_w,
-      BWord.toBitVec64_poly_toInt_poly is_U64_bhw]
+      BWord.toBitVec64_toInt_poly is_U64_bhw]
   rw [BHWord.toInt_poly, BWord.toInt_poly]
   split_ifs <;> [ skip; tauto; tauto; skip ] <;>
   simp [sw, extend_poly, BWord.toNat_poly, BHWord.toNat_poly] <;>
@@ -1522,7 +1525,7 @@ lemma extend_true_is_signExtend_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {w : BHWord (ZMod p)} :
   w.isU32_poly →
-  (w.extend_poly false).toBitVec64_poly = BitVec.setWidth 64 w.toBitVec32_poly
+  (w.extend_poly false).toBitVec64 = BitVec.setWidth 64 w.toBitVec32_poly
     := by
   set sw := extend_poly w false
   intro is_U32_w
@@ -1531,7 +1534,7 @@ lemma extend_false_is_setWidth_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     subst sw; simp [extend_poly]
     apply BWord.isU64_of_cases_poly <;> simp <;> omega
   rw [← BitVec.toNat_inj]
-  rw [BWord.toBitVec64_poly_toNat_poly is_U64_bhw]
+  rw [BWord.toBitVec64_toNat_poly is_U64_bhw]
   rw [BitVec.setWidth_idem (by simp)]
   rw [BHWord.toBitVec32_poly_toNat_poly is_U32_w]
   simp [sw, BWord.toNat_poly, extend_poly, BHWord.toNat_poly]
@@ -1545,26 +1548,26 @@ namespace Word
 /-- Polymorphic counterpart of `Word.and_toBWord`. -/
 lemma and_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {a b : Word (ZMod p)} : a.isU64_poly → b.isU64_poly →
-    a.toBitVec64_poly &&& b.toBitVec64_poly =
-      a.toBWord_poly.toBitVec64_poly &&& b.toBWord_poly.toBitVec64_poly := by
+    a.toBitVec64 &&& b.toBitVec64 =
+      a.toBWord_poly.toBitVec64 &&& b.toBWord_poly.toBitVec64 := by
   intro h_a_64 h_b_64
-  rw [Word.toBitVec64_poly_toBWord_poly h_a_64, Word.toBitVec64_poly_toBWord_poly h_b_64]
+  rw [Word.toBitVec64_toBWord_poly h_a_64, Word.toBitVec64_toBWord_poly h_b_64]
 
 /-- Polymorphic counterpart of `Word.or_toBWord`. -/
 lemma or_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {a b : Word (ZMod p)} : a.isU64_poly → b.isU64_poly →
-    a.toBitVec64_poly ||| b.toBitVec64_poly =
-      a.toBWord_poly.toBitVec64_poly ||| b.toBWord_poly.toBitVec64_poly := by
+    a.toBitVec64 ||| b.toBitVec64 =
+      a.toBWord_poly.toBitVec64 ||| b.toBWord_poly.toBitVec64 := by
   intro h_a_64 h_b_64
-  rw [Word.toBitVec64_poly_toBWord_poly h_a_64, Word.toBitVec64_poly_toBWord_poly h_b_64]
+  rw [Word.toBitVec64_toBWord_poly h_a_64, Word.toBitVec64_toBWord_poly h_b_64]
 
 /-- Polymorphic counterpart of `Word.xor_toBWord`. -/
 lemma xor_toBWord_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     {a b : Word (ZMod p)} : a.isU64_poly → b.isU64_poly →
-    a.toBitVec64_poly ^^^ b.toBitVec64_poly =
-      a.toBWord_poly.toBitVec64_poly ^^^ b.toBWord_poly.toBitVec64_poly := by
+    a.toBitVec64 ^^^ b.toBitVec64 =
+      a.toBWord_poly.toBitVec64 ^^^ b.toBWord_poly.toBitVec64 := by
   intro h_a_64 h_b_64
-  rw [Word.toBitVec64_poly_toBWord_poly h_a_64, Word.toBitVec64_poly_toBWord_poly h_b_64]
+  rw [Word.toBitVec64_toBWord_poly h_a_64, Word.toBitVec64_toBWord_poly h_b_64]
 
 end Word
 
@@ -1604,14 +1607,14 @@ lemma bitVec_ofNat8_eq_of_mod (a b : ℕ) (h : a % 256 = b % 256) :
 lemma signExtend64_ofNat8_of_ge_128_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
     (x : ZMod p) (hlt : x.val < 256) (hge : 128 ≤ x.val) :
     BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x + 65280, (65535 : ZMod p), (65535 : ZMod p), (65535 : ZMod p)] := by
+      Word.toBitVec64 #v[x + 65280, (65535 : ZMod p), (65535 : ZMod p), (65535 : ZMod p)] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_signExtend]
   have hmsb : BitVec.msb (BitVec.ofNat 8 x.val) = true := by
     rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]
     rw [Nat.mod_eq_of_lt (by omega)]; omega
   simp [hmsb, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat]
   rw [Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -1663,10 +1666,10 @@ lemma nat_decomp_of_inv8_decomp_poly {p : ℕ} [NeZero p] [Fact (2 ^ 17 < p)]
 lemma setWidth64_ofNat8_poly {p : ℕ} [NeZero p]
     (x : ZMod p) (hlt : x.val < 256) :
     BitVec.setWidth 64 (BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, (0 : ZMod p), (0 : ZMod p), (0 : ZMod p)] := by
+      Word.toBitVec64 #v[x, (0 : ZMod p), (0 : ZMod p), (0 : ZMod p)] := by
   apply BitVec.toNat_inj.mp
   simp [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat]
   rw [Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -1678,14 +1681,14 @@ lemma setWidth64_ofNat8_poly {p : ℕ} [NeZero p]
 lemma signExtend64_ofNat8_of_lt_128_poly {p : ℕ} [NeZero p]
     (x : ZMod p) (hlt : x.val < 256) (hge : x.val < 128) :
     BitVec.signExtend 64 (BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, (0 : ZMod p), (0 : ZMod p), (0 : ZMod p)] := by
+      Word.toBitVec64 #v[x, (0 : ZMod p), (0 : ZMod p), (0 : ZMod p)] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_signExtend]
   have hmsb : BitVec.msb (BitVec.ofNat 8 x.val) = false := by
     rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]
     rw [Nat.mod_eq_of_lt (by omega)]; omega
   simp [hmsb, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat]
   rw [Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -1712,10 +1715,10 @@ private lemma toNat_concat_halfword_bytes_poly {p : ℕ} [NeZero p]
 lemma setWidth64_ofNat16_concat_poly {p : ℕ} [NeZero p]
     (x : ZMod p) (hlt : x.val < 65536) :
     BitVec.setWidth 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, 0, 0, 0] := by
+      Word.toBitVec64 #v[x, 0, 0, 0] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes_poly x hlt]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, ZMod.val_zero]
@@ -1727,7 +1730,7 @@ lemma setWidth64_ofNat16_concat_poly {p : ℕ} [NeZero p]
 lemma signExtend64_ofNat16_concat_of_lt_32768_poly {p : ℕ} [NeZero p]
     (x : ZMod p) (hlt : x.val < 65536) (hmsb : x.val < 32768) :
     BitVec.signExtend 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, 0, 0, 0] := by
+      Word.toBitVec64 #v[x, 0, 0, 0] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_signExtend]
   have hmsb_false : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = false := by
@@ -1738,7 +1741,7 @@ lemma signExtend64_ofNat16_concat_of_lt_32768_poly {p : ℕ} [NeZero p]
   rw [hmsb_false]
   simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
   rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes_poly x hlt]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, ZMod.val_zero]
@@ -1751,7 +1754,7 @@ lemma signExtend64_ofNat16_concat_of_ge_32768_poly {p : ℕ} [NeZero p]
     [Fact (2 ^ 17 < p)]
     (x : ZMod p) (hlt : x.val < 65536) (hmsb : 32768 ≤ x.val) :
     BitVec.signExtend 64 (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, (65535 : ZMod p), (65535 : ZMod p), (65535 : ZMod p)] := by
+      Word.toBitVec64 #v[x, (65535 : ZMod p), (65535 : ZMod p), (65535 : ZMod p)] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_signExtend]
   have hmsb_true : BitVec.msb (BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) = true := by
@@ -1762,7 +1765,7 @@ lemma signExtend64_ofNat16_concat_of_ge_32768_poly {p : ℕ} [NeZero p]
   rw [hmsb_true]
   simp only [↓reduceIte]
   rw [BitVec.toNat_setWidth, toNat_concat_halfword_bytes_poly x hlt]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ]
@@ -1812,10 +1815,10 @@ lemma setWidth64_ofNat32_concat_poly {p : ℕ} [NeZero p]
     (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) :
     BitVec.setWidth 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
       BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, y, (0 : ZMod p), (0 : ZMod p)] := by
+      Word.toBitVec64 #v[x, y, (0 : ZMod p), (0 : ZMod p)] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_setWidth, toNat_concat_word_bytes_poly x y hx hy]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, ZMod.val_zero]
@@ -1828,7 +1831,7 @@ lemma signExtend64_ofNat32_concat_of_lt_32768_poly {p : ℕ} [NeZero p]
     (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) (hmsb : y.val < 32768) :
     BitVec.signExtend 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
       BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, y, (0 : ZMod p), (0 : ZMod p)] := by
+      Word.toBitVec64 #v[x, y, (0 : ZMod p), (0 : ZMod p)] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_signExtend]
   have hmsb_false : BitVec.msb
@@ -1841,7 +1844,7 @@ lemma signExtend64_ofNat32_concat_of_lt_32768_poly {p : ℕ} [NeZero p]
   rw [hmsb_false]
   simp only [Bool.false_eq_true, ↓reduceIte, add_zero]
   rw [BitVec.toNat_setWidth, toNat_concat_word_bytes_poly x y hx hy]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, ZMod.val_zero]
@@ -1855,7 +1858,7 @@ lemma signExtend64_ofNat32_concat_of_ge_32768_poly {p : ℕ} [NeZero p]
     (x y : ZMod p) (hx : x.val < 65536) (hy : y.val < 65536) (hmsb : 32768 ≤ y.val) :
     BitVec.signExtend 64 (BitVec.ofNat 8 (y.val >>> 8) ++ BitVec.ofNat 8 y.val ++
       BitVec.ofNat 8 (x.val >>> 8) ++ BitVec.ofNat 8 x.val) =
-      Word.toBitVec64_poly #v[x, y, (65535 : ZMod p), (65535 : ZMod p)] := by
+      Word.toBitVec64 #v[x, y, (65535 : ZMod p), (65535 : ZMod p)] := by
   apply BitVec.toNat_inj.mp
   rw [BitVec.toNat_signExtend]
   have hmsb_true : BitVec.msb
@@ -1868,7 +1871,7 @@ lemma signExtend64_ofNat32_concat_of_ge_32768_poly {p : ℕ} [NeZero p]
   rw [hmsb_true]
   simp only [↓reduceIte]
   rw [BitVec.toNat_setWidth, toNat_concat_word_bytes_poly x y hx hy]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   rw [BitVec.toNat_ofNat, Word.toNat_poly_def]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ]

@@ -33,13 +33,13 @@ def spec_lui (imm : BitVec 20) (rd : regidx) : SailM ExecutionResult := do
 /-- The SP1 implementation: shared between AUIPC and LUI; the addend (`pc` for
 AUIPC, `0` for LUI) is built into the trace via `Main[22..24]`. -/
 def sp1_utype : SailM ExecutionResult := do
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
   Sail.write_reg (sp1_op_a Main)
-                 (Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]])
+                 (Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]])
   return RETIRE_SUCCESS
 
 -- Internal helper: from the trusted-instr divisibility + sign-extension equality,
--- the `Word.toBitVec64_poly` of `Main[14..17]` equals the Sail-style
+-- the `Word.toBitVec64` of `Main[14..17]` equals the Sail-style
 -- `signExtend 64 (imm +++ 0#12)` where `imm` is the 20-bit immediate recovered by
 -- `sp1_op_b`. Polymorphic counterpart of `toBitVec64_eq_signExtend_sp1_op_b`.
 set_option linter.unusedSectionVars false in
@@ -47,8 +47,8 @@ private lemma toBitVec64_eq_signExtend_sp1_op_b_poly
     (_h14_lt : Main[14].val < 65536) (_h15_lt : Main[15].val < 65536)
     (h_div : Main[14].val % 2 ^ 12 = 0)
     (h_se : BitVec.signExtend 64 (BitVec.ofNat 32 (Main[14].val + Main[15].val * 65536)) =
-            Word.toBitVec64_poly #v[Main[14], Main[15], Main[16], Main[17]]) :
-    Word.toBitVec64_poly #v[Main[14], Main[15], Main[16], Main[17]] =
+            Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]]) :
+    Word.toBitVec64 #v[Main[14], Main[15], Main[16], Main[17]] =
       BitVec.signExtend 64 (sp1_op_b Main +++ 0#12) := by
   rw [← h_se]
   congr 1
@@ -109,7 +109,7 @@ theorem correct_lui
   -- Recover the standard sign-extension equality for the 20-bit immediate.
   have h_imm := toBitVec64_eq_signExtend_sp1_op_b_poly Main h14_val_lt h15_val_lt h_div h_se
   -- Initial state: PC.
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     AddOperation.constraints, CPUState.constraints,
     JTypeReader.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, _⟩ := state_cstrs
@@ -119,18 +119,18 @@ theorem correct_lui
   clear rest
   -- pc + 4 bridge.
   have h_pc3 : Main[3].val < 65536 := lt65k _ h3_lt
-  have h_pc_step : Word.toBitVec64_poly (#v[Main[3], Main[4], Main[5], (0 : ZMod p)]) + 4#64 =
-      Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0] := by
+  have h_pc_step : Word.toBitVec64 (#v[Main[3], Main[4], Main[5], (0 : ZMod p)]) + 4#64 =
+      Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0] := by
     have hp_lt : 131072 < p := by
       have := Fact.out (p := 2 ^ 17 < p)
       have h17 : (2 : ℕ) ^ 17 = 131072 := by decide
       omega
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   -- The zero word's BitVec form is 0#64.
-  have h_zero_word : Word.toBitVec64_poly (#v[(0 : ZMod p), 0, 0, 0]) = 0#64 := by
-    simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+  have h_zero_word : Word.toBitVec64 (#v[(0 : ZMod p), 0, 0, 0]) = 0#64 := by
+    simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
   by_cases h_is_op_a_0 : Main[6] = 0
   · -- rd = x0: spec's wX_bits is a no-op; sp1's write_reg is a no-op when value = 0.
     have h13_one : Main[13] = 1 := h_a0_iff.mpr h_is_op_a_0
@@ -208,7 +208,7 @@ theorem correct_auipc
   have h_pc_isU64 : Word.isU64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] :=
     Word.isU64_of_cases_poly h3_val_lt h4_val_lt h5_val_lt (by simp [ZMod.val_zero])
   have h_imm := toBitVec64_eq_signExtend_sp1_op_b_poly Main h14_val_lt h15_val_lt h_div h_se
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     AddOperation.constraints, CPUState.constraints,
     JTypeReader.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, _⟩ := state_cstrs
@@ -219,18 +219,18 @@ theorem correct_auipc
   rw [run_readReg_insert_of_ne _ (by decide : Register.nextPC ≠ Register.PC), read_pc]
   clear rest
   -- pc + 4 bridge.
-  have h_pc_step : Word.toBitVec64_poly (#v[Main[3], Main[4], Main[5], (0 : ZMod p)]) + 4#64 =
-      Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0] := by
+  have h_pc_step : Word.toBitVec64 (#v[Main[3], Main[4], Main[5], (0 : ZMod p)]) + 4#64 =
+      Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0] := by
     have hp_lt : 131072 < p := by
       have := Fact.out (p := 2 ^ 17 < p)
       have h17 : (2 : ℕ) ^ 17 = 131072 := by decide
       omega
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   -- The zero word's BitVec form is 0#64 — needed for AUIPC's `if` reduction.
-  have h_zero_word : Word.toBitVec64_poly (#v[(0 : ZMod p), 0, 0, 0]) = 0#64 := by
-    simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+  have h_zero_word : Word.toBitVec64 (#v[(0 : ZMod p), 0, 0, 0]) = 0#64 := by
+    simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
   by_cases h_is_op_a_0 : Main[6] = 0
   · have h13_one : Main[13] = 1 := h_a0_iff.mpr h_is_op_a_0
     obtain ⟨h25, h26, h27, h28⟩ := h_op_a_0_zero (by rw [h13_one]; exact one_ne_zero)

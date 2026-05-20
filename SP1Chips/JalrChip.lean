@@ -24,8 +24,8 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 def sp1_jalr (Main : Vector (ZMod p) 35) : SailM Unit := do
   let op_a := sp1_op_a Main
-  set_next_pc (Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)])
-  wX_bits (.Regidx op_a) (Word.toBitVec64_poly #v[Main[30], Main[31], Main[32], Main[33]])
+  set_next_pc (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)])
+  wX_bits (.Regidx op_a) (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
 
 noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := do
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
@@ -35,12 +35,12 @@ noncomputable def spec_jalr (imm : BitVec 12) (rs1 rd : regidx) : SailM Unit := 
 `JALR_correct` so the `Nat.zero_mul + Nat.add_zero` simp pass that produces
 the kernel-tripping proof term sits in its own decl. -/
 private lemma word_four_eq_bitvec_four_jalr :
-    Word.toBitVec64_poly (#v[(4 : ZMod p), 0, 0, 0]) = (4#64 : BitVec 64) := by
+    Word.toBitVec64 (#v[(4 : ZMod p), 0, 0, 0]) = (4#64 : BitVec 64) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h4v : ((4 : ℕ) : ZMod p).val = 4 := ZMod.val_natCast_of_lt (by omega)
   rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl]
-  simp only [Word.toBitVec64_poly, Word.toNat_poly_def, Vector.getElem_mk,
+  simp only [Word.toBitVec64, Word.toNat_poly_def, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
     h4v, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
 
@@ -48,10 +48,10 @@ private lemma word_four_eq_bitvec_four_jalr :
 omit [Fact (2 ^ 17 < p)] in
 lemma jalr_target_mod4_poly (Main : Vector (ZMod p) 35)
     (h_masked_mod4 : (Main[26] - Main[34]).val % 4 = 0) :
-    (Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)]) % 4#64 =
+    (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)]) % 4#64 =
         0#64 := by
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  simp [Word.toBitVec64_poly_mod4, ofNat64_mod_4_eq_zero_iff, h_masked_mod4]
+  simp [Word.toBitVec64_mod4, ofNat64_mod_4_eq_zero_iff, h_masked_mod4]
 
 -- Sub-lemma 2 (poly): the unmasked next-PC sum equals the masked sum plus `Main[34]` at bit 0.
 omit [Fact (2 ^ 17 < p)] in
@@ -63,30 +63,30 @@ lemma jalr_unmasked_eq_masked_plus_poly (Main : Vector (ZMod p) 35)
     (_h28_lt : Main[28].val < 65536)
     (h34_le : Main[34].val ≤ 1)
     (h34_le26 : Main[34].val ≤ Main[26].val) :
-    Word.toBitVec64_poly #v[Main[26], Main[27], Main[28], Main[29]] =
-      Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)]
+    Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
+      Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)]
         + BitVec.ofNat 64 Main[34].val := by
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  simp [Word.toBitVec64_poly, Word.toNat_poly_def, h29, ZMod.val_zero, h_sub_val]
+  simp [Word.toBitVec64, Word.toNat_poly_def, h29, ZMod.val_zero, h_sub_val]
   bv_omega
 
 -- Sub-lemma 3 (poly): masking bit 0 of the unmasked sum gives back the masked sum.
 lemma jalr_target_eq_poly (Main : Vector (ZMod p) 35)
     (h_unmasked_eq_masked_plus :
-      Word.toBitVec64_poly #v[Main[26], Main[27], Main[28], Main[29]] =
-        Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)]
+      Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
+        Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)]
           + BitVec.ofNat 64 Main[34].val)
     (h_target_mod4 :
-      (Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)])
+      (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)])
           % 4#64 = 0#64)
     (h34_bit : Main[34] = 0 ∨ Main[34] = 1) :
     18446744073709551614#64 &&&
-        Word.toBitVec64_poly #v[Main[26], Main[27], Main[28], Main[29]] =
-      Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)] := by
+        Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] =
+      Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)] := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [h_unmasked_eq_masked_plus]
   set t : BitVec 64 :=
-    Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)] with ht
+    Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], (0 : ZMod p)] with ht
   rcases h34_bit with h0 | h1
   · rw [h0, ZMod.val_zero]
     have h0n : (BitVec.ofNat 64 0) = 0#64 := rfl
@@ -198,7 +198,7 @@ theorem JALR_correct
           _h_diff_b_lt, _h_diff_a_lt, _h_window_b, _h_window_a,
           _h_mem_a_isU64, h_mem_b_isU64, h_op_a_0_impl⟩ := reader_cstrs
   -- destructure the trailing tail of cstrs (E1, M[29] = 0, etc)
-  simp [SP1Constraint.toProp_poly, h_is_real, sub_eq_zero] at rest_cstrs
+  simp [SP1Constraint.toProp, h_is_real, sub_eq_zero] at rest_cstrs
   obtain ⟨h29, h34_bit, h_low_align, h33, h13_zero_or_M30, h13_zero_or_M31, h13_zero_or_M32⟩ :=
     rest_cstrs
   have h_op_a_b_zero : (Main[13] = 0 ∨ Main[30] = 0) ∧ (Main[13] = 0 ∨ Main[31] = 0) ∧
@@ -208,7 +208,7 @@ theorem JALR_correct
     have : Main[6].val < (32 : ZMod p).val := h_op_a_lt; rwa [h32] at this
   have h14 : Main[14].val < 32 := by
     have : Main[14].val < (32 : ZMod p).val := h_op_b_lt32; rwa [h32] at this
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, AddOperation.constraints, ITypeReader.constraints, CPUState.constraints,
     h_is_real, h6, h14] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
@@ -231,7 +231,7 @@ theorem JALR_correct
     · exact h24
   -- imm sign-extension already extracted as `h_imm_se` from trusted_instr_poly
   have h_imm_signExtend :
-      Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
+      Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := h_imm_se
   -- M[15..18] is rs1's previous value (isU64 from reader memory)
   have h15_isU64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := h_mem_b_isU64
@@ -306,8 +306,8 @@ theorem JALR_correct
   simp only [BitVec.ofNatLT_eq_ofNat] at read_op_a read_op_b
   -- Discharge h_link conditionally on rd ≠ 0 (locally `op_b` = sp1_op_a Main = rd).
   have h_link_cond : (op_b : BitVec 5) ≠ 0#5 →
-      Word.toBitVec64_poly #v[Main[30], Main[31], Main[32], Main[33]] =
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], 0] + 4#64 := by
+      Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]] =
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4#64 := by
     intro hrd_ne
     have h6_zero : Main[6] ≠ 0 := by
       intro h0
@@ -332,7 +332,7 @@ theorem JALR_correct
       · exact hp4
       · exact hp5
       · rw [ZMod.val_zero]; omega
-    have h_inc_pc' : List.Forall SP1Constraint.toProp_poly
+    have h_inc_pc' : List.Forall SP1Constraint.toProp
         (AddOperation.constraints #v[Main[3], Main[4], Main[5], (0 : ZMod p)]
           #v[(4 : ZMod p), 0, 0, 0]
           { value := #v[Main[30], Main[31], Main[32], Main[33]] } 1) := by
@@ -347,7 +347,7 @@ theorem JALR_correct
     exact h_add_pc'
   -- Apply the bare-`BitVec` helper. read_pc is in `get` form (line 193); reverse to get? form.
   have read_pc_q : s.regs.get? Register.PC =
-      some (Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], 0]) := by
+      some (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0]) := by
     rw [Std.ExtDHashMap.get?_eq_some_get (hs _)]; exact congrArg some read_pc
   -- sp1_jalr unfolds to set_next_pc + wX_bits. Unfold set_next_pc → writeReg .nextPC.
   simp only [sp1_jalr, sp1_op_a, set_next_pc, sail_branch_announce]
@@ -355,24 +355,24 @@ theorem JALR_correct
   -- to local `op_c, op_b, op_a` respectively — so locally `op_c = sp1_op_b Main` (rs1 index),
   -- `op_b = sp1_op_a Main` (rd index), `op_a = sp1_op_c Main` (imm).
   have read_op_b' : SailState.get_reg? s op_c =
-      some (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]) := read_op_b
+      some (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]) := read_op_b
   refine jalr_spec_eq_sp1 s hs hv
-    (Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], 0]) read_pc_q
+    (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0]) read_pc_q
     op_c
-    (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
+    (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
     read_op_b'
     op_a
-    (Word.toBitVec64_poly #v[Main[26] - Main[34], Main[27], Main[28], 0])
+    (Word.toBitVec64 #v[Main[26] - Main[34], Main[27], Main[28], 0])
     ?_
     (by simpa using h_target_mod4)
     op_b
-    (Word.toBitVec64_poly #v[Main[30], Main[31], Main[32], Main[33]])
+    (Word.toBitVec64 #v[Main[30], Main[31], Main[32], Main[33]])
     h_link_cond
   · -- h_target: 0xF..E &&& (rs1_val + signExt imm) = target_word
     -- Bridge through h_add + h_target_eq + h_imm_signExtend.
-    have : Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+    have : Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
             BitVec.signExtend 64 op_a =
-           Word.toBitVec64_poly #v[Main[26], Main[27], Main[28], Main[29]] := by
+           Word.toBitVec64 #v[Main[26], Main[27], Main[28], Main[29]] := by
       rw [show (op_a : BitVec 12) = BitVec.ofNat 12 Main[21].val from rfl,
           ← h_imm_signExtend]
       exact h_add.symm

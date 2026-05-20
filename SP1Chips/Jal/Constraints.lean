@@ -2,6 +2,9 @@ import SP1Operations.Operation.AddOperation
 
 namespace Jal
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section constraints
 
 -- Generated Lean code for chip JalChip

@@ -4,6 +4,9 @@ import SP1Operations.Reader.ITypeReader
 
 namespace Jalr
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section constraints
 
 -- Generated Lean code for chip JalrChip

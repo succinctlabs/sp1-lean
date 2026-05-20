@@ -5,14 +5,14 @@ import SP1Operations.Operation.U16MSBOperation.Constraints
 namespace U16MSBOperation
 
 /-- The `Range` constraint emits a `.val < 65536` shape via
-`SP1Constraint.toProp_poly`, so this iff states the bound at the `ℕ`
+`SP1Constraint.toProp`, so this iff states the bound at the `ℕ`
 level rather than the field level. -/
 lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     [Fact (2 ^ 17 < p)]
   {a : ZMod p}
   {cols : U16MSBOperation (ZMod p)}
   {is_real : ZMod p} :
-  List.Forall SP1Constraint.toProp_poly (constraints a cols is_real) ↔
+  List.Forall SP1Constraint.toProp (constraints a cols is_real) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (cols.msb = 0 ∨ cols.msb = 1) ∧
     (¬is_real = 0 → (2 * a - cols.msb * 65536).val < 65536)
@@ -26,7 +26,7 @@ lemma spec_poly
   {a : ZMod p}
   {cols : U16MSBOperation (ZMod p)}
   (h_a_isU16 : a.val < 65536) :
-  List.Forall SP1Constraint.toProp_poly (constraints a cols 1) →
+  List.Forall SP1Constraint.toProp (constraints a cols 1) →
     cols.msb = if a.val ≥ 32768 then 1 else 0 := by
   have hp_lt : 2 ^ 17 < p := hp17.out
   have hp_neZero : NeZero p := ⟨by omega⟩
@@ -60,7 +60,7 @@ lemma spec.U64_poly
   {w : Word (ZMod p)}
   {cols : U16MSBOperation (ZMod p)}
   (h_w_isU64 : w.isU64_poly) :
-  List.Forall SP1Constraint.toProp_poly (constraints w[3] cols 1) →
+  List.Forall SP1Constraint.toProp (constraints w[3] cols 1) →
     cols.msb = if w.isNegative_poly then 1 else 0 := by
   intro h
   have h_w3_lt : w[3].val < 65536 := h_w_isU64 3
@@ -76,7 +76,7 @@ lemma spec.gen_poly
   {cols : U16MSBOperation (ZMod p)}
   {is_real : ZMod p}
   (h_a_isU16 : a.val < 65536) :
-  List.Forall SP1Constraint.toProp_poly (constraints a cols is_real) →
+  List.Forall SP1Constraint.toProp (constraints a cols is_real) →
     is_real = 1 →
       cols.msb = if a.val ≥ 32768 then 1 else 0 := by
   intros h hir

@@ -22,7 +22,7 @@ Formal verification in Lean 4 that SP1 Hypercube's AIR constraints correctly imp
   - `. <tac>` bullets → `· <tac>` (U+00B7). Only at bullet position; never inside expressions like `Foo.bar`.
   - `2^N` → `2 ^ N` (mathlib spacing). `{ a b c : T }` → `{a b c : T}`.
   - Blank lines inside a `by ...` block or any `set_option ... in` wrapped command trigger `linter.style.emptyLine` — delete them.
-  - Already disabled globally in `lakefile.toml`: `linter.flexible`, `linter.style.longLine`, `linter.unusedSimpArgs`. Per-file disables for `linter.style.multiGoal` in 12 files with imbalanced-goal-tree proofs (DivRem/Constraints + DivRem/{Common,DivRem,DivuRemu,DivwRemw,DivuwRemuw}, ShiftRight/Constraints, ShiftLeft/Constraints, Mul/Constraints, MulOperation/Constraints, BitwiseU16Operation, LtOperationSigned).
+  - Already disabled globally in `lakefile.toml`: `linter.flexible`, `linter.unusedSimpArgs`. Per-file disables for `linter.style.multiGoal` in 12 files with imbalanced-goal-tree proofs (DivRem/Constraints + DivRem/{Common,DivRem,DivuRemu,DivwRemw,DivuwRemuw}, ShiftRight/Constraints, ShiftLeft/Constraints, Mul/Constraints, MulOperation/Constraints, BitwiseU16Operation, LtOperationSigned). `linter.style.longLine` is enabled globally but every Lean source file with a hand-written `have h : T := by …` or large nested struct expression that doesn't wrap cleanly carries a file-level `set_option linter.style.longLine false` near the top (paired with `set_option linter.style.setOption false`). The 38 `Constraints.lean` files inherit the same pragma above the `section constraints` splice — `update_constraints.py` only edits between the markers, so the pragma survives regeneration.
 
 ## Architecture
 

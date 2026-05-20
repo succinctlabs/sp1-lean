@@ -10,7 +10,11 @@ import SP1Chips.ShiftRight.Sraw
 open LeanRV64D.Functions
 open BitVec
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace ShiftRight
+
 
 variable
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
@@ -21,8 +25,8 @@ variable
 -- columns; the chip's constraints determine which Sail spec those columns implement.
 def sp1_shift_right : SailM Unit := do
   let op_a := sp1_op_a_poly Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]])
 
 end ShiftRight
 
@@ -56,7 +60,7 @@ theorem correct_srl
   have ⟨h6_lt, h14_lt, h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, _h_imm1, _h_a0_zeros⟩ :=
     bounds_poly Main cstrs h_real
   have h21_lt : Main[21].val < 32 := h_imm0_op_c_lt eq_imm
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h21_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
@@ -68,14 +72,14 @@ theorem correct_srl
   have hp : 2 ^ 17 < p := Fact.out
   by_cases h_is_op_a_0 : Main[6] = 0
   · simp_all
-    have h_shift_zero : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] >>>
-        ((Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]]).toNat % 64) :
+    have h_shift_zero : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] >>>
+        ((Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]]).toNat % 64) :
         BitVec 64) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -85,7 +89,7 @@ theorem correct_srl
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 
@@ -123,7 +127,7 @@ theorem correct_srli
   obtain ⟨e_25, h_26, h_27, h_28, h_25_lt_64_via_sr, _h_25_lt_32_via_sw⟩ := h_imm1 eq_imm
   have h_25_lt_64 : Main[25].val < 64 := h_25_lt_64_via_sr (Or.inl eq_srl)
   have h_21_lt_64 : Main[21].val < 64 := by rw [e_25]; exact h_25_lt_64
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
@@ -145,14 +149,14 @@ theorem correct_srli
   rw [show rop_of_sop sop.SRLI = rop.SRL from rfl]
   by_cases h_is_op_a_0 : Main[6] = 0
   · simp_all
-    have h_shift_zero : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] >>>
-        ((Word.toBitVec64_poly (#v[Main[25], 0, 0, 0] : Word (ZMod p))).toNat % 64) :
+    have h_shift_zero : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] >>>
+        ((Word.toBitVec64 (#v[Main[25], 0, 0, 0] : Word (ZMod p))).toNat % 64) :
         BitVec 64) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -161,7 +165,7 @@ theorem correct_srli
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 
@@ -197,7 +201,7 @@ theorem correct_sra
   have ⟨h6_lt, h14_lt, h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, _h_imm1, _h_a0_zeros⟩ :=
     bounds_poly Main cstrs h_real
   have h21_lt : Main[21].val < 32 := h_imm0_op_c_lt eq_imm
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h21_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
@@ -209,13 +213,13 @@ theorem correct_sra
   have hp : 2 ^ 17 < p := Fact.out
   by_cases h_is_op_a_0 : Main[6] = 0
   · simp_all
-    have h_shift_zero : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).sshiftRight
-        ((Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]]).toNat % 64) = 0#64 := by
+    have h_shift_zero : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).sshiftRight
+        ((Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]]).toNat % 64) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -225,7 +229,7 @@ theorem correct_sra
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 
@@ -263,7 +267,7 @@ theorem correct_srai
   obtain ⟨e_25, h_26, h_27, h_28, h_25_lt_64_via_sr, _h_25_lt_32_via_sw⟩ := h_imm1 eq_imm
   have h_25_lt_64 : Main[25].val < 64 := h_25_lt_64_via_sr (Or.inr eq_sra)
   have h_21_lt_64 : Main[21].val < 64 := by rw [e_25]; exact h_25_lt_64
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
@@ -285,13 +289,13 @@ theorem correct_srai
   rw [show rop_of_sop sop.SRAI = rop.SRA from rfl]
   by_cases h_is_op_a_0 : Main[6] = 0
   · simp_all
-    have h_shift_zero : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).sshiftRight
-        ((Word.toBitVec64_poly (#v[Main[25], 0, 0, 0] : Word (ZMod p))).toNat % 64) = 0#64 := by
+    have h_shift_zero : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).sshiftRight
+        ((Word.toBitVec64 (#v[Main[25], 0, 0, 0] : Word (ZMod p))).toNat % 64) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -300,7 +304,7 @@ theorem correct_srai
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 
@@ -336,7 +340,7 @@ theorem correct_srlw
   have ⟨h6_lt, h14_lt, h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, _h_imm1, _h_a0_zeros⟩ :=
     bounds_poly Main cstrs h_real
   have h21_lt : Main[21].val < 32 := h_imm0_op_c_lt eq_imm
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h21_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
@@ -353,10 +357,10 @@ theorem correct_srlw
         ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly >>>
           (((Word.low_poly (#v[Main[25], Main[26], Main[27], Main[28]] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -365,7 +369,7 @@ theorem correct_srlw
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 
@@ -403,7 +407,7 @@ theorem correct_srliw
   obtain ⟨e_25, h_26, h_27, h_28, _h_25_lt_64_via_sr, h_25_lt_32_via_sw⟩ := h_imm1 eq_imm
   have h_25_lt_32 : Main[25].val < 32 := h_25_lt_32_via_sw (Or.inl eq_srlw)
   have h_21_lt_32 : Main[21].val < 32 := by rw [e_25]; exact h_25_lt_32
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
@@ -429,10 +433,10 @@ theorem correct_srliw
         ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly >>>
           (((Word.low_poly (#v[Main[25], (0 : ZMod p), 0, 0] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -441,7 +445,7 @@ theorem correct_srliw
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 
@@ -477,7 +481,7 @@ theorem correct_sraw
   have ⟨h6_lt, h14_lt, h_imm0_op_c_lt, h_pc_lt, is_U64_b, is_U64_c, _h_imm1, _h_a0_zeros⟩ :=
     bounds_poly Main cstrs h_real
   have h21_lt : Main[21].val < 32 := h_imm0_op_c_lt eq_imm
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h21_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
@@ -494,10 +498,10 @@ theorem correct_sraw
         ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly.sshiftRight
           (((Word.low_poly (#v[Main[25], Main[26], Main[27], Main[28]] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -506,7 +510,7 @@ theorem correct_sraw
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 
@@ -544,7 +548,7 @@ theorem correct_sraiw
   obtain ⟨e_25, h_26, h_27, h_28, _h_25_lt_64_via_sr, h_25_lt_32_via_sw⟩ := h_imm1 eq_imm
   have h_25_lt_32 : Main[25].val < 32 := h_25_lt_32_via_sw (Or.inr eq_sraw)
   have h_21_lt_32 : Main[21].val < 32 := by rw [e_25]; exact h_25_lt_32
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
     List.Forall, U16MSBOperation.constraints, CPUState.constraints, ALUTypeReader.constraints,
     h6_lt, h14_lt, h_real, eq_imm] at state_cstrs
   obtain ⟨read_pc, read_op_a, read_op_b⟩ := state_cstrs
@@ -570,10 +574,10 @@ theorem correct_sraiw
         ((Word.low_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p))).toBitVec32_poly.sshiftRight
           (((Word.low_poly (#v[Main[25], (0 : ZMod p), 0, 0] : Word (ZMod p))).toBitVec32_poly).toNat % 32)) = 0#64 := by
       rw [← spec_eq]
-      simp [Word.toBitVec64_poly, Word.toNat_poly_def, ZMod.val_zero]
+      simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
     rw [if_pos h_shift_zero]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   · simp_all
     have h6_val : Main[6].val ≠ 0 := by
@@ -582,7 +586,7 @@ theorem correct_sraiw
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp_all [bitVecToRegidxVal]
 

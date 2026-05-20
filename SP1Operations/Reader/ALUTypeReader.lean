@@ -4,6 +4,8 @@ import SP1Operations.Reader.ALUTypeReader.Constraints
 
 namespace ALUTypeReader
 
+set_option linter.style.longLine false
+
 attribute [-simp] Opcode.trusted_instr_poly
 
 set_option linter.style.setOption false
@@ -21,7 +23,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     {cols : ALUTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p}
     (h_eq : is_trusted = is_real) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (is_real = 0 → cols.imm_c = 0) ∧
     (¬is_real = 0 →
@@ -64,7 +66,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     change (0 : ZMod p).val < (256 : ZMod p).val; simp
   have h0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
     change (0 : ZMod p).val < (65536 : ZMod p).val; simp
-  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly, h16, h0_lt_256, h0_lt_65536]
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp, h16, h0_lt_256, h0_lt_65536]
   intros h_is_real
   rcases h_is_real with h | h
   · simp [h, and_assoc]
@@ -88,7 +90,7 @@ lemma allHold_constraints_iff_is_real_poly
     {cols : ALUTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p}
     (h : is_real = 1) (h_trusted : is_trusted = is_real) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
     cols.op_a < (32 : ZMod p) ∧
     cols.op_b < (65536 : ZMod p) ∧

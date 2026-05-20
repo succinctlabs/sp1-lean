@@ -1,7 +1,11 @@
 import SP1Foundations
 import SP1Chips.Branch.Constraints
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Branch
+
 
 open Sail SailState BitVec LeanRV64D.Functions
 
@@ -18,7 +22,7 @@ def sp1_op_b : BitVec 5 := BitVec.ofNat 5 Main[14].val
 def sp1_imm : BitVec 13 := BitVec.ofNat 13 Main[21].val
 
 def sp1_branch : SailM ExecutionResult := do
-  writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], 0])
+  writeReg Register.nextPC (Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0])
   pure RETIRE_SUCCESS
 
 namespace BEQ
@@ -58,13 +62,13 @@ theorem correct_beq
   have h40_lt : (40 : ℕ) < p := by omega
   have h40_val : (40 : ZMod p).val = 40 := ZMod.val_natCast_of_lt h40_lt
   -- simplify reader constraints (BEQ -> opcode 40)
-  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp_poly,
+  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
     h_is_beq, h_29, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, h40_val] at reader_cstrs
   -- bounds from reader cstrs
   have op_a_is_u64 : Word.isU64_poly #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
-  let op_a_val := Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]
-  let op_b_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+  let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
+  let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
   have h6_zmod : Main[6] < (32 : ZMod p) := by simp_all only
   have h14_zmod : Main[14] < (32 : ZMod p) := by simp_all only
   have h6 : Main[6].val < 32 := by
@@ -109,7 +113,7 @@ theorem correct_beq
   -- with `BV.eq ↔ flags-zero-quad`, breaking the bridge's expected shape).
   have spec_lt_unsigned := spec_lt.1 rfl
   -- state cstrs: extract PC read + op_a/op_b reads
-  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp,
     List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints,
     LtOperationSigned.constraints, LtOperationUnsigned.constraints,
     U16MSBOperation.constraints, U16CompareOperation.constraints,
@@ -129,13 +133,13 @@ theorem correct_beq
   -- under isU64_poly bounds.
   obtain ⟨h_eq_iff, h_neq_iff, _h_lt_ite⟩ := spec_lt_unsigned
   have h_BV_to_Word :
-      Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]] =
-        Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] →
+      Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]] =
+        Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] →
       (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) =
         #v[Main[15], Main[16], Main[17], Main[18]] := by
     intro h
-    have h_a := Word.toBitVec64_poly_toNat_poly op_a_is_u64
-    have h_b := Word.toBitVec64_poly_toNat_poly op_b_is_u64
+    have h_a := Word.toBitVec64_toNat_poly op_a_is_u64
+    have h_b := Word.toBitVec64_toNat_poly op_b_is_u64
     have h_nat : Word.toNat_poly (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) =
         Word.toNat_poly #v[Main[15], Main[16], Main[17], Main[18]] := by
       rw [← h_a, ← h_b, h]
@@ -249,9 +253,9 @@ theorem correct_beq
       · exact absurd h h_65_ne
       · right; exact h
     have h_addr_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
             BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       branch_addr_eq_poly Main h_sign_extend h_pc_0 h_pc_1 h_pc_2
         h_imm_0 h_imm_1 h_imm_2 h_imm_3 h25 h26 h27 h_limb0' h_limb1' h_limb2' h_limb3'
     rw [h_addr_eq]
@@ -260,7 +264,7 @@ theorem correct_beq
     have h_word_ne : ¬ (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) =
         #v[Main[15], Main[16], Main[17], Main[18]] := by
       intro h_word_eq; apply h_eq
-      exact congr_arg Word.toBitVec64_poly h_word_eq
+      exact congr_arg Word.toBitVec64 h_word_eq
     have h_flags_one : Main[36] + Main[37] + Main[38] + Main[39] = 1 := h_neq_iff.mp h_word_ne
     have h_is_branching : Main[34] = 0 := by
       have chip_tmp := chip_cstrs
@@ -281,8 +285,8 @@ theorem correct_beq
     have h26 : Main[26].val < 65536 := h_bound_checks.2.1
     have h27 : Main[27].val < 65536 := h_bound_checks.2.2
     have h_pc4_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       pc_plus_4_eq_poly_chip Main h_pc_0 h_pc_1 h_pc_2 h25 h26 h27
         h_limb0 h_limb1 h_limb2 h_limb3
     rw [h_pc4_eq]
@@ -323,12 +327,12 @@ theorem correct_bne
   have h65_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
   have h41_lt : (41 : ℕ) < p := by omega
   have h41_val : (41 : ZMod p).val = 41 := ZMod.val_natCast_of_lt h41_lt
-  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp_poly,
+  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
     h_is_bne, h_28, h_30, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, h41_val] at reader_cstrs
   have op_a_is_u64 : Word.isU64_poly #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
-  let op_a_val := Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]
-  let op_b_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+  let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
+  let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
   have h6_zmod : Main[6] < (32 : ZMod p) := by simp_all only
   have h14_zmod : Main[14] < (32 : ZMod p) := by simp_all only
   have h6 : Main[6].val < 32 := by
@@ -367,7 +371,7 @@ theorem correct_bne
   clear lt_cstrs
   have spec_lt_unsigned := spec_lt.1 rfl
   -- state cstrs
-  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp,
     List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints,
     LtOperationSigned.constraints, LtOperationUnsigned.constraints,
     U16MSBOperation.constraints, U16CompareOperation.constraints,
@@ -383,13 +387,13 @@ theorem correct_bne
   simp [op_a, sp1_op_a, h_op_a_read, op_b, sp1_op_b, h_op_b_read]
   obtain ⟨h_eq_iff, h_neq_iff, _h_lt_ite⟩ := spec_lt_unsigned
   have h_BV_to_Word :
-      Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]] =
-        Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] →
+      Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]] =
+        Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] →
       (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) =
         #v[Main[15], Main[16], Main[17], Main[18]] := by
     intro h
-    have h_a := Word.toBitVec64_poly_toNat_poly op_a_is_u64
-    have h_b := Word.toBitVec64_poly_toNat_poly op_b_is_u64
+    have h_a := Word.toBitVec64_toNat_poly op_a_is_u64
+    have h_b := Word.toBitVec64_toNat_poly op_b_is_u64
     have h_nat : Word.toNat_poly (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) =
         Word.toNat_poly #v[Main[15], Main[16], Main[17], Main[18]] := by
       rw [← h_a, ← h_b, h]
@@ -426,7 +430,7 @@ theorem correct_bne
     have h_word_ne : ¬ (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) =
         #v[Main[15], Main[16], Main[17], Main[18]] := by
       intro h_word_eq; apply h_eq
-      exact congr_arg Word.toBitVec64_poly h_word_eq
+      exact congr_arg Word.toBitVec64 h_word_eq
     have h_flags_one : Main[36] + Main[37] + Main[38] + Main[39] = 1 := h_neq_iff.mp h_word_ne
     have h_is_branching : Main[34] = 1 := by
       clear *- h_flags_one chip_cstrs h_is_bne h_28 h_30 h_31 h_32 h_33
@@ -495,9 +499,9 @@ theorem correct_bne
       · exact absurd h h_65_ne
       · right; exact h
     have h_addr_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
             BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       branch_addr_eq_poly Main h_sign_extend h_pc_0 h_pc_1 h_pc_2
         h_imm_0 h_imm_1 h_imm_2 h_imm_3 h25 h26 h27 h_limb0' h_limb1' h_limb2' h_limb3'
     rw [h_addr_eq]
@@ -518,9 +522,9 @@ theorem correct_bne
     simp [h_is_branching] at chip_cstrs
     -- Bridge h_word_eq (Word equality) to BV equality for the if-then-else collapse.
     have h_BV_eq :
-        Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]] =
-          Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] :=
-      congr_arg Word.toBitVec64_poly h_word_eq
+        Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]] =
+          Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] :=
+      congr_arg Word.toBitVec64 h_word_eq
     simp [h_BV_eq]
     obtain ⟨h_limb0, h_limb1, h_limb2, h_limb3, h_bound_checks⟩ := chip_cstrs
     have h14_lt : (14 : ℕ) < p := by omega
@@ -534,8 +538,8 @@ theorem correct_bne
     have h26 : Main[26].val < 65536 := h_bound_checks.2.1
     have h27 : Main[27].val < 65536 := h_bound_checks.2.2
     have h_pc4_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       pc_plus_4_eq_poly_chip Main h_pc_0 h_pc_1 h_pc_2 h25 h26 h27
         h_limb0 h_limb1 h_limb2 h_limb3
     rw [h_pc4_eq]
@@ -576,12 +580,12 @@ theorem correct_blt
   have h65_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
   have h42_lt : (42 : ℕ) < p := by omega
   have h42_val : (42 : ZMod p).val = 42 := ZMod.val_natCast_of_lt h42_lt
-  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp_poly,
+  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
     h_is_blt, h_28, h_29, h_31, h_32, h_33, Opcode.ofNat, Nat.ble, h42_val] at reader_cstrs
   have op_a_is_u64 : Word.isU64_poly #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
-  let op_a_val := Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]
-  let op_b_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+  let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
+  let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
   have h6_zmod : Main[6] < (32 : ZMod p) := by simp_all only
   have h14_zmod : Main[14] < (32 : ZMod p) := by simp_all only
   have h6 : Main[6].val < 32 := by
@@ -622,11 +626,11 @@ theorem correct_blt
   -- BV.toInt ↔ Word.toInt_poly bridges
   have h_a_int : op_a_val.toInt =
       Word.toInt_poly (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toInt_poly op_a_is_u64
+    Word.toBitVec64_toInt_poly op_a_is_u64
   have h_b_int : op_b_val.toInt =
       Word.toInt_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toInt_poly op_b_is_u64
-  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp_poly,
+    Word.toBitVec64_toInt_poly op_b_is_u64
+  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp,
     List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints,
     LtOperationSigned.constraints, LtOperationUnsigned.constraints,
     U16MSBOperation.constraints, U16CompareOperation.constraints,
@@ -720,9 +724,9 @@ theorem correct_blt
       · exact absurd h h_65_ne
       · right; exact h
     have h_addr_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
             BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       branch_addr_eq_poly Main h_sign_extend h_pc_0 h_pc_1 h_pc_2
         h_imm_0 h_imm_1 h_imm_2 h_imm_3 h25 h26 h27 h_limb0' h_limb1' h_limb2' h_limb3'
     rw [h_addr_eq]
@@ -747,8 +751,8 @@ theorem correct_blt
     have h26 : Main[26].val < 65536 := h_bound_checks.2.1
     have h27 : Main[27].val < 65536 := h_bound_checks.2.2
     have h_pc4_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       pc_plus_4_eq_poly_chip Main h_pc_0 h_pc_1 h_pc_2 h25 h26 h27
         h_limb0 h_limb1 h_limb2 h_limb3
     rw [h_pc4_eq]
@@ -790,12 +794,12 @@ theorem correct_bge
   have h65_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
   have h43_lt : (43 : ℕ) < p := by omega
   have h43_val : (43 : ZMod p).val = 43 := ZMod.val_natCast_of_lt h43_lt
-  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp_poly,
+  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
     h_is_bge, h_28, h_29, h_30, h_32, h_33, Opcode.ofNat, Nat.ble, h43_val] at reader_cstrs
   have op_a_is_u64 : Word.isU64_poly #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
-  let op_a_val := Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]
-  let op_b_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+  let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
+  let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
   have h6_zmod : Main[6] < (32 : ZMod p) := by simp_all only
   have h14_zmod : Main[14] < (32 : ZMod p) := by simp_all only
   have h6 : Main[6].val < 32 := by
@@ -834,11 +838,11 @@ theorem correct_bge
   obtain ⟨_h_eq_iff, _h_neq_iff, h_lt_ite⟩ := spec_lt.2 rfl
   have h_a_int : op_a_val.toInt =
       Word.toInt_poly (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toInt_poly op_a_is_u64
+    Word.toBitVec64_toInt_poly op_a_is_u64
   have h_b_int : op_b_val.toInt =
       Word.toInt_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toInt_poly op_b_is_u64
-  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp_poly,
+    Word.toBitVec64_toInt_poly op_b_is_u64
+  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp,
     List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints,
     LtOperationSigned.constraints, LtOperationUnsigned.constraints,
     U16MSBOperation.constraints, U16CompareOperation.constraints,
@@ -855,14 +859,14 @@ theorem correct_bge
   rw [← h_a_int, ← h_b_int] at h_lt_ite
   by_cases h_ge : op_a_val.toInt ≥ op_b_val.toInt <;> simp only [op_a_val, op_b_val] at h_ge
   · -- branching arm: ge holds, so lt fails
-    have h_not_lt : ¬ ((Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
-                       (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt) :=
+    have h_not_lt : ¬ ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
+                       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toInt) :=
       Int.not_lt.mpr h_ge
     rw [if_neg h_not_lt] at h_lt_ite
     have h35 : Main[35] = 0 := h_lt_ite
     -- The goal's BGE if is `if b.toInt ≤ a.toInt then writeReg else pure_RETIRE` (GE form).
-    have h_le : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt ≤
-                (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt := h_ge
+    have h_le : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toInt ≤
+                (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toInt := h_ge
     simp [h_le]
     rw [run_readReg]
     simp only [show imm = BitVec.ofNat 13 Main[21].val from rfl]
@@ -937,20 +941,20 @@ theorem correct_bge
       · exact absurd h h_65_ne
       · right; exact h
     have h_addr_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
             BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       branch_addr_eq_poly Main h_sign_extend h_pc_0 h_pc_1 h_pc_2
         h_imm_0 h_imm_1 h_imm_2 h_imm_3 h25 h26 h27 h_limb0' h_limb1' h_limb2' h_limb3'
     rw [h_addr_eq]
   · -- non-branching arm: ¬ge, so lt holds
-    have h_lt : (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
-                (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt :=
+    have h_lt : (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toInt <
+                (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toInt :=
       Int.not_le.mp h_ge
     rw [if_pos h_lt] at h_lt_ite
     have h35 : Main[35] = 1 := h_lt_ite
-    have h_not_le : ¬ ((Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toInt ≤
-                       (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toInt) :=
+    have h_not_le : ¬ ((Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toInt ≤
+                       (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toInt) :=
       Int.not_le.mpr h_lt
     simp [h_not_le]
     have h_is_branching : Main[34] = 0 := by
@@ -970,8 +974,8 @@ theorem correct_bge
     have h26 : Main[26].val < 65536 := h_bound_checks.2.1
     have h27 : Main[27].val < 65536 := h_bound_checks.2.2
     have h_pc4_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       pc_plus_4_eq_poly_chip Main h_pc_0 h_pc_1 h_pc_2 h25 h26 h27
         h_limb0 h_limb1 h_limb2 h_limb3
     rw [h_pc4_eq]
@@ -1013,12 +1017,12 @@ theorem correct_bltu
   have h65_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
   have h44_lt : (44 : ℕ) < p := by omega
   have h44_val : (44 : ZMod p).val = 44 := ZMod.val_natCast_of_lt h44_lt
-  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp_poly,
+  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
     h_is_bltu, h_28, h_29, h_30, h_31, h_33, Opcode.ofNat, Nat.ble, h44_val] at reader_cstrs
   have op_a_is_u64 : Word.isU64_poly #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
-  let op_a_val := Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]
-  let op_b_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+  let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
+  let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
   have h6_zmod : Main[6] < (32 : ZMod p) := by simp_all only
   have h14_zmod : Main[14] < (32 : ZMod p) := by simp_all only
   have h6 : Main[6].val < 32 := by
@@ -1057,11 +1061,11 @@ theorem correct_bltu
   obtain ⟨_h_eq_iff, _h_neq_iff, h_lt_ite⟩ := spec_lt.1 rfl
   have h_a_nat : op_a_val.toNat =
       Word.toNat_poly (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toNat_poly op_a_is_u64
+    Word.toBitVec64_toNat_poly op_a_is_u64
   have h_b_nat : op_b_val.toNat =
       Word.toNat_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toNat_poly op_b_is_u64
-  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp_poly,
+    Word.toBitVec64_toNat_poly op_b_is_u64
+  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp,
     List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints,
     LtOperationSigned.constraints, LtOperationUnsigned.constraints,
     U16MSBOperation.constraints, U16CompareOperation.constraints,
@@ -1154,9 +1158,9 @@ theorem correct_bltu
       · exact absurd h h_65_ne
       · right; exact h
     have h_addr_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
             BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       branch_addr_eq_poly Main h_sign_extend h_pc_0 h_pc_1 h_pc_2
         h_imm_0 h_imm_1 h_imm_2 h_imm_3 h25 h26 h27 h_limb0' h_limb1' h_limb2' h_limb3'
     rw [h_addr_eq]
@@ -1181,8 +1185,8 @@ theorem correct_bltu
     have h26 : Main[26].val < 65536 := h_bound_checks.2.1
     have h27 : Main[27].val < 65536 := h_bound_checks.2.2
     have h_pc4_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       pc_plus_4_eq_poly_chip Main h_pc_0 h_pc_1 h_pc_2 h25 h26 h27
         h_limb0 h_limb1 h_limb2 h_limb3
     rw [h_pc4_eq]
@@ -1225,12 +1229,12 @@ theorem correct_bgeu
   have h65_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
   have h45_lt : (45 : ℕ) < p := by omega
   have h45_val : (45 : ZMod p).val = 45 := ZMod.val_natCast_of_lt h45_lt
-  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp_poly,
+  simp [ITypeReaderImmutable.constraints, SP1Constraint.toProp,
     h_is_bgeu, h_28, h_29, h_30, h_31, h_32, Opcode.ofNat, Nat.ble, h45_val] at reader_cstrs
   have op_a_is_u64 : Word.isU64_poly #v[Main[7], Main[8], Main[9], Main[10]] := by simp_all only
   have op_b_is_u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by simp_all only
-  let op_a_val := Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]
-  let op_b_val := Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]
+  let op_a_val := Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]
+  let op_b_val := Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]
   have h6_zmod : Main[6] < (32 : ZMod p) := by simp_all only
   have h14_zmod : Main[14] < (32 : ZMod p) := by simp_all only
   have h6 : Main[6].val < 32 := by
@@ -1269,11 +1273,11 @@ theorem correct_bgeu
   obtain ⟨_h_eq_iff, _h_neq_iff, h_lt_ite⟩ := spec_lt.1 rfl
   have h_a_nat : op_a_val.toNat =
       Word.toNat_poly (#v[Main[7], Main[8], Main[9], Main[10]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toNat_poly op_a_is_u64
+    Word.toBitVec64_toNat_poly op_a_is_u64
   have h_b_nat : op_b_val.toNat =
       Word.toNat_poly (#v[Main[15], Main[16], Main[17], Main[18]] : Word (ZMod p)) :=
-    Word.toBitVec64_poly_toNat_poly op_b_is_u64
-  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp_poly,
+    Word.toBitVec64_toNat_poly op_b_is_u64
+  simp [SP1ConstraintList.initialState_poly, Branch.constraints, SP1Constraint.toStateProp,
     List.Forall, CPUState.constraints, ITypeReaderImmutable.constraints,
     LtOperationSigned.constraints, LtOperationUnsigned.constraints,
     U16MSBOperation.constraints, U16CompareOperation.constraints,
@@ -1290,13 +1294,13 @@ theorem correct_bgeu
   rw [← h_a_nat, ← h_b_nat] at h_lt_ite
   by_cases h_ge : op_a_val.toNat ≥ op_b_val.toNat <;> simp only [op_a_val, op_b_val] at h_ge
   · -- branching arm: ge holds, so lt fails
-    have h_not_lt : ¬ ((Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toNat <
-                       (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
+    have h_not_lt : ¬ ((Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat <
+                       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat) := by
       omega
     rw [if_neg h_not_lt] at h_lt_ite
     have h35 : Main[35] = 0 := h_lt_ite
-    have h_le : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat ≤
-                (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toNat := h_ge
+    have h_le : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat ≤
+                (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat := h_ge
     simp [h_le]
     rw [run_readReg]
     simp only [show imm = BitVec.ofNat 13 Main[21].val from rfl]
@@ -1371,20 +1375,20 @@ theorem correct_bgeu
       · exact absurd h h_65_ne
       · right; exact h
     have h_addr_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
             BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       branch_addr_eq_poly Main h_sign_extend h_pc_0 h_pc_1 h_pc_2
         h_imm_0 h_imm_1 h_imm_2 h_imm_3 h25 h26 h27 h_limb0' h_limb1' h_limb2' h_limb3'
     rw [h_addr_eq]
   · -- non-branching arm: ¬ge, so lt holds
-    have h_lt : (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toNat <
-                (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat := by
+    have h_lt : (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat <
+                (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat := by
       omega
     rw [if_pos h_lt] at h_lt_ite
     have h35 : Main[35] = 1 := h_lt_ite
-    have h_not_le : ¬ ((Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat ≤
-                       (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]]).toNat) := by
+    have h_not_le : ¬ ((Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat ≤
+                       (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]]).toNat) := by
       omega
     simp [h_not_le]
     have h_is_branching : Main[34] = 0 := by
@@ -1404,8 +1408,8 @@ theorem correct_bgeu
     have h26 : Main[26].val < 65536 := h_bound_checks.2.1
     have h27 : Main[27].val < 65536 := h_bound_checks.2.2
     have h_pc4_eq :
-        Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
+        Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] + 4#64 =
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] :=
       pc_plus_4_eq_poly_chip Main h_pc_0 h_pc_1 h_pc_2 h25 h26 h27
         h_limb0 h_limb1 h_limb2 h_limb3
     rw [h_pc4_eq]

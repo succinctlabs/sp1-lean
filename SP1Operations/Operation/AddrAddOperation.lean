@@ -21,10 +21,10 @@ lemma allHold_constraints_iff_poly
       (cols.value[0].val < 65536) ∧
       (cols.value[1].val < 65536) ∧
       (cols.value[2].val < 65536) := by
-  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp]
 
 /-! Recipe: rewrite the BitVec equation goal via `← BitVec.toNat_inj,
-BitVec.toNat_add, Word.toBitVec64_poly_toNat_poly, Word.toNat_poly_def`,
+BitVec.toNat_add, Word.toBitVec64_toNat_poly, Word.toNat_poly_def`,
 get nat carry equations via `linear_combination * h65inv` + `limb_lift`,
 close with `omega`. We skip an explicit `cols_is_a_sum_b_poly`
 intermediate step because its `(...) % 2^64 = ...` type-level form was
@@ -58,7 +58,7 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 def spec_poly {p : ℕ} [NeZero p] (a b : Word (ZMod p)) (cols : AddrAddOperation (ZMod p)) : Prop :=
   let cols_word : Word (ZMod p) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
-  cols_word.isU64_poly ∧ cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly
+  cols_word.isU64_poly ∧ cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
 /-- Bare-`ℕ` close for the AddrAdd carry chain: omega over Nat limb equations.
 Accepts the full 4-limb form on the RHS (with `0 * 2 ^ 48` for the high limb)
@@ -83,7 +83,7 @@ set_option maxHeartbeats 16000000 in
 -- Carry-chain rearrangements + BitVec/Nat bridge run 4–8M; 16M leaves headroom.
 /-- Combines `isU64_poly` of the cols_word (low 3 limbs bounded, high
 limb is 0) with the BitVec equation
-`cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly`,
+`cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64`,
 the latter proved via the AddOperation-style carry chain. -/
 lemma spec_of_constraints_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p))
@@ -115,9 +115,9 @@ lemma spec_of_constraints_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   rw [← BitVec.toNat_inj, BitVec.toNat_add,
-      Word.toBitVec64_poly_toNat_poly h_isU64_v,
-      Word.toBitVec64_poly_toNat_poly hb,
-      Word.toBitVec64_poly_toNat_poly ha,
+      Word.toBitVec64_toNat_poly h_isU64_v,
+      Word.toBitVec64_toNat_poly hb,
+      Word.toBitVec64_toNat_poly ha,
       Word.toNat_poly_def, Word.toNat_poly_def, Word.toNat_poly_def]
   -- Reduce cols_word indices, but keep the `+ 0 * 2 ^ 48` term so the helper
   -- absorbs the closure with no extra simp leakage.

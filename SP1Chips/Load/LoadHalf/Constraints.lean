@@ -4,9 +4,13 @@ import SP1Operations.Operation.U16MSBOperation.Constraints
 import SP1Operations.Reader.ITypeReader.Constraints
 import SP1Operations.Reader.CPUState.Constraints
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Load
 
 namespace LoadHalf
+
 
 section constraints
 
@@ -117,8 +121,8 @@ set_option maxHeartbeats 800000 in
 -- Polymorphic counterpart of `allHold_constraints_iff_of_is_lh`.
 lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
     (h_is_lh : is_lh_poly Main) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    (List.Forall SP1Constraint.toProp
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[21], Main[22], Main[23], Main[24]]
         { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
@@ -127,12 +131,12 @@ lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
     Main[28] * (Main[26] + Main[27]) = 1 ∧
     ((Main[25] - 4 * Main[39] - 2 * Main[38]) * (8 : ZMod p)⁻¹).val <
       2 ^ ZMod.val (13 : ZMod p) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (U16MSBOperation.constraints Main[40] { msb := Main[41] } 1) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
         #v[Main[3], Main[4], Main[5]] 30
         #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
@@ -160,9 +164,9 @@ lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
   have : Main[42] = 1 := h_is_lh
   by_cases h43 : Main[43] = 0
   · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h43,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
   · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h43,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
     intros
     have h2 : (1 + 1 : ZMod p) ≠ 0 := by
       rw [show (1 + 1 : ZMod p) = (2 : ZMod p) from by norm_num]; exact val_2_ne_zero
@@ -172,8 +176,8 @@ set_option maxHeartbeats 800000 in
 -- Polymorphic counterpart of `allHold_constraints_iff_of_is_lhu`.
 lemma allHold_constraints_iff_of_is_lhu_poly (Main : Vector (ZMod p) 44)
     (h_is_lhu : is_lhu_poly Main) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    (List.Forall SP1Constraint.toProp
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[21], Main[22], Main[23], Main[24]]
         { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
@@ -182,12 +186,12 @@ lemma allHold_constraints_iff_of_is_lhu_poly (Main : Vector (ZMod p) 44)
     Main[28] * (Main[26] + Main[27]) = 1 ∧
     ((Main[25] - 4 * Main[39] - 2 * Main[38]) * (8 : ZMod p)⁻¹).val <
       2 ^ ZMod.val (13 : ZMod p) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (U16MSBOperation.constraints Main[40] { msb := Main[41] } 0) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
         #v[Main[3], Main[4], Main[5]] 33
         #v[Main[40], 65535 * Main[41], 65535 * Main[41], 65535 * Main[41]]
@@ -216,9 +220,9 @@ lemma allHold_constraints_iff_of_is_lhu_poly (Main : Vector (ZMod p) 44)
   have : Main[43] = 1 := h_is_lhu
   by_cases h42 : Main[42] = 0
   · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h42,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
   · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h42,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
     intros
     have h2 : (1 + 1 : ZMod p) ≠ 0 := by
       rw [show (1 + 1 : ZMod p) = (2 : ZMod p) from by norm_num]; exact val_2_ne_zero

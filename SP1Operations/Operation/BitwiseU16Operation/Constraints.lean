@@ -4,6 +4,9 @@ import SP1Operations.Operation.BitwiseU16Operation.Operation
 
 namespace BitwiseU16Operation
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section constraints
 
 @[irreducible] def constraints {F : Type} [Field F] [CoeHead F ℕ]

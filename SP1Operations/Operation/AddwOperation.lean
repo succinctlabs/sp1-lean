@@ -14,13 +14,13 @@ lemma allHold_constraints_iff_poly
     SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
       let carry0 : ZMod p := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
       let carry1 : ZMod p := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
-      List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
+      List.Forall SP1Constraint.toProp (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
       ((carry0 = 0 ∨ carry0 = 1) ∧
       (carry1 = 0 ∨ carry1 = 1) ∧
       (cols.value[0].val < 65536) ∧
       (cols.value[1].val < 65536)) := by
   simp [constraints, U16MSBOperation.constraints,
-        sub_eq_zero, SP1Constraint.toProp_poly]
+        sub_eq_zero, SP1Constraint.toProp]
   tauto
 
 /-- Per-limb Nat lift: same as `SubwOperation.limb_lift`. -/

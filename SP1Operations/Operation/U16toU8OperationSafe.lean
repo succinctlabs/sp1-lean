@@ -4,6 +4,9 @@ import SP1Operations.Operation.U16toU8OperationSafe.Constraints
 
 namespace U16toU8OperationSafe
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 /-- The auto-gen U8Range opcode produces field-level `<` (per the B.8
 finding on `constrain_poly_U8Range`); the proof needs an explicit
 `(0 : ZMod p) < (256 : ZMod p)` hypothesis. -/
@@ -12,7 +15,7 @@ lemma allHold_constraints_iff_poly
   (u16_values : (Vector (ZMod p) 4))
   (cols : U16toU8Operation (ZMod p))
   (is_real : ZMod p) :
-  List.Forall SP1Constraint.toProp_poly (constraints u16_values cols is_real).2 ↔
+  List.Forall SP1Constraint.toProp (constraints u16_values cols is_real).2 ↔
     (¬is_real = 0 → cols.low_bytes[0] < 256 ∧ ((u16_values[0] - cols.low_bytes[0]) * (256 : ZMod p)⁻¹) < 256) ∧
     (¬is_real = 0 → cols.low_bytes[1] < 256 ∧ ((u16_values[1] - cols.low_bytes[1]) * (256 : ZMod p)⁻¹) < 256) ∧
     (¬is_real = 0 → cols.low_bytes[2] < 256 ∧ ((u16_values[2] - cols.low_bytes[2]) * (256 : ZMod p)⁻¹) < 256) ∧
@@ -20,7 +23,7 @@ lemma allHold_constraints_iff_poly
   := by
   have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
     change (0 : ZMod p).val < (256 : ZMod p).val; simp
-  simp [constraints, SP1Constraint.toProp_poly, h0_lt_256]
+  simp [constraints, SP1Constraint.toProp, h0_lt_256]
 
 /-- Given the two `< 256` bounds (low byte and high byte after dividing
 by `256⁻¹`) in field-level form (matching the iff_poly RHS shape),
@@ -59,7 +62,7 @@ lemma spec.unsafe.return_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {u16_values : (Vector (ZMod p) 4)}
   {cols : U16toU8Operation (ZMod p)} :
-  List.Forall SP1Constraint.toProp_poly (constraints u16_values cols 1).2 →
+  List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     (U16toU8OperationUnsafe.constraints u16_values cols).1 = Word.toBWord_poly u16_values
   := by
     intro cstrs
@@ -96,7 +99,7 @@ lemma spec.return_poly
   {u16_values : (Vector (ZMod p) 4)}
   {cols : U16toU8Operation (ZMod p)}
   (is_real : ZMod p) :
-  List.Forall SP1Constraint.toProp_poly (constraints u16_values cols 1).2 →
+  List.Forall SP1Constraint.toProp (constraints u16_values cols 1).2 →
     (constraints u16_values cols is_real).1 = Word.toBWord_poly u16_values
   := by
     intro cstrs

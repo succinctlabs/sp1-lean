@@ -8,6 +8,8 @@ set_option linter.style.multiGoal false
 -- Unused variables expected because many proofs are currently stopped.
 set_option linter.unusedVariables false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
+
 
 section sraw_poly
 
@@ -20,7 +22,7 @@ mirrors `spec.srlw_common_poly` with an msb_b case split (since under SRAW,
 `w_msb_b` doesn't force msb_b = 0; msb_b is determined by U16MSBOperation on b1). -/
 private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
     (cstrs : (constraints Main).allHold_poly) (eq_sraw : Main[67] = 1) :
-    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
       execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[25], Main[26], Main[27], Main[28]] .SRAW := by
   -- Setup (mirrors spec.srlw_common_poly prologue).
@@ -38,7 +40,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
   obtain ⟨_, _, _, sop_4⟩ := single_op_poly Main cstrs
   have ⟨h_no_srl, h_no_sra, h_no_srlw⟩ := sop_4 eq_sraw
   -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   -- Set up local names.
   set b0 := Main[15]; set b1 := Main[16]; set b2 := Main[17]; set b3 := Main[18]
@@ -671,7 +673,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
           simp [h, h_msb]
         · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
           BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
         have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
@@ -830,7 +832,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
           simp [h, h_msb]
         · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
           BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
         have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
@@ -1079,7 +1081,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
           simp [h, h_msb]
         · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
           BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
         have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
@@ -1236,7 +1238,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
           simp [h, h_msb]
         · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
           BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
         have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
@@ -1349,14 +1351,14 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
 
 lemma spec.sraw_poly (Main : Vector (ZMod p) 69) (h : is_sraw_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRAW :=
   fun cstrs => spec.sraw_common_poly Main cstrs h.1
 
 lemma spec.sraiw_poly (Main : Vector (ZMod p) 69) (h : is_sraiw_poly Main) :
     (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
         execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRAW :=
   fun cstrs => spec.sraw_common_poly Main cstrs h.1

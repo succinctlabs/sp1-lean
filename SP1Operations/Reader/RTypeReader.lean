@@ -3,6 +3,9 @@ import SP1Operations.Reader.RTypeReader.Constraints
 
 namespace RTypeReader
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 attribute [-simp] Opcode.trusted_instr_poly
 
 /-- RHS uses `.val`-level Nat-arithmetic for `Range`-opcode-derived bounds
@@ -16,7 +19,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     {op_a_write_value : Word (ZMod p)}
     {cols : RTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p} :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (¬is_trusted = 0 →
       Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
@@ -47,7 +50,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     change (0 : ZMod p).val < (256 : ZMod p).val; simp
   have h0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
     change (0 : ZMod p).val < (65536 : ZMod p).val; simp
-  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly, h16, h0_lt_256, h0_lt_65536]
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp, h16, h0_lt_256, h0_lt_65536]
   intro h_is_real
   rcases h_is_real with h_is_real | h_is_real
   · simp [h_is_real]
@@ -70,7 +73,7 @@ lemma allHold_constraints_iff_is_real_poly
     {cols : RTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p}
     (h : is_real = 1) (h_trusted : is_trusted = 1) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c 0 0 0 0 0 ∧
     cols.op_a < (32 : ZMod p) ∧
     cols.op_b < (65536 : ZMod p) ∧

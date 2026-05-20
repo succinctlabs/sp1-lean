@@ -9,6 +9,9 @@ open LeanRV64D.Functions BitVec
 
 namespace Sub
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 variable
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (Main : Vector (ZMod p) 33)
@@ -27,8 +30,8 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
 def sp1_sub : SailM Unit := do
   let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 open Sail
 
@@ -58,7 +61,7 @@ theorem correct_sub
     have h21 : Main[21].val < 32 := by
       have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
       rwa [h32] at this
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, SubOperation.constraints, CPUState.constraints, RTypeReader.constraints,
       h6, h14, h21, h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
@@ -79,7 +82,7 @@ theorem correct_sub
         intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
-      -- Bridge `execute_RTYPE_pure` to the toBitVec64_poly subtraction form
+      -- Bridge `execute_RTYPE_pure` to the toBitVec64 subtraction form
       rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
       simp only [execute_RTYPE_pure_w_poly]
       -- Bridge `+ 4#64` to limb-0 addition via the generic helper.
@@ -89,7 +92,7 @@ theorem correct_sub
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl, ← is_sub]
       simp [bitVecToRegidxVal]
 

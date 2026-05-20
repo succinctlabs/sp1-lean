@@ -9,6 +9,8 @@ set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 set_option linter.style.multiGoal false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
+
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
@@ -103,9 +105,9 @@ lemma sll_within_byte_shift_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < 
     (h_b1 : b1 = hl1 * ((N : ℕ) : ZMod p) + ll1)
     (h_b2 : b2 = hl2 * ((N : ℕ) : ZMod p) + ll2)
     (h_b3 : b3 = hl3 * ((N : ℕ) : ZMod p) + ll3) :
-    (Word.toBitVec64_poly #v[ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1,
+    (Word.toBitVec64 #v[ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1,
                               ll3 * v0123 + hl2]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M % 2 ^ 64 := by
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M % 2 ^ 64 := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
   have h_N_lt_p : N < p := by nlinarith [h_MN]
@@ -159,8 +161,8 @@ lemma sll_within_byte_shift_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < 
     rw [ZMod.val_add_of_lt]
     · rw [h_ll3_mul]
     · rw [h_ll3_mul]; nlinarith [lt_ll3, lt_lh2, h_MN]
-  -- Expand toBitVec64_poly.toNat and substitute.
-  unfold Word.toBitVec64_poly
+  -- Expand toBitVec64.toNat and substitute.
+  unfold Word.toBitVec64
   simp only [BitVec.toNat_ofNat, Word.toNat_poly_def, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
   rw [h_ll0_mul, h_compose1_val, h_compose2_val, h_compose3_val,
@@ -211,9 +213,9 @@ lemma sll_close_cb4cb5_zero_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < 
     (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123)
     (h_b2_dec : b2 * v0123 = hl2 * ((65536 : ℕ) : ZMod p) + ll2 * v0123)
     (h_b3_dec : b3 * v0123 = hl3 * ((65536 : ℕ) : ZMod p) + ll3 * v0123) :
-    (Word.toBitVec64_poly #v[ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1,
+    (Word.toBitVec64 #v[ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1,
                               ll3 * v0123 + hl2]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]
         <<< (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val).toNat
         := by
   -- Push `BitVec.toNat_shiftLeft` rewrite into this helper's olean (single kernel walk over
@@ -247,8 +249,8 @@ lemma sll_close_cb4cb5_zero_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < 
   have h_b3' := cancel_mul_65536_poly hdvd hpos h_b3_dec
   rw [h_v_val] at h_b0' h_b1' h_b2' h_b3'
   -- Bridge `<<< S` to `* M`.
-  rw [show (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<< S
-          = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M from by
+  rw [show (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat <<< S
+          = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M from by
         rw [Nat.shiftLeft_eq, h_M_eq]]
   -- Apply within-byte-shift helper. Replace `65536/M` in h_b_j' with `N`.
   have h_div_eq : (65536 : ℕ) / M = N := by
@@ -282,8 +284,8 @@ lemma sll_within_byte_shift_3_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 
     (h_b1 : b1 = hl1 * ((N : ℕ) : ZMod p) + ll1)
     (h_b2 : b2 = hl2 * ((N : ℕ) : ZMod p) + ll2)
     (h_b3 : b3 = hl3 * ((N : ℕ) : ZMod p) + ll3) :
-    (Word.toBitVec64_poly #v[0, 0, 0, ll0 * v0123]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M * 2 ^ 48 % 2 ^ 64 := by
+    (Word.toBitVec64 #v[0, 0, 0, ll0 * v0123]).toNat
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M * 2 ^ 48 % 2 ^ 64 := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
   have h_N_lt_p : N < p := by nlinarith [h_MN]
@@ -318,8 +320,8 @@ lemma sll_within_byte_shift_3_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 
     rw [h_b3, ZMod.val_add_of_lt]
     · rw [h_hl3_mul]
     · rw [h_hl3_mul]; nlinarith [lt_ll3, lt_lh3, h_MN, h_NM]
-  -- Expand toBitVec64_poly.toNat for both sides.
-  unfold Word.toBitVec64_poly
+  -- Expand toBitVec64.toNat for both sides.
+  unfold Word.toBitVec64
   simp only [BitVec.toNat_ofNat, Word.toNat_poly_def, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero,
     zero_mul, zero_add]
@@ -350,8 +352,8 @@ lemma sll_within_byte_shift_2_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 
     (h_b1 : b1 = hl1 * ((N : ℕ) : ZMod p) + ll1)
     (h_b2 : b2 = hl2 * ((N : ℕ) : ZMod p) + ll2)
     (h_b3 : b3 = hl3 * ((N : ℕ) : ZMod p) + ll3) :
-    (Word.toBitVec64_poly #v[0, 0, ll0 * v0123, ll1 * v0123 + hl0]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M * 2 ^ 32 % 2 ^ 64 := by
+    (Word.toBitVec64 #v[0, 0, ll0 * v0123, ll1 * v0123 + hl0]).toNat
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M * 2 ^ 32 % 2 ^ 64 := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
   have h_N_lt_p : N < p := by nlinarith [h_MN]
@@ -389,7 +391,7 @@ lemma sll_within_byte_shift_2_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 
     rw [ZMod.val_add_of_lt]
     · rw [h_ll1_mul]
     · rw [h_ll1_mul]; nlinarith [lt_ll1, lt_lh0, h_MN]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   simp only [BitVec.toNat_ofNat, Word.toNat_poly_def, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero,
     zero_mul, zero_add]
@@ -418,8 +420,8 @@ lemma sll_within_byte_shift_1_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 
     (h_b1 : b1 = hl1 * ((N : ℕ) : ZMod p) + ll1)
     (h_b2 : b2 = hl2 * ((N : ℕ) : ZMod p) + ll2)
     (h_b3 : b3 = hl3 * ((N : ℕ) : ZMod p) + ll3) :
-    (Word.toBitVec64_poly #v[0, ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M * 2 ^ 16 % 2 ^ 64 := by
+    (Word.toBitVec64 #v[0, ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1]).toNat
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M * 2 ^ 16 % 2 ^ 64 := by
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
   have h_N_lt_p : N < p := by nlinarith [h_MN]
@@ -463,7 +465,7 @@ lemma sll_within_byte_shift_1_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 
     rw [ZMod.val_add_of_lt]
     · rw [h_ll2_mul]
     · rw [h_ll2_mul]; nlinarith [lt_ll2, lt_lh1, h_MN]
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   simp only [BitVec.toNat_ofNat, Word.toNat_poly_def, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero,
     zero_mul, zero_add]
@@ -511,8 +513,8 @@ lemma sll_close_cb4cb5_one_one_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17
     (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123)
     (h_b2_dec : b2 * v0123 = hl2 * ((65536 : ℕ) : ZMod p) + ll2 * v0123)
     (h_b3_dec : b3 * v0123 = hl3 * ((65536 : ℕ) : ZMod p) + ll3 * v0123) :
-    (Word.toBitVec64_poly #v[0, 0, 0, ll0 * v0123]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]
+    (Word.toBitVec64 #v[0, 0, 0, ll0 * v0123]).toNat
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]
         <<< (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val).toNat
         := by
   rw [BitVec.toNat_shiftLeft]
@@ -544,8 +546,8 @@ lemma sll_close_cb4cb5_one_one_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17
   have h_b3' := cancel_mul_65536_poly hdvd hpos h_b3_dec
   rw [h_v_val] at h_b0' h_b1' h_b2' h_b3'
   -- Bridge `<<< (S + 48)` to `* M * 2^48`.
-  rw [show (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<< (S + 48)
-          = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M * 2 ^ 48 from by
+  rw [show (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat <<< (S + 48)
+          = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M * 2 ^ 48 from by
         rw [Nat.shiftLeft_eq, h_M_eq, pow_add, ← Nat.mul_assoc]]
   -- Replace `65536/M` in h_b_j' with `N`.
   have h_div_eq : (65536 : ℕ) / M = N := by
@@ -596,8 +598,8 @@ lemma sll_close_cb4cb5_zero_one_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 1
     (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123)
     (h_b2_dec : b2 * v0123 = hl2 * ((65536 : ℕ) : ZMod p) + ll2 * v0123)
     (h_b3_dec : b3 * v0123 = hl3 * ((65536 : ℕ) : ZMod p) + ll3 * v0123) :
-    (Word.toBitVec64_poly #v[0, 0, ll0 * v0123, ll1 * v0123 + hl0]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]
+    (Word.toBitVec64 #v[0, 0, ll0 * v0123, ll1 * v0123 + hl0]).toNat
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]
         <<< (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val).toNat
         := by
   rw [BitVec.toNat_shiftLeft]
@@ -625,8 +627,8 @@ lemma sll_close_cb4cb5_zero_one_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 1
   have h_b2' := cancel_mul_65536_poly hdvd hpos h_b2_dec
   have h_b3' := cancel_mul_65536_poly hdvd hpos h_b3_dec
   rw [h_v_val] at h_b0' h_b1' h_b2' h_b3'
-  rw [show (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<< (S + 32)
-          = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M * 2 ^ 32 from by
+  rw [show (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat <<< (S + 32)
+          = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M * 2 ^ 32 from by
         rw [Nat.shiftLeft_eq, h_M_eq, pow_add, ← Nat.mul_assoc]]
   have h_div_eq : (65536 : ℕ) / M = N := by
     rw [← h_MN]; exact Nat.mul_div_cancel_left N h_M_pos
@@ -675,8 +677,8 @@ lemma sll_close_cb4cb5_one_zero_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 1
     (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123)
     (h_b2_dec : b2 * v0123 = hl2 * ((65536 : ℕ) : ZMod p) + ll2 * v0123)
     (h_b3_dec : b3 * v0123 = hl3 * ((65536 : ℕ) : ZMod p) + ll3 * v0123) :
-    (Word.toBitVec64_poly #v[0, ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1]).toNat
-    = (Word.toBitVec64_poly #v[b0, b1, b2, b3]
+    (Word.toBitVec64 #v[0, ll0 * v0123, ll1 * v0123 + hl0, ll2 * v0123 + hl1]).toNat
+    = (Word.toBitVec64 #v[b0, b1, b2, b3]
         <<< (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val).toNat
         := by
   rw [BitVec.toNat_shiftLeft]
@@ -704,8 +706,8 @@ lemma sll_close_cb4cb5_one_zero_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 1
   have h_b2' := cancel_mul_65536_poly hdvd hpos h_b2_dec
   have h_b3' := cancel_mul_65536_poly hdvd hpos h_b3_dec
   rw [h_v_val] at h_b0' h_b1' h_b2' h_b3'
-  rw [show (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<< (S + 16)
-          = (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat * M * 2 ^ 16 from by
+  rw [show (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat <<< (S + 16)
+          = (Word.toBitVec64 #v[b0, b1, b2, b3]).toNat * M * 2 ^ 16 from by
         rw [Nat.shiftLeft_eq, h_M_eq, pow_add, ← Nat.mul_assoc]]
   have h_div_eq : (65536 : ℕ) / M = N := by
     rw [← h_MN]; exact Nat.mul_div_cancel_left N h_M_pos
@@ -949,7 +951,7 @@ the BitVec MSB of `#v[a0, a1]` (i.e. `if msb then 65535 else 0`). This lets the
 sllw proof match the canonical form produced by `HWord.sign_extend_32_to_64_msb_poly`. -/
 lemma sllw_a2_a3_eq_msb_byte {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {a0 a1 a2 a3 msb : ZMod p}
-    (h_msb_a1 : List.Forall SP1Constraint.toProp_poly
+    (h_msb_a1 : List.Forall SP1Constraint.toProp
       (U16MSBOperation.constraints a1 { msb := msb } 1))
     (h_a1_lt : a1.val < 65536)
     (h_a2_eq : msb * 65535 = a2)
@@ -1002,11 +1004,11 @@ lemma sllw_subcase_cb4_zero {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123)
     (h_b0_lt : b0.val < 65536) (h_b1_lt : b1.val < 65536)
     (h_c0_lt : c0.val < 65536) (h_c1_lt : c1.val < 65536)
-    (h_msb_a1 : List.Forall SP1Constraint.toProp_poly
+    (h_msb_a1 : List.Forall SP1Constraint.toProp
       (U16MSBOperation.constraints (ll1 * v0123 + hl0) { msb := msb } 1))
     (h_a2_eq : msb * 65535 = a2) (h_a3_eq : msb * 65535 = a3)
     (h_c_mod_32 : c0.val % 32 = (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val) :
-    Word.toBitVec64_poly #v[ll0 * v0123, ll1 * v0123 + hl0, a2, a3]
+    Word.toBitVec64 #v[ll0 * v0123, ll1 * v0123 + hl0, a2, a3]
       = BitVec.signExtend 64 (HWord.toBitVec32_poly #v[b0, b1] <<<
                               BitVec.setWidth 5 (HWord.toBitVec32_poly #v[c0, c1])) := by
   have hp : 2 ^ 17 < p := Fact.out
@@ -1111,11 +1113,11 @@ lemma sllw_subcase_cb4_one {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (h_b1_dec : b1 * v0123 = hl1 * ((65536 : ℕ) : ZMod p) + ll1 * v0123)
     (h_b0_lt : b0.val < 65536) (h_b1_lt : b1.val < 65536)
     (h_c0_lt : c0.val < 65536) (h_c1_lt : c1.val < 65536)
-    (h_msb_a1 : List.Forall SP1Constraint.toProp_poly
+    (h_msb_a1 : List.Forall SP1Constraint.toProp
       (U16MSBOperation.constraints (ll0 * v0123) { msb := msb } 1))
     (h_a2_eq : msb * 65535 = a2) (h_a3_eq : msb * 65535 = a3)
     (h_c_mod_32 : c0.val % 32 = (cb0 + cb1 * (2 : ZMod p) + cb2 * 4 + cb3 * 8 + cb4 * 16).val) :
-    Word.toBitVec64_poly #v[0, ll0 * v0123, a2, a3]
+    Word.toBitVec64 #v[0, ll0 * v0123, a2, a3]
       = BitVec.signExtend 64 (HWord.toBitVec32_poly #v[b0, b1] <<<
                               BitVec.setWidth 5 (HWord.toBitVec32_poly #v[c0, c1])) := by
   have hp : 2 ^ 17 < p := Fact.out
@@ -1201,7 +1203,7 @@ lemma single_op_poly (Main : Vector (ZMod p) 65)
     (cstrs : (constraints Main).allHold_poly) :
     (Main[62] = 1 → Main[63] = 0) ∧ (Main[63] = 1 → Main[62] = 0) := by
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   obtain ⟨_, _, _, sum_disj, b_sll, b_sllw, _⟩ := cstrs
   have h_one_ne_zero : (1 : ZMod p) ≠ 0 := by
@@ -1250,7 +1252,7 @@ lemma sll_or_sllw_of_real (Main : Vector (ZMod p) 65)
     (h_real : Main[62] + Main[63] = 1) :
     Main[62] = 1 ∧ Main[63] = 0 ∨ Main[62] = 0 ∧ Main[63] = 1 := by
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   obtain ⟨_, _, _, _, b_62, b_63, _⟩ := cstrs
   have hp : 2 ^ 17 < p := Fact.out
@@ -1283,7 +1285,7 @@ lemma ops_U64_b_c_poly (Main : Vector (ZMod p) 65)
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   have hp : 2 ^ 17 < p := Fact.out
   have h_disj := sll_or_sllw_of_real Main cstrs h_real
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   obtain ⟨_, _, alu, _⟩ := cstrs
   rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_real rfl] at alu
@@ -1380,7 +1382,7 @@ lemma bounds_poly (Main : Vector (ZMod p) 65)
   -- Get the opcode disjunction.
   have h_disj := sll_or_sllw_of_real Main cstrs h_real
   -- Open chip iff. Take only what we need.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
   rw [allHold_constraints_iff_poly] at cstrs
   obtain ⟨_, _, alu, rest⟩ := cstrs
   -- Main[13] = 0 is the very last conjunct in the rest tuple. Extract by `And.right` chain via tauto/rfl.

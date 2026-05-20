@@ -1,6 +1,9 @@
 import LeanRV64D
 import Mathlib
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 open Lean
 
 /-- Custom array indexing tactic, scales better with large contexts. -/

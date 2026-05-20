@@ -3,9 +3,13 @@ import SP1Operations.Operation.AddressOperation.Constraints
 import SP1Operations.Reader.ITypeReader.Constraints
 import SP1Operations.Reader.CPUState.Constraints
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Load
 
 namespace LoadByte
+
 
 section constraints
 
@@ -127,8 +131,8 @@ set_option maxHeartbeats 800000 in
 -- Polymorphic counterpart of `allHold_constraints_iff_of_is_lb`.
 lemma allHold_constraints_iff_of_is_lb_poly (Main : Vector (ZMod p) 47)
     (h_is_lb : is_lb_poly Main) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    (List.Forall SP1Constraint.toProp
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[21], Main[22], Main[23], Main[24]]
         { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
@@ -138,10 +142,10 @@ lemma allHold_constraints_iff_of_is_lb_poly (Main : Vector (ZMod p) 47)
     Main[28] * (Main[26] + Main[27]) = 1 ∧
     ((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * (8 : ZMod p)⁻¹).val <
       2 ^ ZMod.val (13 : ZMod p) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
         #v[Main[3], Main[4], Main[5]] 29
         #v[Main[43] + 65280 * Main[44], 65535 * Main[44], 65535 * Main[44], 65535 * Main[44]]
@@ -176,10 +180,10 @@ lemma allHold_constraints_iff_of_is_lb_poly (Main : Vector (ZMod p) 47)
   have : Main[45] = 1 := h_is_lb
   by_cases h46 : Main[46] = 0
   · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h46,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
     intros; simp_all
   · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h46,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
     by_cases h46' : Main[46] = 1
     · simp [h46']
       intros
@@ -192,8 +196,8 @@ set_option maxHeartbeats 800000 in
 -- Polymorphic counterpart of `allHold_constraints_iff_of_is_lbu`.
 lemma allHold_constraints_iff_of_is_lbu_poly (Main : Vector (ZMod p) 47)
     (h_is_lbu : is_lbu_poly Main) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) ↔
-    (List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    (List.Forall SP1Constraint.toProp
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[21], Main[22], Main[23], Main[24]]
         { value := #v[Main[25], Main[26], Main[27]] } 1) ∧
@@ -203,10 +207,10 @@ lemma allHold_constraints_iff_of_is_lbu_poly (Main : Vector (ZMod p) 47)
     Main[28] * (Main[26] + Main[27]) = 1 ∧
     ((Main[25] - 4 * Main[40] - 2 * Main[39] - Main[38]) * (8 : ZMod p)⁻¹).val <
       2 ^ ZMod.val (13 : ZMod p) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] }
         #v[Main[3] + 4, Main[4], Main[5]] 8 1) ∧
-    List.Forall SP1Constraint.toProp_poly
+    List.Forall SP1Constraint.toProp
       (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
         #v[Main[3], Main[4], Main[5]] 32
         #v[Main[43] + 65280 * Main[44], 65535 * Main[44], 65535 * Main[44], 65535 * Main[44]]
@@ -239,9 +243,9 @@ lemma allHold_constraints_iff_of_is_lbu_poly (Main : Vector (ZMod p) 47)
   have : Main[46] = 1 := h_is_lbu
   by_cases h45 : Main[45] = 0
   · simp [h45, constraints, AddressOperation.constraints, this, sub_eq_zero,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
   · simp [constraints, AddressOperation.constraints, this, sub_eq_zero, h45,
-      SP1Constraint.toProp_poly]
+      SP1Constraint.toProp]
     by_cases h45' : Main[45] = 1
     · simp [h45']
       intros

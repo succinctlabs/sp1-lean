@@ -6,6 +6,9 @@ import SP1Chips.Bitwise.Constraints
 
 open LeanRV64D.Functions BitVec
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 /-! ### Shared helpers used by all 6 Bitwise chip arms.
 
 The Bitwise chip's `Constraints.lean` declares a single `allHold_constraints_iff_poly`
@@ -13,6 +16,7 @@ covering all 6 variants; per-variant chip arms apply the iff plus `single_op_pol
 to collapse to the active variant, then bridge through `BitwiseU16Operation.spec.{xor,or,and}_poly`. -/
 
 namespace Bitwise
+
 
 variable
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
@@ -23,8 +27,8 @@ variable
 -- chip's constraints determine which Sail spec those columns implement.
 def sp1_bitwise : SailM Unit := do
   let op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
 
 end Bitwise
 
@@ -98,7 +102,7 @@ theorem correct_xor
     apply BitwiseU16Operation.spec.xor_poly is_U64_b is_U64_c at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -117,7 +121,7 @@ theorem correct_xor
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -199,7 +203,7 @@ theorem correct_or
     apply BitwiseU16Operation.spec.or_poly is_U64_b is_U64_c at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -218,7 +222,7 @@ theorem correct_or
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -300,7 +304,7 @@ theorem correct_and
     apply BitwiseU16Operation.spec.and_poly is_U64_b is_U64_c at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -319,7 +323,7 @@ theorem correct_and
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -414,7 +418,7 @@ theorem correct_xori
     apply BitwiseU16Operation.spec.xor_poly is_U64_b h_op_c_imm_isU64 at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -426,7 +430,7 @@ theorem correct_xori
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
     rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
@@ -438,7 +442,7 @@ theorem correct_xori
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -533,7 +537,7 @@ theorem correct_ori
     apply BitwiseU16Operation.spec.or_poly is_U64_b h_op_c_imm_isU64 at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -545,7 +549,7 @@ theorem correct_ori
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
     rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
@@ -557,7 +561,7 @@ theorem correct_ori
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -652,7 +656,7 @@ theorem correct_andi
     apply BitwiseU16Operation.spec.and_poly is_U64_b h_op_c_imm_isU64 at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -664,7 +668,7 @@ theorem correct_andi
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
     rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
@@ -676,7 +680,7 @@ theorem correct_andi
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all

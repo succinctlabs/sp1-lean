@@ -4,6 +4,9 @@ import SP1Operations.Operation.SubwOperation.Constraints
 
 namespace SubwOperation
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 /-- Disjunction-shift helper for the Subw carry-bridging proof; mirrors
 the Sub-side `carry_swap_iff_poly`. -/
 private lemma carry_swap_iff_poly {p : ℕ} [Fact (Nat.Prime p)]
@@ -30,7 +33,7 @@ lemma allHold_constraints_iff_poly
     SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
       let carry0 : ZMod p := (b[0] + cols.value[0] - a[0]) * 65536⁻¹
       let carry1 : ZMod p := (b[1] + cols.value[1] - a[1] + carry0) * 65536⁻¹
-      List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
+      List.Forall SP1Constraint.toProp (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
       ((carry0 = 0 ∨ carry0 = 1) ∧
       (carry1 = 0 ∨ carry1 = 1) ∧
       (cols.value[0].val < 65536) ∧
@@ -48,10 +51,10 @@ lemma allHold_constraints_iff_poly
     linear_combination (1 : ZMod p) * hbridge
   have h_borrow :
       SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
-        List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
+        List.Forall SP1Constraint.toProp (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
         (d0 = 0 ∨ d0 = 1) ∧ (d1 = 0 ∨ d1 = 1) ∧
         cols.value[0].val < 65536 ∧ cols.value[1].val < 65536 := by
-    simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly,
+    simp [constraints, sub_eq_zero, SP1Constraint.toProp,
           hd0_def, hd1_def]
   rw [h_borrow,
       carry_swap_iff_poly d0 c0 hd0_swap,

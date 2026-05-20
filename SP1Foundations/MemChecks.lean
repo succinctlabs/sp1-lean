@@ -1,5 +1,8 @@
 import SP1Foundations.Assumptions
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 open LeanRV64D.Functions Sail SailState
 
 attribute [simp] LeanRV64D.Functions.xlen_bytes Sail.assert PreSail.assert

@@ -5,20 +5,21 @@ import SP1Operations.Operation.BitwiseU16Operation.Operation
 import SP1Operations.Operation.BitwiseU16Operation.Constraints
 
 set_option linter.style.setOption false
+set_option linter.style.longLine false
 set_option maxHeartbeats 10000000
 
 namespace BitwiseU16Operation
 
 set_option maxHeartbeats 64000000 in
 -- `bv_decide`-after-byte-decomposition recipe; uses `spec.unsafe.return_poly`
--- + `Word.toBitVec64_poly` and explicit `.val` arithmetic to remove `% p`
+-- + `Word.toBitVec64` and explicit `.val` arithmetic to remove `% p`
 -- from the byte-AND/OR/XOR equations (`byte.val < 256 < p` makes `% p` an
 -- identity).
 lemma spec.and_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {b cc : Word (ZMod p)} {cols : BitwiseU16Operation (ZMod p)}
     (h_isU64_b : b.isU64_poly) (h_isU64_cc : cc.isU64_poly) :
-    List.Forall SP1Constraint.toProp_poly (constraints b cc cols 0 1).2 →
-      Word.toBitVec64_poly (constraints b cc cols 0 1).1 = execute_RTYPE_pure_w_poly b cc .AND
+    List.Forall SP1Constraint.toProp (constraints b cc cols 0 1).2 →
+      Word.toBitVec64 (constraints b cc cols 0 1).1 = execute_RTYPE_pure_w_poly b cc .AND
         := by
   intro cstrs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -100,7 +101,7 @@ lemma spec.and_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     · rw [h256_val]
     · rw [h256_val]; nlinarith
     · rw [ZMod.val_mul_of_lt (by rw [h256_val]; nlinarith), h256_val]; nlinarith
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
   rw [hadd _ _ hr0' hr1', hadd _ _ hr2' hr3', hadd _ _ hr4' hr5', hadd _ _ hr6' hr7']
@@ -154,8 +155,8 @@ lemma spec.and_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {b cc : Word (ZMod p)} {cols : BitwiseU16Operation (ZMod p)}
     (h_isU64_b : b.isU64_poly) (h_isU64_cc : cc.isU64_poly) :
-    List.Forall SP1Constraint.toProp_poly (constraints b cc cols 1 1).2 →
-      Word.toBitVec64_poly (constraints b cc cols 1 1).1 = execute_RTYPE_pure_w_poly b cc .OR
+    List.Forall SP1Constraint.toProp (constraints b cc cols 1 1).2 →
+      Word.toBitVec64 (constraints b cc cols 1 1).1 = execute_RTYPE_pure_w_poly b cc .OR
         := by
   intro cstrs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -243,7 +244,7 @@ lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     · rw [h256_val]
     · rw [h256_val]; nlinarith
     · rw [ZMod.val_mul_of_lt (by rw [h256_val]; nlinarith), h256_val]; nlinarith
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
   rw [hadd _ _ hr0' hr1', hadd _ _ hr2' hr3', hadd _ _ hr4' hr5', hadd _ _ hr6' hr7']
@@ -297,8 +298,8 @@ lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 lemma spec.xor_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {b cc : Word (ZMod p)} {cols : BitwiseU16Operation (ZMod p)}
     (h_isU64_b : b.isU64_poly) (h_isU64_cc : cc.isU64_poly) :
-    List.Forall SP1Constraint.toProp_poly (constraints b cc cols 2 1).2 →
-      Word.toBitVec64_poly (constraints b cc cols 2 1).1 = execute_RTYPE_pure_w_poly b cc .XOR
+    List.Forall SP1Constraint.toProp (constraints b cc cols 2 1).2 →
+      Word.toBitVec64 (constraints b cc cols 2 1).1 = execute_RTYPE_pure_w_poly b cc .XOR
         := by
   intro cstrs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -387,7 +388,7 @@ lemma spec.xor_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     · rw [h256_val]
     · rw [h256_val]; nlinarith
     · rw [ZMod.val_mul_of_lt (by rw [h256_val]; nlinarith), h256_val]; nlinarith
-  unfold Word.toBitVec64_poly
+  unfold Word.toBitVec64
   simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
   rw [hadd _ _ hr0' hr1', hadd _ _ hr2' hr3', hadd _ _ hr4' hr5', hadd _ _ hr6' hr7']

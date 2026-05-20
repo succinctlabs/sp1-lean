@@ -6,7 +6,11 @@ import SP1Chips.Mul.Constraints
 open LeanRV64D.Functions
 open BitVec
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Mul
+
 
 variable
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
@@ -17,8 +21,8 @@ variable
 -- constraints determine which Sail spec those columns implement.
 def sp1_mul_chip : SailM Unit := do
   let op_a := sp1_op_a_poly Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]])
 
 end Mul
 
@@ -79,7 +83,7 @@ theorem correct_mul
     have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
     rwa [h32] at this
   -- state_cstrs handling
-  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp,
     List.Forall, MulOperation.constraints, U16toU8OperationSafe.constraints,
     U16MSBOperation.constraints, CPUState.constraints, RTypeReader.constraints,
     h6, h14, h21, h_77, h_78, h_79, h_80, h_81, h_M30, h_is_real_eq_one] at state_cstrs
@@ -113,7 +117,7 @@ theorem correct_mul
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp [bitVecToRegidxVal]
 
@@ -171,7 +175,7 @@ theorem correct_mulh
   have h21 : Main[21].val < 32 := by
     have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
     rwa [h32] at this
-  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp,
     List.Forall, MulOperation.constraints, U16toU8OperationSafe.constraints,
     U16MSBOperation.constraints, CPUState.constraints, RTypeReader.constraints,
     h6, h14, h21, h_77, h_78, h_79, h_80, h_81, h_M30, h_is_real_eq_one] at state_cstrs
@@ -199,7 +203,7 @@ theorem correct_mulh
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp [bitVecToRegidxVal]
 
@@ -257,7 +261,7 @@ theorem correct_mulhu
   have h21 : Main[21].val < 32 := by
     have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
     rwa [h32] at this
-  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp,
     List.Forall, MulOperation.constraints, U16toU8OperationSafe.constraints,
     U16MSBOperation.constraints, CPUState.constraints, RTypeReader.constraints,
     h6, h14, h21, h_77, h_78, h_79, h_80, h_81, h_M30, h_is_real_eq_one] at state_cstrs
@@ -285,7 +289,7 @@ theorem correct_mulhu
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp [bitVecToRegidxVal]
 
@@ -343,7 +347,7 @@ theorem correct_mulhsu
   have h21 : Main[21].val < 32 := by
     have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
     rwa [h32] at this
-  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp,
     List.Forall, MulOperation.constraints, U16toU8OperationSafe.constraints,
     U16MSBOperation.constraints, CPUState.constraints, RTypeReader.constraints,
     h6, h14, h21, h_77, h_78, h_79, h_80, h_81, h_M30, h_is_real_eq_one] at state_cstrs
@@ -371,7 +375,7 @@ theorem correct_mulhsu
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp [bitVecToRegidxVal]
 
@@ -429,7 +433,7 @@ theorem correct_mulw
   have h21 : Main[21].val < 32 := by
     have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
     rwa [h32] at this
-  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState_poly, Mul.constraints, SP1Constraint.toStateProp,
     List.Forall, MulOperation.constraints, U16toU8OperationSafe.constraints,
     U16MSBOperation.constraints, CPUState.constraints, RTypeReader.constraints,
     h6, h14, h21, h_77, h_78, h_79, h_80, h_81, h_M30, h_is_real_eq_one] at state_cstrs
@@ -455,7 +459,7 @@ theorem correct_mulw
       intro heq; rw [← BitVec.toNat_inj] at heq; simp at heq; omega
     rw [if_neg h_bv_neq, if_neg h_bv_neq]
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     simp [bitVecToRegidxVal]
 

@@ -3,16 +3,19 @@ import SP1Operations.Compare.LtOperationSigned.Constraints
 
 namespace LtOperationSigned
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 lemma allHold_constraints_iff_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b : Word (ZMod p)}
   {d : Word (ZMod p)}
   {cols : LtOperationSigned (ZMod p)}
   {is_signed : ZMod p} :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols is_signed 1) ↔
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints b[3] cols.b_msb is_signed) ∧
-    List.Forall SP1Constraint.toProp_poly (U16MSBOperation.constraints d[3] cols.c_msb is_signed) ∧
-    List.Forall SP1Constraint.toProp_poly (LtOperationUnsigned.constraints
+  List.Forall SP1Constraint.toProp (constraints b d cols is_signed 1) ↔
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints b[3] cols.b_msb is_signed) ∧
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints d[3] cols.c_msb is_signed) ∧
+    List.Forall SP1Constraint.toProp (LtOperationUnsigned.constraints
       #v[b[0], b[1], b[2], b[3] + is_signed * 32768 - 65536 * cols.b_msb.msb]
       #v[d[0], d[1], d[2], d[3] + is_signed * 32768 - 65536 * cols.c_msb.msb]
       { u16_compare_operation := cols.result.u16_compare_operation,
@@ -23,7 +26,7 @@ lemma allHold_constraints_iff_poly
     (is_signed = 0 ∨ is_signed = 1) ∧
     (is_signed = 1 ∨ cols.b_msb.msb = 0) ∧
     (is_signed = 1 ∨ cols.c_msb.msb = 0)
-  := by simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
+  := by simp [constraints, sub_eq_zero, SP1Constraint.toProp]
 
 /-- Natural-form unsigned spec: with `is_signed = 0`, the msb constraints
 force `cols.{b,c}_msb.msb = 0`, so the `LtOperationUnsigned` sub-proof on
@@ -35,7 +38,7 @@ lemma spec.unsigned_poly
   {cols : LtOperationSigned (ZMod p)}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols 0 1) →
+  List.Forall SP1Constraint.toProp (constraints b d cols 0 1) →
     cols.result.u16_compare_operation.bit =
       if b.toNat_poly < d.toNat_poly then (1 : ZMod p) else (0 : ZMod p)
   := by
@@ -64,7 +67,7 @@ lemma spec.signed_poly
   {cols : LtOperationSigned (ZMod p)}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols 1 1) →
+  List.Forall SP1Constraint.toProp (constraints b d cols 1 1) →
     cols.result.u16_compare_operation.bit =
       if b.toInt_poly < d.toInt_poly then (1 : ZMod p) else (0 : ZMod p)
   := by
@@ -207,7 +210,7 @@ private lemma branch_helper_eq_iff_unsigned_poly
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationSigned (ZMod p)} :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols 0 1) →
+  List.Forall SP1Constraint.toProp (constraints b d cols 0 1) →
     (b = d ↔ cols.result.u16_flags[0] = 0 ∧ cols.result.u16_flags[1] = 0
             ∧ cols.result.u16_flags[2] = 0 ∧ cols.result.u16_flags[3] = 0)
     := by
@@ -277,7 +280,7 @@ private lemma branch_helper_eq_iff_signed_poly
   {cols : LtOperationSigned (ZMod p)}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols 1 1) →
+  List.Forall SP1Constraint.toProp (constraints b d cols 1 1) →
     (b = d ↔ cols.result.u16_flags[0] = 0 ∧ cols.result.u16_flags[1] = 0
             ∧ cols.result.u16_flags[2] = 0 ∧ cols.result.u16_flags[3] = 0)
     := by
@@ -394,7 +397,7 @@ lemma spec.branch_poly
   {is_signed : ZMod p}
   (h_b_isU64 : Word.isU64_poly b)
   (h_d_isU64 : Word.isU64_poly d) :
-  List.Forall SP1Constraint.toProp_poly (constraints b d cols is_signed 1) →
+  List.Forall SP1Constraint.toProp (constraints b d cols is_signed 1) →
     spec.branch.def_poly b d cols is_signed
     := by
   intro cstrs

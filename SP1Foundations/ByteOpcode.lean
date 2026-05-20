@@ -15,6 +15,9 @@ inductive ByteOpcode
 
 namespace ByteOpcode
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section ofNat
 
 -- Deriving decidable equality also derives an `OfNat` instance
