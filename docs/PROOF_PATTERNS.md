@@ -620,16 +620,24 @@ As of the **2026-05-17 evening sweep** there were 11 such lines. The
 `spec.slli_poly` and Srl's `spec.srl_common_poly`) via two new
 patterns documented below. The **2026-05-19 sweep** cleared all 4
 Store sites + JalChip + JalrChip via recipe-2 helpers (full-equation
-lift to bare `BitVec`) — see "Cleared during the 2026-05-19 sweep"
-sections below for the recipe and helper names. Current count: **2
-load-bearing sites in 2 files**, both DivRem cores. The earlier
-recipe-6 (stale-comment delete + rebuild) remains fully exhausted on
-this branch — both surviving sites reproduce `(kernel) deep
-recursion detected` on plain deletion.
+lift to bare `BitVec`); the **2026-05-19 evening pass** additionally
+cleared `divu_remu_poly` via an opaque `2^128` alias (recipe 10
+below) — see "Cleared during the 2026-05-19 sweep" sections below
+for the recipes and helper names. Current count: **1 load-bearing
+site in 1 file**, the signed DivRem core. The earlier recipe-6
+(stale-comment delete + rebuild) remains exhausted on this branch —
+the surviving site reproduces `(kernel) deep recursion detected` on
+plain deletion.
 
 - `SP1Chips/DivRem/DivRem.lean` — `div_rem_poly` core (signed 64-bit
-  DWord 8-limb)
-- `SP1Chips/DivRem/DivuRemu.lean` — `divu_remu_poly` core
+  DWord 8-limb). Sorry-bisect confirms multiple kernel-tripping
+  sites: the visible `simp [← BitVec.toNat_inj, BitVec.toNat_ofNat,
+  BitVec.toNat_add]` at line ~645 is *not* the only one (sorry'ing
+  it leaves the kernel still tripping). Likely additional triggers
+  in `h_abs` / `h_sign` / `h_prod` proofs via `simp [← BitVec.toInt_inj]`
+  (line 359) and `simp [Word.toNat_poly]` calls. Applying recipe 10
+  to each surviving trigger is mechanical but case-by-case; not yet
+  attempted.
 
 Cleared during the 2026-05-17 sweep (kept removed):
 `AddrAddOperation.spec_of_constraints_poly`,
@@ -723,14 +731,51 @@ Chip-side template (both JAL and JALR):
 Build time on Jal/Jalr drops to ~7s (helper olean ~50 lines).
 Axioms unchanged.
 
-Status after 2026-05-19 sweep: **2 load-bearing skipKernelTC sites
-remain** (DivRem cores `div_rem_poly` and `divu_remu_poly`), down
-from 11 at the start of the day. Both DivRem cores have a
-structurally different trigger (`% 2^128` in the chip's goal type
-via `BitVec.toNat_ofNat` on `BitVec.ofNat 128 _`) that this
-recipe-2 approach can't directly attack; see the 2026-05-19 evening
-"DivRem core: every `2^128 ↔ 340...` bridge mechanism tried trips"
-note above.
+Status after 2026-05-19 sweep: **1 load-bearing skipKernelTC site
+remains** (`div_rem_poly`), down from 11 at the start of the day.
+
+### Recipe 10: opaque `2^N` alias for the DivRem `% 2^128` trigger (2026-05-19 evening)
+
+The DivRem cores' trigger is the `BitVec.toNat_ofNat` simp call
+introducing `% 2^128` syntactically in the goal, which omega then
+trips on. The fix:
+
+1. Define `@[irreducible] def N128 : ℕ := 2 ^ 128` (in `SP1Chips/DivRem/Common.lean`
+   as `DivRem.divrem_N128`). Single-unfold lemma:
+   `divrem_N128_eq : divrem_N128 = 2 ^ 128 := by unfold divrem_N128; rfl`.
+2. Write custom width-128 versions of the simp lemmas:
+   - `BitVec.toNat_ofNat_128 (k : ℕ) : (BitVec.ofNat 128 k).toNat = k % divrem_N128`
+   - `BitVec.toNat_add_128 (x y : BitVec 128) : (x + y).toNat = (x.toNat + y.toNat) % divrem_N128`
+   Both prove via `rw [divrem_N128_eq, BitVec.toNat_ofNat/_add]` — kernel walks
+   `2^128` once per olean.
+3. Write the close-helper at bare `Nat`, using `divrem_N128` opaquely in both
+   type and proof body. **Avoid `omega`** (whose `Int.toNat (… % 2^128)`
+   certificate trips the kernel); use a manual chain instead:
+   ```
+   rw [← Nat.add_mod, ← h_main, Nat.add_mul_mod_self_right]
+   ```
+4. Chip-side: replace the simp set:
+   ```
+   simp only [← BitVec.toNat_inj, BitVec.toNat_ofNat, BitVec.toNat_add, hsumXX]
+   ```
+   with:
+   ```
+   simp only [← BitVec.toNat_inj, DivRem.BitVec.toNat_ofNat_128,
+     DivRem.BitVec.toNat_add_128, hsumXX]
+   ```
+   Convert `main_eq`'s `340…456` literal to `divrem_N128` via:
+   ```
+   rw [show (340… : ℕ) = divrem_N128 from by rw [divrem_N128_eq]; decide] at main_eq
+   ```
+   Then `exact close_helper … main_eq`.
+
+The chip's olean walks `divrem_N128` (opaque); only the Common helpers' oleans
+walk `2^128`, once each. Total kernel walk count: O(1) per chip.
+
+Cleared `divu_remu_poly` (2026-05-19 evening). `div_rem_poly` has additional
+trigger sites elsewhere in its 750-line proof body that need the same treatment
+(`simp [← BitVec.toInt_inj]` at line 359 likely; potentially others). Recipe is
+mechanical but case-by-case.
 
 #### Empirical findings (2026-05-17 evening)
 
