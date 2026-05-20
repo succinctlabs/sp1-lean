@@ -1,7 +1,7 @@
 name = "sp1-lean"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["SP1Operations", "SP1Chips"]
+defaultTargets = ["SP1Operations", "SP1Chips", "SP1Clean"]
 
 moreLeanArgs = ["--tstack=400000"]
 preferReleaseBuild = true
@@ -25,6 +25,12 @@ name = "LeanRV64D"
 git = "https://github.com/succinctlabs/sail-riscv-lean"
 rev = "v6.1.0"
 
+# Pilot dep on Verified-zkEVM/clean (use case B from docs/CLEAN_DSL_EVALUATION.md).
+# Tracks a sibling checkout at ../clean on the bump-lean-4.29 branch.
+[[require]]
+name = "Clean"
+path = "../clean"
+
 [[lean_lib]]
 name = "SP1Foundations"
 
@@ -33,3 +39,6 @@ name = "SP1Operations"
 
 [[lean_lib]]
 name = "SP1Chips"
+
+[[lean_lib]]
+name = "SP1Clean"

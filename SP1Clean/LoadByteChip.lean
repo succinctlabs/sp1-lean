@@ -1,0 +1,218 @@
+import Clean.Circuit.Basic
+import Clean.Circuit.Provable
+import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
+import Clean.Gadgets.Equality
+import Clean.Utils.Field
+import Clean.Utils.Tactics
+import Clean.Utils.Tactics.ProvableStructDeriving
+import SP1Foundations.Constraint
+import SP1Foundations.ByteOpcode
+import SP1Foundations.Field
+import SP1Operations.Reader.ITypeReader
+import SP1Operations.Reader.CPUState
+import SP1Clean.ByteOpcodeTable
+import SP1Clean.ProgramTable
+import SP1Clean.MemoryAccess
+import SP1Clean.Reader.CPUState
+import SP1Clean.Reader.ITypeReader
+
+/-! # Chip-level `LoadByteChip` mirror — first chip with a real memory load
+
+The Load Byte chip is the canonical example of a chip whose memory bus is
+not exhausted by register reads: in addition to the three register
+accesses every reader emits (`op_a`, `op_b`, `op_c`), `LoadByteChip` also
+emits a memory access at the computed load address `op_b + sign_ext(imm_c)`.
+That additional access has `addr0.val ≥ 32` in general, so it hits the
+RAM branch of `SP1Constraint.toStateProp_poly` rather than the
+register-special-case branch — exercising both code paths the `MemoryAccess`
+record needs to support.
+
+This file is the **focused pilot mirror**: it captures the program-bus
+interaction and the load-side `MemoryAccess` record explicitly, in a form
+suitable for the trace-level `OfflineMemory` aggregation. The chip's full
+`iff_sp1` to `_root_.Load.LoadByte.constraints` is deferred to follow-up
+work; the goal here is to demonstrate that the `MemoryAccess` + `ProgramTable`
+design generalizes from register-only chips (AddChip) to memory-touching
+chips, and to seed the OfflineMemory consistency theorem with a real
+non-register access.
+
+Opcode: `29 = LB` (Load Byte, signed). Sibling chips `LoadByteUnsigned`,
+`LoadHalf*`, `LoadWord*`, `LoadDouble` follow the same shape with width
+and signedness selectors.
+-/
+
+namespace SP1Clean.LoadByte
+
+open Circuit ProvableType
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The chip's column struct, mirroring SP1's Rust `LoadByteCols<T>` over
+47 field elements. Field order matches the `Main[k]` indexing in
+`SP1Chips/Load/LoadByte/Constraints.lean`. -/
+structure LoadByteCols (T : Type) where
+  clk_high : T                              -- Main[0]
+  clk_16_24 : T                             -- Main[1]
+  clk_0_16 : T                              -- Main[2]
+  pc : Vector T 3                           -- Main[3..5]
+  op_a : T                                  -- Main[6]
+  op_a_memory_prev_value : Vector T 4       -- Main[7..10]
+  op_a_memory_prev_low : T                  -- Main[11]
+  op_a_memory_diff_low : T                  -- Main[12]
+  op_a_0 : T                                -- Main[13]
+  op_b : T                                  -- Main[14]
+  op_b_memory_prev_value : Vector T 4       -- Main[15..18]
+  op_b_memory_prev_low : T                  -- Main[19]
+  op_b_memory_diff_low : T                  -- Main[20]
+  op_c_imm : Vector T 4                     -- Main[21..24]
+  addr_value : Vector T 3                   -- Main[25..27] (op_b + imm_c, low 3 limbs)
+  addr_top_two_limb_inv : T                 -- Main[28]
+  load_prev_value : Vector T 4              -- Main[29..32] (the 4-limb loaded word)
+  load_memory_prev_high : T                 -- Main[33]
+  load_memory_prev_low : T                  -- Main[34]
+  load_memory_flag : T                      -- Main[35]
+  load_memory_diff_low : T                  -- Main[36]
+  load_memory_diff_high : T                 -- Main[37]
+  byte_selector_top : T                     -- Main[38] (selects which of 8 bytes)
+  byte_selector_mid : T                     -- Main[39]
+  byte_selector_lo : T                      -- Main[40]
+  selected_byte : T                         -- Main[41]
+  selected_byte_alt : T                     -- Main[42]
+  result_byte : T                           -- Main[43] (the loaded byte value)
+  signed_extension_flag : T                 -- Main[44] (1 if sign bit set, 0 otherwise)
+  is_lb : T                                 -- Main[45]
+  is_lbu : T                                -- Main[46]
+deriving ProvableStruct
+
+/-- Clean-side circuit. Mirrors the SP1 source's emissions for the LB
+(signed Load Byte) case: byte lookups for the various range/U8 checks
+plus the program-bus interaction. The full memory-access machinery is
+exposed via the `Spec` predicate (one `memoryAccessSpec` per access) and
+threaded through the trace-level OfflineMemory bridge — Clean has no
+native send/receive bus, so per-row consistency is propositional rather
+than circuit-level.
+
+Opcode is `is_lb * 29 + is_lbu * 32` to admit both LB (signed) and LBU
+(unsigned) variants in the same chip; the immediate-mode flag is
+`imm_c = 1` (I-type), and `op_c` carries 4 immediate limbs from
+`op_c_imm`. -/
+def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, op_b,
+       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
+       _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
+       _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
+       _selected_byte, selected_byte_alt, result_byte, signed_extension_flag,
+       is_lb, is_lbu⟩ := cols
+  -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), (clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), clk_16_24, 8, 0]
+      : Vector (Expression (ZMod p)) 4)
+  -- Load-memory timestamp bounds (one Range(16) on the low diff, one
+  -- U8Range on the high diff, mirroring the SP1 `.send (.byte 6 ... 16)`
+  -- and `.send (.byte 3 0 ... 0)` calls).
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), load_memory_diff_low, 16, 0]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[(3 : Expression (ZMod p)), 0, load_memory_diff_high, 0]
+      : Vector (Expression (ZMod p)) 4)
+  -- Selected byte U8 range (for the byte being loaded).
+  lookup ByteOpcodeTable
+    (#v[(3 : Expression (ZMod p)), 0, selected_byte_alt, 0]
+      : Vector (Expression (ZMod p)) 4)
+  -- MSB lookup (for sign-extension flag determination on LB).
+  lookup ByteOpcodeTable
+    (#v[(5 : Expression (ZMod p)), signed_extension_flag, result_byte, 0]
+      : Vector (Expression (ZMod p)) 4)
+  -- Program-bus interaction. Opcode is is_lb * 29 + is_lbu * 32; I-type
+  -- discipline: op_b is single-limb register index, op_c_imm carries
+  -- 4 immediate limbs, imm_c = 1.
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, is_lb * 29 + is_lbu * 32,
+      op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  -- Boolean and selector gates.
+  is_lb * (is_lb - 1) === 0
+  is_lbu * (is_lbu - 1) === 0
+  (is_lb + is_lbu) * (is_lb + is_lbu - 1) === 0
+  op_a_0 === 0
+
+/-- The Clean-flavored Spec for `LoadByteChip` under `is_lb + is_lbu = 1`.
+Composes the existing per-fragment specs (`cpuStateSpec`, `itypeReaderSpec`)
+with the four `memoryAccessSpec` records that drive the trace-level
+OfflineMemory bridge:
+- three register reads (op_a, op_b — op_c is immediate so no memory access)
+- the load-side access at `addr_value` (which can be RAM, not a register)
+
+The address-arithmetic side (the `AddressOperation` fragment that asserts
+`addr_value = op_b + sign_ext(imm_c)`) is folded into a future iteration —
+keeping `Spec` light here lets the OfflineMemory bridge consume the chip
+without depending on those proofs. -/
+def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  -- Three register-bus accesses + their bookkeeping (op_a write, op_b read,
+  -- op_c is immediate so no memory access).
+  SP1Clean.memoryAccessSpec
+    (cols.clk_0_16 + cols.clk_16_24 * 65536) 4
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
+      { prev_value := cols.op_a_memory_prev_value,
+        access_timestamp :=
+          { prev_low := cols.op_a_memory_prev_low,
+            diff_low_limb := cols.op_a_memory_diff_low } }) ∧
+  SP1Clean.memoryAccessSpec
+    (cols.clk_0_16 + cols.clk_16_24 * 65536) 3
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
+      { prev_value := cols.op_b_memory_prev_value,
+        access_timestamp :=
+          { prev_low := cols.op_b_memory_prev_low,
+            diff_low_limb := cols.op_b_memory_diff_low } }) ∧
+  -- The load-side memory access. Address is the 3-limb `addr_value`
+  -- computed by the AddressOperation; this is generally NOT a register
+  -- address (`addr_value[0].val ≥ 32`), so the RAM branch of
+  -- `SP1Constraint.toStateProp_poly` fires.
+  SP1Clean.memoryAccessSpec
+    (cols.clk_0_16 + cols.clk_16_24 * 65536) 1
+    { addr := cols.addr_value,
+      prev_value := cols.load_prev_value,
+      prev_low := cols.load_memory_prev_low,
+      diff_low_limb := cols.load_memory_diff_low } ∧
+  -- Program-bus consequence (opcode = 29 = LB when is_lb = 1, 32 = LBU
+  -- when is_lbu = 1).
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc,
+      opcode := cols.is_lb * 29 + cols.is_lbu * 32,
+      op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0],
+      op_c := cols.op_c_imm,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  -- Boolean and selector gates.
+  cols.is_lb * (cols.is_lb - 1) = 0 ∧
+  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
+  (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+/-- The load access as a `MemoryAccess` record, exposed for trace-level
+OfflineMemory aggregation. This is the access that hits the RAM branch
+(not registers): `addr_value` is the load destination computed by the
+AddressOperation sub-fragment.
+
+The companion register-read access for `op_b` (which carries the base
+address) is accessible via `MemoryAccess.ofRegisterShared` on the
+`op_b_memory_*` column group; together with `addr_value`, OfflineMemory
+sees both the register read and the subsequent memory read on the same
+chip row. -/
+def loadMemoryAccess (cols : LoadByteCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
+  { addr := cols.addr_value,
+    prev_value := cols.load_prev_value,
+    prev_low := cols.load_memory_prev_low,
+    diff_low_limb := cols.load_memory_diff_low }
+
+end SP1Clean.LoadByte

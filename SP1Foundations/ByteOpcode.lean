@@ -26,6 +26,25 @@ section ofNat
 @[simp] lemma ofNat_five : ByteOpcode.ofNat 5 = .MSB := rfl
 @[simp] lemma ofNat_seven : ByteOpcode.ofNat 6 = .Range := rfl
 
+/-- Inverse of `ofNat`: emit the natural-number tag the auto-generated
+constraint compiler uses when it lowers `ByteOpcode` to a field literal. -/
+def toNat : ByteOpcode → ℕ
+  | AND => 0
+  | OR => 1
+  | XOR => 2
+  | U8Range => 3
+  | LTU => 4
+  | MSB => 5
+  | Range => 6
+
+@[simp] lemma toNat_AND : ByteOpcode.AND.toNat = 0 := rfl
+@[simp] lemma toNat_OR : ByteOpcode.OR.toNat = 1 := rfl
+@[simp] lemma toNat_XOR : ByteOpcode.XOR.toNat = 2 := rfl
+@[simp] lemma toNat_U8Range : ByteOpcode.U8Range.toNat = 3 := rfl
+@[simp] lemma toNat_LTU : ByteOpcode.LTU.toNat = 4 := rfl
+@[simp] lemma toNat_MSB : ByteOpcode.MSB.toNat = 5 := rfl
+@[simp] lemma toNat_Range : ByteOpcode.Range.toNat = 6 := rfl
+
 end ofNat
 
 /-! ### Polymorphic `constrain_poly` over `ZMod p` -/

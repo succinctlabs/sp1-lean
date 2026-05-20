@@ -1,0 +1,203 @@
+import Clean.Circuit.Basic
+import Clean.Circuit.Provable
+import Clean.Circuit.Lookup
+import Clean.Gadgets.Equality
+import Clean.Utils.Field
+import Clean.Utils.Tactics
+import Clean.Utils.Tactics.ProvableStructDeriving
+import SP1Foundations.Constraint
+import SP1Foundations.ByteOpcode
+import SP1Foundations.Field
+import SP1Operations.Operation.SubwOperation
+import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.RTypeReader
+import SP1Chips.SubwChip
+import SP1Clean.SubwOperation
+import SP1Clean.ByteOpcodeTable
+import SP1Clean.ProgramTable
+import SP1Clean.Reader.CPUState
+import SP1Clean.Reader.RTypeReader
+
+/-! # Chip-level `SubwChip` mirror — 32-bit R-type subtract with sign-extension
+
+The R-type Subw chip: 32 columns, composes `SP1Clean.SubwOp` with
+`CPUState` and `RTypeReader` Spec helpers. The 32-bit result is stored in
+two limbs (`Main[28]`, `Main[29]`) plus a `msb` column (`Main[30]`) that
+both seeds the high-bit decomposition and drives the sign-extension limbs
+fed into the RTypeReader's `op_a_write_value` (limbs 2-3 reconstructed as
+`msb * 65535`).
+-/
+
+namespace SP1Clean.Sub
+
+open Circuit ProvableType
+
+namespace W
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The chip's column struct, mirroring SP1's Rust `SubwCols<T>`. -/
+structure SubwCols (T : Type) where
+  clk_high : T
+  clk_16_24 : T
+  clk_0_16 : T
+  pc : Vector T 3
+  op_a : T
+  op_a_memory_prev_value : Vector T 4
+  op_a_memory_prev_low : T
+  op_a_memory_diff_low : T
+  op_a_0 : T
+  op_b : T
+  op_b_memory_prev_value : Vector T 4
+  op_b_memory_prev_low : T
+  op_b_memory_diff_low : T
+  op_c : T
+  op_c_memory_prev_value : Vector T 4
+  op_c_memory_prev_low : T
+  op_c_memory_diff_low : T
+  subw_value : Vector T 2
+  subw_msb : T
+  is_real : T
+deriving ProvableStruct
+
+/-- Clean-side circuit. Mirrors SP1 Rust's `SubwChip::eval(builder, cols)`. -/
+def main (cols : Var SubwCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
+       op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c, op_c_memory_prev_value, _op_c_memory_prev_low,
+       _op_c_memory_diff_low, subw_value, subw_msb, is_real⟩ := cols
+  -- SubwOperation: op_b_memory.prev_value - op_c_memory.prev_value = subw_value (low 32 bits).
+  SP1Clean.SubwOp.main op_b_memory_prev_value op_c_memory_prev_value subw_value subw_msb
+  -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), (clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), clk_16_24, 8, 0]
+      : Vector (Expression (ZMod p)) 4)
+  -- Program-bus interaction (opcode = 20 = SUBW; R-type discipline).
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, 20, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  -- Trailing assertZero gates.
+  is_real * (is_real - 1) === 0
+  op_a_0 === 0
+
+/-- Pilot Spec, expressed over field-valued `SubwCols (ZMod p)`. Opcode
+index `20` (`SUBW`) flows into the RTypeReader fragment; the
+`op_a_write_value` passed to the reader is the 4-limb reconstruction
+`[subw_value[0], subw_value[1], subw_msb * 65535, subw_msb * 65535]`. -/
+def Spec (cols : SubwCols (ZMod p)) : Prop :=
+  SP1Clean.SubwOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_memory_prev_value
+      { value := cols.subw_value, msb := { msb := cols.subw_msb } } ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.RTypeReader.rtypeReaderSpec
+      (cols.clk_0_16 + cols.clk_16_24 * 65536) 20 cols.pc
+      #v[cols.subw_value[0], cols.subw_value[1],
+         cols.subw_msb * 65535, cols.subw_msb * 65535]
+      { op_a := cols.op_a,
+        op_a_memory :=
+          { prev_value := cols.op_a_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_a_memory_prev_low,
+                diff_low_limb := cols.op_a_memory_diff_low } },
+        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+        op_b_memory :=
+          { prev_value := cols.op_b_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_b_memory_prev_low,
+                diff_low_limb := cols.op_b_memory_diff_low } },
+        op_c := cols.op_c,
+        op_c_memory :=
+          { prev_value := cols.op_c_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_c_memory_prev_low,
+                diff_low_limb := cols.op_c_memory_diff_low } } } ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+/-- Project a raw SP1 row into the structured `SubwCols` view. Mirrors the
+index map in `SP1Chips/Subw/Constraints.lean`. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 32) : SubwCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13], Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20], Main[21],
+   #v[Main[22], Main[23], Main[24], Main[25]],
+   Main[26], Main[27],
+   #v[Main[28], Main[29]],
+   Main[30], Main[31]⟩
+
+/-- The chip-level bridge: SP1's `allHold_poly` over the flat row
+`Subw.constraints Main` is exactly `Spec (fromMain Main)`, under
+`is_real = Main[31] = 1`. -/
+theorem iff_sp1
+    (Main : Vector (ZMod p) 32) (h_is_real : Main[31] = 1) :
+    (_root_.Subw.constraints Main).allHold_poly ↔ Spec (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [fromMain, Spec, SP1Clean.SubwOp.Spec,
+    SP1Clean.CPUState.cpuStateSpec, SP1Clean.RTypeReader.rtypeReaderSpec]
+  rw [show (_root_.Subw.constraints Main).allHold_poly ↔
+        ((SubwOperation.constraints (F := ZMod p)
+            #v[Main[15], Main[16], Main[17], Main[18]]
+            #v[Main[22], Main[23], Main[24], Main[25]]
+            { value := #v[Main[28], Main[29]], msb := { msb := Main[30] } }
+            Main[31]).allHold_poly ∧
+          (CPUState.constraints (F := ZMod p)
+            { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+              pc := #v[Main[3], Main[4], Main[5]] }
+            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[31]).allHold_poly ∧
+          (RTypeReader.constraints (F := ZMod p)
+            Main[0] (Main[2] + Main[1] * 65536)
+            #v[Main[3], Main[4], Main[5]] 20
+            #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535]
+            { op_a := Main[6],
+              op_a_memory :=
+                { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                  access_timestamp :=
+                    { prev_low := Main[11], diff_low_limb := Main[12] } },
+              op_a_0 := Main[13], op_b := Main[14],
+              op_b_memory :=
+                { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                  access_timestamp :=
+                    { prev_low := Main[19], diff_low_limb := Main[20] } },
+              op_c := Main[21],
+              op_c_memory :=
+                { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
+                  access_timestamp :=
+                    { prev_low := Main[26], diff_low_limb := Main[27] } } }
+            Main[31] Main[31]).allHold_poly ∧
+          (Main[31] * (Main[31] - 1) = 0 ∧ Main[13] = 0)) from by
+      simp [_root_.Subw.constraints, SP1ConstraintList.allHold_poly,
+        List.forall_append, List.Forall, SP1Constraint.toProp_poly]]
+  rw [h_is_real]
+  rw [SubwOperation.allHold_constraints_iff_poly,
+      SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+      SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1]
+  simp [SP1Clean.SubwOp.Spec, SP1Clean.CPUState.cpuStateSpec,
+    SP1Clean.RTypeReader.rtypeReaderSpec, and_assoc]
+
+/-- Clean-side `correct_subw`: same Sail equivalence statement as SP1's
+`Subw.correct_subw`, but with the constraint hypothesis re-expressed
+against the Clean-flavored `Spec` predicate over a structured `SubwCols`
+view. Pure composition with the SP1 proof via `iff_sp1.mpr`. -/
+theorem correct_subw
+    (Main : Vector (ZMod p) 32) (s : SailState)
+    (h_is_real : Main[31] = 1)
+    (h_spec : Spec (fromMain Main))
+    (state_cstrs : (_root_.Subw.constraints Main).initialState_poly s) :
+    let op_c := _root_.Subw.sp1_op_c Main
+    let op_b := _root_.Subw.sp1_op_b Main
+    let op_a := _root_.Subw.sp1_op_a Main
+    (_root_.Subw.spec_subw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Subw.sp1_subw Main).run s :=
+  _root_.Subw.correct_subw Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+    h_is_real state_cstrs
+
+end W
+end SP1Clean.Sub
