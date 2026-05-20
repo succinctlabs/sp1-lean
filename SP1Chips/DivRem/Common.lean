@@ -1077,7 +1077,9 @@ set_option maxRecDepth 1000000 in
 set_option maxHeartbeats 32000000 in
 -- 32M heartbeats + 1M recursion: same budget as `div_rem_poly`. `skipKernelTC`
 -- localizes the kernel-trip to this helper's olean; the chip's olean references
--- the constant and does not re-walk the body.
+-- the constant and does not re-walk the body. Splitting the 4-way rcases body
+-- into 4 case helpers would eliminate the trip entirely (each case is 22-56
+-- lines, well under the kernel WHNF depth limit) — left for future work.
 set_option debug.skipKernelTC true in
 /-- Extracted `h_abs` for `div_rem_poly` (signed 64-bit DRS branch).
 
