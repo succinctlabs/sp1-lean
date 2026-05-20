@@ -9,7 +9,7 @@ set_option maxHeartbeats 4000000 in
 -- impossible when `a.val, b.val < 65536` and `p > 2^17`). The
 -- `cols.bit = 1` case uses `ZMod.val_add_of_lt` to compute
 -- `(a - b + 65536).val`.
-lemma spec_poly
+lemma spec
   {p : ℕ} [Fact (Nat.Prime p)] [hp17 : Fact (2 ^ 17 < p)]
   (a b : ZMod p)
   (cols : U16CompareOperation (ZMod p))

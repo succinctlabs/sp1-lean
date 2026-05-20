@@ -178,11 +178,11 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 sub-opcodes (LB/LBU/LH/LHU/LW/LWU/LD when `op_a = x0`); each is selected
 by exactly one of `Main[41..47]` being 1, and the sum is the chip-wide
 "is real" flag. -/
-@[simp] def is_loadX0_poly (Main : Vector (ZMod p) 48) : Prop :=
+@[simp] def is_loadX0 (Main : Vector (ZMod p) 48) : Prop :=
   Main[41] + Main[42] + Main[43] + Main[44] + Main[45] + Main[46] + Main[47] = 1
 
 /-- `Main[47] = 1` selects the LD (load-doubleword) sub-opcode. -/
-@[simp] def is_loadX0_ld_poly (Main : Vector (ZMod p) 48) : Prop := Main[47] = 1
+@[simp] def is_loadX0_ld (Main : Vector (ZMod p) 48) : Prop := Main[47] = 1
 
 end poly_helpers
 

@@ -289,7 +289,7 @@ variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxRecDepth 1000000 in
-lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 65) :
+lemma allHold_constraints_iff (Main : Vector (ZMod p) 65) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[33] { msb := Main[61] } Main[63]) ∧
     List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[62] + Main[63])) ∧

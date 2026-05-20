@@ -64,14 +64,14 @@ end ZMod
 /-- `Opcode.ofNat` in the auto-gen `program` interactions reads the opcode
 field as a `ℕ`. At `F := Fin n` and `F := ZMod p` the `.val` projection
 provides this; the typeclass `CoeHead F ℕ` is the generic surface that
-the `_poly` cascade uses to lift readers with `program` clauses
+the `` cascade uses to lift readers with `program` clauses
 (RTypeReader, ITypeReader, JTypeReader, ALUTypeReader). -/
 instance Fin.coeHeadNat {n : ℕ} : CoeHead (Fin n) ℕ := ⟨Fin.val⟩
 instance ZMod.coeHeadNat {p : ℕ} [NeZero p] : CoeHead (ZMod p) ℕ := ⟨ZMod.val⟩
 
 /-- Reduces `CoeHead.coe (x : ZMod p)` to `x.val` so simp normalizes the
 `Opcode.ofNat` argument inside `program`-clause auto-gen output to match
-the iff_poly RHS `Opcode.ofNat opcode.val` form. -/
+the iff RHS `Opcode.ofNat opcode.val` form. -/
 @[simp] lemma coeHead_zmod_eq_val {p : ℕ} [NeZero p] (x : ZMod p) :
     @CoeHead.coe (ZMod p) ℕ _ x = x.val := rfl
 
@@ -119,7 +119,7 @@ lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
 
 /-! ### Polymorphic `.val` helpers over `ZMod p`
 
-These let `_poly` operation iff lemmas reduce `(N : ZMod p).val` to `N` for
+These let `` operation iff lemmas reduce `(N : ZMod p).val` to `N` for
 the literal values that appear in our auto-gen constraint definitions
 (`16` from byte-opcode `Range`, `32` for register-index bounds, `256` /
 `65536` for U16/U8 boundaries). Under `[Fact (2 ^ 17 < p)]` (which decides
@@ -149,7 +149,7 @@ variable {p : ℕ} [hp : Fact (2 ^ 17 < p)]
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
 
--- DivRem opcode values (15-28) needed for chip-level _poly proofs' opcode reductions.
+-- DivRem opcode values (15-28) needed for chip-level  proofs' opcode reductions.
 @[simp] lemma val_15_zmod_p : (15 : ZMod p).val = 15 := by
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (15 : ℕ) < p by omega)
@@ -260,7 +260,7 @@ lemma val_2_ne_zero : (2 : ZMod p) ≠ 0 := by
   intro hz; rw [hz] at h; simp at h
 
 /-- Polymorphic non-zero bridge for `(3 : ZMod p)`. Used in
-`LtOperationUnsigned/Signed` `_poly` proofs to discharge impossible
+`LtOperationUnsigned/Signed` `` proofs to discharge impossible
 flag-sum combinations (sum = 3 case). -/
 lemma val_3_ne_zero : (3 : ZMod p) ≠ 0 := by
   have h : (3 : ZMod p).val = 3 := by
@@ -274,18 +274,18 @@ lemma val_3_ne_zero : (3 : ZMod p) ≠ 0 := by
 (`AddOperation`, `SubOperation`, `Addw`, `Subw`, `AddrAdd`) have shape
 `x * 65536⁻¹ = 1`; this rewrites it to `x = 65536`. The prime hypothesis
 is needed for the `GroupWithZero` instance via `Field (ZMod p)`. -/
-lemma mul_inv_65536_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma mul_inv_65536_eq_one_iff [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (65536 : ZMod p)⁻¹ = 1 ↔ x = 65536 := by
   rw [mul_inv_eq_one₀ val_65536_ne_zero]
 
 /-- Used by AddrAdd/Branch-style ops where `(2^2)⁻¹` appears (PC alignment
 carries). -/
-lemma mul_inv_4_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma mul_inv_4_eq_one_iff [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (4 : ZMod p)⁻¹ = 1 ↔ x = 4 := by
   rw [mul_inv_eq_one₀ val_4_ne_zero]
 
 /-- Carry binarity in Add/Sub iff lemmas factors through this disjunction. -/
-lemma inv_65536_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma inv_65536_zero_or_one [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (65536 : ZMod p)⁻¹ = 0 ∨ x * (65536 : ZMod p)⁻¹ = 1 ↔
       x = 0 ∨ x = 65536 := by
   have h1 : (65536 : ZMod p)⁻¹ ≠ 0 := inv_ne_zero val_65536_ne_zero
@@ -293,7 +293,7 @@ lemma inv_65536_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
   aesop
 
 /-- Carry binarity for `(4 : ZMod p)⁻¹`. -/
-lemma inv_4_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma inv_4_zero_or_one [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (4 : ZMod p)⁻¹ = 0 ∨ x * (4 : ZMod p)⁻¹ = 1 ↔
       x = 0 ∨ x = 4 := by
   have h1 : (4 : ZMod p)⁻¹ ≠ 0 := inv_ne_zero val_4_ne_zero
@@ -302,7 +302,7 @@ lemma inv_4_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
 
 /-- Small-literal equality bridge for `ZMod p` under `[Fact (2^17 < p)]`.
 Converts `(n : ZMod p) = (m : ZMod p)` to `n = m` (Nat-level) for any
-`n, m < 2^17`. Used in the LtOperationUnsigned/Signed `_poly` proofs to
+`n, m < 2^17`. Used in the LtOperationUnsigned/Signed `` proofs to
 handle impossible cases where multiple flag bits are 1 simultaneously. -/
 lemma small_nat_eq_zmod {n m : ℕ} (hn : n < 2 ^ 17) (hm : m < 2 ^ 17) :
     ((n : ZMod p) = (m : ZMod p)) ↔ n = m := by
@@ -356,7 +356,7 @@ lemma val_mod_4_eq_zero_iff_zmod
 /-- Case-split helper for `(a - b).val` over `ZMod p`. The positive branch
 matches mathlib's `ZMod.val_sub`; the wrap-around branch follows from
 `a - b = -(b - a)` plus `ZMod.neg_val`. The `if`-shape is `omega`-friendly,
-making this the missing primitive for `_poly` proofs of operations whose
+making this the missing primitive for `` proofs of operations whose
 RHS contains subtraction over `ZMod p` (`AddOperation`, `SubOperation`,
 `U16CompareOperation`, etc.). -/
 lemma val_sub_cases {p : ℕ} [NeZero p] (a b : ZMod p) :
@@ -380,8 +380,8 @@ automatically. -/
 instance KoalaBear.Fact_2pow17_lt_KB : Fact (2 ^ 17 < KB) := ⟨by decide⟩
 
 /-- Strengthened version of the polymorphic prime-size hypothesis used by the
-Mul `_poly` operation lemmas (`core_mul_poly` / `core_mulw_poly` and the
-five `MulOperation.spec.<variant>_poly` lemmas). The byte-level carry chain
+Mul `` operation lemmas (`core_mul` / `core_mulw` and the
+five `MulOperation.spec.<variant>` lemmas). The byte-level carry chain
 needs `prod[i].val + carry[i].val * 256 < p` (max ≤ 2 ^ 24 − 1) to lift
 the ZMod constraints to Nat equations cleanly. KB ≈ 2^31 satisfies this
 trivially; BabyBear and Mersenne31 do as well. -/

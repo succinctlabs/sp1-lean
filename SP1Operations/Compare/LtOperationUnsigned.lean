@@ -5,7 +5,7 @@ namespace LtOperationUnsigned
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-lemma allHold_constraints_iff_poly
+lemma allHold_constraints_iff
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (b : Word (ZMod p))
   (d : Word (ZMod p))
@@ -34,26 +34,26 @@ set_option maxHeartbeats 8000000 in
 -- (`h_sum`) discards 14 of 16 cases (those with 2+ flags = 1) via
 -- field-level contradictions. The 2 remaining valid cases (0 flags or
 -- exactly 1 flag) close by rewriting `cols.comparison_limbs[i]` via
--- `← h_e0` / `← h_e1` and using the `isU64_poly` bounds.
+-- `← h_e0` / `← h_e1` and using the `isU64` bounds.
 @[grind →]
-lemma cl_are_U16_poly
+lemma cl_are_U16
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b : Word (ZMod p)}
   {d : Word (ZMod p)}
   {cols : LtOperationUnsigned (ZMod p)}
   {is_real : ZMod p}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
     is_real = 1 →
       cols.comparison_limbs[0].val < 65536 ∧ cols.comparison_limbs[1].val < 65536
   := by
     intro cstrs his
-    rw [allHold_constraints_iff_poly] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     rcases cstrs with
       ⟨_, _, h_f0, h_f1, h_f2, h_f3, h_sum, _, _, _, _, h_e0, h_e1, _⟩
-    obtain ⟨h_b0, h_b1, h_b2, h_b3⟩ := Word.lt_cases_of_isU64_poly h_b_isU64
-    obtain ⟨h_d0, h_d1, h_d2, h_d3⟩ := Word.lt_cases_of_isU64_poly h_d_isU64
+    obtain ⟨h_b0, h_b1, h_b2, h_b3⟩ := Word.lt_cases_of_isU64 h_b_isU64
+    obtain ⟨h_d0, h_d1, h_d2, h_d3⟩ := Word.lt_cases_of_isU64 h_d_isU64
     rcases h_f0 with hf0 | hf0 <;> rcases h_f1 with hf1 | hf1 <;>
       rcases h_f2 with hf2 | hf2 <;> rcases h_f3 with hf3 | hf3 <;>
       rcases h_sum with h_sum | h_sum <;>
@@ -80,7 +80,7 @@ lemma cl_are_U16_poly
            | (rw [← h_e1]; simp))
 
 /-- Helper: `not_eq_inv * (a - b) = 1` implies `a.val ≠ b.val`. Used in
-the `_poly` cascade to bridge field-level inequality (encoded by the
+the `` cascade to bridge field-level inequality (encoded by the
 `not_eq_inv` constraint) to Nat-level inequality (which `omega` /
 `grind` can use for limb-comparison reasoning). -/
 private lemma val_ne_of_inv_mul_eq {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
@@ -98,28 +98,28 @@ set_option maxHeartbeats 64000000 in
 -- disjunction; use `grind` with an optional `h_neq` hint from
 -- `val_ne_of_inv_mul_eq` to close.
 @[grind →, aesop safe forward]
-lemma spec.nat_poly
+lemma spec.nat
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationUnsigned (ZMod p)}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1) →
     cols.u16_compare_operation.bit =
-      if b.toNat_poly < d.toNat_poly then (1 : ZMod p) else (0 : ZMod p)
+      if b.toNat < d.toNat then (1 : ZMod p) else (0 : ZMod p)
   := by
     intro cstrs
-    have ⟨h_cl0, h_cl1⟩ := cl_are_U16_poly h_b_isU64 h_d_isU64 cstrs (by rfl)
-    rw [allHold_constraints_iff_poly] at cstrs
+    have ⟨h_cl0, h_cl1⟩ := cl_are_U16 h_b_isU64 h_d_isU64 cstrs (by rfl)
+    rw [allHold_constraints_iff] at cstrs
     rcases cstrs with ⟨h_comp_limbs, _, h_flag_0_bool, h_flag_1_bool,
       h_flag_2_bool, h_flag_3_bool, h_sum, h_eq3, h_eq2, h_eq1, h_eq0,
       h_e0, h_e1, h_inv⟩
-    have h_bit := U16CompareOperation.spec_poly _ _
+    have h_bit := U16CompareOperation.spec _ _
       cols.u16_compare_operation h_cl0 h_cl1 h_comp_limbs
-    obtain ⟨h_b0, h_b1, h_b2, h_b3⟩ := Word.lt_cases_of_isU64_poly h_b_isU64
-    obtain ⟨h_d0, h_d1, h_d2, h_d3⟩ := Word.lt_cases_of_isU64_poly h_d_isU64
+    obtain ⟨h_b0, h_b1, h_b2, h_b3⟩ := Word.lt_cases_of_isU64 h_b_isU64
+    obtain ⟨h_d0, h_d1, h_d2, h_d3⟩ := Word.lt_cases_of_isU64 h_d_isU64
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    unfold Word.toNat_poly
+    unfold Word.toNat
     rcases h_flag_0_bool with hf0 | hf0 <;>
       rcases h_flag_1_bool with hf1 | hf1 <;>
       rcases h_flag_2_bool with hf2 | hf2 <;>
@@ -144,41 +144,41 @@ lemma spec.nat_poly
       | grind
       | (have h_neq := val_ne_of_inv_mul_eq h_inv; grind)
 
-/-- BitVec form. Bridges `spec.nat_poly` to the BitVec form via
-`execute_RTYPE_pure_w_poly`'s SLTU arm. -/
-lemma spec_poly
+/-- BitVec form. Bridges `spec.nat` to the BitVec form via
+`execute_RTYPE_pure_w`'s SLTU arm. -/
+lemma spec
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationUnsigned (ZMod p)}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1) →
-    BitVec.ofNat 64 cols.u16_compare_operation.bit.val = execute_RTYPE_pure_w_poly b d .SLTU
+    BitVec.ofNat 64 cols.u16_compare_operation.bit.val = execute_RTYPE_pure_w b d .SLTU
   := by
     intro cstrs
-    have h := spec.nat_poly h_b_isU64 h_d_isU64 cstrs
-    simp only [execute_RTYPE_pure_w_poly]
+    have h := spec.nat h_b_isU64 h_d_isU64 cstrs
+    simp only [execute_RTYPE_pure_w]
     rw [h]
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     split_ifs <;> simp [ZMod.val_one, ZMod.val_zero]
 
 section gen
 
-lemma spec.nat.gen_poly
+lemma spec.nat.gen
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationUnsigned (ZMod p)}
   {is_real : ZMod p}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_real) →
     is_real = 1 →
       cols.u16_compare_operation.bit =
-        if b.toNat_poly < d.toNat_poly then (1 : ZMod p) else (0 : ZMod p)
+        if b.toNat < d.toNat then (1 : ZMod p) else (0 : ZMod p)
   := by
     intro cstrs h_is_real
     subst h_is_real
-    exact spec.nat_poly h_b_isU64 h_d_isU64 cstrs
+    exact spec.nat h_b_isU64 h_d_isU64 cstrs
 
 end gen
 

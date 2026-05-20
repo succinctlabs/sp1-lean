@@ -6,7 +6,7 @@ namespace LtOperationSigned
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-lemma allHold_constraints_iff_poly
+lemma allHold_constraints_iff
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b : Word (ZMod p)}
   {d : Word (ZMod p)}
@@ -31,55 +31,55 @@ lemma allHold_constraints_iff_poly
 /-- Natural-form unsigned spec: with `is_signed = 0`, the msb constraints
 force `cols.{b,c}_msb.msb = 0`, so the `LtOperationUnsigned` sub-proof on
 the same b, d applies. -/
-lemma spec.unsigned_poly
+lemma spec.unsigned
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b : Word (ZMod p)}
   {d : Word (ZMod p)}
   {cols : LtOperationSigned (ZMod p)}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 0 1) →
     cols.result.u16_compare_operation.bit =
-      if b.toNat_poly < d.toNat_poly then (1 : ZMod p) else (0 : ZMod p)
+      if b.toNat < d.toNat then (1 : ZMod p) else (0 : ZMod p)
   := by
     intro cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     rcases cstrs with ⟨h_b_msb, h_c_msb, h_lt, h_is_signed_bool, h_is_signed_b_msb, h_is_signed_c_msb⟩
-    apply Word.lt_cases_of_isU64_poly at h_b_isU64
-    apply Word.lt_cases_of_isU64_poly at h_d_isU64
-    apply LtOperationUnsigned.spec.nat_poly at h_lt
-    · simp_all [Word.toNat_poly]
-    · apply Word.isU64_of_cases_poly <;> simp_all
-    · apply Word.isU64_of_cases_poly <;> simp_all
+    apply Word.lt_cases_of_isU64 at h_b_isU64
+    apply Word.lt_cases_of_isU64 at h_d_isU64
+    apply LtOperationUnsigned.spec.nat at h_lt
+    · simp_all [Word.toNat]
+    · apply Word.isU64_of_cases <;> simp_all
+    · apply Word.isU64_of_cases <;> simp_all
 
 set_option maxHeartbeats 4000000 in
 -- Heartbeats elevated for the structured `.val`-arithmetic case-split
--- on `cols.{b,c}_msb.msb` plus the `LtOperationUnsigned.spec.nat_poly`
+-- on `cols.{b,c}_msb.msb` plus the `LtOperationUnsigned.spec.nat`
 -- chain through the shifted vectors.
 /-- Natural-form signed spec. The shifted limb 3
 (`b[3] + 32768 - 65536 * msb`) converts a signed comparison into an
-unsigned one: in both `msb` cases the resulting `Word.toNat_poly` equals
-`b.toInt_poly + 32768 * 2^48`, so `shifted_b < shifted_d` iff
-`b.toInt_poly < d.toInt_poly`. -/
-lemma spec.signed_poly
+unsigned one: in both `msb` cases the resulting `Word.toNat` equals
+`b.toInt + 32768 * 2^48`, so `shifted_b < shifted_d` iff
+`b.toInt < d.toInt`. -/
+lemma spec.signed
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationSigned (ZMod p)}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1 1) →
     cols.result.u16_compare_operation.bit =
-      if b.toInt_poly < d.toInt_poly then (1 : ZMod p) else (0 : ZMod p)
+      if b.toInt < d.toInt then (1 : ZMod p) else (0 : ZMod p)
   := by
     intro cstrs
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have hp_lt := Fact.out (p := 2 ^ 17 < p)
-    rw [allHold_constraints_iff_poly] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     rcases cstrs with ⟨h_b_msb, h_c_msb, h_lt, _⟩
-    have h_b_msb_eq := U16MSBOperation.spec.U64_poly h_b_isU64 h_b_msb
-    have h_c_msb_eq := U16MSBOperation.spec.U64_poly h_d_isU64 h_c_msb
-    obtain ⟨h_b0, h_b1, h_b2, h_b3⟩ := Word.lt_cases_of_isU64_poly h_b_isU64
-    obtain ⟨h_d0, h_d1, h_d2, h_d3⟩ := Word.lt_cases_of_isU64_poly h_d_isU64
+    have h_b_msb_eq := U16MSBOperation.spec.U64 h_b_isU64 h_b_msb
+    have h_c_msb_eq := U16MSBOperation.spec.U64 h_d_isU64 h_c_msb
+    obtain ⟨h_b0, h_b1, h_b2, h_b3⟩ := Word.lt_cases_of_isU64 h_b_isU64
+    obtain ⟨h_d0, h_d1, h_d2, h_d3⟩ := Word.lt_cases_of_isU64 h_d_isU64
     simp only [one_mul] at h_lt
     have h32768_val : (32768 : ZMod p).val = 32768 := by
       have : 131072 < p := by have := hp_lt; omega
@@ -117,35 +117,35 @@ lemma spec.signed_poly
       · rw [hmsb_eq, if_neg hneg, mul_zero, sub_zero, if_neg hneg]
         rw [ZMod.val_add_of_lt (by rw [h32768_val]; omega), h32768_val]
         push_cast; omega
-    have h_sb_isU64 : Word.isU64_poly
+    have h_sb_isU64 : Word.isU64
         #v[b[0], b[1], b[2], b[3] + 32768 - 65536 * cols.b_msb.msb] := by
-      apply Word.isU64_of_cases_poly <;> simp only [Vector.getElem_mk, List.getElem_toArray,
+      apply Word.isU64_of_cases <;> simp only [Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ]
       · exact h_b0
       · exact h_b1
       · exact h_b2
       · exact h_shifted_lt b[3] h_b3 cols.b_msb.msb
-          (by simpa [Word.isNegative_poly] using h_b_msb_eq)
-    have h_sd_isU64 : Word.isU64_poly
+          (by simpa [Word.isNegative] using h_b_msb_eq)
+    have h_sd_isU64 : Word.isU64
         #v[d[0], d[1], d[2], d[3] + 32768 - 65536 * cols.c_msb.msb] := by
-      apply Word.isU64_of_cases_poly <;> simp only [Vector.getElem_mk, List.getElem_toArray,
+      apply Word.isU64_of_cases <;> simp only [Vector.getElem_mk, List.getElem_toArray,
         List.getElem_cons_zero, List.getElem_cons_succ]
       · exact h_d0
       · exact h_d1
       · exact h_d2
       · exact h_shifted_lt d[3] h_d3 cols.c_msb.msb
-          (by simpa [Word.isNegative_poly] using h_c_msb_eq)
-    have h_lt_nat := LtOperationUnsigned.spec.nat_poly h_sb_isU64 h_sd_isU64 h_lt
+          (by simpa [Word.isNegative] using h_c_msb_eq)
+    have h_lt_nat := LtOperationUnsigned.spec.nat h_sb_isU64 h_sd_isU64 h_lt
     have h_b_eq := h_shifted_val b[3] h_b3 cols.b_msb.msb
-      (by simpa [Word.isNegative_poly] using h_b_msb_eq)
+      (by simpa [Word.isNegative] using h_b_msb_eq)
     have h_d_eq := h_shifted_val d[3] h_d3 cols.c_msb.msb
-      (by simpa [Word.isNegative_poly] using h_c_msb_eq)
+      (by simpa [Word.isNegative] using h_c_msb_eq)
     rw [h_lt_nat]
     congr 1
     apply propext
-    simp only [Word.toNat_poly, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat, Vector.getElem_mk, List.getElem_toArray,
                List.getElem_cons_zero, List.getElem_cons_succ]
-    unfold Word.toInt_poly Word.toNat_poly
+    unfold Word.toInt Word.toNat
     constructor <;> intro h
     · have h' : ((b[0].val + b[1].val * 2 ^ 16 + b[2].val * 2 ^ 32
                   + (b[3] + 32768 - 65536 * cols.b_msb.msb).val * 2 ^ 48 : ℕ) : ℤ) <
@@ -154,9 +154,9 @@ lemma spec.signed_poly
         exact_mod_cast h
       push_cast at h'
       rw [h_b_eq, h_d_eq] at h'
-      simp only [Word.isNegative_poly]
+      simp only [Word.isNegative]
       split_ifs <;> push_cast <;> omega
-    · simp only [Word.isNegative_poly] at h
+    · simp only [Word.isNegative] at h
       have h' : ((b[0].val + b[1].val * 2 ^ 16 + b[2].val * 2 ^ 32
                   + (b[3] + 32768 - 65536 * cols.b_msb.msb).val * 2 ^ 48 : ℕ) : ℤ) <
                  ((d[0].val + d[1].val * 2 ^ 16 + d[2].val * 2 ^ 32
@@ -167,8 +167,8 @@ lemma spec.signed_poly
       exact_mod_cast h'
 
 /-- Natural-form branch spec: uses `Word` equality directly and
-`toNat_poly`/`toInt_poly` ordering. -/
-def spec.branch.def_poly {p : ℕ} [NeZero p]
+`toNat`/`toInt` ordering. -/
+def spec.branch.def {p : ℕ} [NeZero p]
     (b : (Word (ZMod p)))
     (c : (Word (ZMod p)))
     (cols : LtOperationSigned (ZMod p))
@@ -185,7 +185,7 @@ def spec.branch.def_poly {p : ℕ} [NeZero p]
           + cols.result.u16_flags[1]
           + cols.result.u16_flags[2]
           + cols.result.u16_flags[3] = 1)
-    ∧ if b.toNat_poly < c.toNat_poly
+    ∧ if b.toNat < c.toNat
       then (cols.result.u16_compare_operation.bit = 1)
       else (cols.result.u16_compare_operation.bit = 0))
   ∧ (is_signed = 1 →
@@ -199,14 +199,14 @@ def spec.branch.def_poly {p : ℕ} [NeZero p]
             + cols.result.u16_flags[1]
             + cols.result.u16_flags[2]
             + cols.result.u16_flags[3] = 1)
-      ∧ if b.toInt_poly < c.toInt_poly
+      ∧ if b.toInt < c.toInt
         then (cols.result.u16_compare_operation.bit = 1)
         else (cols.result.u16_compare_operation.bit = 0))
 
 set_option maxHeartbeats 16000000 in
 -- Heartbeats elevated for the 16-way flag-bool case-split discharging
 -- impossible flag-sum cases via `linear_combination + val_k_ne_zero`.
-private lemma branch_helper_eq_iff_unsigned_poly
+private lemma branch_helper_eq_iff_unsigned
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationSigned (ZMod p)} :
@@ -218,13 +218,13 @@ private lemma branch_helper_eq_iff_unsigned_poly
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
   have h_zero_ne_one : (0 : ZMod p) ≠ 1 := zero_ne_one
-  rw [allHold_constraints_iff_poly] at cstrs
+  rw [allHold_constraints_iff] at cstrs
   rcases cstrs with ⟨_, _, h_lt, _, h_msb_b_eq, h_msb_d_eq⟩
   have hmsb_b : cols.b_msb.msb = 0 := h_msb_b_eq.resolve_left h_zero_ne_one
   have hmsb_d : cols.c_msb.msb = 0 := h_msb_d_eq.resolve_left h_zero_ne_one
   rw [hmsb_b, hmsb_d] at h_lt
   simp only [mul_zero, sub_zero, zero_mul, add_zero] at h_lt
-  rw [LtOperationUnsigned.allHold_constraints_iff_poly] at h_lt
+  rw [LtOperationUnsigned.allHold_constraints_iff] at h_lt
   rcases h_lt with ⟨_, _, h_f0, h_f1, h_f2, h_f3,
      _, lt_d3, lt_d2, lt_d1, lt_d0, h_cmp_b, h_cmp_d, h_neq⟩
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -272,14 +272,14 @@ private lemma branch_helper_eq_iff_unsigned_poly
 
 set_option maxHeartbeats 32000000 in
 -- Heartbeats elevated for the 16-way flag-bool case-split + 4-way
--- (b.isNegative_poly, d.isNegative_poly) sub-case-split for limb 3
+-- (b.isNegative, d.isNegative) sub-case-split for limb 3
 -- (using `val_sub_cases` to discharge cross-msb cases).
-private lemma branch_helper_eq_iff_signed_poly
+private lemma branch_helper_eq_iff_signed
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationSigned (ZMod p)}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols 1 1) →
     (b = d ↔ cols.result.u16_flags[0] = 0 ∧ cols.result.u16_flags[1] = 0
             ∧ cols.result.u16_flags[2] = 0 ∧ cols.result.u16_flags[3] = 0)
@@ -288,17 +288,17 @@ private lemma branch_helper_eq_iff_signed_poly
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt := Fact.out (p := 2 ^ 17 < p)
   have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
-  obtain ⟨_, _, _, h_b3_lt⟩ := Word.lt_cases_of_isU64_poly h_b_isU64
-  obtain ⟨_, _, _, h_d3_lt⟩ := Word.lt_cases_of_isU64_poly h_d_isU64
-  rw [allHold_constraints_iff_poly] at cstrs
+  obtain ⟨_, _, _, h_b3_lt⟩ := Word.lt_cases_of_isU64 h_b_isU64
+  obtain ⟨_, _, _, h_d3_lt⟩ := Word.lt_cases_of_isU64 h_d_isU64
+  rw [allHold_constraints_iff] at cstrs
   rcases cstrs with ⟨h_b_msb, h_d_msb, h_lt, _⟩
-  have h_b_msb_eq := U16MSBOperation.spec.U64_poly h_b_isU64 h_b_msb
-  have h_c_msb_eq := U16MSBOperation.spec.U64_poly h_d_isU64 h_d_msb
+  have h_b_msb_eq := U16MSBOperation.spec.U64 h_b_isU64 h_b_msb
+  have h_c_msb_eq := U16MSBOperation.spec.U64 h_d_isU64 h_d_msb
   have h32768_val : (32768 : ZMod p).val = 32768 := by
     have : 131072 < p := by omega
     exact ZMod.val_natCast_of_lt (show (32768 : ℕ) < p by omega)
   have h65536_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
-  rw [LtOperationUnsigned.allHold_constraints_iff_poly] at h_lt
+  rw [LtOperationUnsigned.allHold_constraints_iff] at h_lt
   rcases h_lt with ⟨_, _, h_f0, h_f1, h_f2, h_f3,
      _, lt_d3, lt_d2, lt_d1, lt_d0, h_cmp_b, h_cmp_d, h_neq⟩
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
@@ -311,7 +311,7 @@ private lemma branch_helper_eq_iff_signed_poly
   · intro ⟨h0, h1, h2, h3⟩
     have h_msb_eq : cols.b_msb.msb = cols.c_msb.msb := by
       rw [h_b_msb_eq, h_c_msb_eq]
-      simp [Word.isNegative_poly, h3]
+      simp [Word.isNegative, h3]
     have h_cmp_eq : cols.result.comparison_limbs[0] = cols.result.comparison_limbs[1] := by
       rw [← h_cmp_b, ← h_cmp_d, h0, h1, h2, h3, h_msb_eq]
     rcases h_neq with h_neq | h_neq
@@ -352,7 +352,7 @@ private lemma branch_helper_eq_iff_signed_poly
       · exact h
     have hb3eqd3 : b[3] = d[3] := by
       rw [h_b_msb_eq, h_c_msb_eq] at h_shifted_eq
-      simp only [Word.isNegative_poly] at h_shifted_eq
+      simp only [Word.isNegative] at h_shifted_eq
       by_cases hbn : b[3].val ≥ 32768 <;> by_cases hdn : d[3].val ≥ 32768
       all_goals simp [hbn, hdn] at h_shifted_eq
       · linear_combination h_shifted_eq
@@ -383,22 +383,22 @@ private lemma branch_helper_eq_iff_signed_poly
 
 set_option maxHeartbeats 16000000 in
 -- Heartbeats elevated for the inline neq-iff proof
--- (16-way flag-bool case-split via h_sum) plus the spec.{unsigned,signed}_poly
+-- (16-way flag-bool case-split via h_sum) plus the spec.{unsigned,signed}
 -- bridge to the if-then-else conclusion.
 /-- Branch-form spec. Both `is_signed = 0` and `is_signed = 1` branches
 reuse the same combinatorial argument for the equality + sum iffs
-(extracted into `branch_helper_eq_iff_unsigned_poly` and
-`branch_helper_eq_iff_signed_poly`); the if-then-else conclusion comes
-from `spec.unsigned_poly` / `spec.signed_poly`. -/
-lemma spec.branch_poly
+(extracted into `branch_helper_eq_iff_unsigned` and
+`branch_helper_eq_iff_signed`); the if-then-else conclusion comes
+from `spec.unsigned` / `spec.signed`. -/
+lemma spec.branch
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {b d : Word (ZMod p)}
   {cols : LtOperationSigned (ZMod p)}
   {is_signed : ZMod p}
-  (h_b_isU64 : Word.isU64_poly b)
-  (h_d_isU64 : Word.isU64_poly d) :
+  (h_b_isU64 : Word.isU64 b)
+  (h_d_isU64 : Word.isU64 d) :
   List.Forall SP1Constraint.toProp (constraints b d cols is_signed 1) →
-    spec.branch.def_poly b d cols is_signed
+    spec.branch.def b d cols is_signed
     := by
   intro cstrs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -406,11 +406,11 @@ lemma spec.branch_poly
   refine ⟨?_, ?_⟩
   · intro h_sgn0
     subst h_sgn0
-    have h_eq := branch_helper_eq_iff_unsigned_poly cstrs
+    have h_eq := branch_helper_eq_iff_unsigned cstrs
     have h_cstrs := cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     rcases cstrs with ⟨_, _, h_lt, _⟩
-    rw [LtOperationUnsigned.allHold_constraints_iff_poly] at h_lt
+    rw [LtOperationUnsigned.allHold_constraints_iff] at h_lt
     rcases h_lt with ⟨_, _, h_f0, h_f1, h_f2, h_f3, h_sum, _⟩
     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
       List.getElem_cons_succ] at h_f0 h_f1 h_f2 h_f3 h_sum
@@ -445,15 +445,15 @@ lemma spec.branch_poly
         rw [h0, h1, h2, h3] at h_sum_eq
         simp at h_sum_eq
     refine ⟨h_eq, h_neq, ?_⟩
-    have h_unsigned := spec.unsigned_poly h_b_isU64 h_d_isU64 h_cstrs
+    have h_unsigned := spec.unsigned h_b_isU64 h_d_isU64 h_cstrs
     split_ifs with hcond <;> simp [hcond] at h_unsigned <;> exact h_unsigned
   · intro h_sgn1
     subst h_sgn1
-    have h_eq := branch_helper_eq_iff_signed_poly h_b_isU64 h_d_isU64 cstrs
+    have h_eq := branch_helper_eq_iff_signed h_b_isU64 h_d_isU64 cstrs
     have h_cstrs := cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     rcases cstrs with ⟨_, _, h_lt, _⟩
-    rw [LtOperationUnsigned.allHold_constraints_iff_poly] at h_lt
+    rw [LtOperationUnsigned.allHold_constraints_iff] at h_lt
     rcases h_lt with ⟨_, _, h_f0, h_f1, h_f2, h_f3, h_sum, _⟩
     simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
       List.getElem_cons_succ] at h_f0 h_f1 h_f2 h_f3 h_sum
@@ -488,7 +488,7 @@ lemma spec.branch_poly
         rw [h0, h1, h2, h3] at h_sum_eq
         simp at h_sum_eq
     refine ⟨h_eq, h_neq, ?_⟩
-    have h_signed := spec.signed_poly h_b_isU64 h_d_isU64 h_cstrs
+    have h_signed := spec.signed h_b_isU64 h_d_isU64 h_cstrs
     split_ifs with hcond <;> simp [hcond] at h_signed <;> exact h_signed
 
 end LtOperationSigned

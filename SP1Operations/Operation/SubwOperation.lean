@@ -8,8 +8,8 @@ set_option linter.style.setOption false
 set_option linter.style.longLine false
 
 /-- Disjunction-shift helper for the Subw carry-bridging proof; mirrors
-the Sub-side `carry_swap_iff_poly`. -/
-private lemma carry_swap_iff_poly {p : ℕ} [Fact (Nat.Prime p)]
+the Sub-side `carry_swap_iff`. -/
+private lemma carry_swap_iff {p : ℕ} [Fact (Nat.Prime p)]
     (x y : ZMod p) (hxy : x = 1 - y) :
     (x = 0 ∨ x = 1) ↔ (y = 0 ∨ y = 1) := by
   rw [hxy, sub_eq_zero, sub_eq_self]
@@ -26,11 +26,11 @@ set_option maxHeartbeats 4000000 in
 /-- Borrow-form ↔ natural-form bridging recipe (mirrors Sub): pose
 carries `c_i` (natural) and `d_i` (borrow), prove `d_i = 1 - c_i` via
 `linear_combination`, close the borrow-form iff via bare simp, then
-bridge each carry-binary clause via `carry_swap_iff_poly`. -/
-lemma allHold_constraints_iff_poly
+bridge each carry-binary clause via `carry_swap_iff`. -/
+lemma allHold_constraints_iff
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p)) (cols : SubwOperation (ZMod p)) :
-    SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
+    SP1ConstraintList.allHold (constraints a b cols 1) ↔
       let carry0 : ZMod p := (b[0] + cols.value[0] - a[0]) * 65536⁻¹
       let carry1 : ZMod p := (b[1] + cols.value[1] - a[1] + carry0) * 65536⁻¹
       List.Forall SP1Constraint.toProp (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
@@ -50,15 +50,15 @@ lemma allHold_constraints_iff_poly
     rw [hd1_def, hd0_swap, hc1_def, hc0_def]
     linear_combination (1 : ZMod p) * hbridge
   have h_borrow :
-      SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
+      SP1ConstraintList.allHold (constraints a b cols 1) ↔
         List.Forall SP1Constraint.toProp (U16MSBOperation.constraints cols.value[1] cols.msb 1) ∧
         (d0 = 0 ∨ d0 = 1) ∧ (d1 = 0 ∨ d1 = 1) ∧
         cols.value[0].val < 65536 ∧ cols.value[1].val < 65536 := by
     simp [constraints, sub_eq_zero, SP1Constraint.toProp,
           hd0_def, hd1_def]
   rw [h_borrow,
-      carry_swap_iff_poly d0 c0 hd0_swap,
-      carry_swap_iff_poly d1 c1 hd1_swap]
+      carry_swap_iff d0 c0 hd0_swap,
+      carry_swap_iff d1 c1 hd1_swap]
 
 /-- Per-limb Nat lift: same as `SubOperation.limb_lift`. -/
 private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
@@ -88,39 +88,39 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   exact h
 
 set_option maxHeartbeats 16000000 in
--- Like `SubOperation.spec_poly` adapted to the 32-bit `HWord` result and
+-- Like `SubOperation.spec` adapted to the 32-bit `HWord` result and
 -- the U16MSB cascade. Two carries instead of four; the same
 -- linear_combination + limb_lift recipe closes the BitVec goal, and
--- `U16MSBOperation.spec_poly` discharges the MSB clause.
-theorem spec_poly
+-- `U16MSBOperation.spec` discharges the MSB clause.
+theorem spec
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a b : Word (ZMod p)}
   {cols : SubwOperation (ZMod p)}
-  (h_isU64_a : a.isU64_poly)
-  (h_isU64_b : b.isU64_poly) :
-  SP1ConstraintList.allHold_poly (constraints a b cols 1) →
-    HWord.isU32_poly cols.value ∧
-    HWord.toBitVec32_poly cols.value = execute_RTYPEW_pure_32_w_poly a b .SUBW ∧
-    cols.msb.msb = if (HWord.toBitVec32_poly cols.value).msb then 1 else 0 := by
+  (h_isU64_a : a.isU64)
+  (h_isU64_b : b.isU64) :
+  SP1ConstraintList.allHold (constraints a b cols 1) →
+    HWord.isU32 cols.value ∧
+    HWord.toBitVec32 cols.value = execute_RTYPEW_pure_32_w a b .SUBW ∧
+    cols.msb.msb = if (HWord.toBitVec32 cols.value).msb then 1 else 0 := by
   intro cstrs
-  rw [allHold_constraints_iff_poly] at cstrs
+  rw [allHold_constraints_iff] at cstrs
   obtain ⟨hmsb, hc0, hc1, hv0, hv1⟩ := cstrs
-  have h_isU32_v : HWord.isU32_poly cols.value :=
-    HWord.isU32_of_cases_poly hv0 hv1
-  obtain ⟨ha0, ha1, _, _⟩ := Word.lt_cases_of_isU64_poly h_isU64_a
-  obtain ⟨hbb0, hbb1, _, _⟩ := Word.lt_cases_of_isU64_poly h_isU64_b
+  have h_isU32_v : HWord.isU32 cols.value :=
+    HWord.isU32_of_cases hv0 hv1
+  obtain ⟨ha0, ha1, _, _⟩ := Word.lt_cases_of_isU64 h_isU64_a
+  obtain ⟨hbb0, hbb1, _, _⟩ := Word.lt_cases_of_isU64 h_isU64_b
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   refine ⟨h_isU32_v, ?_, ?_⟩
   · -- BitVec equation: cols.value = a.low - b.low
-    rw [show execute_RTYPEW_pure_32_w_poly a b .SUBW =
-          a.low_poly.toBitVec32_poly - b.low_poly.toBitVec32_poly from rfl,
+    rw [show execute_RTYPEW_pure_32_w a b .SUBW =
+          a.low.toBitVec32 - b.low.toBitVec32 from rfl,
         BitVec.eq_sub_iff_add_eq, ← BitVec.toNat_inj, BitVec.toNat_add,
-        HWord.toBitVec32_poly_toNat_poly h_isU32_v,
-        HWord.toBitVec32_poly_toNat_poly (Word.isU64_poly_low_poly_isU32_poly h_isU64_b),
-        HWord.toBitVec32_poly_toNat_poly (Word.isU64_poly_low_poly_isU32_poly h_isU64_a)]
-    simp only [HWord.toNat_poly, Word.low_poly, Vector.getElem_mk,
+        HWord.toBitVec32_toNat h_isU32_v,
+        HWord.toBitVec32_toNat (Word.isU64_low_isU32 h_isU64_b),
+        HWord.toBitVec32_toNat (Word.isU64_low_isU32 h_isU64_a)]
+    simp only [HWord.toNat, Word.low, Vector.getElem_mk,
       List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
     set c0 : ZMod p := (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹ with hc0_def
     set c1 : ZMod p := (b[1] + cols.value[1] - a[1] + c0) * (65536 : ZMod p)⁻¹ with hc1_def
@@ -136,9 +136,9 @@ theorem spec_poly
       rcases hc1 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
     omega
   · -- MSB clause
-    apply U16MSBOperation.spec_poly hv1 at hmsb
+    apply U16MSBOperation.spec hv1 at hmsb
     rw [hmsb]
-    simp only [HWord.toBitVec32_poly, HWord.toNat_poly, BitVec.msb_eq_toNat,
+    simp only [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat,
       BitVec.toNat_ofNat]
     have h_sum_lt : cols.value[0].val + cols.value[1].val * 2 ^ 16 < 2 ^ 32 := by omega
     rw [Nat.mod_eq_of_lt h_sum_lt]

@@ -114,13 +114,13 @@ section poly_helpers
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-@[simp] def is_lh_poly (Main : Vector (ZMod p) 44) : Prop := Main[42] = 1
-@[simp] def is_lhu_poly (Main : Vector (ZMod p) 44) : Prop := Main[43] = 1
+@[simp] def is_lh (Main : Vector (ZMod p) 44) : Prop := Main[42] = 1
+@[simp] def is_lhu (Main : Vector (ZMod p) 44) : Prop := Main[43] = 1
 
 set_option maxHeartbeats 800000 in
--- Polymorphic counterpart of `allHold_constraints_iff_of_is_lh`.
-lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
-    (h_is_lh : is_lh_poly Main) :
+-- Higher heartbeats: the iff destructure unfolds the full constraint list.
+lemma allHold_constraints_iff_of_is_lh (Main : Vector (ZMod p) 44)
+    (h_is_lh : is_lh Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     (List.Forall SP1Constraint.toProp
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
@@ -155,7 +155,7 @@ lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
         Main[36] + Main[37] * 65536 ∧
     Main[36].val < 65536 ∧
     ((0 : ZMod p) < 256 ∧ Main[37] < (256 : ZMod p) ∧ (0 : ZMod p) < 256) ∧
-    Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] ∧
+    Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] ∧
     Main[43] = 0 ∧ Main[13] = 0 ∧
     (Main[38] = 1 ∨ Main[39] = 1 ∨ Main[40] = Main[29]) ∧
     (Main[38] = 0 ∨ Main[39] = 1 ∨ Main[40] = Main[30]) ∧
@@ -173,9 +173,9 @@ lemma allHold_constraints_iff_of_is_lh_poly (Main : Vector (ZMod p) 44)
     simp_all
 
 set_option maxHeartbeats 800000 in
--- Polymorphic counterpart of `allHold_constraints_iff_of_is_lhu`.
-lemma allHold_constraints_iff_of_is_lhu_poly (Main : Vector (ZMod p) 44)
-    (h_is_lhu : is_lhu_poly Main) :
+-- Higher heartbeats: the iff destructure unfolds the full constraint list.
+lemma allHold_constraints_iff_of_is_lhu (Main : Vector (ZMod p) 44)
+    (h_is_lhu : is_lhu Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     (List.Forall SP1Constraint.toProp
       (AddrAddOperation.constraints #v[Main[15], Main[16], Main[17], Main[18]]
@@ -210,7 +210,7 @@ lemma allHold_constraints_iff_of_is_lhu_poly (Main : Vector (ZMod p) 44)
         Main[36] + Main[37] * 65536 ∧
     Main[36].val < 65536 ∧
     ((0 : ZMod p) < 256 ∧ Main[37] < (256 : ZMod p) ∧ (0 : ZMod p) < 256) ∧
-    Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] ∧
+    Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] ∧
     Main[42] = 0 ∧ Main[13] = 0 ∧
     (Main[38] = 1 ∨ Main[39] = 1 ∨ Main[40] = Main[29]) ∧
     (Main[38] = 0 ∨ Main[39] = 1 ∨ Main[40] = Main[30]) ∧

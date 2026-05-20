@@ -202,21 +202,21 @@ section poly_helpers
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-@[simp] def is_real_poly (Main : Vector (ZMod p) 45) : Prop :=
+@[simp] def is_real (Main : Vector (ZMod p) 45) : Prop :=
   Main[28] = 1 ∨ Main[29] = 1 ∨ Main[30] = 1 ∨ Main[31] = 1 ∨ Main[32] = 1 ∨ Main[33] = 1
 
-@[simp] def is_beq_poly (Main : Vector (ZMod p) 45) := Main[28] = 1
-@[simp] def is_bne_poly (Main : Vector (ZMod p) 45) := Main[29] = 1
-@[simp] def is_blt_poly (Main : Vector (ZMod p) 45) := Main[30] = 1
-@[simp] def is_bge_poly (Main : Vector (ZMod p) 45) := Main[31] = 1
-@[simp] def is_bltu_poly (Main : Vector (ZMod p) 45) := Main[32] = 1
-@[simp] def is_bgeu_poly (Main : Vector (ZMod p) 45) := Main[33] = 1
+@[simp] def is_beq (Main : Vector (ZMod p) 45) := Main[28] = 1
+@[simp] def is_bne (Main : Vector (ZMod p) 45) := Main[29] = 1
+@[simp] def is_blt (Main : Vector (ZMod p) 45) := Main[30] = 1
+@[simp] def is_bge (Main : Vector (ZMod p) 45) := Main[31] = 1
+@[simp] def is_bltu (Main : Vector (ZMod p) 45) := Main[32] = 1
+@[simp] def is_bgeu (Main : Vector (ZMod p) 45) := Main[33] = 1
 
 set_option maxHeartbeats 1600000 in
 -- 6-way nested case split, closed by `simp_all` once the disjunctions are
 -- destructured. Heartbeats elevated for the 64-case combinatorial closure.
-lemma single_op_poly (Main : Vector (ZMod p) 45)
-    (cstrs : SP1ConstraintList.allHold_poly (constraints Main)) :
+lemma single_op (Main : Vector (ZMod p) 45)
+    (cstrs : SP1ConstraintList.allHold (constraints Main)) :
     (Main[28] = 1 → Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) ∧
     (Main[29] = 1 → Main[28] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) ∧
     (Main[30] = 1 → Main[28] = 0 ∧ Main[29] = 0 ∧ Main[31] = 0 ∧ Main[32] = 0 ∧ Main[33] = 0) ∧
@@ -276,14 +276,14 @@ lemma single_op_poly (Main : Vector (ZMod p) 45)
     h6_ne_zero, h6_ne_one]
 
 set_option maxHeartbeats 1600000 in
--- Polymorphic counterpart of `eq_signExtend_of_is_real`. The 6-arm
--- case-split over `is_real` extracts the trusted_instr signExtend
--- bridge from the active variant's reader constraint. Each variant
--- pins the opcode to a specific small constant (40-45 for branch
--- variants); supply `(k : ZMod p).val = k` simp lemmas explicitly.
-lemma eq_signExtend_of_is_real_poly (Main : Vector (ZMod p) 45)
-    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
-    (is_real : is_real_poly Main) :
+-- The 6-arm case-split over `is_real` extracts the trusted_instr
+-- signExtend bridge from the active variant's reader constraint. Each
+-- variant pins the opcode to a specific small constant (40-45 for
+-- branch variants); supply `(k : ZMod p).val = k` simp lemmas
+-- explicitly.
+lemma eq_signExtend_of_is_real (Main : Vector (ZMod p) 45)
+    (cstrs : SP1ConstraintList.allHold (constraints Main))
+    (is_real : is_real Main) :
     Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -300,7 +300,7 @@ lemma eq_signExtend_of_is_real_poly (Main : Vector (ZMod p) 45)
   have h43_val : (43 : ZMod p).val = 43 := ZMod.val_natCast_of_lt h43_lt
   have h44_val : (44 : ZMod p).val = 44 := ZMod.val_natCast_of_lt h44_lt
   have h45_val : (45 : ZMod p).val = 45 := ZMod.val_natCast_of_lt h45_lt
-  have := single_op_poly Main cstrs
+  have := single_op Main cstrs
   rcases is_real with h | h | h | h | h | h
   all_goals
   · simp_all [constraints, ITypeReaderImmutable.constraints,
@@ -308,18 +308,17 @@ lemma eq_signExtend_of_is_real_poly (Main : Vector (ZMod p) 45)
       h40_val, h41_val, h42_val, h43_val, h44_val, h45_val]
 
 set_option maxHeartbeats 1600000 in
--- Polymorphic counterpart of `add_signExtend_of_constraints`. Uses the
--- ZMod %4 → Nat %4 bridge (`val_mod_4_eq_zero_iff_zmod` in Field.lean)
--- to convert `Main[3] % 4 = 0` from the iff_poly's pc-alignment clause
+-- Uses the ZMod %4 → Nat %4 bridge (`val_mod_4_eq_zero_iff_zmod` in Field.lean)
+-- to convert `Main[3] % 4 = 0` from the iff's pc-alignment clause
 -- into `Main[3].val % 4 = 0`, then closes via the field-agnostic
 -- `BitVec.add_mod4_eq_zero_of_mod4_eq_zero` + `BitVec.ofNat64_mod_4_eq_zero_iff`.
-lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
-    (cstrs : SP1ConstraintList.allHold_poly (constraints Main))
-    (is_real : is_real_poly Main) :
+lemma add_signExtend_of_constraints (Main : Vector (ZMod p) 45)
+    (cstrs : SP1ConstraintList.allHold (constraints Main))
+    (is_real : is_real Main) :
     (Word.toBitVec64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] +
       BitVec.signExtend 64 (BitVec.ofNat 13 Main[21].val)) % 4 = 0 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h_signExt := eq_signExtend_of_is_real_poly Main cstrs is_real
+  have h_signExt := eq_signExtend_of_is_real Main cstrs is_real
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h40_lt : (40 : ℕ) < p := by omega
   have h41_lt : (41 : ℕ) < p := by omega
@@ -335,7 +334,7 @@ lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
   have h45_val : (45 : ZMod p).val = 45 := ZMod.val_natCast_of_lt h45_lt
   -- Extract Main[3] % 4 = 0 from the active variant's reader iff (as ZMod equation).
   have h_pc_mod_zmod : Main[3] % (4 : ZMod p) = (0 : ZMod p) := by
-    have := single_op_poly Main cstrs
+    have := single_op Main cstrs
     rcases is_real with h | h | h | h | h | h
     all_goals
     · simp_all [constraints, ITypeReaderImmutable.constraints,
@@ -346,7 +345,7 @@ lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
   -- Extract the alignment fact from the active variant's trusted_instr (b_type's 4th clause).
   have h_imm_aligned :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] % 4#64 = 0#64 := by
-    have := single_op_poly Main cstrs
+    have := single_op Main cstrs
     rcases is_real with h | h | h | h | h | h
     all_goals
     · simp_all [constraints, ITypeReaderImmutable.constraints,
@@ -357,7 +356,7 @@ lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
     change _ % 4#64 = 0#64
     simp only [Word.toBitVec64]
     rw [BitVec.ofNat64_mod_4_eq_zero_iff]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero]
     omega
   · -- signExtend(imm) is mod-4-zero: bridge via h_signExt to the imm's toBitVec64 form.
@@ -367,8 +366,8 @@ lemma add_signExtend_of_constraints_poly (Main : Vector (ZMod p) 45)
 /-- Per-limb Nat lift: same as `AddrAddOperation.limb_lift`. Converts a ZMod
 equation `bb + vv + prev = aa + cc * 65536` (where prev/cc are carry bits and
 the other three limbs are < 2^16) to the corresponding Nat equation. Public
-so the chip-level `correct_b*_poly` proofs can lift the post-simp ZMod
-limb equations directly without round-tripping through `pc_plus_4_eq_poly`'s
+so the chip-level `correct_b*` proofs can lift the post-simp ZMod
+limb equations directly without round-tripping through `pc_plus_4_eq`'s
 strict carry-disjunction shape. -/
 lemma limb_lift_branch
     (bb vv aa prev cc : ZMod p)
@@ -396,7 +395,7 @@ lemma limb_lift_branch
   rw [h1, h3] at h
   exact h
 
-/-- Bare-`ℕ` close for `branch_addr_eq_poly`'s carry chain. Mirrors the
+/-- Bare-`ℕ` close for `branch_addr_eq`'s carry chain. Mirrors the
 `AddrAddOperation.close_addr_add_nat` recipe — extracted helper isolates the
 `% 2 ^ 64` exposure so the kernel re-check passes without `skipKernelTC`. -/
 private lemma close_branch_addr_nat
@@ -412,15 +411,14 @@ private lemma close_branch_addr_nat
   omega
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of `branch_addr_eq`. Mirrors
--- `AddrAddOperation.spec_of_constraints_poly`'s `linear_combination * h65inv`
+-- Mirrors `AddrAddOperation.spec_of_constraints`'s `linear_combination * h65inv`
 -- + `limb_lift` recipe. The four carry hypotheses come from the chip's
 -- assertZero'd limb-binarity constraints (E102/E109/E116/E123 with Main[34]=1
 -- substituted), which after destructuring yield disjunctions of the form
 -- `c = 0 ∨ c = 1` where `c` is the inverse-form carry expression. The high
 -- limb of the result vector is `0` (the chip pins next_pc[3] = 0 via E121's
 -- final-carry = 0 case).
-lemma branch_addr_eq_poly
+lemma branch_addr_eq
     (Main : Vector (ZMod p) 45)
     (h_imm_signExtend :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
@@ -452,27 +450,27 @@ lemma branch_addr_eq_poly
       = Word.toBitVec64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [← h_imm_signExtend]
-  -- isU64_poly facts to feed Word.toBitVec64_toNat_poly.
+  -- isU64 facts to feed Word.toBitVec64_toNat.
   have h_zero_val : ((0 : ZMod p)).val = 0 := ZMod.val_zero
   have hzero_lt : ((0 : ZMod p)).val < 2 ^ 16 := by rw [h_zero_val]; omega
-  have h_pc_isU64 : Word.isU64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h_pc_isU64 : Word.isU64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h_pc_0
     · exact h_pc_1
     · exact h_pc_2
     · rw [h_zero_val]; omega
-  have h_imm_isU64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h_imm_isU64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h_imm_0
     · exact h_imm_1
     · exact h_imm_2
     · exact h_imm_3
-  have h_npc_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h_npc_isU64 : Word.isU64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h25
@@ -482,14 +480,14 @@ lemma branch_addr_eq_poly
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   rw [← BitVec.toNat_inj, BitVec.toNat_add,
-      Word.toBitVec64_toNat_poly h_npc_isU64,
-      Word.toBitVec64_toNat_poly h_imm_isU64,
-      Word.toBitVec64_toNat_poly h_pc_isU64,
-      Word.toNat_poly_def, Word.toNat_poly_def, Word.toNat_poly_def]
+      Word.toBitVec64_toNat h_npc_isU64,
+      Word.toBitVec64_toNat h_imm_isU64,
+      Word.toBitVec64_toNat h_pc_isU64,
+      Word.toNat_def, Word.toNat_def, Word.toNat_def]
   -- Reduce vector literal indices, keep `+ 0 * 2 ^ 48` for the helper.
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, h_zero_val]
-  -- Carry-chain rearrangement, mirroring AddrAddOperation.spec_of_constraints_poly.
+  -- Carry-chain rearrangement, mirroring AddrAddOperation.spec_of_constraints.
   set c0 : ZMod p := (Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (c0 + Main[4] + Main[22] - Main[26]) * (65536 : ZMod p)⁻¹ with hc1_def
   set c2 : ZMod p := (c1 + Main[5] + Main[23] - Main[27]) * (65536 : ZMod p)⁻¹ with hc2_def
@@ -524,7 +522,7 @@ lemma branch_addr_eq_poly
   exact (close_branch_addr_nat _ _ _ _ _ _ _ _ _ _ _ _ _ _
     h25_lt h26_lt h27_lt n0 n1 n2 n3).symm
 
-/-- Bare-`ℕ` close for `pc_plus_4_eq_poly`'s carry chain. The `4 % 2 ^ 64`
+/-- Bare-`ℕ` close for `pc_plus_4_eq`'s carry chain. The `4 % 2 ^ 64`
 appears because `BitVec.toNat_ofNat` was used to unfold `4#64.toNat`; omega
 absorbs it trivially. Same isolation principle as `close_branch_addr_nat`. -/
 private lemma close_pc_plus_4_nat
@@ -539,15 +537,15 @@ private lemma close_pc_plus_4_nat
   omega
 
 set_option maxHeartbeats 16000000 in
--- Polymorphic counterpart of the not-branching-case PC arithmetic. Same
--- recipe as `branch_addr_eq_poly` but with the addend fixed to `4#64`
+-- Not-branching-case PC arithmetic. Same recipe as `branch_addr_eq`
+-- but with the addend fixed to `4#64`
 -- (i.e. `b = #v[4, 0, 0, 0]` viewed as a Word). The four carry hypotheses
 -- come from the chip's E131/E139/E147/E155 binarity assertZeros (gated by
 -- `E16 - Main[34] = 1` when not branching, i.e. Main[34] = 0). The high
 -- three limbs of the addend are 0; only the low limb gets `+4`. This is
--- the missing companion to `branch_addr_eq_poly` for the BEQ/BNE/etc.
+-- the missing companion to `branch_addr_eq` for the BEQ/BNE/etc.
 -- "branch was not taken" path.
-lemma pc_plus_4_eq_poly
+lemma pc_plus_4_eq
     (Main : Vector (ZMod p) 45)
     (h_pc_0 : Main[3].val < 65536) (h_pc_1 : Main[4].val < 65536)
     (h_pc_2 : Main[5].val < 65536)
@@ -574,16 +572,16 @@ lemma pc_plus_4_eq_poly
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h_zero_val : ((0 : ZMod p)).val = 0 := ZMod.val_zero
   have hzero_lt : ((0 : ZMod p)).val < 2 ^ 16 := by rw [h_zero_val]; omega
-  have h_pc_isU64 : Word.isU64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h_pc_isU64 : Word.isU64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h_pc_0
     · exact h_pc_1
     · exact h_pc_2
     · rw [h_zero_val]; omega
-  have h_npc_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h_npc_isU64 : Word.isU64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h25
@@ -595,9 +593,9 @@ lemma pc_plus_4_eq_poly
   -- Bridge `... + 4#64 = ...` via toNat:
   rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
       ← BitVec.toNat_inj, BitVec.toNat_add,
-      Word.toBitVec64_toNat_poly h_npc_isU64,
-      Word.toBitVec64_toNat_poly h_pc_isU64,
-      Word.toNat_poly_def, Word.toNat_poly_def, BitVec.toNat_ofNat]
+      Word.toBitVec64_toNat h_npc_isU64,
+      Word.toBitVec64_toNat h_pc_isU64,
+      Word.toNat_def, Word.toNat_def, BitVec.toNat_ofNat]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, h_zero_val]
   set c0 : ZMod p := (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ with hc0_def
@@ -642,15 +640,15 @@ lemma pc_plus_4_eq_poly
     h25_lt h26_lt h27_lt n0 n1 n2 n3).symm
 
 set_option maxHeartbeats 16000000 in
--- Variant of `pc_plus_4_eq_poly` accepting the chip's *natural* post-simp
+-- Variant of `pc_plus_4_eq` accepting the chip's *natural* post-simp
 -- limb form: each carry hypothesis is the simp-fragmented disjunction
 -- `((a = b ∨ 65536 = 0) ∨ (a - b) * 65536⁻¹ = 1)` from default simp's
 -- `mul_eq_zero` + `inv_eq_zero` + `sub_eq_zero` firing on the assertZero
 -- constraint `((a - b) * 65536⁻¹) * (((a - b) * 65536⁻¹) - 1) = 0`. The chip
 -- proof passes `chip_cstrs.h_limb0..3` directly without any pre-bridge step.
--- Internally bridges to canonical form, then mirrors `pc_plus_4_eq_poly`'s
+-- Internally bridges to canonical form, then mirrors `pc_plus_4_eq`'s
 -- `limb_lift_branch` chain. Heartbeats elevated for the bridges + chain.
-lemma pc_plus_4_eq_poly_chip
+lemma pc_plus_4_eq_chip
     (Main : Vector (ZMod p) 45)
     (h_pc_0 : Main[3].val < 65536) (h_pc_1 : Main[4].val < 65536)
     (h_pc_2 : Main[5].val < 65536)
@@ -718,19 +716,19 @@ lemma pc_plus_4_eq_poly_chip
           zero_mul, zero_mul]
     · exact absurd h h_65_ne
     · right; exact h
-  -- Now mirror pc_plus_4_eq_poly's body using the canonical-form carries.
+  -- Now mirror pc_plus_4_eq's body using the canonical-form carries.
   have h_zero_val : ((0 : ZMod p)).val = 0 := ZMod.val_zero
   have hzero_lt : ((0 : ZMod p)).val < 2 ^ 16 := by rw [h_zero_val]; omega
-  have h_pc_isU64 : Word.isU64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h_pc_isU64 : Word.isU64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h_pc_0
     · exact h_pc_1
     · exact h_pc_2
     · rw [h_zero_val]; omega
-  have h_npc_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h_npc_isU64 : Word.isU64 #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h25
@@ -741,9 +739,9 @@ lemma pc_plus_4_eq_poly_chip
     mul_inv_cancel₀ val_65536_ne_zero
   rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
       ← BitVec.toNat_inj, BitVec.toNat_add,
-      Word.toBitVec64_toNat_poly h_npc_isU64,
-      Word.toBitVec64_toNat_poly h_pc_isU64,
-      Word.toNat_poly_def, Word.toNat_poly_def, BitVec.toNat_ofNat]
+      Word.toBitVec64_toNat h_npc_isU64,
+      Word.toBitVec64_toNat h_pc_isU64,
+      Word.toNat_def, Word.toNat_def, BitVec.toNat_ofNat]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, h_zero_val]
   set c0 : ZMod p := (Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ with hc0_def

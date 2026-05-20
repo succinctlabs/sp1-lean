@@ -654,7 +654,7 @@ set_option maxRecDepth 1000000 in
 -- `assertZero`-derived equalities/disjunctions are structurally identical
 -- across field instantiations; only the outer `List.Forall` wrapper switches
 -- to `SP1Constraint.toProp`.
-lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 246) :
+lemma allHold_constraints_iff (Main : Vector (ZMod p) 246) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp
     (MulOperation.constraints

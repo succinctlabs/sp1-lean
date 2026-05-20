@@ -6,7 +6,7 @@ namespace CPUState
 /-- RHS is stated in `.val`-level Nat-arithmetic form (matching simp's
 natural output after `SP1Constraint.toProp`) rather than the
 field-level `<` form. -/
-lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
+lemma allHold_constraints_iff {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     [Fact (2 ^ 17 < p)]
     {cols : CPUState (ZMod p)} {next_pc : Vector (ZMod p) 3}
     {clk_increment is_real : ZMod p} :
@@ -24,7 +24,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
       simp
     simp [constraints, SP1Constraint.toProp, sub_eq_zero, h13, h0_lt_256, imp_and]
 
-lemma allHold_constraints_iff_is_real_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
+lemma allHold_constraints_iff_is_real {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     [Fact (2 ^ 17 < p)]
     {cols : CPUState (ZMod p)} {next_pc : Vector (ZMod p) 3}
     {clk_increment is_real : ZMod p}
@@ -32,6 +32,6 @@ lemma allHold_constraints_iff_is_real_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZer
   List.Forall SP1Constraint.toProp (constraints cols next_pc clk_increment is_real) ↔
       ((cols.clk_0_16 - (1 : ZMod p)) * (8 : ZMod p)⁻¹).val < 8192 ∧
       cols.clk_16_24 < (256 : ZMod p)
-    := by simp_all [allHold_constraints_iff_poly]
+    := by simp_all [allHold_constraints_iff]
 
 end CPUState

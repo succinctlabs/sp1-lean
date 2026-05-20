@@ -75,12 +75,12 @@ section poly_helpers
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-@[simp] def is_real_poly (Main : Vector (ZMod p) 51) : Prop :=
+@[simp] def is_real (Main : Vector (ZMod p) 51) : Prop :=
   Main[48] = 1 ∨ Main[49] = 1 ∨ Main[50] = 1
 
 /-- From `a = 1` and `b, c ∈ {0,1}` with `a + b + c ∈ {0, 1}`, conclude
 `a + b + c = 1`. Used by chip arms to derive `is_real = 1` from the variant
-hypothesis plus the iff_poly's bool/sum disjunctions. -/
+hypothesis plus the iff's bool/sum disjunctions. -/
 lemma sum_eq_one_of_eq_one_left
     {a b c : ZMod p}
     (h_a : a = 1)
@@ -142,10 +142,9 @@ lemma sum_eq_one_of_eq_one_right
         · right; linear_combination h)
   linear_combination heq
 
-/-- Mutual exclusion: from the `b ∈ {0,1}` disjunctions plus `is_real = 1`, the three
-opcode columns are mutually exclusive (only one can be `1`). Polymorphic counterpart of
-the chip-local `single_op` lemma in this file (line 101). -/
-lemma single_op_poly (Main : Vector (ZMod p) 51)
+/-- Mutual exclusion: from the `b ∈ {0,1}` disjunctions plus `is_real = 1`,
+the three opcode columns are mutually exclusive (only one can be `1`). -/
+lemma single_op (Main : Vector (ZMod p) 51)
     (b_xor : Main[48] = 0 ∨ Main[48] = 1)
     (b_or : Main[49] = 0 ∨ Main[49] = 1)
     (b_and : Main[50] = 0 ∨ Main[50] = 1)
@@ -200,19 +199,19 @@ lemma single_op_poly (Main : Vector (ZMod p) 51)
     · exfalso; exact (h_sum_inj _ _ _ h_sum).1 (by linear_combination h' + h + h_X)
     · exfalso; exact (h_sum_inj _ _ _ h_sum).2 (by linear_combination h' + h + h_X)
 
-@[simp] def is_xor_poly (Main : Vector (ZMod p) 51) := Main[48] = 1 ∧ Main[31] = 0
-@[simp] def is_xori_poly (Main : Vector (ZMod p) 51) := Main[48] = 1 ∧ Main[31] = 1
-@[simp] def is_or_poly (Main : Vector (ZMod p) 51) := Main[49] = 1 ∧ Main[31] = 0
-@[simp] def is_ori_poly (Main : Vector (ZMod p) 51) := Main[49] = 1 ∧ Main[31] = 1
-@[simp] def is_and_poly (Main : Vector (ZMod p) 51) := Main[50] = 1 ∧ Main[31] = 0
-@[simp] def is_andi_poly (Main : Vector (ZMod p) 51) := Main[50] = 1 ∧ Main[31] = 1
+@[simp] def is_xor (Main : Vector (ZMod p) 51) := Main[48] = 1 ∧ Main[31] = 0
+@[simp] def is_xori (Main : Vector (ZMod p) 51) := Main[48] = 1 ∧ Main[31] = 1
+@[simp] def is_or (Main : Vector (ZMod p) 51) := Main[49] = 1 ∧ Main[31] = 0
+@[simp] def is_ori (Main : Vector (ZMod p) 51) := Main[49] = 1 ∧ Main[31] = 1
+@[simp] def is_and (Main : Vector (ZMod p) 51) := Main[50] = 1 ∧ Main[31] = 0
+@[simp] def is_andi (Main : Vector (ZMod p) 51) := Main[50] = 1 ∧ Main[31] = 1
 
 set_option linter.unusedSectionVars false in
 set_option maxHeartbeats 800000 in
--- Mirror of `allHold_constraints_iff` over `ZMod p` via `_poly` predicates.
+-- Mirror of `allHold_constraints_iff` over `ZMod p` via `` predicates.
 -- Closes via the same `simp` recipe; budget elevated for the BitwiseU16Operation
 -- expansion plus 51-column constraint body.
-lemma allHold_constraints_iff_poly (Main : Vector (ZMod p) 51) :
+lemma allHold_constraints_iff (Main : Vector (ZMod p) 51) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1
     List.Forall SP1Constraint.toProp (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).2 ∧

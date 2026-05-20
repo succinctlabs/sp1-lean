@@ -43,9 +43,9 @@ section toProp
 /-- Constraint-level prop over a generic prime field `ZMod p`. -/
 def toProp {p : ℕ} [NeZero p] : SP1Constraint (ZMod p) → Prop
   | .assertZero x => (x = 0)
-  | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain_poly a b c
+  | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
   | (.send (.memory _clk_high _clk_low _addr0 _addr1 _addr2 limb0 limb1 limb2 limb3) mult) =>
-      mult ≠ 0 → Word.isU64_poly #v[limb0, limb1, limb2, limb3]
+      mult ≠ 0 → Word.isU64 #v[limb0, limb1, limb2, limb3]
   | .send
       (.program
       pc0 pc1 pc2
@@ -58,7 +58,7 @@ def toProp {p : ℕ} [NeZero p] : SP1Constraint (ZMod p) → Prop
       imm_c)
       mult =>
         mult ≠ 0
-        -> opcode.trusted_instr_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+        -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
            ∧ op_a < 32
            ∧ (op_b_0 < 65536 ∧ op_b_1 < 65536 ∧ op_b_2 < 65536 ∧ op_b_3 < 65536)
            ∧ (op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ op_c_2 < 65536 ∧ op_c_3 < 65536)
@@ -69,13 +69,13 @@ def toProp {p : ℕ} [NeZero p] : SP1Constraint (ZMod p) → Prop
            ∧ (pc0 % 4 = 0 ∧ (pc0 < 65536 ∧ pc1 < 65536 ∧ pc2 < 65536))
   | _ => True
 
-@[simp] lemma toProp_poly_assertZero {p : ℕ} [NeZero p] (x : ZMod p) :
+@[simp] lemma toProp_assertZero {p : ℕ} [NeZero p] (x : ZMod p) :
     (assertZero (F := ZMod p) x).toProp ↔ x = 0 := Iff.rfl
 
-@[simp] lemma toProp_poly_send_byte {p : ℕ} [NeZero p]
+@[simp] lemma toProp_send_byte {p : ℕ} [NeZero p]
     (op : ByteOpcode) (a b c mult : ZMod p) :
     (send (F := ZMod p) (.byte op a b c) mult).toProp ↔
-      (mult ≠ 0 → op.constrain_poly a b c) := Iff.rfl
+      (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 
 end toProp
 
@@ -94,14 +94,14 @@ def toStateProp {p : ℕ} [NeZero p]
         s.get_reg? (BitVec.ofNatLT addr0.val h_addrs.left) =
           some (Word.toBitVec64 #v[limb0, limb1, limb2, limb3])
       else
-        s.mem[Word.toNat_poly #v[addr0, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb0.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 1, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb0.val >>> 8)) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 2, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb1.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 3, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb1.val >>> 8)) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 4, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb2.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 5, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb2.val >>> 8)) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 6, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb3.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 7, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb3.val >>> 8))
+        s.mem[Word.toNat #v[addr0, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb0.val) ∧
+        s.mem[Word.toNat #v[addr0 + 1, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb0.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 2, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb1.val) ∧
+        s.mem[Word.toNat #v[addr0 + 3, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb1.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 4, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb2.val) ∧
+        s.mem[Word.toNat #v[addr0 + 5, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb2.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 6, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb3.val) ∧
+        s.mem[Word.toNat #v[addr0 + 7, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb3.val >>> 8))
   | .receive (.state _ _ pc0 pc1 pc2) mult => mult ≠ 0 →
       s.regs.get? Register.PC = some (Word.toBitVec64 #v[pc0, pc1, pc2, 0])
   | _ => True
@@ -115,11 +115,11 @@ section constraintList
 /-- Wrapper for lists of constraints. Mainly used to namespace lemmas. -/
 @[reducible] def SP1ConstraintList (F : Type*) := List (SP1Constraint F)
 
-@[reducible] protected def SP1ConstraintList.allHold_poly {p : ℕ} [NeZero p]
+@[reducible] protected def SP1ConstraintList.allHold {p : ℕ} [NeZero p]
     (xs : SP1ConstraintList (ZMod p)) : Prop :=
   List.Forall SP1Constraint.toProp xs
 
-@[simp] protected def SP1ConstraintList.initialState_poly {p : ℕ} [NeZero p]
+@[simp] protected def SP1ConstraintList.initialState {p : ℕ} [NeZero p]
     (xs : SP1ConstraintList (ZMod p)) (s : SailState) : Prop :=
   List.Forall (SP1Constraint.toStateProp · s) xs
 

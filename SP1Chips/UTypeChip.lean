@@ -41,9 +41,9 @@ def sp1_utype : SailM ExecutionResult := do
 -- Internal helper: from the trusted-instr divisibility + sign-extension equality,
 -- the `Word.toBitVec64` of `Main[14..17]` equals the Sail-style
 -- `signExtend 64 (imm +++ 0#12)` where `imm` is the 20-bit immediate recovered by
--- `sp1_op_b`. Polymorphic counterpart of `toBitVec64_eq_signExtend_sp1_op_b`.
+-- `sp1_op_b`.
 set_option linter.unusedSectionVars false in
-private lemma toBitVec64_eq_signExtend_sp1_op_b_poly
+private lemma toBitVec64_eq_signExtend_sp1_op_b
     (_h14_lt : Main[14].val < 65536) (_h15_lt : Main[15].val < 65536)
     (h_div : Main[14].val % 2 ^ 12 = 0)
     (h_se : BitVec.signExtend 64 (BitVec.ofNat 32 (Main[14].val + Main[15].val * 65536)) =
@@ -63,10 +63,10 @@ set_option maxHeartbeats 1600000 in
 -- Sign-extend manipulation in the non-zero op_a branch sits well above
 -- the default 200K heartbeat budget (matches AddwChip).
 theorem correct_lui
-    (cstrs : (constraints Main).allHold_poly)
+    (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)
     (h_is_lui : Main[29] = 0)
-    (state_cstrs : (constraints Main).initialState_poly s) :
+    (state_cstrs : (constraints Main).initialState s) :
     let rd := sp1_op_a Main
     (spec_lui (sp1_op_b Main) (.Regidx rd)).run s = (sp1_utype Main).run s := by
   simp only []
@@ -74,8 +74,8 @@ theorem correct_lui
   -- Split the constraints into the four pieces.
   simp [constraints] at cstrs
   obtain ⟨_, add_op_cstrs, reader_cstrs, rest⟩ := cstrs
-  -- Apply JTypeReader iff_poly.
-  rw [JTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at reader_cstrs
+  -- Apply JTypeReader iff.
+  rw [JTypeReader.allHold_constraints_iff_is_real h_is_real h_is_real] at reader_cstrs
   -- Specialize the addend to LUI's 0 word and reduce the opcode to LUI.
   have h49_lt : (49 : ℕ) < p := by
     have h := Fact.out (p := 2 ^ 17 < p)
@@ -83,7 +83,7 @@ theorem correct_lui
     omega
   have h49_val : (49 : ZMod p).val = 49 := ZMod.val_natCast_of_lt h49_lt
   simp [h_is_lui, h_is_real, show (Opcode.ofNat 49) = Opcode.LUI from rfl,
-    Opcode.trusted_instr_poly, h49_val] at add_op_cstrs reader_cstrs
+    Opcode.trusted_instr, h49_val] at add_op_cstrs reader_cstrs
   -- LUI's addend is the zero word: from rest, Main[22..24] = 0.
   obtain ⟨h22, h23, h24⟩ : Main[22] = 0 ∧ Main[23] = 0 ∧ Main[24] = 0 := by
     rcases rest with ⟨_, _, h22, h23, h24, _⟩
@@ -104,12 +104,12 @@ theorem correct_lui
   have h15_val_lt : Main[15].val < 65536 := lt65k _ h15_lt
   have h16_val_lt : Main[16].val < 65536 := lt65k _ h16_lt
   have h17_val_lt : Main[17].val < 65536 := lt65k _ h17_lt
-  have h_op_b_isU64 : Word.isU64_poly #v[Main[14], Main[15], Main[16], Main[17]] :=
-    Word.isU64_of_cases_poly h14_val_lt h15_val_lt h16_val_lt h17_val_lt
+  have h_op_b_isU64 : Word.isU64 #v[Main[14], Main[15], Main[16], Main[17]] :=
+    Word.isU64_of_cases h14_val_lt h15_val_lt h16_val_lt h17_val_lt
   -- Recover the standard sign-extension equality for the 20-bit immediate.
-  have h_imm := toBitVec64_eq_signExtend_sp1_op_b_poly Main h14_val_lt h15_val_lt h_div h_se
+  have h_imm := toBitVec64_eq_signExtend_sp1_op_b Main h14_val_lt h15_val_lt h_div h_se
   -- Initial state: PC.
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
+  simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
     AddOperation.constraints, CPUState.constraints,
     JTypeReader.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, _⟩ := state_cstrs
@@ -130,7 +130,7 @@ theorem correct_lui
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   -- The zero word's BitVec form is 0#64.
   have h_zero_word : Word.toBitVec64 (#v[(0 : ZMod p), 0, 0, 0]) = 0#64 := by
-    simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
+    simp [Word.toBitVec64, Word.toNat_def, ZMod.val_zero]
   by_cases h_is_op_a_0 : Main[6] = 0
   · -- rd = x0: spec's wX_bits is a no-op; sp1's write_reg is a no-op when value = 0.
     have h13_one : Main[13] = 1 := h_a0_iff.mpr h_is_op_a_0
@@ -144,9 +144,9 @@ theorem correct_lui
       · exact h
       · exact absurd (h_a0_iff.mp h) h_is_op_a_0
     rw [show (1 : ZMod p) - Main[13] = 1 by simp [h13_zero]] at add_op_cstrs
-    have h_zero_isU64 : Word.isU64_poly (#v[(0 : ZMod p), 0, 0, 0]) := by
-      apply Word.isU64_of_cases_poly <;> simp [ZMod.val_zero]
-    have ⟨_, h_add⟩ := AddOperation.spec_poly h_zero_isU64 h_op_b_isU64 add_op_cstrs
+    have h_zero_isU64 : Word.isU64 (#v[(0 : ZMod p), 0, 0, 0]) := by
+      apply Word.isU64_of_cases <;> simp [ZMod.val_zero]
+    have ⟨_, h_add⟩ := AddOperation.spec h_zero_isU64 h_op_b_isU64 add_op_cstrs
     simp [h_zero_word, BitVec.zero_add] at h_add
     have h6_val : Main[6].val ≠ 0 := by
       intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h
@@ -160,24 +160,24 @@ set_option maxHeartbeats 1600000 in
 -- Same heartbeat justification as `correct_lui`; AUIPC's pc-addend path
 -- doubles the BitVec arithmetic load.
 theorem correct_auipc
-    (cstrs : (constraints Main).allHold_poly)
+    (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)
     (h_is_auipc : Main[29] = 1)
-    (state_cstrs : (constraints Main).initialState_poly s) :
+    (state_cstrs : (constraints Main).initialState s) :
     let rd := sp1_op_a Main
     (spec_auipc (sp1_op_b Main) (.Regidx rd)).run s = (sp1_utype Main).run s := by
   simp only []
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp [constraints] at cstrs
   obtain ⟨_, add_op_cstrs, reader_cstrs, rest⟩ := cstrs
-  rw [JTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real] at reader_cstrs
+  rw [JTypeReader.allHold_constraints_iff_is_real h_is_real h_is_real] at reader_cstrs
   have h48_lt : (48 : ℕ) < p := by
     have h := Fact.out (p := 2 ^ 17 < p)
     have : (48 : ℕ) < 2 ^ 17 := by decide
     omega
   have h48_val : (48 : ZMod p).val = 48 := ZMod.val_natCast_of_lt h48_lt
   simp [h_is_auipc, h_is_real, show (Opcode.ofNat 48) = Opcode.AUIPC from rfl,
-    Opcode.trusted_instr_poly, h48_val] at add_op_cstrs reader_cstrs
+    Opcode.trusted_instr, h48_val] at add_op_cstrs reader_cstrs
   -- AUIPC's addend is the pc word: from rest, Main[22..24] = pc[0..2].
   obtain ⟨h22, h23, h24⟩ : Main[22] = Main[3] ∧ Main[23] = Main[4] ∧ Main[24] = Main[5] := by
     obtain ⟨_, _, hr22, hr23, hr24, _⟩ := rest
@@ -203,12 +203,12 @@ theorem correct_auipc
   have h15_val_lt : Main[15].val < 65536 := lt65k _ h15_lt
   have h16_val_lt : Main[16].val < 65536 := lt65k _ h16_lt
   have h17_val_lt : Main[17].val < 65536 := lt65k _ h17_lt
-  have h_op_b_isU64 : Word.isU64_poly #v[Main[14], Main[15], Main[16], Main[17]] :=
-    Word.isU64_of_cases_poly h14_val_lt h15_val_lt h16_val_lt h17_val_lt
-  have h_pc_isU64 : Word.isU64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] :=
-    Word.isU64_of_cases_poly h3_val_lt h4_val_lt h5_val_lt (by simp [ZMod.val_zero])
-  have h_imm := toBitVec64_eq_signExtend_sp1_op_b_poly Main h14_val_lt h15_val_lt h_div h_se
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
+  have h_op_b_isU64 : Word.isU64 #v[Main[14], Main[15], Main[16], Main[17]] :=
+    Word.isU64_of_cases h14_val_lt h15_val_lt h16_val_lt h17_val_lt
+  have h_pc_isU64 : Word.isU64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] :=
+    Word.isU64_of_cases h3_val_lt h4_val_lt h5_val_lt (by simp [ZMod.val_zero])
+  have h_imm := toBitVec64_eq_signExtend_sp1_op_b Main h14_val_lt h15_val_lt h_div h_se
+  simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
     AddOperation.constraints, CPUState.constraints,
     JTypeReader.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, _⟩ := state_cstrs
@@ -230,7 +230,7 @@ theorem correct_auipc
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
   -- The zero word's BitVec form is 0#64 — needed for AUIPC's `if` reduction.
   have h_zero_word : Word.toBitVec64 (#v[(0 : ZMod p), 0, 0, 0]) = 0#64 := by
-    simp [Word.toBitVec64, Word.toNat_poly_def, ZMod.val_zero]
+    simp [Word.toBitVec64, Word.toNat_def, ZMod.val_zero]
   by_cases h_is_op_a_0 : Main[6] = 0
   · have h13_one : Main[13] = 1 := h_a0_iff.mpr h_is_op_a_0
     obtain ⟨h25, h26, h27, h28⟩ := h_op_a_0_zero (by rw [h13_one]; exact one_ne_zero)
@@ -242,7 +242,7 @@ theorem correct_auipc
       · exact h
       · exact absurd (h_a0_iff.mp h) h_is_op_a_0
     rw [show (1 : ZMod p) - Main[13] = 1 by simp [h13_zero]] at add_op_cstrs
-    have ⟨_, h_add⟩ := AddOperation.spec_poly h_pc_isU64 h_op_b_isU64 add_op_cstrs
+    have ⟨_, h_add⟩ := AddOperation.spec h_pc_isU64 h_op_b_isU64 add_op_cstrs
     simp at h_add
     have h6_val : Main[6].val ≠ 0 := by
       intro h; apply h_is_op_a_0; exact (ZMod.val_eq_zero _).mp h

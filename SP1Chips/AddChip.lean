@@ -36,9 +36,9 @@ def sp1_add : SailM Unit := do
 open Sail
 
 theorem correct_add
-  (cstrs : (constraints Main).allHold_poly)
+  (cstrs : (constraints Main).allHold)
   (h_is_real : Main[32] = 1)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
@@ -46,8 +46,8 @@ theorem correct_add
   := by
     simp [constraints] at cstrs
     obtain ⟨add_op_cstrs, cpu_cstrs, reader_cstrs, rest⟩ := cstrs
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real,
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    simp [RTypeReader.allHold_constraints_iff_is_real h_is_real h_is_real,
       Opcode.ofNat, Nat.ble] at reader_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
       ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := reader_cstrs
@@ -62,12 +62,12 @@ theorem correct_add
     have h21 : Main[21].val < 32 := by
       have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
       rwa [h32] at this
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, AddOperation.constraints, CPUState.constraints, RTypeReader.constraints,
       h6, h14, h21, h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     rw [h_is_real] at *
-    apply AddOperation.spec_poly is_U64_b is_U64_c at add_op_cstrs
+    apply AddOperation.spec is_U64_b is_U64_c at add_op_cstrs
     obtain ⟨is_U64_val, is_add⟩ := add_op_cstrs
     simp [BitVec.ofNatLT_eq_ofNat] at *
     -- Now the monadic manipulation
@@ -84,8 +84,8 @@ theorem correct_add
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       -- Bridge `execute_RTYPE_pure` to the toBitVec64 addition form
-      rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
-      simp only [execute_RTYPE_pure_w_poly]
+      rw [exec_RTYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
+      simp only [execute_RTYPE_pure_w]
       -- Bridge `+ 4#64` to limb-0 addition via the generic helper.
       have hp_lt : 2 ^ 17 < p := Fact.out
       have h_pc3 : Main[3].val < 65536 := by

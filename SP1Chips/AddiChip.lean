@@ -33,9 +33,9 @@ def sp1_addi : SailM Unit := do
 open Sail
 
 theorem correct_addi
-  (cstrs : (constraints Main).allHold_poly)
+  (cstrs : (constraints Main).allHold)
   (h_is_real : Main[29] = 1)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
@@ -46,8 +46,8 @@ theorem correct_addi
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     haveI hp1 : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [ITypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real,
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    simp [ITypeReader.allHold_constraints_iff_is_real h_is_real h_is_real,
       Opcode.ofNat, Nat.ble, h1_val] at reader_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, c0, c1, c2, c3,
             _h_a0_bool, h_a0_iff,
@@ -74,14 +74,14 @@ theorem correct_addi
     have h24 : Main[24].val < 65536 := by
       have : Main[24].val < (65536 : ZMod p).val := c3
       rwa [h65] at this
-    have h_op_c_imm_isU64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] :=
-      Word.isU64_of_cases_poly h21 h22 h23 h24
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
+    have h_op_c_imm_isU64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] :=
+      Word.isU64_of_cases h21 h22 h23 h24
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, AddOperation.constraints, CPUState.constraints, ITypeReader.constraints,
       h6, h14, h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_b, read_op_c⟩ := state_cstrs
     rw [h_is_real] at *
-    apply AddOperation.spec_poly is_U64_b h_op_c_imm_isU64 at add_op_cstrs
+    apply AddOperation.spec is_U64_b h_op_c_imm_isU64 at add_op_cstrs
     obtain ⟨is_U64_val, is_add⟩ := add_op_cstrs
     simp [BitVec.ofNatLT_eq_ofNat] at *
     -- Now the monadic manipulation
@@ -98,12 +98,12 @@ theorem correct_addi
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       rw [if_neg (by simp [← BitVec.toNat_inj]; omega)]
       -- Push the signExtend immediate back to toBitVec64 form, then bridge
-      -- via exec_ITYPE_pure_bv_to_w_poly so the spec's execute reduces to the
+      -- via exec_ITYPE_pure_bv_to_w so the spec's execute reduces to the
       -- same sum form the SP1 side already has (`is_add` was applied via
       -- simp_all to rewrite the result limbs).
       rw [← trusted_instr_prop.2]
-      rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
-      simp only [execute_ITYPE_pure_w_poly, execute_RTYPE_pure_w_poly, rop_of_iop]
+      rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b h_op_c_imm_isU64]
+      simp only [execute_ITYPE_pure_w, execute_RTYPE_pure_w, rop_of_iop]
       -- Bridge `+ 4#64` to limb-0 addition via the generic helper.
       have hp_lt : 2 ^ 17 < p := Fact.out
       have h_pc3 : Main[3].val < 65536 := by

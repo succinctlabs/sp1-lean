@@ -24,7 +24,7 @@ def sp1_ob_b (Main : Vector (ZMod p) 39) : BitVec 5 :=
   BitVec.ofNat 5 Main[14].val
 
 def sp1_imm_c (Main : Vector (ZMod p) 39) : BitVec 12 :=
-  BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])
+  BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])
 
 def sp1_sb (Main : Vector (ZMod p) 39) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
@@ -42,8 +42,8 @@ def sp1_sb (Main : Vector (ZMod p) 39) : SailM ExecutionResult := do
 theorem correct (Main : Vector (ZMod p) 39)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (StoreDouble.constraints Main).allHold_poly)
-    (state_cstrs : (StoreDouble.constraints Main).initialState_poly s)
+    (h_cstrs : (StoreDouble.constraints Main).allHold)
+    (state_cstrs : (StoreDouble.constraints Main).initialState s)
     (h_is_real : Main[38] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -51,7 +51,7 @@ theorem correct (Main : Vector (ZMod p) 39)
       reg_val + offset + 8 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
-        (BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])))) 8 = true)
+        (BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])))) 8 = true)
     :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
@@ -63,7 +63,7 @@ theorem correct (Main : Vector (ZMod p) 39)
   obtain ⟨_, _, _, _, _⟩ := hs_config
   -- Extract the main constraints from the chip via direct simp expansion.
   rw [StoreDouble.constraints] at h_cstrs
-  simp [SP1ConstraintList.allHold_poly] at h_cstrs
+  simp [SP1ConstraintList.allHold] at h_cstrs
   simp [AddressOperation.constraints, sub_eq_zero, SP1Constraint.toProp,
     h_is_real] at h_cstrs
   obtain ⟨h_add_addr, h_top, _h39, _h_cpu, h_reader, _h_cstrs_rest⟩ := h_cstrs
@@ -90,21 +90,21 @@ theorem correct (Main : Vector (ZMod p) 39)
   have h14_32 : Main[14].val < 32 := by
     have : Main[14].val < (32 : ZMod p).val := h14_lt_zmod; rwa [h32] at this
   -- Extract state facts: PC read, op_a/op_b/op_c memory accesses.
-  simp [SP1ConstraintList.initialState_poly, StoreDouble.constraints,
+  simp [SP1ConstraintList.initialState, StoreDouble.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints,
     CPUState.constraints, ITypeReaderImmutable.constraints,
     Opcode.ofNat, Nat.ble, h_is_real, h6_32, h14_32, h39_val] at state_cstrs
   obtain ⟨h_read_pc, h6_op_a, h14_op_a, _h_imm_state⟩ := state_cstrs
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
-  have h15u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by
+  have h15u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
     clear *- h_reader; simp_all only
   have h21_lt_zmod : Main[21] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
   have h22_lt_zmod : Main[22] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
   have h23_lt_zmod : Main[23] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
   have h24_lt_zmod : Main[24] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt_zmod; rwa [h65] at this
@@ -112,9 +112,9 @@ theorem correct (Main : Vector (ZMod p) 39)
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt_zmod; rwa [h65] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt_zmod; rwa [h65] at this
   -- Extract the addr-add spec via the polymorphic helper.
-  have haddr_add := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_add_addr
+  have haddr_add := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_add_addr
   -- Derive `h_in_range` from the chip's address-bounds constraints.
-  obtain ⟨h25_lt, h26_lt, h27_lt, _⟩ := Word.lt_cases_of_isU64_poly haddr_add.1
+  obtain ⟨h25_lt, h26_lt, h27_lt, _⟩ := Word.lt_cases_of_isU64 haddr_add.1
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at h25_lt h26_lt h27_lt
   obtain ⟨h_addr_lo, h_addr_hi⟩ :=
@@ -124,20 +124,20 @@ theorem correct (Main : Vector (ZMod p) 39)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_add.2, Word.toBitVec64_toNat_poly haddr_add.1,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_add.2, Word.toBitVec64_toNat haddr_add.1,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
     rw [h_imm_c, sp1_imm_c]
     congr 1; apply BitVec.eq_of_toNat_eq
-    simp [Word.toNat_poly_def]; omega
+    simp [Word.toNat_def]; omega
   have h_align : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat % 8 = 0 := by
     have h := h_is_aligned
-    rw [show (BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])) =
+    rw [show (BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])) =
         BitVec.ofNat 12 Main[21].val from by
-          apply BitVec.eq_of_toNat_eq; simp [Word.toNat_poly_def]; omega,
+          apply BitVec.eq_of_toNat_eq; simp [Word.toNat_def]; omega,
         ← h_imm_c, is_aligned_vaddr_iff_mod] at h
     exact h
   have h_in_range :
@@ -157,7 +157,7 @@ theorem correct (Main : Vector (ZMod p) 39)
   simp only [BitVec.ofNatLT_eq_ofNat] at h6_op_a h14_op_a
   simp [op_a, sp1_op_a, h6_op_a]
   simp [op_b, sp1_ob_b, h14_op_a]
-  simp [AddrAddOperation.spec_poly] at haddr_add
+  simp [AddrAddOperation.spec] at haddr_add
   simp [sp1_sb, haddr_add.2]
   -- Apply the main helper lemma.
   rw [run_vmem_write_of_width_8 (BitVec.ofNat 5 Main[14].val)

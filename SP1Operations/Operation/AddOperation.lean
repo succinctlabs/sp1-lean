@@ -5,10 +5,10 @@ import SP1Operations.Operation.AddOperation.Constraints
 namespace AddOperation
 
 /-- Equivalent formulation of constraints given that `is_real = 1`. -/
-lemma allHold_constraints_iff_poly
+lemma allHold_constraints_iff
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p)) (cols : AddOperation (ZMod p)) :
-    SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
+    SP1ConstraintList.allHold (constraints a b cols 1) ↔
       let carry0 : ZMod p := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
       let carry1 : ZMod p := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
       let carry2 : ZMod p := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
@@ -60,38 +60,38 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 set_option maxHeartbeats 16000000 in
 -- The 4 `linear_combination`-based carry rearrangements plus the BitVec
 -- ↔ Nat bridge sit in the 4–8M heartbeat range; 16M leaves headroom.
-/-- Rearranges each iff_poly carry from inverse-form to a sum equation
+/-- Rearranges each iff carry from inverse-form to a sum equation
 `a[i] + b[i] + prev = cols.value[i] + c_i * 65536` via `linear_combination`
 over `(65536 : ZMod p) * 65536⁻¹ = 1`, then applies `limb_lift` to convert
 each to a Nat equation, and closes the BitVec goal (after
-`Word.toBitVec64_toNat_poly` bridges) by omega. -/
-theorem spec_poly
+`Word.toBitVec64_toNat` bridges) by omega. -/
+theorem spec
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a b : Word (ZMod p)}
   {cols : AddOperation (ZMod p)}
-  (h_isU64_a : a.isU64_poly)
-  (h_isU64_b : b.isU64_poly) :
-  SP1ConstraintList.allHold_poly (constraints a b cols 1) →
-    cols.value.isU64_poly ∧
-    cols.value.toBitVec64 = execute_RTYPE_pure_w_poly a b .ADD := by
+  (h_isU64_a : a.isU64)
+  (h_isU64_b : b.isU64) :
+  SP1ConstraintList.allHold (constraints a b cols 1) →
+    cols.value.isU64 ∧
+    cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
   intro cstrs
-  rw [allHold_constraints_iff_poly] at cstrs
+  rw [allHold_constraints_iff] at cstrs
   obtain ⟨hc0, hc1, hc2, hc3, hv0, hv1, hv2, hv3⟩ := cstrs
-  have h_isU64_v : cols.value.isU64_poly :=
-    Word.isU64_of_cases_poly hv0 hv1 hv2 hv3
+  have h_isU64_v : cols.value.isU64 :=
+    Word.isU64_of_cases hv0 hv1 hv2 hv3
   refine ⟨h_isU64_v, ?_⟩
-  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64_poly h_isU64_a
-  obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64_poly h_isU64_b
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 h_isU64_a
+  obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 h_isU64_b
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
-  rw [show execute_RTYPE_pure_w_poly a b .ADD =
+  rw [show execute_RTYPE_pure_w a b .ADD =
         a.toBitVec64 + b.toBitVec64 from rfl,
       ← BitVec.toNat_inj, BitVec.toNat_add,
-      Word.toBitVec64_toNat_poly h_isU64_v,
-      Word.toBitVec64_toNat_poly h_isU64_b,
-      Word.toBitVec64_toNat_poly h_isU64_a,
-      Word.toNat_poly_def, Word.toNat_poly_def, Word.toNat_poly_def]
+      Word.toBitVec64_toNat h_isU64_v,
+      Word.toBitVec64_toNat h_isU64_b,
+      Word.toBitVec64_toNat h_isU64_a,
+      Word.toNat_def, Word.toNat_def, Word.toNat_def]
   set c0 : ZMod p := (a[0] + b[0] - cols.value[0]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (a[1] + b[1] - cols.value[1] + c0) * (65536 : ZMod p)⁻¹ with hc1_def
   set c2 : ZMod p := (a[2] + b[2] - cols.value[2] + c1) * (65536 : ZMod p)⁻¹ with hc2_def
@@ -122,20 +122,20 @@ theorem spec_poly
 
 section gen
 
-theorem spec.gen_poly
+theorem spec.gen
   {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   {a b : Word (ZMod p)}
   {cols : AddOperation (ZMod p)}
   {is_real : ZMod p}
-  (h_isU64_a : a.isU64_poly)
-  (h_isU64_b : b.isU64_poly) :
+  (h_isU64_a : a.isU64)
+  (h_isU64_b : b.isU64) :
   List.Forall SP1Constraint.toProp (constraints a b cols is_real) →
     is_real = 1 →
-      cols.value.isU64_poly ∧
-      cols.value.toBitVec64 = execute_RTYPE_pure_w_poly a b .ADD := by
+      cols.value.isU64 ∧
+      cols.value.toBitVec64 = execute_RTYPE_pure_w a b .ADD := by
   intros cstrs hir
   subst hir
-  exact spec_poly h_isU64_a h_isU64_b cstrs
+  exact spec h_isU64_a h_isU64_b cstrs
 
 end gen
 

@@ -54,11 +54,11 @@ section constraints
 end constraints
 
 
-@[simp] def is_slt_poly {p : ℕ} (Main : Vector (ZMod p) 44) := Main[32] = 1 ∧ Main[31] = 0
+@[simp] def is_slt {p : ℕ} (Main : Vector (ZMod p) 44) := Main[32] = 1 ∧ Main[31] = 0
 
-lemma allHold_constraints_iff_slt_poly
+lemma allHold_constraints_iff_slt
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
-    (Main : Vector (ZMod p) 44) (h : is_slt_poly Main) :
+    (Main : Vector (ZMod p) 44) (h : is_slt Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[34] }, u16_flags := #v[Main[35], Main[36], Main[37], Main[38]], not_eq_inv := Main[39], comparison_limbs := #v[Main[40], Main[41]] }, b_msb := { msb := Main[42] }, c_msb := { msb := Main[43] } } Main[32] (Main[32] + Main[33])) ∧
     List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
@@ -87,13 +87,13 @@ lemma allHold_constraints_iff_slt_poly
   · rintro ⟨h33, h13⟩
     exact ⟨Or.inl h33, Or.inr h33, h13⟩
 
-@[simp] def is_sltu_poly {p : ℕ} (Main : Vector (ZMod p) 44) := Main[33] = 1 ∧ Main[31] = 0
-@[simp] def is_slti_poly {p : ℕ} (Main : Vector (ZMod p) 44) := Main[32] = 1 ∧ Main[31] = 1
-@[simp] def is_sltiu_poly {p : ℕ} (Main : Vector (ZMod p) 44) := Main[33] = 1 ∧ Main[31] = 1
+@[simp] def is_sltu {p : ℕ} (Main : Vector (ZMod p) 44) := Main[33] = 1 ∧ Main[31] = 0
+@[simp] def is_slti {p : ℕ} (Main : Vector (ZMod p) 44) := Main[32] = 1 ∧ Main[31] = 1
+@[simp] def is_sltiu {p : ℕ} (Main : Vector (ZMod p) 44) := Main[33] = 1 ∧ Main[31] = 1
 
-lemma allHold_constraints_iff_sltu_poly
+lemma allHold_constraints_iff_sltu
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
-    (Main : Vector (ZMod p) 44) (h : is_sltu_poly Main) :
+    (Main : Vector (ZMod p) 44) (h : is_sltu Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[34] }, u16_flags := #v[Main[35], Main[36], Main[37], Main[38]], not_eq_inv := Main[39], comparison_limbs := #v[Main[40], Main[41]] }, b_msb := { msb := Main[42] }, c_msb := { msb := Main[43] } } Main[32] (Main[32] + Main[33])) ∧
     List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
@@ -123,9 +123,9 @@ lemma allHold_constraints_iff_sltu_poly
   · rintro ⟨h32, h13⟩
     exact ⟨Or.inl h32, Or.inr h32, h13⟩
 
-lemma allHold_constraints_iff_slti_poly
+lemma allHold_constraints_iff_slti
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
-    (Main : Vector (ZMod p) 44) (h : is_slti_poly Main) :
+    (Main : Vector (ZMod p) 44) (h : is_slti Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[34] }, u16_flags := #v[Main[35], Main[36], Main[37], Main[38]], not_eq_inv := Main[39], comparison_limbs := #v[Main[40], Main[41]] }, b_msb := { msb := Main[42] }, c_msb := { msb := Main[43] } } Main[32] (Main[32] + Main[33])) ∧
     List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
@@ -154,9 +154,9 @@ lemma allHold_constraints_iff_slti_poly
   · rintro ⟨h33, h13⟩
     exact ⟨Or.inl h33, Or.inr h33, h13⟩
 
-lemma allHold_constraints_iff_sltiu_poly
+lemma allHold_constraints_iff_sltiu
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
-    (Main : Vector (ZMod p) 44) (h : is_sltiu_poly Main) :
+    (Main : Vector (ZMod p) 44) (h : is_sltiu Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     List.Forall SP1Constraint.toProp (LtOperationSigned.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { result := { u16_compare_operation := { bit := Main[34] }, u16_flags := #v[Main[35], Main[36], Main[37], Main[38]], not_eq_inv := Main[39], comparison_limbs := #v[Main[40], Main[41]] }, b_msb := { msb := Main[42] }, c_msb := { msb := Main[43] } } Main[32] (Main[32] + Main[33])) ∧
     List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧

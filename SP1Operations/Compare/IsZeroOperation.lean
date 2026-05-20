@@ -3,7 +3,7 @@ import SP1Operations.Compare.IsZeroOperation.Constraints
 namespace IsZeroOperation
 
 @[grind →, aesop safe forward]
-lemma spec_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
+lemma spec {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
   {a : ZMod p}
   {cols : IsZeroOperation (ZMod p)} :
   List.Forall SP1Constraint.toProp (constraints a cols 1) →

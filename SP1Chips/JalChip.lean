@@ -16,17 +16,17 @@ variable
 
 lemma op_a_lt32_of_constraints {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {Main : Vector (ZMod p) 31}
-    (h_cstrs : (constraints Main).allHold_poly) (h_is_real : Main[30] = 1) :
+    (h_cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1) :
     Main[6].val < 32 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
-  simp [SP1ConstraintList.allHold_poly, constraints, SP1Constraint.toProp] at h_cstrs
+  simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp] at h_cstrs
   -- Extract Main[6] < 32 from the constraint list (the program send clause).
   have h6_lt : Main[6] < (32 : ZMod p) := by aesop
   have : Main[6].val < (32 : ZMod p).val := h6_lt
   rwa [h32] at this
 
-def sp1_op_a (cstrs : (constraints Main).allHold_poly) (h_is_real : Main[30] = 1) :
+def sp1_op_a (cstrs : (constraints Main).allHold) (h_is_real : Main[30] = 1) :
     BitVec 5 :=
   Main[6].val#'(op_a_lt32_of_constraints cstrs h_is_real)
 
@@ -50,7 +50,7 @@ private lemma word_four_eq_bitvec_four {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h4_val : ((4 : ℕ) : ZMod p).val = 4 := ZMod.val_natCast_of_lt (by omega)
   rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by push_cast; rfl]
-  simp only [Word.toBitVec64, Word.toNat_poly_def, Vector.getElem_mk,
+  simp only [Word.toBitVec64, Word.toNat_def, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
     h4_val, ZMod.val_zero, Nat.zero_mul, Nat.add_zero]
 
@@ -59,7 +59,7 @@ including `readReg PC` from the inserted state, the match-on-match iota collapse
 `jump_to (pc + signExtend imm)` via `jump_to_of_mod4_eq_zero` — is performed here at the
 bare-`BitVec` level (no `Word (ZMod p)` polymorphism in the proof term), so the kernel
 re-check stays within stack bounds. Chip-side `SP1JAL_correct` discharges the `target_word`
-+ `link_word` equalities from its `AddOperation.spec_poly` constraints, then `exact`s this
++ `link_word` equalities from its `AddOperation.spec` constraints, then `exact`s this
 lemma. -/
 private lemma jal_spec_eq_sp1 (s : SailState) (hs : SailState.isInitialized s)
     (pc : BitVec 64) (h_pc : s.regs.get? Register.PC = some pc)
@@ -104,12 +104,12 @@ private lemma jal_spec_eq_sp1 (s : SailState) (hs : SailState.isInitialized s)
 -- Sail-state JAL semantics + AddOperation chain + PC alignment via the ZMod %4 bridge.
 -- The kernel-tripping `simp [Std.ExtDHashMap.get_insert, read_pc]` chain is now absorbed
 -- by the bare-`BitVec` helper `jal_spec_eq_sp1` above; the chip's only remaining work is
--- discharging the `target` and `link` equalities from the chip's `AddOperation.spec_poly`
+-- discharging the `target` and `link` equalities from the chip's `AddOperation.spec`
 -- constraints.
 theorem SP1JAL_correct
-    (cstrs : (constraints Main).allHold_poly)
+    (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)
-    (state_cstrs : (constraints Main).initialState_poly s)
+    (state_cstrs : (constraints Main).initialState s)
     (hs : SailState.isInitialized s) :
     let op_a := sp1_op_a Main cstrs h_is_real
     let op_b := sp1_op_b Main
@@ -120,11 +120,11 @@ theorem SP1JAL_correct
   have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
   have h65 : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
   -- state_cstrs extraction: PC read + AddOperation state-prop.
-  simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp,
+  simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
     List.Forall, AddOperation.constraints, h_is_real] at state_cstrs
   obtain ⟨read_pc, h⟩ := state_cstrs
   -- h_cstrs extraction.
-  simp [SP1ConstraintList.allHold_poly, constraints, SP1Constraint.toProp,
+  simp [SP1ConstraintList.allHold, constraints, SP1Constraint.toProp,
     sub_eq_zero, h_is_real] at cstrs
   have h3 : Main[3] < (65536 : ZMod p) := by simp_all only
   have h4 : Main[4] < (65536 : ZMod p) := by simp_all only
@@ -156,14 +156,14 @@ theorem SP1JAL_correct
     refine add_mod4_eq_zero_of_mod4_eq_zero ?_ ?_
     · -- pc % 4 = 0 from chip cstrs (active is_real → pc[0] % 4 = 0 via val_mod_4 bridge)
       simp only [Word.toBitVec64, BitVec.ofNat_eq_ofNat, ofNat64_mod_4_eq_zero_iff,
-        Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        Word.toNat_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ, ZMod.val_zero]
       have h_pc_mod_zmod : Main[3] % (4 : ZMod p) = 0 := by simp_all only
       have h_pc_mod : Main[3].val % 4 = 0 :=
         (val_mod_4_eq_zero_iff_zmod _).mp h_pc_mod_zmod
       omega
     · simp only [← h_sign_extend, Word.toBitVec64, BitVec.ofNat_eq_ofNat,
-        ofNat64_mod_4_eq_zero_iff, Word.toNat_poly_def, Vector.getElem_mk,
+        ofNat64_mod_4_eq_zero_iff, Word.toNat_def, Vector.getElem_mk,
         List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
       simp_all only [show (Opcode.ofNat 46) = Opcode.JAL from rfl]
   have hmod  := (mul4_means_0_1_are_0 hmod4).2
@@ -172,23 +172,23 @@ theorem SP1JAL_correct
       #v[Main[3], Main[4], Main[5], (0 : ZMod p)]
       #v[Main[14], Main[15], Main[16], Main[17]]
       {value := #v[Main[22], Main[23], Main[24], Main[25]]} 1) := cstrs.1
-  have pc_isU64 : Word.isU64_poly #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
-    apply Word.isU64_of_cases_poly <;>
+  have pc_isU64 : Word.isU64 #v[Main[3], Main[4], Main[5], (0 : ZMod p)] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h3_val
     · exact h4_val
     · exact h5_val
     · rw [ZMod.val_zero]; omega
-  have imm_isU64 : Word.isU64_poly #v[Main[14], Main[15], Main[16], Main[17]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have imm_isU64 : Word.isU64 #v[Main[14], Main[15], Main[16], Main[17]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact h14_val
     · exact h15_val
     · exact h16_val
     · exact h17_val
-  have h_add' := (AddOperation.spec_poly pc_isU64 imm_isU64 h_add_imm).2
+  have h_add' := (AddOperation.spec pc_isU64 imm_isU64 h_add_imm).2
   simp at h_add'
   have hmod4_target :
       Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]] % 4 = 0 :=
@@ -205,7 +205,7 @@ theorem SP1JAL_correct
     have h_add_pc : List.Forall SP1Constraint.toProp (AddOperation.constraints
       #v[Main[3], Main[4], Main[5], (0 : ZMod p)] #v[4, 0, 0, 0]
       {value := #v[Main[26], Main[27], Main[28], Main[29]]} 1) := by aesop
-    have h_add_pc' := (AddOperation.spec_poly pc_isU64 Word.four_isU64_poly h_add_pc).2
+    have h_add_pc' := (AddOperation.spec pc_isU64 Word.four_isU64 h_add_pc).2
     simp at h_add_pc'
     rw [word_four_eq_bitvec_four] at h_add_pc'
     exact h_add_pc'

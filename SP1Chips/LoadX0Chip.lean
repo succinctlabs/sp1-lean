@@ -176,8 +176,8 @@ set_option maxHeartbeats 1600000 in
 theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
-    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_cstrs : (LoadX0.constraints Main).allHold)
+    (state_cstrs : (LoadX0.constraints Main).initialState s)
     (h_is_loadX0_ld : Main[47] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -196,7 +196,7 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
   obtain ⟨_, _, _, _, _⟩ := hs_config
   -- Inline constraint flattening via simp; LoadX0 has no per-sub-opcode
   -- iff lemma, so we destructure the 29-conjunct simp normal form directly.
-  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.allHold, LoadX0.constraints,
     AddressOperation.constraints, sub_eq_zero,
     SP1Constraint.toProp] at h_cstrs
   obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
@@ -247,9 +247,9 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
   -- Also `Main[13] = 1` collapses the op_a_0-related clauses.
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero,
     h_is_loadX0_ld] at h_reader
-  -- Reader extraction via the iff_is_real_poly specialization.
+  -- Reader extraction via the iff_is_real specialization.
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -264,13 +264,13 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
   have h35_lt_p : (35 : ℕ) < p := by omega
   have h35_val : (35 : ZMod p).val = 35 := ZMod.val_natCast_of_lt h35_lt_p
   -- The opcode argument simp-reduces to 35 since only Main[47] is non-zero.
-  -- Reduce h_trusted (Opcode.trusted_instr_poly) to extract h_imm_se.
+  -- Reduce h_trusted (Opcode.trusted_instr) to extract h_imm_se.
   -- The opcode value `35*Main[47]` collapses to `35`.
   -- We need: Word.toBitVec64 Main[21..24] = signExtend 64 (BitVec.ofNat 12 Main[21].val).
-  -- h_trusted reduces to i_type_constraints_poly for opcode 35 (LD).
+  -- h_trusted reduces to i_type_constraints for opcode 35 (LD).
   -- Reduce it to extract `Main[14] < 32` and `h_imm_se`.
-  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
-    h35_val, i_type_constraints_poly] at h_trusted
+  simp [Opcode.trusted_instr, Opcode.ofNat, Nat.ble,
+    h35_val, i_type_constraints] at h_trusted
   -- h_trusted now: Main[14] < 32 ∧ h_imm_se (after collapse).
   have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
   have h_imm_se : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
@@ -284,20 +284,20 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
   have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
   have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
     rw [h6_val_eq_zero]
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
     · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
-  -- Memory result Word.isU64_poly.
-  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+  -- Memory result Word.isU64.
+  have h_mem_isU64' : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     apply h_mem_isU64
     rw [h_sum_eq_one]; exact one_ne_zero
   -- AddrAdd spec
-  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  have haddr_spec := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_addr
   obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at haddr_isU64 haddr_eq
@@ -315,8 +315,8 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_eq, Word.toBitVec64_toNat_poly haddr_isU64,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_eq, Word.toBitVec64_toNat haddr_isU64,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
@@ -347,7 +347,7 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
     exact zero_ne_one h28_inv
   -- AddressOperation's E89/E90/E91 collapse: bit shifts are 0, so
   -- E89 = Main[25], E90 = Main[26], E91 = Main[27].
-  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.initialState, LoadX0.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
     CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
@@ -365,12 +365,12 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
     have heq := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
     rw [← heq, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by
-        rw [Word.toNat_poly_def]
+        rw [Word.toNat_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
@@ -383,14 +383,14 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
           exact Nat.mul_le_mul_right _ this
         omega)]
   have haddr_plus : ∀ (k : ℕ), k < 8 →
-      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
-      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+      Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
     intro k hk
     have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
     have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- Simplify the spec side; the `wX_bits 0 _` step is a no-op.
@@ -466,8 +466,8 @@ set_option maxHeartbeats 1600000 in
 theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
-    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_cstrs : (LoadX0.constraints Main).allHold)
+    (state_cstrs : (LoadX0.constraints Main).initialState s)
     (h_is_loadX0_lwu : Main[46] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -484,7 +484,7 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   obtain ⟨_, _, _, _, _⟩ := hs_config
-  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.allHold, LoadX0.constraints,
     AddressOperation.constraints, sub_eq_zero,
     SP1Constraint.toProp] at h_cstrs
   obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
@@ -533,7 +533,7 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM47_zero,
     h_is_loadX0_lwu] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -547,8 +547,8 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
   have h34_lt_p : (34 : ℕ) < p := by omega
   have h34_val : (34 : ZMod p).val = 34 := ZMod.val_natCast_of_lt h34_lt_p
   -- The opcode argument simp-reduces to 34 since only Main[46] is non-zero.
-  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
-    h34_val, i_type_constraints_poly] at h_trusted
+  simp [Opcode.trusted_instr, Opcode.ofNat, Nat.ble,
+    h34_val, i_type_constraints] at h_trusted
   have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
   have h_imm_se : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
@@ -561,18 +561,18 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
   have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
   have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
     rw [h6_val_eq_zero]
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
     · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
-  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+  have h_mem_isU64' : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     apply h_mem_isU64
     rw [h_sum_eq_one]; exact one_ne_zero
-  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  have haddr_spec := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_addr
   obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at haddr_isU64 haddr_eq
@@ -588,8 +588,8 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_eq, Word.toBitVec64_toNat_poly haddr_isU64,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_eq, Word.toBitVec64_toNat haddr_isU64,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
@@ -618,7 +618,7 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
     rw [h_sum_eq_one] at h28_inv
     exact zero_ne_one h28_inv
   -- For LWU we don't pre-fold Main[40] (it's free in {0,1}).
-  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.initialState, LoadX0.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
     CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
@@ -635,12 +635,12 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
     have heq := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
     rw [← heq, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by
-        rw [Word.toNat_poly_def]
+        rw [Word.toNat_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
@@ -653,14 +653,14 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
           exact Nat.mul_le_mul_right _ this
         omega)]
   have haddr_plus : ∀ (k : ℕ), k < 8 →
-      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
-      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+      Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
     intro k hk
     have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
     have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- Case-split on bit2 (Main[40]).
@@ -767,8 +767,8 @@ set_option maxHeartbeats 1600000 in
 theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
-    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_cstrs : (LoadX0.constraints Main).allHold)
+    (state_cstrs : (LoadX0.constraints Main).initialState s)
     (h_is_loadX0_lw : Main[45] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -785,7 +785,7 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   obtain ⟨_, _, _, _, _⟩ := hs_config
-  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.allHold, LoadX0.constraints,
     AddressOperation.constraints, sub_eq_zero,
     SP1Constraint.toProp] at h_cstrs
   obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
@@ -835,7 +835,7 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM44_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lw] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -849,8 +849,8 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
   have h31_lt_p : (31 : ℕ) < p := by omega
   have h31_val : (31 : ZMod p).val = 31 := ZMod.val_natCast_of_lt h31_lt_p
   -- The opcode argument simp-reduces to 31 since only Main[45] is non-zero.
-  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
-    h31_val, i_type_constraints_poly] at h_trusted
+  simp [Opcode.trusted_instr, Opcode.ofNat, Nat.ble,
+    h31_val, i_type_constraints] at h_trusted
   have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
   have h_imm_se : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
@@ -863,18 +863,18 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
   have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
   have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
     rw [h6_val_eq_zero]
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
     · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
-  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+  have h_mem_isU64' : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     apply h_mem_isU64
     rw [h_sum_eq_one]; exact one_ne_zero
-  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  have haddr_spec := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_addr
   obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at haddr_isU64 haddr_eq
@@ -890,8 +890,8 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_eq, Word.toBitVec64_toNat_poly haddr_isU64,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_eq, Word.toBitVec64_toNat haddr_isU64,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
@@ -920,7 +920,7 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
     rw [h_sum_eq_one] at h28_inv
     exact zero_ne_one h28_inv
   -- For LW we don't pre-fold Main[40] (it's free in {0,1}).
-  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.initialState, LoadX0.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
     CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
@@ -937,12 +937,12 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
     have heq := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
     rw [← heq, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by
-        rw [Word.toNat_poly_def]
+        rw [Word.toNat_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
@@ -955,14 +955,14 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
           exact Nat.mul_le_mul_right _ this
         omega)]
   have haddr_plus : ∀ (k : ℕ), k < 8 →
-      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
-      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+      Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
     intro k hk
     have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
     have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- Case-split on bit2 (Main[40]).
@@ -1069,8 +1069,8 @@ set_option maxHeartbeats 1600000 in
 theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
-    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_cstrs : (LoadX0.constraints Main).allHold)
+    (state_cstrs : (LoadX0.constraints Main).initialState s)
     (h_is_loadX0_lhu : Main[44] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -1087,7 +1087,7 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   obtain ⟨_, _, _, _, _⟩ := hs_config
-  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.allHold, LoadX0.constraints,
     AddressOperation.constraints, sub_eq_zero,
     SP1Constraint.toProp] at h_cstrs
   obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
@@ -1131,7 +1131,7 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM43_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lhu] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -1145,8 +1145,8 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
   have h33_lt_p : (33 : ℕ) < p := by omega
   have h33_val : (33 : ZMod p).val = 33 := ZMod.val_natCast_of_lt h33_lt_p
   -- The opcode argument simp-reduces to 33 since only Main[44] is non-zero.
-  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
-    h33_val, i_type_constraints_poly] at h_trusted
+  simp [Opcode.trusted_instr, Opcode.ofNat, Nat.ble,
+    h33_val, i_type_constraints] at h_trusted
   have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
   have h_imm_se : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
@@ -1159,18 +1159,18 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
   have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
   have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
     rw [h6_val_eq_zero]
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
     · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
-  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+  have h_mem_isU64' : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     apply h_mem_isU64
     rw [h_sum_eq_one]; exact one_ne_zero
-  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  have haddr_spec := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_addr
   obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at haddr_isU64 haddr_eq
@@ -1186,8 +1186,8 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_eq, Word.toBitVec64_toNat_poly haddr_isU64,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_eq, Word.toBitVec64_toNat haddr_isU64,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
@@ -1217,7 +1217,7 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
     exact zero_ne_one h28_inv
   -- For LHU we don't pre-fold Main[39] or Main[40] (both free in {0,1}).
   -- Pre-fold Main[38] = 0 only.
-  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.initialState, LoadX0.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
     CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
@@ -1234,12 +1234,12 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
     have heq := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
     rw [← heq, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by
-        rw [Word.toNat_poly_def]
+        rw [Word.toNat_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
@@ -1252,14 +1252,14 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
           exact Nat.mul_le_mul_right _ this
         omega)]
   have haddr_plus : ∀ (k : ℕ), k < 8 →
-      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
-      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+      Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
     intro k hk
     have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
     have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 4-way nested case-split on (Main[40], Main[39]).
@@ -1407,8 +1407,8 @@ set_option maxHeartbeats 1600000 in
 theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
-    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_cstrs : (LoadX0.constraints Main).allHold)
+    (state_cstrs : (LoadX0.constraints Main).initialState s)
     (h_is_loadX0_lh : Main[43] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -1425,7 +1425,7 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   obtain ⟨_, _, _, _, _⟩ := hs_config
-  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.allHold, LoadX0.constraints,
     AddressOperation.constraints, sub_eq_zero,
     SP1Constraint.toProp] at h_cstrs
   obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
@@ -1467,7 +1467,7 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM42_zero, hM44_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lh] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -1481,8 +1481,8 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
   have h30_lt_p : (30 : ℕ) < p := by omega
   have h30_val : (30 : ZMod p).val = 30 := ZMod.val_natCast_of_lt h30_lt_p
   -- The opcode argument simp-reduces to 30 since only Main[43] is non-zero.
-  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
-    h30_val, i_type_constraints_poly] at h_trusted
+  simp [Opcode.trusted_instr, Opcode.ofNat, Nat.ble,
+    h30_val, i_type_constraints] at h_trusted
   have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
   have h_imm_se : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
@@ -1495,18 +1495,18 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
   have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
   have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
     rw [h6_val_eq_zero]
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
     · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
-  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+  have h_mem_isU64' : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     apply h_mem_isU64
     rw [h_sum_eq_one]; exact one_ne_zero
-  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  have haddr_spec := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_addr
   obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at haddr_isU64 haddr_eq
@@ -1522,8 +1522,8 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_eq, Word.toBitVec64_toNat_poly haddr_isU64,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_eq, Word.toBitVec64_toNat haddr_isU64,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
@@ -1552,7 +1552,7 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
     rw [h_sum_eq_one] at h28_inv
     exact zero_ne_one h28_inv
   -- Pre-fold Main[38] = 0 only.
-  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.initialState, LoadX0.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
     CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
@@ -1569,12 +1569,12 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
     have heq := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
     rw [← heq, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by
-        rw [Word.toNat_poly_def]
+        rw [Word.toNat_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
@@ -1587,14 +1587,14 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
           exact Nat.mul_le_mul_right _ this
         omega)]
   have haddr_plus : ∀ (k : ℕ), k < 8 →
-      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
-      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+      Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
     intro k hk
     have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
     have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 4-way nested case-split on (Main[40], Main[39]).
@@ -1745,8 +1745,8 @@ set_option maxHeartbeats 1600000 in
 theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
-    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_cstrs : (LoadX0.constraints Main).allHold)
+    (state_cstrs : (LoadX0.constraints Main).initialState s)
     (h_is_loadX0_lbu : Main[42] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -1763,7 +1763,7 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   obtain ⟨_, _, _, _, _⟩ := hs_config
-  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.allHold, LoadX0.constraints,
     AddressOperation.constraints, sub_eq_zero,
     SP1Constraint.toProp] at h_cstrs
   obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
@@ -1800,7 +1800,7 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM41_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lbu] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -1812,8 +1812,8 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
   have h32val : (32 : ZMod p).val = 32 := val_32_zmod_p
   have h65val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
   -- The opcode argument simp-reduces to 32 since only Main[42] is non-zero.
-  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
-    h32val, i_type_constraints_poly] at h_trusted
+  simp [Opcode.trusted_instr, Opcode.ofNat, Nat.ble,
+    h32val, i_type_constraints] at h_trusted
   have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
   have h_imm_se : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
@@ -1826,18 +1826,18 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
   have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
   have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
     rw [h6_val_eq_zero]
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
     · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
-  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+  have h_mem_isU64' : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     apply h_mem_isU64
     rw [h_sum_eq_one]; exact one_ne_zero
-  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  have haddr_spec := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_addr
   obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at haddr_isU64 haddr_eq
@@ -1853,8 +1853,8 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_eq, Word.toBitVec64_toNat_poly haddr_isU64,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_eq, Word.toBitVec64_toNat haddr_isU64,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
@@ -1883,7 +1883,7 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
     rw [h_sum_eq_one] at h28_inv
     exact zero_ne_one h28_inv
   -- For LBU we don't pre-fold any of Main[38], Main[39], Main[40] (all free in {0,1}).
-  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.initialState, LoadX0.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
     CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
@@ -1900,12 +1900,12 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
     have heq := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
     rw [← heq, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by
-        rw [Word.toNat_poly_def]
+        rw [Word.toNat_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
@@ -1918,14 +1918,14 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
           exact Nat.mul_le_mul_right _ this
         omega)]
   have haddr_plus : ∀ (k : ℕ), k < 8 →
-      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
-      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+      Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
     intro k hk
     have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
     have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 8-way nested case-split on (Main[40], Main[39], Main[38]).
@@ -2141,8 +2141,8 @@ set_option maxHeartbeats 1600000 in
 theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (LoadX0.constraints Main).allHold_poly)
-    (state_cstrs : (LoadX0.constraints Main).initialState_poly s)
+    (h_cstrs : (LoadX0.constraints Main).allHold)
+    (state_cstrs : (LoadX0.constraints Main).initialState s)
     (h_is_loadX0_lb : Main[41] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -2159,7 +2159,7 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
   extract_lets op_a op_b imm_c
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   obtain ⟨_, _, _, _, _⟩ := hs_config
-  simp [SP1ConstraintList.allHold_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.allHold, LoadX0.constraints,
     AddressOperation.constraints, sub_eq_zero,
     SP1Constraint.toProp] at h_cstrs
   obtain ⟨h_addr, _h_sum_or1, h_M38_or, h_M39_or, h_M40_or, h28_inv, _h_low_align,
@@ -2193,7 +2193,7 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
   rw [h_sum_eq_one, hM42_zero, hM43_zero, hM44_zero, hM45_zero, hM46_zero, hM47_zero,
     h_is_loadX0_lb] at h_reader
   have h_reader' :=
-    ITypeReaderImmutable.allHold_constraints_iff_is_real_poly (h := rfl) (h_trusted := rfl) |>.mp h_reader
+    ITypeReaderImmutable.allHold_constraints_iff_is_real (h := rfl) (h_trusted := rfl) |>.mp h_reader
   obtain ⟨h_trusted, h6_lt, h14_lt, h21_lt, h22_lt, h23_lt, h24_lt,
     _hM13_or, h13_iff_op_a_zero, _hPC_align, _hPC0_lt, _hPC1_lt, _hPC2_lt,
     _hM12_lt, _hM20_lt, _h_clk_a, _h_clk_b, _h_op_a_isU64, h15u64,
@@ -2207,8 +2207,8 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
   have h29_lt_p : (29 : ℕ) < p := by omega
   have h29_val : (29 : ZMod p).val = 29 := ZMod.val_natCast_of_lt h29_lt_p
   -- The opcode argument simp-reduces to 29 since only Main[41] is non-zero.
-  simp [Opcode.trusted_instr_poly, Opcode.ofNat, Nat.ble,
-    h29_val, i_type_constraints_poly] at h_trusted
+  simp [Opcode.trusted_instr, Opcode.ofNat, Nat.ble,
+    h29_val, i_type_constraints] at h_trusted
   have h14_lt_zmod : Main[14] < (32 : ZMod p) := by clear *- h_trusted; simp_all only
   have h_imm_se : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
@@ -2221,18 +2221,18 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
   have h6_val_eq_zero : Main[6].val = 0 := by rw [h6_eq_zero, ZMod.val_zero]
   have h_op_a_zero : (BitVec.ofNat 5 Main[6].val : BitVec 5) = 0#5 := by
     rw [h6_val_eq_zero]
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt; rwa [h65val] at this
     · have : Main[22].val < (65536 : ZMod p).val := h22_lt; rwa [h65val] at this
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt; rwa [h65val] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt; rwa [h65val] at this
-  have h_mem_isU64' : Word.isU64_poly #v[Main[29], Main[30], Main[31], Main[32]] := by
+  have h_mem_isU64' : Word.isU64 #v[Main[29], Main[30], Main[31], Main[32]] := by
     apply h_mem_isU64
     rw [h_sum_eq_one]; exact one_ne_zero
-  have haddr_spec := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_addr
+  have haddr_spec := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_addr
   obtain ⟨haddr_isU64, haddr_eq⟩ := haddr_spec
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at haddr_isU64 haddr_eq
@@ -2248,8 +2248,8 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
       (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
         Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_eq, Word.toBitVec64_toNat_poly haddr_isU64,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_eq, Word.toBitVec64_toNat haddr_isU64,
+      Word.toNat_def]; simp
   have h_offset_eq :
       Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
@@ -2278,7 +2278,7 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
     rw [h_sum_eq_one] at h28_inv
     exact zero_ne_one h28_inv
   -- All three offset bits free.
-  simp [SP1ConstraintList.initialState_poly, LoadX0.constraints,
+  simp [SP1ConstraintList.initialState, LoadX0.constraints,
     AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints, ITypeReaderImmutable.constraints,
     CPUState.constraints, BitVec.ofNatLT_eq_ofNat,
@@ -2295,12 +2295,12 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
     omega
   have haddr_nat : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat +
           (Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
-        Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
+        Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] := by
     have heq := congr_arg BitVec.toNat haddr_eq
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt h_fits_real] at heq
     rw [← heq, Word.toBitVec64, BitVec.toNat_ofNat,
       Nat.mod_eq_of_lt (by
-        rw [Word.toNat_poly_def]
+        rw [Word.toNat_def]
         simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
           List.getElem_cons_succ, ZMod.val_zero]
         have hpow : (2 ^ 64 : ℕ) = 18446744073709551616 := by decide
@@ -2313,14 +2313,14 @@ theorem correct_loadX0_lb (Main : Vector (ZMod p) 48)
           exact Nat.mul_le_mul_right _ this
         omega)]
   have haddr_plus : ∀ (k : ℕ), k < 8 →
-      Word.toNat_poly #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
-      Word.toNat_poly #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
+      Word.toNat #v[Main[25], Main[26], Main[27], (0 : ZMod p)] + k =
+      Word.toNat #v[Main[25] + (k : ZMod p), Main[26], Main[27], (0 : ZMod p)] := by
     intro k hk
     have hk_val : ((k : ℕ) : ZMod p).val = k := ZMod.val_natCast_of_lt (by omega)
     have h25k_lt : Main[25].val + (k : ZMod p).val < p := by rw [hk_val]; omega
     have h25k_val : (Main[25] + (k : ZMod p)).val = Main[25].val + k := by
       rw [ZMod.val_add_of_lt h25k_lt, hk_val]
-    simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+    simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
       List.getElem_cons_zero, List.getElem_cons_succ, ZMod.val_zero, h25k_val]
     omega
   -- 8-way nested case-split on (Main[40], Main[39], Main[38]).
