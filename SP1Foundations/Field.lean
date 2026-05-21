@@ -1,30 +1,8 @@
 import SP1Foundations.Misc
 
 /-!
-# KoalaBear field setup and bridges to a generic prime field
-
-This file plays two roles:
-
-1. **Concrete field instances on `Fin KB`** (`namespace KoalaBear`): primality,
-   `Field`, `NoZeroDivisors`, and a block of high-priority arithmetic instances
-   that are perf-critical (see `docs/PERF_PATTERNS.md`).
-2. **KB-specific bridges** (free-floating lemmas below the namespace): `rfl`-only
-   facts like `(2130673921 : Fin KB) = 65536⁻¹` that translate the literal
-   inverse-of-`2^k` values that the SP1 constraint compiler emits into
-   `Field`-generic forms (`(2^k : F)⁻¹`). These are inherently KB-specific
-   because the literal value is the modular inverse computed in `Fin KB`. They
-   are the "instantiation-time bridge" — generic operation lemmas (Phase 3 of
-   `docs/FIELD_GENERIC.md`) state their RHS in terms of `(2^k : F)⁻¹` so the
-   only KB-coupling is whether the simp set includes the matching bridge.
-
-A second concrete field (e.g. BabyBear) would need its own copies of these
-bridges with its own literal values; the constraint compiler would emit a
-different literal for `(2^16)⁻¹` mod that prime. See Phase 5 of
-`docs/FIELD_GENERIC.md` for the BabyBear instantiation recipe.
+# General Facts about Prime Fields
 -/
-
-notation "KB" => 2130706433
-@[simp] lemma BB_eq : KB = 2130706433 := rfl
 
 /-- `Fin n`-level mod equals zero iff the underlying `Nat` mod does. Generic over any
 `Fin n`; the only dependence was on `(m : Fin n).val = m.val`. Useful because the
@@ -64,14 +42,14 @@ end ZMod
 /-- `Opcode.ofNat` in the auto-gen `program` interactions reads the opcode
 field as a `ℕ`. At `F := Fin n` and `F := ZMod p` the `.val` projection
 provides this; the typeclass `CoeHead F ℕ` is the generic surface that
-the `_poly` cascade uses to lift readers with `program` clauses
+the `` cascade uses to lift readers with `program` clauses
 (RTypeReader, ITypeReader, JTypeReader, ALUTypeReader). -/
 instance Fin.coeHeadNat {n : ℕ} : CoeHead (Fin n) ℕ := ⟨Fin.val⟩
 instance ZMod.coeHeadNat {p : ℕ} [NeZero p] : CoeHead (ZMod p) ℕ := ⟨ZMod.val⟩
 
 /-- Reduces `CoeHead.coe (x : ZMod p)` to `x.val` so simp normalizes the
 `Opcode.ofNat` argument inside `program`-clause auto-gen output to match
-the iff_poly RHS `Opcode.ofNat opcode.val` form. -/
+the iff RHS `Opcode.ofNat opcode.val` form. -/
 @[simp] lemma coeHead_zmod_eq_val {p : ℕ} [NeZero p] (x : ZMod p) :
     @CoeHead.coe (ZMod p) ℕ _ x = x.val := rfl
 
@@ -82,32 +60,13 @@ the iff_poly RHS `Opcode.ofNat opcode.val` form. -/
 
 namespace KoalaBear
 
--- dt: Need `#eval`-level `native_decide` strength to make this work on all OS
-set_option linter.style.nativeDecide false in
-lemma prime_KoalaBearPrime : Nat.Prime KB := by native_decide
-
-instance Fact_BBPrime : Fact (Nat.Prime KB) := ⟨prime_KoalaBearPrime⟩
-instance : NeZero KB := by constructor; decide
-
--- dt: Wouldn't need this if `ZMod` was the fundamental object for us.
-instance : Field (Fin KB) := ZMod.instField KB
-instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
-
--- High-priority direct instances for Fin KB arithmetic. Without these, Lean's
--- typeclass synth considers 5-9 candidates per Add/Mul/Sub/OfNat query (via
--- AddZero.toAdd, Lean.Grind.Semiring.toAdd, AddSemigroup.toAdd, etc.). The
--- constraints files have thousands of Fin KB arithmetic ops, so this matters —
--- initial profile showed 779s cumulative typeclass inference in ShiftRight.
-@[instance 10000] instance instAdd : Add (Fin KB) := Fin.instAdd
-@[instance 10000] instance instMul : Mul (Fin KB) := Fin.instMul
-@[instance 10000] instance instSub : Sub (Fin KB) := Fin.instSub
-@[instance 10000] instance instNeg : Neg (Fin KB) := inferInstance
-@[instance 10000] instance instZero : Zero (Fin KB) := inferInstance
-@[instance 10000] instance instOne : One (Fin KB) := inferInstance
-@[instance 10000] instance instOfNat (n : Nat) : OfNat (Fin KB) n := Fin.instOfNat
-@[instance 10000] instance instHAdd : HAdd (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a + b⟩
-@[instance 10000] instance instHMul : HMul (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a * b⟩
-@[instance 10000] instance instHSub : HSub (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a - b⟩
+-- High-priority direct instances for ZMod p Arithmetic
+@[instance 10000] instance instAdd (p : ℕ) [NeZero p] : Add (ZMod p) := inferInstance
+@[instance 10000] instance instMul (p : ℕ) [NeZero p] : Mul (ZMod p) := inferInstance
+@[instance 10000] instance instSub (p : ℕ) [NeZero p] : Sub (ZMod p) := inferInstance
+@[instance 10000] instance instNeg (p : ℕ) [NeZero p] : Neg (ZMod p) := inferInstance
+@[instance 10000] instance instZero (p : ℕ) [NeZero p] : Zero (ZMod p) := inferInstance
+@[instance 10000] instance instOne (p : ℕ) [NeZero p] : One (ZMod p) := inferInstance
 
 end KoalaBear
 
@@ -119,7 +78,7 @@ lemma mul_diff_one_neq {α : Type*} [Field α] {a b c : α} :
 
 /-! ### Polymorphic `.val` helpers over `ZMod p`
 
-These let `_poly` operation iff lemmas reduce `(N : ZMod p).val` to `N` for
+These let `` operation iff lemmas reduce `(N : ZMod p).val` to `N` for
 the literal values that appear in our auto-gen constraint definitions
 (`16` from byte-opcode `Range`, `32` for register-index bounds, `256` /
 `65536` for U16/U8 boundaries). Under `[Fact (2 ^ 17 < p)]` (which decides
@@ -149,7 +108,7 @@ variable {p : ℕ} [hp : Fact (2 ^ 17 < p)]
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (16 : ℕ) < p by omega)
 
--- DivRem opcode values (15-28) needed for chip-level _poly proofs' opcode reductions.
+-- DivRem opcode values (15-28) needed for chip-level  proofs' opcode reductions.
 @[simp] lemma val_15_zmod_p : (15 : ZMod p).val = 15 := by
   have : 131072 < p := by have := hp.out; omega
   exact ZMod.val_natCast_of_lt (show (15 : ℕ) < p by omega)
@@ -260,7 +219,7 @@ lemma val_2_ne_zero : (2 : ZMod p) ≠ 0 := by
   intro hz; rw [hz] at h; simp at h
 
 /-- Polymorphic non-zero bridge for `(3 : ZMod p)`. Used in
-`LtOperationUnsigned/Signed` `_poly` proofs to discharge impossible
+`LtOperationUnsigned/Signed` `` proofs to discharge impossible
 flag-sum combinations (sum = 3 case). -/
 lemma val_3_ne_zero : (3 : ZMod p) ≠ 0 := by
   have h : (3 : ZMod p).val = 3 := by
@@ -274,18 +233,18 @@ lemma val_3_ne_zero : (3 : ZMod p) ≠ 0 := by
 (`AddOperation`, `SubOperation`, `Addw`, `Subw`, `AddrAdd`) have shape
 `x * 65536⁻¹ = 1`; this rewrites it to `x = 65536`. The prime hypothesis
 is needed for the `GroupWithZero` instance via `Field (ZMod p)`. -/
-lemma mul_inv_65536_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma mul_inv_65536_eq_one_iff [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (65536 : ZMod p)⁻¹ = 1 ↔ x = 65536 := by
   rw [mul_inv_eq_one₀ val_65536_ne_zero]
 
 /-- Used by AddrAdd/Branch-style ops where `(2^2)⁻¹` appears (PC alignment
 carries). -/
-lemma mul_inv_4_eq_one_iff_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma mul_inv_4_eq_one_iff [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (4 : ZMod p)⁻¹ = 1 ↔ x = 4 := by
   rw [mul_inv_eq_one₀ val_4_ne_zero]
 
 /-- Carry binarity in Add/Sub iff lemmas factors through this disjunction. -/
-lemma inv_65536_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma inv_65536_zero_or_one [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (65536 : ZMod p)⁻¹ = 0 ∨ x * (65536 : ZMod p)⁻¹ = 1 ↔
       x = 0 ∨ x = 65536 := by
   have h1 : (65536 : ZMod p)⁻¹ ≠ 0 := inv_ne_zero val_65536_ne_zero
@@ -293,7 +252,7 @@ lemma inv_65536_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
   aesop
 
 /-- Carry binarity for `(4 : ZMod p)⁻¹`. -/
-lemma inv_4_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
+lemma inv_4_zero_or_one [Fact (Nat.Prime p)] (x : ZMod p) :
     x * (4 : ZMod p)⁻¹ = 0 ∨ x * (4 : ZMod p)⁻¹ = 1 ↔
       x = 0 ∨ x = 4 := by
   have h1 : (4 : ZMod p)⁻¹ ≠ 0 := inv_ne_zero val_4_ne_zero
@@ -302,7 +261,7 @@ lemma inv_4_zero_or_one_poly [Fact (Nat.Prime p)] (x : ZMod p) :
 
 /-- Small-literal equality bridge for `ZMod p` under `[Fact (2^17 < p)]`.
 Converts `(n : ZMod p) = (m : ZMod p)` to `n = m` (Nat-level) for any
-`n, m < 2^17`. Used in the LtOperationUnsigned/Signed `_poly` proofs to
+`n, m < 2^17`. Used in the LtOperationUnsigned/Signed `` proofs to
 handle impossible cases where multiple flag bits are 1 simultaneously. -/
 lemma small_nat_eq_zmod {n m : ℕ} (hn : n < 2 ^ 17) (hm : m < 2 ^ 17) :
     ((n : ZMod p) = (m : ZMod p)) ↔ n = m := by
@@ -356,7 +315,7 @@ lemma val_mod_4_eq_zero_iff_zmod
 /-- Case-split helper for `(a - b).val` over `ZMod p`. The positive branch
 matches mathlib's `ZMod.val_sub`; the wrap-around branch follows from
 `a - b = -(b - a)` plus `ZMod.neg_val`. The `if`-shape is `omega`-friendly,
-making this the missing primitive for `_poly` proofs of operations whose
+making this the missing primitive for `` proofs of operations whose
 RHS contains subtraction over `ZMod p` (`AddOperation`, `SubOperation`,
 `U16CompareOperation`, etc.). -/
 lemma val_sub_cases {p : ℕ} [NeZero p] (a b : ZMod p) :
@@ -372,20 +331,6 @@ lemma val_sub_cases {p : ℕ} [NeZero p] (a b : ZMod p) :
     rw [if_neg hba, ZMod.val_sub (le_of_lt h)]
 
 end Polymorphic
-
-/-- At `p := KB`, the strong-prime fact decides. Other concrete primes ≥ 2^17
-(BabyBear, Mersenne31) similarly decide. Registered as an instance so chip
-code that pins `F := Fin KB = ZMod KB` synthesizes the polymorphic helpers
-automatically. -/
-instance KoalaBear.Fact_2pow17_lt_KB : Fact (2 ^ 17 < KB) := ⟨by decide⟩
-
-/-- Strengthened version of the polymorphic prime-size hypothesis used by the
-Mul `_poly` operation lemmas (`core_mul_poly` / `core_mulw_poly` and the
-five `MulOperation.spec.<variant>_poly` lemmas). The byte-level carry chain
-needs `prod[i].val + carry[i].val * 256 < p` (max ≤ 2 ^ 24 − 1) to lift
-the ZMod constraints to Nat equations cleanly. KB ≈ 2^31 satisfies this
-trivially; BabyBear and Mersenne31 do as well. -/
-instance KoalaBear.Fact_2pow24_lt_KB : Fact (2 ^ 24 < KB) := ⟨by decide⟩
 
 /-! ### Integer helpers (not field-related; lives here for historical reasons) -/
 

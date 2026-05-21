@@ -4,8 +4,8 @@ import SP1Foundations.Assumptions
 import LeanRV64D
 
 /-- Field-generic AIR interaction. The inductive only stores field elements; the
-specific typeclass requirements live on `SP1Constraint.toProp_poly` /
-`SP1Constraint.toStateProp_poly`. -/
+specific typeclass requirements live on `SP1Constraint.toProp` /
+`SP1Constraint.toStateProp`. -/
 inductive AirInteraction (F : Type*) where
   | byte (op : ByteOpcode) (a b c : F)
   | memory (clk_high clk_low addr0 addr1 addr2 limb0 limb1 limb2 limb3 : F)
@@ -35,14 +35,17 @@ inductive SP1Constraint (F : Type*) where
 
 namespace SP1Constraint
 
-section toProp_poly
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
+section toProp
 
 /-- Constraint-level prop over a generic prime field `ZMod p`. -/
-def toProp_poly {p : ℕ} [NeZero p] : SP1Constraint (ZMod p) → Prop
+def toProp {p : ℕ} [NeZero p] : SP1Constraint (ZMod p) → Prop
   | .assertZero x => (x = 0)
-  | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain_poly a b c
+  | .send (.byte op a b c) mult => mult ≠ 0 → op.constrain a b c
   | (.send (.memory _clk_high _clk_low _addr0 _addr1 _addr2 limb0 limb1 limb2 limb3) mult) =>
-      mult ≠ 0 → Word.isU64_poly #v[limb0, limb1, limb2, limb3]
+      mult ≠ 0 → Word.isU64 #v[limb0, limb1, limb2, limb3]
   | .send
       (.program
       pc0 pc1 pc2
@@ -55,7 +58,7 @@ def toProp_poly {p : ℕ} [NeZero p] : SP1Constraint (ZMod p) → Prop
       imm_c)
       mult =>
         mult ≠ 0
-        -> opcode.trusted_instr_poly op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
+        -> opcode.trusted_instr op_a op_b_0 op_b_1 op_b_2 op_b_3 op_c_0 op_c_1 op_c_2 op_c_3 imm_b imm_c
            ∧ op_a < 32
            ∧ (op_b_0 < 65536 ∧ op_b_1 < 65536 ∧ op_b_2 < 65536 ∧ op_b_3 < 65536)
            ∧ (op_c_0 < 65536 ∧ op_c_1 < 65536 ∧ op_c_2 < 65536 ∧ op_c_3 < 65536)
@@ -66,44 +69,44 @@ def toProp_poly {p : ℕ} [NeZero p] : SP1Constraint (ZMod p) → Prop
            ∧ (pc0 % 4 = 0 ∧ (pc0 < 65536 ∧ pc1 < 65536 ∧ pc2 < 65536))
   | _ => True
 
-@[simp] lemma toProp_poly_assertZero {p : ℕ} [NeZero p] (x : ZMod p) :
-    (assertZero (F := ZMod p) x).toProp_poly ↔ x = 0 := Iff.rfl
+@[simp] lemma toProp_assertZero {p : ℕ} [NeZero p] (x : ZMod p) :
+    (assertZero (F := ZMod p) x).toProp ↔ x = 0 := Iff.rfl
 
-@[simp] lemma toProp_poly_send_byte {p : ℕ} [NeZero p]
+@[simp] lemma toProp_send_byte {p : ℕ} [NeZero p]
     (op : ByteOpcode) (a b c mult : ZMod p) :
-    (send (F := ZMod p) (.byte op a b c) mult).toProp_poly ↔
-      (mult ≠ 0 → op.constrain_poly a b c) := Iff.rfl
+    (send (F := ZMod p) (.byte op a b c) mult).toProp ↔
+      (mult ≠ 0 → op.constrain a b c) := Iff.rfl
 
-end toProp_poly
+end toProp
 
-section toStateProp_poly
+section toStateProp
 
 open PreSail
 
 /-- State-prop projection over `SP1Constraint (ZMod p)`. The address bound
 is phrased as `addr0.val < 32` (Nat-level) so the proof witness for
 `BitVec.ofNatLT` is directly available regardless of `p`'s specific value. -/
-def toStateProp_poly {p : ℕ} [NeZero p]
+def toStateProp {p : ℕ} [NeZero p]
     (cstr : SP1Constraint (ZMod p)) (s : SailState) : Prop :=
   match cstr with
   | .send (.memory _ _ addr0 addr1 addr2 limb0 limb1 limb2 limb3) mult => mult ≠ 0 →
       if h_addrs : addr0.val < 32 ∧ addr1 = 0 ∧ addr2 = 0 then
         s.get_reg? (BitVec.ofNatLT addr0.val h_addrs.left) =
-          some (Word.toBitVec64_poly #v[limb0, limb1, limb2, limb3])
+          some (Word.toBitVec64 #v[limb0, limb1, limb2, limb3])
       else
-        s.mem[Word.toNat_poly #v[addr0, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb0.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 1, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb0.val >>> 8)) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 2, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb1.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 3, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb1.val >>> 8)) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 4, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb2.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 5, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb2.val >>> 8)) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 6, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb3.val) ∧
-        s.mem[Word.toNat_poly #v[addr0 + 7, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb3.val >>> 8))
+        s.mem[Word.toNat #v[addr0, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb0.val) ∧
+        s.mem[Word.toNat #v[addr0 + 1, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb0.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 2, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb1.val) ∧
+        s.mem[Word.toNat #v[addr0 + 3, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb1.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 4, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb2.val) ∧
+        s.mem[Word.toNat #v[addr0 + 5, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb2.val >>> 8)) ∧
+        s.mem[Word.toNat #v[addr0 + 6, addr1, addr2, 0]]? = some (BitVec.ofNat 8 limb3.val) ∧
+        s.mem[Word.toNat #v[addr0 + 7, addr1, addr2, 0]]? = some (BitVec.ofNat 8 (limb3.val >>> 8))
   | .receive (.state _ _ pc0 pc1 pc2) mult => mult ≠ 0 →
-      s.regs.get? Register.PC = some (Word.toBitVec64_poly #v[pc0, pc1, pc2, 0])
+      s.regs.get? Register.PC = some (Word.toBitVec64 #v[pc0, pc1, pc2, 0])
   | _ => True
 
-end toStateProp_poly
+end toStateProp
 
 end SP1Constraint
 
@@ -112,12 +115,12 @@ section constraintList
 /-- Wrapper for lists of constraints. Mainly used to namespace lemmas. -/
 @[reducible] def SP1ConstraintList (F : Type*) := List (SP1Constraint F)
 
-@[reducible] protected def SP1ConstraintList.allHold_poly {p : ℕ} [NeZero p]
+@[reducible] protected def SP1ConstraintList.allHold {p : ℕ} [NeZero p]
     (xs : SP1ConstraintList (ZMod p)) : Prop :=
-  List.Forall SP1Constraint.toProp_poly xs
+  List.Forall SP1Constraint.toProp xs
 
-@[simp] protected def SP1ConstraintList.initialState_poly {p : ℕ} [NeZero p]
+@[simp] protected def SP1ConstraintList.initialState {p : ℕ} [NeZero p]
     (xs : SP1ConstraintList (ZMod p)) (s : SailState) : Prop :=
-  List.Forall (SP1Constraint.toStateProp_poly · s) xs
+  List.Forall (SP1Constraint.toStateProp · s) xs
 
 end constraintList

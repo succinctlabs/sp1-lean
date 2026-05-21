@@ -8,15 +8,17 @@ set_option linter.style.multiGoal false
 -- Unused variables expected because many proofs are currently stopped.
 set_option linter.unusedVariables false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
 
-section sra_poly
+
+section sra
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 400000000 in
 -- 400M heartbeats: msb_b case split × 4-way byte_shift × 16-way cb sub-cases.
-/-- Shared proof body for `spec.sra_poly` and `spec.srai_poly`. Structure mirrors
-`spec.srl_common_poly` but with two msb_b sub-cases:
+/-- Shared proof body for `spec.sra` and `spec.srai`. Structure mirrors
+`spec.srl_common` but with two msb_b sub-cases:
 
 - **msb_b = 0**: `BitVec.sshiftRight` reduces to `ushiftRight` at the Nat level
   (`BitVec.toNat_sshiftRight_of_msb_false`); the proof then matches SRL exactly
@@ -27,26 +29,26 @@ set_option maxHeartbeats 400000000 in
 
 For now, the prologue is set up and msb_b case-split structure laid out;
 inner work stubbed with sorry. -/
-private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
-    (cstrs : (constraints Main).allHold_poly) (eq_sra : Main[65] = 1) :
-    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-      execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+private lemma spec.sra_common (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold) (eq_sra : Main[65] = 1) :
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+      execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[25], Main[26], Main[27], Main[28]] .SRA := by
   -- Setup.
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   have hp : 2 ^ 17 < p := Fact.out
   haveI : Fact (1 < p) := ⟨by omega⟩
   have h_real := is_real_eq_one_of_sra Main cstrs eq_sra
-  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
-  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_real
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64 is_U64_b
+  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64 is_U64_c
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
              List.getElem_cons_succ] at b0_16 b1_16 b2_16 b3_16 c0_16
-  obtain ⟨_, sop_2, _, _⟩ := single_op_poly Main cstrs
+  obtain ⟨_, sop_2, _, _⟩ := single_op Main cstrs
   have ⟨h_no_srl, h_no_srlw, h_no_sraw⟩ := sop_2 eq_sra
-  -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
-  rw [allHold_constraints_iff_poly] at cstrs
+  -- Open the iff.
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
+  rw [allHold_constraints_iff] at cstrs
   -- Set up local names for Main[i] indices (mirrors SRL).
   set b0 := Main[15]; set b1 := Main[16]; set b2 := Main[17]; set b3 := Main[18]
   set c0 := Main[25]; set c1 := Main[26]; set c2 := Main[27]; set c3 := Main[28]
@@ -60,7 +62,7 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
   set lr0 := Main[56]; set lr1 := Main[57]; set lr2 := Main[58]; set lr3 := Main[59]
   set su160 := Main[60]; set su161 := Main[61]; set su162 := Main[62]; set su163 := Main[63]
   -- Destructure (same shape as SRL prologue; h_msb_b3 has Main[65] = 1 multiplier
-  -- which we'll use to extract msb_b via U16MSBOperation.spec_poly).
+  -- which we'll use to extract msb_b via U16MSBOperation.spec).
   obtain ⟨h_msb_b3, _, _, _, _,
            _, _, _, _, _, _,
            b_cb0, b_cb1, b_cb2, b_cb3, b_cb4, b_cb5, diff,
@@ -96,33 +98,33 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
   have lt_lh2 := lt_lh2' h_sum_ne
   have lt_ll3 := lt_ll3' h_sum_ne
   have lt_lh3 := lt_lh3' h_sum_ne
-  -- Derive msb_b ∈ {0, 1} from U16MSBOperation.spec_poly on h_msb_b3.
+  -- Derive msb_b ∈ {0, 1} from U16MSBOperation.spec on h_msb_b3.
   -- h_msb_b3 is the U16MSBOperation constraint on b3 with multiplier Main[65] = 1.
   -- For SRA arm, Main[65] = 1 (eq_sra), so the constraint is active.
   have h_msb_b_eq : msb_b = if b3.val ≥ 32768 then 1 else 0 := by
     rw [show msb_b = ({ msb := msb_b } : U16MSBOperation (ZMod p)).msb from rfl]
-    apply U16MSBOperation.spec_poly b3_16
+    apply U16MSBOperation.spec b3_16
     rw [eq_sra] at h_msb_b3
     exact h_msb_b3
   -- Case-split on b3.val ≥ 32768 (equivalently msb_b ∈ {0, 1}).
   by_cases hb3 : b3.val ≥ 32768
   · -- b3.val ≥ 32768 ⇒ msb_b = 1 ⇒ result is sign-extended.
     have h_msb_b_one : msb_b = 1 := by rw [h_msb_b_eq, if_pos hb3]
-    -- Establish `(Word.toBitVec64_poly b).msb = true` from `hb3`.
-    have h_neg : Word.isNegative_poly #v[b0, b1, b2, b3] := by
-      simp only [Word.isNegative_poly, Vector.getElem_mk, List.getElem_toArray,
+    -- Establish `(Word.toBitVec64 b).msb = true` from `hb3`.
+    have h_neg : Word.isNegative #v[b0, b1, b2, b3] := by
+      simp only [Word.isNegative, Vector.getElem_mk, List.getElem_toArray,
                  List.getElem_cons_succ, List.getElem_cons_zero]
       exact hb3
-    have h_msb_true : (Word.toBitVec64_poly #v[b0, b1, b2, b3]).msb = true :=
-      (Word.isNegative_poly_msb is_U64_b).mp h_neg
+    have h_msb_true : (Word.toBitVec64 #v[b0, b1, b2, b3]).msb = true :=
+      (Word.isNegative_msb is_U64_b).mp h_neg
     -- Reduce 64-bit goal to nat arithmetic via the signed-complement form.
     rw [← BitVec.toNat_inj]
-    simp only [execute_RTYPE_pure_w_poly, BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
+    simp only [execute_RTYPE_pure_w, BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
     rw [BitVec.toNat_sshiftRight_of_msb_true h_msb_true]
     simp only [Nat.shiftRight_eq_div_pow]
     -- Reduce shift count to `c0.val % 64` (same as msb_b=0 arm).
-    have h_shift_eq : (Word.toBitVec64_poly #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
-      rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+    have h_shift_eq : (Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
+      rw [Word.toBitVec64_toNat is_U64_c, Word.toNat_def]
       simp; omega
     rw [h_shift_eq]; clear h_shift_eq
     have h_cb_sum_lt : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val < 64 := by
@@ -132,7 +134,7 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
       have hcb3 : cb3.val ≤ 1 := by rcases b_cb3 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
       have hcb4 : cb4.val ≤ 1 := by rcases b_cb4 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
       have hcb5 : cb5.val ≤ 1 := by rcases b_cb5 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
-      have h_eq := cb_sum_val_eq_poly b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+      have h_eq := cb_sum_val_eq b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
       omega
     have h_val_10 : (10 : ZMod p).val = 10 := by
       rw [show (10 : ZMod p) = ((10 : ℕ) : ZMod p) from by push_cast; rfl]
@@ -140,7 +142,7 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
     have h_diff := diff h_sum_ne
     rw [h_val_10] at h_diff
     have h_c0_mod : c0.val % 64 = (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val := by
-      apply is_mod_64_poly (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
+      apply is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
       · exact h_cb_sum_lt
       · exact c0_16
       · exact h_diff
@@ -666,27 +668,27 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
           h_b0_dec h_b1_dec h_b2_dec h_b3_dec
   · -- b3.val < 32768 ⇒ msb_b = 0 ⇒ result matches SRL (4×16 blast via srl_close_su16_*_case).
     have h_msb_b_zero : msb_b = 0 := by rw [h_msb_b_eq, if_neg hb3]
-    -- Establish (Word.toBitVec64_poly b).msb = false from hb3.
-    have h_not_neg : ¬ Word.isNegative_poly #v[b0, b1, b2, b3] := by
-      simp only [Word.isNegative_poly, Vector.getElem_mk, List.getElem_toArray,
+    -- Establish (Word.toBitVec64 b).msb = false from hb3.
+    have h_not_neg : ¬ Word.isNegative #v[b0, b1, b2, b3] := by
+      simp only [Word.isNegative, Vector.getElem_mk, List.getElem_toArray,
                  List.getElem_cons_succ, List.getElem_cons_zero]
       omega
-    have h_msb_false : (Word.toBitVec64_poly #v[b0, b1, b2, b3]).msb = false := by
-      have h_neg_iff := Word.isNegative_poly_msb is_U64_b
-      cases h_eq : (Word.toBitVec64_poly #v[b0, b1, b2, b3]).msb
+    have h_msb_false : (Word.toBitVec64 #v[b0, b1, b2, b3]).msb = false := by
+      have h_neg_iff := Word.isNegative_msb is_U64_b
+      cases h_eq : (Word.toBitVec64 #v[b0, b1, b2, b3]).msb
       · rfl
       · exact absurd (h_neg_iff.mpr h_eq) h_not_neg
     -- Goal manipulation: reduce to nat arithmetic.
     rw [← BitVec.toNat_inj]
-    simp only [execute_RTYPE_pure_w_poly, BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
+    simp only [execute_RTYPE_pure_w, BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
     rw [BitVec.toNat_sshiftRight_of_msb_false h_msb_false]
     simp only [Nat.shiftRight_eq_div_pow]
-    -- Reduce shift count `(toBitVec64_poly c).toNat % 2^6` to `c0.val % 64`.
-    have h_shift_eq : (Word.toBitVec64_poly #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
-      rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+    -- Reduce shift count `(toBitVec64 c).toNat % 2^6` to `c0.val % 64`.
+    have h_shift_eq : (Word.toBitVec64 #v[c0, c1, c2, c3]).toNat % 2 ^ 6 = c0.val % 64 := by
+      rw [Word.toBitVec64_toNat is_U64_c, Word.toNat_def]
       simp; omega
     rw [h_shift_eq]; clear h_shift_eq
-    -- Reduce c0.val % 64 to (cb_sum_zmod).val via is_mod_64_poly.
+    -- Reduce c0.val % 64 to (cb_sum_zmod).val via is_mod_64.
     have h_cb_sum_lt : (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val < 64 := by
       have hcb0 : cb0.val ≤ 1 := by rcases b_cb0 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
       have hcb1 : cb1.val ≤ 1 := by rcases b_cb1 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
@@ -694,7 +696,7 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
       have hcb3 : cb3.val ≤ 1 := by rcases b_cb3 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
       have hcb4 : cb4.val ≤ 1 := by rcases b_cb4 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
       have hcb5 : cb5.val ≤ 1 := by rcases b_cb5 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
-      have h_eq := cb_sum_val_eq_poly b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+      have h_eq := cb_sum_val_eq b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
       omega
     have h_val_10 : (10 : ZMod p).val = 10 := by
       rw [show (10 : ZMod p) = ((10 : ℕ) : ZMod p) from by push_cast; rfl]
@@ -702,7 +704,7 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
     have h_diff := diff h_sum_ne
     rw [h_val_10] at h_diff
     have h_c0_mod : c0.val % 64 = (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val := by
-      apply is_mod_64_poly (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
+      apply is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
       · exact h_cb_sum_lt
       · exact c0_16
       · exact h_diff
@@ -1224,20 +1226,20 @@ private lemma spec.sra_common_poly (Main : Vector (ZMod p) 69)
           lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
           h_b0_dec h_b1_dec h_b2_dec h_b3_dec
 
-lemma spec.sra_poly (Main : Vector (ZMod p) 69) (h : is_sra_poly Main) :
-    (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+lemma spec.sra (Main : Vector (ZMod p) 69) (h : is_sra Main) :
+    (constraints Main).allHold →
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRA :=
-  fun cstrs => spec.sra_common_poly Main cstrs h.1
+  fun cstrs => spec.sra_common Main cstrs h.1
 
-lemma spec.srai_poly (Main : Vector (ZMod p) 69) (h : is_srai_poly Main) :
-    (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+lemma spec.srai (Main : Vector (ZMod p) 69) (h : is_srai Main) :
+    (constraints Main).allHold →
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRA :=
-  fun cstrs => spec.sra_common_poly Main cstrs h.1
+  fun cstrs => spec.sra_common Main cstrs h.1
 
-end sra_poly
+end sra
 
 end ShiftRight

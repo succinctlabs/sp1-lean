@@ -9,6 +9,8 @@ set_option maxHeartbeats 100000000
 -- time. Rewriting each to `<;>` would flatten the tree but require goal-state
 -- reasoning the linter can't see; keep the existing structure.
 set_option linter.style.multiGoal false
+set_option linter.style.longLine false
+
 
 attribute [-simp] mul_eq_zero not_and
 
@@ -18,13 +20,13 @@ set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
 set_option maxHeartbeats 32000000 in
 -- 32-bit unsigned div/rem with 64-bit sign-extended results. Mirrors
--- `divu_remu_poly` recipe at HWord (32-bit) input width: 4-limb carry
+-- `divu_remu` recipe at HWord (32-bit) input width: 4-limb carry
 -- chain (ctq0..3) + Word-level bv_ctqr (no DWord 128-bit form needed
 -- since q*c fits in 64 bits).
-lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+lemma divuw_remuw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3 q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7 cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7 is_c_0 is_div is_divu is_rem is_remu is_divw is_remw is_divuw is_remuw is_overflow is_overflow_b is_overflow_c msb_b msb_rem msb_c msb_quot b_neg b_neg_not_overflow b_not_neg_not_overflow is_word rem_neg c_neg abs_c_alu_event abs_rem_alu_event : ZMod p)
-  (is_U64_b : Word.isU64_poly #v[b0, b1, b2, b3])
-  (is_U64_c : Word.isU64_poly #v[c0, c1, c2, c3])
+  (is_U64_b : Word.isU64 #v[b0, b1, b2, b3])
+  (is_U64_c : Word.isU64 #v[c0, c1, c2, c3])
   (sop1 : is_div = 1 → is_divu = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
   (sop2 : is_divu = 1 → is_div = 0 ∧ is_rem = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
   (sop3 : is_rem = 1 → is_div = 0 ∧ is_divu = 0 ∧ is_remu = 0 ∧ is_divw = 0 ∧ is_remw = 0 ∧ is_divuw = 0 ∧ is_remuw = 0)
@@ -184,10 +186,10 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (w_overflow_b : is_word = 1 → is_overflow_b = if #v[b0, b1, 0, 0] = (#v[0, 32768, 0, 0] : Word (ZMod p)) then 1 else 0)
   (w_overflow_c : is_word = 1 → is_overflow_c = if #v[c0, c1, 0, 0] = (#v[65535, 65535, 0, 0] : Word (ZMod p)) then 1 else 0)
   (div_zero : is_c_0 = if #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535] = (#v[0, 0, 0, 0] : Word (ZMod p)) then 1 else 0)
-  (c_neg_sum_zero : c_neg = 1 → Word.isU64_poly #v[cnop0, cnop1, cnop2, cnop3] ∧ Word.toBitVec64_poly #v[cnop0, cnop1, cnop2, cnop3] = Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535] + Word.toBitVec64_poly #v[ac0, ac1, ac2, ac3])
-  (rem_neg_sum_zero : rem_neg = 1 → Word.isU64_poly #v[rnop0, rnop1, rnop2, rnop3] ∧ Word.toBitVec64_poly #v[rnop0, rnop1, rnop2, rnop3] = Word.toBitVec64_poly #v[r0, r1, rbc2, rbc3] + Word.toBitVec64_poly #v[ar0, ar1, ar2, ar3])
-  (main_mul_low : Word.isU64_poly #v[ctq0, ctq1, ctq2, ctq3] ∧ Word.toBitVec64_poly #v[ctq0, ctq1, ctq2, ctq3] = execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MUL)
-  (main_mul_high : is_word = 0 → (is_div + is_rem = 1 → Word.isU64_poly #v[ctq4, ctq5, ctq6, ctq7] ∧ Word.toBitVec64_poly #v[ctq4, ctq5, ctq6, ctq7] = execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MULH) ∧ (is_divu + is_remu = 1 → Word.isU64_poly #v[ctq4, ctq5, ctq6, ctq7] ∧ Word.toBitVec64_poly #v[ctq4, ctq5, ctq6, ctq7] = execute_MUL_pure (Word.toBitVec64_poly #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64_poly #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MULHU))
+  (c_neg_sum_zero : c_neg = 1 → Word.isU64 #v[cnop0, cnop1, cnop2, cnop3] ∧ Word.toBitVec64 #v[cnop0, cnop1, cnop2, cnop3] = Word.toBitVec64 #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535] + Word.toBitVec64 #v[ac0, ac1, ac2, ac3])
+  (rem_neg_sum_zero : rem_neg = 1 → Word.isU64 #v[rnop0, rnop1, rnop2, rnop3] ∧ Word.toBitVec64 #v[rnop0, rnop1, rnop2, rnop3] = Word.toBitVec64 #v[r0, r1, rbc2, rbc3] + Word.toBitVec64 #v[ar0, ar1, ar2, ar3])
+  (main_mul_low : Word.isU64 #v[ctq0, ctq1, ctq2, ctq3] ∧ Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] = execute_MUL_pure (Word.toBitVec64 #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64 #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MUL)
+  (main_mul_high : is_word = 0 → (is_div + is_rem = 1 → Word.isU64 #v[ctq4, ctq5, ctq6, ctq7] ∧ Word.toBitVec64 #v[ctq4, ctq5, ctq6, ctq7] = execute_MUL_pure (Word.toBitVec64 #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64 #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MULH) ∧ (is_divu + is_remu = 1 → Word.isU64 #v[ctq4, ctq5, ctq6, ctq7] ∧ Word.toBitVec64 #v[ctq4, ctq5, ctq6, ctq7] = execute_MUL_pure (Word.toBitVec64 #v[q0, q1, qbc2, qbc3]) (Word.toBitVec64 #v[c0, c1, c2 * (1 - is_word) + c_neg * is_word * 65535, c3 * (1 - is_word) + c_neg * is_word * 65535]) mop.MULHU))
   (overflow_b : is_word = 0 → is_overflow_b = if #v[b0, b1, b2, b3] = (#v[0, 0, 0, 32768] : Word (ZMod p)) then 1 else 0)
   (overflow_c : is_word = 0 → is_overflow_c = if #v[c0, c1, c2, c3] = (#v[65535, 65535, 65535, 65535] : Word (ZMod p)) then 1 else 0)
   (eq_msb_b : is_word = 0 → msb_b = if 32768 ≤ b3 then 1 else 0)
@@ -197,9 +199,9 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (w_eq_msb_c : is_word = 1 → msb_c = if 32768 ≤ c1 then 1 else 0)
   (w_eq_msb_rem : is_word = 1 → msb_rem = if 32768 ≤ r1 then 1 else 0)
   (w_eq_msb_quot : is_word = 1 → msb_quot = if 32768 ≤ q1 then 1 else 0)
-  (abs_check : is_c_0 = 0 → arlt = if Word.toNat_poly #v[ar0, ar1, ar2, ar3] < Word.toNat_poly #v[is_c_0 + (1 - is_c_0) * ac0, (1 - is_c_0) * ac1, (1 - is_c_0) * ac2, (1 - is_c_0) * ac3] then 1 else 0) :
+  (abs_check : is_c_0 = 0 → arlt = if Word.toNat #v[ar0, ar1, ar2, ar3] < Word.toNat #v[is_c_0 + (1 - is_c_0) * ac0, (1 - is_c_0) * ac1, (1 - is_c_0) * ac2, (1 - is_c_0) * ac3] then 1 else 0) :
     is_divuw + is_remuw = 1 →
-    ⟨Word.toBitVec64_poly #v[q0, q1, q2, q3], Word.toBitVec64_poly #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64_poly #v[b0, b1, b2, b3]) (Word.toBitVec64_poly #v[c0, c1, c2, c3]) .DRWU
+    ⟨Word.toBitVec64 #v[q0, q1, q2, q3], Word.toBitVec64 #v[r0, r1, r2, r3]⟩ = execute_DIV_REM_pure (Word.toBitVec64 #v[b0, b1, b2, b3]) (Word.toBitVec64 #v[c0, c1, c2, c3]) .DRWU
       := by
     haveI : NeZero p := ⟨Nat.Prime.ne_zero Fact.out⟩
     have h17 : 2 ^ 17 < p := Fact.out
@@ -245,60 +247,60 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     simp [eq_is_overflow] at *
     subst ar0 ar1 ar2 ar3 ac0 ac1 ac2 ac3 b_neg_not_overflow b_not_neg_not_overflow
     simp [execute_DIV_REM_pure, execute_DIV_REM_pure_int, Bool.cond_eq_ite, -BitVec.toNat_setWidth]
-    rw [Word.setWidth_eq_low_poly is_U64_b, Word.setWidth_eq_low_poly is_U64_c]
-    have is_U32_bl := Word.isU64_poly_low_poly_isU32_poly is_U64_b
-    have is_U32_cl := Word.isU64_poly_low_poly_isU32_poly is_U64_c
-    simp [Word.low_poly] at *
-    rw [HWord.toBitVec32_poly_toNat_poly is_U32_bl, HWord.toBitVec32_poly_toNat_poly is_U32_cl]
+    rw [Word.setWidth_eq_low is_U64_b, Word.setWidth_eq_low is_U64_c]
+    have is_U32_bl := Word.isU64_low_isU32 is_U64_b
+    have is_U32_cl := Word.isU64_low_isU32 is_U64_c
+    simp [Word.low] at *
+    rw [HWord.toBitVec32_toNat is_U32_bl, HWord.toBitVec32_toNat is_U32_cl]
     have heq32_q1 : (32768 : ZMod p) ≤ q1 ↔ 32768 ≤ q1.val := by
       change (32768 : ZMod p).val ≤ q1.val ↔ _; rw [val_32768_zmod_p]
     have heq32_r1 : (32768 : ZMod p) ≤ r1 ↔ 32768 ≤ r1.val := by
       change (32768 : ZMod p).val ≤ r1.val ↔ _; rw [val_32768_zmod_p]
-    have ext_q : (#v[q0, q1, q2, q3] : Word (ZMod p)) = HWord.extend_poly #v[q0, q1] true := by
+    have ext_q : (#v[q0, q1, q2, q3] : Word (ZMod p)) = HWord.extend #v[q0, q1] true := by
       subst q2 q3 msb_quot
-      simp [HWord.extend_poly, HWord.isNegative_poly, heq32_q1]
-    have ext_r : (#v[r0, r1, r2, r3] : Word (ZMod p)) = HWord.extend_poly #v[r0, r1] true := by
+      simp [HWord.extend, HWord.isNegative, heq32_q1]
+    have ext_r : (#v[r0, r1, r2, r3] : Word (ZMod p)) = HWord.extend #v[r0, r1] true := by
       subst r2 r3 msb_rem
-      simp [HWord.extend_poly, HWord.isNegative_poly, heq32_r1]
+      simp [HWord.extend, HWord.isNegative, heq32_r1]
     rw [ext_q, ext_r]
-    repeat rw [HWord.extend_true_is_signExtend_poly (by apply HWord.isU32_of_cases_poly <;> simpa)]
+    repeat rw [HWord.extend_true_is_signExtend (by apply HWord.isU32_of_cases <;> simpa)]
     suffices :
-      HWord.toBitVec32_poly #v[q0, q1] = BitVec.ofNat 32 (if HWord.toNat_poly #v[c0, c1] = 0 then (18446744073709551615 : ℤ) else (HWord.toNat_poly #v[b0, b1]) / (HWord.toNat_poly #v[c0, c1])).toNat ∧
-      HWord.toBitVec32_poly #v[r0, r1] = BitVec.ofNat 32 (((HWord.toNat_poly #v[b0, b1]) : ℤ).tmod ↑(HWord.toNat_poly #v[c0, c1])).toNat
+      HWord.toBitVec32 #v[q0, q1] = BitVec.ofNat 32 (if HWord.toNat #v[c0, c1] = 0 then (18446744073709551615 : ℤ) else (HWord.toNat #v[b0, b1]) / (HWord.toNat #v[c0, c1])).toNat ∧
+      HWord.toBitVec32 #v[r0, r1] = BitVec.ofNat 32 (((HWord.toNat #v[b0, b1]) : ℤ).tmod ↑(HWord.toNat #v[c0, c1])).toNat
     · split_ands <;> congr 1 <;> [ exact this.1; exact this.2 ]
     · split_ifs at div_zero with nzc <;> simp [div_zero] at *
       · obtain ⟨zc0, zc1⟩ := nzc
         subst c0 c1 q0 q1 r0 r1
-        simp [HWord.toBitVec32_poly, HWord.toNat_poly, h65535_val, h0v]
+        simp [HWord.toBitVec32, HWord.toNat, h65535_val, h0v]
         push_cast [ZMod.cast_eq_val]
         rfl
       · subst arlt maco10 maco11 is_c_0; simp at *
         rw [if_neg]; rotate_left
         · intro zc
           have h_zc : c0.val + c1.val * 65536 = 0 := by
-            unfold HWord.toNat_poly at zc; simpa using zc
+            unfold HWord.toNat at zc; simpa using zc
           apply nzc
           have hc0v : c0.val = 0 := by omega
           have hc1v : c1.val = 0 := by omega
           exact ⟨(ZMod.val_eq_zero c0).mp hc0v, (ZMod.val_eq_zero c1).mp hc1v⟩
-        · have is_U32_r : HWord.isU32_poly #v[r0, r1] := by
-            apply HWord.isU32_of_cases_poly <;> simp <;> [ exact u16_r0; exact u16_r1 ]
-          have is_U32_q : HWord.isU32_poly #v[q0, q1] := by
-            apply HWord.isU32_of_cases_poly <;> simp <;> [ exact u16_q0; exact u16_q1 ]
+        · have is_U32_r : HWord.isU32 #v[r0, r1] := by
+            apply HWord.isU32_of_cases <;> simp <;> [ exact u16_r0; exact u16_r1 ]
+          have is_U32_q : HWord.isU32 #v[q0, q1] := by
+            apply HWord.isU32_of_cases <;> simp <;> [ exact u16_q0; exact u16_q1 ]
           suffices :
-            HWord.toNat_poly #v[q0, q1] = (((HWord.toNat_poly #v[b0, b1]) : ℤ).tdiv (HWord.toNat_poly #v[c0, c1])).toNat ∧
-            HWord.toNat_poly #v[r0, r1] = (((HWord.toNat_poly #v[b0, b1]) : ℤ).tmod (HWord.toNat_poly #v[c0, c1])).toNat
+            HWord.toNat #v[q0, q1] = (((HWord.toNat #v[b0, b1]) : ℤ).tdiv (HWord.toNat #v[c0, c1])).toNat ∧
+            HWord.toNat #v[r0, r1] = (((HWord.toNat #v[b0, b1]) : ℤ).tmod (HWord.toNat #v[c0, c1])).toNat
           · obtain ⟨hdiv, hrem⟩ := this
             simp at hdiv; rw [← hdiv, ← hrem]
             simp [← BitVec.toNat_inj]
-            rw [HWord.toBitVec32_poly_toNat_poly is_U32_q, HWord.toBitVec32_poly_toNat_poly is_U32_r]
-            rw [Nat.mod_eq_of_lt (by apply HWord.toNat_poly_lt_of_isU32_poly is_U32_q)]
-            rw [Nat.mod_eq_of_lt (by apply HWord.toNat_poly_lt_of_isU32_poly is_U32_r)]
+            rw [HWord.toBitVec32_toNat is_U32_q, HWord.toBitVec32_toNat is_U32_r]
+            rw [Nat.mod_eq_of_lt (by apply HWord.toNat_lt_of_isU32 is_U32_q)]
+            rw [Nat.mod_eq_of_lt (by apply HWord.toNat_lt_of_isU32 is_U32_r)]
             simp
-          · have cnz : HWord.toNat_poly #v[c0, c1] ≠ 0 := by
+          · have cnz : HWord.toNat #v[c0, c1] ≠ 0 := by
               intro zc
               have h_zc : c0.val + c1.val * 65536 = 0 := by
-                unfold HWord.toNat_poly at zc; simpa using zc
+                unfold HWord.toNat at zc; simpa using zc
               apply nzc
               have hc0v : c0.val = 0 := by omega
               have hc1v : c1.val = 0 := by omega
@@ -306,14 +308,14 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
             rw [tdiv_tmod_unique_full_nat cnz]
             split_ands <;>
               [ skip
-              ; (simp [HWord.toNat_poly, h0v, h1v];
-                 simp [Word.toNat_poly, h0v, h1v] at abs_check; exact abs_check) ]
-            have is_U32_b : HWord.isU32_poly #v[b0, b1] := by
-              apply Word.lt_cases_of_isU64_poly at is_U64_b; clear *- is_U64_b
-              apply HWord.isU32_of_cases_poly <;> tauto
-            have is_U32_c : HWord.isU32_poly #v[c0, c1] := by
-              apply Word.lt_cases_of_isU64_poly at is_U64_c; clear *- is_U64_c
-              apply HWord.isU32_of_cases_poly <;> tauto
+              ; (simp [HWord.toNat, h0v, h1v];
+                 simp [Word.toNat, h0v, h1v] at abs_check; exact abs_check) ]
+            have is_U32_b : HWord.isU32 #v[b0, b1] := by
+              apply Word.lt_cases_of_isU64 at is_U64_b; clear *- is_U64_b
+              apply HWord.isU32_of_cases <;> tauto
+            have is_U32_c : HWord.isU32 #v[c0, c1] := by
+              apply Word.lt_cases_of_isU64 at is_U64_c; clear *- is_U64_c
+              apply HWord.isU32_of_cases <;> tauto
             clear *- is_U32_b is_U32_c is_U32_q is_U32_r
                      u16_ctqpr0 u16_ctqpr1 u16_ctqpr2 u16_ctqpr3
                      b_cry0 b_cry1 b_cry2 b_cry3
@@ -323,43 +325,43 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
                      h17 h01 h21 h65535_val h32768_val h1v h0v
                      hcv0 hcv1 hcv2 hcv3
             obtain ⟨is_U64_ctql, ctq_low⟩ := main_mul_low
-            have eq_eb : (#v[b0, b1, 0, 0] : Word (ZMod p)) = HWord.extend_poly #v[b0, b1] false := by
-              simp [HWord.extend_poly]
-            have eq_er : (#v[r0, r1, 0, 0] : Word (ZMod p)) = HWord.extend_poly #v[r0, r1] false := by
-              simp [HWord.extend_poly]
+            have eq_eb : (#v[b0, b1, 0, 0] : Word (ZMod p)) = HWord.extend #v[b0, b1] false := by
+              simp [HWord.extend]
+            have eq_er : (#v[r0, r1, 0, 0] : Word (ZMod p)) = HWord.extend #v[r0, r1] false := by
+              simp [HWord.extend]
             suffices bv_ctqr :
-              Word.toBitVec64_poly #v[b0, b1, 0, 0] =
-                Word.toBitVec64_poly #v[ctq0, ctq1, ctq2, ctq3] +
-                Word.toBitVec64_poly #v[r0, r1, 0, 0]
-            · have := HWord.toNat_poly_lt_of_isU32_poly is_U32_b
-              have := HWord.toNat_poly_lt_of_isU32_poly is_U32_q
-              have := HWord.toNat_poly_lt_of_isU32_poly is_U32_c
-              have := HWord.toNat_poly_lt_of_isU32_poly is_U32_r
-              trans (Word.toBitVec64_poly #v[b0, b1, 0, 0]).toNat
-              · rw [Word.low_toNat_poly is_U32_b]
-              · have hctq : (Word.toBitVec64_poly #v[ctq0, ctq1, ctq2, ctq3]).toNat
-                    = HWord.toNat_poly #v[q0, q1] * HWord.toNat_poly #v[c0, c1] := by
+              Word.toBitVec64 #v[b0, b1, 0, 0] =
+                Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] +
+                Word.toBitVec64 #v[r0, r1, 0, 0]
+            · have := HWord.toNat_lt_of_isU32 is_U32_b
+              have := HWord.toNat_lt_of_isU32 is_U32_q
+              have := HWord.toNat_lt_of_isU32 is_U32_c
+              have := HWord.toNat_lt_of_isU32 is_U32_r
+              trans (Word.toBitVec64 #v[b0, b1, 0, 0]).toNat
+              · rw [Word.low_toNat is_U32_b]
+              · have hctq : (Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3]).toNat
+                    = HWord.toNat #v[q0, q1] * HWord.toNat #v[c0, c1] := by
                   simp only [ctq_low, execute_MUL_pure, ↓reduceIte, reduceCtorEq, or_self]
                   simp only [BitVec.extend, ↓reduceIte]
                   simp only [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb']
                   rw [Nat.shiftRight_zero, BitVec.toNat_mul]
-                  simp [Word.low_toNat_poly is_U32_q, Word.low_toNat_poly is_U32_c]
+                  simp [Word.low_toNat is_U32_q, Word.low_toNat is_U32_c]
                   nlinarith
-                rw [bv_ctqr, BitVec.toNat_add, hctq, Word.low_toNat_poly is_U32_r]
+                rw [bv_ctqr, BitVec.toNat_add, hctq, Word.low_toNat is_U32_r]
                 simp; nlinarith
             · clear is_U32_c eq_msb_b eq_msb_c eq_msb_rem ctq_low eq_is_word r_neg_b_neg r_pos_b_pos eq_eb eq_er
-              apply HWord.lt_cases_of_isU32_poly at is_U32_b
-              apply HWord.lt_cases_of_isU32_poly at is_U32_r
-              apply HWord.lt_cases_of_isU32_poly at is_U32_q
-              apply Word.lt_cases_of_isU64_poly at is_U64_ctql
+              apply HWord.lt_cases_of_isU32 at is_U32_b
+              apply HWord.lt_cases_of_isU32 at is_U32_r
+              apply HWord.lt_cases_of_isU32 at is_U32_q
+              apply Word.lt_cases_of_isU64 at is_U64_ctql
               simp at *
               rw [← add_sub_right_comm] at u16_ctqpr1 u16_ctqpr2 u16_ctqpr3
                                             nof_eq_ctqpr1 nof_eq_ctqpr2 nof_eq_ctqpr3
-              rw [div_mod_decomposition_w_poly (by omega) (by omega : cry0.val < 2)] at nof_eq_ctqpr0
-              rw [div_mod_decomposition_w_poly (by omega) (by omega : cry1.val < 2)] at nof_eq_ctqpr1
-              rw [div_mod_decomposition_w_poly (by simp) (by omega : cry2.val < 2)] at nof_eq_ctqpr2
-              rw [div_mod_decomposition_w_poly (by simp) (by omega : cry3.val < 2)] at nof_eq_ctqpr3
-              -- Reduce LHS Word toBitVec64_poly to BitVec.ofNat 64 form. For
+              rw [div_mod_decomposition_w (by omega) (by omega : cry0.val < 2)] at nof_eq_ctqpr0
+              rw [div_mod_decomposition_w (by omega) (by omega : cry1.val < 2)] at nof_eq_ctqpr1
+              rw [div_mod_decomposition_w (by simp) (by omega : cry2.val < 2)] at nof_eq_ctqpr2
+              rw [div_mod_decomposition_w (by simp) (by omega : cry3.val < 2)] at nof_eq_ctqpr3
+              -- Reduce LHS Word toBitVec64 to BitVec.ofNat 64 form. For
               -- divuw_remuw, r2 = r3 = 0 (rem_neg = 0 path) so the carry chain
               -- only references ctq0..3 + r0,r1 (the high two limbs vanish).
               obtain ⟨b0_lt, b1_lt⟩ := is_U32_b
@@ -403,41 +405,41 @@ lemma divuw_remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
               -- Lift to BitVec equality via .toNat injection.
               rw [← BitVec.toNat_inj]
               rw [BitVec.toNat_add]
-              rw [show Word.toBitVec64_poly (#v[b0, b1, 0, 0] : Word (ZMod p)) =
+              rw [show Word.toBitVec64 (#v[b0, b1, 0, 0] : Word (ZMod p)) =
                     BitVec.ofNat 64 (b0.val + b1.val * 65536) from by
-                    simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]]
-              rw [show Word.toBitVec64_poly #v[ctq0, ctq1, ctq2, ctq3] =
+                    simp [Word.toBitVec64, Word.toNat, ZMod.val_zero]]
+              rw [show Word.toBitVec64 #v[ctq0, ctq1, ctq2, ctq3] =
                     BitVec.ofNat 64 (ctq0.val + ctq1.val * 65536 +
                       ctq2.val * 4294967296 + ctq3.val * 281474976710656) from by
-                    simp [Word.toBitVec64_poly, Word.toNat_poly]]
-              rw [show Word.toBitVec64_poly (#v[r0, r1, 0, 0] : Word (ZMod p)) =
+                    simp [Word.toBitVec64, Word.toNat]]
+              rw [show Word.toBitVec64 (#v[r0, r1, 0, 0] : Word (ZMod p)) =
                     BitVec.ofNat 64 (r0.val + r1.val * 65536) from by
-                    simp [Word.toBitVec64_poly, Word.toNat_poly, ZMod.val_zero]]
+                    simp [Word.toBitVec64, Word.toNat, ZMod.val_zero]]
               simp only [BitVec.toNat_ofNat]
               omega
 
--- Mirrors `spec.divu_poly` recipe but with `.DRWU` instruction,
--- `is_divuw_poly` flag, `sop7` mutex implication, and threads through
--- `divuw_remuw_poly` (4-limb HWord core).
+-- Mirrors `spec.divu` recipe but with `.DRWU` instruction,
+-- `is_divuw` flag, `sop7` mutex implication, and threads through
+-- `divuw_remuw` (4-limb HWord core).
 set_option maxHeartbeats 32000000 in
 -- DRWU expansion + 11-arm `first` closer chain on each side-goal exceeds the
 -- default heartbeat budget; matches the divu/divw spec wrapper pattern.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
-lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
+lemma spec.divuw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
     (Main : Vector (ZMod p) 246) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) →
-    is_real_poly Main → is_divuw_poly Main →
-      Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]] =
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    is_real Main → is_divuw Main →
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] =
       (execute_DIV_REM_pure
-        (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
-        (Word.toBitVec64_poly #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).1
+        (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
+        (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).1
   := by
   intro cstrs h_is_real h_is_divuw
-  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op_poly Main cstrs
-  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_is_real
-  replace cstrs := (allHold_constraints_iff_poly Main).mp cstrs; simp at h_is_real
-  simp [is_divuw_poly] at h_is_divuw
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
+  simp [is_divuw] at h_is_divuw
   set a0 := Main[28]
   set a1 := Main[29]
   set a2 := Main[30]
@@ -588,23 +590,23 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
   rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
   simp_all [-h_is_divuw]
-  apply MulOperation.spec.mul_poly at main_mul_low
-  apply MulOperation.spec.mulh.gen_poly at main_mul_high
-  apply IsEqualWordOperation.spec.gen_poly at overflow_b
-  apply IsEqualWordOperation.spec.gen_poly at overflow_c
-  apply IsEqualWordOperation.spec.gen_poly at w_overflow_b
-  apply IsEqualWordOperation.spec.gen_poly at w_overflow_c
-  apply IsZeroWordOperation.spec_poly at div_zero
-  apply U16MSBOperation.spec.gen_poly at eq_msb_b
-  apply U16MSBOperation.spec.gen_poly at eq_msb_c
-  apply U16MSBOperation.spec.gen_poly at eq_msb_rem
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_b
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_c
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_rem
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_quot
-  apply AddOperation.spec.gen_poly at c_neg_sum_zero
-  apply AddOperation.spec.gen_poly at rem_neg_sum_zero
-  apply LtOperationUnsigned.spec.nat.gen_poly at abs_check
+  apply MulOperation.spec.mul at main_mul_low
+  apply MulOperation.spec.mulh.gen at main_mul_high
+  apply IsEqualWordOperation.spec.gen at overflow_b
+  apply IsEqualWordOperation.spec.gen at overflow_c
+  apply IsEqualWordOperation.spec.gen at w_overflow_b
+  apply IsEqualWordOperation.spec.gen at w_overflow_c
+  apply IsZeroWordOperation.spec at div_zero
+  apply U16MSBOperation.spec.gen at eq_msb_b
+  apply U16MSBOperation.spec.gen at eq_msb_c
+  apply U16MSBOperation.spec.gen at eq_msb_rem
+  apply U16MSBOperation.spec.gen at w_eq_msb_b
+  apply U16MSBOperation.spec.gen at w_eq_msb_c
+  apply U16MSBOperation.spec.gen at w_eq_msb_rem
+  apply U16MSBOperation.spec.gen at w_eq_msb_quot
+  apply AddOperation.spec.gen at c_neg_sum_zero
+  apply AddOperation.spec.gen at rem_neg_sum_zero
+  apply LtOperationUnsigned.spec.nat.gen at abs_check
   simp [-Vector.eq_mk, -Vector.mk_eq, -Vector.mk.injEq]
     at main_mul_low main_mul_high overflow_b overflow_c w_overflow_b w_overflow_c
        div_zero eq_msb_b eq_msb_c eq_msb_rem
@@ -619,7 +621,7 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   set is_word := is_divw + is_remw + is_divuw + is_remuw
   have eq_is_word : is_word = is_divw + is_remw + is_divuw + is_remuw := by
     subst is_word; rfl
-  have := divuw_remuw_poly a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3
+  have := divuw_remuw a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3
     q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3
     ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7
     cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7
@@ -693,38 +695,38 @@ lemma spec.divuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   all_goals first
     | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
-    | (apply Word.isU64_of_cases_poly <;> simp <;> omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_c
-       apply Word.isU64_of_cases_poly <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_b
-       apply Word.isU64_of_cases_poly <;> simp at is_U64_b ⊢ <;> omega)
-    | (apply maco_arm_closer_poly u16_ac0 u16_ac1 u16_ac2 u16_ac3
+    | (apply Word.isU64_of_cases <;> simp <;> omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_c
+       apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_b
+       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
+    | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
 
--- Twin of `spec.divuw_poly` with `.2` projection, `is_remuw_poly` flag,
+-- Twin of `spec.divuw` with `.2` projection, `is_remuw` flag,
 -- `sop8` mutex, and `eq_r_*` writeback.
 set_option maxHeartbeats 32000000 in
--- See spec.divuw_poly: same DRWU expansion blow-up.
+-- See spec.divuw: same DRWU expansion blow-up.
 set_option linter.unusedVariables false in
 set_option maxRecDepth 1000000 in
-lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
+lemma spec.remuw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)]
     (Main : Vector (ZMod p) 246) :
-  List.Forall SP1Constraint.toProp_poly (constraints Main) →
-    is_real_poly Main → is_remuw_poly Main →
-      Word.toBitVec64_poly #v[Main[28], Main[29], Main[30], Main[31]] =
+  List.Forall SP1Constraint.toProp (constraints Main) →
+    is_real Main → is_remuw Main →
+      Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] =
       (execute_DIV_REM_pure
-        (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
-        (Word.toBitVec64_poly #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).2
+        (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
+        (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]]) .DRWU).2
   := by
   intro cstrs h_is_real h_is_remuw
-  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op_poly Main cstrs
-  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_is_real
-  replace cstrs := (allHold_constraints_iff_poly Main).mp cstrs; simp at h_is_real
-  simp [is_remuw_poly] at h_is_remuw
+  have ⟨sop1, sop2, sop3, sop4, sop5, sop6, sop7, sop8⟩ := single_op Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_is_real
+  replace cstrs := (allHold_constraints_iff Main).mp cstrs; simp at h_is_real
+  simp [is_remuw] at h_is_remuw
   set a0 := Main[28]
   set a1 := Main[29]
   set a2 := Main[30]
@@ -875,23 +877,23 @@ lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   rw [eq_comm (b := ac2)] at cn_ac2; rw [eq_comm (b := ar2)] at rn_ar2
   rw [eq_comm (b := ac3)] at cn_ac3; rw [eq_comm (b := ar3)] at rn_ar3
   simp_all [-h_is_remuw]
-  apply MulOperation.spec.mul_poly at main_mul_low
-  apply MulOperation.spec.mulh.gen_poly at main_mul_high
-  apply IsEqualWordOperation.spec.gen_poly at overflow_b
-  apply IsEqualWordOperation.spec.gen_poly at overflow_c
-  apply IsEqualWordOperation.spec.gen_poly at w_overflow_b
-  apply IsEqualWordOperation.spec.gen_poly at w_overflow_c
-  apply IsZeroWordOperation.spec_poly at div_zero
-  apply U16MSBOperation.spec.gen_poly at eq_msb_b
-  apply U16MSBOperation.spec.gen_poly at eq_msb_c
-  apply U16MSBOperation.spec.gen_poly at eq_msb_rem
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_b
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_c
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_rem
-  apply U16MSBOperation.spec.gen_poly at w_eq_msb_quot
-  apply AddOperation.spec.gen_poly at c_neg_sum_zero
-  apply AddOperation.spec.gen_poly at rem_neg_sum_zero
-  apply LtOperationUnsigned.spec.nat.gen_poly at abs_check
+  apply MulOperation.spec.mul at main_mul_low
+  apply MulOperation.spec.mulh.gen at main_mul_high
+  apply IsEqualWordOperation.spec.gen at overflow_b
+  apply IsEqualWordOperation.spec.gen at overflow_c
+  apply IsEqualWordOperation.spec.gen at w_overflow_b
+  apply IsEqualWordOperation.spec.gen at w_overflow_c
+  apply IsZeroWordOperation.spec at div_zero
+  apply U16MSBOperation.spec.gen at eq_msb_b
+  apply U16MSBOperation.spec.gen at eq_msb_c
+  apply U16MSBOperation.spec.gen at eq_msb_rem
+  apply U16MSBOperation.spec.gen at w_eq_msb_b
+  apply U16MSBOperation.spec.gen at w_eq_msb_c
+  apply U16MSBOperation.spec.gen at w_eq_msb_rem
+  apply U16MSBOperation.spec.gen at w_eq_msb_quot
+  apply AddOperation.spec.gen at c_neg_sum_zero
+  apply AddOperation.spec.gen at rem_neg_sum_zero
+  apply LtOperationUnsigned.spec.nat.gen at abs_check
   simp [-Vector.eq_mk, -Vector.mk_eq, -Vector.mk.injEq]
     at main_mul_low main_mul_high overflow_b overflow_c w_overflow_b w_overflow_c
        div_zero eq_msb_b eq_msb_c eq_msb_rem
@@ -906,7 +908,7 @@ lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   set is_word := is_divw + is_remw + is_divuw + is_remuw
   have eq_is_word : is_word = is_divw + is_remw + is_divuw + is_remuw := by
     subst is_word; rfl
-  have := divuw_remuw_poly a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3
+  have := divuw_remuw a0 a1 a2 a3 b0 b1 b2 b3 c0 c1 c2 c3 lb0 lb1 lb2 lb3 lc0 lc1 lc2 lc3
     q0 q1 q2 q3 qbc0 qbc1 qbc2 qbc3 rbc0 rbc1 rbc2 rbc3 r0 r1 r2 r3 ar0 ar1 ar2 ar3
     ac0 ac1 ac2 ac3 maco10 maco11 maco12 maco13 ctq0 ctq1 ctq2 ctq3 ctq4 ctq5 ctq6 ctq7
     cnop0 cnop1 cnop2 cnop3 rnop0 rnop1 rnop2 rnop3 arlt cry0 cry1 cry2 cry3 cry4 cry5 cry6 cry7
@@ -976,14 +978,14 @@ lemma spec.remuw_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (
   all_goals first
     | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
-    | (apply Word.isU64_of_cases_poly <;> simp <;> omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_b; simp at is_U64_b; omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_c
-       apply Word.isU64_of_cases_poly <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64_poly at is_U64_b
-       apply Word.isU64_of_cases_poly <;> simp at is_U64_b ⊢ <;> omega)
-    | (apply maco_arm_closer_poly u16_ac0 u16_ac1 u16_ac2 u16_ac3
+    | (apply Word.isU64_of_cases <;> simp <;> omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_c
+       apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_b
+       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
+    | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))

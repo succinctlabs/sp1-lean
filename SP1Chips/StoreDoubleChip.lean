@@ -24,36 +24,34 @@ def sp1_ob_b (Main : Vector (ZMod p) 39) : BitVec 5 :=
   BitVec.ofNat 5 Main[14].val
 
 def sp1_imm_c (Main : Vector (ZMod p) 39) : BitVec 12 :=
-  BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])
+  BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])
 
 def sp1_sb (Main : Vector (ZMod p) 39) : SailM ExecutionResult := do
   let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  let addr : BitVec 64 := Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], 0]
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  let addr : BitVec 64 := Word.toBitVec64 #v[Main[25], Main[26], Main[27], 0]
   Sail.ConcurrencyInterfaceV1.write_ram 64 8 0#64 addr
-    (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]])
+    (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
   return RETIRE_SUCCESS
 
-set_option maxHeartbeats 1600000 in
--- Memory-write monadic chain plus AddrAdd / signExtend bridges run heavy
--- under the default 200K budget. `skipKernelTC` for residual kernel
--- deep-recursion in the long chain of default-`simp` calls handling the
--- monadic write expansion (each simp implicitly includes Nat.zero_mul /
--- Nat.add_zero / similar).
-set_option debug.skipKernelTC true in
+-- Memory-write monadic chain plus AddrAdd / signExtend bridges (StoreDouble pattern).
+-- The bullet-1 monadic-write equation is discharged by `store_double_post_vmem_eq`
+-- (bare-`BitVec` recipe-2 lift, `docs/PROOF_PATTERNS.md` §3); the `is_aligned_vaddr`
+-- side-condition uses the chip's `h_is_aligned` hypothesis. Together they let this
+-- proof drop the previous `skipKernelTC` + maxHeartbeats bump.
 theorem correct (Main : Vector (ZMod p) 39)
     (s : SailState) (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_cstrs : (StoreDouble.constraints Main).allHold_poly)
-    (state_cstrs : (StoreDouble.constraints Main).initialState_poly s)
+    (h_cstrs : (StoreDouble.constraints Main).allHold)
+    (state_cstrs : (StoreDouble.constraints Main).initialState s)
     (h_is_real : Main[38] = 1)
     (h_fits_in_mem :
-      let reg_val := (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (sp1_imm_c Main)).toNat
       reg_val + offset + 8 < 2 ^ 64)
     (h_is_aligned : is_aligned_vaddr (virtaddr.Virtaddr
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
-        (BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])))) 8 = true)
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])))) 8 = true)
     :
     let op_a := sp1_op_a Main
     let op_b := sp1_ob_b Main
@@ -65,8 +63,8 @@ theorem correct (Main : Vector (ZMod p) 39)
   obtain ⟨_, _, _, _, _⟩ := hs_config
   -- Extract the main constraints from the chip via direct simp expansion.
   rw [StoreDouble.constraints] at h_cstrs
-  simp [SP1ConstraintList.allHold_poly] at h_cstrs
-  simp [AddressOperation.constraints, sub_eq_zero, SP1Constraint.toProp_poly,
+  simp [SP1ConstraintList.allHold] at h_cstrs
+  simp [AddressOperation.constraints, sub_eq_zero, SP1Constraint.toProp,
     h_is_real] at h_cstrs
   obtain ⟨h_add_addr, h_top, _h39, _h_cpu, h_reader, _h_cstrs_rest⟩ := h_cstrs
   -- Set up `(k : ZMod p).val = k` helpers needed for the reader simp.
@@ -80,9 +78,9 @@ theorem correct (Main : Vector (ZMod p) 39)
   have h39_val : (39 : ZMod p).val = 39 := ZMod.val_natCast_of_lt h39_lt
   -- Direct simp expansion of the reader's constraints.
   simp [ITypeReaderImmutable.constraints,
-      SP1Constraint.toProp_poly, Opcode.ofNat, Nat.ble, h39_val] at h_reader
+      SP1Constraint.toProp, Opcode.ofNat, Nat.ble, h39_val] at h_reader
   -- Extract specific facts via `simp_all only` (uses h_reader as a rewrite source).
-  have h_imm_c : Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
+  have h_imm_c : Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
       BitVec.signExtend 64 (BitVec.ofNat 12 Main[21].val) := by
     clear *- h_reader; simp_all only
   have h6_lt_zmod : Main[6] < (32 : ZMod p) := by clear *- h_reader; simp_all only
@@ -92,21 +90,21 @@ theorem correct (Main : Vector (ZMod p) 39)
   have h14_32 : Main[14].val < 32 := by
     have : Main[14].val < (32 : ZMod p).val := h14_lt_zmod; rwa [h32] at this
   -- Extract state facts: PC read, op_a/op_b/op_c memory accesses.
-  simp [SP1ConstraintList.initialState_poly, StoreDouble.constraints,
-    AddressOperation.constraints, SP1Constraint.toStateProp_poly,
+  simp [SP1ConstraintList.initialState, StoreDouble.constraints,
+    AddressOperation.constraints, SP1Constraint.toStateProp,
     AddrAddOperation.constraints,
     CPUState.constraints, ITypeReaderImmutable.constraints,
     Opcode.ofNat, Nat.ble, h_is_real, h6_32, h14_32, h39_val] at state_cstrs
   obtain ⟨h_read_pc, h6_op_a, h14_op_a, _h_imm_state⟩ := state_cstrs
   rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_read_pc
-  have h15u64 : Word.isU64_poly #v[Main[15], Main[16], Main[17], Main[18]] := by
+  have h15u64 : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] := by
     clear *- h_reader; simp_all only
   have h21_lt_zmod : Main[21] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
   have h22_lt_zmod : Main[22] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
   have h23_lt_zmod : Main[23] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
   have h24_lt_zmod : Main[24] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
-  have h21u64 : Word.isU64_poly #v[Main[21], Main[22], Main[23], Main[24]] := by
-    apply Word.isU64_of_cases_poly <;>
+  have h21u64 : Word.isU64 #v[Main[21], Main[22], Main[23], Main[24]] := by
+    apply Word.isU64_of_cases <;>
       simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · have : Main[21].val < (65536 : ZMod p).val := h21_lt_zmod; rwa [h65] at this
@@ -114,37 +112,37 @@ theorem correct (Main : Vector (ZMod p) 39)
     · have : Main[23].val < (65536 : ZMod p).val := h23_lt_zmod; rwa [h65] at this
     · have : Main[24].val < (65536 : ZMod p).val := h24_lt_zmod; rwa [h65] at this
   -- Extract the addr-add spec via the polymorphic helper.
-  have haddr_add := AddrAddOperation.spec_of_constraints_poly _ _ h15u64 h21u64 _ h_add_addr
+  have haddr_add := AddrAddOperation.spec_of_constraints _ _ h15u64 h21u64 _ h_add_addr
   -- Derive `h_in_range` from the chip's address-bounds constraints.
-  obtain ⟨h25_lt, h26_lt, h27_lt, _⟩ := Word.lt_cases_of_isU64_poly haddr_add.1
+  obtain ⟨h25_lt, h26_lt, h27_lt, _⟩ := Word.lt_cases_of_isU64 haddr_add.1
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ] at h25_lt h26_lt h27_lt
   obtain ⟨h_addr_lo, h_addr_hi⟩ :=
     AddressOperation.addr_limbs_bounds Main[25] Main[26] Main[27] Main[28]
       h25_lt h26_lt h27_lt h_top
   have h_addr_eq :
-      (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
-        Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
+        Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat =
         Main[25].val + Main[26].val * 2 ^ 16 + Main[27].val * 2 ^ 32 := by
-    rw [← haddr_add.2, Word.toBitVec64_poly_toNat_poly haddr_add.1,
-      Word.toNat_poly_def]; simp
+    rw [← haddr_add.2, Word.toBitVec64_toNat haddr_add.1,
+      Word.toNat_def]; simp
   have h_offset_eq :
-      Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]] =
+      Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]] =
         BitVec.signExtend 64 (sp1_imm_c Main) := by
     rw [h_imm_c, sp1_imm_c]
     congr 1; apply BitVec.eq_of_toNat_eq
-    simp [Word.toNat_poly_def]; omega
-  have h_align : (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
-        Word.toBitVec64_poly #v[Main[21], Main[22], Main[23], Main[24]]).toNat % 8 = 0 := by
+    simp [Word.toNat_def]; omega
+  have h_align : (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
+        Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]).toNat % 8 = 0 := by
     have h := h_is_aligned
-    rw [show (BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])) =
+    rw [show (BitVec.ofNat 12 (Word.toNat #v[Main[21], Main[22], Main[23], Main[24]])) =
         BitVec.ofNat 12 Main[21].val from by
-          apply BitVec.eq_of_toNat_eq; simp [Word.toNat_poly_def]; omega,
+          apply BitVec.eq_of_toNat_eq; simp [Word.toNat_def]; omega,
         ← h_imm_c, is_aligned_vaddr_iff_mod] at h
     exact h
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt
-          (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]] +
+          (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
             BitVec.signExtend 64 (sp1_imm_c Main)) 0))
         (to_bits 8) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true := by
     rw [← h_offset_eq]
@@ -159,30 +157,31 @@ theorem correct (Main : Vector (ZMod p) 39)
   simp only [BitVec.ofNatLT_eq_ofNat] at h6_op_a h14_op_a
   simp [op_a, sp1_op_a, h6_op_a]
   simp [op_b, sp1_ob_b, h14_op_a]
-  simp [AddrAddOperation.spec_poly] at haddr_add
+  simp [AddrAddOperation.spec] at haddr_add
   simp [sp1_sb, haddr_add.2]
   -- Apply the main helper lemma.
   rw [run_vmem_write_of_width_8 (BitVec.ofNat 5 Main[14].val)
-    (Word.toBitVec64_poly #v[Main[15], Main[16], Main[17], Main[18]])
+    (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])
     (BitVec.signExtend 64 imm_c)
-    (Word.toBitVec64_poly #v[Main[7], Main[8], Main[9], Main[10]])]
-  · -- Arithmetic post-write goal: PC equation + addr equation.
-    simp [sp1_sb, h_imm_c, imm_c, sp1_imm_c, Sail.ConcurrencyInterfaceV1.write_ram,
-      PreSail.write_ram, PreSail.writeBytes, PreSail.writeByte]
-    constructor
-    · -- PC bridge: Word.toBitVec64_poly #v[Main[3], Main[4], Main[5], 0] + 4#64
-      --          = Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0]
-      have h_pc3 : Main[3].val < 65536 := by
-        have h3 : Main[3] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
-        have : Main[3].val < (65536 : ZMod p).val := h3
-        rwa [h65] at this
+    (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])]
+  · -- Bullet 1: align the sp1-side `Word.toBitVec64` references and discharge
+    -- via the bare-`BitVec` `store_double_post_vmem_eq` helper.
+    have h_pc3 : Main[3].val < 65536 := by
+      have h3 : Main[3] < (65536 : ZMod p) := by clear *- h_reader; simp_all only
+      have : Main[3].val < (65536 : ZMod p).val := h3
+      rwa [h65] at this
+    have h_pc_lift : Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0]
+        = Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4#64 := by
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
-    have h1221 : (BitVec.ofNat 12 (Word.toNat_poly #v[Main[21], Main[22], Main[23], Main[24]])) =
-      BitVec.ofNat 12 Main[21].val := by
-      simp [Word.toNat_poly_def, BitVec.ofNat_add, BitVec.ofNat_mul]
-    simp [h1221]
+    rw [h_pc_lift, show Word.toBitVec64 #v[Main[21], Main[22], Main[23], Main[24]]
+                      = BitVec.signExtend 64 imm_c from h_offset_eq]
+    exact store_double_post_vmem_eq s
+      (Word.toBitVec64 #v[Main[3], Main[4], Main[5], 0] + 4#64)
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] +
+        BitVec.signExtend 64 imm_c)
+      (Word.toBitVec64 #v[Main[7], Main[8], Main[9], Main[10]])
   · simp [SailState.isInitialized, hs]
   · simpa using h14_op_a
   · simpa [imm_c, sp1_imm_c] using h_is_aligned

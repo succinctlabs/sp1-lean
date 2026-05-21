@@ -2,6 +2,9 @@ import SP1Operations.Reader.ITypeReader.Operation
 
 namespace ITypeReader
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 set_option linter.unusedVariables false
 -- Generated Lean code for operation ITypeReader (from chip Addi)
 section constraints

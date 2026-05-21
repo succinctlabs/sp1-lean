@@ -3,6 +3,9 @@ import SP1Operations.Reader.ALUTypeReader.Operation
 
 namespace ALUTypeReader
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 set_option linter.unusedVariables false
 -- Generated Lean code for operation ALUTypeReader (from chip Bitwise)
 section constraints

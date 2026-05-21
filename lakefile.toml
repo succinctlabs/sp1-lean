@@ -10,7 +10,6 @@ preferReleaseBuild = true
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 linter.unusedSimpArgs = false
 linter.flexible = false
-linter.style.longLine = false
 synthInstance.maxHeartbeats = 1000000
 weak.linter.mathlibStandardSet = true
 

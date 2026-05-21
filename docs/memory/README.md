@@ -57,23 +57,13 @@ their place when CLAUDE.md or another doc still points at them.
   active memory entry with a one-line hook. **Mirrors live exactly.**
 - `feedback_*.md` — guidance learned from past sessions ("don't do X",
   "the trick that closed Y"). Read-then-act.
-- `project_*.md` — current state of ongoing initiatives (e.g.
-  `project_divrem_poly.md`, `project_sll_poly_status.md`).
+- `project_*.md` — current state of ongoing initiatives.
 - `reference_*.md` — pointers to commits / external resources.
 
 ## Archive divergence
 
-A small set of `feedback_*.md` files in this directory are NOT listed
-in `MEMORY.md` because they've been pruned from live memory, but they
-remain in the repo because external docs still reference them:
-
-- `feedback_extra_shells_slow_compile.md` — referenced from `CLAUDE.md`
-  (build-concurrency section)
-- `feedback_grind_ring_finkb.md` — referenced from `docs/PERF_PATTERNS.md`
-- `feedback_poly_proof_patterns.md` — referenced from `docs/FIELD_GENERIC.md`
-- `feedback_divrem_core_port_blockers.md` — referenced from
-  `feedback_extra_shells_slow_compile.md`
-
-When updating those external docs, either keep these archive files in
-sync or inline the relevant content into the doc and delete the archive
-entry.
+`feedback_extra_shells_slow_compile.md` is in this directory but NOT
+listed in `MEMORY.md` — it was pruned from live memory but stays in the
+repo because `CLAUDE.md`'s build-concurrency section still references it.
+When updating that section, either inline the relevant content into
+`CLAUDE.md` and delete this archive entry, or keep the archive in sync.

@@ -4,7 +4,9 @@ import SP1Operations.Reader.ALUTypeReader.Constraints
 
 namespace ALUTypeReader
 
-attribute [-simp] Opcode.trusted_instr_poly
+set_option linter.style.longLine false
+
+attribute [-simp] Opcode.trusted_instr
 
 set_option linter.style.setOption false
 set_option maxHeartbeats 2000000
@@ -12,7 +14,7 @@ set_option maxRecDepth 2000
 
 /-- RHS uses `.val`-level Nat-arithmetic for `Range`-opcode-derived bounds;
 field-level `<` for U8Range bounds and program-clause bounds. -/
-lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
+lemma allHold_constraints_iff {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     [Fact (2 ^ 17 < p)]
     {clk_high clk_low : ZMod p}
     {pc : Vector (ZMod p) 3}
@@ -21,11 +23,11 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     {cols : ALUTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p}
     (h_eq : is_trusted = is_real) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
     (is_real = 0 ∨ is_real = 1) ∧
     (is_real = 0 → cols.imm_c = 0) ∧
     (¬is_real = 0 →
-      Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
+      Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
       cols.op_a < (32 : ZMod p) ∧
       cols.op_b < (65536 : ZMod p) ∧
       (cols.op_c[0] < (65536 : ZMod p) ∧ cols.op_c[1] < (65536 : ZMod p) ∧ cols.op_c[2] < (65536 : ZMod p) ∧ cols.op_c[3] < (65536 : ZMod p)) ∧
@@ -38,13 +40,13 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
       cols.op_b_memory.access_timestamp.diff_low_limb.val < 65536 ∧
       (clk_low + 3 - cols.op_b_memory.access_timestamp.prev_low - 1 - cols.op_b_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
       (clk_low + 4 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
-      Word.isU64_poly #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
-      Word.isU64_poly #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]]) ∧
+      Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
+      Word.isU64 #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]]) ∧
     (is_real - cols.imm_c = 0 ∨ is_real - cols.imm_c - 1 = 0) ∧
     (¬is_real - cols.imm_c = 0 →
       (clk_low + 2 - cols.op_c_memory.access_timestamp.prev_low - 1 - cols.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
       cols.op_c_memory.access_timestamp.diff_low_limb.val < 65536 ∧
-      Word.isU64_poly #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1], cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]]) ∧
+      Word.isU64 #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1], cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]]) ∧
     (cols.op_a_0 ≠ 0 →
       op_a_write_value[0] = 0 ∧
       op_a_write_value[1] = 0 ∧
@@ -64,7 +66,7 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     change (0 : ZMod p).val < (256 : ZMod p).val; simp
   have h0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
     change (0 : ZMod p).val < (65536 : ZMod p).val; simp
-  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly, h16, h0_lt_256, h0_lt_65536]
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp, h16, h0_lt_256, h0_lt_65536]
   intros h_is_real
   rcases h_is_real with h | h
   · simp [h, and_assoc]
@@ -78,8 +80,8 @@ lemma allHold_constraints_iff_poly {p : ℕ} [Fact (Nat.Prime p)] [NeZero p]
     · simp [hop_a_0]
       aesop
 
-/-- Specializes `allHold_constraints_iff_poly` to `is_real = 1`. -/
-lemma allHold_constraints_iff_is_real_poly
+/-- Specializes `allHold_constraints_iff` to `is_real = 1`. -/
+lemma allHold_constraints_iff_is_real
     {p : ℕ} [Fact (Nat.Prime p)] [NeZero p] [Fact (2 ^ 17 < p)]
     {clk_high clk_low : ZMod p}
     {pc : Vector (ZMod p) 3}
@@ -88,8 +90,8 @@ lemma allHold_constraints_iff_is_real_poly
     {cols : ALUTypeReader (ZMod p)}
     {is_real is_trusted : ZMod p}
     (h : is_real = 1) (h_trusted : is_trusted = is_real) :
-  List.Forall SP1Constraint.toProp_poly (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
-    Opcode.trusted_instr_poly (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
+  List.Forall SP1Constraint.toProp (constraints clk_high clk_low pc opcode op_a_write_value cols is_real is_trusted) ↔
+    Opcode.trusted_instr (Opcode.ofNat opcode.val) cols.op_a cols.op_b 0 0 0 cols.op_c[0] cols.op_c[1] cols.op_c[2] cols.op_c[3] 0 cols.imm_c ∧
     cols.op_a < (32 : ZMod p) ∧
     cols.op_b < (65536 : ZMod p) ∧
     (cols.op_c[0] < (65536 : ZMod p) ∧ cols.op_c[1] < (65536 : ZMod p) ∧ cols.op_c[2] < (65536 : ZMod p) ∧ cols.op_c[3] < (65536 : ZMod p)) ∧
@@ -102,12 +104,12 @@ lemma allHold_constraints_iff_is_real_poly
     cols.op_b_memory.access_timestamp.diff_low_limb.val < 65536 ∧
     (clk_low + 3 - cols.op_b_memory.access_timestamp.prev_low - 1 - cols.op_b_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
     (clk_low + 4 - cols.op_a_memory.access_timestamp.prev_low - 1 - cols.op_a_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
-    Word.isU64_poly #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
-    Word.isU64_poly #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]] ∧
+    Word.isU64 #v[cols.op_a_memory.prev_value[0], cols.op_a_memory.prev_value[1], cols.op_a_memory.prev_value[2], cols.op_a_memory.prev_value[3]] ∧
+    Word.isU64 #v[cols.op_b_memory.prev_value[0], cols.op_b_memory.prev_value[1], cols.op_b_memory.prev_value[2], cols.op_b_memory.prev_value[3]] ∧
     (cols.imm_c = 0 →
       (clk_low + 2 - cols.op_c_memory.access_timestamp.prev_low - 1 - cols.op_c_memory.access_timestamp.diff_low_limb) * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
       cols.op_c_memory.access_timestamp.diff_low_limb.val < 65536 ∧
-      Word.isU64_poly #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1], cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]]) ∧
+      Word.isU64 #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1], cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]]) ∧
     (¬cols.op_a_0 = 0 →
       op_a_write_value[0] = 0 ∧
       op_a_write_value[1] = 0 ∧
@@ -119,6 +121,6 @@ lemma allHold_constraints_iff_is_real_poly
       cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
       cols.op_c_memory.prev_value[3] = cols.op_c[3]) := by
   subst h_trusted; subst h
-  aesop (add safe (by simp [allHold_constraints_iff_poly rfl]))
+  aesop (add safe (by simp [allHold_constraints_iff rfl]))
 
 end ALUTypeReader

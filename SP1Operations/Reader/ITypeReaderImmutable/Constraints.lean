@@ -3,6 +3,9 @@ import SP1Operations.Reader.ITypeReader.Operation
 
 namespace ITypeReaderImmutable
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 set_option linter.unusedVariables false
 
 section constraints

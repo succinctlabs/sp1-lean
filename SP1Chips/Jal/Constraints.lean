@@ -2,6 +2,9 @@ import SP1Operations.Operation.AddOperation
 
 namespace Jal
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section constraints
 
 -- Generated Lean code for chip JalChip
@@ -72,12 +75,13 @@ section constraints
 
 end constraints
 
-section poly_helpers
+section opcodes
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-@[simp] def is_real_poly (Main : Vector (ZMod p) 31) : Prop := Main[30] = 1
+@[simp] def is_real (Main : Vector (ZMod p) 31) : Prop := Main[30] = 1
+  deriving Decidable
 
-end poly_helpers
+end opcodes
 
 end Jal

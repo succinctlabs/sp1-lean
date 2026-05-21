@@ -3,14 +3,14 @@ import SP1Operations.Operation.BitwiseU16Operation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.ALUTypeReader
 import SP1Chips.Bitwise.Constraints
+import SP1Chips.Bitwise.Common
 
 open LeanRV64D.Functions BitVec
 
-/-! ### Shared helpers used by all 6 Bitwise chip arms.
+/-!
+# Bitwise Chip Proofs
 
-The Bitwise chip's `Constraints.lean` declares a single `allHold_constraints_iff_poly`
-covering all 6 variants; per-variant chip arms apply the iff plus `single_op_poly`
-to collapse to the active variant, then bridge through `BitwiseU16Operation.spec.{xor,or,and}_poly`. -/
+-/
 
 namespace Bitwise
 
@@ -23,8 +23,9 @@ variable
 -- chip's constraints determine which Sail spec those columns implement.
 def sp1_bitwise : SailM Unit := do
   let op_a : BitVec 5 := BitVec.ofNat 5 Main[6].val
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256, Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[40] + Main[41] * 256, Main[42] + Main[43] * 256,
+    Main[44] + Main[45] * 256, Main[46] + Main[47] * 256])
 
 end Bitwise
 
@@ -49,28 +50,28 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 open Sail
 
 set_option maxHeartbeats 1600000 in
--- BitwiseU16Operation spec_poly bridge plus PC arithmetic exceeds default 200K.
+-- BitwiseU16Operation spec bridge plus PC arithmetic exceeds default 200K.
 theorem correct_xor
-  (cstrs : (constraints Main).allHold_poly)
-  (h_is_xor : is_xor_poly Main)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (cstrs : (constraints Main).allHold)
+  (h_is_xor : is_xor Main)
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
   (spec_xor (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
-    simp [SP1ConstraintList.allHold_poly] at cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    simp [SP1ConstraintList.allHold] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     obtain ⟨h_bop, cpu_cstrs, alu_cstrs, b_xor, b_or, b_and, one_of, _h13⟩ := cstrs
     obtain ⟨h_M48, h_imm_c⟩ := h_is_xor
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h_is_real : Main[48] + Main[49] + Main[50] = 1 :=
       sum_eq_one_of_eq_one_left h_M48 b_or b_and one_of
-    have ⟨h_M49, h_M50⟩ := (single_op_poly Main b_xor b_or b_and h_is_real).1 h_M48
+    have ⟨h_M49, h_M50⟩ := (single_op Main b_xor b_or b_and h_is_real).1 h_M48
     have h3_lt : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h3_val : (3 : ZMod p).val = 3 := ZMod.val_natCast_of_lt h3_lt
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h3_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -95,10 +96,10 @@ theorem correct_xor
       rw [h_M48, h_M49, h_M50]; push_cast; ring
     have h_real_args : Main[48] + Main[49] + Main[50] = (1 : ZMod p) := h_is_real
     rw [h_xor_args, h_real_args] at h_bop
-    apply BitwiseU16Operation.spec.xor_poly is_U64_b is_U64_c at h_bop
+    apply BitwiseU16Operation.spec.xor is_U64_b is_U64_c at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -108,8 +109,8 @@ theorem correct_xor
     simp [spec_xor, Bitwise.sp1_bitwise, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
-    simp only [execute_RTYPE_pure_w_poly]
+    rw [exec_RTYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
+    simp only [execute_RTYPE_pure_w]
     rw [← h_bop]
     have hp_lt : 2 ^ 17 < p := Fact.out
     have h_pc3 : Main[3].val < 65536 := by
@@ -117,7 +118,7 @@ theorem correct_xor
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -152,28 +153,28 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 open Sail
 
 set_option maxHeartbeats 1600000 in
--- BitwiseU16Operation OR-spec_poly bridge plus PC arithmetic exceeds default 200K.
+-- BitwiseU16Operation OR-spec bridge plus PC arithmetic exceeds default 200K.
 theorem correct_or
-  (cstrs : (constraints Main).allHold_poly)
-  (h_is_or : is_or_poly Main)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (cstrs : (constraints Main).allHold)
+  (h_is_or : is_or Main)
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
   (spec_or (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
-    simp [SP1ConstraintList.allHold_poly] at cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    simp [SP1ConstraintList.allHold] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     obtain ⟨h_bop, cpu_cstrs, alu_cstrs, b_xor, b_or, b_and, one_of, _h13⟩ := cstrs
     obtain ⟨h_M49, h_imm_c⟩ := h_is_or
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h_is_real : Main[48] + Main[49] + Main[50] = 1 :=
       sum_eq_one_of_eq_one_mid h_M49 b_xor b_and one_of
-    have ⟨h_M48, h_M50⟩ := (single_op_poly Main b_xor b_or b_and h_is_real).2.1 h_M49
+    have ⟨h_M48, h_M50⟩ := (single_op Main b_xor b_or b_and h_is_real).2.1 h_M49
     have h4_lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h4_val : (4 : ZMod p).val = 4 := ZMod.val_natCast_of_lt h4_lt
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h4_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -196,10 +197,10 @@ theorem correct_or
       rw [h_M48, h_M49, h_M50]; push_cast; ring
     have h_real_args : Main[48] + Main[49] + Main[50] = (1 : ZMod p) := h_is_real
     rw [h_or_args, h_real_args] at h_bop
-    apply BitwiseU16Operation.spec.or_poly is_U64_b is_U64_c at h_bop
+    apply BitwiseU16Operation.spec.or is_U64_b is_U64_c at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -209,8 +210,8 @@ theorem correct_or
     simp [spec_or, Bitwise.sp1_bitwise, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
-    simp only [execute_RTYPE_pure_w_poly]
+    rw [exec_RTYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
+    simp only [execute_RTYPE_pure_w]
     rw [← h_bop]
     have hp_lt : 2 ^ 17 < p := Fact.out
     have h_pc3 : Main[3].val < 65536 := by
@@ -218,7 +219,7 @@ theorem correct_or
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -253,28 +254,28 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 open Sail
 
 set_option maxHeartbeats 1600000 in
--- BitwiseU16Operation AND-spec_poly bridge plus PC arithmetic exceeds default 200K.
+-- BitwiseU16Operation AND-spec bridge plus PC arithmetic exceeds default 200K.
 theorem correct_and
-  (cstrs : (constraints Main).allHold_poly)
-  (h_is_and : is_and_poly Main)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (cstrs : (constraints Main).allHold)
+  (h_is_and : is_and Main)
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
   (spec_and (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
-    simp [SP1ConstraintList.allHold_poly] at cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    simp [SP1ConstraintList.allHold] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     obtain ⟨h_bop, cpu_cstrs, alu_cstrs, b_xor, b_or, b_and, one_of, _h13⟩ := cstrs
     obtain ⟨h_M50, h_imm_c⟩ := h_is_and
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h_is_real : Main[48] + Main[49] + Main[50] = 1 :=
       sum_eq_one_of_eq_one_right h_M50 b_xor b_or one_of
-    have ⟨h_M48, h_M49⟩ := (single_op_poly Main b_xor b_or b_and h_is_real).2.2 h_M50
+    have ⟨h_M48, h_M49⟩ := (single_op Main b_xor b_or b_and h_is_real).2.2 h_M50
     have h5_lt : (5 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h5_val : (5 : ZMod p).val = 5 := ZMod.val_natCast_of_lt h5_lt
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h5_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, _h_c_bnds,
             _h_a0_bool, h_a0_iff,
@@ -297,10 +298,10 @@ theorem correct_and
       rw [h_M48, h_M49, h_M50]; push_cast; ring
     have h_real_args : Main[48] + Main[49] + Main[50] = (1 : ZMod p) := h_is_real
     rw [h_and_args, h_real_args] at h_bop
-    apply BitwiseU16Operation.spec.and_poly is_U64_b is_U64_c at h_bop
+    apply BitwiseU16Operation.spec.and is_U64_b is_U64_c at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -310,8 +311,8 @@ theorem correct_and
     simp [spec_and, Bitwise.sp1_bitwise, execute_RTYPE']
     rw [run_readReg, read_pc]
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b, read_op_c]
-    rw [exec_RTYPE_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
-    simp only [execute_RTYPE_pure_w_poly]
+    rw [exec_RTYPE_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
+    simp only [execute_RTYPE_pure_w]
     rw [← h_bop]
     have hp_lt : 2 ^ 17 < p := Fact.out
     have h_pc3 : Main[3].val < 65536 := by
@@ -319,7 +320,7 @@ theorem correct_and
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -354,28 +355,28 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 open Sail
 
 set_option maxHeartbeats 1600000 in
--- I-type signExtend bridge plus BitwiseU16Operation spec_poly chain.
+-- I-type signExtend bridge plus BitwiseU16Operation spec chain.
 theorem correct_xori
-  (cstrs : (constraints Main).allHold_poly)
-  (h_is_xori : is_xori_poly Main)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (cstrs : (constraints Main).allHold)
+  (h_is_xori : is_xori Main)
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
   (spec_xori op_c (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
-    simp [SP1ConstraintList.allHold_poly] at cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    simp [SP1ConstraintList.allHold] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     obtain ⟨h_bop, cpu_cstrs, alu_cstrs, b_xor, b_or, b_and, one_of, _h13⟩ := cstrs
     obtain ⟨h_M48, h_imm_c⟩ := h_is_xori
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h_is_real : Main[48] + Main[49] + Main[50] = 1 :=
       sum_eq_one_of_eq_one_left h_M48 b_or b_and one_of
-    have ⟨h_M49, h_M50⟩ := (single_op_poly Main b_xor b_or b_and h_is_real).1 h_M48
+    have ⟨h_M49, h_M50⟩ := (single_op Main b_xor b_or b_and h_is_real).1 h_M48
     have h3_lt : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h3_val : (3 : ZMod p).val = 3 := ZMod.val_natCast_of_lt h3_lt
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h3_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,
@@ -403,18 +404,18 @@ theorem correct_xori
     have h24 : Main[24].val < 65536 := by
       have : Main[24].val < (65536 : ZMod p).val := c3
       rwa [h65] at this
-    have h_op_c_imm_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+    have h_op_c_imm_isU64 : Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq]
-      exact Word.isU64_of_cases_poly h21 h22 h23 h24
+      exact Word.isU64_of_cases h21 h22 h23 h24
     obtain ⟨h_f, h_imm_c_consts⟩ := trusted_instr_prop
     have h_xor_args : (Main[48] * 2 + Main[49] * 1 + Main[50] * 0 : ZMod p) = 2 := by
       rw [h_M48, h_M49, h_M50]; push_cast; ring
     have h_real_args : Main[48] + Main[49] + Main[50] = (1 : ZMod p) := h_is_real
     rw [h_xor_args, h_real_args] at h_bop
-    apply BitwiseU16Operation.spec.xor_poly is_U64_b h_op_c_imm_isU64 at h_bop
+    apply BitwiseU16Operation.spec.xor is_U64_b h_op_c_imm_isU64 at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -426,11 +427,11 @@ theorem correct_xori
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
-    rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
-    simp only [execute_ITYPE_pure_w_poly, execute_RTYPE_pure_w_poly]
+    rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b h_op_c_imm_isU64]
+    simp only [execute_ITYPE_pure_w, execute_RTYPE_pure_w]
     rw [← h_bop]
     have hp_lt : 2 ^ 17 < p := Fact.out
     have h_pc3 : Main[3].val < 65536 := by
@@ -438,7 +439,7 @@ theorem correct_xori
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -473,28 +474,28 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 open Sail
 
 set_option maxHeartbeats 1600000 in
--- I-type ORI variant: signExtend bridge + spec.or_poly bridge.
+-- I-type ORI variant: signExtend bridge + spec.or bridge.
 theorem correct_ori
-  (cstrs : (constraints Main).allHold_poly)
-  (h_is_ori : is_ori_poly Main)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (cstrs : (constraints Main).allHold)
+  (h_is_ori : is_ori Main)
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
   (spec_ori op_c (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
-    simp [SP1ConstraintList.allHold_poly] at cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    simp [SP1ConstraintList.allHold] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     obtain ⟨h_bop, cpu_cstrs, alu_cstrs, b_xor, b_or, b_and, one_of, _h13⟩ := cstrs
     obtain ⟨h_M49, h_imm_c⟩ := h_is_ori
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h_is_real : Main[48] + Main[49] + Main[50] = 1 :=
       sum_eq_one_of_eq_one_mid h_M49 b_xor b_and one_of
-    have ⟨h_M48, h_M50⟩ := (single_op_poly Main b_xor b_or b_and h_is_real).2.1 h_M49
+    have ⟨h_M48, h_M50⟩ := (single_op Main b_xor b_or b_and h_is_real).2.1 h_M49
     have h4_lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h4_val : (4 : ZMod p).val = 4 := ZMod.val_natCast_of_lt h4_lt
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h4_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,
@@ -522,18 +523,18 @@ theorem correct_ori
     have h24 : Main[24].val < 65536 := by
       have : Main[24].val < (65536 : ZMod p).val := c3
       rwa [h65] at this
-    have h_op_c_imm_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+    have h_op_c_imm_isU64 : Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq]
-      exact Word.isU64_of_cases_poly h21 h22 h23 h24
+      exact Word.isU64_of_cases h21 h22 h23 h24
     obtain ⟨h_f, h_imm_c_consts⟩ := trusted_instr_prop
     have h_or_args : (Main[48] * 2 + Main[49] * 1 + Main[50] * 0 : ZMod p) = 1 := by
       rw [h_M48, h_M49, h_M50]; push_cast; ring
     have h_real_args : Main[48] + Main[49] + Main[50] = (1 : ZMod p) := h_is_real
     rw [h_or_args, h_real_args] at h_bop
-    apply BitwiseU16Operation.spec.or_poly is_U64_b h_op_c_imm_isU64 at h_bop
+    apply BitwiseU16Operation.spec.or is_U64_b h_op_c_imm_isU64 at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -545,11 +546,11 @@ theorem correct_ori
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
-    rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
-    simp only [execute_ITYPE_pure_w_poly, execute_RTYPE_pure_w_poly]
+    rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b h_op_c_imm_isU64]
+    simp only [execute_ITYPE_pure_w, execute_RTYPE_pure_w]
     rw [← h_bop]
     have hp_lt : 2 ^ 17 < p := Fact.out
     have h_pc3 : Main[3].val < 65536 := by
@@ -557,7 +558,7 @@ theorem correct_ori
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
@@ -592,28 +593,28 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 open Sail
 
 set_option maxHeartbeats 1600000 in
--- I-type ANDI variant: signExtend bridge + spec.and_poly bridge.
+-- I-type ANDI variant: signExtend bridge + spec.and bridge.
 theorem correct_andi
-  (cstrs : (constraints Main).allHold_poly)
-  (h_is_andi : is_andi_poly Main)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (cstrs : (constraints Main).allHold)
+  (h_is_andi : is_andi Main)
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
   (spec_andi op_c (.Regidx op_b) (.Regidx op_a)).run s = (Bitwise.sp1_bitwise Main).run s
   := by
-    simp [SP1ConstraintList.allHold_poly] at cstrs
-    rw [allHold_constraints_iff_poly] at cstrs
+    simp [SP1ConstraintList.allHold] at cstrs
+    rw [allHold_constraints_iff] at cstrs
     obtain ⟨h_bop, cpu_cstrs, alu_cstrs, b_xor, b_or, b_and, one_of, _h13⟩ := cstrs
     obtain ⟨h_M50, h_imm_c⟩ := h_is_andi
     haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
     have h_is_real : Main[48] + Main[49] + Main[50] = 1 :=
       sum_eq_one_of_eq_one_right h_M50 b_xor b_or one_of
-    have ⟨h_M48, h_M49⟩ := (single_op_poly Main b_xor b_or b_and h_is_real).2.2 h_M50
+    have ⟨h_M48, h_M49⟩ := (single_op Main b_xor b_or b_and h_is_real).2.2 h_M50
     have h5_lt : (5 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     have h5_val : (5 : ZMod p).val = 5 := ZMod.val_natCast_of_lt h5_lt
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    rw [ALUTypeReader.allHold_constraints_iff_is_real_poly h_is_real rfl] at alu_cstrs
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    rw [ALUTypeReader.allHold_constraints_iff_is_real h_is_real rfl] at alu_cstrs
     simp [h_M48, h_M49, h_M50, Opcode.ofNat, Nat.ble, h5_val, h_imm_c] at alu_cstrs
     obtain ⟨trusted_instr_prop, h_op_a_lt, h_op_b_lt, ⟨c0, c1, c2, c3⟩,
             _h_a0_bool, h_a0_iff,
@@ -641,18 +642,18 @@ theorem correct_andi
     have h24 : Main[24].val < 65536 := by
       have : Main[24].val < (65536 : ZMod p).val := c3
       rwa [h65] at this
-    have h_op_c_imm_isU64 : Word.isU64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+    have h_op_c_imm_isU64 : Word.isU64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq]
-      exact Word.isU64_of_cases_poly h21 h22 h23 h24
+      exact Word.isU64_of_cases h21 h22 h23 h24
     obtain ⟨h_f, h_imm_c_consts⟩ := trusted_instr_prop
     have h_and_args : (Main[48] * 2 + Main[49] * 1 + Main[50] * 0 : ZMod p) = 0 := by
       rw [h_M48, h_M49, h_M50]; push_cast; ring
     have h_real_args : Main[48] + Main[49] + Main[50] = (1 : ZMod p) := h_is_real
     rw [h_and_args, h_real_args] at h_bop
-    apply BitwiseU16Operation.spec.and_poly is_U64_b h_op_c_imm_isU64 at h_bop
+    apply BitwiseU16Operation.spec.and is_U64_b h_op_c_imm_isU64 at h_bop
     simp [BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints] at h_bop
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, BitwiseU16Operation.constraints, U16toU8OperationUnsafe.constraints,
       BitwiseOperation.constraints,
       CPUState.constraints, ALUTypeReader.constraints,
@@ -664,11 +665,11 @@ theorem correct_andi
     simp [sp1_op_a, sp1_op_b, sp1_op_c, read_op_b]
     have h_signExt_eq :
         signExtend 64 (BitVec.ofNat 12 Main[21].val) =
-          Word.toBitVec64_poly #v[Main[25], Main[26], Main[27], Main[28]] := by
+          Word.toBitVec64 #v[Main[25], Main[26], Main[27], Main[28]] := by
       rw [h25_eq, h26_eq, h27_eq, h28_eq, ← h_imm_c_consts]
     rw [h_signExt_eq]
-    rw [exec_ITYPE_pure_bv_to_w_poly _ _ _ is_U64_b h_op_c_imm_isU64]
-    simp only [execute_ITYPE_pure_w_poly, execute_RTYPE_pure_w_poly]
+    rw [exec_ITYPE_pure_bv_to_w _ _ _ is_U64_b h_op_c_imm_isU64]
+    simp only [execute_ITYPE_pure_w, execute_RTYPE_pure_w]
     rw [← h_bop]
     have hp_lt : 2 ^ 17 < p := Fact.out
     have h_pc3 : Main[3].val < 65536 := by
@@ -676,7 +677,7 @@ theorem correct_andi
       have : Main[3].val < (65536 : ZMod p).val := h3
       rwa [val_65536_zmod_p] at this
     rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-        Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+        Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
         show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all

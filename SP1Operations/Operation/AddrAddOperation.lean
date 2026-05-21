@@ -6,10 +6,10 @@ namespace AddrAddOperation
 
 /-- Same Add-style carry shape as `AddOperation` (no borrow form), so bare
 `simp` closes. -/
-lemma allHold_constraints_iff_poly
+lemma allHold_constraints_iff
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p)) (cols : AddrAddOperation (ZMod p)) :
-    SP1ConstraintList.allHold_poly (constraints a b cols 1) ↔
+    SP1ConstraintList.allHold (constraints a b cols 1) ↔
       let carry0 : ZMod p := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
       let carry1 : ZMod p := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
       let carry2 : ZMod p := (a[2] + b[2] - cols.value[2] + carry1) * 65536⁻¹
@@ -21,12 +21,12 @@ lemma allHold_constraints_iff_poly
       (cols.value[0].val < 65536) ∧
       (cols.value[1].val < 65536) ∧
       (cols.value[2].val < 65536) := by
-  simp [constraints, sub_eq_zero, SP1Constraint.toProp_poly]
+  simp [constraints, sub_eq_zero, SP1Constraint.toProp]
 
 /-! Recipe: rewrite the BitVec equation goal via `← BitVec.toNat_inj,
-BitVec.toNat_add, Word.toBitVec64_poly_toNat_poly, Word.toNat_poly_def`,
+BitVec.toNat_add, Word.toBitVec64_toNat, Word.toNat_def`,
 get nat carry equations via `linear_combination * h65inv` + `limb_lift`,
-close with `omega`. We skip an explicit `cols_is_a_sum_b_poly`
+close with `omega`. We skip an explicit `cols_is_a_sum_b`
 intermediate step because its `(...) % 2^64 = ...` type-level form was
 triggering kernel deep recursion on `2^64` during proof-term checking. -/
 
@@ -56,17 +56,17 @@ private lemma limb_lift {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   rw [h1, h3] at h
   exact h
 
-def spec_poly {p : ℕ} [NeZero p] (a b : Word (ZMod p)) (cols : AddrAddOperation (ZMod p)) : Prop :=
+def spec {p : ℕ} [NeZero p] (a b : Word (ZMod p)) (cols : AddrAddOperation (ZMod p)) : Prop :=
   let cols_word : Word (ZMod p) := #v[cols.value[0], cols.value[1], cols.value[2], 0]
-  cols_word.isU64_poly ∧ cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly
+  cols_word.isU64 ∧ cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64
 
 /-- Bare-`ℕ` close for the AddrAdd carry chain: omega over Nat limb equations.
 Accepts the full 4-limb form on the RHS (with `0 * 2 ^ 48` for the high limb)
 so the spec body doesn't need a `Nat.zero_mul + Nat.add_zero` simp pass.
-Lifted out of `spec_of_constraints_poly` so the kernel re-check sees the
+Lifted out of `spec_of_constraints` so the kernel re-check sees the
 `2^64`-bearing omega certificate in isolation — keeps the polymorphic `ZMod p`
 instance graph out of the certificate's proof term, sidestepping the
-deep-recursion gotcha in `docs/GOTCHAS.md`. -/
+deep-recursion gotcha in `docs/PROOF_PATTERNS.md`. -/
 private lemma close_addr_add_nat
     (a0 a1 a2 a3 b0 b1 b2 b3 v0 v1 v2 c0 c1 c2 c3 : ℕ)
     (hv0 : v0 < 2 ^ 16) (hv1 : v1 < 2 ^ 16) (hv2 : v2 < 2 ^ 16)
@@ -81,27 +81,27 @@ private lemma close_addr_add_nat
 
 set_option maxHeartbeats 16000000 in
 -- Carry-chain rearrangements + BitVec/Nat bridge run 4–8M; 16M leaves headroom.
-/-- Combines `isU64_poly` of the cols_word (low 3 limbs bounded, high
+/-- Combines `isU64` of the cols_word (low 3 limbs bounded, high
 limb is 0) with the BitVec equation
-`cols_word.toBitVec64_poly = a.toBitVec64_poly + b.toBitVec64_poly`,
+`cols_word.toBitVec64 = a.toBitVec64 + b.toBitVec64`,
 the latter proved via the AddOperation-style carry chain. -/
-lemma spec_of_constraints_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+lemma spec_of_constraints {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (a b : Word (ZMod p))
-    (ha : a.isU64_poly) (hb : b.isU64_poly)
+    (ha : a.isU64) (hb : b.isU64)
     (cols : AddrAddOperation (ZMod p))
-    (h : SP1ConstraintList.allHold_poly (constraints a b cols 1)) :
-    (spec_poly a b cols) := by
+    (h : SP1ConstraintList.allHold (constraints a b cols 1)) :
+    (spec a b cols) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  rw [allHold_constraints_iff_poly] at h
+  rw [allHold_constraints_iff] at h
   obtain ⟨hc0, hc1, hc2, hc3, hv0, hv1, hv2⟩ := h
   have h_zero_val : ((0 : ZMod p)).val = 0 := ZMod.val_zero
   have hzero_lt : ((0 : ZMod p)).val < 2 ^ 16 := by rw [h_zero_val]; omega
   -- Build the cols_word.
   set cols_word : Word (ZMod p) :=
     #v[cols.value[0], cols.value[1], cols.value[2], (0 : ZMod p)] with hcw_def
-  -- isU64_poly of cols_word: each limb < 65536.
-  have h_isU64_v : cols_word.isU64_poly := by
-    apply Word.isU64_of_cases_poly <;>
+  -- isU64 of cols_word: each limb < 65536.
+  have h_isU64_v : cols_word.isU64 := by
+    apply Word.isU64_of_cases <;>
       simp only [hcw_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
         List.getElem_cons_succ]
     · exact hv0
@@ -110,20 +110,20 @@ lemma spec_of_constraints_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)
     · rw [h_zero_val]; omega
   refine ⟨h_isU64_v, ?_⟩
   -- BitVec equation: bridge via toNat, then carry-chain omega.
-  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64_poly ha
-  obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64_poly hb
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
+  obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   rw [← BitVec.toNat_inj, BitVec.toNat_add,
-      Word.toBitVec64_poly_toNat_poly h_isU64_v,
-      Word.toBitVec64_poly_toNat_poly hb,
-      Word.toBitVec64_poly_toNat_poly ha,
-      Word.toNat_poly_def, Word.toNat_poly_def, Word.toNat_poly_def]
+      Word.toBitVec64_toNat h_isU64_v,
+      Word.toBitVec64_toNat hb,
+      Word.toBitVec64_toNat ha,
+      Word.toNat_def, Word.toNat_def, Word.toNat_def]
   -- Reduce cols_word indices, but keep the `+ 0 * 2 ^ 48` term so the helper
   -- absorbs the closure with no extra simp leakage.
   simp only [hcw_def, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
     List.getElem_cons_succ, h_zero_val]
-  -- Carry-chain rearrangement, mirroring AddOperation.spec_poly.
+  -- Carry-chain rearrangement, mirroring AddOperation.spec.
   set c0 : ZMod p := (a[0] + b[0] - cols.value[0]) * (65536 : ZMod p)⁻¹ with hc0_def
   set c1 : ZMod p := (a[1] + b[1] - cols.value[1] + c0) * (65536 : ZMod p)⁻¹ with hc1_def
   set c2 : ZMod p := (a[2] + b[2] - cols.value[2] + c1) * (65536 : ZMod p)⁻¹ with hc2_def

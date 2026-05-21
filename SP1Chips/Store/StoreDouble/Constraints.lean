@@ -3,9 +3,13 @@ import SP1Operations.Operation.AddressOperation.Constraints
 import SP1Operations.Reader.ITypeReaderImmutable.Constraints
 import SP1Operations.Reader.CPUState.Constraints
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace Store
 
 namespace StoreDouble
+
 
 section constraints
 
@@ -56,13 +60,14 @@ section constraints
 
 end constraints
 
-section poly_helpers
+section opcodes
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-@[simp] def is_real_poly (Main : Vector (ZMod p) 39) : Prop := Main[38] = 1
+@[simp] def is_real (Main : Vector (ZMod p) 39) : Prop := Main[38] = 1
+  deriving Decidable
 
-end poly_helpers
+end opcodes
 
 end StoreDouble
 

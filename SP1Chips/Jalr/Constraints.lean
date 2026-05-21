@@ -4,6 +4,9 @@ import SP1Operations.Reader.ITypeReader
 
 namespace Jalr
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 section constraints
 
 -- Generated Lean code for chip JalrChip
@@ -41,12 +44,13 @@ section constraints
 
 end constraints
 
-section poly_helpers
+section opcodes
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-@[simp] def is_real_poly (Main : Vector (ZMod p) 35) : Prop := Main[25] = 1
+@[simp] def is_real (Main : Vector (ZMod p) 35) : Prop := Main[25] = 1
+  deriving Decidable
 
-end poly_helpers
+end opcodes
 
 end Jalr

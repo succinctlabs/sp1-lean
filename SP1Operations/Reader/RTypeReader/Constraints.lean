@@ -2,6 +2,9 @@ import SP1Operations.Reader.RTypeReader.Operation
 
 namespace RTypeReader
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 set_option linter.unusedVariables false
 -- Generated Lean code for operation RTypeReader (from chip Add)
 section constraints

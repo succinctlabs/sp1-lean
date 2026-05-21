@@ -8,8 +8,7 @@ open LeanRV64D.Functions BitVec
 
 namespace Subw
 
-variable
-  {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   (Main : Vector (ZMod p) 32)
   (s : SailState)
 
@@ -26,8 +25,8 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
 def sp1_subw : SailM Unit := do
   let op_a := sp1_op_a Main
-  Sail.writeReg Register.nextPC (Word.toBitVec64_poly #v[Main[3] + 4, Main[4], Main[5], 0])
-  Sail.write_reg op_a (Word.toBitVec64_poly #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535])
+  Sail.writeReg Register.nextPC (Word.toBitVec64 #v[Main[3] + 4, Main[4], Main[5], 0])
+  Sail.write_reg op_a (Word.toBitVec64 #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535])
 
 open Sail
 
@@ -35,9 +34,9 @@ set_option maxHeartbeats 1600000 in
 -- Subw migration's BitVec/sign-extend manipulation in the non-zero
 -- op_a branch sits well above the default 200K heartbeat budget.
 theorem correct_subw
-  (cstrs : (constraints Main).allHold_poly)
+  (cstrs : (constraints Main).allHold)
   (h_is_real : Main[31] = 1)
-  (state_cstrs : (constraints Main).initialState_poly s) :
+  (state_cstrs : (constraints Main).initialState s) :
   let op_c := sp1_op_c Main
   let op_b := sp1_op_b Main
   let op_a := sp1_op_a Main
@@ -51,10 +50,11 @@ theorem correct_subw
       have : (20 : ℕ) < 2 ^ 17 := by decide
       omega
     have h20_val : (20 : ZMod p).val = 20 := ZMod.val_natCast_of_lt h20_lt
-    rw [CPUState.allHold_constraints_iff_is_real_poly h_is_real] at cpu_cstrs
-    simp [RTypeReader.allHold_constraints_iff_is_real_poly h_is_real h_is_real,
+    rw [CPUState.allHold_constraints_iff_is_real h_is_real] at cpu_cstrs
+    simp [RTypeReader.allHold_constraints_iff_is_real h_is_real h_is_real,
       Opcode.ofNat, Nat.ble, h20_val] at reader_cstrs
-    obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _, ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := reader_cstrs
+    obtain ⟨trusted_instr_prop, h_op_a_lt, _, _, _, _, _,
+      ⟨⟨_, _, ⟨_, is_U64_b, is_U64_c⟩⟩, _⟩⟩ := reader_cstrs
     have h32 : (32 : ZMod p).val = 32 := val_32_zmod_p
     have h6 : Main[6].val < 32 := by
       have : Main[6].val < (32 : ZMod p).val := h_op_a_lt
@@ -65,12 +65,12 @@ theorem correct_subw
     have h21 : Main[21].val < 32 := by
       have : Main[21].val < (32 : ZMod p).val := trusted_instr_prop.2
       rwa [h32] at this
-    simp [SP1ConstraintList.initialState_poly, constraints, SP1Constraint.toStateProp_poly,
+    simp [SP1ConstraintList.initialState, constraints, SP1Constraint.toStateProp,
       List.Forall, SubwOperation.constraints, CPUState.constraints, RTypeReader.constraints,
       U16MSBOperation.constraints, h6, h14, h21, h_is_real] at state_cstrs
     obtain ⟨read_pc, read_op_a, read_op_b, read_op_c⟩ := state_cstrs
     rw [h_is_real] at *
-    apply SubwOperation.spec_poly is_U64_b is_U64_c at subw_op_cstrs
+    apply SubwOperation.spec is_U64_b is_U64_c at subw_op_cstrs
     obtain ⟨is_U32_val, is_subw, is_msb⟩ := subw_op_cstrs
     simp [BitVec.ofNatLT_eq_ofNat] at *
     -- Now the monadic manipulation
@@ -79,15 +79,15 @@ theorem correct_subw
     simp [sp1_op_b, read_op_b]
     simp [sp1_op_c, read_op_c]
     simp [sp1_op_a]
-    -- Bridge `execute_RTYPEW_pure` to the `_w_poly` form, then push `is_subw` into
+    -- Bridge `execute_RTYPEW_pure` to the `_w` form, then push `is_subw` into
     -- `is_msb` so simp_all-driven Main[30] rewrites produce the `execute` form
     -- (which `← is_subw` later flips uniformly to the `toBitVec32` form).
-    rw [exec_RTYPEW_pure_bv_to_w_poly _ _ _ is_U64_b is_U64_c]
+    rw [exec_RTYPEW_pure_bv_to_w _ _ _ is_U64_b is_U64_c]
     -- Push the sign-extend rewrite through the spec BEFORE the by_cases /
     -- simp_all so simp_all only sees the unfolded form.
-    simp only [execute_RTYPEW_pure_w_poly, execute_RTYPEW_pure_32_w_poly,
+    simp only [execute_RTYPEW_pure_w, execute_RTYPEW_pure_32_w,
       LeanRV64D.Functions.sign_extend, Sail.BitVec.signExtend]
-    rw [← is_subw, HWord.sign_extend_32_to_64_msb_poly is_U32_val]
+    rw [← is_subw, HWord.sign_extend_32_to_64_msb is_U32_val]
     by_cases h_is_op_a_0 : Main[6] = 0
     · simp_all
     · simp_all
@@ -109,7 +109,7 @@ theorem correct_subw
         have : Main[3].val < (65536 : ZMod p).val := h3
         rwa [val_65536_zmod_p] at this
       rw [show (4#64 : BitVec 64) = BitVec.ofNat 64 4 from rfl,
-          Word.toBitVec64_poly_lowLimb_add_nat _ _ _ _ 4 (by omega),
+          Word.toBitVec64_lowLimb_add_nat _ _ _ _ 4 (by omega),
           show ((4 : ℕ) : ZMod p) = 4 from by push_cast; rfl]
       simp [bitVecToRegidxVal]
 

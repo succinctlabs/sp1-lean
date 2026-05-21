@@ -8,38 +8,40 @@ set_option linter.style.multiGoal false
 -- Unused variables expected because many proofs are currently stopped.
 set_option linter.unusedVariables false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
 
-section sraw_poly
+
+section sraw
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 2000000000 in
 -- 2B heartbeats: cb-blast for hl2=ll2=hl3=ll3=0 + msb_b case split + 2x32-leaf inner blasts.
-/-- Shared proof body for `spec.sraw_poly` and `spec.sraiw_poly`. Structure
-mirrors `spec.srlw_common_poly` with an msb_b case split (since under SRAW,
+/-- Shared proof body for `spec.sraw` and `spec.sraiw`. Structure
+mirrors `spec.srlw_common` with an msb_b case split (since under SRAW,
 `w_msb_b` doesn't force msb_b = 0; msb_b is determined by U16MSBOperation on b1). -/
-private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
-    (cstrs : (constraints Main).allHold_poly) (eq_sraw : Main[67] = 1) :
-    Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-      execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+private lemma spec.sraw_common (Main : Vector (ZMod p) 69)
+    (cstrs : (constraints Main).allHold) (eq_sraw : Main[67] = 1) :
+    Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+      execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
         #v[Main[25], Main[26], Main[27], Main[28]] .SRAW := by
-  -- Setup (mirrors spec.srlw_common_poly prologue).
+  -- Setup (mirrors spec.srlw_common prologue).
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   have hp : 2 ^ 17 < p := Fact.out
   haveI : Fact (1 < p) := ⟨by omega⟩
   have h_real := is_real_eq_one_of_sraw Main cstrs eq_sraw
-  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  have is_U32_b := Word.isU64_poly_low_poly_isU32_poly is_U64_b
-  have is_U32_c := Word.isU64_poly_low_poly_isU32_poly is_U64_c
-  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
-  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_real
+  have is_U32_b := Word.isU64_low_isU32 is_U64_b
+  have is_U32_c := Word.isU64_low_isU32 is_U64_c
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64 is_U64_b
+  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64 is_U64_c
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
              List.getElem_cons_succ] at b0_16 b1_16 b2_16 b3_16 c0_16
-  obtain ⟨_, _, _, sop_4⟩ := single_op_poly Main cstrs
+  obtain ⟨_, _, _, sop_4⟩ := single_op Main cstrs
   have ⟨h_no_srl, h_no_sra, h_no_srlw⟩ := sop_4 eq_sraw
-  -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
-  rw [allHold_constraints_iff_poly] at cstrs
+  -- Open the iff.
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
+  rw [allHold_constraints_iff] at cstrs
   -- Set up local names.
   set b0 := Main[15]; set b1 := Main[16]; set b2 := Main[17]; set b3 := Main[18]
   set c0 := Main[25]; set c1 := Main[26]; set c2 := Main[27]; set c3 := Main[28]
@@ -89,7 +91,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
   have lt_ll3 := lt_ll3' h_sum_ne
   have lt_lh3 := lt_lh3' h_sum_ne
   -- Under SRAW: srl + sra = 0, so the LHS multiplier in h_b2_dec, h_b3_dec is 0,
-  -- forcing hl2 = ll2 = hl3 = ll3 = 0 via cancel_mul_65536_zero_poly (after 16
+  -- forcing hl2 = ll2 = hl3 = ll3 = 0 via cancel_mul_65536_zero (after 16
   -- cb sub-cases to identify v0123). Same as the SRLW cb-blast.
   rw [h_no_srl, h_no_sra] at h_b2_dec h_b3_dec
   simp only [add_zero, zero_add, zero_mul, mul_zero] at h_b2_dec h_b3_dec
@@ -110,7 +112,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
       rw [h_v0123_eq]; exact ZMod.val_natCast_of_lt h_M_lt_p
     have h_v0123_dvd : v0123.val ∣ 65536 := by rw [h_v0123_val]; exact h_M_dvd
     have h_v0123_pos : 0 < v0123.val := by rw [h_v0123_val]; exact h_M_pos
-    have h_cancel := cancel_mul_65536_zero_poly h_v0123_dvd h_v0123_pos h_eq
+    have h_cancel := cancel_mul_65536_zero h_v0123_dvd h_v0123_pos h_eq
     rw [h_v0123_val] at h_cancel
     have h_quot_eq : 65536 / M = N := by
       rw [← h_MN]; exact Nat.mul_div_cancel_left N h_M_pos
@@ -307,27 +309,27 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
     at srw_w2 srw_w3
   have h_a2_eq : a2 = msb_srw * 65535 := srw_w2
   have h_a3_eq : a3 = msb_srw * 65535 := srw_w3
-  -- Relate msb_srw to MSB of a1 via U16MSBOperation.spec_poly. Multiplier srlw+sraw = 1.
+  -- Relate msb_srw to MSB of a1 via U16MSBOperation.spec. Multiplier srlw+sraw = 1.
   rw [h_no_srlw, eq_sraw] at h_msb_a1_srw
   simp only [zero_add] at h_msb_a1_srw
   have h_msb_srw_bool : msb_srw = 0 ∨ msb_srw = 1 := by
-    rw [U16MSBOperation.allHold_constraints_iff_poly] at h_msb_a1_srw
+    rw [U16MSBOperation.allHold_constraints_iff] at h_msb_a1_srw
     exact h_msb_a1_srw.2.1
   -- a1.val < 65536 will be derived inside each (msb_b, cb4) outer leaf from the
   -- concrete a1 form (lr1 + correction, or msb_b * 65535).
   have h_a2_lt : a2.val < 65536 := by
     rw [h_a2_eq]
     have h_eq : msb_srw * (65535 : ZMod p) = msb_srw * (((65535 : ℕ) : ZMod p)) := by norm_cast
-    rw [h_eq]; exact bool_mul_65535_lt_poly h_msb_srw_bool
+    rw [h_eq]; exact bool_mul_65535_lt h_msb_srw_bool
   have h_a3_lt : a3.val < 65536 := by
     rw [h_a3_eq]
     have h_eq : msb_srw * (65535 : ZMod p) = msb_srw * (((65535 : ℕ) : ZMod p)) := by norm_cast
-    rw [h_eq]; exact bool_mul_65535_lt_poly h_msb_srw_bool
+    rw [h_eq]; exact bool_mul_65535_lt h_msb_srw_bool
   -- Derive msb_b case split via h_msb_b1_sraw (U16MSBOperation on b1, multiplier Main[67] = 1).
   rw [eq_sraw] at h_msb_b1_sraw
   have h_msb_b_eq : msb_b = if b1.val ≥ 32768 then 1 else 0 := by
     rw [show msb_b = ({ msb := msb_b } : U16MSBOperation (ZMod p)).msb from rfl]
-    apply U16MSBOperation.spec_poly b1_16 h_msb_b1_sraw
+    apply U16MSBOperation.spec b1_16 h_msb_b1_sraw
   -- Resolve h_su16k under SRAW: srl + sra = 0, so cb5 * 2 * (srl + sra) = 0.
   rw [h_no_srl, h_no_sra] at h_su160 h_su161 h_su162 h_su163 one_of_su16s
   simp only [add_zero, zero_add, zero_mul, mul_zero] at h_su160 h_su161 h_su162 h_su163 one_of_su16s
@@ -383,7 +385,7 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
     have hb3 : cb3.val ≤ 1 := by rcases b_cb3 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
     have hb4 : cb4.val ≤ 1 := by rcases b_cb4 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
     have hb5 : cb5.val ≤ 1 := by rcases b_cb5 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
-    have h_eq := cb_sum_val_eq_poly b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+    have h_eq := cb_sum_val_eq b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
     omega
   have h_val_10 : (10 : ZMod p).val = 10 := by
     rw [show (10 : ZMod p) = ((10 : ℕ) : ZMod p) from by push_cast; rfl]
@@ -391,11 +393,11 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
   have h_diff := diff h_sum_ne
   rw [h_val_10] at h_diff
   have h_c0_mod_64 : c0.val % 64 = (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32 : ZMod p).val := by
-    apply is_mod_64_poly (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
+    apply is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
     · exact h_cb_sum_lt_64
     · exact c0_16
     · exact h_diff
-  have h_cb_sum_eq := cb_sum_val_eq_poly b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
+  have h_cb_sum_eq := cb_sum_val_eq b_cb0 b_cb1 b_cb2 b_cb3 b_cb4 b_cb5
   have hb0_le : cb0.val ≤ 1 := by rcases b_cb0 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
   have hb1_le : cb1.val ≤ 1 := by rcases b_cb1 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
   have hb2_le : cb2.val ≤ 1 := by rcases b_cb2 with h | h <;> rw [h] <;> simp [h_v0_val, h_v1_val]
@@ -456,14 +458,14 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
     -- srw_01 : su160 = 0 ∨ a1 = lr1 + (65536 - v0123)
     -- srw_10 : su161 = 0 ∨ a0 = lr1 + (65536 - v0123)
     -- srw_11 : su161 = 0 ∨ a1 = 65535
-    have h_isU32_b_lo : (Word.low_poly #v[b0, b1, b2, b3]).isU32_poly :=
-      Word.isU64_poly_low_poly_isU32_poly is_U64_b
-    have h_isU32_c_lo : (Word.low_poly #v[c0, c1, c2, c3]).isU32_poly :=
-      Word.isU64_poly_low_poly_isU32_poly is_U64_c
+    have h_isU32_b_lo : (Word.low #v[b0, b1, b2, b3]).isU32 :=
+      Word.isU64_low_isU32 is_U64_b
+    have h_isU32_c_lo : (Word.low #v[c0, c1, c2, c3]).isU32 :=
+      Word.isU64_low_isU32 is_U64_c
     -- low_b32.msb = true (from b1.val ≥ 32768).
-    have h_b_lo_msb_true : ((Word.low_poly #v[b0, b1, b2, b3]).toBitVec32_poly).msb = true := by
-      rw [BitVec.msb_eq_decide, HWord.toBitVec32_poly_toNat_poly h_isU32_b_lo]
-      simp [Word.low_poly, HWord.toNat_poly]
+    have h_b_lo_msb_true : ((Word.low #v[b0, b1, b2, b3]).toBitVec32).msb = true := by
+      rw [BitVec.msb_eq_decide, HWord.toBitVec32_toNat h_isU32_b_lo]
+      simp [Word.low, HWord.toNat]
       omega
     -- Reusable bound helpers.
     have lr_blast : ∀ {hl ll : ZMod p}
@@ -475,67 +477,67 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
       intro hl ll lt_hl lt_ll
       rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
         rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
-      · exact lr_blast_per_pattern_poly 0 65536 1 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 0 65536 1 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 8 256 256 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 8 256 256 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 4 4096 16 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 4 4096 16 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 12 16 4096 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 12 16 4096 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 2 16384 4 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 2 16384 4 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 10 64 1024 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 10 64 1024 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 6 1024 64 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 6 1024 64 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 14 4 16384 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 14 4 16384 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 1 32768 2 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 1 32768 2 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 9 128 512 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 9 128 512 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 5 2048 32 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 5 2048 32 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 13 8 8192 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 13 8 8192 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 3 8192 8 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 3 8192 8 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 11 32 2048 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 11 32 2048 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 7 512 128 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 7 512 128 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 15 2 32768 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 15 2 32768 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
@@ -643,58 +645,58 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
       have h_a1_lt : a1.val < 65536 := by
         rw [h_a1_eq, eq_lr1, eq_ll2, zero_mul, add_zero]
         exact correction_blast lt_lh1
-      have h_isU32_a_lo : HWord.isU32_poly #v[a0, a1] := by
-        intro i; fin_cases i <;> simp [HWord.isU32_poly]
+      have h_isU32_a_lo : HWord.isU32 #v[a0, a1] := by
+        intro i; fin_cases i <;> simp [HWord.isU32]
         · exact h_a0_lt
         · exact h_a1_lt
       have h_msb_srw_eq : msb_srw = if a1.val ≥ 32768 then 1 else 0 := by
         rw [show msb_srw = ({ msb := msb_srw } : U16MSBOperation (ZMod p)).msb from rfl]
-        apply U16MSBOperation.spec_poly h_a1_lt h_msb_a1_srw
-      have h_a01_msb_eq : (HWord.toBitVec32_poly #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
-        have h_toNat : (HWord.toBitVec32_poly #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
-          rw [HWord.toBitVec32_poly_toNat_poly h_isU32_a_lo]; simp [HWord.toNat_poly]
+        apply U16MSBOperation.spec h_a1_lt h_msb_a1_srw
+      have h_a01_msb_eq : (HWord.toBitVec32 #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
+        have h_toNat : (HWord.toBitVec32 #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
+          rw [HWord.toBitVec32_toNat h_isU32_a_lo]; simp [HWord.toNat]
         rw [BitVec.msb_eq_decide, h_toNat]
         have h_iff : (2 ^ (32 - 1) ≤ a0.val + a1.val * 2 ^ 16) ↔ (a1.val ≥ 32768) := by
           constructor <;> (intro h; omega)
         exact decide_eq_decide.mpr h_iff
-      have h_a2_msb : a2 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a2_msb : a2 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a2_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_a3_msb : a3 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a3_msb : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a3_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
-          BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
+          BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
-        have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
+        have := HWord.sign_extend_32_to_64_msb h_isU32_a_lo
         have h_a0_idx : (#v[a0, a1] : HWord (ZMod p))[0] = a0 := rfl
         have h_a1_idx : (#v[a0, a1] : HWord (ZMod p))[1] = a1 := rfl
         rw [h_a0_idx, h_a1_idx] at this
         exact this.symm
       rw [h_signext_bridge]
-      simp only [execute_RTYPEW_pure_w_poly, execute_RTYPEW_pure_32_w_poly]
-      change BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1])
-           = BitVec.signExtend 64 ((Word.low_poly #v[b0, b1, b2, b3]).toBitVec32_poly.sshiftRight
-              ((BitVec.setWidth 5 (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly).toNat))
+      simp only [execute_RTYPEW_pure_w, execute_RTYPEW_pure_32_w]
+      change BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1])
+           = BitVec.signExtend 64 ((Word.low #v[b0, b1, b2, b3]).toBitVec32.sshiftRight
+              ((BitVec.setWidth 5 (Word.low #v[c0, c1, c2, c3]).toBitVec32).toNat))
       congr 1
       -- Bridge sshiftRight via msb=true.
       rw [← BitVec.toNat_inj]
       rw [BitVec.toNat_sshiftRight_of_msb_true h_b_lo_msb_true]
       simp only [BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
-      have h_shift_eq : (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly.toNat % 2 ^ 5
+      have h_shift_eq : (Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 2 ^ 5
                       = c0.val % 32 := by
-        rw [HWord.toBitVec32_poly_toNat_poly h_isU32_c_lo]
-        simp [Word.low_poly, HWord.toNat_poly]; omega
+        rw [HWord.toBitVec32_toNat h_isU32_c_lo]
+        simp [Word.low, HWord.toNat]; omega
       rw [h_shift_eq]; clear h_shift_eq
-      simp only [Word.low_poly, Vector.getElem_mk, List.getElem_toArray,
+      simp only [Word.low, Vector.getElem_mk, List.getElem_toArray,
                  List.getElem_cons_zero, List.getElem_cons_succ]
       rw [h_a0_eq, h_a1_eq, eq_lr0, eq_lr1, eq_ll2, zero_mul, add_zero]
       rw [h_c0_mod_32]
@@ -802,57 +804,57 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
         rw [h_a1_eq, show ((65535 : ℕ) : ZMod p).val = 65535 from
           ZMod.val_natCast_of_lt (by omega)]
         omega
-      have h_isU32_a_lo : HWord.isU32_poly #v[a0, a1] := by
-        intro i; fin_cases i <;> simp [HWord.isU32_poly]
+      have h_isU32_a_lo : HWord.isU32 #v[a0, a1] := by
+        intro i; fin_cases i <;> simp [HWord.isU32]
         · exact h_a0_lt
         · exact h_a1_lt
       have h_msb_srw_eq : msb_srw = if a1.val ≥ 32768 then 1 else 0 := by
         rw [show msb_srw = ({ msb := msb_srw } : U16MSBOperation (ZMod p)).msb from rfl]
-        apply U16MSBOperation.spec_poly h_a1_lt h_msb_a1_srw
-      have h_a01_msb_eq : (HWord.toBitVec32_poly #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
-        have h_toNat : (HWord.toBitVec32_poly #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
-          rw [HWord.toBitVec32_poly_toNat_poly h_isU32_a_lo]; simp [HWord.toNat_poly]
+        apply U16MSBOperation.spec h_a1_lt h_msb_a1_srw
+      have h_a01_msb_eq : (HWord.toBitVec32 #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
+        have h_toNat : (HWord.toBitVec32 #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
+          rw [HWord.toBitVec32_toNat h_isU32_a_lo]; simp [HWord.toNat]
         rw [BitVec.msb_eq_decide, h_toNat]
         have h_iff : (2 ^ (32 - 1) ≤ a0.val + a1.val * 2 ^ 16) ↔ (a1.val ≥ 32768) := by
           constructor <;> (intro h; omega)
         exact decide_eq_decide.mpr h_iff
-      have h_a2_msb : a2 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a2_msb : a2 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a2_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_a3_msb : a3 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a3_msb : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a3_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
-          BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
+          BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
-        have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
+        have := HWord.sign_extend_32_to_64_msb h_isU32_a_lo
         have h_a0_idx : (#v[a0, a1] : HWord (ZMod p))[0] = a0 := rfl
         have h_a1_idx : (#v[a0, a1] : HWord (ZMod p))[1] = a1 := rfl
         rw [h_a0_idx, h_a1_idx] at this
         exact this.symm
       rw [h_signext_bridge]
-      simp only [execute_RTYPEW_pure_w_poly, execute_RTYPEW_pure_32_w_poly]
-      change BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1])
-           = BitVec.signExtend 64 ((Word.low_poly #v[b0, b1, b2, b3]).toBitVec32_poly.sshiftRight
-              ((BitVec.setWidth 5 (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly).toNat))
+      simp only [execute_RTYPEW_pure_w, execute_RTYPEW_pure_32_w]
+      change BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1])
+           = BitVec.signExtend 64 ((Word.low #v[b0, b1, b2, b3]).toBitVec32.sshiftRight
+              ((BitVec.setWidth 5 (Word.low #v[c0, c1, c2, c3]).toBitVec32).toNat))
       congr 1
       rw [← BitVec.toNat_inj]
       rw [BitVec.toNat_sshiftRight_of_msb_true h_b_lo_msb_true]
       simp only [BitVec.toNat_setWidth, Nat.shiftRight_eq_div_pow]
-      have h_shift_eq : (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly.toNat % 2 ^ 5
+      have h_shift_eq : (Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 2 ^ 5
                       = c0.val % 32 := by
-        rw [HWord.toBitVec32_poly_toNat_poly h_isU32_c_lo]
-        simp [Word.low_poly, HWord.toNat_poly]; omega
+        rw [HWord.toBitVec32_toNat h_isU32_c_lo]
+        simp [Word.low, HWord.toNat]; omega
       rw [h_shift_eq]; clear h_shift_eq
-      simp only [Word.low_poly, Vector.getElem_mk, List.getElem_toArray,
+      simp only [Word.low, Vector.getElem_mk, List.getElem_toArray,
                  List.getElem_cons_zero, List.getElem_cons_succ]
       rw [h_a0_eq, h_a1_eq, eq_lr1, eq_ll2, zero_mul, add_zero]
       rw [h_c0_mod_32]
@@ -948,14 +950,14 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
     -- srw_01 : su160 = 0 ∨ a1 = lr1
     -- srw_10 : su161 = 0 ∨ a0 = lr1
     -- srw_11 : su161 = 0 ∨ a1 = 0
-    have h_isU32_b_lo : (Word.low_poly #v[b0, b1, b2, b3]).isU32_poly :=
-      Word.isU64_poly_low_poly_isU32_poly is_U64_b
-    have h_isU32_c_lo : (Word.low_poly #v[c0, c1, c2, c3]).isU32_poly :=
-      Word.isU64_poly_low_poly_isU32_poly is_U64_c
+    have h_isU32_b_lo : (Word.low #v[b0, b1, b2, b3]).isU32 :=
+      Word.isU64_low_isU32 is_U64_b
+    have h_isU32_c_lo : (Word.low #v[c0, c1, c2, c3]).isU32 :=
+      Word.isU64_low_isU32 is_U64_c
     -- low_b32.msb = false (from b1.val < 32768).
-    have h_b_lo_msb_false : ((Word.low_poly #v[b0, b1, b2, b3]).toBitVec32_poly).msb = false := by
-      rw [BitVec.msb_eq_decide, HWord.toBitVec32_poly_toNat_poly h_isU32_b_lo]
-      simp [Word.low_poly, HWord.toNat_poly]
+    have h_b_lo_msb_false : ((Word.low #v[b0, b1, b2, b3]).toBitVec32).msb = false := by
+      rw [BitVec.msb_eq_decide, HWord.toBitVec32_toNat h_isU32_b_lo]
+      simp [Word.low, HWord.toNat]
       omega
     -- Reusable bound helper: `(hl + ll * v0123).val < 65536` via 16-way cb-blast.
     have lr_blast : ∀ {hl ll : ZMod p}
@@ -967,67 +969,67 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
       intro hl ll lt_hl lt_ll
       rcases b_cb0 with hcb0 | hcb0 <;> rcases b_cb1 with hcb1 | hcb1 <;>
         rcases b_cb2 with hcb2 | hcb2 <;> rcases b_cb3 with hcb3 | hcb3
-      · exact lr_blast_per_pattern_poly 0 65536 1 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 0 65536 1 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 8 256 256 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 8 256 256 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 4 4096 16 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 4 4096 16 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 12 16 4096 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 12 16 4096 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 2 16384 4 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 2 16384 4 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 10 64 1024 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 10 64 1024 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 6 1024 64 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 6 1024 64 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 14 4 16384 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 14 4 16384 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 1 32768 2 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 1 32768 2 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 9 128 512 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 9 128 512 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 5 2048 32 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 5 2048 32 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 13 8 8192 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 13 8 8192 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 3 8192 8 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 3 8192 8 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 11 32 2048 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 11 32 2048 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 7 512 128 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 7 512 128 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
-      · exact lr_blast_per_pattern_poly 15 2 32768 (by omega) (by decide) (by omega) rfl rfl
+      · exact lr_blast_per_pattern 15 2 32768 (by omega) (by decide) (by omega) rfl rfl
           (by rw [hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           (by rw [eq_v0123, eq_v012, eq_v01, hcb0, hcb1, hcb2, hcb3]; push_cast; ring)
           lt_hl lt_ll
@@ -1050,61 +1052,61 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
         have := lr_blast (hl := hl1) (ll := ll2) lt_lh1 lt_ll2
         exact this
       -- Signext bridge.
-      have h_isU32_a_lo : HWord.isU32_poly #v[a0, a1] := by
-        intro i; fin_cases i <;> simp [HWord.isU32_poly]
+      have h_isU32_a_lo : HWord.isU32 #v[a0, a1] := by
+        intro i; fin_cases i <;> simp [HWord.isU32]
         · exact h_a0_lt
         · exact h_a1_lt
-      -- Compute msb_srw via U16MSBOperation.spec_poly on h_msb_a1_srw (now a1_16 = h_a1_lt).
+      -- Compute msb_srw via U16MSBOperation.spec on h_msb_a1_srw (now a1_16 = h_a1_lt).
       have h_msb_srw_eq : msb_srw = if a1.val ≥ 32768 then 1 else 0 := by
         rw [show msb_srw = ({ msb := msb_srw } : U16MSBOperation (ZMod p)).msb from rfl]
-        apply U16MSBOperation.spec_poly h_a1_lt h_msb_a1_srw
-      have h_a01_msb_eq : (HWord.toBitVec32_poly #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
-        have h_toNat : (HWord.toBitVec32_poly #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
-          rw [HWord.toBitVec32_poly_toNat_poly h_isU32_a_lo]; simp [HWord.toNat_poly]
+        apply U16MSBOperation.spec h_a1_lt h_msb_a1_srw
+      have h_a01_msb_eq : (HWord.toBitVec32 #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
+        have h_toNat : (HWord.toBitVec32 #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
+          rw [HWord.toBitVec32_toNat h_isU32_a_lo]; simp [HWord.toNat]
         rw [BitVec.msb_eq_decide, h_toNat]
         have h_iff : (2 ^ (32 - 1) ≤ a0.val + a1.val * 2 ^ 16) ↔ (a1.val ≥ 32768) := by
           constructor <;> (intro h; omega)
         exact decide_eq_decide.mpr h_iff
-      have h_a2_msb : a2 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a2_msb : a2 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a2_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_a3_msb : a3 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a3_msb : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a3_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
-          BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
+          BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
-        have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
+        have := HWord.sign_extend_32_to_64_msb h_isU32_a_lo
         have h_a0_idx : (#v[a0, a1] : HWord (ZMod p))[0] = a0 := rfl
         have h_a1_idx : (#v[a0, a1] : HWord (ZMod p))[1] = a1 := rfl
         rw [h_a0_idx, h_a1_idx] at this
         exact this.symm
       rw [h_signext_bridge]
-      -- Unfold execute_RTYPEW_pure_w_poly for SRAW: sign_extend (m:=64) of sshiftRight.
-      simp only [execute_RTYPEW_pure_w_poly, execute_RTYPEW_pure_32_w_poly]
-      change BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1])
-           = BitVec.signExtend 64 ((Word.low_poly #v[b0, b1, b2, b3]).toBitVec32_poly.sshiftRight
-              ((BitVec.setWidth 5 (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly).toNat))
+      -- Unfold execute_RTYPEW_pure_w for SRAW: sign_extend (m:=64) of sshiftRight.
+      simp only [execute_RTYPEW_pure_w, execute_RTYPEW_pure_32_w]
+      change BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1])
+           = BitVec.signExtend 64 ((Word.low #v[b0, b1, b2, b3]).toBitVec32.sshiftRight
+              ((BitVec.setWidth 5 (Word.low #v[c0, c1, c2, c3]).toBitVec32).toNat))
       congr 1
       -- Reduce sshiftRight to >>> via msb=false.
       rw [BitVec.sshiftRight_eq_of_msb_false h_b_lo_msb_false]
       rw [← BitVec.toNat_inj]
       simp only [BitVec.ushiftRight_eq', BitVec.toNat_ushiftRight, BitVec.toNat_setWidth,
                  Nat.shiftRight_eq_div_pow]
-      have h_shift_eq : (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly.toNat % 2 ^ 5
+      have h_shift_eq : (Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 2 ^ 5
                       = c0.val % 32 := by
-        rw [HWord.toBitVec32_poly_toNat_poly h_isU32_c_lo]
-        simp [Word.low_poly, HWord.toNat_poly]; omega
+        rw [HWord.toBitVec32_toNat h_isU32_c_lo]
+        simp [Word.low, HWord.toNat]; omega
       rw [h_shift_eq]; clear h_shift_eq
-      simp only [Word.low_poly, Vector.getElem_mk, List.getElem_toArray,
+      simp only [Word.low, Vector.getElem_mk, List.getElem_toArray,
                  List.getElem_cons_zero, List.getElem_cons_succ]
       -- Substitute a0 = lr0 = hl0+ll1*v0123, a1 = lr1 = hl1+ll2*v0123 = hl1.
       rw [h_a0_eq, h_a1_eq, eq_lr0, eq_lr1, eq_ll2, zero_mul, add_zero]
@@ -1208,58 +1210,58 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
         rw [h_a0_eq, eq_lr1]
         exact lr_blast (hl := hl1) (ll := ll2) lt_lh1 lt_ll2
       have h_a1_lt : a1.val < 65536 := by rw [h_a1_eq]; simp [h_v0_val]
-      have h_isU32_a_lo : HWord.isU32_poly #v[a0, a1] := by
-        intro i; fin_cases i <;> simp [HWord.isU32_poly]
+      have h_isU32_a_lo : HWord.isU32 #v[a0, a1] := by
+        intro i; fin_cases i <;> simp [HWord.isU32]
         · exact h_a0_lt
         · exact h_a1_lt
       have h_msb_srw_eq : msb_srw = if a1.val ≥ 32768 then 1 else 0 := by
         rw [show msb_srw = ({ msb := msb_srw } : U16MSBOperation (ZMod p)).msb from rfl]
-        apply U16MSBOperation.spec_poly h_a1_lt h_msb_a1_srw
-      have h_a01_msb_eq : (HWord.toBitVec32_poly #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
-        have h_toNat : (HWord.toBitVec32_poly #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
-          rw [HWord.toBitVec32_poly_toNat_poly h_isU32_a_lo]; simp [HWord.toNat_poly]
+        apply U16MSBOperation.spec h_a1_lt h_msb_a1_srw
+      have h_a01_msb_eq : (HWord.toBitVec32 #v[a0, a1]).msb = decide (a1.val ≥ 32768) := by
+        have h_toNat : (HWord.toBitVec32 #v[a0, a1]).toNat = a0.val + a1.val * 2 ^ 16 := by
+          rw [HWord.toBitVec32_toNat h_isU32_a_lo]; simp [HWord.toNat]
         rw [BitVec.msb_eq_decide, h_toNat]
         have h_iff : (2 ^ (32 - 1) ≤ a0.val + a1.val * 2 ^ 16) ↔ (a1.val ≥ 32768) := by
           constructor <;> (intro h; omega)
         exact decide_eq_decide.mpr h_iff
-      have h_a2_msb : a2 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a2_msb : a2 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a2_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_a3_msb : a3 = if (HWord.toBitVec32_poly #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
+      have h_a3_msb : a3 = if (HWord.toBitVec32 #v[a0, a1]).msb = true then ((65535 : ℕ) : ZMod p) else 0 := by
         rw [h_a3_eq, h_msb_srw_eq]
         by_cases h : a1.val ≥ 32768
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = true := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-        · have h_msb : (HWord.toBitVec32_poly #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
+        · have h_msb : (HWord.toBitVec32 #v[a0, a1]).msb = false := by rw [h_a01_msb_eq]; simp [h]
           simp [h, h_msb]
-      have h_signext_bridge : Word.toBitVec64_poly #v[a0, a1, a2, a3] =
-          BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1]) := by
+      have h_signext_bridge : Word.toBitVec64 #v[a0, a1, a2, a3] =
+          BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1]) := by
         rw [h_a2_msb, h_a3_msb]
-        have := HWord.sign_extend_32_to_64_msb_poly h_isU32_a_lo
+        have := HWord.sign_extend_32_to_64_msb h_isU32_a_lo
         have h_a0_idx : (#v[a0, a1] : HWord (ZMod p))[0] = a0 := rfl
         have h_a1_idx : (#v[a0, a1] : HWord (ZMod p))[1] = a1 := rfl
         rw [h_a0_idx, h_a1_idx] at this
         exact this.symm
       rw [h_signext_bridge]
-      simp only [execute_RTYPEW_pure_w_poly, execute_RTYPEW_pure_32_w_poly]
-      change BitVec.signExtend 64 (HWord.toBitVec32_poly #v[a0, a1])
-           = BitVec.signExtend 64 ((Word.low_poly #v[b0, b1, b2, b3]).toBitVec32_poly.sshiftRight
-              ((BitVec.setWidth 5 (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly).toNat))
+      simp only [execute_RTYPEW_pure_w, execute_RTYPEW_pure_32_w]
+      change BitVec.signExtend 64 (HWord.toBitVec32 #v[a0, a1])
+           = BitVec.signExtend 64 ((Word.low #v[b0, b1, b2, b3]).toBitVec32.sshiftRight
+              ((BitVec.setWidth 5 (Word.low #v[c0, c1, c2, c3]).toBitVec32).toNat))
       congr 1
       rw [BitVec.sshiftRight_eq_of_msb_false h_b_lo_msb_false]
       rw [← BitVec.toNat_inj]
       simp only [BitVec.ushiftRight_eq', BitVec.toNat_ushiftRight, BitVec.toNat_setWidth,
                  Nat.shiftRight_eq_div_pow]
-      have h_shift_eq : (Word.low_poly #v[c0, c1, c2, c3]).toBitVec32_poly.toNat % 2 ^ 5
+      have h_shift_eq : (Word.low #v[c0, c1, c2, c3]).toBitVec32.toNat % 2 ^ 5
                       = c0.val % 32 := by
-        rw [HWord.toBitVec32_poly_toNat_poly h_isU32_c_lo]
-        simp [Word.low_poly, HWord.toNat_poly]; omega
+        rw [HWord.toBitVec32_toNat h_isU32_c_lo]
+        simp [Word.low, HWord.toNat]; omega
       rw [h_shift_eq]; clear h_shift_eq
-      simp only [Word.low_poly, Vector.getElem_mk, List.getElem_toArray,
+      simp only [Word.low, Vector.getElem_mk, List.getElem_toArray,
                  List.getElem_cons_zero, List.getElem_cons_succ]
       rw [h_a0_eq, h_a1_eq, eq_lr1, eq_ll2, zero_mul, add_zero]
       rw [h_c0_mod_32]
@@ -1347,20 +1349,20 @@ private lemma spec.sraw_common_poly (Main : Vector (ZMod p) 69)
           (by rw [hcb0, hcb1, hcb2, hcb3, hcb4]; push_cast; ring)
           lt_ll0 lt_lh0 lt_ll1 lt_lh1 h_b0_dec h_b1_dec
 
-lemma spec.sraw_poly (Main : Vector (ZMod p) 69) (h : is_sraw_poly Main) :
-    (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-        execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+lemma spec.sraw (Main : Vector (ZMod p) 69) (h : is_sraw Main) :
+    (constraints Main).allHold →
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRAW :=
-  fun cstrs => spec.sraw_common_poly Main cstrs h.1
+  fun cstrs => spec.sraw_common Main cstrs h.1
 
-lemma spec.sraiw_poly (Main : Vector (ZMod p) 69) (h : is_sraiw_poly Main) :
-    (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-        execute_RTYPEW_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+lemma spec.sraiw (Main : Vector (ZMod p) 69) (h : is_sraiw Main) :
+    (constraints Main).allHold →
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPEW_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SRAW :=
-  fun cstrs => spec.sraw_common_poly Main cstrs h.1
+  fun cstrs => spec.sraw_common Main cstrs h.1
 
-end sraw_poly
+end sraw
 
 end ShiftRight

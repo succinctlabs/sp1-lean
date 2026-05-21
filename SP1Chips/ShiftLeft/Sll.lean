@@ -6,32 +6,31 @@ set_option linter.style.setOption false
 -- Imbalanced goal tree: proof applies tactics per-focused-case.
 set_option linter.style.multiGoal false
 set_option maxHeartbeats 100000000
+set_option linter.style.longLine false
 
-section sll_poly
+
+section sll
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [hp : Fact (2 ^ 17 < p)]
 
-set_option debug.skipKernelTC true in
--- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel
--- deep recursion at re-check; see docs/GOTCHAS.md "Kernel deep-recursion on 2^N".
-lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
-    (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+lemma spec.sll (Main : Vector (ZMod p) 65) (h : is_sll Main) :
+    (constraints Main).allHold →
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLL := by
   intro cstrs
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨eq_sll, _eq_imm⟩ := h
   have h_real := is_real_eq_one_of_sll Main cstrs eq_sll
-  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
-  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
-  obtain ⟨sop_1, _sop_2⟩ := single_op_poly Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_real
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64 is_U64_b
+  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64 is_U64_c
+  obtain ⟨sop_1, _sop_2⟩ := single_op Main cstrs
   have h_no_sllw : Main[63] = 0 := sop_1 eq_sll
-  -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
-  rw [allHold_constraints_iff_poly] at cstrs
+  -- Open the iff.
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
+  rw [allHold_constraints_iff] at cstrs
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -87,18 +86,21 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
   have diff' := diff h_sum_ne
   -- Goal manipulation: reduce to nat arithmetic.
   rw [← BitVec.toNat_inj]
-  simp only [execute_RTYPE_pure_w_poly]
-  simp only [BitVec.toNat_shiftLeft, BitVec.shiftLeft_eq', BitVec.toNat_setWidth]
-  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b).toNat <<< ((toBitVec64_poly c).toNat % 2^6) % 2^64
-  change (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
-        (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<<
-          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6) % 2 ^ 64
+  simp only [execute_RTYPE_pure_w]
+  rw [BitVec.shiftLeft_eq']
+  simp only [BitVec.toNat_setWidth]
+  -- Goal: (toBitVec64 a).toNat = (toBitVec64 b <<< ((toBitVec64 c).toNat % 2^6)).toNat
+  -- (`BitVec.toNat_shiftLeft` is pushed into each `sll_close_cb4cb5_*_case` helper to
+  -- isolate the kernel walk over `% 2^64` to a single olean.)
+  change (Word.toBitVec64 #v[a0, a1, a2, a3]).toNat =
+        (Word.toBitVec64 #v[b0, b1, b2, b3] <<<
+          ((Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
   -- Reduce the c-toNat % 64 to c0.val % 64
-  have h_c_mod : (Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
-    rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+  have h_c_mod : (Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
+    rw [Word.toBitVec64_toNat is_U64_c, Word.toNat_def]
     simp; omega
   rw [h_c_mod]; clear h_c_mod
-  -- Use is_mod_64_poly to convert c0.val % 64 to cb sum.
+  -- Use is_mod_64 to convert c0.val % 64 to cb sum.
   have h_p_huge : 131072 < p := by have := hp; omega
   haveI : Fact (1 < p) := ⟨by omega⟩
   have h_v1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
@@ -177,7 +179,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
     · have := h_sum_step4; have := h_m5_val; omega
     · have := h_sum_step4; have := h_m5_val; omega
   have h_c_mod_64 : c0.val % 64 = (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val := by
-    apply is_mod_64_poly (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
+    apply is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
     · exact h_cb_sum_lt
     · exact c0_16
     · -- diff' has `< 2 ^ (10 : ZMod p).val`; reduce to `< 1024`.
@@ -286,8 +288,7 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
         simp only [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, zero_mul, zero_add, add_zero]
         exact h_v0_val
       rw [h_cb_sum_zero]
-      simp only [Nat.shiftLeft_zero]
-      rw [Nat.mod_eq_of_lt (BitVec.isLt _)]
+      simp only [BitVec.shiftLeft_zero]
     -- Remaining 15 cb0..3 sub-cases for cb4=cb5=0, in lex order over (cb0, cb1, cb2, cb3).
     · -- cb0=0, cb1=0, cb2=0, cb3=1: shift=8. M=256, N=256.
       have hv0123_val : v0123.val = 256 := by
@@ -1064,27 +1065,24 @@ lemma spec.sll_poly (Main : Vector (ZMod p) 65) (h : is_sll_poly Main) :
         lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
         h_b0_dec h_b1_dec h_b2_dec h_b3_dec
 
-set_option debug.skipKernelTC true in
--- skipKernelTC: large 2^N from Word.toBitVec64_poly_toNat_poly trips kernel
--- deep recursion at re-check; see docs/GOTCHAS.md "Kernel deep-recursion on 2^N".
-lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
-    (constraints Main).allHold_poly →
-      Word.toBitVec64_poly #v[Main[32], Main[33], Main[34], Main[35]] =
-        execute_RTYPE_pure_w_poly #v[Main[15], Main[16], Main[17], Main[18]]
+lemma spec.slli (Main : Vector (ZMod p) 65) (h : is_slli Main) :
+    (constraints Main).allHold →
+      Word.toBitVec64 #v[Main[32], Main[33], Main[34], Main[35]] =
+        execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[25], Main[26], Main[27], Main[28]] .SLL := by
   intro cstrs
   haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨eq_slli, _eq_imm⟩ := h
   have h_real := is_real_eq_one_of_sll Main cstrs eq_slli
-  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c_poly Main cstrs h_real
-  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_b
-  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64_poly is_U64_c
-  obtain ⟨sop_1, _sop_2⟩ := single_op_poly Main cstrs
+  have ⟨is_U64_b, is_U64_c⟩ := ops_U64_b_c Main cstrs h_real
+  obtain ⟨b0_16, b1_16, b2_16, b3_16⟩ := Word.lt_cases_of_isU64 is_U64_b
+  obtain ⟨c0_16, _c1_16, _c2_16, _c3_16⟩ := Word.lt_cases_of_isU64 is_U64_c
+  obtain ⟨sop_1, _sop_2⟩ := single_op Main cstrs
   have h_no_sllw : Main[63] = 0 := sop_1 eq_slli
-  -- Open the iff_poly.
-  change List.Forall SP1Constraint.toProp_poly (constraints Main) at cstrs
-  rw [allHold_constraints_iff_poly] at cstrs
+  -- Open the iff.
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
+  rw [allHold_constraints_iff] at cstrs
   set b0 := Main[15]
   set b1 := Main[16]
   set b2 := Main[17]
@@ -1140,18 +1138,21 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
   have diff' := diff h_sum_ne
   -- Goal manipulation: reduce to nat arithmetic.
   rw [← BitVec.toNat_inj]
-  simp only [execute_RTYPE_pure_w_poly]
-  simp only [BitVec.toNat_shiftLeft, BitVec.shiftLeft_eq', BitVec.toNat_setWidth]
-  -- Goal: (toBitVec64_poly a).toNat = (toBitVec64_poly b).toNat <<< ((toBitVec64_poly c).toNat % 2^6) % 2^64
-  change (Word.toBitVec64_poly #v[a0, a1, a2, a3]).toNat =
-        (Word.toBitVec64_poly #v[b0, b1, b2, b3]).toNat <<<
-          ((Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6) % 2 ^ 64
+  simp only [execute_RTYPE_pure_w]
+  rw [BitVec.shiftLeft_eq']
+  simp only [BitVec.toNat_setWidth]
+  -- Goal: (toBitVec64 a).toNat = (toBitVec64 b <<< ((toBitVec64 c).toNat % 2^6)).toNat
+  -- (`BitVec.toNat_shiftLeft` is pushed into each `sll_close_cb4cb5_*_case` helper to
+  -- isolate the kernel walk over `% 2^64` to a single olean.)
+  change (Word.toBitVec64 #v[a0, a1, a2, a3]).toNat =
+        (Word.toBitVec64 #v[b0, b1, b2, b3] <<<
+          ((Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6)).toNat
   -- Reduce the c-toNat % 64 to c0.val % 64
-  have h_c_mod : (Word.toBitVec64_poly #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
-    rw [Word.toBitVec64_poly_toNat_poly is_U64_c, Word.toNat_poly_def]
+  have h_c_mod : (Word.toBitVec64 #v[c0, Main[26], Main[27], Main[28]]).toNat % 2 ^ 6 = c0.val % 64 := by
+    rw [Word.toBitVec64_toNat is_U64_c, Word.toNat_def]
     simp; omega
   rw [h_c_mod]; clear h_c_mod
-  -- Use is_mod_64_poly to convert c0.val % 64 to cb sum.
+  -- Use is_mod_64 to convert c0.val % 64 to cb sum.
   have h_p_huge : 131072 < p := by have := hp; omega
   haveI : Fact (1 < p) := ⟨by omega⟩
   have h_v1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
@@ -1230,7 +1231,7 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
     · have := h_sum_step4; have := h_m5_val; omega
     · have := h_sum_step4; have := h_m5_val; omega
   have h_c_mod_64 : c0.val % 64 = (cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32).val := by
-    apply is_mod_64_poly (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
+    apply is_mod_64 (m := cb0 + cb1 * 2 + cb2 * 4 + cb3 * 8 + cb4 * 16 + cb5 * 32)
     · exact h_cb_sum_lt
     · exact c0_16
     · -- diff' has `< 2 ^ (10 : ZMod p).val`; reduce to `< 1024`.
@@ -1339,8 +1340,7 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
         simp only [hcb0, hcb1, hcb2, hcb3, hcb4, hcb5, zero_mul, zero_add, add_zero]
         exact h_v0_val
       rw [h_cb_sum_zero]
-      simp only [Nat.shiftLeft_zero]
-      rw [Nat.mod_eq_of_lt (BitVec.isLt _)]
+      simp only [BitVec.shiftLeft_zero]
     -- Remaining 15 cb0..3 sub-cases for cb4=cb5=0, in lex order over (cb0, cb1, cb2, cb3).
     · -- cb0=0, cb1=0, cb2=0, cb3=1: shift=8. M=256, N=256.
       have hv0123_val : v0123.val = 256 := by
@@ -2117,6 +2117,6 @@ lemma spec.slli_poly (Main : Vector (ZMod p) 65) (h : is_slli_poly Main) :
         lt_ll0 lt_lh0 lt_ll1 lt_lh1 lt_ll2 lt_lh2 lt_ll3 lt_lh3
         h_b0_dec h_b1_dec h_b2_dec h_b3_dec
 
-end sll_poly
+end sll
 
 end ShiftLeft

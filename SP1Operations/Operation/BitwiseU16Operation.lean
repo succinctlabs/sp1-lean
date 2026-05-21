@@ -5,43 +5,44 @@ import SP1Operations.Operation.BitwiseU16Operation.Operation
 import SP1Operations.Operation.BitwiseU16Operation.Constraints
 
 set_option linter.style.setOption false
+set_option linter.style.longLine false
 set_option maxHeartbeats 10000000
 
 namespace BitwiseU16Operation
 
 set_option maxHeartbeats 64000000 in
--- `bv_decide`-after-byte-decomposition recipe; uses `spec.unsafe.return_poly`
--- + `Word.toBitVec64_poly` and explicit `.val` arithmetic to remove `% p`
+-- `bv_decide`-after-byte-decomposition recipe; uses `spec.unsafe.return`
+-- + `Word.toBitVec64` and explicit `.val` arithmetic to remove `% p`
 -- from the byte-AND/OR/XOR equations (`byte.val < 256 < p` makes `% p` an
 -- identity).
-lemma spec.and_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+lemma spec.and {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {b cc : Word (ZMod p)} {cols : BitwiseU16Operation (ZMod p)}
-    (h_isU64_b : b.isU64_poly) (h_isU64_cc : cc.isU64_poly) :
-    List.Forall SP1Constraint.toProp_poly (constraints b cc cols 0 1).2 →
-      Word.toBitVec64_poly (constraints b cc cols 0 1).1 = execute_RTYPE_pure_w_poly b cc .AND
+    (h_isU64_b : b.isU64) (h_isU64_cc : cc.isU64) :
+    List.Forall SP1Constraint.toProp (constraints b cc cols 0 1).2 →
+      Word.toBitVec64 (constraints b cc cols 0 1).1 = execute_RTYPE_pure_w b cc .AND
         := by
   intro cstrs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp_lt : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
     change (0 : ZMod p).val < (256 : ZMod p).val; simp
-  have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return_poly p _ _ b
+  have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return p _ _ b
     { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1],
       cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] } (by
     simp [constraints, BitwiseOperation.constraints,
       U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints, h0_lt_256] at *
     obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := cstrs
     aesop)
-  have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return_poly p _ _ cc
+  have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return p _ _ cc
     { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1],
       cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] } (by
     simp [constraints, BitwiseOperation.constraints,
       U16toU8OperationUnsafe.constraints, U16toU8OperationSafe.constraints, h0_lt_256] at *
     obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := cstrs
     aesop)
-  obtain ⟨hb0lt, hb1lt, hb2lt, hb3lt⟩ := Word.lt_cases_of_isU64_poly h_isU64_b
-  obtain ⟨hc0lt, hc1lt, hc2lt, hc3lt⟩ := Word.lt_cases_of_isU64_poly h_isU64_cc
-  simp [U16toU8OperationUnsafe.constraints, Word.toBWord_poly] at h_bw_b h_bw_c
+  obtain ⟨hb0lt, hb1lt, hb2lt, hb3lt⟩ := Word.lt_cases_of_isU64 h_isU64_b
+  obtain ⟨hc0lt, hc1lt, hc2lt, hc3lt⟩ := Word.lt_cases_of_isU64 h_isU64_cc
+  simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at h_bw_b h_bw_c
   obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := h_bw_b
   obtain ⟨c0, c1, c2, c3, c4, c5, c6, c7⟩ := h_bw_c
   simp_all [constraints, U16toU8OperationUnsafe.constraints]
@@ -100,8 +101,8 @@ lemma spec.and_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     · rw [h256_val]
     · rw [h256_val]; nlinarith
     · rw [ZMod.val_mul_of_lt (by rw [h256_val]; nlinarith), h256_val]; nlinarith
-  unfold Word.toBitVec64_poly
-  simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+  unfold Word.toBitVec64
+  simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
   rw [hadd _ _ hr0' hr1', hadd _ _ hr2' hr3', hadd _ _ hr4' hr5', hadd _ _ hr6' hr7']
   rw [heq_0, heq_1, heq_2, heq_3, heq_4, heq_5, heq_6, heq_7]
@@ -151,11 +152,11 @@ lemma spec.and_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   simp only [BitVec.ofNat_add, BitVec.ofNat_mul, BitVec.ofNat_and]
   bv_decide
 
-lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+lemma spec.or {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {b cc : Word (ZMod p)} {cols : BitwiseU16Operation (ZMod p)}
-    (h_isU64_b : b.isU64_poly) (h_isU64_cc : cc.isU64_poly) :
-    List.Forall SP1Constraint.toProp_poly (constraints b cc cols 1 1).2 →
-      Word.toBitVec64_poly (constraints b cc cols 1 1).1 = execute_RTYPE_pure_w_poly b cc .OR
+    (h_isU64_b : b.isU64) (h_isU64_cc : cc.isU64) :
+    List.Forall SP1Constraint.toProp (constraints b cc cols 1 1).2 →
+      Word.toBitVec64 (constraints b cc cols 1 1).1 = execute_RTYPE_pure_w b cc .OR
         := by
   intro cstrs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -164,7 +165,7 @@ lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
     change (0 : ZMod p).val < (256 : ZMod p).val; simp
   have h1_val : (1 : ZMod p).val = 1 := ZMod.val_one p
-  have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return_poly p _ _ b
+  have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return p _ _ b
     { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1],
       cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] } (by
     simp [constraints, BitwiseOperation.constraints,
@@ -172,7 +173,7 @@ lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
       h1_val] at *
     obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := cstrs
     aesop)
-  have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return_poly p _ _ cc
+  have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return p _ _ cc
     { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1],
       cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] } (by
     simp [constraints, BitwiseOperation.constraints,
@@ -180,9 +181,9 @@ lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
       h1_val] at *
     obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := cstrs
     aesop)
-  obtain ⟨hb0lt, hb1lt, hb2lt, hb3lt⟩ := Word.lt_cases_of_isU64_poly h_isU64_b
-  obtain ⟨hc0lt, hc1lt, hc2lt, hc3lt⟩ := Word.lt_cases_of_isU64_poly h_isU64_cc
-  simp [U16toU8OperationUnsafe.constraints, Word.toBWord_poly] at h_bw_b h_bw_c
+  obtain ⟨hb0lt, hb1lt, hb2lt, hb3lt⟩ := Word.lt_cases_of_isU64 h_isU64_b
+  obtain ⟨hc0lt, hc1lt, hc2lt, hc3lt⟩ := Word.lt_cases_of_isU64 h_isU64_cc
+  simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at h_bw_b h_bw_c
   obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := h_bw_b
   obtain ⟨c0, c1, c2, c3, c4, c5, c6, c7⟩ := h_bw_c
   simp_all [constraints, U16toU8OperationUnsafe.constraints]
@@ -243,8 +244,8 @@ lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     · rw [h256_val]
     · rw [h256_val]; nlinarith
     · rw [ZMod.val_mul_of_lt (by rw [h256_val]; nlinarith), h256_val]; nlinarith
-  unfold Word.toBitVec64_poly
-  simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+  unfold Word.toBitVec64
+  simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
   rw [hadd _ _ hr0' hr1', hadd _ _ hr2' hr3', hadd _ _ hr4' hr5', hadd _ _ hr6' hr7']
   rw [heq_0, heq_1, heq_2, heq_3, heq_4, heq_5, heq_6, heq_7]
@@ -294,11 +295,11 @@ lemma spec.or_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   simp only [BitVec.ofNat_add, BitVec.ofNat_mul, BitVec.ofNat_or]
   bv_decide
 
-lemma spec.xor_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+lemma spec.xor {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     {b cc : Word (ZMod p)} {cols : BitwiseU16Operation (ZMod p)}
-    (h_isU64_b : b.isU64_poly) (h_isU64_cc : cc.isU64_poly) :
-    List.Forall SP1Constraint.toProp_poly (constraints b cc cols 2 1).2 →
-      Word.toBitVec64_poly (constraints b cc cols 2 1).1 = execute_RTYPE_pure_w_poly b cc .XOR
+    (h_isU64_b : b.isU64) (h_isU64_cc : cc.isU64) :
+    List.Forall SP1Constraint.toProp (constraints b cc cols 2 1).2 →
+      Word.toBitVec64 (constraints b cc cols 2 1).1 = execute_RTYPE_pure_w b cc .XOR
         := by
   intro cstrs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -306,7 +307,7 @@ lemma spec.xor_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   have h0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
     change (0 : ZMod p).val < (256 : ZMod p).val; simp
   have h2_val : (2 : ZMod p).val = 2 := val_2_zmod_p
-  have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return_poly p _ _ b
+  have h_bw_b := @U16toU8OperationSafe.spec.unsafe.return p _ _ b
     { low_bytes := #v[cols.b_low_bytes.low_bytes[0], cols.b_low_bytes.low_bytes[1],
       cols.b_low_bytes.low_bytes[2], cols.b_low_bytes.low_bytes[3]] } (by
     simp [constraints, BitwiseOperation.constraints,
@@ -314,7 +315,7 @@ lemma spec.xor_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
       h2_val] at *
     obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := cstrs
     aesop)
-  have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return_poly p _ _ cc
+  have h_bw_c := @U16toU8OperationSafe.spec.unsafe.return p _ _ cc
     { low_bytes := #v[cols.c_low_bytes.low_bytes[0], cols.c_low_bytes.low_bytes[1],
       cols.c_low_bytes.low_bytes[2], cols.c_low_bytes.low_bytes[3]] } (by
     simp [constraints, BitwiseOperation.constraints,
@@ -322,9 +323,9 @@ lemma spec.xor_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
       h2_val] at *
     obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := cstrs
     aesop)
-  obtain ⟨hb0lt, hb1lt, hb2lt, hb3lt⟩ := Word.lt_cases_of_isU64_poly h_isU64_b
-  obtain ⟨hc0lt, hc1lt, hc2lt, hc3lt⟩ := Word.lt_cases_of_isU64_poly h_isU64_cc
-  simp [U16toU8OperationUnsafe.constraints, Word.toBWord_poly] at h_bw_b h_bw_c
+  obtain ⟨hb0lt, hb1lt, hb2lt, hb3lt⟩ := Word.lt_cases_of_isU64 h_isU64_b
+  obtain ⟨hc0lt, hc1lt, hc2lt, hc3lt⟩ := Word.lt_cases_of_isU64 h_isU64_cc
+  simp [U16toU8OperationUnsafe.constraints, Word.toBWord] at h_bw_b h_bw_c
   obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7⟩ := h_bw_b
   obtain ⟨c0, c1, c2, c3, c4, c5, c6, c7⟩ := h_bw_c
   simp_all [constraints, U16toU8OperationUnsafe.constraints]
@@ -387,8 +388,8 @@ lemma spec.xor_poly {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     · rw [h256_val]
     · rw [h256_val]; nlinarith
     · rw [ZMod.val_mul_of_lt (by rw [h256_val]; nlinarith), h256_val]; nlinarith
-  unfold Word.toBitVec64_poly
-  simp only [Word.toNat_poly_def, Vector.getElem_mk, List.getElem_toArray,
+  unfold Word.toBitVec64
+  simp only [Word.toNat_def, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ]
   rw [hadd _ _ hr0' hr1', hadd _ _ hr2' hr3', hadd _ _ hr4' hr5', hadd _ _ hr6' hr7']
   rw [heq_0, heq_1, heq_2, heq_3, heq_4, heq_5, heq_6, heq_7]
