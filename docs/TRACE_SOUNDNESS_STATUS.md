@@ -45,31 +45,35 @@ grep -nE "^\s+| <Chip> " SP1Clean/Soundness/MemoryConsistency.lean
 | DivRem | ✅ 8 | ❌ Spec only | ✅ |
 | Jal | ✅ 1 | ✅ | ✅ |
 | Jalr | ✅ 1 | ✅ | ✅ |
-| LoadByte | ✅ 2 | ❌ Spec only | ✅ |
-| LoadDouble | ✅ 1 | ❌ Spec only | ✅ |
-| LoadHalf | ✅ 2 | ❌ Spec only | ✅ |
-| LoadWord | ✅ 2 | ❌ Spec only | ✅ |
+| LoadByte | ✅ 2 | ✅ | ✅ |
+| LoadDouble | ✅ 1 | ✅ | ✅ |
+| LoadHalf | ✅ 2 | ✅ | ✅ |
+| LoadWord | ✅ 2 | ✅ | ✅ |
 | LoadX0 | ✅ 7 | ✅ | ✅ |
-| Lt | ✅ 4 | ❌ Spec only | ✅ |
+| Lt | ✅ 4 | ✅ | ✅ |
 | Mul | ✅ 5 | ❌ Spec only | ✅ |
 | ShiftLeft | ✅ 4 | ❌ Spec only | ✅ |
 | ShiftRight | ✅ 8 | ❌ Spec only | ✅ |
 | StoreByte | ✅ 1 | ✅ | ✅ |
-| StoreDouble | ✅ 1 | ❌ Spec only | ✅ |
-| StoreHalf | ✅ 1 | ❌ Spec only | ✅ |
-| StoreWord | ✅ 1 | ❌ Spec only | ✅ |
+| StoreDouble | ✅ 1 | ✅ | ✅ |
+| StoreHalf | ✅ 1 | ✅ | ✅ |
+| StoreWord | ✅ 1 | ✅ | ✅ |
 | Sub | ✅ 1 | ✅ | ❌ (wiring gap) |
 | Subw | ✅ 1 | ✅ | ❌ (wiring gap) |
-| UType | ✅ 2 | ❌ Spec + `iff_sp1` | ✅ |
+| UType | ✅ 2 | ✅ | ✅ |
 
 **Aggregate counts:**
 - Dirty `correct_*`: **24 / 24** proven (zero active sorries; inert
   `sorry`-mentioning comments at `SP1Chips/ShiftRight/Sra.lean:31` and
   `SP1Chips/DivRem/DivRem.lean:814` only).
-- Clean `FormalAssertion` (S+C, sorry-free): **10 / 24** —
-  Add, Addi, Addw, Bitwise, Jal, Jalr, LoadX0, StoreByte, Sub, Subw.
-- Clean `Spec`-only: **14 / 24** — Branch, DivRem, four Load* variants,
-  Lt, Mul, ShiftLeft, ShiftRight, three Store* variants, UType.
+- Clean `FormalAssertion` (S+C, sorry-free): **19 / 24** —
+  Add, Addi, Addw, Bitwise, Jal, Jalr, LoadByte, LoadDouble, LoadHalf,
+  LoadWord, LoadX0, Lt, StoreByte, StoreDouble, StoreHalf, StoreWord,
+  Sub, Subw, UType.
+- Clean `Spec`-only: **5 / 24** — Branch, DivRem, Mul, ShiftLeft,
+  ShiftRight. (Earlier reports distinguished an `iff_sp1`-bridge tier
+  between "Spec only" and "FormalAssertion"; that tier is now empty —
+  every chip with an `iff_sp1` bridge has been promoted via Path-2.)
 - `ChipRow` registered (in trace aggregator): **20 / 24** — Addi,
   Bitwise, Sub, Subw are FormalAssertion-complete but not yet wired.
 
@@ -99,31 +103,27 @@ instance; tightened two examples; added `split_ifs <;> rfl` on the
 Soundness reads: a trace satisfying AIR constraints witnesses a
 corresponding Sail execution. The remaining gaps:
 
-### 1. Promote 14 chips to Clean `FormalAssertion` (S+C)
+### 1. Promote 5 chips to Clean `FormalAssertion` (S+C)
 
-The 14 "Spec-only" chips need explicit `theorem soundness` and
-`theorem completeness` proofs converting their chip-row `Spec` into a
-top-level `FormalAssertion`. Templates exist in Add, Sub, Jal,
-StoreByte, LoadX0.
+The 5 remaining "Spec-only" chips need explicit `theorem soundness`
+and `theorem completeness` proofs converting their chip-row `Spec`
+into a top-level `FormalAssertion`. Templates exist in Add, Sub, Jal,
+StoreByte, LoadX0. The 7 Load/Store and 2 easy-arithmetic chips that
+formerly sat in this section were promoted via Path-2 (CPUState +
+ProgramTable subcircuits + scalar boolean gates) on 2026-05-21.
 
 Effort estimate (informed by iter-4/iter-5 promotion experience —
 see `docs/CLEAN_PILOT_ITER4.md` and `docs/CLEAN_PILOT_ITER5.md`):
 
-- **Easy arithmetic** (UType, Lt) — ~1–2 hours each. Pattern matches
-  AddwChip.
 - **Branch family** (Branch) — half day. The `compare_bit` case-split
   on whether the branch is taken adds Vector-indexed `next_pc`
   conjuncts that interact badly with `circuit_norm`.
-- **Load family** (LoadByte, LoadHalf, LoadWord, LoadDouble) — half
-  day each. Memory-bus interaction with the signed-extension flag is
-  the new wrinkle vs. existing StoreByte.
-- **Store family** (StoreDouble, StoreHalf, StoreWord) — ~2 hours
-  each. Pattern matches StoreByte; some have extra `addr_low_word_*`
-  clauses to surface.
 - **Mul, ShiftLeft, ShiftRight** — full day each. `MulOperation`'s
   60+ conjunct expansion stresses the `iff_sp1` rewrite (see iter-5
   perf notes); shift chips have a 5-byte carry chain that needs
-  per-shift-amount case analysis.
+  per-shift-amount case analysis. These chips do not have an
+  `iff_sp1` bridge yet, so the Path-2 recipe used for Loads/Stores
+  does not transfer directly.
 - **DivRem** — 1–2 days. The biggest chip (247-element Main vector,
   ~17–40 min cold build). Already at `Spec`-only stage with the
   underlying `Common.lean` helpers in place; promotion is mechanical
@@ -251,8 +251,8 @@ Order of operations to land
 1. **(1 hour)** Wire Addi / Bitwise / Sub / Subw into `ChipRow`. §2.
 2. **(1–2 days)** Discharge `TraceClkValid`, `TraceStateValid`,
    `TraceIsRealBinary` from chip `Spec`s. §3.
-3. **(~2 weeks)** Promote the 14 Spec-only chips to Clean
-   `FormalAssertion`. §1.
+3. **(~1 week)** Promote the 5 remaining Spec-only chips (Branch,
+   DivRem, Mul, ShiftLeft, ShiftRight) to Clean `FormalAssertion`. §1.
 4. **(~3 weeks)** Bridge or port the 24 dirty `correct_*` to Clean
    `FormalAssertion.Spec`-form. §4.
 5. **(half-day)** `Sail.execute_trace` wrapper. §5.

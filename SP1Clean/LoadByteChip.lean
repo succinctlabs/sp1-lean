@@ -411,4 +411,94 @@ theorem iff_sp1_of_is_lbu (Main : Vector (ZMod p) 47) (h_is_lbu : Main[46] = 1) 
     SP1Clean.AddrAddOp.iff_sp1]
   simp [SpecForIff_of_is_lbu, fromMain]
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+Drops the bare byte lookups (CPUState inline bytes, load-memory diff
+bytes, selected_byte_alt range, MSB lookup); covers `CPUState`,
+`ProgramTable`, the three boolean gates (`is_lb`, `is_lbu`, sum), and
+the `op_a_0 = 0` gate. Memory-bus consistency is deferred to
+OfflineMemory. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, op_b,
+       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
+       _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
+       _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
+       _selected_byte, _selected_byte_alt, _result_byte, _signed_extension_flag,
+       is_lb, is_lbu⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, is_lb * 29 + is_lbu * 32,
+      op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_lb * (is_lb - 1) === 0
+  is_lbu * (is_lbu - 1) === 0
+  (is_lb + is_lbu) * (is_lb + is_lbu - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) LoadByteCols unit where
+  name := "SP1Clean.LoadByte"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : LoadByteCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := cols.is_lb * 29 + cols.is_lbu * 32,
+      op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  cols.is_lb * (cols.is_lb - 1) = 0 ∧
+  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
+  (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_lb, h_lbu, h_sum, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_lb
+  · linear_combination h_lbu
+  · linear_combination h_sum
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_lb, h_lbu, h_sum, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_lb
+  · linear_combination h_lbu
+  · linear_combination h_sum
+  · exact h_op_a_0
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) LoadByteCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.LoadByte

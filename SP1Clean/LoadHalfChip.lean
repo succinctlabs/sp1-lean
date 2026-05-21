@@ -293,4 +293,87 @@ theorem iff_sp1_of_is_lhu (Main : Vector (ZMod p) 44) (h_is_lhu : Main[43] = 1) 
     SP1Clean.AddrAddOp.iff_sp1]
   simp [SpecForIff_of_is_lhu, fromMain]
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+Drops the two bare byte lookups on `load_memory_diff_low` /
+`load_memory_diff_high`; covers `CPUState`, `ProgramTable`, and the
+three boolean gates (`is_lh`, `is_lhu`, and the aggregate sum).
+Memory-bus consistency is deferred to OfflineMemory. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
+       _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
+       _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
+       _half_offset_bit1, _half_offset_bit2, _op_a_write_value_lo,
+       _signed_extension_msb, is_lh, is_lhu⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, is_lh * 30 + is_lhu * 33,
+      op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_lh * (is_lh - 1) === 0
+  is_lhu * (is_lhu - 1) === 0
+  (is_lh + is_lhu) * (is_lh + is_lhu - 1) === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) LoadHalfCols unit where
+  name := "SP1Clean.LoadHalf"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : LoadHalfCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : LoadHalfCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := cols.is_lh * 30 + cols.is_lhu * 33,
+      op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  cols.is_lh * (cols.is_lh - 1) = 0 ∧
+  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
+  (cols.is_lh + cols.is_lhu) * (cols.is_lh + cols.is_lhu - 1) = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_lh, h_lhu, h_sum⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_lh
+  · linear_combination h_lhu
+  · linear_combination h_sum
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_lh, h_lhu, h_sum⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_lh
+  · linear_combination h_lhu
+  · linear_combination h_sum
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) LoadHalfCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.LoadHalf
