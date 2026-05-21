@@ -63,8 +63,15 @@ under `docs/`, look at the matching entry below.
   `CLEAN_PILOT_INTRO.md` when planning the next pilot iteration or
   evaluating where Clean fits long-term. Lives alongside the
   per-iter retrospectives (`CLEAN_PILOT_NOTES.md`,
-  `CLEAN_PILOT_ITER2/3/4.md`) and the original tradeoff doc
+  `CLEAN_PILOT_ITER2/3/4/5.md`) and the original tradeoff doc
   (`CLEAN_DSL_EVALUATION.md`).
+
+- **`CLEAN_PILOT_ITER5.md`** — iter-5 retrospective. Documents the
+  `iff_sp1` sweep across 8 Load/Store/UType chips (19 of 23 mirrored
+  chips now have an iff_sp1) and the first Phase-A gating combinator
+  (`GatedAddOp.assertion`), including the lookup-restriction caveat
+  that blocks a polymorphic combinator and the JalrChip Path-1.5
+  re-promotion that partially closes the iter-4 Tier-2 finding.
 
 ## Auto-memory mirror
 

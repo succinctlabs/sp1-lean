@@ -15,6 +15,7 @@ import SP1Operations.Reader.ITypeReader
 import SP1Chips.JalrChip
 import SP1Clean.AddOperation
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.GatedAddOp
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
@@ -154,25 +155,36 @@ def opBMemoryAccess (cols : JalrCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) 
     prev_low := cols.op_b_memory_prev_low,
     diff_low_limb := cols.op_b_memory_diff_low }
 
-/-! ## Full `FormalAssertion` promotion (Path-2; Tier-2 probe finding)
+/-! ## Full `FormalAssertion` promotion (Path-2 + single-gate Phase-A)
 
-**Tier-2 probe result.** JalrChip has two `AddOperation.constraints
+**Tier-2 probe history.** JalrChip has two `AddOperation.constraints
 ... allHold` clauses in its legacy `Spec` (one gated on `is_real`,
-one gated on `is_real - op_a_0`). The Clean `SP1Clean.AddOp.assertion`
-subcircuit is unconditional — it emits the AddOp constraints with no
-selector. Calling it from `Assertion.main` would force the carry chain
-to hold even on is_real=0 rows (and op_a=x0 rows for the second AddOp),
-which breaks completeness on those rows. Adding gating to Clean's
-subcircuit DSL is out of scope for this round, so the raw `allHold`
-clauses remain in the legacy `Spec` and we promote only the
-unconditional lookup-derivable surface.
+one gated on `is_real - op_a_0`). Iter-4 dropped both from
+`Assertion.main` because Clean's unconditional `AddOp.assertion`
+subcircuit would force the carry chain on padding / op_a=x0 rows where
+completeness can't hold.
 
-What survives: `CPUState.assertion`, `ProgramTable.assertion`, and the
-three scalar boolean asserts (`is_real`, `low_bit`, `(is_real - 1) *
-op_a_0`). The alignment lookup and the four Vector-indexed asserts on
-`jump_target[3]` / `op_a_write_value[3]` / `op_a_0 * op_a_write_value[k]`
-are dropped to avoid the same Vector.map_push bridging cascade that hit
-`SP1Clean.Addi.Assertion`. -/
+**Iter-5 update (Phase-A first demonstration).** The `is_real`-gated
+jump-target AddOp is now promoted via `SP1Clean.GatedAddOp.assertion`:
+its `main` emits `is_real * carry_k * (carry_k - 1) === 0` for each
+of 4 carries (the inner `Range(16)` byte-bound lookups are dropped —
+gating a lookup by field multiplication isn't sound; see
+`SP1Clean/Gated.lean` for the lookup-restriction rationale). The
+matching FormalSpec clause is `is_real = 0 ∨ GatedAddOp.Spec ...`,
+satisfied vacuously on padding rows.
+
+The second AddOp (gated on `is_real - op_a_0`) stays as a Path-2 drop
+for now — it needs a multi-factor gate (essentially a 2-element gate
+combinator since `is_real - op_a_0` is itself a difference of two
+boolean selectors). Picking that up is iter-6 work.
+
+What survives in `Assertion.main` today: `CPUState.assertion`,
+`ProgramTable.assertion`, `GatedAddOp.assertion` for the jump-target
+sum, and the three scalar boolean asserts (`is_real`, `low_bit`,
+`(is_real - 1) * op_a_0`). The alignment lookup, the second AddOp
+clause, and the four Vector-indexed asserts on `jump_target[3]` /
+`op_a_write_value[3]` / `op_a_0 * op_a_write_value[k]` remain in the
+legacy chip-level `Spec`. -/
 
 namespace Assertion
 
@@ -182,13 +194,21 @@ open Circuit
 def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
-       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
-       op_c_imm, is_real, _jump_target, _op_a_write_value, low_bit⟩ := cols
+       op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c_imm, is_real, jump_target, _op_a_write_value, low_bit⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc, 47, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  -- Gated jump-target sum: `is_real * carry_k * (carry_k - 1) === 0` for
+  -- each of 4 carries, encoded via the `GatedAddOp` FormalAssertion (Phase-A
+  -- gating combinator, iter-5 first demonstration). The matching range
+  -- checks on `jump_target[k]` are dropped from the gated form — they
+  -- remain in the legacy chip-level `Spec` (see `Jalr.Spec`).
+  SP1Clean.GatedAddOp.assertion
+    (⟨op_b_memory_prev_value, op_c_imm, jump_target, is_real⟩ :
+      Var SP1Clean.GatedAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   low_bit * (low_bit - 1) === 0
   (is_real - 1) * op_a_0 === 0
@@ -207,6 +227,8 @@ def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
     { pc := cols.pc, opcode := 47, op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  (cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
+    cols.op_b_memory_prev_value cols.op_c_imm cols.jump_target) ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.low_bit * (cols.low_bit - 1) = 0 ∧
   (cols.is_real - 1) * cols.op_a_0 = 0
@@ -214,11 +236,13 @@ def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_lowbit, h_isreal_op_a_0⟩ := h_holds
+  obtain ⟨h_cpu_sub, h_prog_sub, h_gated_sub, h_isreal, h_lowbit, h_isreal_op_a_0⟩
+    := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
+  · exact h_gated_sub trivial
   · linear_combination h_isreal
   · linear_combination h_lowbit
   · linear_combination h_isreal_op_a_0
@@ -226,11 +250,12 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu, h_prog, h_isreal, h_lowbit, h_isreal_op_a_0⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_gated, h_isreal, h_lowbit, h_isreal_op_a_0⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
+  · exact ⟨trivial, h_gated⟩
   · linear_combination h_isreal
   · linear_combination h_lowbit
   · linear_combination h_isreal_op_a_0
