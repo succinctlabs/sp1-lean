@@ -638,18 +638,16 @@ lemma single_op (Main : Vector (ZMod p) 246)
   simp only [SP1ConstraintList.allHold, constraints, List.forall_append, List.Forall,
     SP1Constraint.toProp_assertZero, SP1Constraint.toProp_send_byte,
     sub_eq_zero, mul_eq_zero] at cstrs
-  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩, _⟩,
-    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
-    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
-    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
-    _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
-    _, _, _, _, _,
-    b201, b202, b203, b204, b205, b206, b207, b208,
-    _, _, _, _, _, _, _, _, _, _,
-    sum_disj, _h_M13⟩ := cstrs
-  -- sum_disj : 1 = Main[202] + Main[204] + Main[201] + Main[203] + Main[205]
-  --                + Main[206] + Main[207] + Main[208]
-  -- Permute to put each active flag first, then apply eight_mutex_left.
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    cstrs⟩ := cstrs
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    cstrs⟩ := cstrs
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    cstrs⟩ := cstrs
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+    cstrs⟩ := cstrs
+  obtain ⟨_, _, _, _, _, b201, b202, b203, b204, b205, b206, b207, b208,
+    _, _, _, _, _, _, _, _, _, _, sum_disj, _h_M13⟩ := cstrs
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intro h
   · have hsum : Main[201] + Main[202] + Main[203] + Main[204] +
         Main[205] + Main[206] + Main[207] + Main[208] = 1 := by
