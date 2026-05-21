@@ -76,7 +76,6 @@ private lemma halfword_msb (a b : ZMod p)
     rw [h_sub_val] at h_hi
     omega
 
-set_option maxHeartbeats 1600000 in
 -- LoadHalf (signed) correct proof.
 theorem correct_lh (Main : Vector (ZMod p) 44)
     (s : SailState) (hs : SailState.isInitialized s)
@@ -358,7 +357,6 @@ theorem correct_lh (Main : Vector (ZMod p) 44)
             Main[25] - 4 * Main[39] - 2 * Main[38] + 7 by rw [he39, he40]; push_cast; ring]
       simpa using hL7
 
-set_option maxHeartbeats 1600000 in
 -- LoadHalf (unsigned) correct proof.
 theorem correct_lhu (Main : Vector (ZMod p) 44)
     (s : SailState) (hs : SailState.isInitialized s)

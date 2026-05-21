@@ -30,9 +30,6 @@ def sp1_subw : SailM Unit := do
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- Subw migration's BitVec/sign-extend manipulation in the non-zero
--- op_a branch sits well above the default 200K heartbeat budget.
 theorem correct_subw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[31] = 1)

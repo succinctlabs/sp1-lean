@@ -14,8 +14,6 @@ namespace LoadHalf
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 800000 in
--- Higher heartbeats: the iff destructure unfolds the full constraint list.
 lemma allHold_constraints_iff_of_is_lh (Main : Vector (ZMod p) 44)
     (h_is_lh : is_lh Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
@@ -69,8 +67,6 @@ lemma allHold_constraints_iff_of_is_lh (Main : Vector (ZMod p) 44)
       rw [show (1 + 1 : ZMod p) = (2 : ZMod p) from by norm_num]; exact val_2_ne_zero
     simp_all
 
-set_option maxHeartbeats 800000 in
--- Higher heartbeats: the iff destructure unfolds the full constraint list.
 lemma allHold_constraints_iff_of_is_lhu (Main : Vector (ZMod p) 44)
     (h_is_lhu : is_lhu Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔

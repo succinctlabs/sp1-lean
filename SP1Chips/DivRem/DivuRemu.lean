@@ -1,4 +1,4 @@
-import SP1Chips.DivRem.Common
+import SP1Chips.DivRem.ProdHelper
 
 namespace DivRem
 

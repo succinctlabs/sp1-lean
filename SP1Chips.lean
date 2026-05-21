@@ -10,12 +10,14 @@ import SP1Chips.BitwiseChip
 import SP1Chips.Branch.Common
 import SP1Chips.Branch.Constraints
 import SP1Chips.BranchChip
+import SP1Chips.DivRem.AbsHelper
 import SP1Chips.DivRem.Common
 import SP1Chips.DivRem.Constraints
 import SP1Chips.DivRem.DivRem
 import SP1Chips.DivRem.DivuRemu
 import SP1Chips.DivRem.DivuwRemuw
 import SP1Chips.DivRem.DivwRemw
+import SP1Chips.DivRem.ProdHelper
 import SP1Chips.DivRemChip
 import SP1Chips.Jal.Constraints
 import SP1Chips.JalChip

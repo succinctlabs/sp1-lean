@@ -67,6 +67,7 @@ namespace KoalaBear
 @[instance 10000] instance instNeg (p : ℕ) [NeZero p] : Neg (ZMod p) := inferInstance
 @[instance 10000] instance instZero (p : ℕ) [NeZero p] : Zero (ZMod p) := inferInstance
 @[instance 10000] instance instOne (p : ℕ) [NeZero p] : One (ZMod p) := inferInstance
+@[instance 10000] instance instPow (p : ℕ) [NeZero p] : Pow (ZMod p) ℕ := inferInstance
 
 end KoalaBear
 

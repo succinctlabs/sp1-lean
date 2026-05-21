@@ -164,7 +164,6 @@ private lemma seven_collapse
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
   · apply (ZMod.val_eq_zero _).mp; omega
 
-set_option maxHeartbeats 1600000 in
 -- LoadX0 LD sub-opcode correct proof. Mirrors `Load.LoadDouble.correct_ld`
 -- with three structural differences:
 -- - No register write — `op_a = x0` makes `wX_bits 0 _` a no-op, so
@@ -452,7 +451,6 @@ theorem correct_loadX0_ld (Main : Vector (ZMod p) 48)
         haddr_nat, haddr_plus 7 (by omega)]
     simpa using hload.2.2.2.2.2.2.2
 
-set_option maxHeartbeats 1600000 in
 -- LoadX0 LWU sub-opcode correct proof. Mirrors `correct_loadX0_ld`
 -- but for 4-byte unsigned load. Key differences:
 -- - Selected flag: `Main[46] = 1` (instead of `Main[47] = 1`).
@@ -753,7 +751,6 @@ theorem correct_loadX0_lwu (Main : Vector (ZMod p) 48)
             Main[25] - 4 * Main[40] + 7 from by rw [hM40_one]; push_cast; ring]
       simpa using hload.2.2.2.2.2.2.2
 
-set_option maxHeartbeats 1600000 in
 -- LoadX0 LW sub-opcode correct proof. Mirrors `correct_loadX0_lwu`
 -- but for the signed 4-byte load. Key differences:
 -- - Selected flag: `Main[45] = 1` (instead of `Main[46] = 1`).
@@ -1055,7 +1052,6 @@ theorem correct_loadX0_lw (Main : Vector (ZMod p) 48)
             Main[25] - 4 * Main[40] + 7 from by rw [hM40_one]; push_cast; ring]
       simpa using hload.2.2.2.2.2.2.2
 
-set_option maxHeartbeats 1600000 in
 -- LoadX0 LHU sub-opcode correct proof. Mirrors `correct_loadX0_lwu`
 -- but for 2-byte unsigned load. Key differences:
 -- - Selected flag: `Main[44] = 1` (instead of `Main[46] = 1`).
@@ -1395,7 +1391,6 @@ theorem correct_loadX0_lhu (Main : Vector (ZMod p) 48)
                 rw [hM40_one, hM39_one]; push_cast; ring]
         simpa using hload.2.2.2.2.2.2.2
 
-set_option maxHeartbeats 1600000 in
 -- LoadX0 LH sub-opcode correct proof. Mirrors `correct_loadX0_lhu`
 -- but for the signed 2-byte load. Key differences:
 -- - Selected flag: `Main[43] = 1` (instead of `Main[44] = 1`).
@@ -1730,7 +1725,6 @@ theorem correct_loadX0_lh (Main : Vector (ZMod p) 48)
                 rw [hM40_one, hM39_one]; push_cast; ring]
         simpa using hload.2.2.2.2.2.2.2
 
-set_option maxHeartbeats 1600000 in
 -- LoadX0 LBU sub-opcode correct proof. Mirrors `correct_loadX0_lhu`
 -- but for 1-byte unsigned load. Key differences:
 -- - Selected flag: `Main[42] = 1` (instead of `Main[44] = 1`).
@@ -2129,7 +2123,6 @@ theorem correct_loadX0_lbu (Main : Vector (ZMod p) 48)
                   rw [hM40_one, hM39_one, hM38_one]; ring]
           simpa using hload.2.2.2.2.2.2.2
 
-set_option maxHeartbeats 1600000 in
 -- LoadX0 LB sub-opcode correct proof. Mirrors `correct_loadX0_lbu`
 -- but for the signed 1-byte load. Key differences:
 -- - Selected flag: `Main[41] = 1` (instead of `Main[42] = 1`).

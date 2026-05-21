@@ -132,10 +132,8 @@ lemma single_op (Main : Vector (ZMod p) 51)
     · exfalso; exact (h_sum_inj _ _ _ h_sum).2 (by linear_combination h' + h + h_X)
 
 set_option linter.unusedSectionVars false in
-set_option maxHeartbeats 800000 in
 -- Mirror of `allHold_constraints_iff` over `ZMod p` via `` predicates.
--- Closes via the same `simp` recipe; budget elevated for the BitwiseU16Operation
--- expansion plus 51-column constraint body.
+-- Closes via the same `simp` recipe.
 lemma allHold_constraints_iff (Main : Vector (ZMod p) 51) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
     let ret_val := (BitwiseU16Operation.constraints #v[Main[15], Main[16], Main[17], Main[18]] #v[Main[25], Main[26], Main[27], Main[28]] { b_low_bytes := { low_bytes := #v[Main[32], Main[33], Main[34], Main[35]] }, c_low_bytes := { low_bytes := #v[Main[36], Main[37], Main[38], Main[39]] }, bitwise_operation := { result := #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]] } } (Main[48] * 2 + Main[49] * 1 + Main[50] * 0) (Main[48] + Main[49] + Main[50])).1

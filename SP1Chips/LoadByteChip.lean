@@ -40,7 +40,6 @@ noncomputable def spec_lbu (imm : BitVec 12) (rs1 rs2 : regidx) : SailM Executio
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_LOAD imm rs1 rs2 (is_unsigned := true) (width := 1)
 
-set_option maxHeartbeats 1600000 in
 -- LoadByte (signed) correct proof — 8-byte fan-out via h38/h39/h40.
 theorem correct_lb (Main : Vector (ZMod p) 47)
     (s : SailState) (hs : SailState.isInitialized s)
@@ -414,7 +413,6 @@ theorem correct_lb (Main : Vector (ZMod p) 47)
             omega]
       simpa using hL7
 
-set_option maxHeartbeats 1600000 in
 -- LoadByte (unsigned) correct proof.
 theorem correct_lbu (Main : Vector (ZMod p) 47)
     (s : SailState) (hs : SailState.isInitialized s)

@@ -59,9 +59,6 @@ private lemma toBitVec64_eq_signExtend_sp1_op_b
     omega
   rw [BitVec.toNat_append]; simp; omega
 
-set_option maxHeartbeats 1600000 in
--- Sign-extend manipulation in the non-zero op_a branch sits well above
--- the default 200K heartbeat budget (matches AddwChip).
 theorem correct_lui
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)
@@ -156,9 +153,6 @@ theorem correct_lui
       simp [← BitVec.toNat_inj]; omega
     simp [h_pc_step, ← h_imm, ← h_add, if_neg h_rd_ne, bitVecToRegidxVal]
 
-set_option maxHeartbeats 1600000 in
--- Same heartbeat justification as `correct_lui`; AUIPC's pc-addend path
--- doubles the BitVec arithmetic load.
 theorem correct_auipc
     (cstrs : (constraints Main).allHold)
     (h_is_real : Main[30] = 1)

@@ -346,7 +346,6 @@ theorem correct_lw (Main : Vector (ZMod p) 44)
             Main[25] - 4 * Main[38] + 7 by rw [he39]; push_cast; ring]
       simpa using hL7
 
-set_option maxHeartbeats 1600000 in
 -- LoadWord (unsigned) correct proof.
 theorem correct_lwu (Main : Vector (ZMod p) 44)
     (s : SailState) (hs : SailState.isInitialized s)
