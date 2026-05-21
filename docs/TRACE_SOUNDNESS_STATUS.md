@@ -38,9 +38,9 @@ grep -nE "^\s+| <Chip> " SP1Clean/Soundness/MemoryConsistency.lean
 | Chip | Dirty `correct_*` | Clean FormalAssertion (S+C) | `ChipRow` registered |
 |---|---|---|---|
 | Add | ✅ 1 thm | ✅ | ✅ |
-| Addi | ✅ 1 | ✅ | ❌ (wiring gap) |
+| Addi | ✅ 1 | ✅ | ✅ |
 | Addw | ✅ 2 | ✅ | ✅ |
-| Bitwise | ✅ 6 | ✅ | ❌ (wiring gap) |
+| Bitwise | ✅ 6 | ✅ | ✅ |
 | Branch | ✅ 6 | ✅ | ✅ |
 | DivRem | ✅ 8 | ✅ | ✅ |
 | Jal | ✅ 1 | ✅ | ✅ |
@@ -58,8 +58,8 @@ grep -nE "^\s+| <Chip> " SP1Clean/Soundness/MemoryConsistency.lean
 | StoreDouble | ✅ 1 | ✅ | ✅ |
 | StoreHalf | ✅ 1 | ✅ | ✅ |
 | StoreWord | ✅ 1 | ✅ | ✅ |
-| Sub | ✅ 1 | ✅ | ❌ (wiring gap) |
-| Subw | ✅ 1 | ✅ | ❌ (wiring gap) |
+| Sub | ✅ 1 | ✅ | ✅ |
+| Subw | ✅ 1 | ✅ | ✅ |
 | UType | ✅ 2 | ✅ | ✅ |
 
 **Aggregate counts:**
@@ -77,8 +77,10 @@ grep -nE "^\s+| <Chip> " SP1Clean/Soundness/MemoryConsistency.lean
   pipeline, not the FormalAssertion. ShiftLeft drops 10 Vector-indexed
   bit_shift/byte_shift gates from its FormalSpec for the same reason.
 - Clean `Spec`-only: **0 / 24** — the Spec-only tier is now empty.
-- `ChipRow` registered (in trace aggregator): **20 / 24** — Addi,
-  Bitwise, Sub, Subw are FormalAssertion-complete but not yet wired.
+- `ChipRow` registered (in trace aggregator): **24 / 24** — wired in
+  `SP1Clean/Soundness/MemoryConsistency.lean` (constructors +
+  `memoryAccesses` / `clockComponents` / `Spec` / `offsets` cases) and
+  `SP1Clean/Soundness/StateConsistency.lean` (`stateAccess` cases).
 
 ## Trace-level scaffolding (Phases A–D, completed 2026-05-21)
 
@@ -130,17 +132,16 @@ trace pipeline.
 
 See `docs/CLEAN_PILOT_ITER7.md` for the full iter-7 retrospective.
 
-### 2. Register 4 chips in `ChipRow` (pure wiring)
+### 2. Register chips in `ChipRow` — **DONE**
 
-Addi, Bitwise, Sub, Subw need:
-
-- New constructor in `inductive ChipRow` (`SP1Clean/Soundness/MemoryConsistency.lean:85-105`).
-- Matching cases in `ChipRow.memoryAccesses`, `ChipRow.clockComponents`,
-  `ChipRow.offsets`, `ChipRow.Spec` (same file).
-- Matching cases in `ChipRow.stateAccess`
-  (`SP1Clean/Soundness/StateConsistency.lean`).
-
-No new proofs. ~1 hour total.
+All 24 chips have constructors in `inductive ChipRow`
+(`SP1Clean/Soundness/MemoryConsistency.lean:81-104`) with matching
+cases in `ChipRow.memoryAccesses`, `ChipRow.clockComponents`,
+`ChipRow.Spec`, `ChipRow.offsets` (same file) and `ChipRow.stateAccess`
+(`SP1Clean/Soundness/StateConsistency.lean`). The earlier wiring gap
+for Addi / Bitwise / Sub / Subw was closed in the same 2026-05-21
+"lowest-hanging fruit" pass that promoted UType + Lt to FormalAssertion
+and discharged §3c (`TraceIsRealBinary`).
 
 ### 3. Discharge the three trace-shape bundles
 
@@ -249,11 +250,14 @@ because no Sail trace executor is needed — the Sail trace is the
 Order of operations to land
 `∀ rows, valid_trace_shape rows → ∃ s_final, Sail.execute_trace s₀ rows.length = some s_final`:
 
-1. **(1 hour)** Wire Addi / Bitwise / Sub / Subw into `ChipRow`. §2.
-2. **(1–2 days)** Discharge `TraceClkValid`, `TraceStateValid`,
-   `TraceIsRealBinary` from chip `Spec`s. §3.
+1. ~~Wire Addi / Bitwise / Sub / Subw into `ChipRow`. §2.~~
+   **DONE 2026-05-21** (lowest-hanging fruit pass). 24/24 chips wired.
+2. **(1–2 days)** Discharge `TraceClkValid` (§3a) and `TraceStateValid`
+   (§3b) from chip `Spec`s. §3c (`TraceIsRealBinary`) is already
+   discharged.
 3. ~~Promote remaining Spec-only chips to Clean `FormalAssertion`. §1.~~
-   **DONE 2026-05-21** (iter-7). All 24 chips now FormalAssertion.
+   **DONE 2026-05-21** (iter-6 + iter-7). All 24 chips now
+   FormalAssertion.
 4. **(~3 weeks)** Bridge or port the 24 dirty `correct_*` to Clean
    `FormalAssertion.Spec`-form. §4.
 5. **(half-day)** `Sail.execute_trace` wrapper. §5.
@@ -261,10 +265,10 @@ Order of operations to land
    per-chip Sail equivalence + `execute_trace` → full ensemble
    theorem.
 
-Steps 1 and 5 are session-sized. Step 6 is the closing composition.
-Steps 2 and 3 each fit in a week or two of focused work. Step 4 is
-the dominant cost; it's the heavy mathematical content that connects
-the Clean `Spec` predicate to actual Sail semantics.
+Steps 1 and 3 closed today; step 5 is session-sized; step 6 is the
+closing composition. Step 2 fits in a week of focused work. Step 4 is
+the dominant cost — the heavy mathematical content that connects the
+Clean `Spec` predicate to actual Sail semantics.
 
 ## Open design choices for the next plan
 

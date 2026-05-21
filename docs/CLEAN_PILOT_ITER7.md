@@ -112,18 +112,23 @@ trimmed is the right trade.
 
 ## Iter-8 follow-ups
 
-1. **Wire 4 remaining chips into `ChipRow`.** Addi, Bitwise, Sub,
-   Subw are FormalAssertion-complete but not yet in the trace
-   aggregator. ~1 hour per `docs/TRACE_SOUNDNESS_STATUS.md` §2.
-2. **Discharge `TraceClkValid` and `TraceStateValid`** (§3a / §3b).
-3. **Step 4 of the critical path: port 24 dirty `correct_*` to
+1. **Discharge `TraceClkValid` and `TraceStateValid`** (§3a / §3b).
+   The clk monotonicity hypothesis + per-chip clk extraction lifts to
+   Nat via `ZMod.val`; the PC chain needs per-chip carry-aware
+   `next_pc` projection (Branch's `compare_bit` case-split is the
+   main wrinkle). 1–2 days.
+2. **Step 4 of the critical path: port 24 dirty `correct_*` to
    Clean.** With 24/24 FormalAssertion in place, the bridge strategy
    from `TRACE_SOUNDNESS_STATUS.md` §4 is now viable for every chip
    (each chip has a Clean Spec to land the Sail equivalence against).
-4. **Promote operation FormalAssertions** if any of the trimmed
+3. **Promote operation FormalAssertions** if any of the trimmed
    content (`bit_shift`/`byte_shift` gates, MulOperation carry chain,
    shift carry chain, DivRem quotient chain) becomes relevant. Not
    blocking for trace soundness, but tightens the chip Specs.
+
+(Earlier drafts listed a §2 wiring gap for Addi/Bitwise/Sub/Subw —
+that was already closed in the same 2026-05-21 lowest-hanging-fruit
+pass that promoted UType + Lt and discharged §3c.)
 
 ## Documentation impact
 
