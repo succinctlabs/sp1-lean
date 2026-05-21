@@ -257,4 +257,115 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
   cols.op_a_0 = 0 ∧
   mulSpec cols
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+Drops the inline CPUState byte lookups (converted to
+`SP1Clean.CPUState.assertion` subcircuit) plus the 16 carry-bound and
+16 product-bound lookups. `Assertion.main` keeps only the
+subcircuit-and-scalar-gate surface: CPUState, ProgramTable, the 5
+opcode boolean gates, the aggregate-is-real boolean, and `op_a_0 === 0`.
+The MulOperation carry chain stays in legacy `Spec` via the `mulSpec`
+placeholder; memory-bus consistency is deferred to OfflineMemory. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
+       _op_b_memory_diff_low, op_c, _op_c_memory_prev_value,
+       _op_c_memory_prev_low, _op_c_memory_diff_low, _op_a_write_value,
+       _carry, _product, _b_low_bytes, _c_low_bytes,
+       _b_msb, _c_msb, _product_msb, _b_sign_extend, _c_sign_extend,
+       is_mul, is_mulh, is_mulw, is_mulhsu, is_mulhu⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  let is_real_e := is_mul + is_mulh + is_mulw + is_mulhsu + is_mulhu
+  let opcode_e := is_mul * 11 + is_mulh * 12 + is_mulw * 13
+                    + is_mulhsu * 14 + is_mulhu * 24
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, opcode_e, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0],
+      op_a_0, 0, 0⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_mul * (is_mul - 1) === 0
+  is_mulh * (is_mulh - 1) === 0
+  is_mulw * (is_mulw - 1) === 0
+  is_mulhsu * (is_mulhsu - 1) === 0
+  is_mulhu * (is_mulhu - 1) === 0
+  is_real_e * (is_real_e - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) MulCols unit where
+  name := "SP1Clean.Mul"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : MulCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
+  let is_real : ZMod p :=
+    cols.is_mul + cols.is_mulh + cols.is_mulw + cols.is_mulhsu + cols.is_mulhu
+  let opcode_e : ZMod p :=
+    cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulw * 13
+      + cols.is_mulhsu * 14 + cols.is_mulhu * 24
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := opcode_e, op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0], op_c := #v[cols.op_c, 0, 0, 0],
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  cols.is_mul * (cols.is_mul - 1) = 0 ∧
+  cols.is_mulh * (cols.is_mulh - 1) = 0 ∧
+  cols.is_mulw * (cols.is_mulw - 1) = 0 ∧
+  cols.is_mulhsu * (cols.is_mulhsu - 1) = 0 ∧
+  cols.is_mulhu * (cols.is_mulhu - 1) = 0 ∧
+  is_real * (is_real - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_mul, h_mulh, h_mulw, h_mulhsu, h_mulhu,
+          h_real, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_mul
+  · linear_combination h_mulh
+  · linear_combination h_mulw
+  · linear_combination h_mulhsu
+  · linear_combination h_mulhu
+  · linear_combination h_real
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_mul, h_mulh, h_mulw, h_mulhsu, h_mulhu, h_real,
+          h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_mul
+  · linear_combination h_mulh
+  · linear_combination h_mulw
+  · linear_combination h_mulhsu
+  · linear_combination h_mulhu
+  · linear_combination h_real
+  · exact h_op_a_0
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) MulCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.Mul

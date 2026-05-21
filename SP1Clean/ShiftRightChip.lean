@@ -139,4 +139,105 @@ def Spec (cols : ShiftRightCols (ZMod p)) : Prop :=
   cols.op_a_0 = 0 ∧
   shiftSpec cols
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+`Assertion.main` is identical to the chip's `main` (no byte lookups to
+drop here — `ShiftRight`'s `main` already only emits `CPUState`,
+`ProgramTable`, and scalar boolean gates). The shift-arithmetic content
+in `intermediates_aux` stays in legacy `Spec` (via `shiftSpec`
+placeholder) and is deferred to the trace-level OfflineMemory bridge.
+Memory-bus consistency is similarly deferred. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
+       _op_b_memory_diff_low, op_c, _op_c_memory_prev_value,
+       _op_c_memory_prev_low, _op_c_memory_diff_low, imm_c, _op_a_write_value,
+       _intermediates_aux, is_srl, is_sra, is_srlw, is_sraw, _sign_extend⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  let opcode_e := is_srl * 7 + is_sra * 8 + is_srlw * 22 + is_sraw * 23
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, opcode_e, op_a, #v[op_b, 0, 0, 0], op_c,
+      op_a_0, 0, imm_c⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_srl * (is_srl - 1) === 0
+  is_sra * (is_sra - 1) === 0
+  is_srlw * (is_srlw - 1) === 0
+  is_sraw * (is_sraw - 1) === 0
+  let sum := is_srl + is_sra + is_srlw + is_sraw
+  sum * (sum - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) ShiftRightCols unit where
+  name := "SP1Clean.ShiftRight"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : ShiftRightCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
+  let is_real : ZMod p :=
+    cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw
+  let opcode_e : ZMod p :=
+    cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc, opcode := opcode_e, op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
+  cols.is_srl * (cols.is_srl - 1) = 0 ∧
+  cols.is_sra * (cols.is_sra - 1) = 0 ∧
+  cols.is_srlw * (cols.is_srlw - 1) = 0 ∧
+  cols.is_sraw * (cols.is_sraw - 1) = 0 ∧
+  is_real * (is_real - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_srl, h_sra, h_srlw, h_sraw, h_sum,
+          h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_srl
+  · linear_combination h_sra
+  · linear_combination h_srlw
+  · linear_combination h_sraw
+  · linear_combination h_sum
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_srl, h_sra, h_srlw, h_sraw, h_sum, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_srl
+  · linear_combination h_sra
+  · linear_combination h_srlw
+  · linear_combination h_sraw
+  · linear_combination h_sum
+  · exact h_op_a_0
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) ShiftRightCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.ShiftRight

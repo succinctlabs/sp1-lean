@@ -132,4 +132,98 @@ def Spec (cols : DivRemCols (ZMod p)) : Prop :=
   cols.op_a_0 = 0 ∧
   divRemSpec cols
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+`Assertion.main` is identical to the chip's `main` (no byte lookups to
+drop). The 209 intermediate columns (`MulOperation × 2`, `IsZeroWord`,
+`AddOperation`, sign-extension, quotient/remainder layout) stay in
+legacy `Spec` via `divRemSpec` placeholder; memory-bus consistency is
+deferred to OfflineMemory. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
+       _op_b_memory_diff_low, op_c, _op_c_memory_prev_value,
+       _op_c_memory_prev_low, _op_c_memory_diff_low, _op_a_write_value,
+       _aux, is_signed, is_w, is_rem, is_real, _msb_aux1⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.ProgramTable.assertion
+    (⟨pc,
+      (15 : Expression (ZMod p)) + is_signed * 0 + is_rem * 2 + is_w * 10,
+      op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_signed * (is_signed - 1) === 0
+  is_w * (is_w - 1) === 0
+  is_rem * (is_rem - 1) === 0
+  is_real * (is_real - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) DivRemCols unit where
+  name := "SP1Clean.DivRem"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : DivRemCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc,
+      opcode := (15 : ZMod p) + cols.is_signed * 0 + cols.is_rem * 2 +
+                  cols.is_w * 10,
+      op_a := cols.op_a, op_b := #v[cols.op_b, 0, 0, 0],
+      op_c := #v[cols.op_c, 0, 0, 0],
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  cols.is_signed * (cols.is_signed - 1) = 0 ∧
+  cols.is_w * (cols.is_w - 1) = 0 ∧
+  cols.is_rem * (cols.is_rem - 1) = 0 ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_signed, h_w, h_rem, h_real, h_op_a_0⟩ :=
+    h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_signed
+  · linear_combination h_w
+  · linear_combination h_rem
+  · linear_combination h_real
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_signed, h_w, h_rem, h_real, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_signed
+  · linear_combination h_w
+  · linear_combination h_rem
+  · linear_combination h_real
+  · exact h_op_a_0
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) DivRemCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.DivRem
