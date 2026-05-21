@@ -37,4 +37,5 @@ import SP1Clean.StoreByteChip
 import SP1Clean.JalChip
 import SP1Clean.MulChip
 import SP1Clean.ShiftLeftChip
-import SP1Clean.Soundness.MemoryConsistency
+import SP1Clean.Multiplicity
+import SP1Clean.Soundness

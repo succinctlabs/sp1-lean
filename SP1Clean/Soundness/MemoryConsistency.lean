@@ -1,3 +1,4 @@
+import Clean.Utils.OfflineMemory
 import SP1Clean.MemoryAccess
 import SP1Clean.AddChip
 import SP1Clean.LoadByteChip
@@ -26,19 +27,9 @@ This file wires per-chip `MemoryAccess` records into the
 `Clean.Utils.OfflineMemory` consistency theorem
 (`MemoryAccessList.isConsistentOnline_iff_isConsistentOffline`).
 
-**Decoupling note (2026-05-19).** `Clean.Utils.OfflineMemory` in the
-`../clean` fork currently has 3 pre-existing build failures unrelated
-to this pilot (lines 278, 287, 311 — `simp_all` / `simp [filter_cons]`
-leaving residual decidability goals on Lean 4.29 / current Mathlib).
-Until those upstream proofs are repaired, this file defines a
-**compatible local shape** `MemoryAccessTuple` / `MemoryAccessList`
-matching OfflineMemory's API verbatim, and states the trace-level
-bridge as an abstract claim parameterized by the offline-consistency
-predicate. When OfflineMemory builds again, swap the local
-`MemoryAccessTuple` for `_root_.MemoryAccess` and the abstract
-`IsConsistentOffline` parameter for OfflineMemory's
-`MemoryAccessList.isConsistentOffline` plus its main equivalence
-theorem.
+`MemoryAccessTuple` / `MemoryAccessList` are transparent aliases for
+the upstream `_root_.MemoryAccess` / `_root_.MemoryAccessList`
+(`Clean.Utils.OfflineMemory`).
 
 The design (per `docs/CLEAN_PILOT_NOTES.md` and the plan
 `/home/dtumad/.claude/plans/make-a-plan-to-stateful-cookie.md`):
@@ -65,14 +56,14 @@ open SP1Clean
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The 4-tuple OfflineMemory representation:
-`(timestamp, address, readValue, writeValue)`. Matches
-`Clean.Utils.OfflineMemory.MemoryAccess` verbatim. -/
-abbrev MemoryAccessTuple := ℕ × ℕ × ℕ × ℕ
+`(timestamp, address, readValue, writeValue)`. Transparent alias for
+`_root_.MemoryAccess` from `Clean.Utils.OfflineMemory`. -/
+abbrev MemoryAccessTuple := _root_.MemoryAccess
 
 /-- Time-ordered list of memory accesses (canonically reverse-ordered:
-most-recent at head). Matches `Clean.Utils.OfflineMemory.MemoryAccessList`
-verbatim. -/
-abbrev MemoryAccessList := List MemoryAccessTuple
+most-recent at head). Transparent alias for `_root_.MemoryAccessList`
+from `Clean.Utils.OfflineMemory`. -/
+abbrev MemoryAccessList := _root_.MemoryAccessList
 
 /-- A chip row in the heterogenous aggregation. Each constructor wraps
 one chip's column struct so the aggregator can pattern-match on chip
@@ -542,46 +533,51 @@ def offsets : ChipRow p → List (ZMod p)
 
 end ChipRow
 
+/-- The per-row access-tuple list. Each chip row's memory accesses
+paired with their per-access offsets and write-values, encoded via
+`SP1Clean.MemoryAccess.toAccessTuple` into the `(timestamp, addr, read,
+write)` 4-tuple form expected by `Clean.Utils.OfflineMemory`. -/
+def ChipRow.rowAccessTuples (row : ChipRow p) : List _root_.MemoryAccess :=
+  let (clk_high, clk_low) := row.clockComponents
+  let accesses := row.memoryAccesses
+  let offs := row.offsets
+  (accesses.zip offs).map fun ((acc, write_value), offset) =>
+    acc.toAccessTuple clk_high clk_low offset write_value
+
 /-- Aggregate a list of chip rows into a single `MemoryAccessList`.
-Each row contributes its memory-access tuples in `(timestamp, addr,
-readValue, writeValue)` form via `MemoryAccess.toAccessTuple`. -/
-def aggregateMemoryAccesses : List (ChipRow p) → MemoryAccessList
-  | [] => []
-  | row :: rest =>
-      let (clk_high, clk_low) := row.clockComponents
-      let accesses := row.memoryAccesses
-      let offs := row.offsets
-      let rowAccesses :=
-        (accesses.zip offs).map fun ((acc, write_value), offset) =>
-          acc.toAccessTuple clk_high clk_low offset write_value
-      rowAccesses ++ aggregateMemoryAccesses rest
+Each row contributes its memory-access tuples via `ChipRow.rowAccessTuples`.
 
-/-- Compatibility-shaped statement of the trace-level OfflineMemory
-bridge. Stated against an abstract `isConsistentOffline` predicate so the
-pilot does not depend on the (currently non-building)
-`Clean.Utils.OfflineMemory` proofs.
+Rows are iterated in **reverse trace order** (latest row first) to match
+`Clean.Utils.OfflineMemory`'s canonical "most-recent at head" convention
+for `MemoryAccessList`. Each row's internal `offsets` list is already
+decreasing (e.g. `[4, 3, 2]`), so the resulting list is in strictly
+decreasing timestamp order under the trace-shape clock invariant.
 
-The intended target: when `Clean.Utils.OfflineMemory` builds again,
-this signature collapses to a direct call to
-`MemoryAccessList.isConsistentOnline_iff_isConsistentOffline`.
+Note: trace input `rows` is in **chronological** order (row 0 = earliest,
+row n-1 = latest). The reversal here is purely a presentation choice for
+the OfflineMemory bridge. -/
+def aggregateMemoryAccesses (rows : List (ChipRow p)) : MemoryAccessList :=
+  rows.reverse.flatMap ChipRow.rowAccessTuples
+
+/-- Trace-level OfflineMemory bridge: given trace-shape hypotheses
+`h_sorted` and `h_nodup`, the aggregated chip-row memory accesses are
+online-consistent iff there is a permutation that is offline-consistent.
 
 The role of `h_specs` is to assert that every chip row's `Spec` holds.
-In the eventual end-to-end proof, this is the hook by which per-chip
-soundness propagates into the trace-level claim — but the trace-level
-equivalence itself follows purely from OfflineMemory's main theorem and
-does not consume `h_specs` directly. -/
+The two trace-shape hypotheses (`h_sorted`, `h_nodup`) are discharged
+from `h_specs` plus a clock-monotonicity assumption in
+`SP1Clean/Soundness/MemoryConsistencyClock.lean` (Phase A.3 of the
+trace-soundness plan). -/
 theorem chip_specs_admit_offline_bridge
     (rows : List (ChipRow p))
     (_h_specs : ∀ row ∈ rows, row.Spec)
-    (isConsistentOnline : MemoryAccessList → Prop)
-    (isConsistentOffline : MemoryAccessList → Prop)
-    -- The OfflineMemory main theorem, supplied as a hypothesis until
-    -- the upstream file builds.
-    (h_offline_bridge :
-      isConsistentOnline (aggregateMemoryAccesses rows) ↔
-        isConsistentOffline (aggregateMemoryAccesses rows)) :
-    isConsistentOnline (aggregateMemoryAccesses rows) ↔
-      isConsistentOffline (aggregateMemoryAccesses rows) :=
-  h_offline_bridge
+    (h_sorted : (aggregateMemoryAccesses rows).isTimestampSorted)
+    (h_nodup : (aggregateMemoryAccesses rows).Notimestampdup) :
+    MemoryAccessList.isConsistentOnline (aggregateMemoryAccesses rows) h_sorted ↔
+    ∃ permuted : AddressSortedMemoryAccessList,
+      permuted.val.Perm (aggregateMemoryAccesses rows) ∧
+      MemoryAccessList.isConsistentOffline permuted.val permuted.property :=
+  MemoryAccessList.isConsistentOnline_iff_isConsistentOffline
+    (aggregateMemoryAccesses rows) h_sorted h_nodup
 
 end SP1Clean.Soundness

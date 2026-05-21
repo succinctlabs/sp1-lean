@@ -73,6 +73,15 @@ under `docs/`, look at the matching entry below.
   that blocks a polymorphic combinator and the JalrChip Path-1.5
   re-promotion that partially closes the iter-4 Tier-2 finding.
 
+- **`TRACE_SOUNDNESS_STATUS.md`** — consolidated status across the
+  three proof layers (dirty `correct_*`, Clean `FormalAssertion`,
+  trace-level aggregator) per chip, plus the remaining gaps for a
+  single end-to-end ensemble soundness + completeness theorem. Read
+  when scoping the next planning session on full trace-level closure.
+  Records what the Phase A–D scaffolding (memory bus + state bus +
+  multiplicity-gating + `is_real` binarity) delivers and what
+  discharge work + chip promotions remain.
+
 ## Auto-memory mirror
 
 `docs/memory/` is **not** part of this documentation set — it's a
