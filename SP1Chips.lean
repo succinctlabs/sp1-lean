@@ -4,8 +4,10 @@ import SP1Chips.Addi.Constraints
 import SP1Chips.AddiChip
 import SP1Chips.Addw.Constraints
 import SP1Chips.AddwChip
+import SP1Chips.Bitwise.Common
 import SP1Chips.Bitwise.Constraints
 import SP1Chips.BitwiseChip
+import SP1Chips.Branch.Common
 import SP1Chips.Branch.Constraints
 import SP1Chips.BranchChip
 import SP1Chips.DivRem.Common
@@ -19,9 +21,13 @@ import SP1Chips.Jal.Constraints
 import SP1Chips.JalChip
 import SP1Chips.Jalr.Constraints
 import SP1Chips.JalrChip
+import SP1Chips.Load.LoadByte.Common
 import SP1Chips.Load.LoadByte.Constraints
+import SP1Chips.Load.LoadDouble.Common
 import SP1Chips.Load.LoadDouble.Constraints
+import SP1Chips.Load.LoadHalf.Common
 import SP1Chips.Load.LoadHalf.Constraints
+import SP1Chips.Load.LoadWord.Common
 import SP1Chips.Load.LoadWord.Constraints
 import SP1Chips.Load.LoadX0.Constraints
 import SP1Chips.LoadByteChip
@@ -29,8 +35,10 @@ import SP1Chips.LoadDoubleChip
 import SP1Chips.LoadHalfChip
 import SP1Chips.LoadWordChip
 import SP1Chips.LoadX0Chip
+import SP1Chips.Lt.Common
 import SP1Chips.Lt.Constraints
 import SP1Chips.LtChip
+import SP1Chips.Mul.Common
 import SP1Chips.Mul.Constraints
 import SP1Chips.MulChip
 import SP1Chips.ShiftLeft.Common

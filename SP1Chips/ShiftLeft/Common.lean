@@ -11,8 +11,126 @@ set_option linter.style.multiGoal false
 set_option maxHeartbeats 100000000
 set_option linter.style.longLine false
 
-
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+
+omit [Fact (2 ^ 17 < p)] in
+set_option maxRecDepth 1000000 in
+lemma allHold_constraints_iff (Main : Vector (ZMod p) 65) :
+  List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[33] { msb := Main[61] } Main[63]) ∧
+    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[62] + Main[63])) ∧
+    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[62] * 6 + Main[63] * 21)
+      #v[Main[32], Main[33], Main[34], Main[35]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } (Main[62] + Main[63]) (Main[62] + Main[63])) ∧
+    (Main[62] + Main[63] = 0 ∨ Main[62] + Main[63] = 1) ∧
+    (Main[62] = 0 ∨ Main[62] = 1) ∧
+    (Main[63] = 0 ∨ Main[63] = 1) ∧
+    (Main[36] = 0 ∨ Main[36] = 1) ∧
+    (Main[37] = 0 ∨ Main[37] = 1) ∧
+    (Main[38] = 0 ∨ Main[38] = 1) ∧
+    (Main[39] = 0 ∨ Main[39] = 1) ∧
+    (Main[40] = 0 ∨ Main[40] = 1) ∧
+    (Main[41] = 0 ∨ Main[41] = 1) ∧
+    (¬Main[62] + Main[63] = 0 → ((Main[25] - (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8 + Main[40] * 16 + Main[41] * 32)) * ((64 : ZMod p)⁻¹)).val < 2 ^ (10 : ZMod p).val) ∧
+    (Main[45] = 0 ∨ Main[40] + Main[41] * 2 * Main[62] = 0) ∧
+    (Main[45] = 0 ∨ Main[45] = 1) ∧
+    (Main[46] = 0 ∨ Main[40] + Main[41] * 2 * Main[62] = 1) ∧
+    (Main[46] = 0 ∨ Main[46] = 1) ∧
+    (Main[47] = 0 ∨ Main[40] + Main[41] * 2 * Main[62] = 2) ∧
+    (Main[47] = 0 ∨ Main[47] = 1) ∧
+    (Main[48] = 0 ∨ Main[40] + Main[41] * 2 * Main[62] = 3) ∧
+    (Main[48] = 0 ∨ Main[48] = 1) ∧
+    (Main[62] + Main[63] = 0 ∨ Main[45] + Main[46] + Main[47] + Main[48] = 1) ∧
+    (Main[42] = (Main[36] + 1) * (Main[37] * 3 + 1)) ∧
+    (Main[43] = Main[42] * (Main[38] * 15 + 1)) ∧
+    (Main[44] = Main[43] * (Main[39] * 255 + 1)) ∧
+    (¬Main[62] + Main[63] = 0 → Main[49].val < 2 ^ ((16 : ZMod p) - (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val) ∧
+    (¬Main[62] + Main[63] = 0 → Main[53].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8).val) ∧
+    (Main[15] * Main[44] = Main[53] * 65536 + Main[49] * Main[44]) ∧
+    (¬Main[62] + Main[63] = 0 → Main[50].val < 2 ^ ((16 : ZMod p) - (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val) ∧
+    (¬Main[62] + Main[63] = 0 → Main[54].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8).val) ∧
+    (Main[16] * Main[44] = Main[54] * 65536 + Main[50] * Main[44]) ∧
+    (¬Main[62] + Main[63] = 0 → Main[51].val < 2 ^ ((16 : ZMod p) - (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val) ∧
+    (¬Main[62] + Main[63] = 0 → Main[55].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8).val) ∧
+    (Main[17] * Main[44] = Main[55] * 65536 + Main[51] * Main[44]) ∧
+    (¬Main[62] + Main[63] = 0 → Main[52].val < 2 ^ ((16 : ZMod p) - (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8)).val) ∧
+    (¬Main[62] + Main[63] = 0 → Main[56].val < 2 ^ (Main[36] + Main[37] * 2 + Main[38] * 4 + Main[39] * 8).val) ∧
+    (Main[18] * Main[44] = Main[56] * 65536 + Main[52] * Main[44]) ∧
+    (Main[57] = Main[49] * Main[44]) ∧
+    (Main[58] = Main[50] * Main[44] + Main[53]) ∧
+    (Main[59] = Main[51] * Main[44] + Main[54]) ∧
+    (Main[60] = Main[52] * Main[44] + Main[55]) ∧
+    (Main[62] = 0 ∨ Main[45] = 0 ∨ Main[32] = Main[57]) ∧
+    (Main[62] = 0 ∨ Main[45] = 0 ∨ Main[33] = Main[58]) ∧
+    (Main[62] = 0 ∨ Main[45] = 0 ∨ Main[34] = Main[59]) ∧
+    (Main[62] = 0 ∨ Main[45] = 0 ∨ Main[35] = Main[60]) ∧
+    (Main[62] = 0 ∨ Main[46] = 0 ∨ Main[32] = 0) ∧
+    (Main[62] = 0 ∨ Main[46] = 0 ∨ Main[33] = Main[57]) ∧
+    (Main[62] = 0 ∨ Main[46] = 0 ∨ Main[34] = Main[58]) ∧
+    (Main[62] = 0 ∨ Main[46] = 0 ∨ Main[35] = Main[59]) ∧
+    (Main[62] = 0 ∨ Main[47] = 0 ∨ Main[32] = 0) ∧
+    (Main[62] = 0 ∨ Main[47] = 0 ∨ Main[33] = 0) ∧
+    (Main[62] = 0 ∨ Main[47] = 0 ∨ Main[34] = Main[57]) ∧
+    (Main[62] = 0 ∨ Main[47] = 0 ∨ Main[35] = Main[58]) ∧
+    (Main[62] = 0 ∨ Main[48] = 0 ∨ Main[32] = 0) ∧
+    (Main[62] = 0 ∨ Main[48] = 0 ∨ Main[33] = 0) ∧
+    (Main[62] = 0 ∨ Main[48] = 0 ∨ Main[34] = 0) ∧
+    (Main[62] = 0 ∨ Main[48] = 0 ∨ Main[35] = Main[57]) ∧
+    (Main[63] = 0 ∨ Main[45] = 0 ∨ Main[32] = Main[57]) ∧
+    (Main[63] = 0 ∨ Main[45] = 0 ∨ Main[33] = Main[58]) ∧
+    (Main[63] = 0 ∨ Main[46] = 0 ∨ Main[32] = 0) ∧
+    (Main[63] = 0 ∨ Main[46] = 0 ∨ Main[33] = Main[57]) ∧
+    (Main[63] = 0 ∨ Main[61] * 65535 = Main[34]) ∧
+    (Main[63] = 0 ∨ Main[61] * 65535 = Main[35]) ∧
+    Main[64] = Main[63] * Main[31] ∧
+    Main[13] = 0 := by
+  simp [constraints, sub_eq_zero]
+
+section opcodes
+
+lemma single_op (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold) :
+    (Main[62] = 1 → Main[63] = 0) ∧ (Main[63] = 1 → Main[62] = 0) := by
+  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
+  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
+  rw [allHold_constraints_iff] at cstrs
+  obtain ⟨_, _, _, sum_disj, b_sll, b_sllw, _⟩ := cstrs
+  have h_one_ne_zero : (1 : ZMod p) ≠ 0 := by
+    have hp : 2 ^ 17 < p := Fact.out
+    haveI : Fact (1 < p) := ⟨by omega⟩
+    have h1 : (1 : ZMod p).val = 1 := ZMod.val_one p
+    intro h; rw [h, ZMod.val_zero] at h1; exact one_ne_zero h1.symm
+  have h_two_ne_zero : (2 : ZMod p) ≠ 0 := val_2_ne_zero
+  refine ⟨fun h_sll => ?_, fun h_sllw => ?_⟩
+  · rcases b_sllw with h | h
+    · exact h
+    · exfalso
+      have : Main[62] + Main[63] = 2 := by rw [h_sll, h]; ring
+      rcases sum_disj with hs | hs
+      · apply h_two_ne_zero; linear_combination hs - this
+      · apply h_one_ne_zero; linear_combination hs - this
+  · rcases b_sll with h | h
+    · exact h
+    · exfalso
+      have : Main[62] + Main[63] = 2 := by rw [h, h_sllw]; ring
+      rcases sum_disj with hs | hs
+      · apply h_two_ne_zero; linear_combination hs - this
+      · apply h_one_ne_zero; linear_combination hs - this
+
+/-- Derive `Main[62] + Main[63] = 1` from cstrs + `Main[62] = 1`. -/
+lemma is_real_eq_one_of_sll (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold) (h_sll : Main[62] = 1) :
+    Main[62] + Main[63] = 1 := by
+  have ⟨hno_sllw, _⟩ := single_op Main cstrs
+  rw [h_sll, hno_sllw h_sll]; ring
+
+/-- Derive `Main[62] + Main[63] = 1` from cstrs + `Main[63] = 1`. -/
+lemma is_real_eq_one_of_sllw (Main : Vector (ZMod p) 65)
+    (cstrs : (constraints Main).allHold) (h_sllw : Main[63] = 1) :
+    Main[62] + Main[63] = 1 := by
+  have ⟨_, hno_sll⟩ := single_op Main cstrs
+  rw [hno_sll h_sllw, h_sllw]; ring
+
+end opcodes
 
 section field_arithmetic
 
@@ -1185,65 +1303,6 @@ lemma sllw_subcase_cb4_one {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 end field_arithmetic
 
-section opcodes
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] def is_sll (Main : Vector (ZMod p) 65) := Main[62] = 1 ∧ Main[31] = 0
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] def is_sllw (Main : Vector (ZMod p) 65) := Main[63] = 1 ∧ Main[31] = 0
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] def is_slli (Main : Vector (ZMod p) 65) := Main[62] = 1 ∧ Main[31] = 1
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] def is_slliw (Main : Vector (ZMod p) 65) := Main[63] = 1 ∧ Main[31] = 1
-
-lemma single_op (Main : Vector (ZMod p) 65)
-    (cstrs : (constraints Main).allHold) :
-    (Main[62] = 1 → Main[63] = 0) ∧ (Main[63] = 1 → Main[62] = 0) := by
-  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  change List.Forall SP1Constraint.toProp (constraints Main) at cstrs
-  rw [allHold_constraints_iff] at cstrs
-  obtain ⟨_, _, _, sum_disj, b_sll, b_sllw, _⟩ := cstrs
-  have h_one_ne_zero : (1 : ZMod p) ≠ 0 := by
-    have hp : 2 ^ 17 < p := Fact.out
-    haveI : Fact (1 < p) := ⟨by omega⟩
-    have h1 : (1 : ZMod p).val = 1 := ZMod.val_one p
-    intro h; rw [h, ZMod.val_zero] at h1; exact one_ne_zero h1.symm
-  have h_two_ne_zero : (2 : ZMod p) ≠ 0 := val_2_ne_zero
-  refine ⟨fun h_sll => ?_, fun h_sllw => ?_⟩
-  · rcases b_sllw with h | h
-    · exact h
-    · exfalso
-      have : Main[62] + Main[63] = 2 := by rw [h_sll, h]; ring
-      rcases sum_disj with hs | hs
-      · apply h_two_ne_zero; linear_combination hs - this
-      · apply h_one_ne_zero; linear_combination hs - this
-  · rcases b_sll with h | h
-    · exact h
-    · exfalso
-      have : Main[62] + Main[63] = 2 := by rw [h, h_sllw]; ring
-      rcases sum_disj with hs | hs
-      · apply h_two_ne_zero; linear_combination hs - this
-      · apply h_one_ne_zero; linear_combination hs - this
-
-/-- Derive `Main[62] + Main[63] = 1` from cstrs + `Main[62] = 1`. -/
-lemma is_real_eq_one_of_sll (Main : Vector (ZMod p) 65)
-    (cstrs : (constraints Main).allHold) (h_sll : Main[62] = 1) :
-    Main[62] + Main[63] = 1 := by
-  have ⟨hno_sllw, _⟩ := single_op Main cstrs
-  rw [h_sll, hno_sllw h_sll]; ring
-
-/-- Derive `Main[62] + Main[63] = 1` from cstrs + `Main[63] = 1`. -/
-lemma is_real_eq_one_of_sllw (Main : Vector (ZMod p) 65)
-    (cstrs : (constraints Main).allHold) (h_sllw : Main[63] = 1) :
-    Main[62] + Main[63] = 1 := by
-  have ⟨_, hno_sll⟩ := single_op Main cstrs
-  rw [hno_sll h_sllw, h_sllw]; ring
-
-end opcodes
-
 section bounds
 
 /-- Determine which opcode flag is set, given the sum constraint. -/
@@ -1493,20 +1552,5 @@ lemma bounds (Main : Vector (ZMod p) 65)
       exact zero_ne_one h13_eq_one
 
 end bounds
-
-section operands
-
-@[simp] def sp1_op_a (Main : Vector (ZMod p) 65) : BitVec 5 :=
-  BitVec.ofNat 5 Main[6].val
-@[simp] def sp1_op_b (Main : Vector (ZMod p) 65) : BitVec 5 :=
-  BitVec.ofNat 5 Main[14].val
-@[simp] def sp1_op_c (Main : Vector (ZMod p) 65) : BitVec 5 :=
-  BitVec.ofNat 5 Main[21].val
-@[simp] def sp1_op_c_imm (Main : Vector (ZMod p) 65) : BitVec 6 :=
-  BitVec.ofNat 6 Main[21].val
-@[simp] def sp1_op_c_imm_w (Main : Vector (ZMod p) 65) : BitVec 5 :=
-  BitVec.ofNat 5 Main[21].val
-
-end operands
 
 end ShiftLeft

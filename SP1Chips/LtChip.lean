@@ -6,6 +6,7 @@ import SP1Operations.Operation.U16MSBOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.ALUTypeReader
 import SP1Chips.Lt.Constraints
+import SP1Chips.Lt.Common
 
 open LeanRV64D.Functions BitVec
 

@@ -2,6 +2,7 @@ import SP1Operations.Operation.MulOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.RTypeReader
 import SP1Chips.Mul.Constraints
+import SP1Chips.Mul.Common
 
 open LeanRV64D.Functions
 open BitVec

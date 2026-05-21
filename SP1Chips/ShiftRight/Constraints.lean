@@ -365,91 +365,42 @@ section constraints
 
 end constraints
 
-section poly
+variable {p : ℕ}
 
-variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+section opcodes
 
-omit [Fact (2 ^ 17 < p)] in
-set_option maxRecDepth 1000000 in
-lemma allHold_constraints_iff (Main : Vector (ZMod p) 69) :
-  List.Forall SP1Constraint.toProp (constraints Main) ↔
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[18] { msb := Main[36] } Main[65]) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[16] { msb := Main[36] } Main[67]) ∧
-    List.Forall SP1Constraint.toProp (U16MSBOperation.constraints Main[33] { msb := Main[37] } (Main[66] + Main[67])) ∧
-    List.Forall SP1Constraint.toProp (CPUState.constraints { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2], pc := #v[Main[3], Main[4], Main[5]] } #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[64] + Main[65] + Main[66] + Main[67])) ∧
-    List.Forall SP1Constraint.toProp (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] (Main[64] * 7 + Main[65] * 8 + Main[66] * 22 + Main[67] * 23)
-      #v[Main[32], Main[33], Main[34], Main[35]] { op_a := Main[6], op_a_memory := { prev_value := #v[Main[7], Main[8], Main[9], Main[10]], access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } }, op_a_0 := Main[13], op_b := Main[14], op_b_memory := { prev_value := #v[Main[15], Main[16], Main[17], Main[18]], access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } }, op_c := #v[Main[21], Main[22], Main[23], Main[24]], op_c_memory := { prev_value := #v[Main[25], Main[26], Main[27], Main[28]], access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } }, imm_c := Main[31] } (Main[64] + Main[65] + Main[66] + Main[67]) (Main[64] + Main[65] + Main[66] + Main[67])) ∧
-    (Main[64] = 0 ∨ Main[64] = 1) ∧
-    (Main[65] = 0 ∨ Main[65] = 1) ∧
-    (Main[66] = 0 ∨ Main[66] = 1) ∧
-    (Main[67] = 0 ∨ Main[67] = 1) ∧
-    (Main[64] + Main[65] + Main[66] + Main[67] = 0 ∨ Main[64] + Main[65] + Main[66] + Main[67] = 1) ∧
-    (Main[68] = (Main[66] + Main[67]) * Main[31]) ∧
-    (Main[38] = 0 ∨ Main[38] = 1) ∧
-    (Main[39] = 0 ∨ Main[39] = 1) ∧
-    (Main[40] = 0 ∨ Main[40] = 1) ∧
-    (Main[41] = 0 ∨ Main[41] = 1) ∧
-    (Main[42] = 0 ∨ Main[42] = 1) ∧
-    (Main[43] = 0 ∨ Main[43] = 1) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → ((Main[25] - (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8 + Main[42] * 16 + Main[43] * 32)) * ((64 : ZMod p)⁻¹)).val < 2 ^ (10 : ZMod p).val) ∧
-    (Main[60] = 0 ∨ Main[42] + Main[43] * 2 * (Main[64] + Main[65]) = 0) ∧
-    (Main[60] = 0 ∨ Main[60] = 1) ∧
-    (Main[61] = 0 ∨ Main[42] + Main[43] * 2 * (Main[64] + Main[65]) = 1) ∧
-    (Main[61] = 0 ∨ Main[61] = 1) ∧
-    (Main[62] = 0 ∨ Main[42] + Main[43] * 2 * (Main[64] + Main[65]) = 2) ∧
-    (Main[62] = 0 ∨ Main[62] = 1) ∧
-    (Main[63] = 0 ∨ Main[42] + Main[43] * 2 * (Main[64] + Main[65]) = 3) ∧
-    (Main[63] = 0 ∨ Main[63] = 1) ∧
-    (Main[64] + Main[65] + Main[66] + Main[67] = 0 ∨ Main[60] + Main[61] + Main[62] + Main[63] = 1) ∧
-    (Main[47] = (1 - Main[38] + 1) * 2 * ((1 - Main[39]) * 3 + 1)) ∧
-    (Main[46] = Main[47] * ((1 - Main[40]) * 15 + 1)) ∧
-    (Main[45] = Main[46] * ((1 - Main[41]) * 255 + 1)) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[48].val < 2 ^ (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8 : ZMod p).val) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[52].val < 2 ^ ((16 : ZMod p) - (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8)).val) ∧
-    (Main[15] * Main[45] = Main[52] * 65536 + Main[48] * Main[45]) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[49].val < 2 ^ (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8 : ZMod p).val) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[53].val < 2 ^ ((16 : ZMod p) - (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8)).val) ∧
-    (Main[16] * Main[45] = Main[53] * 65536 + Main[49] * Main[45]) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[50].val < 2 ^ (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8 : ZMod p).val) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[54].val < 2 ^ ((16 : ZMod p) - (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8)).val) ∧
-    (Main[17] * Main[45] * (Main[64] + Main[65]) = Main[54] * 65536 + Main[50] * Main[45]) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[51].val < 2 ^ (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8 : ZMod p).val) ∧
-    (¬Main[64] + Main[65] + Main[66] + Main[67] = 0 → Main[55].val < 2 ^ ((16 : ZMod p) - (Main[38] + Main[39] * 2 + Main[40] * 4 + Main[41] * 8)).val) ∧
-    (Main[18] * Main[45] * (Main[64] + Main[65]) = Main[55] * 65536 + Main[51] * Main[45]) ∧
-    (Main[56] = Main[52] + Main[49] * Main[45]) ∧
-    (Main[57] = Main[53] + Main[50] * Main[45]) ∧
-    (Main[58] = Main[54] + Main[51] * Main[45]) ∧
-    (Main[59] = Main[55]) ∧
-    (Main[64] + Main[66] = 0 ∨ Main[36] = 0) ∧
-    (Main[44] = Main[36] * Main[45]) ∧
-    (Main[66] + Main[67] = 1 ∨ Main[37] = 0) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[60] = 0 ∨ Main[32] = Main[56]) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[60] = 0 ∨ Main[33] = Main[57]) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[60] = 0 ∨ Main[34] = Main[58]) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[60] = 0 ∨ Main[35] = Main[59] + (Main[36] * 65536 - Main[44])) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[61] = 0 ∨ Main[32] = Main[57]) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[61] = 0 ∨ Main[33] = Main[58]) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[61] = 0 ∨ Main[34] = Main[59] + (Main[36] * 65536 - Main[44])) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[61] = 0 ∨ Main[35] = Main[36] * 65535) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[62] = 0 ∨ Main[32] = Main[58]) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[62] = 0 ∨ Main[33] = Main[59] + (Main[36] * 65536 - Main[44])) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[62] = 0 ∨ Main[34] = Main[36] * 65535) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[62] = 0 ∨ Main[35] = Main[36] * 65535) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[63] = 0 ∨ Main[32] = Main[59] + (Main[36] * 65536 - Main[44])) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[63] = 0 ∨ Main[33] = Main[36] * 65535) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[63] = 0 ∨ Main[34] = Main[36] * 65535) ∧
-    (Main[64] + Main[65] = 0 ∨ Main[63] = 0 ∨ Main[35] = Main[36] * 65535) ∧
-    (Main[66] + Main[67] = 0 ∨ Main[60] = 0 ∨ Main[32] = Main[56]) ∧
-    (Main[66] + Main[67] = 0 ∨ Main[60] = 0 ∨ Main[33] = Main[57] + (Main[36] * 65536 - Main[44])) ∧
-    (Main[66] + Main[67] = 0 ∨ Main[61] = 0 ∨ Main[32] = Main[57] + (Main[36] * 65536 - Main[44])) ∧
-    (Main[66] + Main[67] = 0 ∨ Main[61] = 0 ∨ Main[33] = Main[36] * 65535) ∧
-    (Main[66] + Main[67] = 0 ∨ Main[34] = Main[37] * 65535) ∧
-    (Main[66] + Main[67] = 0 ∨ Main[35] = Main[37] * 65535) ∧
-    Main[13] = 0
-   := by
-  haveI : NeZero p := ⟨(Fact.out (p := Nat.Prime p)).pos.ne'⟩
-  simp [constraints, sub_eq_zero]
+@[simp] def is_real (Main : Vector (ZMod p) 69) : Prop :=
+  Main[64] = 1 ∨ Main[65] = 1 ∨ Main[66] = 1 ∨ Main[67] = 1
+  deriving Decidable
 
-end poly
+@[simp] def is_srl (Main : Vector (ZMod p) 69) := Main[64] = 1 ∧ Main[31] = 0
+  deriving Decidable
+@[simp] def is_sra (Main : Vector (ZMod p) 69) := Main[65] = 1 ∧ Main[31] = 0
+  deriving Decidable
+@[simp] def is_srlw (Main : Vector (ZMod p) 69) := Main[66] = 1 ∧ Main[31] = 0
+  deriving Decidable
+@[simp] def is_sraw (Main : Vector (ZMod p) 69) := Main[67] = 1 ∧ Main[31] = 0
+  deriving Decidable
+@[simp] def is_srli (Main : Vector (ZMod p) 69) := Main[64] = 1 ∧ Main[31] = 1
+  deriving Decidable
+@[simp] def is_srai (Main : Vector (ZMod p) 69) := Main[65] = 1 ∧ Main[31] = 1
+  deriving Decidable
+@[simp] def is_srliw (Main : Vector (ZMod p) 69) := Main[66] = 1 ∧ Main[31] = 1
+  deriving Decidable
+@[simp] def is_sraiw (Main : Vector (ZMod p) 69) := Main[67] = 1 ∧ Main[31] = 1
+  deriving Decidable
+
+@[simp] def sp1_op_a (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[6].val
+@[simp] def sp1_op_b (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[14].val
+@[simp] def sp1_op_c (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+@[simp] def sp1_op_c_imm (Main : Vector (ZMod p) 69) : BitVec 6 :=
+  BitVec.ofNat 6 Main[21].val
+@[simp] def sp1_op_c_imm_w (Main : Vector (ZMod p) 69) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+
+end opcodes
 
 end ShiftRight

@@ -1,5 +1,6 @@
 import SP1Foundations
 import SP1Chips.Branch.Constraints
+import SP1Chips.Branch.Common
 
 namespace Branch
 

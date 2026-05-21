@@ -1,30 +1,8 @@
 import SP1Foundations.Misc
 
 /-!
-# KoalaBear field setup and bridges to a generic prime field
-
-This file plays two roles:
-
-1. **Concrete field instances on `Fin KB`** (`namespace KoalaBear`): primality,
-   `Field`, `NoZeroDivisors`, and a block of high-priority arithmetic instances
-   that are perf-critical (see `docs/PROOF_PATTERNS.md`).
-2. **KB-specific bridges** (free-floating lemmas below the namespace): `rfl`-only
-   facts like `(2130673921 : Fin KB) = 65536⁻¹` that translate the literal
-   inverse-of-`2^k` values that the SP1 constraint compiler emits into
-   `Field`-generic forms (`(2^k : F)⁻¹`). These are inherently KB-specific
-   because the literal value is the modular inverse computed in `Fin KB`. They
-   are the "instantiation-time bridge" — generic operation lemmas (Phase 3 of
-   `docs/FIELD_GENERIC.md`) state their RHS in terms of `(2^k : F)⁻¹` so the
-   only KB-coupling is whether the simp set includes the matching bridge.
-
-A second concrete field (e.g. BabyBear) would need its own copies of these
-bridges with its own literal values; the constraint compiler would emit a
-different literal for `(2^16)⁻¹` mod that prime. See Phase 5 of
-`docs/FIELD_GENERIC.md` for the BabyBear instantiation recipe.
+# General Facts about Prime Fields
 -/
-
-notation "KB" => 2130706433
-@[simp] lemma BB_eq : KB = 2130706433 := rfl
 
 /-- `Fin n`-level mod equals zero iff the underlying `Nat` mod does. Generic over any
 `Fin n`; the only dependence was on `(m : Fin n).val = m.val`. Useful because the
@@ -82,32 +60,13 @@ the iff RHS `Opcode.ofNat opcode.val` form. -/
 
 namespace KoalaBear
 
--- dt: Need `#eval`-level `native_decide` strength to make this work on all OS
-set_option linter.style.nativeDecide false in
-lemma prime_KoalaBearPrime : Nat.Prime KB := by native_decide
-
-instance Fact_BBPrime : Fact (Nat.Prime KB) := ⟨prime_KoalaBearPrime⟩
-instance : NeZero KB := by constructor; decide
-
--- dt: Wouldn't need this if `ZMod` was the fundamental object for us.
-instance : Field (Fin KB) := ZMod.instField KB
-instance : NoZeroDivisors (Fin 2130706433) := Fin.noZeroDivisors_of_prime _ (hp := Fact_BBPrime)
-
--- High-priority direct instances for Fin KB arithmetic. Without these, Lean's
--- typeclass synth considers 5-9 candidates per Add/Mul/Sub/OfNat query (via
--- AddZero.toAdd, Lean.Grind.Semiring.toAdd, AddSemigroup.toAdd, etc.). The
--- constraints files have thousands of Fin KB arithmetic ops, so this matters —
--- initial profile showed 779s cumulative typeclass inference in ShiftRight.
-@[instance 10000] instance instAdd : Add (Fin KB) := Fin.instAdd
-@[instance 10000] instance instMul : Mul (Fin KB) := Fin.instMul
-@[instance 10000] instance instSub : Sub (Fin KB) := Fin.instSub
-@[instance 10000] instance instNeg : Neg (Fin KB) := inferInstance
-@[instance 10000] instance instZero : Zero (Fin KB) := inferInstance
-@[instance 10000] instance instOne : One (Fin KB) := inferInstance
-@[instance 10000] instance instOfNat (n : Nat) : OfNat (Fin KB) n := Fin.instOfNat
-@[instance 10000] instance instHAdd : HAdd (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a + b⟩
-@[instance 10000] instance instHMul : HMul (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a * b⟩
-@[instance 10000] instance instHSub : HSub (Fin KB) (Fin KB) (Fin KB) := ⟨fun a b => a - b⟩
+-- High-priority direct instances for ZMod p Arithmetic
+@[instance 10000] instance instAdd (p : ℕ) [NeZero p] : Add (ZMod p) := inferInstance
+@[instance 10000] instance instMul (p : ℕ) [NeZero p] : Mul (ZMod p) := inferInstance
+@[instance 10000] instance instSub (p : ℕ) [NeZero p] : Sub (ZMod p) := inferInstance
+@[instance 10000] instance instNeg (p : ℕ) [NeZero p] : Neg (ZMod p) := inferInstance
+@[instance 10000] instance instZero (p : ℕ) [NeZero p] : Zero (ZMod p) := inferInstance
+@[instance 10000] instance instOne (p : ℕ) [NeZero p] : One (ZMod p) := inferInstance
 
 end KoalaBear
 
@@ -372,20 +331,6 @@ lemma val_sub_cases {p : ℕ} [NeZero p] (a b : ZMod p) :
     rw [if_neg hba, ZMod.val_sub (le_of_lt h)]
 
 end Polymorphic
-
-/-- At `p := KB`, the strong-prime fact decides. Other concrete primes ≥ 2^17
-(BabyBear, Mersenne31) similarly decide. Registered as an instance so chip
-code that pins `F := Fin KB = ZMod KB` synthesizes the polymorphic helpers
-automatically. -/
-instance KoalaBear.Fact_2pow17_lt_KB : Fact (2 ^ 17 < KB) := ⟨by decide⟩
-
-/-- Strengthened version of the polymorphic prime-size hypothesis used by the
-Mul `` operation lemmas (`core_mul` / `core_mulw` and the
-five `MulOperation.spec.<variant>` lemmas). The byte-level carry chain
-needs `prod[i].val + carry[i].val * 256 < p` (max ≤ 2 ^ 24 − 1) to lift
-the ZMod constraints to Nat equations cleanly. KB ≈ 2^31 satisfies this
-trivially; BabyBear and Mersenne31 do as well. -/
-instance KoalaBear.Fact_2pow24_lt_KB : Fact (2 ^ 24 < KB) := ⟨by decide⟩
 
 /-! ### Integer helpers (not field-related; lives here for historical reasons) -/
 

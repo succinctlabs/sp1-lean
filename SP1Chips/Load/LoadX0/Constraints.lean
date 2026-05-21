@@ -170,7 +170,7 @@ section constraints
 
 end constraints
 
-section poly_helpers
+section opcodes
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
@@ -180,11 +180,13 @@ by exactly one of `Main[41..47]` being 1, and the sum is the chip-wide
 "is real" flag. -/
 @[simp] def is_loadX0 (Main : Vector (ZMod p) 48) : Prop :=
   Main[41] + Main[42] + Main[43] + Main[44] + Main[45] + Main[46] + Main[47] = 1
+  deriving Decidable
 
 /-- `Main[47] = 1` selects the LD (load-doubleword) sub-opcode. -/
 @[simp] def is_loadX0_ld (Main : Vector (ZMod p) 48) : Prop := Main[47] = 1
+  deriving Decidable
 
-end poly_helpers
+end opcodes
 
 end LoadX0
 

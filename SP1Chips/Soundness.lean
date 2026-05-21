@@ -42,13 +42,6 @@ having to stitch together five-to-eight opcode-specific theorems per chip.
 
 open LeanRV64D.Functions BitVec Sail
 
--- The if-then-else dispatch in multi-opcode soundness theorems uses propositional
--- selectors (`is_<op> Main`) which reduce to ZMod equalities. We pull in
--- classical decidability for these statements rather than threading explicit
--- `Decidable` instances through every chip.
-set_option linter.style.openClassical false
-open Classical
-
 section
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 

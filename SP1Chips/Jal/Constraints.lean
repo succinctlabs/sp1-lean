@@ -75,12 +75,13 @@ section constraints
 
 end constraints
 
-section poly_helpers
+section opcodes
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 @[simp] def is_real (Main : Vector (ZMod p) 31) : Prop := Main[30] = 1
+  deriving Decidable
 
-end poly_helpers
+end opcodes
 
 end Jal
