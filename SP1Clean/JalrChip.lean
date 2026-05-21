@@ -100,18 +100,18 @@ def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
   op_a_0 * op_a_write_value[2] === 0
 
 /-- Pilot Spec, expressed over field-valued `JalrCols (ZMod p)`. The
-two `AddOperation` clauses are left in raw `allHold_poly` form
+two `AddOperation` clauses are left in raw `allHold` form
 (one gated on `is_real`, the other on `is_real - op_a_0`). -/
 def Spec (cols : JalrCols (ZMod p)) : Prop :=
   (_root_.AddOperation.constraints (F := ZMod p)
       cols.op_b_memory_prev_value cols.op_c_imm
       { value := cols.jump_target }
-      cols.is_real).allHold_poly ∧
+      cols.is_real).allHold ∧
   (_root_.AddOperation.constraints (F := ZMod p)
       #v[cols.pc[0], cols.pc[1], cols.pc[2], 0]
       #v[4, 0, 0, 0]
       { value := cols.op_a_write_value }
-      (cols.is_real - cols.op_a_0)).allHold_poly ∧
+      (cols.is_real - cols.op_a_0)).allHold ∧
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
       (cols.clk_0_16 + cols.clk_16_24 * 65536) 47 cols.pc
@@ -157,13 +157,13 @@ def opBMemoryAccess (cols : JalrCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) 
 /-! ## Full `FormalAssertion` promotion (Path-2; Tier-2 probe finding)
 
 **Tier-2 probe result.** JalrChip has two `AddOperation.constraints
-... allHold_poly` clauses in its legacy `Spec` (one gated on `is_real`,
+... allHold` clauses in its legacy `Spec` (one gated on `is_real`,
 one gated on `is_real - op_a_0`). The Clean `SP1Clean.AddOp.assertion`
 subcircuit is unconditional — it emits the AddOp constraints with no
 selector. Calling it from `Assertion.main` would force the carry chain
 to hold even on is_real=0 rows (and op_a=x0 rows for the second AddOp),
 which breaks completeness on those rows. Adding gating to Clean's
-subcircuit DSL is out of scope for this round, so the raw `allHold_poly`
+subcircuit DSL is out of scope for this round, so the raw `allHold`
 clauses remain in the legacy `Spec` and we promote only the
 unconditional lookup-derivable surface.
 

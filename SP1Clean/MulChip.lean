@@ -42,7 +42,7 @@ Three structural unknowns it forces:
 
 The pilot deliberately does **not** mirror SP1's `MulOperation` as a
 separate Clean operation file. The iff RHS in
-`MulOperation.allHold_constraints_iff_is_real_poly` is 60+ conjuncts
+`MulOperation.allHold_constraints_iff_is_real` is 60+ conjuncts
 spanning the full 16-limb product carry chain plus sub-fragments —
 inlining it into a Clean `Spec` would be enormous and tells us nothing
 new about Risk 1 beyond what the chip-level scaling test already
@@ -199,7 +199,7 @@ def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
 
 /-- Placeholder for the MulOperation-derivable Spec content. Currently
 trivially `True`; a follow-up iteration can either inline the 60+
-conjuncts of `MulOperation.allHold_constraints_iff_is_real_poly`'s RHS
+conjuncts of `MulOperation.allHold_constraints_iff_is_real`'s RHS
 or factor a dedicated `SP1Clean.MulOp.Spec` predicate.
 
 The chip-level Spec below references this placeholder so the

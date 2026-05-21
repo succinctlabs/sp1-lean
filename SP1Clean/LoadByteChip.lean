@@ -11,6 +11,9 @@ import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.CPUState
+import SP1Operations.Operation.AddrAddOperation
+import SP1Chips.Load.LoadByte.Common
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -24,7 +27,7 @@ not exhausted by register reads: in addition to the three register
 accesses every reader emits (`op_a`, `op_b`, `op_c`), `LoadByteChip` also
 emits a memory access at the computed load address `op_b + sign_ext(imm_c)`.
 That additional access has `addr0.val ≥ 32` in general, so it hits the
-RAM branch of `SP1Constraint.toStateProp_poly` rather than the
+RAM branch of `SP1Constraint.toStateProp` rather than the
 register-special-case branch — exercising both code paths the `MemoryAccess`
 record needs to support.
 
@@ -177,7 +180,7 @@ def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
   -- The load-side memory access. Address is the 3-limb `addr_value`
   -- computed by the AddressOperation; this is generally NOT a register
   -- address (`addr_value[0].val ≥ 32`), so the RAM branch of
-  -- `SP1Constraint.toStateProp_poly` fires.
+  -- `SP1Constraint.toStateProp` fires.
   SP1Clean.memoryAccessSpec
     (cols.clk_0_16 + cols.clk_16_24 * 65536) 1
     { addr := cols.addr_value,
@@ -214,5 +217,198 @@ def loadMemoryAccess (cols : LoadByteCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
     prev_value := cols.load_prev_value,
     prev_low := cols.load_memory_prev_low,
     diff_low_limb := cols.load_memory_diff_low }
+
+/-- Project a raw SP1 row into the structured `LoadByteCols` view. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 47) : LoadByteCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20],
+   #v[Main[21], Main[22], Main[23], Main[24]],
+   #v[Main[25], Main[26], Main[27]],
+   Main[28],
+   #v[Main[29], Main[30], Main[31], Main[32]],
+   Main[33], Main[34], Main[35], Main[36], Main[37],
+   Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44],
+   Main[45], Main[46]⟩
+
+/-! ## `SpecForIff` — iff-equivalent to the SP1 constraint list
+
+These two predicates mirror the RHS of
+`_root_.Load.LoadByte.allHold_constraints_iff_of_is_l<op>` verbatim,
+modulo replacing the raw `(CPUState.constraints …).allHold` /
+`(ITypeReader.constraints …).allHold` clauses with the Clean-flavored
+`cpuStateSpec` / `itypeReaderSpec` predicates. They serve the iff_sp1
+bridge; the lighter-weight `Spec` above remains for the OfflineMemory
+trace bridge (which consumes `loadMemoryAccess` directly, not `Spec`).
+
+The `AddrAddOperation.constraints` clause stays in raw `.allHold` form
+because no Clean-side mirror of that operation exists yet (Phase-B per
+`docs/CLEAN_PILOT_ROADMAP.md` §3). -/
+
+/-- Iff RHS for the signed Load Byte (LB) variant, mirroring
+`_root_.Load.LoadByte.allHold_constraints_iff_of_is_lb`. -/
+def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
+  SP1Clean.AddrAddOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_imm
+      { value := cols.addr_value } ∧
+  (cols.byte_selector_top = 0 ∨ cols.byte_selector_top = 1) ∧
+  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_mid = 1) ∧
+  (cols.byte_selector_lo = 0 ∨ cols.byte_selector_lo = 1) ∧
+  cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
+  ((cols.addr_value[0] - 4 * cols.byte_selector_lo - 2 * cols.byte_selector_mid
+        - cols.byte_selector_top) * (8 : ZMod p)⁻¹).val
+    < 2 ^ ZMod.val (13 : ZMod p) ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ITypeReader.itypeReaderSpec
+      (cols.clk_0_16 + cols.clk_16_24 * 65536) 29 cols.pc
+      #v[cols.result_byte + 65280 * cols.signed_extension_flag,
+         65535 * cols.signed_extension_flag,
+         65535 * cols.signed_extension_flag,
+         65535 * cols.signed_extension_flag]
+      { op_a := cols.op_a,
+        op_a_memory :=
+          { prev_value := cols.op_a_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_a_memory_prev_low,
+                diff_low_limb := cols.op_a_memory_diff_low } },
+        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+        op_b_memory :=
+          { prev_value := cols.op_b_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_b_memory_prev_low,
+                diff_low_limb := cols.op_b_memory_diff_low } },
+        op_c_imm := cols.op_c_imm } ∧
+  (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
+  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.clk_high -
+      (cols.load_memory_flag * cols.load_memory_prev_low +
+        (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
+    cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
+  cols.load_memory_diff_low.val < 65536 ∧
+  ((0 : ZMod p) < 256 ∧ cols.load_memory_diff_high < (256 : ZMod p) ∧
+    (0 : ZMod p) < 256) ∧
+  Word.isU64 cols.load_prev_value ∧
+  cols.is_lbu = 0 ∧ cols.op_a_0 = 0 ∧
+  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 1 ∨
+    cols.selected_byte = cols.load_prev_value[0]) ∧
+  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 1 ∨
+    cols.selected_byte = cols.load_prev_value[1]) ∧
+  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 0 ∨
+    cols.selected_byte = cols.load_prev_value[2]) ∧
+  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 0 ∨
+    cols.selected_byte = cols.load_prev_value[3]) ∧
+  ((0 : ZMod p) < 256 ∧ cols.selected_byte_alt < (256 : ZMod p) ∧
+    (cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹
+      < (256 : ZMod p)) ∧
+  cols.result_byte = cols.byte_selector_top *
+      ((cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹) +
+    (1 - cols.byte_selector_top) * cols.selected_byte_alt ∧
+  (cols.signed_extension_flag < (256 : ZMod p) ∧
+    cols.result_byte < (256 : ZMod p)) ∧
+  (cols.signed_extension_flag = 0 ∨ cols.signed_extension_flag = 1) ∧
+  (cols.signed_extension_flag = 1 ↔ (128 : ZMod p) ≤ cols.result_byte)
+
+/-- Iff RHS for the unsigned Load Byte (LBU) variant, mirroring
+`_root_.Load.LoadByte.allHold_constraints_iff_of_is_lbu`. Differs from
+the signed variant in the ITypeReader opcode (32 vs 29), the forced-zero
+selector (`is_lb = 0` vs `is_lbu = 0`), and the sign-extension trailer
+(`signed_extension_flag = 0` instead of the MSB lookup). -/
+def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
+  SP1Clean.AddrAddOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_imm
+      { value := cols.addr_value } ∧
+  (cols.byte_selector_top = 0 ∨ cols.byte_selector_top = 1) ∧
+  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_mid = 1) ∧
+  (cols.byte_selector_lo = 0 ∨ cols.byte_selector_lo = 1) ∧
+  cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
+  ((cols.addr_value[0] - 4 * cols.byte_selector_lo - 2 * cols.byte_selector_mid
+        - cols.byte_selector_top) * (8 : ZMod p)⁻¹).val
+    < 2 ^ ZMod.val (13 : ZMod p) ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ITypeReader.itypeReaderSpec
+      (cols.clk_0_16 + cols.clk_16_24 * 65536) 32 cols.pc
+      #v[cols.result_byte + 65280 * cols.signed_extension_flag,
+         65535 * cols.signed_extension_flag,
+         65535 * cols.signed_extension_flag,
+         65535 * cols.signed_extension_flag]
+      { op_a := cols.op_a,
+        op_a_memory :=
+          { prev_value := cols.op_a_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_a_memory_prev_low,
+                diff_low_limb := cols.op_a_memory_diff_low } },
+        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+        op_b_memory :=
+          { prev_value := cols.op_b_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_b_memory_prev_low,
+                diff_low_limb := cols.op_b_memory_diff_low } },
+        op_c_imm := cols.op_c_imm } ∧
+  (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
+  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.clk_high -
+      (cols.load_memory_flag * cols.load_memory_prev_low +
+        (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
+    cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
+  cols.load_memory_diff_low.val < 65536 ∧
+  ((0 : ZMod p) < 256 ∧ cols.load_memory_diff_high < (256 : ZMod p) ∧
+    (0 : ZMod p) < 256) ∧
+  Word.isU64 cols.load_prev_value ∧
+  cols.is_lb = 0 ∧ cols.op_a_0 = 0 ∧
+  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 1 ∨
+    cols.selected_byte = cols.load_prev_value[0]) ∧
+  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 1 ∨
+    cols.selected_byte = cols.load_prev_value[1]) ∧
+  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 0 ∨
+    cols.selected_byte = cols.load_prev_value[2]) ∧
+  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 0 ∨
+    cols.selected_byte = cols.load_prev_value[3]) ∧
+  ((0 : ZMod p) < 256 ∧ cols.selected_byte_alt < (256 : ZMod p) ∧
+    (cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹
+      < (256 : ZMod p)) ∧
+  cols.result_byte = cols.byte_selector_top *
+      ((cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹) +
+    (1 - cols.byte_selector_top) * cols.selected_byte_alt ∧
+  cols.signed_extension_flag = 0
+
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: the iff destructure unfolds the full constraint list
+-- via the SP1-side `_of_is_lb` helper.
+/-- The chip-level bridge for the signed Load Byte variant. -/
+theorem iff_sp1_of_is_lb (Main : Vector (ZMod p) 47) (h_is_lb : Main[45] = 1) :
+    (_root_.Load.LoadByte.constraints Main).allHold ↔
+      SpecForIff_of_is_lb (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change List.Forall SP1Constraint.toProp (_root_.Load.LoadByte.constraints Main) ↔ _
+  rw [_root_.Load.LoadByte.allHold_constraints_iff_of_is_lb Main h_is_lb]
+  simp only [show ∀ (a : SP1ConstraintList (ZMod p)),
+      List.Forall SP1Constraint.toProp a = a.allHold from fun _ => rfl,
+    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+    SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1,
+    SP1Clean.AddrAddOp.iff_sp1]
+  simp [SpecForIff_of_is_lb, fromMain]
+
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: same reason as `iff_sp1_of_is_lb`.
+/-- The chip-level bridge for the unsigned Load Byte variant. -/
+theorem iff_sp1_of_is_lbu (Main : Vector (ZMod p) 47) (h_is_lbu : Main[46] = 1) :
+    (_root_.Load.LoadByte.constraints Main).allHold ↔
+      SpecForIff_of_is_lbu (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change List.Forall SP1Constraint.toProp (_root_.Load.LoadByte.constraints Main) ↔ _
+  rw [_root_.Load.LoadByte.allHold_constraints_iff_of_is_lbu Main h_is_lbu]
+  simp only [show ∀ (a : SP1ConstraintList (ZMod p)),
+      List.Forall SP1Constraint.toProp a = a.allHold from fun _ => rfl,
+    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+    SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1,
+    SP1Clean.AddrAddOp.iff_sp1]
+  simp [SpecForIff_of_is_lbu, fromMain]
 
 end SP1Clean.LoadByte

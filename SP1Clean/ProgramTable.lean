@@ -18,10 +18,10 @@ interactions emitted by readers (R-type, I-type, ALU-type, etc.).
 The program bus is "send-only" in SP1 — there is no receive side; chips
 trust the row's claim that it is executing `opcode` at `pc`. We mirror this
 on the Clean side with a **stateless** `Table` whose `Contains` predicate
-is exactly the RHS of `SP1Constraint.toProp_poly` for the `.program` case
+is exactly the RHS of `SP1Constraint.toProp` for the `.program` case
 in `SP1Foundations/Constraint.lean`:
 
-  opcode.trusted_instr_poly ∧ register bounds ∧ PC alignment ∧ flag binarity ∧
+  opcode.trusted_instr ∧ register bounds ∧ PC alignment ∧ flag binarity ∧
   (op_a_0 ↔ op_a = 0)
 
 Per the pilot's convention (see `SP1Clean/ByteOpcodeTable.lean`), SP1's
@@ -41,10 +41,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- Spec of `ProgramTable`. A 16-tuple
 `#v[pc0, pc1, pc2, opcode, op_a, op_b_0..3, op_c_0..3, op_a_0, imm_b, imm_c]`
 is in the table iff the corresponding `AirInteraction.program` clause's
-`SP1Constraint.toProp_poly` (under `mult = 1`) holds. -/
+`SP1Constraint.toProp` (under `mult = 1`) holds. -/
 def ProgramSpec (row : fields 16 (ZMod p)) : Prop :=
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  (Opcode.ofNat row[3].val).trusted_instr_poly
+  (Opcode.ofNat row[3].val).trusted_instr
       row[4] row[5] row[6] row[7] row[8] row[9] row[10] row[11] row[12]
       row[14] row[15]
     ∧ row[4] < (32 : ZMod p)
@@ -65,7 +65,7 @@ def ProgramSpec (row : fields 16 (ZMod p)) : Prop :=
 `ByteOpcodeTable`, this sidesteps a `StaticTable` enumeration (a full RV64IM
 program ROM would have to list every valid instruction encoding — overkill
 for the pilot, whose goal is the per-row equivalence to SP1's
-`toProp_poly`). -/
+`toProp`). -/
 def ProgramTable : Table (ZMod p) (fields 16) where
   name := "SP1Program"
   Contains _ row := ProgramSpec row

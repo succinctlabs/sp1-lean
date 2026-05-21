@@ -134,25 +134,25 @@ index map in `SP1Chips/Subw/Constraints.lean`. -/
    #v[Main[28], Main[29]],
    Main[30], Main[31]⟩
 
-/-- The chip-level bridge: SP1's `allHold_poly` over the flat row
+/-- The chip-level bridge: SP1's `allHold` over the flat row
 `Subw.constraints Main` is exactly `Spec (fromMain Main)`, under
 `is_real = Main[31] = 1`. -/
 theorem iff_sp1
     (Main : Vector (ZMod p) 32) (h_is_real : Main[31] = 1) :
-    (_root_.Subw.constraints Main).allHold_poly ↔ Spec (fromMain Main) := by
+    (_root_.Subw.constraints Main).allHold ↔ Spec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [fromMain, Spec, SP1Clean.SubwOp.Spec,
     SP1Clean.CPUState.cpuStateSpec, SP1Clean.RTypeReader.rtypeReaderSpec]
-  rw [show (_root_.Subw.constraints Main).allHold_poly ↔
+  rw [show (_root_.Subw.constraints Main).allHold ↔
         ((SubwOperation.constraints (F := ZMod p)
             #v[Main[15], Main[16], Main[17], Main[18]]
             #v[Main[22], Main[23], Main[24], Main[25]]
             { value := #v[Main[28], Main[29]], msb := { msb := Main[30] } }
-            Main[31]).allHold_poly ∧
+            Main[31]).allHold ∧
           (CPUState.constraints (F := ZMod p)
             { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
               pc := #v[Main[3], Main[4], Main[5]] }
-            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[31]).allHold_poly ∧
+            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[31]).allHold ∧
           (RTypeReader.constraints (F := ZMod p)
             Main[0] (Main[2] + Main[1] * 65536)
             #v[Main[3], Main[4], Main[5]] 20
@@ -172,12 +172,12 @@ theorem iff_sp1
                 { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
                   access_timestamp :=
                     { prev_low := Main[26], diff_low_limb := Main[27] } } }
-            Main[31] Main[31]).allHold_poly ∧
+            Main[31] Main[31]).allHold ∧
           (Main[31] * (Main[31] - 1) = 0 ∧ Main[13] = 0)) from by
-      simp [_root_.Subw.constraints, SP1ConstraintList.allHold_poly,
-        List.forall_append, List.Forall, SP1Constraint.toProp_poly]]
+      simp [_root_.Subw.constraints, SP1ConstraintList.allHold,
+        List.forall_append, List.Forall, SP1Constraint.toProp]]
   rw [h_is_real]
-  rw [SubwOperation.allHold_constraints_iff_poly,
+  rw [SubwOperation.allHold_constraints_iff,
       SP1Clean.CPUState.cpuStateSpec_iff_sp1,
       SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1]
   simp [SP1Clean.SubwOp.Spec, SP1Clean.CPUState.cpuStateSpec,
@@ -191,7 +191,7 @@ theorem correct_subw
     (Main : Vector (ZMod p) 32) (s : SailState)
     (h_is_real : Main[31] = 1)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Subw.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Subw.constraints Main).initialState s) :
     let op_c := _root_.Subw.sp1_op_c Main
     let op_b := _root_.Subw.sp1_op_b Main
     let op_a := _root_.Subw.sp1_op_a Main

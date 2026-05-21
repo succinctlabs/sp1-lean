@@ -363,7 +363,13 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
           diff_low_limb := cols.op_b_memory_diff_low }
       let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
         SP1Clean.LoadWord.loadMemoryAccess cols
-      [(op_a_mem, cols.op_a_write_value),
+      -- op_a is written with the sign-extended loaded word: the two
+      -- stored limbs `op_a_write_value_lo[0..1]` plus the
+      -- sign-extension limbs derived from `signed_extension_msb`.
+      [(op_a_mem,
+        #v[cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
+           65535 * cols.signed_extension_msb,
+           65535 * cols.signed_extension_msb]),
        (op_b_mem, cols.op_b_memory_prev_value),
        (load_mem, cols.load_prev_value)]
   | .branch cols =>
@@ -443,7 +449,14 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
           diff_low_limb := cols.op_b_memory_diff_low }
       let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
         SP1Clean.LoadHalf.loadMemoryAccess cols
-      [(op_a_mem, cols.op_a_write_value),
+      -- op_a is written with the sign-extended loaded half: the stored
+      -- limb `op_a_write_value_lo` plus three sign-extension limbs
+      -- derived from `signed_extension_msb`.
+      [(op_a_mem,
+        #v[cols.op_a_write_value_lo,
+           65535 * cols.signed_extension_msb,
+           65535 * cols.signed_extension_msb,
+           65535 * cols.signed_extension_msb]),
        (op_b_mem, cols.op_b_memory_prev_value),
        (load_mem, cols.load_prev_value)]
 

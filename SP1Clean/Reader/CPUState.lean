@@ -16,7 +16,7 @@ import SP1Clean.ByteOpcodeTable
 
 Factors out the inline `clk_0_16`/`clk_16_24` range clauses that every
 chip-level `Spec` would otherwise expand by hand. The `iff_sp1` re-export
-turns `CPUState.allHold_constraints_iff_is_real_poly` into a one-line
+turns `CPUState.allHold_constraints_iff_is_real` into a one-line
 rewrite at the chip level.
 -/
 
@@ -24,7 +24,7 @@ namespace SP1Clean.CPUState
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The RHS of `_root_.CPUState.allHold_constraints_iff_is_real_poly`,
+/-- The RHS of `_root_.CPUState.allHold_constraints_iff_is_real`,
 packaged as a named predicate. Captures the two range bounds the CPU-state
 fragment imposes on the clock fields under `is_real = 1`. The fragment's
 other arguments (`pc`, `next_pc`, `clk_increment`) appear in the `send
@@ -35,22 +35,22 @@ def cpuStateSpec (clk_0_16 clk_16_24 : ZMod p) : Prop :=
   clk_16_24 < (256 : ZMod p)
 
 /-- The bridge to SP1: under `is_real = 1`, the CPUState constraint list's
-`allHold_poly` is exactly `cpuStateSpec`. Pure re-export of
-`_root_.CPUState.allHold_constraints_iff_is_real_poly`. -/
+`allHold` is exactly `cpuStateSpec`. Pure re-export of
+`_root_.CPUState.allHold_constraints_iff_is_real`. -/
 theorem cpuStateSpec_iff_sp1
     {cols : _root_.CPUState (ZMod p)} {next_pc : Vector (ZMod p) 3}
     {clk_increment : ZMod p} :
-    (_root_.CPUState.constraints cols next_pc clk_increment 1).allHold_poly ↔
+    (_root_.CPUState.constraints cols next_pc clk_increment 1).allHold ↔
       cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  exact _root_.CPUState.allHold_constraints_iff_is_real_poly rfl
+  exact _root_.CPUState.allHold_constraints_iff_is_real rfl
 
 /-! ## Full `FormalAssertion` promotion
 
 Wraps the propositional layer of `_root_.CPUState.constraints` — the two
 byte lookups under `is_real = 1` — into a Clean `FormalAssertion`. The
 state `send`/`receive` interactions stay on the SP1 side (they live in
-`initialState_poly`, not in `allHold_poly`).
+`initialState`, not in `allHold`).
 -/
 
 /-- Bundled inputs: just the two clock-field components. -/
@@ -109,7 +109,7 @@ lemma byteOpcodeSpec_range13
     rfl
   subst h_eq
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
-             List.getElem_cons_zero, ByteOpcode.constrain_poly_Range] at hconstr
+             List.getElem_cons_zero, ByteOpcode.constrain_Range] at hconstr
   have h13 : (13 : ZMod p).val = 13 := by
     rw [show (13 : ZMod p) = ((13 : ℕ) : ZMod p) from by push_cast; rfl,
         ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
@@ -126,7 +126,7 @@ lemma byteOpcodeSpec_range13_of_lt
   refine ⟨.Range, ?_, ?_⟩
   · simp only [ByteOpcode.toNat, Vector.getElem_mk, List.getElem_toArray,
                List.getElem_cons_zero, Nat.cast_ofNat]
-  · simp only [ByteOpcode.constrain_poly_Range, Vector.getElem_mk, List.getElem_toArray,
+  · simp only [ByteOpcode.constrain_Range, Vector.getElem_mk, List.getElem_toArray,
                List.getElem_cons_zero, List.getElem_cons_succ]
     have h13 : (13 : ZMod p).val = 13 := by
       rw [show (13 : ZMod p) = ((13 : ℕ) : ZMod p) from by push_cast; rfl,
@@ -156,7 +156,7 @@ lemma byteOpcodeSpec_u8range
     rfl
   subst h_eq
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
-             List.getElem_cons_zero, ByteOpcode.constrain_poly_U8Range] at hconstr
+             List.getElem_cons_zero, ByteOpcode.constrain_U8Range] at hconstr
   exact hconstr.2.1
 
 /-- Helper for completeness (U8Range): given `x < 256`, build a
@@ -169,7 +169,7 @@ lemma byteOpcodeSpec_u8range_of_lt
   refine ⟨.U8Range, ?_, ?_⟩
   · simp only [ByteOpcode.toNat, Vector.getElem_mk, List.getElem_toArray,
                List.getElem_cons_zero, Nat.cast_ofNat]
-  · simp only [ByteOpcode.constrain_poly_U8Range, Vector.getElem_mk, List.getElem_toArray,
+  · simp only [ByteOpcode.constrain_U8Range, Vector.getElem_mk, List.getElem_toArray,
                List.getElem_cons_zero, List.getElem_cons_succ]
     have h_zero_lt : (0 : ZMod p) < (256 : ZMod p) := by
       change (0 : ZMod p).val < (256 : ZMod p).val

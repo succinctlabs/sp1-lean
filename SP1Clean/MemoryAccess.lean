@@ -7,13 +7,13 @@ import SP1Foundations.MemoryConsistency
 
 This file defines the per-row record `MemoryAccess` plus the per-row
 predicate `memoryAccessSpec` that mirrors the timestamp / U64 clauses
-surfaced by SP1's reader-level `_poly` iff lemmas (R-type, I-type,
+surfaced by SP1's reader-level `` iff lemmas (R-type, I-type,
 ALU-type) for each memory bus interaction.
 
-The clauses come from `_root_.RTypeReader.allHold_constraints_iff_is_real_poly`'s
+The clauses come from `_root_.RTypeReader.allHold_constraints_iff_is_real`'s
 RHS in `SP1Operations/Reader/RTypeReader.lean` and the parallel
 `AirInteraction.memory` semantics in `SP1Foundations/Constraint.lean:44-45`
-(per-row: `Word.isU64_poly` on the 4-limb value).
+(per-row: `Word.isU64` on the 4-limb value).
 
 `MemoryAccess` carries only the **read side** of an access — `prev_value`
 plus the prior-access timestamp components. The write side (when present,
@@ -46,13 +46,13 @@ structure MemoryAccess (T : Type) where
   diff_low_limb : T
 
 /-- Per-row spec for a memory access. Matches the clauses surfaced by
-`_root_.RTypeReader.allHold_constraints_iff_is_real_poly` for each
+`_root_.RTypeReader.allHold_constraints_iff_is_real` for each
 operand:
 
 - `diff_low_limb.val < 65536` (Nat-level limb bound)
 - `(clk_low + offset - prev_low - 1 - diff_low_limb) * 65536⁻¹ < 256`
   (field-level scaled timestamp bound)
-- `Word.isU64_poly prev_value` (the 4 limbs each fit in 16 bits)
+- `Word.isU64 prev_value` (the 4 limbs each fit in 16 bits)
 
 The `offset` parameter is the per-operand sub-clock offset SP1's constraint
 compiler emits (e.g., `+2` for `op_c`, `+3` for `op_b`, `+4` for `op_a` on
@@ -61,7 +61,7 @@ def memoryAccessSpec (clk_low offset : ZMod p) (acc : MemoryAccess (ZMod p)) : P
   acc.diff_low_limb.val < 65536 ∧
   (clk_low + offset - acc.prev_low - 1 - acc.diff_low_limb)
       * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
-  Word.isU64_poly acc.prev_value
+  Word.isU64 acc.prev_value
 
 /-- Construct a `MemoryAccess` from an existing
 `MemoryAccessInSharedCols`-shaped record and an explicit address. Bridges
@@ -75,7 +75,7 @@ def MemoryAccess.ofShared (addr : Vector (ZMod p) 3)
    m.access_timestamp.diff_low_limb⟩
 
 /-- Construct a `MemoryAccess` for a register read: the 3-limb address is
-`#v[reg_index, 0, 0]` per `SP1Constraint.toStateProp_poly`'s
+`#v[reg_index, 0, 0]` per `SP1Constraint.toStateProp`'s
 `addr0.val < 32 ∧ addr1 = 0 ∧ addr2 = 0` register-special-case branch
 (`SP1Foundations/Constraint.lean:89-92`). -/
 @[reducible]

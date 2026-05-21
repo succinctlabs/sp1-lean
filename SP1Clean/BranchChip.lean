@@ -28,7 +28,7 @@ Variants are distinguished by selectors at `Main[28..33]`. Uses
 `LtOperationSigned` sub-fragment to compute the comparison result.
 
 Structural mirror discipline (Spec only). The `LtOperationSigned`
-constraint clause is left in raw `allHold_poly` form. The next_pc
+constraint clause is left in raw `allHold` form. The next_pc
 chain is state-bus content (per-row `True`); cross-row PC consistency
 is a separate trace-level concern.
 
@@ -126,7 +126,7 @@ def Spec (cols : BranchCols (ZMod p)) : Prop :=
       c_msb := { msb := cols.c_msb } }
   (_root_.LtOperationSigned.constraints (F := ZMod p)
       cols.op_a_memory_prev_value cols.op_b_memory_prev_value
-      lt_cols cols.lt_is_signed is_real).allHold_poly ∧
+      lt_cols cols.lt_is_signed is_real).allHold ∧
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := opcode_e,

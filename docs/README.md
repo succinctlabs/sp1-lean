@@ -45,6 +45,27 @@ under `docs/`, look at the matching entry below.
   silent-success bug in `lake env lean` discovered during DivRem
   `_poly` work.
 
+- **`CLEAN_PILOT_INTRO.md`** — friendly onboarding for the SP1Clean
+  pilot. Read this first if you've heard the pilot mentioned but
+  don't yet know what `SP1Clean/` is, how it differs from the
+  existing `SP1Chips/` / `SP1Operations/` formalization, or why
+  it exists in parallel. Side-by-side Add example, three-layer
+  bridging story, what's built today, what benefits are realized
+  vs. speculative. Background context for the roadmap.
+
+- **`CLEAN_PILOT_ROADMAP.md`** — strategic roadmap for the SP1Clean
+  pilot. Inventory of mirrored chips / FormalAssertion bundles / True-
+  placeholder Specs / missing operations; concrete iter-5 work list;
+  phased plan (gating combinator → heavy ops → reader promotion →
+  write-back tooling) for adopting Clean as the source of truth with
+  SP1 constraints as a validator; the three-layer bridging discipline
+  for reusing SP1's `_poly` proofs without rewriting. Read after
+  `CLEAN_PILOT_INTRO.md` when planning the next pilot iteration or
+  evaluating where Clean fits long-term. Lives alongside the
+  per-iter retrospectives (`CLEAN_PILOT_NOTES.md`,
+  `CLEAN_PILOT_ITER2/3/4.md`) and the original tradeoff doc
+  (`CLEAN_DSL_EVALUATION.md`).
+
 ## Auto-memory mirror
 
 `docs/memory/` is **not** part of this documentation set — it's a

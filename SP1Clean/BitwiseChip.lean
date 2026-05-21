@@ -32,9 +32,9 @@ This mirror exposes:
   sub-fragment lookups, since neither has a Clean operation wrapper yet —
   the iff-only pilot doesn't need them)
 - `Spec` — predicate Spec matching the RHS of
-  `_root_.Bitwise.allHold_constraints_iff_poly`, with `CPUState` and
+  `_root_.Bitwise.allHold_constraints_iff`, with `CPUState` and
   `ALUTypeReader` packaged via their Clean Spec helpers
-- `iff_sp1` — chip-level bridge between SP1's `allHold_poly` and `Spec`
+- `iff_sp1` — chip-level bridge between SP1's `allHold` and `Spec`
 - Six `correct_<variant>` wrappers — each composes the corresponding
   `_root_.<Variant>.correct_<variant>` SP1 proof with `iff_sp1.mpr`
 -/
@@ -98,7 +98,7 @@ def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- OR=4, AND=5). `imm_c` toggles R-type (single-limb op_c register index +
   -- three zero limbs) vs I-type (4 immediate limbs); we use the 4-limb
   -- `op_c` slot uniformly since R-type column `op_c` is just `op_c[0]` with
-  -- limbs 1..3 zeroed by the trusted_instr_poly check.
+  -- limbs 1..3 zeroed by the trusted_instr check.
   SP1Clean.ProgramTable.assertion
     (⟨pc, is_xor * 3 + is_or * 4 + is_and * 5,
       op_a, #v[op_b, 0, 0, 0], op_c, op_a_0, 0, imm_c⟩ :
@@ -112,7 +112,7 @@ def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
   op_a_0 === 0
 
 /-- Pilot Spec, expressed over field-valued `BitwiseCols (ZMod p)`. Matches
-the RHS of `_root_.Bitwise.allHold_constraints_iff_poly`: a propositional
+the RHS of `_root_.Bitwise.allHold_constraints_iff`: a propositional
 clause for the `BitwiseU16Operation` sub-fragment (no Clean wrapper yet),
 two Clean Spec helpers (`cpuStateSpec` / `aluTypeReaderSpec`), the four
 boolean disjunctions on the opcode selectors, and `op_a_0 = 0`. -/
@@ -127,7 +127,7 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
     (BitwiseU16Operation.constraints (F := ZMod p)
       cols.op_b_memory_prev_value cols.op_c_memory_prev_value
       bw_cols opcode_bw is_real).1
-  List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp
     (BitwiseU16Operation.constraints (F := ZMod p)
       cols.op_b_memory_prev_value cols.op_c_memory_prev_value
       bw_cols opcode_bw is_real).2 ∧
@@ -181,43 +181,43 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
    Main[48], Main[49], Main[50]⟩
 
 set_option maxHeartbeats 800000 in
--- Chip-level bridge: SP1's `allHold_poly` over the flat row equals
+-- Chip-level bridge: SP1's `allHold` over the flat row equals
 -- `Spec (fromMain Main)` under `is_real = Main[48] + Main[49] + Main[50] = 1`.
--- 800K mirrors the budget of `Bitwise.allHold_constraints_iff_poly`, whose
+-- 800K mirrors the budget of `Bitwise.allHold_constraints_iff`, whose
 -- 51-column conjunction plus the BitwiseU16/U16toU8 unfolding exceeds default.
 theorem iff_sp1
     (Main : Vector (ZMod p) 51)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1) :
-    (_root_.Bitwise.constraints Main).allHold_poly ↔ Spec (fromMain Main) := by
+    (_root_.Bitwise.constraints Main).allHold ↔ Spec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  -- Bridge `.allHold_poly` (reducible) to `List.Forall toProp_poly` so the
-  -- existing `Bitwise.allHold_constraints_iff_poly` lemma applies.
-  change List.Forall SP1Constraint.toProp_poly (_root_.Bitwise.constraints Main) ↔ _
-  rw [_root_.Bitwise.allHold_constraints_iff_poly]
+  -- Bridge `.allHold` (reducible) to `List.Forall toProp` so the
+  -- existing `Bitwise.allHold_constraints_iff` lemma applies.
+  change List.Forall SP1Constraint.toProp (_root_.Bitwise.constraints Main) ↔ _
+  rw [_root_.Bitwise.allHold_constraints_iff]
   -- Collapse the `is_real` sum to `1` so the sub-iff lemmas fire.
   simp only [Spec, h_is_real]
-  -- Bridge each sub-conjunct from `List.Forall toProp_poly (...)` to its
-  -- `.allHold_poly` form so `cpuStateSpec_iff_sp1` / `aluTypeReaderSpec_iff_sp1`
-  -- can rewrite it. The two forms are defn-equal (`.allHold_poly` is reducible).
+  -- Bridge each sub-conjunct from `List.Forall toProp (...)` to its
+  -- `.allHold` form so `cpuStateSpec_iff_sp1` / `aluTypeReaderSpec_iff_sp1`
+  -- can rewrite it. The two forms are defn-equal (`.allHold` is reducible).
   rw [show ∀ (cols : CPUState (ZMod p)) (next_pc : Vector (ZMod p) 3)
           (clk_increment is_real : ZMod p),
-        List.Forall SP1Constraint.toProp_poly
+        List.Forall SP1Constraint.toProp
           (CPUState.constraints cols next_pc clk_increment is_real) =
-        (CPUState.constraints cols next_pc clk_increment is_real).allHold_poly
+        (CPUState.constraints cols next_pc clk_increment is_real).allHold
         from fun _ _ _ _ => rfl,
       show ∀ (clk_high clk_low opcode : ZMod p) (pc : Vector (ZMod p) 3)
           (op_a_write_value : Word (ZMod p)) (cols : ALUTypeReader (ZMod p))
           (is_real is_trusted : ZMod p),
-        List.Forall SP1Constraint.toProp_poly
+        List.Forall SP1Constraint.toProp
           (ALUTypeReader.constraints clk_high clk_low pc opcode op_a_write_value
             cols is_real is_trusted) =
         (ALUTypeReader.constraints clk_high clk_low pc opcode op_a_write_value
-            cols is_real is_trusted).allHold_poly
+            cols is_real is_trusted).allHold
         from fun _ _ _ _ _ _ _ _ => rfl]
   rw [SP1Clean.CPUState.cpuStateSpec_iff_sp1,
       SP1Clean.ALUTypeReader.aluTypeReaderSpec_iff_sp1]
   -- Final residual: `↑2 vs 2` coercion artifacts in the opcode arguments
-  -- from `Bitwise.allHold_constraints_iff_poly`'s LHS-side polymorphic
+  -- from `Bitwise.allHold_constraints_iff`'s LHS-side polymorphic
   -- elaboration. After normalizing with push_cast both sides are identical
   -- (modulo the still-folded `cpuStateSpec` / `aluTypeReaderSpec` named calls).
   push_cast
@@ -231,7 +231,7 @@ theorem correct_xor
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_xor : Main[48] = 1) (h_imm_c : Main[31] = 0)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Bitwise.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Xor.sp1_op_c Main
     let op_b := _root_.Xor.sp1_op_b Main
     let op_a := _root_.Xor.sp1_op_a Main
@@ -246,7 +246,7 @@ theorem correct_or
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_or : Main[49] = 1) (h_imm_c : Main[31] = 0)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Bitwise.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Or.sp1_op_c Main
     let op_b := _root_.Or.sp1_op_b Main
     let op_a := _root_.Or.sp1_op_a Main
@@ -261,7 +261,7 @@ theorem correct_and
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_and : Main[50] = 1) (h_imm_c : Main[31] = 0)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Bitwise.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.And.sp1_op_c Main
     let op_b := _root_.And.sp1_op_b Main
     let op_a := _root_.And.sp1_op_a Main
@@ -276,7 +276,7 @@ theorem correct_xori
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_xor : Main[48] = 1) (h_imm_c : Main[31] = 1)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Bitwise.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Xori.sp1_op_c Main
     let op_b := _root_.Xori.sp1_op_b Main
     let op_a := _root_.Xori.sp1_op_a Main
@@ -291,7 +291,7 @@ theorem correct_ori
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_or : Main[49] = 1) (h_imm_c : Main[31] = 1)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Bitwise.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Ori.sp1_op_c Main
     let op_b := _root_.Ori.sp1_op_b Main
     let op_a := _root_.Ori.sp1_op_a Main
@@ -306,7 +306,7 @@ theorem correct_andi
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_and : Main[50] = 1) (h_imm_c : Main[31] = 1)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Bitwise.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Andi.sp1_op_c Main
     let op_b := _root_.Andi.sp1_op_b Main
     let op_a := _root_.Andi.sp1_op_a Main

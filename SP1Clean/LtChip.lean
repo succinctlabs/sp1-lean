@@ -28,7 +28,7 @@ distinguished by selectors `is_slt`/`is_sltu` (Main[32..33]) and
 `LtOperationSigned` sub-fragment via `is_signed := Main[32]`.
 
 Structural mirror discipline (Spec only). The `LtOperationSigned`
-constraint clause is left in raw `allHold_poly` form — no Clean
+constraint clause is left in raw `allHold` form — no Clean
 operation wrapper yet for this Compare-family sub-fragment.
 
 Opcode encoding: `is_slt * 9 + is_sltu * 10` (SLT=9, SLTU=10).
@@ -99,7 +99,7 @@ def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
   op_a_0 === 0
 
 /-- Pilot Spec, expressed over field-valued `LtCols (ZMod p)`. The
-`LtOperationSigned` clause is left in raw `allHold_poly` form (it
+`LtOperationSigned` clause is left in raw `allHold` form (it
 internally fans out into `U16MSBOperation` and `LtOperationUnsigned`
 sub-fragments). The chip-level `is_signed` argument is `is_slt`; the
 chip-level `is_real` argument is `is_slt + is_sltu`. -/
@@ -115,7 +115,7 @@ def Spec (cols : LtCols (ZMod p)) : Prop :=
       c_msb := { msb := cols.c_msb } }
   (_root_.LtOperationSigned.constraints (F := ZMod p)
       cols.op_b_memory_prev_value cols.op_c_memory_prev_value
-      lt_cols cols.is_slt is_real).allHold_poly ∧
+      lt_cols cols.is_slt is_real).allHold ∧
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ALUTypeReader.aluTypeReaderSpec
       (cols.clk_0_16 + cols.clk_16_24 * 65536)

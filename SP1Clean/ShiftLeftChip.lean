@@ -161,7 +161,7 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
 /-- Placeholder for the shift-arithmetic Spec content (bit decomposition
 correctness, shift power chain, byte-shift one-hot, limb-shift). Currently
 trivially `True` — a follow-up iteration can inline the relevant clauses
-from `_root_.ShiftLeft.allHold_constraints_iff_poly`'s RHS or factor a
+from `_root_.ShiftLeft.allHold_constraints_iff`'s RHS or factor a
 dedicated `SP1Clean.ShiftLeftOp.Spec` predicate. -/
 def shiftSpec (_cols : ShiftLeftCols (ZMod p)) : Prop := True
 

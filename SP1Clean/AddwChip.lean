@@ -138,25 +138,25 @@ index map in `SP1Chips/Addw/Constraints.lean`. -/
    #v[Main[32], Main[33]],
    Main[34], Main[35]⟩
 
-/-- The chip-level bridge: SP1's `allHold_poly` over the flat row
+/-- The chip-level bridge: SP1's `allHold` over the flat row
 `Addw.constraints Main` is exactly `Spec (fromMain Main)`, under
 `is_real = Main[35] = 1`. -/
 theorem iff_sp1
     (Main : Vector (ZMod p) 36) (h_is_real : Main[35] = 1) :
-    (_root_.Addw.constraints Main).allHold_poly ↔ Spec (fromMain Main) := by
+    (_root_.Addw.constraints Main).allHold ↔ Spec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   simp only [fromMain, Spec, SP1Clean.AddwOp.Spec,
     SP1Clean.CPUState.cpuStateSpec, SP1Clean.ALUTypeReader.aluTypeReaderSpec]
-  rw [show (_root_.Addw.constraints Main).allHold_poly ↔
+  rw [show (_root_.Addw.constraints Main).allHold ↔
         ((AddwOperation.constraints (F := ZMod p)
             #v[Main[15], Main[16], Main[17], Main[18]]
             #v[Main[25], Main[26], Main[27], Main[28]]
             { value := #v[Main[32], Main[33]], msb := { msb := Main[34] } }
-            Main[35]).allHold_poly ∧
+            Main[35]).allHold ∧
           (CPUState.constraints (F := ZMod p)
             { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
               pc := #v[Main[3], Main[4], Main[5]] }
-            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[35]).allHold_poly ∧
+            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[35]).allHold ∧
           (ALUTypeReader.constraints (F := ZMod p)
             Main[0] (Main[2] + Main[1] * 65536)
             #v[Main[3], Main[4], Main[5]] 19
@@ -177,12 +177,12 @@ theorem iff_sp1
                   access_timestamp :=
                     { prev_low := Main[29], diff_low_limb := Main[30] } },
               imm_c := Main[31] }
-            Main[35] Main[35]).allHold_poly ∧
+            Main[35] Main[35]).allHold ∧
           (Main[35] * (Main[35] - 1) = 0 ∧ Main[13] = 0)) from by
-      simp [_root_.Addw.constraints, SP1ConstraintList.allHold_poly,
-        List.forall_append, List.Forall, SP1Constraint.toProp_poly]]
+      simp [_root_.Addw.constraints, SP1ConstraintList.allHold,
+        List.forall_append, List.Forall, SP1Constraint.toProp]]
   rw [h_is_real]
-  rw [AddwOperation.allHold_constraints_iff_poly,
+  rw [AddwOperation.allHold_constraints_iff,
       SP1Clean.CPUState.cpuStateSpec_iff_sp1,
       SP1Clean.ALUTypeReader.aluTypeReaderSpec_iff_sp1]
   simp [SP1Clean.AddwOp.Spec, SP1Clean.CPUState.cpuStateSpec,
@@ -193,7 +193,7 @@ theorem correct_addw
     (Main : Vector (ZMod p) 36) (s : SailState)
     (h_is_real : Main[35] = 1) (h_is_addw : Main[31] = 0)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Addw.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Addw.constraints Main).initialState s) :
     let op_c := _root_.Addw.sp1_op_c Main
     let op_b := _root_.Addw.sp1_op_b Main
     let op_a := _root_.Addw.sp1_op_a Main
@@ -207,7 +207,7 @@ theorem correct_addiw
     (Main : Vector (ZMod p) 36) (s : SailState)
     (h_is_real : Main[35] = 1) (h_is_addiw : Main[31] = 1)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Addw.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Addw.constraints Main).initialState s) :
     let op_c := _root_.Addiw.sp1_op_c Main
     let op_b := _root_.Addiw.sp1_op_b Main
     let op_a := _root_.Addiw.sp1_op_a Main

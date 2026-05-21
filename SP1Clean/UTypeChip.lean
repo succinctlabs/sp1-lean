@@ -13,6 +13,7 @@ import SP1Operations.Operation.AddOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.JTypeReader
 import SP1Chips.UTypeChip
+import SP1Chips.UType.Constraints
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -30,7 +31,7 @@ immediate, producing the 64-bit value written to `op_a`.
 Structural mirror discipline (same as JalChip / MulChip / ShiftLeftChip):
 defines `UTypeCols`, `main`, and `Spec`; no `iff_sp1` / `correct_*`
 bridges, no `FormalAssertion` promotion. The chip-level Spec composes
-`AddOperation.constraints.allHold_poly` (kept in raw form because the
+`AddOperation.constraints.allHold` (kept in raw form because the
 operation's is_real arg is the conditional `is_real - op_a_0`),
 `cpuStateSpec`, `jtypeReaderSpec`, and the chip's selector + alignment
 trailing asserts.
@@ -90,18 +91,20 @@ def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   pc_addend[2] - is_auipc * pc[2] === 0
   (is_real - 1) * op_a_0 === 0
 
-/-- Pilot Spec, expressed over field-valued `UTypeCols (ZMod p)`. The
-`AddOperation` clause is left in raw `allHold_poly` form (under
-is_real arg `is_real - op_a_0`) because the iff lemma is only stated
-for `is_real arg = 1`. -/
+/-- Pilot Spec, expressed over field-valued `UTypeCols (ZMod p)`. Conjunct
+order matches the SP1 constraint list emission (CPUState ∧ AddOperation ∧
+JTypeReader ∧ trailing assertZero gates) so `iff_sp1` reshapes by `and_assoc`
+without needing `and_comm`. The `AddOperation` clause is left in raw `allHold`
+form (under is_real arg `is_real - op_a_0`) because the iff lemma is only
+stated for `is_real arg = 1`. -/
 def Spec (cols : UTypeCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p := cols.is_auipc * 48 + (1 - cols.is_auipc) * 49
   let addend : Word (ZMod p) :=
     #v[cols.pc_addend[0], cols.pc_addend[1], cols.pc_addend[2], 0]
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   (_root_.AddOperation.constraints (F := ZMod p)
       addend cols.op_b_imm { value := cols.add_result }
-      (cols.is_real - cols.op_a_0)).allHold_poly ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+      (cols.is_real - cols.op_a_0)).allHold ∧
   SP1Clean.JTypeReader.jtypeReaderSpec
       (cols.clk_0_16 + cols.clk_16_24 * 65536) opcode_e cols.pc
       cols.add_result
@@ -128,5 +131,71 @@ def opAMemoryAccess (cols : UTypeCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p)
     prev_value := cols.op_a_memory_prev_value,
     prev_low := cols.op_a_memory_prev_low,
     diff_low_limb := cols.op_a_memory_diff_low }
+
+/-- Project a raw SP1 row into the structured `UTypeCols` view. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 31) : UTypeCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   #v[Main[14], Main[15], Main[16], Main[17]],
+   #v[Main[18], Main[19], Main[20], Main[21]],
+   #v[Main[22], Main[23], Main[24]],
+   #v[Main[25], Main[26], Main[27], Main[28]],
+   Main[29], Main[30]⟩
+
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: the iff destructure unfolds the full UType constraint
+-- list (CPUState ++ AddOperation ++ JTypeReader ++ 7 trailing assertZeros).
+/-- The chip-level bridge: SP1's `allHold` over the flat row
+`UType.constraints Main` is exactly the Clean-flavored `Spec (fromMain Main)`,
+under `is_real = Main[30] = 1`. The AddOperation clause is preserved in raw
+`allHold` form on both sides (the is_real argument `Main[30] - Main[13]` is
+the conditional `is_real - op_a_0` rather than the bare `1`, so the
+operation-level iff lemma cannot fire). -/
+theorem iff_sp1
+    (Main : Vector (ZMod p) 31) (h_is_real : Main[30] = 1) :
+    (_root_.UType.constraints Main).allHold ↔ Spec (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [fromMain, Spec, SP1Clean.CPUState.cpuStateSpec,
+    SP1Clean.JTypeReader.jtypeReaderSpec]
+  rw [show (_root_.UType.constraints Main).allHold ↔
+        ((CPUState.constraints (F := ZMod p)
+            { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+              pc := #v[Main[3], Main[4], Main[5]] }
+            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[30]).allHold ∧
+          (AddOperation.constraints (F := ZMod p)
+              #v[Main[22], Main[23], Main[24], 0]
+              #v[Main[14], Main[15], Main[16], Main[17]]
+              { value := #v[Main[25], Main[26], Main[27], Main[28]] }
+              (Main[30] - Main[13])).allHold ∧
+          (JTypeReader.constraints (F := ZMod p)
+              Main[0] (Main[2] + Main[1] * 65536)
+              #v[Main[3], Main[4], Main[5]]
+              (Main[29] * 48 + (1 - Main[29]) * 49)
+              #v[Main[25], Main[26], Main[27], Main[28]]
+              { op_a := Main[6],
+                op_a_memory :=
+                  { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                    access_timestamp :=
+                      { prev_low := Main[11], diff_low_limb := Main[12] } },
+                op_a_0 := Main[13],
+                op_b_imm := #v[Main[14], Main[15], Main[16], Main[17]],
+                op_c_imm := #v[Main[18], Main[19], Main[20], Main[21]] }
+              Main[30] Main[30]).allHold ∧
+          (Main[30] * (Main[30] - 1) = 0 ∧
+           Main[29] * (Main[29] - 1) = 0 ∧
+           Main[22] - (Main[29] * Main[3] + (1 - Main[29]) * 0) = 0 ∧
+           Main[23] - (Main[29] * Main[4] + (1 - Main[29]) * 0) = 0 ∧
+           Main[24] - (Main[29] * Main[5] + (1 - Main[29]) * 0) = 0 ∧
+           (Main[30] - 1) * Main[13] = 0)) from by
+      simp [_root_.UType.constraints, SP1ConstraintList.allHold,
+        List.forall_append, List.Forall, SP1Constraint.toProp]]
+  rw [h_is_real]
+  rw [SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+      SP1Clean.JTypeReader.jtypeReaderSpec_iff_sp1]
+  simp [SP1Clean.CPUState.cpuStateSpec, SP1Clean.JTypeReader.jtypeReaderSpec,
+    and_assoc]
 
 end SP1Clean.UType

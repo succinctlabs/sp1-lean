@@ -24,7 +24,7 @@ This Clean mirror adopts the same shape: `main` takes `(a, b, result)` and
 emits the 4 inverse-form boolean carry asserts plus 4 `Range(16)` byte
 lookups bounding each result limb. The Spec adopts SP1's
 inverse-form RHS verbatim, so `iff_sp1` is a one-line re-export of
-`AddOperation.allHold_constraints_iff_poly`.
+`AddOperation.allHold_constraints_iff`.
 -/
 
 namespace SP1Clean.AddOp
@@ -55,7 +55,7 @@ def main (a b result : Vector (Expression (ZMod p)) 4) : Circuit (ZMod p) Unit :
   lookup ByteOpcodeTable
     (#v[(6 : Expression (ZMod p)), result[3], 16, 0] : Vector (Expression (ZMod p)) 4)
 
-/-- Pilot Spec, matching SP1's `AddOperation.allHold_constraints_iff_poly`
+/-- Pilot Spec, matching SP1's `AddOperation.allHold_constraints_iff`
 RHS verbatim: each of the 4 inverse-form carries is boolean and each
 result limb fits in `< 65536`. -/
 def Spec (a b result : Word (ZMod p)) : Prop :=
@@ -72,13 +72,13 @@ def Spec (a b result : Word (ZMod p)) : Prop :=
   result[2].val < 65536 ∧
   result[3].val < 65536
 
-/-- The bridge to SP1: SP1's `allHold_poly` under `is_real = 1` is exactly
+/-- The bridge to SP1: SP1's `allHold` under `is_real = 1` is exactly
 the pilot `Spec`. Direct re-export of
-`AddOperation.allHold_constraints_iff_poly`. -/
+`AddOperation.allHold_constraints_iff`. -/
 theorem iff_sp1 (a b : Word (ZMod p)) (cols : AddOperation (ZMod p)) :
-    (AddOperation.constraints a b cols 1).allHold_poly ↔
+    (AddOperation.constraints a b cols 1).allHold ↔
       Spec a b cols.value :=
-  AddOperation.allHold_constraints_iff_poly a b cols
+  AddOperation.allHold_constraints_iff a b cols
 
 /-! ## Full `FormalAssertion` promotion
 
@@ -143,7 +143,7 @@ lemma byteOpcodeSpec_range16
     rfl
   subst h_eq
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
-             List.getElem_cons_zero, ByteOpcode.constrain_poly_Range] at hconstr
+             List.getElem_cons_zero, ByteOpcode.constrain_Range] at hconstr
   have h16 : (16 : ZMod p).val = 16 := by
     rw [show (16 : ZMod p) = ((16 : ℕ) : ZMod p) from by push_cast; rfl,
         ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
@@ -160,7 +160,7 @@ lemma byteOpcodeSpec_range16_of_lt
   refine ⟨.Range, ?_, ?_⟩
   · simp only [ByteOpcode.toNat, Vector.getElem_mk, List.getElem_toArray,
                List.getElem_cons_zero, Nat.cast_ofNat]
-  · simp only [ByteOpcode.constrain_poly_Range, Vector.getElem_mk, List.getElem_toArray,
+  · simp only [ByteOpcode.constrain_Range, Vector.getElem_mk, List.getElem_toArray,
                List.getElem_cons_zero, List.getElem_cons_succ]
     have h16 : (16 : ZMod p).val = 16 := by
       rw [show (16 : ZMod p) = ((16 : ℕ) : ZMod p) from by push_cast; rfl,

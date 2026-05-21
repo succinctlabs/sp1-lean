@@ -60,20 +60,20 @@ lemma val_sixteen : ((16 : ZMod p) : ZMod p).val = 16 := by
   omega
 
 omit [Fact (p > 512)] in
-/-- Helper: `Range.constrain_poly _ 16 _` reduces to `_.val < 65536`. -/
+/-- Helper: `Range.constrain _ 16 _` reduces to `_.val < 65536`. -/
 lemma range_at_sixteen (x : ZMod p) :
-    ByteOpcode.Range.constrain_poly x (16 : ZMod p) (0 : ZMod p) ↔ x.val < 65536 := by
-  rw [ByteOpcode.constrain_poly_Range, val_sixteen]
+    ByteOpcode.Range.constrain x (16 : ZMod p) (0 : ZMod p) ↔ x.val < 65536 := by
+  rw [ByteOpcode.constrain_Range, val_sixteen]
   norm_num
 
 omit [Fact (p > 512)] in
-/-- The bridge to SP1: SP1's `allHold_poly` under `is_real = 1` is exactly
+/-- The bridge to SP1: SP1's `allHold` under `is_real = 1` is exactly
 the pilot `Spec`. -/
 theorem iff_sp1 (a : ZMod p) (cols : U16MSBOperation (ZMod p)) :
-    (U16MSBOperation.constraints (F := ZMod p) a cols 1).allHold_poly ↔
+    (U16MSBOperation.constraints (F := ZMod p) a cols 1).allHold ↔
     Spec a cols.msb := by
-  simp only [U16MSBOperation.constraints, SP1ConstraintList.allHold_poly, List.Forall,
-    SP1Constraint.toProp_poly, Spec]
+  simp only [U16MSBOperation.constraints, SP1ConstraintList.allHold, List.Forall,
+    SP1Constraint.toProp, Spec]
   simp only [ByteOpcode.ofNat_seven]  -- ByteOpcode.ofNat 6 = Range
   constructor
   · rintro ⟨_h_isreal, h_bool, h_range⟩

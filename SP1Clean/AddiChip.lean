@@ -159,28 +159,28 @@ take/drop tower the `ProvableStruct`-derived path produces. -/
    #v[Main[25], Main[26], Main[27], Main[28]],
    Main[29]⟩
 
-/-- The chip-level bridge: SP1's `allHold_poly` over the flat row
+/-- The chip-level bridge: SP1's `allHold` over the flat row
 `Addi.constraints Main` is exactly the Clean-flavored `Spec (fromMain Main)`,
 under `is_real = Main[29] = 1`. -/
 theorem iff_sp1
     (Main : Vector (ZMod p) 30) (h_is_real : Main[29] = 1) :
-    (_root_.Addi.constraints Main).allHold_poly ↔ Spec (fromMain Main) := by
+    (_root_.Addi.constraints Main).allHold ↔ Spec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   -- Unfold the structural projection of `fromMain` on `Main` so each
   -- `cols.X` reduces to the matching `Main[k]`. After that, Spec is
   -- structurally identical to the version that operates directly on `Main`.
   simp only [fromMain, Spec, SP1Clean.AddOp.Spec,
     SP1Clean.CPUState.cpuStateSpec, SP1Clean.ITypeReader.itypeReaderSpec]
-  rw [show (_root_.Addi.constraints Main).allHold_poly ↔
+  rw [show (_root_.Addi.constraints Main).allHold ↔
         ((AddOperation.constraints (F := ZMod p)
             #v[Main[15], Main[16], Main[17], Main[18]]
             #v[Main[21], Main[22], Main[23], Main[24]]
             { value := #v[Main[25], Main[26], Main[27], Main[28]] }
-            Main[29]).allHold_poly ∧
+            Main[29]).allHold ∧
           (CPUState.constraints (F := ZMod p)
             { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
               pc := #v[Main[3], Main[4], Main[5]] }
-            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[29]).allHold_poly ∧
+            #v[Main[3] + 4, Main[4], Main[5]] 8 Main[29]).allHold ∧
           (ITypeReader.constraints (F := ZMod p)
             Main[0] (Main[2] + Main[1] * 65536)
             #v[Main[3], Main[4], Main[5]] 1
@@ -196,12 +196,12 @@ theorem iff_sp1
                   access_timestamp :=
                     { prev_low := Main[19], diff_low_limb := Main[20] } },
               op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] }
-            Main[29] Main[29]).allHold_poly ∧
+            Main[29] Main[29]).allHold ∧
           (Main[29] * (Main[29] - 1) = 0 ∧ Main[13] = 0)) from by
-      simp [_root_.Addi.constraints, SP1ConstraintList.allHold_poly,
-        List.forall_append, List.Forall, SP1Constraint.toProp_poly]]
+      simp [_root_.Addi.constraints, SP1ConstraintList.allHold,
+        List.forall_append, List.Forall, SP1Constraint.toProp]]
   rw [h_is_real]
-  rw [AddOperation.allHold_constraints_iff_poly,
+  rw [AddOperation.allHold_constraints_iff,
       SP1Clean.CPUState.cpuStateSpec_iff_sp1,
       SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1]
   simp [SP1Clean.CPUState.cpuStateSpec, SP1Clean.ITypeReader.itypeReaderSpec, and_assoc]
@@ -214,7 +214,7 @@ theorem correct_addi
     (Main : Vector (ZMod p) 30) (s : SailState)
     (h_is_real : Main[29] = 1)
     (h_spec : Spec (fromMain Main))
-    (state_cstrs : (_root_.Addi.constraints Main).initialState_poly s) :
+    (state_cstrs : (_root_.Addi.constraints Main).initialState s) :
     let op_c := _root_.Addi.sp1_op_c Main
     let op_b := _root_.Addi.sp1_op_b Main
     let op_a := _root_.Addi.sp1_op_a Main

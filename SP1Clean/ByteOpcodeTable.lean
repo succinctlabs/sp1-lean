@@ -26,17 +26,17 @@ variable {p : ℕ} [Fact p.Prime] [Fact (p > 512)]
 
 /-- Spec of `ByteOpcodeTable`. A 4-tuple `#v[op, a, b, c]` is in the table iff
 there exists a concrete `ByteOpcode` whose `toNat` matches `op` (as a field
-element) and whose `constrain_poly` holds on `(a, b, c)`. -/
+element) and whose `constrain` holds on `(a, b, c)`. -/
 def ByteOpcodeSpec (row : fields 4 (ZMod p)) : Prop :=
   ∃ bop : ByteOpcode,
-    (bop.toNat : ZMod p) = row[0] ∧ bop.constrain_poly row[1] row[2] row[3]
+    (bop.toNat : ZMod p) = row[0] ∧ bop.constrain row[1] row[2] row[3]
 
 /-- The polymorphic byte-opcode table.
 
 `Contains := Soundness := Completeness := ByteOpcodeSpec`, sidestepping the
 `StaticTable` enumeration (it would require explicitly listing every
 AND/OR/XOR/Range/… row — overkill for the pilot, whose only goal is the
-equivalence to SP1's `toProp_poly`). -/
+equivalence to SP1's `toProp`). -/
 def ByteOpcodeTable : Table (ZMod p) (fields 4) where
   name := "SP1ByteOpcode"
   Contains _ row := ByteOpcodeSpec row

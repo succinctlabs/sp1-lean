@@ -14,7 +14,7 @@ import SP1Clean.ByteOpcodeTable
 The borrow-chain twin of `SP1Clean.AddOperation`. SP1's `SubOperation` is a
 4-limb borrow-chain 64-bit subtract; its auto-gen carries `d_i` are in
 inverse/borrow form, while the natural-form iff lemma
-`SubOperation.allHold_constraints_iff_poly` re-phrases them as the
+`SubOperation.allHold_constraints_iff` re-phrases them as the
 natural-form carries `c_i`.
 
 The Clean-side `main` matches SP1's auto-gen RHS (borrow form) verbatim,
@@ -52,7 +52,7 @@ def main (a b result : Vector (Expression (ZMod p)) 4) : Circuit (ZMod p) Unit :
   lookup ByteOpcodeTable
     (#v[(6 : Expression (ZMod p)), result[3], 16, 0] : Vector (Expression (ZMod p)) 4)
 
-/-- Pilot Spec, mirroring `SubOperation.allHold_constraints_iff_poly` RHS
+/-- Pilot Spec, mirroring `SubOperation.allHold_constraints_iff` RHS
 verbatim: each of the 4 natural-form carries is boolean and each result
 limb fits in `< 65536`. -/
 def Spec (a b result : Word (ZMod p)) : Prop :=
@@ -69,12 +69,12 @@ def Spec (a b result : Word (ZMod p)) : Prop :=
   result[2].val < 65536 ∧
   result[3].val < 65536
 
-/-- The bridge to SP1: SP1's `allHold_poly` under `is_real = 1` is exactly
+/-- The bridge to SP1: SP1's `allHold` under `is_real = 1` is exactly
 the pilot `Spec`. Direct re-export of
-`SubOperation.allHold_constraints_iff_poly`. -/
+`SubOperation.allHold_constraints_iff`. -/
 theorem iff_sp1 (a b : Word (ZMod p)) (cols : SubOperation (ZMod p)) :
-    (SubOperation.constraints a b cols 1).allHold_poly ↔
+    (SubOperation.constraints a b cols 1).allHold ↔
       Spec a b cols.value :=
-  SubOperation.allHold_constraints_iff_poly a b cols
+  SubOperation.allHold_constraints_iff a b cols
 
 end SP1Clean.SubOp

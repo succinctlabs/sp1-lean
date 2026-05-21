@@ -11,6 +11,9 @@ import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.CPUState
+import SP1Operations.Operation.AddrAddOperation
+import SP1Chips.Load.LoadDouble.Common
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -117,5 +120,81 @@ def loadMemoryAccess (cols : LoadDoubleCols (ZMod p)) : SP1Clean.MemoryAccess (Z
     prev_value := cols.load_prev_value,
     prev_low := cols.load_memory_prev_low,
     diff_low_limb := cols.load_memory_diff_low }
+
+/-- Project a raw SP1 row into the structured `LoadDoubleCols` view. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 39) : LoadDoubleCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20],
+   #v[Main[21], Main[22], Main[23], Main[24]],
+   #v[Main[25], Main[26], Main[27]],
+   Main[28],
+   #v[Main[29], Main[30], Main[31], Main[32]],
+   Main[33], Main[34], Main[35], Main[36], Main[37],
+   Main[38]⟩
+
+/-- Iff RHS for the Load Double (LD) variant, mirroring
+`_root_.Load.LoadDouble.allHold_constraints_iff_of_is_ld`. LD has only
+one opcode (no LDU — RV64IM has no unsigned doubleword load), so a
+single iff_sp1 lemma per chip. The full 4-limb loaded word goes
+directly into op_a_write_value (no sub-word selection or sign
+extension). -/
+def SpecForIff_of_is_ld (cols : LoadDoubleCols (ZMod p)) : Prop :=
+  SP1Clean.AddrAddOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_imm
+      { value := cols.addr_value } ∧
+  cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
+  (cols.addr_value[0] * (8 : ZMod p)⁻¹).val < 2 ^ ZMod.val (13 : ZMod p) ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ITypeReader.itypeReaderSpec
+      (cols.clk_0_16 + cols.clk_16_24 * 65536) 35 cols.pc
+      cols.load_prev_value
+      { op_a := cols.op_a,
+        op_a_memory :=
+          { prev_value := cols.op_a_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_a_memory_prev_low,
+                diff_low_limb := cols.op_a_memory_diff_low } },
+        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+        op_b_memory :=
+          { prev_value := cols.op_b_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_b_memory_prev_low,
+                diff_low_limb := cols.op_b_memory_diff_low } },
+        op_c_imm := cols.op_c_imm } ∧
+  (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
+  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.clk_high -
+      (cols.load_memory_flag * cols.load_memory_prev_low +
+        (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
+    cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
+  cols.load_memory_diff_low.val < 65536 ∧
+  ((0 : ZMod p) < 256 ∧ cols.load_memory_diff_high < (256 : ZMod p) ∧
+    (0 : ZMod p) < 256) ∧
+  Word.isU64 cols.load_prev_value ∧
+  cols.op_a_0 = 0
+
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: the iff destructure unfolds the full constraint list
+-- via the SP1-side `_of_is_ld` helper.
+/-- The chip-level bridge for the Load Double variant. -/
+theorem iff_sp1_of_is_ld (Main : Vector (ZMod p) 39) (h_is_ld : Main[38] = 1) :
+    (_root_.Load.LoadDouble.constraints Main).allHold ↔
+      SpecForIff_of_is_ld (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change List.Forall SP1Constraint.toProp (_root_.Load.LoadDouble.constraints Main) ↔ _
+  rw [_root_.Load.LoadDouble.allHold_constraints_iff_of_is_ld Main h_is_ld]
+  simp only [show ∀ (a : SP1ConstraintList (ZMod p)),
+      List.Forall SP1Constraint.toProp a = a.allHold from fun _ => rfl,
+    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+    SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1,
+    SP1Clean.AddrAddOp.iff_sp1]
+  simp [SpecForIff_of_is_ld, fromMain]
 
 end SP1Clean.LoadDouble

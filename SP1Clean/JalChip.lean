@@ -30,9 +30,9 @@ the return-address store.
 SP1 emits `.receive (.state clk_high clk_low pc0 pc1 pc2)` (current
 state) and `.send (.state clk_high clk_low next_pc0 next_pc1 next_pc2)`
 (next state) on the state bus. At the **propositional** level
-(`SP1Constraint.toProp_poly`), state interactions are vacuous — they
+(`SP1Constraint.toProp`), state interactions are vacuous — they
 fall through to `True`. At the **state-bridging** level
-(`toStateProp_poly`), only `.receive (.state ...)` carries a fact: the
+(`toStateProp`), only `.receive (.state ...)` carries a fact: the
 SailState's PC register matches the row's PC limbs.
 
 Crucially, the PC limb bounds and alignment (`pc0 % 4 = 0`) are already

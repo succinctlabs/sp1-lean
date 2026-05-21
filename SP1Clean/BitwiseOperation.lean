@@ -17,7 +17,7 @@ opcode) result[i] a[i] b[i]) is_real`** — and nothing else. This makes it the
 single best Tier-2 test for the opcode-parametric, multi-payload byte
 interaction encoding from `SP1Clean/ByteOpcodeTable.lean`.
 
-The pilot deliverable is the **equivalence iff** between SP1's `allHold_poly`
+The pilot deliverable is the **equivalence iff** between SP1's `allHold`
 and the Clean spec — `FormalCircuit` integration is deferred per the
 import-collision note in `IsZeroOperation.lean`.
 -/
@@ -54,31 +54,31 @@ def main (a b : Vector (Expression (ZMod p)) 8) (opcode : Expression (ZMod p)) :
   return #v[r0, r1, r2, r3, r4, r5, r6, r7]
 
 /-- Pilot Spec: under SP1's `is_real = 1`, each of the 8 byte-sends asserts
-that `(ByteOpcode.ofNat opcode.val).constrain_poly` holds on the per-byte
+that `(ByteOpcode.ofNat opcode.val).constrain` holds on the per-byte
 triple `(result[i], a[i], b[i])`.
 
-This phrasing matches SP1's `toProp_poly` exactly, which makes the iff a
+This phrasing matches SP1's `toProp` exactly, which makes the iff a
 case-split on `i`. The connection to `ByteOpcodeTable.ByteOpcodeSpec` (via
 the existential over `ByteOpcode`) goes through `ByteOpcode.ofNat opcode.val`
 as the witness — provable only when `opcode.val < 7`, a hypothesis that is
 the **chip's** responsibility to supply (typically via an extra constraint
 like `opcode * (opcode - 1) * (opcode - 2) = 0`). -/
 def Spec (a b : Vector (ZMod p) 8) (opcode : ZMod p) (result : Vector (ZMod p) 8) : Prop :=
-  ∀ i : Fin 8, (ByteOpcode.ofNat opcode.val).constrain_poly
+  ∀ i : Fin 8, (ByteOpcode.ofNat opcode.val).constrain
     (result[i.val]'i.is_lt) (a[i.val]'i.is_lt) (b[i.val]'i.is_lt)
 
 omit [Fact (p > 512)] in
-/-- The bridge to SP1: SP1's `allHold_poly` under `is_real = 1` is exactly
+/-- The bridge to SP1: SP1's `allHold` under `is_real = 1` is exactly
 the pilot `Spec`. Pure case-split on the `Fin 8` index — no opcode
 round-trip needed. -/
 theorem iff_sp1
     (a b : Vector (ZMod p) 8) (opcode : ZMod p)
     (cols : BitwiseOperation (ZMod p)) :
-    (BitwiseOperation.constraints (F := ZMod p) a b cols opcode 1).allHold_poly ↔
+    (BitwiseOperation.constraints (F := ZMod p) a b cols opcode 1).allHold ↔
     Spec a b opcode cols.result := by
   have h1ne : ((1 : ZMod p) ≠ 0) := one_ne_zero
-  simp only [BitwiseOperation.constraints, SP1ConstraintList.allHold_poly, List.Forall,
-    SP1Constraint.toProp_poly, Spec]
+  simp only [BitwiseOperation.constraints, SP1ConstraintList.allHold, List.Forall,
+    SP1Constraint.toProp, Spec]
   constructor
   · rintro ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ i
     match i with

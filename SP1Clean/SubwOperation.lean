@@ -14,7 +14,7 @@ import SP1Clean.ByteOpcodeTable
 
 SP1's `SubwOperation` is a 2-limb borrow-chain 32-bit subtract plus a
 `U16MSBOperation` sub-fragment that pins the msb of the second result limb.
-The natural-form iff lemma `SubwOperation.allHold_constraints_iff_poly`
+The natural-form iff lemma `SubwOperation.allHold_constraints_iff`
 exposes both: a `List.Forall ... U16MSBOperation.constraints` clause on
 `(cols.value[1], cols.msb)` plus the carry+limb-bound clauses for the two
 result limbs.
@@ -53,7 +53,7 @@ def main (a b : Vector (Expression (ZMod p)) 4)
         (2 : Expression (ZMod p)) * result[1] - msb * 65536, 16, 0]
       : Vector (Expression (ZMod p)) 4)
 
-/-- Pilot Spec, mirroring `SubwOperation.allHold_constraints_iff_poly` RHS
+/-- Pilot Spec, mirroring `SubwOperation.allHold_constraints_iff` RHS
 verbatim: a `U16MSBOperation` constraints clause plus 2 natural-form
 carries are boolean plus each result limb fits in `< 65536`. The
 U16MSBOperation clause is left as `List.Forall ...` (matching the SP1
@@ -61,19 +61,19 @@ lemma) — promoting to the `SP1Clean.U16MSBOp.Spec` form is a follow-up. -/
 def Spec (a b : Word (ZMod p)) (cols : _root_.SubwOperation (ZMod p)) : Prop :=
   let carry0 : ZMod p := (b[0] + cols.value[0] - a[0]) * 65536⁻¹
   let carry1 : ZMod p := (b[1] + cols.value[1] - a[1] + carry0) * 65536⁻¹
-  List.Forall SP1Constraint.toProp_poly
+  List.Forall SP1Constraint.toProp
       (_root_.U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } 1) ∧
   (carry0 = 0 ∨ carry0 = 1) ∧
   (carry1 = 0 ∨ carry1 = 1) ∧
   cols.value[0].val < 65536 ∧
   cols.value[1].val < 65536
 
-/-- The bridge to SP1: SP1's `allHold_poly` under `is_real = 1` is exactly
+/-- The bridge to SP1: SP1's `allHold` under `is_real = 1` is exactly
 the pilot `Spec`. Direct re-export of
-`SubwOperation.allHold_constraints_iff_poly`. -/
+`SubwOperation.allHold_constraints_iff`. -/
 theorem iff_sp1 (a b : Word (ZMod p)) (cols : _root_.SubwOperation (ZMod p)) :
-    (_root_.SubwOperation.constraints a b cols 1).allHold_poly ↔
+    (_root_.SubwOperation.constraints a b cols 1).allHold ↔
       Spec a b cols :=
-  _root_.SubwOperation.allHold_constraints_iff_poly a b cols
+  _root_.SubwOperation.allHold_constraints_iff a b cols
 
 end SP1Clean.SubwOp

@@ -15,7 +15,7 @@ circuit** as the canonical Clean side and only contribute the bridge.
 Deliverables for the pilot:
 - `circuit : FormalCircuit (ZMod p) field field` — Clean-side soundness +
   completeness, inherited from upstream.
-- `iff_sp1` — the equivalence between SP1's `allHold_poly` and the
+- `iff_sp1` — the equivalence between SP1's `allHold` and the
   Clean Spec, witnessed by an inverse column.
 -/
 
@@ -40,10 +40,10 @@ Reads: "for the prover to satisfy SP1's IsZero constraints with output column
 exactly when the result column matches the Clean spec." -/
 theorem iff_sp1 (a result : ZMod p) :
     (∃ inverse : ZMod p,
-      (IsZeroOperation.constraints (F := ZMod p) a ⟨inverse, result⟩ 1).allHold_poly) ↔
+      (IsZeroOperation.constraints (F := ZMod p) a ⟨inverse, result⟩ 1).allHold) ↔
     Spec a result := by
-  simp only [IsZeroOperation.constraints, SP1ConstraintList.allHold_poly, List.Forall,
-    SP1Constraint.toProp_poly, Spec]
+  simp only [IsZeroOperation.constraints, SP1ConstraintList.allHold, List.Forall,
+    SP1Constraint.toProp, Spec]
   constructor
   · rintro ⟨inv, hr, _hbool, hra⟩
     have hr' : 1 - inv * a - result = 0 := by linear_combination hr

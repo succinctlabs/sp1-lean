@@ -12,6 +12,9 @@ import SP1Foundations.Field
 import SP1Operations.Reader.ITypeReader
 import SP1Operations.Reader.CPUState
 import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.AddrAddOperation
+import SP1Chips.Load.LoadHalf.Common
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -57,11 +60,12 @@ structure LoadHalfCols (T : Type) where
   load_memory_flag : T                      -- Main[35]
   load_memory_diff_low : T                  -- Main[36]
   load_memory_diff_high : T                 -- Main[37]
-  half_offset_flag : T                      -- Main[38]
-  op_a_write_value : Vector T 4             -- Main[39..42] (loaded + sign-ext'd half)
-  signed_extension_flag : T                 -- (msb of loaded half, used for LH sign-ext)
-  is_lh : T                                 -- Main[?]
-  is_lhu : T                                -- Main[?]
+  half_offset_bit1 : T                      -- Main[38] (sub-word selector, weight 2)
+  half_offset_bit2 : T                      -- Main[39] (sub-double selector, weight 4)
+  op_a_write_value_lo : T                   -- Main[40] (selected 16-bit half)
+  signed_extension_msb : T                  -- Main[41] (MSB for sign-extension)
+  is_lh : T                                 -- Main[42]
+  is_lhu : T                                -- Main[43]
 deriving ProvableStruct
 
 def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
@@ -71,8 +75,8 @@ def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
-       _half_offset_flag, _op_a_write_value, _signed_extension_flag,
-       is_lh, is_lhu⟩ := cols
+       _half_offset_bit1, _half_offset_bit2, _op_a_write_value_lo,
+       _signed_extension_msb, is_lh, is_lhu⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   lookup ByteOpcodeTable
@@ -126,5 +130,167 @@ def loadMemoryAccess (cols : LoadHalfCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
     prev_value := cols.load_prev_value,
     prev_low := cols.load_memory_prev_low,
     diff_low_limb := cols.load_memory_diff_low }
+
+/-- Project a raw SP1 row into the structured `LoadHalfCols` view. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 44) : LoadHalfCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20],
+   #v[Main[21], Main[22], Main[23], Main[24]],
+   #v[Main[25], Main[26], Main[27]],
+   Main[28],
+   #v[Main[29], Main[30], Main[31], Main[32]],
+   Main[33], Main[34], Main[35], Main[36], Main[37],
+   Main[38], Main[39], Main[40], Main[41], Main[42], Main[43]⟩
+
+/-- Iff RHS for the signed Load Half (LH) variant, mirroring
+`_root_.Load.LoadHalf.allHold_constraints_iff_of_is_lh`. -/
+def SpecForIff_of_is_lh (cols : LoadHalfCols (ZMod p)) : Prop :=
+  SP1Clean.AddrAddOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_imm
+      { value := cols.addr_value } ∧
+  (cols.half_offset_bit1 = 0 ∨ cols.half_offset_bit1 = 1) ∧
+  (cols.half_offset_bit2 = 0 ∨ cols.half_offset_bit2 = 1) ∧
+  cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
+  ((cols.addr_value[0] - 4 * cols.half_offset_bit2 - 2 * cols.half_offset_bit1)
+      * (8 : ZMod p)⁻¹).val < 2 ^ ZMod.val (13 : ZMod p) ∧
+  (U16MSBOperation.constraints cols.op_a_write_value_lo
+      { msb := cols.signed_extension_msb } 1).allHold ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ITypeReader.itypeReaderSpec
+      (cols.clk_0_16 + cols.clk_16_24 * 65536) 30 cols.pc
+      #v[cols.op_a_write_value_lo,
+         65535 * cols.signed_extension_msb,
+         65535 * cols.signed_extension_msb,
+         65535 * cols.signed_extension_msb]
+      { op_a := cols.op_a,
+        op_a_memory :=
+          { prev_value := cols.op_a_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_a_memory_prev_low,
+                diff_low_limb := cols.op_a_memory_diff_low } },
+        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+        op_b_memory :=
+          { prev_value := cols.op_b_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_b_memory_prev_low,
+                diff_low_limb := cols.op_b_memory_diff_low } },
+        op_c_imm := cols.op_c_imm } ∧
+  (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
+  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.clk_high -
+      (cols.load_memory_flag * cols.load_memory_prev_low +
+        (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
+    cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
+  cols.load_memory_diff_low.val < 65536 ∧
+  ((0 : ZMod p) < 256 ∧ cols.load_memory_diff_high < (256 : ZMod p) ∧
+    (0 : ZMod p) < 256) ∧
+  Word.isU64 cols.load_prev_value ∧
+  cols.is_lhu = 0 ∧ cols.op_a_0 = 0 ∧
+  (cols.half_offset_bit1 = 1 ∨ cols.half_offset_bit2 = 1 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[0]) ∧
+  (cols.half_offset_bit1 = 0 ∨ cols.half_offset_bit2 = 1 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[1]) ∧
+  (cols.half_offset_bit1 = 1 ∨ cols.half_offset_bit2 = 0 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[2]) ∧
+  (cols.half_offset_bit1 = 0 ∨ cols.half_offset_bit2 = 0 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[3])
+
+/-- Iff RHS for the unsigned Load Half (LHU) variant. Differs from the
+signed variant in the ITypeReader opcode (33 vs 30), the forced-zero
+selector (`is_lh = 0` vs `is_lhu = 0`), the U16MSB constraint's is_real
+arg (0 vs 1; forces msb=0 trivially), and the trailing
+`signed_extension_msb = 0` clause. -/
+def SpecForIff_of_is_lhu (cols : LoadHalfCols (ZMod p)) : Prop :=
+  SP1Clean.AddrAddOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_imm
+      { value := cols.addr_value } ∧
+  (cols.half_offset_bit1 = 0 ∨ cols.half_offset_bit1 = 1) ∧
+  (cols.half_offset_bit2 = 0 ∨ cols.half_offset_bit2 = 1) ∧
+  cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
+  ((cols.addr_value[0] - 4 * cols.half_offset_bit2 - 2 * cols.half_offset_bit1)
+      * (8 : ZMod p)⁻¹).val < 2 ^ ZMod.val (13 : ZMod p) ∧
+  (U16MSBOperation.constraints cols.op_a_write_value_lo
+      { msb := cols.signed_extension_msb } 0).allHold ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ITypeReader.itypeReaderSpec
+      (cols.clk_0_16 + cols.clk_16_24 * 65536) 33 cols.pc
+      #v[cols.op_a_write_value_lo,
+         65535 * cols.signed_extension_msb,
+         65535 * cols.signed_extension_msb,
+         65535 * cols.signed_extension_msb]
+      { op_a := cols.op_a,
+        op_a_memory :=
+          { prev_value := cols.op_a_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_a_memory_prev_low,
+                diff_low_limb := cols.op_a_memory_diff_low } },
+        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+        op_b_memory :=
+          { prev_value := cols.op_b_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_b_memory_prev_low,
+                diff_low_limb := cols.op_b_memory_diff_low } },
+        op_c_imm := cols.op_c_imm } ∧
+  (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
+  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.clk_high -
+      (cols.load_memory_flag * cols.load_memory_prev_low +
+        (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
+    cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
+  cols.load_memory_diff_low.val < 65536 ∧
+  ((0 : ZMod p) < 256 ∧ cols.load_memory_diff_high < (256 : ZMod p) ∧
+    (0 : ZMod p) < 256) ∧
+  Word.isU64 cols.load_prev_value ∧
+  cols.is_lh = 0 ∧ cols.op_a_0 = 0 ∧
+  (cols.half_offset_bit1 = 1 ∨ cols.half_offset_bit2 = 1 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[0]) ∧
+  (cols.half_offset_bit1 = 0 ∨ cols.half_offset_bit2 = 1 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[1]) ∧
+  (cols.half_offset_bit1 = 1 ∨ cols.half_offset_bit2 = 0 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[2]) ∧
+  (cols.half_offset_bit1 = 0 ∨ cols.half_offset_bit2 = 0 ∨
+    cols.op_a_write_value_lo = cols.load_prev_value[3]) ∧
+  cols.signed_extension_msb = 0
+
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: the iff destructure unfolds the full constraint list
+-- via the SP1-side `_of_is_lh` helper.
+/-- The chip-level bridge for the signed Load Half variant. -/
+theorem iff_sp1_of_is_lh (Main : Vector (ZMod p) 44) (h_is_lh : Main[42] = 1) :
+    (_root_.Load.LoadHalf.constraints Main).allHold ↔
+      SpecForIff_of_is_lh (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change List.Forall SP1Constraint.toProp (_root_.Load.LoadHalf.constraints Main) ↔ _
+  rw [_root_.Load.LoadHalf.allHold_constraints_iff_of_is_lh Main h_is_lh]
+  simp only [show ∀ (a : SP1ConstraintList (ZMod p)),
+      List.Forall SP1Constraint.toProp a = a.allHold from fun _ => rfl,
+    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+    SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1,
+    SP1Clean.AddrAddOp.iff_sp1]
+  simp [SpecForIff_of_is_lh, fromMain]
+
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: same reason as `iff_sp1_of_is_lh`.
+/-- The chip-level bridge for the unsigned Load Half variant. -/
+theorem iff_sp1_of_is_lhu (Main : Vector (ZMod p) 44) (h_is_lhu : Main[43] = 1) :
+    (_root_.Load.LoadHalf.constraints Main).allHold ↔
+      SpecForIff_of_is_lhu (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change List.Forall SP1Constraint.toProp (_root_.Load.LoadHalf.constraints Main) ↔ _
+  rw [_root_.Load.LoadHalf.allHold_constraints_iff_of_is_lhu Main h_is_lhu]
+  simp only [show ∀ (a : SP1ConstraintList (ZMod p)),
+      List.Forall SP1Constraint.toProp a = a.allHold from fun _ => rfl,
+    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+    SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1,
+    SP1Clean.AddrAddOp.iff_sp1]
+  simp [SpecForIff_of_is_lhu, fromMain]
 
 end SP1Clean.LoadHalf

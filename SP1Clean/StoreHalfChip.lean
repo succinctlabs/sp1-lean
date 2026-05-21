@@ -11,11 +11,15 @@ import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Reader.ITypeReaderImmutable
 import SP1Operations.Reader.CPUState
+import SP1Operations.Operation.AddrAddOperation
+import SP1Chips.Store.StoreHalf.Common
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
+import SP1Clean.Reader.ITypeReaderImmutable
 
 /-! # Chip-level `StoreHalfChip` mirror — 16-bit store
 
@@ -121,5 +125,96 @@ def storeMemoryAccess (cols : StoreHalfCols (ZMod p)) : SP1Clean.MemoryAccess (Z
 
 def storeWriteValue (cols : StoreHalfCols (ZMod p)) : Word (ZMod p) :=
   cols.store_write_value
+
+/-- Project a raw SP1 row into the structured `StoreHalfCols` view. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 45) : StoreHalfCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20],
+   #v[Main[21], Main[22], Main[23], Main[24]],
+   #v[Main[25], Main[26], Main[27]],
+   Main[28],
+   #v[Main[29], Main[30], Main[31], Main[32]],
+   Main[33], Main[34], Main[35], Main[36], Main[37],
+   Main[38], Main[39],
+   #v[Main[40], Main[41], Main[42], Main[43]],
+   Main[44]⟩
+
+/-- Iff RHS for the Store Half (SH) variant, mirroring
+`_root_.Store.StoreHalf.allHold_constraints_iff_of_is_real`. SH writes
+a 16-bit half-word at one of four positions within the 8-byte aligned
+doubleword (selected by `byte_selector_upper`/`byte_selector_lower`).
+The 4-limb `store_write_value` is the byte-selected merge of the
+write data (`op_a_memory_prev_value[0]`) and the existing `store_prev_value`. -/
+def SpecForIff_of_is_real (cols : StoreHalfCols (ZMod p)) : Prop :=
+  SP1Clean.AddrAddOp.Spec
+      cols.op_b_memory_prev_value cols.op_c_imm
+      { value := cols.addr_value } ∧
+  (cols.byte_selector_upper = 0 ∨ cols.byte_selector_upper = 1) ∧
+  (cols.byte_selector_lower = 0 ∨ cols.byte_selector_lower = 1) ∧
+  cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
+  ((cols.addr_value[0] - 4 * cols.byte_selector_lower - 2 * cols.byte_selector_upper)
+      * (8 : ZMod p)⁻¹).val < 2 ^ ZMod.val (13 : ZMod p) ∧
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ITypeReaderImmutable.itypeReaderImmutableSpec
+      (cols.clk_0_16 + cols.clk_16_24 * 65536) 37 cols.pc
+      { op_a := cols.op_a,
+        op_a_memory :=
+          { prev_value := cols.op_a_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_a_memory_prev_low,
+                diff_low_limb := cols.op_a_memory_diff_low } },
+        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+        op_b_memory :=
+          { prev_value := cols.op_b_memory_prev_value,
+            access_timestamp :=
+              { prev_low := cols.op_b_memory_prev_low,
+                diff_low_limb := cols.op_b_memory_diff_low } },
+        op_c_imm := cols.op_c_imm } ∧
+  (cols.store_memory_flag = 0 ∨ cols.store_memory_flag = 1) ∧
+  (cols.store_memory_flag = 0 ∨ cols.clk_high = cols.store_memory_prev_high) ∧
+  cols.store_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
+      (1 - cols.store_memory_flag) * cols.clk_high -
+      (cols.store_memory_flag * cols.store_memory_prev_low +
+        (1 - cols.store_memory_flag) * cols.store_memory_prev_high) - 1 =
+    cols.store_memory_diff_low + cols.store_memory_diff_high * 65536 ∧
+  cols.store_memory_diff_low.val < 65536 ∧
+  ((0 : ZMod p) < 256 ∧ cols.store_memory_diff_high < (256 : ZMod p) ∧
+    (0 : ZMod p) < 256) ∧
+  Word.isU64 cols.store_prev_value ∧
+  cols.store_write_value[0] = cols.store_prev_value[0] +
+      (cols.op_a_memory_prev_value[0] - cols.store_prev_value[0]) *
+      (1 - cols.byte_selector_upper) * (1 - cols.byte_selector_lower) ∧
+  cols.store_write_value[1] = cols.store_prev_value[1] +
+      (cols.op_a_memory_prev_value[0] - cols.store_prev_value[1]) *
+      cols.byte_selector_upper * (1 - cols.byte_selector_lower) ∧
+  cols.store_write_value[2] = cols.store_prev_value[2] +
+      (cols.op_a_memory_prev_value[0] - cols.store_prev_value[2]) *
+      (1 - cols.byte_selector_upper) * cols.byte_selector_lower ∧
+  cols.store_write_value[3] = cols.store_prev_value[3] +
+      (cols.op_a_memory_prev_value[0] - cols.store_prev_value[3]) *
+      cols.byte_selector_upper * cols.byte_selector_lower
+
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: the iff destructure unfolds the full constraint list
+-- via the SP1-side `_of_is_real` helper.
+/-- The chip-level bridge for the Store Half variant. -/
+theorem iff_sp1_of_is_real (Main : Vector (ZMod p) 45) (h_is_real : Main[44] = 1) :
+    (_root_.Store.StoreHalf.constraints Main).allHold ↔
+      SpecForIff_of_is_real (fromMain Main) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change List.Forall SP1Constraint.toProp (_root_.Store.StoreHalf.constraints Main) ↔ _
+  rw [_root_.Store.StoreHalf.allHold_constraints_iff_of_is_real Main h_is_real]
+  simp only [show ∀ (a : SP1ConstraintList (ZMod p)),
+      List.Forall SP1Constraint.toProp a = a.allHold from fun _ => rfl,
+    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+    SP1Clean.ITypeReaderImmutable.itypeReaderImmutableSpec_iff_sp1,
+    SP1Clean.AddrAddOp.iff_sp1]
+  simp [SpecForIff_of_is_real, fromMain]
 
 end SP1Clean.StoreHalf
