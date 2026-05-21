@@ -1,4 +1,4 @@
-import SP1Operations.Operation.U16toU8OperationUnsafe
+import SP1Operations.Operation.U16toU8OperationUnsafe.U16toU8OperationUnsafe
 import SP1Operations.Operation.U16toU8OperationSafe.Operation
 import SP1Operations.Operation.U16toU8OperationSafe.Constraints
 

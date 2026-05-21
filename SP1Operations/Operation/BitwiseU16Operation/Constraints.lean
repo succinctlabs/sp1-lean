@@ -1,5 +1,5 @@
-import SP1Operations.Operation.U16toU8OperationUnsafe
-import SP1Operations.Operation.BitwiseOperation
+import SP1Operations.Operation.U16toU8OperationUnsafe.U16toU8OperationUnsafe
+import SP1Operations.Operation.BitwiseOperation.BitwiseOperation
 import SP1Operations.Operation.BitwiseU16Operation.Operation
 
 namespace BitwiseU16Operation

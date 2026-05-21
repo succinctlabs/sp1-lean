@@ -1,6 +1,6 @@
-import SP1Operations.Operation.BitwiseU16Operation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Operation.BitwiseU16Operation.BitwiseU16Operation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Bitwise.Constraints
 
 namespace Bitwise

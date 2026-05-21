@@ -1,7 +1,7 @@
 import SP1Foundations
-import SP1Operations.Reader.CPUState
-import SP1Operations.Compare.LtOperationSigned
-import SP1Operations.Reader.ITypeReaderImmutable
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Compare.LtOperationSigned.LtOperationSigned
+import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
 
 namespace Branch
 

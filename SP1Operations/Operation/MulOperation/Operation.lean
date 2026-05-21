@@ -1,5 +1,5 @@
-import SP1Operations.Operation.U16toU8OperationSafe
-import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.U16toU8OperationSafe.U16toU8OperationSafe
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 
 @[ext] structure MulOperation (F : Type) where
     carry : Vector F 16

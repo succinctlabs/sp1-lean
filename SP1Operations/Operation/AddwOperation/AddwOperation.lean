@@ -1,5 +1,5 @@
 import SP1Foundations
-import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 import SP1Operations.Operation.AddwOperation.Operation
 import SP1Operations.Operation.AddwOperation.Constraints
 

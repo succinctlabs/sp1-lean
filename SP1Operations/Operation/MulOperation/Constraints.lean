@@ -1,7 +1,7 @@
 import SP1Foundations
 import SP1Operations.Operation.MulOperation.Operation
-import SP1Operations.Operation.U16toU8OperationSafe
-import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.U16toU8OperationSafe.U16toU8OperationSafe
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 
 namespace MulOperation
 

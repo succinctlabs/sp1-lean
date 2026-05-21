@@ -1,5 +1,5 @@
 import SP1Operations.Compare.LtOperationUnsigned.Operation
-import SP1Operations.Compare.U16CompareOperation
+import SP1Operations.Compare.U16CompareOperation.U16CompareOperation
 
 namespace LtOperationUnsigned
 

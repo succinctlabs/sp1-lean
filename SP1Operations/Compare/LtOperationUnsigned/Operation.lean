@@ -1,4 +1,4 @@
-import SP1Operations.Compare.U16CompareOperation
+import SP1Operations.Compare.U16CompareOperation.U16CompareOperation
 
 structure LtOperationUnsigned (F : Type) where
   u16_compare_operation : U16CompareOperation F

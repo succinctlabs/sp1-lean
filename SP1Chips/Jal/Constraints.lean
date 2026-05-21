@@ -1,4 +1,4 @@
-import SP1Operations.Operation.AddOperation
+import SP1Operations.Operation.AddOperation.AddOperation
 
 namespace Jal
 

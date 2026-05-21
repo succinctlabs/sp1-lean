@@ -1,5 +1,5 @@
 import SP1Operations.Compare.IsZeroWordOperation.Operation
-import SP1Operations.Compare.IsZeroOperation
+import SP1Operations.Compare.IsZeroOperation.IsZeroOperation
 
 namespace IsZeroWordOperation
 

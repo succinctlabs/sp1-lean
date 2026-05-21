@@ -1,7 +1,7 @@
 import SP1Foundations
 import SP1Chips.Store.StoreHalf.Constraints
-import SP1Operations.Operation.AddrAddOperation
-import SP1Operations.Reader.ITypeReaderImmutable
+import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
+import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
 
 open LeanRV64D.Functions Sail SailState
 
