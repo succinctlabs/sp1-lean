@@ -689,23 +689,22 @@ lemma spec.divuw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 2
     have h_qbc3_eq : qbc3 = 0 := w_eq_qbc3_uw.resolve_left h_sum_ne
     simp [h_is_divuw, z0, z1, z2, z3, z4, z5, z6,
           h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
-  -- Trailing-arm closer in `first` form. Covers writeback, omega,
-  -- isU64-via-cases (both `simp_all` and `simp+omega` variants), per-limb c/b
-  -- bounds via `lt_cases_of_isU64`, 2-step c/b extractions, and the maco arm.
+  -- Order: cheapest-first (omega → rw → typed apply-helpers → heavy simp/omega
+  -- variants). See spec.divw in DivwRemw.lean for the rationale. Putting
+  -- `maco_arm_closer` ahead of `Word.isU64_of_cases <;> simp <;> omega` saves
+  -- the simp+omega cost on every maco-shaped goal.
   all_goals first
-    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
+    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
+    | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
+        (by split_ifs at div_zero
+            · right; exact div_zero
+            · left; exact div_zero))
     | (apply Word.isU64_of_cases <;> simp <;> omega)
     | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
     | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
     | (apply Word.lt_cases_of_isU64 at is_U64_c
        apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b
-       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
-    | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
-        (by split_ifs at div_zero
-            · right; exact div_zero
-            · left; exact div_zero))
 
 -- Twin of `spec.divuw` with `.2` projection, `is_remuw` flag,
 -- `sop8` mutex, and `eq_r_*` writeback.
@@ -975,20 +974,19 @@ lemma spec.remuw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 2
     have h_qbc3_eq : qbc3 = 0 := w_eq_qbc3_uw.resolve_left h_sum_ne
     simp [h_is_remuw, z0, z1, z2, z3, z4, z5, z6,
           h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
+  -- Order mirrors spec.divuw (see there for rationale); writeback uses `eq_r_*`.
   all_goals first
-    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
+    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
+    | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
+        (by split_ifs at div_zero
+            · right; exact div_zero
+            · left; exact div_zero))
     | (apply Word.isU64_of_cases <;> simp <;> omega)
     | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
     | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
     | (apply Word.lt_cases_of_isU64 at is_U64_c
        apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b
-       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
-    | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
-        (by split_ifs at div_zero
-            · right; exact div_zero
-            · left; exact div_zero))
 
 end divuw_remuw
 

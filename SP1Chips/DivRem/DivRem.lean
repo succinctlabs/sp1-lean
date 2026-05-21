@@ -815,23 +815,18 @@ lemma spec.div {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 
     have ⟨_hb0, _hb1, _hb2, _hb3⟩ := Word.lt_cases_of_isU64 is_U64_b
     have ⟨_hc0, _hc1, _hc2, _hc3⟩ := Word.lt_cases_of_isU64 is_U64_c
     simp [h_is_div, z0, z1, z2, z3, z4, z5, z6] at *
+  -- Order: cheapest-first (omega → rw → typed apply-helper → heavy simp_all).
+  -- See spec.divw in DivwRemw.lean for the rationale. The pre-extracted limb
+  -- bounds (`_hb0..3`, `_hc0..3` above) feed `simp_all`, which closes every
+  -- residual goal after omega/rw/maco — no further fallback arms are needed.
   all_goals first
-    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
-    | (apply Word.isU64_of_cases <;> simp_all; done)
-    | (apply Word.isU64_of_cases <;> simp <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c
-       apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b
-       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
-    | (rcases b_b_neg with hbn | hbn <;>
-       (apply Word.isU64_of_cases <;> simp_all [hbn] <;> omega))
+    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
+    | (apply Word.isU64_of_cases <;> simp_all)
 
 -- Twin of `spec.div` with `.2` projection, `is_rem` flag,
 -- `sop3` mutex, `eq_r_*` writeback.
@@ -1093,23 +1088,15 @@ lemma spec.rem {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 
     have ⟨_hb0, _hb1, _hb2, _hb3⟩ := Word.lt_cases_of_isU64 is_U64_b
     have ⟨_hc0, _hc1, _hc2, _hc3⟩ := Word.lt_cases_of_isU64 is_U64_c
     simp [h_is_rem, z0, z1, z2, z3, z4, z5, z6] at *
+  -- Order mirrors spec.div (see there for rationale); writeback uses `eq_r_*`.
   all_goals first
-    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
-    | (apply Word.isU64_of_cases <;> simp_all; done)
-    | (apply Word.isU64_of_cases <;> simp <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c
-       apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b
-       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
-    | (rcases b_b_neg with hbn | hbn <;>
-       (apply Word.isU64_of_cases <;> simp_all [hbn] <;> omega))
+    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
+    | (apply Word.isU64_of_cases <;> simp_all)
 
 end div_rem
 

@@ -725,22 +725,20 @@ lemma spec.divu {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop2 h_is_divu
     simp [h_is_divu, z0, z1, z2, z3, z4, z5, z6] at *
-  -- Trailing-arm closer. Options A/B/C handle writeback + omega + generic isU64
-  -- arms. Options D/E discharge per-limb-bound arms shaped `bi.val < 65536`
-  -- / `ci.val < 65536`. Option F dispatches the maco-form arm
-  -- (`Word.isU64 #v[is_c_0 + (1-is_c_0)*ac0, ...]`) via the named helper
-  -- `divu_maco_arm_closer` (a small fresh context that avoids the
-  -- simp_all stack overflow an inline closer triggers).
+  -- Order: cheapest-first (omega → rw → typed apply-helpers → heavy simp_all).
+  -- See spec.divw in DivwRemw.lean for the rationale. Putting `maco_arm_closer`
+  -- ahead of `Word.isU64_of_cases <;> simp_all` saves the full simp_all cost on
+  -- every maco-shaped goal.
   all_goals first
-    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
-    | (apply Word.isU64_of_cases <;> simp_all; done)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
+    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
+    | (apply Word.isU64_of_cases <;> simp_all)
+    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
 
 -- Twin of `spec.divu`; differs only in: `is_remu` flag, `.2`
 -- projection (remainder output), `sop4` mutex implication (instead of
@@ -1001,18 +999,17 @@ lemma spec.remu {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
   all_goals
     obtain ⟨z0, z1, z2, z3, z4, z5, z6⟩ := sop4 h_is_remu
     simp [h_is_remu, z0, z1, z2, z3, z4, z5, z6] at *
-  -- Trailing-arm closer. Mirrors spec.divu's chain but the writeback
-  -- option uses `eq_r_*` (remainder output) instead of `eq_d_*`.
+  -- Order mirrors spec.divu (see there for rationale); writeback uses `eq_r_*`.
   all_goals first
-    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
-    | (apply Word.isU64_of_cases <;> simp_all; done)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
+    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
+    | (apply Word.isU64_of_cases <;> simp_all)
+    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
+    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
 
 end divu_remu
 
