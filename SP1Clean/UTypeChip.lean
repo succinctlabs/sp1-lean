@@ -198,4 +198,101 @@ theorem iff_sp1
   simp [SP1Clean.CPUState.cpuStateSpec, SP1Clean.JTypeReader.jtypeReaderSpec,
     and_assoc]
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+Wraps the chip-level constraint surface into a Clean `FormalAssertion`.
+Composes `SP1Clean.CPUState.assertion` and `SP1Clean.ProgramTable.assertion`
+as subcircuits, plus the three scalar trailing assertZero gates
+(`is_real` binary, `is_auipc` binary, `(is_real - 1) * op_a_0 = 0`).
+
+**Path-2 drops.** The `AddOperation` clause and the three Vector-indexed
+`pc_addend[i] - is_auipc * pc[i] = 0` gates are NOT promoted here. The
+Vector-indexed clauses hit the FormalAssertion friction noted in memory
+`feedback_formal_assertion_friction` (completeness goals on
+`Expression.eval env input_var_pc_addend[i]` don't bridge cleanly to
+`cols.pc_addend[i]`). They remain in the legacy chip-level `Spec` /
+`iff_sp1` route. Same Path-2 design as `SP1Clean.Jalr.Assertion`. -/
+
+namespace Assertion
+
+open Circuit
+
+/-- Refactored chip-level circuit using subcircuit composition. Drops
+the AddOperation byte lookups and the 3 Vector-indexed `pc_addend`
+clauses (see Scope note above). -/
+@[reducible]
+def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b_imm,
+       op_c_imm, _pc_addend, _add_result, is_auipc, is_real⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, is_auipc * 48 + (1 - is_auipc) * 49,
+      op_a, op_b_imm, op_c_imm, op_a_0, 0, 0⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+  is_auipc * (is_auipc - 1) === 0
+  (is_real - 1) * op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) UTypeCols unit where
+  name := "SP1Clean.UType"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : UTypeCols (ZMod p)) : Prop := True
+
+/-- The chip's Circuit-derivable spec: byte-lookup consequences for the
+clock-decomposition gadget, the program-bus existential witness, and the
+three scalar trailing assertZero gates. -/
+def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc,
+      opcode := cols.is_auipc * 48 + (1 + -cols.is_auipc) * 49,
+      op_a := cols.op_a,
+      op_b := cols.op_b_imm,
+      op_c := cols.op_c_imm,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
+  (cols.is_real - 1) * cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_isauipc, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_isreal
+  · linear_combination h_isauipc
+  · linear_combination h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_isreal, h_isauipc, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_isreal
+  · linear_combination h_isauipc
+  · linear_combination h_op_a_0
+
+end Assertion
+
+/-- The full Clean `FormalAssertion` for the byte- and program-lookup-
+derivable subset of `UTypeChip`'s constraint surface (Path-2 design;
+drops the `AddOperation` byte lookups). -/
+def assertion : FormalAssertion (ZMod p) UTypeCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.UType

@@ -166,4 +166,107 @@ def opCMemoryAccess (cols : LtCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
     prev_low := cols.op_c_memory_prev_low,
     diff_low_limb := cols.op_c_memory_diff_low }
 
+/-! ## Full `FormalAssertion` promotion (Path-2)
+
+Wraps the chip-level constraint surface into a Clean `FormalAssertion`.
+Composes `SP1Clean.CPUState.assertion` and `SP1Clean.ProgramTable.assertion`
+as subcircuits, plus the four scalar trailing assertZero gates
+(`is_slt` binary, `is_sltu` binary, sum binary, `op_a_0 = 0`).
+
+**Path-2 drops.** The `LtOperationSigned` `allHold` clause is NOT
+promoted here — no Clean operation wrapper exists yet for the
+Compare-family sub-fragment. The memory-bus side of `aluTypeReaderSpec`
+is also deferred to the legacy chip-level `Spec` / `iff_sp1` route.
+Same Path-2 design as `SP1Clean.Addi.Assertion`. -/
+
+namespace Assertion
+
+open Circuit
+
+/-- Refactored chip-level circuit using subcircuit composition. Drops
+the `LtOperationSigned` byte lookups and `ALUTypeReader` memory accesses. -/
+@[reducible]
+def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
+       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_c, _op_c_memory_prev_value, _op_c_memory_prev_low,
+       _op_c_memory_diff_low, imm_c, is_slt, is_sltu, _compare_bit,
+       _u16_flags, _not_eq_inv, _comparison_limbs, _b_msb, _c_msb⟩ := cols
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.ProgramTable.assertion
+    (⟨pc, is_slt * 9 + is_sltu * 10,
+      op_a, #v[op_b, 0, 0, 0], op_c,
+      op_a_0, 0, imm_c⟩ :
+      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  is_slt * (is_slt - 1) === 0
+  is_sltu * (is_sltu - 1) === 0
+  (is_slt + is_sltu) * (is_slt + is_sltu - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) LtCols unit where
+  name := "SP1Clean.Lt"
+  main := main
+  localLength _ := 0
+
+def Assumptions (_ : LtCols (ZMod p)) : Prop := True
+
+/-- The chip's Circuit-derivable spec: byte-lookup consequences for the
+clock-decomposition gadget, the program-bus existential witness, and the
+four scalar trailing assertZero gates. -/
+def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
+  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.ProgramTable.Spec
+    { pc := cols.pc,
+      opcode := cols.is_slt * 9 + cols.is_sltu * 10,
+      op_a := cols.op_a,
+      op_b := #v[cols.op_b, 0, 0, 0],
+      op_c := cols.op_c,
+      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
+  cols.is_slt * (cols.is_slt - 1) = 0 ∧
+  cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
+  (cols.is_slt + cols.is_sltu) * (cols.is_slt + cols.is_sltu - 1) = 0 ∧
+  cols.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu_sub, h_prog_sub, h_isslt, h_issltu, h_sum, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_prog_sub trivial
+  · linear_combination h_isslt
+  · linear_combination h_issltu
+  · linear_combination h_sum
+  · exact h_op_a_0
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_cpu, h_prog, h_isslt, h_issltu, h_sum, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_prog⟩
+  · linear_combination h_isslt
+  · linear_combination h_issltu
+  · linear_combination h_sum
+  · exact h_op_a_0
+
+end Assertion
+
+/-- The full Clean `FormalAssertion` for the byte- and program-lookup-
+derivable subset of `LtChip`'s constraint surface (Path-2 design;
+drops the `LtOperationSigned` byte lookups and memory-bus side of
+`ALUTypeReader`). -/
+def assertion : FormalAssertion (ZMod p) LtCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
 end SP1Clean.Lt

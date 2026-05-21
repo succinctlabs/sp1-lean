@@ -20,6 +20,10 @@ import SP1Clean.BranchChip
 import SP1Clean.LoadX0Chip
 import SP1Clean.ShiftRightChip
 import SP1Clean.DivRemChip
+import SP1Clean.AddiChip
+import SP1Clean.BitwiseChip
+import SP1Clean.SubChip
+import SP1Clean.SubwChip
 
 /-! # Trace-level OfflineMemory bridge
 
@@ -94,6 +98,10 @@ inductive ChipRow (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   | loadX0 (cols : SP1Clean.LoadX0.LoadX0Cols (ZMod p))
   | shiftRight (cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
   | divRem (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
+  | addi (cols : SP1Clean.Addi.AddiCols (ZMod p))
+  | bitwise (cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
+  | sub (cols : SP1Clean.Sub.SubCols (ZMod p))
+  | subw (cols : SP1Clean.Sub.W.SubwCols (ZMod p))
 
 namespace ChipRow
 
@@ -450,6 +458,93 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
            65535 * cols.signed_extension_msb]),
        (op_b_mem, cols.op_b_memory_prev_value),
        (load_mem, cols.load_prev_value)]
+  | .addi cols =>
+      -- I-type: two register accesses (op_a read+write, op_b pure read).
+      -- op_c is the 4-limb immediate `op_c_imm` — no memory access.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value)]
+  | .bitwise cols =>
+      -- Three register accesses (op_a write, op_b/op_c pure reads). The
+      -- op_a write value is the 4-limb word reconstruction from the chip's
+      -- 8-limb `bitwise_result` (mirrors the `E19/E21/E23/E25` halfword
+      -- packs in `BitwiseU16Operation.constraints`).
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c[0], 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem,
+        #v[cols.bitwise_result[0] + cols.bitwise_result[1] * 256,
+           cols.bitwise_result[2] + cols.bitwise_result[3] * 256,
+           cols.bitwise_result[4] + cols.bitwise_result[5] * 256,
+           cols.bitwise_result[6] + cols.bitwise_result[7] * 256]),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .sub cols =>
+      -- R-type: three register accesses. op_a is read AND written
+      -- (write_value = op_a_write_value); op_b and op_c are pure reads.
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c, 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem, cols.op_a_write_value),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
+  | .subw cols =>
+      -- W-type: three register accesses, op_a write is the 4-limb
+      -- sign-extended reconstruction `[subw_value[0], subw_value[1],
+      -- subw_msb * 65535, subw_msb * 65535]` (mirrors Addw).
+      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_a, 0, 0],
+          prev_value := cols.op_a_memory_prev_value,
+          prev_low := cols.op_a_memory_prev_low,
+          diff_low_limb := cols.op_a_memory_diff_low }
+      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_b, 0, 0],
+          prev_value := cols.op_b_memory_prev_value,
+          prev_low := cols.op_b_memory_prev_low,
+          diff_low_limb := cols.op_b_memory_diff_low }
+      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
+        { addr := #v[cols.op_c, 0, 0],
+          prev_value := cols.op_c_memory_prev_value,
+          prev_low := cols.op_c_memory_prev_low,
+          diff_low_limb := cols.op_c_memory_diff_low }
+      [(op_a_mem,
+        #v[cols.subw_value[0], cols.subw_value[1],
+           cols.subw_msb * 65535, cols.subw_msb * 65535]),
+       (op_b_mem, cols.op_b_memory_prev_value),
+       (op_c_mem, cols.op_c_memory_prev_value)]
 
 /-- The chip-row's `clk_high` and (composed) `clk_low` for the per-access
 timestamp encoding `clk_high * 2^24 + clk_low + offset`. -/
@@ -474,6 +569,10 @@ def clockComponents : ChipRow p → ZMod p × ZMod p
   | .loadX0 cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
   | .shiftRight cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
   | .divRem cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .addi cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .bitwise cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .sub cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .subw cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
 
 /-- The chip-row's natural Spec predicate (the propositional content the
 chip's FormalAssertion / iff_sp1 establishes). -/
@@ -498,6 +597,10 @@ def Spec : ChipRow p → Prop
   | .loadX0 cols => SP1Clean.LoadX0.Spec cols
   | .shiftRight cols => SP1Clean.ShiftRight.Spec cols
   | .divRem cols => SP1Clean.DivRem.Spec cols
+  | .addi cols => SP1Clean.Addi.Spec cols
+  | .bitwise cols => SP1Clean.Bitwise.Spec cols
+  | .sub cols => SP1Clean.Sub.Spec cols
+  | .subw cols => SP1Clean.Sub.W.Spec cols
 
 /-- Per-row, per-access sub-clock offsets. R-type and I-type readers
 emit accesses at `clk_low + 4` (op_a), `clk_low + 3` (op_b), and
@@ -530,6 +633,11 @@ def offsets : ChipRow p → List (ZMod p)
   | .loadX0 _ => [4, 3, 1]
   | .shiftRight _ => [4, 3, 2]
   | .divRem _ => [4, 3, 2]
+  -- Addi: 2 register accesses (op_a + op_b) at +4/+3; op_c is immediate.
+  | .addi _ => [4, 3]
+  | .bitwise _ => [4, 3, 2]
+  | .sub _ => [4, 3, 2]
+  | .subw _ => [4, 3, 2]
 
 end ChipRow
 

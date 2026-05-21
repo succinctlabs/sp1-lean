@@ -178,6 +178,30 @@ def ChipRow.stateAccess : ChipRow p → StateAccess (ZMod p)
         pc := cols.pc,
         next_pc := #v[cols.pc[0] + 4, cols.pc[1], cols.pc[2]],
         is_real := cols.is_real }
+  | .addi cols =>
+      { clk_high := cols.clk_high,
+        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
+        pc := cols.pc,
+        next_pc := #v[cols.pc[0] + 4, cols.pc[1], cols.pc[2]],
+        is_real := cols.is_real }
+  | .bitwise cols =>
+      { clk_high := cols.clk_high,
+        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
+        pc := cols.pc,
+        next_pc := #v[cols.pc[0] + 4, cols.pc[1], cols.pc[2]],
+        is_real := cols.is_xor + cols.is_or + cols.is_and }
+  | .sub cols =>
+      { clk_high := cols.clk_high,
+        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
+        pc := cols.pc,
+        next_pc := #v[cols.pc[0] + 4, cols.pc[1], cols.pc[2]],
+        is_real := cols.is_real }
+  | .subw cols =>
+      { clk_high := cols.clk_high,
+        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
+        pc := cols.pc,
+        next_pc := #v[cols.pc[0] + 4, cols.pc[1], cols.pc[2]],
+        is_real := cols.is_real }
 
 /-- Aggregate a list of chip rows into a per-row state-access list.
 
