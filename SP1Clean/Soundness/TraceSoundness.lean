@@ -65,20 +65,20 @@ and the state bus's PC chain holds. -/
 theorem trace_soundness_aggregateMemory
     (rows : List (ChipRow p))
     (clkIncrement : ZMod p)
-    (_h_specs : ∀ row ∈ rows, ChipRow.Spec row)
+    (h_specs : ∀ row ∈ rows, ChipRow.Spec row)
     (h_clk : TraceClkValid rows)
     (h_state : TraceStateValid rows clkIncrement)
-    (_h_real : TraceIsRealBinary rows)
     (h_online :
       MemoryAccessList.isConsistentOnline (aggregateMemoryAccesses rows)
         (aggregateMemoryAccesses_isTimestampSorted rows h_clk)) :
     (∃ permuted : AddressSortedMemoryAccessList,
         permuted.val.Perm (aggregateMemoryAccesses rows) ∧
         MemoryAccessList.isConsistentOffline permuted.val permuted.property)
-      ∧ pcChainProp clkIncrement (aggregateStateAccesses rows) := by
-  refine ⟨?_, h_state.chain_holds⟩
+      ∧ pcChainProp clkIncrement (aggregateStateAccesses rows)
+      ∧ TraceIsRealBinary rows := by
+  refine ⟨?_, h_state.chain_holds, traceIsRealBinary_of_chip_specs rows h_specs⟩
   have h_sorted := aggregateMemoryAccesses_isTimestampSorted rows h_clk
   have h_nodup := aggregateMemoryAccesses_Notimestampdup rows h_clk
-  exact (chip_specs_admit_offline_bridge rows _h_specs h_sorted h_nodup).mp h_online
+  exact (chip_specs_admit_offline_bridge rows h_specs h_sorted h_nodup).mp h_online
 
 end SP1Clean.Soundness

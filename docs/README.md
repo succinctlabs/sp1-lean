@@ -73,6 +73,13 @@ under `docs/`, look at the matching entry below.
   that blocks a polymorphic combinator and the JalrChip Path-1.5
   re-promotion that partially closes the iter-4 Tier-2 finding.
 
+- **`STRUCT_DIVERGENCE.md`** — field-level snapshot of how far
+  `SP1Clean/` column structs and `SP1Operations/` operation structs
+  have drifted from upstream Rust (`../sp1`). Read when scoping a
+  sync, evaluating coverage gaps (privilege/trap, paging, syscalls,
+  lookup tables, etc.), or before any porting work that depends on
+  upstream struct shape. Focuses on shape only — no constraint logic.
+
 - **`TRACE_SOUNDNESS_STATUS.md`** — consolidated status across the
   three proof layers (dirty `correct_*`, Clean `FormalAssertion`,
   trace-level aggregator) per chip, plus the remaining gaps for a

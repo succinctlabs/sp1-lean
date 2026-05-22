@@ -10,10 +10,12 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.AddOperation
+import SP1Operations.Operation.AddrAddOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.ITypeReader
 import SP1Chips.AddiChip
 import SP1Clean.AddOperation
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState
@@ -67,6 +69,7 @@ structure AddiCols (T : Type) where
   op_c_imm : Vector T 4
   op_a_write_value : Vector T 4
   is_real : T
+  next_pc_carry_value : Vector T 3
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `AddiChip::eval(builder, cols)`:
@@ -76,7 +79,7 @@ def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
        op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
-       op_c_imm, op_a_write_value, is_real⟩ := cols
+       op_c_imm, op_a_write_value, is_real, _next_pc_carry_value⟩ := cols
   -- AddOperation: op_b_memory.prev_value + op_c_imm = op_a_write_value.
   SP1Clean.AddOp.main op_b_memory_prev_value op_c_imm op_a_write_value
   -- CPUState: clk_0_16 progression (Range 13 → < 2^13 = 8192) and clk_16_24
@@ -157,7 +160,7 @@ take/drop tower the `ProvableStruct`-derived path produces. -/
    Main[19], Main[20],
    #v[Main[21], Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27], Main[28]],
-   Main[29]⟩
+   Main[29], #v[0, 0, 0]⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
 `Addi.constraints Main` is exactly the Clean-flavored `Spec (fromMain Main)`,
@@ -255,7 +258,7 @@ def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
        op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
-       op_c_imm, op_a_write_value, is_real⟩ := cols
+       op_c_imm, op_a_write_value, is_real, next_pc_carry_value⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨op_b_memory_prev_value, op_c_imm, op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
@@ -267,6 +270,13 @@ def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
   SP1Clean.ProgramTable.assertion
     (⟨pc, 1, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  -- AddrAddOperation: pc + 4 carry-aware computation, stored in
+  -- `next_pc_carry_value`.
+  SP1Clean.AddrAddOp.assertion
+    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
+       #v[(4 : Expression (ZMod p)), 0, 0, 0],
+       next_pc_carry_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   op_a_0 === 0
 
@@ -292,30 +302,45 @@ def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
       op_b := #v[cols.op_b, 0, 0, 0],
       op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  SP1Clean.AddrAddOp.assertion.Spec
+    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+     #v[(4 : ZMod p), 0, 0, 0],
+     cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.op_a_0 = 0
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_isreal, h_op_a_0⟩ := h_holds
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17⟩ := h_input
+  subst_eqs
+  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_addop_sub trivial
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
+  · simp only [Vector.getElem_map]
+    exact h_addr_sub trivial
   · linear_combination h_isreal
   · exact h_op_a_0
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_addop, h_cpu, h_prog, h_isreal, h_op_a_0⟩ := h_spec
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17⟩ := h_input
+  subst_eqs
+  obtain ⟨h_addop, h_cpu, h_prog, h_addr, h_isreal, h_op_a_0⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_addop⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
+  · refine ⟨trivial, ?_⟩
+    simp only [Vector.getElem_map] at h_addr
+    exact h_addr
   · linear_combination h_isreal
   · exact h_op_a_0
 

@@ -18,6 +18,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
+import SP1Clean.Compare.LtOperationSigned
 
 /-! # Chip-level `BranchChip` mirror — bundled 6-variant conditional branch
 
@@ -66,12 +67,7 @@ structure BranchCols (T : Type) where
   is_bltu : T                               -- Main[32]
   is_bgeu : T                               -- Main[33]
   lt_is_signed : T                          -- Main[34]
-  compare_bit : T                           -- Main[35]
-  u16_flags : Vector T 4                    -- Main[36..39]
-  not_eq_inv : T                            -- Main[40]
-  comparison_limbs : Vector T 2             -- Main[41..42]
-  b_msb : T                                 -- Main[43]
-  c_msb : T                                 -- Main[44]
+  compare_operation : LtOperationSigned T   -- Main[35..44]
 deriving ProvableStruct
 
 /-- Aggregate is-real flag: sum of 6 selectors. -/
@@ -90,8 +86,7 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
        _op_b_memory_diff_low, op_c_imm, _next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
-       _lt_is_signed, _compare_bit, _u16_flags, _not_eq_inv,
-       _comparison_limbs, _b_msb, _c_msb⟩ := cols
+       _lt_is_signed, _compare_operation⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let opcode_e := is_beq * 40 + is_bne * 41 + is_blt * 42 +
@@ -116,17 +111,9 @@ def Spec (cols : BranchCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p :=
     cols.is_beq * 40 + cols.is_bne * 41 + cols.is_blt * 42 +
       cols.is_bge * 43 + cols.is_bltu * 44 + cols.is_bgeu * 45
-  let lt_cols : _root_.LtOperationSigned (ZMod p) :=
-    { result :=
-        { u16_compare_operation := { bit := cols.compare_bit },
-          u16_flags := cols.u16_flags,
-          not_eq_inv := cols.not_eq_inv,
-          comparison_limbs := cols.comparison_limbs },
-      b_msb := { msb := cols.b_msb },
-      c_msb := { msb := cols.c_msb } }
   (_root_.LtOperationSigned.constraints (F := ZMod p)
       cols.op_a_memory_prev_value cols.op_b_memory_prev_value
-      lt_cols cols.lt_is_signed is_real).allHold ∧
+      cols.compare_operation cols.lt_is_signed is_real).allHold ∧
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := opcode_e,
@@ -175,8 +162,7 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
        _op_b_memory_diff_low, op_c_imm, _next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
-       _lt_is_signed, _compare_bit, _u16_flags, _not_eq_inv,
-       _comparison_limbs, _b_msb, _c_msb⟩ := cols
+       _lt_is_signed, _compare_operation⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let opcode_e := is_beq * 40 + is_bne * 41 + is_blt * 42 +

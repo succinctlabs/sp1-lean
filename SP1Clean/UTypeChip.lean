@@ -10,10 +10,12 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.AddOperation
+import SP1Operations.Operation.AddrAddOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.JTypeReader
 import SP1Chips.UTypeChip
 import SP1Chips.UType.Constraints
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -63,6 +65,7 @@ structure UTypeCols (T : Type) where
   add_result : Vector T 4
   is_auipc : T
   is_real : T
+  next_pc_carry_value : Vector T 3
 deriving ProvableStruct
 
 /-- Clean-side circuit. Emits CPUState range lookups (via subcircuit),
@@ -76,7 +79,8 @@ constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b_imm,
-       op_c_imm, pc_addend, _add_result, is_auipc, is_real⟩ := cols
+       op_c_imm, pc_addend, _add_result, is_auipc, is_real,
+       _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
@@ -143,7 +147,7 @@ def opAMemoryAccess (cols : UTypeCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p)
    #v[Main[18], Main[19], Main[20], Main[21]],
    #v[Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27], Main[28]],
-   Main[29], Main[30]⟩
+   Main[29], Main[30], #v[0, 0, 0]⟩
 
 set_option maxHeartbeats 800000 in
 -- Higher heartbeats: the iff destructure unfolds the full UType constraint
@@ -224,13 +228,19 @@ clauses (see Scope note above). -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b_imm,
-       op_c_imm, _pc_addend, _add_result, is_auipc, is_real⟩ := cols
+       op_c_imm, _pc_addend, _add_result, is_auipc, is_real,
+       next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc, is_auipc * 48 + (1 - is_auipc) * 49,
       op_a, op_b_imm, op_c_imm, op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
+       #v[(4 : Expression (ZMod p)), 0, 0, 0],
+       next_pc_carry_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   is_auipc * (is_auipc - 1) === 0
   (is_real - 1) * op_a_0 === 0
@@ -255,6 +265,10 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
       op_b := cols.op_b_imm,
       op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  SP1Clean.AddrAddOp.assertion.Spec
+    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+     #v[(4 : ZMod p), 0, 0, 0],
+     cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
   (cols.is_real - 1) * cols.op_a_0 = 0
@@ -262,11 +276,16 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_isauipc, h_op_a_0⟩ := h_holds
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
+          e16⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_isauipc, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
+  · simp only [Vector.getElem_map]
+    exact h_addr_sub trivial
   · linear_combination h_isreal
   · linear_combination h_isauipc
   · linear_combination h_op_a_0
@@ -274,11 +293,17 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu, h_prog, h_isreal, h_isauipc, h_op_a_0⟩ := h_spec
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
+          e16⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_isauipc, h_op_a_0⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
+  · refine ⟨trivial, ?_⟩
+    simp only [Vector.getElem_map] at h_addr
+    exact h_addr
   · linear_combination h_isreal
   · linear_combination h_isauipc
   · linear_combination h_op_a_0

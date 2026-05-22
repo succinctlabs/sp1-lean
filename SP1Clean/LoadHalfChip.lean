@@ -66,6 +66,7 @@ structure LoadHalfCols (T : Type) where
   signed_extension_msb : T                  -- Main[41] (MSB for sign-extension)
   is_lh : T                                 -- Main[42]
   is_lhu : T                                -- Main[43]
+  next_pc_carry_value : Vector T 3
 deriving ProvableStruct
 
 def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
@@ -76,7 +77,7 @@ def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
        _half_offset_bit1, _half_offset_bit2, _op_a_write_value_lo,
-       _signed_extension_msb, is_lh, is_lhu⟩ := cols
+       _signed_extension_msb, is_lh, is_lhu, _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   lookup ByteOpcodeTable
@@ -146,7 +147,7 @@ def loadMemoryAccess (cols : LoadHalfCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
    Main[28],
    #v[Main[29], Main[30], Main[31], Main[32]],
    Main[33], Main[34], Main[35], Main[36], Main[37],
-   Main[38], Main[39], Main[40], Main[41], Main[42], Main[43]⟩
+   Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], #v[0, 0, 0]⟩
 
 /-- Iff RHS for the signed Load Half (LH) variant, mirroring
 `_root_.Load.LoadHalf.allHold_constraints_iff_of_is_lh`. -/
@@ -313,13 +314,18 @@ def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
        _half_offset_bit1, _half_offset_bit2, _op_a_write_value_lo,
-       _signed_extension_msb, is_lh, is_lhu⟩ := cols
+       _signed_extension_msb, is_lh, is_lhu, next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc, is_lh * 30 + is_lhu * 33,
       op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
+       #v[(4 : Expression (ZMod p)), 0, 0, 0],
+       next_pc_carry_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_lh * (is_lh - 1) === 0
   is_lhu * (is_lhu - 1) === 0
   (is_lh + is_lhu) * (is_lh + is_lhu - 1) === 0
@@ -339,6 +345,10 @@ def FormalSpec (cols : LoadHalfCols (ZMod p)) : Prop :=
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+  SP1Clean.AddrAddOp.assertion.Spec
+    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+     #v[(4 : ZMod p), 0, 0, 0],
+     cols.next_pc_carry_value⟩ ∧
   cols.is_lh * (cols.is_lh - 1) = 0 ∧
   cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
   (cols.is_lh + cols.is_lhu) * (cols.is_lh + cols.is_lhu - 1) = 0
@@ -346,11 +356,17 @@ def FormalSpec (cols : LoadHalfCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu_sub, h_prog_sub, h_lh, h_lhu, h_sum⟩ := h_holds
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29⟩ :=
+    h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_lh, h_lhu, h_sum⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
+  · simp only [Vector.getElem_map]
+    exact h_addr_sub trivial
   · linear_combination h_lh
   · linear_combination h_lhu
   · linear_combination h_sum
@@ -358,11 +374,18 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu, h_prog, h_lh, h_lhu, h_sum⟩ := h_spec
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29⟩ :=
+    h_input
+  subst_eqs
+  obtain ⟨h_cpu, h_prog, h_addr, h_lh, h_lhu, h_sum⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
+  · refine ⟨trivial, ?_⟩
+    simp only [Vector.getElem_map] at h_addr
+    exact h_addr
   · linear_combination h_lh
   · linear_combination h_lhu
   · linear_combination h_sum

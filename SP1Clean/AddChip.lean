@@ -10,10 +10,12 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.AddOperation
+import SP1Operations.Operation.AddrAddOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.RTypeReader
 import SP1Chips.AddChip
 import SP1Clean.AddOperation
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -40,7 +42,11 @@ open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The chip's column struct, mirroring SP1's Rust `AddCols<T>`. -/
+/-- The chip's column struct, mirroring SP1's Rust `AddCols<T>` plus a
+Clean-only `next_pc_carry_value` column for the trace-level state-bus PC
+chain. The new field is the 3-limb result of `pc + 4` with carry; it
+exists only on the Clean side (SP1 emits this constraint inline in the
+state-bus interaction). -/
 structure AddCols (T : Type) where
   clk_high : T
   clk_16_24 : T
@@ -61,6 +67,7 @@ structure AddCols (T : Type) where
   op_c_memory_diff_low : T
   op_a_write_value : Vector T 4
   is_real : T
+  next_pc_carry_value : Vector T 3
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `AddChip::eval(builder, cols)`:
@@ -71,7 +78,8 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
        op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
        op_c, op_c_memory_prev_value, _op_c_memory_prev_low,
-       _op_c_memory_diff_low, op_a_write_value, is_real⟩ := cols
+       _op_c_memory_diff_low, op_a_write_value, is_real,
+       _next_pc_carry_value⟩ := cols
   -- AddOperation: op_b_memory.prev_value + op_c_memory.prev_value = op_a_write_value.
   SP1Clean.AddOp.main op_b_memory_prev_value op_c_memory_prev_value op_a_write_value
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
@@ -128,7 +136,13 @@ def Spec (cols : AddCols (ZMod p)) : Prop :=
   cols.op_a_0 = 0
 
 /-- Project a raw SP1 row into the structured `AddCols` view. Mirrors the
-index map in `SP1Chips/Add/Constraints.lean`. -/
+index map in `SP1Chips/Add/Constraints.lean`.
+
+`next_pc_carry_value` is initialized to a placeholder `#v[0,0,0]` since the
+SP1 row doesn't carry this column; the legacy `Spec` (which `iff_sp1`
+maps to) doesn't reference `next_pc_carry_value`, so the placeholder is
+harmless for the legacy path. The trace-level `assertion.Spec` consumes
+the field via the FormalAssertion soundness/completeness arms instead. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 33) : AddCols (ZMod p) :=
   ⟨Main[0], Main[1], Main[2],
    #v[Main[3], Main[4], Main[5]],
@@ -140,7 +154,7 @@ index map in `SP1Chips/Add/Constraints.lean`. -/
    #v[Main[22], Main[23], Main[24], Main[25]],
    Main[26], Main[27],
    #v[Main[28], Main[29], Main[30], Main[31]],
-   Main[32]⟩
+   Main[32], #v[0, 0, 0]⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
 `Add.constraints Main` is exactly `Spec (fromMain Main)`, under
@@ -237,7 +251,8 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
        op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
        op_c, op_c_memory_prev_value, _op_c_memory_prev_low,
-       _op_c_memory_diff_low, op_a_write_value, is_real⟩ := cols
+       _op_c_memory_diff_low, op_a_write_value, is_real,
+       next_pc_carry_value⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨op_b_memory_prev_value, op_c_memory_prev_value, op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
@@ -249,6 +264,14 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   SP1Clean.ProgramTable.assertion
     (⟨pc, 0, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  -- AddrAddOperation: pc + 4 carry-aware computation, stored in
+  -- `next_pc_carry_value`. Constrains the new column to be the
+  -- carry-aware semantic next_pc for the trace-level state bus.
+  SP1Clean.AddrAddOp.assertion
+    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
+       #v[(4 : Expression (ZMod p)), 0, 0, 0],
+       next_pc_carry_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   op_a_0 === 0
 
@@ -262,7 +285,8 @@ def Assumptions (_ : AddCols (ZMod p)) : Prop := True
 
 /-- The chip's Circuit-derivable spec: byte-lookup consequences for the
 addition + clock-decomposition gadgets, the program-bus existential
-witness, and the two trailing assertZero gates. The memory-bus side of
+witness, the carry-aware `pc + 4` witness in `next_pc_carry_value`, and
+the two trailing assertZero gates. The memory-bus side of
 `rtypeReaderSpec` is deferred to the trace-level OfflineMemory bridge. -/
 def FormalSpec (cols : AddCols (ZMod p)) : Prop :=
   SP1Clean.AddOp.Spec
@@ -274,30 +298,47 @@ def FormalSpec (cols : AddCols (ZMod p)) : Prop :=
       op_b := #v[cols.op_b, 0, 0, 0],
       op_c := #v[cols.op_c, 0, 0, 0],
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  SP1Clean.AddrAddOp.assertion.Spec
+    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+     #v[(4 : ZMod p), 0, 0, 0],
+     cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.op_a_0 = 0
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_isreal, h_op_a_0⟩ := h_holds
+  -- Substitute all input-eval equations to put the goal in the same form as
+  -- the subcircuit specs (which use `Expression.eval env input_var_X`).
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20⟩ := h_input
+  subst_eqs
+  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_addop_sub trivial
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
+  · simp only [Vector.getElem_map]
+    exact h_addr_sub trivial
   · linear_combination h_isreal
   · exact h_op_a_0
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_addop, h_cpu, h_prog, h_isreal, h_op_a_0⟩ := h_spec
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20⟩ := h_input
+  subst_eqs
+  obtain ⟨h_addop, h_cpu, h_prog, h_addr, h_isreal, h_op_a_0⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_addop⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
+  · refine ⟨trivial, ?_⟩
+    simp only [Vector.getElem_map] at h_addr
+    exact h_addr
   · linear_combination h_isreal
   · exact h_op_a_0
 

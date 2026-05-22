@@ -10,8 +10,10 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.AddrAddOperation
 import SP1Operations.Reader.CPUState
 import SP1Operations.Reader.ALUTypeReader
+import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -91,6 +93,7 @@ structure ShiftLeftCols (T : Type) where
   is_sll : T                                -- Main[62]
   is_sllw : T                               -- Main[63]
   sign_extend : T                           -- Main[64]
+  next_pc_carry_value : Vector T 3
 deriving ProvableStruct
 
 /-- The aggregate is-real flag: at least one of the two shift variants
@@ -125,7 +128,8 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_c_memory_prev_low, _op_c_memory_diff_low, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
        bit_shift, _shift_pow, byte_shift, _limb_shift,
-       _result_intermediate, is_sll, is_sllw, _sign_extend⟩ := cols
+       _result_intermediate, is_sll, is_sllw, _sign_extend,
+       _next_pc_carry_value⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -242,7 +246,8 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_c_memory_prev_low, _op_c_memory_diff_low, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
        _bit_shift, _shift_pow, _byte_shift, _limb_shift,
-       _result_intermediate, is_sll, is_sllw, _sign_extend⟩ := cols
+       _result_intermediate, is_sll, is_sllw, _sign_extend,
+       next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
@@ -250,6 +255,11 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
       op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0],
       op_a_0, 0, imm_c⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
+       #v[(4 : Expression (ZMod p)), 0, 0, 0],
+       next_pc_carry_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_sll * (is_sll - 1) === 0
   is_sllw * (is_sllw - 1) === 0
   (is_sll + is_sllw) * (is_sll + is_sllw - 1) === 0
@@ -270,6 +280,10 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
       op_a := cols.op_a, op_b := #v[cols.op_b, 0, 0, 0],
       op_c := #v[cols.op_c, 0, 0, 0],
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
+  SP1Clean.AddrAddOp.assertion.Spec
+    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+     #v[(4 : ZMod p), 0, 0, 0],
+     cols.next_pc_carry_value⟩ ∧
   cols.is_sll * (cols.is_sll - 1) = 0 ∧
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
   (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
@@ -278,11 +292,18 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu_sub, h_prog_sub, h_sll, h_sllw, h_sum, h_op_a_0⟩ := h_holds
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
+          e31⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_sll, h_sllw, h_sum,
+          h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
+  · simp only [Vector.getElem_map]
+    exact h_addr_sub trivial
   · linear_combination h_sll
   · linear_combination h_sllw
   · linear_combination h_sum
@@ -291,11 +312,18 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu, h_prog, h_sll, h_sllw, h_sum, h_op_a_0⟩ := h_spec
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
+          e31⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu, h_prog, h_addr, h_sll, h_sllw, h_sum, h_op_a_0⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
+  · refine ⟨trivial, ?_⟩
+    simp only [Vector.getElem_map] at h_addr
+    exact h_addr
   · linear_combination h_sll
   · linear_combination h_sllw
   · linear_combination h_sum

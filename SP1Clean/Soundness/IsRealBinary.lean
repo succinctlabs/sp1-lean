@@ -75,7 +75,7 @@ theorem is_real_binary_add (cols : SP1Clean.Add.AddCols (ZMod p))
     (h : SP1Clean.Add.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   change SP1Clean.Add.Assertion.FormalSpec cols at h
-  exact binary_of_assertZero _ h.2.2.2.1
+  exact binary_of_assertZero _ h.2.2.2.2.1
 
 omit [Fact (2 ^ 17 < p)] in
 theorem is_real_binary_addi (cols : SP1Clean.Addi.AddiCols (ZMod p))

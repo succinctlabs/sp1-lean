@@ -282,7 +282,7 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
         SP1Clean.Lt.opBMemoryAccess cols
       let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
         SP1Clean.Lt.opCMemoryAccess cols
-      [(op_a_mem, #v[cols.compare_bit, 0, 0, 0]),
+      [(op_a_mem, #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]),
        (op_b_mem, cols.op_b_memory_prev_value),
        (op_c_mem, cols.op_c_memory_prev_value)]
   | .storeWord cols =>
