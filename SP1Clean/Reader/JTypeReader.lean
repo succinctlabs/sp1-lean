@@ -1,6 +1,6 @@
 import SP1Foundations.Constraint
 import SP1Foundations.Field
-import SP1Operations.Reader.JTypeReader
+import SP1Operations.Reader.JTypeReader.JTypeReader
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 

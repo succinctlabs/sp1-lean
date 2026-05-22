@@ -6,8 +6,8 @@ import Clean.Utils.Field
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.AddwOperation
-import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.AddwOperation.AddwOperation
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 import SP1Clean.ByteOpcodeTable
 
 /-! # `AddwOperation` gadget mirror — Assertion style

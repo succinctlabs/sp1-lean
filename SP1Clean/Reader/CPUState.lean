@@ -9,7 +9,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Reader.CPUState
+import SP1Operations.Reader.CPUState.CPUState
 import SP1Clean.ByteOpcodeTable
 
 /-! # Reusable `CPUState` Spec helper

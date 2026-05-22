@@ -1,6 +1,6 @@
 import SP1Foundations.Constraint
 import SP1Foundations.Field
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 
 /-! # Reusable `ALUTypeReader` Spec helper
 

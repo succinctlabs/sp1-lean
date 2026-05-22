@@ -9,7 +9,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.AddOperation
+import SP1Operations.Operation.AddOperation.AddOperation
 import SP1Clean.ByteOpcodeTable
 
 /-! # `AddOperation` gadget mirror — Assertion style

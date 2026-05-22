@@ -9,7 +9,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.AddrAddOperation
+import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 
 /-! # `AddrAddOperation` gadget mirror — Spec + iff_sp1 only

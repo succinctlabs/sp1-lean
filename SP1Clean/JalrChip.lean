@@ -9,10 +9,10 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.AddOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ITypeReader
-import SP1Chips.JalrChip
+import SP1Operations.Operation.AddOperation.AddOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ITypeReader.ITypeReader
+import SP1Chips.Jalr.JalrChip
 import SP1Clean.AddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.GatedAddOp

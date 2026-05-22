@@ -6,7 +6,7 @@ import Clean.Utils.Field
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.SubOperation
+import SP1Operations.Operation.SubOperation.SubOperation
 import SP1Clean.ByteOpcodeTable
 
 /-! # `SubOperation` gadget mirror — Assertion style

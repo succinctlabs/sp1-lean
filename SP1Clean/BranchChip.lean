@@ -9,10 +9,10 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Compare.LtOperationSigned
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ITypeReaderImmutable
-import SP1Chips.BranchChip
+import SP1Operations.Compare.LtOperationSigned.LtOperationSigned
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
+import SP1Chips.Branch.BranchChip
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess

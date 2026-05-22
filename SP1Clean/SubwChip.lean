@@ -9,11 +9,11 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.SubwOperation
-import SP1Operations.Operation.AddrAddOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.RTypeReader
-import SP1Chips.SubwChip
+import SP1Operations.Operation.SubwOperation.SubwOperation
+import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.RTypeReader.RTypeReader
+import SP1Chips.Subw.SubwChip
 import SP1Clean.SubwOperation
 import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable

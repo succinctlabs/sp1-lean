@@ -8,11 +8,11 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.BitwiseU16Operation
-import SP1Operations.Operation.AddrAddOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
-import SP1Chips.BitwiseChip
+import SP1Operations.Operation.BitwiseU16Operation.BitwiseU16Operation
+import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
+import SP1Chips.Bitwise.BitwiseChip
 import SP1Clean.BitwiseOperation
 import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable

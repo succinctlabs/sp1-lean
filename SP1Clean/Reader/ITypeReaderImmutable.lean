@@ -1,6 +1,6 @@
 import SP1Foundations.Constraint
 import SP1Foundations.Field
-import SP1Operations.Reader.ITypeReaderImmutable
+import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
 
 /-! # Reusable `ITypeReaderImmutable` Spec helper
 

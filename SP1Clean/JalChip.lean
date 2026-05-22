@@ -9,8 +9,8 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
-import SP1Operations.Operation.AddOperation
-import SP1Operations.Reader.CPUState
+import SP1Operations.Operation.AddOperation.AddOperation
+import SP1Operations.Reader.CPUState.CPUState
 import SP1Clean.AddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
