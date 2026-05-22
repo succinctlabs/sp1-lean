@@ -1,7 +1,7 @@
 import SP1Foundations
 import SP1Operations.Operation.MulOperation.Operation
-import SP1Operations.Operation.U16toU8OperationSafe
-import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.U16toU8OperationSafe.U16toU8OperationSafe
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 
 namespace MulOperation
 
@@ -1745,6 +1745,14 @@ private lemma sum_eq_one_of_eq_one_5
         · right; linear_combination h)
   linear_combination heq
 
+/-- Bridge: a `ZMod p` byte bound `x.val < (256 : ZMod p).val` (the unfolded form
+of `x < 256` via `instLT.lt`) implies the `Nat`-level bound `x.val < 256` that
+`core_mul` / `core_mulw` accept. At call sites with `NeZero p` in scope, `pp_N : x < 256`
+coerces to the `.val < .val` form by defeq, eliminating ~3 lines per byte. -/
+private lemma pp_byte_lt_256 {p : ℕ} [Fact (2 ^ 17 < p)] {x : ZMod p}
+    (h : x.val < (256 : ZMod p).val) : x.val < 256 := by
+  rwa [val_256_zmod_p] at h
+
 set_option maxHeartbeats 32000000 in
 -- Uses `single_op` (op-level) + `sum_eq_one_of_eq_one_left` to derive
 -- `is_mul = 1 → variant zeros`, then `core_mul` (16-byte carry chain)
@@ -1821,61 +1829,28 @@ lemma spec.mul [Fact (2 ^ 24 < p)]
   -- the residual `0 * 255` matches `BWord.extend bbw false`'s definitional
   -- reduction (its `let ext := (if false then ... else 0) * 255` does not auto-reduce).
   rw [h_b_sgn, h_c_sgn] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-  -- Convert product bounds (`< 256` over `ZMod p`) to Nat form so they can
-  -- feed `core_mul`'s `prod[i].val < 256` premises and `omega`.
-  have pp0' : cols.product[0].val < 256 := by
-    have h : cols.product[0].val < (256 : ZMod p).val := pp0
-    rwa [val_256_zmod_p] at h
-  have pp1' : cols.product[1].val < 256 := by
-    have h : cols.product[1].val < (256 : ZMod p).val := pp1
-    rwa [val_256_zmod_p] at h
-  have pp2' : cols.product[2].val < 256 := by
-    have h : cols.product[2].val < (256 : ZMod p).val := pp2
-    rwa [val_256_zmod_p] at h
-  have pp3' : cols.product[3].val < 256 := by
-    have h : cols.product[3].val < (256 : ZMod p).val := pp3
-    rwa [val_256_zmod_p] at h
-  have pp4' : cols.product[4].val < 256 := by
-    have h : cols.product[4].val < (256 : ZMod p).val := pp4
-    rwa [val_256_zmod_p] at h
-  have pp5' : cols.product[5].val < 256 := by
-    have h : cols.product[5].val < (256 : ZMod p).val := pp5
-    rwa [val_256_zmod_p] at h
-  have pp6' : cols.product[6].val < 256 := by
-    have h : cols.product[6].val < (256 : ZMod p).val := pp6
-    rwa [val_256_zmod_p] at h
-  have pp7' : cols.product[7].val < 256 := by
-    have h : cols.product[7].val < (256 : ZMod p).val := pp7
-    rwa [val_256_zmod_p] at h
-  have pp8' : cols.product[8].val < 256 := by
-    have h : cols.product[8].val < (256 : ZMod p).val := pp8
-    rwa [val_256_zmod_p] at h
-  have pp9' : cols.product[9].val < 256 := by
-    have h : cols.product[9].val < (256 : ZMod p).val := pp9
-    rwa [val_256_zmod_p] at h
-  have pp10' : cols.product[10].val < 256 := by
-    have h : cols.product[10].val < (256 : ZMod p).val := pp10
-    rwa [val_256_zmod_p] at h
-  have pp11' : cols.product[11].val < 256 := by
-    have h : cols.product[11].val < (256 : ZMod p).val := pp11
-    rwa [val_256_zmod_p] at h
-  have pp12' : cols.product[12].val < 256 := by
-    have h : cols.product[12].val < (256 : ZMod p).val := pp12
-    rwa [val_256_zmod_p] at h
-  have pp13' : cols.product[13].val < 256 := by
-    have h : cols.product[13].val < (256 : ZMod p).val := pp13
-    rwa [val_256_zmod_p] at h
-  have pp14' : cols.product[14].val < 256 := by
-    have h : cols.product[14].val < (256 : ZMod p).val := pp14
-    rwa [val_256_zmod_p] at h
-  have pp15' : cols.product[15].val < 256 := by
-    have h : cols.product[15].val < (256 : ZMod p).val := pp15
-    rwa [val_256_zmod_p] at h
+  -- Convert product bounds (`< 256` over `ZMod p`) to Nat form for `core_mul`.
+  have pp0 := pp_byte_lt_256 pp0
+  have pp1 := pp_byte_lt_256 pp1
+  have pp2 := pp_byte_lt_256 pp2
+  have pp3 := pp_byte_lt_256 pp3
+  have pp4 := pp_byte_lt_256 pp4
+  have pp5 := pp_byte_lt_256 pp5
+  have pp6 := pp_byte_lt_256 pp6
+  have pp7 := pp_byte_lt_256 pp7
+  have pp8 := pp_byte_lt_256 pp8
+  have pp9 := pp_byte_lt_256 pp9
+  have pp10 := pp_byte_lt_256 pp10
+  have pp11 := pp_byte_lt_256 pp11
+  have pp12 := pp_byte_lt_256 pp12
+  have pp13 := pp_byte_lt_256 pp13
+  have pp14 := pp_byte_lt_256 pp14
+  have pp15 := pp_byte_lt_256 pp15
   have mul_spec :=
     core_mul bbw cbw isU64_bbw isU64_cbw false false cols.product cols.carry
              p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
              c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
-             pp0' pp1' pp2' pp3' pp4' pp5' pp6' pp7' pp8' pp9' pp10' pp11' pp12' pp13' pp14' pp15'
+             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
   have isU128_prod : BDWord.isU128 cols.product := by
     apply BDWord.isU128_of_cases <;> omega
   have isU64_prod_low : (BDWord.low cols.product).isU64 :=
@@ -2000,59 +1975,27 @@ lemma spec.mulh [Fact (2 ^ 24 < p)]
   -- definitional form (`#v[bbw[0],..,bbw[7], (if true then (if isNeg ...) else 0) * 255, ...]`).
   rw [h_b_sgn, h_c_sgn] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
   -- Convert product bounds to Nat.
-  have pp0' : cols.product[0].val < 256 := by
-    have h : cols.product[0].val < (256 : ZMod p).val := pp0
-    rwa [val_256_zmod_p] at h
-  have pp1' : cols.product[1].val < 256 := by
-    have h : cols.product[1].val < (256 : ZMod p).val := pp1
-    rwa [val_256_zmod_p] at h
-  have pp2' : cols.product[2].val < 256 := by
-    have h : cols.product[2].val < (256 : ZMod p).val := pp2
-    rwa [val_256_zmod_p] at h
-  have pp3' : cols.product[3].val < 256 := by
-    have h : cols.product[3].val < (256 : ZMod p).val := pp3
-    rwa [val_256_zmod_p] at h
-  have pp4' : cols.product[4].val < 256 := by
-    have h : cols.product[4].val < (256 : ZMod p).val := pp4
-    rwa [val_256_zmod_p] at h
-  have pp5' : cols.product[5].val < 256 := by
-    have h : cols.product[5].val < (256 : ZMod p).val := pp5
-    rwa [val_256_zmod_p] at h
-  have pp6' : cols.product[6].val < 256 := by
-    have h : cols.product[6].val < (256 : ZMod p).val := pp6
-    rwa [val_256_zmod_p] at h
-  have pp7' : cols.product[7].val < 256 := by
-    have h : cols.product[7].val < (256 : ZMod p).val := pp7
-    rwa [val_256_zmod_p] at h
-  have pp8' : cols.product[8].val < 256 := by
-    have h : cols.product[8].val < (256 : ZMod p).val := pp8
-    rwa [val_256_zmod_p] at h
-  have pp9' : cols.product[9].val < 256 := by
-    have h : cols.product[9].val < (256 : ZMod p).val := pp9
-    rwa [val_256_zmod_p] at h
-  have pp10' : cols.product[10].val < 256 := by
-    have h : cols.product[10].val < (256 : ZMod p).val := pp10
-    rwa [val_256_zmod_p] at h
-  have pp11' : cols.product[11].val < 256 := by
-    have h : cols.product[11].val < (256 : ZMod p).val := pp11
-    rwa [val_256_zmod_p] at h
-  have pp12' : cols.product[12].val < 256 := by
-    have h : cols.product[12].val < (256 : ZMod p).val := pp12
-    rwa [val_256_zmod_p] at h
-  have pp13' : cols.product[13].val < 256 := by
-    have h : cols.product[13].val < (256 : ZMod p).val := pp13
-    rwa [val_256_zmod_p] at h
-  have pp14' : cols.product[14].val < 256 := by
-    have h : cols.product[14].val < (256 : ZMod p).val := pp14
-    rwa [val_256_zmod_p] at h
-  have pp15' : cols.product[15].val < 256 := by
-    have h : cols.product[15].val < (256 : ZMod p).val := pp15
-    rwa [val_256_zmod_p] at h
+  have pp0 := pp_byte_lt_256 pp0
+  have pp1 := pp_byte_lt_256 pp1
+  have pp2 := pp_byte_lt_256 pp2
+  have pp3 := pp_byte_lt_256 pp3
+  have pp4 := pp_byte_lt_256 pp4
+  have pp5 := pp_byte_lt_256 pp5
+  have pp6 := pp_byte_lt_256 pp6
+  have pp7 := pp_byte_lt_256 pp7
+  have pp8 := pp_byte_lt_256 pp8
+  have pp9 := pp_byte_lt_256 pp9
+  have pp10 := pp_byte_lt_256 pp10
+  have pp11 := pp_byte_lt_256 pp11
+  have pp12 := pp_byte_lt_256 pp12
+  have pp13 := pp_byte_lt_256 pp13
+  have pp14 := pp_byte_lt_256 pp14
+  have pp15 := pp_byte_lt_256 pp15
   have mul_spec :=
     core_mul bbw cbw isU64_bbw isU64_cbw true true cols.product cols.carry
              p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
              c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
-             pp0' pp1' pp2' pp3' pp4' pp5' pp6' pp7' pp8' pp9' pp10' pp11' pp12' pp13' pp14' pp15'
+             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
   have isU128_prod : BDWord.isU128 cols.product := by
     apply BDWord.isU128_of_cases <;> omega
   have isU64_prod_high : (BDWord.high cols.product).isU64 :=
@@ -2135,59 +2078,27 @@ lemma spec.mulhu [Fact (2 ^ 24 < p)]
   have isU64_cbw : BWord.isU64 cbw := by
     rw [eq_cbw]; exact Word.toBWord_toU64 isU64_cw
   rw [h_b_sgn, h_c_sgn] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-  have pp0' : cols.product[0].val < 256 := by
-    have h : cols.product[0].val < (256 : ZMod p).val := pp0
-    rwa [val_256_zmod_p] at h
-  have pp1' : cols.product[1].val < 256 := by
-    have h : cols.product[1].val < (256 : ZMod p).val := pp1
-    rwa [val_256_zmod_p] at h
-  have pp2' : cols.product[2].val < 256 := by
-    have h : cols.product[2].val < (256 : ZMod p).val := pp2
-    rwa [val_256_zmod_p] at h
-  have pp3' : cols.product[3].val < 256 := by
-    have h : cols.product[3].val < (256 : ZMod p).val := pp3
-    rwa [val_256_zmod_p] at h
-  have pp4' : cols.product[4].val < 256 := by
-    have h : cols.product[4].val < (256 : ZMod p).val := pp4
-    rwa [val_256_zmod_p] at h
-  have pp5' : cols.product[5].val < 256 := by
-    have h : cols.product[5].val < (256 : ZMod p).val := pp5
-    rwa [val_256_zmod_p] at h
-  have pp6' : cols.product[6].val < 256 := by
-    have h : cols.product[6].val < (256 : ZMod p).val := pp6
-    rwa [val_256_zmod_p] at h
-  have pp7' : cols.product[7].val < 256 := by
-    have h : cols.product[7].val < (256 : ZMod p).val := pp7
-    rwa [val_256_zmod_p] at h
-  have pp8' : cols.product[8].val < 256 := by
-    have h : cols.product[8].val < (256 : ZMod p).val := pp8
-    rwa [val_256_zmod_p] at h
-  have pp9' : cols.product[9].val < 256 := by
-    have h : cols.product[9].val < (256 : ZMod p).val := pp9
-    rwa [val_256_zmod_p] at h
-  have pp10' : cols.product[10].val < 256 := by
-    have h : cols.product[10].val < (256 : ZMod p).val := pp10
-    rwa [val_256_zmod_p] at h
-  have pp11' : cols.product[11].val < 256 := by
-    have h : cols.product[11].val < (256 : ZMod p).val := pp11
-    rwa [val_256_zmod_p] at h
-  have pp12' : cols.product[12].val < 256 := by
-    have h : cols.product[12].val < (256 : ZMod p).val := pp12
-    rwa [val_256_zmod_p] at h
-  have pp13' : cols.product[13].val < 256 := by
-    have h : cols.product[13].val < (256 : ZMod p).val := pp13
-    rwa [val_256_zmod_p] at h
-  have pp14' : cols.product[14].val < 256 := by
-    have h : cols.product[14].val < (256 : ZMod p).val := pp14
-    rwa [val_256_zmod_p] at h
-  have pp15' : cols.product[15].val < 256 := by
-    have h : cols.product[15].val < (256 : ZMod p).val := pp15
-    rwa [val_256_zmod_p] at h
+  have pp0 := pp_byte_lt_256 pp0
+  have pp1 := pp_byte_lt_256 pp1
+  have pp2 := pp_byte_lt_256 pp2
+  have pp3 := pp_byte_lt_256 pp3
+  have pp4 := pp_byte_lt_256 pp4
+  have pp5 := pp_byte_lt_256 pp5
+  have pp6 := pp_byte_lt_256 pp6
+  have pp7 := pp_byte_lt_256 pp7
+  have pp8 := pp_byte_lt_256 pp8
+  have pp9 := pp_byte_lt_256 pp9
+  have pp10 := pp_byte_lt_256 pp10
+  have pp11 := pp_byte_lt_256 pp11
+  have pp12 := pp_byte_lt_256 pp12
+  have pp13 := pp_byte_lt_256 pp13
+  have pp14 := pp_byte_lt_256 pp14
+  have pp15 := pp_byte_lt_256 pp15
   have mul_spec :=
     core_mul bbw cbw isU64_bbw isU64_cbw false false cols.product cols.carry
              p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
              c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
-             pp0' pp1' pp2' pp3' pp4' pp5' pp6' pp7' pp8' pp9' pp10' pp11' pp12' pp13' pp14' pp15'
+             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
   have isU128_prod : BDWord.isU128 cols.product := by
     apply BDWord.isU128_of_cases <;> omega
   have isU64_prod_high : (BDWord.high cols.product).isU64 :=
@@ -2272,59 +2183,27 @@ lemma spec.mulhsu [Fact (2 ^ 24 < p)]
   have isU64_cbw : BWord.isU64 cbw := by
     rw [eq_cbw]; exact Word.toBWord_toU64 isU64_cw
   rw [h_b_sgn, h_c_sgn] at p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-  have pp0' : cols.product[0].val < 256 := by
-    have h : cols.product[0].val < (256 : ZMod p).val := pp0
-    rwa [val_256_zmod_p] at h
-  have pp1' : cols.product[1].val < 256 := by
-    have h : cols.product[1].val < (256 : ZMod p).val := pp1
-    rwa [val_256_zmod_p] at h
-  have pp2' : cols.product[2].val < 256 := by
-    have h : cols.product[2].val < (256 : ZMod p).val := pp2
-    rwa [val_256_zmod_p] at h
-  have pp3' : cols.product[3].val < 256 := by
-    have h : cols.product[3].val < (256 : ZMod p).val := pp3
-    rwa [val_256_zmod_p] at h
-  have pp4' : cols.product[4].val < 256 := by
-    have h : cols.product[4].val < (256 : ZMod p).val := pp4
-    rwa [val_256_zmod_p] at h
-  have pp5' : cols.product[5].val < 256 := by
-    have h : cols.product[5].val < (256 : ZMod p).val := pp5
-    rwa [val_256_zmod_p] at h
-  have pp6' : cols.product[6].val < 256 := by
-    have h : cols.product[6].val < (256 : ZMod p).val := pp6
-    rwa [val_256_zmod_p] at h
-  have pp7' : cols.product[7].val < 256 := by
-    have h : cols.product[7].val < (256 : ZMod p).val := pp7
-    rwa [val_256_zmod_p] at h
-  have pp8' : cols.product[8].val < 256 := by
-    have h : cols.product[8].val < (256 : ZMod p).val := pp8
-    rwa [val_256_zmod_p] at h
-  have pp9' : cols.product[9].val < 256 := by
-    have h : cols.product[9].val < (256 : ZMod p).val := pp9
-    rwa [val_256_zmod_p] at h
-  have pp10' : cols.product[10].val < 256 := by
-    have h : cols.product[10].val < (256 : ZMod p).val := pp10
-    rwa [val_256_zmod_p] at h
-  have pp11' : cols.product[11].val < 256 := by
-    have h : cols.product[11].val < (256 : ZMod p).val := pp11
-    rwa [val_256_zmod_p] at h
-  have pp12' : cols.product[12].val < 256 := by
-    have h : cols.product[12].val < (256 : ZMod p).val := pp12
-    rwa [val_256_zmod_p] at h
-  have pp13' : cols.product[13].val < 256 := by
-    have h : cols.product[13].val < (256 : ZMod p).val := pp13
-    rwa [val_256_zmod_p] at h
-  have pp14' : cols.product[14].val < 256 := by
-    have h : cols.product[14].val < (256 : ZMod p).val := pp14
-    rwa [val_256_zmod_p] at h
-  have pp15' : cols.product[15].val < 256 := by
-    have h : cols.product[15].val < (256 : ZMod p).val := pp15
-    rwa [val_256_zmod_p] at h
+  have pp0 := pp_byte_lt_256 pp0
+  have pp1 := pp_byte_lt_256 pp1
+  have pp2 := pp_byte_lt_256 pp2
+  have pp3 := pp_byte_lt_256 pp3
+  have pp4 := pp_byte_lt_256 pp4
+  have pp5 := pp_byte_lt_256 pp5
+  have pp6 := pp_byte_lt_256 pp6
+  have pp7 := pp_byte_lt_256 pp7
+  have pp8 := pp_byte_lt_256 pp8
+  have pp9 := pp_byte_lt_256 pp9
+  have pp10 := pp_byte_lt_256 pp10
+  have pp11 := pp_byte_lt_256 pp11
+  have pp12 := pp_byte_lt_256 pp12
+  have pp13 := pp_byte_lt_256 pp13
+  have pp14 := pp_byte_lt_256 pp14
+  have pp15 := pp_byte_lt_256 pp15
   have mul_spec :=
     core_mul bbw cbw isU64_bbw isU64_cbw true false cols.product cols.carry
              p0 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
              c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15
-             pp0' pp1' pp2' pp3' pp4' pp5' pp6' pp7' pp8' pp9' pp10' pp11' pp12' pp13' pp14' pp15'
+             pp0 pp1 pp2 pp3 pp4 pp5 pp6 pp7 pp8 pp9 pp10 pp11 pp12 pp13 pp14 pp15
   have isU128_prod : BDWord.isU128 cols.product := by
     apply BDWord.isU128_of_cases <;> omega
   have isU64_prod_high : (BDWord.high cols.product).isU64 :=
@@ -2412,18 +2291,10 @@ lemma spec.mulw [Fact (2 ^ 24 < p)]
   set hcw : BHWord (ZMod p) := #v[cbw[0], cbw[1], cbw[2], cbw[3]]
   set ahw : BHWord (ZMod p) := #v[cols.product[0], cols.product[1], cols.product[2], cols.product[3]]
   -- Convert pp0..pp3 to Nat-form bounds.
-  have pp0' : cols.product[0].val < 256 := by
-    have h : cols.product[0].val < (256 : ZMod p).val := pp0
-    rwa [val_256_zmod_p] at h
-  have pp1' : cols.product[1].val < 256 := by
-    have h : cols.product[1].val < (256 : ZMod p).val := pp1
-    rwa [val_256_zmod_p] at h
-  have pp2' : cols.product[2].val < 256 := by
-    have h : cols.product[2].val < (256 : ZMod p).val := pp2
-    rwa [val_256_zmod_p] at h
-  have pp3' : cols.product[3].val < 256 := by
-    have h : cols.product[3].val < (256 : ZMod p).val := pp3
-    rwa [val_256_zmod_p] at h
+  have pp0 := pp_byte_lt_256 pp0
+  have pp1 := pp_byte_lt_256 pp1
+  have pp2 := pp_byte_lt_256 pp2
+  have pp3 := pp_byte_lt_256 pp3
   have isU32_ahw : BHWord.isU32 ahw := by
     apply BHWord.isU32_of_cases <;> simp [ahw] <;> omega
   have isU32_hbw : BHWord.isU32 hbw := by
@@ -2438,8 +2309,8 @@ lemma spec.mulw [Fact (2 ^ 24 < p)]
   -- After substituting h_aw1, aw[1] = product[2] + product[3]*256. We need to show this is < 65536.
   have h_aw1_isU16 : aw[1].val < 65536 := by
     rw [h_aw1]
-    have h_p2 : cols.product[2].val < 256 := pp2'
-    have h_p3 : cols.product[3].val < 256 := pp3'
+    have h_p2 : cols.product[2].val < 256 := pp2
+    have h_p3 : cols.product[3].val < 256 := pp3
     have h_p3_256_val : (cols.product[3] * 256).val = cols.product[3].val * 256 := by
       rw [ZMod.val_mul_of_lt (by rw [val_256_zmod_p]; nlinarith), val_256_zmod_p]
     rw [ZMod.val_add_of_lt (by rw [h_p3_256_val]; omega), h_p3_256_val]
@@ -2458,8 +2329,8 @@ lemma spec.mulw [Fact (2 ^ 24 < p)]
     rw [h_aw1]
     have h_p3_256_val : (cols.product[3] * 256).val = cols.product[3].val * 256 := by
       rw [ZMod.val_mul_of_lt (by rw [val_256_zmod_p]; nlinarith), val_256_zmod_p]
-    rw [ZMod.val_add_of_lt (by rw [h_p3_256_val]; nlinarith [pp2', pp3']), h_p3_256_val]
-    constructor <;> intro h <;> [nlinarith [pp2']; omega]
+    rw [ZMod.val_add_of_lt (by rw [h_p3_256_val]; nlinarith [pp2, pp3]), h_p3_256_val]
+    constructor <;> intro h <;> [nlinarith [pp2]; omega]
   have eq_aw : aw = BWord.toWord (BHWord.extend ahw true) := by
     rw [BWord.toWord]
     apply (Word.eq_pointwise.mp _).symm
@@ -2525,7 +2396,7 @@ lemma spec.mulw [Fact (2 ^ 24 < p)]
                     #v[cols.product[0], cols.product[1], cols.product[2], cols.product[3]]
                     #v[cols.carry[0], cols.carry[1], cols.carry[2], cols.carry[3]]
                     p0 p1 p2 p3
-                    _c0 _c1 _c2 _c3 pp0' pp1' pp2' pp3'
+                    _c0 _c1 _c2 _c3 pp0 pp1 pp2 pp3
 
 /-- Bundles the three high-half multiplication conclusions
 (MULH/MULHU/MULHSU) gated on `is_real = 1`. -/

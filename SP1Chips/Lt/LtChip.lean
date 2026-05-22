@@ -1,10 +1,10 @@
 import SP1Foundations
-import SP1Operations.Compare.LtOperationSigned
-import SP1Operations.Compare.LtOperationUnsigned
-import SP1Operations.Compare.U16CompareOperation
-import SP1Operations.Operation.U16MSBOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Compare.LtOperationSigned.LtOperationSigned
+import SP1Operations.Compare.LtOperationUnsigned.LtOperationUnsigned
+import SP1Operations.Compare.U16CompareOperation.U16CompareOperation
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Lt.Constraints
 import SP1Chips.Lt.Common
 

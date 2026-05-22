@@ -1,7 +1,7 @@
 import SP1Foundations
-import SP1Operations.Operation.BitwiseU16Operation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Operation.BitwiseU16Operation.BitwiseU16Operation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Bitwise.Constraints
 import SP1Chips.Bitwise.Common
 
@@ -49,8 +49,6 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- BitwiseU16Operation spec bridge plus PC arithmetic exceeds default 200K.
 theorem correct_xor
   (cstrs : (constraints Main).allHold)
   (h_is_xor : is_xor Main)
@@ -152,8 +150,6 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- BitwiseU16Operation OR-spec bridge plus PC arithmetic exceeds default 200K.
 theorem correct_or
   (cstrs : (constraints Main).allHold)
   (h_is_or : is_or Main)
@@ -253,8 +249,6 @@ def sp1_op_c : BitVec 5 := BitVec.ofNat 5 Main[21].val
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- BitwiseU16Operation AND-spec bridge plus PC arithmetic exceeds default 200K.
 theorem correct_and
   (cstrs : (constraints Main).allHold)
   (h_is_and : is_and Main)
@@ -354,8 +348,6 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- I-type signExtend bridge plus BitwiseU16Operation spec chain.
 theorem correct_xori
   (cstrs : (constraints Main).allHold)
   (h_is_xori : is_xori Main)
@@ -473,8 +465,6 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- I-type ORI variant: signExtend bridge + spec.or bridge.
 theorem correct_ori
   (cstrs : (constraints Main).allHold)
   (h_is_ori : is_ori Main)
@@ -592,8 +582,6 @@ def sp1_op_c : BitVec 12 := BitVec.ofNat 12 Main[21].val
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- I-type ANDI variant: signExtend bridge + spec.and bridge.
 theorem correct_andi
   (cstrs : (constraints Main).allHold)
   (h_is_andi : is_andi Main)

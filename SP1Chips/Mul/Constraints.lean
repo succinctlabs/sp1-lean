@@ -1,6 +1,6 @@
-import SP1Operations.Operation.MulOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.RTypeReader
+import SP1Operations.Operation.MulOperation.MulOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.RTypeReader.RTypeReader
 
 namespace Mul
 

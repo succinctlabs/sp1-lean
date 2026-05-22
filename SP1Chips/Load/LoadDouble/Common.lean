@@ -13,9 +13,6 @@ namespace LoadDouble
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 800000 in
--- Range bounds are stated as `.val < N` (Nat-level) and `< (256 : ZMod p)`
--- (field-level) depending on which form the surrounding `` predicates use.
 lemma allHold_constraints_iff_of_is_ld (Main : Vector (ZMod p) 39)
     (h_is_ld : is_ld Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔

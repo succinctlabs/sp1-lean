@@ -13,8 +13,6 @@ namespace LoadByte
 
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
-set_option maxHeartbeats 800000 in
--- Higher heartbeats: the iff destructure unfolds the full constraint list.
 lemma allHold_constraints_iff_of_is_lb (Main : Vector (ZMod p) 47)
     (h_is_lb : is_lb Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔
@@ -78,8 +76,6 @@ lemma allHold_constraints_iff_of_is_lb (Main : Vector (ZMod p) 47)
       simp_all
     · simp [h46']
 
-set_option maxHeartbeats 800000 in
--- Higher heartbeats: the iff destructure unfolds the full constraint list.
 lemma allHold_constraints_iff_of_is_lbu (Main : Vector (ZMod p) 47)
     (h_is_lbu : is_lbu Main) :
   List.Forall SP1Constraint.toProp (constraints Main) ↔

@@ -1,7 +1,7 @@
 import SP1Foundations
 import SP1Chips.Load.LoadDouble.Constraints
 import SP1Chips.Load.LoadDouble.Common
-import SP1Operations.Operation.AddrAddOperation
+import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 
 open LeanRV64D.Functions Sail SailState
 

@@ -1,5 +1,5 @@
-import SP1Operations.Operation.U16toU8OperationUnsafe
-import SP1Operations.Operation.BitwiseOperation
+import SP1Operations.Operation.U16toU8OperationUnsafe.U16toU8OperationUnsafe
+import SP1Operations.Operation.BitwiseOperation.BitwiseOperation
 
 @[ext] structure BitwiseU16Operation (F : Type) where
   b_low_bytes : U16toU8Operation F

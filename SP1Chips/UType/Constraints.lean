@@ -1,6 +1,6 @@
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.JTypeReader
-import SP1Operations.Operation.AddOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.JTypeReader.JTypeReader
+import SP1Operations.Operation.AddOperation.AddOperation
 
 namespace UType
 

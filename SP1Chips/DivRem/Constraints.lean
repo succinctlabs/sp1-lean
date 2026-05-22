@@ -1,11 +1,11 @@
-import SP1Operations.Operation.MulOperation
-import SP1Operations.Operation.AddOperation
-import SP1Operations.Compare.IsEqualWordOperation
-import SP1Operations.Compare.IsZeroWordOperation
-import SP1Operations.Compare.LtOperationUnsigned
-import SP1Operations.Operation.U16MSBOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.RTypeReader
+import SP1Operations.Operation.MulOperation.MulOperation
+import SP1Operations.Operation.AddOperation.AddOperation
+import SP1Operations.Compare.IsEqualWordOperation.IsEqualWordOperation
+import SP1Operations.Compare.IsZeroWordOperation.IsZeroWordOperation
+import SP1Operations.Compare.LtOperationUnsigned.LtOperationUnsigned
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.RTypeReader.RTypeReader
 
 namespace DivRem
 
@@ -644,5 +644,38 @@ section constraints
   ]
 
 end constraints
+
+section opcodes
+
+@[simp] def is_real (Main : Vector (ZMod p) 246) : Prop := Main[244] = 1
+  deriving Decidable
+
+@[simp] def is_div (Main : Vector (ZMod p) 246) : Prop := Main[201] = 1
+  deriving Decidable
+@[simp] def is_divu (Main : Vector (ZMod p) 246) : Prop := Main[202] = 1
+  deriving Decidable
+@[simp] def is_rem (Main : Vector (ZMod p) 246) : Prop := Main[203] = 1
+  deriving Decidable
+@[simp] def is_remu (Main : Vector (ZMod p) 246) : Prop := Main[204] = 1
+  deriving Decidable
+@[simp] def is_divw (Main : Vector (ZMod p) 246) : Prop := Main[205] = 1
+  deriving Decidable
+@[simp] def is_remw (Main : Vector (ZMod p) 246) : Prop := Main[206] = 1
+  deriving Decidable
+@[simp] def is_divuw (Main : Vector (ZMod p) 246) : Prop := Main[207] = 1
+  deriving Decidable
+@[simp] def is_remuw (Main : Vector (ZMod p) 246) : Prop := Main[208] = 1
+  deriving Decidable
+
+@[simp] def sp1_op_a (Main : Vector (ZMod p) 246) : BitVec 5 :=
+  BitVec.ofNat 5 Main[6].val
+
+@[simp] def sp1_op_b (Main : Vector (ZMod p) 246) : BitVec 5 :=
+  BitVec.ofNat 5 Main[14].val
+
+@[simp] def sp1_op_c (Main : Vector (ZMod p) 246) : BitVec 5 :=
+  BitVec.ofNat 5 Main[21].val
+
+end opcodes
 
 end DivRem

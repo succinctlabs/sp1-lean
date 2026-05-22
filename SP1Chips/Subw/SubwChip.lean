@@ -1,7 +1,7 @@
 import SP1Foundations
-import SP1Operations.Operation.SubwOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.RTypeReader
+import SP1Operations.Operation.SubwOperation.SubwOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.RTypeReader.RTypeReader
 import SP1Chips.Subw.Constraints
 
 open LeanRV64D.Functions BitVec
@@ -30,9 +30,6 @@ def sp1_subw : SailM Unit := do
 
 open Sail
 
-set_option maxHeartbeats 1600000 in
--- Subw migration's BitVec/sign-extend manipulation in the non-zero
--- op_a branch sits well above the default 200K heartbeat budget.
 theorem correct_subw
   (cstrs : (constraints Main).allHold)
   (h_is_real : Main[31] = 1)

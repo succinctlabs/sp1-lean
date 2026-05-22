@@ -1,6 +1,6 @@
-import SP1Operations.Operation.U16MSBOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 
 namespace ShiftRight
 

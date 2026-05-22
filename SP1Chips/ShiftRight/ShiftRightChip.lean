@@ -1,7 +1,7 @@
 import SP1Foundations
-import SP1Operations.Operation.U16MSBOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ALUTypeReader
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.ShiftRight.Srl
 import SP1Chips.ShiftRight.Srlw
 import SP1Chips.ShiftRight.Sra
@@ -44,8 +44,6 @@ noncomputable def spec_srl (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_RTYPE rs2 rs1 rd rop.SRL
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application.
 theorem correct_srl
     (cstrs : (constraints Main).allHold)
     (h_is_srl : is_srl Main)
@@ -109,8 +107,6 @@ noncomputable def spec_srli (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit :=
   _ ← execute_SHIFTIOP shamt rs1 rd sop.SRLI
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application.
 theorem correct_srli
     (cstrs : (constraints Main).allHold)
     (h_is_srli : is_srli Main)
@@ -185,8 +181,6 @@ noncomputable def spec_sra (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_RTYPE rs2 rs1 rd rop.SRA
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application.
 theorem correct_sra
     (cstrs : (constraints Main).allHold)
     (h_is_sra : is_sra Main)
@@ -249,8 +243,6 @@ noncomputable def spec_srai (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit :=
   _ ← execute_SHIFTIOP shamt rs1 rd sop.SRAI
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application.
 theorem correct_srai
     (cstrs : (constraints Main).allHold)
     (h_is_srai : is_srai Main)
@@ -324,8 +316,6 @@ noncomputable def spec_srlw (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_RTYPEW rs2 rs1 rd ropw.SRLW
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application chains; mirrors MulChip pattern.
 theorem correct_srlw
     (cstrs : (constraints Main).allHold)
     (h_is_srlw : is_srlw Main)
@@ -389,8 +379,6 @@ noncomputable def spec_srliw (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit :
   _ ← execute_SHIFTIWOP shamt rs1 rd sopw.SRLIW
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application chains; mirrors MulChip pattern.
 theorem correct_srliw
     (cstrs : (constraints Main).allHold)
     (h_is_srliw : is_srliw Main)
@@ -465,8 +453,6 @@ noncomputable def spec_sraw (rs2 rs1 rd : regidx) : SailM Unit := do
   _ ← execute_RTYPEW rs2 rs1 rd ropw.SRAW
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application chains; mirrors MulChip pattern.
 theorem correct_sraw
     (cstrs : (constraints Main).allHold)
     (h_is_sraw : is_sraw Main)
@@ -530,8 +516,6 @@ noncomputable def spec_sraiw (shamt : BitVec 6) (rs1 rd : regidx) : SailM Unit :
   _ ← execute_SHIFTIWOP shamt rs1 rd sopw.SRAIW
   pure ()
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: chip cstrs flatten + ALU iff + state simp + spec.* application chains; mirrors MulChip pattern.
 theorem correct_sraiw
     (cstrs : (constraints Main).allHold)
     (h_is_sraiw : is_sraiw Main)

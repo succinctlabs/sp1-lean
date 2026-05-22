@@ -312,6 +312,7 @@ lemma divw_remw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
           have h_max : (c0.val : ℤ) + (c1.val : ℤ) * 65536 < 4294967296 := by
             have hc1_lt_int : (c1.val : ℤ) ≤ 65535 := by exact_mod_cast Nat.lt_succ_iff.mp hc1_lt
             have hc0_lt_int : (c0.val : ℤ) ≤ 65535 := by exact_mod_cast Nat.lt_succ_iff.mp hc0_lt
+            clear *- hc1_lt_int hc0_lt_int
             nlinarith
           linarith
         · push_cast at zc
@@ -408,6 +409,7 @@ lemma divw_remw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
                   have h_max : (c0.val : ℤ) + (c1.val : ℤ) * 65536 < 4294967296 := by
                     have hc1_lt_int : (c1.val : ℤ) ≤ 65535 := by exact_mod_cast Nat.lt_succ_iff.mp hc1_lt
                     have hc0_lt_int : (c0.val : ℤ) ≤ 65535 := by exact_mod_cast Nat.lt_succ_iff.mp hc0_lt
+                    clear *- hc1_lt_int hc0_lt_int
                     nlinarith
                   linarith
                 · push_cast at zc
@@ -962,8 +964,8 @@ lemma spec.divw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
            eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
            eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
            eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2,
-           w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
-           eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2,
+           w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3, cstrs⟩ := cstrs
+  obtain ⟨eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2,
            w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
            eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
            of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
@@ -1151,31 +1153,29 @@ lemma spec.divw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
            rw [h]; split_ifs <;> [right; left] <;> rfl)
     simp [h_is_divw, z0, z1, z2, z3, z4, z5, z6,
           h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
+  -- Order: cheap closers first (omega/rw), then typed helpers
+  -- (fail-fast on type unification — implicit-argument shape decides
+  -- whether `apply` even commits), then `simp_all` as catch-all. The
+  -- previous order placed `simp_all`-bearing alternatives before the
+  -- typed `msb_arm_closer`/`maco_arm_closer` helpers, so every goal
+  -- closable by a typed helper first paid the full TC + simp_all cost of
+  -- the heavier alts. With typed helpers running first, `simp_all` alone
+  -- catches every residual goal — the `lt_cases_of_isU64` / 2-step /
+  -- `rcases b_b_neg` fallback arms that the prior ordering required are
+  -- no longer needed.
   all_goals first
-    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
     | omega
-    | (apply Word.isU64_of_cases <;> simp_all; done)
-    | (apply Word.isU64_of_cases <;> simp <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c
-       apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b
-       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
-    | (rcases b_b_neg with hbn | hbn <;>
-       (apply Word.isU64_of_cases <;> simp_all [hbn] <;> omega))
+    | (rw [← this, eq_d_a0, eq_d_a1, eq_d_a2, eq_d_a3])
+    -- msb-bearing arms: Word.isU64 goals for sign-extended r/q/c words
+    -- have shape `#v[?, ?, m * 65535, m * 65535]` where m ∈ {0, 1}.
+    | (apply msb_arm_closer u16_r0 u16_r1 h_msb_rem_01)
+    | (apply msb_arm_closer u16_q0 u16_q1 h_msb_quot_01)
+    | (apply msb_arm_closer hc0 hc1 h_msb_c_01)
     | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    -- msb-bearing arms: Word.isU64 goals for sign-extended r/q/c words
-    -- have shape `#v[?, ?, m * 65535, m * 65535]` where m ∈ {0, 1}.
-    -- `msb_arm_closer` closes each shape directly given the low-limb
-    -- u16 bounds (from `u16_r0`/`u16_q0` directly, or from `is_U64_c`).
-    -- (b-side msb arm not needed for `divw` writeback — kept derived for parity.)
-    | (apply msb_arm_closer u16_r0 u16_r1 h_msb_rem_01)
-    | (apply msb_arm_closer u16_q0 u16_q1 h_msb_quot_01)
-    | (apply msb_arm_closer hc0 hc1 h_msb_c_01)
+    | (apply Word.isU64_of_cases <;> simp_all)
 
 -- Twin of `spec.divw` with `.2` projection, `is_remw` flag,
 -- `sop6` mutex, `eq_r_*` writeback.
@@ -1305,8 +1305,8 @@ lemma spec.remw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
            eq_is_real_not_word, eq_b_neg, eq_rem_neg, eq_c_neg,
            eq_lb0, eq_lc0, eq_lb1, eq_lc1, eq_lb2, eq_lc2, eq_lb3, eq_lc3,
            eq_qbc0, eq_qbc1, w_eq_qbc2_uw, w_eq_qbc2_w, w_eq_q2_w, eq_qbc2,
-           w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3,
-           eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2,
+           w_eq_qbc3_uw, w_eq_qbc3_w, w_eq_q3_w, eq_qbc3, cstrs⟩ := cstrs
+  obtain ⟨eq_rbc0, eq_rbc1, w_eq_rbc2_uw, w_eq_rbc2_w, w_eq_r2_w, eq_rbc2,
            w_eq_rbc3_uw, w_eq_rbc3_w, w_eq_r3_w, eq_rbc3,
            eq_is_overflow, eq_b_neg_not_overflow, eq_not_b_neg_not_overflow,
            of_eq_q0, of_eq_r0, of_eq_q1, of_eq_r1, of_eq_q2, of_eq_r2, of_eq_q3, of_eq_r3,
@@ -1488,27 +1488,18 @@ lemma spec.remw {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24
            rw [h]; split_ifs <;> [right; left] <;> rfl)
     simp [h_is_remw, z0, z1, z2, z3, z4, z5, z6,
           h_rbc2_eq, h_rbc3_eq, h_qbc2_eq, h_qbc3_eq] at *
+  -- Order mirrors spec.divw (see there for rationale).
   all_goals first
-    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
     | omega
-    | (apply Word.isU64_of_cases <;> simp_all; done)
-    | (apply Word.isU64_of_cases <;> simp <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c; simp at is_U64_c; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b; simp at is_U64_b; omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_c
-       apply Word.isU64_of_cases <;> simp at is_U64_c ⊢ <;> omega)
-    | (apply Word.lt_cases_of_isU64 at is_U64_b
-       apply Word.isU64_of_cases <;> simp at is_U64_b ⊢ <;> omega)
-    | (rcases b_b_neg with hbn | hbn <;>
-       (apply Word.isU64_of_cases <;> simp_all [hbn] <;> omega))
+    | (rw [← this, eq_r_a0, eq_r_a1, eq_r_a2, eq_r_a3])
+    | (apply msb_arm_closer u16_r0 u16_r1 h_msb_rem_01)
+    | (apply msb_arm_closer u16_q0 u16_q1 h_msb_quot_01)
+    | (apply msb_arm_closer hc0 hc1 h_msb_c_01)
     | (apply maco_arm_closer u16_ac0 u16_ac1 u16_ac2 u16_ac3
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    -- msb-bearing arms (see spec.divw for shape rationale).
-    | (apply msb_arm_closer u16_r0 u16_r1 h_msb_rem_01)
-    | (apply msb_arm_closer u16_q0 u16_q1 h_msb_quot_01)
-    | (apply msb_arm_closer hc0 hc1 h_msb_c_01)
+    | (apply Word.isU64_of_cases <;> simp_all)
 
 end divw_remw
 

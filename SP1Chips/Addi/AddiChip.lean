@@ -1,6 +1,6 @@
-import SP1Operations.Operation.AddOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.ITypeReader
+import SP1Operations.Operation.AddOperation.AddOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.ITypeReader.ITypeReader
 import SP1Chips.Addi.Constraints
 
 import SP1Chips.Add.Constraints

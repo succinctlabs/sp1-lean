@@ -1,5 +1,5 @@
 import SP1Foundations
-import SP1Operations.Operation.U16MSBOperation
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 
 structure SubwOperation (F : Type) where
   value : Vector F 2

@@ -1,4 +1,4 @@
-import SP1Operations.Operation.AddOperation
+import SP1Operations.Operation.AddOperation.AddOperation
 import SP1Chips.Jal.Constraints
 
 namespace Jal

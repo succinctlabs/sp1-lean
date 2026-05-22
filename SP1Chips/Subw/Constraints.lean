@@ -1,6 +1,6 @@
-import SP1Operations.Operation.SubwOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.RTypeReader
+import SP1Operations.Operation.SubwOperation.SubwOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.RTypeReader.RTypeReader
 
 namespace Subw
 

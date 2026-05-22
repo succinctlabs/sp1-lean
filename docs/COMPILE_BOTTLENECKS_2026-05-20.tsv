@@ -1,0 +1,31 @@
+wall_s	user_s	sys_s	rss_kb	exit	file
+300.14	395.46	4.12	10688716	0	SP1Operations/Operation/MulOperation/Constraints.lean
+12.76	62.11	1.20	7125160	0	SP1Chips/LoadX0Chip.lean
+117.66	312.65	1.61	7056176	0	SP1Chips/ShiftRight/Common.lean
+27.00	50.05	1.06	6919564	0	SP1Chips/ShiftLeft/Sll.lean
+10.84	29.81	1.13	6776560	0	SP1Foundations/Word.lean
+198.36	220.12	1.28	7257328	134	SP1Chips/DivRem/Common.lean
+97.65	145.81	1.16	6688444	0	SP1Chips/ShiftLeft/Common.lean
+0.47	0.28	0.19	753992	1	SP1Chips/DivRem/DivwRemw.lean
+11.45	46.73	1.16	6961180	0	SP1Chips/BranchChip.lean
+91.37	91.87	1.32	7417636	1	SP1Chips/ShiftRight/Sraw.lean
+5.56	21.96	1.25	6561004	0	SP1Foundations/MemChecks.lean
+22.92	81.43	1.92	7432296	0	SP1Foundations/SailM.lean
+64.27	63.62	1.11	6896540	0	SP1Chips/ShiftRight/Sra.lean
+43.91	52.88	1.13	7048020	1	SP1Chips/ShiftRight/Srlw.lean
+0.47	0.26	0.21	755268	1	SP1Chips/DivRem/DivRem.lean
+0.47	0.28	0.20	754984	1	SP1Chips/DivRem/DivuRemu.lean
+7.26	15.18	0.95	6631956	0	SP1Chips/ShiftLeft/Sllw.lean
+0.47	0.26	0.21	754808	1	SP1Chips/DivRem/DivuwRemuw.lean
+34.87	34.29	1.01	6666472	0	SP1Chips/ShiftRight/Srl.lean
+7.39	25.80	1.03	6696104	0	SP1Chips/BitwiseChip.lean
+1.05	0.46	0.59	2007364	1	SP1Chips/DivRemChip.lean
+15.99	30.09	0.99	6568832	0	SP1Chips/Branch/Common.lean
+3.34	3.33	0.85	6382244	0	SP1Chips/Bitwise/Common.lean
+11.87	38.54	1.51	7246148	0	SP1Chips/ShiftRightChip.lean
+11.43	24.50	1.11	6952992	0	SP1Chips/ShiftLeftChip.lean
+14.49	40.44	1.25	7058324	0	SP1Chips/MulChip.lean
+4.99	10.53	0.92	6490176	0	SP1Operations/Compare/LtOperationSigned.lean
+---
+# DivRem/Common retry at --tstack=4000000:
+292.76	315.42	1.69	7873736	0	SP1Chips/DivRem/Common.lean (at --tstack=4000000)

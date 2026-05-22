@@ -30,9 +30,6 @@ noncomputable def spec_beq (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) :
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BEQ
 
-set_option maxHeartbeats 16000000 in
--- Heartbeats elevated for the post-state-cstrs `simp_all` chain (ZMod cast
--- normalization is expensive).
 theorem correct_beq
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 45)
@@ -299,7 +296,6 @@ noncomputable def spec_bne (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) :
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BNE
 
-set_option maxHeartbeats 16000000 in
 -- NEQ/EQ polarity flipped vs `correct_beq`: branching arm is NEQ (sum = 1),
 -- non-branching is EQ (sum = 0).
 theorem correct_bne
@@ -553,7 +549,6 @@ noncomputable def spec_blt (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) :
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BLT
 
-set_option maxHeartbeats 16000000 in
 -- is_signed = 1 (signed comparison via `spec_lt.2`). Main[34] = Main[35]:
 -- branching when lt holds, non-branching when not.
 theorem correct_blt
@@ -767,7 +762,6 @@ noncomputable def spec_bge (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) :
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BGE
 
-set_option maxHeartbeats 16000000 in
 -- is_signed = 1 (signed via `spec_lt.2`). Main[34] = 1 - Main[35]:
 -- branching when ≥ holds (Main[35] = 0), non-branching when < holds
 -- (Main[35] = 1).
@@ -991,7 +985,6 @@ noncomputable def spec_bltu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) :
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BLTU
 
-set_option maxHeartbeats 16000000 in
 -- Unsigned variant of BLT: is_signed = 0 (`spec_lt.1`); uses
 -- `Word.toNat` / `BitVec.toNat` for ordering. Main[34] = Main[35]
 -- (same shape as BLT).
@@ -1203,7 +1196,6 @@ noncomputable def spec_bgeu (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) :
   Sail.writeReg Register.nextPC ((← Sail.readReg Register.PC) + 4#64)
   execute_BTYPE imm rs2 rs1 bop.BGEU
 
-set_option maxHeartbeats 16000000 in
 -- Unsigned BGE variant: is_signed = 0 (`spec_lt.1`), `Word.toNat`
 -- ordering. Branching when ≥ holds (Main[35] = 0, Main[34] = 1),
 -- non-branching when < holds.

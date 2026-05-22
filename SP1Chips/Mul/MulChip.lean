@@ -1,6 +1,6 @@
-import SP1Operations.Operation.MulOperation
-import SP1Operations.Reader.CPUState
-import SP1Operations.Reader.RTypeReader
+import SP1Operations.Operation.MulOperation.MulOperation
+import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.RTypeReader.RTypeReader
 import SP1Chips.Mul.Constraints
 import SP1Chips.Mul.Common
 
@@ -43,10 +43,6 @@ noncomputable def spec_mul (rs2 rs1 rd : regidx) : SailM Unit := do
 
 open Sail
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: the chip cstrs flatten + reader iff + state simp + spec.mul application
--- chains push past the default 200K budget; AddChip uses the 1.6M default but Mul has 5× the
--- variant flags + 16-byte product to thread through.
 theorem correct_mul
     (cstrs : (Mul.constraints Main).allHold)
     (h_is_mul : Mul.is_mul Main)
@@ -140,8 +136,6 @@ noncomputable def spec_mulh (rs2 rs1 rd : regidx) : SailM Unit := do
 
 open Sail
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: see correct_mul comment.
 theorem correct_mulh
     (cstrs : (Mul.constraints Main).allHold)
     (h_is_mulh : Mul.is_mulh Main)
@@ -226,8 +220,6 @@ noncomputable def spec_mulhu (rs2 rs1 rd : regidx) : SailM Unit := do
 
 open Sail
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: see correct_mul comment.
 theorem correct_mulhu
     (cstrs : (Mul.constraints Main).allHold)
     (h_is_mulhu : Mul.is_mulhu Main)
@@ -312,8 +304,6 @@ noncomputable def spec_mulhsu (rs2 rs1 rd : regidx) : SailM Unit := do
 
 open Sail
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: see correct_mul comment.
 theorem correct_mulhsu
     (cstrs : (Mul.constraints Main).allHold)
     (h_is_mulhsu : Mul.is_mulhsu Main)
@@ -398,8 +388,6 @@ noncomputable def spec_mulw (rs2 rs1 rd : regidx) : SailM Unit := do
 
 open Sail
 
-set_option maxHeartbeats 8000000 in
--- 8M heartbeats: see correct_mul comment.
 theorem correct_mulw
     (cstrs : (Mul.constraints Main).allHold)
     (h_is_mulw : Mul.is_mulw Main)
