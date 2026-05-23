@@ -49,14 +49,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The chip's column struct, mirroring SP1's Rust `LtCols<T>`. -/
 structure LtCols (T : Type) where
   state : CPUState T
-  op_a : T
-  op_a_memory : MemoryAccessInSharedCols T
-  op_a_0 : T
-  op_b : T
-  op_b_memory : MemoryAccessInSharedCols T
-  op_c : Vector T 4
-  op_c_memory : MemoryAccessInSharedCols T
-  imm_c : T
+  adapter : ALUTypeReader T
   is_slt : T
   is_sltu : T
   lt_operation : LtOperationSigned T
@@ -69,9 +62,8 @@ assertZero gates (the two opcode-selector booleans, the sum-boolean,
 and the op_a_0 = 0 forcing). The `LtOperationSigned` sub-fragment
 constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory, op_a_0, op_b,
-       _op_b_memory,
-       op_c, _op_c_memory, imm_c, is_slt, is_sltu, lt_operation,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c⟩, is_slt, is_sltu, lt_operation,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -95,49 +87,50 @@ chip-level `is_real` argument is `is_slt + is_sltu`. -/
 def Spec (cols : LtCols (ZMod p)) : Prop :=
   let is_real : ZMod p := cols.is_slt + cols.is_sltu
   (_root_.LtOperationSigned.constraints (F := ZMod p)
-      cols.op_b_memory.prev_value cols.op_c_memory.prev_value
+      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
       cols.lt_operation cols.is_slt is_real).allHold ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ALUTypeReader.aluTypeReaderSpec
       (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536)
       (cols.is_slt * 9 + cols.is_sltu * 10) cols.state.pc
       #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]
-      { op_a := cols.op_a,
+      { op_a := cols.adapter.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory.prev_value,
+          { prev_value := cols.adapter.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
-        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+              { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } },
+        op_a_0 := cols.adapter.op_a_0, op_b := cols.adapter.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory.prev_value,
+          { prev_value := cols.adapter.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
-        op_c := cols.op_c,
+              { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } },
+        op_c := cols.adapter.op_c,
         op_c_memory :=
-          { prev_value := cols.op_c_memory.prev_value,
+          { prev_value := cols.adapter.op_c_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_c_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb } },
-        imm_c := cols.imm_c } ∧
+              { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } },
+        imm_c := cols.adapter.imm_c } ∧
   cols.is_slt * (cols.is_slt - 1) = 0 ∧
   cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
   (cols.is_slt + cols.is_sltu) * (cols.is_slt + cols.is_sltu - 1) = 0 ∧
-  cols.op_a_0 = 0
+  cols.adapter.op_a_0 = 0
 
 /-- Project a raw SP1 row into the structured `LtCols` view. Mirrors
 the index map in `SP1Chips/Lt/Constraints.lean` (44 columns; the
 `lt_operation` sub-struct is packed from `Main[34..43]`). -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 44) : LtCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      Main[6],
-   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
-   Main[14],
-   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-   #v[Main[21], Main[22], Main[23], Main[24]],
-   ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
-   Main[31], Main[32], Main[33],
+      ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    Main[14],
+    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
+    #v[Main[21], Main[22], Main[23], Main[24]],
+    ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
+    Main[31]⟩, Main[32], Main[33],
    { result :=
        { u16_compare_operation := { bit := Main[34] },
          u16_flags := #v[Main[35], Main[36], Main[37], Main[38]],
@@ -193,22 +186,22 @@ theorem correct_sltu
 OfflineMemory aggregation. op_a writes the 4-limb boolean result
 `#v[compare_bit, 0, 0, 0]`. -/
 def opAMemoryAccess (cols : LtCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
-  { addr := #v[cols.op_a, 0, 0],
-    prev_value := cols.op_a_memory.prev_value,
-    prev_low := cols.op_a_memory.access_timestamp.prev_low,
-    diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+  { addr := #v[cols.adapter.op_a, 0, 0],
+    prev_value := cols.adapter.op_a_memory.prev_value,
+    prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
 
 def opBMemoryAccess (cols : LtCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
-  { addr := #v[cols.op_b, 0, 0],
-    prev_value := cols.op_b_memory.prev_value,
-    prev_low := cols.op_b_memory.access_timestamp.prev_low,
-    diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb }
+  { addr := #v[cols.adapter.op_b, 0, 0],
+    prev_value := cols.adapter.op_b_memory.prev_value,
+    prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
 
 def opCMemoryAccess (cols : LtCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
-  { addr := #v[cols.op_c[0], 0, 0],
-    prev_value := cols.op_c_memory.prev_value,
-    prev_low := cols.op_c_memory.access_timestamp.prev_low,
-    diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb }
+  { addr := #v[cols.adapter.op_c[0], 0, 0],
+    prev_value := cols.adapter.op_c_memory.prev_value,
+    prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
 
 /-! ## Full `FormalAssertion` promotion (Path-2)
 
@@ -231,9 +224,8 @@ open Circuit
 the `LtOperationSigned` byte lookups and `ALUTypeReader` memory accesses. -/
 @[reducible]
 def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory, op_a_0, op_b,
-       op_b_memory,
-       op_c, op_c_memory, imm_c, is_slt, is_sltu, _lt_operation,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, is_slt, is_sltu, _lt_operation,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -284,10 +276,10 @@ def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
       opcode := cols.is_slt * 9 + cols.is_sltu * 10,
-      op_a := cols.op_a,
-      op_b := #v[cols.op_b, 0, 0, 0],
-      op_c := cols.op_c,
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
+      op_a := cols.adapter.op_a,
+      op_b := #v[cols.adapter.op_b, 0, 0, 0],
+      op_c := cols.adapter.op_c,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
   SP1Clean.AddrAddOp.assertion.Spec
     ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
@@ -295,18 +287,18 @@ def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   cols.is_slt * (cols.is_slt - 1) = 0 ∧
   cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
   (cols.is_slt + cols.is_sltu) * (cols.is_slt + cols.is_sltu - 1) = 0 ∧
-  cols.op_a_0 = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
-     cols.op_a_memory.prev_value⟩ ∧
+    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
-     cols.op_b_memory.prev_value⟩ ∧
+    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_b_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.op_c_memory.access_timestamp.prev_low, cols.op_c_memory.access_timestamp.diff_low_limb,
-     cols.op_c_memory.prev_value⟩
+    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

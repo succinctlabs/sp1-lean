@@ -243,29 +243,29 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
   | .addw cols =>
       -- Three register accesses. op_a is read AND written (write_value is
       -- the 4-limb sign-extended reconstruction of the 32-bit result).
-      -- op_c uses `cols.op_c[0]` as the register-index limb; when
+      -- op_c uses `cols.adapter.op_c[0]` as the register-index limb; when
       -- `imm_c = 1` (addiw) the chip Spec constrains
       -- `op_c_memory.prev_value = op_c` so the access is harmless.
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_a, 0, 0],
-          prev_value := cols.op_a_memory.prev_value,
-          prev_low := cols.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_a, 0, 0],
+          prev_value := cols.adapter.op_a_memory.prev_value,
+          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
       let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_b, 0, 0],
-          prev_value := cols.op_b_memory.prev_value,
-          prev_low := cols.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_b, 0, 0],
+          prev_value := cols.adapter.op_b_memory.prev_value,
+          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
       let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_c[0], 0, 0],
-          prev_value := cols.op_c_memory.prev_value,
-          prev_low := cols.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_c[0], 0, 0],
+          prev_value := cols.adapter.op_c_memory.prev_value,
+          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
       [(op_a_mem,
         #v[cols.addw_value[0], cols.addw_value[1],
            cols.addw_msb * 65535, cols.addw_msb * 65535]),
-       (op_b_mem, cols.op_b_memory.prev_value),
-       (op_c_mem, cols.op_c_memory.prev_value)]
+       (op_b_mem, cols.adapter.op_b_memory.prev_value),
+       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
   | .uType cols =>
       -- One register access only (op_a write). U-type has no op_b/op_c
       -- register reads — both are immediates.
@@ -292,8 +292,8 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
         SP1Clean.Lt.opCMemoryAccess cols
       [(op_a_mem, #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]),
-       (op_b_mem, cols.op_b_memory.prev_value),
-       (op_c_mem, cols.op_c_memory.prev_value)]
+       (op_b_mem, cols.adapter.op_b_memory.prev_value),
+       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
   | .storeWord cols =>
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
         { addr := #v[cols.adapter.op_a, 0, 0],
@@ -408,23 +408,23 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
        (load_mem, cols.load_prev_value)]
   | .shiftRight cols =>
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_a, 0, 0],
-          prev_value := cols.op_a_memory.prev_value,
-          prev_low := cols.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_a, 0, 0],
+          prev_value := cols.adapter.op_a_memory.prev_value,
+          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
       let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_b, 0, 0],
-          prev_value := cols.op_b_memory.prev_value,
-          prev_low := cols.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_b, 0, 0],
+          prev_value := cols.adapter.op_b_memory.prev_value,
+          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
       let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_c[0], 0, 0],
-          prev_value := cols.op_c_memory.prev_value,
-          prev_low := cols.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_c[0], 0, 0],
+          prev_value := cols.adapter.op_c_memory.prev_value,
+          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
       [(op_a_mem, cols.op_a_write_value),
-       (op_b_mem, cols.op_b_memory.prev_value),
-       (op_c_mem, cols.op_c_memory.prev_value)]
+       (op_b_mem, cols.adapter.op_b_memory.prev_value),
+       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
   | .divRem cols =>
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
         { addr := #v[cols.adapter.op_a, 0, 0],
@@ -488,27 +488,27 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       -- 8-limb `bitwise_result` (mirrors the `E19/E21/E23/E25` halfword
       -- packs in `BitwiseU16Operation.constraints`).
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_a, 0, 0],
-          prev_value := cols.op_a_memory.prev_value,
-          prev_low := cols.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_a, 0, 0],
+          prev_value := cols.adapter.op_a_memory.prev_value,
+          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
       let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_b, 0, 0],
-          prev_value := cols.op_b_memory.prev_value,
-          prev_low := cols.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_b, 0, 0],
+          prev_value := cols.adapter.op_b_memory.prev_value,
+          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
       let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_c[0], 0, 0],
-          prev_value := cols.op_c_memory.prev_value,
-          prev_low := cols.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_c[0], 0, 0],
+          prev_value := cols.adapter.op_c_memory.prev_value,
+          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
       [(op_a_mem,
         #v[cols.bitwise_result[0] + cols.bitwise_result[1] * 256,
            cols.bitwise_result[2] + cols.bitwise_result[3] * 256,
            cols.bitwise_result[4] + cols.bitwise_result[5] * 256,
            cols.bitwise_result[6] + cols.bitwise_result[7] * 256]),
-       (op_b_mem, cols.op_b_memory.prev_value),
-       (op_c_mem, cols.op_c_memory.prev_value)]
+       (op_b_mem, cols.adapter.op_b_memory.prev_value),
+       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
   | .sub cols =>
       -- R-type: three register accesses. op_a is read AND written
       -- (write_value = op_a_write_value); op_b and op_c are pure reads.
