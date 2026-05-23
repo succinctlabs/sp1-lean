@@ -57,12 +57,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 `SP1Chips/Load/LoadByte/Constraints.lean`. -/
 structure LoadByteCols (T : Type) where
   state : CPUState T
-  op_a : T                                  -- Main[6]
-  op_a_memory : MemoryAccessInSharedCols T
-  op_a_0 : T                                -- Main[13]
-  op_b : T                                  -- Main[14]
-  op_b_memory : MemoryAccessInSharedCols T
-  op_c_imm : Vector T 4                     -- Main[21..24]
+  adapter : ITypeReader T
   addr_value : Vector T 3                   -- Main[25..27] (op_b + imm_c, low 3 limbs)
   addr_top_two_limb_inv : T                 -- Main[28]
   load_prev_value : Vector T 4              -- Main[29..32] (the 4-limb loaded word)
@@ -96,11 +91,8 @@ Opcode is `is_lb * 29 + is_lbu * 32` to admit both LB (signed) and LBU
 `imm_c = 1` (I-type), and `op_c` carries 4 immediate limbs from
 `op_c_imm`. -/
 def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       _op_a_memory,
-       op_a_0, op_b,
-       _op_b_memory,
-       op_c_imm, _addr_value, _addr_top_two_limb_inv,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c_imm⟩, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
        _offset_bit_2, _offset_bit_1, _offset_bit_0,
@@ -160,18 +152,18 @@ def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
   -- op_c is immediate so no memory access).
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
-      { prev_value := cols.op_a_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
+      { prev_value := cols.adapter.op_a_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
-      { prev_value := cols.op_b_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_b
+      { prev_value := cols.adapter.op_b_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_b_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }) ∧
   -- The load-side memory access. Address is the 3-limb `addr_value`
   -- computed by the AddressOperation; this is generally NOT a register
   -- address (`addr_value[0].val ≥ 32`), so the RAM branch of
@@ -187,15 +179,15 @@ def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
       opcode := cols.is_lb * 29 + cols.is_lbu * 32,
-      op_a := cols.op_a,
-      op_b := #v[cols.op_b, 0, 0, 0],
-      op_c := cols.op_c_imm,
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+      op_a := cols.adapter.op_a,
+      op_b := #v[cols.adapter.op_b, 0, 0, 0],
+      op_c := cols.adapter.op_c_imm,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
   -- Boolean and selector gates.
   cols.is_lb * (cols.is_lb - 1) = 0 ∧
   cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
   (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
-  cols.op_a_0 = 0
+  cols.adapter.op_a_0 = 0
 
 /-- The load access as a `MemoryAccess` record, exposed for trace-level
 OfflineMemory aggregation. This is the access that hits the RAM branch
@@ -216,11 +208,12 @@ def loadMemoryAccess (cols : LoadByteCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
 /-- Project a raw SP1 row into the structured `LoadByteCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 47) : LoadByteCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      Main[6],
-   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
-   Main[14],
-   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-   #v[Main[21], Main[22], Main[23], Main[24]],
+      ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    Main[14],
+    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
+    #v[Main[21], Main[22], Main[23], Main[24]]⟩,
    #v[Main[25], Main[26], Main[27]],
    Main[28],
    #v[Main[29], Main[30], Main[31], Main[32]],
@@ -246,7 +239,7 @@ because no Clean-side mirror of that operation exists yet (Phase-B per
 `_root_.Load.LoadByte.allHold_constraints_iff_of_is_lb`. -/
 def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
-      cols.op_b_memory.prev_value cols.op_c_imm
+      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm
       { value := cols.addr_value } ∧
   (cols.offset_bit_2 = 0 ∨ cols.offset_bit_2 = 1) ∧
   (cols.offset_bit_1 = 0 ∨ cols.offset_bit_1 = 1) ∧
@@ -262,19 +255,19 @@ def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag]
-      { op_a := cols.op_a,
+      { op_a := cols.adapter.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory.prev_value,
+          { prev_value := cols.adapter.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
-        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+              { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } },
+        op_a_0 := cols.adapter.op_a_0, op_b := cols.adapter.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory.prev_value,
+          { prev_value := cols.adapter.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
-        op_c_imm := cols.op_c_imm } ∧
+              { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } },
+        op_c_imm := cols.adapter.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
   (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
   cols.load_memory_flag * (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 1) +
@@ -286,7 +279,7 @@ def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
   ((0 : ZMod p) < 256 ∧ cols.load_memory_diff_high < (256 : ZMod p) ∧
     (0 : ZMod p) < 256) ∧
   Word.isU64 cols.load_prev_value ∧
-  cols.is_lbu = 0 ∧ cols.op_a_0 = 0 ∧
+  cols.is_lbu = 0 ∧ cols.adapter.op_a_0 = 0 ∧
   (cols.offset_bit_1 = 1 ∨ cols.offset_bit_0 = 1 ∨
     cols.selected_limb = cols.load_prev_value[0]) ∧
   (cols.offset_bit_1 = 0 ∨ cols.offset_bit_0 = 1 ∨
@@ -313,7 +306,7 @@ selector (`is_lb = 0` vs `is_lbu = 0`), and the sign-extension trailer
 (`signed_extension_flag = 0` instead of the MSB lookup). -/
 def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
-      cols.op_b_memory.prev_value cols.op_c_imm
+      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm
       { value := cols.addr_value } ∧
   (cols.offset_bit_2 = 0 ∨ cols.offset_bit_2 = 1) ∧
   (cols.offset_bit_1 = 0 ∨ cols.offset_bit_1 = 1) ∧
@@ -329,19 +322,19 @@ def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag]
-      { op_a := cols.op_a,
+      { op_a := cols.adapter.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory.prev_value,
+          { prev_value := cols.adapter.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
-        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+              { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } },
+        op_a_0 := cols.adapter.op_a_0, op_b := cols.adapter.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory.prev_value,
+          { prev_value := cols.adapter.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
-        op_c_imm := cols.op_c_imm } ∧
+              { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } },
+        op_c_imm := cols.adapter.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
   (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
   cols.load_memory_flag * (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 1) +
@@ -353,7 +346,7 @@ def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
   ((0 : ZMod p) < 256 ∧ cols.load_memory_diff_high < (256 : ZMod p) ∧
     (0 : ZMod p) < 256) ∧
   Word.isU64 cols.load_prev_value ∧
-  cols.is_lb = 0 ∧ cols.op_a_0 = 0 ∧
+  cols.is_lb = 0 ∧ cols.adapter.op_a_0 = 0 ∧
   (cols.offset_bit_1 = 1 ∨ cols.offset_bit_0 = 1 ∨
     cols.selected_limb = cols.load_prev_value[0]) ∧
   (cols.offset_bit_1 = 0 ∨ cols.offset_bit_0 = 1 ∨
@@ -417,11 +410,8 @@ open Circuit
 
 @[reducible]
 def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory,
-       op_a_0, op_b,
-       op_b_memory,
-       op_c_imm, _addr_value, _addr_top_two_limb_inv,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
        _offset_bit_2, _offset_bit_1, _offset_bit_0,
@@ -474,9 +464,9 @@ def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc, opcode := cols.is_lb * 29 + cols.is_lbu * 32,
-      op_a := cols.op_a,
-      op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+      op_a := cols.adapter.op_a,
+      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
     ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
@@ -484,15 +474,15 @@ def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
   cols.is_lb * (cols.is_lb - 1) = 0 ∧
   cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
   (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
-  cols.op_a_0 = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E (partial). Register-side memory-bus byte content:
   -- op_a/+4, op_b/+3. The load_mem/+1 access is deferred.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
-     cols.op_a_memory.prev_value⟩ ∧
+    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
-     cols.op_b_memory.prev_value⟩
+    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

@@ -55,12 +55,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The chip's column struct, mirroring SP1's Rust `AddiCols<T>`. -/
 structure AddiCols (T : Type) where
   state : CPUState T
-  op_a : T
-  op_a_memory : MemoryAccessInSharedCols T
-  op_a_0 : T
-  op_b : T
-  op_b_memory : MemoryAccessInSharedCols T
-  op_c_imm : Vector T 4
+  adapter : ITypeReader T
   op_a_write_value : Vector T 4
   is_real : T
   next_pc_carry_value : Vector T 3
@@ -70,9 +65,8 @@ deriving ProvableStruct
 takes a `Var AddiCols (ZMod p)` (struct of `Expression`s), destructures it,
 and emits the constraints for each sub-component. -/
 def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory, op_a_0, op_b,
-       op_b_memory,
-       op_c_imm, op_a_write_value, is_real, _next_pc_carry_value⟩ := cols
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, op_a_write_value, is_real, _next_pc_carry_value⟩ := cols
   -- AddOperation: op_b_memory.prev_value + op_c_imm = op_a_write_value.
   SP1Clean.AddOp.main op_b_memory.prev_value op_c_imm op_a_write_value
   -- CPUState: clk_0_16 progression (Range 13 → < 2^13 = 8192) and clk_16_24
@@ -118,26 +112,26 @@ the reusable helper Specs (`SP1Clean.AddOp`, `SP1Clean.CPUState`,
 `SP1Clean.ITypeReader`) plus the trailing assertZero gates. -/
 def Spec (cols : AddiCols (ZMod p)) : Prop :=
   SP1Clean.AddOp.Spec
-      cols.op_b_memory.prev_value cols.op_c_imm cols.op_a_write_value ∧
+      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
       (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 1 cols.state.pc
       cols.op_a_write_value
-      { op_a := cols.op_a,
+      { op_a := cols.adapter.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory.prev_value,
+          { prev_value := cols.adapter.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
-        op_a_0 := cols.op_a_0, op_b := cols.op_b,
+              { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } },
+        op_a_0 := cols.adapter.op_a_0, op_b := cols.adapter.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory.prev_value,
+          { prev_value := cols.adapter.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
-        op_c_imm := cols.op_c_imm } ∧
+              { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } },
+        op_c_imm := cols.adapter.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.op_a_0 = 0
+  cols.adapter.op_a_0 = 0
 
 /-- Project a raw SP1 row into the structured `AddiCols` view. Defined via
 direct indexed access — semantically the same as `ProvableType.fromElements`
@@ -145,10 +139,12 @@ but with field projections that reduce by `rfl` to `Main[k]`, avoiding the
 take/drop tower the `ProvableStruct`-derived path produces. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 30) : AddiCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      Main[6],
-   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13], Main[14],
-   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-   #v[Main[21], Main[22], Main[23], Main[24]],
+      ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    Main[14],
+    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
+    #v[Main[21], Main[22], Main[23], Main[24]]⟩,
    #v[Main[25], Main[26], Main[27], Main[28]],
    Main[29], #v[0, 0, 0]⟩
 
@@ -245,9 +241,8 @@ open Circuit
 the 4 immediate-limb byte lookups (see Scope note above). -/
 @[reducible]
 def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory, op_a_0, op_b,
-       op_b_memory,
-       op_c_imm, op_a_write_value, is_real, next_pc_carry_value⟩ := cols
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, op_a_write_value, is_real, next_pc_carry_value⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨op_b_memory.prev_value, op_c_imm, op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
@@ -296,27 +291,27 @@ legacy chip-level `Spec` / `iff_sp1`. -/
 def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.AddOp.Spec
-      cols.op_b_memory.prev_value cols.op_c_imm cols.op_a_write_value ∧
+      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 1, op_a := cols.op_a,
-      op_b := #v[cols.op_b, 0, 0, 0],
-      op_c := cols.op_c_imm,
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
+    { pc := cols.state.pc, opcode := 1, op_a := cols.adapter.op_a,
+      op_b := #v[cols.adapter.op_b, 0, 0, 0],
+      op_c := cols.adapter.op_c_imm,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
     ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.op_a_0 = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- I-type: op_a at +4, op_b at +3 (op_c_imm is immediate).
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
-     cols.op_a_memory.prev_value⟩ ∧
+    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
-     cols.op_b_memory.prev_value⟩
+    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

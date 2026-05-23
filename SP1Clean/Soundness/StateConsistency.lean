@@ -581,7 +581,7 @@ projected `next_pc` is `jump_target` with bit-0 cleared (see
 theorem nextPc_of_spec_jalr (cols : Jalr.JalrCols (ZMod p))
     (h : Jalr.assertion.Spec cols) :
     cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
-      cols.op_b_memory.prev_value cols.op_c_imm cols.jump_target := by
+      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm cols.jump_target := by
   change Jalr.Assertion.FormalSpec cols at h
   exact h.2.2.1
 
@@ -660,7 +660,7 @@ def ChipRow.nextPcValid : ChipRow p → Prop
       SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.imm cols.next_pc
   | .jalr cols =>
       cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
-        cols.op_b_memory.prev_value cols.op_c_imm cols.jump_target
+        cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm cols.jump_target
   | .loadByte cols =>
       SP1Clean.AddrAddOp.assertion.Spec
         ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
