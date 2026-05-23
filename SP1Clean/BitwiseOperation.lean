@@ -1,7 +1,11 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Provable
 import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
+import Clean.Gadgets.Equality
 import Clean.Utils.Field
+import Clean.Utils.Tactics
+import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
@@ -114,5 +118,152 @@ lemma ByteOpcodeSpec_of_Spec_when_lt7
   have hround : ((opcode.val : ℕ) : ZMod p) = opcode := by
     exact_mod_cast ZMod.natCast_zmod_val opcode
   interval_cases opcode.val <;> push_cast at hround <;> simp [hround]
+
+/-- The reverse of `ByteOpcodeSpec_of_Spec_when_lt7`. Given a per-byte
+`ByteOpcodeSpec` and `opcode.val < 7`, the existential `bop` is pinned to
+`ByteOpcode.ofNat opcode.val` and the `Spec` falls out. -/
+lemma Spec_of_ByteOpcodeSpec_when_lt7
+    (a b : Vector (ZMod p) 8) (opcode : ZMod p) (result : Vector (ZMod p) 8)
+    (_h_opcode : opcode.val < 7)
+    (h_each : ∀ i : Fin 8,
+      SP1Clean.ByteOpcodeSpec (#v[opcode, result[i.val]'i.is_lt,
+        a[i.val]'i.is_lt, b[i.val]'i.is_lt] : Vector (ZMod p) 4)) :
+    Spec a b opcode result := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := p > 512); omega⟩
+  have hp : 512 < p := Fact.out
+  intro i
+  obtain ⟨bop, hbop, hconstr⟩ := h_each i
+  simp only [Vector.getElem_mk, List.getElem_toArray,
+             List.getElem_cons_succ, List.getElem_cons_zero] at hbop hconstr
+  have hbop_lt : bop.toNat < 7 := by cases bop <;> simp [ByteOpcode.toNat]
+  -- From `(bop.toNat : ZMod p) = opcode`, derive `bop.toNat = opcode.val`.
+  have hbop_val : bop.toNat = opcode.val := by
+    apply_fun ZMod.val at hbop
+    rw [ZMod.val_natCast, Nat.mod_eq_of_lt (by omega : bop.toNat < p)] at hbop
+    exact hbop
+  -- ByteOpcode.ofNat round-trip closes the case.
+  have hbop_eq : bop = ByteOpcode.ofNat opcode.val := by
+    rw [← hbop_val]
+    cases bop <;> simp [ByteOpcode.toNat]
+  rw [hbop_eq] at hconstr
+  exact hconstr
+
+/-! ## Full `FormalAssertion` promotion
+
+Wraps an assertion-style `main` (taking `result` as a parameter, not
+witnessing it) into a Clean `FormalAssertion`. The chip must supply
+`opcode.val < 7` as an `Assumptions` discharger — this gates the
+`ByteOpcode.ofNat opcode.val` round-trip in both directions. -/
+
+/-- Bundled FormalAssertion input: the two 8-byte operands, the externally
+supplied 8-byte result, and the opcode field. -/
+structure Inputs (F : Type) where
+  a : fields 8 F
+  b : fields 8 F
+  result : fields 8 F
+  opcode : F
+deriving ProvableStruct
+
+namespace Assertion
+
+open Circuit
+
+/-- Assertion-style `main`. Takes the 8-byte `result` as a parameter
+rather than witnessing each limb internally. -/
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[0], input.a[0], input.b[0]]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[1], input.a[1], input.b[1]]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[2], input.a[2], input.b[2]]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[3], input.a[3], input.b[3]]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[4], input.a[4], input.b[4]]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[5], input.a[5], input.b[5]]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[6], input.a[6], input.b[6]]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[input.opcode, input.result[7], input.a[7], input.b[7]]
+      : Vector (Expression (ZMod p)) 4)
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.BitwiseOp"
+  main := main
+  localLength _ := 0
+
+/-- The chip is responsible for enforcing `opcode.val < 7` (typically via
+its `is_and + is_or + is_xor = 1` one-hot decomposition). -/
+def Assumptions (input : Inputs (ZMod p)) : Prop := input.opcode.val < 7
+
+/-- The FormalAssertion's spec, identical to the top-level
+`SP1Clean.BitwiseOp.Spec`. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  SP1Clean.BitwiseOp.Spec input.a input.b input.opcode input.result
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq, h_op_eq⟩ := h_input
+  subst h_a_eq
+  subst h_b_eq
+  subst h_r_eq
+  subst h_op_eq
+  simp only [circuit_norm, Lookup.Soundness, Table.toRaw,
+             SP1Clean.ByteOpcodeTable] at h_holds
+  obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ := h_holds
+  refine Spec_of_ByteOpcodeSpec_when_lt7 _ _ _ _ h_assumptions ?_
+  intro i
+  simp only [Vector.getElem_map]
+  match i with
+  | ⟨0, _⟩ => exact h0
+  | ⟨1, _⟩ => exact h1
+  | ⟨2, _⟩ => exact h2
+  | ⟨3, _⟩ => exact h3
+  | ⟨4, _⟩ => exact h4
+  | ⟨5, _⟩ => exact h5
+  | ⟨6, _⟩ => exact h6
+  | ⟨7, _⟩ => exact h7
+
+omit [Fact (p > 512)] in
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq, h_op_eq⟩ := h_input
+  subst h_a_eq
+  subst h_b_eq
+  subst h_r_eq
+  subst h_op_eq
+  simp only [circuit_norm, Lookup.Completeness, Table.toRaw,
+             SP1Clean.ByteOpcodeTable]
+  have h_specs := ByteOpcodeSpec_of_Spec_when_lt7 _ _ _ _ h_assumptions h_spec
+  simp only [Vector.getElem_map] at h_specs
+  exact ⟨h_specs ⟨0, by omega⟩, h_specs ⟨1, by omega⟩,
+         h_specs ⟨2, by omega⟩, h_specs ⟨3, by omega⟩,
+         h_specs ⟨4, by omega⟩, h_specs ⟨5, by omega⟩,
+         h_specs ⟨6, by omega⟩, h_specs ⟨7, by omega⟩⟩
+
+end Assertion
+
+/-- The full Clean `FormalAssertion` for `BitwiseOperation`: soundness +
+completeness against the opcode-parametric per-byte `Spec`, gated by
+`opcode.val < 7` in `Assumptions`. -/
+def assertion : FormalAssertion (ZMod p) Inputs :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.Spec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
 
 end SP1Clean.BitwiseOp

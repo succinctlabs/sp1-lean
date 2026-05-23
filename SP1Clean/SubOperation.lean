@@ -1,13 +1,17 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Provable
 import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
 import Clean.Gadgets.Equality
 import Clean.Utils.Field
+import Clean.Utils.Tactics
+import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.SubOperation.SubOperation
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.AddOperation
 
 /-! # `SubOperation` gadget mirror — Assertion style
 
@@ -76,5 +80,124 @@ theorem iff_sp1 (a b : Word (ZMod p)) (cols : SubOperation (ZMod p)) :
     (SubOperation.constraints a b cols 1).allHold ↔
       Spec a b cols.value :=
   SubOperation.allHold_constraints_iff a b cols
+
+/-! ## Full `FormalAssertion` promotion
+
+Wraps the assertion-style `main` above into a Clean `FormalAssertion`. The
+`Assertion.Spec` is stated in **borrow form** (matching `main` verbatim)
+rather than the natural form used by the top-level `Spec` / `iff_sp1`. The
+two forms are algebraically related by `d_i = 1 - c_i`; the top-level
+chip's `iff_sp1` continues to consume the natural-form `Spec`. -/
+
+/-- Bundled FormalAssertion input: the two operand words and the result
+word. -/
+structure Inputs (F : Type) where
+  a : fields 4 F
+  b : fields 4 F
+  result : fields 4 F
+deriving ProvableStruct
+
+namespace Assertion
+
+open Circuit
+
+/-- Wrapper around `SP1Clean.SubOp.main` that destructures a `Var Inputs`. -/
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit :=
+  SP1Clean.SubOp.main input.a input.b input.result
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.SubOp"
+  main := main
+  localLength _ := 0
+
+/-- No external assumptions. -/
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+/-- The FormalAssertion's spec, in **borrow form**: each of the 4 inverse
+borrow values `d_i` is boolean, and each result limb fits in `< 65536`.
+Matches `SP1Clean.SubOp.main` body verbatim. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  let d0 : ZMod p :=
+    (input.a[0] + 65536 - 1 - input.b[0] - input.result[0] + 1) * 65536⁻¹
+  let d1 : ZMod p :=
+    (input.a[1] + 65536 - 1 - input.b[1] - input.result[1] + d0) * 65536⁻¹
+  let d2 : ZMod p :=
+    (input.a[2] + 65536 - 1 - input.b[2] - input.result[2] + d1) * 65536⁻¹
+  let d3 : ZMod p :=
+    (input.a[3] + 65536 - 1 - input.b[3] - input.result[3] + d2) * 65536⁻¹
+  (d0 = 0 ∨ d0 = 1) ∧
+  (d1 = 0 ∨ d1 = 1) ∧
+  (d2 = 0 ∨ d2 = 1) ∧
+  (d3 = 0 ∨ d3 = 1) ∧
+  input.result[0].val < 65536 ∧
+  input.result[1].val < 65536 ∧
+  input.result[2].val < 65536 ∧
+  input.result[3].val < 65536
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq⟩ := h_input
+  subst h_a_eq
+  subst h_b_eq
+  subst h_r_eq
+  simp only [SP1Clean.SubOp.main, circuit_norm, Lookup.Soundness, Table.toRaw,
+             SP1Clean.ByteOpcodeTable] at h_holds
+  obtain ⟨h_d0, h_d1, h_d2, h_d3, h_l0, h_l1, h_l2, h_l3⟩ := h_holds
+  simp only [Vector.getElem_map]
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_l0,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_l1,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_l2,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_l3⟩
+  · obtain h | h := mul_eq_zero.mp h_d0
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr (by linear_combination h)
+  · obtain h | h := mul_eq_zero.mp h_d1
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr (by linear_combination h)
+  · obtain h | h := mul_eq_zero.mp h_d2
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr (by linear_combination h)
+  · obtain h | h := mul_eq_zero.mp h_d3
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr (by linear_combination h)
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq⟩ := h_input
+  subst h_a_eq
+  subst h_b_eq
+  subst h_r_eq
+  simp only [Vector.getElem_map, sub_eq_add_neg] at h_spec
+  obtain ⟨hb0, hb1, hb2, hb3, hr0, hr1, hr2, hr3⟩ := h_spec
+  simp only [SP1Clean.SubOp.main, circuit_norm, Lookup.Completeness, Table.toRaw,
+             SP1Clean.ByteOpcodeTable]
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr0,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr1,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr2,
+          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr3⟩
+  · rcases hb0 with h | h <;> rw [h] <;> ring
+  · rcases hb1 with h | h <;> rw [h] <;> ring
+  · rcases hb2 with h | h <;> rw [h] <;> ring
+  · rcases hb3 with h | h <;> rw [h] <;> ring
+
+end Assertion
+
+/-- The full Clean `FormalAssertion` for `SubOperation`: soundness +
+completeness against the borrow-form `Assertion.Spec`, no internal
+witnesses. Compose into a chip's `main` via `SubOp.assertion input`. -/
+def assertion : FormalAssertion (ZMod p) Inputs :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.Spec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
 
 end SP1Clean.SubOp
