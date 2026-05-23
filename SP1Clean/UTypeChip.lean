@@ -51,10 +51,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 AddOperation, and `add_result` is the 64-bit AddOp output written to
 op_a. -/
 structure UTypeCols (T : Type) where
-  clk_high : T
-  clk_16_24 : T
-  clk_0_16 : T
-  pc : Vector T 3
+  state : CPUState T
   op_a : T
   op_a_memory_prev_value : Vector T 4
   op_a_memory_prev_low : T
@@ -78,7 +75,7 @@ gate). The AddOperation sub-fragment (operating on `addend` and
 `op_b_imm`) is intentionally not emitted as a subcircuit — its
 constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b_imm,
        op_c_imm, addend, _add_result, is_auipc, is_real,
        _next_pc_carry_value⟩ := cols
@@ -106,12 +103,12 @@ def Spec (cols : UTypeCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p := cols.is_auipc * 48 + (1 - cols.is_auipc) * 49
   let addend : Word (ZMod p) :=
     #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   (_root_.AddOperation.constraints (F := ZMod p)
       addend cols.op_b_imm { value := cols.add_result }
       (cols.is_real - cols.op_a_0)).allHold ∧
   SP1Clean.JTypeReader.jtypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) opcode_e cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) opcode_e cols.state.pc
       cols.add_result
       { op_a := cols.op_a,
         op_a_memory :=
@@ -123,9 +120,9 @@ def Spec (cols : UTypeCols (ZMod p)) : Prop :=
         op_b_imm := cols.op_b_imm, op_c_imm := cols.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
-  cols.addend[0] - cols.is_auipc * cols.pc[0] = 0 ∧
-  cols.addend[1] - cols.is_auipc * cols.pc[1] = 0 ∧
-  cols.addend[2] - cols.is_auipc * cols.pc[2] = 0 ∧
+  cols.addend[0] - cols.is_auipc * cols.state.pc[0] = 0 ∧
+  cols.addend[1] - cols.is_auipc * cols.state.pc[1] = 0 ∧
+  cols.addend[2] - cols.is_auipc * cols.state.pc[2] = 0 ∧
   (cols.is_real - 1) * cols.op_a_0 = 0
 
 /-- The op_a register access (read prior, write result), exposed for
@@ -139,9 +136,8 @@ def opAMemoryAccess (cols : UTypeCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p)
 
 /-- Project a raw SP1 row into the structured `UTypeCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 31) : UTypeCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13],
    #v[Main[14], Main[15], Main[16], Main[17]],
@@ -227,7 +223,7 @@ the AddOperation byte lookups and the 3 Vector-indexed `addend`
 clauses (see Scope note above). -/
 @[reducible]
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, op_a_memory_prev_value,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory_prev_value,
        op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b_imm,
        op_c_imm, _addend, _add_result, is_auipc, is_real,
        next_pc_carry_value⟩ := cols
@@ -268,17 +264,17 @@ carry-aware `pc + 4` witness in `next_pc_carry_value`, the three scalar
 trailing assertZero gates, and the per-operand memory-bus byte content
 for `op_a` (the chip's only register access). -/
 def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc,
+    { pc := cols.state.pc,
       opcode := cols.is_auipc * 48 + (1 + -cols.is_auipc) * 49,
       op_a := cols.op_a,
       op_b := cols.op_b_imm,
       op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
@@ -293,7 +289,7 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
           e16⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_oa_a, h_isreal, h_isauipc,
@@ -312,7 +308,7 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
           e16⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_isauipc, h_op_a_0, h_oa_a⟩ := h_spec

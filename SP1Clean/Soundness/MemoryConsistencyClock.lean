@@ -127,7 +127,7 @@ def TraceClkLink (rows : List (ChipRow p)) (clkIncrement : ℕ) : Prop :=
 /-! ### Per-chip `cpuStateSpec` projection lemmas
 
 Each chip's `Spec` (the predicate used by `ChipRow.Spec`) contains
-`CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24` as a conjunct.
+`CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24` as a conjunct.
 These 24 lemmas project that conjunct, mirroring the
 `is_real_binary_<chip>` recipe in `IsRealBinary.lean`. -/
 
@@ -139,144 +139,144 @@ theorem cpuStateSpec_of_spec_add (cols : Add.AddCols (ZMod p))
 
 theorem cpuStateSpec_of_spec_addi (cols : Addi.AddiCols (ZMod p))
     (h : Addi.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Addi.Assertion.FormalSpec cols at h
   exact h.2.1
 
 theorem cpuStateSpec_of_spec_addw (cols : Addw.AddwCols (ZMod p))
     (h : Addw.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Addw.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_bitwise (cols : Bitwise.BitwiseCols (ZMod p))
     (h : Bitwise.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Bitwise.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_branch (cols : Branch.BranchCols (ZMod p))
     (h : Branch.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Branch.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_divRem (cols : DivRem.DivRemCols (ZMod p))
     (h : DivRem.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change DivRem.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_jal (cols : Jal.JalCols (ZMod p))
     (h : Jal.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Jal.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_jalr (cols : Jalr.JalrCols (ZMod p))
     (h : Jalr.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Jalr.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_loadByte (cols : LoadByte.LoadByteCols (ZMod p))
     (h : LoadByte.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change LoadByte.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_loadDouble
     (cols : LoadDouble.LoadDoubleCols (ZMod p))
     (h : LoadDouble.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change LoadDouble.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_loadHalf (cols : LoadHalf.LoadHalfCols (ZMod p))
     (h : LoadHalf.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change LoadHalf.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_loadWord (cols : LoadWord.LoadWordCols (ZMod p))
     (h : LoadWord.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change LoadWord.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_loadX0 (cols : LoadX0.LoadX0Cols (ZMod p))
     (h : LoadX0.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change LoadX0.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_lt (cols : Lt.LtCols (ZMod p))
     (h : Lt.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Lt.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_mul (cols : Mul.MulCols (ZMod p))
     (h : Mul.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Mul.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_shiftLeft (cols : ShiftLeft.ShiftLeftCols (ZMod p))
     (h : ShiftLeft.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change ShiftLeft.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_shiftRight
     (cols : ShiftRight.ShiftRightCols (ZMod p))
     (h : ShiftRight.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change ShiftRight.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_storeByte (cols : StoreByte.StoreByteCols (ZMod p))
     (h : StoreByte.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change StoreByte.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_storeDouble
     (cols : StoreDouble.StoreDoubleCols (ZMod p))
     (h : StoreDouble.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change StoreDouble.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_storeHalf
     (cols : StoreHalf.StoreHalfCols (ZMod p))
     (h : StoreHalf.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change StoreHalf.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_storeWord
     (cols : StoreWord.StoreWordCols (ZMod p))
     (h : StoreWord.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change StoreWord.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_sub (cols : Sub.SubCols (ZMod p))
     (h : Sub.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Sub.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_subw (cols : Sub.W.SubwCols (ZMod p))
     (h : Sub.W.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Sub.W.Assertion.FormalSpec cols at h
   exact h.1
 
 theorem cpuStateSpec_of_spec_uType (cols : UType.UTypeCols (ZMod p))
     (h : UType.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change UType.Assertion.FormalSpec cols at h
   exact h.1
 
@@ -285,29 +285,29 @@ theorem cpuStateSpec_of_spec_uType (cols : UType.UTypeCols (ZMod p))
 clock fields. -/
 def ChipRow.cpuStateSpec : ChipRow p → Prop
   | .add cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .addi cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .addw cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .bitwise cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .branch cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .divRem cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .jal cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .jalr cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .loadByte cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .loadDouble cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .loadHalf cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .loadWord cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .loadX0 cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .lt cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .mul cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .shiftLeft cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .shiftRight cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .storeByte cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .storeDouble cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .storeHalf cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .storeWord cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .sub cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .subw cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
-  | .uType cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
+  | .addi cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .addw cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .bitwise cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .branch cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .divRem cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .jal cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .jalr cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .loadByte cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .loadDouble cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .loadHalf cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .loadWord cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .loadX0 cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .lt cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .mul cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .shiftLeft cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .shiftRight cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .storeByte cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .storeDouble cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .storeHalf cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .storeWord cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .sub cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .subw cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .uType cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   -- Boundary chips: no `clk_0_16` / `clk_16_24` decomposition; the
   -- timestamp bound comes from a different mechanism (Phase 4.5
   -- follow-up). Placeholder `True` here keeps the dispatch total.

@@ -19,6 +19,7 @@ import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ALUTypeReader
+import SP1Clean.Reader.OperandAccess
 
 /-! # Chip-level `BitwiseChip` mirror — bundled 6-variant ALU chip
 
@@ -49,10 +50,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The chip's column struct, mirroring SP1's Rust `BitwiseCols<T>`. -/
 structure BitwiseCols (T : Type) where
-  clk_high : T
-  clk_16_24 : T
-  clk_0_16 : T
-  pc : Vector T 3
+  state : CPUState T
   op_a : T
   op_a_memory_prev_value : Vector T 4
   op_a_memory_prev_low : T
@@ -86,11 +84,11 @@ ranges (`ALUTypeReader`) are intentionally omitted — neither sub-fragment
 has a Clean operation wrapper yet; the `FormalAssertion` below proves
 only what `main` actually emits. -/
 def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
-       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
-       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
-       op_c, _op_c_memory_prev_value, _op_c_memory_prev_low,
-       _op_c_memory_diff_low, imm_c, _b_low_bytes, _c_low_bytes,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory_prev_value,
+       op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b,
+       op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_c, op_c_memory_prev_value, op_c_memory_prev_low,
+       op_c_memory_diff_low, imm_c, _b_low_bytes, _c_low_bytes,
        _bitwise_result, is_xor, is_or, is_and, next_pc_carry_value⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
@@ -120,6 +118,23 @@ def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_and * (is_and - 1) === 0
   (is_xor + is_or + is_and) * (is_xor + is_or + is_and - 1) === 0
   op_a_0 === 0
+  -- Iter-8 sub-task E: per-operand memory-bus byte content.
+  -- R-type-shaped: op_a at +4, op_b at +3, op_c at +2 (the 4-limb op_c
+  -- column doubles as the I-type immediate; the op_c-memory triple
+  -- characterises the register-read consequence either way).
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 2, op_c_memory_prev_low, op_c_memory_diff_low,
+       op_c_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
 /-- Pilot Spec, expressed over field-valued `BitwiseCols (ZMod p)`. Matches
 the RHS of `_root_.Bitwise.allHold_constraints_iff`: a propositional
@@ -141,11 +156,11 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
     (BitwiseU16Operation.constraints (F := ZMod p)
       cols.op_b_memory_prev_value cols.op_c_memory_prev_value
       bw_cols opcode_bw is_real).2 ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ALUTypeReader.aluTypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536)
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536)
       (cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5)
-      cols.pc
+      cols.state.pc
       #v[ret_val[0], ret_val[1], ret_val[2], ret_val[3]]
       { op_a := cols.op_a,
         op_a_memory :=
@@ -175,9 +190,8 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
 
 /-- Project a raw SP1 row into the structured `BitwiseCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 51) : BitwiseCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13], Main[14],
    #v[Main[15], Main[16], Main[17], Main[18]],
@@ -341,6 +355,9 @@ namespace Assertion
 
 open Circuit ProvableType
 
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: 25 input fields + 4 subcircuit calls + 3 OperandAccess
+-- calls pushes localLength_eq synthesis past the default 200k cap.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) BitwiseCols unit where
   name := "SP1Clean.Bitwise"
@@ -354,16 +371,17 @@ the two sub-assertion consequences plus the four trailing assert
 clauses. Drops the BitwiseU16 carry chain + `aluTypeReaderSpec`
 content, which is not derivable from `main`'s lookups alone. -/
 def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc,
+    { pc := cols.state.pc,
       opcode := cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5,
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0],
       op_c := cols.op_c,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_xor * (cols.is_xor - 1) = 0 ∧
@@ -371,18 +389,29 @@ def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
   cols.is_and * (cols.is_and - 1) = 0 ∧
   (cols.is_xor + cols.is_or + cols.is_and)
     * (cols.is_xor + cols.is_or + cols.is_and - 1) = 0 ∧
-  cols.op_a_0 = 0
+  cols.op_a_0 = 0 ∧
+  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
+  -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 2, cols.op_c_memory_prev_low, cols.op_c_memory_diff_low,
+     cols.op_c_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_xor, h_or, h_and, h_sum,
-          h_op_a_0⟩ := h_holds
+          h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
@@ -392,16 +421,20 @@ theorem soundness :
   · linear_combination h_and
   · linear_combination h_sum
   · exact h_op_a_0
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
+  · exact h_oa_c trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_xor, h_or, h_and, h_sum, h_op_a_0⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_addr, h_xor, h_or, h_and, h_sum, h_op_a_0,
+          h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
@@ -412,6 +445,9 @@ theorem completeness :
   · linear_combination h_and
   · linear_combination h_sum
   · exact h_op_a_0
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
+  · exact ⟨trivial, h_oa_c⟩
 
 end Assertion
 

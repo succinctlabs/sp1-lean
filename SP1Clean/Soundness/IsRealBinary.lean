@@ -77,194 +77,220 @@ theorem is_real_binary_add (cols : SP1Clean.Add.AddCols (ZMod p))
   change SP1Clean.Add.Assertion.FormalSpec cols at h
   exact binary_of_assertZero _ h.2.2.2.2.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem is_real_binary_addi (cols : SP1Clean.Addi.AddiCols (ZMod p))
-    (h : SP1Clean.Addi.Spec cols) :
-    cols.is_real = 0 ∨ cols.is_real = 1 :=
-  binary_of_assertZero _ h.2.2.2.1
-
-omit [Fact (2 ^ 17 < p)] in
-theorem is_real_binary_addw (cols : SP1Clean.Addw.AddwCols (ZMod p))
-    (h : SP1Clean.Addw.Spec cols) :
+    (h : SP1Clean.Addi.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Addw.Spec at h
+  change SP1Clean.Addi.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Addi.Assertion.FormalSpec at h
   tauto
 
-omit [Fact (2 ^ 17 < p)] in
+theorem is_real_binary_addw (cols : SP1Clean.Addw.AddwCols (ZMod p))
+    (h : SP1Clean.Addw.assertion.Spec cols) :
+    cols.is_real = 0 ∨ cols.is_real = 1 := by
+  apply binary_of_assertZero
+  change SP1Clean.Addw.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Addw.Assertion.FormalSpec at h
+  tauto
+
 theorem is_real_binary_bitwise (cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
-    (h : SP1Clean.Bitwise.Spec cols) :
+    (h : SP1Clean.Bitwise.assertion.Spec cols) :
     cols.is_xor + cols.is_or + cols.is_and = 0 ∨
     cols.is_xor + cols.is_or + cols.is_and = 1 := by
-  apply binary_of_disjunction
-  unfold SP1Clean.Bitwise.Spec at h
+  apply binary_of_assertZero
+  change SP1Clean.Bitwise.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Bitwise.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_branch (cols : SP1Clean.Branch.BranchCols (ZMod p))
-    (h : SP1Clean.Branch.Spec cols) :
+    (h : SP1Clean.Branch.assertion.Spec cols) :
     cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
       cols.is_bltu + cols.is_bgeu = 0 ∨
     cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
       cols.is_bltu + cols.is_bgeu = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Branch.Spec at h
+  change SP1Clean.Branch.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Branch.Assertion.FormalSpec at h
   tauto
 
-omit [Fact (2 ^ 17 < p)] in
 theorem is_real_binary_divRem (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
-    (h : SP1Clean.DivRem.Spec cols) :
+    (h : SP1Clean.DivRem.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.DivRem.Spec at h
+  change SP1Clean.DivRem.Assertion.FormalSpec cols at h
+  unfold SP1Clean.DivRem.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_jal (cols : SP1Clean.Jal.JalCols (ZMod p))
-    (h : SP1Clean.Jal.Spec cols) :
+    (h : SP1Clean.Jal.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Jal.Spec at h
+  change SP1Clean.Jal.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Jal.Assertion.FormalSpec at h
   tauto
 
-omit [Fact (2 ^ 17 < p)] in
 theorem is_real_binary_jalr (cols : SP1Clean.Jalr.JalrCols (ZMod p))
-    (h : SP1Clean.Jalr.Spec cols) :
+    (h : SP1Clean.Jalr.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Jalr.Spec at h
+  change SP1Clean.Jalr.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Jalr.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_loadByte (cols : SP1Clean.LoadByte.LoadByteCols (ZMod p))
-    (h : SP1Clean.LoadByte.Spec cols) :
+    (h : SP1Clean.LoadByte.assertion.Spec cols) :
     cols.is_lb + cols.is_lbu = 0 ∨ cols.is_lb + cols.is_lbu = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.LoadByte.Spec at h
+  change SP1Clean.LoadByte.Assertion.FormalSpec cols at h
+  unfold SP1Clean.LoadByte.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_loadDouble
     (cols : SP1Clean.LoadDouble.LoadDoubleCols (ZMod p))
-    (h : SP1Clean.LoadDouble.Spec cols) :
+    (h : SP1Clean.LoadDouble.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.LoadDouble.Spec at h
+  change SP1Clean.LoadDouble.Assertion.FormalSpec cols at h
+  unfold SP1Clean.LoadDouble.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_loadHalf
     (cols : SP1Clean.LoadHalf.LoadHalfCols (ZMod p))
-    (h : SP1Clean.LoadHalf.Spec cols) :
+    (h : SP1Clean.LoadHalf.assertion.Spec cols) :
     cols.is_lh + cols.is_lhu = 0 ∨ cols.is_lh + cols.is_lhu = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.LoadHalf.Spec at h
+  change SP1Clean.LoadHalf.Assertion.FormalSpec cols at h
+  unfold SP1Clean.LoadHalf.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_loadWord
     (cols : SP1Clean.LoadWord.LoadWordCols (ZMod p))
-    (h : SP1Clean.LoadWord.Spec cols) :
+    (h : SP1Clean.LoadWord.assertion.Spec cols) :
     cols.is_lw + cols.is_lwu = 0 ∨ cols.is_lw + cols.is_lwu = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.LoadWord.Spec at h
+  change SP1Clean.LoadWord.Assertion.FormalSpec cols at h
+  unfold SP1Clean.LoadWord.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_loadX0
     (cols : SP1Clean.LoadX0.LoadX0Cols (ZMod p))
-    (h : SP1Clean.LoadX0.Spec cols) :
+    (h : SP1Clean.LoadX0.assertion.Spec cols) :
     cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
       cols.is_lw + cols.is_lwu + cols.is_ld = 0 ∨
     cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
       cols.is_lw + cols.is_lwu + cols.is_ld = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.LoadX0.Spec at h
+  change SP1Clean.LoadX0.Assertion.FormalSpec cols at h
+  unfold SP1Clean.LoadX0.Assertion.FormalSpec at h
   tauto
 
-omit [Fact (2 ^ 17 < p)] in
 theorem is_real_binary_lt (cols : SP1Clean.Lt.LtCols (ZMod p))
-    (h : SP1Clean.Lt.Spec cols) :
+    (h : SP1Clean.Lt.assertion.Spec cols) :
     cols.is_slt + cols.is_sltu = 0 ∨ cols.is_slt + cols.is_sltu = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Lt.Spec at h
+  change SP1Clean.Lt.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Lt.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_mul (cols : SP1Clean.Mul.MulCols (ZMod p))
-    (h : SP1Clean.Mul.Spec cols) :
+    (h : SP1Clean.Mul.assertion.Spec cols) :
     cols.is_mul + cols.is_mulh + cols.is_mulw +
       cols.is_mulhsu + cols.is_mulhu = 0 ∨
     cols.is_mul + cols.is_mulh + cols.is_mulw +
       cols.is_mulhsu + cols.is_mulhu = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Mul.Spec at h
+  change SP1Clean.Mul.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Mul.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_shiftLeft
     (cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))
-    (h : SP1Clean.ShiftLeft.Spec cols) :
+    (h : SP1Clean.ShiftLeft.assertion.Spec cols) :
     cols.is_sll + cols.is_sllw = 0 ∨ cols.is_sll + cols.is_sllw = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.ShiftLeft.Spec at h
+  change SP1Clean.ShiftLeft.Assertion.FormalSpec cols at h
+  unfold SP1Clean.ShiftLeft.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_shiftRight
     (cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
-    (h : SP1Clean.ShiftRight.Spec cols) :
+    (h : SP1Clean.ShiftRight.assertion.Spec cols) :
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 ∨
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.ShiftRight.Spec at h
+  change SP1Clean.ShiftRight.Assertion.FormalSpec cols at h
+  unfold SP1Clean.ShiftRight.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_storeByte
     (cols : SP1Clean.StoreByte.StoreByteCols (ZMod p))
-    (h : SP1Clean.StoreByte.Spec cols) :
+    (h : SP1Clean.StoreByte.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.StoreByte.Spec at h
+  change SP1Clean.StoreByte.Assertion.FormalSpec cols at h
+  unfold SP1Clean.StoreByte.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_storeDouble
     (cols : SP1Clean.StoreDouble.StoreDoubleCols (ZMod p))
-    (h : SP1Clean.StoreDouble.Spec cols) :
+    (h : SP1Clean.StoreDouble.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.StoreDouble.Spec at h
+  change SP1Clean.StoreDouble.Assertion.FormalSpec cols at h
+  unfold SP1Clean.StoreDouble.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_storeHalf
     (cols : SP1Clean.StoreHalf.StoreHalfCols (ZMod p))
-    (h : SP1Clean.StoreHalf.Spec cols) :
+    (h : SP1Clean.StoreHalf.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.StoreHalf.Spec at h
+  change SP1Clean.StoreHalf.Assertion.FormalSpec cols at h
+  unfold SP1Clean.StoreHalf.Assertion.FormalSpec at h
   tauto
 
 theorem is_real_binary_storeWord
     (cols : SP1Clean.StoreWord.StoreWordCols (ZMod p))
-    (h : SP1Clean.StoreWord.Spec cols) :
+    (h : SP1Clean.StoreWord.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.StoreWord.Spec at h
+  change SP1Clean.StoreWord.Assertion.FormalSpec cols at h
+  unfold SP1Clean.StoreWord.Assertion.FormalSpec at h
   tauto
 
-omit [Fact (2 ^ 17 < p)] in
 theorem is_real_binary_sub (cols : SP1Clean.Sub.SubCols (ZMod p))
-    (h : SP1Clean.Sub.Spec cols) :
+    (h : SP1Clean.Sub.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Sub.Spec at h
+  change SP1Clean.Sub.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Sub.Assertion.FormalSpec at h
   tauto
 
-omit [Fact (2 ^ 17 < p)] in
 theorem is_real_binary_subw (cols : SP1Clean.Sub.W.SubwCols (ZMod p))
-    (h : SP1Clean.Sub.W.Spec cols) :
+    (h : SP1Clean.Sub.W.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
-  unfold SP1Clean.Sub.W.Spec at h
+  change SP1Clean.Sub.W.Assertion.FormalSpec cols at h
+  unfold SP1Clean.Sub.W.Assertion.FormalSpec at h
+  tauto
+
+theorem is_real_binary_uType (cols : SP1Clean.UType.UTypeCols (ZMod p))
+    (h : SP1Clean.UType.assertion.Spec cols) :
+    cols.is_real = 0 ∨ cols.is_real = 1 := by
+  apply binary_of_assertZero
+  change SP1Clean.UType.Assertion.FormalSpec cols at h
+  unfold SP1Clean.UType.Assertion.FormalSpec at h
   tauto
 
 omit [Fact (2 ^ 17 < p)] in
-theorem is_real_binary_uType (cols : SP1Clean.UType.UTypeCols (ZMod p))
-    (h : SP1Clean.UType.Spec cols) :
-    cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
-  unfold SP1Clean.UType.Spec at h
-  tauto
+/-- Boundary chip discharge: the `is_real * (is_real - 1) = 0` clause is
+the only conjunct in `MemoryGlobal.Spec` (Phase 4 minimal placeholder),
+so it projects via `binary_of_assertZero` directly. -/
+theorem is_real_binary_memInitFinalize
+    (cols : SP1Clean.MemoryGlobal.MemoryGlobalCols (ZMod p))
+    (h : SP1Clean.MemoryGlobal.Spec cols) :
+    cols.is_real = 0 ∨ cols.is_real = 1 :=
+  binary_of_assertZero _ h
 
 /-- The full discharge: every chip-row `Spec` implies `is_real ∈ {0, 1}`
 on the row's `stateAccess`. Replaces the previously-bundled
@@ -299,5 +325,7 @@ theorem traceIsRealBinary_of_chip_specs (rows : List (ChipRow p))
   | sub cols => exact is_real_binary_sub cols hs
   | subw cols => exact is_real_binary_subw cols hs
   | uType cols => exact is_real_binary_uType cols hs
+  | memInit cols => exact is_real_binary_memInitFinalize cols hs
+  | memFinalize cols => exact is_real_binary_memInitFinalize cols hs
 
 end SP1Clean.Soundness

@@ -47,10 +47,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The chip's column struct, mirroring SP1's Rust `BranchCols<T>`. -/
 structure BranchCols (T : Type) where
-  clk_high : T                              -- Main[0]
-  clk_16_24 : T                             -- Main[1]
-  clk_0_16 : T                              -- Main[2]
-  pc : Vector T 3                           -- Main[3..5]
+  state : CPUState T
   op_a : T                                  -- Main[6]
   op_a_memory_prev_value : Vector T 4       -- Main[7..10] (source register a)
   op_a_memory_prev_low : T                  -- Main[11]
@@ -96,7 +93,7 @@ def opcodeExpr (cols : Var BranchCols (ZMod p)) : Expression (ZMod p) :=
     cols.is_bge * 43 + cols.is_bltu * 44 + cols.is_bgeu * 45
 
 def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
        op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
        _op_b_memory_diff_low, op_c_imm, _next_pc,
@@ -130,9 +127,9 @@ def Spec (cols : BranchCols (ZMod p)) : Prop :=
   (_root_.LtOperationSigned.constraints (F := ZMod p)
       cols.op_a_memory_prev_value cols.op_b_memory_prev_value
       cols.compare_operation (cols.is_blt + cols.is_bge) is_real).allHold ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := opcode_e,
+    { pc := cols.state.pc, opcode := opcode_e,
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0],
       op_c := cols.op_c_imm,
@@ -166,9 +163,8 @@ carry vectors) default to placeholder values since the SP1 row doesn't
 carry them. Note: `is_branching` at Main[34] *is* on the row (Rust-aligned
 name; previously misnamed `lt_is_signed`). -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 45) : BranchCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13],
    Main[14],
@@ -229,7 +225,7 @@ open Circuit
 
 @[reducible]
 def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
        op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
        op_b_memory_diff_low, op_c_imm, next_pc,
@@ -310,10 +306,10 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p :=
     cols.is_beq * 40 + cols.is_bne * 41 + cols.is_blt * 42 +
       cols.is_bge * 43 + cols.is_bltu * 44 + cols.is_bgeu * 45
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := opcode_e, op_a := cols.op_a,
+    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
   cols.is_beq * (cols.is_beq - 1) = 0 ∧
@@ -325,11 +321,11 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
   is_real * (is_real - 1) = 0 ∧
   -- Iter-8 sub-task C: state-bus next_pc grounding (case-split on `is_branching`).
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      cols.op_c_imm,
      cols.next_pc_branched_carry⟩ ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_unbranched_carry⟩ ∧
   cols.is_branching_aux * (cols.is_branching_aux - 1) = 0 ∧
@@ -354,7 +350,7 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu,
@@ -391,7 +387,7 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu, h_prog, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu, h_sum,

@@ -71,10 +71,7 @@ and product vectors into `Vector T 16` fields; the `U16toU8OperationSafe`
 sub-fragments are inlined as `Vector T 4` (the SP1 struct's
 `low_bytes` field). -/
 structure MulCols (T : Type) where
-  clk_high : T                              -- Main[0]
-  clk_16_24 : T                             -- Main[1]
-  clk_0_16 : T                              -- Main[2]
-  pc : Vector T 3                           -- Main[3..5]
+  state : CPUState T
   op_a : T                                  -- Main[6]
   op_a_memory_prev_value : Vector T 4       -- Main[7..10]
   op_a_memory_prev_low : T                  -- Main[11]
@@ -142,7 +139,7 @@ deliberately not emitted as a subcircuit here — the goal of this chip
 is the structural-scale test, not the per-fragment correctness, which
 would require a full MulOp Clean mirror (see file docstring). -/
 def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
        op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
        _op_b_memory_diff_low, op_c, _op_c_memory_prev_value,
@@ -227,23 +224,23 @@ records (op_a write, op_b read, op_c read), the `ProgramTable.Spec`
 consequence, the selector boolean gates, and the placeholder
 `mulSpec`. -/
 def Spec (cols : MulCols (ZMod p)) : Prop :=
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 4
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
       { prev_value := cols.op_a_memory_prev_value,
         access_timestamp :=
           { prev_low := cols.op_a_memory_prev_low,
             diff_low_limb := cols.op_a_memory_diff_low } }) ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 3
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
       { prev_value := cols.op_b_memory_prev_value,
         access_timestamp :=
           { prev_low := cols.op_b_memory_prev_low,
             diff_low_limb := cols.op_b_memory_diff_low } }) ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 2
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_c
       { prev_value := cols.op_c_memory_prev_value,
         access_timestamp :=
@@ -251,7 +248,7 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
             diff_low_limb := cols.op_c_memory_diff_low } }) ∧
   -- Program-bus consequence with the selector-weighted opcode.
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc,
+    { pc := cols.state.pc,
       opcode := cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulw * 13
                   + cols.is_mulhsu * 14 + cols.is_mulhu * 24,
       op_a := cols.op_a,
@@ -276,9 +273,8 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
 `b_low_bytes/c_low_bytes : Vector T 4`, `mul_aux_bits : Vector T 5`
 packed from contiguous Main slots. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 82) : MulCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13],
    Main[14],
@@ -344,7 +340,7 @@ open Circuit
 
 @[reducible]
 def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
        op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
        op_b_memory_diff_low, op_c, op_c_memory_prev_value,
@@ -409,14 +405,14 @@ def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p :=
     cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulw * 13
       + cols.is_mulhsu * 14 + cols.is_mulhu * 24
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := opcode_e, op_a := cols.op_a,
+    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := #v[cols.op_c, 0, 0, 0],
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_mul * (cols.is_mul - 1) = 0 ∧
@@ -443,7 +439,7 @@ theorem soundness :
   circuit_proof_start
   -- Substitute all input-eval equations so the goal matches the subcircuit
   -- specs (which reference `Expression.eval env input_var_X` of pc/etc).
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31, e32, e33⟩ := h_input
   subst_eqs
@@ -470,7 +466,7 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31, e32, e33⟩ := h_input
   subst_eqs

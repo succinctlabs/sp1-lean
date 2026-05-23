@@ -81,4 +81,30 @@ theorem trace_soundness_aggregateMemory
   have h_nodup := aggregateMemoryAccesses_Notimestampdup rows h_clk
   exact (chip_specs_admit_offline_bridge rows h_specs h_sorted h_nodup).mp h_online
 
+/-- Trace-soundness with state-bus boundary closure (iter-8 Phase 4):
+strengthens `trace_soundness_aggregateMemory` with `TraceStateBoundary`,
+which ties the first row's `pc` to a committed `initial_pc` and the
+last row's `next_pc` to `final_pc`. This is the version with closed
+state bus — combined with the existing PC chain, the trace witnesses
+a complete `initial_pc → final_pc` execution path. -/
+theorem trace_soundness_with_boundary
+    (rows : List (ChipRow p))
+    (clkIncrement : ZMod p) (initial_pc final_pc : Vector (ZMod p) 3)
+    (h_specs : ∀ row ∈ rows, ChipRow.Spec row)
+    (h_clk : TraceClkValid rows)
+    (h_state : TraceStateValid rows clkIncrement)
+    (h_boundary : TraceStateBoundary rows initial_pc final_pc)
+    (h_online :
+      MemoryAccessList.isConsistentOnline (aggregateMemoryAccesses rows)
+        (aggregateMemoryAccesses_isTimestampSorted rows h_clk)) :
+    (∃ permuted : AddressSortedMemoryAccessList,
+        permuted.val.Perm (aggregateMemoryAccesses rows) ∧
+        MemoryAccessList.isConsistentOffline permuted.val permuted.property)
+      ∧ pcChainProp clkIncrement (aggregateStateAccesses rows)
+      ∧ TraceIsRealBinary rows
+      ∧ TraceStateBoundary rows initial_pc final_pc := by
+  obtain ⟨h_mem, h_chain, h_isReal⟩ :=
+    trace_soundness_aggregateMemory rows clkIncrement h_specs h_clk h_state h_online
+  exact ⟨h_mem, h_chain, h_isReal, h_boundary⟩
+
 end SP1Clean.Soundness

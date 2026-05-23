@@ -40,10 +40,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The chip's column struct, mirroring SP1's Rust `StoreWordCols<T>`. -/
 structure StoreWordCols (T : Type) where
-  clk_high : T                              -- Main[0]
-  clk_16_24 : T                             -- Main[1]
-  clk_0_16 : T                              -- Main[2]
-  pc : Vector T 3                           -- Main[3..5]
+  state : CPUState T
   op_a : T                                  -- Main[6]
   op_a_memory_prev_value : Vector T 4       -- Main[7..10]
   op_a_memory_prev_low : T                  -- Main[11]
@@ -71,7 +68,7 @@ deriving ProvableStruct
 /-- Clean-side circuit. CPUState range lookups + store-memory timestamp
 range lookups + program-bus + is_real boolean. -/
 def main (cols : Var StoreWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
        op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
        _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
@@ -98,16 +95,16 @@ def main (cols : Var StoreWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
 three memory accesses (op_a source read, op_b base read, RAM
 read-then-write at addr_value) + program-bus + is_real gate. -/
 def Spec (cols : StoreWordCols (ZMod p)) : Prop :=
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 4
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
       { prev_value := cols.op_a_memory_prev_value,
         access_timestamp :=
           { prev_low := cols.op_a_memory_prev_low,
             diff_low_limb := cols.op_a_memory_diff_low } }) ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 3
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
       { prev_value := cols.op_b_memory_prev_value,
         access_timestamp :=
@@ -120,7 +117,7 @@ def Spec (cols : StoreWordCols (ZMod p)) : Prop :=
       prev_low := cols.store_memory_prev_low,
       diff_low_limb := cols.store_memory_diff_low } ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := 38,
+    { pc := cols.state.pc, opcode := 38,
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0],
       op_c := cols.op_c_imm,
@@ -140,9 +137,8 @@ def storeWriteValue (cols : StoreWordCols (ZMod p)) : Word (ZMod p) :=
 
 /-- Project a raw SP1 row into the structured `StoreWordCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 44) : StoreWordCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13],
    Main[14],
@@ -172,9 +168,9 @@ def SpecForIff_of_is_real (cols : StoreWordCols (ZMod p)) : Prop :=
   cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
   ((cols.addr_value[0] - 4 * cols.offset_bit) * (8 : ZMod p)⁻¹).val
     < 2 ^ ZMod.val (13 : ZMod p) ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReaderImmutable.itypeReaderImmutableSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) 38 cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 38 cols.state.pc
       { op_a := cols.op_a,
         op_a_memory :=
           { prev_value := cols.op_a_memory_prev_value,
@@ -189,9 +185,9 @@ def SpecForIff_of_is_real (cols : StoreWordCols (ZMod p)) : Prop :=
                 diff_low_limb := cols.op_b_memory_diff_low } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.store_memory_flag = 0 ∨ cols.store_memory_flag = 1) ∧
-  (cols.store_memory_flag = 0 ∨ cols.clk_high = cols.store_memory_prev_high) ∧
-  cols.store_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
-      (1 - cols.store_memory_flag) * cols.clk_high -
+  (cols.store_memory_flag = 0 ∨ cols.state.clk_high = cols.store_memory_prev_high) ∧
+  cols.store_memory_flag * (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 1) +
+      (1 - cols.store_memory_flag) * cols.state.clk_high -
       (cols.store_memory_flag * cols.store_memory_prev_low +
         (1 - cols.store_memory_flag) * cols.store_memory_prev_high) - 1 =
     cols.store_memory_diff_low + cols.store_memory_diff_high * 65536 ∧
@@ -241,7 +237,7 @@ open Circuit
 
 @[reducible]
 def main (cols : Var StoreWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
        op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
        op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
@@ -284,14 +280,14 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreWordCols unit where
 def Assumptions (_ : StoreWordCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : StoreWordCols (ZMod p)) : Prop :=
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := 38, op_a := cols.op_a,
+    { pc := cols.state.pc, opcode := 38, op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
@@ -305,7 +301,7 @@ def FormalSpec (cols : StoreWordCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_oa_a, h_oa_b⟩ := h_holds
@@ -322,7 +318,7 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_oa_a, h_oa_b⟩ := h_spec

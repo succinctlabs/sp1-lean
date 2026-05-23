@@ -67,148 +67,148 @@ def ChipRow.stateAccess : ChipRow p → StateAccess (ZMod p)
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .loadByte cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_lb + cols.is_lbu }
   | .storeByte cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .jal cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]],
         is_real := cols.is_real }
   | .mul cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_mul + cols.is_mulh + cols.is_mulw +
           cols.is_mulhsu + cols.is_mulhu }
   | .shiftLeft cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_sll + cols.is_sllw }
   | .addw cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .uType cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .jalr cols =>
       -- `jump_target[0]` is the unmasked low limb; the chip's `lsb`
       -- column carries the to-be-cleared bit so `jump_target[0] - lsb`
       -- is the bit-0-cleared real next_pc.
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := #v[cols.jump_target[0] - cols.lsb,
           cols.jump_target[1], cols.jump_target[2]],
         is_real := cols.is_real }
   | .lt cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_slt + cols.is_sltu }
   | .storeWord cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .storeDouble cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .storeHalf cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .loadDouble cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .loadWord cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_lw + cols.is_lwu }
   | .loadHalf cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_lh + cols.is_lhu }
   | .branch cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc,
         is_real := cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
           cols.is_bltu + cols.is_bgeu }
   | .loadX0 cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
           cols.is_lw + cols.is_lwu + cols.is_ld }
   | .shiftRight cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw }
   | .divRem cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .addi cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .bitwise cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_xor + cols.is_or + cols.is_and }
   | .sub cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .subw cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   -- Boundary chips: not part of the PC chain. Their `stateAccess`
@@ -387,7 +387,7 @@ theorem nextPc_of_spec_add (cols : Add.AddCols (ZMod p))
 theorem nextPc_of_spec_addi (cols : Addi.AddiCols (ZMod p))
     (h : Addi.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Addi.Assertion.FormalSpec cols at h
@@ -396,7 +396,7 @@ theorem nextPc_of_spec_addi (cols : Addi.AddiCols (ZMod p))
 theorem nextPc_of_spec_addw (cols : Addw.AddwCols (ZMod p))
     (h : Addw.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Addw.Assertion.FormalSpec cols at h
@@ -405,7 +405,7 @@ theorem nextPc_of_spec_addw (cols : Addw.AddwCols (ZMod p))
 theorem nextPc_of_spec_bitwise (cols : Bitwise.BitwiseCols (ZMod p))
     (h : Bitwise.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Bitwise.Assertion.FormalSpec cols at h
@@ -414,7 +414,7 @@ theorem nextPc_of_spec_bitwise (cols : Bitwise.BitwiseCols (ZMod p))
 theorem nextPc_of_spec_divRem (cols : DivRem.DivRemCols (ZMod p))
     (h : DivRem.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change DivRem.Assertion.FormalSpec cols at h
@@ -423,7 +423,7 @@ theorem nextPc_of_spec_divRem (cols : DivRem.DivRemCols (ZMod p))
 theorem nextPc_of_spec_loadByte (cols : LoadByte.LoadByteCols (ZMod p))
     (h : LoadByte.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change LoadByte.Assertion.FormalSpec cols at h
@@ -432,7 +432,7 @@ theorem nextPc_of_spec_loadByte (cols : LoadByte.LoadByteCols (ZMod p))
 theorem nextPc_of_spec_loadDouble (cols : LoadDouble.LoadDoubleCols (ZMod p))
     (h : LoadDouble.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change LoadDouble.Assertion.FormalSpec cols at h
@@ -441,7 +441,7 @@ theorem nextPc_of_spec_loadDouble (cols : LoadDouble.LoadDoubleCols (ZMod p))
 theorem nextPc_of_spec_loadHalf (cols : LoadHalf.LoadHalfCols (ZMod p))
     (h : LoadHalf.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change LoadHalf.Assertion.FormalSpec cols at h
@@ -450,7 +450,7 @@ theorem nextPc_of_spec_loadHalf (cols : LoadHalf.LoadHalfCols (ZMod p))
 theorem nextPc_of_spec_loadWord (cols : LoadWord.LoadWordCols (ZMod p))
     (h : LoadWord.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change LoadWord.Assertion.FormalSpec cols at h
@@ -459,7 +459,7 @@ theorem nextPc_of_spec_loadWord (cols : LoadWord.LoadWordCols (ZMod p))
 theorem nextPc_of_spec_loadX0 (cols : LoadX0.LoadX0Cols (ZMod p))
     (h : LoadX0.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change LoadX0.Assertion.FormalSpec cols at h
@@ -468,7 +468,7 @@ theorem nextPc_of_spec_loadX0 (cols : LoadX0.LoadX0Cols (ZMod p))
 theorem nextPc_of_spec_lt (cols : Lt.LtCols (ZMod p))
     (h : Lt.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Lt.Assertion.FormalSpec cols at h
@@ -477,7 +477,7 @@ theorem nextPc_of_spec_lt (cols : Lt.LtCols (ZMod p))
 theorem nextPc_of_spec_mul (cols : Mul.MulCols (ZMod p))
     (h : Mul.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Mul.Assertion.FormalSpec cols at h
@@ -486,7 +486,7 @@ theorem nextPc_of_spec_mul (cols : Mul.MulCols (ZMod p))
 theorem nextPc_of_spec_shiftLeft (cols : ShiftLeft.ShiftLeftCols (ZMod p))
     (h : ShiftLeft.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change ShiftLeft.Assertion.FormalSpec cols at h
@@ -495,7 +495,7 @@ theorem nextPc_of_spec_shiftLeft (cols : ShiftLeft.ShiftLeftCols (ZMod p))
 theorem nextPc_of_spec_shiftRight (cols : ShiftRight.ShiftRightCols (ZMod p))
     (h : ShiftRight.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change ShiftRight.Assertion.FormalSpec cols at h
@@ -504,7 +504,7 @@ theorem nextPc_of_spec_shiftRight (cols : ShiftRight.ShiftRightCols (ZMod p))
 theorem nextPc_of_spec_storeByte (cols : StoreByte.StoreByteCols (ZMod p))
     (h : StoreByte.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change StoreByte.Assertion.FormalSpec cols at h
@@ -513,7 +513,7 @@ theorem nextPc_of_spec_storeByte (cols : StoreByte.StoreByteCols (ZMod p))
 theorem nextPc_of_spec_storeDouble (cols : StoreDouble.StoreDoubleCols (ZMod p))
     (h : StoreDouble.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change StoreDouble.Assertion.FormalSpec cols at h
@@ -522,7 +522,7 @@ theorem nextPc_of_spec_storeDouble (cols : StoreDouble.StoreDoubleCols (ZMod p))
 theorem nextPc_of_spec_storeHalf (cols : StoreHalf.StoreHalfCols (ZMod p))
     (h : StoreHalf.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change StoreHalf.Assertion.FormalSpec cols at h
@@ -531,7 +531,7 @@ theorem nextPc_of_spec_storeHalf (cols : StoreHalf.StoreHalfCols (ZMod p))
 theorem nextPc_of_spec_storeWord (cols : StoreWord.StoreWordCols (ZMod p))
     (h : StoreWord.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change StoreWord.Assertion.FormalSpec cols at h
@@ -540,7 +540,7 @@ theorem nextPc_of_spec_storeWord (cols : StoreWord.StoreWordCols (ZMod p))
 theorem nextPc_of_spec_sub (cols : Sub.SubCols (ZMod p))
     (h : Sub.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Sub.Assertion.FormalSpec cols at h
@@ -549,7 +549,7 @@ theorem nextPc_of_spec_sub (cols : Sub.SubCols (ZMod p))
 theorem nextPc_of_spec_subw (cols : Sub.W.SubwCols (ZMod p))
     (h : Sub.W.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Sub.W.Assertion.FormalSpec cols at h
@@ -558,7 +558,7 @@ theorem nextPc_of_spec_subw (cols : Sub.W.SubwCols (ZMod p))
 theorem nextPc_of_spec_uType (cols : UType.UTypeCols (ZMod p))
     (h : UType.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change UType.Assertion.FormalSpec cols at h
@@ -569,7 +569,7 @@ theorem nextPc_of_spec_uType (cols : UType.UTypeCols (ZMod p))
 leading `cpuStateSpec` conjunct added in Phase 2). -/
 theorem nextPc_of_spec_jal (cols : Jal.JalCols (ZMod p))
     (h : Jal.assertion.Spec cols) :
-    SP1Clean.AddOp.Spec (cols.pc.push 0) cols.imm cols.next_pc := by
+    SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.imm cols.next_pc := by
   change Jal.Assertion.FormalSpec cols at h
   exact h.2.1
 
@@ -594,11 +594,11 @@ AddrAddOp arms as a bundled pair. -/
 theorem nextPc_of_spec_branch (cols : Branch.BranchCols (ZMod p))
     (h : Branch.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          cols.op_c_imm,
          cols.next_pc_branched_carry⟩ ∧
     SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_unbranched_carry⟩ := by
   change Branch.Assertion.FormalSpec cols at h
@@ -629,116 +629,116 @@ def ChipRow.nextPcValid : ChipRow p → Prop
          cols.next_pc_carry_value⟩
   | .addi cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .addw cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .bitwise cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .branch cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-          ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+          ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
            cols.op_c_imm,
            cols.next_pc_branched_carry⟩ ∧
       SP1Clean.AddrAddOp.assertion.Spec
-          ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+          ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
            #v[(4 : ZMod p), 0, 0, 0],
            cols.next_pc_unbranched_carry⟩
   | .divRem cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .jal cols =>
-      SP1Clean.AddOp.Spec (cols.pc.push 0) cols.imm cols.next_pc
+      SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.imm cols.next_pc
   | .jalr cols =>
       cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
         cols.op_b_memory_prev_value cols.op_c_imm cols.jump_target
   | .loadByte cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .loadDouble cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .loadHalf cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .loadWord cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .loadX0 cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .lt cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .mul cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .shiftLeft cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .shiftRight cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .storeByte cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .storeDouble cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .storeHalf cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .storeWord cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .sub cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .subw cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .uType cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   -- Boundary chips: no `next_pc` semantic content. Placeholder `True`

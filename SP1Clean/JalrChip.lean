@@ -46,10 +46,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The chip's column struct, mirroring SP1's Rust `JalrCols<T>`. -/
 structure JalrCols (T : Type) where
-  clk_high : T
-  clk_16_24 : T
-  clk_0_16 : T
-  pc : Vector T 3
+  state : CPUState T
   op_a : T
   op_a_memory_prev_value : Vector T 4
   op_a_memory_prev_low : T
@@ -75,7 +72,7 @@ next_pc[3] = 0, op_a_write_value[3] = 0, vacuous op_a gates).
 The two `AddOperation` sub-fragments are not emitted as subcircuits
 here — their constraints are captured propositionally in `Spec`. -/
 def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
        _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
        op_c_imm, is_real, jump_target, op_a_write_value, lsb⟩ := cols
@@ -110,13 +107,13 @@ def Spec (cols : JalrCols (ZMod p)) : Prop :=
       { value := cols.jump_target }
       cols.is_real).allHold ∧
   (_root_.AddOperation.constraints (F := ZMod p)
-      #v[cols.pc[0], cols.pc[1], cols.pc[2], 0]
+      #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
       #v[4, 0, 0, 0]
       { value := cols.op_a_write_value }
       (cols.is_real - cols.op_a_0)).allHold ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) 47 cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 47 cols.state.pc
       cols.op_a_write_value
       { op_a := cols.op_a,
         op_a_memory :=
@@ -163,9 +160,8 @@ def opBMemoryAccess (cols : JalrCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) 
 /-- Project a raw SP1 row into the structured `JalrCols` view. Mirrors
 the index map in `SP1Chips/Jalr/Constraints.lean` (35 columns). -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 35) : JalrCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13],
    Main[14],
@@ -246,7 +242,7 @@ open Circuit
 
 @[reducible]
 def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, op_a_memory_prev_value,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory_prev_value,
        op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b,
        op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
        op_c_imm, is_real, jump_target, _op_a_write_value, lsb⟩ := cols
@@ -288,10 +284,10 @@ instance elaborated : ElaboratedCircuit (ZMod p) JalrCols unit where
 def Assumptions (_ : JalrCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := 47, op_a := cols.op_a,
+    { pc := cols.state.pc, opcode := 47, op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
   (cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec

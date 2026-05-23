@@ -40,10 +40,7 @@ open Circuit ProvableType
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 structure LoadWordCols (T : Type) where
-  clk_high : T                              -- Main[0]
-  clk_16_24 : T                             -- Main[1]
-  clk_0_16 : T                              -- Main[2]
-  pc : Vector T 3                           -- Main[3..5]
+  state : CPUState T
   op_a : T                                  -- Main[6]
   op_a_memory_prev_value : Vector T 4       -- Main[7..10]
   op_a_memory_prev_low : T                  -- Main[11]
@@ -71,7 +68,7 @@ structure LoadWordCols (T : Type) where
 deriving ProvableStruct
 
 def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
        op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
        _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
@@ -96,16 +93,16 @@ def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
   (is_lw + is_lwu) * (is_lw + is_lwu - 1) === 0
 
 def Spec (cols : LoadWordCols (ZMod p)) : Prop :=
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 4
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
       { prev_value := cols.op_a_memory_prev_value,
         access_timestamp :=
           { prev_low := cols.op_a_memory_prev_low,
             diff_low_limb := cols.op_a_memory_diff_low } }) ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 3
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
       { prev_value := cols.op_b_memory_prev_value,
         access_timestamp :=
@@ -118,7 +115,7 @@ def Spec (cols : LoadWordCols (ZMod p)) : Prop :=
       prev_low := cols.load_memory_prev_low,
       diff_low_limb := cols.load_memory_diff_low } ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := cols.is_lw * 31 + cols.is_lwu * 34,
+    { pc := cols.state.pc, opcode := cols.is_lw * 31 + cols.is_lwu * 34,
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0],
       op_c := cols.op_c_imm,
@@ -135,9 +132,8 @@ def loadMemoryAccess (cols : LoadWordCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
 
 /-- Project a raw SP1 row into the structured `LoadWordCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 44) : LoadWordCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13],
    Main[14],
@@ -164,9 +160,9 @@ def SpecForIff_of_is_lw (cols : LoadWordCols (ZMod p)) : Prop :=
     < 2 ^ ZMod.val (13 : ZMod p) ∧
   (U16MSBOperation.constraints cols.op_a_write_value_lo[1]
       { msb := cols.signed_extension_msb } 1).allHold ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) 31 cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 31 cols.state.pc
       #v[cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
          65535 * cols.signed_extension_msb,
          65535 * cols.signed_extension_msb]
@@ -184,9 +180,9 @@ def SpecForIff_of_is_lw (cols : LoadWordCols (ZMod p)) : Prop :=
                 diff_low_limb := cols.op_b_memory_diff_low } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
-  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
-  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
-      (1 - cols.load_memory_flag) * cols.clk_high -
+  (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.state.clk_high -
       (cols.load_memory_flag * cols.load_memory_prev_low +
         (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
     cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
@@ -214,9 +210,9 @@ def SpecForIff_of_is_lwu (cols : LoadWordCols (ZMod p)) : Prop :=
     < 2 ^ ZMod.val (13 : ZMod p) ∧
   (U16MSBOperation.constraints cols.op_a_write_value_lo[1]
       { msb := cols.signed_extension_msb } 0).allHold ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) 34 cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 34 cols.state.pc
       #v[cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
          65535 * cols.signed_extension_msb,
          65535 * cols.signed_extension_msb]
@@ -234,9 +230,9 @@ def SpecForIff_of_is_lwu (cols : LoadWordCols (ZMod p)) : Prop :=
                 diff_low_limb := cols.op_b_memory_diff_low } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
-  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
-  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
-      (1 - cols.load_memory_flag) * cols.clk_high -
+  (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.state.clk_high -
       (cols.load_memory_flag * cols.load_memory_prev_low +
         (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
     cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
@@ -297,7 +293,7 @@ open Circuit
 
 @[reducible]
 def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
        op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
        op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
@@ -343,15 +339,15 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadWordCols unit where
 def Assumptions (_ : LoadWordCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := cols.is_lw * 31 + cols.is_lwu * 34,
+    { pc := cols.state.pc, opcode := cols.is_lw * 31 + cols.is_lwu * 34,
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_lw * (cols.is_lw - 1) = 0 ∧
@@ -367,7 +363,7 @@ def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_lw, h_lwu, h_sum,
@@ -387,7 +383,7 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu, h_prog, h_addr, h_lw, h_lwu, h_sum, h_oa_a, h_oa_b⟩ := h_spec

@@ -56,10 +56,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 47 field elements. Field order matches the `Main[k]` indexing in
 `SP1Chips/Load/LoadByte/Constraints.lean`. -/
 structure LoadByteCols (T : Type) where
-  clk_high : T                              -- Main[0]
-  clk_16_24 : T                             -- Main[1]
-  clk_0_16 : T                              -- Main[2]
-  pc : Vector T 3                           -- Main[3..5]
+  state : CPUState T
   op_a : T                                  -- Main[6]
   op_a_memory_prev_value : Vector T 4       -- Main[7..10]
   op_a_memory_prev_low : T                  -- Main[11]
@@ -103,7 +100,7 @@ Opcode is `is_lb * 29 + is_lbu * 32` to admit both LB (signed) and LBU
 `imm_c = 1` (I-type), and `op_c` carries 4 immediate limbs from
 `op_c_imm`. -/
 def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
        op_a_0, op_b,
        _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
@@ -162,18 +159,18 @@ The address-arithmetic side (the `AddressOperation` fragment that asserts
 keeping `Spec` light here lets the OfflineMemory bridge consume the chip
 without depending on those proofs. -/
 def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   -- Three register-bus accesses + their bookkeeping (op_a write, op_b read,
   -- op_c is immediate so no memory access).
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 4
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
       { prev_value := cols.op_a_memory_prev_value,
         access_timestamp :=
           { prev_low := cols.op_a_memory_prev_low,
             diff_low_limb := cols.op_a_memory_diff_low } }) ∧
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 3
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
       { prev_value := cols.op_b_memory_prev_value,
         access_timestamp :=
@@ -184,7 +181,7 @@ def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
   -- address (`addr_value[0].val ≥ 32`), so the RAM branch of
   -- `SP1Constraint.toStateProp` fires.
   SP1Clean.memoryAccessSpec
-    (cols.clk_0_16 + cols.clk_16_24 * 65536) 1
+    (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 1
     { addr := cols.addr_value,
       prev_value := cols.load_prev_value,
       prev_low := cols.load_memory_prev_low,
@@ -192,7 +189,7 @@ def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
   -- Program-bus consequence (opcode = 29 = LB when is_lb = 1, 32 = LBU
   -- when is_lbu = 1).
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc,
+    { pc := cols.state.pc,
       opcode := cols.is_lb * 29 + cols.is_lbu * 32,
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0],
@@ -222,9 +219,8 @@ def loadMemoryAccess (cols : LoadByteCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
 
 /-- Project a raw SP1 row into the structured `LoadByteCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 47) : LoadByteCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
-   Main[6],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+      Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13],
    Main[14],
@@ -265,9 +261,9 @@ def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
   ((cols.addr_value[0] - 4 * cols.offset_bit_0 - 2 * cols.offset_bit_1
         - cols.offset_bit_2) * (8 : ZMod p)⁻¹).val
     < 2 ^ ZMod.val (13 : ZMod p) ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) 29 cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 29 cols.state.pc
       #v[cols.selected_byte + 65280 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
@@ -286,9 +282,9 @@ def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
                 diff_low_limb := cols.op_b_memory_diff_low } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
-  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
-  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
-      (1 - cols.load_memory_flag) * cols.clk_high -
+  (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.state.clk_high -
       (cols.load_memory_flag * cols.load_memory_prev_low +
         (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
     cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
@@ -332,9 +328,9 @@ def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
   ((cols.addr_value[0] - 4 * cols.offset_bit_0 - 2 * cols.offset_bit_1
         - cols.offset_bit_2) * (8 : ZMod p)⁻¹).val
     < 2 ^ ZMod.val (13 : ZMod p) ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) 32 cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 32 cols.state.pc
       #v[cols.selected_byte + 65280 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
@@ -353,9 +349,9 @@ def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
                 diff_low_limb := cols.op_b_memory_diff_low } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
-  (cols.load_memory_flag = 0 ∨ cols.clk_high = cols.load_memory_prev_high) ∧
-  cols.load_memory_flag * (cols.clk_0_16 + cols.clk_16_24 * 65536 + 1) +
-      (1 - cols.load_memory_flag) * cols.clk_high -
+  (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
+  cols.load_memory_flag * (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536 + 1) +
+      (1 - cols.load_memory_flag) * cols.state.clk_high -
       (cols.load_memory_flag * cols.load_memory_prev_low +
         (1 - cols.load_memory_flag) * cols.load_memory_prev_high) - 1 =
     cols.load_memory_diff_low + cols.load_memory_diff_high * 65536 ∧
@@ -427,7 +423,7 @@ open Circuit
 
 @[reducible]
 def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
        op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
        op_a_0, op_b,
        op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
@@ -480,15 +476,15 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadByteCols unit where
 def Assumptions (_ : LoadByteCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
-  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := cols.is_lb * 29 + cols.is_lbu * 32,
+    { pc := cols.state.pc, opcode := cols.is_lb * 29 + cols.is_lbu * 32,
       op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0], op_c := cols.op_c_imm,
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 1 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_lb * (cols.is_lb - 1) = 0 ∧
@@ -507,7 +503,7 @@ def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31, e32⟩ := h_input
   subst_eqs
@@ -529,7 +525,7 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31, e32⟩ := h_input
   subst_eqs
