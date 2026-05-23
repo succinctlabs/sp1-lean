@@ -72,13 +72,7 @@ sub-fragments are inlined as `Vector T 4` (the SP1 struct's
 `low_bytes` field). -/
 structure MulCols (T : Type) where
   state : CPUState T
-  op_a : T                                  -- Main[6]
-  op_a_memory : MemoryAccessInSharedCols T
-  op_a_0 : T                                -- Main[13]
-  op_b : T                                  -- Main[14]
-  op_b_memory : MemoryAccessInSharedCols T
-  op_c : T                                  -- Main[21]
-  op_c_memory : MemoryAccessInSharedCols T
+  adapter : RTypeReader T
   op_a_write_value : Vector T 4             -- Main[28..31]
   carry : Vector T 16                       -- Main[32..47]
   product : Vector T 16                     -- Main[48..63]
@@ -133,9 +127,8 @@ deliberately not emitted as a subcircuit here — the goal of this chip
 is the structural-scale test, not the per-fragment correctness, which
 would require a full MulOp Clean mirror (see file docstring). -/
 def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       _op_a_memory,
-       op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, _op_a_write_value,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory⟩, _op_a_write_value,
        carry, product, _b_low_bytes, _c_low_bytes, _mul_aux_bits,
        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw,
        _next_pc_carry_value⟩ := cols
@@ -219,34 +212,34 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
-      { prev_value := cols.op_a_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
+      { prev_value := cols.adapter.op_a_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
-      { prev_value := cols.op_b_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_b
+      { prev_value := cols.adapter.op_b_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_b_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_c
-      { prev_value := cols.op_c_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_c
+      { prev_value := cols.adapter.op_c_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_c_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }) ∧
   -- Program-bus consequence with the selector-weighted opcode.
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
       opcode := cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulw * 13
                   + cols.is_mulhsu * 14 + cols.is_mulhu * 24,
-      op_a := cols.op_a,
-      op_b := #v[cols.op_b, 0, 0, 0],
-      op_c := #v[cols.op_c, 0, 0, 0],
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+      op_a := cols.adapter.op_a,
+      op_b := #v[cols.adapter.op_b, 0, 0, 0],
+      op_c := #v[cols.adapter.op_c, 0, 0, 0],
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
   -- Five opcode-selector boolean gates plus the aggregate-is-real gate.
   cols.is_mul * (cols.is_mul - 1) = 0 ∧
   cols.is_mulh * (cols.is_mulh - 1) = 0 ∧
@@ -257,7 +250,7 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
     + cols.is_mulhsu + cols.is_mulhu)
    * (cols.is_mul + cols.is_mulh + cols.is_mulw
       + cols.is_mulhsu + cols.is_mulhu - 1)) = 0 ∧
-  cols.op_a_0 = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
   mulSpec cols
 
 /-- Project a raw SP1 row into the structured `MulCols` view.
@@ -266,12 +259,13 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
 packed from contiguous Main slots. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 82) : MulCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      Main[6],
-   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
-   Main[14],
-   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-   Main[21],
-   ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩,
+      ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    Main[14],
+    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
+    Main[21],
+    ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
    #v[Main[28], Main[29], Main[30], Main[31]],
    #v[Main[32], Main[33], Main[34], Main[35], Main[36], Main[37], Main[38],
       Main[39], Main[40], Main[41], Main[42], Main[43], Main[44], Main[45],
@@ -329,9 +323,8 @@ open Circuit
 
 @[reducible]
 def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory,
-       op_a_0, op_b, op_b_memory, op_c, op_c_memory, _op_a_write_value,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩, _op_a_write_value,
        _carry, _product, _b_low_bytes, _c_low_bytes, _mul_aux_bits,
        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw,
        next_pc_carry_value⟩ := cols
@@ -395,9 +388,9 @@ def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.op_a,
-      op_b := #v[cols.op_b, 0, 0, 0], op_c := #v[cols.op_c, 0, 0, 0],
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
+      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := #v[cols.adapter.op_c, 0, 0, 0],
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
     ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
@@ -408,18 +401,18 @@ def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
   cols.is_mulhsu * (cols.is_mulhsu - 1) = 0 ∧
   cols.is_mulhu * (cols.is_mulhu - 1) = 0 ∧
   is_real * (is_real - 1) = 0 ∧
-  cols.op_a_0 = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- R-type: op_a/+4, op_b/+3, op_c/+2.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
-     cols.op_a_memory.prev_value⟩ ∧
+    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
-     cols.op_b_memory.prev_value⟩ ∧
+    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_b_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.op_c_memory.access_timestamp.prev_low, cols.op_c_memory.access_timestamp.diff_low_limb,
-     cols.op_c_memory.prev_value⟩
+    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
