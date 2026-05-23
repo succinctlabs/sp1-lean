@@ -11,6 +11,10 @@ import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Foundations.MemoryConsistency
 import SP1Operations.Reader.CPUState.CPUState
+import SP1Operations.Reader.RTypeReader.RTypeReader
+import SP1Operations.Reader.ITypeReader.ITypeReader
+import SP1Operations.Reader.JTypeReader.JTypeReader
+import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Clean.ByteOpcodeTable
 
 /-! # Reusable `CPUState` Spec helper
@@ -30,6 +34,11 @@ applied to the `LtOperationSigned` chain.
 deriving instance ProvableStruct for CPUState
 deriving instance ProvableStruct for MemoryAccessInShardTimestamp
 deriving instance ProvableStruct for MemoryAccessInSharedCols
+deriving instance ProvableStruct for RTypeReader
+deriving instance ProvableStruct for ITypeReader
+deriving instance ProvableStruct for JTypeReader
+deriving instance ProvableStruct for ALUTypeReader
+-- ITypeReaderImmutable reuses ITypeReader's struct, so no separate derivation needed.
 
 namespace SP1Clean.CPUState
 

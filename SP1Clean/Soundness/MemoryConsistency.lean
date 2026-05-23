@@ -121,25 +121,25 @@ into one OfflineMemory tuple via
 def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Word (ZMod p))
   | .add cols =>
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_a, 0, 0],
-          prev_value := cols.op_a_memory.prev_value,
-          prev_low := cols.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_a, 0, 0],
+          prev_value := cols.adapter.op_a_memory.prev_value,
+          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
       let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_b, 0, 0],
-          prev_value := cols.op_b_memory.prev_value,
-          prev_low := cols.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_b, 0, 0],
+          prev_value := cols.adapter.op_b_memory.prev_value,
+          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
       let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_c, 0, 0],
-          prev_value := cols.op_c_memory.prev_value,
-          prev_low := cols.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_c, 0, 0],
+          prev_value := cols.adapter.op_c_memory.prev_value,
+          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
       -- op_a is read AND written (write_value = op_a_write_value);
       -- op_b and op_c are pure reads (write_value = prev_value).
       [(op_a_mem, cols.op_a_write_value),
-       (op_b_mem, cols.op_b_memory.prev_value),
-       (op_c_mem, cols.op_c_memory.prev_value)]
+       (op_b_mem, cols.adapter.op_b_memory.prev_value),
+       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
   | .loadByte cols =>
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
         { addr := #v[cols.op_a, 0, 0],
