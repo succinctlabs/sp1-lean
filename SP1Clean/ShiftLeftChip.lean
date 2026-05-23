@@ -60,18 +60,12 @@ Vector blocks where SP1's emission already treats them as a unit
 structure ShiftLeftCols (T : Type) where
   state : CPUState T
   op_a : T                                  -- Main[6]
-  op_a_memory_prev_value : Vector T 4       -- Main[7..10]
-  op_a_memory_prev_low : T                  -- Main[11]
-  op_a_memory_diff_low : T                  -- Main[12]
+  op_a_memory : MemoryAccessInSharedCols T
   op_a_0 : T                                -- Main[13]
   op_b : T                                  -- Main[14]
-  op_b_memory_prev_value : Vector T 4       -- Main[15..18]
-  op_b_memory_prev_low : T                  -- Main[19]
-  op_b_memory_diff_low : T                  -- Main[20]
+  op_b_memory : MemoryAccessInSharedCols T
   op_c : T                                  -- Main[21]
-  op_c_memory_prev_value : Vector T 4       -- Main[22..25]
-  op_c_memory_prev_low : T                  -- Main[26]
-  op_c_memory_diff_low : T                  -- Main[27]
+  op_c_memory : MemoryAccessInSharedCols T
   imm_c : T                                 -- Main[28] (I-type immediate-mode flag)
   -- Intermediate shift-amount columns (Main[29..31]).
   shift_imm_low : T                         -- Main[29]
@@ -121,10 +115,8 @@ power chain, byte-shift one-hot, limb-shift correctness) is deferred
 to `shiftSpec` placeholder; see file docstring. -/
 def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
-       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
-       _op_b_memory_diff_low, op_c, _op_c_memory_prev_value,
-       _op_c_memory_prev_low, _op_c_memory_diff_low, imm_c,
+       _op_a_memory,
+       op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
        c_bits, _shift_pow, shift_u16, _limb_shift,
        _result_intermediate, is_sll, is_sllw, _sign_extend,
@@ -177,24 +169,24 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
-      { prev_value := cols.op_a_memory_prev_value,
+      { prev_value := cols.op_a_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_a_memory_prev_low,
-            diff_low_limb := cols.op_a_memory_diff_low } }) ∧
+          { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
-      { prev_value := cols.op_b_memory_prev_value,
+      { prev_value := cols.op_b_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_b_memory_prev_low,
-            diff_low_limb := cols.op_b_memory_diff_low } }) ∧
+          { prev_low := cols.op_b_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_c
-      { prev_value := cols.op_c_memory_prev_value,
+      { prev_value := cols.op_c_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_c_memory_prev_low,
-            diff_low_limb := cols.op_c_memory_diff_low } }) ∧
+          { prev_low := cols.op_c_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
       opcode := cols.is_sll * 8 + cols.is_sllw * 14,
@@ -226,14 +218,11 @@ contiguous Main slots. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 65) : ShiftLeftCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       Main[6],
-   #v[Main[7], Main[8], Main[9], Main[10]],
-   Main[11], Main[12], Main[13],
+   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
    Main[14],
-   #v[Main[15], Main[16], Main[17], Main[18]],
-   Main[19], Main[20],
+   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
    Main[21],
-   #v[Main[22], Main[23], Main[24], Main[25]],
-   Main[26], Main[27],
+   ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩,
    Main[28],
    Main[29], Main[30], Main[31],
    #v[Main[32], Main[33], Main[34], Main[35]],
@@ -289,10 +278,8 @@ open Circuit
 @[reducible]
 def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
-       op_b_memory_diff_low, op_c, op_c_memory_prev_value,
-       op_c_memory_prev_low, op_c_memory_diff_low, imm_c,
+       op_a_memory,
+       op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
        _c_bits, _shift_pow, _shift_u16, _limb_shift,
        _result_intermediate, is_sll, is_sllw, _sign_extend,
@@ -317,16 +304,16 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- R-type: op_a/+4, op_b/+3, op_c/+2.
   let clk_low := clk_0_16 + clk_16_24 * 65536
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_memory_prev_value⟩ :
+    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
+       op_a_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
-       op_b_memory_prev_value⟩ :
+    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low, op_b_memory.access_timestamp.diff_low_limb,
+       op_b_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 2, op_c_memory_prev_low, op_c_memory_diff_low,
-       op_c_memory_prev_value⟩ :
+    (⟨clk_low, 2, op_c_memory.access_timestamp.prev_low, op_c_memory.access_timestamp.diff_low_limb,
+       op_c_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
 set_option maxHeartbeats 800000 in
@@ -359,14 +346,14 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- R-type: op_a/+4, op_b/+3, op_c/+2.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
-     cols.op_a_memory_prev_value⟩ ∧
+    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
+     cols.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
-     cols.op_b_memory_prev_value⟩ ∧
+    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
+     cols.op_b_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.op_c_memory_prev_low, cols.op_c_memory_diff_low,
-     cols.op_c_memory_prev_value⟩
+    ⟨clk_low, 2, cols.op_c_memory.access_timestamp.prev_low, cols.op_c_memory.access_timestamp.diff_low_limb,
+     cols.op_c_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

@@ -49,14 +49,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 structure BranchCols (T : Type) where
   state : CPUState T
   op_a : T                                  -- Main[6]
-  op_a_memory_prev_value : Vector T 4       -- Main[7..10] (source register a)
-  op_a_memory_prev_low : T                  -- Main[11]
-  op_a_memory_diff_low : T                  -- Main[12]
+  op_a_memory : MemoryAccessInSharedCols T
   op_a_0 : T                                -- Main[13]
   op_b : T                                  -- Main[14]
-  op_b_memory_prev_value : Vector T 4       -- Main[15..18] (source register b)
-  op_b_memory_prev_low : T                  -- Main[19]
-  op_b_memory_diff_low : T                  -- Main[20]
+  op_b_memory : MemoryAccessInSharedCols T
   op_c_imm : Vector T 4                     -- Main[21..24]
   next_pc : Vector T 3                      -- Main[25..27]
   is_beq : T                                -- Main[28]
@@ -94,9 +90,8 @@ def opcodeExpr (cols : Var BranchCols (ZMod p)) : Expression (ZMod p) :=
 
 def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
-       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
-       _op_b_memory_diff_low, op_c_imm, _next_pc,
+       _op_a_memory,
+       op_a_0, op_b, _op_b_memory, op_c_imm, _next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
        _is_branching, _compare_operation,
        _is_branching_aux, _next_pc_branched_carry, _next_pc_unbranched_carry⟩ := cols
@@ -125,7 +120,7 @@ def Spec (cols : BranchCols (ZMod p)) : Prop :=
     cols.is_beq * 40 + cols.is_bne * 41 + cols.is_blt * 42 +
       cols.is_bge * 43 + cols.is_bltu * 44 + cols.is_bgeu * 45
   (_root_.LtOperationSigned.constraints (F := ZMod p)
-      cols.op_a_memory_prev_value cols.op_b_memory_prev_value
+      cols.op_a_memory.prev_value cols.op_b_memory.prev_value
       cols.compare_operation (cols.is_blt + cols.is_bge) is_real).allHold ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
@@ -146,15 +141,15 @@ def Spec (cols : BranchCols (ZMod p)) : Prop :=
 doesn't update any register, only PC). -/
 def opAMemoryAccess (cols : BranchCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
   { addr := #v[cols.op_a, 0, 0],
-    prev_value := cols.op_a_memory_prev_value,
-    prev_low := cols.op_a_memory_prev_low,
-    diff_low_limb := cols.op_a_memory_diff_low }
+    prev_value := cols.op_a_memory.prev_value,
+    prev_low := cols.op_a_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
 
 def opBMemoryAccess (cols : BranchCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
   { addr := #v[cols.op_b, 0, 0],
-    prev_value := cols.op_b_memory_prev_value,
-    prev_low := cols.op_b_memory_prev_low,
-    diff_low_limb := cols.op_b_memory_diff_low }
+    prev_value := cols.op_b_memory.prev_value,
+    prev_low := cols.op_b_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb }
 
 /-- Project a raw SP1 row into the structured `BranchCols` view.
 45 columns; `compare_operation : LtOperationSigned T` packed from
@@ -165,11 +160,9 @@ name; previously misnamed `lt_is_signed`). -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 45) : BranchCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       Main[6],
-   #v[Main[7], Main[8], Main[9], Main[10]],
-   Main[11], Main[12], Main[13],
+   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
    Main[14],
-   #v[Main[15], Main[16], Main[17], Main[18]],
-   Main[19], Main[20],
+   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
    #v[Main[21], Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27]],
    Main[28], Main[29], Main[30], Main[31], Main[32], Main[33],
@@ -226,9 +219,8 @@ open Circuit
 @[reducible]
 def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
-       op_b_memory_diff_low, op_c_imm, next_pc,
+       op_a_memory,
+       op_a_0, op_b, op_b_memory, op_c_imm, next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
        _is_branching, _compare_operation,
        is_branching_aux, next_pc_branched_carry, next_pc_unbranched_carry⟩ := cols
@@ -280,12 +272,12 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- reads (no register writes; only PC is updated).
   let clk_low := clk_0_16 + clk_16_24 * 65536
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_memory_prev_value⟩ :
+    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
+       op_a_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
-       op_b_memory_prev_value⟩ :
+    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low, op_b_memory.access_timestamp.diff_low_limb,
+       op_b_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
 set_option maxHeartbeats 800000 in
@@ -341,11 +333,11 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- Branch emits 2 register accesses: op_a/+4 and op_b/+3 (pure reads).
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
-     cols.op_a_memory_prev_value⟩ ∧
+    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
+     cols.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
-     cols.op_b_memory_prev_value⟩
+    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
+     cols.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

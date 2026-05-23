@@ -56,14 +56,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 structure AddiCols (T : Type) where
   state : CPUState T
   op_a : T
-  op_a_memory_prev_value : Vector T 4
-  op_a_memory_prev_low : T
-  op_a_memory_diff_low : T
+  op_a_memory : MemoryAccessInSharedCols T
   op_a_0 : T
   op_b : T
-  op_b_memory_prev_value : Vector T 4
-  op_b_memory_prev_low : T
-  op_b_memory_diff_low : T
+  op_b_memory : MemoryAccessInSharedCols T
   op_c_imm : Vector T 4
   op_a_write_value : Vector T 4
   is_real : T
@@ -74,12 +70,11 @@ deriving ProvableStruct
 takes a `Var AddiCols (ZMod p)` (struct of `Expression`s), destructures it,
 and emits the constraints for each sub-component. -/
 def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory_prev_value,
-       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
-       op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory, op_a_0, op_b,
+       op_b_memory,
        op_c_imm, op_a_write_value, is_real, _next_pc_carry_value⟩ := cols
   -- AddOperation: op_b_memory.prev_value + op_c_imm = op_a_write_value.
-  SP1Clean.AddOp.main op_b_memory_prev_value op_c_imm op_a_write_value
+  SP1Clean.AddOp.main op_b_memory.prev_value op_c_imm op_a_write_value
   -- CPUState: clk_0_16 progression (Range 13 → < 2^13 = 8192) and clk_16_24
   -- bound (Range 8 → < 2^8 = 256).
   lookup ByteOpcodeTable
@@ -123,23 +118,23 @@ the reusable helper Specs (`SP1Clean.AddOp`, `SP1Clean.CPUState`,
 `SP1Clean.ITypeReader`) plus the trailing assertZero gates. -/
 def Spec (cols : AddiCols (ZMod p)) : Prop :=
   SP1Clean.AddOp.Spec
-      cols.op_b_memory_prev_value cols.op_c_imm cols.op_a_write_value ∧
+      cols.op_b_memory.prev_value cols.op_c_imm cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
       (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 1 cols.state.pc
       cols.op_a_write_value
       { op_a := cols.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory_prev_value,
+          { prev_value := cols.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory_prev_low,
-                diff_low_limb := cols.op_a_memory_diff_low } },
+              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
         op_a_0 := cols.op_a_0, op_b := cols.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory_prev_value,
+          { prev_value := cols.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory_prev_low,
-                diff_low_limb := cols.op_b_memory_diff_low } },
+              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
         op_c_imm := cols.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.op_a_0 = 0
@@ -151,10 +146,8 @@ take/drop tower the `ProvableStruct`-derived path produces. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 30) : AddiCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       Main[6],
-   #v[Main[7], Main[8], Main[9], Main[10]],
-   Main[11], Main[12], Main[13], Main[14],
-   #v[Main[15], Main[16], Main[17], Main[18]],
-   Main[19], Main[20],
+   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13], Main[14],
+   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
    #v[Main[21], Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27], Main[28]],
    Main[29], #v[0, 0, 0]⟩
@@ -252,12 +245,11 @@ open Circuit
 the 4 immediate-limb byte lookups (see Scope note above). -/
 @[reducible]
 def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory_prev_value,
-       op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b,
-       op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory, op_a_0, op_b,
+       op_b_memory,
        op_c_imm, op_a_write_value, is_real, next_pc_carry_value⟩ := cols
   SP1Clean.AddOp.assertion
-    (⟨op_b_memory_prev_value, op_c_imm, op_a_write_value⟩ :
+    (⟨op_b_memory.prev_value, op_c_imm, op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -278,12 +270,12 @@ def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- op_a at +4, op_b at +3 (op_c_imm is the immediate, no memory access).
   let clk_low := clk_0_16 + clk_16_24 * 65536
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_memory_prev_value⟩ :
+    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
+       op_a_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
-       op_b_memory_prev_value⟩ :
+    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low, op_b_memory.access_timestamp.diff_low_limb,
+       op_b_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   op_a_0 === 0
@@ -304,7 +296,7 @@ legacy chip-level `Spec` / `iff_sp1`. -/
 def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.AddOp.Spec
-      cols.op_b_memory_prev_value cols.op_c_imm cols.op_a_write_value ∧
+      cols.op_b_memory.prev_value cols.op_c_imm cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc, opcode := 1, op_a := cols.op_a,
@@ -320,11 +312,11 @@ def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- I-type: op_a at +4, op_b at +3 (op_c_imm is immediate).
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
-     cols.op_a_memory_prev_value⟩ ∧
+    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
+     cols.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
-     cols.op_b_memory_prev_value⟩
+    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
+     cols.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

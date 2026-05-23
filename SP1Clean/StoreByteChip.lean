@@ -60,14 +60,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 structure StoreByteCols (T : Type) where
   state : CPUState T
   op_a : T                                  -- Main[6]
-  op_a_memory_prev_value : Vector T 4       -- Main[7..10] (source data)
-  op_a_memory_prev_low : T                  -- Main[11]
-  op_a_memory_diff_low : T                  -- Main[12]
+  op_a_memory : MemoryAccessInSharedCols T
   op_a_0 : T                                -- Main[13]
   op_b : T                                  -- Main[14]
-  op_b_memory_prev_value : Vector T 4       -- Main[15..18] (base address)
-  op_b_memory_prev_low : T                  -- Main[19]
-  op_b_memory_diff_low : T                  -- Main[20]
+  op_b_memory : MemoryAccessInSharedCols T
   op_c_imm : Vector T 4                     -- Main[21..24] (immediate offset)
   addr_value : Vector T 3                   -- Main[25..27] (computed store addr)
   addr_top_two_limb_inv : T                 -- Main[28]
@@ -101,9 +97,9 @@ Opcode is `36 = SB`. Immediate-mode flag is `imm_c = 1` (I-type
 discipline); `op_c` carries 4 immediate limbs from `op_c_imm`. -/
 def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       _op_a_memory,
        op_a_0, op_b,
-       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       _op_b_memory,
        op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
        _store_memory_flag, store_memory_diff_low, store_memory_diff_high,
@@ -166,18 +162,18 @@ def Spec (cols : StoreByteCols (ZMod p)) : Prop :=
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
-      { prev_value := cols.op_a_memory_prev_value,
+      { prev_value := cols.op_a_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_a_memory_prev_low,
-            diff_low_limb := cols.op_a_memory_diff_low } }) ∧
+          { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } }) ∧
   -- Base-register read for op_b.
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
-      { prev_value := cols.op_b_memory_prev_value,
+      { prev_value := cols.op_b_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_b_memory_prev_low,
-            diff_low_limb := cols.op_b_memory_diff_low } }) ∧
+          { prev_low := cols.op_b_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } }) ∧
   -- Store-side memory access. Address is the 3-limb `addr_value`
   -- computed by the AddressOperation; this is generally NOT a register
   -- address (`addr_value[0].val ≥ 32`), so the RAM branch of
@@ -230,11 +226,9 @@ def storeWriteValue (cols : StoreByteCols (ZMod p)) : Word (ZMod p) :=
 @[reducible] def fromMain (Main : Vector (ZMod p) 50) : StoreByteCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       Main[6],
-   #v[Main[7], Main[8], Main[9], Main[10]],
-   Main[11], Main[12], Main[13],
+   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
    Main[14],
-   #v[Main[15], Main[16], Main[17], Main[18]],
-   Main[19], Main[20],
+   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
    #v[Main[21], Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27]],
    Main[28],
@@ -249,11 +243,11 @@ def storeWriteValue (cols : StoreByteCols (ZMod p)) : Word (ZMod p) :=
 a single byte at one of 8 positions within the 8-byte aligned
 doubleword (selected by three byte selectors). The 4-limb
 `store_value` is the byte-selected merge of the new byte (derived
-from `op_a_memory_prev_value[0]` via the `register_low_byte`/`increment`
+from `op_a_memory.prev_value[0]` via the `register_low_byte`/`increment`
 chain) with the existing `store_prev_value`. -/
 def SpecForIff_of_is_real (cols : StoreByteCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
-      cols.op_b_memory_prev_value cols.op_c_imm
+      cols.op_b_memory.prev_value cols.op_c_imm
       { value := cols.addr_value } ∧
   (cols.byte_selector_top = 0 ∨ cols.byte_selector_top = 1) ∧
   (cols.byte_selector_mid = 0 ∨ cols.byte_selector_mid = 1) ∧
@@ -267,16 +261,16 @@ def SpecForIff_of_is_real (cols : StoreByteCols (ZMod p)) : Prop :=
       (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 36 cols.state.pc
       { op_a := cols.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory_prev_value,
+          { prev_value := cols.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory_prev_low,
-                diff_low_limb := cols.op_a_memory_diff_low } },
+              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
         op_a_0 := cols.op_a_0, op_b := cols.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory_prev_value,
+          { prev_value := cols.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory_prev_low,
-                diff_low_limb := cols.op_b_memory_diff_low } },
+              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.store_memory_flag = 0 ∨ cols.store_memory_flag = 1) ∧
   (cols.store_memory_flag = 0 ∨ cols.state.clk_high = cols.store_memory_prev_high) ∧
@@ -298,7 +292,7 @@ def SpecForIff_of_is_real (cols : StoreByteCols (ZMod p)) : Prop :=
   (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 0 ∨
     cols.mem_limb = cols.store_prev_value[3]) ∧
   ((0 : ZMod p) < 256 ∧ cols.register_low_byte < (256 : ZMod p) ∧
-    (cols.op_a_memory_prev_value[0] - cols.register_low_byte) * (256 : ZMod p)⁻¹
+    (cols.op_a_memory.prev_value[0] - cols.register_low_byte) * (256 : ZMod p)⁻¹
       < (256 : ZMod p)) ∧
   ((0 : ZMod p) < 256 ∧ cols.mem_limb_low_byte < (256 : ZMod p) ∧
     (cols.mem_limb - cols.mem_limb_low_byte) * (256 : ZMod p)⁻¹
@@ -353,9 +347,9 @@ open Circuit
 @[reducible]
 def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory,
        op_a_0, op_b,
-       op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory,
        op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
        _store_memory_flag, _store_memory_diff_low, _store_memory_diff_high,
@@ -378,12 +372,12 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- Store RAM access deferred (see `load-store-ram-access-deferred`).
   let clk_low := clk_0_16 + clk_16_24 * 65536
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_memory_prev_value⟩ :
+    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
+       op_a_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
-       op_b_memory_prev_value⟩ :
+    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low, op_b_memory.access_timestamp.diff_low_limb,
+       op_b_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
 set_option maxHeartbeats 800000 in
@@ -410,11 +404,11 @@ def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
      cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
-     cols.op_a_memory_prev_value⟩ ∧
+    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
+     cols.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
-     cols.op_b_memory_prev_value⟩
+    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
+     cols.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

@@ -53,9 +53,7 @@ op_a. -/
 structure UTypeCols (T : Type) where
   state : CPUState T
   op_a : T
-  op_a_memory_prev_value : Vector T 4
-  op_a_memory_prev_low : T
-  op_a_memory_diff_low : T
+  op_a_memory : MemoryAccessInSharedCols T
   op_a_0 : T
   op_b_imm : Vector T 4
   op_c_imm : Vector T 4
@@ -75,8 +73,7 @@ gate). The AddOperation sub-fragment (operating on `addend` and
 `op_b_imm`) is intentionally not emitted as a subcircuit — its
 constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory_prev_value,
-       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b_imm,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory, op_a_0, op_b_imm,
        op_c_imm, addend, _add_result, is_auipc, is_real,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
@@ -112,10 +109,10 @@ def Spec (cols : UTypeCols (ZMod p)) : Prop :=
       cols.add_result
       { op_a := cols.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory_prev_value,
+          { prev_value := cols.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory_prev_low,
-                diff_low_limb := cols.op_a_memory_diff_low } },
+              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
         op_a_0 := cols.op_a_0,
         op_b_imm := cols.op_b_imm, op_c_imm := cols.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
@@ -130,16 +127,15 @@ trace-level OfflineMemory aggregation. `write_value` at aggregation
 time is `cols.add_result`. -/
 def opAMemoryAccess (cols : UTypeCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
   { addr := #v[cols.op_a, 0, 0],
-    prev_value := cols.op_a_memory_prev_value,
-    prev_low := cols.op_a_memory_prev_low,
-    diff_low_limb := cols.op_a_memory_diff_low }
+    prev_value := cols.op_a_memory.prev_value,
+    prev_low := cols.op_a_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
 
 /-- Project a raw SP1 row into the structured `UTypeCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 31) : UTypeCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       Main[6],
-   #v[Main[7], Main[8], Main[9], Main[10]],
-   Main[11], Main[12], Main[13],
+   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
    #v[Main[14], Main[15], Main[16], Main[17]],
    #v[Main[18], Main[19], Main[20], Main[21]],
    #v[Main[22], Main[23], Main[24]],
@@ -223,8 +219,7 @@ the AddOperation byte lookups and the 3 Vector-indexed `addend`
 clauses (see Scope note above). -/
 @[reducible]
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory_prev_value,
-       op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b_imm,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory, op_a_0, op_b_imm,
        op_c_imm, _addend, _add_result, is_auipc, is_real,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
@@ -243,8 +238,8 @@ def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- register reads (both are immediates).
   let clk_low := clk_0_16 + clk_16_24 * 65536
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_memory_prev_value⟩ :
+    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
+       op_a_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   is_auipc * (is_auipc - 1) === 0
@@ -283,8 +278,8 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequence.
   -- UType emits a single op_a register access at offset +4.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
-     cols.op_a_memory_prev_value⟩
+    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
+     cols.op_a_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

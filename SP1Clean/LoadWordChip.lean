@@ -42,14 +42,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 structure LoadWordCols (T : Type) where
   state : CPUState T
   op_a : T                                  -- Main[6]
-  op_a_memory_prev_value : Vector T 4       -- Main[7..10]
-  op_a_memory_prev_low : T                  -- Main[11]
-  op_a_memory_diff_low : T                  -- Main[12]
+  op_a_memory : MemoryAccessInSharedCols T
   op_a_0 : T                                -- Main[13]
   op_b : T                                  -- Main[14]
-  op_b_memory_prev_value : Vector T 4       -- Main[15..18]
-  op_b_memory_prev_low : T                  -- Main[19]
-  op_b_memory_diff_low : T                  -- Main[20]
+  op_b_memory : MemoryAccessInSharedCols T
   op_c_imm : Vector T 4                     -- Main[21..24]
   addr_value : Vector T 3                   -- Main[25..27]
   addr_top_two_limb_inv : T                 -- Main[28]
@@ -69,9 +65,8 @@ deriving ProvableStruct
 
 def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
-       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
-       _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       _op_a_memory,
+       op_a_0, op_b, _op_b_memory, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
        _offset_bit, _op_a_write_value_lo, _signed_extension_msb,
@@ -97,17 +92,17 @@ def Spec (cols : LoadWordCols (ZMod p)) : Prop :=
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
-      { prev_value := cols.op_a_memory_prev_value,
+      { prev_value := cols.op_a_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_a_memory_prev_low,
-            diff_low_limb := cols.op_a_memory_diff_low } }) ∧
+          { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
     (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
-      { prev_value := cols.op_b_memory_prev_value,
+      { prev_value := cols.op_b_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_b_memory_prev_low,
-            diff_low_limb := cols.op_b_memory_diff_low } }) ∧
+          { prev_low := cols.op_b_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.load_memory_prev_high * (2 ^ 24) + cols.load_memory_prev_low) 1
     { addr := cols.addr_value,
@@ -134,11 +129,9 @@ def loadMemoryAccess (cols : LoadWordCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
 @[reducible] def fromMain (Main : Vector (ZMod p) 44) : LoadWordCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       Main[6],
-   #v[Main[7], Main[8], Main[9], Main[10]],
-   Main[11], Main[12], Main[13],
+   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
    Main[14],
-   #v[Main[15], Main[16], Main[17], Main[18]],
-   Main[19], Main[20],
+   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
    #v[Main[21], Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27]],
    Main[28],
@@ -152,7 +145,7 @@ def loadMemoryAccess (cols : LoadWordCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
 `_root_.Load.LoadWord.allHold_constraints_iff_of_is_lw`. -/
 def SpecForIff_of_is_lw (cols : LoadWordCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
-      cols.op_b_memory_prev_value cols.op_c_imm
+      cols.op_b_memory.prev_value cols.op_c_imm
       { value := cols.addr_value } ∧
   (cols.offset_bit = 0 ∨ cols.offset_bit = 1) ∧
   cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
@@ -168,16 +161,16 @@ def SpecForIff_of_is_lw (cols : LoadWordCols (ZMod p)) : Prop :=
          65535 * cols.signed_extension_msb]
       { op_a := cols.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory_prev_value,
+          { prev_value := cols.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory_prev_low,
-                diff_low_limb := cols.op_a_memory_diff_low } },
+              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
         op_a_0 := cols.op_a_0, op_b := cols.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory_prev_value,
+          { prev_value := cols.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory_prev_low,
-                diff_low_limb := cols.op_b_memory_diff_low } },
+              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
   (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
@@ -202,7 +195,7 @@ selector (`is_lw = 0` vs `is_lwu = 0`), the U16MSB constraint's is_real
 arg (0 vs 1), and the trailing `signed_extension_msb = 0` clause. -/
 def SpecForIff_of_is_lwu (cols : LoadWordCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
-      cols.op_b_memory_prev_value cols.op_c_imm
+      cols.op_b_memory.prev_value cols.op_c_imm
       { value := cols.addr_value } ∧
   (cols.offset_bit = 0 ∨ cols.offset_bit = 1) ∧
   cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
@@ -218,16 +211,16 @@ def SpecForIff_of_is_lwu (cols : LoadWordCols (ZMod p)) : Prop :=
          65535 * cols.signed_extension_msb]
       { op_a := cols.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory_prev_value,
+          { prev_value := cols.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory_prev_low,
-                diff_low_limb := cols.op_a_memory_diff_low } },
+              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
         op_a_0 := cols.op_a_0, op_b := cols.op_b,
         op_b_memory :=
-          { prev_value := cols.op_b_memory_prev_value,
+          { prev_value := cols.op_b_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_b_memory_prev_low,
-                diff_low_limb := cols.op_b_memory_diff_low } },
+              { prev_low := cols.op_b_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } },
         op_c_imm := cols.op_c_imm } ∧
   (cols.load_memory_flag = 0 ∨ cols.load_memory_flag = 1) ∧
   (cols.load_memory_flag = 0 ∨ cols.state.clk_high = cols.load_memory_prev_high) ∧
@@ -294,9 +287,8 @@ open Circuit
 @[reducible]
 def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
-       op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       op_a_memory,
+       op_a_0, op_b, op_b_memory, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
        _offset_bit, _op_a_write_value_lo, _signed_extension_msb,
@@ -319,12 +311,12 @@ def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- Load RAM access deferred (see `load-store-ram-access-deferred`).
   let clk_low := clk_0_16 + clk_16_24 * 65536
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
-       op_a_memory_prev_value⟩ :
+    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
+       op_a_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
-       op_b_memory_prev_value⟩ :
+    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low, op_b_memory.access_timestamp.diff_low_limb,
+       op_b_memory.prev_value⟩ :
       Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
 set_option maxHeartbeats 800000 in
@@ -354,11 +346,11 @@ def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
   cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
   (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0 ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
-     cols.op_a_memory_prev_value⟩ ∧
+    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
+     cols.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
-     cols.op_b_memory_prev_value⟩
+    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
+     cols.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
