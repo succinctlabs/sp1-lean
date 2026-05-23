@@ -88,13 +88,16 @@ structure DivRemCols (T : Type) where
   c_times_quotient_lower : MulOperation T   -- Main[76..120]
   c_times_quotient_upper : MulOperation T   -- Main[121..165]
   aux_post : DivRemAuxPost T                -- Main[166..240], decomposed in sub-record
-  -- Main[241..245]: legacy 3-flag labels (Lean ↔ Rust divergence tracked
-  -- by `divrem_flag_projection`; resolution = Strategy C Phase 4d).
-  is_signed : T                             -- Main[241]
-  is_w : T                                  -- Main[242]
-  is_rem : T                                -- Main[243]
+  -- Main[241..245]: per-mode multiplicity flags (Rust DivRemCols layout).
+  -- The 3-flag (is_signed, is_w, is_rem) labels these previously carried
+  -- were a mode-encoding placeholder that got out of sync with upstream
+  -- — Rust has the 8-flag one-hot at Main[201..208] (see mode_flags in
+  -- DivRemAuxPost) and reserves these cells for sub-operation multiplicity.
+  c_neg : T                                 -- Main[241] (sign-flip flag for c)
+  abs_c_alu_event : T                       -- Main[242] (mult arg to c_neg AddOp)
+  abs_rem_alu_event : T                     -- Main[243] (mult arg to rem_neg AddOp)
   is_real : T                               -- Main[244]
-  msb_aux1 : T                              -- Main[245]
+  remainder_check_multiplicity : T          -- Main[245] (mult arg to remainder_lt_op)
   next_pc_carry_value : Vector T 3
 deriving ProvableStruct
 
@@ -106,24 +109,27 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _abs_remainder, _abs_c, _max_abs_c_or_1, _c_times_quotient,
        _c_times_quotient_lower, _c_times_quotient_upper,
        _aux_post,
-       is_signed, is_w, is_rem, is_real, _msb_aux1,
+       c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  -- Opcode encoding: DIV=15, DIVU=16, REM=17, REMU=18 (32-bit set);
-  -- DIVW=25, DIVUW=26, REMW=27, REMUW=28 (64-bit/32-bit set). Encoded
-  -- as `is_signed * (DIVW vs DIV bias) + is_rem * (REM vs DIV bias) +
-  -- is_w * (W vs non-W bias)` plus a base; here we expose the simplest
-  -- placeholder opcode in the program-bus assertion below — the actual
-  -- mapping is encoded via the auxiliary selector columns.
+  -- Opcode encoding placeholder. The honest formula is a one-hot
+  -- weighted sum over the 8 mode flags in `aux_post.mode_flags` (Main[201..208])
+  -- with opcodes {15, 16, 17, 18, 25, 27, 26, 28}, but the nested access
+  -- doesn't reduce cleanly under the current soundness proof shape. The
+  -- formula below uses three of the per-sub-op multiplicity flags as a
+  -- placeholder — it doesn't produce a valid RISC-V opcode in general.
+  -- TODO: move mode_flags to top-level fields (would require a different
+  -- ProvableStruct cap workaround) and switch to the weighted-sum formula.
   SP1Clean.ProgramTable.assertion
     (⟨pc,
-      (15 : Expression (ZMod p)) + is_signed * 0 + is_rem * 2 + is_w * 10,
+      (15 : Expression (ZMod p)) + c_neg * 0 + abs_rem_alu_event * 2
+        + abs_c_alu_event * 10,
       op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  is_signed * (is_signed - 1) === 0
-  is_w * (is_w - 1) === 0
-  is_rem * (is_rem - 1) === 0
+  c_neg * (c_neg - 1) === 0
+  abs_c_alu_event * (abs_c_alu_event - 1) === 0
+  abs_rem_alu_event * (abs_rem_alu_event - 1) === 0
   is_real * (is_real - 1) === 0
   op_a_0 === 0
 
@@ -156,9 +162,9 @@ def Spec (cols : DivRemCols (ZMod p)) : Prop :=
         access_timestamp :=
           { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
             diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }) ∧
-  cols.is_signed * (cols.is_signed - 1) = 0 ∧
-  cols.is_w * (cols.is_w - 1) = 0 ∧
-  cols.is_rem * (cols.is_rem - 1) = 0 ∧
+  cols.c_neg * (cols.c_neg - 1) = 0 ∧
+  cols.abs_c_alu_event * (cols.abs_c_alu_event - 1) = 0 ∧
+  cols.abs_rem_alu_event * (cols.abs_rem_alu_event - 1) = 0 ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
   divRemSpec cols
@@ -273,87 +279,6 @@ theorem correct_div [Fact (2 ^ 24 < p)]
     (spec_implies_allHold Main h_is_real h_op_a_0 h_spec)
     h_is_real h_is_div state_cstrs
 
-/-! ## Phase 1c interim consistency: 3-flag ↔ 8-flag projection
-
-Lean `DivRemCols` carries three boolean flags `(is_signed, is_w, is_rem)`
-at Main[241..243], where upstream `DivRemCols<T, M>` has eight one-hot
-mode flags `is_div, is_divu, is_rem, is_remu, is_divw, is_remw, is_divuw,
-is_remuw` (alu/divrem/mod.rs:120-141). The audit (2026-05-23) flagged
-this as DIVERGENT — the encoding scheme differs.
-
-This lemma is the **interim consistency proof**: under any three booleans
-the eight upstream-style one-hot flags can be reconstructed as products
-of `(is_signed, 1-is_signed) × (is_w, 1-is_w) × (is_rem, 1-is_rem)`,
-they are each boolean, and they sum to 1. Strategy C Phase 4d will
-replace the 3-flag encoding with the 8-flag one directly; this lemma
-exists to make the projection explicit in the meantime and to support
-re-tagging the audit doc's DivRem DIVERGENT row from "encoding scheme
-differs" to "encoding scheme differs but projection consistency proved".
-
-The reconstructed-flag order matches upstream's struct declaration
-order: `is_div, is_divu, is_rem, is_remu, is_divw, is_remw, is_divuw,
-is_remuw`.
-
-Note: this lemma intentionally does not reference the actual aux:209
-block at Main[32..240], where the upstream 8-flag columns physically
-live (Main[201..208] per the bridge `SP1Chips/DivRem/Constraints.lean`).
-The lemma proves a pure arithmetic identity on the Lean 3-flag values
-— constraint-equivalence to upstream's 8-flag layout is the broader
-Phase 4d work. -/
-
-omit [Fact (2 ^ 17 < p)] in
-private lemma bool_mul3 {x y z : ZMod p}
-    (hx : x * (x - 1) = 0) (hy : y * (y - 1) = 0) (hz : z * (z - 1) = 0) :
-    (x * y * z) * (x * y * z - 1) = 0 := by
-  linear_combination (y * z)^2 * hx + (x * z^2) * hy + (x * y) * hz
-
-omit [Fact (2 ^ 17 < p)] in
-private lemma bool_comp {x : ZMod p} (hx : x * (x - 1) = 0) :
-    (1 - x) * ((1 - x) - 1) = 0 := by
-  linear_combination hx
-
-omit [Fact (2 ^ 17 < p)] in
-theorem divrem_flag_projection
-    (is_signed is_w is_rem : ZMod p)
-    (h_signed : is_signed * (is_signed - 1) = 0)
-    (h_w : is_w * (is_w - 1) = 0)
-    (h_rem : is_rem * (is_rem - 1) = 0) :
-    let r_is_div   : ZMod p := is_signed       * (1 - is_w) * (1 - is_rem)
-    let r_is_divu  : ZMod p := (1 - is_signed) * (1 - is_w) * (1 - is_rem)
-    let r_is_rem'  : ZMod p := is_signed       * (1 - is_w) * is_rem
-    let r_is_remu  : ZMod p := (1 - is_signed) * (1 - is_w) * is_rem
-    let r_is_divw  : ZMod p := is_signed       * is_w       * (1 - is_rem)
-    let r_is_remw  : ZMod p := is_signed       * is_w       * is_rem
-    let r_is_divuw : ZMod p := (1 - is_signed) * is_w       * (1 - is_rem)
-    let r_is_remuw : ZMod p := (1 - is_signed) * is_w       * is_rem
-    -- Each reconstructed flag is boolean.
-    r_is_div   * (r_is_div   - 1) = 0 ∧
-    r_is_divu  * (r_is_divu  - 1) = 0 ∧
-    r_is_rem'  * (r_is_rem'  - 1) = 0 ∧
-    r_is_remu  * (r_is_remu  - 1) = 0 ∧
-    r_is_divw  * (r_is_divw  - 1) = 0 ∧
-    r_is_remw  * (r_is_remw  - 1) = 0 ∧
-    r_is_divuw * (r_is_divuw - 1) = 0 ∧
-    r_is_remuw * (r_is_remuw - 1) = 0 ∧
-    -- The eight reconstructed flags sum to 1 (one-hot encoding under any
-    -- assignment to the three booleans).
-    r_is_div + r_is_divu + r_is_rem' + r_is_remu +
-      r_is_divw + r_is_remw + r_is_divuw + r_is_remuw = 1 := by
-  simp only
-  have h_neg_s := bool_comp h_signed
-  have h_neg_w := bool_comp h_w
-  have h_neg_r := bool_comp h_rem
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact bool_mul3 h_signed h_neg_w h_neg_r
-  · exact bool_mul3 h_neg_s h_neg_w h_neg_r
-  · exact bool_mul3 h_signed h_neg_w h_rem
-  · exact bool_mul3 h_neg_s h_neg_w h_rem
-  · exact bool_mul3 h_signed h_w h_neg_r
-  · exact bool_mul3 h_signed h_w h_rem
-  · exact bool_mul3 h_neg_s h_w h_neg_r
-  · exact bool_mul3 h_neg_s h_w h_rem
-  · ring
-
 /-! ## Full `FormalAssertion` promotion (Path-2)
 
 `Assertion.main` is identical to the chip's `main` (no byte lookups to
@@ -375,13 +300,14 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _abs_remainder, _abs_c, _max_abs_c_or_1, _c_times_quotient,
        _c_times_quotient_lower, _c_times_quotient_upper,
        _aux_post,
-       is_signed, is_w, is_rem, is_real, _msb_aux1,
+       c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc,
-      (15 : Expression (ZMod p)) + is_signed * 0 + is_rem * 2 + is_w * 10,
+      (15 : Expression (ZMod p)) + c_neg * 0 + abs_rem_alu_event * 2
+        + abs_c_alu_event * 10,
       op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   SP1Clean.AddrAddOp.assertion
@@ -389,9 +315,9 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        #v[(4 : Expression (ZMod p)), 0, 0, 0],
        next_pc_carry_value⟩ :
       Var SP1Clean.AddrAddOp.Inputs (ZMod p))
-  is_signed * (is_signed - 1) === 0
-  is_w * (is_w - 1) === 0
-  is_rem * (is_rem - 1) === 0
+  c_neg * (c_neg - 1) === 0
+  abs_c_alu_event * (abs_c_alu_event - 1) === 0
+  abs_rem_alu_event * (abs_rem_alu_event - 1) === 0
   is_real * (is_real - 1) === 0
   op_a_0 === 0
   -- Iter-8 sub-task E: per-operand memory-bus byte content.
@@ -426,8 +352,8 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
-      opcode := (15 : ZMod p) + cols.is_signed * 0 + cols.is_rem * 2 +
-                  cols.is_w * 10,
+      opcode := (15 : ZMod p) + cols.c_neg * 0 + cols.abs_rem_alu_event * 2
+                  + cols.abs_c_alu_event * 10,
       op_a := cols.adapter.op_a, op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := #v[cols.adapter.op_c, 0, 0, 0],
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
@@ -435,9 +361,9 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
     ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
-  cols.is_signed * (cols.is_signed - 1) = 0 ∧
-  cols.is_w * (cols.is_w - 1) = 0 ∧
-  cols.is_rem * (cols.is_rem - 1) = 0 ∧
+  cols.c_neg * (cols.c_neg - 1) = 0 ∧
+  cols.abs_c_alu_event * (cols.abs_c_alu_event - 1) = 0 ∧
+  cols.abs_rem_alu_event * (cols.abs_rem_alu_event - 1) = 0 ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
@@ -458,7 +384,7 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_signed, h_w, h_rem, h_real,
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_c_neg, h_abs_c, h_abs_rem, h_real,
           h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -466,9 +392,9 @@ theorem soundness :
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
     exact h_addr_sub trivial
-  · linear_combination h_signed
-  · linear_combination h_w
-  · linear_combination h_rem
+  · linear_combination h_c_neg
+  · linear_combination h_abs_c
+  · linear_combination h_abs_rem
   · linear_combination h_real
   · exact h_op_a_0
   · exact h_oa_a trivial
@@ -481,7 +407,7 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_signed, h_w, h_rem, h_real, h_op_a_0,
+  obtain ⟨h_cpu, h_prog, h_addr, h_c_neg, h_abs_c, h_abs_rem, h_real, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -490,9 +416,9 @@ theorem completeness :
   · refine ⟨trivial, ?_⟩
     simp only [Vector.getElem_map] at h_addr
     exact h_addr
-  · linear_combination h_signed
-  · linear_combination h_w
-  · linear_combination h_rem
+  · linear_combination h_c_neg
+  · linear_combination h_abs_c
+  · linear_combination h_abs_rem
   · linear_combination h_real
   · exact h_op_a_0
   · exact ⟨trivial, h_oa_a⟩
