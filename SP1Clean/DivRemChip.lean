@@ -108,23 +108,28 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _b, _c, _quotient, _quotient_comp, _remainder_comp, _remainder,
        _abs_remainder, _abs_c, _max_abs_c_or_1, _c_times_quotient,
        _c_times_quotient_lower, _c_times_quotient_upper,
-       _aux_post,
+       aux_post,
        c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  -- Opcode encoding placeholder. The honest formula is a one-hot
-  -- weighted sum over the 8 mode flags in `aux_post.mode_flags` (Main[201..208])
-  -- with opcodes {15, 16, 17, 18, 25, 27, 26, 28}, but the nested access
-  -- doesn't reduce cleanly under the current soundness proof shape. The
-  -- formula below uses three of the per-sub-op multiplicity flags as a
-  -- placeholder — it doesn't produce a valid RISC-V opcode in general.
-  -- TODO: move mode_flags to top-level fields (would require a different
-  -- ProvableStruct cap workaround) and switch to the weighted-sum formula.
+  -- Opcode encoded one-hot via the 8 mode flags at Main[201..208].
+  -- Opcodes: DIV=15, DIVU=16, REM=17, REMU=18, DIVW=25, DIVUW=26,
+  --          REMW=27, REMUW=28. mode_flags order matches upstream:
+  --          [is_div, is_divu, is_rem, is_remu, is_divw, is_remw,
+  --           is_divuw, is_remuw].
+  let is_div   : Expression (ZMod p) := aux_post.mode_flags[0]
+  let is_divu  : Expression (ZMod p) := aux_post.mode_flags[1]
+  let is_rem_f : Expression (ZMod p) := aux_post.mode_flags[2]
+  let is_remu  : Expression (ZMod p) := aux_post.mode_flags[3]
+  let is_divw  : Expression (ZMod p) := aux_post.mode_flags[4]
+  let is_remw  : Expression (ZMod p) := aux_post.mode_flags[5]
+  let is_divuw : Expression (ZMod p) := aux_post.mode_flags[6]
+  let is_remuw : Expression (ZMod p) := aux_post.mode_flags[7]
   SP1Clean.ProgramTable.assertion
     (⟨pc,
-      (15 : Expression (ZMod p)) + c_neg * 0 + abs_rem_alu_event * 2
-        + abs_c_alu_event * 10,
+      is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
+        + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28,
       op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   c_neg * (c_neg - 1) === 0
@@ -299,15 +304,23 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _b, _c, _quotient, _quotient_comp, _remainder_comp, _remainder,
        _abs_remainder, _abs_c, _max_abs_c_or_1, _c_times_quotient,
        _c_times_quotient_lower, _c_times_quotient_upper,
-       _aux_post,
+       aux_post,
        c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  let is_div   : Expression (ZMod p) := aux_post.mode_flags[0]
+  let is_divu  : Expression (ZMod p) := aux_post.mode_flags[1]
+  let is_rem_f : Expression (ZMod p) := aux_post.mode_flags[2]
+  let is_remu  : Expression (ZMod p) := aux_post.mode_flags[3]
+  let is_divw  : Expression (ZMod p) := aux_post.mode_flags[4]
+  let is_remw  : Expression (ZMod p) := aux_post.mode_flags[5]
+  let is_divuw : Expression (ZMod p) := aux_post.mode_flags[6]
+  let is_remuw : Expression (ZMod p) := aux_post.mode_flags[7]
   SP1Clean.ProgramTable.assertion
     (⟨pc,
-      (15 : Expression (ZMod p)) + c_neg * 0 + abs_rem_alu_event * 2
-        + abs_c_alu_event * 10,
+      is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
+        + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28,
       op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   SP1Clean.AddrAddOp.assertion
@@ -349,11 +362,19 @@ def Assumptions (_ : DivRemCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let is_div   : ZMod p := cols.aux_post.mode_flags[0]
+  let is_divu  : ZMod p := cols.aux_post.mode_flags[1]
+  let is_rem_f : ZMod p := cols.aux_post.mode_flags[2]
+  let is_remu  : ZMod p := cols.aux_post.mode_flags[3]
+  let is_divw  : ZMod p := cols.aux_post.mode_flags[4]
+  let is_remw  : ZMod p := cols.aux_post.mode_flags[5]
+  let is_divuw : ZMod p := cols.aux_post.mode_flags[6]
+  let is_remuw : ZMod p := cols.aux_post.mode_flags[7]
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
-      opcode := (15 : ZMod p) + cols.c_neg * 0 + cols.abs_rem_alu_event * 2
-                  + cols.abs_c_alu_event * 10,
+      opcode := is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
+                  + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28,
       op_a := cols.adapter.op_a, op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := #v[cols.adapter.op_c, 0, 0, 0],
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
@@ -383,13 +404,18 @@ theorem soundness :
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
+  -- e19 is the 14-way conjunction of DivRemAuxPost field equations.
+  -- Flatten enough to expose the mode_flags equation so `subst_eqs` can
+  -- substitute `input_aux_post_mode_flags` globally.
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, e_mf, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := e19
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_c_neg, h_abs_c, h_abs_rem, h_real,
           h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
-  · exact h_prog_sub trivial
+  · convert h_prog_sub trivial using 2
+    simp only [Vector.getElem_map]
   · simp only [Vector.getElem_map]
     exact h_addr_sub trivial
   · linear_combination h_c_neg
@@ -406,13 +432,16 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, e_mf, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := e19
   subst_eqs
   obtain ⟨h_cpu, h_prog, h_addr, h_c_neg, h_abs_c, h_abs_rem, h_real, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
-  · exact ⟨trivial, h_prog⟩
+  · refine ⟨trivial, ?_⟩
+    convert h_prog using 2
+    simp only [Vector.getElem_map]
   · refine ⟨trivial, ?_⟩
     simp only [Vector.getElem_map] at h_addr
     exact h_addr
