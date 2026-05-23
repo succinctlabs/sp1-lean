@@ -9,6 +9,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
+import SP1Foundations.MemoryConsistency
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Clean.ByteOpcodeTable
 
@@ -27,6 +28,8 @@ applied to the `LtOperationSigned` chain.
 -/
 
 deriving instance ProvableStruct for CPUState
+deriving instance ProvableStruct for MemoryAccessInShardTimestamp
+deriving instance ProvableStruct for MemoryAccessInSharedCols
 
 namespace SP1Clean.CPUState
 
