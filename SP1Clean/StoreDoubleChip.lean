@@ -20,13 +20,14 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.ITypeReaderImmutable
+import SP1Clean.Reader.OperandAccess
 
 /-! # Chip-level `StoreDoubleChip` mirror — 64-bit store
 
 Sibling of `StoreWordChip` for 64-bit doubleword stores (`sd`). 39
 columns. Distinguishes from SW by storing the entire `op_a` register
 value (the 4-limb `op_a_memory_prev_value`) at the computed address —
-no explicit `store_write_value` columns since the chip just routes
+no explicit `store_value` columns since the chip just routes
 op_a's current value to RAM.
 
 Opcode: `39 = SD` (Store Double).
@@ -214,9 +215,9 @@ open Circuit
 @[reducible]
 def main (cols : Var StoreDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
-       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
-       _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
+       op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
        _store_memory_flag, _store_memory_diff_low, _store_memory_diff_high,
        is_real, next_pc_carry_value⟩ := cols
@@ -231,6 +232,17 @@ def main (cols : Var StoreDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
        next_pc_carry_value⟩ :
       Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
+  -- Iter-8 sub-task E (partial): register-side OperandAccess only.
+  -- Store RAM access deferred (see `load-store-ram-access-deferred`).
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) StoreDoubleCols unit where
@@ -241,6 +253,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreDoubleCols unit where
 def Assumptions (_ : StoreDoubleCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := 39, op_a := cols.op_a,
@@ -250,7 +263,13 @@ def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
     ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -258,14 +277,16 @@ theorem soundness :
   obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal⟩ := h_holds
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_oa_a, h_oa_b⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
     exact h_addr_sub trivial
   · linear_combination h_isreal
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -273,15 +294,17 @@ theorem completeness :
   obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_isreal⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_oa_a, h_oa_b⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
     simp only [Vector.getElem_map] at h_addr
     exact h_addr
   · linear_combination h_isreal
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
 
 end Assertion
 

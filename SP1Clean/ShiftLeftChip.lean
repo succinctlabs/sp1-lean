@@ -18,6 +18,8 @@ import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
+import SP1Clean.Reader.OperandAccess
+import SP1Chips.ShiftLeft.ShiftLeftChip
 
 /-! # Chip-level `ShiftLeftChip` mirror — second heavy-arithmetic scaling probe
 
@@ -54,7 +56,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- The chip's column struct, mirroring SP1's Rust `ShiftLeftCols<T>`
 over 65 field elements. The non-reader columns are grouped into named
 Vector blocks where SP1's emission already treats them as a unit
-(`bit_shift`, `byte_shift`, `shifted_limbs`, `result`). -/
+(`c_bits`, `shift_u16`, `shifted_limbs`, `result`). -/
 structure ShiftLeftCols (T : Type) where
   clk_high : T                              -- Main[0]
   clk_16_24 : T                             -- Main[1]
@@ -81,11 +83,11 @@ structure ShiftLeftCols (T : Type) where
   -- The 4-limb shifted result (committed to op_a register).
   result : Vector T 4                       -- Main[32..35]
   -- 6-bit decomposition of the shift amount mod 64 (Main[36..41]).
-  bit_shift : Vector T 6                    -- Main[36..41]
+  c_bits : Vector T 6                    -- Main[36..41]
   -- Shift power intermediates (Main[42..44]).
   shift_pow : Vector T 3                    -- Main[42..44]
   -- One-hot byte-shift selector over 4 byte positions (Main[45..48]).
-  byte_shift : Vector T 4                   -- Main[45..48]
+  shift_u16 : Vector T 4                   -- Main[45..48]
   -- Shifted-limb intermediates and high-half spill (Main[49..56]).
   limb_shift : Vector T 8                   -- Main[49..56]
   -- Intermediate result columns before final assignment (Main[57..61]).
@@ -127,24 +129,24 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_b_memory_diff_low, op_c, _op_c_memory_prev_value,
        _op_c_memory_prev_low, _op_c_memory_diff_low, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
-       bit_shift, _shift_pow, byte_shift, _limb_shift,
+       c_bits, _shift_pow, shift_u16, _limb_shift,
        _result_intermediate, is_sll, is_sllw, _sign_extend,
        _next_pc_carry_value⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   -- 6 boolean asserts on the bit decomposition.
-  bit_shift[0] * (bit_shift[0] - 1) === 0
-  bit_shift[1] * (bit_shift[1] - 1) === 0
-  bit_shift[2] * (bit_shift[2] - 1) === 0
-  bit_shift[3] * (bit_shift[3] - 1) === 0
-  bit_shift[4] * (bit_shift[4] - 1) === 0
-  bit_shift[5] * (bit_shift[5] - 1) === 0
+  c_bits[0] * (c_bits[0] - 1) === 0
+  c_bits[1] * (c_bits[1] - 1) === 0
+  c_bits[2] * (c_bits[2] - 1) === 0
+  c_bits[3] * (c_bits[3] - 1) === 0
+  c_bits[4] * (c_bits[4] - 1) === 0
+  c_bits[5] * (c_bits[5] - 1) === 0
   -- 4 boolean asserts on the byte-shift selector.
-  byte_shift[0] * (byte_shift[0] - 1) === 0
-  byte_shift[1] * (byte_shift[1] - 1) === 0
-  byte_shift[2] * (byte_shift[2] - 1) === 0
-  byte_shift[3] * (byte_shift[3] - 1) === 0
+  shift_u16[0] * (shift_u16[0] - 1) === 0
+  shift_u16[1] * (shift_u16[1] - 1) === 0
+  shift_u16[2] * (shift_u16[2] - 1) === 0
+  shift_u16[3] * (shift_u16[3] - 1) === 0
   -- 2 opcode-selector boolean asserts + aggregate is-real boolean.
   is_sll * (is_sll - 1) === 0
   is_sllw * (is_sllw - 1) === 0
@@ -204,26 +206,77 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
       op_c := #v[cols.op_c, 0, 0, 0],
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
   -- 6 + 4 + 2 + 1 = 13 boolean gates.
-  cols.bit_shift[0] * (cols.bit_shift[0] - 1) = 0 ∧
-  cols.bit_shift[1] * (cols.bit_shift[1] - 1) = 0 ∧
-  cols.bit_shift[2] * (cols.bit_shift[2] - 1) = 0 ∧
-  cols.bit_shift[3] * (cols.bit_shift[3] - 1) = 0 ∧
-  cols.bit_shift[4] * (cols.bit_shift[4] - 1) = 0 ∧
-  cols.bit_shift[5] * (cols.bit_shift[5] - 1) = 0 ∧
-  cols.byte_shift[0] * (cols.byte_shift[0] - 1) = 0 ∧
-  cols.byte_shift[1] * (cols.byte_shift[1] - 1) = 0 ∧
-  cols.byte_shift[2] * (cols.byte_shift[2] - 1) = 0 ∧
-  cols.byte_shift[3] * (cols.byte_shift[3] - 1) = 0 ∧
+  cols.c_bits[0] * (cols.c_bits[0] - 1) = 0 ∧
+  cols.c_bits[1] * (cols.c_bits[1] - 1) = 0 ∧
+  cols.c_bits[2] * (cols.c_bits[2] - 1) = 0 ∧
+  cols.c_bits[3] * (cols.c_bits[3] - 1) = 0 ∧
+  cols.c_bits[4] * (cols.c_bits[4] - 1) = 0 ∧
+  cols.c_bits[5] * (cols.c_bits[5] - 1) = 0 ∧
+  cols.shift_u16[0] * (cols.shift_u16[0] - 1) = 0 ∧
+  cols.shift_u16[1] * (cols.shift_u16[1] - 1) = 0 ∧
+  cols.shift_u16[2] * (cols.shift_u16[2] - 1) = 0 ∧
+  cols.shift_u16[3] * (cols.shift_u16[3] - 1) = 0 ∧
   cols.is_sll * (cols.is_sll - 1) = 0 ∧
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
   (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
   cols.op_a_0 = 0 ∧
   shiftSpec cols
 
+/-- Project a raw SP1 row into the structured `ShiftLeftCols` view.
+65 columns; sub-struct vectors `result`, `c_bits`, `shift_pow`,
+`shift_u16`, `limb_shift`, `result_intermediate` packed from
+contiguous Main slots. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 65) : ShiftLeftCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20],
+   Main[21],
+   #v[Main[22], Main[23], Main[24], Main[25]],
+   Main[26], Main[27],
+   Main[28],
+   Main[29], Main[30], Main[31],
+   #v[Main[32], Main[33], Main[34], Main[35]],
+   #v[Main[36], Main[37], Main[38], Main[39], Main[40], Main[41]],
+   #v[Main[42], Main[43], Main[44]],
+   #v[Main[45], Main[46], Main[47], Main[48]],
+   #v[Main[49], Main[50], Main[51], Main[52], Main[53], Main[54], Main[55], Main[56]],
+   #v[Main[57], Main[58], Main[59], Main[60], Main[61]],
+   Main[62], Main[63], Main[64],
+   #v[0, 0, 0]⟩
+
+/-- The chip-level half-iff bridge (ShiftLeft). **Proof body sorry'd**
+— see `feedback_path2_correct_bridge_costs.md`. -/
+theorem spec_implies_allHold (Main : Vector (ZMod p) 65)
+    (h_is_real : Main[62] + Main[63] = 1)
+    (h_spec : Spec (fromMain Main)) :
+    (_root_.ShiftLeft.constraints Main).allHold := by
+  sorry
+
+/-- Clean-side `correct_sll`: R-type left shift. -/
+theorem correct_sll
+    (Main : Vector (ZMod p) 65) (s : SailState)
+    (h_is_sll : Main[62] = 1) (h_imm_c : Main[31] = 0)
+    (h_sllw_zero : Main[63] = 0)
+    (h_spec : Spec (fromMain Main))
+    (state_cstrs : (_root_.ShiftLeft.constraints Main).initialState s) :
+    let op_c := _root_.ShiftLeft.sp1_op_c Main
+    let op_b := _root_.ShiftLeft.sp1_op_b Main
+    let op_a := _root_.ShiftLeft.sp1_op_a Main
+    (_root_.Sll.Poly.spec_sll (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.ShiftLeft.sp1_shift_left Main).run s :=
+  _root_.Sll.Poly.correct_sll Main s
+    (spec_implies_allHold Main (by rw [h_is_sll, h_sllw_zero]; ring) h_spec)
+    ⟨h_is_sll, h_imm_c⟩ state_cstrs
+
 /-! ## Full `FormalAssertion` promotion (Path-2 — trimmed)
 
 `Assertion.main` drops the 10 Vector-indexed boolean gates (6 for
-`bit_shift`, 4 for `byte_shift`) that the chip's `main` emits. Those
+`c_bits`, 4 for `shift_u16`) that the chip's `main` emits. Those
 gates are internal to the shift-arithmetic operation and would trip
 the documented Path-1 friction (`Vector.map (eval env) input_var_X =
 input_X` doesn't reduce per-element under `circuit_proof_start`). They
@@ -240,12 +293,12 @@ open Circuit
 @[reducible]
 def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
-       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
-       _op_b_memory_diff_low, op_c, _op_c_memory_prev_value,
-       _op_c_memory_prev_low, _op_c_memory_diff_low, imm_c,
+       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
+       op_b_memory_diff_low, op_c, op_c_memory_prev_value,
+       op_c_memory_prev_low, op_c_memory_diff_low, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
-       _bit_shift, _shift_pow, _byte_shift, _limb_shift,
+       _c_bits, _shift_pow, _shift_u16, _limb_shift,
        _result_intermediate, is_sll, is_sllw, _sign_extend,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
@@ -264,7 +317,25 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_sllw * (is_sllw - 1) === 0
   (is_sll + is_sllw) * (is_sll + is_sllw - 1) === 0
   op_a_0 === 0
+  -- Iter-8 sub-task E: per-operand memory-bus byte content.
+  -- R-type: op_a/+4, op_b/+3, op_c/+2.
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 2, op_c_memory_prev_low, op_c_memory_diff_low,
+       op_c_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: 31 input fields + 4 subcircuit calls + 3 OperandAccess
+-- calls pushes localLength_eq synthesis past the default 200k cap.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) ShiftLeftCols unit where
   name := "SP1Clean.ShiftLeft"
@@ -274,6 +345,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) ShiftLeftCols unit where
 def Assumptions (_ : ShiftLeftCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := cols.is_sll * 8 + cols.is_sllw * 14,
@@ -287,7 +359,18 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   cols.is_sll * (cols.is_sll - 1) = 0 ∧
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
   (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
-  cols.op_a_0 = 0
+  cols.op_a_0 = 0 ∧
+  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
+  -- R-type: op_a/+4, op_b/+3, op_c/+2.
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 2, cols.op_c_memory_prev_low, cols.op_c_memory_diff_low,
+     cols.op_c_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -297,9 +380,9 @@ theorem soundness :
           e31⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_sll, h_sllw, h_sum,
-          h_op_a_0⟩ := h_holds
+          h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
@@ -308,6 +391,9 @@ theorem soundness :
   · linear_combination h_sllw
   · linear_combination h_sum
   · exact h_op_a_0
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
+  · exact h_oa_c trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -316,9 +402,10 @@ theorem completeness :
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_sll, h_sllw, h_sum, h_op_a_0⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_addr, h_sll, h_sllw, h_sum, h_op_a_0,
+          h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
@@ -328,6 +415,9 @@ theorem completeness :
   · linear_combination h_sllw
   · linear_combination h_sum
   · exact h_op_a_0
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
+  · exact ⟨trivial, h_oa_c⟩
 
 end Assertion
 

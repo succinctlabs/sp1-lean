@@ -18,6 +18,8 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
+import SP1Clean.Reader.OperandAccess
+import SP1Chips.Load.LoadX0.LoadX0Chip
 
 /-! # Chip-level `LoadX0Chip` mirror — load-when-op_a-is-x0 fast path
 
@@ -61,7 +63,7 @@ structure LoadX0Cols (T : Type) where
   load_memory_flag : T                      -- Main[35]
   load_memory_diff_low : T                  -- Main[36]
   load_memory_diff_high : T                 -- Main[37]
-  byte_offset_selectors : Vector T 3        -- Main[38..40] (byte-position selectors)
+  offset_bit : Vector T 3        -- Main[38..40] (byte-position selectors)
   is_lb : T                                 -- Main[41]
   is_lbu : T                                -- Main[42]
   is_lh : T                                 -- Main[43]
@@ -89,7 +91,7 @@ def main (cols : Var LoadX0Cols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
-       _byte_offset_selectors, is_lb, is_lbu, is_lh, is_lhu, is_lw,
+       _offset_bit, is_lb, is_lbu, is_lh, is_lhu, is_lw,
        is_lwu, is_ld, _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -163,6 +165,67 @@ def loadMemoryAccess (cols : LoadX0Cols (ZMod p)) : SP1Clean.MemoryAccess (ZMod 
     prev_low := cols.load_memory_prev_low,
     diff_low_limb := cols.load_memory_diff_low }
 
+/-- Project a raw SP1 row into the structured `LoadX0Cols` view.
+Mirrors the index map in `SP1Chips/Load/LoadX0/Constraints.lean`
+(48 columns). -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 48) : LoadX0Cols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20],
+   #v[Main[21], Main[22], Main[23], Main[24]],
+   #v[Main[25], Main[26], Main[27]],
+   Main[28],
+   #v[Main[29], Main[30], Main[31], Main[32]],
+   Main[33], Main[34], Main[35], Main[36], Main[37],
+   #v[Main[38], Main[39], Main[40]],
+   Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47],
+   #v[0, 0, 0]⟩
+
+/-- The chip-level half-iff bridge (LoadX0): under the active-variant
+hypothesis (one of `is_lb..is_ld = 1`, the rest zero), `Spec` implies
+SP1's `allHold`. **Proof body sorry'd** — see
+`feedback_path2_correct_bridge_costs.md`. -/
+theorem spec_implies_allHold (Main : Vector (ZMod p) 48)
+    (h_is_real : Main[41] + Main[42] + Main[43] + Main[44] + Main[45] +
+                 Main[46] + Main[47] = 1)
+    (h_spec : Spec (fromMain Main)) :
+    (_root_.Load.LoadX0.constraints Main).allHold := by
+  sorry
+
+/-- Clean-side `correct_loadX0_ld`: 64-bit doubleword load to x0. -/
+theorem correct_loadX0_ld
+    (Main : Vector (ZMod p) 48) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_is_loadX0_ld : Main[47] = 1)
+    (h_others_zero : Main[41] = 0 ∧ Main[42] = 0 ∧ Main[43] = 0 ∧
+                     Main[44] = 0 ∧ Main[45] = 0 ∧ Main[46] = 0)
+    (h_spec : Spec (fromMain Main))
+    (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
+      reg_val + offset + 8 < 2 ^ 64)
+    (h_is_aligned : LeanRV64D.Functions.is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 8 = true) :
+    let op_a := _root_.Load.LoadX0.sp1_op_a Main
+    let op_b := _root_.Load.LoadX0.sp1_ob_b Main
+    let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
+    (_root_.Load.LoadX0.spec_loadX0_ld imm_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
+  _root_.Load.LoadX0.correct_loadX0_ld Main s hs hs_config
+    (spec_implies_allHold Main
+      (by obtain ⟨h41, h42, h43, h44, h45, h46⟩ := h_others_zero
+          rw [h41, h42, h43, h44, h45, h46, h_is_loadX0_ld]; ring)
+      h_spec)
+    state_cstrs h_is_loadX0_ld h_fits_in_mem h_is_aligned
+
 /-! ## Full `FormalAssertion` promotion (Path-2)
 
 Drops the two bare `load_memory_diff_{low,high}` byte lookups; covers
@@ -177,12 +240,12 @@ open Circuit
 @[reducible]
 def main (cols : Var LoadX0Cols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
-       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
-       _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
+       op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
-       _byte_offset_selectors, is_lb, is_lbu, is_lh, is_lhu, is_lw,
+       _offset_bit, is_lb, is_lbu, is_lh, is_lhu, is_lw,
        is_lwu, is_ld, next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -205,7 +268,21 @@ def main (cols : Var LoadX0Cols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_ld * (is_ld - 1) === 0
   let sum := is_lb + is_lbu + is_lh + is_lhu + is_lw + is_lwu + is_ld
   sum * (sum - 1) === 0
+  -- Iter-8 sub-task E (partial): register-side OperandAccess only.
+  -- Load RAM access deferred (see `load-store-ram-access-deferred`).
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: 31 input fields + 4 subcircuit calls + 2 OperandAccess
+-- calls pushes localLength_eq synthesis past the default 200k cap.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) LoadX0Cols unit where
   name := "SP1Clean.LoadX0"
@@ -221,6 +298,7 @@ def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
   let opcode_e : ZMod p :=
     cols.is_lb * 29 + cols.is_lbu * 32 + cols.is_lh * 30 + cols.is_lhu * 33 +
       cols.is_lw * 31 + cols.is_lwu * 34 + cols.is_ld * 35
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := opcode_e, op_a := cols.op_a,
@@ -237,7 +315,13 @@ def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
   cols.is_lw * (cols.is_lw - 1) = 0 ∧
   cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
   cols.is_ld * (cols.is_ld - 1) = 0 ∧
-  is_real * (is_real - 1) = 0
+  is_real * (is_real - 1) = 0 ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -247,9 +331,9 @@ theorem soundness :
           e31⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_lb, h_lbu, h_lh, h_lhu, h_lw,
-          h_lwu, h_ld, h_sum⟩ := h_holds
+          h_lwu, h_ld, h_sum, h_oa_a, h_oa_b⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
@@ -262,6 +346,8 @@ theorem soundness :
   · linear_combination h_lwu
   · linear_combination h_ld
   · linear_combination h_sum
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -271,9 +357,9 @@ theorem completeness :
           e31⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu, h_prog, h_addr, h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld,
-          h_sum⟩ := h_spec
+          h_sum, h_oa_a, h_oa_b⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
@@ -287,6 +373,8 @@ theorem completeness :
   · linear_combination h_lwu
   · linear_combination h_ld
   · linear_combination h_sum
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
 
 end Assertion
 

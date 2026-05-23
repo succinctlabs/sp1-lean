@@ -20,6 +20,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.ITypeReaderImmutable
+import SP1Clean.Reader.OperandAccess
 
 /-! # Chip-level `StoreByteChip` mirror — first chip with a memory write
 
@@ -82,11 +83,11 @@ structure StoreByteCols (T : Type) where
   byte_selector_top : T                     -- Main[38] (selects which byte half)
   byte_selector_mid : T                     -- Main[39]
   byte_selector_lo : T                      -- Main[40]
-  selected_byte : T                         -- Main[41] (byte being stored)
-  selected_byte_alt : T                     -- Main[42]
-  result_byte : T                           -- Main[43] (the new byte at the offset)
-  selected_combined : T                     -- Main[44] (intermediate: combined byte at offset)
-  store_write_value : Vector T 4            -- Main[45..48] (new 4-limb word)
+  mem_limb : T                         -- Main[41] (byte being stored)
+  mem_limb_low_byte : T                     -- Main[42]
+  register_low_byte : T                           -- Main[43] (the new byte at the offset)
+  increment : T                     -- Main[44] (intermediate: combined byte at offset)
+  store_value : Vector T 4            -- Main[45..48] (new 4-limb word)
   is_real : T                               -- Main[49]
   next_pc_carry_value : Vector T 3
 deriving ProvableStruct
@@ -110,8 +111,8 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
        _store_memory_flag, store_memory_diff_low, store_memory_diff_high,
        _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
-       _selected_byte, selected_byte_alt, result_byte,
-       _selected_combined, _store_write_value, is_real,
+       _mem_limb, mem_limb_low_byte, register_low_byte,
+       _increment, _store_value, is_real,
        _next_pc_carry_value⟩ := cols
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
   lookup ByteOpcodeTable
@@ -132,10 +133,10 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- Byte-byte U8 range lookups for the store byte and its complement
   -- (the SP1 source emits the same two `.send (.byte 3 0 _ _)` calls).
   lookup ByteOpcodeTable
-    (#v[(3 : Expression (ZMod p)), 0, result_byte, 0]
+    (#v[(3 : Expression (ZMod p)), 0, register_low_byte, 0]
       : Vector (Expression (ZMod p)) 4)
   lookup ByteOpcodeTable
-    (#v[(3 : Expression (ZMod p)), 0, selected_byte_alt, 0]
+    (#v[(3 : Expression (ZMod p)), 0, mem_limb_low_byte, 0]
       : Vector (Expression (ZMod p)) 4)
   -- Program-bus interaction. Opcode is 36 = SB; I-type discipline:
   -- op_b is single-limb register index, op_c_imm carries 4 immediate
@@ -210,8 +211,8 @@ computed by the AddressOperation sub-fragment.
 
 For trace-level aggregation, the corresponding `write_value` is the
 4-limb word `[Main[45], Main[46], Main[47], Main[48]]` in the SP1
-constraints (here exposed as `cols.store_write_value` plus
-`cols.store_write_value_3`). For pure register reads of `op_a` / `op_b`,
+constraints (here exposed as `cols.store_value` plus
+`cols.store_value_3`). For pure register reads of `op_a` / `op_b`,
 the aggregator uses `write_value = prev_value` per the established
 read-only convention. -/
 def storeMemoryAccess (cols : StoreByteCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
@@ -224,9 +225,9 @@ def storeMemoryAccess (cols : StoreByteCols (ZMod p)) : SP1Clean.MemoryAccess (Z
 word at `addr_value` after the store: limb i = prev_value[i] OR the
 selected byte, depending on the byte selector. The SP1 constraint
 compiler emits one assertZero per limb to bind each to a function of
-`store_prev_value`, `selected_combined`, and the byte selectors. -/
+`store_prev_value`, `increment`, and the byte selectors. -/
 def storeWriteValue (cols : StoreByteCols (ZMod p)) : Word (ZMod p) :=
-  cols.store_write_value
+  cols.store_value
 
 /-- Project a raw SP1 row into the structured `StoreByteCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 50) : StoreByteCols (ZMod p) :=
@@ -251,8 +252,8 @@ def storeWriteValue (cols : StoreByteCols (ZMod p)) : Word (ZMod p) :=
 `_root_.Store.StoreByte.allHold_constraints_iff_of_is_real`. SB writes
 a single byte at one of 8 positions within the 8-byte aligned
 doubleword (selected by three byte selectors). The 4-limb
-`store_write_value` is the byte-selected merge of the new byte (derived
-from `op_a_memory_prev_value[0]` via the `result_byte`/`selected_combined`
+`store_value` is the byte-selected merge of the new byte (derived
+from `op_a_memory_prev_value[0]` via the `register_low_byte`/`increment`
 chain) with the existing `store_prev_value`. -/
 def SpecForIff_of_is_real (cols : StoreByteCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
@@ -293,36 +294,36 @@ def SpecForIff_of_is_real (cols : StoreByteCols (ZMod p)) : Prop :=
     (0 : ZMod p) < 256) ∧
   Word.isU64 cols.store_prev_value ∧
   (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 1 ∨
-    cols.selected_byte = cols.store_prev_value[0]) ∧
+    cols.mem_limb = cols.store_prev_value[0]) ∧
   (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 1 ∨
-    cols.selected_byte = cols.store_prev_value[1]) ∧
+    cols.mem_limb = cols.store_prev_value[1]) ∧
   (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 0 ∨
-    cols.selected_byte = cols.store_prev_value[2]) ∧
+    cols.mem_limb = cols.store_prev_value[2]) ∧
   (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 0 ∨
-    cols.selected_byte = cols.store_prev_value[3]) ∧
-  ((0 : ZMod p) < 256 ∧ cols.result_byte < (256 : ZMod p) ∧
-    (cols.op_a_memory_prev_value[0] - cols.result_byte) * (256 : ZMod p)⁻¹
+    cols.mem_limb = cols.store_prev_value[3]) ∧
+  ((0 : ZMod p) < 256 ∧ cols.register_low_byte < (256 : ZMod p) ∧
+    (cols.op_a_memory_prev_value[0] - cols.register_low_byte) * (256 : ZMod p)⁻¹
       < (256 : ZMod p)) ∧
-  ((0 : ZMod p) < 256 ∧ cols.selected_byte_alt < (256 : ZMod p) ∧
-    (cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹
+  ((0 : ZMod p) < 256 ∧ cols.mem_limb_low_byte < (256 : ZMod p) ∧
+    (cols.mem_limb - cols.mem_limb_low_byte) * (256 : ZMod p)⁻¹
       < (256 : ZMod p)) ∧
-  cols.selected_combined =
-    (cols.result_byte - cols.selected_byte_alt) * (1 - cols.byte_selector_top) +
+  cols.increment =
+    (cols.register_low_byte - cols.mem_limb_low_byte) * (1 - cols.byte_selector_top) +
     256 *
-      (cols.result_byte -
-        (cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹) *
+      (cols.register_low_byte -
+        (cols.mem_limb - cols.mem_limb_low_byte) * (256 : ZMod p)⁻¹) *
       cols.byte_selector_top ∧
-  cols.store_write_value[0] =
-    cols.selected_combined * (1 - cols.byte_selector_mid) *
+  cols.store_value[0] =
+    cols.increment * (1 - cols.byte_selector_mid) *
       (1 - cols.byte_selector_lo) + cols.store_prev_value[0] ∧
-  cols.store_write_value[1] =
-    cols.selected_combined * cols.byte_selector_mid *
+  cols.store_value[1] =
+    cols.increment * cols.byte_selector_mid *
       (1 - cols.byte_selector_lo) + cols.store_prev_value[1] ∧
-  cols.store_write_value[2] =
-    cols.selected_combined * (1 - cols.byte_selector_mid) *
+  cols.store_value[2] =
+    cols.increment * (1 - cols.byte_selector_mid) *
       cols.byte_selector_lo + cols.store_prev_value[2] ∧
-  cols.store_write_value[3] =
-    cols.selected_combined * cols.byte_selector_mid * cols.byte_selector_lo +
+  cols.store_value[3] =
+    cols.increment * cols.byte_selector_mid * cols.byte_selector_lo +
     cols.store_prev_value[3]
 
 set_option maxHeartbeats 800000 in
@@ -345,7 +346,7 @@ theorem iff_sp1_of_is_real (Main : Vector (ZMod p) 50) (h_is_real : Main[49] = 1
 /-! ## Full `FormalAssertion` promotion (Path-2)
 
 Drops the bare byte lookups (CPUState bytes done inline, store memory
-diff bytes, result_byte U8 range, selected_byte_alt U8 range); covers
+diff bytes, register_low_byte U8 range, mem_limb_low_byte U8 range); covers
 `CPUState`, `ProgramTable`, and the `is_real` boolean. Memory-bus
 consistency is deferred to OfflineMemory. -/
 
@@ -356,15 +357,15 @@ open Circuit
 @[reducible]
 def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
        op_a_0, op_b,
-       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
        op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
        _store_memory_flag, _store_memory_diff_low, _store_memory_diff_high,
        _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
-       _selected_byte, _selected_byte_alt, _result_byte,
-       _selected_combined, _store_write_value, is_real,
+       _mem_limb, _mem_limb_low_byte, _register_low_byte,
+       _increment, _store_value, is_real,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -377,7 +378,21 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        next_pc_carry_value⟩ :
       Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
+  -- Iter-8 sub-task E (partial): register-side OperandAccess only.
+  -- Store RAM access deferred (see `load-store-ram-access-deferred`).
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: 32 input fields + 4 subcircuit calls + 2 OperandAccess
+-- calls pushes localLength_eq synthesis past the default 200k cap.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) StoreByteCols unit where
   name := "SP1Clean.StoreByte"
@@ -387,6 +402,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreByteCols unit where
 def Assumptions (_ : StoreByteCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := 36, op_a := cols.op_a,
@@ -396,7 +412,13 @@ def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
     ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -405,14 +427,16 @@ theorem soundness :
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31, e32⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal⟩ := h_holds
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_oa_a, h_oa_b⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
     exact h_addr_sub trivial
   · linear_combination h_isreal
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -421,15 +445,17 @@ theorem completeness :
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31, e32⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_isreal⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_oa_a, h_oa_b⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
     simp only [Vector.getElem_map] at h_addr
     exact h_addr
   · linear_combination h_isreal
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
 
 end Assertion
 

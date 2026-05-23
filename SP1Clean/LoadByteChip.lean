@@ -19,6 +19,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
+import SP1Clean.Reader.OperandAccess
 
 /-! # Chip-level `LoadByteChip` mirror — first chip with a real memory load
 
@@ -77,12 +78,12 @@ structure LoadByteCols (T : Type) where
   load_memory_flag : T                      -- Main[35]
   load_memory_diff_low : T                  -- Main[36]
   load_memory_diff_high : T                 -- Main[37]
-  byte_selector_top : T                     -- Main[38] (selects which of 8 bytes)
-  byte_selector_mid : T                     -- Main[39]
-  byte_selector_lo : T                      -- Main[40]
-  selected_byte : T                         -- Main[41]
-  selected_byte_alt : T                     -- Main[42]
-  result_byte : T                           -- Main[43] (the loaded byte value)
+  offset_bit_2 : T                     -- Main[38] (selects which of 8 bytes)
+  offset_bit_1 : T                     -- Main[39]
+  offset_bit_0 : T                      -- Main[40]
+  selected_limb : T                         -- Main[41]
+  selected_limb_low_byte : T                     -- Main[42]
+  selected_byte : T                           -- Main[43] (the loaded byte value)
   signed_extension_flag : T                 -- Main[44] (1 if sign bit set, 0 otherwise)
   is_lb : T                                 -- Main[45]
   is_lbu : T                                -- Main[46]
@@ -109,8 +110,8 @@ def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
-       _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
-       _selected_byte, selected_byte_alt, result_byte, signed_extension_flag,
+       _offset_bit_2, _offset_bit_1, _offset_bit_0,
+       _selected_limb, selected_limb_low_byte, selected_byte, signed_extension_flag,
        is_lb, is_lbu, _next_pc_carry_value⟩ := cols
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
   lookup ByteOpcodeTable
@@ -130,11 +131,11 @@ def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
       : Vector (Expression (ZMod p)) 4)
   -- Selected byte U8 range (for the byte being loaded).
   lookup ByteOpcodeTable
-    (#v[(3 : Expression (ZMod p)), 0, selected_byte_alt, 0]
+    (#v[(3 : Expression (ZMod p)), 0, selected_limb_low_byte, 0]
       : Vector (Expression (ZMod p)) 4)
   -- MSB lookup (for sign-extension flag determination on LB).
   lookup ByteOpcodeTable
-    (#v[(5 : Expression (ZMod p)), signed_extension_flag, result_byte, 0]
+    (#v[(5 : Expression (ZMod p)), signed_extension_flag, selected_byte, 0]
       : Vector (Expression (ZMod p)) 4)
   -- Program-bus interaction. Opcode is is_lb * 29 + is_lbu * 32; I-type
   -- discipline: op_b is single-limb register index, op_c_imm carries
@@ -257,17 +258,17 @@ def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
       cols.op_b_memory_prev_value cols.op_c_imm
       { value := cols.addr_value } ∧
-  (cols.byte_selector_top = 0 ∨ cols.byte_selector_top = 1) ∧
-  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_mid = 1) ∧
-  (cols.byte_selector_lo = 0 ∨ cols.byte_selector_lo = 1) ∧
+  (cols.offset_bit_2 = 0 ∨ cols.offset_bit_2 = 1) ∧
+  (cols.offset_bit_1 = 0 ∨ cols.offset_bit_1 = 1) ∧
+  (cols.offset_bit_0 = 0 ∨ cols.offset_bit_0 = 1) ∧
   cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
-  ((cols.addr_value[0] - 4 * cols.byte_selector_lo - 2 * cols.byte_selector_mid
-        - cols.byte_selector_top) * (8 : ZMod p)⁻¹).val
+  ((cols.addr_value[0] - 4 * cols.offset_bit_0 - 2 * cols.offset_bit_1
+        - cols.offset_bit_2) * (8 : ZMod p)⁻¹).val
     < 2 ^ ZMod.val (13 : ZMod p) ∧
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
       (cols.clk_0_16 + cols.clk_16_24 * 65536) 29 cols.pc
-      #v[cols.result_byte + 65280 * cols.signed_extension_flag,
+      #v[cols.selected_byte + 65280 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag]
@@ -296,24 +297,24 @@ def SpecForIff_of_is_lb (cols : LoadByteCols (ZMod p)) : Prop :=
     (0 : ZMod p) < 256) ∧
   Word.isU64 cols.load_prev_value ∧
   cols.is_lbu = 0 ∧ cols.op_a_0 = 0 ∧
-  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 1 ∨
-    cols.selected_byte = cols.load_prev_value[0]) ∧
-  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 1 ∨
-    cols.selected_byte = cols.load_prev_value[1]) ∧
-  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 0 ∨
-    cols.selected_byte = cols.load_prev_value[2]) ∧
-  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 0 ∨
-    cols.selected_byte = cols.load_prev_value[3]) ∧
-  ((0 : ZMod p) < 256 ∧ cols.selected_byte_alt < (256 : ZMod p) ∧
-    (cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹
+  (cols.offset_bit_1 = 1 ∨ cols.offset_bit_0 = 1 ∨
+    cols.selected_limb = cols.load_prev_value[0]) ∧
+  (cols.offset_bit_1 = 0 ∨ cols.offset_bit_0 = 1 ∨
+    cols.selected_limb = cols.load_prev_value[1]) ∧
+  (cols.offset_bit_1 = 1 ∨ cols.offset_bit_0 = 0 ∨
+    cols.selected_limb = cols.load_prev_value[2]) ∧
+  (cols.offset_bit_1 = 0 ∨ cols.offset_bit_0 = 0 ∨
+    cols.selected_limb = cols.load_prev_value[3]) ∧
+  ((0 : ZMod p) < 256 ∧ cols.selected_limb_low_byte < (256 : ZMod p) ∧
+    (cols.selected_limb - cols.selected_limb_low_byte) * (256 : ZMod p)⁻¹
       < (256 : ZMod p)) ∧
-  cols.result_byte = cols.byte_selector_top *
-      ((cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹) +
-    (1 - cols.byte_selector_top) * cols.selected_byte_alt ∧
+  cols.selected_byte = cols.offset_bit_2 *
+      ((cols.selected_limb - cols.selected_limb_low_byte) * (256 : ZMod p)⁻¹) +
+    (1 - cols.offset_bit_2) * cols.selected_limb_low_byte ∧
   (cols.signed_extension_flag < (256 : ZMod p) ∧
-    cols.result_byte < (256 : ZMod p)) ∧
+    cols.selected_byte < (256 : ZMod p)) ∧
   (cols.signed_extension_flag = 0 ∨ cols.signed_extension_flag = 1) ∧
-  (cols.signed_extension_flag = 1 ↔ (128 : ZMod p) ≤ cols.result_byte)
+  (cols.signed_extension_flag = 1 ↔ (128 : ZMod p) ≤ cols.selected_byte)
 
 /-- Iff RHS for the unsigned Load Byte (LBU) variant, mirroring
 `_root_.Load.LoadByte.allHold_constraints_iff_of_is_lbu`. Differs from
@@ -324,17 +325,17 @@ def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
       cols.op_b_memory_prev_value cols.op_c_imm
       { value := cols.addr_value } ∧
-  (cols.byte_selector_top = 0 ∨ cols.byte_selector_top = 1) ∧
-  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_mid = 1) ∧
-  (cols.byte_selector_lo = 0 ∨ cols.byte_selector_lo = 1) ∧
+  (cols.offset_bit_2 = 0 ∨ cols.offset_bit_2 = 1) ∧
+  (cols.offset_bit_1 = 0 ∨ cols.offset_bit_1 = 1) ∧
+  (cols.offset_bit_0 = 0 ∨ cols.offset_bit_0 = 1) ∧
   cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
-  ((cols.addr_value[0] - 4 * cols.byte_selector_lo - 2 * cols.byte_selector_mid
-        - cols.byte_selector_top) * (8 : ZMod p)⁻¹).val
+  ((cols.addr_value[0] - 4 * cols.offset_bit_0 - 2 * cols.offset_bit_1
+        - cols.offset_bit_2) * (8 : ZMod p)⁻¹).val
     < 2 ^ ZMod.val (13 : ZMod p) ∧
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ITypeReader.itypeReaderSpec
       (cols.clk_0_16 + cols.clk_16_24 * 65536) 32 cols.pc
-      #v[cols.result_byte + 65280 * cols.signed_extension_flag,
+      #v[cols.selected_byte + 65280 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag,
          65535 * cols.signed_extension_flag]
@@ -363,20 +364,20 @@ def SpecForIff_of_is_lbu (cols : LoadByteCols (ZMod p)) : Prop :=
     (0 : ZMod p) < 256) ∧
   Word.isU64 cols.load_prev_value ∧
   cols.is_lb = 0 ∧ cols.op_a_0 = 0 ∧
-  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 1 ∨
-    cols.selected_byte = cols.load_prev_value[0]) ∧
-  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 1 ∨
-    cols.selected_byte = cols.load_prev_value[1]) ∧
-  (cols.byte_selector_mid = 1 ∨ cols.byte_selector_lo = 0 ∨
-    cols.selected_byte = cols.load_prev_value[2]) ∧
-  (cols.byte_selector_mid = 0 ∨ cols.byte_selector_lo = 0 ∨
-    cols.selected_byte = cols.load_prev_value[3]) ∧
-  ((0 : ZMod p) < 256 ∧ cols.selected_byte_alt < (256 : ZMod p) ∧
-    (cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹
+  (cols.offset_bit_1 = 1 ∨ cols.offset_bit_0 = 1 ∨
+    cols.selected_limb = cols.load_prev_value[0]) ∧
+  (cols.offset_bit_1 = 0 ∨ cols.offset_bit_0 = 1 ∨
+    cols.selected_limb = cols.load_prev_value[1]) ∧
+  (cols.offset_bit_1 = 1 ∨ cols.offset_bit_0 = 0 ∨
+    cols.selected_limb = cols.load_prev_value[2]) ∧
+  (cols.offset_bit_1 = 0 ∨ cols.offset_bit_0 = 0 ∨
+    cols.selected_limb = cols.load_prev_value[3]) ∧
+  ((0 : ZMod p) < 256 ∧ cols.selected_limb_low_byte < (256 : ZMod p) ∧
+    (cols.selected_limb - cols.selected_limb_low_byte) * (256 : ZMod p)⁻¹
       < (256 : ZMod p)) ∧
-  cols.result_byte = cols.byte_selector_top *
-      ((cols.selected_byte - cols.selected_byte_alt) * (256 : ZMod p)⁻¹) +
-    (1 - cols.byte_selector_top) * cols.selected_byte_alt ∧
+  cols.selected_byte = cols.offset_bit_2 *
+      ((cols.selected_limb - cols.selected_limb_low_byte) * (256 : ZMod p)⁻¹) +
+    (1 - cols.offset_bit_2) * cols.selected_limb_low_byte ∧
   cols.signed_extension_flag = 0
 
 set_option maxHeartbeats 800000 in
@@ -415,7 +416,7 @@ theorem iff_sp1_of_is_lbu (Main : Vector (ZMod p) 47) (h_is_lbu : Main[46] = 1) 
 /-! ## Full `FormalAssertion` promotion (Path-2)
 
 Drops the bare byte lookups (CPUState inline bytes, load-memory diff
-bytes, selected_byte_alt range, MSB lookup); covers `CPUState`,
+bytes, selected_limb_low_byte range, MSB lookup); covers `CPUState`,
 `ProgramTable`, the three boolean gates (`is_lb`, `is_lbu`, sum), and
 the `op_a_0 = 0` gate. Memory-bus consistency is deferred to
 OfflineMemory. -/
@@ -427,14 +428,14 @@ open Circuit
 @[reducible]
 def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
+       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
        op_a_0, op_b,
-       _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
+       op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
        op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
-       _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
-       _selected_byte, _selected_byte_alt, _result_byte, _signed_extension_flag,
+       _offset_bit_2, _offset_bit_1, _offset_bit_0,
+       _selected_limb, _selected_limb_low_byte, _selected_byte, _signed_extension_flag,
        is_lb, is_lbu, next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -451,7 +452,25 @@ def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_lbu * (is_lbu - 1) === 0
   (is_lb + is_lbu) * (is_lb + is_lbu - 1) === 0
   op_a_0 === 0
+  -- Iter-8 sub-task E (partial for Load chips). Emit OperandAccess only
+  -- for the 2 register accesses (op_a/+4, op_b/+3). The RAM access at
+  -- +1 uses a (diff_low, diff_high) flag-gated timestamp encoding that
+  -- doesn't match OperandAccess.Spec's scaled-timestamp form; deferred
+  -- to a follow-up that introduces a flag-aware `LoadOperandAccess`
+  -- variant (see memory `load-store-ram-access-deferred`).
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: 32 input fields + 4 subcircuit calls + 2 OperandAccess
+-- calls pushes localLength_eq synthesis past the default 200k cap.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) LoadByteCols unit where
   name := "SP1Clean.LoadByte"
@@ -461,6 +480,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadByteCols unit where
 def Assumptions (_ : LoadByteCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := cols.is_lb * 29 + cols.is_lbu * 32,
@@ -474,7 +494,15 @@ def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
   cols.is_lb * (cols.is_lb - 1) = 0 ∧
   cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
   (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
-  cols.op_a_0 = 0
+  cols.op_a_0 = 0 ∧
+  -- Iter-8 sub-task E (partial). Register-side memory-bus byte content:
+  -- op_a/+4, op_b/+3. The load_mem/+1 access is deferred.
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -484,9 +512,9 @@ theorem soundness :
           e31, e32⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_lb, h_lbu, h_sum,
-          h_op_a_0⟩ := h_holds
+          h_op_a_0, h_oa_a, h_oa_b⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
@@ -495,6 +523,8 @@ theorem soundness :
   · linear_combination h_lbu
   · linear_combination h_sum
   · exact h_op_a_0
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -503,9 +533,10 @@ theorem completeness :
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31, e32⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_lb, h_lbu, h_sum, h_op_a_0⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_addr, h_lb, h_lbu, h_sum, h_op_a_0,
+          h_oa_a, h_oa_b⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
@@ -515,6 +546,8 @@ theorem completeness :
   · linear_combination h_lbu
   · linear_combination h_sum
   · exact h_op_a_0
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
 
 end Assertion
 

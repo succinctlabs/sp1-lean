@@ -20,6 +20,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
+import SP1Clean.Reader.OperandAccess
 
 /-! # Chip-level `LoadWordChip` mirror — 32-bit signed/unsigned load
 
@@ -61,7 +62,7 @@ structure LoadWordCols (T : Type) where
   load_memory_flag : T                      -- Main[35]
   load_memory_diff_low : T                  -- Main[36]
   load_memory_diff_high : T                 -- Main[37]
-  word_offset_flag : T                      -- Main[38] (selects high vs low word in double)
+  offset_bit : T                      -- Main[38] (selects high vs low word in double)
   op_a_write_value_lo : Vector T 2          -- Main[39..40] (selected 32-bit word's two limbs)
   signed_extension_msb : T                  -- Main[41] (MSB for sign-extension)
   is_lw : T                                 -- Main[42]
@@ -76,7 +77,7 @@ def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
-       _word_offset_flag, _op_a_write_value_lo, _signed_extension_msb,
+       _offset_bit, _op_a_write_value_lo, _signed_extension_msb,
        is_lw, is_lwu, _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -157,9 +158,9 @@ def SpecForIff_of_is_lw (cols : LoadWordCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
       cols.op_b_memory_prev_value cols.op_c_imm
       { value := cols.addr_value } ∧
-  (cols.word_offset_flag = 0 ∨ cols.word_offset_flag = 1) ∧
+  (cols.offset_bit = 0 ∨ cols.offset_bit = 1) ∧
   cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
-  ((cols.addr_value[0] - 4 * cols.word_offset_flag) * (8 : ZMod p)⁻¹).val
+  ((cols.addr_value[0] - 4 * cols.offset_bit) * (8 : ZMod p)⁻¹).val
     < 2 ^ ZMod.val (13 : ZMod p) ∧
   (U16MSBOperation.constraints cols.op_a_write_value_lo[1]
       { msb := cols.signed_extension_msb } 1).allHold ∧
@@ -194,10 +195,10 @@ def SpecForIff_of_is_lw (cols : LoadWordCols (ZMod p)) : Prop :=
     (0 : ZMod p) < 256) ∧
   Word.isU64 cols.load_prev_value ∧
   cols.is_lwu = 0 ∧ cols.op_a_0 = 0 ∧
-  (cols.word_offset_flag = 1 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[0]) ∧
-  (cols.word_offset_flag = 1 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[1]) ∧
-  (cols.word_offset_flag = 0 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[2]) ∧
-  (cols.word_offset_flag = 0 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[3])
+  (cols.offset_bit = 1 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[0]) ∧
+  (cols.offset_bit = 1 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[1]) ∧
+  (cols.offset_bit = 0 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[2]) ∧
+  (cols.offset_bit = 0 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[3])
 
 /-- Iff RHS for the unsigned Load Word (LWU) variant. Differs from the
 signed variant in the ITypeReader opcode (34 vs 31), the forced-zero
@@ -207,9 +208,9 @@ def SpecForIff_of_is_lwu (cols : LoadWordCols (ZMod p)) : Prop :=
   SP1Clean.AddrAddOp.Spec
       cols.op_b_memory_prev_value cols.op_c_imm
       { value := cols.addr_value } ∧
-  (cols.word_offset_flag = 0 ∨ cols.word_offset_flag = 1) ∧
+  (cols.offset_bit = 0 ∨ cols.offset_bit = 1) ∧
   cols.addr_top_two_limb_inv * (cols.addr_value[1] + cols.addr_value[2]) = 1 ∧
-  ((cols.addr_value[0] - 4 * cols.word_offset_flag) * (8 : ZMod p)⁻¹).val
+  ((cols.addr_value[0] - 4 * cols.offset_bit) * (8 : ZMod p)⁻¹).val
     < 2 ^ ZMod.val (13 : ZMod p) ∧
   (U16MSBOperation.constraints cols.op_a_write_value_lo[1]
       { msb := cols.signed_extension_msb } 0).allHold ∧
@@ -244,10 +245,10 @@ def SpecForIff_of_is_lwu (cols : LoadWordCols (ZMod p)) : Prop :=
     (0 : ZMod p) < 256) ∧
   Word.isU64 cols.load_prev_value ∧
   cols.is_lw = 0 ∧ cols.op_a_0 = 0 ∧
-  (cols.word_offset_flag = 1 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[0]) ∧
-  (cols.word_offset_flag = 1 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[1]) ∧
-  (cols.word_offset_flag = 0 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[2]) ∧
-  (cols.word_offset_flag = 0 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[3]) ∧
+  (cols.offset_bit = 1 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[0]) ∧
+  (cols.offset_bit = 1 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[1]) ∧
+  (cols.offset_bit = 0 ∨ cols.op_a_write_value_lo[0] = cols.load_prev_value[2]) ∧
+  (cols.offset_bit = 0 ∨ cols.op_a_write_value_lo[1] = cols.load_prev_value[3]) ∧
   cols.signed_extension_msb = 0
 
 set_option maxHeartbeats 800000 in
@@ -297,12 +298,12 @@ open Circuit
 @[reducible]
 def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a,
-       _op_a_memory_prev_value, _op_a_memory_prev_low, _op_a_memory_diff_low,
-       op_a_0, op_b, _op_b_memory_prev_value, _op_b_memory_prev_low,
-       _op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
+       op_a_memory_prev_value, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_0, op_b, op_b_memory_prev_value, op_b_memory_prev_low,
+       op_b_memory_diff_low, op_c_imm, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
-       _word_offset_flag, _op_a_write_value_lo, _signed_extension_msb,
+       _offset_bit, _op_a_write_value_lo, _signed_extension_msb,
        is_lw, is_lwu, next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -318,7 +319,21 @@ def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_lw * (is_lw - 1) === 0
   is_lwu * (is_lwu - 1) === 0
   (is_lw + is_lwu) * (is_lw + is_lwu - 1) === 0
+  -- Iter-8 sub-task E (partial): register-side OperandAccess only.
+  -- Load RAM access deferred (see `load-store-ram-access-deferred`).
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
+set_option maxHeartbeats 800000 in
+-- Higher heartbeats: 28 input fields + 4 subcircuit calls + 2 OperandAccess
+-- calls pushes localLength_eq synthesis past the default 200k cap.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) LoadWordCols unit where
   name := "SP1Clean.LoadWord"
@@ -328,6 +343,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadWordCols unit where
 def Assumptions (_ : LoadWordCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := cols.is_lw * 31 + cols.is_lwu * 34,
@@ -340,7 +356,13 @@ def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
      cols.next_pc_carry_value⟩ ∧
   cols.is_lw * (cols.is_lw - 1) = 0 ∧
   cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0
+  (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0 ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -348,9 +370,10 @@ theorem soundness :
   obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_lw, h_lwu, h_sum⟩ := h_holds
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_lw, h_lwu, h_sum,
+          h_oa_a, h_oa_b⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
@@ -358,6 +381,8 @@ theorem soundness :
   · linear_combination h_lw
   · linear_combination h_lwu
   · linear_combination h_sum
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -365,9 +390,9 @@ theorem completeness :
   obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_lw, h_lwu, h_sum⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_addr, h_lw, h_lwu, h_sum, h_oa_a, h_oa_b⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
@@ -376,6 +401,8 @@ theorem completeness :
   · linear_combination h_lw
   · linear_combination h_lwu
   · linear_combination h_sum
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
 
 end Assertion
 

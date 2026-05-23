@@ -21,6 +21,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.JTypeReader
+import SP1Clean.Reader.OperandAccess
 
 /-! # Chip-level `UTypeChip` mirror — bundled U-type (LUI/AUIPC)
 
@@ -46,7 +47,7 @@ open Circuit ProvableType
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The chip's column struct, mirroring SP1's Rust `UTypeCols<T>`.
-`pc_addend` is the conditional `is_auipc * pc` carried into the
+`addend` is the conditional `is_auipc * pc` carried into the
 AddOperation, and `add_result` is the 64-bit AddOp output written to
 op_a. -/
 structure UTypeCols (T : Type) where
@@ -61,7 +62,7 @@ structure UTypeCols (T : Type) where
   op_a_0 : T
   op_b_imm : Vector T 4
   op_c_imm : Vector T 4
-  pc_addend : Vector T 3
+  addend : Vector T 3
   add_result : Vector T 4
   is_auipc : T
   is_real : T
@@ -72,14 +73,14 @@ deriving ProvableStruct
 the program-bus interaction with the selector-weighted opcode
 (`is_auipc * 48 + (1 - is_auipc) * 49` — AUIPC=48, LUI=49), and the
 trailing assertZero gates (is_real boolean, is_auipc boolean, three
-`pc_addend = is_auipc * pc` clauses, the `(is_real - 1) * op_a_0 = 0`
-gate). The AddOperation sub-fragment (operating on `pc_addend` and
+`addend = is_auipc * pc` clauses, the `(is_real - 1) * op_a_0 = 0`
+gate). The AddOperation sub-fragment (operating on `addend` and
 `op_b_imm`) is intentionally not emitted as a subcircuit — its
 constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b_imm,
-       op_c_imm, pc_addend, _add_result, is_auipc, is_real,
+       op_c_imm, addend, _add_result, is_auipc, is_real,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -90,9 +91,9 @@ def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   is_auipc * (is_auipc - 1) === 0
-  pc_addend[0] - is_auipc * pc[0] === 0
-  pc_addend[1] - is_auipc * pc[1] === 0
-  pc_addend[2] - is_auipc * pc[2] === 0
+  addend[0] - is_auipc * pc[0] === 0
+  addend[1] - is_auipc * pc[1] === 0
+  addend[2] - is_auipc * pc[2] === 0
   (is_real - 1) * op_a_0 === 0
 
 /-- Pilot Spec, expressed over field-valued `UTypeCols (ZMod p)`. Conjunct
@@ -104,7 +105,7 @@ stated for `is_real arg = 1`. -/
 def Spec (cols : UTypeCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p := cols.is_auipc * 48 + (1 - cols.is_auipc) * 49
   let addend : Word (ZMod p) :=
-    #v[cols.pc_addend[0], cols.pc_addend[1], cols.pc_addend[2], 0]
+    #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   (_root_.AddOperation.constraints (F := ZMod p)
       addend cols.op_b_imm { value := cols.add_result }
@@ -122,9 +123,9 @@ def Spec (cols : UTypeCols (ZMod p)) : Prop :=
         op_b_imm := cols.op_b_imm, op_c_imm := cols.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
-  cols.pc_addend[0] - cols.is_auipc * cols.pc[0] = 0 ∧
-  cols.pc_addend[1] - cols.is_auipc * cols.pc[1] = 0 ∧
-  cols.pc_addend[2] - cols.is_auipc * cols.pc[2] = 0 ∧
+  cols.addend[0] - cols.is_auipc * cols.pc[0] = 0 ∧
+  cols.addend[1] - cols.is_auipc * cols.pc[1] = 0 ∧
+  cols.addend[2] - cols.is_auipc * cols.pc[2] = 0 ∧
   (cols.is_real - 1) * cols.op_a_0 = 0
 
 /-- The op_a register access (read prior, write result), exposed for
@@ -210,11 +211,11 @@ as subcircuits, plus the three scalar trailing assertZero gates
 (`is_real` binary, `is_auipc` binary, `(is_real - 1) * op_a_0 = 0`).
 
 **Path-2 drops.** The `AddOperation` clause and the three Vector-indexed
-`pc_addend[i] - is_auipc * pc[i] = 0` gates are NOT promoted here. The
+`addend[i] - is_auipc * pc[i] = 0` gates are NOT promoted here. The
 Vector-indexed clauses hit the FormalAssertion friction noted in memory
 `feedback_formal_assertion_friction` (completeness goals on
-`Expression.eval env input_var_pc_addend[i]` don't bridge cleanly to
-`cols.pc_addend[i]`). They remain in the legacy chip-level `Spec` /
+`Expression.eval env input_var_addend[i]` don't bridge cleanly to
+`cols.addend[i]`). They remain in the legacy chip-level `Spec` /
 `iff_sp1` route. Same Path-2 design as `SP1Clean.Jalr.Assertion`. -/
 
 namespace Assertion
@@ -222,13 +223,13 @@ namespace Assertion
 open Circuit
 
 /-- Refactored chip-level circuit using subcircuit composition. Drops
-the AddOperation byte lookups and the 3 Vector-indexed `pc_addend`
+the AddOperation byte lookups and the 3 Vector-indexed `addend`
 clauses (see Scope note above). -/
 @[reducible]
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
-       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b_imm,
-       op_c_imm, _pc_addend, _add_result, is_auipc, is_real,
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, op_a_memory_prev_value,
+       op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b_imm,
+       op_c_imm, _addend, _add_result, is_auipc, is_real,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -241,6 +242,14 @@ def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
        #v[(4 : Expression (ZMod p)), 0, 0, 0],
        next_pc_carry_value⟩ :
       Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  -- Iter-8 sub-task E: per-operand memory-bus byte content. UType has
+  -- a single register access (op_a) at offset +4 — no op_b / op_c
+  -- register reads (both are immediates).
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   is_auipc * (is_auipc - 1) === 0
   (is_real - 1) * op_a_0 === 0
@@ -254,9 +263,12 @@ instance elaborated : ElaboratedCircuit (ZMod p) UTypeCols unit where
 def Assumptions (_ : UTypeCols (ZMod p)) : Prop := True
 
 /-- The chip's Circuit-derivable spec: byte-lookup consequences for the
-clock-decomposition gadget, the program-bus existential witness, and the
-three scalar trailing assertZero gates. -/
+clock-decomposition gadget, the program-bus existential witness, the
+carry-aware `pc + 4` witness in `next_pc_carry_value`, the three scalar
+trailing assertZero gates, and the per-operand memory-bus byte content
+for `op_a` (the chip's only register access). -/
 def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc,
@@ -271,7 +283,12 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
      cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
-  (cols.is_real - 1) * cols.op_a_0 = 0
+  (cols.is_real - 1) * cols.op_a_0 = 0 ∧
+  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequence.
+  -- UType emits a single op_a register access at offset +4.
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -279,9 +296,10 @@ theorem soundness :
   obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
           e16⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_isauipc, h_op_a_0⟩ := h_holds
+  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_oa_a, h_isreal, h_isauipc,
+          h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · simp only [Vector.getElem_map]
@@ -289,6 +307,7 @@ theorem soundness :
   · linear_combination h_isreal
   · linear_combination h_isauipc
   · linear_combination h_op_a_0
+  · exact h_oa_a trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -296,14 +315,15 @@ theorem completeness :
   obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
           e16⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_isauipc, h_op_a_0⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_isauipc, h_op_a_0, h_oa_a⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
     simp only [Vector.getElem_map] at h_addr
     exact h_addr
+  · exact ⟨trivial, h_oa_a⟩
   · linear_combination h_isreal
   · linear_combination h_isauipc
   · linear_combination h_op_a_0

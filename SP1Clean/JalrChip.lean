@@ -20,6 +20,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
+import SP1Clean.Reader.OperandAccess
 
 /-! # Chip-level `JalrChip` mirror — JALR (I-type indirect jump)
 
@@ -62,13 +63,13 @@ structure JalrCols (T : Type) where
   is_real : T
   jump_target : Vector T 4
   op_a_write_value : Vector T 4
-  low_bit : T
+  lsb : T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Emits CPUState range lookups, the program-bus
 interaction (opcode 47 = JALR), the alignment lookup for the next-PC's
 low limb, byte lookups for the memory-access timestamps, and the
-trailing assertZero gates (is_real boolean, low_bit boolean,
+trailing assertZero gates (is_real boolean, lsb boolean,
 next_pc[3] = 0, op_a_write_value[3] = 0, vacuous op_a gates).
 
 The two `AddOperation` sub-fragments are not emitted as subcircuits
@@ -77,7 +78,7 @@ def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
        _op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
-       op_c_imm, is_real, jump_target, op_a_write_value, low_bit⟩ := cols
+       op_c_imm, is_real, jump_target, op_a_write_value, lsb⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   -- Program-bus interaction. Opcode is 47 = JALR; I-type discipline
@@ -86,14 +87,14 @@ def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
   SP1Clean.ProgramTable.assertion
     (⟨pc, 47, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- Alignment lookup: (jump_target[0] - low_bit) / 4 must fit in Range(14).
+  -- Alignment lookup: (jump_target[0] - lsb) / 4 must fit in Range(14).
   lookup ByteOpcodeTable
-    (#v[(6 : Expression (ZMod p)), (jump_target[0] - low_bit) * (4 : ZMod p)⁻¹, 14, 0]
+    (#v[(6 : Expression (ZMod p)), (jump_target[0] - lsb) * (4 : ZMod p)⁻¹, 14, 0]
       : Vector (Expression (ZMod p)) 4)
   -- Trailing asserts.
   is_real * (is_real - 1) === 0
   jump_target[3] === 0
-  low_bit * (low_bit - 1) === 0
+  lsb * (lsb - 1) === 0
   (is_real - 1) * op_a_0 === 0
   op_a_write_value[3] === 0
   op_a_0 * op_a_write_value[0] === 0
@@ -132,12 +133,16 @@ def Spec (cols : JalrCols (ZMod p)) : Prop :=
         op_c_imm := cols.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.jump_target[3] = 0 ∧
-  cols.low_bit * (cols.low_bit - 1) = 0 ∧
+  cols.lsb * (cols.lsb - 1) = 0 ∧
   (cols.is_real - 1) * cols.op_a_0 = 0 ∧
   cols.op_a_write_value[3] = 0 ∧
   cols.op_a_0 * cols.op_a_write_value[0] = 0 ∧
   cols.op_a_0 * cols.op_a_write_value[1] = 0 ∧
-  cols.op_a_0 * cols.op_a_write_value[2] = 0
+  cols.op_a_0 * cols.op_a_write_value[2] = 0 ∧
+  -- iter-9 strengthening: PC alignment byte-send consequence
+  -- ((jump_target[0] - lsb) / 4 in Range(14) — the bit-0-cleared
+  -- jump target is 4-aligned in the low limb).
+  ((cols.jump_target[0] - cols.lsb) * (4 : ZMod p)⁻¹).val < 16384
 
 /-- The op_a register access (read prior, write return address),
 exposed for trace-level OfflineMemory aggregation. -/
@@ -154,6 +159,55 @@ def opBMemoryAccess (cols : JalrCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) 
     prev_value := cols.op_b_memory_prev_value,
     prev_low := cols.op_b_memory_prev_low,
     diff_low_limb := cols.op_b_memory_diff_low }
+
+/-- Project a raw SP1 row into the structured `JalrCols` view. Mirrors
+the index map in `SP1Chips/Jalr/Constraints.lean` (35 columns). -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 35) : JalrCols (ZMod p) :=
+  ⟨Main[0], Main[1], Main[2],
+   #v[Main[3], Main[4], Main[5]],
+   Main[6],
+   #v[Main[7], Main[8], Main[9], Main[10]],
+   Main[11], Main[12], Main[13],
+   Main[14],
+   #v[Main[15], Main[16], Main[17], Main[18]],
+   Main[19], Main[20],
+   #v[Main[21], Main[22], Main[23], Main[24]],
+   Main[25],
+   #v[Main[26], Main[27], Main[28], Main[29]],
+   #v[Main[30], Main[31], Main[32], Main[33]],
+   Main[34]⟩
+
+/-- The chip-level half-iff bridge: under `is_real = 1 ∧ op_a_0 = 0`,
+the Clean-flavored `Spec` implies SP1's `allHold` over the flat row.
+Used by `correct_jalr` to thread the Clean Spec into the dirty-side
+`JALR_correct` proof.
+
+**Iter-9 status: proof body sorry'd** — same rationale as
+`Jal.spec_implies_allHold`; see `feedback_path2_correct_bridge_costs.md`. -/
+theorem spec_implies_allHold (Main : Vector (ZMod p) 35)
+    (h_is_real : Main[25] = 1) (h_op_a_0 : Main[13] = 0)
+    (h_spec : Spec (fromMain Main)) :
+    (_root_.Jalr.constraints Main).allHold := by
+  sorry
+
+/-- Clean-side `correct_jalr`: same Sail equivalence statement as the
+dirty `_root_.Jalr.JALR_correct`, with the constraint hypothesis
+re-expressed against the Clean `Spec` predicate via `spec_implies_allHold`. -/
+theorem correct_jalr
+    (Main : Vector (ZMod p) 35) (s : SailState)
+    (h_is_real : Main[25] = 1) (h_op_a_0 : Main[13] = 0)
+    (h_spec : Spec (fromMain Main))
+    (hs : SailState.isInitialized s)
+    (state_cstrs : (_root_.Jalr.constraints Main).initialState s)
+    (hv : SailState.isValidMemConfig s hs) :
+    let op_b := _root_.Jalr.sp1_op_b Main
+    let op_a := _root_.Jalr.sp1_op_a Main
+    let op_c := _root_.Jalr.sp1_op_c Main
+    (_root_.Jalr.spec_jalr op_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Jalr.sp1_jalr Main).run s :=
+  _root_.Jalr.JALR_correct Main s
+    (spec_implies_allHold Main h_is_real h_op_a_0 h_spec)
+    h_is_real hs state_cstrs hv
 
 /-! ## Full `FormalAssertion` promotion (Path-2 + single-gate Phase-A)
 
@@ -180,7 +234,7 @@ boolean selectors). Picking that up is iter-6 work.
 
 What survives in `Assertion.main` today: `CPUState.assertion`,
 `ProgramTable.assertion`, `GatedAddOp.assertion` for the jump-target
-sum, and the three scalar boolean asserts (`is_real`, `low_bit`,
+sum, and the three scalar boolean asserts (`is_real`, `lsb`,
 `(is_real - 1) * op_a_0`). The alignment lookup, the second AddOp
 clause, and the four Vector-indexed asserts on `jump_target[3]` /
 `op_a_write_value[3]` / `op_a_0 * op_a_write_value[k]` remain in the
@@ -192,10 +246,10 @@ open Circuit
 
 @[reducible]
 def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
-       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
-       op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
-       op_c_imm, is_real, jump_target, _op_a_write_value, low_bit⟩ := cols
+  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, op_a_memory_prev_value,
+       op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b,
+       op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_c_imm, is_real, jump_target, _op_a_write_value, lsb⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
@@ -210,8 +264,20 @@ def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (⟨op_b_memory_prev_value, op_c_imm, jump_target, is_real⟩ :
       Var SP1Clean.GatedAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
-  low_bit * (low_bit - 1) === 0
+  lsb * (lsb - 1) === 0
   (is_real - 1) * op_a_0 === 0
+  -- Iter-8 sub-task E: per-operand memory-bus byte content. Jalr emits
+  -- 2 register accesses: op_a/+4 (return-address write), op_b/+3
+  -- (jump-target base register read). op_c is the I-type immediate.
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
 
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) JalrCols unit where
@@ -222,6 +288,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) JalrCols unit where
 def Assumptions (_ : JalrCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
+  let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.pc, opcode := 47, op_a := cols.op_a,
@@ -230,35 +297,48 @@ def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
   (cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
     cols.op_b_memory_prev_value cols.op_c_imm cols.jump_target) ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.low_bit * (cols.low_bit - 1) = 0 ∧
-  (cols.is_real - 1) * cols.op_a_0 = 0
+  cols.lsb * (cols.lsb - 1) = 0 ∧
+  (cols.is_real - 1) * cols.op_a_0 = 0 ∧
+  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
+  -- Jalr emits 2 register accesses: op_a/+4 and op_b/+3.
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu_sub, h_prog_sub, h_gated_sub, h_isreal, h_lowbit, h_isreal_op_a_0⟩
-    := h_holds
+  obtain ⟨h_cpu_sub, h_prog_sub, h_gated_sub, h_isreal, h_lowbit, h_isreal_op_a_0,
+          h_oa_a, h_oa_b⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
   · exact h_gated_sub trivial
   · linear_combination h_isreal
   · linear_combination h_lowbit
   · linear_combination h_isreal_op_a_0
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu, h_prog, h_gated, h_isreal, h_lowbit, h_isreal_op_a_0⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_gated, h_isreal, h_lowbit, h_isreal_op_a_0,
+          h_oa_a, h_oa_b⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · exact ⟨trivial, h_gated⟩
   · linear_combination h_isreal
   · linear_combination h_lowbit
   · linear_combination h_isreal_op_a_0
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
 
 end Assertion
 
