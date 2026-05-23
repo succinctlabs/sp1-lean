@@ -503,10 +503,14 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
           prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
           diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
       [(op_a_mem,
-        #v[cols.bitwise_result[0] + cols.bitwise_result[1] * 256,
-           cols.bitwise_result[2] + cols.bitwise_result[3] * 256,
-           cols.bitwise_result[4] + cols.bitwise_result[5] * 256,
-           cols.bitwise_result[6] + cols.bitwise_result[7] * 256]),
+        #v[cols.bitwise_operation.bitwise_operation.result[0] +
+             cols.bitwise_operation.bitwise_operation.result[1] * 256,
+           cols.bitwise_operation.bitwise_operation.result[2] +
+             cols.bitwise_operation.bitwise_operation.result[3] * 256,
+           cols.bitwise_operation.bitwise_operation.result[4] +
+             cols.bitwise_operation.bitwise_operation.result[5] * 256,
+           cols.bitwise_operation.bitwise_operation.result[6] +
+             cols.bitwise_operation.bitwise_operation.result[7] * 256]),
        (op_b_mem, cols.adapter.op_b_memory.prev_value),
        (op_c_mem, cols.adapter.op_c_memory.prev_value)]
   | .sub cols =>

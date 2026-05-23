@@ -52,9 +52,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 structure BitwiseCols (T : Type) where
   state : CPUState T
   adapter : ALUTypeReader T
-  b_low_bytes : Vector T 4
-  c_low_bytes : Vector T 4
-  bitwise_result : Vector T 8
+  bitwise_operation : BitwiseU16Operation T
   is_xor : T
   is_or : T
   is_and : T
@@ -72,8 +70,8 @@ has a Clean operation wrapper yet; the `FormalAssertion` below proves
 only what `main` actually emits. -/
 def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, _b_low_bytes, _c_low_bytes,
-       _bitwise_result, is_xor, is_or, is_and, next_pc_carry_value⟩ := cols
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩,
+       _bitwise_operation, is_xor, is_or, is_and, next_pc_carry_value⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -128,10 +126,7 @@ boolean disjunctions on the opcode selectors, and `op_a_0 = 0`. -/
 def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
   let opcode_bw : ZMod p := cols.is_xor * 2 + cols.is_or * 1 + cols.is_and * 0
   let is_real : ZMod p := cols.is_xor + cols.is_or + cols.is_and
-  let bw_cols : BitwiseU16Operation (ZMod p) :=
-    { b_low_bytes := { low_bytes := cols.b_low_bytes },
-      c_low_bytes := { low_bytes := cols.c_low_bytes },
-      bitwise_operation := { result := cols.bitwise_result } }
+  let bw_cols : BitwiseU16Operation (ZMod p) := cols.bitwise_operation
   let ret_val : Word (ZMod p) :=
     (BitwiseU16Operation.constraints (F := ZMod p)
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
@@ -183,9 +178,9 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
     #v[Main[21], Main[22], Main[23], Main[24]],
     ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
     Main[31]⟩,
-   #v[Main[32], Main[33], Main[34], Main[35]],
-   #v[Main[36], Main[37], Main[38], Main[39]],
-   #v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]],
+   ⟨⟨#v[Main[32], Main[33], Main[34], Main[35]]⟩,
+    ⟨#v[Main[36], Main[37], Main[38], Main[39]]⟩,
+    ⟨#v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]]⟩⟩,
    Main[48], Main[49], Main[50], #v[0, 0, 0]⟩
 
 set_option maxHeartbeats 800000 in

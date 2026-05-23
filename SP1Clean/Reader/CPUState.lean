@@ -15,6 +15,12 @@ import SP1Operations.Reader.RTypeReader.RTypeReader
 import SP1Operations.Reader.ITypeReader.ITypeReader
 import SP1Operations.Reader.JTypeReader.JTypeReader
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
+import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
+import SP1Operations.Operation.U16toU8OperationUnsafe.U16toU8OperationUnsafe
+import SP1Operations.Operation.BitwiseOperation.BitwiseOperation
+import SP1Operations.Operation.BitwiseU16Operation.BitwiseU16Operation
+import SP1Operations.Operation.MulOperation.MulOperation
+import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.ByteOpcodeTable
 
 /-! # Reusable `CPUState` Spec helper
@@ -39,6 +45,14 @@ deriving instance ProvableStruct for ITypeReader
 deriving instance ProvableStruct for JTypeReader
 deriving instance ProvableStruct for ALUTypeReader
 -- ITypeReaderImmutable reuses ITypeReader's struct, so no separate derivation needed.
+
+-- Operation gadget derivations for Phase 3c sub-operation nesting in
+-- chip Cols. U16MSBOperation already has a sidecar in
+-- `SP1Clean/Compare/LtOperationSigned.lean`.
+deriving instance ProvableStruct for U16toU8Operation
+deriving instance ProvableStruct for BitwiseOperation
+deriving instance ProvableStruct for BitwiseU16Operation
+deriving instance ProvableStruct for MulOperation
 
 namespace SP1Clean.CPUState
 

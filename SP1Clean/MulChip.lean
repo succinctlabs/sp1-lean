@@ -73,19 +73,15 @@ sub-fragments are inlined as `Vector T 4` (the SP1 struct's
 structure MulCols (T : Type) where
   state : CPUState T
   adapter : RTypeReader T
-  op_a_write_value : Vector T 4             -- Main[28..31]
-  carry : Vector T 16                       -- Main[32..47]
-  product : Vector T 16                     -- Main[48..63]
-  b_low_bytes : Vector T 4                  -- Main[64..67]
-  c_low_bytes : Vector T 4                  -- Main[68..71]
-  -- Five trailing single-cell fields collapsed into one `Vector T 5` so the
-  -- new `next_pc_carry_value` keeps the struct at 29 < 33 fields, below the
-  -- `deriving ProvableStruct` handler's list-literal elaboration ceiling.
-  -- Cell layout preserved (depth-first flatten): mul_aux_bits[0..4] map to
-  -- the old `b_msb, c_msb, product_msb, b_sign_extend, c_sign_extend` order.
-  -- None of the five are referenced in `main` / `Spec` / `Assertion.main` /
-  -- `FormalSpec` today — only destructured with `_` placeholders.
-  mul_aux_bits : Vector T 5                 -- Main[72..76]
+  op_a_write_value : Vector T 4             -- Main[28..31] (== mul_operation.product[0..3])
+  -- Phase 3c: MulOperation (45 cells) nested as a single field, replacing
+  -- the previous 5 flat fields (carry:16, product:16, b_low_bytes:4,
+  -- c_low_bytes:4, mul_aux_bits:5). The 5-field `mul_aux_bits` collapse
+  -- (which existed to keep the struct under the 33-field ProvableStruct
+  -- elaboration ceiling) is no longer needed; MulOperation's 9 nested
+  -- fields naturally expose b_msb/c_msb/product_msb/b_sign_extend/c_sign_extend
+  -- without flattening.
+  mul_operation : MulOperation T            -- Main[32..76]
   -- Slot order matches upstream's `MulCols<T, M>` field declaration order in
   -- alu/mul/mod.rs (is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw). The
   -- previous Lean order put is_mulw at Main[79] and is_mulhu at Main[81] —
@@ -129,9 +125,11 @@ would require a full MulOp Clean mirror (see file docstring). -/
 def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory⟩, _op_a_write_value,
-       carry, product, _b_low_bytes, _c_low_bytes, _mul_aux_bits,
+       mul_op,
        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw,
        _next_pc_carry_value⟩ := cols
+  let carry := mul_op.carry
+  let product := mul_op.product
   let is_real_e := is_mul + is_mulh + is_mulw + is_mulhsu + is_mulhu
   let opcode_e := is_mul * 11 + is_mulh * 12 + is_mulw * 13
                     + is_mulhsu * 14 + is_mulhu * 24
@@ -267,15 +265,15 @@ packed from contiguous Main slots. -/
     Main[21],
     ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
    #v[Main[28], Main[29], Main[30], Main[31]],
-   #v[Main[32], Main[33], Main[34], Main[35], Main[36], Main[37], Main[38],
-      Main[39], Main[40], Main[41], Main[42], Main[43], Main[44], Main[45],
-      Main[46], Main[47]],
-   #v[Main[48], Main[49], Main[50], Main[51], Main[52], Main[53], Main[54],
-      Main[55], Main[56], Main[57], Main[58], Main[59], Main[60], Main[61],
-      Main[62], Main[63]],
-   #v[Main[64], Main[65], Main[66], Main[67]],
-   #v[Main[68], Main[69], Main[70], Main[71]],
-   #v[Main[72], Main[73], Main[74], Main[75], Main[76]],
+   ⟨#v[Main[32], Main[33], Main[34], Main[35], Main[36], Main[37], Main[38],
+       Main[39], Main[40], Main[41], Main[42], Main[43], Main[44], Main[45],
+       Main[46], Main[47]],
+    #v[Main[48], Main[49], Main[50], Main[51], Main[52], Main[53], Main[54],
+       Main[55], Main[56], Main[57], Main[58], Main[59], Main[60], Main[61],
+       Main[62], Main[63]],
+    ⟨#v[Main[64], Main[65], Main[66], Main[67]]⟩,
+    ⟨#v[Main[68], Main[69], Main[70], Main[71]]⟩,
+    Main[72], Main[73], ⟨Main[74]⟩, Main[75], Main[76]⟩,
    Main[77], Main[78], Main[79], Main[80], Main[81],
    #v[0, 0, 0]⟩
 
@@ -325,7 +323,7 @@ open Circuit
 def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩, _op_a_write_value,
-       _carry, _product, _b_low_bytes, _c_low_bytes, _mul_aux_bits,
+       _mul_op,
        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
