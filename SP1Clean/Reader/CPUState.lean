@@ -20,6 +20,10 @@ import SP1Operations.Operation.U16toU8OperationUnsafe.U16toU8OperationUnsafe
 import SP1Operations.Operation.BitwiseOperation.BitwiseOperation
 import SP1Operations.Operation.BitwiseU16Operation.BitwiseU16Operation
 import SP1Operations.Operation.MulOperation.MulOperation
+import SP1Operations.Operation.AddOperation.AddOperation
+import SP1Operations.Compare.IsZeroOperation.IsZeroOperation
+import SP1Operations.Compare.IsZeroWordOperation.IsZeroWordOperation
+import SP1Operations.Compare.IsEqualWordOperation.IsEqualWordOperation
 import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.ByteOpcodeTable
 
@@ -53,6 +57,10 @@ deriving instance ProvableStruct for U16toU8Operation
 deriving instance ProvableStruct for BitwiseOperation
 deriving instance ProvableStruct for BitwiseU16Operation
 deriving instance ProvableStruct for MulOperation
+deriving instance ProvableStruct for AddOperation
+deriving instance ProvableStruct for IsZeroOperation
+deriving instance ProvableStruct for IsZeroWordOperation
+deriving instance ProvableStruct for IsEqualWordOperation
 
 namespace SP1Clean.CPUState
 

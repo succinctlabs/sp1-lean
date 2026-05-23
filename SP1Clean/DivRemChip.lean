@@ -40,26 +40,56 @@ open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The chip's column struct. The 213 middle columns hold the
-arithmetic intermediates (two MulOperation cols × ~46 each, IsZeroWord
-cols, AddOperation cols, selectors, etc.). They're bundled into an
-`aux : Vector T 213` field rather than separated since the SP1 source
-itself uses them only via the sub-operations. -/
+/-- Sub-record bundling the 14 named fields of upstream `DivRemCols`'s
+"post-MulOperation" intermediates (Main[166..240]). Nested into `DivRemCols`
+to keep the top-level field count tractable for `deriving ProvableStruct`
+(the auto-deriver bails on flat structs with >~25 fields). -/
+structure DivRemAuxPost (T : Type) where
+  c_neg_operation : AddOperation T          -- Main[166..169]
+  rem_neg_operation : AddOperation T        -- Main[170..173]
+  remainder_lt_operation : LtOperationUnsigned T  -- Main[174..181]
+  carry : Vector T 8                        -- Main[182..189]
+  is_c_0 : IsZeroWordOperation T            -- Main[190..200]
+  -- 8 one-hot mode flags (Main[201..208]): is_div, is_divu, is_rem,
+  -- is_remu, is_divw, is_remw, is_divuw, is_remuw in declaration order.
+  mode_flags : Vector T 8                   -- Main[201..208]
+  is_overflow : T                           -- Main[209]
+  is_overflow_b : IsEqualWordOperation T    -- Main[210..220]
+  is_overflow_c : IsEqualWordOperation T    -- Main[221..231]
+  b_msb : U16MSBOperation T                 -- Main[232]
+  rem_msb : U16MSBOperation T               -- Main[233]
+  c_msb : U16MSBOperation T                 -- Main[234]
+  quot_msb : U16MSBOperation T              -- Main[235]
+  -- Five single-bit flags (Main[236..240]): b_neg, b_neg_not_overflow,
+  -- b_not_neg_not_overflow, is_real_not_word, rem_neg in order.
+  neg_flags : Vector T 5                    -- Main[236..240]
+deriving ProvableStruct
+
+/-- The chip's column struct. The 246 columns mirror upstream
+`DivRemCols<T, M>` declaration order (alu/divrem/mod.rs:58-200). The 14
+aux_post fields are bundled into a `DivRemAuxPost` sub-record so the
+total field count stays inside what `deriving ProvableStruct` can
+chain-coerce. -/
 structure DivRemCols (T : Type) where
   state : CPUState T
   adapter : RTypeReader T
-  op_a_write_value : Vector T 4             -- Main[28..31]
-  -- Phase 3d (partial): extract the two MulOperation sub-structs from
-  -- the aux:209 blob. Bracketing aux_pre:44 + aux_post:75 stay opaque
-  -- until per-slot labeling is done for the remaining cells (quotient,
-  -- remainder, IsZeroWord, IsEqualWord, AddOperation, LtOperation, etc).
-  -- Slot pins verified from the bridge:
-  --   CS0 (line 117): c_times_quotient_lower cols span Main[76..120]
-  --   CS1 (line 120): c_times_quotient_upper cols span Main[121..165]
-  aux_pre : Vector T 44                     -- Main[32..75]
+  op_a_write_value : Vector T 4             -- Main[28..31] (= upstream `a : Word<T>`)
+  -- Phase 3f: aux_pre:44 fully decomposed into 10 named upstream sub-fields.
+  b : Vector T 4                            -- Main[32..35]
+  c : Vector T 4                            -- Main[36..39]
+  quotient : Vector T 4                     -- Main[40..43]
+  quotient_comp : Vector T 4                -- Main[44..47]
+  remainder_comp : Vector T 4               -- Main[48..51]
+  remainder : Vector T 4                    -- Main[52..55]
+  abs_remainder : Vector T 4                -- Main[56..59]
+  abs_c : Vector T 4                        -- Main[60..63]
+  max_abs_c_or_1 : Vector T 4               -- Main[64..67]
+  c_times_quotient : Vector T 8             -- Main[68..75]
   c_times_quotient_lower : MulOperation T   -- Main[76..120]
   c_times_quotient_upper : MulOperation T   -- Main[121..165]
-  aux_post : Vector T 75                    -- Main[166..240]
+  aux_post : DivRemAuxPost T                -- Main[166..240], decomposed in sub-record
+  -- Main[241..245]: legacy 3-flag labels (Lean ↔ Rust divergence tracked
+  -- by `divrem_flag_projection`; resolution = Strategy C Phase 4d).
   is_signed : T                             -- Main[241]
   is_w : T                                  -- Main[242]
   is_rem : T                                -- Main[243]
@@ -71,8 +101,12 @@ deriving ProvableStruct
 def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory⟩,
-       _op_a_write_value, _aux_pre, _c_times_quotient_lower, _c_times_quotient_upper,
-       _aux_post, is_signed, is_w, is_rem, is_real, _msb_aux1,
+       _op_a_write_value,
+       _b, _c, _quotient, _quotient_comp, _remainder_comp, _remainder,
+       _abs_remainder, _abs_c, _max_abs_c_or_1, _c_times_quotient,
+       _c_times_quotient_lower, _c_times_quotient_upper,
+       _aux_post,
+       is_signed, is_w, is_rem, is_real, _msb_aux1,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -129,9 +163,8 @@ def Spec (cols : DivRemCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0 ∧
   divRemSpec cols
 
-/-- Project a raw SP1 row into the structured `DivRemCols` view.
-246 columns; `aux : Vector T 209` packed from Main[32..240] via
-`Vector.ofFn` to avoid 209 hand-written entries. -/
+/-- Project a raw SP1 row into the structured `DivRemCols` view. 246 columns,
+all fields named per the upstream `DivRemCols<T, M>` declaration order. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 246) : DivRemCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       ⟨Main[6],
@@ -142,7 +175,18 @@ def Spec (cols : DivRemCols (ZMod p)) : Prop :=
     Main[21],
     ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
    #v[Main[28], Main[29], Main[30], Main[31]],
-   Vector.ofFn (fun (i : Fin 44) => Main[32 + i.val]'(by have := i.isLt; omega)),
+   -- aux_pre[44]: 10 Word/Vector fields at Main[32..75].
+   #v[Main[32], Main[33], Main[34], Main[35]],   -- b
+   #v[Main[36], Main[37], Main[38], Main[39]],   -- c
+   #v[Main[40], Main[41], Main[42], Main[43]],   -- quotient
+   #v[Main[44], Main[45], Main[46], Main[47]],   -- quotient_comp
+   #v[Main[48], Main[49], Main[50], Main[51]],   -- remainder_comp
+   #v[Main[52], Main[53], Main[54], Main[55]],   -- remainder
+   #v[Main[56], Main[57], Main[58], Main[59]],   -- abs_remainder
+   #v[Main[60], Main[61], Main[62], Main[63]],   -- abs_c
+   #v[Main[64], Main[65], Main[66], Main[67]],   -- max_abs_c_or_1
+   #v[Main[68], Main[69], Main[70], Main[71],
+      Main[72], Main[73], Main[74], Main[75]],   -- c_times_quotient
    -- c_times_quotient_lower (45 cells: Main[76..120])
    { carry := #v[Main[76], Main[77], Main[78], Main[79], Main[80], Main[81], Main[82],
                  Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89],
@@ -167,7 +211,43 @@ def Spec (cols : DivRemCols (ZMod p)) : Prop :=
      b_msb := Main[161], c_msb := Main[162],
      product_msb := ⟨Main[163]⟩,
      b_sign_extend := Main[164], c_sign_extend := Main[165] },
-   Vector.ofFn (fun (i : Fin 75) => Main[166 + i.val]'(by have := i.isLt; omega)),
+   -- aux_post (Main[166..240]) : DivRemAuxPost (14 fields)
+   { c_neg_operation := ⟨#v[Main[166], Main[167], Main[168], Main[169]]⟩,
+     rem_neg_operation := ⟨#v[Main[170], Main[171], Main[172], Main[173]]⟩,
+     remainder_lt_operation :=
+       { u16_compare_operation := ⟨Main[174]⟩,
+         u16_flags := #v[Main[175], Main[176], Main[177], Main[178]],
+         not_eq_inv := Main[179],
+         comparison_limbs := #v[Main[180], Main[181]] },
+     carry := #v[Main[182], Main[183], Main[184], Main[185],
+                 Main[186], Main[187], Main[188], Main[189]],
+     is_c_0 :=
+       { is_zero_limb := #v[⟨Main[190], Main[191]⟩, ⟨Main[192], Main[193]⟩,
+                            ⟨Main[194], Main[195]⟩, ⟨Main[196], Main[197]⟩],
+         is_zero_first_half := Main[198],
+         is_zero_second_half := Main[199],
+         result := Main[200] },
+     mode_flags := #v[Main[201], Main[202], Main[203], Main[204],
+                      Main[205], Main[206], Main[207], Main[208]],
+     is_overflow := Main[209],
+     is_overflow_b :=
+       { is_diff_zero :=
+           { is_zero_limb := #v[⟨Main[210], Main[211]⟩, ⟨Main[212], Main[213]⟩,
+                                ⟨Main[214], Main[215]⟩, ⟨Main[216], Main[217]⟩],
+             is_zero_first_half := Main[218],
+             is_zero_second_half := Main[219],
+             result := Main[220] } },
+     is_overflow_c :=
+       { is_diff_zero :=
+           { is_zero_limb := #v[⟨Main[221], Main[222]⟩, ⟨Main[223], Main[224]⟩,
+                                ⟨Main[225], Main[226]⟩, ⟨Main[227], Main[228]⟩],
+             is_zero_first_half := Main[229],
+             is_zero_second_half := Main[230],
+             result := Main[231] } },
+     b_msb := ⟨Main[232]⟩, rem_msb := ⟨Main[233]⟩,
+     c_msb := ⟨Main[234]⟩, quot_msb := ⟨Main[235]⟩,
+     neg_flags := #v[Main[236], Main[237], Main[238], Main[239], Main[240]] },
+   -- Legacy 3-flag labels (Main[241..245]).
    Main[241], Main[242], Main[243], Main[244], Main[245],
    #v[0, 0, 0]⟩
 
@@ -290,8 +370,12 @@ open Circuit
 def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
-       _op_a_write_value, _aux_pre, _c_times_quotient_lower, _c_times_quotient_upper,
-       _aux_post, is_signed, is_w, is_rem, is_real, _msb_aux1,
+       _op_a_write_value,
+       _b, _c, _quotient, _quotient_comp, _remainder_comp, _remainder,
+       _abs_remainder, _abs_c, _max_abs_c_or_1, _c_times_quotient,
+       _c_times_quotient_lower, _c_times_quotient_upper,
+       _aux_post,
+       is_signed, is_w, is_rem, is_real, _msb_aux1,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
