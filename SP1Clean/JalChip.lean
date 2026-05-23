@@ -22,7 +22,7 @@ import SP1Chips.Jal.JalChip
 /-! # Chip-level `JalChip` mirror — first chip with PC control flow
 
 The Jal chip is the canonical example of a chip whose PC update is not
-`pc + 4`: the next PC is `pc + sign_ext(imm)` (jump target), and the
+`pc + 4`: the next PC is `pc + sign_ext(op_b_imm)` (jump target), and the
 return address `pc + 4` is written to the destination register `op_a`.
 Two `AddOperation`s sub-fragments fire: one for the jump target, one for
 the return-address store.
@@ -68,18 +68,14 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 `SP1Chips/Jal/Constraints.lean`. -/
 structure JalCols (T : Type) where
   state : CPUState T
-  op_a : T                                  -- Main[6] (return-address destination)
-  op_a_memory : MemoryAccessInSharedCols T
-  op_a_0 : T                                -- Main[13]
-  imm : Vector T 4                          -- Main[14..17] (sign-extended J-type immediate)
-  op_c : Vector T 4                         -- Main[18..21]
+  adapter : JTypeReader T
   next_pc : Vector T 4                      -- Main[22..25] (jump target, Main[25] is high limb)
   op_a_write_value : Vector T 4             -- Main[26..29] (return address = pc + 4)
   is_real : T                               -- Main[30]
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors the SP1 source's emissions for JAL:
-two `AddOperation` subcircuits (PC + imm = next_pc; PC + 4 = return
+two `AddOperation` subcircuits (PC + op_b_imm = next_pc; PC + 4 = return
 address), byte lookups for the PC alignment and clock decomposition,
 plus the program-bus interaction.
 
@@ -91,12 +87,12 @@ PC chain permutes across rows (future work, parallel to OfflineMemory).
 
 Opcode: `46 = JAL`. -/
 def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory,
-       op_a_0, imm, op_c, next_pc, op_a_write_value, is_real⟩ := cols
-  -- AddOperation for jump target: pc + imm = next_pc.
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩,
+       next_pc, op_a_write_value, is_real⟩ := cols
+  -- AddOperation for jump target: pc + op_b_imm = next_pc.
   SP1Clean.AddOp.assertion
-    (⟨pc.push 0, imm, #v[next_pc[0], next_pc[1], next_pc[2], next_pc[3]]⟩ :
+    (⟨pc.push 0, op_b_imm, #v[next_pc[0], next_pc[1], next_pc[2], next_pc[3]]⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   -- AddOperation for return address: pc + 4 = op_a_write_value.
   SP1Clean.AddOp.assertion
@@ -118,10 +114,10 @@ def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (#v[(6 : Expression (ZMod p)), op_a_memory.access_timestamp.diff_low_limb, 16, 0]
       : Vector (Expression (ZMod p)) 4)
   -- Program-bus interaction. Opcode is 46 = JAL; J-type discipline:
-  -- op_b carries the 4-limb sign-extended immediate, op_c is unused
+  -- op_b carries the 4-limb sign-extended immediate, op_c_imm is unused
   -- (Main[18..21]), imm_b = imm_c = 1.
   SP1Clean.ProgramTable.assertion
-    (⟨pc, 46, op_a, imm, op_c, op_a_0, 1, 1⟩ :
+    (⟨pc, 46, op_a, op_b_imm, op_c_imm, op_a_0, 1, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   -- Trailing asserts: is_real boolean, next_pc[3] = 0 (high limb of
   -- PC is zero), op_a_write_value[3] = 0 (high limb of return address
@@ -132,7 +128,7 @@ def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
 
 /-- The Clean-flavored Spec for `JalChip`. Composes the existing
 per-fragment specs:
-- `AddOp.Spec` for the jump-target carry chain (PC + imm = next_pc)
+- `AddOp.Spec` for the jump-target carry chain (PC + op_b_imm = next_pc)
 - `AddOp.Spec` for the return-address carry chain (PC + 4 = op_a_write_value)
 - `cpuStateSpec` for clock decomposition
 - `memoryAccessSpec` for op_a (read prior + write return address)
@@ -142,23 +138,23 @@ per-fragment specs:
 The state-bus content beyond what ProgramTable.Spec gives (PC alignment,
 PC limb bounds) is empty per-row — see the file docstring. -/
 def Spec (cols : JalCols (ZMod p)) : Prop :=
-  SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.imm cols.next_pc ∧
+  SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
   SP1Clean.AddOp.Spec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
-      { prev_value := cols.op_a_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
+      { prev_value := cols.adapter.op_a_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
       opcode := 46,
-      op_a := cols.op_a,
-      op_b := cols.imm,
-      op_c := cols.op_c,
-      op_a_0 := cols.op_a_0, imm_b := 1, imm_c := 1 } ∧
+      op_a := cols.adapter.op_a,
+      op_b := cols.adapter.op_b_imm,
+      op_c := cols.adapter.op_c_imm,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 1, imm_c := 1 } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.next_pc[3] = 0 ∧
   cols.op_a_write_value[3] = 0 ∧
@@ -171,19 +167,20 @@ def Spec (cols : JalCols (ZMod p)) : Prop :=
 for trace-level OfflineMemory aggregation. `write_value` at aggregation
 time is `cols.op_a_write_value`. -/
 def opAMemoryAccess (cols : JalCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
-  { addr := #v[cols.op_a, 0, 0],
-    prev_value := cols.op_a_memory.prev_value,
-    prev_low := cols.op_a_memory.access_timestamp.prev_low,
-    diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+  { addr := #v[cols.adapter.op_a, 0, 0],
+    prev_value := cols.adapter.op_a_memory.prev_value,
+    prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
 
 /-- Project a raw SP1 row into the structured `JalCols` view. Mirrors
 the index map in `SP1Chips/Jal/Constraints.lean` (31 columns). -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 31) : JalCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      Main[6],
-   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
-   #v[Main[14], Main[15], Main[16], Main[17]],
-   #v[Main[18], Main[19], Main[20], Main[21]],
+      ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    #v[Main[14], Main[15], Main[16], Main[17]],
+    #v[Main[18], Main[19], Main[20], Main[21]]⟩,
    #v[Main[22], Main[23], Main[24], Main[25]],
    #v[Main[26], Main[27], Main[28], Main[29]],
    Main[30]⟩
@@ -258,22 +255,22 @@ open Circuit
 
 @[reducible]
 def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory,
-       op_a_0, imm, op_c, next_pc, op_a_write_value, is_real⟩ := cols
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩,
+       next_pc, op_a_write_value, is_real⟩ := cols
   -- CPUState: clk_0_16 / clk_16_24 range bounds.
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  -- Jump target: pc + imm = next_pc.
+  -- Jump target: pc + op_b_imm = next_pc.
   SP1Clean.AddOp.assertion
-    (⟨pc.push 0, imm, next_pc⟩ : Var SP1Clean.AddOp.Inputs (ZMod p))
+    (⟨pc.push 0, op_b_imm, next_pc⟩ : Var SP1Clean.AddOp.Inputs (ZMod p))
   -- Return address: pc + 4 = op_a_write_value.
   SP1Clean.AddOp.assertion
     (⟨pc.push 0, #v[4, 0, 0, 0], op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   -- Program-bus interaction (opcode = 46 = JAL).
   SP1Clean.ProgramTable.assertion
-    (⟨pc, 46, op_a, imm, op_c, op_a_0, 1, 1⟩ :
+    (⟨pc, 46, op_a, op_b_imm, op_c_imm, op_a_0, 1, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   -- Iter-8 sub-task E: per-operand memory-bus byte content. Jal emits
   -- a single op_a register access (return-address write) at offset +4.
@@ -295,18 +292,18 @@ def Assumptions (_ : JalCols (ZMod p)) : Prop := True
 def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.imm cols.next_pc ∧
+  SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
   SP1Clean.AddOp.Spec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 46, op_a := cols.op_a,
-      op_b := cols.imm, op_c := cols.op_c,
-      op_a_0 := cols.op_a_0, imm_b := 1, imm_c := 1 } ∧
+    { pc := cols.state.pc, opcode := 46, op_a := cols.adapter.op_a,
+      op_b := cols.adapter.op_b_imm, op_c := cols.adapter.op_c_imm,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 1, imm_c := 1 } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequence.
   -- Jal emits a single op_a register access at offset +4.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
-     cols.op_a_memory.prev_value⟩
+    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

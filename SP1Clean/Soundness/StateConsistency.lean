@@ -569,7 +569,7 @@ theorem nextPc_of_spec_uType (cols : UType.UTypeCols (ZMod p))
 leading `cpuStateSpec` conjunct added in Phase 2). -/
 theorem nextPc_of_spec_jal (cols : Jal.JalCols (ZMod p))
     (h : Jal.assertion.Spec cols) :
-    SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.imm cols.next_pc := by
+    SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc := by
   change Jal.Assertion.FormalSpec cols at h
   exact h.2.1
 
@@ -595,7 +595,7 @@ theorem nextPc_of_spec_branch (cols : Branch.BranchCols (ZMod p))
     (h : Branch.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
         ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-         cols.op_c_imm,
+         cols.adapter.op_c_imm,
          cols.next_pc_branched_carry⟩ ∧
     SP1Clean.AddrAddOp.assertion.Spec
         ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
@@ -645,7 +645,7 @@ def ChipRow.nextPcValid : ChipRow p → Prop
   | .branch cols =>
       SP1Clean.AddrAddOp.assertion.Spec
           ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-           cols.op_c_imm,
+           cols.adapter.op_c_imm,
            cols.next_pc_branched_carry⟩ ∧
       SP1Clean.AddrAddOp.assertion.Spec
           ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
@@ -657,7 +657,7 @@ def ChipRow.nextPcValid : ChipRow p → Prop
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .jal cols =>
-      SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.imm cols.next_pc
+      SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc
   | .jalr cols =>
       cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
         cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm cols.jump_target

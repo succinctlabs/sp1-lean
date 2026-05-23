@@ -387,8 +387,8 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
         SP1Clean.Branch.opAMemoryAccess cols
       let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
         SP1Clean.Branch.opBMemoryAccess cols
-      [(op_a_mem, cols.op_a_memory.prev_value),
-       (op_b_mem, cols.op_b_memory.prev_value)]
+      [(op_a_mem, cols.adapter.op_a_memory.prev_value),
+       (op_b_mem, cols.adapter.op_b_memory.prev_value)]
   | .loadX0 cols =>
       -- Two reg + 1 RAM read. op_a's write is absorbed (target is x0).
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=

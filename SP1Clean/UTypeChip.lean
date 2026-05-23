@@ -52,11 +52,7 @@ AddOperation, and `add_result` is the 64-bit AddOp output written to
 op_a. -/
 structure UTypeCols (T : Type) where
   state : CPUState T
-  op_a : T
-  op_a_memory : MemoryAccessInSharedCols T
-  op_a_0 : T
-  op_b_imm : Vector T 4
-  op_c_imm : Vector T 4
+  adapter : JTypeReader T
   addend : Vector T 3
   add_result : Vector T 4
   is_auipc : T
@@ -73,8 +69,8 @@ gate). The AddOperation sub-fragment (operating on `addend` and
 `op_b_imm`) is intentionally not emitted as a subcircuit — its
 constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory, op_a_0, op_b_imm,
-       op_c_imm, addend, _add_result, is_auipc, is_real,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, _op_a_memory, op_a_0, op_b_imm, op_c_imm⟩, addend, _add_result, is_auipc, is_real,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -102,42 +98,43 @@ def Spec (cols : UTypeCols (ZMod p)) : Prop :=
     #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   (_root_.AddOperation.constraints (F := ZMod p)
-      addend cols.op_b_imm { value := cols.add_result }
-      (cols.is_real - cols.op_a_0)).allHold ∧
+      addend cols.adapter.op_b_imm { value := cols.add_result }
+      (cols.is_real - cols.adapter.op_a_0)).allHold ∧
   SP1Clean.JTypeReader.jtypeReaderSpec
       (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) opcode_e cols.state.pc
       cols.add_result
-      { op_a := cols.op_a,
+      { op_a := cols.adapter.op_a,
         op_a_memory :=
-          { prev_value := cols.op_a_memory.prev_value,
+          { prev_value := cols.adapter.op_a_memory.prev_value,
             access_timestamp :=
-              { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } },
-        op_a_0 := cols.op_a_0,
-        op_b_imm := cols.op_b_imm, op_c_imm := cols.op_c_imm } ∧
+              { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+                diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } },
+        op_a_0 := cols.adapter.op_a_0,
+        op_b_imm := cols.adapter.op_b_imm, op_c_imm := cols.adapter.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
   cols.addend[0] - cols.is_auipc * cols.state.pc[0] = 0 ∧
   cols.addend[1] - cols.is_auipc * cols.state.pc[1] = 0 ∧
   cols.addend[2] - cols.is_auipc * cols.state.pc[2] = 0 ∧
-  (cols.is_real - 1) * cols.op_a_0 = 0
+  (cols.is_real - 1) * cols.adapter.op_a_0 = 0
 
 /-- The op_a register access (read prior, write result), exposed for
 trace-level OfflineMemory aggregation. `write_value` at aggregation
 time is `cols.add_result`. -/
 def opAMemoryAccess (cols : UTypeCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
-  { addr := #v[cols.op_a, 0, 0],
-    prev_value := cols.op_a_memory.prev_value,
-    prev_low := cols.op_a_memory.access_timestamp.prev_low,
-    diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+  { addr := #v[cols.adapter.op_a, 0, 0],
+    prev_value := cols.adapter.op_a_memory.prev_value,
+    prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
 
 /-- Project a raw SP1 row into the structured `UTypeCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 31) : UTypeCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      Main[6],
-   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
-   #v[Main[14], Main[15], Main[16], Main[17]],
-   #v[Main[18], Main[19], Main[20], Main[21]],
+      ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    #v[Main[14], Main[15], Main[16], Main[17]],
+    #v[Main[18], Main[19], Main[20], Main[21]]⟩,
    #v[Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27], Main[28]],
    Main[29], Main[30], #v[0, 0, 0]⟩
@@ -219,8 +216,8 @@ the AddOperation byte lookups and the 3 Vector-indexed `addend`
 clauses (see Scope note above). -/
 @[reducible]
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory, op_a_0, op_b_imm,
-       op_c_imm, _addend, _add_result, is_auipc, is_real,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩, _addend, _add_result, is_auipc, is_real,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -264,22 +261,22 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
       opcode := cols.is_auipc * 48 + (1 + -cols.is_auipc) * 49,
-      op_a := cols.op_a,
-      op_b := cols.op_b_imm,
-      op_c := cols.op_c_imm,
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
+      op_a := cols.adapter.op_a,
+      op_b := cols.adapter.op_b_imm,
+      op_c := cols.adapter.op_c_imm,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
     ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
-  (cols.is_real - 1) * cols.op_a_0 = 0 ∧
+  (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequence.
   -- UType emits a single op_a register access at offset +4.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
-     cols.op_a_memory.prev_value⟩
+    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
