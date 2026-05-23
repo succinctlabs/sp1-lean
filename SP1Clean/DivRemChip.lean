@@ -49,9 +49,17 @@ structure DivRemCols (T : Type) where
   state : CPUState T
   adapter : RTypeReader T
   op_a_write_value : Vector T 4             -- Main[28..31]
-  -- 209 intermediate columns: MulOperation × 2, IsZeroWord, AddOp,
-  -- sign-extension, quotient/remainder layout, etc.
-  aux : Vector T 209                        -- Main[32..240]
+  -- Phase 3d (partial): extract the two MulOperation sub-structs from
+  -- the aux:209 blob. Bracketing aux_pre:44 + aux_post:75 stay opaque
+  -- until per-slot labeling is done for the remaining cells (quotient,
+  -- remainder, IsZeroWord, IsEqualWord, AddOperation, LtOperation, etc).
+  -- Slot pins verified from the bridge:
+  --   CS0 (line 117): c_times_quotient_lower cols span Main[76..120]
+  --   CS1 (line 120): c_times_quotient_upper cols span Main[121..165]
+  aux_pre : Vector T 44                     -- Main[32..75]
+  c_times_quotient_lower : MulOperation T   -- Main[76..120]
+  c_times_quotient_upper : MulOperation T   -- Main[121..165]
+  aux_post : Vector T 75                    -- Main[166..240]
   is_signed : T                             -- Main[241]
   is_w : T                                  -- Main[242]
   is_rem : T                                -- Main[243]
@@ -62,8 +70,9 @@ deriving ProvableStruct
 
 def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory⟩, _op_a_write_value,
-       _aux, is_signed, is_w, is_rem, is_real, _msb_aux1,
+       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory⟩,
+       _op_a_write_value, _aux_pre, _c_times_quotient_lower, _c_times_quotient_upper,
+       _aux_post, is_signed, is_w, is_rem, is_real, _msb_aux1,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -133,7 +142,32 @@ def Spec (cols : DivRemCols (ZMod p)) : Prop :=
     Main[21],
     ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
    #v[Main[28], Main[29], Main[30], Main[31]],
-   Vector.ofFn (fun (i : Fin 209) => Main[32 + i.val]'(by have := i.isLt; omega)),
+   Vector.ofFn (fun (i : Fin 44) => Main[32 + i.val]'(by have := i.isLt; omega)),
+   -- c_times_quotient_lower (45 cells: Main[76..120])
+   { carry := #v[Main[76], Main[77], Main[78], Main[79], Main[80], Main[81], Main[82],
+                 Main[83], Main[84], Main[85], Main[86], Main[87], Main[88], Main[89],
+                 Main[90], Main[91]],
+     product := #v[Main[92], Main[93], Main[94], Main[95], Main[96], Main[97], Main[98],
+                   Main[99], Main[100], Main[101], Main[102], Main[103], Main[104], Main[105],
+                   Main[106], Main[107]],
+     b_lower_byte := ⟨#v[Main[108], Main[109], Main[110], Main[111]]⟩,
+     c_lower_byte := ⟨#v[Main[112], Main[113], Main[114], Main[115]]⟩,
+     b_msb := Main[116], c_msb := Main[117],
+     product_msb := ⟨Main[118]⟩,
+     b_sign_extend := Main[119], c_sign_extend := Main[120] },
+   -- c_times_quotient_upper (45 cells: Main[121..165])
+   { carry := #v[Main[121], Main[122], Main[123], Main[124], Main[125], Main[126], Main[127],
+                 Main[128], Main[129], Main[130], Main[131], Main[132], Main[133], Main[134],
+                 Main[135], Main[136]],
+     product := #v[Main[137], Main[138], Main[139], Main[140], Main[141], Main[142], Main[143],
+                   Main[144], Main[145], Main[146], Main[147], Main[148], Main[149], Main[150],
+                   Main[151], Main[152]],
+     b_lower_byte := ⟨#v[Main[153], Main[154], Main[155], Main[156]]⟩,
+     c_lower_byte := ⟨#v[Main[157], Main[158], Main[159], Main[160]]⟩,
+     b_msb := Main[161], c_msb := Main[162],
+     product_msb := ⟨Main[163]⟩,
+     b_sign_extend := Main[164], c_sign_extend := Main[165] },
+   Vector.ofFn (fun (i : Fin 75) => Main[166 + i.val]'(by have := i.isLt; omega)),
    Main[241], Main[242], Main[243], Main[244], Main[245],
    #v[0, 0, 0]⟩
 
@@ -255,8 +289,9 @@ open Circuit
 @[reducible]
 def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩, _op_a_write_value,
-       _aux, is_signed, is_w, is_rem, is_real, _msb_aux1,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
+       _op_a_write_value, _aux_pre, _c_times_quotient_lower, _c_times_quotient_upper,
+       _aux_post, is_signed, is_w, is_rem, is_real, _msb_aux1,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
