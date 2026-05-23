@@ -826,7 +826,17 @@ lemma spec.div {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    | (apply Word.isU64_of_cases <;> simp_all)
+    | (apply Word.isU64_of_cases <;>
+        (clear *- _hb0 _hb1 _hb2 _hb3 _hc0 _hc1 _hc2 _hc3
+           u16_q0 u16_q1 u16_q2 u16_q3 u16_r0 u16_r1 u16_r2 u16_r3
+           u16_ar0 u16_ar1 u16_ar2 u16_ar3 u16_ac0 u16_ac1 u16_ac2 u16_ac3
+           u16_ctq0 u16_ctq1 u16_ctq2 u16_ctq3 u16_ctq4 u16_ctq5 u16_ctq6 u16_ctq7
+           eq_qbc0 eq_qbc1 eq_qbc2 eq_qbc3
+           eq_rbc0 eq_rbc1 eq_rbc2 eq_rbc3
+           w_eq_qbc2_uw w_eq_qbc2_w w_eq_q2_w w_eq_qbc3_uw w_eq_qbc3_w w_eq_q3_w
+           w_eq_rbc2_uw w_eq_rbc2_w w_eq_r2_w w_eq_rbc3_uw w_eq_rbc3_w w_eq_r3_w
+           z0 z1 z2 z3 z4 z5 z6 h_is_div eq_d_a0 eq_d_a1 eq_d_a2 eq_d_a3;
+         simp_all))
 
 -- Twin of `spec.div` with `.2` projection, `is_rem` flag,
 -- `sop3` mutex, `eq_r_*` writeback.
@@ -1096,7 +1106,17 @@ lemma spec.rem {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 
         (by split_ifs at div_zero
             · right; exact div_zero
             · left; exact div_zero))
-    | (apply Word.isU64_of_cases <;> simp_all)
+    | (apply Word.isU64_of_cases <;>
+        (clear *- _hb0 _hb1 _hb2 _hb3 _hc0 _hc1 _hc2 _hc3
+           u16_q0 u16_q1 u16_q2 u16_q3 u16_r0 u16_r1 u16_r2 u16_r3
+           u16_ar0 u16_ar1 u16_ar2 u16_ar3 u16_ac0 u16_ac1 u16_ac2 u16_ac3
+           u16_ctq0 u16_ctq1 u16_ctq2 u16_ctq3 u16_ctq4 u16_ctq5 u16_ctq6 u16_ctq7
+           eq_qbc0 eq_qbc1 eq_qbc2 eq_qbc3
+           eq_rbc0 eq_rbc1 eq_rbc2 eq_rbc3
+           w_eq_qbc2_uw w_eq_qbc2_w w_eq_q2_w w_eq_qbc3_uw w_eq_qbc3_w w_eq_q3_w
+           w_eq_rbc2_uw w_eq_rbc2_w w_eq_r2_w w_eq_rbc3_uw w_eq_rbc3_w w_eq_r3_w
+           z0 z1 z2 z3 z4 z5 z6 h_is_rem eq_r_a0 eq_r_a1 eq_r_a2 eq_r_a3;
+         simp_all))
 
 end div_rem
 
