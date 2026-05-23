@@ -18,7 +18,15 @@ Factors out the inline `clk_0_16`/`clk_16_24` range clauses that every
 chip-level `Spec` would otherwise expand by hand. The `iff_sp1` re-export
 turns `CPUState.allHold_constraints_iff_is_real` into a one-line
 rewrite at the chip level.
+
+This file also carries the sidecar `deriving instance ProvableStruct
+for CPUState` so chip Cols structs can nest `CPUState T` as a single
+field (matching upstream's composition) rather than flattening to four
+fields. See `SP1Clean.Compare.LtOperationSigned` for the same pattern
+applied to the `LtOperationSigned` chain.
 -/
+
+deriving instance ProvableStruct for CPUState
 
 namespace SP1Clean.CPUState
 

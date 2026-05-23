@@ -18,6 +18,7 @@ import SP1Clean.AddOperation
 import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
+import SP1Clean.Reader.OperandAccess
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.RTypeReader
@@ -48,10 +49,12 @@ chain. The new field is the 3-limb result of `pc + 4` with carry; it
 exists only on the Clean side (SP1 emits this constraint inline in the
 state-bus interaction). -/
 structure AddCols (T : Type) where
-  clk_high : T
-  clk_16_24 : T
-  clk_0_16 : T
-  pc : Vector T 3
+  -- Phase 3a partial: CPUState nested as a single field, replacing the
+  -- previous 4 flat fields (clk_high, clk_16_24, clk_0_16, pc). The
+  -- adapter (RTypeReader) and AddOperation are intentionally left flat
+  -- for now — full Phase 3a re-nest is a multi-week effort across 24
+  -- chips. This Add file is the proof-of-concept exemplar.
+  state : CPUState T
   op_a : T
   op_a_memory_prev_value : Vector T 4
   op_a_memory_prev_low : T
@@ -74,7 +77,7 @@ deriving ProvableStruct
 takes a `Var AddCols (ZMod p)`, destructures it, and emits constraints for
 each sub-component. -/
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, _op_a_memory_prev_value,
        _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
        op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
        op_c, op_c_memory_prev_value, _op_c_memory_prev_low,
@@ -110,9 +113,9 @@ def Spec (cols : AddCols (ZMod p)) : Prop :=
   SP1Clean.AddOp.Spec
       cols.op_b_memory_prev_value cols.op_c_memory_prev_value
       cols.op_a_write_value ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.RTypeReader.rtypeReaderSpec
-      (cols.clk_0_16 + cols.clk_16_24 * 65536) 0 cols.pc
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 0 cols.state.pc
       cols.op_a_write_value
       { op_a := cols.op_a,
         op_a_memory :=
@@ -144,8 +147,7 @@ maps to) doesn't reference `next_pc_carry_value`, so the placeholder is
 harmless for the legacy path. The trace-level `assertion.Spec` consumes
 the field via the FormalAssertion soundness/completeness arms instead. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 33) : AddCols (ZMod p) :=
-  ⟨Main[0], Main[1], Main[2],
-   #v[Main[3], Main[4], Main[5]],
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
    Main[6],
    #v[Main[7], Main[8], Main[9], Main[10]],
    Main[11], Main[12], Main[13], Main[14],
@@ -247,11 +249,11 @@ open Circuit
 /-- Refactored chip-level circuit using subcircuit composition. -/
 @[reducible]
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, clk_16_24, clk_0_16, pc, op_a, _op_a_memory_prev_value,
-       _op_a_memory_prev_low, _op_a_memory_diff_low, op_a_0, op_b,
-       op_b_memory_prev_value, _op_b_memory_prev_low, _op_b_memory_diff_low,
-       op_c, op_c_memory_prev_value, _op_c_memory_prev_low,
-       _op_c_memory_diff_low, op_a_write_value, is_real,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a, op_a_memory_prev_value,
+       op_a_memory_prev_low, op_a_memory_diff_low, op_a_0, op_b,
+       op_b_memory_prev_value, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_c, op_c_memory_prev_value, op_c_memory_prev_low,
+       op_c_memory_diff_low, op_a_write_value, is_real,
        next_pc_carry_value⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨op_b_memory_prev_value, op_c_memory_prev_value, op_a_write_value⟩ :
@@ -272,6 +274,23 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
        #v[(4 : Expression (ZMod p)), 0, 0, 0],
        next_pc_carry_value⟩ :
       Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  -- Iter-8 sub-task E: per-operand memory-bus byte content. Each call
+  -- emits 6 byte lookups (Range 16 on diff_low + U8Range on timestamp +
+  -- 4 Range 16 lookups on prev_value limbs) ⇒ `memoryAccessSpec`.
+  -- R-type offsets: op_a at +4, op_b at +3, op_c at +2.
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 4, op_a_memory_prev_low, op_a_memory_diff_low,
+       op_a_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 3, op_b_memory_prev_low, op_b_memory_diff_low,
+       op_b_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertion
+    (⟨clk_low, 2, op_c_memory_prev_low, op_c_memory_diff_low,
+       op_c_memory_prev_value⟩ :
+      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   op_a_0 === 0
 
@@ -289,33 +308,49 @@ witness, the carry-aware `pc + 4` witness in `next_pc_carry_value`, and
 the two trailing assertZero gates. The memory-bus side of
 `rtypeReaderSpec` is deferred to the trace-level OfflineMemory bridge. -/
 def FormalSpec (cols : AddCols (ZMod p)) : Prop :=
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.AddOp.Spec
       cols.op_b_memory_prev_value cols.op_c_memory_prev_value
       cols.op_a_write_value ∧
-  SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
-    { pc := cols.pc, opcode := 0, op_a := cols.op_a,
+    { pc := cols.state.pc, opcode := 0, op_a := cols.op_a,
       op_b := #v[cols.op_b, 0, 0, 0],
       op_c := #v[cols.op_c, 0, 0, 0],
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := 0 } ∧
   SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.op_a_0 = 0
+  cols.op_a_0 = 0 ∧
+  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
+  -- Each OperandAccess.assertion's Spec is exactly the `memoryAccessSpec`
+  -- for that operand's `(diff_low_limb, prev_low, prev_value)` triple.
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 4, cols.op_a_memory_prev_low, cols.op_a_memory_diff_low,
+     cols.op_a_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 3, cols.op_b_memory_prev_low, cols.op_b_memory_diff_low,
+     cols.op_b_memory_prev_value⟩ ∧
+  SP1Clean.OperandAccess.Assertion.Spec
+    ⟨clk_low, 2, cols.op_c_memory_prev_low, cols.op_c_memory_diff_low,
+     cols.op_c_memory_prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
   -- Substitute all input-eval equations to put the goal in the same form as
   -- the subcircuit specs (which use `Expression.eval env input_var_X`).
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  -- After Phase 3 partial: state is now nested, so h_input destructures with
+  -- a nested-of-4 pattern at the front (the four CPUState fields).
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_op_a_0⟩ := h_holds
+  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_addr_sub, h_oa_a, h_oa_b, h_oa_c,
+          h_isreal, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_addop_sub trivial
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
@@ -323,22 +358,36 @@ theorem soundness :
     exact h_addr_sub trivial
   · linear_combination h_isreal
   · exact h_op_a_0
+  · -- op_a memory-access spec (offset +4)
+    exact h_oa_a trivial
+  · -- op_b memory-access spec (offset +3)
+    exact h_oa_b trivial
+  · -- op_c memory-access spec (offset +2)
+    exact h_oa_c trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+  -- After Phase 3 partial: state is now nested, so h_input destructures with
+  -- a nested-of-4 pattern at the front (the four CPUState fields).
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop, h_cpu, h_prog, h_addr, h_isreal, h_op_a_0⟩ := h_spec
+  obtain ⟨h_addop, h_cpu, h_prog, h_addr, h_isreal, h_op_a_0,
+          h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  -- Completeness obligations follow main's emission order: 4 subcircuit
+  -- arms, then the 3 OperandAccess arms, then the 2 scalar gates.
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_addop⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
   · refine ⟨trivial, ?_⟩
     simp only [Vector.getElem_map] at h_addr
     exact h_addr
+  · exact ⟨trivial, h_oa_a⟩
+  · exact ⟨trivial, h_oa_b⟩
+  · exact ⟨trivial, h_oa_c⟩
   · linear_combination h_isreal
   · exact h_op_a_0
 

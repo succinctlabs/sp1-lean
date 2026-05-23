@@ -61,9 +61,9 @@ components, current `pc`, the row's claimed `next_pc`, and the
 (see file docstring). -/
 def ChipRow.stateAccess : ChipRow p → StateAccess (ZMod p)
   | .add cols =>
-      { clk_high := cols.clk_high,
-        clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536,
-        pc := cols.pc,
+      { clk_high := cols.state.clk_high,
+        clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+        pc := cols.state.pc,
         next_pc := cols.next_pc_carry_value,
         is_real := cols.is_real }
   | .loadByte cols =>
@@ -378,7 +378,7 @@ FormalSpec — that lands in iter-8 sub-task C. -/
 theorem nextPc_of_spec_add (cols : Add.AddCols (ZMod p))
     (h : Add.assertion.Spec cols) :
     SP1Clean.AddrAddOp.assertion.Spec
-      ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+      ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
        #v[(4 : ZMod p), 0, 0, 0],
        cols.next_pc_carry_value⟩ := by
   change Add.Assertion.FormalSpec cols at h
@@ -624,7 +624,7 @@ Each arm extracts the chip-specific next_pc-witness that
 def ChipRow.nextPcValid : ChipRow p → Prop
   | .add cols =>
       SP1Clean.AddrAddOp.assertion.Spec
-        ⟨#v[cols.pc[0], cols.pc[1], cols.pc[2], 0],
+        ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
          #v[(4 : ZMod p), 0, 0, 0],
          cols.next_pc_carry_value⟩
   | .addi cols =>

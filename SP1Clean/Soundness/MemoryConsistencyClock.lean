@@ -133,167 +133,158 @@ These 24 lemmas project that conjunct, mirroring the
 
 theorem cpuStateSpec_of_spec_add (cols : Add.AddCols (ZMod p))
     (h : Add.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
+    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Add.Assertion.FormalSpec cols at h
   exact h.2.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_addi (cols : Addi.AddiCols (ZMod p))
-    (h : Addi.Spec cols) :
+    (h : Addi.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Addi.Spec at h
-  tauto
+  change Addi.Assertion.FormalSpec cols at h
+  exact h.2.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_addw (cols : Addw.AddwCols (ZMod p))
-    (h : Addw.Spec cols) :
+    (h : Addw.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Addw.Spec at h
-  tauto
+  change Addw.Assertion.FormalSpec cols at h
+  exact h.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_bitwise (cols : Bitwise.BitwiseCols (ZMod p))
-    (h : Bitwise.Spec cols) :
+    (h : Bitwise.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Bitwise.Spec at h
-  tauto
+  change Bitwise.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_branch (cols : Branch.BranchCols (ZMod p))
-    (h : Branch.Spec cols) :
+    (h : Branch.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Branch.Spec at h
-  tauto
+  change Branch.Assertion.FormalSpec cols at h
+  exact h.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_divRem (cols : DivRem.DivRemCols (ZMod p))
-    (h : DivRem.Spec cols) :
+    (h : DivRem.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold DivRem.Spec at h
-  tauto
+  change DivRem.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_jal (cols : Jal.JalCols (ZMod p))
-    (h : Jal.Spec cols) :
+    (h : Jal.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Jal.Spec at h
-  tauto
+  change Jal.Assertion.FormalSpec cols at h
+  exact h.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_jalr (cols : Jalr.JalrCols (ZMod p))
-    (h : Jalr.Spec cols) :
+    (h : Jalr.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Jalr.Spec at h
-  tauto
+  change Jalr.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_loadByte (cols : LoadByte.LoadByteCols (ZMod p))
-    (h : LoadByte.Spec cols) :
+    (h : LoadByte.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold LoadByte.Spec at h
-  tauto
+  change LoadByte.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_loadDouble
     (cols : LoadDouble.LoadDoubleCols (ZMod p))
-    (h : LoadDouble.Spec cols) :
+    (h : LoadDouble.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold LoadDouble.Spec at h
-  tauto
+  change LoadDouble.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_loadHalf (cols : LoadHalf.LoadHalfCols (ZMod p))
-    (h : LoadHalf.Spec cols) :
+    (h : LoadHalf.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold LoadHalf.Spec at h
-  tauto
+  change LoadHalf.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_loadWord (cols : LoadWord.LoadWordCols (ZMod p))
-    (h : LoadWord.Spec cols) :
+    (h : LoadWord.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold LoadWord.Spec at h
-  tauto
+  change LoadWord.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_loadX0 (cols : LoadX0.LoadX0Cols (ZMod p))
-    (h : LoadX0.Spec cols) :
+    (h : LoadX0.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold LoadX0.Spec at h
-  tauto
+  change LoadX0.Assertion.FormalSpec cols at h
+  exact h.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_lt (cols : Lt.LtCols (ZMod p))
-    (h : Lt.Spec cols) :
+    (h : Lt.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Lt.Spec at h
-  tauto
+  change Lt.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_mul (cols : Mul.MulCols (ZMod p))
-    (h : Mul.Spec cols) :
+    (h : Mul.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Mul.Spec at h
-  tauto
+  change Mul.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_shiftLeft (cols : ShiftLeft.ShiftLeftCols (ZMod p))
-    (h : ShiftLeft.Spec cols) :
+    (h : ShiftLeft.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold ShiftLeft.Spec at h
-  tauto
+  change ShiftLeft.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_shiftRight
     (cols : ShiftRight.ShiftRightCols (ZMod p))
-    (h : ShiftRight.Spec cols) :
+    (h : ShiftRight.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold ShiftRight.Spec at h
-  tauto
+  change ShiftRight.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_storeByte (cols : StoreByte.StoreByteCols (ZMod p))
-    (h : StoreByte.Spec cols) :
+    (h : StoreByte.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold StoreByte.Spec at h
-  tauto
+  change StoreByte.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_storeDouble
     (cols : StoreDouble.StoreDoubleCols (ZMod p))
-    (h : StoreDouble.Spec cols) :
+    (h : StoreDouble.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold StoreDouble.Spec at h
-  tauto
+  change StoreDouble.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_storeHalf
     (cols : StoreHalf.StoreHalfCols (ZMod p))
-    (h : StoreHalf.Spec cols) :
+    (h : StoreHalf.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold StoreHalf.Spec at h
-  tauto
+  change StoreHalf.Assertion.FormalSpec cols at h
+  exact h.1
 
 theorem cpuStateSpec_of_spec_storeWord
     (cols : StoreWord.StoreWordCols (ZMod p))
-    (h : StoreWord.Spec cols) :
+    (h : StoreWord.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold StoreWord.Spec at h
-  tauto
+  change StoreWord.Assertion.FormalSpec cols at h
+  exact h.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_sub (cols : Sub.SubCols (ZMod p))
-    (h : Sub.Spec cols) :
+    (h : Sub.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Sub.Spec at h
-  tauto
+  change Sub.Assertion.FormalSpec cols at h
+  exact h.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_subw (cols : Sub.W.SubwCols (ZMod p))
-    (h : Sub.W.Spec cols) :
+    (h : Sub.W.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold Sub.W.Spec at h
-  tauto
+  change Sub.W.Assertion.FormalSpec cols at h
+  exact h.1
 
-omit [Fact (2 ^ 17 < p)] in
 theorem cpuStateSpec_of_spec_uType (cols : UType.UTypeCols (ZMod p))
-    (h : UType.Spec cols) :
+    (h : UType.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24 := by
-  unfold UType.Spec at h
-  tauto
+  change UType.Assertion.FormalSpec cols at h
+  exact h.1
 
 /-- Row-level cpuStateSpec predicate: every chip carries the same
 `((clk_0_16 - 1) * 8⁻¹).val < 8192 ∧ clk_16_24 < 256` constraint on its
 clock fields. -/
 def ChipRow.cpuStateSpec : ChipRow p → Prop
-  | .add cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
+  | .add cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .addi cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
   | .addw cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
   | .bitwise cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
@@ -317,6 +308,11 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
   | .sub cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
   | .subw cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
   | .uType cols => CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
+  -- Boundary chips: no `clk_0_16` / `clk_16_24` decomposition; the
+  -- timestamp bound comes from a different mechanism (Phase 4.5
+  -- follow-up). Placeholder `True` here keeps the dispatch total.
+  | .memInit _ => True
+  | .memFinalize _ => True
 
 /-- Top-level projection: every `ChipRow.Spec row` yields the
 `cpuStateSpec` bound on the row's underlying clock fields. Mirrors
@@ -348,6 +344,8 @@ theorem cpuStateSpec_of_chipRow_spec
   | sub cols => exact cpuStateSpec_of_spec_sub cols h
   | subw cols => exact cpuStateSpec_of_spec_subw cols h
   | uType cols => exact cpuStateSpec_of_spec_uType cols h
+  | memInit _ => trivial
+  | memFinalize _ => trivial
 
 /-! ### Bounds derived from `cpuStateSpec`
 
@@ -592,10 +590,16 @@ private lemma rowAccessTuples_pairwise_of_cpuStateSpec
     (row : ChipRow p) (h_cpu : row.cpuStateSpec) :
     row.rowAccessTuples.Pairwise timestamp_ordering := by
   obtain ⟨h_off_bound, h_off_desc⟩ := chipRow_offsets_props row
-  cases row <;> (
-    simp only [ChipRow.rowAccessTuples, ChipRow.clockComponents]
-    apply toAccessTuples_pairwise _ _ (clk_low_val_lt h_cpu) _
-      (zipped_off_bound _ _ h_off_bound) (zipped_off_desc _ _ h_off_desc))
+  -- Boundary chips: empty `rowAccessTuples` (Phase 4 placeholder).
+  cases row <;> first
+    -- Interior chips: apply the timestamp-pairwise machinery.
+    | (simp only [ChipRow.rowAccessTuples, ChipRow.clockComponents]
+       apply toAccessTuples_pairwise _ _ (clk_low_val_lt h_cpu) _
+         (zipped_off_bound _ _ h_off_bound) (zipped_off_desc _ _ h_off_desc))
+    -- Boundary chips: empty list is trivially Pairwise.
+    | simp [ChipRow.rowAccessTuples, ChipRow.memoryAccesses,
+        SP1Clean.MemoryGlobal.initMemoryAccesses,
+        SP1Clean.MemoryGlobal.finalizeMemoryAccesses]
 
 /-! ### Inter-row Pairwise lemma
 
@@ -611,14 +615,20 @@ private lemma rowAccessTuples_timestamp_range
     (x : _root_.MemoryAccess) (hx : x ∈ row.rowAccessTuples) :
     row.encodedClk ≤ x.1 ∧ x.1 ≤ row.encodedClk + 4 := by
   obtain ⟨h_off_bound, _⟩ := chipRow_offsets_props row
-  cases row <;> (
-    simp only [ChipRow.rowAccessTuples, ChipRow.clockComponents] at hx
-    simp only [List.mem_map] at hx
-    obtain ⟨e, he_mem, rfl⟩ := hx
-    have h_off : e.2.val ≤ 4 := zipped_off_bound _ _ h_off_bound _ he_mem
-    rw [toAccessTuple_fst_eq _ _ _ _ _ (clk_low_val_lt h_cpu) h_off]
-    simp only [ChipRow.encodedClk, ChipRow.clockComponents]
-    refine ⟨by omega, by omega⟩)
+  -- Boundary chips: empty `rowAccessTuples`, so `hx : x ∈ []` is vacuous.
+  cases row <;> first
+    -- Interior chips: bound via the toAccessTuple_fst_eq lemma.
+    | (simp only [ChipRow.rowAccessTuples, ChipRow.clockComponents] at hx
+       simp only [List.mem_map] at hx
+       obtain ⟨e, he_mem, rfl⟩ := hx
+       have h_off : e.2.val ≤ 4 := zipped_off_bound _ _ h_off_bound _ he_mem
+       rw [toAccessTuple_fst_eq _ _ _ _ _ (clk_low_val_lt h_cpu) h_off]
+       simp only [ChipRow.encodedClk, ChipRow.clockComponents]
+       refine ⟨by omega, by omega⟩)
+    -- Boundary chips: `hx : x ∈ []` is False; close vacuously.
+    | (simp [ChipRow.rowAccessTuples, ChipRow.memoryAccesses,
+        SP1Clean.MemoryGlobal.initMemoryAccesses,
+        SP1Clean.MemoryGlobal.finalizeMemoryAccesses] at hx)
 
 /-- Inter-row timestamp comparison: every tuple of the later row has
 strictly higher timestamp than every tuple of the earlier row, given

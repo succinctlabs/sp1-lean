@@ -562,7 +562,7 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
 /-- The chip-row's `clk_high` and (composed) `clk_low` for the per-access
 timestamp encoding `clk_high * 2^24 + clk_low + offset`. -/
 def clockComponents : ChipRow p → ZMod p × ZMod p
-  | .add cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
+  | .add cols => (cols.state.clk_high, cols.state.clk_0_16 + cols.state.clk_16_24 * 65536)
   | .loadByte cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
   | .storeByte cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
   | .jal cols => (cols.clk_high, cols.clk_0_16 + cols.clk_16_24 * 65536)
