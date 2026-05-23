@@ -42,8 +42,23 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 structure ShiftRightCols (T : Type) where
   state : CPUState T
   adapter : ALUTypeReader T
-  op_a_write_value : Vector T 4             -- Main[32..35]
-  intermediates_aux : Vector T 28           -- Main[36..63] (shift-arithmetic ws)
+  op_a_write_value : Vector T 4             -- Main[32..35] (= upstream `a : Word<T>`)
+  -- Phase 3e: aux:28 decomposed into 11 named upstream sub-fields.
+  -- Slot mapping verified against `SP1Chips/ShiftRight/Constraints.lean`
+  -- (the U16MSBOperation calls at lines 191-197 pin Main[36]/[37], the
+  -- bit-boolean asserts pin Main[38..43], the shift-pow chain E124-E135
+  -- pins Main[45..47], the limb arithmetic pins Main[48..63]).
+  b_msb : U16MSBOperation T                 -- Main[36]
+  srw_msb : U16MSBOperation T               -- Main[37]
+  c_bits : Vector T 6                       -- Main[38..43]
+  sra_msb_v0123 : T                         -- Main[44]
+  v_0123 : T                                -- Main[45]
+  v_012 : T                                 -- Main[46]
+  v_01 : T                                  -- Main[47]
+  lower_limb : Vector T 4                   -- Main[48..51]
+  higher_limb : Vector T 4                  -- Main[52..55]
+  limb_result : Vector T 4                  -- Main[56..59]
+  shift_u16 : Vector T 4                    -- Main[60..63]
   is_srl : T                                -- Main[64]
   is_sra : T                                -- Main[65]
   is_srlw : T                               -- Main[66]
@@ -61,8 +76,11 @@ def opcodeExpr (cols : Var ShiftRightCols (ZMod p)) : Expression (ZMod p) :=
 
 def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c⟩, _op_a_write_value,
-       _intermediates_aux, is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
+       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c⟩,
+       _op_a_write_value,
+       _b_msb, _srw_msb, _c_bits, _sra_msb_v0123, _v_0123, _v_012, _v_01,
+       _lower_limb, _higher_limb, _limb_result, _shift_u16,
+       is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
        _next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -138,10 +156,17 @@ def Spec (cols : ShiftRightCols (ZMod p)) : Prop :=
     ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
     Main[31]⟩,
    #v[Main[32], Main[33], Main[34], Main[35]],
-   #v[Main[36], Main[37], Main[38], Main[39], Main[40], Main[41], Main[42],
-      Main[43], Main[44], Main[45], Main[46], Main[47], Main[48], Main[49],
-      Main[50], Main[51], Main[52], Main[53], Main[54], Main[55], Main[56],
-      Main[57], Main[58], Main[59], Main[60], Main[61], Main[62], Main[63]],
+   ⟨Main[36]⟩,                          -- b_msb : U16MSBOperation
+   ⟨Main[37]⟩,                          -- srw_msb : U16MSBOperation
+   #v[Main[38], Main[39], Main[40], Main[41], Main[42], Main[43]],  -- c_bits
+   Main[44],                            -- sra_msb_v0123
+   Main[45],                            -- v_0123
+   Main[46],                            -- v_012
+   Main[47],                            -- v_01
+   #v[Main[48], Main[49], Main[50], Main[51]],  -- lower_limb
+   #v[Main[52], Main[53], Main[54], Main[55]],  -- higher_limb
+   #v[Main[56], Main[57], Main[58], Main[59]],  -- limb_result
+   #v[Main[60], Main[61], Main[62], Main[63]],  -- shift_u16
    Main[64], Main[65], Main[66], Main[67], Main[68],
    #v[0, 0, 0]⟩
 
@@ -187,8 +212,11 @@ open Circuit
 @[reducible]
 def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, _op_a_write_value,
-       _intermediates_aux, is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩,
+       _op_a_write_value,
+       _b_msb, _srw_msb, _c_bits, _sra_msb_v0123, _v_0123, _v_012, _v_01,
+       _lower_limb, _higher_limb, _limb_result, _shift_u16,
+       is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
