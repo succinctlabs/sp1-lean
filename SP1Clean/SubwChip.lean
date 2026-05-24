@@ -13,6 +13,9 @@ import SP1Operations.Operation.SubwOperation.SubwOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.RTypeReader.RTypeReader
 import SP1Chips.Subw.SubwChip
+import SP1Chips.Subw.Common
+import SP1Chips.Soundness
+import SP1Clean.MemoryAccess
 import SP1Clean.SubwOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
@@ -78,7 +81,7 @@ def main (cols : Var SubwCols (ZMod p)) : Circuit (ZMod p) Unit := do
 index `20` (`SUBW`) flows into the RTypeReader fragment; the
 `op_a_write_value` passed to the reader is the 4-limb reconstruction
 `[subw_value[0], subw_value[1], subw_msb * 65535, subw_msb * 65535]`. -/
-def Spec (cols : SubwCols (ZMod p)) : Prop :=
+def TraceSpec (cols : SubwCols (ZMod p)) : Prop :=
   SP1Clean.SubwOp.Spec
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
       { value := cols.subw_value, msb := { msb := cols.subw_msb } } ∧
@@ -125,13 +128,13 @@ index map in `SP1Chips/Subw/Constraints.lean`. -/
    ⟨Main[31]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
-`Subw.constraints Main` is exactly `Spec (fromMain Main)`, under
+`Subw.constraints Main` is exactly `TraceSpec (fromMain Main)`, under
 `is_real = Main[31] = 1`. -/
-theorem iff_sp1
+theorem traceSpec_iff_allHold
     (Main : Vector (ZMod p) 32) (h_is_real : Main[31] = 1) :
-    (_root_.Subw.constraints Main).allHold ↔ Spec (fromMain Main) := by
+    (_root_.Subw.constraints Main).allHold ↔ TraceSpec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  simp only [fromMain, Spec, SP1Clean.SubwOp.Spec,
+  simp only [fromMain, TraceSpec, SP1Clean.SubwOp.Spec,
     SP1Clean.CPUState.cpuStateSpec, SP1Clean.RTypeReader.rtypeReaderSpec]
   rw [show (_root_.Subw.constraints Main).allHold ↔
         ((SubwOperation.constraints (F := ZMod p)
@@ -176,26 +179,135 @@ theorem iff_sp1
 /-- Clean-side `correct_subw`: same Sail equivalence statement as SP1's
 `Subw.correct_subw`, but with the constraint hypothesis re-expressed
 against the Clean-flavored `Spec` predicate over a structured `SubwCols`
-view. Pure composition with the SP1 proof via `iff_sp1.mpr`. -/
+view. Pure composition with the SP1 proof via `traceSpec_iff_allHold.mpr`. -/
 theorem correct_subw
     (Main : Vector (ZMod p) 32) (s : SailState)
     (h_is_real : Main[31] = 1)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Subw.constraints Main).initialState s) :
     let op_c := _root_.Subw.sp1_op_c Main
     let op_b := _root_.Subw.sp1_op_b Main
     let op_a := _root_.Subw.sp1_op_a Main
     (_root_.Subw.spec_subw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Subw.sp1_subw Main).run s :=
-  _root_.Subw.correct_subw Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Subw.correct_subw Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     h_is_real state_cstrs
+
+/-! ## RawSpec / SemanticSpec POC -/
+
+def RawSpec (Main : Vector (ZMod p) 32) : Prop :=
+  (SubwOperation.constraints (F := ZMod p)
+      #v[Main[15], Main[16], Main[17], Main[18]]
+      #v[Main[22], Main[23], Main[24], Main[25]]
+      { value := #v[Main[28], Main[29]], msb := { msb := Main[30] } } Main[31]).allHold ∧
+  (CPUState.constraints (F := ZMod p)
+      { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+        pc := #v[Main[3], Main[4], Main[5]] }
+      #v[Main[3] + 4, Main[4], Main[5]] 8 Main[31]).allHold ∧
+  (RTypeReader.constraints (F := ZMod p)
+      Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 20
+      #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535]
+      { op_a := Main[6],
+        op_a_memory :=
+          { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+            access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+        op_a_0 := Main[13], op_b := Main[14],
+        op_b_memory :=
+          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+            access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+        op_c := Main[21],
+        op_c_memory :=
+          { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
+            access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
+      Main[31] Main[31]).allHold ∧
+  Main[31] * (Main[31] - 1) = 0 ∧
+  Main[13] = 0
+
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 32) :
+    (_root_.Subw.constraints Main).allHold ↔ RawSpec Main := by
+  change List.Forall SP1Constraint.toProp (_root_.Subw.constraints Main) ↔ _
+  rw [_root_.Subw.allHold_constraints_iff]
+  rfl
+
+def SemanticSpec (Main : Vector (ZMod p) 32) : Prop :=
+  let cols := fromMain Main
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
+        { prev_value := cols.adapter.op_a_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_b
+        { prev_value := cols.adapter.op_b_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_c
+        { prev_value := cols.adapter.op_c_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.ProgramTable.Spec
+      { pc := cols.state.pc, opcode := 20, op_a := cols.adapter.op_a,
+        op_b := #v[cols.adapter.op_b, 0, 0, 0],
+        op_c := #v[cols.adapter.op_c, 0, 0, 0],
+        op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (∀ s : SailState, (_root_.Subw.constraints Main).initialState s →
+    (_root_.Subw.sp1_subw Main).run s =
+      (_root_.Subw.spec_subw (.Regidx (_root_.Subw.sp1_op_c Main))
+        (.Regidx (_root_.Subw.sp1_op_b Main))
+        (.Regidx (_root_.Subw.sp1_op_a Main))).run s)
+
+theorem raw_to_semantic (Main : Vector (ZMod p) 32) (h_is_real : Main[31] = 1)
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨h_subwop, h_cpu_raw, h_rtr_raw, h_real_bin, h_a0⟩ := h_raw
+  have h_allHold : (_root_.Subw.constraints Main).allHold :=
+    (rawSpec_iff_allHold Main).mpr ⟨h_subwop, h_cpu_raw, h_rtr_raw, h_real_bin, h_a0⟩
+  rw [h_is_real] at h_cpu_raw h_rtr_raw
+  have h_cpu_spec := SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu_raw
+  have h_rtr_spec := SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1.mp h_rtr_raw
+  obtain ⟨h_ti, h_op_a_lt, h_op_b_lt, h_op_c_lt, h_a0_bin, h_a0_iff,
+          ⟨h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩,
+          ⟨⟨h_diff_a, h_diff_b, h_diff_c⟩,
+           ⟨h_ts_c, h_ts_b, h_ts_a⟩,
+           ⟨h_isU64_a, h_isU64_b, h_isU64_c⟩⟩,
+          _h_a0_implies⟩ := h_rtr_spec
+  have h_zero_lt : (0 : ZMod p) < (65536 : ZMod p) := by
+    have h65536_lt : (65536 : ℕ) < p := by
+      have := Fact.out (p := 2 ^ 17 < p); omega
+    have h65536_val : (65536 : ZMod p).val = 65536 := ZMod.val_natCast_of_lt h65536_lt
+    change (0 : ZMod p).val < (65536 : ZMod p).val
+    rw [ZMod.val_zero, h65536_val]; omega
+  refine ⟨h_cpu_spec,
+          ⟨h_diff_a, h_ts_a, h_isU64_a⟩,
+          ⟨h_diff_b, h_ts_b, h_isU64_b⟩,
+          ⟨h_diff_c, h_ts_c, h_isU64_c⟩,
+          ?_, h_real_bin, ?_⟩
+  · simp only [SP1Clean.ProgramTable.Spec, SP1Clean.ProgramSpec,
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ]
+    refine ⟨?_, h_op_a_lt, ⟨h_op_b_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
+            ⟨h_op_c_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
+            h_a0_bin, h_a0_iff, Or.inl trivial, Or.inl trivial,
+            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
+    convert h_ti using 1
+  · intro s state_cstrs
+    exact soundness_subw Main s h_allHold h_is_real state_cstrs
 
 /-! ## Full `FormalAssertion` promotion (Path-2 design)
 
 Mirrors `SP1Clean.Addw.Assertion`: drops `SubwOp.main` from
 `Assertion.main`, so the FormalSpec covers `CPUState`, `ProgramTable`,
 and boolean asserts only. The SubwOp 32-bit-with-MSB surface continues
-to be carried by the legacy chip-level `Spec` / `iff_sp1` / `correct_subw`
+to be carried by the legacy chip-level `Spec` / `traceSpec_iff_allHold` / `correct_subw`
 route. -/
 
 namespace Assertion

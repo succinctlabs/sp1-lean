@@ -15,6 +15,7 @@ import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
 import SP1Chips.Branch.BranchChip
 import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.GatedAddOp
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
@@ -67,8 +68,6 @@ structure BranchCols (T : Type) where
   -- (which is `is_blt + is_bge`); it is the branch-taken predicate output.
   is_branching : T                          -- Main[34] (Rust-aligned name)
   compare_operation : LtOperationSigned T   -- Main[35..44]
-  next_pc_branched_carry : Vector T 3       -- Clean-only: pc + op_c_imm carry-aware result
-  next_pc_unbranched_carry : Vector T 3     -- Clean-only: pc + 4 carry-aware result
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -87,7 +86,6 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c_imm⟩, _next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
        _is_branching, _compare_operation,
-       _next_pc_branched_carry, _next_pc_unbranched_carry,
        _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -106,7 +104,110 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let sum := is_beq + is_bne + is_blt + is_bge + is_bltu + is_bgeu
   sum * (sum - 1) === 0
 
-def Spec (cols : BranchCols (ZMod p)) : Prop :=
+/-- The branch-arithmetic Spec content. Bundles the iff-RHS conjuncts of
+`_root_.Branch.allHold_constraints_iff` that aren't otherwise carried by
+the chip-level Spec (cpuStateSpec / LtOperationSigned / ProgramTable.Spec /
+opcode boolean gates). Includes:
+  - `ITypeReaderImmutable.constraints.allHold` (the full reader content,
+    subsumes the ProgramTable.Spec in Spec)
+  - `is_branching` boolean and outcome equation
+  - 4 branch-taken carry assertZeros (gated by `is_branching`)
+  - 4 branch-not-taken carry assertZeros (gated by `is_real - is_branching`)
+  - 3 PC alignment byte sends (next_pc[0..2])
+-/
+def branchSpec (cols : BranchCols (ZMod p)) : Prop :=
+  let is_real : ZMod p :=
+    cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
+      cols.is_bltu + cols.is_bgeu
+  let opcode_e : ZMod p :=
+    cols.is_beq * 40 + cols.is_bne * 41 + cols.is_blt * 42 +
+      cols.is_bge * 43 + cols.is_bltu * 44 + cols.is_bgeu * 45
+  let u16_sum : ZMod p :=
+    cols.compare_operation.result.u16_flags[0] +
+    cols.compare_operation.result.u16_flags[1] +
+    cols.compare_operation.result.u16_flags[2] +
+    cols.compare_operation.result.u16_flags[3]
+  let bit : ZMod p := cols.compare_operation.result.u16_compare_operation.bit
+  -- ITypeReaderImmutable.constraints.allHold with the chip's args.
+  (_root_.ITypeReaderImmutable.constraints cols.state.clk_high
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) cols.state.pc
+      opcode_e cols.adapter is_real is_real).allHold ∧
+  -- is_branching boolean
+  cols.is_branching * (cols.is_branching - 1) = 0 ∧
+  -- is_branching outcome equation (gated by is_real)
+  is_real * (cols.is_branching -
+    (0 + cols.is_beq * (1 - u16_sum) +
+         cols.is_bne * (1 - (1 - u16_sum)) +
+         (cols.is_bge + cols.is_bgeu) * (1 - bit) +
+         (cols.is_blt + cols.is_bltu) * bit)) = 0 ∧
+  -- 4 branch-taken carry assertZeros (PC + op_c_imm = next_pc)
+  cols.is_branching *
+    ((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+        (65536 : ZMod p)⁻¹ *
+      ((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+          (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  cols.is_branching *
+    (((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+          (65536 : ZMod p)⁻¹ + cols.state.pc[1] + cols.adapter.op_c_imm[1] -
+          cols.next_pc[1]) * (65536 : ZMod p)⁻¹ *
+      (((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+          (65536 : ZMod p)⁻¹ + cols.state.pc[1] + cols.adapter.op_c_imm[1] -
+          cols.next_pc[1]) * (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  cols.is_branching *
+    ((((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+            (65536 : ZMod p)⁻¹ + cols.state.pc[1] + cols.adapter.op_c_imm[1] -
+            cols.next_pc[1]) * (65536 : ZMod p)⁻¹ + cols.state.pc[2] +
+          cols.adapter.op_c_imm[2] - cols.next_pc[2]) * (65536 : ZMod p)⁻¹ *
+      ((((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+              (65536 : ZMod p)⁻¹ + cols.state.pc[1] + cols.adapter.op_c_imm[1] -
+              cols.next_pc[1]) * (65536 : ZMod p)⁻¹ + cols.state.pc[2] +
+            cols.adapter.op_c_imm[2] - cols.next_pc[2]) *
+          (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  cols.is_branching *
+    (((((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+              (65536 : ZMod p)⁻¹ + cols.state.pc[1] + cols.adapter.op_c_imm[1] -
+              cols.next_pc[1]) * (65536 : ZMod p)⁻¹ + cols.state.pc[2] +
+            cols.adapter.op_c_imm[2] - cols.next_pc[2]) *
+          (65536 : ZMod p)⁻¹ + 0 + cols.adapter.op_c_imm[3] - 0) *
+        (65536 : ZMod p)⁻¹ *
+      (((((0 + cols.state.pc[0] + cols.adapter.op_c_imm[0] - cols.next_pc[0]) *
+                (65536 : ZMod p)⁻¹ + cols.state.pc[1] + cols.adapter.op_c_imm[1] -
+                cols.next_pc[1]) * (65536 : ZMod p)⁻¹ + cols.state.pc[2] +
+              cols.adapter.op_c_imm[2] - cols.next_pc[2]) *
+            (65536 : ZMod p)⁻¹ + 0 + cols.adapter.op_c_imm[3] - 0) *
+          (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  -- 4 branch-not-taken carry assertZeros (PC + 4 = next_pc) gated by is_real - is_branching
+  (is_real - cols.is_branching) *
+    ((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ *
+      ((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  (is_real - cols.is_branching) *
+    (((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ +
+          cols.state.pc[1] + 0 - cols.next_pc[1]) * (65536 : ZMod p)⁻¹ *
+      (((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ +
+            cols.state.pc[1] + 0 - cols.next_pc[1]) * (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  (is_real - cols.is_branching) *
+    ((((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ +
+            cols.state.pc[1] + 0 - cols.next_pc[1]) * (65536 : ZMod p)⁻¹ +
+          cols.state.pc[2] + 0 - cols.next_pc[2]) * (65536 : ZMod p)⁻¹ *
+      ((((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ +
+              cols.state.pc[1] + 0 - cols.next_pc[1]) * (65536 : ZMod p)⁻¹ +
+            cols.state.pc[2] + 0 - cols.next_pc[2]) *
+          (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  (is_real - cols.is_branching) *
+    (((((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ +
+              cols.state.pc[1] + 0 - cols.next_pc[1]) * (65536 : ZMod p)⁻¹ +
+            cols.state.pc[2] + 0 - cols.next_pc[2]) * (65536 : ZMod p)⁻¹ +
+          0 + 0 - 0) * (65536 : ZMod p)⁻¹ *
+      (((((0 + cols.state.pc[0] + 4 - cols.next_pc[0]) * (65536 : ZMod p)⁻¹ +
+                cols.state.pc[1] + 0 - cols.next_pc[1]) * (65536 : ZMod p)⁻¹ +
+              cols.state.pc[2] + 0 - cols.next_pc[2]) * (65536 : ZMod p)⁻¹ +
+            0 + 0 - 0) * (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+  -- 3 PC alignment byte sends
+  (is_real ≠ 0 → (ByteOpcode.ofNat 6).constrain (cols.next_pc[0] * (4 : ZMod p)⁻¹) 14 0) ∧
+  (is_real ≠ 0 → (ByteOpcode.ofNat 6).constrain cols.next_pc[1] 16 0) ∧
+  (is_real ≠ 0 → (ByteOpcode.ofNat 6).constrain cols.next_pc[2] 16 0)
+
+def TraceSpec (cols : BranchCols (ZMod p)) : Prop :=
   let is_real : ZMod p :=
     cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
       cols.is_bltu + cols.is_bgeu
@@ -130,6 +231,7 @@ def Spec (cols : BranchCols (ZMod p)) : Prop :=
   cols.is_bltu * (cols.is_bltu - 1) = 0 ∧
   cols.is_bgeu * (cols.is_bgeu - 1) = 0 ∧
   is_real * (is_real - 1) = 0 ∧
+  branchSpec cols ∧
   cols.adapter_cols.is_trusted = 1
 
 /-- The op_a / op_b register accesses (both reads; no writes — Branch
@@ -148,10 +250,8 @@ def opBMemoryAccess (cols : BranchCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p
 
 /-- Project a raw SP1 row into the structured `BranchCols` view.
 45 columns; `compare_operation : LtOperationSigned T` packed from
-Main[35..44]. Clean-only fields (branched/unbranched carry vectors)
-default to placeholder values since the SP1 row doesn't carry them.
-Note: `is_branching` at Main[34] *is* on the row (Rust-aligned name;
-previously misnamed `lt_is_signed`). -/
+Main[35..44]. Note: `is_branching` at Main[34] *is* on the row
+(Rust-aligned name; previously misnamed `lt_is_signed`). -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 45) : BranchCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       ⟨Main[6],
@@ -170,24 +270,66 @@ previously misnamed `lt_is_signed`). -/
          comparison_limbs := #v[Main[41], Main[42]] },
      b_msb := { msb := Main[43] },
      c_msb := { msb := Main[44] } },
-   #v[0, 0, 0], #v[0, 0, 0],
    ⟨Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33]⟩⟩
 
-/-- The chip-level half-iff bridge (Branch). **Proof body sorry'd**. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 45)
+set_option maxHeartbeats 2400000 in
+-- Heartbeats elevated for the ~24-conjunct iff RHS refine on 45 cols.
+/-- The chip-level half-iff bridge (Branch). -/
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 45)
     (h_is_real : Main[28] + Main[29] + Main[30] + Main[31] +
                  Main[32] + Main[33] = 1)
-    (h_spec : Spec (fromMain Main)) :
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.Branch.constraints Main).allHold := by
-  sorry
-
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [TraceSpec, fromMain, branchSpec,
+    Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ] at h_spec
+  obtain ⟨h_lt_op, h_cpu_spec, _h_program,
+          h_beq_bin, h_bne_bin, h_blt_bin, h_bge_bin, h_bltu_bin, h_bgeu_bin,
+          h_aggregate,
+          h_bs, _h_trusted⟩ := h_spec
+  obtain ⟨h_iti, h_brn_bin, h_brn_eq,
+          h_bt0, h_bt1, h_bt2, h_bt3,
+          h_nt0, h_nt1, h_nt2, h_nt3,
+          h_pc0_send, h_pc1_send, h_pc2_send⟩ := h_bs
+  change List.Forall SP1Constraint.toProp (_root_.Branch.constraints Main)
+  rw [_root_.Branch.allHold_constraints_iff]
+  -- Boolean conversion helper
+  have bool_of : ∀ {x : ZMod p}, x * (x - 1) = 0 → x = 0 ∨ x = 1 := fun h =>
+    (mul_eq_zero.mp h).imp_right (by intro h'; linear_combination h')
+  -- iff RHS order: 3 sub-allHolds + 6 booleans + aggregate + is_branching boolean
+  -- + outcome eq + 4 BT carries + 4 NT carries + 3 byte sends
+  refine ⟨?_, ?_, h_lt_op,
+          h_beq_bin, h_bne_bin, h_blt_bin, h_bge_bin, h_bltu_bin, h_bgeu_bin,
+          h_aggregate,
+          h_brn_bin, ?_,
+          ?_, ?_, ?_, ?_,
+          ?_, ?_, ?_, ?_,
+          h_pc0_send, h_pc1_send, h_pc2_send⟩
+  -- 1: CPUState bridge via cpuStateSpec_iff_sp1
+  · rw [show (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] : ZMod p) = 1
+        from h_is_real]
+    exact (SP1Clean.CPUState.cpuStateSpec_iff_sp1).mpr h_cpu_spec
+  -- 2: ITypeReaderImmutable.constraints.allHold — directly from branchSpec
+  · exact h_iti
+  -- 3+: is_branching outcome equation and 8 carry-chain assertZeros — push_cast
+  -- normalizes the `↑0` and `↑1` casts the iff lemma's `push_cast; rfl` introduced.
+  · convert h_brn_eq using 2; push_cast; ring
+  · exact h_bt0
+  · exact h_bt1
+  · exact h_bt2
+  · exact h_bt3
+  · exact h_nt0
+  · exact h_nt1
+  · exact h_nt2
+  · exact h_nt3
 /-- Clean-side `correct_beq`: branch-if-equal. -/
 theorem correct_beq
     (Main : Vector (ZMod p) 45) (s : SailState) (hs : s.isInitialized)
     (h_is_beq : Main[28] = 1)
     (h_others_zero : Main[29] = 0 ∧ Main[30] = 0 ∧ Main[31] = 0 ∧
                      Main[32] = 0 ∧ Main[33] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Branch.constraints Main).initialState s) :
     let imm := _root_.Branch.sp1_imm Main
     let op_b := regidx.Regidx (_root_.Branch.sp1_op_b Main)
@@ -195,7 +337,7 @@ theorem correct_beq
     (_root_.Branch.BEQ.spec_beq imm op_b op_a).run s =
       (_root_.Branch.sp1_branch Main).run s :=
   _root_.Branch.BEQ.correct_beq Main s hs h_is_beq
-    (spec_implies_allHold Main
+    (traceSpec_implies_allHold Main
       (by obtain ⟨h29, h30, h31, h32, h33⟩ := h_others_zero
           rw [h_is_beq, h29, h30, h31, h32, h33]; ring)
       h_spec)
@@ -219,7 +361,6 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
        is_branching, _compare_operation,
-       next_pc_branched_carry, next_pc_unbranched_carry,
        _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -236,32 +377,29 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_bgeu * (is_bgeu - 1) === 0
   let sum := is_beq + is_bne + is_blt + is_bge + is_bltu + is_bgeu
   sum * (sum - 1) === 0
-  -- State-bus next_pc grounding (iter-8 sub-task C). Both arms' carry-aware
-  -- AddrAddOp constraints are emitted unconditionally; the chip's `next_pc`
-  -- column is the `is_branching`-weighted mux of the two arm results.
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       op_c_imm,
-       next_pc_branched_carry⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_unbranched_carry⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_branching * (is_branching - 1) === 0
-  -- Per-limb mux: next_pc[i] = is_branching * (branched[i] - unbranched[i]) + unbranched[i].
-  -- Equivalent to `is_branching * branched + (1 - is_branching) * unbranched`
-  -- but avoids `(1 : ℕ) - is_branching : Expression _` type ambiguity.
-  next_pc[0] -
-    (is_branching * (next_pc_branched_carry[0] - next_pc_unbranched_carry[0]) +
-     next_pc_unbranched_carry[0]) === 0
-  next_pc[1] -
-    (is_branching * (next_pc_branched_carry[1] - next_pc_unbranched_carry[1]) +
-     next_pc_unbranched_carry[1]) === 0
-  next_pc[2] -
-    (is_branching * (next_pc_branched_carry[2] - next_pc_unbranched_carry[2]) +
-     next_pc_unbranched_carry[2]) === 0
+  -- State-bus next_pc grounding. Mirrors upstream's `when(is_branching) /
+  -- when(is_real - is_branching)` per-limb carry chain in
+  -- `../sp1/.../control_flow/branch/air.rs`. Two gated carry chains
+  -- target the same committed `next_pc` (3 limbs, padded to 4 with high
+  -- limb 0): one gated by `is_branching` for the `pc + op_c_imm` arm,
+  -- one by `1 - is_branching` for the `pc + 4` arm.
+  SP1Clean.GatedAddOp.assertion
+    (⟨pc.push 0, op_c_imm, next_pc.push 0, is_branching⟩ :
+      Var SP1Clean.GatedAddOp.Inputs (ZMod p))
+  SP1Clean.GatedAddOp.assertion
+    (⟨pc.push 0, #v[(4 : Expression (ZMod p)), 0, 0, 0],
+       next_pc.push 0, 1 - is_branching⟩ :
+      Var SP1Clean.GatedAddOp.Inputs (ZMod p))
+  -- Range bounds on `next_pc[i]` (replaces the lookups previously
+  -- emitted by `AddrAddOp.assertion`; `GatedAddOp` drops them per
+  -- the lookup-restriction discussion in SP1Clean/Gated.lean).
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), next_pc[0], 16, 0] : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), next_pc[1], 16, 0] : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), next_pc[2], 16, 0] : Vector (Expression (ZMod p)) 4)
   -- Iter-8 sub-task E: per-operand memory-bus byte content. Branch
   -- emits 2 register accesses (op_a at +4, op_b at +3) — both pure
   -- reads (no register writes; only PC is updated).
@@ -306,25 +444,20 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
   cols.is_bltu * (cols.is_bltu - 1) = 0 ∧
   cols.is_bgeu * (cols.is_bgeu - 1) = 0 ∧
   is_real * (is_real - 1) = 0 ∧
-  -- Iter-8 sub-task C: state-bus next_pc grounding (case-split on `is_branching`).
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     cols.adapter.op_c_imm,
-     cols.next_pc_branched_carry⟩ ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_unbranched_carry⟩ ∧
   cols.is_branching * (cols.is_branching - 1) = 0 ∧
-  cols.next_pc[0] = cols.is_branching *
-      (cols.next_pc_branched_carry[0] - cols.next_pc_unbranched_carry[0]) +
-    cols.next_pc_unbranched_carry[0] ∧
-  cols.next_pc[1] = cols.is_branching *
-      (cols.next_pc_branched_carry[1] - cols.next_pc_unbranched_carry[1]) +
-    cols.next_pc_unbranched_carry[1] ∧
-  cols.next_pc[2] = cols.is_branching *
-      (cols.next_pc_branched_carry[2] - cols.next_pc_unbranched_carry[2]) +
-    cols.next_pc_unbranched_carry[2] ∧
+  -- State-bus next_pc grounding: two gated carry chains targeting the
+  -- same committed `next_pc` (padded to 4 limbs with high limb 0).
+  -- Mirrors upstream's `when(is_branching) / when(is_real - is_branching)`
+  -- conditional carry checks in `../sp1/.../control_flow/branch/air.rs`.
+  (cols.is_branching = 0 ∨ SP1Clean.GatedAddOp.Spec
+    (cols.state.pc.push 0) cols.adapter.op_c_imm (cols.next_pc.push 0)) ∧
+  (1 - cols.is_branching = 0 ∨ SP1Clean.GatedAddOp.Spec
+    (cols.state.pc.push 0) #v[4, 0, 0, 0] (cols.next_pc.push 0)) ∧
+  -- Range bounds on `next_pc[i]` (replaces the lookups previously
+  -- carried by `AddrAddOp.assertion`).
+  (cols.next_pc[0]).val < 65536 ∧
+  (cols.next_pc[1]).val < 65536 ∧
+  (cols.next_pc[2]).val < 65536 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- Branch emits 2 register accesses: op_a/+4 and op_b/+3 (pure reads).
   SP1Clean.OperandAccess.Assertion.Spec
@@ -337,12 +470,14 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26⟩ := h_input
-  subst_eqs
+  obtain ⟨⟨_, _, _, h_pc⟩, _, h_next_pc, _⟩ := h_input
+  subst h_next_pc
   obtain ⟨h_cpu_sub, h_prog_sub, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu,
-          h_sum, h_addr_taken, h_addr_unt, h_branching_bool,
-          h_mux0, h_mux1, h_mux2, h_oa_a, h_oa_b⟩ := h_holds
+          h_sum, h_branching_bool, h_gated_b, h_gated_u,
+          h_l0, h_l1, h_l2, h_oa_a, h_oa_b⟩ := h_holds
+  simp only [Vector.map_push, h_pc] at h_gated_b h_gated_u
+  simp only [circuit_norm, Lookup.Soundness, Table.toRaw, SP1Clean.ByteOpcodeTable]
+    at h_l0 h_l1 h_l2
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
@@ -354,32 +489,30 @@ theorem soundness :
   · linear_combination h_bltu
   · linear_combination h_bgeu
   · linear_combination h_sum
-  · simp only [Vector.getElem_map]
-    exact h_addr_taken trivial
-  · simp only [Vector.getElem_map]
-    exact h_addr_unt trivial
   · linear_combination h_branching_bool
-  · dsimp only
-    simp only [Vector.getElem_map]
-    linear_combination h_mux0
-  · dsimp only
-    simp only [Vector.getElem_map]
-    linear_combination h_mux1
-  · dsimp only
-    simp only [Vector.getElem_map]
-    linear_combination h_mux2
+  · exact h_gated_b trivial
+  · rcases h_gated_u trivial with h | h
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr h
+  · simp only [Vector.getElem_map]
+    exact SP1Clean.AddrAddOp.Assertion.byteOpcodeSpec_range16 _ h_l0
+  · simp only [Vector.getElem_map]
+    exact SP1Clean.AddrAddOp.Assertion.byteOpcodeSpec_range16 _ h_l1
+  · simp only [Vector.getElem_map]
+    exact SP1Clean.AddrAddOp.Assertion.byteOpcodeSpec_range16 _ h_l2
   · exact h_oa_a trivial
   · exact h_oa_b trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26⟩ := h_input
-  subst_eqs
+  obtain ⟨⟨_, _, _, h_pc⟩, _, h_next_pc, _⟩ := h_input
+  subst h_next_pc
   obtain ⟨h_cpu, h_prog, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu, h_sum,
-          h_addr_taken, h_addr_unt, h_branching_bool,
-          h_mux0, h_mux1, h_mux2, h_oa_a, h_oa_b⟩ := h_spec
+          h_branching_bool, h_gated_b, h_gated_u,
+          h_l0, h_l1, h_l2, h_oa_a, h_oa_b⟩ := h_spec
+  simp only [Vector.map_push, h_pc]
+  simp only [circuit_norm, Lookup.Completeness, Table.toRaw, SP1Clean.ByteOpcodeTable]
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
@@ -391,22 +524,18 @@ theorem completeness :
   · linear_combination h_bltu
   · linear_combination h_bgeu
   · linear_combination h_sum
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr_taken
-    exact h_addr_taken
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr_unt
-    exact h_addr_unt
   · linear_combination h_branching_bool
-  · dsimp only at h_mux0
-    simp only [Vector.getElem_map] at h_mux0
-    linear_combination h_mux0
-  · dsimp only at h_mux1
-    simp only [Vector.getElem_map] at h_mux1
-    linear_combination h_mux1
-  · dsimp only at h_mux2
-    simp only [Vector.getElem_map] at h_mux2
-    linear_combination h_mux2
+  · exact ⟨trivial, h_gated_b⟩
+  · refine ⟨trivial, ?_⟩
+    rcases h_gated_u with h | h
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr h
+  · simp only [Vector.getElem_map] at h_l0
+    exact SP1Clean.AddrAddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_l0
+  · simp only [Vector.getElem_map] at h_l1
+    exact SP1Clean.AddrAddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_l1
+  · simp only [Vector.getElem_map] at h_l2
+    exact SP1Clean.AddrAddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_l2
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩
 

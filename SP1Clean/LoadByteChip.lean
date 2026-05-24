@@ -36,7 +36,7 @@ record needs to support.
 This file is the **focused pilot mirror**: it captures the program-bus
 interaction and the load-side `MemoryAccess` record explicitly, in a form
 suitable for the trace-level `OfflineMemory` aggregation. The chip's full
-`iff_sp1` to `_root_.Load.LoadByte.constraints` is deferred to follow-up
+`traceSpec_iff_allHold` to `_root_.Load.LoadByte.constraints` is deferred to follow-up
 work; the goal here is to demonstrate that the `MemoryAccess` + `ProgramTable`
 design generalizes from register-only chips (AddChip) to memory-touching
 chips, and to seed the OfflineMemory consistency theorem with a real
@@ -150,7 +150,7 @@ The address-arithmetic side (the `AddressOperation` fragment that asserts
 `addr_value = op_b + sign_ext(imm_c)`) is folded into a future iteration —
 keeping `Spec` light here lets the OfflineMemory bridge consume the chip
 without depending on those proofs. -/
-def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
+def TraceSpec (cols : LoadByteCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   -- Three register-bus accesses + their bookkeeping (op_a write, op_b read,
   -- op_c is immediate so no memory access).
@@ -232,7 +232,7 @@ These two predicates mirror the RHS of
 `_root_.Load.LoadByte.allHold_constraints_iff_of_is_l<op>` verbatim,
 modulo replacing the raw `(CPUState.constraints …).allHold` /
 `(ITypeReader.constraints …).allHold` clauses with the Clean-flavored
-`cpuStateSpec` / `itypeReaderSpec` predicates. They serve the iff_sp1
+`cpuStateSpec` / `itypeReaderSpec` predicates. They serve the traceSpec_iff_allHold
 bridge; the lighter-weight `Spec` above remains for the OfflineMemory
 trace bridge (which consumes `loadMemoryAccess` directly, not `Spec`).
 

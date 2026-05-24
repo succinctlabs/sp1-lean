@@ -77,7 +77,7 @@ def main (cols : Var StoreDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
 
-def Spec (cols : StoreDoubleCols (ZMod p)) : Prop :=
+def TraceSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4

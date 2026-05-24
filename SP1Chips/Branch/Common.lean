@@ -441,9 +441,9 @@ lemma pc_plus_4_eq
 set_option maxHeartbeats 16000000 in
 -- Variant of `pc_plus_4_eq` accepting the chip's *natural* post-simp
 -- limb form: each carry hypothesis is the simp-fragmented disjunction
--- `((a = b ∨ 65536 = 0) ∨ (a - b) * 65536⁻¹ = 1)` from default simp's
+-- `((a = b ∨ 65536 = 0) ∨ (a - b) * (65536 : ZMod p)⁻¹ = 1)` from default simp's
 -- `mul_eq_zero` + `inv_eq_zero` + `sub_eq_zero` firing on the assertZero
--- constraint `((a - b) * 65536⁻¹) * (((a - b) * 65536⁻¹) - 1) = 0`. The chip
+-- constraint `((a - b) * (65536 : ZMod p)⁻¹) * (((a - b) * (65536 : ZMod p)⁻¹) - 1) = 0`. The chip
 -- proof passes `chip_cstrs.h_limb0..3` directly without any pre-bridge step.
 -- Internally bridges to canonical form, then mirrors `pc_plus_4_eq`'s
 -- `limb_lift_branch` chain. Heartbeats elevated for the bridges + chain.
@@ -582,5 +582,119 @@ lemma pc_plus_4_eq_chip
   exact (close_pc_plus_4_nat _ _ _ _ _ _ _ _ _ _
     h25_lt h26_lt h27_lt n0 n1 n2 n3).symm
 
+
+set_option linter.unusedSectionVars false in
+-- Polymorphic iff lemma mirroring `Bitwise.allHold_constraints_iff`.
+-- Exposes 3 sub-allHolds (CPUState/ITypeReaderImmutable/LtOperationSigned) +
+-- 17 chip-list assertZero props + 3 byte-send props (PC alignment Range checks).
+-- The is_real sum and the inverse-form carry expressions are inlined verbatim.
+lemma allHold_constraints_iff (Main : Vector (ZMod p) 45) :
+    List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp
+        (_root_.CPUState.constraints
+          (CPUState.mk Main[0] Main[1] Main[2] #v[Main[3], Main[4], Main[5]])
+          #v[Main[25], Main[26], Main[27]] 8
+          (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp
+        (ITypeReaderImmutable.constraints Main[0] (Main[2] + Main[1] * 65536)
+          #v[Main[3], Main[4], Main[5]]
+          (Main[28] * 40 + Main[29] * 41 + Main[30] * 42 + Main[31] * 43 +
+            Main[32] * 44 + Main[33] * 45)
+          { op_a := Main[6],
+            op_a_memory :=
+              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+            op_a_0 := Main[13], op_b := Main[14],
+            op_b_memory :=
+              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] }
+          (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33])
+          (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33])) ∧
+    List.Forall SP1Constraint.toProp
+        (LtOperationSigned.constraints
+          #v[Main[7], Main[8], Main[9], Main[10]]
+          #v[Main[15], Main[16], Main[17], Main[18]]
+          { result :=
+              { u16_compare_operation := { bit := Main[35] },
+                u16_flags := #v[Main[36], Main[37], Main[38], Main[39]],
+                not_eq_inv := Main[40],
+                comparison_limbs := #v[Main[41], Main[42]] },
+            b_msb := { msb := Main[43] }, c_msb := { msb := Main[44] } }
+          (Main[30] + Main[31])
+          (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33])) ∧
+    Main[28] * (Main[28] - 1) = 0 ∧
+    Main[29] * (Main[29] - 1) = 0 ∧
+    Main[30] * (Main[30] - 1) = 0 ∧
+    Main[31] * (Main[31] - 1) = 0 ∧
+    Main[32] * (Main[32] - 1) = 0 ∧
+    Main[33] * (Main[33] - 1) = 0 ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33]) *
+      (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] - 1) = 0 ∧
+    Main[34] * (Main[34] - 1) = 0 ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33]) *
+        (Main[34] -
+          (0 + Main[28] * (1 - (Main[36] + Main[37] + Main[38] + Main[39])) +
+              Main[29] * (1 - (1 - (Main[36] + Main[37] + Main[38] + Main[39]))) +
+              (Main[31] + Main[33]) * (1 - Main[35]) +
+            (Main[30] + Main[32]) * Main[35])) = 0 ∧
+    Main[34] *
+        ((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ *
+          ((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    Main[34] *
+        (((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + Main[22] - Main[26]) *
+            (65536 : ZMod p)⁻¹ *
+          (((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + Main[22] - Main[26]) *
+              (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    Main[34] *
+        ((((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + Main[22] - Main[26]) *
+                (65536 : ZMod p)⁻¹ + Main[5] + Main[23] - Main[27]) *
+            (65536 : ZMod p)⁻¹ *
+          ((((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + Main[22] - Main[26]) *
+                  (65536 : ZMod p)⁻¹ + Main[5] + Main[23] - Main[27]) *
+              (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    Main[34] *
+        (((((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + Main[22] - Main[26]) *
+                  (65536 : ZMod p)⁻¹ + Main[5] + Main[23] - Main[27]) *
+              (65536 : ZMod p)⁻¹ + 0 + Main[24] - 0) *
+            (65536 : ZMod p)⁻¹ *
+          (((((0 + Main[3] + Main[21] - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + Main[22] - Main[26]) *
+                    (65536 : ZMod p)⁻¹ + Main[5] + Main[23] - Main[27]) *
+                (65536 : ZMod p)⁻¹ + 0 + Main[24] - 0) *
+              (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] - Main[34]) *
+        ((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ *
+          ((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] - Main[34]) *
+        (((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + 0 - Main[26]) *
+            (65536 : ZMod p)⁻¹ *
+          (((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + 0 - Main[26]) *
+              (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] - Main[34]) *
+        ((((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + 0 - Main[26]) *
+                (65536 : ZMod p)⁻¹ + Main[5] + 0 - Main[27]) *
+            (65536 : ZMod p)⁻¹ *
+          ((((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + 0 - Main[26]) *
+                  (65536 : ZMod p)⁻¹ + Main[5] + 0 - Main[27]) *
+              (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] - Main[34]) *
+        (((((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + 0 - Main[26]) *
+                  (65536 : ZMod p)⁻¹ + Main[5] + 0 - Main[27]) *
+              (65536 : ZMod p)⁻¹ + 0 + 0 - 0) *
+            (65536 : ZMod p)⁻¹ *
+          (((((0 + Main[3] + 4 - Main[25]) * (65536 : ZMod p)⁻¹ + Main[4] + 0 - Main[26]) *
+                    (65536 : ZMod p)⁻¹ + Main[5] + 0 - Main[27]) *
+                (65536 : ZMod p)⁻¹ + 0 + 0 - 0) *
+              (65536 : ZMod p)⁻¹ - 1)) = 0 ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] ≠ 0 →
+      (ByteOpcode.ofNat 6).constrain (Main[25] * (4 : ZMod p)⁻¹) 14 0) ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] ≠ 0 →
+      (ByteOpcode.ofNat 6).constrain Main[26] 16 0) ∧
+    (Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33] ≠ 0 →
+      (ByteOpcode.ofNat 6).constrain Main[27] 16 0) := by
+  simp only [constraints, List.forall_append, List.Forall, SP1Constraint.toProp,
+    and_assoc]
+  push_cast
+  rfl
 
 end Branch

@@ -38,7 +38,7 @@ relies on for write-side consistency.
 This file is the **focused pilot mirror** following the `LoadByteChip`
 template: it captures the program-bus interaction and the store-side
 `MemoryAccess` record explicitly, in a form suitable for the trace-level
-`OfflineMemory` aggregation. The chip's full `iff_sp1` to
+`OfflineMemory` aggregation. The chip's full `traceSpec_iff_allHold` to
 `_root_.Store.StoreByte.constraints` is deferred; the goal here is to
 demonstrate that the `MemoryAccess` + `ProgramTable` design generalizes
 from memory-read chips (LoadByte) to memory-write chips, and to seed the
@@ -151,7 +151,7 @@ fragments asserting `addr_value = op_b + sign_ext(imm_c)` and the
 read-write byte-selector logic) is folded into a future iteration —
 keeping `Spec` light here lets the OfflineMemory bridge consume the
 chip without depending on those proofs. -/
-def Spec (cols : StoreByteCols (ZMod p)) : Prop :=
+def TraceSpec (cols : StoreByteCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   -- Source-register read for op_a (no write — stores don't write the
   -- destination register).

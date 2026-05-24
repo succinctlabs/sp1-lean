@@ -19,6 +19,8 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.RTypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Chips.Mul.MulChip
+import SP1Chips.Mul.Common
+import SP1Chips.Soundness
 import SP1Clean.TrustMode
 
 /-! # Chip-level `MulChip` mirror — heavy-arithmetic scaling test
@@ -194,22 +196,26 @@ def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_real_e * (is_real_e - 1) === 0
   op_a_0 === 0
 
-/-- Placeholder for the MulOperation-derivable Spec content. Currently
-trivially `True`; a follow-up iteration can either inline the 60+
-conjuncts of `MulOperation.allHold_constraints_iff_is_real`'s RHS
-or factor a dedicated `SP1Clean.MulOp.Spec` predicate.
-
-The chip-level Spec below references this placeholder so the
-trace-level OfflineMemory bridge can consume `MulCols` rows without
-depending on the full MulOperation proof. -/
-def mulSpec (_cols : MulCols (ZMod p)) : Prop := True
+/-- The MulOperation-derivable Spec content: exactly the chip-level
+`MulOperation.constraints.allHold` with the chip's args (mult =
+aggregate is-real sum; opcode selectors in the order MulOperation
+expects: is_mul, is_mulh, is_mulw, is_mulhu, is_mulhsu). The bridge
+to SP1 trivially threads this through the chip iff lemma. -/
+def mulSpec (cols : MulCols (ZMod p)) : Prop :=
+  (_root_.MulOperation.constraints
+      cols.op_a_write_value
+      cols.adapter.op_b_memory.prev_value
+      cols.adapter.op_c_memory.prev_value
+      cols.mul_operation
+      (cols.is_mul + cols.is_mulh + cols.is_mulhu + cols.is_mulhsu + cols.is_mulw)
+      cols.is_mul cols.is_mulh cols.is_mulw cols.is_mulhu cols.is_mulhsu).allHold
 
 /-- The Clean-flavored Spec for `MulChip`. Composes the existing
 per-fragment specs (`cpuStateSpec`) with three `memoryAccessSpec`
 records (op_a write, op_b read, op_c read), the `ProgramTable.Spec`
 consequence, the selector boolean gates, and the placeholder
 `mulSpec`. -/
-def Spec (cols : MulCols (ZMod p)) : Prop :=
+def TraceSpec (cols : MulCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
@@ -235,8 +241,8 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
   -- Program-bus consequence with the selector-weighted opcode.
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
-      opcode := cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulw * 13
-                  + cols.is_mulhsu * 14 + cols.is_mulhu * 24,
+      opcode := cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13
+                  + cols.is_mulhsu * 14 + cols.is_mulw * 24,
       op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := #v[cols.adapter.op_c, 0, 0, 0],
@@ -284,13 +290,64 @@ packed from contiguous Main slots. -/
    -- `E3 E3` (is_real, is_trusted) where `E3` is that sum.
    ⟨Main[77] + Main[78] + Main[79] + Main[80] + Main[81]⟩⟩
 
-/-- The chip-level half-iff bridge (Mul). **Proof body sorry'd**. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 82)
+set_option maxHeartbeats 1600000 in
+-- Heartbeats elevated for the 10-conjunct refine + cpuStateSpec_iff_sp1 +
+-- rtypeReaderSpec_iff_sp1 + ProgramTable.Spec re-association on 82 cols.
+/-- The chip-level half-iff bridge (Mul). -/
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 82)
     (h_is_real : Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1)
-    (h_op_a_0 : Main[30] = 0)
-    (h_spec : Spec (fromMain Main)) :
+    (_h_op_a_0 : Main[30] = 0)
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.Mul.constraints Main).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [TraceSpec, fromMain, mulSpec] at h_spec
+  obtain ⟨h_cpu_spec, h_mem_a, h_mem_b, h_mem_c, h_program,
+          h_mul_bin, h_mulh_bin, h_mulw_bin, h_mulhsu_bin, h_mulhu_bin,
+          h_aggregate, h_a0, h_mul_op, _h_trusted⟩ := h_spec
+  change List.Forall SP1Constraint.toProp (_root_.Mul.constraints Main)
+  rw [_root_.Mul.allHold_constraints_iff]
+  -- 10-tuple refine matching the iff RHS order. Order in iff is
+  -- MulOp/CPUState/RTypeReader + 5 booleans (77,78,79,81,80) + aggregate +
+  -- op_a_0 = 0.
+  refine ⟨?_, ?_, ?_, h_mul_bin, h_mulh_bin, h_mulhu_bin, h_mulw_bin,
+          h_mulhsu_bin, ?_, h_a0⟩
+  -- 1: MulOperation.constraints.allHold — direct from h_mul_op.
+  · exact h_mul_op
+  -- 2: CPUState.constraints.allHold — bridge via cpuStateSpec_iff_sp1
+  --    after rw'ing is_real_sum = 1.
+  · rw [show (Main[77] + Main[78] + Main[79] + Main[80] + Main[81] : ZMod p) = 1
+        from h_is_real]
+    exact (SP1Clean.CPUState.cpuStateSpec_iff_sp1).mpr h_cpu_spec
+  -- 3: RTypeReader.constraints.allHold — assemble rtypeReaderSpec from
+  --    ProgramTable.Spec + 3 memoryAccessSpec records + h_a0 (vacuous
+  --    op_a_0 ≠ 0 → write_value zeros under Main[13] = 0).
+  · rw [show (Main[77] + Main[78] + Main[79] + Main[80] + Main[81] : ZMod p) = 1
+        from h_is_real]
+    refine (SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1).mpr ?_
+    simp only [SP1Clean.ProgramTable.Spec, SP1Clean.ProgramSpec,
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ] at h_program
+    obtain ⟨h_ti, h_op_a_lt, ⟨h_b0, _, _, _⟩, ⟨h_c0, _, _, _⟩,
+            h_a0_bin, h_a0_iff, _h_imm_b, _h_imm_c, h_pc_mod, h_pc_0, h_pc_1, h_pc_2⟩
+      := h_program
+    simp only [SP1Clean.memoryAccessSpec, SP1Clean.MemoryAccess.ofRegisterShared,
+      SP1Clean.MemoryAccess.ofShared] at h_mem_a h_mem_b h_mem_c
+    refine ⟨?_, h_op_a_lt, h_b0, h_c0, h_a0_bin, h_a0_iff,
+            ⟨h_pc_mod, h_pc_0, h_pc_1, h_pc_2⟩,
+            ⟨⟨h_mem_a.1, h_mem_b.1, h_mem_c.1⟩,
+             ⟨h_mem_c.2.1, h_mem_b.2.1, h_mem_a.2.1⟩,
+             ⟨h_mem_a.2.2, h_mem_b.2.2, h_mem_c.2.2⟩⟩,
+            ?_⟩
+    -- trusted_instr: matches directly after Spec opcode mapping fixed
+    -- (the field-order/opcode-pair bug was the prior obstacle).
+    · convert h_ti using 2
+    -- op_a_0 ≠ 0 → write_value zeros: vacuous under h_a0.
+    · intro h_ne
+      exact absurd h_a0 h_ne
+  -- aggregate boolean — Spec order is (mul,mulh,mulw,mulhsu,mulhu) but iff
+  -- uses Main slot order (77,78,79,80,81 = mul,mulh,mulhu,mulhsu,mulw).
+  --   They're equal by commutativity; close via linear_combination.
+  · linear_combination h_aggregate * 1
 
 /-- Clean-side `correct_mul`: 64-bit multiply (low 64 bits). -/
 theorem correct_mul [Fact (2 ^ 24 < p)]
@@ -298,7 +355,7 @@ theorem correct_mul [Fact (2 ^ 24 < p)]
     (h_is_mul : Main[77] = 1)
     (h_others_zero : Main[78] = 0 ∧ Main[79] = 0 ∧ Main[80] = 0 ∧ Main[81] = 0)
     (h_op_a_0 : Main[30] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Mul.constraints Main).initialState s) :
     let op_c := _root_.Mul.sp1_op_c Main
     let op_b := _root_.Mul.sp1_op_b Main
@@ -306,11 +363,197 @@ theorem correct_mul [Fact (2 ^ 24 < p)]
     (_root_.Mul.Poly.spec_mul (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Mul.sp1_mul_chip Main).run s :=
   _root_.Mul.Poly.correct_mul Main s
-    (spec_implies_allHold Main
+    (traceSpec_implies_allHold Main
       (by obtain ⟨h78, h79, h80, h81⟩ := h_others_zero
           rw [h_is_mul, h78, h79, h80, h81]; ring)
       h_op_a_0 h_spec)
     ⟨h_is_mul, h_op_a_0⟩ state_cstrs
+
+/-! ## RawSpec / SemanticSpec POC (parallel to AddChip's POC)
+
+Same two-layer split as in `AddChip.lean`. `RawSpec` is the iff-RHS of
+`Mul.allHold_constraints_iff` (3 sub-allHolds + 7 chip-list props);
+`SemanticSpec` is the trace-facing contract (cpuStateSpec + 3
+memoryAccessSpec + ProgramTable.Spec + is_real_bin + per-row Sail
+equivalence via `soundness_mul` — single if-then-else cascade dispatching
+on the 5 opcode flags, no per-variant unfolding). `raw_to_semantic`
+confines the chip-internal MulOperation arithmetic + RTypeReader bridge
+to one proof. -/
+
+/-- Structural mirror of `Mul.constraints.allHold`. Matches the RHS of
+`Mul.allHold_constraints_iff` at `SP1Chips/Mul/Common.lean:235`. -/
+def RawSpec (Main : Vector (ZMod p) 82) : Prop :=
+  (MulOperation.constraints (F := ZMod p)
+      #v[Main[28], Main[29], Main[30], Main[31]]
+      #v[Main[15], Main[16], Main[17], Main[18]]
+      #v[Main[22], Main[23], Main[24], Main[25]]
+      { carry := #v[Main[32], Main[33], Main[34], Main[35], Main[36], Main[37],
+          Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44],
+          Main[45], Main[46], Main[47]],
+        product := #v[Main[48], Main[49], Main[50], Main[51], Main[52], Main[53],
+          Main[54], Main[55], Main[56], Main[57], Main[58], Main[59], Main[60],
+          Main[61], Main[62], Main[63]],
+        b_lower_byte := { low_bytes := #v[Main[64], Main[65], Main[66], Main[67]] },
+        c_lower_byte := { low_bytes := #v[Main[68], Main[69], Main[70], Main[71]] },
+        b_msb := Main[72], c_msb := Main[73],
+        product_msb := { msb := Main[74] },
+        b_sign_extend := Main[75], c_sign_extend := Main[76] }
+      (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])
+      Main[77] Main[78] Main[81] Main[79] Main[80]).allHold ∧
+  (CPUState.constraints (F := ZMod p)
+      { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+        pc := #v[Main[3], Main[4], Main[5]] }
+      #v[Main[3] + 4, Main[4], Main[5]] 8
+      (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])).allHold ∧
+  (RTypeReader.constraints (F := ZMod p)
+      Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]]
+      (Main[77] * 11 + Main[78] * 12 + Main[79] * 13 + Main[80] * 14 + Main[81] * 24)
+      #v[Main[28], Main[29], Main[30], Main[31]]
+      { op_a := Main[6],
+        op_a_memory :=
+          { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+            access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+        op_a_0 := Main[13], op_b := Main[14],
+        op_b_memory :=
+          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+            access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+        op_c := Main[21],
+        op_c_memory :=
+          { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
+            access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
+      (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])
+      (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])).allHold ∧
+  Main[77] * (Main[77] - 1) = 0 ∧
+  Main[78] * (Main[78] - 1) = 0 ∧
+  Main[79] * (Main[79] - 1) = 0 ∧
+  Main[81] * (Main[81] - 1) = 0 ∧
+  Main[80] * (Main[80] - 1) = 0 ∧
+  (Main[77] + Main[78] + Main[79] + Main[80] + Main[81]) *
+    (Main[77] + Main[78] + Main[79] + Main[80] + Main[81] - 1) = 0 ∧
+  Main[13] = 0
+
+/-- `RawSpec` is exactly `allHold`. Direct rewrite via the Phase-0 iff
+`Mul.allHold_constraints_iff`. -/
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 82) :
+    (_root_.Mul.constraints Main).allHold ↔ RawSpec Main := by
+  change List.Forall SP1Constraint.toProp (_root_.Mul.constraints Main) ↔ _
+  rw [_root_.Mul.allHold_constraints_iff]
+  rfl
+
+/-- The row's user-facing contract: trace-facing structural specs + Sail
+equivalence as a Prop. The Sail-eq conjunct uses `SP1Chips.soundness_mul`'s
+if-then-else cascade dispatching on the 5 opcode flags. -/
+def SemanticSpec (Main : Vector (ZMod p) 82) : Prop :=
+  let cols := fromMain Main
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
+        { prev_value := cols.adapter.op_a_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_b
+        { prev_value := cols.adapter.op_b_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_c
+        { prev_value := cols.adapter.op_c_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.ProgramTable.Spec
+      { pc := cols.state.pc,
+        opcode := cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13
+                  + cols.is_mulhsu * 14 + cols.is_mulw * 24,
+        op_a := cols.adapter.op_a,
+        op_b := #v[cols.adapter.op_b, 0, 0, 0],
+        op_c := #v[cols.adapter.op_c, 0, 0, 0],
+        op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  (cols.is_mul + cols.is_mulh + cols.is_mulhu + cols.is_mulhsu + cols.is_mulw) *
+    (cols.is_mul + cols.is_mulh + cols.is_mulhu + cols.is_mulhsu + cols.is_mulw - 1) = 0 ∧
+  -- Per-row Sail equivalence via the SP1Chips.Soundness aggregator —
+  -- one if-then-else cascade dispatching on all 5 opcode flags.
+  (∀ s : SailState, (_root_.Mul.constraints Main).initialState s →
+    (_root_.Mul.sp1_mul_chip Main).run s =
+      (if _root_.Mul.is_mul Main then
+        (_root_.Mul.Poly.spec_mul (.Regidx (_root_.Mul.sp1_op_c Main))
+          (.Regidx (_root_.Mul.sp1_op_b Main))
+          (.Regidx (_root_.Mul.sp1_op_a Main))).run s
+      else if _root_.Mul.is_mulh Main then
+        (_root_.Mulh.Poly.spec_mulh (.Regidx (_root_.Mul.sp1_op_c Main))
+          (.Regidx (_root_.Mul.sp1_op_b Main))
+          (.Regidx (_root_.Mul.sp1_op_a Main))).run s
+      else if _root_.Mul.is_mulhu Main then
+        (_root_.Mulhu.Poly.spec_mulhu (.Regidx (_root_.Mul.sp1_op_c Main))
+          (.Regidx (_root_.Mul.sp1_op_b Main))
+          (.Regidx (_root_.Mul.sp1_op_a Main))).run s
+      else if _root_.Mul.is_mulhsu Main then
+        (_root_.Mulhsu.Poly.spec_mulhsu (.Regidx (_root_.Mul.sp1_op_c Main))
+          (.Regidx (_root_.Mul.sp1_op_b Main))
+          (.Regidx (_root_.Mul.sp1_op_a Main))).run s
+      else if _root_.Mul.is_mulw Main then
+        (_root_.Mulw.Poly.spec_mulw (.Regidx (_root_.Mul.sp1_op_c Main))
+          (.Regidx (_root_.Mul.sp1_op_b Main))
+          (.Regidx (_root_.Mul.sp1_op_a Main))).run s
+      else (_root_.Mul.sp1_mul_chip Main).run s))
+
+set_option maxHeartbeats 1600000 in
+-- Heartbeats elevated for the ProgramTable.Spec assembly + soundness_mul plumbing.
+/-- The bridge: `RawSpec → SemanticSpec` under `is_real_sum = 1`. Confines all
+chip-internal arithmetic (MulOperation carry chain, byte ranges, Sail
+equivalence via `soundness_mul`) to this one proof. The `Fact (2 ^ 24 < p)`
+requirement matches `Mul.Poly.correct_mul`'s bound (inherited via
+`soundness_mul`). -/
+theorem raw_to_semantic [Fact (2 ^ 24 < p)] (Main : Vector (ZMod p) 82)
+    (h_is_real : Main[77] + Main[78] + Main[79] + Main[80] + Main[81] = 1)
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨h_mulop, h_cpu_raw, h_rtr_raw, _h_mul_bin, _h_mulh_bin, _h_mulhu_bin,
+          _h_mulw_bin, _h_mulhsu_bin, h_aggregate, h_a0⟩ := h_raw
+  have h_allHold : (_root_.Mul.constraints Main).allHold :=
+    (rawSpec_iff_allHold Main).mpr ⟨h_mulop, h_cpu_raw, h_rtr_raw,
+      _h_mul_bin, _h_mulh_bin, _h_mulhu_bin, _h_mulw_bin, _h_mulhsu_bin, h_aggregate, h_a0⟩
+  rw [h_is_real] at h_cpu_raw h_rtr_raw
+  have h_cpu_spec := SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu_raw
+  have h_rtr_spec := SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1.mp h_rtr_raw
+  obtain ⟨h_ti, h_op_a_lt, h_op_b_lt, h_op_c_lt, h_a0_bin, h_a0_iff,
+          ⟨h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩,
+          ⟨⟨h_diff_a, h_diff_b, h_diff_c⟩,
+           ⟨h_ts_c, h_ts_b, h_ts_a⟩,
+           ⟨h_isU64_a, h_isU64_b, h_isU64_c⟩⟩,
+          _h_a0_implies⟩ := h_rtr_spec
+  have h_zero_lt : (0 : ZMod p) < (65536 : ZMod p) := by
+    have h65536_lt : (65536 : ℕ) < p := by
+      have := Fact.out (p := 2 ^ 17 < p); omega
+    have h65536_val : (65536 : ZMod p).val = 65536 := ZMod.val_natCast_of_lt h65536_lt
+    change (0 : ZMod p).val < (65536 : ZMod p).val
+    rw [ZMod.val_zero, h65536_val]; omega
+  refine ⟨h_cpu_spec,
+          ⟨h_diff_a, h_ts_a, h_isU64_a⟩,
+          ⟨h_diff_b, h_ts_b, h_isU64_b⟩,
+          ⟨h_diff_c, h_ts_c, h_isU64_c⟩,
+          ?_, ?_, ?_⟩
+  -- ProgramTable.Spec
+  · simp only [SP1Clean.ProgramTable.Spec, SP1Clean.ProgramSpec,
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ]
+    refine ⟨?_, h_op_a_lt, ⟨h_op_b_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
+            ⟨h_op_c_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
+            h_a0_bin, h_a0_iff, Or.inl trivial, Or.inl trivial,
+            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
+    -- trusted_instr: matches after the opcode formula reduces.
+    convert h_ti using 2
+  -- aggregate boolean (Cols-field order vs Main-slot order via linear_combination).
+  · linear_combination h_aggregate * 1
+  -- Sail equivalence via soundness_mul
+  · intro s state_cstrs
+    exact soundness_mul Main s h_allHold state_cstrs
 
 /-! ## Full `FormalAssertion` promotion (Path-2)
 

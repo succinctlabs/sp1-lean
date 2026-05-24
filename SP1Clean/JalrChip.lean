@@ -13,6 +13,8 @@ import SP1Operations.Operation.AddOperation.AddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ITypeReader.ITypeReader
 import SP1Chips.Jalr.JalrChip
+import SP1Chips.Jalr.Common
+import SP1Chips.Soundness
 import SP1Clean.AddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.GatedAddOp
@@ -31,7 +33,7 @@ return-address `pc + 4` to op_a. 35 columns. Two `AddOperation`
 sub-fragments fire: one for the jump-target sum (`op_b + op_c_imm`),
 one for the return address (`pc + 4`).
 
-Structural mirror discipline (Spec only, no iff_sp1 / correct_*). The
+Structural mirror discipline (Spec only, no traceSpec_iff_allHold / correct_*). The
 `AddOperation` for the return address is gated on `is_real - op_a_0`
 (vacuous when op_a is x0); the jump-target `AddOperation` is gated
 on `is_real`.
@@ -95,7 +97,7 @@ def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
 /-- Pilot Spec, expressed over field-valued `JalrCols (ZMod p)`. The
 two `AddOperation` clauses are left in raw `allHold` form
 (one gated on `is_real`, the other on `is_real - op_a_0`). -/
-def Spec (cols : JalrCols (ZMod p)) : Prop :=
+def TraceSpec (cols : JalrCols (ZMod p)) : Prop :=
   (_root_.AddOperation.constraints (F := ZMod p)
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm
       { value := cols.jump_target }
@@ -168,26 +170,61 @@ the index map in `SP1Chips/Jalr/Constraints.lean` (35 columns). -/
    Main[34],
    ⟨Main[25]⟩⟩
 
+set_option maxHeartbeats 1200000 in
+-- Heartbeats elevated for the 35-col inline-flatten + 4-sub-op bridge dance.
 /-- The chip-level half-iff bridge: under `is_real = 1 ∧ op_a_0 = 0`,
 the Clean-flavored `Spec` implies SP1's `allHold` over the flat row.
 Used by `correct_jalr` to thread the Clean Spec into the dirty-side
 `JALR_correct` proof.
 
-**Iter-9 status: proof body sorry'd** — same rationale as
-`Jal.spec_implies_allHold`; see `feedback_path2_correct_bridge_costs.md`. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 35)
-    (h_is_real : Main[25] = 1) (h_op_a_0 : Main[13] = 0)
-    (h_spec : Spec (fromMain Main)) :
+Single-opcode chip (is_real = Main[25]). Proof: inline-flatten Jalr's
+constraint-list to expose the 4 sub-`allHold`s + 9 chip-side asserts/sends,
+then bridge each conjunct via the Spec components and the cpuState/itypeReader
+spec_iff_sp1 helpers. -/
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 35)
+    (h_is_real : Main[25] = 1) (_h_op_a_0 : Main[13] = 0)
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.Jalr.constraints Main).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [TraceSpec, fromMain] at h_spec
+  obtain ⟨h_add_jump, h_add_ret, h_cpu_spec, h_reader_spec,
+          h_is_real_bin, h_jump3, h_lsb_bin, h_op_a0_gated,
+          h_op_a_w3, h_a0_w0, h_a0_w1, h_a0_w2, h_pc_align, _h_trusted⟩ := h_spec
+  change List.Forall SP1Constraint.toProp (_root_.Jalr.constraints Main)
+  simp only [_root_.Jalr.constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp, and_assoc]
+  -- 13-conjunct right-associated structure: 4 sub-allHolds + 9 chip props.
+  refine ⟨?_, ?_, ?_, ?_, h_is_real_bin, h_jump3, h_lsb_bin,
+          ?_, h_op_a0_gated, h_op_a_w3, h_a0_w0, h_a0_w1, h_a0_w2⟩
+  -- 1: AddOperation (jump target) — direct from Spec.
+  · exact h_add_jump
+  -- 2: CPUState — bridge via cpuStateSpec_iff_sp1 under is_real = 1.
+  · rw [h_is_real]
+    exact (SP1Clean.CPUState.cpuStateSpec_iff_sp1).mpr h_cpu_spec
+  -- 3: ITypeReader — bridge via itypeReaderSpec_iff_sp1 under is_real = is_trusted = 1.
+  · rw [h_is_real]
+    exact (SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1).mpr h_reader_spec
+  -- 4: AddOperation (return address) — direct from Spec.
+  · exact h_add_ret
+  -- 8: byte send for PC alignment — Range constraint ⇔ `.val < 2^14 = 16384`.
+  · intro _h_ne
+    have h14 : ((14 : ℕ) : ZMod p).val = 14 := by
+      have hp : 2 ^ 17 < p := Fact.out
+      exact ZMod.val_natCast_of_lt (by omega)
+    have h14_eq : (14 : ZMod p).val = 14 := by
+      rw [show (14 : ZMod p) = ((14 : ℕ) : ZMod p) from by push_cast; rfl, h14]
+    simp only [show (ByteOpcode.ofNat 6 : ByteOpcode) = .Range from rfl,
+      ByteOpcode.constrain_Range, h14_eq, Vector.getElem_mk,
+      List.getElem_toArray, List.getElem_cons_zero] at h_pc_align ⊢
+    exact h_pc_align
 
 /-- Clean-side `correct_jalr`: same Sail equivalence statement as the
 dirty `_root_.Jalr.JALR_correct`, with the constraint hypothesis
-re-expressed against the Clean `Spec` predicate via `spec_implies_allHold`. -/
+re-expressed against the Clean `Spec` predicate via `traceSpec_implies_allHold`. -/
 theorem correct_jalr
     (Main : Vector (ZMod p) 35) (s : SailState)
     (h_is_real : Main[25] = 1) (h_op_a_0 : Main[13] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (hs : SailState.isInitialized s)
     (state_cstrs : (_root_.Jalr.constraints Main).initialState s)
     (hv : SailState.isValidMemConfig s hs) :
@@ -197,7 +234,35 @@ theorem correct_jalr
     (_root_.Jalr.spec_jalr op_c (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Jalr.sp1_jalr Main).run s :=
   _root_.Jalr.JALR_correct Main s
-    (spec_implies_allHold Main h_is_real h_op_a_0 h_spec)
+    (traceSpec_implies_allHold Main h_is_real h_op_a_0 h_spec)
+    h_is_real hs state_cstrs hv
+
+/-! ## RawSpec / SemanticSpec POC -/
+
+@[reducible]
+def RawSpec (Main : Vector (ZMod p) 35) : Prop :=
+  List.Forall SP1Constraint.toProp (_root_.Jalr.constraints Main)
+
+omit [Fact (2 ^ 17 < p)] in
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 35) :
+    (_root_.Jalr.constraints Main).allHold ↔ RawSpec Main := Iff.rfl
+
+def SemanticSpec (Main : Vector (ZMod p) 35) : Prop :=
+  TraceSpec (fromMain Main) ∧
+  (∀ (s : SailState) (_hs : SailState.isInitialized s)
+     (_state_cstrs : (_root_.Jalr.constraints Main).initialState s)
+     (_hv : SailState.isValidMemConfig s _hs),
+    (_root_.Jalr.sp1_jalr Main).run s =
+      (_root_.Jalr.spec_jalr (_root_.Jalr.sp1_op_c Main)
+        (.Regidx (_root_.Jalr.sp1_op_b Main))
+        (.Regidx (_root_.Jalr.sp1_op_a Main))).run s)
+
+theorem raw_to_semantic (Main : Vector (ZMod p) 35) (h_is_real : Main[25] = 1)
+    (_h_op_a_0 : Main[13] = 0) (h_spec : TraceSpec (fromMain Main))
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  refine ⟨h_spec, ?_⟩
+  intro s hs state_cstrs hv
+  exact soundness_jalr Main s ((rawSpec_iff_allHold Main).mpr h_raw)
     h_is_real hs state_cstrs hv
 
 /-! ## Full `FormalAssertion` promotion (Path-2 + single-gate Phase-A)

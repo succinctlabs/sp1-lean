@@ -13,6 +13,7 @@ import SP1Operations.Compare.LtOperationSigned.LtOperationSigned
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Lt.LtChip
+import SP1Chips.Soundness
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -86,7 +87,7 @@ def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
 internally fans out into `U16MSBOperation` and `LtOperationUnsigned`
 sub-fragments). The chip-level `is_signed` argument is `is_slt`; the
 chip-level `is_real` argument is `is_slt + is_sltu`. -/
-def Spec (cols : LtCols (ZMod p)) : Prop :=
+def TraceSpec (cols : LtCols (ZMod p)) : Prop :=
   let is_real : ZMod p := cols.is_slt + cols.is_sltu
   (_root_.LtOperationSigned.constraints (F := ZMod p)
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
@@ -146,22 +147,68 @@ the index map in `SP1Chips/Lt/Constraints.lean` (44 columns; the
    -- the same sum for both `is_real` and `is_trusted`.
    ⟨Main[32] + Main[33]⟩⟩
 
+set_option maxHeartbeats 800000 in
+-- Two-arm case-split (slt vs sltu) under is_real_sum = 1 + boolean gates,
+-- each arm rewrites via the Lt._iff_slt/_iff_sltu polymorphic iff lemmas
+-- and bridges three sub-allHolds via the *Spec_iff_sp1 helpers.
 /-- The chip-level half-iff bridge (Lt): under
-`is_slt + is_sltu = 1 ∧ op_a_0 = 0`, the Clean `Spec` implies SP1's
-`allHold`. Used by `correct_slt`/`correct_sltu` wrappers.
-**Proof body sorry'd** (see `feedback_path2_correct_bridge_costs.md`). -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 44)
+`is_slt + is_sltu = 1 ∧ op_a_0 = 0 ∧ imm_c = 0`, the Clean `Spec` implies
+SP1's `allHold`. Used by `correct_slt`/`correct_sltu` wrappers. -/
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 44)
     (h_is_real : Main[32] + Main[33] = 1) (h_op_a_0 : Main[13] = 0)
-    (h_spec : Spec (fromMain Main)) :
+    (h_imm_c : Main[31] = 0)
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.Lt.constraints Main).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [TraceSpec, fromMain] at h_spec
+  obtain ⟨h_lt_op, h_cpu_spec, h_alu_spec,
+          h_slt_bin, h_sltu_bin, _h_sum_bin, _h_a0, h_trusted⟩ := h_spec
+  -- The aggregate is_real sum = 1 + slt/sltu boolean gates ⇒ exactly one variant active.
+  have h_slt_or : Main[32] = 0 ∨ Main[32] = 1 := by
+    rcases mul_eq_zero.mp h_slt_bin with h | h
+    · exact Or.inl h
+    · exact Or.inr (by linear_combination h)
+  -- Bridge to the SP1ConstraintList.allHold form (definitionally List.Forall toProp).
+  change List.Forall SP1Constraint.toProp (_root_.Lt.constraints Main)
+  rcases h_slt_or with h_slt_zero | h_slt_one
+  · -- sltu case: Main[32] = 0, so Main[33] = 1 from h_is_real.
+    have h_sltu_one : Main[33] = 1 := by linear_combination h_is_real - h_slt_zero
+    have h_is_sltu : _root_.Lt.is_sltu Main := ⟨h_sltu_one, h_imm_c⟩
+    rw [_root_.Lt.allHold_constraints_iff_sltu Main h_is_sltu]
+    -- Bridge each iff-RHS conjunct from Spec components, with Main[33] = 1 substituted.
+    refine ⟨?_, ?_, ?_, h_slt_zero, h_op_a_0⟩
+    · -- LtOperationSigned.constraints.allHold — directly from Spec.
+      change List.Forall SP1Constraint.toProp _
+      convert h_lt_op using 2
+    · -- CPUState.constraints.allHold under is_real = 1.
+      change List.Forall SP1Constraint.toProp _
+      rw [show (Main[32] + Main[33] : ZMod p) = 1 from h_is_real] at *
+      exact (SP1Clean.CPUState.cpuStateSpec_iff_sp1).mpr h_cpu_spec
+    · -- ALUTypeReader.constraints.allHold under is_real = is_trusted = 1.
+      change List.Forall SP1Constraint.toProp _
+      -- aluTypeReaderSpec_iff_sp1 expects both gating args to be literally 1.
+      rw [show (Main[32] + Main[33] : ZMod p) = 1 from h_is_real]
+      exact (SP1Clean.ALUTypeReader.aluTypeReaderSpec_iff_sp1).mpr h_alu_spec
+  · -- slt case: Main[32] = 1, so Main[33] = 0 from h_is_real.
+    have h_sltu_zero : Main[33] = 0 := by linear_combination h_is_real - h_slt_one
+    have h_is_slt : _root_.Lt.is_slt Main := ⟨h_slt_one, h_imm_c⟩
+    rw [_root_.Lt.allHold_constraints_iff_slt Main h_is_slt]
+    refine ⟨?_, ?_, ?_, h_sltu_zero, h_op_a_0⟩
+    · change List.Forall SP1Constraint.toProp _
+      convert h_lt_op using 2
+    · change List.Forall SP1Constraint.toProp _
+      rw [show (Main[32] + Main[33] : ZMod p) = 1 from h_is_real]
+      exact (SP1Clean.CPUState.cpuStateSpec_iff_sp1).mpr h_cpu_spec
+    · change List.Forall SP1Constraint.toProp _
+      rw [show (Main[32] + Main[33] : ZMod p) = 1 from h_is_real]
+      exact (SP1Clean.ALUTypeReader.aluTypeReaderSpec_iff_sp1).mpr h_alu_spec
 
 /-- Clean-side `correct_slt`: signed less-than (R-type). -/
 theorem correct_slt
     (Main : Vector (ZMod p) 44) (s : SailState)
     (h_is_slt : Main[32] = 1) (h_imm_c : Main[31] = 0) (h_op_a_0 : Main[13] = 0)
     (h_sltu_zero : Main[33] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Lt.constraints Main).initialState s) :
     let op_c := _root_.Slt.sp1_op_c Main
     let op_b := _root_.Slt.sp1_op_b Main
@@ -169,7 +216,7 @@ theorem correct_slt
     (_root_.Slt.spec_slt (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Lt.sp1_lt Main).run s :=
   _root_.Slt.correct_slt Main s
-    (spec_implies_allHold Main (by rw [h_is_slt, h_sltu_zero]; ring) h_op_a_0 h_spec)
+    (traceSpec_implies_allHold Main (by rw [h_is_slt, h_sltu_zero]; ring) h_op_a_0 h_imm_c h_spec)
     ⟨h_is_slt, h_imm_c⟩ state_cstrs
 
 /-- Clean-side `correct_sltu`: unsigned less-than (R-type). -/
@@ -177,7 +224,7 @@ theorem correct_sltu
     (Main : Vector (ZMod p) 44) (s : SailState)
     (h_is_sltu : Main[33] = 1) (h_imm_c : Main[31] = 0) (h_op_a_0 : Main[13] = 0)
     (h_slt_zero : Main[32] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Lt.constraints Main).initialState s) :
     let op_c := _root_.Sltu.sp1_op_c Main
     let op_b := _root_.Sltu.sp1_op_b Main
@@ -185,8 +232,48 @@ theorem correct_sltu
     (_root_.Sltu.spec_sltu (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Lt.sp1_lt Main).run s :=
   _root_.Sltu.correct_sltu Main s
-    (spec_implies_allHold Main (by rw [h_is_sltu, h_slt_zero]; ring) h_op_a_0 h_spec)
+    (traceSpec_implies_allHold Main (by rw [h_is_sltu, h_slt_zero]; ring) h_op_a_0 h_imm_c h_spec)
     ⟨h_is_sltu, h_imm_c⟩ state_cstrs
+
+/-! ## RawSpec / SemanticSpec POC -/
+
+@[reducible]
+def RawSpec (Main : Vector (ZMod p) 44) : Prop :=
+  List.Forall SP1Constraint.toProp (_root_.Lt.constraints Main)
+
+omit [Fact (2 ^ 17 < p)] in
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 44) :
+    (_root_.Lt.constraints Main).allHold ↔ RawSpec Main := Iff.rfl
+
+def SemanticSpec (Main : Vector (ZMod p) 44) : Prop :=
+  TraceSpec (fromMain Main) ∧
+  (∀ s : SailState, (_root_.Lt.constraints Main).initialState s →
+    (_root_.Lt.sp1_lt Main).run s =
+      (if _root_.Lt.is_slt Main then
+        (_root_.Slt.spec_slt (.Regidx (_root_.Slt.sp1_op_c Main))
+          (.Regidx (_root_.Slt.sp1_op_b Main))
+          (.Regidx (_root_.Slt.sp1_op_a Main))).run s
+      else if _root_.Lt.is_sltu Main then
+        (_root_.Sltu.spec_sltu (.Regidx (_root_.Sltu.sp1_op_c Main))
+          (.Regidx (_root_.Sltu.sp1_op_b Main))
+          (.Regidx (_root_.Sltu.sp1_op_a Main))).run s
+      else if _root_.Lt.is_slti Main then
+        (_root_.Slti.spec_slti (_root_.Slti.sp1_op_c Main)
+          (.Regidx (_root_.Slti.sp1_op_b Main))
+          (.Regidx (_root_.Slti.sp1_op_a Main))).run s
+      else if _root_.Lt.is_sltiu Main then
+        (_root_.Sltiu.spec_sltiu (_root_.Sltiu.sp1_op_c Main)
+          (.Regidx (_root_.Sltiu.sp1_op_b Main))
+          (.Regidx (_root_.Sltiu.sp1_op_a Main))).run s
+      else (_root_.Lt.sp1_lt Main).run s))
+
+theorem raw_to_semantic (Main : Vector (ZMod p) 44)
+    (_h_is_real_sum : Main[32] + Main[33] = 1) (_h_op_a_0 : Main[13] = 0)
+    (_h_imm_c : Main[31] = 0) (h_spec : TraceSpec (fromMain Main))
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  refine ⟨h_spec, ?_⟩
+  intro s state_cstrs
+  exact soundness_lt Main s ((rawSpec_iff_allHold Main).mpr h_raw) state_cstrs
 
 /-- The op_a / op_b / op_c register accesses, exposed for trace-level
 OfflineMemory aggregation. op_a writes the 4-limb boolean result
@@ -219,7 +306,7 @@ as subcircuits, plus the four scalar trailing assertZero gates
 **Path-2 drops.** The `LtOperationSigned` `allHold` clause is NOT
 promoted here — no Clean operation wrapper exists yet for the
 Compare-family sub-fragment. The memory-bus side of `aluTypeReaderSpec`
-is also deferred to the legacy chip-level `Spec` / `iff_sp1` route.
+is also deferred to the legacy chip-level `Spec` / `traceSpec_iff_allHold` route.
 Same Path-2 design as `SP1Clean.Addi.Assertion`. -/
 
 namespace Assertion

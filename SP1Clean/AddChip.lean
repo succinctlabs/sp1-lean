@@ -13,6 +13,7 @@ import SP1Operations.Operation.AddOperation.AddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.RTypeReader.RTypeReader
 import SP1Chips.Add.AddChip
+import SP1Chips.Soundness
 import SP1Clean.AddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
@@ -60,10 +61,29 @@ structure AddCols (T : Type) where
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
+/-- Project a raw SP1 row into the structured `AddCols` view. Mirrors the
+index map in `SP1Chips/Add/Constraints.lean`. `adapter_cols.is_trusted`
+aliases `Main[32]` (= `is_real`) because the current extractor passes
+`Main[32] Main[32]` to `RTypeReader.constraints` (see
+`SP1Chips/Add/Constraints.lean:21`). When upstream regen lands a separate
+`is_trusted` Main column, switch to that index. -/
+@[reducible] def fromMain (Main : Vector (ZMod p) 33) : AddCols (ZMod p) :=
+  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
+   ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    Main[14],
+    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
+    Main[21],
+    ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
+   #v[Main[28], Main[29], Main[30], Main[31]],
+   Main[32],
+   ⟨Main[32]⟩⟩
+
 /-- Clean-side circuit. Mirrors SP1 Rust's `AddChip::eval(builder, cols)`:
 takes a `Var AddCols (ZMod p)`, destructures it, and emits constraints for
 each sub-component. -/
-def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
+def AddCircuit (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
        op_a_write_value, is_real, _adapter_cols⟩ := cols
@@ -95,10 +115,7 @@ Each clause mirrors one sub-component's constraint surface under
 `SP1Clean.CPUState`, and `SP1Clean.RTypeReader`. The trailing
 `cols.adapter_cols.is_trusted = 1` conjunct pins the
 `UserModeReaderCols<T>` payload to the trusted-row case we verify. -/
-def Spec (cols : AddCols (ZMod p)) : Prop :=
-  SP1Clean.AddOp.Spec
-      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
-      cols.op_a_write_value ∧
+def TraceSpec (cols : AddCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.RTypeReader.rtypeReaderSpec
       (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 0 cols.state.pc
@@ -125,33 +142,20 @@ def Spec (cols : AddCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0 ∧
   cols.adapter_cols.is_trusted = 1
 
-/-- Project a raw SP1 row into the structured `AddCols` view. Mirrors the
-index map in `SP1Chips/Add/Constraints.lean`. `adapter_cols.is_trusted`
-aliases `Main[32]` (= `is_real`) because the current extractor passes
-`Main[32] Main[32]` to `RTypeReader.constraints` (see
-`SP1Chips/Add/Constraints.lean:21`). When upstream regen lands a separate
-`is_trusted` Main column, switch to that index. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 33) : AddCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-   ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    Main[21],
-    ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
-   #v[Main[28], Main[29], Main[30], Main[31]],
-   Main[32],
-   ⟨Main[32]⟩⟩
+def ArithSpec (cols : AddCols (ZMod p)) : Prop :=
+  SP1Clean.AddOp.Spec
+    cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
+    cols.op_a_write_value
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
-`Add.constraints Main` is exactly `Spec (fromMain Main)`, under
+`Add.constraints Main` is exactly `TraceSpec (fromMain Main)`, under
 `is_real = Main[32] = 1`. -/
-theorem iff_sp1
+theorem traceSpec_iff_allHold
     (Main : Vector (ZMod p) 33) (h_is_real : Main[32] = 1) :
-    (_root_.Add.constraints Main).allHold ↔ Spec (fromMain Main) := by
+    (_root_.Add.constraints Main).allHold ↔
+      ArithSpec (fromMain Main) ∧ TraceSpec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  simp only [fromMain, Spec, SP1Clean.AddOp.Spec,
+  simp only [fromMain, TraceSpec, ArithSpec, SP1Clean.AddOp.Spec,
     SP1Clean.CPUState.cpuStateSpec, SP1Clean.RTypeReader.rtypeReaderSpec]
   rw [show (_root_.Add.constraints Main).allHold ↔
         ((AddOperation.constraints (F := ZMod p)
@@ -195,19 +199,168 @@ theorem iff_sp1
 /-- Clean-side `correct_add`: same Sail equivalence statement as SP1's
 `Add.correct_add`, but with the constraint hypothesis re-expressed against
 the Clean-flavored `Spec` predicate over a structured `AddCols` view.
-Pure composition with the SP1 proof via `iff_sp1.mpr`. -/
+Pure composition with the SP1 proof via `traceSpec_iff_allHold.mpr`. -/
 theorem correct_add
     (Main : Vector (ZMod p) 33) (s : SailState)
     (h_is_real : Main[32] = 1)
-    (h_spec : Spec (fromMain Main))
+    (h_arith : ArithSpec (fromMain Main))
+    (h_trace : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Add.constraints Main).initialState s) :
     let op_c := _root_.Add.sp1_op_c Main
     let op_b := _root_.Add.sp1_op_b Main
     let op_a := _root_.Add.sp1_op_a Main
     (_root_.Add.spec_add (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Add.sp1_add Main).run s :=
-  _root_.Add.correct_add Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Add.correct_add Main s ((traceSpec_iff_allHold Main h_is_real).mpr ⟨h_arith, h_trace⟩)
     h_is_real state_cstrs
+
+/-! ## RawSpec / SemanticSpec POC
+
+A two-layer alternative to the legacy `Spec` + `traceSpec_iff_allHold` pair. The split:
+
+- **`RawSpec Main`** is a structural mirror of `(Add.constraints Main).allHold`
+  flattened into named sub-`allHold`s. Pure transcription of the chip-list
+  shape — no arithmetic reasoning. `rawSpec_iff_allHold` discharges via the
+  same `simp` recipe the legacy `traceSpec_iff_allHold` uses.
+- **`SemanticSpec Main`** is the user-facing contract: trace-facing data
+  (`cpuStateSpec`, three `memoryAccessSpec` records, `ProgramTable.Spec`,
+  is-real-binary) **plus** the per-row Sail equivalence as a Prop.
+- **`raw_to_semantic`** does the bridging work — the only place where the
+  chip-internal arithmetic (here `AddOperation.allHold`'s carry-chain content,
+  bridged via the operation-level Specs and `Add.correct_add`) is referenced.
+
+Downstream consumers see only `SemanticSpec`; they never touch the chip-list
+flattening or carry-chain assertions. POC scope: additive only, the legacy
+`Spec` + `traceSpec_iff_allHold` + `correct_add` remain in place. -/
+
+/-- Structural mirror of `Add.constraints.allHold`. Iff-RHS over `Main`. -/
+def RawSpec (Main : Vector (ZMod p) 33) : Prop :=
+  (AddOperation.constraints (F := ZMod p)
+      #v[Main[15], Main[16], Main[17], Main[18]]
+      #v[Main[22], Main[23], Main[24], Main[25]]
+      { value := #v[Main[28], Main[29], Main[30], Main[31]] }
+      Main[32]).allHold ∧
+  (CPUState.constraints (F := ZMod p)
+      { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+        pc := #v[Main[3], Main[4], Main[5]] }
+      #v[Main[3] + 4, Main[4], Main[5]] 8 Main[32]).allHold ∧
+  (RTypeReader.constraints (F := ZMod p)
+      Main[0] (Main[2] + Main[1] * 65536)
+      #v[Main[3], Main[4], Main[5]] 0
+      #v[Main[28], Main[29], Main[30], Main[31]]
+      { op_a := Main[6],
+        op_a_memory :=
+          { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+            access_timestamp :=
+              { prev_low := Main[11], diff_low_limb := Main[12] } },
+        op_a_0 := Main[13], op_b := Main[14],
+        op_b_memory :=
+          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+            access_timestamp :=
+              { prev_low := Main[19], diff_low_limb := Main[20] } },
+        op_c := Main[21],
+        op_c_memory :=
+          { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
+            access_timestamp :=
+              { prev_low := Main[26], diff_low_limb := Main[27] } } }
+      Main[32] Main[32]).allHold ∧
+  Main[32] * (Main[32] - 1) = 0 ∧
+  Main[13] = 0
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `RawSpec` is exactly `allHold`. Pure restatement; no arithmetic. -/
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 33) :
+    (_root_.Add.constraints Main).allHold ↔ RawSpec Main := by
+  simp only [RawSpec]
+  simp [_root_.Add.constraints, SP1ConstraintList.allHold,
+    List.forall_append, List.Forall, SP1Constraint.toProp, and_assoc]
+
+/-- The row's user-facing contract: trace-facing structural specs + Sail
+equivalence as a Prop. Downstream consumers (trace soundness, etc.) see only
+this; the chip-internal arithmetic is hidden behind `raw_to_semantic`. -/
+def SemanticSpec (Main : Vector (ZMod p) 33) : Prop :=
+  let cols := fromMain Main
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
+        { prev_value := cols.adapter.op_a_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_b
+        { prev_value := cols.adapter.op_b_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.memoryAccessSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
+      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_c
+        { prev_value := cols.adapter.op_c_memory.prev_value,
+          access_timestamp :=
+            { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+              diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }) ∧
+  SP1Clean.ProgramTable.Spec
+      { pc := cols.state.pc, opcode := 0, op_a := cols.adapter.op_a,
+        op_b := #v[cols.adapter.op_b, 0, 0, 0],
+        op_c := #v[cols.adapter.op_c, 0, 0, 0],
+        op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  -- Per-row Sail equivalence as a Prop. Trace level can chain these.
+  (∀ s : SailState, (_root_.Add.constraints Main).initialState s →
+    (_root_.Add.sp1_add Main).run s =
+      (_root_.Add.spec_add (.Regidx (_root_.Add.sp1_op_c Main))
+        (.Regidx (_root_.Add.sp1_op_b Main))
+        (.Regidx (_root_.Add.sp1_op_a Main))).run s)
+
+/-- The bridge: `RawSpec → SemanticSpec` under `is_real = 1`. Confines all
+chip-internal arithmetic (carry chain via `AddOperation`'s spec, byte ranges
+via `rtypeReaderSpec`, Sail equivalence via `soundness_add`) to this one proof.
+Callers see only `SemanticSpec`. -/
+theorem raw_to_semantic (Main : Vector (ZMod p) 33) (h_is_real : Main[32] = 1)
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨h_addop, h_cpu_raw, h_rtr_raw, h_real_bin, h_a0⟩ := h_raw
+  have h_allHold : (_root_.Add.constraints Main).allHold :=
+    (rawSpec_iff_allHold Main).mpr ⟨h_addop, h_cpu_raw, h_rtr_raw, h_real_bin, h_a0⟩
+  rw [h_is_real] at h_cpu_raw h_rtr_raw
+  have h_cpu_spec := SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu_raw
+  have h_rtr_spec := SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1.mp h_rtr_raw
+  obtain ⟨h_ti, h_op_a_lt, h_op_b_lt, h_op_c_lt, h_a0_bin, h_a0_iff,
+          ⟨h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩,
+          ⟨⟨h_diff_a, h_diff_b, h_diff_c⟩,
+           ⟨h_ts_c, h_ts_b, h_ts_a⟩,
+           ⟨h_isU64_a, h_isU64_b, h_isU64_c⟩⟩,
+          _h_a0_implies⟩ := h_rtr_spec
+  have h_zero_lt : (0 : ZMod p) < (65536 : ZMod p) := by
+    have h65536_lt : (65536 : ℕ) < p := by
+      have := Fact.out (p := 2 ^ 17 < p); omega
+    have h65536_val : (65536 : ZMod p).val = 65536 := ZMod.val_natCast_of_lt h65536_lt
+    change (0 : ZMod p).val < (65536 : ZMod p).val
+    rw [ZMod.val_zero, h65536_val]; omega
+  refine ⟨h_cpu_spec,
+          ⟨h_diff_a, h_ts_a, h_isU64_a⟩,
+          ⟨h_diff_b, h_ts_b, h_isU64_b⟩,
+          ⟨h_diff_c, h_ts_c, h_isU64_c⟩,
+          ?_, h_real_bin, ?_⟩
+  -- ProgramTable.Spec: assemble from rtypeReaderSpec's program-bus pieces
+  -- + trivial 0 < 65536 for the unused op_b/op_c high limbs.
+  · simp only [SP1Clean.ProgramTable.Spec, SP1Clean.ProgramSpec,
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ]
+    have h_op_c0_val : ((0 : ZMod p).val : ℕ) = 0 := by rw [ZMod.val_zero]
+    have h_zero_val_opcode : (0 : ZMod p).val = 0 := ZMod.val_zero
+    refine ⟨?_, h_op_a_lt, ⟨h_op_b_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
+            ⟨h_op_c_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
+            h_a0_bin, h_a0_iff, Or.inl trivial, Or.inl trivial,
+            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
+    -- trusted_instr: opcode = 0 ⇒ Opcode.ofNat 0 = ADD; matches rtypeReader's `opcode = 0`
+    convert h_ti using 1
+  -- Sail equivalence — single call to soundness_add
+  · intro s state_cstrs
+    exact soundness_add Main s h_allHold h_is_real state_cstrs
 
 /-! ## Full `FormalAssertion` promotion
 

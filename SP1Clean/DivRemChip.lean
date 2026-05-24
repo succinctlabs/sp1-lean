@@ -148,7 +148,7 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
 quotient/remainder/sign-handling clauses. -/
 def divRemSpec (_cols : DivRemCols (ZMod p)) : Prop := True
 
-def Spec (cols : DivRemCols (ZMod p)) : Prop :=
+def TraceSpec (cols : DivRemCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
@@ -268,9 +268,9 @@ all fields named per the upstream `DivRemCols<T, M>` declaration order. -/
    ⟨Main[244]⟩⟩
 
 /-- The chip-level half-iff bridge (DivRem). **Proof body sorry'd**. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 246)
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 246)
     (h_is_real : Main[244] = 1) (h_op_a_0 : Main[13] = 0)
-    (h_spec : Spec (fromMain Main)) :
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.DivRem.constraints Main).allHold := by
   sorry
 
@@ -278,7 +278,7 @@ theorem spec_implies_allHold (Main : Vector (ZMod p) 246)
 theorem correct_div [Fact (2 ^ 24 < p)]
     (Main : Vector (ZMod p) 246) (s : SailState)
     (h_is_div : Main[201] = 1) (h_is_real : Main[244] = 1) (h_op_a_0 : Main[13] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.DivRem.constraints Main).initialState s) :
     let op_c := _root_.DivRem.sp1_op_c Main
     let op_b := _root_.DivRem.sp1_op_b Main
@@ -286,7 +286,7 @@ theorem correct_div [Fact (2 ^ 24 < p)]
     (_root_.Div.spec_div (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.DivRem.Poly.sp1_op Main).run s :=
   _root_.DivRem.Poly.correct_div Main s
-    (spec_implies_allHold Main h_is_real h_op_a_0 h_spec)
+    (traceSpec_implies_allHold Main h_is_real h_op_a_0 h_spec)
     h_is_real h_is_div state_cstrs
 
 /-! ## Full `FormalAssertion` promotion (Path-2)

@@ -58,18 +58,13 @@ Vector blocks where SP1's emission already treats them as a unit
 (`c_bits`, `shift_u16`, `shifted_limbs`, `result`). -/
 structure ShiftLeftCols (T : Type) where
   state : CPUState T
-  op_a : T                                  -- Main[6]
-  op_a_memory : MemoryAccessInSharedCols T
-  op_a_0 : T                                -- Main[13]
-  op_b : T                                  -- Main[14]
-  op_b_memory : MemoryAccessInSharedCols T
-  op_c : T                                  -- Main[21]
-  op_c_memory : MemoryAccessInSharedCols T
-  imm_c : T                                 -- Main[28] (I-type immediate-mode flag)
-  -- Intermediate shift-amount columns (Main[29..31]).
-  shift_imm_low : T                         -- Main[29]
-  shift_imm_high : T                        -- Main[30]
-  msb : T                                   -- Main[31]
+  -- Nested ALUTypeReader (Main[6..31]). `op_c : Word T` (4 limbs) and
+  -- `imm_c : T` are part of this adapter, matching upstream's
+  -- `adapter: ALUTypeReader<T>` field count + ordering. Replaces the
+  -- prior 9-field inlining + 3 misnamed `shift_imm_low/shift_imm_high/msb`
+  -- padding cells; see `SP1Chips/ShiftLeft/Constraints.lean:215` (the
+  -- CS2 line that uses `op_c := #v[Main[21..24]]` and `imm_c := Main[31]`).
+  adapter : ALUTypeReader T
   -- The 4-limb shifted result (committed to op_a register).
   result : Vector T 4                       -- Main[32..35]
   -- 6-bit decomposition of the shift amount mod 64 (Main[36..41]).
@@ -127,10 +122,9 @@ The shift-arithmetic content (bit-decomposition correctness, shift
 power chain, byte-shift one-hot, limb-shift correctness) is deferred
 to `shiftSpec` placeholder; see file docstring. -/
 def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       _op_a_memory,
-       op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c,
-       _shift_imm_low, _shift_imm_high, _msb, _result,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c⟩,
+       _result,
        c_bits, _v_01, _v_012, _v_0123, shift_u16, _lower_limb, _higher_limb,
        _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
        _adapter_cols⟩ := cols
@@ -154,59 +148,157 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_sllw * (is_sllw - 1) === 0
   (is_sll + is_sllw) * (is_sll + is_sllw - 1) === 0
   -- Program-bus interaction. R-type discipline when imm_c = 0
-  -- (sll/sllw); I-type when imm_c = 1 (slli/slliw). op_c column carries
-  -- either single-limb register index or first immediate limb;
-  -- additional immediate limbs are not present in the column struct
-  -- (the constraints check them implicitly via the shift decomposition).
+  -- (sll/sllw); I-type when imm_c = 1 (slli/slliw). `op_c : Word T` is
+  -- a 4-limb field — for R-type it's just `op_c[0]` (the register index)
+  -- with limbs 1..3 zeroed by the trusted_instr check.
   SP1Clean.ProgramTable.assertion
     (⟨pc, is_sll * 8 + is_sllw * 14,
-      op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0],
+      op_a, #v[op_b, 0, 0, 0], op_c,
       op_a_0, 0, imm_c⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   -- op_a_0 forced to zero.
   op_a_0 === 0
 
-/-- Placeholder for the shift-arithmetic Spec content (bit decomposition
-correctness, shift power chain, byte-shift one-hot, limb-shift). Currently
-trivially `True` — a follow-up iteration can inline the relevant clauses
-from `_root_.ShiftLeft.allHold_constraints_iff`'s RHS or factor a
-dedicated `SP1Clean.ShiftLeftOp.Spec` predicate. -/
-def shiftSpec (_cols : ShiftLeftCols (ZMod p)) : Prop := True
+/-- The shift-arithmetic Spec content. Bundles the iff-RHS conjuncts of
+`_root_.ShiftLeft.allHold_constraints_iff` that aren't otherwise carried
+by the chip-level Spec (cpuStateSpec / memoryAccessSpec / ProgramTable.Spec /
+boolean gates). Includes:
+  - `U16MSBOperation.constraints.allHold` for the SLLW sign-extension MSB
+  - `ALUTypeReader.constraints.allHold` (raw form — assembly from factored
+    Spec components is awkward due to imm_c-gated op_c)
+  - The shift-exponent byte bound on `op_c[0]`
+  - Byte-offset gates linking `c_bits[4..5]` to `shift_u16[0..3]`
+  - Shift-power chain (`v_01`, `v_012`, `v_0123`)
+  - Per-limb shift bounds/identities (Main[15..18] inputs, lower/higher limbs)
+  - Per-limb output (Main[57..60] = `limb_result`)
+  - 16 SLL gated output equations + 4 SLLW + 2 SLLW sign extensions
+  - `is_sllw_imm` derivation
+-/
+def shiftSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+  (_root_.U16MSBOperation.constraints cols.result[1]
+      cols.sllw_msb cols.is_sllw).allHold ∧
+  (_root_.ALUTypeReader.constraints cols.state.clk_high
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) cols.state.pc
+      (cols.is_sll * 6 + cols.is_sllw * 21)
+      cols.result cols.adapter
+      (cols.is_sll + cols.is_sllw) (cols.is_sll + cols.is_sllw)).allHold ∧
+  -- shift-exponent bound: (op_c[0] - bit_decomp) * 64⁻¹ < 2^10
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    ((cols.adapter.op_c_memory.prev_value[0] - (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8 + cols.c_bits[4] * 16 +
+        cols.c_bits[5] * 32)) * ((64 : ZMod p)⁻¹)).val < 2 ^ (10 : ZMod p).val) ∧
+  -- 4 byte-offset gates: shift_u16[i] = 0 ∨ <bit decomp = i>
+  (cols.shift_u16[0] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 * cols.is_sll = 0) ∧
+  (cols.shift_u16[1] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 * cols.is_sll = 1) ∧
+  (cols.shift_u16[2] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 * cols.is_sll = 2) ∧
+  (cols.shift_u16[3] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 * cols.is_sll = 3) ∧
+  -- shift_u16 one-hot under is_real
+  (cols.is_sll + cols.is_sllw = 0 ∨
+    cols.shift_u16[0] + cols.shift_u16[1] + cols.shift_u16[2] + cols.shift_u16[3] = 1) ∧
+  -- shift-power chain
+  (cols.v_01 = (cols.c_bits[0] + 1) * (cols.c_bits[1] * 3 + 1)) ∧
+  (cols.v_012 = cols.v_01 * (cols.c_bits[2] * 15 + 1)) ∧
+  (cols.v_0123 = cols.v_012 * (cols.c_bits[3] * 255 + 1)) ∧
+  -- per-limb shift bounds + identities (4 sets for Main[15..18])
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.lower_limb[0]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.higher_limb[0]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8).val) ∧
+  (cols.adapter.op_b_memory.prev_value[0] * cols.v_0123 =
+    cols.higher_limb[0] * 65536 + cols.lower_limb[0] * cols.v_0123) ∧
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.lower_limb[1]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.higher_limb[1]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8).val) ∧
+  (cols.adapter.op_b_memory.prev_value[1] * cols.v_0123 =
+    cols.higher_limb[1] * 65536 + cols.lower_limb[1] * cols.v_0123) ∧
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.lower_limb[2]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.higher_limb[2]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8).val) ∧
+  (cols.adapter.op_b_memory.prev_value[2] * cols.v_0123 =
+    cols.higher_limb[2] * 65536 + cols.lower_limb[2] * cols.v_0123) ∧
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.lower_limb[3]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (¬ cols.is_sll + cols.is_sllw = 0 →
+    (cols.higher_limb[3]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8).val) ∧
+  (cols.adapter.op_b_memory.prev_value[3] * cols.v_0123 =
+    cols.higher_limb[3] * 65536 + cols.lower_limb[3] * cols.v_0123) ∧
+  -- limb_result equations
+  (cols.limb_result[0] = cols.lower_limb[0] * cols.v_0123) ∧
+  (cols.limb_result[1] = cols.lower_limb[1] * cols.v_0123 + cols.higher_limb[0]) ∧
+  (cols.limb_result[2] = cols.lower_limb[2] * cols.v_0123 + cols.higher_limb[1]) ∧
+  (cols.limb_result[3] = cols.lower_limb[3] * cols.v_0123 + cols.higher_limb[2]) ∧
+  -- 16 SLL gated output equations (4 limbs × 4 shift_u16 cases)
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[0] = cols.limb_result[0]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[1] = cols.limb_result[1]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[2] = cols.limb_result[2]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[3] = cols.limb_result[3]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[1] = cols.limb_result[0]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[2] = cols.limb_result[1]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[3] = cols.limb_result[2]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[1] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[2] = cols.limb_result[0]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[3] = cols.limb_result[1]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[1] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[2] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[3] = cols.limb_result[0]) ∧
+  -- 4 SLLW gated output equations (shift_u16[0..1] cases × 2 low limbs)
+  (cols.is_sllw = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[0] = cols.limb_result[0]) ∧
+  (cols.is_sllw = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[1] = cols.limb_result[1]) ∧
+  (cols.is_sllw = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sllw = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[1] = cols.limb_result[0]) ∧
+  -- SLLW sign extension: high two limbs = sllw_msb * 0xFFFF
+  (cols.is_sllw = 0 ∨ cols.sllw_msb.msb * 65535 = cols.result[2]) ∧
+  (cols.is_sllw = 0 ∨ cols.sllw_msb.msb * 65535 = cols.result[3]) ∧
+  -- is_sllw_imm = is_sllw * imm_c
+  cols.is_sllw_imm = cols.is_sllw * cols.adapter.imm_c
 
 /-- The Clean-flavored Spec for `ShiftLeftChip`. Composes the existing
 per-fragment specs with three memory access records (op_a, op_b, op_c),
 the program-bus consequence, the boolean gates, and the placeholder
 shift content. -/
-def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+def TraceSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_a
-      { prev_value := cols.op_a_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
+      { prev_value := cols.adapter.op_a_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_a_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_b
-      { prev_value := cols.op_b_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_b
+      { prev_value := cols.adapter.op_b_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_b_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
-    (SP1Clean.MemoryAccess.ofRegisterShared cols.op_c
-      { prev_value := cols.op_c_memory.prev_value,
+    (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_c[0]
+      { prev_value := cols.adapter.op_c_memory.prev_value,
         access_timestamp :=
-          { prev_low := cols.op_c_memory.access_timestamp.prev_low,
-            diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb } }) ∧
+          { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+            diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }) ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc,
       opcode := cols.is_sll * 8 + cols.is_sllw * 14,
-      op_a := cols.op_a,
-      op_b := #v[cols.op_b, 0, 0, 0],
-      op_c := #v[cols.op_c, 0, 0, 0],
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
+      op_a := cols.adapter.op_a,
+      op_b := #v[cols.adapter.op_b, 0, 0, 0],
+      op_c := cols.adapter.op_c,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
   -- 6 + 4 + 2 + 1 = 13 boolean gates.
   cols.c_bits[0] * (cols.c_bits[0] - 1) = 0 ∧
   cols.c_bits[1] * (cols.c_bits[1] - 1) = 0 ∧
@@ -221,7 +313,7 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   cols.is_sll * (cols.is_sll - 1) = 0 ∧
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
   (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
-  cols.op_a_0 = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
   shiftSpec cols ∧
   cols.adapter_cols.is_trusted = 1
 
@@ -232,14 +324,14 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
 (Main[57..61]), and `is_sllw_imm` replaces the old `sign_extend`. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 65) : ShiftLeftCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      Main[6],
-   ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩, Main[13],
-   Main[14],
-   ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-   Main[21],
-   ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩,
-   Main[28],
-   Main[29], Main[30], Main[31],
+   ⟨Main[6],
+    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
+    Main[13],
+    Main[14],
+    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
+    #v[Main[21], Main[22], Main[23], Main[24]],
+    ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
+    Main[31]⟩,
    #v[Main[32], Main[33], Main[34], Main[35]],
    #v[Main[36], Main[37], Main[38], Main[39], Main[40], Main[41]],
    Main[42], Main[43], Main[44],
@@ -253,20 +345,80 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
    -- (`Main[62]+Main[63]`).
    ⟨Main[62] + Main[63]⟩⟩
 
-/-- The chip-level half-iff bridge (ShiftLeft). **Proof body sorry'd**
-— see `feedback_path2_correct_bridge_costs.md`. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 65)
+set_option maxHeartbeats 2400000 in
+-- Heartbeats elevated for the ~65-conjunct iff RHS refine on 65 cols.
+/-- The chip-level half-iff bridge (ShiftLeft). -/
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 65)
     (h_is_real : Main[62] + Main[63] = 1)
-    (h_spec : Spec (fromMain Main)) :
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.ShiftLeft.constraints Main).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [TraceSpec, fromMain, shiftSpec,
+    Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ] at h_spec
+  change List.Forall SP1Constraint.toProp (_root_.ShiftLeft.constraints Main)
+  rw [_root_.ShiftLeft.allHold_constraints_iff]
+  obtain ⟨h_cpu_spec, _h_mem_a, _h_mem_b, _h_mem_c, _h_program,
+          h_cb0, h_cb1, h_cb2, h_cb3, h_cb4, h_cb5,
+          h_su0, h_su1, h_su2, h_su3,
+          h_sll_bin, h_sllw_bin, h_aggregate, _h_op_a_0,
+          h_ss, _h_trusted⟩ := h_spec
+  obtain ⟨h_u16msb, h_alu, h_exp_bound,
+          h_su0g, h_su1g, h_su2g, h_su3g, h_su_one_hot,
+          h_v01, h_v012, h_v0123,
+          h_lo0_b, h_hi0_b, h_li0,
+          h_lo1_b, h_hi1_b, h_li1,
+          h_lo2_b, h_hi2_b, h_li2,
+          h_lo3_b, h_hi3_b, h_li3,
+          h_lr0, h_lr1, h_lr2, h_lr3,
+          h_sll00, h_sll01, h_sll02, h_sll03,
+          h_sll10, h_sll11, h_sll12, h_sll13,
+          h_sll20, h_sll21, h_sll22, h_sll23,
+          h_sll30, h_sll31, h_sll32, h_sll33,
+          h_sllw00, h_sllw01, h_sllw10, h_sllw11,
+          h_sllw_se0, h_sllw_se1, h_sllw_imm⟩ := h_ss
+  -- Boolean conversion helper: `x * (x - 1) = 0 ↔ x = 0 ∨ x = 1`.
+  have bool_of : ∀ {x : ZMod p}, x * (x - 1) = 0 → x = 0 ∨ x = 1 := fun h =>
+    (mul_eq_zero.mp h).imp_right (by intro h'; linear_combination h')
+  have h_cb0' := bool_of h_cb0
+  have h_cb1' := bool_of h_cb1
+  have h_cb2' := bool_of h_cb2
+  have h_cb3' := bool_of h_cb3
+  have h_cb4' := bool_of h_cb4
+  have h_cb5' := bool_of h_cb5
+  have h_su0' := bool_of h_su0
+  have h_su1' := bool_of h_su1
+  have h_su2' := bool_of h_su2
+  have h_su3' := bool_of h_su3
+  have h_sll' := bool_of h_sll_bin
+  have h_sllw' := bool_of h_sllw_bin
+  have h_aggregate' := bool_of h_aggregate
+  refine ⟨h_u16msb, ?_, h_alu, h_aggregate', h_sll', h_sllw',
+          h_cb0', h_cb1', h_cb2', h_cb3', h_cb4', h_cb5',
+          h_exp_bound,
+          h_su0g, h_su0', h_su1g, h_su1', h_su2g, h_su2', h_su3g, h_su3',
+          h_su_one_hot, h_v01, h_v012, h_v0123,
+          h_lo0_b, h_hi0_b, h_li0,
+          h_lo1_b, h_hi1_b, h_li1,
+          h_lo2_b, h_hi2_b, h_li2,
+          h_lo3_b, h_hi3_b, h_li3,
+          h_lr0, h_lr1, h_lr2, h_lr3,
+          h_sll00, h_sll01, h_sll02, h_sll03,
+          h_sll10, h_sll11, h_sll12, h_sll13,
+          h_sll20, h_sll21, h_sll22, h_sll23,
+          h_sll30, h_sll31, h_sll32, h_sll33,
+          h_sllw00, h_sllw01, h_sllw10, h_sllw11,
+          h_sllw_se0, h_sllw_se1, h_sllw_imm, _h_op_a_0⟩
+  -- 2: CPUState bridge via cpuStateSpec_iff_sp1 (after rw is_real_sum = 1).
+  rw [show (Main[62] + Main[63] : ZMod p) = 1 from h_is_real]
+  exact (SP1Clean.CPUState.cpuStateSpec_iff_sp1).mpr h_cpu_spec
 
 /-- Clean-side `correct_sll`: R-type left shift. -/
 theorem correct_sll
     (Main : Vector (ZMod p) 65) (s : SailState)
     (h_is_sll : Main[62] = 1) (h_imm_c : Main[31] = 0)
     (h_sllw_zero : Main[63] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.ShiftLeft.constraints Main).initialState s) :
     let op_c := _root_.ShiftLeft.sp1_op_c Main
     let op_b := _root_.ShiftLeft.sp1_op_b Main
@@ -274,7 +426,7 @@ theorem correct_sll
     (_root_.Sll.Poly.spec_sll (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.ShiftLeft.sp1_shift_left Main).run s :=
   _root_.Sll.Poly.correct_sll Main s
-    (spec_implies_allHold Main (by rw [h_is_sll, h_sllw_zero]; ring) h_spec)
+    (traceSpec_implies_allHold Main (by rw [h_is_sll, h_sllw_zero]; ring) h_spec)
     ⟨h_is_sll, h_imm_c⟩ state_cstrs
 
 /-! ## Full `FormalAssertion` promotion (Path-2 — trimmed)
@@ -296,10 +448,9 @@ open Circuit
 
 @[reducible]
 def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, op_a,
-       op_a_memory,
-       op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c,
-       _shift_imm_low, _shift_imm_high, _msb, _result,
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩,
+       _result,
        _c_bits, _v_01, _v_012, _v_0123, _shift_u16, _lower_limb, _higher_limb,
        _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
        _adapter_cols⟩ := cols
@@ -307,7 +458,7 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc, is_sll * 8 + is_sllw * 14,
-      op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0],
+      op_a, #v[op_b, 0, 0, 0], op_c,
       op_a_0, 0, imm_c⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   is_sll * (is_sll - 1) === 0
@@ -346,27 +497,27 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc, opcode := cols.is_sll * 8 + cols.is_sllw * 14,
-      op_a := cols.op_a, op_b := #v[cols.op_b, 0, 0, 0],
-      op_c := #v[cols.op_c, 0, 0, 0],
-      op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
+      op_a := cols.adapter.op_a, op_b := #v[cols.adapter.op_b, 0, 0, 0],
+      op_c := cols.adapter.op_c,
+      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
   cols.is_sll * (cols.is_sll - 1) = 0 ∧
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
   (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
-  cols.op_a_0 = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- R-type: op_a/+4, op_b/+3, op_c/+2.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low,
-     cols.op_a_memory.access_timestamp.diff_low_limb,
-     cols.op_a_memory.prev_value⟩ ∧
+    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low,
-     cols.op_b_memory.access_timestamp.diff_low_limb,
-     cols.op_b_memory.prev_value⟩ ∧
+    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_b_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.op_c_memory.access_timestamp.prev_low,
-     cols.op_c_memory.access_timestamp.diff_low_limb,
-     cols.op_c_memory.prev_value⟩
+    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low,
+     cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

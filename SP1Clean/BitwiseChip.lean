@@ -12,6 +12,7 @@ import SP1Operations.Operation.BitwiseU16Operation.BitwiseU16Operation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Bitwise.BitwiseChip
+import SP1Chips.Soundness
 import SP1Clean.BitwiseOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
@@ -36,9 +37,9 @@ This mirror exposes:
 - `Spec` — predicate Spec matching the RHS of
   `_root_.Bitwise.allHold_constraints_iff`, with `CPUState` and
   `ALUTypeReader` packaged via their Clean Spec helpers
-- `iff_sp1` — chip-level bridge between SP1's `allHold` and `Spec`
+- `traceSpec_iff_allHold` — chip-level bridge between SP1's `allHold` and `Spec`
 - Six `correct_<variant>` wrappers — each composes the corresponding
-  `_root_.<Variant>.correct_<variant>` SP1 proof with `iff_sp1.mpr`
+  `_root_.<Variant>.correct_<variant>` SP1 proof with `traceSpec_iff_allHold.mpr`
 -/
 
 set_option linter.style.setOption false
@@ -118,7 +119,7 @@ the RHS of `_root_.Bitwise.allHold_constraints_iff`: a propositional
 clause for the `BitwiseU16Operation` sub-fragment (no Clean wrapper yet),
 two Clean Spec helpers (`cpuStateSpec` / `aluTypeReaderSpec`), the four
 boolean disjunctions on the opcode selectors, and `op_a_0 = 0`. -/
-def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
+def TraceSpec (cols : BitwiseCols (ZMod p)) : Prop :=
   let opcode_bw : ZMod p := cols.is_xor * 2 + cols.is_or * 1 + cols.is_and * 0
   let is_real : ZMod p := cols.is_xor + cols.is_or + cols.is_and
   let bw_cols : BitwiseU16Operation (ZMod p) := cols.bitwise_operation
@@ -185,20 +186,20 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
 
 set_option maxHeartbeats 800000 in
 -- Chip-level bridge: SP1's `allHold` over the flat row equals
--- `Spec (fromMain Main)` under `is_real = Main[48] + Main[49] + Main[50] = 1`.
+-- `TraceSpec (fromMain Main)` under `is_real = Main[48] + Main[49] + Main[50] = 1`.
 -- 800K mirrors the budget of `Bitwise.allHold_constraints_iff`, whose
 -- 51-column conjunction plus the BitwiseU16/U16toU8 unfolding exceeds default.
-theorem iff_sp1
+theorem traceSpec_iff_allHold
     (Main : Vector (ZMod p) 51)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1) :
-    (_root_.Bitwise.constraints Main).allHold ↔ Spec (fromMain Main) := by
+    (_root_.Bitwise.constraints Main).allHold ↔ TraceSpec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   -- Bridge `.allHold` (reducible) to `List.Forall toProp` so the
   -- existing `Bitwise.allHold_constraints_iff` lemma applies.
   change List.Forall SP1Constraint.toProp (_root_.Bitwise.constraints Main) ↔ _
   rw [_root_.Bitwise.allHold_constraints_iff]
   -- Collapse the `is_real` sum to `1` so the sub-iff lemmas fire.
-  simp only [Spec, h_is_real]
+  simp only [TraceSpec, h_is_real]
   -- Bridge each sub-conjunct from `List.Forall toProp (...)` to its
   -- `.allHold` form so `cpuStateSpec_iff_sp1` / `aluTypeReaderSpec_iff_sp1`
   -- can rewrite it. The two forms are defn-equal (`.allHold` is reducible).
@@ -235,14 +236,14 @@ theorem correct_xor
     (Main : Vector (ZMod p) 51) (s : SailState)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_xor : Main[48] = 1) (h_imm_c : Main[31] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Xor.sp1_op_c Main
     let op_b := _root_.Xor.sp1_op_b Main
     let op_a := _root_.Xor.sp1_op_a Main
     (_root_.Xor.spec_xor (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Bitwise.sp1_bitwise Main).run s :=
-  _root_.Xor.correct_xor Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Xor.correct_xor Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     ⟨h_is_xor, h_imm_c⟩ state_cstrs
 
 /-- Clean-side `correct_or`. -/
@@ -250,14 +251,14 @@ theorem correct_or
     (Main : Vector (ZMod p) 51) (s : SailState)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_or : Main[49] = 1) (h_imm_c : Main[31] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Or.sp1_op_c Main
     let op_b := _root_.Or.sp1_op_b Main
     let op_a := _root_.Or.sp1_op_a Main
     (_root_.Or.spec_or (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Bitwise.sp1_bitwise Main).run s :=
-  _root_.Or.correct_or Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Or.correct_or Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     ⟨h_is_or, h_imm_c⟩ state_cstrs
 
 /-- Clean-side `correct_and`. -/
@@ -265,14 +266,14 @@ theorem correct_and
     (Main : Vector (ZMod p) 51) (s : SailState)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_and : Main[50] = 1) (h_imm_c : Main[31] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.And.sp1_op_c Main
     let op_b := _root_.And.sp1_op_b Main
     let op_a := _root_.And.sp1_op_a Main
     (_root_.And.spec_and (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Bitwise.sp1_bitwise Main).run s :=
-  _root_.And.correct_and Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.And.correct_and Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     ⟨h_is_and, h_imm_c⟩ state_cstrs
 
 /-- Clean-side `correct_xori`. -/
@@ -280,14 +281,14 @@ theorem correct_xori
     (Main : Vector (ZMod p) 51) (s : SailState)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_xor : Main[48] = 1) (h_imm_c : Main[31] = 1)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Xori.sp1_op_c Main
     let op_b := _root_.Xori.sp1_op_b Main
     let op_a := _root_.Xori.sp1_op_a Main
     (_root_.Xori.spec_xori op_c (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Bitwise.sp1_bitwise Main).run s :=
-  _root_.Xori.correct_xori Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Xori.correct_xori Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     ⟨h_is_xor, h_imm_c⟩ state_cstrs
 
 /-- Clean-side `correct_ori`. -/
@@ -295,14 +296,14 @@ theorem correct_ori
     (Main : Vector (ZMod p) 51) (s : SailState)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_or : Main[49] = 1) (h_imm_c : Main[31] = 1)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Ori.sp1_op_c Main
     let op_b := _root_.Ori.sp1_op_b Main
     let op_a := _root_.Ori.sp1_op_a Main
     (_root_.Ori.spec_ori op_c (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Bitwise.sp1_bitwise Main).run s :=
-  _root_.Ori.correct_ori Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Ori.correct_ori Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     ⟨h_is_or, h_imm_c⟩ state_cstrs
 
 /-- Clean-side `correct_andi`. -/
@@ -310,15 +311,61 @@ theorem correct_andi
     (Main : Vector (ZMod p) 51) (s : SailState)
     (h_is_real : Main[48] + Main[49] + Main[50] = 1)
     (h_is_and : Main[50] = 1) (h_imm_c : Main[31] = 1)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Bitwise.constraints Main).initialState s) :
     let op_c := _root_.Andi.sp1_op_c Main
     let op_b := _root_.Andi.sp1_op_b Main
     let op_a := _root_.Andi.sp1_op_a Main
     (_root_.Andi.spec_andi op_c (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Bitwise.sp1_bitwise Main).run s :=
-  _root_.Andi.correct_andi Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Andi.correct_andi Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     ⟨h_is_and, h_imm_c⟩ state_cstrs
+
+/-! ## RawSpec / SemanticSpec POC -/
+
+@[reducible]
+def RawSpec (Main : Vector (ZMod p) 51) : Prop :=
+  List.Forall SP1Constraint.toProp (_root_.Bitwise.constraints Main)
+
+omit [Fact (2 ^ 17 < p)] in
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 51) :
+    (_root_.Bitwise.constraints Main).allHold ↔ RawSpec Main := Iff.rfl
+
+def SemanticSpec (Main : Vector (ZMod p) 51) : Prop :=
+  TraceSpec (fromMain Main) ∧
+  (∀ s : SailState, (_root_.Bitwise.constraints Main).initialState s →
+    (_root_.Bitwise.sp1_bitwise Main).run s =
+      (if _root_.Bitwise.is_xor Main then
+        (_root_.Xor.spec_xor (.Regidx (_root_.Xor.sp1_op_c Main))
+          (.Regidx (_root_.Xor.sp1_op_b Main))
+          (.Regidx (_root_.Xor.sp1_op_a Main))).run s
+      else if _root_.Bitwise.is_or Main then
+        (_root_.Or.spec_or (.Regidx (_root_.Or.sp1_op_c Main))
+          (.Regidx (_root_.Or.sp1_op_b Main))
+          (.Regidx (_root_.Or.sp1_op_a Main))).run s
+      else if _root_.Bitwise.is_and Main then
+        (_root_.And.spec_and (.Regidx (_root_.And.sp1_op_c Main))
+          (.Regidx (_root_.And.sp1_op_b Main))
+          (.Regidx (_root_.And.sp1_op_a Main))).run s
+      else if _root_.Bitwise.is_xori Main then
+        (_root_.Xori.spec_xori (_root_.Xori.sp1_op_c Main)
+          (.Regidx (_root_.Xori.sp1_op_b Main))
+          (.Regidx (_root_.Xori.sp1_op_a Main))).run s
+      else if _root_.Bitwise.is_ori Main then
+        (_root_.Ori.spec_ori (_root_.Ori.sp1_op_c Main)
+          (.Regidx (_root_.Ori.sp1_op_b Main))
+          (.Regidx (_root_.Ori.sp1_op_a Main))).run s
+      else if _root_.Bitwise.is_andi Main then
+        (_root_.Andi.spec_andi (_root_.Andi.sp1_op_c Main)
+          (.Regidx (_root_.Andi.sp1_op_b Main))
+          (.Regidx (_root_.Andi.sp1_op_a Main))).run s
+      else (_root_.Bitwise.sp1_bitwise Main).run s))
+
+theorem raw_to_semantic (Main : Vector (ZMod p) 51) (h_spec : TraceSpec (fromMain Main))
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  refine ⟨h_spec, ?_⟩
+  intro s state_cstrs
+  exact soundness_bitwise Main s ((rawSpec_iff_allHold Main).mpr h_raw) state_cstrs
 
 /-! ## Full `FormalAssertion` promotion
 

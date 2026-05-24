@@ -85,7 +85,7 @@ def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_lwu * (is_lwu - 1) === 0
   (is_lw + is_lwu) * (is_lw + is_lwu - 1) === 0
 
-def Spec (cols : LoadWordCols (ZMod p)) : Prop :=
+def TraceSpec (cols : LoadWordCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4

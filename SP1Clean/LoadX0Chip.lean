@@ -106,7 +106,7 @@ def main (cols : Var LoadX0Cols (ZMod p)) : Circuit (ZMod p) Unit := do
   let sum := is_lb + is_lbu + is_lh + is_lhu + is_lw + is_lwu + is_ld
   sum * (sum - 1) === 0
 
-def Spec (cols : LoadX0Cols (ZMod p)) : Prop :=
+def TraceSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
   let is_real : ZMod p :=
     cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
       cols.is_lw + cols.is_lwu + cols.is_ld
@@ -179,10 +179,10 @@ Mirrors the index map in `SP1Chips/Load/LoadX0/Constraints.lean`
 hypothesis (one of `is_lb..is_ld = 1`, the rest zero), `Spec` implies
 SP1's `allHold`. **Proof body sorry'd** — see
 `feedback_path2_correct_bridge_costs.md`. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 48)
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 48)
     (h_is_real : Main[41] + Main[42] + Main[43] + Main[44] + Main[45] +
                  Main[46] + Main[47] = 1)
-    (h_spec : Spec (fromMain Main)) :
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.Load.LoadX0.constraints Main).allHold := by
   sorry
 
@@ -194,7 +194,7 @@ theorem correct_loadX0_ld
     (h_is_loadX0_ld : Main[47] = 1)
     (h_others_zero : Main[41] = 0 ∧ Main[42] = 0 ∧ Main[43] = 0 ∧
                      Main[44] = 0 ∧ Main[45] = 0 ∧ Main[46] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
@@ -209,7 +209,7 @@ theorem correct_loadX0_ld
     (_root_.Load.LoadX0.spec_loadX0_ld imm_c (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
   _root_.Load.LoadX0.correct_loadX0_ld Main s hs hs_config
-    (spec_implies_allHold Main
+    (traceSpec_implies_allHold Main
       (by obtain ⟨h41, h42, h43, h44, h45, h46⟩ := h_others_zero
           rw [h41, h42, h43, h44, h45, h46, h_is_loadX0_ld]; ring)
       h_spec)

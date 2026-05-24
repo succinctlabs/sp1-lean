@@ -223,23 +223,23 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       -- `cols.result`, the 4-limb shifted output). op_b and op_c are pure
       -- reads.
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_a, 0, 0],
-          prev_value := cols.op_a_memory.prev_value,
-          prev_low := cols.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_a_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_a, 0, 0],
+          prev_value := cols.adapter.op_a_memory.prev_value,
+          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
       let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_b, 0, 0],
-          prev_value := cols.op_b_memory.prev_value,
-          prev_low := cols.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_b_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_b, 0, 0],
+          prev_value := cols.adapter.op_b_memory.prev_value,
+          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
       let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.op_c, 0, 0],
-          prev_value := cols.op_c_memory.prev_value,
-          prev_low := cols.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.op_c_memory.access_timestamp.diff_low_limb }
+        { addr := #v[cols.adapter.op_c[0], 0, 0],
+          prev_value := cols.adapter.op_c_memory.prev_value,
+          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
       [(op_a_mem, cols.result),
-       (op_b_mem, cols.op_b_memory.prev_value),
-       (op_c_mem, cols.op_c_memory.prev_value)]
+       (op_b_mem, cols.adapter.op_b_memory.prev_value),
+       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
   | .addw cols =>
       -- Three register accesses. op_a is read AND written (write_value is
       -- the 4-limb sign-extended reconstruction of the 32-bit result).

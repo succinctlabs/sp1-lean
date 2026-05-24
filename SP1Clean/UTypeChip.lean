@@ -14,6 +14,7 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.JTypeReader.JTypeReader
 import SP1Chips.UType.UTypeChip
 import SP1Chips.UType.Constraints
+import SP1Chips.Soundness
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -31,7 +32,7 @@ single 31-column trace, distinguished by the `is_auipc` selector at
 immediate, producing the 64-bit value written to `op_a`.
 
 Structural mirror discipline (same as JalChip / MulChip / ShiftLeftChip):
-defines `UTypeCols`, `main`, and `Spec`; no `iff_sp1` / `correct_*`
+defines `UTypeCols`, `main`, and `Spec`; no `traceSpec_iff_allHold` / `correct_*`
 bridges, no `FormalAssertion` promotion. The chip-level Spec composes
 `AddOperation.constraints.allHold` (kept in raw form because the
 operation's is_real arg is the conditional `is_real - op_a_0`),
@@ -90,11 +91,11 @@ def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
 
 /-- Pilot Spec, expressed over field-valued `UTypeCols (ZMod p)`. Conjunct
 order matches the SP1 constraint list emission (CPUState ∧ AddOperation ∧
-JTypeReader ∧ trailing assertZero gates) so `iff_sp1` reshapes by `and_assoc`
+JTypeReader ∧ trailing assertZero gates) so `traceSpec_iff_allHold` reshapes by `and_assoc`
 without needing `and_comm`. The `AddOperation` clause is left in raw `allHold`
 form (under is_real arg `is_real - op_a_0`) because the iff lemma is only
 stated for `is_real arg = 1`. -/
-def Spec (cols : UTypeCols (ZMod p)) : Prop :=
+def TraceSpec (cols : UTypeCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p := cols.is_auipc * 48 + (1 - cols.is_auipc) * 49
   let addend : Word (ZMod p) :=
     #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
@@ -147,16 +148,16 @@ set_option maxHeartbeats 800000 in
 -- Higher heartbeats: the iff destructure unfolds the full UType constraint
 -- list (CPUState ++ AddOperation ++ JTypeReader ++ 7 trailing assertZeros).
 /-- The chip-level bridge: SP1's `allHold` over the flat row
-`UType.constraints Main` is exactly the Clean-flavored `Spec (fromMain Main)`,
+`UType.constraints Main` is exactly the Clean-flavored `TraceSpec (fromMain Main)`,
 under `is_real = Main[30] = 1`. The AddOperation clause is preserved in raw
 `allHold` form on both sides (the is_real argument `Main[30] - Main[13]` is
 the conditional `is_real - op_a_0` rather than the bare `1`, so the
 operation-level iff lemma cannot fire). -/
-theorem iff_sp1
+theorem traceSpec_iff_allHold
     (Main : Vector (ZMod p) 31) (h_is_real : Main[30] = 1) :
-    (_root_.UType.constraints Main).allHold ↔ Spec (fromMain Main) := by
+    (_root_.UType.constraints Main).allHold ↔ TraceSpec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  simp only [fromMain, Spec, SP1Clean.CPUState.cpuStateSpec,
+  simp only [fromMain, TraceSpec, SP1Clean.CPUState.cpuStateSpec,
     SP1Clean.JTypeReader.jtypeReaderSpec]
   rw [show (_root_.UType.constraints Main).allHold ↔
         ((CPUState.constraints (F := ZMod p)
@@ -196,6 +197,36 @@ theorem iff_sp1
   simp [SP1Clean.CPUState.cpuStateSpec, SP1Clean.JTypeReader.jtypeReaderSpec,
     and_assoc]
 
+/-! ## RawSpec / SemanticSpec POC -/
+
+@[reducible]
+def RawSpec (Main : Vector (ZMod p) 31) : Prop :=
+  List.Forall SP1Constraint.toProp (_root_.UType.constraints Main)
+
+omit [Fact (2 ^ 17 < p)] in
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 31) :
+    (_root_.UType.constraints Main).allHold ↔ RawSpec Main := Iff.rfl
+
+def SemanticSpec (Main : Vector (ZMod p) 31) : Prop :=
+  TraceSpec (fromMain Main) ∧
+  (∀ s : SailState, (_root_.UType.constraints Main).initialState s →
+    (_root_.UType.sp1_utype Main).run s =
+      (if Main[29] = 1 then
+        (_root_.UType.spec_auipc (_root_.UType.sp1_op_b Main)
+          (.Regidx (_root_.UType.sp1_op_a Main))).run s
+      else if Main[29] = 0 then
+        (_root_.UType.spec_lui (_root_.UType.sp1_op_b Main)
+          (.Regidx (_root_.UType.sp1_op_a Main))).run s
+      else (_root_.UType.sp1_utype Main).run s))
+
+theorem raw_to_semantic (Main : Vector (ZMod p) 31) (h_is_real : Main[30] = 1)
+    (h_spec : TraceSpec (fromMain Main)) (h_raw : RawSpec Main) :
+    SemanticSpec Main := by
+  refine ⟨h_spec, ?_⟩
+  intro s state_cstrs
+  exact soundness_utype Main s ((rawSpec_iff_allHold Main).mpr h_raw)
+    h_is_real state_cstrs
+
 /-! ## Full `FormalAssertion` promotion (Path-2)
 
 Wraps the chip-level constraint surface into a Clean `FormalAssertion`.
@@ -209,7 +240,7 @@ Vector-indexed clauses hit the FormalAssertion friction noted in memory
 `feedback_formal_assertion_friction` (completeness goals on
 `Expression.eval env input_var_addend[i]` don't bridge cleanly to
 `cols.addend[i]`). They remain in the legacy chip-level `Spec` /
-`iff_sp1` route. Same Path-2 design as `SP1Clean.Jalr.Assertion`. -/
+`traceSpec_iff_allHold` route. Same Path-2 design as `SP1Clean.Jalr.Assertion`. -/
 
 namespace Assertion
 

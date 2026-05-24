@@ -13,6 +13,10 @@ import SP1Operations.Operation.AddwOperation.AddwOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Addw.AddwChip
+import SP1Chips.Addw.Common
+import SP1Chips.Soundness
+import SP1Clean.MemoryAccess
+import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.AddwOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
@@ -79,7 +83,7 @@ def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
 index `19` (`ADDW`) flows into the ALUTypeReader fragment; the
 `op_a_write_value` is the 4-limb reconstruction
 `[addw_value[0], addw_value[1], addw_msb * 65535, addw_msb * 65535]`. -/
-def Spec (cols : AddwCols (ZMod p)) : Prop :=
+def TraceSpec (cols : AddwCols (ZMod p)) : Prop :=
   SP1Clean.AddwOp.Spec
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
       { value := cols.addw_value, msb := { msb := cols.addw_msb } } ∧
@@ -128,13 +132,13 @@ index map in `SP1Chips/Addw/Constraints.lean`. -/
    ⟨Main[35]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
-`Addw.constraints Main` is exactly `Spec (fromMain Main)`, under
+`Addw.constraints Main` is exactly `TraceSpec (fromMain Main)`, under
 `is_real = Main[35] = 1`. -/
-theorem iff_sp1
+theorem traceSpec_iff_allHold
     (Main : Vector (ZMod p) 36) (h_is_real : Main[35] = 1) :
-    (_root_.Addw.constraints Main).allHold ↔ Spec (fromMain Main) := by
+    (_root_.Addw.constraints Main).allHold ↔ TraceSpec (fromMain Main) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  simp only [fromMain, Spec, SP1Clean.AddwOp.Spec,
+  simp only [fromMain, TraceSpec, SP1Clean.AddwOp.Spec,
     SP1Clean.CPUState.cpuStateSpec, SP1Clean.ALUTypeReader.aluTypeReaderSpec]
   rw [show (_root_.Addw.constraints Main).allHold ↔
         ((AddwOperation.constraints (F := ZMod p)
@@ -181,28 +185,108 @@ theorem iff_sp1
 theorem correct_addw
     (Main : Vector (ZMod p) 36) (s : SailState)
     (h_is_real : Main[35] = 1) (h_is_addw : Main[31] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Addw.constraints Main).initialState s) :
     let op_c := _root_.Addw.sp1_op_c Main
     let op_b := _root_.Addw.sp1_op_b Main
     let op_a := _root_.Addw.sp1_op_a Main
     (_root_.Addw.spec_addw (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Addw.sp1_addw Main).run s :=
-  _root_.Addw.correct_addw Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Addw.correct_addw Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     h_is_real h_is_addw state_cstrs
+
+/-! ## RawSpec / SemanticSpec POC -/
+
+def RawSpec (Main : Vector (ZMod p) 36) : Prop :=
+  (AddwOperation.constraints (F := ZMod p)
+      #v[Main[15], Main[16], Main[17], Main[18]]
+      #v[Main[25], Main[26], Main[27], Main[28]]
+      { value := #v[Main[32], Main[33]], msb := { msb := Main[34] } } Main[35]).allHold ∧
+  (CPUState.constraints (F := ZMod p)
+      { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+        pc := #v[Main[3], Main[4], Main[5]] }
+      #v[Main[3] + 4, Main[4], Main[5]] 8 Main[35]).allHold ∧
+  (ALUTypeReader.constraints (F := ZMod p)
+      Main[0] (Main[2] + Main[1] * 65536) #v[Main[3], Main[4], Main[5]] 19
+      #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535]
+      { op_a := Main[6],
+        op_a_memory :=
+          { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+            access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+        op_a_0 := Main[13], op_b := Main[14],
+        op_b_memory :=
+          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+            access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+        op_c := #v[Main[21], Main[22], Main[23], Main[24]],
+        op_c_memory :=
+          { prev_value := #v[Main[25], Main[26], Main[27], Main[28]],
+            access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } },
+        imm_c := Main[31] }
+      Main[35] Main[35]).allHold ∧
+  Main[35] * (Main[35] - 1) = 0 ∧
+  Main[13] = 0
+
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 36) :
+    (_root_.Addw.constraints Main).allHold ↔ RawSpec Main := by
+  change List.Forall SP1Constraint.toProp (_root_.Addw.constraints Main) ↔ _
+  rw [_root_.Addw.allHold_constraints_iff]
+  rfl
+
+/-- For ALU-type chips with imm_c dispatch, SemanticSpec uses
+`aluTypeReaderSpec` directly (which handles imm_c-gated op_c memory).
+Sail-eq cascades on `Main[31]` (the imm_c flag) between ADDW and ADDIW. -/
+def SemanticSpec (Main : Vector (ZMod p) 36) : Prop :=
+  let cols := fromMain Main
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
+  SP1Clean.ALUTypeReader.aluTypeReaderSpec
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 19 cols.state.pc
+      #v[cols.addw_value[0], cols.addw_value[1],
+         cols.addw_msb * 65535, cols.addw_msb * 65535]
+      cols.adapter ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  -- Two-variant Sail-eq: ADDW (imm_c=0) and ADDIW (imm_c=1) have distinct
+  -- `sp1_*` functions in SP1Chips, so a unified if-then-else won't typecheck.
+  -- Instead, split into two conditional equations.
+  (∀ s : SailState, (_root_.Addw.constraints Main).initialState s →
+    Main[31] = 0 →
+    (_root_.Addw.sp1_addw Main).run s =
+      (_root_.Addw.spec_addw (.Regidx (_root_.Addw.sp1_op_c Main))
+        (.Regidx (_root_.Addw.sp1_op_b Main))
+        (.Regidx (_root_.Addw.sp1_op_a Main))).run s) ∧
+  (∀ s : SailState, (_root_.Addw.constraints Main).initialState s →
+    Main[31] = 1 →
+    (_root_.Addiw.sp1_addiw Main).run s =
+      (_root_.Addiw.spec_addiw (_root_.Addiw.sp1_op_c Main)
+        (.Regidx (_root_.Addiw.sp1_op_b Main))
+        (.Regidx (_root_.Addiw.sp1_op_a Main))).run s)
+
+theorem raw_to_semantic (Main : Vector (ZMod p) 36) (h_is_real : Main[35] = 1)
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨h_addwop, h_cpu_raw, h_alu_raw, h_real_bin, h_a0⟩ := h_raw
+  have h_allHold : (_root_.Addw.constraints Main).allHold :=
+    (rawSpec_iff_allHold Main).mpr ⟨h_addwop, h_cpu_raw, h_alu_raw, h_real_bin, h_a0⟩
+  rw [h_is_real] at h_cpu_raw h_alu_raw
+  refine ⟨SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu_raw,
+          SP1Clean.ALUTypeReader.aluTypeReaderSpec_iff_sp1.mp h_alu_raw,
+          h_real_bin, ?_, ?_⟩
+  · intro s state_cstrs h_addw
+    exact soundness_addw Main s h_allHold h_is_real h_addw state_cstrs
+  · intro s state_cstrs h_addiw
+    exact soundness_addiw Main s h_allHold h_is_real h_addiw state_cstrs
 
 /-- Clean-side `correct_addiw`: ADDIW I-type case (`imm_c = 1`). -/
 theorem correct_addiw
     (Main : Vector (ZMod p) 36) (s : SailState)
     (h_is_real : Main[35] = 1) (h_is_addiw : Main[31] = 1)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Addw.constraints Main).initialState s) :
     let op_c := _root_.Addiw.sp1_op_c Main
     let op_b := _root_.Addiw.sp1_op_b Main
     let op_a := _root_.Addiw.sp1_op_a Main
     (_root_.Addiw.spec_addiw op_c (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Addw.sp1_addw Main).run s :=
-  _root_.Addiw.correct_addw Main s ((iff_sp1 Main h_is_real).mpr h_spec)
+  _root_.Addiw.correct_addw Main s ((traceSpec_iff_allHold Main h_is_real).mpr h_spec)
     h_is_real h_is_addiw state_cstrs
 
 /-! ## Full `FormalAssertion` promotion

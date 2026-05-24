@@ -87,7 +87,7 @@ def main (cols : Var StoreWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
 /-- The Clean-flavored Spec for `StoreWordChip`. Composes CPUState +
 three memory accesses (op_a source read, op_b base read, RAM
 read-then-write at addr_value) + program-bus + is_real gate. -/
-def Spec (cols : StoreWordCols (ZMod p)) : Prop :=
+def TraceSpec (cols : StoreWordCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4

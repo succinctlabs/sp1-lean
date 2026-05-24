@@ -228,4 +228,65 @@ lemma is_real_eq_one_of_mulw (Main : Vector (ZMod p) 82)
   exact sum_eq_one_of_eq_one_5 h_81 b_77 b_78 b_79 b_80 sum_disj
 
 
+set_option linter.unusedSectionVars false in
+-- Polymorphic iff lemma mirroring `Bitwise.allHold_constraints_iff`.
+-- Exposes the 3 sub-allHolds (MulOp/CPUState/RTypeReader) + the 7 chip-list
+-- props (5 variant boolean gates + sum disjunction + op_a_0 = 0).
+-- Slot order for the booleans matches the constraint compiler: 77, 78, 79, 81, 80.
+lemma allHold_constraints_iff (Main : Vector (ZMod p) 82) :
+    List.Forall SP1Constraint.toProp (constraints Main) ↔
+    List.Forall SP1Constraint.toProp
+        (MulOperation.constraints #v[Main[28], Main[29], Main[30], Main[31]]
+          #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[22], Main[23], Main[24], Main[25]]
+          { carry := #v[Main[32], Main[33], Main[34], Main[35], Main[36], Main[37],
+              Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44],
+              Main[45], Main[46], Main[47]],
+            product := #v[Main[48], Main[49], Main[50], Main[51], Main[52], Main[53],
+              Main[54], Main[55], Main[56], Main[57], Main[58], Main[59], Main[60],
+              Main[61], Main[62], Main[63]],
+            b_lower_byte := { low_bytes := #v[Main[64], Main[65], Main[66], Main[67]] },
+            c_lower_byte := { low_bytes := #v[Main[68], Main[69], Main[70], Main[71]] },
+            b_msb := Main[72], c_msb := Main[73],
+            product_msb := { msb := Main[74] },
+            b_sign_extend := Main[75], c_sign_extend := Main[76] }
+          (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])
+          Main[77] Main[78] Main[81] Main[79] Main[80]) ∧
+    List.Forall SP1Constraint.toProp
+        (_root_.CPUState.constraints
+          (CPUState.mk Main[0] Main[1] Main[2] #v[Main[3], Main[4], Main[5]])
+          #v[Main[3] + 4, Main[4], Main[5]] 8
+          (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])) ∧
+    List.Forall SP1Constraint.toProp
+        (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
+          #v[Main[3], Main[4], Main[5]]
+          (Main[77] * 11 + Main[78] * 12 + Main[79] * 13 + Main[80] * 14 + Main[81] * 24)
+          #v[Main[28], Main[29], Main[30], Main[31]]
+          { op_a := Main[6],
+            op_a_memory :=
+              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+            op_a_0 := Main[13], op_b := Main[14],
+            op_b_memory :=
+              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+            op_c := Main[21],
+            op_c_memory :=
+              { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
+                access_timestamp := { prev_low := Main[26], diff_low_limb := Main[27] } } }
+          (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])
+          (Main[77] + Main[78] + Main[79] + Main[80] + Main[81])) ∧
+    Main[77] * (Main[77] - 1) = 0 ∧
+    Main[78] * (Main[78] - 1) = 0 ∧
+    Main[79] * (Main[79] - 1) = 0 ∧
+    Main[81] * (Main[81] - 1) = 0 ∧
+    Main[80] * (Main[80] - 1) = 0 ∧
+    (Main[77] + Main[78] + Main[79] + Main[80] + Main[81]) *
+      (Main[77] + Main[78] + Main[79] + Main[80] + Main[81] - 1) = 0 ∧
+    Main[13] = 0 := by
+  simp only [constraints, List.forall_append, List.Forall, SP1Constraint.toProp,
+    and_assoc]
+  push_cast
+  rfl
+
 end Mul

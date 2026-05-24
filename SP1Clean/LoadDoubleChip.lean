@@ -74,7 +74,7 @@ def main (cols : Var LoadDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
 
-def Spec (cols : LoadDoubleCols (ZMod p)) : Prop :=
+def TraceSpec (cols : LoadDoubleCols (ZMod p)) : Prop :=
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
@@ -132,7 +132,7 @@ def loadMemoryAccess (cols : LoadDoubleCols (ZMod p)) : SP1Clean.MemoryAccess (Z
 /-- Iff RHS for the Load Double (LD) variant, mirroring
 `_root_.Load.LoadDouble.allHold_constraints_iff_of_is_ld`. LD has only
 one opcode (no LDU — RV64IM has no unsigned doubleword load), so a
-single iff_sp1 lemma per chip. The full 4-limb loaded word goes
+single traceSpec_iff_allHold lemma per chip. The full 4-limb loaded word goes
 directly into op_a_write_value (no sub-word selection or sign
 extension). -/
 def SpecForIff_of_is_ld (cols : LoadDoubleCols (ZMod p)) : Prop :=

@@ -65,7 +65,12 @@ structure ShiftRightCols (T : Type) where
   is_sra : T                                -- Main[65]
   is_srlw : T                               -- Main[66]
   is_sraw : T                               -- Main[67]
-  sign_extend : T                           -- Main[68]
+  -- `is_w_imm = (is_srlw + is_sraw) * imm_c` (forced by bridge E47).
+  -- Matches upstream's `is_w_imm: T` in `alu/sr/mod.rs:104`; the
+  -- prior Lean name `sign_extend` was a misnomer — this is a
+  -- W-variant immediate flag (used in opcode adjustment), not a
+  -- sign-extension witness.
+  is_w_imm : T                              -- Main[68] (was sign_extend)
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -82,7 +87,7 @@ def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_a_write_value,
        _b_msb, _srw_msb, _c_bits, _sra_msb_v0123, _v_0123, _v_012, _v_01,
        _lower_limb, _higher_limb, _limb_result, _shift_u16,
-       is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
+       is_srl, is_sra, is_srlw, is_sraw, _is_w_imm,
        _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -99,12 +104,166 @@ def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
   sum * (sum - 1) === 0
   op_a_0 === 0
 
-/-- Placeholder for the shift-arithmetic Spec content (bit-decomposition,
-shift power chain, byte-shift one-hot, limb-shift, sign-extension via
-U16MSB). Currently trivially `True`. -/
-def shiftSpec (_cols : ShiftRightCols (ZMod p)) : Prop := True
+/-- The shift-arithmetic Spec content for ShiftRight. Bundles the iff-RHS
+conjuncts of `_root_.ShiftRight.allHold_constraints_iff` that aren't otherwise
+carried by the chip-level Spec. Includes 3 `U16MSBOperation` sub-allHolds (one
+each for SRA on op_b high limb, SRAW on op_b mid limb, and SRLW/SRAW on result
+high limb), the raw `ALUTypeReader` sub-allHold, the is_w_imm derivation, the
+c_bits and shift_u16 boolean gates (not in Spec), the shift-exponent bound,
+the shift-power chain (uses `1 - c_bit_i`, the inverse-form for right-shift),
+per-limb shift bounds + identities (with `(is_srl + is_sra)` factor on high
+limbs for SRA propagation), 4 limb_result equations, `sra_msb_v0123`
+intermediate, and 22 gated output equations (16 for srl+sra × 4 shift_u16, 6
+for srlw+sraw shift_u16 arms). -/
+def shiftSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
+  -- 3 U16MSBOperation sub-allHolds.
+  (_root_.U16MSBOperation.constraints cols.adapter.op_b_memory.prev_value[3]
+      cols.b_msb cols.is_sra).allHold ∧
+  (_root_.U16MSBOperation.constraints cols.adapter.op_b_memory.prev_value[1]
+      cols.b_msb cols.is_sraw).allHold ∧
+  (_root_.U16MSBOperation.constraints cols.op_a_write_value[1]
+      cols.srw_msb (cols.is_srlw + cols.is_sraw)).allHold ∧
+  -- ALUTypeReader.constraints.allHold (raw form, with chip args).
+  (_root_.ALUTypeReader.constraints cols.state.clk_high
+      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) cols.state.pc
+      (cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23)
+      cols.op_a_write_value cols.adapter
+      (cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw)
+      (cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw)).allHold ∧
+  -- is_w_imm = (is_srlw + is_sraw) * imm_c
+  cols.is_w_imm = (cols.is_srlw + cols.is_sraw) * cols.adapter.imm_c ∧
+  -- 6 c_bits booleans
+  (cols.c_bits[0] = 0 ∨ cols.c_bits[0] = 1) ∧
+  (cols.c_bits[1] = 0 ∨ cols.c_bits[1] = 1) ∧
+  (cols.c_bits[2] = 0 ∨ cols.c_bits[2] = 1) ∧
+  (cols.c_bits[3] = 0 ∨ cols.c_bits[3] = 1) ∧
+  (cols.c_bits[4] = 0 ∨ cols.c_bits[4] = 1) ∧
+  (cols.c_bits[5] = 0 ∨ cols.c_bits[5] = 1) ∧
+  -- shift-exponent bound
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    ((cols.adapter.op_c_memory.prev_value[0] - (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8 + cols.c_bits[4] * 16 +
+        cols.c_bits[5] * 32)) * ((64 : ZMod p)⁻¹)).val < 2 ^ (10 : ZMod p).val) ∧
+  -- 4 shift_u16 byte-offset gates + booleans (interleaved)
+  (cols.shift_u16[0] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 *
+      (cols.is_srl + cols.is_sra) = 0) ∧
+  (cols.shift_u16[0] = 0 ∨ cols.shift_u16[0] = 1) ∧
+  (cols.shift_u16[1] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 *
+      (cols.is_srl + cols.is_sra) = 1) ∧
+  (cols.shift_u16[1] = 0 ∨ cols.shift_u16[1] = 1) ∧
+  (cols.shift_u16[2] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 *
+      (cols.is_srl + cols.is_sra) = 2) ∧
+  (cols.shift_u16[2] = 0 ∨ cols.shift_u16[2] = 1) ∧
+  (cols.shift_u16[3] = 0 ∨ cols.c_bits[4] + cols.c_bits[5] * 2 *
+      (cols.is_srl + cols.is_sra) = 3) ∧
+  (cols.shift_u16[3] = 0 ∨ cols.shift_u16[3] = 1) ∧
+  -- shift_u16 one-hot under is_real
+  (cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 ∨
+    cols.shift_u16[0] + cols.shift_u16[1] + cols.shift_u16[2] + cols.shift_u16[3] = 1) ∧
+  -- shift-power chain (inverse: uses (1 - cb_i))
+  (cols.v_01 = (1 - cols.c_bits[0] + 1) * 2 * ((1 - cols.c_bits[1]) * 3 + 1)) ∧
+  (cols.v_012 = cols.v_01 * ((1 - cols.c_bits[2]) * 15 + 1)) ∧
+  (cols.v_0123 = cols.v_012 * ((1 - cols.c_bits[3]) * 255 + 1)) ∧
+  -- per-limb shift bounds + identities (4 sets for Main[15..18])
+  -- Limb 0: standard
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.lower_limb[0]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8 : ZMod p).val) ∧
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.higher_limb[0]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] +
+        cols.c_bits[1] * 2 + cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (cols.adapter.op_b_memory.prev_value[0] * cols.v_0123 =
+    cols.higher_limb[0] * 65536 + cols.lower_limb[0] * cols.v_0123) ∧
+  -- Limb 1
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.lower_limb[1]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8 : ZMod p).val) ∧
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.higher_limb[1]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] +
+        cols.c_bits[1] * 2 + cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (cols.adapter.op_b_memory.prev_value[1] * cols.v_0123 =
+    cols.higher_limb[1] * 65536 + cols.lower_limb[1] * cols.v_0123) ∧
+  -- Limb 2: gated by (is_srl + is_sra) — for SRA-style: high limb propagates
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.lower_limb[2]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8 : ZMod p).val) ∧
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.higher_limb[2]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] +
+        cols.c_bits[1] * 2 + cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (cols.adapter.op_b_memory.prev_value[2] * cols.v_0123 * (cols.is_srl + cols.is_sra) =
+    cols.higher_limb[2] * 65536 + cols.lower_limb[2] * cols.v_0123) ∧
+  -- Limb 3
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.lower_limb[3]).val < 2 ^ (cols.c_bits[0] + cols.c_bits[1] * 2 +
+        cols.c_bits[2] * 4 + cols.c_bits[3] * 8 : ZMod p).val) ∧
+  (¬ cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 →
+    (cols.higher_limb[3]).val < 2 ^ ((16 : ZMod p) - (cols.c_bits[0] +
+        cols.c_bits[1] * 2 + cols.c_bits[2] * 4 + cols.c_bits[3] * 8)).val) ∧
+  (cols.adapter.op_b_memory.prev_value[3] * cols.v_0123 * (cols.is_srl + cols.is_sra) =
+    cols.higher_limb[3] * 65536 + cols.lower_limb[3] * cols.v_0123) ∧
+  -- 4 limb_result equations
+  (cols.limb_result[0] = cols.higher_limb[0] + cols.lower_limb[1] * cols.v_0123) ∧
+  (cols.limb_result[1] = cols.higher_limb[1] + cols.lower_limb[2] * cols.v_0123) ∧
+  (cols.limb_result[2] = cols.higher_limb[2] + cols.lower_limb[3] * cols.v_0123) ∧
+  (cols.limb_result[3] = cols.higher_limb[3]) ∧
+  -- b_msb gating: srl + srlw → b_msb = 0 (no sign extension)
+  (cols.is_srl + cols.is_srlw = 0 ∨ cols.b_msb.msb = 0) ∧
+  -- sra_msb_v0123 = b_msb * v_0123
+  (cols.sra_msb_v0123 = cols.b_msb.msb * cols.v_0123) ∧
+  -- srw_msb gating: not (srlw + sraw) → srw_msb = 0  (lit form: srlw+sraw = 1 ∨ srw_msb = 0)
+  (cols.is_srlw + cols.is_sraw = 1 ∨ cols.srw_msb.msb = 0) ∧
+  -- 16 SR (srl/sra) gated output equations: gated by (is_srl + is_sra) × shift_u16
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[0]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[1]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[2] = cols.limb_result[2]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[3] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[1]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[2]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[2] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[3] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[2]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[2] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[3] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[1] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[2] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[3] = cols.b_msb.msb * 65535) ∧
+  -- 6 srlw/sraw gated output equations
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[0]) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[1] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[1] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[1] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.op_a_write_value[2] = cols.srw_msb.msb * 65535) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.op_a_write_value[3] = cols.srw_msb.msb * 65535)
 
-def Spec (cols : ShiftRightCols (ZMod p)) : Prop :=
+def TraceSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   let is_real : ZMod p :=
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw
   let opcode_e : ZMod p :=
@@ -175,19 +334,78 @@ def Spec (cols : ShiftRightCols (ZMod p)) : Prop :=
    -- (`Main[64]+Main[65]+Main[66]+Main[67]`).
    ⟨Main[64] + Main[65] + Main[66] + Main[67]⟩⟩
 
-/-- The chip-level half-iff bridge (ShiftRight). **Proof body sorry'd**. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 69)
+set_option maxHeartbeats 4000000 in
+-- Heartbeats elevated for the ~75-conjunct iff RHS refine on 69 cols.
+/-- The chip-level half-iff bridge (ShiftRight). -/
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 69)
     (h_is_real : Main[64] + Main[65] + Main[66] + Main[67] = 1)
-    (h_spec : Spec (fromMain Main)) :
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.ShiftRight.constraints Main).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [TraceSpec, fromMain, shiftSpec,
+    Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ] at h_spec
+  obtain ⟨h_cpu_spec, _h_mem_a, _h_mem_b, _h_mem_c, _h_program,
+          h_srl_bin, h_sra_bin, h_srlw_bin, h_sraw_bin, h_aggregate,
+          _h_a0, h_ss, _h_trusted⟩ := h_spec
+  obtain ⟨h_u16a, h_u16b, h_u16c, h_alu, h_iswi,
+          h_cb0, h_cb1, h_cb2, h_cb3, h_cb4, h_cb5,
+          h_exp_bound,
+          h_su0g, h_su0, h_su1g, h_su1, h_su2g, h_su2, h_su3g, h_su3,
+          h_su_one_hot,
+          h_v01, h_v012, h_v0123,
+          h_lo0_b, h_hi0_b, h_li0,
+          h_lo1_b, h_hi1_b, h_li1,
+          h_lo2_b, h_hi2_b, h_li2,
+          h_lo3_b, h_hi3_b, h_li3,
+          h_lr0, h_lr1, h_lr2, h_lr3,
+          h_bmsb_gate, h_sra_msb_eq, h_srwmsb_gate,
+          h_srl_sra00, h_srl_sra01, h_srl_sra02, h_srl_sra03,
+          h_srl_sra10, h_srl_sra11, h_srl_sra12, h_srl_sra13,
+          h_srl_sra20, h_srl_sra21, h_srl_sra22, h_srl_sra23,
+          h_srl_sra30, h_srl_sra31, h_srl_sra32, h_srl_sra33,
+          h_srlw_sraw00, h_srlw_sraw01,
+          h_srlw_sraw10, h_srlw_sraw11,
+          h_srlw_sraw_high2, h_srlw_sraw_high3⟩ := h_ss
+  change List.Forall SP1Constraint.toProp (_root_.ShiftRight.constraints Main)
+  rw [_root_.ShiftRight.allHold_constraints_iff]
+  -- Boolean conversion helper
+  have bool_of : ∀ {x : ZMod p}, x * (x - 1) = 0 → x = 0 ∨ x = 1 := fun h =>
+    (mul_eq_zero.mp h).imp_right (by intro h'; linear_combination h')
+  -- iff RHS order: 3 U16MSB + CPUState + ALUTypeReader + 4 opcode bool + aggregate bool
+  -- + is_w_imm + 6 c_bits bool + exp_bound + 8 shift_u16 (gate+bool interleaved) + one_hot
+  -- + 3 shift-power + 12 per-limb + 4 limb_result + 4 special (b_msb_gate, sra_msb_eq, srw_gate)
+  -- + 16 srl/sra gated + 6 srlw/sraw gated + Main[13] = 0
+  refine ⟨h_u16a, h_u16b, h_u16c, ?_, h_alu,
+          bool_of h_srl_bin, bool_of h_sra_bin, bool_of h_srlw_bin, bool_of h_sraw_bin,
+          bool_of h_aggregate, h_iswi,
+          h_cb0, h_cb1, h_cb2, h_cb3, h_cb4, h_cb5,
+          h_exp_bound,
+          h_su0g, h_su0, h_su1g, h_su1, h_su2g, h_su2, h_su3g, h_su3, h_su_one_hot,
+          h_v01, h_v012, h_v0123,
+          h_lo0_b, h_hi0_b, h_li0,
+          h_lo1_b, h_hi1_b, h_li1,
+          h_lo2_b, h_hi2_b, h_li2,
+          h_lo3_b, h_hi3_b, h_li3,
+          h_lr0, h_lr1, h_lr2, h_lr3,
+          h_bmsb_gate, h_sra_msb_eq, h_srwmsb_gate,
+          h_srl_sra00, h_srl_sra01, h_srl_sra02, h_srl_sra03,
+          h_srl_sra10, h_srl_sra11, h_srl_sra12, h_srl_sra13,
+          h_srl_sra20, h_srl_sra21, h_srl_sra22, h_srl_sra23,
+          h_srl_sra30, h_srl_sra31, h_srl_sra32, h_srl_sra33,
+          h_srlw_sraw00, h_srlw_sraw01,
+          h_srlw_sraw10, h_srlw_sraw11,
+          h_srlw_sraw_high2, h_srlw_sraw_high3, _h_a0⟩
+  -- CPUState bridge via cpuStateSpec_iff_sp1
+  rw [show (Main[64] + Main[65] + Main[66] + Main[67] : ZMod p) = 1 from h_is_real]
+  exact (SP1Clean.CPUState.cpuStateSpec_iff_sp1).mpr h_cpu_spec
 
 /-- Clean-side `correct_srl`: R-type logical right shift. -/
 theorem correct_srl
     (Main : Vector (ZMod p) 69) (s : SailState)
     (h_is_srl : Main[64] = 1) (h_imm_c : Main[31] = 0)
     (h_others_zero : Main[65] = 0 ∧ Main[66] = 0 ∧ Main[67] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.ShiftRight.constraints Main).initialState s) :
     let op_c := _root_.ShiftRight.sp1_op_c Main
     let op_b := _root_.ShiftRight.sp1_op_b Main
@@ -195,7 +413,7 @@ theorem correct_srl
     (_root_.Srl.Poly.spec_srl (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.ShiftRight.sp1_shift_right Main).run s :=
   _root_.Srl.Poly.correct_srl Main s
-    (spec_implies_allHold Main
+    (traceSpec_implies_allHold Main
       (by obtain ⟨h65, h66, h67⟩ := h_others_zero
           rw [h_is_srl, h65, h66, h67]; ring)
       h_spec)
@@ -221,7 +439,7 @@ def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_a_write_value,
        _b_msb, _srw_msb, _c_bits, _sra_msb_v0123, _v_0123, _v_012, _v_01,
        _lower_limb, _higher_limb, _limb_result, _shift_u16,
-       is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
+       is_srl, is_sra, is_srlw, is_sraw, _is_w_imm,
        _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))

@@ -11,6 +11,8 @@ import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.AddOperation.AddOperation
 import SP1Operations.Reader.CPUState.CPUState
+import SP1Chips.Jal.Common
+import SP1Chips.Soundness
 import SP1Clean.AddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
@@ -142,7 +144,7 @@ per-fragment specs:
 
 The state-bus content beyond what ProgramTable.Spec gives (PC alignment,
 PC limb bounds) is empty per-row — see the file docstring. -/
-def Spec (cols : JalCols (ZMod p)) : Prop :=
+def TraceSpec (cols : JalCols (ZMod p)) : Prop :=
   SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
   SP1Clean.AddOp.Spec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
@@ -215,29 +217,156 @@ the chip constraint list, then dispatches each clause:
 
 See `feedback_path2_correct_bridge_costs.md` for the rationale on
 shipping with a stub proof. -/
-theorem spec_implies_allHold (Main : Vector (ZMod p) 31)
+theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 31)
     (h_is_real : Main[30] = 1) (h_op_a_0 : Main[13] = 0)
-    (h_spec : Spec (fromMain Main)) :
+    (h_spec : TraceSpec (fromMain Main)) :
     (_root_.Jal.constraints Main).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  have hp_big : 131072 < p := by simpa using hp
+  have h13_lt : (13 : ℕ) < p := by omega
+  have h14_lt : (14 : ℕ) < p := by omega
+  have h16_lt : (16 : ℕ) < p := by omega
+  have h46_lt : (46 : ℕ) < p := by omega
+  have h256_lt : (256 : ℕ) < p := by omega
+  have h13_val : (13 : ZMod p).val = 13 := ZMod.val_natCast_of_lt h13_lt
+  have h14_val : (14 : ZMod p).val = 14 := ZMod.val_natCast_of_lt h14_lt
+  have h16_val : (16 : ZMod p).val = 16 := ZMod.val_natCast_of_lt h16_lt
+  have h46_val : (46 : ZMod p).val = 46 := ZMod.val_natCast_of_lt h46_lt
+  have h256_val : (256 : ZMod p).val = 256 := ZMod.val_natCast_of_lt h256_lt
+  have h_0_lt_256 : (0 : ZMod p) < (256 : ZMod p) := by
+    change (0 : ZMod p).val < (256 : ZMod p).val
+    rw [ZMod.val_zero, h256_val]; omega
+  simp only [TraceSpec, fromMain] at h_spec
+  obtain ⟨h_add_jump, h_add_ret, h_cpu_spec, h_memory_acc, h_program,
+          h_is_real_bin, h_next_pc_3, h_op_a_w3, h_pc_align, _h_trusted⟩ := h_spec
+  -- Normalize Vector accesses from `fromMain` (`#v[...][k]` → `Main[i]`).
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ] at h_next_pc_3 h_op_a_w3 h_pc_align h_memory_acc
+  change List.Forall SP1Constraint.toProp (_root_.Jal.constraints Main)
+  simp only [_root_.Jal.constraints, List.forall_append, List.Forall,
+    SP1Constraint.toProp, and_assoc]
+  -- 26-tuple refine: ⟨AddJump, AddRet, is_real_bin, next_pc_3,
+  --   PC_align_send, is_real_bin, True, True, clk_0_16_send, clk_16_24_send,
+  --   op_a0_gate, op_a_w3, a0*w0, a0*w1, a0*w2, is_real_bin, program_send,
+  --   a0*(w0-0), a0*(w1-0), a0*(w2-0), a0*(w3-0), is_real_bin,
+  --   diff_low_send, ts_send, mem_send, True⟩
+  refine ⟨?_, ?_, h_is_real_bin, h_next_pc_3, ?_, h_is_real_bin,
+          trivial, trivial, ?_, ?_, ?_, h_op_a_w3,
+          ?_, ?_, ?_, h_is_real_bin, ?_, ?_, ?_, ?_, ?_, h_is_real_bin,
+          ?_, ?_, ?_, trivial⟩
+  -- 1: AddOperation jump-target.
+  · rw [show Main[30] = 1 from h_is_real]
+    exact (SP1Clean.AddOp.iff_sp1 _ _ _).mpr h_add_jump
+  -- 2: AddOperation return-addr (gated by Main[30] - Main[13] = 1).
+  · rw [show (Main[30] - Main[13] : ZMod p) = 1 from by rw [h_is_real, h_op_a_0]; ring]
+    exact (SP1Clean.AddOp.iff_sp1 _ _ _).mpr h_add_ret
+  -- 5: PC alignment send (Range 14): (next_pc[0] * 4⁻¹).val < 16384.
+  · intro _h_ne
+    simp only [show (ByteOpcode.ofNat 6 : ByteOpcode) = .Range from rfl,
+      ByteOpcode.constrain_Range, h14_val]
+    exact h_pc_align
+  -- 9: clk_0_16 alignment send (Range 13).
+  · intro _h_ne
+    simp only [show (ByteOpcode.ofNat 6 : ByteOpcode) = .Range from rfl,
+      ByteOpcode.constrain_Range, h13_val]
+    exact h_cpu_spec.1
+  -- 10: clk_16_24 U8Range send.
+  · intro _h_ne
+    simp only [show (ByteOpcode.ofNat 3 : ByteOpcode) = .U8Range from rfl,
+      ByteOpcode.constrain_U8Range]
+    exact ⟨h_0_lt_256, h_cpu_spec.2, h_0_lt_256⟩
+  -- 11: (Main[30] - 1) * Main[13] = 0
+  · rw [h_is_real]; ring
+  -- 13/14/15: Main[13] * Main[26/27/28] = 0
+  · rw [h_op_a_0]; ring
+  · rw [h_op_a_0]; ring
+  · rw [h_op_a_0]; ring
+  -- 17: program send → ProgramTable.Spec. Re-associate the op_b/op_c
+  -- 4-tuples (Spec groups them; chip-list spreads them right-associated).
+  · intro _h_ne
+    simp only [SP1Clean.ProgramTable.Spec, SP1Clean.ProgramSpec,
+      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ, h46_val] at h_program
+    obtain ⟨h_ti, h_a, ⟨h_b0, h_b1, h_b2, h_b3⟩, ⟨h_c0, h_c1, h_c2, h_c3⟩,
+            h_a0_bin, h_a0_iff, h_imm_b, h_imm_c, h_pc_mod, h_pc_0, h_pc_1, h_pc_2⟩ :=
+      h_program
+    exact ⟨h_ti, h_a, h_b0, h_b1, h_b2, h_b3, h_c0, h_c1, h_c2, h_c3,
+           h_a0_bin, h_a0_iff, h_imm_b, h_imm_c, h_pc_mod, h_pc_0, h_pc_1, h_pc_2⟩
+  -- 18/19/20/21: Main[13] * (Main[26/27/28/29] - 0) = 0
+  · rw [h_op_a_0]; ring
+  · rw [h_op_a_0]; ring
+  · rw [h_op_a_0]; ring
+  · rw [h_op_a_0]; ring
+  -- 23: diff_low_limb (Main[12]) byte range
+  · intro _h_ne
+    simp only [show (ByteOpcode.ofNat 6 : ByteOpcode) = .Range from rfl,
+      ByteOpcode.constrain_Range, h16_val]
+    exact h_memory_acc.1
+  -- 24: timestamp U8Range
+  · intro _h_ne
+    simp only [show (ByteOpcode.ofNat 3 : ByteOpcode) = .U8Range from rfl,
+      ByteOpcode.constrain_U8Range]
+    exact ⟨h_0_lt_256, h_memory_acc.2.1, h_0_lt_256⟩
+  -- 25: Word.isU64 prev_value
+  · intro _h_ne
+    exact h_memory_acc.2.2
 
 /-- Clean-side `correct_jal`: same Sail equivalence statement as the
 dirty `_root_.Jal.SP1JAL_correct`, but with the constraint hypothesis
 re-expressed against the Clean-flavored `Spec` predicate via
-`spec_implies_allHold`. Pure composition with the SP1 proof. -/
+`traceSpec_implies_allHold`. Pure composition with the SP1 proof. -/
 theorem correct_jal
     (Main : Vector (ZMod p) 31) (s : SailState)
     (h_is_real : Main[30] = 1) (h_op_a_0 : Main[13] = 0)
-    (h_spec : Spec (fromMain Main))
+    (h_spec : TraceSpec (fromMain Main))
     (state_cstrs : (_root_.Jal.constraints Main).initialState s)
     (hs : SailState.isInitialized s) :
-    let cstrs := spec_implies_allHold Main h_is_real h_op_a_0 h_spec
+    let cstrs := traceSpec_implies_allHold Main h_is_real h_op_a_0 h_spec
     let op_a := _root_.Jal.sp1_op_a Main cstrs h_is_real
     let op_b := _root_.Jal.sp1_op_b Main
     (_root_.Jal.spec_jal op_b (.Regidx op_a)).run s =
       (_root_.Jal.sp1_jal Main).run s :=
   _root_.Jal.SP1JAL_correct Main s
-    (spec_implies_allHold Main h_is_real h_op_a_0 h_spec)
+    (traceSpec_implies_allHold Main h_is_real h_op_a_0 h_spec)
+    h_is_real state_cstrs hs
+
+/-! ## RawSpec / SemanticSpec POC
+
+Jal is a special case: `Jal.sp1_op_a Main cstrs h_is_real` is dependent on
+the allHold proof (for the `< 32` bound). The Sail-eq conjunct in
+SemanticSpec therefore takes allHold + h_is_real + isInitialized as
+universal preconditions; `raw_to_semantic` discharges allHold via
+`rawSpec_iff_allHold.mpr`. -/
+
+/-- Structural mirror of `Jal.constraints.allHold`. Iff RHS from
+`SP1Chips/Jal/Common.lean:18` verbatim. -/
+@[reducible]
+def RawSpec (Main : Vector (ZMod p) 31) : Prop :=
+  List.Forall SP1Constraint.toProp (_root_.Jal.constraints Main)
+
+theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 31) :
+    (_root_.Jal.constraints Main).allHold ↔ RawSpec Main := Iff.rfl
+
+/-- Minimal SemanticSpec for Jal: keeps the legacy `Spec`'s structural
+content plus a Sail-equivalence conjunct universally quantified over
+`(cstrs, h_is_real, s, state_cstrs, hs)`. -/
+def SemanticSpec (Main : Vector (ZMod p) 31) : Prop :=
+  TraceSpec (fromMain Main) ∧
+  (∀ (cstrs : (_root_.Jal.constraints Main).allHold)
+     (h_is_real : Main[30] = 1)
+     (s : SailState) (state_cstrs : (_root_.Jal.constraints Main).initialState s)
+     (hs : SailState.isInitialized s),
+    (_root_.Jal.sp1_jal Main).run s =
+      (_root_.Jal.spec_jal (_root_.Jal.sp1_op_b Main)
+        (.Regidx (_root_.Jal.sp1_op_a Main cstrs h_is_real))).run s)
+
+theorem raw_to_semantic (Main : Vector (ZMod p) 31) (h_is_real : Main[30] = 1)
+    (h_op_a_0 : Main[13] = 0) (h_spec : TraceSpec (fromMain Main))
+    (h_raw : RawSpec Main) : SemanticSpec Main := by
+  refine ⟨h_spec, ?_⟩
+  intro _cstrs _h_is_real s state_cstrs hs
+  exact soundness_jal Main s ((rawSpec_iff_allHold Main).mpr h_raw)
     h_is_real state_cstrs hs
 
 /-! ## Full `FormalAssertion` promotion (Path-2 minimal)
@@ -254,7 +383,7 @@ lookup, op_a memory-diff lookup, and the two trailing
 dropped from `Assertion.main`. Bridging them would require a manual
 subst cascade over the 14-field `h_input` conjunction — too much
 friction for this scaling round. They remain in the legacy chip-level
-`Spec` carried by `iff_sp1`. -/
+`Spec` carried by `traceSpec_iff_allHold`. -/
 
 namespace Assertion
 
