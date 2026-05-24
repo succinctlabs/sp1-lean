@@ -67,13 +67,6 @@ structure BranchCols (T : Type) where
   -- (which is `is_blt + is_bge`); it is the branch-taken predicate output.
   is_branching : T                          -- Main[34] (Rust-aligned name)
   compare_operation : LtOperationSigned T   -- Main[35..44]
-  -- Iter-8 sub-task C: state-bus next_pc grounding mux selector.
-  -- Semantically redundant with `is_branching` (Main[34]) — both encode the
-  -- branch-taken predicate. Kept as a separate Clean-only column for now to
-  -- preserve the existing Assertion.main mux structure; Phase 4 (TrustMode)
-  -- — adapter_cols scaffolding landed; this is_branching_aux removal is
-  -- still pending.
-  is_branching_aux : T                      -- Clean-only mux selector (duplicates is_branching)
   next_pc_branched_carry : Vector T 3       -- Clean-only: pc + op_c_imm carry-aware result
   next_pc_unbranched_carry : Vector T 3     -- Clean-only: pc + 4 carry-aware result
   adapter_cols : SP1Clean.UserModeReaderCols T
@@ -94,7 +87,7 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c_imm⟩, _next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
        _is_branching, _compare_operation,
-       _is_branching_aux, _next_pc_branched_carry, _next_pc_unbranched_carry,
+       _next_pc_branched_carry, _next_pc_unbranched_carry,
        _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -155,10 +148,10 @@ def opBMemoryAccess (cols : BranchCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p
 
 /-- Project a raw SP1 row into the structured `BranchCols` view.
 45 columns; `compare_operation : LtOperationSigned T` packed from
-Main[35..44]. Clean-only fields (`is_branching_aux`, branched/unbranched
-carry vectors) default to placeholder values since the SP1 row doesn't
-carry them. Note: `is_branching` at Main[34] *is* on the row (Rust-aligned
-name; previously misnamed `lt_is_signed`). -/
+Main[35..44]. Clean-only fields (branched/unbranched carry vectors)
+default to placeholder values since the SP1 row doesn't carry them.
+Note: `is_branching` at Main[34] *is* on the row (Rust-aligned name;
+previously misnamed `lt_is_signed`). -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 45) : BranchCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       ⟨Main[6],
@@ -177,7 +170,7 @@ name; previously misnamed `lt_is_signed`). -/
          comparison_limbs := #v[Main[41], Main[42]] },
      b_msb := { msb := Main[43] },
      c_msb := { msb := Main[44] } },
-   0, #v[0, 0, 0], #v[0, 0, 0],
+   #v[0, 0, 0], #v[0, 0, 0],
    ⟨Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33]⟩⟩
 
 /-- The chip-level half-iff bridge (Branch). **Proof body sorry'd**. -/
@@ -225,8 +218,8 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
-       _is_branching, _compare_operation,
-       is_branching_aux, next_pc_branched_carry, next_pc_unbranched_carry,
+       is_branching, _compare_operation,
+       next_pc_branched_carry, next_pc_unbranched_carry,
        _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -256,21 +249,18 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        #v[(4 : Expression (ZMod p)), 0, 0, 0],
        next_pc_unbranched_carry⟩ :
       Var SP1Clean.AddrAddOp.Inputs (ZMod p))
-  is_branching_aux * (is_branching_aux - 1) === 0
-  -- Per-limb mux: next_pc[i] = is_branching_aux * (branched[i] - unbranched[i]) + unbranched[i].
-  -- Equivalent to `is_branching_aux * branched + (1 - is_branching_aux) * unbranched`
-  -- but avoids `(1 : ℕ) - is_branching_aux : Expression _` type ambiguity.
-  -- `is_branching_aux` is the Clean-only mux selector duplicating Main[34]'s
-  -- `is_branching`; Phase 4 (TrustMode) — adapter_cols scaffolding landed;
-  -- this is_branching_aux removal is still pending.
+  is_branching * (is_branching - 1) === 0
+  -- Per-limb mux: next_pc[i] = is_branching * (branched[i] - unbranched[i]) + unbranched[i].
+  -- Equivalent to `is_branching * branched + (1 - is_branching) * unbranched`
+  -- but avoids `(1 : ℕ) - is_branching : Expression _` type ambiguity.
   next_pc[0] -
-    (is_branching_aux * (next_pc_branched_carry[0] - next_pc_unbranched_carry[0]) +
+    (is_branching * (next_pc_branched_carry[0] - next_pc_unbranched_carry[0]) +
      next_pc_unbranched_carry[0]) === 0
   next_pc[1] -
-    (is_branching_aux * (next_pc_branched_carry[1] - next_pc_unbranched_carry[1]) +
+    (is_branching * (next_pc_branched_carry[1] - next_pc_unbranched_carry[1]) +
      next_pc_unbranched_carry[1]) === 0
   next_pc[2] -
-    (is_branching_aux * (next_pc_branched_carry[2] - next_pc_unbranched_carry[2]) +
+    (is_branching * (next_pc_branched_carry[2] - next_pc_unbranched_carry[2]) +
      next_pc_unbranched_carry[2]) === 0
   -- Iter-8 sub-task E: per-operand memory-bus byte content. Branch
   -- emits 2 register accesses (op_a at +4, op_b at +3) — both pure
@@ -325,14 +315,14 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
     ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
      #v[(4 : ZMod p), 0, 0, 0],
      cols.next_pc_unbranched_carry⟩ ∧
-  cols.is_branching_aux * (cols.is_branching_aux - 1) = 0 ∧
-  cols.next_pc[0] = cols.is_branching_aux *
+  cols.is_branching * (cols.is_branching - 1) = 0 ∧
+  cols.next_pc[0] = cols.is_branching *
       (cols.next_pc_branched_carry[0] - cols.next_pc_unbranched_carry[0]) +
     cols.next_pc_unbranched_carry[0] ∧
-  cols.next_pc[1] = cols.is_branching_aux *
+  cols.next_pc[1] = cols.is_branching *
       (cols.next_pc_branched_carry[1] - cols.next_pc_unbranched_carry[1]) +
     cols.next_pc_unbranched_carry[1] ∧
-  cols.next_pc[2] = cols.is_branching_aux *
+  cols.next_pc[2] = cols.is_branching *
       (cols.next_pc_branched_carry[2] - cols.next_pc_unbranched_carry[2]) +
     cols.next_pc_unbranched_carry[2] ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
