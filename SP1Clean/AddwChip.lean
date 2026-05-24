@@ -10,12 +10,10 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.AddwOperation.AddwOperation
-import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Addw.AddwChip
 import SP1Clean.AddwOperation
-import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -53,7 +51,6 @@ structure AddwCols (T : Type) where
   addw_value : Vector T 2
   addw_msb : T
   is_real : T
-  next_pc_carry_value : Vector T 3
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -61,7 +58,7 @@ deriving ProvableStruct
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, addw_value, addw_msb, is_real,
-       _next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   -- AddwOperation: op_b_memory.prev_value + op_c_memory.prev_value = addw_value (low 32 bits).
   SP1Clean.AddwOp.main op_b_memory.prev_value op_c_memory.prev_value addw_value addw_msb
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
@@ -127,7 +124,7 @@ index map in `SP1Chips/Addw/Constraints.lean`. -/
     ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
     Main[31]⟩,
    #v[Main[32], Main[33]],
-   Main[34], Main[35], #v[0, 0, 0],
+   Main[34], Main[35],
    ⟨Main[35]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
@@ -228,17 +225,12 @@ assertZero gates — the AddwOp byte lookups are not promoted here. -/
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, _addw_value, _addw_msb, is_real,
-       next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc, 19, op_a, #v[op_b, 0, 0, 0], op_c, op_a_0, 0, imm_c⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_carry_value⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   op_a_0 === 0
   -- Iter-8 sub-task E: per-operand memory-bus byte content.
@@ -276,10 +268,6 @@ def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
       op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := cols.adapter.op_c,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
@@ -300,14 +288,12 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_op_a_0,
+  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · simp only [Vector.getElem_map]
-    exact h_addr_sub trivial
   · linear_combination h_isreal
   · exact h_op_a_0
   · exact h_oa_a trivial
@@ -320,15 +306,12 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_op_a_0,
+  obtain ⟨h_cpu, h_prog, h_isreal, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr
-    exact h_addr
   · linear_combination h_isreal
   · exact h_op_a_0
   · exact ⟨trivial, h_oa_a⟩

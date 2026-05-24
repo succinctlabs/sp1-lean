@@ -10,12 +10,10 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.AddOperation.AddOperation
-import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.RTypeReader.RTypeReader
 import SP1Chips.Add.AddChip
 import SP1Clean.AddOperation
-import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.OperandAccess
@@ -48,19 +46,17 @@ open Circuit ProvableType
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The chip's column struct, mirroring SP1's Rust `AddCols<T, M: TrustMode>`
-(`sp1/crates/core/machine/src/alu/add_sub/add.rs:47-62`) plus a Clean-only
-`next_pc_carry_value` column for the trace-level state-bus PC chain.
-The `adapter_cols : UserModeReaderCols T` slot is the last field, matching
-Rust under `M = UserMode`. We don't carry an explicit `M` type parameter on
-the struct because `deriving ProvableStruct` can't reduce through an
-abstract `M`; future SupervisorMode chips would use a separate
-`*ColsSupervisor` struct with `adapter_cols : EmptyCols T`. -/
+(`sp1/crates/core/machine/src/alu/add_sub/add.rs:47-62`). The
+`adapter_cols : UserModeReaderCols T` slot is the last field, matching Rust
+under `M = UserMode`. We don't carry an explicit `M` type parameter on the
+struct because `deriving ProvableStruct` can't reduce through an abstract
+`M`; future SupervisorMode chips would use a separate `*ColsSupervisor`
+struct with `adapter_cols : EmptyCols T`. -/
 structure AddCols (T : Type) where
   state : CPUState T
   adapter : RTypeReader T
   op_a_write_value : Vector T 4
   is_real : T
-  next_pc_carry_value : Vector T 3
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -70,7 +66,7 @@ each sub-component. -/
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
-       op_a_write_value, is_real, _next_pc_carry_value, _adapter_cols⟩ := cols
+       op_a_write_value, is_real, _adapter_cols⟩ := cols
   -- AddOperation: op_b_memory.prev_value + op_c_memory.prev_value = op_a_write_value.
   SP1Clean.AddOp.main op_b_memory.prev_value op_c_memory.prev_value op_a_write_value
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
@@ -130,13 +126,11 @@ def Spec (cols : AddCols (ZMod p)) : Prop :=
   cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `AddCols` view. Mirrors the
-index map in `SP1Chips/Add/Constraints.lean`.
-
-`next_pc_carry_value` is initialized to a placeholder `#v[0,0,0]` since the
-SP1 row doesn't carry this column; the legacy `Spec` (which `iff_sp1`
-maps to) doesn't reference `next_pc_carry_value`, so the placeholder is
-harmless for the legacy path. The trace-level `assertion.Spec` consumes
-the field via the FormalAssertion soundness/completeness arms instead. -/
+index map in `SP1Chips/Add/Constraints.lean`. `adapter_cols.is_trusted`
+aliases `Main[32]` (= `is_real`) because the current extractor passes
+`Main[32] Main[32]` to `RTypeReader.constraints` (see
+`SP1Chips/Add/Constraints.lean:21`). When upstream regen lands a separate
+`is_trusted` Main column, switch to that index. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 33) : AddCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
    ⟨Main[6],
@@ -147,11 +141,7 @@ the field via the FormalAssertion soundness/completeness arms instead. -/
     Main[21],
     ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
    #v[Main[28], Main[29], Main[30], Main[31]],
-   Main[32], #v[0, 0, 0],
-   -- `adapter_cols.is_trusted` aliases `Main[32]` (= `is_real`) because the
-   -- current extractor passes `Main[32] Main[32]` to `RTypeReader.constraints`
-   -- (see `SP1Chips/Add/Constraints.lean:21`). When upstream regen lands a
-   -- separate `is_trusted` Main column, switch to that index.
+   Main[32],
    ⟨Main[32]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
@@ -247,7 +237,7 @@ open Circuit
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
-       op_a_write_value, is_real, next_pc_carry_value, _adapter_cols⟩ := cols
+       op_a_write_value, is_real, _adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨op_b_memory.prev_value, op_c_memory.prev_value, op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
@@ -259,14 +249,6 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   SP1Clean.ProgramTable.assertion
     (⟨pc, 0, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- AddrAddOperation: pc + 4 carry-aware computation, stored in
-  -- `next_pc_carry_value`. Constrains the new column to be the
-  -- carry-aware semantic next_pc for the trace-level state bus.
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_carry_value⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   -- Iter-8 sub-task E: per-operand memory-bus byte content. Each call
   -- emits 6 byte lookups (Range 16 on diff_low + U8Range on timestamp +
   -- 4 Range 16 lookups on prev_value limbs) ⇒ `memoryAccessSpec`.
@@ -300,9 +282,11 @@ def Assumptions (_ : AddCols (ZMod p)) : Prop := True
 
 /-- The chip's Circuit-derivable spec: byte-lookup consequences for the
 addition + clock-decomposition gadgets, the program-bus existential
-witness, the carry-aware `pc + 4` witness in `next_pc_carry_value`, and
-the two trailing assertZero gates. The memory-bus side of
-`rtypeReaderSpec` is deferred to the trace-level OfflineMemory bridge. -/
+witness, and the two trailing assertZero gates. The memory-bus side of
+`rtypeReaderSpec` is deferred to the trace-level OfflineMemory bridge.
+Per-row PC carry was lifted out — the trace-level state-bus chain
+(`StateConsistency.pcChainProp`) now derives `next_pc` literally as
+`#v[pc[0]+4, pc[1], pc[2]]` per Rust's design at `adapter/state.rs:75`. -/
 def FormalSpec (cols : AddCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.AddOp.Spec
@@ -314,10 +298,6 @@ def FormalSpec (cols : AddCols (ZMod p)) : Prop :=
       op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := #v[cols.adapter.op_c, 0, 0, 0],
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
@@ -338,49 +318,37 @@ theorem soundness :
   circuit_proof_start
   -- Substitute all input-eval equations to put the goal in the same form as
   -- the subcircuit specs (which use `Expression.eval env input_var_X`).
-  -- After Phase 3 partial: state is now nested, so h_input destructures with
-  -- a nested-of-4 pattern at the front (the four CPUState fields).
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_addr_sub, h_oa_a, h_oa_b, h_oa_c,
+  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_oa_a, h_oa_b, h_oa_c,
           h_isreal, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_addop_sub trivial
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · simp only [Vector.getElem_map]
-    exact h_addr_sub trivial
   · linear_combination h_isreal
   · exact h_op_a_0
-  · -- op_a memory-access spec (offset +4)
-    exact h_oa_a trivial
-  · -- op_b memory-access spec (offset +3)
-    exact h_oa_b trivial
-  · -- op_c memory-access spec (offset +2)
-    exact h_oa_c trivial
+  · exact h_oa_a trivial
+  · exact h_oa_b trivial
+  · exact h_oa_c trivial
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  -- After Phase 3 partial: state is now nested, so h_input destructures with
-  -- a nested-of-4 pattern at the front (the four CPUState fields).
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop, h_cpu, h_prog, h_addr, h_isreal, h_op_a_0,
+  obtain ⟨h_addop, h_cpu, h_prog, h_isreal, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  -- Completeness obligations follow main's emission order: 4 subcircuit
+  -- Completeness obligations follow main's emission order: 3 subcircuit
   -- arms, then the 3 OperandAccess arms, then the 2 scalar gates.
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_addop⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr
-    exact h_addr
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩
   · exact ⟨trivial, h_oa_c⟩

@@ -10,12 +10,10 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.AddOperation.AddOperation
-import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.JTypeReader.JTypeReader
 import SP1Chips.UType.UTypeChip
 import SP1Chips.UType.Constraints
-import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -61,7 +59,6 @@ structure UTypeCols (T : Type) where
   add_result : Vector T 4
   is_auipc : T
   is_real : T
-  next_pc_carry_value : Vector T 3
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -76,7 +73,7 @@ constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b_imm, op_c_imm⟩, addend, _add_result, is_auipc, is_real,
-       _next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
@@ -143,7 +140,7 @@ def opAMemoryAccess (cols : UTypeCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p)
     #v[Main[18], Main[19], Main[20], Main[21]]⟩,
    #v[Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27], Main[28]],
-   Main[29], Main[30], #v[0, 0, 0],
+   Main[29], Main[30],
    ⟨Main[30]⟩⟩
 
 set_option maxHeartbeats 800000 in
@@ -225,18 +222,13 @@ clauses (see Scope note above). -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩, _addend, _add_result, is_auipc, is_real,
-       next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc, is_auipc * 48 + (1 - is_auipc) * 49,
       op_a, op_b_imm, op_c_imm, op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_carry_value⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   -- Iter-8 sub-task E: per-operand memory-bus byte content. UType has
   -- a single register access (op_a) at offset +4 — no op_b / op_c
   -- register reads (both are immediates).
@@ -259,9 +251,8 @@ def Assumptions (_ : UTypeCols (ZMod p)) : Prop := True
 
 /-- The chip's Circuit-derivable spec: byte-lookup consequences for the
 clock-decomposition gadget, the program-bus existential witness, the
-carry-aware `pc + 4` witness in `next_pc_carry_value`, the three scalar
-trailing assertZero gates, and the per-operand memory-bus byte content
-for `op_a` (the chip's only register access). -/
+three scalar trailing assertZero gates, and the per-operand memory-bus
+byte content for `op_a` (the chip's only register access). -/
 def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
@@ -272,10 +263,6 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
       op_b := cols.adapter.op_b_imm,
       op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
   (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
@@ -291,14 +278,12 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
           e16⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_oa_a, h_isreal, h_isauipc,
+  obtain ⟨h_cpu_sub, h_prog_sub, h_oa_a, h_isreal, h_isauipc,
           h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · simp only [Vector.getElem_map]
-    exact h_addr_sub trivial
   · linear_combination h_isreal
   · linear_combination h_isauipc
   · linear_combination h_op_a_0
@@ -310,14 +295,11 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15,
           e16⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_isauipc, h_op_a_0, h_oa_a⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_isreal, h_isauipc, h_op_a_0, h_oa_a⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr
-    exact h_addr
   · exact ⟨trivial, h_oa_a⟩
   · linear_combination h_isreal
   · linear_combination h_isauipc

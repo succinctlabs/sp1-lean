@@ -81,7 +81,6 @@ structure StoreByteCols (T : Type) where
   increment : T                     -- Main[44] (intermediate: combined byte at offset)
   store_value : Vector T 4            -- Main[45..48] (new 4-limb word)
   is_real : T                               -- Main[49]
-  next_pc_carry_value : Vector T 3
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -103,7 +102,7 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
        _mem_limb, mem_limb_low_byte, register_low_byte,
        _increment, _store_value, is_real,
-       _next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
   lookup ByteOpcodeTable
     (#v[(6 : Expression (ZMod p)), (clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0]
@@ -235,7 +234,7 @@ def storeWriteValue (cols : StoreByteCols (ZMod p)) : Word (ZMod p) :=
    Main[33], Main[34], Main[35], Main[36], Main[37],
    Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44],
    #v[Main[45], Main[46], Main[47], Main[48]],
-   Main[49], #v[0, 0, 0], ⟨Main[49]⟩⟩
+   Main[49], ⟨Main[49]⟩⟩
 
 /-- Iff RHS for the Store Byte (SB) variant, mirroring
 `_root_.Store.StoreByte.allHold_constraints_iff_of_is_real`. SB writes
@@ -352,17 +351,12 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
        _mem_limb, _mem_limb_low_byte, _register_low_byte,
        _increment, _store_value, is_real,
-       next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
     (⟨pc, 36, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_carry_value⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   -- Iter-8 sub-task E (partial): register-side OperandAccess only.
   -- Store RAM access deferred (see `load-store-ram-access-deferred`).
@@ -394,10 +388,6 @@ def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 36, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_carry_value⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
@@ -410,16 +400,13 @@ theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
-          e31, e32⟩ := h_input
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_isreal, h_oa_a, h_oa_b⟩ := h_holds
+  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_oa_a, h_oa_b⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · simp only [Vector.getElem_map]
-    exact h_addr_sub trivial
   · linear_combination h_isreal
   · exact h_oa_a trivial
   · exact h_oa_b trivial
@@ -428,17 +415,13 @@ theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
-          e31, e32⟩ := h_input
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_isreal, h_oa_a, h_oa_b⟩ := h_spec
+  obtain ⟨h_cpu, h_prog, h_isreal, h_oa_a, h_oa_b⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr
-    exact h_addr
   · linear_combination h_isreal
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩

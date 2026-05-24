@@ -857,7 +857,7 @@ theorem memoryAccessesValid_of_spec_add
     (h : SP1Clean.Add.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.add cols) := by
   change SP1Clean.Add.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, _h_prog, _h_addr, _h_isreal, _h_op_a_0,
+  obtain ⟨_h_addop, _h_cpu, _h_prog, _h_isreal, _h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h
   -- The three OperandAccess.Assertion.Spec carry the memoryAccessSpec
   -- content for op_a/b/c at offsets +4/+3/+2.
@@ -879,7 +879,7 @@ theorem memoryAccessesValid_of_spec_uType
     (h : SP1Clean.UType.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.uType cols) := by
   change SP1Clean.UType.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_isreal, _h_isauipc, _h_op_a_0,
+  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_isauipc, _h_op_a_0,
           h_oa_a⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -913,7 +913,7 @@ theorem memoryAccessesValid_of_spec_addi
     (h : SP1Clean.Addi.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.addi cols) := by
   change SP1Clean.Addi.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, _h_prog, _h_addr, _h_isreal, _h_op_a_0,
+  obtain ⟨_h_addop, _h_cpu, _h_prog, _h_isreal, _h_op_a_0,
           h_oa_a, h_oa_b⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -970,7 +970,7 @@ theorem memoryAccessesValid_of_spec_sub
     (h : SP1Clean.Sub.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.sub cols) := by
   change SP1Clean.Sub.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_isreal, _h_op_a_0,
+  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -988,7 +988,7 @@ theorem memoryAccessesValid_of_spec_subw
     (h : SP1Clean.Sub.W.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.subw cols) := by
   change SP1Clean.Sub.W.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_isreal, _h_op_a_0,
+  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -1008,7 +1008,7 @@ theorem memoryAccessesValid_of_spec_bitwise
     (h : SP1Clean.Bitwise.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.bitwise cols) := by
   change SP1Clean.Bitwise.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_xor, _h_or, _h_and, _h_sum,
+  obtain ⟨_h_cpu, _h_prog, _h_xor, _h_or, _h_and, _h_sum,
           _h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -1026,7 +1026,7 @@ theorem memoryAccessesValid_of_spec_lt
     (h : SP1Clean.Lt.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.lt cols) := by
   change SP1Clean.Lt.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_isslt, _h_issltu, _h_sum, _h_op_a_0,
+  obtain ⟨_h_cpu, _h_prog, _h_isslt, _h_issltu, _h_sum, _h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -1047,7 +1047,7 @@ theorem memoryAccessesValid_of_spec_addw
     (h : SP1Clean.Addw.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.addw cols) := by
   change SP1Clean.Addw.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_isreal, _h_op_a_0,
+  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -1065,7 +1065,7 @@ theorem memoryAccessesValid_of_spec_mul
     (h : SP1Clean.Mul.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.mul cols) := by
   change SP1Clean.Mul.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_mul, _h_mulh, _h_mulw, _h_mulhsu,
+  obtain ⟨_h_cpu, _h_prog, _h_mul, _h_mulh, _h_mulw, _h_mulhsu,
           _h_mulhu, _h_real, _h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
@@ -1084,7 +1084,7 @@ theorem memoryAccessesValid_of_spec_shiftLeft
     (h : SP1Clean.ShiftLeft.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.shiftLeft cols) := by
   change SP1Clean.ShiftLeft.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_sll, _h_sllw, _h_sum, _h_op_a_0,
+  obtain ⟨_h_cpu, _h_prog, _h_sll, _h_sllw, _h_sum, _h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -1102,7 +1102,7 @@ theorem memoryAccessesValid_of_spec_shiftRight
     (h : SP1Clean.ShiftRight.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.shiftRight cols) := by
   change SP1Clean.ShiftRight.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_srl, _h_sra, _h_srlw, _h_sraw, _h_sum,
+  obtain ⟨_h_cpu, _h_prog, _h_srl, _h_sra, _h_srlw, _h_sraw, _h_sum,
           _h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
@@ -1120,7 +1120,7 @@ theorem memoryAccessesValid_of_spec_divRem
     (h : SP1Clean.DivRem.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.divRem cols) := by
   change SP1Clean.DivRem.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_addr, _h_signed, _h_w, _h_rem, _h_real,
+  obtain ⟨_h_cpu, _h_prog, _h_signed, _h_w, _h_rem, _h_real,
           _h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,

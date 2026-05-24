@@ -10,10 +10,8 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
-import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
-import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -101,7 +99,6 @@ structure ShiftLeftCols (T : Type) where
   -- Renamed from `sign_extend` to upstream's `is_sllw_imm` (Phase 2.3).
   -- Bridge: Main[64] = Main[63] * Main[31] = is_sllw * imm_c = is_slliw.
   is_sllw_imm : T                           -- Main[64] (was sign_extend)
-  next_pc_carry_value : Vector T 3
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -136,7 +133,7 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _shift_imm_low, _shift_imm_high, _msb, _result,
        c_bits, _v_01, _v_012, _v_0123, shift_u16, _lower_limb, _higher_limb,
        _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
-       _next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -252,7 +249,6 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
    #v[Main[57], Main[58], Main[59], Main[60]],
    { msb := Main[61] },
    Main[62], Main[63], Main[64],
-   #v[0, 0, 0],
    -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
    -- (`Main[62]+Main[63]`).
    ⟨Main[62] + Main[63]⟩⟩
@@ -306,7 +302,7 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _shift_imm_low, _shift_imm_high, _msb, _result,
        _c_bits, _v_01, _v_012, _v_0123, _shift_u16, _lower_limb, _higher_limb,
        _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
-       next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
@@ -314,11 +310,6 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
       op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0],
       op_a_0, 0, imm_c⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_carry_value⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   is_sll * (is_sll - 1) === 0
   is_sllw * (is_sllw - 1) === 0
   (is_sll + is_sllw) * (is_sll + is_sllw - 1) === 0
@@ -358,10 +349,6 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
       op_a := cols.op_a, op_b := #v[cols.op_b, 0, 0, 0],
       op_c := #v[cols.op_c, 0, 0, 0],
       op_a_0 := cols.op_a_0, imm_b := 0, imm_c := cols.imm_c } ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_carry_value⟩ ∧
   cols.is_sll * (cols.is_sll - 1) = 0 ∧
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
   (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
@@ -388,14 +375,12 @@ theorem soundness :
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_sll, h_sllw, h_sum,
+  obtain ⟨h_cpu_sub, h_prog_sub, h_sll, h_sllw, h_sum,
           h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · simp only [Vector.getElem_map]
-    exact h_addr_sub trivial
   · linear_combination h_sll
   · linear_combination h_sllw
   · linear_combination h_sum
@@ -411,15 +396,12 @@ theorem completeness :
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
           e31⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_sll, h_sllw, h_sum, h_op_a_0,
+  obtain ⟨h_cpu, h_prog, h_sll, h_sllw, h_sum, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr
-    exact h_addr
   · linear_combination h_sll
   · linear_combination h_sllw
   · linear_combination h_sum

@@ -9,12 +9,10 @@ import SP1Foundations.Constraint
 import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Operations.Operation.BitwiseU16Operation.BitwiseU16Operation
-import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Bitwise.BitwiseChip
 import SP1Clean.BitwiseOperation
-import SP1Clean.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState
@@ -60,7 +58,6 @@ structure BitwiseCols (T : Type) where
   is_xor : T
   is_or : T
   is_and : T
-  next_pc_carry_value : Vector T 3
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -76,7 +73,7 @@ only what `main` actually emits. -/
 def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩,
-       _bitwise_operation, is_xor, is_or, is_and, next_pc_carry_value, _adapter_cols⟩ := cols
+       _bitwise_operation, is_xor, is_or, is_and, _adapter_cols⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -91,13 +88,6 @@ def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (⟨pc, is_xor * 3 + is_or * 4 + is_and * 5,
       op_a, #v[op_b, 0, 0, 0], op_c, op_a_0, 0, imm_c⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- AddrAddOperation: pc + 4 carry-aware computation, stored in
-  -- `next_pc_carry_value`.
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_carry_value⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   -- Trailing assertZero gates: the three opcode selectors are booleans,
   -- their sum is 0 or 1, and op_a_0 is forced to 0.
   is_xor * (is_xor - 1) === 0
@@ -187,7 +177,7 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
    ⟨⟨#v[Main[32], Main[33], Main[34], Main[35]]⟩,
     ⟨#v[Main[36], Main[37], Main[38], Main[39]]⟩,
     ⟨#v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]]⟩⟩,
-   Main[48], Main[49], Main[50], #v[0, 0, 0],
+   Main[48], Main[49], Main[50],
    -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
    -- (`Main[48]+Main[49]+Main[50]`), matching upstream's ALUTypeReader
    -- receiving the same sum for both `is_real` and `is_trusted`.
@@ -371,10 +361,6 @@ def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
       op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := cols.adapter.op_c,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_carry_value⟩ ∧
   cols.is_xor * (cols.is_xor - 1) = 0 ∧
   cols.is_or * (cols.is_or - 1) = 0 ∧
   cols.is_and * (cols.is_and - 1) = 0 ∧
@@ -399,14 +385,12 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_xor, h_or, h_and, h_sum,
+  obtain ⟨h_cpu_sub, h_prog_sub, h_xor, h_or, h_and, h_sum,
           h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · simp only [Vector.getElem_map]
-    exact h_addr_sub trivial
   · linear_combination h_xor
   · linear_combination h_or
   · linear_combination h_and
@@ -422,15 +406,12 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_xor, h_or, h_and, h_sum, h_op_a_0,
+  obtain ⟨h_cpu, h_prog, h_xor, h_or, h_and, h_sum, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr
-    exact h_addr
   · linear_combination h_xor
   · linear_combination h_or
   · linear_combination h_and

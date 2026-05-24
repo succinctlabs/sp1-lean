@@ -102,7 +102,6 @@ structure DivRemCols (T : Type) where
   abs_rem_alu_event : T                     -- Main[243] (mult arg to rem_neg AddOp)
   is_real : T                               -- Main[244]
   remainder_check_multiplicity : T          -- Main[245] (mult arg to remainder_lt_op)
-  next_pc_carry_value : Vector T 3
   adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
@@ -115,7 +114,7 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _c_times_quotient_lower, _c_times_quotient_upper,
        aux_post,
        c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
-       _next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   -- Opcode encoded one-hot via the 8 mode flags at Main[201..208].
@@ -266,7 +265,6 @@ all fields named per the upstream `DivRemCols<T, M>` declaration order. -/
      neg_flags := #v[Main[236], Main[237], Main[238], Main[239], Main[240]] },
    -- Legacy 3-flag labels (Main[241..245]).
    Main[241], Main[242], Main[243], Main[244], Main[245],
-   #v[0, 0, 0],
    ⟨Main[244]⟩⟩
 
 /-- The chip-level half-iff bridge (DivRem). **Proof body sorry'd**. -/
@@ -313,7 +311,7 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _c_times_quotient_lower, _c_times_quotient_upper,
        aux_post,
        c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
-       next_pc_carry_value, _adapter_cols⟩ := cols
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let is_div   : Expression (ZMod p) := aux_post.mode_flags[0]
@@ -330,11 +328,6 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
         + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28,
       op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  SP1Clean.AddrAddOp.assertion
-    (⟨#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p))],
-       #v[(4 : Expression (ZMod p)), 0, 0, 0],
-       next_pc_carry_value⟩ :
-      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
   c_neg * (c_neg - 1) === 0
   abs_c_alu_event * (abs_c_alu_event - 1) === 0
   abs_rem_alu_event * (abs_rem_alu_event - 1) === 0
@@ -385,10 +378,6 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
       op_a := cols.adapter.op_a, op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := #v[cols.adapter.op_c, 0, 0, 0],
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
-  SP1Clean.AddrAddOp.assertion.Spec
-    ⟨#v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0],
-     #v[(4 : ZMod p), 0, 0, 0],
-     cols.next_pc_carry_value⟩ ∧
   cols.c_neg * (cols.c_neg - 1) = 0 ∧
   cols.abs_c_alu_event * (cols.abs_c_alu_event - 1) = 0 ∧
   cols.abs_rem_alu_event * (cols.abs_rem_alu_event - 1) = 0 ∧
@@ -410,21 +399,19 @@ theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
+          e17, e18, e19, e20, e21, e22⟩ := h_input
   -- e19 is the 14-way conjunction of DivRemAuxPost field equations.
   -- Flatten enough to expose the mode_flags equation so `subst_eqs` can
   -- substitute `input_aux_post_mode_flags` globally.
   obtain ⟨_, _, _, _, _, _, _, _, _, _, _, e_mf, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := e19
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_addr_sub, h_c_neg, h_abs_c, h_abs_rem, h_real,
+  obtain ⟨h_cpu_sub, h_prog_sub, h_c_neg, h_abs_c, h_abs_rem, h_real,
           h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · convert h_prog_sub trivial using 2
     simp only [Vector.getElem_map]
-  · simp only [Vector.getElem_map]
-    exact h_addr_sub trivial
   · linear_combination h_c_neg
   · linear_combination h_abs_c
   · linear_combination h_abs_rem
@@ -438,20 +425,17 @@ theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
+          e17, e18, e19, e20, e21, e22⟩ := h_input
   obtain ⟨_, _, _, _, _, _, _, _, _, _, _, e_mf, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := e19
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_addr, h_c_neg, h_abs_c, h_abs_rem, h_real, h_op_a_0,
+  obtain ⟨h_cpu, h_prog, h_c_neg, h_abs_c, h_abs_rem, h_real, h_op_a_0,
           h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · refine ⟨trivial, ?_⟩
     convert h_prog using 2
     simp only [Vector.getElem_map]
-  · refine ⟨trivial, ?_⟩
-    simp only [Vector.getElem_map] at h_addr
-    exact h_addr
   · linear_combination h_c_neg
   · linear_combination h_abs_c
   · linear_combination h_abs_rem
