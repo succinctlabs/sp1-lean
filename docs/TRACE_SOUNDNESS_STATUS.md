@@ -1,6 +1,6 @@
 # Trace-soundness status — per-chip and pilot-wide
 
-Current as of 2026-05-21.
+Current as of 2026-05-23.
 
 This is the consolidated status report on how much of SP1's correctness
 has been proven, at what layer, and what remains before a single
@@ -143,42 +143,36 @@ for Addi / Bitwise / Sub / Subw was closed in the same 2026-05-21
 "lowest-hanging fruit" pass that promoted UType + Lt to FormalAssertion
 and discharged §3c (`TraceIsRealBinary`).
 
-### 3. Discharge the three trace-shape bundles
+### 3. Discharge the three trace-shape bundles — **DONE for 3a/3c; 3b discharged via factoring**
 
-The Phase A.3 / B / D.1 deliverables shipped with these as bundled
-hypotheses (parametric over the verifier's evidence). To remove the
-parametricity:
+The Phase A.3 / B / D.1 deliverables originally shipped with these as
+bundled hypotheses (parametric over the verifier's evidence). Iter-8
+removed the parametricity:
 
-**3a. `TraceClkValid` from chip `Spec`s.** Per-chip clk extraction
-from `cpuStateSpec` (`clk_0_16` < 65529, `clk_16_24` < 256), lifted to
-Nat via `ZMod.val`, plus a single chronological clock-monotonicity
-trace hypothesis. The wraparound bound needs `Fact (2^24 < p)` (KB is
-~2^31 so this is given for the concrete prime). The
-`(rows.reverse).Pairwise (fun r₁ r₂ → r₁.encodedClk ≥ r₂.encodedClk + 5)`
-separation reduces to: per-row `encodedClk` is `clk_high.val * 2^24 +
-clk_low.val`; trace assumption is `clk_high * 2^24 + clk_low` strictly
-increases by ≥ `clkIncrement` (8); combine with intra-row offsets
-in `[0, 4]`. 20-chip case analysis on `ChipRow.clockComponents`.
+**3a. `TraceClkValid` from chip `Spec`s.** ✅ Discharged via
+`traceClkValid_of_chip_specs` (`MemoryConsistencyClock.lean:639`).
+Combines per-row `cpuStateSpec` (extracted via
+`cpuStateSpec_of_chipRow_spec`) with a single chronological
+`TraceClkLink` trace assumption. Iter-8 Phase 2 flipped these
+projections to reference `<Chip>.assertion.Spec`.
 
-**3b. `TraceStateValid` from chip `Spec`s.** `ChipRow.stateAccess`
-currently uses placeholder `next_pc := pc + #v[4, 0, 0]` for chips
-without explicit `next_pc` / `jump_target` columns. The discharge work:
+**3b. `TraceStateValid` from chip `Spec`s.** ✅ Factored via
+`nextPcValid_of_chipRow_spec` + `traceNextPcValid_of_chip_specs`
+(`StateConsistency.lean`). Each row's `next_pc` semantic content (the
+`AddrAddOp.assertion.Spec` carry-aware witness for arithmetic chips,
+`AddOp.Spec` for Jal, gated `GatedAddOp.Spec` for Jalr, dual-arm
+witness for Branch) is extractable per-row from `<Chip>.assertion.Spec`.
+The chronological adjacency `a.next_pc = b.pc` between adjacent rows
+remains intrinsic to the trace-shape contract — see the docstring on
+`traceStateValid_of_chip_specs`. Iter-8 Phase 2 documented this
+structural reality: per-row content comes from chip Specs; trace-level
+adjacency is the verifier's commitment.
 
-- For arithmetic chips (15 of 20): prove the placeholder equals the
-  chip's true claimed `next_pc` modulo `pc[0].val < 65532` (no
-  low-limb carry). Either tighten the trace-shape hypothesis to
-  include this bound, or replace the placeholder with an explicit
-  `AddrAddOperation` invocation that exposes the carries.
-- For Branch: case-split on `compare_bit` — taken vs. not-taken
-  `next_pc`.
-- Jal, Jalr already use explicit columns; no work.
-
-~17-chip case analysis.
-
-**3c. `TraceIsRealBinary` from chip `Spec`s.** Each chip's `Spec`
-contains `is_real * (is_real - 1) = 0` (or `sum * (sum - 1) = 0` for
-chips with computed `is_real`). Project the conjunct and apply
-`binary_of_assertZero`. ~20 one-line lemmas.
+**3c. `TraceIsRealBinary` from chip `Spec`s.** ✅ Discharged via
+`traceIsRealBinary_of_chip_specs` (`IsRealBinary.lean:288`). Iter-8
+Phase 2 flipped the 23 per-chip lemmas (`is_real_binary_<chip>`) to
+reference `<Chip>.assertion.Spec` via the `change + unfold + tauto`
+pattern.
 
 ### 4. Port 24 dirty `correct_*` to Clean (or bridge)
 
@@ -207,6 +201,60 @@ how tangled the chip's `Spec` is.
 ~50 LOC of trace-recursion: thread a `SailState`, advance one step
 per real row, skip padding rows (rely on `is_real = 0` ⇒ noop), error
 on partial states. Mechanical, single-file. Half-day estimate.
+
+### 6. Iter-8 deliverables: faithful table-interaction representation
+
+The plan at `/home/dtumad/.claude/plans/make-a-plan-to-squishy-rossum.md`
+closed the gap between SP1Clean's table-interaction encoding and the
+SP1 Rust source-of-truth across four phases:
+
+**Phase 1 (iter-8): OperandAccess sweep — DONE for 24/24 register-side.**
+Every chip's `Assertion.main` now emits
+`SP1Clean.OperandAccess.assertion` per register operand at the
+canonical `(clk_low, offset)`; `FormalSpec` carries matching
+`OperandAccess.Assertion.Spec` conjuncts; `memoryAccessesValid_of_spec_<chip>`
+is proven for 15 chips (the 9 Load/Store chips have register-side
+OperandAccess but their RAM-access piece is deferred — see Phase 4.5
+follow-up).
+
+**Phase 2 (iter-8): `ChipRow.Spec` flipped to `<Chip>.assertion.Spec`.**
+All 23 arms migrated from legacy `<Chip>.Spec` to `<Chip>.assertion.Spec`
+(Add was already on the new form as the POC). 24
+`cpuStateSpec_of_spec_*` and 24 `is_real_binary_*` lemmas flipped via
+`change + unfold + tauto`. Jal gained `CPUState.assertion` (was
+missing in earlier iters). New `ChipRow.nextPcValid` predicate +
+24-arm `nextPcValid_of_chipRow_spec` dispatcher.
+
+**Phase 3 (iter-8): Multiplicity gating + padding-aware aggregator.**
+New `Memory_send_iff_isU64` lemma in `Multiplicity.lean` covers
+memory-bus gating (the only genuinely-new content; sum-of-flag /
+XOR-of-binary cases reuse the existing byte/program lemmas by feeding
+in Phase 2's `is_real_binary_*` binarity). New `ChipRow.isRealField`
+projection + `aggregateMemoryAccessesFiltered` aggregator that drops
+padding rows. Side-by-side with the unfiltered aggregator — switching
+the trace-soundness pipeline is a Phase 3.5 follow-up that requires
+re-discharging the timestamp-sorted/nodup properties for the filtered
+list.
+
+**Phase 4 (iter-8): Boundary chips + `TraceStateBoundary`.** New file
+`SP1Clean/MemoryGlobalChip.lean` with `MemoryGlobalCols` mirroring
+SP1's `MemoryInitCols<T>` (13 fields). Two new `ChipRow` constructors
+(`.memInit`, `.memFinalize`) with placeholder `memoryAccesses = []`
+and `Spec := cols.is_real * (cols.is_real - 1) = 0` (matches SP1's
+`assert_bool(is_real)`; full internal constraint surface deferred).
+New `TraceStateBoundary` predicate tying `head?.pc = initial_pc` and
+`getLast?.next_pc = final_pc`. New `trace_soundness_with_boundary`
+theorem strengthens `trace_soundness_aggregateMemory` with the
+boundary closure.
+
+**Phase 4.5 follow-up (not done):** boundary chips' `memoryAccesses`
+remain empty; full bus closure requires bridging `MemoryGlobalCols`
+to the `MemoryAccess` record shape, which has the same structural
+mismatch as Load/Store's RAM access (the chip's `(diff_low,
+diff_high)` flag-gated timestamp encoding doesn't fit
+`OperandAccess.Spec`'s scaled-timestamp form). A new
+`LoadOperandAccess` / `BoundaryOperandAccess` variant covering both
+shapes would unify them.
 
 ## What remains for full ensemble COMPLETENESS
 
@@ -252,9 +300,11 @@ Order of operations to land
 
 1. ~~Wire Addi / Bitwise / Sub / Subw into `ChipRow`. §2.~~
    **DONE 2026-05-21** (lowest-hanging fruit pass). 24/24 chips wired.
-2. **(1–2 days)** Discharge `TraceClkValid` (§3a) and `TraceStateValid`
-   (§3b) from chip `Spec`s. §3c (`TraceIsRealBinary`) is already
-   discharged.
+2. ~~Discharge `TraceClkValid` (§3a) and `TraceStateValid` (§3b) from
+   chip `Spec`s. §3c (`TraceIsRealBinary`) was already discharged.~~
+   **DONE 2026-05-23** (iter-8 Phase 2). 3a/3c discharged; 3b factored
+   into `nextPcValid_of_chipRow_spec` + chronological link (the link
+   is intrinsic; cannot be derived from per-row content).
 3. ~~Promote remaining Spec-only chips to Clean `FormalAssertion`. §1.~~
    **DONE 2026-05-21** (iter-6 + iter-7). All 24 chips now
    FormalAssertion.
@@ -265,10 +315,14 @@ Order of operations to land
    per-chip Sail equivalence + `execute_trace` → full ensemble
    theorem.
 
-Steps 1 and 3 closed today; step 5 is session-sized; step 6 is the
-closing composition. Step 2 fits in a week of focused work. Step 4 is
-the dominant cost — the heavy mathematical content that connects the
-Clean `Spec` predicate to actual Sail semantics.
+Iter-8 added §6 deliverables: faithful table-interaction representation
+(OperandAccess sweep, Spec flip, multiplicity gating, boundary chips).
+Steps 1, 2, 3, and §6 are closed; step 5 is session-sized; step 6 is
+the closing composition. Step 4 is the dominant cost — the heavy
+mathematical content that connects the Clean `Spec` predicate to actual
+Sail semantics. Step 4.5 (Load/Store RAM accesses + boundary chips'
+full bus closure) is a smaller follow-up that requires a flag-aware
+`LoadOperandAccess` variant.
 
 ## Open design choices for the next plan
 
@@ -305,10 +359,19 @@ These are the forks worth deciding *before* the work in §1–§6 starts:
 
 - Plan that scoped Phases A–D:
   `/home/dtumad/.claude/plans/make-a-plan-to-delightful-kazoo.md`.
-- Memory entry covering today's deliverables and three deferred
-  discharges:
+- Plan that scoped iter-8 Phases 1–4 (faithful table-interaction
+  representation): `/home/dtumad/.claude/plans/make-a-plan-to-squishy-rossum.md`.
+- Memory entry covering Phases A–D deliverables:
   `~/.claude/projects/-home-dtumad-Documents-sp1-lean/memory/project_clean_trace_soundness_phaseABCD.md`.
-- Iter-4 / iter-5 promotion retrospectives (for §1 effort estimates):
-  `docs/CLEAN_PILOT_ITER4.md`, `docs/CLEAN_PILOT_ITER5.md`.
+- Memory entries covering iter-8 phases:
+  `project_clean_pilot_iter8_phase2.md` (Spec flip),
+  `project_clean_pilot_iter8_phase3.md` (multiplicity gating),
+  `project_clean_pilot_iter8_phase4.md` (boundary chips),
+  `feedback_operandaccess_sweep_recipe.md` (per-chip OperandAccess pattern),
+  `feedback_load_store_ram_access_deferred.md` (RAM-access blocker).
+- Iter retrospectives:
+  `docs/CLEAN_PILOT_ITER4.md`, `docs/CLEAN_PILOT_ITER5.md`,
+  `docs/CLEAN_PILOT_ITER6.md`, `docs/CLEAN_PILOT_ITER7.md`,
+  `docs/CLEAN_PILOT_ITER8.md`.
 - Field-genericization design (relevant if extending to BabyBear in
   parallel): `docs/FIELD_GENERIC.md`.

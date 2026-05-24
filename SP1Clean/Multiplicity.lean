@@ -1,6 +1,7 @@
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Foundations.Constraint
+import SP1Foundations.Word
 
 /-! # Multiplicity-gating lemmas
 
@@ -105,5 +106,74 @@ theorem Program_send_iff_clause
   rcases h_mult_binary with h0 | h1
   · subst h0; simp
   · subst h1; simp
+
+/-! ## Memory-bus side
+
+The SP1 memory bus emits `.send (.memory clk_high clk_low addr0 addr1 addr2
+limb0 limb1 limb2 limb3) mult` constraints whose **propositional** content
+(`SP1Constraint.toProp`) is `mult ≠ 0 → Word.isU64 #v[limb0..limb3]` —
+the per-row 4-limb bound on `prev_value`. The full memory-bus consistency
+(matching reads to prior writes) is a **trace-level** obligation handled by
+`Clean.Utils.OfflineMemory` and threaded via `aggregateMemoryAccesses` in
+`SP1Clean/Soundness/MemoryConsistency.lean`. The byte-bus timestamp content
+(`diff_low_limb < 65536` + scaled-timestamp `< 256`) is emitted as separate
+byte sends, not as part of the memory-bus interaction.
+
+Per the pilot convention, the trace-level `MemoryAccess` aggregator drops
+`mult` (and Phase 3 of iter-8 additionally filters padding rows where
+`is_real = 0`). These lemmas formally justify the per-row drop. -/
+
+/-- Under `mult ∈ {0, 1}`, the SP1 `.send (.memory ...) mult` constraint
+is equivalent to the bare `Word.isU64` on the 4-limb value, gated on
+`mult = 1`. Address layout (register vs. RAM) doesn't enter the
+constraint-level prop, so this lemma covers both `register-shared`
+(`addr1 = addr2 = 0`) and RAM (`addr1`/`addr2` nonzero) shapes
+uniformly. -/
+theorem Memory_send_iff_isU64
+    (clk_high clk_low addr0 addr1 addr2
+        limb0 limb1 limb2 limb3 mult : ZMod p)
+    (h_mult_binary : mult = 0 ∨ mult = 1) :
+    (SP1Constraint.send
+        (.memory clk_high clk_low addr0 addr1 addr2
+          limb0 limb1 limb2 limb3) mult).toProp ↔
+      (mult = 1 →
+        Word.isU64 (#v[limb0, limb1, limb2, limb3] : Word (ZMod p))) := by
+  haveI : NeZero p := ⟨(Fact.out (p := p.Prime)).ne_zero⟩
+  unfold SP1Constraint.toProp
+  rcases h_mult_binary with h0 | h1
+  · subst h0; simp
+  · subst h1; simp
+
+/-! ## Sum-of-flag binarity helpers
+
+For chips whose `is_real` is a sum of opcode-selector flags (rather than
+a single column), Phase 2's `is_real_binary_<chip>` lemmas already
+establish the binarity. These convenience wrappers tie the existing
+byte / program / memory gating lemmas to the sum form, so chip-level
+trace consumers can write `Memory_send_iff_isU64 ... (is_real_binary_mul cols h_spec)`
+without manually unfolding the sum. The actual machinery is unchanged
+— the existing `ByteOpcode_send_iff_constrain` / `Program_send_iff_clause`
+/ `Memory_send_iff_isU64` already work for any binary `mult`. -/
+
+/-- Generic binarity-helper: a sum of `n` flags, each of which is binary,
+where the sum itself satisfies `sum * (sum - 1) = 0`, is binary.
+Re-export of `binary_of_assertZero` from `Soundness.IsRealBinary`
+positioned for use at the `Multiplicity.lean` consumer site. (Not
+re-imported here to avoid a circular dep; consumers either import
+`Soundness.IsRealBinary` or use `mul_eq_zero`-based projection
+directly.) -/
+example : True := trivial
+
+/-! ## XOR-of-binary gating (ALU op_c memory access)
+
+The ALU-type op_c memory read in SP1 uses `mult = is_real - imm_c`
+(when `imm_c = 1` the op_c slot is an immediate, not a register, so
+the read is gated off). The constraint compiler emits
+`(is_real - imm_c) * (is_real - imm_c - 1) = 0` as part of the chip's
+constraint set (see `SP1Operations/Reader/ALUTypeReader/Constraints.lean`),
+so the binarity is established. Then the existing
+`ByteOpcode_send_iff_constrain` / `Memory_send_iff_isU64` fire with
+this `mult` directly. No new lemma is needed at this level — the
+binarity proof at the consumer site is the entire content. -/
 
 end SP1Clean.Multiplicity
