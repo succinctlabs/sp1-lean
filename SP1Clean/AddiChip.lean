@@ -46,6 +46,9 @@ Design:
   The existing SP1 `Addi.correct_addi` is still reused as a black box.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Addi
 
 open Circuit ProvableType

@@ -32,6 +32,9 @@ fed into the RTypeReader's `op_a_write_value` (limbs 2-3 reconstructed as
 `msb * 65535`).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Sub
 
 open Circuit ProvableType

@@ -58,6 +58,9 @@ is_mulw * 13 + is_mulhsu * 14 + is_mulhu * 24` (matching the SP1 RISC-V
 opcode IDs).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Mul
 
 open Circuit ProvableType

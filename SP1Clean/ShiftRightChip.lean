@@ -33,6 +33,9 @@ placeholder `shiftSpec` (currently `True`).
 Opcode encoding: SRL=7, SRA=8, SRLW=22, SRAW=23.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.ShiftRight
 
 open Circuit ProvableType

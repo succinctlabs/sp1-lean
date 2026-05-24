@@ -33,6 +33,9 @@ op_a's current value to RAM.
 Opcode: `39 = SD` (Store Double).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.StoreDouble
 
 open Circuit ProvableType

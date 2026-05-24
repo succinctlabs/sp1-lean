@@ -74,18 +74,32 @@ structure ShiftLeftCols (T : Type) where
   -- The 4-limb shifted result (committed to op_a register).
   result : Vector T 4                       -- Main[32..35]
   -- 6-bit decomposition of the shift amount mod 64 (Main[36..41]).
-  c_bits : Vector T 6                    -- Main[36..41]
-  -- Shift power intermediates (Main[42..44]).
-  shift_pow : Vector T 3                    -- Main[42..44]
+  c_bits : Vector T 6                       -- Main[36..41]
+  -- Shift-power intermediates (Main[42..44]). Upstream Rust names these
+  -- as three named scalars (`v_01, v_012, v_0123`) rather than a 3-vector.
+  -- Phase 2.3 decomposition (open-question #4): split for name alignment.
+  v_01 : T                                  -- Main[42] (was shift_pow[0])
+  v_012 : T                                 -- Main[43] (was shift_pow[1])
+  v_0123 : T                                -- Main[44] (was shift_pow[2])
   -- One-hot byte-shift selector over 4 byte positions (Main[45..48]).
-  shift_u16 : Vector T 4                   -- Main[45..48]
-  -- Shifted-limb intermediates and high-half spill (Main[49..56]).
-  limb_shift : Vector T 8                   -- Main[49..56]
-  -- Intermediate result columns before final assignment (Main[57..61]).
-  result_intermediate : Vector T 5          -- Main[57..61]
+  shift_u16 : Vector T 4                    -- Main[45..48]
+  -- Shifted-limb intermediates (Main[49..56]). Upstream Rust names the
+  -- two halves as `lower_limb: Word<T>` and `higher_limb: Word<T>`.
+  -- Phase 2.3 decomposition (open-question #4): split the 8-vector.
+  lower_limb : Vector T 4                   -- Main[49..52] (was limb_shift[0..3])
+  higher_limb : Vector T 4                  -- Main[53..56] (was limb_shift[4..7])
+  -- Intermediate result columns (Main[57..61]). Upstream Rust splits this
+  -- into `limb_result: Word<T>` (4 cells) and `sllw_msb: U16MSBOperation<T>`
+  -- (1 cell, the MSB witness for SLLW sign-extension fed to U16MSBOperation
+  -- in the bridge — see CS0 in SP1Chips/ShiftLeft/Constraints.lean).
+  -- Phase 2.3 decomposition (open-question #4): split the 5-vector.
+  limb_result : Vector T 4                  -- Main[57..60] (was result_intermediate[0..3])
+  sllw_msb : U16MSBOperation T              -- Main[61] (was result_intermediate[4])
   is_sll : T                                -- Main[62]
   is_sllw : T                               -- Main[63]
-  sign_extend : T                           -- Main[64]
+  -- Renamed from `sign_extend` to upstream's `is_sllw_imm` (Phase 2.3).
+  -- Bridge: Main[64] = Main[63] * Main[31] = is_sllw * imm_c = is_slliw.
+  is_sllw_imm : T                           -- Main[64] (was sign_extend)
   next_pc_carry_value : Vector T 3
 deriving ProvableStruct
 
@@ -118,8 +132,8 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _op_a_memory,
        op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
-       c_bits, _shift_pow, shift_u16, _limb_shift,
-       _result_intermediate, is_sll, is_sllw, _sign_extend,
+       c_bits, _v_01, _v_012, _v_0123, shift_u16, _lower_limb, _higher_limb,
+       _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
        _next_pc_carry_value⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
@@ -212,9 +226,10 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   shiftSpec cols
 
 /-- Project a raw SP1 row into the structured `ShiftLeftCols` view.
-65 columns; sub-struct vectors `result`, `c_bits`, `shift_pow`,
-`shift_u16`, `limb_shift`, `result_intermediate` packed from
-contiguous Main slots. -/
+65 columns. Post-Phase-2.3 decomposition: `v_01/v_012/v_0123` are scalars
+(Main[42..44]), `lower_limb`/`higher_limb` split the former 8-vector
+(Main[49..56]), `limb_result`+`sllw_msb` split the former 5-vector
+(Main[57..61]), and `is_sllw_imm` replaces the old `sign_extend`. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 65) : ShiftLeftCols (ZMod p) :=
   ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
       Main[6],
@@ -227,10 +242,12 @@ contiguous Main slots. -/
    Main[29], Main[30], Main[31],
    #v[Main[32], Main[33], Main[34], Main[35]],
    #v[Main[36], Main[37], Main[38], Main[39], Main[40], Main[41]],
-   #v[Main[42], Main[43], Main[44]],
+   Main[42], Main[43], Main[44],
    #v[Main[45], Main[46], Main[47], Main[48]],
-   #v[Main[49], Main[50], Main[51], Main[52], Main[53], Main[54], Main[55], Main[56]],
-   #v[Main[57], Main[58], Main[59], Main[60], Main[61]],
+   #v[Main[49], Main[50], Main[51], Main[52]],
+   #v[Main[53], Main[54], Main[55], Main[56]],
+   #v[Main[57], Main[58], Main[59], Main[60]],
+   { msb := Main[61] },
    Main[62], Main[63], Main[64],
    #v[0, 0, 0]⟩
 
@@ -281,8 +298,8 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        op_a_memory,
        op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c,
        _shift_imm_low, _shift_imm_high, _msb, _result,
-       _c_bits, _shift_pow, _shift_u16, _limb_shift,
-       _result_intermediate, is_sll, is_sllw, _sign_extend,
+       _c_bits, _v_01, _v_012, _v_0123, _shift_u16, _lower_limb, _higher_limb,
+       _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
        next_pc_carry_value⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -346,13 +363,16 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- R-type: op_a/+4, op_b/+3, op_c/+2.
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low, cols.op_a_memory.access_timestamp.diff_low_limb,
+    ⟨clk_low, 4, cols.op_a_memory.access_timestamp.prev_low,
+     cols.op_a_memory.access_timestamp.diff_low_limb,
      cols.op_a_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low, cols.op_b_memory.access_timestamp.diff_low_limb,
+    ⟨clk_low, 3, cols.op_b_memory.access_timestamp.prev_low,
+     cols.op_b_memory.access_timestamp.diff_low_limb,
      cols.op_b_memory.prev_value⟩ ∧
   SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.op_c_memory.access_timestamp.prev_low, cols.op_c_memory.access_timestamp.diff_low_limb,
+    ⟨clk_low, 2, cols.op_c_memory.access_timestamp.prev_low,
+     cols.op_c_memory.access_timestamp.diff_low_limb,
      cols.op_c_memory.prev_value⟩
 
 theorem soundness :

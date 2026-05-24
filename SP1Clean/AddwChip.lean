@@ -36,6 +36,9 @@ msb * 65535, msb * 65535]`.
 Layout mirrors `SP1Clean.Bitwise` for ALU-type discipline and
 `SP1Clean.Sub.W` for the 2-limb + msb operation shape. -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Addw
 
 open Circuit ProvableType

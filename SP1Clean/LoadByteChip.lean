@@ -46,6 +46,9 @@ Opcode: `29 = LB` (Load Byte, signed). Sibling chips `LoadByteUnsigned`,
 and signedness selectors.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.LoadByte
 
 open Circuit ProvableType

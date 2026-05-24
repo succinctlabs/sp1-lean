@@ -40,6 +40,9 @@ Result is a 1-bit boolean written into `op_a_write_value[0]` (via
 `Main[34]`), with the other 3 limbs zero.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Lt
 
 open Circuit ProvableType

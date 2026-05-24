@@ -34,6 +34,9 @@ plan). The full sub-word selection / sign-extension machinery is
 captured propositionally in `Spec`.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.LoadX0
 
 open Circuit ProvableType

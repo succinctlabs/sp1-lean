@@ -57,6 +57,9 @@ asserts), `Spec` (per-row Spec composing `cpuStateSpec`,
 Opcode: `46 = JAL`.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Jal
 
 open Circuit ProvableType

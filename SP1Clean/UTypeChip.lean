@@ -40,6 +40,9 @@ operation's is_real arg is the conditional `is_real - op_a_0`),
 trailing asserts.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.UType
 
 open Circuit ProvableType

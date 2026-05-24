@@ -30,6 +30,9 @@ opcode index (`2` for `SUB` instead of `0` for `ADD`) flowing into
 `RTypeReader`.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Sub
 
 open Circuit ProvableType

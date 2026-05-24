@@ -32,6 +32,9 @@ double.
 Opcodes: `30 = LH`, `33 = LHU`.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.LoadHalf
 
 open Circuit ProvableType

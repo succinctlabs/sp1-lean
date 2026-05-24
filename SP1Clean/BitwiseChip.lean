@@ -42,6 +42,9 @@ This mirror exposes:
   `_root_.<Variant>.correct_<variant>` SP1 proof with `iff_sp1.mpr`
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Bitwise
 
 open Circuit ProvableType

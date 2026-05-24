@@ -38,6 +38,9 @@ on `is_real`.
 Opcode: `47 = JALR`.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Jalr
 
 open Circuit ProvableType

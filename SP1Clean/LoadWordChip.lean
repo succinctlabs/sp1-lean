@@ -33,6 +33,9 @@ handling.
 Opcodes: `31 = LW`, `34 = LWU`.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.LoadWord
 
 open Circuit ProvableType

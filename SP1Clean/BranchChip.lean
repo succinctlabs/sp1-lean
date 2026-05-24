@@ -39,6 +39,9 @@ Opcode encoding: `is_beq * 40 + is_bne * 41 + is_blt * 42 + is_bge * 43
 + is_bltu * 44 + is_bgeu * 45` (40-45 = BEQ/BNE/BLT/BGE/BLTU/BGEU).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Branch
 
 open Circuit ProvableType

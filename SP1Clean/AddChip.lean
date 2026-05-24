@@ -37,6 +37,9 @@ sub-fragment surfaces packaged as `SP1Clean.AddOp.Spec`,
 `SP1Clean.CPUState.cpuStateSpec`, and `SP1Clean.RTypeReader.rtypeReaderSpec`.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.Add
 
 open Circuit ProvableType

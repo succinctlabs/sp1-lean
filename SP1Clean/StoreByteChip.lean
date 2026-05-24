@@ -48,6 +48,9 @@ Opcode: `36 = SB` (Store Byte). Sibling chips `StoreHalf`, `StoreWord`,
 selectors.
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.StoreByte
 
 open Circuit ProvableType

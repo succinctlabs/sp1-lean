@@ -31,6 +31,9 @@ half-word at the address's 2-bit offset) on top of StoreWord's shape.
 Opcode: `37 = SH` (Store Half).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.StoreHalf
 
 open Circuit ProvableType

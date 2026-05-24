@@ -34,6 +34,9 @@ reconstruction) is captured as a placeholder `divRemSpec` (currently
 `True`).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.DivRem
 
 open Circuit ProvableType

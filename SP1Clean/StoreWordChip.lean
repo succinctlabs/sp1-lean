@@ -32,6 +32,9 @@ sub-word selection. Structural mirror following the StoreByte template.
 Opcode: `38 = SW` (Store Word).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.StoreWord
 
 open Circuit ProvableType

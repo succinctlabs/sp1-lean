@@ -30,6 +30,9 @@ at the computed address into op_a.
 Opcode: `35 = LD` (Load Double).
 -/
 
+set_option linter.style.setOption false
+set_option linter.style.longLine false
+
 namespace SP1Clean.LoadDouble
 
 open Circuit ProvableType
