@@ -847,28 +847,38 @@ def ChipRow.memoryAccessesValid (row : ChipRow p) : Prop :=
 def TraceMemoryAccessesValid (rows : List (ChipRow p)) : Prop :=
   ∀ row ∈ rows, row.memoryAccessesValid
 
-/-- Add's per-chip discharge — projects three `OperandAccess.Assertion.Spec`
-conjuncts (FormalSpec positions #7/#8/#9 after sub-task E POC widening)
-onto the corresponding `memoryAccessSpec` clauses. The
-`OperandAccess.Assertion.Spec` definition IS `memoryAccessSpec`-shaped, so
-each is a direct projection. -/
+/-- Add's per-chip discharge — projects the memory-bus tuple of
+`rtypeReaderSpec` (FormalSpec position #3) onto the three
+`memoryAccessSpec` clauses for op_a/b/c at offsets +4/+3/+2. -/
 theorem memoryAccessesValid_of_spec_add
     (cols : SP1Clean.Add.AddCols (ZMod p))
     (h : SP1Clean.Add.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.add cols) := by
   change SP1Clean.Add.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, _h_prog, _h_isreal, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h
-  -- The three OperandAccess.Assertion.Spec carry the memoryAccessSpec
-  -- content for op_a/b/c at offsets +4/+3/+2.
+  obtain ⟨_h_addop, _h_cpu, h_rtr, _h_isreal, _h_op_a_0, _h_sail⟩ := h
+  -- Unpack rtypeReaderSpec's nested memory-bus tuple:
+  -- (diff_{a,b,c} < 65536, ts_{c,b,a} scaled < 256, isU64_{a,b,c}).
+  obtain ⟨_h_ti, _h_op_a_lt, _h_op_b_lt, _h_op_c_lt, _h_op_a_0_bin, _h_op_a_0_iff,
+          _h_pc,
+          ⟨⟨h_diff_a, h_diff_b, h_diff_c⟩,
+           ⟨h_ts_c, h_ts_b, h_ts_a⟩,
+           ⟨h_isU64_a, h_isU64_b, h_isU64_c⟩⟩,
+          _h_a0_implies⟩ := h_rtr
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+  · subst h
+    exact ⟨h_diff_a, h_ts_a,
+      (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_a⟩
+  · subst h
+    exact ⟨h_diff_b, h_ts_b,
+      (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b⟩
+  · subst h
+    exact ⟨h_diff_c, h_ts_c,
+      (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_c⟩
 
 /-- UType's per-chip discharge — projects the single
 `OperandAccess.Assertion.Spec` conjunct (FormalSpec position #7 after

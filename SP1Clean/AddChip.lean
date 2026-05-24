@@ -53,6 +53,7 @@ under `M = UserMode`. We don't carry an explicit `M` type parameter on the
 struct because `deriving ProvableStruct` can't reduce through an abstract
 `M`; future SupervisorMode chips would use a separate `*ColsSupervisor`
 struct with `adapter_cols : EmptyCols T`. -/
+@[ext]
 structure AddCols (T : Type) where
   state : CPUState T
   adapter : RTypeReader T
@@ -80,83 +81,156 @@ aliases `Main[32]` (= `is_real`) because the current extractor passes
    Main[32],
    ⟨Main[32]⟩⟩
 
-/-- Clean-side circuit. Mirrors SP1 Rust's `AddChip::eval(builder, cols)`:
-takes a `Var AddCols (ZMod p)`, destructures it, and emits constraints for
-each sub-component. -/
-def AddCircuit (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
-       op_a_write_value, is_real, _adapter_cols⟩ := cols
-  -- AddOperation: op_b_memory.prev_value + op_c_memory.prev_value = op_a_write_value.
-  SP1Clean.AddOp.main op_b_memory.prev_value op_c_memory.prev_value op_a_write_value
-  -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
-  lookup ByteOpcodeTable
-    (#v[(6 : Expression (ZMod p)), (clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0]
-      : Vector (Expression (ZMod p)) 4)
-  lookup ByteOpcodeTable
-    (#v[(6 : Expression (ZMod p)), clk_16_24, 8, 0]
-      : Vector (Expression (ZMod p)) 4)
-  -- Program-bus interaction for ADD (opcode 0): one lookup into the
-  -- 16-tuple program ROM table. R-type discipline: op_b/op_c each carry a
-  -- single-limb register index (limbs 1-3 zero), and imm_b = imm_c = 0.
-  lookup ProgramTable
-    (#v[pc[0], pc[1], pc[2], (0 : Expression (ZMod p)),
-        op_a, op_b, 0, 0, 0,
-        op_c, 0, 0, 0,
-        op_a_0, 0, 0]
-      : Vector (Expression (ZMod p)) 16)
-  -- Trailing assertZero gates.
-  is_real * (is_real - 1) === 0
-  op_a_0 === 0
+/-- Right inverse of `fromMain`: pack an `AddCols` into a 33-element flat
+row using the same index map as `fromMain`. Used only internally by the
+soundness proof of the Sail clause (see `Assertion.soundness`); not part
+of the user-facing API. Index 32 (= `is_real`) is also the
+`adapter_cols.is_trusted` slot, matching `fromMain`'s aliasing. -/
+@[reducible] def toMain (cols : AddCols (ZMod p)) : Vector (ZMod p) 33 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c,
+     cols.adapter.op_c_memory.prev_value[0],
+     cols.adapter.op_c_memory.prev_value[1],
+     cols.adapter.op_c_memory.prev_value[2],
+     cols.adapter.op_c_memory.prev_value[3],
+     cols.adapter.op_c_memory.access_timestamp.prev_low,
+     cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
+     cols.op_a_write_value[0], cols.op_a_write_value[1],
+     cols.op_a_write_value[2], cols.op_a_write_value[3],
+     cols.is_real]
 
-/-- Pilot Spec, expressed over field-valued `AddCols (ZMod p)`.
-Each clause mirrors one sub-component's constraint surface under
-`is_real = 1`, using the reusable helper Specs from `SP1Clean.AddOp`,
-`SP1Clean.CPUState`, and `SP1Clean.RTypeReader`. The trailing
-`cols.adapter_cols.is_trusted = 1` conjunct pins the
-`UserModeReaderCols<T>` payload to the trusted-row case we verify. -/
-def TraceSpec (cols : AddCols (ZMod p)) : Prop :=
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.RTypeReader.rtypeReaderSpec
-      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 0 cols.state.pc
-      cols.op_a_write_value
-      { op_a := cols.adapter.op_a,
-        op_a_memory :=
-          { prev_value := cols.adapter.op_a_memory.prev_value,
-            access_timestamp :=
-              { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } },
-        op_a_0 := cols.adapter.op_a_0, op_b := cols.adapter.op_b,
-        op_b_memory :=
-          { prev_value := cols.adapter.op_b_memory.prev_value,
-            access_timestamp :=
-              { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } },
-        op_c := cols.adapter.op_c,
-        op_c_memory :=
-          { prev_value := cols.adapter.op_c_memory.prev_value,
-            access_timestamp :=
-              { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-                diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } } } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  cols.adapter_cols.is_trusted = 1
+/-! ## Cols-level Sail-side helpers
 
-def ArithSpec (cols : AddCols (ZMod p)) : Prop :=
-  SP1Clean.AddOp.Spec
-    cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
-    cols.op_a_write_value
+Mirror the Main-level `_root_.Add.sp1_op_{a,b,c}` and `_root_.Add.sp1_add`
+projections directly off `AddCols` fields, so the chip-level `FormalSpec`
+Sail clause stays cols-parameterized without requiring callers to construct
+a `Main : Vector (ZMod p) 33`. Each helper is `@[reducible]` so the
+round-trip lemma `<helper>_cols (fromMain Main) = Add.<helper> Main` closes
+by `rfl`. -/
 
-/-- The chip-level bridge: SP1's `allHold` over the flat row
-`Add.constraints Main` is exactly `TraceSpec (fromMain Main)`, under
-`is_real = Main[32] = 1`. -/
-theorem traceSpec_iff_allHold
+@[reducible] def sp1_op_a_cols (cols : AddCols (ZMod p)) : BitVec 5 :=
+  BitVec.ofNat 5 cols.adapter.op_a.val
+
+@[reducible] def sp1_op_b_cols (cols : AddCols (ZMod p)) : BitVec 5 :=
+  BitVec.ofNat 5 cols.adapter.op_b.val
+
+@[reducible] def sp1_op_c_cols (cols : AddCols (ZMod p)) : BitVec 5 :=
+  BitVec.ofNat 5 cols.adapter.op_c.val
+
+def sp1_add_cols (cols : AddCols (ZMod p)) : SailM Unit := do
+  let op_a := sp1_op_a_cols cols
+  Sail.writeReg Register.nextPC
+    (Word.toBitVec64 #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2], 0])
+  Sail.write_reg op_a (Word.toBitVec64 cols.op_a_write_value)
+
+/-- The cols-level state-bus precondition for the per-row Sail clause:
+universally lifted over any flat `Main` row that re-projects to the given
+`cols`. Stated this way (rather than directly via `toMain cols`) so we
+don't depend on a `fromMain (toMain cols) = cols` round-trip, which fails
+by `rfl` due to `Vector` not having structural eta. Downstream consumers
+that have `cols` in hand can specialize with `Main := toMain cols`. -/
+def addInitialState_cols (cols : AddCols (ZMod p)) (s : SailState) : Prop :=
+  ∀ Main : Vector (ZMod p) 33, fromMain Main = cols →
+    (_root_.Add.constraints Main).initialState s
+
+/-! ### Round-trip lemmas
+
+Each `cols`-level helper equals the corresponding `Main`-level def when
+applied to `fromMain Main`. All hold by `rfl` thanks to `@[reducible]`. -/
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 33) :
+    sp1_op_a_cols (fromMain Main) = _root_.Add.sp1_op_a Main := rfl
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 33) :
+    sp1_op_b_cols (fromMain Main) = _root_.Add.sp1_op_b Main := rfl
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_op_c_cols_fromMain (Main : Vector (ZMod p) 33) :
+    sp1_op_c_cols (fromMain Main) = _root_.Add.sp1_op_c Main := rfl
+
+omit [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_add_cols_fromMain (Main : Vector (ZMod p) 33) :
+    sp1_add_cols (fromMain Main) = _root_.Add.sp1_add Main := rfl
+
+-- The nested-struct ext attribute needs to be applied to the sub-types
+-- for `ext <;> rfl` to recurse fully through `AddCols` → `CPUState` /
+-- `RTypeReader` / `UserModeReaderCols` / `MemoryAccessInSharedCols` / ...
+attribute [ext] _root_.CPUState _root_.RTypeReader
+                _root_.MemoryAccessInSharedCols
+                _root_.MemoryAccessInShardTimestamp
+                SP1Clean.UserModeReaderCols
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+/-- `fromMain` is a left inverse of `toMain` (cols → Main → cols round-trip),
+conditional on `cols.adapter_cols.is_trusted = cols.is_real`. The precondition
+captures `fromMain`'s aliasing of `is_trusted := Main[32] = is_real` (which
+matches the constraint compiler's emission — Main[32] is both `is_real` and
+`is_trusted`). Recursive `ext` through `@[ext]`-marked sub-structures plus
+`Vector.ext` reduces to per-element equations closed by `rfl` (each
+`(toMain cols)[k]` reduces by `@[reducible]` to the matching `cols`
+projection) or by the precondition on the lone `adapter_cols.is_trusted` leaf. -/
+lemma fromMain_toMain (cols : AddCols (ZMod p))
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real) :
+    fromMain (toMain cols) = cols := by
+  ext
+  all_goals first
+    | rfl
+    | exact h_trusted.symm
+    | (next i _ => interval_cases i <;> rfl)
+    | (next i => fin_cases i <;> rfl)
+
+/-- The chip-level structural bridge: SP1's `allHold` over the flat row
+`Add.constraints Main` is exactly the conjunction of `AddOp.Spec`,
+`cpuStateSpec`, and `rtypeReaderSpec` over `fromMain Main`, under
+`is_real = Main[32] = 1`. Used inside the Sail clause's soundness proof to
+construct an `allHold` from the structural pieces of `FormalSpec`. -/
+lemma allHold_iff_structural
     (Main : Vector (ZMod p) 33) (h_is_real : Main[32] = 1) :
     (_root_.Add.constraints Main).allHold ↔
-      ArithSpec (fromMain Main) ∧ TraceSpec (fromMain Main) := by
+      (SP1Clean.AddOp.Spec
+          #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[22], Main[23], Main[24], Main[25]]
+          #v[Main[28], Main[29], Main[30], Main[31]] ∧
+       SP1Clean.CPUState.cpuStateSpec Main[2] Main[1] ∧
+       SP1Clean.RTypeReader.rtypeReaderSpec
+          (Main[2] + Main[1] * 65536) 0 #v[Main[3], Main[4], Main[5]]
+          #v[Main[28], Main[29], Main[30], Main[31]]
+          { op_a := Main[6],
+            op_a_memory :=
+              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                access_timestamp :=
+                  { prev_low := Main[11], diff_low_limb := Main[12] } },
+            op_a_0 := Main[13], op_b := Main[14],
+            op_b_memory :=
+              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                access_timestamp :=
+                  { prev_low := Main[19], diff_low_limb := Main[20] } },
+            op_c := Main[21],
+            op_c_memory :=
+              { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
+                access_timestamp :=
+                  { prev_low := Main[26], diff_low_limb := Main[27] } } } ∧
+       Main[32] * (Main[32] - 1) = 0 ∧
+       Main[13] = 0) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  simp only [fromMain, TraceSpec, ArithSpec, SP1Clean.AddOp.Spec,
-    SP1Clean.CPUState.cpuStateSpec, SP1Clean.RTypeReader.rtypeReaderSpec]
   rw [show (_root_.Add.constraints Main).allHold ↔
         ((AddOperation.constraints (F := ZMod p)
             #v[Main[15], Main[16], Main[17], Main[18]]
@@ -194,236 +268,48 @@ theorem traceSpec_iff_allHold
   rw [AddOperation.allHold_constraints_iff,
       SP1Clean.CPUState.cpuStateSpec_iff_sp1,
       SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1]
-  simp [SP1Clean.CPUState.cpuStateSpec, SP1Clean.RTypeReader.rtypeReaderSpec, and_assoc]
-
-/-- Clean-side `correct_add`: same Sail equivalence statement as SP1's
-`Add.correct_add`, but with the constraint hypothesis re-expressed against
-the Clean-flavored `Spec` predicate over a structured `AddCols` view.
-Pure composition with the SP1 proof via `traceSpec_iff_allHold.mpr`. -/
-theorem correct_add
-    (Main : Vector (ZMod p) 33) (s : SailState)
-    (h_is_real : Main[32] = 1)
-    (h_arith : ArithSpec (fromMain Main))
-    (h_trace : TraceSpec (fromMain Main))
-    (state_cstrs : (_root_.Add.constraints Main).initialState s) :
-    let op_c := _root_.Add.sp1_op_c Main
-    let op_b := _root_.Add.sp1_op_b Main
-    let op_a := _root_.Add.sp1_op_a Main
-    (_root_.Add.spec_add (.Regidx op_c) (.Regidx op_b) (.Regidx op_a)).run s =
-      (_root_.Add.sp1_add Main).run s :=
-  _root_.Add.correct_add Main s ((traceSpec_iff_allHold Main h_is_real).mpr ⟨h_arith, h_trace⟩)
-    h_is_real state_cstrs
-
-/-! ## RawSpec / SemanticSpec POC
-
-A two-layer alternative to the legacy `Spec` + `traceSpec_iff_allHold` pair. The split:
-
-- **`RawSpec Main`** is a structural mirror of `(Add.constraints Main).allHold`
-  flattened into named sub-`allHold`s. Pure transcription of the chip-list
-  shape — no arithmetic reasoning. `rawSpec_iff_allHold` discharges via the
-  same `simp` recipe the legacy `traceSpec_iff_allHold` uses.
-- **`SemanticSpec Main`** is the user-facing contract: trace-facing data
-  (`cpuStateSpec`, three `memoryAccessSpec` records, `ProgramTable.Spec`,
-  is-real-binary) **plus** the per-row Sail equivalence as a Prop.
-- **`raw_to_semantic`** does the bridging work — the only place where the
-  chip-internal arithmetic (here `AddOperation.allHold`'s carry-chain content,
-  bridged via the operation-level Specs and `Add.correct_add`) is referenced.
-
-Downstream consumers see only `SemanticSpec`; they never touch the chip-list
-flattening or carry-chain assertions. POC scope: additive only, the legacy
-`Spec` + `traceSpec_iff_allHold` + `correct_add` remain in place. -/
-
-/-- Structural mirror of `Add.constraints.allHold`. Iff-RHS over `Main`. -/
-def RawSpec (Main : Vector (ZMod p) 33) : Prop :=
-  (AddOperation.constraints (F := ZMod p)
-      #v[Main[15], Main[16], Main[17], Main[18]]
-      #v[Main[22], Main[23], Main[24], Main[25]]
-      { value := #v[Main[28], Main[29], Main[30], Main[31]] }
-      Main[32]).allHold ∧
-  (CPUState.constraints (F := ZMod p)
-      { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
-        pc := #v[Main[3], Main[4], Main[5]] }
-      #v[Main[3] + 4, Main[4], Main[5]] 8 Main[32]).allHold ∧
-  (RTypeReader.constraints (F := ZMod p)
-      Main[0] (Main[2] + Main[1] * 65536)
-      #v[Main[3], Main[4], Main[5]] 0
-      #v[Main[28], Main[29], Main[30], Main[31]]
-      { op_a := Main[6],
-        op_a_memory :=
-          { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-            access_timestamp :=
-              { prev_low := Main[11], diff_low_limb := Main[12] } },
-        op_a_0 := Main[13], op_b := Main[14],
-        op_b_memory :=
-          { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
-            access_timestamp :=
-              { prev_low := Main[19], diff_low_limb := Main[20] } },
-        op_c := Main[21],
-        op_c_memory :=
-          { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
-            access_timestamp :=
-              { prev_low := Main[26], diff_low_limb := Main[27] } } }
-      Main[32] Main[32]).allHold ∧
-  Main[32] * (Main[32] - 1) = 0 ∧
-  Main[13] = 0
-
-omit [Fact (2 ^ 17 < p)] in
-/-- `RawSpec` is exactly `allHold`. Pure restatement; no arithmetic. -/
-theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 33) :
-    (_root_.Add.constraints Main).allHold ↔ RawSpec Main := by
-  simp only [RawSpec]
-  simp [_root_.Add.constraints, SP1ConstraintList.allHold,
-    List.forall_append, List.Forall, SP1Constraint.toProp, and_assoc]
-
-/-- The row's user-facing contract: trace-facing structural specs + Sail
-equivalence as a Prop. Downstream consumers (trace soundness, etc.) see only
-this; the chip-internal arithmetic is hidden behind `raw_to_semantic`. -/
-def SemanticSpec (Main : Vector (ZMod p) 33) : Prop :=
-  let cols := fromMain Main
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.memoryAccessSpec
-      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
-      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_a
-        { prev_value := cols.adapter.op_a_memory.prev_value,
-          access_timestamp :=
-            { prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-              diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb } }) ∧
-  SP1Clean.memoryAccessSpec
-      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 3
-      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_b
-        { prev_value := cols.adapter.op_b_memory.prev_value,
-          access_timestamp :=
-            { prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-              diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } }) ∧
-  SP1Clean.memoryAccessSpec
-      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 2
-      (SP1Clean.MemoryAccess.ofRegisterShared cols.adapter.op_c
-        { prev_value := cols.adapter.op_c_memory.prev_value,
-          access_timestamp :=
-            { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-              diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } }) ∧
-  SP1Clean.ProgramTable.Spec
-      { pc := cols.state.pc, opcode := 0, op_a := cols.adapter.op_a,
-        op_b := #v[cols.adapter.op_b, 0, 0, 0],
-        op_c := #v[cols.adapter.op_c, 0, 0, 0],
-        op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  -- Per-row Sail equivalence as a Prop. Trace level can chain these.
-  (∀ s : SailState, (_root_.Add.constraints Main).initialState s →
-    (_root_.Add.sp1_add Main).run s =
-      (_root_.Add.spec_add (.Regidx (_root_.Add.sp1_op_c Main))
-        (.Regidx (_root_.Add.sp1_op_b Main))
-        (.Regidx (_root_.Add.sp1_op_a Main))).run s)
-
-/-- The bridge: `RawSpec → SemanticSpec` under `is_real = 1`. Confines all
-chip-internal arithmetic (carry chain via `AddOperation`'s spec, byte ranges
-via `rtypeReaderSpec`, Sail equivalence via `soundness_add`) to this one proof.
-Callers see only `SemanticSpec`. -/
-theorem raw_to_semantic (Main : Vector (ZMod p) 33) (h_is_real : Main[32] = 1)
-    (h_raw : RawSpec Main) : SemanticSpec Main := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_addop, h_cpu_raw, h_rtr_raw, h_real_bin, h_a0⟩ := h_raw
-  have h_allHold : (_root_.Add.constraints Main).allHold :=
-    (rawSpec_iff_allHold Main).mpr ⟨h_addop, h_cpu_raw, h_rtr_raw, h_real_bin, h_a0⟩
-  rw [h_is_real] at h_cpu_raw h_rtr_raw
-  have h_cpu_spec := SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu_raw
-  have h_rtr_spec := SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1.mp h_rtr_raw
-  obtain ⟨h_ti, h_op_a_lt, h_op_b_lt, h_op_c_lt, h_a0_bin, h_a0_iff,
-          ⟨h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩,
-          ⟨⟨h_diff_a, h_diff_b, h_diff_c⟩,
-           ⟨h_ts_c, h_ts_b, h_ts_a⟩,
-           ⟨h_isU64_a, h_isU64_b, h_isU64_c⟩⟩,
-          _h_a0_implies⟩ := h_rtr_spec
-  have h_zero_lt : (0 : ZMod p) < (65536 : ZMod p) := by
-    have h65536_lt : (65536 : ℕ) < p := by
-      have := Fact.out (p := 2 ^ 17 < p); omega
-    have h65536_val : (65536 : ZMod p).val = 65536 := ZMod.val_natCast_of_lt h65536_lt
-    change (0 : ZMod p).val < (65536 : ZMod p).val
-    rw [ZMod.val_zero, h65536_val]; omega
-  refine ⟨h_cpu_spec,
-          ⟨h_diff_a, h_ts_a, h_isU64_a⟩,
-          ⟨h_diff_b, h_ts_b, h_isU64_b⟩,
-          ⟨h_diff_c, h_ts_c, h_isU64_c⟩,
-          ?_, h_real_bin, ?_⟩
-  -- ProgramTable.Spec: assemble from rtypeReaderSpec's program-bus pieces
-  -- + trivial 0 < 65536 for the unused op_b/op_c high limbs.
-  · simp only [SP1Clean.ProgramTable.Spec, SP1Clean.ProgramSpec,
-      Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-      List.getElem_cons_succ]
-    have h_op_c0_val : ((0 : ZMod p).val : ℕ) = 0 := by rw [ZMod.val_zero]
-    have h_zero_val_opcode : (0 : ZMod p).val = 0 := ZMod.val_zero
-    refine ⟨?_, h_op_a_lt, ⟨h_op_b_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
-            ⟨h_op_c_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
-            h_a0_bin, h_a0_iff, Or.inl trivial, Or.inl trivial,
-            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
-    -- trusted_instr: opcode = 0 ⇒ Opcode.ofNat 0 = ADD; matches rtypeReader's `opcode = 0`
-    convert h_ti using 1
-  -- Sail equivalence — single call to soundness_add
-  · intro s state_cstrs
-    exact soundness_add Main s h_allHold h_is_real state_cstrs
+  simp [SP1Clean.AddOp.Spec, SP1Clean.CPUState.cpuStateSpec,
+        SP1Clean.RTypeReader.rtypeReaderSpec, and_assoc]
 
 /-! ## Full `FormalAssertion` promotion
 
-Wraps the chip-level constraint surface into a Clean `FormalAssertion`.
-Composes `SP1Clean.AddOp.assertion` and `SP1Clean.CPUState.assertion` as
-subcircuits, emits an explicit `lookup ProgramTable` for the program-bus
-interaction, and finishes with the two trailing assertZero gates.
+Wraps the chip-level constraint surface into a single Clean `FormalAssertion`
+whose `Spec` is the unified semantic-and-structural contract — the
+`AddOperation` arithmetic Spec, the CPU-state byte bounds, the full
+`rtypeReaderSpec` (program + memory bounds + bounds), the two trailing
+scalar gates, and a per-row Sail equivalence between SP1's `sp1_add` and
+the Sail spec.
 
-**Scope note (memory).** `SP1Clean.RTypeReader.rtypeReaderSpec` carries
-two interaction surfaces: program (now covered by `ProgramTable`) and
-memory (3 register-read accesses with timestamp + U64 bounds). The
-memory clauses are not enforced inside `Assertion.main` because the
-required reader-level byte lookups (6 for timestamps + 12 for U64 limbs)
-aren't yet lifted into Clean. `FormalSpec` therefore captures the
-program-bus consequence (`ProgramSpec`) but defers memory-bus consequences
-to the trace-level `SP1Clean.Soundness.MemoryConsistency` bridge, which
-threads each chip's emitted `MemoryAccess` records into Clean's
-`OfflineMemory` consistency theorem. The full `Spec` above and
-`correct_add` continue to consume the legacy `rtypeReaderSpec`. -/
+`Assertion.main` composes three subcircuits — `AddOp.assertion`,
+`CPUState.assertion`, and the new `RTypeReader.assertion` (which itself
+wraps `ProgramTable.assertion` + 3 `OperandAccess.assertion` calls) —
+mirroring `SP1Chips/Add/Constraints.lean`'s single `RTypeReader.constraints`
+call (and faithfully reflecting the upstream Rust `AddChip::eval`'s
+`RTypeReader::eval` call). -/
 
 namespace Assertion
 
 open Circuit
 
-/-- Refactored chip-level circuit using subcircuit composition. -/
+/-- Clean-side chip circuit. Mirrors SP1 Rust's `AddChip::eval(builder, cols)`
+1:1: one `AddOp.assertion` + one `CPUState.assertion` + one
+`RTypeReader.assertion` + two scalar gates. -/
 @[reducible]
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
+       adapter,
        op_a_write_value, is_real, _adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
-    (⟨op_b_memory.prev_value, op_c_memory.prev_value, op_a_write_value⟩ :
+    (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
+      op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  -- Program-bus interaction (opcode = 0 = ADD; R-type discipline:
-  -- op_b/op_c are single-limb register indices with limbs 1-3 zero,
-  -- imm_b = imm_c = 0).
-  SP1Clean.ProgramTable.assertion
-    (⟨pc, 0, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
-      Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- Iter-8 sub-task E: per-operand memory-bus byte content. Each call
-  -- emits 6 byte lookups (Range 16 on diff_low + U8Range on timestamp +
-  -- 4 Range 16 lookups on prev_value limbs) ⇒ `memoryAccessSpec`.
-  -- R-type offsets: op_a at +4, op_b at +3, op_c at +2.
-  let clk_low := clk_0_16 + clk_16_24 * 65536
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low,
-       op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low,
-       op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 2, op_c_memory.access_timestamp.prev_low,
-       op_c_memory.access_timestamp.diff_low_limb,
-       op_c_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.RTypeReader.assertion
+    (⟨clk_0_16 + clk_16_24 * 65536, 0, pc, op_a_write_value, adapter⟩ :
+      Var SP1Clean.RTypeReader.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
-  op_a_0 === 0
+  adapter.op_a_0 === 0
 
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) AddCols unit where
@@ -431,89 +317,127 @@ instance elaborated : ElaboratedCircuit (ZMod p) AddCols unit where
   main := main
   localLength _ := 0
 
-def Assumptions (_ : AddCols (ZMod p)) : Prop := True
+/-- The chip is the `UserMode` variant (`M = UserMode` in upstream Rust),
+so its `adapter_cols.is_trusted` payload is structurally equal to `is_real`
+(both alias `Main[32]` in the constraint compiler's emission). This is a
+type-level / TrustMode-marker fact that the circuit doesn't enforce. -/
+def Assumptions (cols : AddCols (ZMod p)) : Prop :=
+  cols.adapter_cols.is_trusted = cols.is_real
 
-/-- The chip's Circuit-derivable spec: byte-lookup consequences for the
-addition + clock-decomposition gadgets, the program-bus existential
-witness, and the two trailing assertZero gates. The memory-bus side of
-`rtypeReaderSpec` is deferred to the trace-level OfflineMemory bridge.
-Per-row PC carry was lifted out — the trace-level state-bus chain
-(`StateConsistency.pcChainProp`) now derives `next_pc` literally as
-`#v[pc[0]+4, pc[1], pc[2]]` per Rust's design at `adapter/state.rs:75`. -/
+/-- The unified chip Spec. Subsumes the legacy `TraceSpec`/`ArithSpec`/
+`FormalSpec`/`SemanticSpec` split into a single predicate:
+- `AddOp.Spec` — `op_b + op_c = op_a_write_value` (carry chain)
+- `cpuStateSpec` — clk_0_16/clk_16_24 byte bounds
+- `rtypeReaderSpec` — full R-type reader spec (program + memory + bounds)
+- `is_real * (is_real - 1) = 0` — is_real binary
+- `adapter.op_a_0 = 0` — op_a_0 zero gate
+- per-row Sail equivalence (conditional on `is_real = 1`) — bridges SP1's
+  `sp1_add_cols` to the Sail spec via `_root_.Add.correct_add`. -/
 def FormalSpec (cols : AddCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.AddOp.Spec
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
       cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 0, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := #v[cols.adapter.op_c, 0, 0, 0],
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
+  SP1Clean.RTypeReader.rtypeReaderSpec clk_low 0 cols.state.pc
+      cols.op_a_write_value cols.adapter ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- Each OperandAccess.assertion's Spec is exactly the `memoryAccessSpec`
-  -- for that operand's `(diff_low_limb, prev_low, prev_value)` triple.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
+  (cols.is_real = 1 → ∀ s : SailState, addInitialState_cols cols s →
+    (sp1_add_cols cols).run s =
+      (_root_.Add.spec_add (.Regidx (sp1_op_c_cols cols))
+                           (.Regidx (sp1_op_b_cols cols))
+                           (.Regidx (sp1_op_a_cols cols))).run s)
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  -- Substitute all input-eval equations to put the goal in the same form as
-  -- the subcircuit specs (which use `Expression.eval env input_var_X`).
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20⟩ := h_input
+  obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop_sub, h_cpu_sub, h_prog_sub, h_oa_a, h_oa_b, h_oa_c,
-          h_isreal, h_op_a_0⟩ := h_holds
+  obtain ⟨h_addop_sub, h_cpu_sub, h_rtr_sub, h_isreal, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact h_addop_sub trivial
-  · exact h_cpu_sub trivial
-  · exact h_prog_sub trivial
-  · linear_combination h_isreal
-  · exact h_op_a_0
-  · exact h_oa_a trivial
-  · exact h_oa_b trivial
-  · exact h_oa_c trivial
+  have h_addop := h_addop_sub trivial
+  have h_cpu := h_cpu_sub trivial
+  have h_rtr := h_rtr_sub trivial
+  -- Rebind the explicit eval'd-form struct under the name `cols` so the
+  -- helper-cols functions and `addInitialState_cols` references in the
+  -- residual Sail clause unfold against a single named term rather than
+  -- a giant inlined struct in every position.
+  set cols : AddCols (ZMod p) :=
+    { state :=
+        { clk_high := Expression.eval env input_var_state_clk_high,
+          clk_16_24 := Expression.eval env input_var_state_clk_16_24,
+          clk_0_16 := Expression.eval env input_var_state_clk_0_16,
+          pc := Vector.map (Expression.eval env) input_var_state_pc },
+      adapter :=
+        { op_a := input_adapter_op_a,
+          op_a_memory :=
+            { prev_value := input_adapter_op_a_memory_prev_value,
+              access_timestamp :=
+                { prev_low := input_adapter_op_a_memory_access_timestamp_prev_low,
+                  diff_low_limb := input_adapter_op_a_memory_access_timestamp_diff_low_limb } },
+          op_a_0 := input_adapter_op_a_0, op_b := input_adapter_op_b,
+          op_b_memory :=
+            { prev_value := input_adapter_op_b_memory_prev_value,
+              access_timestamp :=
+                { prev_low := input_adapter_op_b_memory_access_timestamp_prev_low,
+                  diff_low_limb := input_adapter_op_b_memory_access_timestamp_diff_low_limb } },
+          op_c := input_adapter_op_c,
+          op_c_memory :=
+            { prev_value := input_adapter_op_c_memory_prev_value,
+              access_timestamp :=
+                { prev_low := input_adapter_op_c_memory_access_timestamp_prev_low,
+                  diff_low_limb := input_adapter_op_c_memory_access_timestamp_diff_low_limb } } },
+      op_a_write_value := Vector.map (Expression.eval env) input_var_op_a_write_value,
+      is_real := Expression.eval env input_var_is_real,
+      adapter_cols := { is_trusted := Expression.eval env input_var_is_real } }
+    with hcols
+  refine ⟨h_addop, h_cpu, h_rtr, by linear_combination h_isreal, h_op_a_0, ?_⟩
+  -- Sail clause: given `is_real = 1` and `addInitialState_cols cols s`, derive
+  -- the Sail equivalence by bridging through `Main := toMain cols` and invoking
+  -- `_root_.Add.correct_add`.
+  intro h_is_real_eq s h_init
+  -- Round-trip: `fromMain (toMain cols) = cols`. Precondition
+  -- `is_trusted = is_real` is the chip's `Assumptions` (UserMode TrustMode
+  -- marker), available in context after `circuit_proof_start`.
+  have h_trusted : cols.adapter_cols.is_trusted = cols.is_real := rfl
+  have h_round_trip := fromMain_toMain cols h_trusted
+  have h_state := h_init (toMain cols) h_round_trip
+  -- `(toMain cols)[32] = cols.is_real` reduces to `h_is_real_eq`.
+  have h_isreal' : (toMain cols)[32] = 1 := h_is_real_eq
+  -- Reconstruct SP1's `allHold` on `toMain cols` from the structural conjuncts
+  -- of `FormalSpec`. Each `convert ... using N` reduces to Vector-eta side goals.
+  have h_allHold : (_root_.Add.constraints (toMain cols)).allHold := by
+    rw [allHold_iff_structural (toMain cols) h_isreal']
+    refine ⟨?_, h_cpu, ?_, ?_, h_op_a_0⟩
+    · -- AddOp.Spec: bridge `#v[(toMain cols)[k..k+3]]` ⇔ cols-level Vector.
+      -- `convert ... using 1` closes via definitional reduction of `toMain`.
+      convert h_addop using 1
+    · -- rtypeReaderSpec: bridge via struct projections through `toMain`.
+      convert h_rtr using 4
+    · -- `(toMain cols)[32] = cols.is_real` reduces by rfl.
+      change cols.is_real * (cols.is_real - 1) = 0
+      linear_combination h_isreal
+  -- Apply Main-level correctness; the result reads `sp1_X (toMain cols)`,
+  -- which is definitionally `sp1_X_cols cols` for each helper.
+  exact (_root_.Add.correct_add (toMain cols) s h_allHold h_isreal' h_state).symm
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20⟩ := h_input
+  obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop, h_cpu, h_prog, h_isreal, h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
+  obtain ⟨h_addop, h_cpu, h_rtr, h_isreal, h_op_a_0, _h_sail⟩ := h_spec
   unfold id at *
-  -- Completeness obligations follow main's emission order: 3 subcircuit
-  -- arms, then the 3 OperandAccess arms, then the 2 scalar gates.
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact ⟨trivial, h_addop⟩
-  · exact ⟨trivial, h_cpu⟩
-  · exact ⟨trivial, h_prog⟩
-  · exact ⟨trivial, h_oa_a⟩
-  · exact ⟨trivial, h_oa_b⟩
-  · exact ⟨trivial, h_oa_c⟩
-  · linear_combination h_isreal
-  · exact h_op_a_0
+  refine ⟨⟨trivial, h_addop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩,
+          by linear_combination h_isreal, h_op_a_0⟩
 
 end Assertion
 
-/-- The full Clean `FormalAssertion` for the byte- and program-lookup-
-derivable subset of `AddChip`'s constraint surface. Composes
-`AddOp.assertion` and `CPUState.assertion`, the `ProgramTable` lookup,
-and two trailing assertZero gates. -/
+/-- The full Clean `FormalAssertion` for `AddChip`. Single subcircuit
+composition (`AddOp.assertion + CPUState.assertion + RTypeReader.assertion
++ 2 scalar gates`) backing one unified `Spec` that covers everything from
+byte-lookup consequences to per-row Sail equivalence. -/
 def assertion : FormalAssertion (ZMod p) AddCols :=
   { Assertion.elaborated with
     Assumptions := Assertion.Assumptions,
