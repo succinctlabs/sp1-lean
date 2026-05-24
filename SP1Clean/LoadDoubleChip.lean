@@ -20,6 +20,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `LoadDoubleChip` mirror — 64-bit load
 
@@ -52,6 +53,7 @@ structure LoadDoubleCols (T : Type) where
   load_memory_diff_high : T                 -- Main[37]
   is_real : T                               -- Main[38]
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 def main (cols : Var LoadDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
@@ -59,7 +61,7 @@ def main (cols : Var LoadDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c_imm⟩, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
-       is_real, _next_pc_carry_value⟩ := cols
+       is_real, _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   lookup ByteOpcodeTable
@@ -101,7 +103,8 @@ def Spec (cols : LoadDoubleCols (ZMod p)) : Prop :=
       op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- The load-side memory access (read of the 4-limb doubleword at
 addr_value; the chip itself doesn't modify RAM, write_value = prev_value
@@ -125,7 +128,7 @@ def loadMemoryAccess (cols : LoadDoubleCols (ZMod p)) : SP1Clean.MemoryAccess (Z
    Main[28],
    #v[Main[29], Main[30], Main[31], Main[32]],
    Main[33], Main[34], Main[35], Main[36], Main[37],
-   Main[38], #v[0, 0, 0]⟩
+   Main[38], #v[0, 0, 0], ⟨Main[38]⟩⟩
 
 /-- Iff RHS for the Load Double (LD) variant, mirroring
 `_root_.Load.LoadDouble.allHold_constraints_iff_of_is_ld`. LD has only
@@ -202,7 +205,7 @@ def main (cols : Var LoadDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, _addr_value, _addr_top_two_limb_inv,
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
-       is_real, next_pc_carry_value⟩ := cols
+       is_real, next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

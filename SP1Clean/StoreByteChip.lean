@@ -21,6 +21,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.ITypeReaderImmutable
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `StoreByteChip` mirror — first chip with a memory write
 
@@ -81,6 +82,7 @@ structure StoreByteCols (T : Type) where
   store_value : Vector T 4            -- Main[45..48] (new 4-limb word)
   is_real : T                               -- Main[49]
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors the SP1 source's emissions for the SB
@@ -101,7 +103,7 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
        _mem_limb, mem_limb_low_byte, register_low_byte,
        _increment, _store_value, is_real,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
   lookup ByteOpcodeTable
     (#v[(6 : Expression (ZMod p)), (clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0]
@@ -190,7 +192,8 @@ def Spec (cols : StoreByteCols (ZMod p)) : Prop :=
       op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
   -- Real-flag boolean gate.
-  cols.is_real * (cols.is_real - 1) = 0
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- The store-side memory access as a `MemoryAccess` record, exposed for
 trace-level OfflineMemory aggregation. This is the access that hits the
@@ -232,7 +235,7 @@ def storeWriteValue (cols : StoreByteCols (ZMod p)) : Word (ZMod p) :=
    Main[33], Main[34], Main[35], Main[36], Main[37],
    Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44],
    #v[Main[45], Main[46], Main[47], Main[48]],
-   Main[49], #v[0, 0, 0]⟩
+   Main[49], #v[0, 0, 0], ⟨Main[49]⟩⟩
 
 /-- Iff RHS for the Store Byte (SB) variant, mirroring
 `_root_.Store.StoreByte.allHold_constraints_iff_of_is_real`. SB writes
@@ -349,7 +352,7 @@ def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _byte_selector_top, _byte_selector_mid, _byte_selector_lo,
        _mem_limb, _mem_limb_low_byte, _register_low_byte,
        _increment, _store_value, is_real,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

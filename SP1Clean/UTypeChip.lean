@@ -22,6 +22,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.JTypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `UTypeChip` mirror — bundled U-type (LUI/AUIPC)
 
@@ -61,6 +62,7 @@ structure UTypeCols (T : Type) where
   is_auipc : T
   is_real : T
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Emits CPUState range lookups (via subcircuit),
@@ -74,7 +76,7 @@ constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b_imm, op_c_imm⟩, addend, _add_result, is_auipc, is_real,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
@@ -119,7 +121,8 @@ def Spec (cols : UTypeCols (ZMod p)) : Prop :=
   cols.addend[0] - cols.is_auipc * cols.state.pc[0] = 0 ∧
   cols.addend[1] - cols.is_auipc * cols.state.pc[1] = 0 ∧
   cols.addend[2] - cols.is_auipc * cols.state.pc[2] = 0 ∧
-  (cols.is_real - 1) * cols.adapter.op_a_0 = 0
+  (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- The op_a register access (read prior, write result), exposed for
 trace-level OfflineMemory aggregation. `write_value` at aggregation
@@ -140,7 +143,8 @@ def opAMemoryAccess (cols : UTypeCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p)
     #v[Main[18], Main[19], Main[20], Main[21]]⟩,
    #v[Main[22], Main[23], Main[24]],
    #v[Main[25], Main[26], Main[27], Main[28]],
-   Main[29], Main[30], #v[0, 0, 0]⟩
+   Main[29], Main[30], #v[0, 0, 0],
+   ⟨Main[30]⟩⟩
 
 set_option maxHeartbeats 800000 in
 -- Higher heartbeats: the iff destructure unfolds the full UType constraint
@@ -221,7 +225,7 @@ clauses (see Scope note above). -/
 def main (cols : Var UTypeCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩, _addend, _add_result, is_auipc, is_real,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

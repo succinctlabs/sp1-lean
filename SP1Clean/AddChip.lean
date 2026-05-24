@@ -22,6 +22,7 @@ import SP1Clean.Reader.OperandAccess
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.RTypeReader
+import SP1Clean.TrustMode
 
 /-! # Chip-level `AddChip` mirror — R-type sibling of `AddiChip`
 
@@ -46,21 +47,21 @@ open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The chip's column struct, mirroring SP1's Rust `AddCols<T>` plus a
-Clean-only `next_pc_carry_value` column for the trace-level state-bus PC
-chain. The new field is the 3-limb result of `pc + 4` with carry; it
-exists only on the Clean side (SP1 emits this constraint inline in the
-state-bus interaction). -/
+/-- The chip's column struct, mirroring SP1's Rust `AddCols<T, M: TrustMode>`
+(`sp1/crates/core/machine/src/alu/add_sub/add.rs:47-62`) plus a Clean-only
+`next_pc_carry_value` column for the trace-level state-bus PC chain.
+The `adapter_cols : UserModeReaderCols T` slot is the last field, matching
+Rust under `M = UserMode`. We don't carry an explicit `M` type parameter on
+the struct because `deriving ProvableStruct` can't reduce through an
+abstract `M`; future SupervisorMode chips would use a separate
+`*ColsSupervisor` struct with `adapter_cols : EmptyCols T`. -/
 structure AddCols (T : Type) where
-  -- Phase 3 full: CPUState + RTypeReader both nested as single fields.
-  -- Remaining flat fields (op_a_write_value, is_real, next_pc_carry_value)
-  -- will be addressed in Phase 3c (sub-operation nesting) and Phase 4
-  -- (TrustMode polymorphism).
   state : CPUState T
   adapter : RTypeReader T
   op_a_write_value : Vector T 4
   is_real : T
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `AddChip::eval(builder, cols)`:
@@ -69,7 +70,7 @@ each sub-component. -/
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
-       op_a_write_value, is_real, _next_pc_carry_value⟩ := cols
+       op_a_write_value, is_real, _next_pc_carry_value, _adapter_cols⟩ := cols
   -- AddOperation: op_b_memory.prev_value + op_c_memory.prev_value = op_a_write_value.
   SP1Clean.AddOp.main op_b_memory.prev_value op_c_memory.prev_value op_a_write_value
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
@@ -92,10 +93,12 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   is_real * (is_real - 1) === 0
   op_a_0 === 0
 
-/-- Pilot Spec, expressed over field-valued `AddCols (ZMod p)`. Each clause
-mirrors one sub-component's constraint surface under `is_real = 1`, using
-the reusable helper Specs from `SP1Clean.AddOp`, `SP1Clean.CPUState`, and
-`SP1Clean.RTypeReader`. -/
+/-- Pilot Spec, expressed over field-valued `AddCols (ZMod p)`.
+Each clause mirrors one sub-component's constraint surface under
+`is_real = 1`, using the reusable helper Specs from `SP1Clean.AddOp`,
+`SP1Clean.CPUState`, and `SP1Clean.RTypeReader`. The trailing
+`cols.adapter_cols.is_trusted = 1` conjunct pins the
+`UserModeReaderCols<T>` payload to the trusted-row case we verify. -/
 def Spec (cols : AddCols (ZMod p)) : Prop :=
   SP1Clean.AddOp.Spec
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
@@ -123,7 +126,8 @@ def Spec (cols : AddCols (ZMod p)) : Prop :=
               { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
                 diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } } } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `AddCols` view. Mirrors the
 index map in `SP1Chips/Add/Constraints.lean`.
@@ -143,7 +147,12 @@ the field via the FormalAssertion soundness/completeness arms instead. -/
     Main[21],
     ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
    #v[Main[28], Main[29], Main[30], Main[31]],
-   Main[32], #v[0, 0, 0]⟩
+   Main[32], #v[0, 0, 0],
+   -- `adapter_cols.is_trusted` aliases `Main[32]` (= `is_real`) because the
+   -- current extractor passes `Main[32] Main[32]` to `RTypeReader.constraints`
+   -- (see `SP1Chips/Add/Constraints.lean:21`). When upstream regen lands a
+   -- separate `is_trusted` Main column, switch to that index.
+   ⟨Main[32]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
 `Add.constraints Main` is exactly `Spec (fromMain Main)`, under
@@ -238,7 +247,7 @@ open Circuit
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
-       op_a_write_value, is_real, next_pc_carry_value⟩ := cols
+       op_a_write_value, is_real, next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨op_b_memory.prev_value, op_c_memory.prev_value, op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))

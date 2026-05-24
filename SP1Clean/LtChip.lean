@@ -22,6 +22,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `LtChip` mirror — bundled signed/unsigned compare
 
@@ -57,6 +58,7 @@ structure LtCols (T : Type) where
   is_sltu : T
   lt_operation : LtOperationSigned T
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Emits CPUState range lookups, the program-bus
@@ -67,7 +69,7 @@ constraints are captured propositionally in `Spec` below. -/
 def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory, imm_c⟩, is_slt, is_sltu, lt_operation,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion
@@ -119,7 +121,8 @@ def Spec (cols : LtCols (ZMod p)) : Prop :=
   cols.is_slt * (cols.is_slt - 1) = 0 ∧
   cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
   (cols.is_slt + cols.is_sltu) * (cols.is_slt + cols.is_sltu - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `LtCols` view. Mirrors
 the index map in `SP1Chips/Lt/Constraints.lean` (44 columns; the
@@ -141,7 +144,11 @@ the index map in `SP1Chips/Lt/Constraints.lean` (44 columns; the
          comparison_limbs := #v[Main[40], Main[41]] },
      b_msb := { msb := Main[42] },
      c_msb := { msb := Main[43] } },
-   #v[0, 0, 0]⟩
+   #v[0, 0, 0],
+   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
+   -- (`Main[32]+Main[33]`), matching upstream's ALUTypeReader receiving
+   -- the same sum for both `is_real` and `is_trusted`.
+   ⟨Main[32] + Main[33]⟩⟩
 
 /-- The chip-level half-iff bridge (Lt): under
 `is_slt + is_sltu = 1 ∧ op_a_0 = 0`, the Clean `Spec` implies SP1's
@@ -229,7 +236,7 @@ the `LtOperationSigned` byte lookups and `ALUTypeReader` memory accesses. -/
 def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, is_slt, is_sltu, _lt_operation,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

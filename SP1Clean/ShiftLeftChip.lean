@@ -20,6 +20,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
 import SP1Chips.ShiftLeft.ShiftLeftChip
+import SP1Clean.TrustMode
 
 /-! # Chip-level `ShiftLeftChip` mirror — second heavy-arithmetic scaling probe
 
@@ -101,6 +102,7 @@ structure ShiftLeftCols (T : Type) where
   -- Bridge: Main[64] = Main[63] * Main[31] = is_sllw * imm_c = is_slliw.
   is_sllw_imm : T                           -- Main[64] (was sign_extend)
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- The aggregate is-real flag: at least one of the two shift variants
@@ -134,7 +136,7 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _shift_imm_low, _shift_imm_high, _msb, _result,
        c_bits, _v_01, _v_012, _v_0123, shift_u16, _lower_limb, _higher_limb,
        _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -223,7 +225,8 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
   (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
   cols.op_a_0 = 0 ∧
-  shiftSpec cols
+  shiftSpec cols ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `ShiftLeftCols` view.
 65 columns. Post-Phase-2.3 decomposition: `v_01/v_012/v_0123` are scalars
@@ -249,7 +252,10 @@ def Spec (cols : ShiftLeftCols (ZMod p)) : Prop :=
    #v[Main[57], Main[58], Main[59], Main[60]],
    { msb := Main[61] },
    Main[62], Main[63], Main[64],
-   #v[0, 0, 0]⟩
+   #v[0, 0, 0],
+   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
+   -- (`Main[62]+Main[63]`).
+   ⟨Main[62] + Main[63]⟩⟩
 
 /-- The chip-level half-iff bridge (ShiftLeft). **Proof body sorry'd**
 — see `feedback_path2_correct_bridge_costs.md`. -/
@@ -300,7 +306,7 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _shift_imm_low, _shift_imm_high, _msb, _result,
        _c_bits, _v_01, _v_012, _v_0123, _shift_u16, _lower_limb, _higher_limb,
        _limb_result, _sllw_msb, is_sll, is_sllw, _is_sllw_imm,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

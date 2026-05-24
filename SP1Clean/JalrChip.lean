@@ -21,6 +21,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `JalrChip` mirror — JALR (I-type indirect jump)
 
@@ -55,6 +56,7 @@ structure JalrCols (T : Type) where
   jump_target : Vector T 4
   op_a_write_value : Vector T 4
   lsb : T
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Emits CPUState range lookups, the program-bus
@@ -67,7 +69,7 @@ The two `AddOperation` sub-fragments are not emitted as subcircuits
 here — their constraints are captured propositionally in `Spec`. -/
 def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c_imm⟩, is_real, jump_target, op_a_write_value, lsb⟩ := cols
+       ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c_imm⟩, is_real, jump_target, op_a_write_value, lsb, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   -- Program-bus interaction. Opcode is 47 = JALR; I-type discipline
@@ -131,7 +133,8 @@ def Spec (cols : JalrCols (ZMod p)) : Prop :=
   -- iter-9 strengthening: PC alignment byte-send consequence
   -- ((jump_target[0] - lsb) / 4 in Range(14) — the bit-0-cleared
   -- jump target is 4-aligned in the low limb).
-  ((cols.jump_target[0] - cols.lsb) * (4 : ZMod p)⁻¹).val < 16384
+  ((cols.jump_target[0] - cols.lsb) * (4 : ZMod p)⁻¹).val < 16384 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- The op_a register access (read prior, write return address),
 exposed for trace-level OfflineMemory aggregation. -/
@@ -162,7 +165,8 @@ the index map in `SP1Chips/Jalr/Constraints.lean` (35 columns). -/
    Main[25],
    #v[Main[26], Main[27], Main[28], Main[29]],
    #v[Main[30], Main[31], Main[32], Main[33]],
-   Main[34]⟩
+   Main[34],
+   ⟨Main[25]⟩⟩
 
 /-- The chip-level half-iff bridge: under `is_real = 1 ∧ op_a_0 = 0`,
 the Clean-flavored `Spec` implies SP1's `allHold` over the flat row.
@@ -234,7 +238,7 @@ open Circuit
 @[reducible]
 def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, is_real, jump_target, _op_a_write_value, lsb⟩ := cols
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, is_real, jump_target, _op_a_write_value, lsb, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

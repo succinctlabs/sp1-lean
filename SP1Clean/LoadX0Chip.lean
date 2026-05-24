@@ -20,6 +20,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Chips.Load.LoadX0.LoadX0Chip
+import SP1Clean.TrustMode
 
 /-! # Chip-level `LoadX0Chip` mirror — load-when-op_a-is-x0 fast path
 
@@ -63,6 +64,7 @@ structure LoadX0Cols (T : Type) where
   is_lwu : T                                -- Main[46]
   is_ld : T                                 -- Main[47]
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 def isRealExpr (cols : Var LoadX0Cols (ZMod p)) : Expression (ZMod p) :=
@@ -81,7 +83,7 @@ def main (cols : Var LoadX0Cols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
        _offset_bit, is_lb, is_lbu, is_lh, is_lhu, is_lw,
-       is_lwu, is_ld, _next_pc_carry_value⟩ := cols
+       is_lwu, is_ld, _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   lookup ByteOpcodeTable
@@ -146,7 +148,8 @@ def Spec (cols : LoadX0Cols (ZMod p)) : Prop :=
   cols.is_lw * (cols.is_lw - 1) = 0 ∧
   cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
   cols.is_ld * (cols.is_ld - 1) = 0 ∧
-  is_real * (is_real - 1) = 0
+  is_real * (is_real - 1) = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 def loadMemoryAccess (cols : LoadX0Cols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
   { addr := cols.addr_value,
@@ -171,7 +174,8 @@ Mirrors the index map in `SP1Chips/Load/LoadX0/Constraints.lean`
    Main[33], Main[34], Main[35], Main[36], Main[37],
    #v[Main[38], Main[39], Main[40]],
    Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47],
-   #v[0, 0, 0]⟩
+   #v[0, 0, 0],
+   ⟨Main[41] + Main[42] + Main[43] + Main[44] + Main[45] + Main[46] + Main[47]⟩⟩
 
 /-- The chip-level half-iff bridge (LoadX0): under the active-variant
 hypothesis (one of `is_lb..is_ld = 1`, the rest zero), `Spec` implies
@@ -231,7 +235,7 @@ def main (cols : Var LoadX0Cols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
        _offset_bit, is_lb, is_lbu, is_lh, is_lhu, is_lw,
-       is_lwu, is_ld, next_pc_carry_value⟩ := cols
+       is_lwu, is_ld, next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let opcode_e := is_lb * 29 + is_lbu * 32 + is_lh * 30 + is_lhu * 33 +

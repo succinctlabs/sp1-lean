@@ -21,6 +21,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `BranchChip` mirror — bundled 6-variant conditional branch
 
@@ -70,10 +71,12 @@ structure BranchCols (T : Type) where
   -- Semantically redundant with `is_branching` (Main[34]) — both encode the
   -- branch-taken predicate. Kept as a separate Clean-only column for now to
   -- preserve the existing Assertion.main mux structure; Phase 4 (TrustMode)
-  -- will remove this and use Main[34]'s `is_branching` directly.
+  -- — adapter_cols scaffolding landed; this is_branching_aux removal is
+  -- still pending.
   is_branching_aux : T                      -- Clean-only mux selector (duplicates is_branching)
   next_pc_branched_carry : Vector T 3       -- Clean-only: pc + op_c_imm carry-aware result
   next_pc_unbranched_carry : Vector T 3     -- Clean-only: pc + 4 carry-aware result
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Aggregate is-real flag: sum of 6 selectors. -/
@@ -91,7 +94,8 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c_imm⟩, _next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
        _is_branching, _compare_operation,
-       _is_branching_aux, _next_pc_branched_carry, _next_pc_unbranched_carry⟩ := cols
+       _is_branching_aux, _next_pc_branched_carry, _next_pc_unbranched_carry,
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let opcode_e := is_beq * 40 + is_bne * 41 + is_blt * 42 +
@@ -132,7 +136,8 @@ def Spec (cols : BranchCols (ZMod p)) : Prop :=
   cols.is_bge * (cols.is_bge - 1) = 0 ∧
   cols.is_bltu * (cols.is_bltu - 1) = 0 ∧
   cols.is_bgeu * (cols.is_bgeu - 1) = 0 ∧
-  is_real * (is_real - 1) = 0
+  is_real * (is_real - 1) = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- The op_a / op_b register accesses (both reads; no writes — Branch
 doesn't update any register, only PC). -/
@@ -172,7 +177,8 @@ name; previously misnamed `lt_is_signed`). -/
          comparison_limbs := #v[Main[41], Main[42]] },
      b_msb := { msb := Main[43] },
      c_msb := { msb := Main[44] } },
-   0, #v[0, 0, 0], #v[0, 0, 0]⟩
+   0, #v[0, 0, 0], #v[0, 0, 0],
+   ⟨Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33]⟩⟩
 
 /-- The chip-level half-iff bridge (Branch). **Proof body sorry'd**. -/
 theorem spec_implies_allHold (Main : Vector (ZMod p) 45)
@@ -220,7 +226,8 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, next_pc,
        is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu,
        _is_branching, _compare_operation,
-       is_branching_aux, next_pc_branched_carry, next_pc_unbranched_carry⟩ := cols
+       is_branching_aux, next_pc_branched_carry, next_pc_unbranched_carry,
+       _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let opcode_e := is_beq * 40 + is_bne * 41 + is_blt * 42 +
@@ -254,7 +261,8 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- Equivalent to `is_branching_aux * branched + (1 - is_branching_aux) * unbranched`
   -- but avoids `(1 : ℕ) - is_branching_aux : Expression _` type ambiguity.
   -- `is_branching_aux` is the Clean-only mux selector duplicating Main[34]'s
-  -- `is_branching`; Phase 4 (TrustMode) will replace this with `is_branching`.
+  -- `is_branching`; Phase 4 (TrustMode) — adapter_cols scaffolding landed;
+  -- this is_branching_aux removal is still pending.
   next_pc[0] -
     (is_branching_aux * (next_pc_branched_carry[0] - next_pc_unbranched_carry[0]) +
      next_pc_unbranched_carry[0]) === 0

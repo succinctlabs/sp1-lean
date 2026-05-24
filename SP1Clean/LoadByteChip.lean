@@ -20,6 +20,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `LoadByteChip` mirror — first chip with a real memory load
 
@@ -79,6 +80,7 @@ structure LoadByteCols (T : Type) where
   is_lb : T                                 -- Main[45]
   is_lbu : T                                -- Main[46]
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors the SP1 source's emissions for the LB
@@ -100,7 +102,7 @@ def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
        _offset_bit_2, _offset_bit_1, _offset_bit_0,
        _selected_limb, selected_limb_low_byte, selected_byte, signed_extension_flag,
-       is_lb, is_lbu, _next_pc_carry_value⟩ := cols
+       is_lb, is_lbu, _next_pc_carry_value, _adapter_cols⟩ := cols
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
   lookup ByteOpcodeTable
     (#v[(6 : Expression (ZMod p)), (clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0]
@@ -190,7 +192,8 @@ def Spec (cols : LoadByteCols (ZMod p)) : Prop :=
   cols.is_lb * (cols.is_lb - 1) = 0 ∧
   cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
   (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- The load access as a `MemoryAccess` record, exposed for trace-level
 OfflineMemory aggregation. This is the access that hits the RAM branch
@@ -222,7 +225,7 @@ def loadMemoryAccess (cols : LoadByteCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
    #v[Main[29], Main[30], Main[31], Main[32]],
    Main[33], Main[34], Main[35], Main[36], Main[37],
    Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44],
-   Main[45], Main[46], #v[0, 0, 0]⟩
+   Main[45], Main[46], #v[0, 0, 0], ⟨Main[45] + Main[46]⟩⟩
 
 /-! ## `SpecForIff` — iff-equivalent to the SP1 constraint list
 
@@ -419,7 +422,7 @@ def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
        _offset_bit_2, _offset_bit_1, _offset_bit_0,
        _selected_limb, _selected_limb_low_byte, _selected_byte, _signed_extension_flag,
-       is_lb, is_lbu, next_pc_carry_value⟩ := cols
+       is_lb, is_lbu, next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

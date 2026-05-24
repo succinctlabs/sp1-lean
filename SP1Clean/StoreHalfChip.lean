@@ -21,6 +21,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.ITypeReaderImmutable
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `StoreHalfChip` mirror — 16-bit store
 
@@ -56,6 +57,7 @@ structure StoreHalfCols (T : Type) where
   store_value : Vector T 4            -- Main[40..43]
   is_real : T                               -- Main[44]
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 def main (cols : Var StoreHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
@@ -64,7 +66,7 @@ def main (cols : Var StoreHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
        _store_memory_flag, store_memory_diff_low, store_memory_diff_high,
        _offset_bit_1, _offset_bit_0, _store_value,
-       is_real, _next_pc_carry_value⟩ := cols
+       is_real, _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   lookup ByteOpcodeTable
@@ -106,7 +108,8 @@ def Spec (cols : StoreHalfCols (ZMod p)) : Prop :=
       op_b := #v[cols.adapter.op_b, 0, 0, 0],
       op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 def storeMemoryAccess (cols : StoreHalfCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
   { addr := cols.addr_value,
@@ -132,7 +135,7 @@ def storeWriteValue (cols : StoreHalfCols (ZMod p)) : Word (ZMod p) :=
    Main[33], Main[34], Main[35], Main[36], Main[37],
    Main[38], Main[39],
    #v[Main[40], Main[41], Main[42], Main[43]],
-   Main[44], #v[0, 0, 0]⟩
+   Main[44], #v[0, 0, 0], ⟨Main[44]⟩⟩
 
 /-- Iff RHS for the Store Half (SH) variant, mirroring
 `_root_.Store.StoreHalf.allHold_constraints_iff_of_is_real`. SH writes
@@ -223,7 +226,7 @@ def main (cols : Var StoreHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _store_prev_value, _store_memory_prev_high, _store_memory_prev_low,
        _store_memory_flag, _store_memory_diff_low, _store_memory_diff_high,
        _offset_bit_1, _offset_bit_0, _store_value,
-       is_real, next_pc_carry_value⟩ := cols
+       is_real, next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

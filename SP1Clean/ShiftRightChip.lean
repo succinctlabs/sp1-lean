@@ -20,6 +20,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.Reader.CPUState
+import SP1Clean.TrustMode
 
 /-! # Chip-level `ShiftRightChip` mirror — bundled 4-variant right shift
 
@@ -68,6 +69,7 @@ structure ShiftRightCols (T : Type) where
   is_sraw : T                               -- Main[67]
   sign_extend : T                           -- Main[68]
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 def isRealExpr (cols : Var ShiftRightCols (ZMod p)) : Expression (ZMod p) :=
@@ -84,7 +86,7 @@ def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _b_msb, _srw_msb, _c_bits, _sra_msb_v0123, _v_0123, _v_012, _v_01,
        _lower_limb, _higher_limb, _limb_result, _shift_u16,
        is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let opcode_e := is_srl * 7 + is_sra * 8 + is_srlw * 22 + is_sraw * 23
@@ -144,7 +146,8 @@ def Spec (cols : ShiftRightCols (ZMod p)) : Prop :=
   cols.is_sraw * (cols.is_sraw - 1) = 0 ∧
   is_real * (is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  shiftSpec cols
+  shiftSpec cols ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `ShiftRightCols` view.
 69 columns; `intermediates_aux : Vector T 28` packed from Main[36..63]. -/
@@ -171,7 +174,10 @@ def Spec (cols : ShiftRightCols (ZMod p)) : Prop :=
    #v[Main[56], Main[57], Main[58], Main[59]],  -- limb_result
    #v[Main[60], Main[61], Main[62], Main[63]],  -- shift_u16
    Main[64], Main[65], Main[66], Main[67], Main[68],
-   #v[0, 0, 0]⟩
+   #v[0, 0, 0],
+   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
+   -- (`Main[64]+Main[65]+Main[66]+Main[67]`).
+   ⟨Main[64] + Main[65] + Main[66] + Main[67]⟩⟩
 
 /-- The chip-level half-iff bridge (ShiftRight). **Proof body sorry'd**. -/
 theorem spec_implies_allHold (Main : Vector (ZMod p) 69)
@@ -220,7 +226,7 @@ def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _b_msb, _srw_msb, _c_bits, _sra_msb_v0123, _v_0123, _v_012, _v_01,
        _lower_limb, _higher_limb, _limb_result, _shift_u16,
        is_srl, is_sra, is_srlw, is_sraw, _sign_extend,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let opcode_e := is_srl * 7 + is_sra * 8 + is_srlw * 22 + is_sraw * 23

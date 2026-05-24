@@ -21,6 +21,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.RTypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `SubChip` mirror — R-type, operation-swap of `AddChip`
 
@@ -39,21 +40,22 @@ open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The chip's column struct, mirroring SP1's Rust `SubCols<T>`. Identical
-to `SP1Clean.Add.AddCols`. -/
+/-- The chip's column struct, mirroring SP1's Rust `SubCols<T, M: TrustMode>`.
+Identical to `SP1Clean.Add.AddCols`. -/
 structure SubCols (T : Type) where
   state : CPUState T
   adapter : RTypeReader T
   op_a_write_value : Vector T 4
   is_real : T
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `SubChip::eval(builder, cols)`. -/
 def main (cols : Var SubCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩, op_a_write_value, is_real,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   -- SubOperation: op_b_memory.prev_value - op_c_memory.prev_value = op_a_write_value.
   SP1Clean.SubOp.main op_b_memory.prev_value op_c_memory.prev_value op_a_write_value
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
@@ -102,7 +104,8 @@ def Spec (cols : SubCols (ZMod p)) : Prop :=
               { prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
                 diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } } } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `SubCols` view. Mirrors the
 index map in `SP1Chips/Sub/Constraints.lean`. -/
@@ -116,7 +119,8 @@ index map in `SP1Chips/Sub/Constraints.lean`. -/
     Main[21],
     ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
    #v[Main[28], Main[29], Main[30], Main[31]],
-   Main[32], #v[0, 0, 0]⟩
+   Main[32], #v[0, 0, 0],
+   ⟨Main[32]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
 `Sub.constraints Main` is exactly `Spec (fromMain Main)`, under
@@ -203,7 +207,7 @@ the `SubOp.main` borrow-form carry chain (see Scope note above). -/
 def main (cols : Var SubCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩, _op_a_write_value, is_real,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   -- Program-bus interaction (opcode = 2 = SUB; R-type discipline).

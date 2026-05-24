@@ -18,6 +18,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 import SP1Chips.DivRem.DivRemChip
 
 /-! # Chip-level `DivRemChip` mirror — bundled 4-variant integer division
@@ -102,6 +103,7 @@ structure DivRemCols (T : Type) where
   is_real : T                               -- Main[244]
   remainder_check_multiplicity : T          -- Main[245] (mult arg to remainder_lt_op)
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
@@ -113,7 +115,7 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _c_times_quotient_lower, _c_times_quotient_upper,
        aux_post,
        c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   -- Opcode encoded one-hot via the 8 mode flags at Main[201..208].
@@ -175,7 +177,8 @@ def Spec (cols : DivRemCols (ZMod p)) : Prop :=
   cols.abs_rem_alu_event * (cols.abs_rem_alu_event - 1) = 0 ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  divRemSpec cols
+  divRemSpec cols ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `DivRemCols` view. 246 columns,
 all fields named per the upstream `DivRemCols<T, M>` declaration order. -/
@@ -263,7 +266,8 @@ all fields named per the upstream `DivRemCols<T, M>` declaration order. -/
      neg_flags := #v[Main[236], Main[237], Main[238], Main[239], Main[240]] },
    -- Legacy 3-flag labels (Main[241..245]).
    Main[241], Main[242], Main[243], Main[244], Main[245],
-   #v[0, 0, 0]⟩
+   #v[0, 0, 0],
+   ⟨Main[244]⟩⟩
 
 /-- The chip-level half-iff bridge (DivRem). **Proof body sorry'd**. -/
 theorem spec_implies_allHold (Main : Vector (ZMod p) 246)
@@ -309,7 +313,7 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _c_times_quotient_lower, _c_times_quotient_upper,
        aux_post,
        c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let is_div   : Expression (ZMod p) := aux_post.mode_flags[0]

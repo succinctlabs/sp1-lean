@@ -21,6 +21,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `LoadWordChip` mirror — 32-bit signed/unsigned load
 
@@ -59,6 +60,7 @@ structure LoadWordCols (T : Type) where
   is_lw : T                                 -- Main[42]
   is_lwu : T                                -- Main[43]
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
@@ -67,7 +69,7 @@ def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, load_memory_diff_low, load_memory_diff_high,
        _offset_bit, _op_a_write_value_lo, _signed_extension_msb,
-       is_lw, is_lwu, _next_pc_carry_value⟩ := cols
+       is_lw, is_lwu, _next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   lookup ByteOpcodeTable
@@ -114,7 +116,8 @@ def Spec (cols : LoadWordCols (ZMod p)) : Prop :=
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
   cols.is_lw * (cols.is_lw - 1) = 0 ∧
   cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0
+  (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 def loadMemoryAccess (cols : LoadWordCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
   { addr := cols.addr_value,
@@ -137,7 +140,7 @@ def loadMemoryAccess (cols : LoadWordCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
    Main[33], Main[34], Main[35], Main[36], Main[37],
    Main[38],
    #v[Main[39], Main[40]],
-   Main[41], Main[42], Main[43], #v[0, 0, 0]⟩
+   Main[41], Main[42], Main[43], #v[0, 0, 0], ⟨Main[42] + Main[43]⟩⟩
 
 /-- Iff RHS for the signed Load Word (LW) variant, mirroring
 `_root_.Load.LoadWord.allHold_constraints_iff_of_is_lw`. -/
@@ -289,7 +292,7 @@ def main (cols : Var LoadWordCols (ZMod p)) : Circuit (ZMod p) Unit := do
        _load_prev_value, _load_memory_prev_high, _load_memory_prev_low,
        _load_memory_flag, _load_memory_diff_low, _load_memory_diff_high,
        _offset_bit, _op_a_write_value_lo, _signed_extension_msb,
-       is_lw, is_lwu, next_pc_carry_value⟩ := cols
+       is_lw, is_lwu, next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

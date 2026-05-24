@@ -21,6 +21,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Tier 3 pilot: chip-level `AddiChip` mirror — struct-of-columns style
 
@@ -55,13 +56,14 @@ open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The chip's column struct, mirroring SP1's Rust `AddiCols<T>`. -/
+/-- The chip's column struct, mirroring SP1's Rust `AddiCols<T, M: TrustMode>`. -/
 structure AddiCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
   op_a_write_value : Vector T 4
   is_real : T
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `AddiChip::eval(builder, cols)`:
@@ -69,7 +71,7 @@ takes a `Var AddiCols (ZMod p)` (struct of `Expression`s), destructures it,
 and emits the constraints for each sub-component. -/
 def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, op_a_write_value, is_real, _next_pc_carry_value⟩ := cols
+       ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, op_a_write_value, is_real, _next_pc_carry_value, _adapter_cols⟩ := cols
   -- AddOperation: op_b_memory.prev_value + op_c_imm = op_a_write_value.
   SP1Clean.AddOp.main op_b_memory.prev_value op_c_imm op_a_write_value
   -- CPUState: clk_0_16 progression (Range 13 → < 2^13 = 8192) and clk_16_24
@@ -134,7 +136,8 @@ def Spec (cols : AddiCols (ZMod p)) : Prop :=
                 diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb } },
         op_c_imm := cols.adapter.op_c_imm } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `AddiCols` view. Defined via
 direct indexed access — semantically the same as `ProvableType.fromElements`
@@ -149,7 +152,8 @@ take/drop tower the `ProvableStruct`-derived path produces. -/
     ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
     #v[Main[21], Main[22], Main[23], Main[24]]⟩,
    #v[Main[25], Main[26], Main[27], Main[28]],
-   Main[29], #v[0, 0, 0]⟩
+   Main[29], #v[0, 0, 0],
+   ⟨Main[29]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
 `Addi.constraints Main` is exactly the Clean-flavored `Spec (fromMain Main)`,
@@ -245,7 +249,7 @@ the 4 immediate-limb byte lookups (see Scope note above). -/
 @[reducible]
 def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, op_a_write_value, is_real, next_pc_carry_value⟩ := cols
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩, op_a_write_value, is_real, next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨op_b_memory.prev_value, op_c_imm, op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))

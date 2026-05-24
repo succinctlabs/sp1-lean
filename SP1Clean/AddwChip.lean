@@ -22,6 +22,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `AddwChip` mirror — 32-bit ALU-type add with sign-extension
 
@@ -53,13 +54,14 @@ structure AddwCols (T : Type) where
   addw_msb : T
   is_real : T
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `AddwChip::eval(builder, cols)`. -/
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, _op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, addw_value, addw_msb, is_real,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   -- AddwOperation: op_b_memory.prev_value + op_c_memory.prev_value = addw_value (low 32 bits).
   SP1Clean.AddwOp.main op_b_memory.prev_value op_c_memory.prev_value addw_value addw_msb
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
@@ -109,7 +111,8 @@ def Spec (cols : AddwCols (ZMod p)) : Prop :=
                 diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb } },
         imm_c := cols.adapter.imm_c } ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `AddwCols` view. Mirrors the
 index map in `SP1Chips/Addw/Constraints.lean`. -/
@@ -124,7 +127,8 @@ index map in `SP1Chips/Addw/Constraints.lean`. -/
     ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
     Main[31]⟩,
    #v[Main[32], Main[33]],
-   Main[34], Main[35], #v[0, 0, 0]⟩
+   Main[34], Main[35], #v[0, 0, 0],
+   ⟨Main[35]⟩⟩
 
 /-- The chip-level bridge: SP1's `allHold` over the flat row
 `Addw.constraints Main` is exactly `Spec (fromMain Main)`, under
@@ -224,7 +228,7 @@ assertZero gates — the AddwOp byte lookups are not promoted here. -/
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩, _addw_value, _addw_msb, is_real,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ProgramTable.assertion

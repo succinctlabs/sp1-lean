@@ -20,6 +20,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.RTypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Chips.Mul.MulChip
+import SP1Clean.TrustMode
 
 /-! # Chip-level `MulChip` mirror — heavy-arithmetic scaling test
 
@@ -98,6 +99,7 @@ structure MulCols (T : Type) where
   is_mulhsu : T                             -- Main[80]
   is_mulw : T                               -- Main[81]
   next_pc_carry_value : Vector T 3          -- Clean-only: pc + 4 carry witness
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- The aggregate is-real flag for Mul: any of the five opcode
@@ -130,7 +132,7 @@ def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, _op_a_memory, op_a_0, op_b, _op_b_memory, op_c, _op_c_memory⟩, _op_a_write_value,
        mul_op,
        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw,
-       _next_pc_carry_value⟩ := cols
+       _next_pc_carry_value, _adapter_cols⟩ := cols
   let carry := mul_op.carry
   let product := mul_op.product
   let is_real_e := is_mul + is_mulh + is_mulw + is_mulhsu + is_mulhu
@@ -252,7 +254,8 @@ def Spec (cols : MulCols (ZMod p)) : Prop :=
    * (cols.is_mul + cols.is_mulh + cols.is_mulw
       + cols.is_mulhsu + cols.is_mulhu - 1)) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  mulSpec cols
+  mulSpec cols ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `MulCols` view.
 82 columns; `carry : Vector T 16`, `product : Vector T 16`,
@@ -278,7 +281,11 @@ packed from contiguous Main slots. -/
     ⟨#v[Main[68], Main[69], Main[70], Main[71]]⟩,
     Main[72], Main[73], ⟨Main[74]⟩, Main[75], Main[76]⟩,
    Main[77], Main[78], Main[79], Main[80], Main[81],
-   #v[0, 0, 0]⟩
+   #v[0, 0, 0],
+   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
+   -- (`Main[77]+...+Main[81]`), matching the upstream RTypeReader receiving
+   -- `E3 E3` (is_real, is_trusted) where `E3` is that sum.
+   ⟨Main[77] + Main[78] + Main[79] + Main[80] + Main[81]⟩⟩
 
 /-- The chip-level half-iff bridge (Mul). **Proof body sorry'd**. -/
 theorem spec_implies_allHold (Main : Vector (ZMod p) 82)
@@ -328,7 +335,7 @@ def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩, _op_a_write_value,
        _mul_op,
        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw,
-       next_pc_carry_value⟩ := cols
+       next_pc_carry_value, _adapter_cols⟩ := cols
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   let is_real_e := is_mul + is_mulh + is_mulw + is_mulhsu + is_mulhu

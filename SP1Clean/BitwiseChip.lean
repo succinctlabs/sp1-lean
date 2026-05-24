@@ -20,6 +20,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 
 /-! # Chip-level `BitwiseChip` mirror — bundled 6-variant ALU chip
 
@@ -60,6 +61,7 @@ structure BitwiseCols (T : Type) where
   is_or : T
   is_and : T
   next_pc_carry_value : Vector T 3
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `BitwiseChip::eval(builder, cols)`
@@ -74,7 +76,7 @@ only what `main` actually emits. -/
 def main (cols : Var BitwiseCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩,
-       _bitwise_operation, is_xor, is_or, is_and, next_pc_carry_value⟩ := cols
+       _bitwise_operation, is_xor, is_or, is_and, next_pc_carry_value, _adapter_cols⟩ := cols
   -- CPUState range lookups (clk_0_16 progression + clk_16_24 U8 bound).
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
@@ -168,7 +170,8 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
   (cols.is_and = 0 ∨ cols.is_and = 1) ∧
   (cols.is_xor + cols.is_or + cols.is_and = 0 ∨
     cols.is_xor + cols.is_or + cols.is_and - 1 = 0) ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- Project a raw SP1 row into the structured `BitwiseCols` view. -/
 @[reducible] def fromMain (Main : Vector (ZMod p) 51) : BitwiseCols (ZMod p) :=
@@ -184,7 +187,11 @@ def Spec (cols : BitwiseCols (ZMod p)) : Prop :=
    ⟨⟨#v[Main[32], Main[33], Main[34], Main[35]]⟩,
     ⟨#v[Main[36], Main[37], Main[38], Main[39]]⟩,
     ⟨#v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]]⟩⟩,
-   Main[48], Main[49], Main[50], #v[0, 0, 0]⟩
+   Main[48], Main[49], Main[50], #v[0, 0, 0],
+   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
+   -- (`Main[48]+Main[49]+Main[50]`), matching upstream's ALUTypeReader
+   -- receiving the same sum for both `is_real` and `is_trusted`.
+   ⟨Main[48] + Main[49] + Main[50]⟩⟩
 
 set_option maxHeartbeats 800000 in
 -- Chip-level bridge: SP1's `allHold` over the flat row equals
@@ -226,8 +233,10 @@ theorem iff_sp1
   -- from `Bitwise.allHold_constraints_iff`'s LHS-side polymorphic
   -- elaboration. After normalizing with push_cast both sides are identical
   -- (modulo the still-folded `cpuStateSpec` / `aluTypeReaderSpec` named calls).
+  -- The trailing `∧ True` comes from the new `cols.adapter_cols.is_trusted = 1`
+  -- conjunct (= `1 = 1` under `h_is_real`); `and_true` strips it.
   push_cast
-  rfl
+  simp only [and_true]
 
 /-- Clean-side `correct_xor`: same Sail equivalence statement as SP1's
 `Xor.correct_xor`, but with the constraint hypothesis re-expressed against

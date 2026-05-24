@@ -17,6 +17,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.TrustMode
 import SP1Chips.Jal.JalChip
 
 /-! # Chip-level `JalChip` mirror — first chip with PC control flow
@@ -75,6 +76,7 @@ structure JalCols (T : Type) where
   next_pc : Vector T 4                      -- Main[22..25] (jump target, Main[25] is high limb)
   op_a_write_value : Vector T 4             -- Main[26..29] (return address = pc + 4)
   is_real : T                               -- Main[30]
+  adapter_cols : SP1Clean.UserModeReaderCols T
 deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors the SP1 source's emissions for JAL:
@@ -92,7 +94,7 @@ Opcode: `46 = JAL`. -/
 def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩,
-       next_pc, op_a_write_value, is_real⟩ := cols
+       next_pc, op_a_write_value, is_real, _adapter_cols⟩ := cols
   -- AddOperation for jump target: pc + op_b_imm = next_pc.
   SP1Clean.AddOp.assertion
     (⟨pc.push 0, op_b_imm, #v[next_pc[0], next_pc[1], next_pc[2], next_pc[3]]⟩ :
@@ -164,7 +166,8 @@ def Spec (cols : JalCols (ZMod p)) : Prop :=
   -- iter-9 strengthening: PC alignment byte-send consequence
   -- (next_pc[0] / 4 in Range(14) — the jump target is 4-aligned).
   -- This was emitted by the chip but not previously surfaced in Spec.
-  (cols.next_pc[0] * (4 : ZMod p)⁻¹).val < 16384
+  (cols.next_pc[0] * (4 : ZMod p)⁻¹).val < 16384 ∧
+  cols.adapter_cols.is_trusted = 1
 
 /-- The op_a register access (read prior, write return address), exposed
 for trace-level OfflineMemory aggregation. `write_value` at aggregation
@@ -186,7 +189,8 @@ the index map in `SP1Chips/Jal/Constraints.lean` (31 columns). -/
     #v[Main[18], Main[19], Main[20], Main[21]]⟩,
    #v[Main[22], Main[23], Main[24], Main[25]],
    #v[Main[26], Main[27], Main[28], Main[29]],
-   Main[30]⟩
+   Main[30],
+   ⟨Main[30]⟩⟩
 
 /-- The chip-level half-iff bridge: under `is_real = 1 ∧ op_a_0 = 0`,
 the Clean-flavored `Spec` implies SP1's `allHold` over the flat row.
@@ -260,7 +264,7 @@ open Circuit
 def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
        ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩,
-       next_pc, op_a_write_value, is_real⟩ := cols
+       next_pc, op_a_write_value, is_real, _adapter_cols⟩ := cols
   -- CPUState: clk_0_16 / clk_16_24 range bounds.
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
