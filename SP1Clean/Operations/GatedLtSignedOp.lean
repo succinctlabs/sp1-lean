@@ -8,22 +8,26 @@ import SP1Foundations.Field
 import SP1Clean.Operations.LtOperationSigned
 import SP1Clean.Operations.GatedLtUnsignedOp
 import SP1Clean.Operations.Gated
+import SP1Clean.SP1Lookup
+import SP1Clean.ByteOpcodeTable
 
 /-! # `GatedLtSignedOp` — gated form of `LtSignedOp.assertion`
 
 Second gated combinator. Composes `GatedLtUnsignedOp.assertion` on
 sign-flipped operands as a sub-circuit (re-using the same `gate`) and
 inlines the 2 U16MSB bit-gates + 3 surviving scalar gates of
-`LtSignedOp`, each multiplied by `gate`. The byte-range lookups that
-`U16MSBOp` and `U16CompareOp` emit are **dropped here** — they live
-on the chip-level multiplicity bus.
+`LtSignedOp`, each multiplied by `gate`. Adds 2 `byteOpcodeGated` calls
+for the U16MSB byte-range entries on `b[3]`/`c[3]` (`2*X[3] - 65536*X_msb`).
+The U16Compare byte-range lookup is emitted by the inner
+`GatedLtUnsignedOp`.
 
-The `FormalSpec` is `gate = 0 ∨ <carry-only Spec>`. The inner Spec
+The `FormalSpec` is `gate = 0 ∨ <carry-and-lookup Spec>`. The inner Spec
 captures:
 - 2× U16MSB bit-gates (`b_msb`, `c_msb` each boolean)
 - the embedded `GatedLtUnsignedOp.FormalSpec` on sign-flipped operands
 - 1× `is_signed` boolean
 - 2× sign-vacuity gates (`(is_signed - 1) * {b,c}_msb = 0`)
+- 2 disjunctive byte-range conjuncts (U16MSB on `b[3]` / `c[3]`)
 
 Mirrors `LtOperationSigned.constraints` under `is_real := gate`. -/
 
@@ -34,7 +38,7 @@ namespace SP1Clean.GatedLtSignedOp
 
 open Circuit
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (p > 512)]
 
 /-- Bundled input. Mirrors `LtSignedOp.Inputs` + a `gate : F` field. -/
 structure Inputs (F : Type) where
@@ -52,9 +56,10 @@ structure Inputs (F : Type) where
   gate : F
 deriving ProvableStruct
 
-/-- Carry-only Spec for the gated signed-less-than operation. The
+/-- Carry-and-lookup Spec for the gated signed-less-than operation. The
 embedded GatedLtUnsignedOp's FormalSpec stays disjunctive (already
-`gate = 0 ∨ ...`); the surrounding 5 gates are inlined as equalities. -/
+`gate = 0 ∨ ...`); the surrounding 5 gates are inlined as equalities;
+the 2 new U16MSB byte-range lookups appear as disjunctive conjuncts. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   let one : ZMod p := 1
   let b3' := input.b[3] + input.is_signed * 32768 - 65536 * input.b_msb
@@ -71,20 +76,29 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
   -- 3 surviving scalar gates.
   input.is_signed * (input.is_signed - one) = 0 ∧
   (input.is_signed - one) * input.b_msb = 0 ∧
-  (input.is_signed - one) * input.c_msb = 0
+  (input.is_signed - one) * input.c_msb = 0 ∧
+  -- 2 disjunctive U16MSB byte-range conjuncts (vacuous on `gate = 0`).
+  -- The `X * 2 - Y * 65536` form matches `main`'s `Expression`-typed
+  -- multiplications; downstream chip-level `iff_sp1` bridges to the
+  -- SP1-native `2 * X - 65536 * Y` form via `ring`.
+  (input.gate = 0 ∨ SP1Clean.ByteOpcodeSpec
+    (#v[6, input.b[3] * 2 - input.b_msb * 65536, 16, 0] : Vector (ZMod p) 4)) ∧
+  (input.gate = 0 ∨ SP1Clean.ByteOpcodeSpec
+    (#v[6, input.c[3] * 2 - input.c_msb * 65536, 16, 0] : Vector (ZMod p) 4))
 
 namespace Assertion
 
 open Circuit
 
 /-- Gated `main`. 2× gated U16MSB bit-gates + 1× sub-circuit
-`GatedLtUnsignedOp.assertion` (carries its own gating) + 3× gated
-scalar gates. -/
+`GatedLtUnsignedOp.assertion` (carries its own gating + U16Compare
+byte-range lookup) + 3× gated scalar gates + 2× `byteOpcodeGated`
+calls for the U16MSB byte-range entries on `b[3]` / `c[3]`. -/
 @[reducible]
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let gate := input.gate
   let one_expr : Expression (ZMod p) := 1
-  -- U16MSB bit-gates (gated; lookups dropped).
+  -- U16MSB bit-gates (gated).
   gate * (input.b_msb * (input.b_msb - one_expr)) === 0
   gate * (input.c_msb * (input.c_msb - one_expr)) === 0
   -- Sub-circuit: GatedLtUnsignedOp on sign-flipped operands.
@@ -100,10 +114,19 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   gate * (input.is_signed * (input.is_signed - one_expr)) === 0
   gate * ((input.is_signed - one_expr) * input.b_msb) === 0
   gate * ((input.is_signed - one_expr) * input.c_msb) === 0
+  -- 2× U16MSB byte-range lookups, gated by `gate`. Expression on the
+  -- left side of `*` so the literal `2`/`65536` can be coerced into
+  -- `Expression (ZMod p)` (the `ℕ * Expression` form has no HMul instance).
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[6, input.b[3] * 2 - input.b_msb * 65536, 16, 0], gate⟩ :
+      Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[6, input.c[3] * 2 - input.c_msb * 65536, 16, 0], gate⟩ :
+      Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
 
-set_option maxHeartbeats 800000 in
--- Sub-circuit GatedLtUnsignedOp + 5 scalar gates exceeds default
--- `subcircuitsConsistent` synth budget.
+set_option maxHeartbeats 1200000 in
+-- Sub-circuits GatedLtUnsignedOp + 2× byteOpcodeGated + 5 scalar gates
+-- exceeds default `subcircuitsConsistent` synth budget.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   name := "SP1Clean.GatedLtSignedOp"
@@ -113,6 +136,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   localLength_eq input offset := by
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
 
 /-- No external assumptions. -/
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
@@ -138,9 +163,12 @@ theorem soundness :
   subst h_bmsb_eq
   subst h_cmsb_eq
   subst h_g_eq
-  obtain ⟨h_bmsb, h_cmsb, h_sub_call, h_isigned, h_bmsb_v, h_cmsb_v⟩ := h_holds
-  -- Sub-circuit hypothesis fires under trivial assumption.
+  obtain ⟨h_bmsb, h_cmsb, h_sub_call, h_isigned, h_bmsb_v, h_cmsb_v,
+          h_b_byte_sub, h_c_byte_sub⟩ := h_holds
+  -- Sub-circuit hypotheses fire under trivial assumption.
   have h_sub := h_sub_call trivial
+  have h_b_byte := h_b_byte_sub trivial
+  have h_c_byte := h_c_byte_sub trivial
   simp only [FormalSpec, SP1Clean.GatedLtSignedOp.Spec, Vector.getElem_map,
              sub_eq_add_neg]
   unfold id at *
@@ -155,11 +183,17 @@ theorem soundness :
   · exact Or.inl (by linear_combination h_g)
   obtain h_g | h_cmsb_v' := mul_eq_zero.mp h_cmsb_v
   · exact Or.inl (by linear_combination h_g)
-  -- All 5 gates' factors nonzero, plus sub-circuit Spec holds.
-  refine Or.inr ⟨h_bmsb', h_cmsb', ?_, h_isigned', h_bmsb_v', h_cmsb_v'⟩
-  -- The sub-FormalSpec is exactly `h_sub` modulo the `Vector.map` shape
-  -- of `b`/`c` after `subst` (`Vector.getElem_map` already in scope).
-  convert h_sub using 2
+  -- All 5 gates' factors nonzero, plus sub-circuit Spec + 2 byte-range
+  -- subcircuit Specs hold.
+  refine Or.inr ⟨h_bmsb', h_cmsb', ?_, h_isigned', h_bmsb_v', h_cmsb_v',
+                  ?_, ?_⟩
+  · -- Embedded GatedLtUnsignedOp.FormalSpec: matches `h_sub` modulo
+    -- `Vector.map` shape of `b`/`c` after `subst`.
+    convert h_sub using 2
+  · -- b[3] U16MSB byte-range from byteOpcodeGated.soundness.
+    simpa using h_b_byte
+  · -- c[3] U16MSB byte-range from byteOpcodeGated.soundness.
+    simpa using h_c_byte
 
 omit [Fact (2 ^ 17 < p)] in
 theorem completeness :
@@ -179,25 +213,30 @@ theorem completeness :
   subst h_g_eq
   unfold id at *
   rcases h_spec with h_gate | h_spec'
-  · -- gate = 0: every `gate * _` is trivially 0, and the sub-FormalSpec
-    -- is satisfied via its own `Or.inl` (gate = 0).
+  · -- gate = 0: every `gate * _` is trivially 0, the sub-FormalSpec is
+    -- satisfied via its own `Or.inl`, and both byte-range subcircuits
+    -- discharge via their `gate = 0` disjuncts.
     dsimp only at h_gate
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · rw [h_gate]; ring
     · rw [h_gate]; ring
-    · -- Sub-circuit completeness premise: tuple `⟨assumption, spec⟩`.
-      -- Discharge the spec via the sub's `gate = 0` disjunct.
+    · -- GatedLtUnsignedOp sub-circuit completeness premise.
       exact ⟨trivial, Or.inl h_gate⟩
     · rw [h_gate]; ring
     · rw [h_gate]; ring
     · rw [h_gate]; ring
+    · -- byteOpcodeGated on b[3]: gate = 0 branch.
+      exact ⟨trivial, Or.inl h_gate⟩
+    · -- byteOpcodeGated on c[3]: gate = 0 branch.
+      exact ⟨trivial, Or.inl h_gate⟩
   · -- Inner Spec holds: each inline gate by multiplication; sub-FormalSpec
-    -- comes from the inner Spec directly.
+    -- comes from the inner Spec directly; byte-range subcircuits discharge
+    -- from the 2 new disjunctive conjuncts.
     simp only [SP1Clean.GatedLtSignedOp.Spec, Vector.getElem_map] at h_spec'
-    obtain ⟨h_bmsb', h_cmsb', h_sub_spec, h_isigned', h_bmsb_v', h_cmsb_v'⟩ :=
-      h_spec'
+    obtain ⟨h_bmsb', h_cmsb', h_sub_spec, h_isigned', h_bmsb_v', h_cmsb_v',
+            h_b_byte', h_c_byte'⟩ := h_spec'
     set g := Expression.eval env.toEnvironment input_var_gate
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · linear_combination g * h_bmsb'
     · linear_combination g * h_cmsb'
     · refine ⟨trivial, ?_⟩
@@ -205,6 +244,12 @@ theorem completeness :
     · linear_combination g * h_isigned'
     · linear_combination g * h_bmsb_v'
     · linear_combination g * h_cmsb_v'
+    · refine ⟨trivial, ?_⟩
+      change g = 0 ∨ ByteOpcodeSpec _
+      simpa [sub_eq_add_neg] using h_b_byte'
+    · refine ⟨trivial, ?_⟩
+      change g = 0 ∨ ByteOpcodeSpec _
+      simpa [sub_eq_add_neg] using h_c_byte'
 
 end Assertion
 

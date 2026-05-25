@@ -114,33 +114,106 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
 
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
 
-/-- Spec: structural mirror of `LtOperationUnsigned.allHold_constraints_iff`'s
-RHS (under `is_real = 1`). Carries the flag-booleans, the one-hot sum,
-the cross-limb wiring equations, the comparison_limbs selection
-identity, and the not_eq_inv discipline + the embedded U16CompareOp
-spec via direct field reference (no `List.Forall` wrapper). -/
+/-- Spec: structural mirror of `LtOperationUnsigned.constraints.allHold`
+under `is_real = 1`, in the `_ = 0` form that matches `main`'s emitted
+gates. Carries `U16CompareOp.Spec` (the inner byte-comparison) + 4 flag
+booleans + sum-of-flags binary + 4 cross-limb selection gates + 2
+`comparison_limbs` derivation identities + the `not_eq_inv` discipline. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
+  let one : ZMod p := 1
   SP1Clean.U16CompareOp.Assertion.Spec
     ⟨input.comparison_limbs[0], input.comparison_limbs[1], input.compare_bit⟩ ∧
-  input.u16_flags[0] * (input.u16_flags[0] - 1) = 0 ∧
-  input.u16_flags[1] * (input.u16_flags[1] - 1) = 0 ∧
-  input.u16_flags[2] * (input.u16_flags[2] - 1) = 0 ∧
-  input.u16_flags[3] * (input.u16_flags[3] - 1) = 0 ∧
+  input.u16_flags[0] * (input.u16_flags[0] - one) = 0 ∧
+  input.u16_flags[1] * (input.u16_flags[1] - one) = 0 ∧
+  input.u16_flags[2] * (input.u16_flags[2] - one) = 0 ∧
+  input.u16_flags[3] * (input.u16_flags[3] - one) = 0 ∧
   (let sum_flags := input.u16_flags[0] + input.u16_flags[1] +
      input.u16_flags[2] + input.u16_flags[3]
-   sum_flags * (sum_flags - 1) = 0) ∧
-  -- Cross-limb selection (the 4 `(1 - cum) * (b[i] - c[i]) = 0` gates)
-  -- and comparison_limbs derivation + not_eq_inv discipline omitted here
-  -- for brevity; soundness proof recovers them from `main`'s assertZeros.
-  True
+   sum_flags * (sum_flags - one) = 0) ∧
+  -- 4 cross-limb selection gates (MSB→LSB cumulative). `one : ZMod p` is
+  -- bound above to fix the leading-`1` elaboration ambiguity that would
+  -- otherwise let Lean infer `(1 : ℕ) - <coerced field value>`.
+  (one - input.u16_flags[3]) * (input.b[3] - input.c[3]) = 0 ∧
+  (one - (input.u16_flags[3] + input.u16_flags[2])) *
+    (input.b[2] - input.c[2]) = 0 ∧
+  (one - (input.u16_flags[3] + input.u16_flags[2] + input.u16_flags[1])) *
+    (input.b[1] - input.c[1]) = 0 ∧
+  (one - (input.u16_flags[3] + input.u16_flags[2] +
+        input.u16_flags[1] + input.u16_flags[0])) *
+    (input.b[0] - input.c[0]) = 0 ∧
+  -- 2 `comparison_limbs` derivation identities.
+  (input.b[3] * input.u16_flags[3] + input.b[2] * input.u16_flags[2] +
+    input.b[1] * input.u16_flags[1] + input.b[0] * input.u16_flags[0]) -
+      input.comparison_limbs[0] = 0 ∧
+  (input.c[3] * input.u16_flags[3] + input.c[2] * input.u16_flags[2] +
+    input.c[1] * input.u16_flags[1] + input.c[0] * input.u16_flags[0]) -
+      input.comparison_limbs[1] = 0 ∧
+  -- `not_eq_inv` discipline.
+  (let sum_flags := input.u16_flags[0] + input.u16_flags[1] +
+     input.u16_flags[2] + input.u16_flags[3]
+   (-sum_flags) * (input.not_eq_inv *
+     (input.comparison_limbs[0] - input.comparison_limbs[1]) - one) = 0)
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨h_b_eq, h_c_eq, h_bit_eq, h_f_eq, h_nei_eq, h_cl_eq⟩ := h_input
+  subst h_b_eq
+  subst h_c_eq
+  subst h_bit_eq
+  subst h_f_eq
+  subst h_nei_eq
+  subst h_cl_eq
+  obtain ⟨h_u16_sub, h_f0, h_f1, h_f2, h_f3, h_s, h_x3, h_x2, h_x1, h_x0,
+          h_cl0, h_cl1, h_nei⟩ := h_holds
+  -- U16CompareOp subcircuit hands back its Spec under trivial assumption.
+  have h_u16 := h_u16_sub trivial
+  unfold id at *
+  simp only [Spec, Vector.getElem_map]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · -- U16CompareOp.Spec form bridge.
+    exact h_u16
+  · linear_combination h_f0
+  · linear_combination h_f1
+  · linear_combination h_f2
+  · linear_combination h_f3
+  · linear_combination h_s
+  · linear_combination h_x3
+  · linear_combination h_x2
+  · linear_combination h_x1
+  · linear_combination h_x0
+  · linear_combination h_cl0
+  · linear_combination h_cl1
+  · linear_combination h_nei
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨h_b_eq, h_c_eq, h_bit_eq, h_f_eq, h_nei_eq, h_cl_eq⟩ := h_input
+  subst h_b_eq
+  subst h_c_eq
+  subst h_bit_eq
+  subst h_f_eq
+  subst h_nei_eq
+  subst h_cl_eq
+  simp only [Spec, Vector.getElem_map] at h_spec
+  obtain ⟨h_u16, h_f0, h_f1, h_f2, h_f3, h_s, h_x3, h_x2, h_x1, h_x0,
+          h_cl0, h_cl1, h_nei⟩ := h_spec
+  unfold id at *
+  refine ⟨⟨trivial, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_u16
+  · linear_combination h_f0
+  · linear_combination h_f1
+  · linear_combination h_f2
+  · linear_combination h_f3
+  · linear_combination h_s
+  · linear_combination h_x3
+  · linear_combination h_x2
+  · linear_combination h_x1
+  · linear_combination h_x0
+  · linear_combination h_cl0
+  · linear_combination h_cl1
+  · linear_combination h_nei
 
 /-- The full Clean `FormalAssertion` for `LtOperationUnsigned`. -/
 def assertion : FormalAssertion (ZMod p) Inputs :=
@@ -151,7 +224,11 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     completeness := completeness }
 
 /-- Bridge to SP1: `Spec input` is equivalent to SP1's
-`LtOperationUnsigned.constraints` `allHold` form under `is_real = 1`. -/
+`LtOperationUnsigned.constraints` `allHold` form under `is_real = 1`.
+Unfolds both `LtOperationUnsigned.constraints` and the embedded
+`U16CompareOperation.constraints` simultaneously, flattens via
+`List.forall_append` + `List.Forall`, then bridges the byte-send
+conjunct via `U16CompareOp.iff_sp1`'s recipe. -/
 theorem iff_sp1 (input : Inputs (ZMod p)) :
     Spec input ↔
       (LtOperationUnsigned.constraints input.b input.c
@@ -159,6 +236,47 @@ theorem iff_sp1 (input : Inputs (ZMod p)) :
           u16_flags := input.u16_flags,
           not_eq_inv := input.not_eq_inv,
           comparison_limbs := input.comparison_limbs } 1).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  have h16_val : (16 : ZMod p).val = 16 := by
+    rw [show (16 : ZMod p) = ((16 : ℕ) : ZMod p) from by push_cast; rfl,
+        ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
+  simp only [LtOperationUnsigned.constraints, U16CompareOperation.constraints,
+             SP1ConstraintList.allHold, List.forall_append, List.Forall,
+             SP1Constraint.toProp, SP1Constraint.toProp_send_byte, Spec,
+             SP1Clean.U16CompareOp.Assertion.Spec,
+             one_ne_zero, not_false_eq_true, true_imp_iff,
+             ByteOpcode.ofNat_seven, ByteOpcode.constrain_Range, h16_val,
+             show (2 ^ 16 : ℕ) = 65536 from rfl, and_assoc]
+  -- After simp:
+  -- LHS (Spec):    bit_bin ∧ range ∧ 4 flag_bin ∧ sum_bin ∧ 4 cross ∧ 2 cl ∧ nei
+  -- RHS (SP1):     E1 (= 1*0 ; trivial) ∧ bit_bin ∧ range ∧ E1' (trivial)
+  --                ∧ 4 flag_bin ∧ sum_bin ∧ 4 cross ∧ 2 cl ∧ nei
+  -- The 2 trivial `1 * (1 - 1) = 0` E1 conjuncts drop; the rest match.
+  constructor
+  · rintro ⟨h_bit_bin, h_range, h_f0, h_f1, h_f2, h_f3, h_s, h_x3, h_x2, h_x1,
+            h_x0, h_cl0, h_cl1, h_nei⟩
+    refine ⟨by ring, h_bit_bin, fun _ => h_range, by ring, h_f0, h_f1, h_f2, h_f3,
+            h_s, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    -- Cross-limb / cl-derivation / nei conjuncts: SP1 form has `0 +` prefix
+    -- from accumulator-style intermediate `let E16 := 0 + ...` etc.
+    · linear_combination h_x3
+    · linear_combination h_x2
+    · linear_combination h_x1
+    · linear_combination h_x0
+    · linear_combination h_cl0
+    · linear_combination h_cl1
+    · linear_combination h_nei
+  · rintro ⟨_h_E1, h_bit_bin, h_range, _h_E1', h_f0, h_f1, h_f2, h_f3, h_s,
+            h_x3, h_x2, h_x1, h_x0, h_cl0, h_cl1, h_nei⟩
+    refine ⟨h_bit_bin, h_range one_ne_zero, h_f0, h_f1, h_f2, h_f3, h_s,
+            ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · linear_combination h_x3
+    · linear_combination h_x2
+    · linear_combination h_x1
+    · linear_combination h_x0
+    · linear_combination h_cl0
+    · linear_combination h_cl1
+    · linear_combination h_nei
 
 end SP1Clean.LtUnsignedOp
