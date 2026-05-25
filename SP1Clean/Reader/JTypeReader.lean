@@ -252,4 +252,126 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
+/-! ## Flag-threaded variant (`Gated`)
+
+Mirrors Rust's `JTypeReader::eval(..., is_real, is_trusted)` from
+`crates/core/machine/src/adapter/register/j_type.rs:75-103`. Same
+shape as `SP1Clean.ITypeReader.Gated`, but for J-type only op_a is a
+register (op_b and op_c are both 4-limb immediates), so the gated
+form emits **one** `RegisterAccess.assertion` (op_a write at +4)
+with `mult := is_real`, plus the `programGated` send with
+`mult := is_trusted`. -/
+
+namespace Gated
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+structure Inputs (F : Type) where
+  clk_high : F
+  clk_low : F
+  opcode : F
+  pc : Vector F 3
+  op_a_write_value : Vector F 4
+  cols : _root_.JTypeReader F
+  is_real : F
+  is_trusted : F
+deriving ProvableStruct
+
+namespace Assertion
+
+open Circuit
+
+/-- Clean-side flag-threaded J-type reader circuit. -/
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       ⟨op_a, op_a_memory, op_a_0, op_b_imm, op_c_imm⟩,
+       is_real, is_trusted⟩ := input
+  is_real * (is_real - 1) === 0
+  -- Program-bus lookup (imm_b = 1, imm_c = 1 for J-type), gated by is_trusted.
+  SP1Clean.programGated
+    (⟨#v[pc[0], pc[1], pc[2], opcode, op_a,
+         op_b_imm[0], op_b_imm[1], op_b_imm[2], op_b_imm[3],
+         op_c_imm[0], op_c_imm[1], op_c_imm[2], op_c_imm[3],
+         op_a_0, 1, 1],
+       is_trusted⟩ : Var SP1Clean.ProgramGated.Inputs (ZMod p))
+  -- One per-operand register-access subcircuit (op_a write at +4),
+  -- gated by is_real. op_b and op_c are immediates (no register read).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 4, op_a, op_a_memory.prev_value, op_a_write_value,
+       op_a_memory.access_timestamp.prev_low,
+       op_a_memory.access_timestamp.diff_low_limb, is_real⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  op_a_0 * op_a_write_value[0] === 0
+  op_a_0 * op_a_write_value[1] === 0
+  op_a_0 * op_a_write_value[2] === 0
+  op_a_0 * op_a_write_value[3] === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.JTypeReader.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       cols, is_real, is_trusted⟩ := input
+  is_real * (is_real - 1) = 0 ∧
+  SP1Clean.ProgramGated.Spec
+    ⟨#v[pc[0], pc[1], pc[2], opcode, cols.op_a,
+        cols.op_b_imm[0], cols.op_b_imm[1], cols.op_b_imm[2], cols.op_b_imm[3],
+        cols.op_c_imm[0], cols.op_c_imm[1], cols.op_c_imm[2], cols.op_c_imm[3],
+        cols.op_a_0, 1, 1],
+     is_trusted⟩ ∧
+  SP1Clean.RegisterAccess.Assertion.Spec
+    ⟨clk_high, clk_low, 4, cols.op_a, cols.op_a_memory.prev_value,
+     op_a_write_value, cols.op_a_memory.access_timestamp.prev_low,
+     cols.op_a_memory.access_timestamp.diff_low_limb, is_real⟩ ∧
+  cols.op_a_0 * op_a_write_value[0] = 0 ∧
+  cols.op_a_0 * op_a_write_value[1] = 0 ∧
+  cols.op_a_0 * op_a_write_value[2] = 0 ∧
+  cols.op_a_0 * op_a_write_value[3] = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨e_ckh, e_cl, e_opc, e_pc, e_oawv,
+          ⟨e_oa, ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_obi, e_oci⟩,
+          e_ir, e_it⟩ := h_input
+  subst_eqs
+  obtain ⟨h_gate, h_prog_sub, h_ra_a_sub,
+          h_z0, h_z1, h_z2, h_z3⟩ := h_holds
+  simp only [Spec, sub_eq_add_neg, Vector.getElem_map]
+  exact ⟨h_gate, h_prog_sub trivial, h_ra_a_sub trivial,
+         h_z0, h_z1, h_z2, h_z3⟩
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨e_ckh, e_cl, e_opc, e_pc, e_oawv,
+          ⟨e_oa, ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_obi, e_oci⟩,
+          e_ir, e_it⟩ := h_input
+  subst_eqs
+  simp only [Spec, sub_eq_add_neg, Vector.getElem_map] at h_spec
+  obtain ⟨h_gate, h_prog, h_ra_a, h_z0, h_z1, h_z2, h_z3⟩ := h_spec
+  exact ⟨h_gate, ⟨trivial, h_prog⟩, ⟨trivial, h_ra_a⟩,
+         h_z0, h_z1, h_z2, h_z3⟩
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) Inputs :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.Spec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
+end Gated
+
 end SP1Clean.JTypeReader
