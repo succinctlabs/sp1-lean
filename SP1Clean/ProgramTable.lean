@@ -8,6 +8,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.Opcode
 import SP1Foundations.Assumptions
+import SP1Clean.SP1Lookup
 
 /-! # Clean-side mirror of SP1's program-bus interactions
 
@@ -157,5 +158,70 @@ def ProgramTable.assertion : FormalAssertion (ZMod p) ProgramTable.Inputs :=
     Spec := ProgramTable.Spec,
     soundness := ProgramTable.soundness,
     completeness := ProgramTable.completeness }
+
+end SP1Clean
+
+/-! ## `HasDefaultRow` for `ProgramTable`
+
+To use the multiplicity-aware `SP1Lookup.lookupGated` with `ProgramTable`
+(needed by readers that thread `is_trusted` through the program-bus
+interaction), we need a known-valid default row. We use the `UNIMP`
+opcode (52), whose `trusted_instr` predicate is trivially `True` for any
+operand values (`SP1Foundations/Assumptions.lean:137`). -/
+
+namespace SP1Clean
+
+/-- Default row for `ProgramTable`: opcode = UNIMP (52), op_a_0 = 1
+(matching op_a = 0 in the op_a_0 iff), all other fields zero. UNIMP's
+`trusted_instr` branch is `True`, so the row satisfies `ProgramSpec`
+unconditionally. -/
+instance ProgramTable.hasDefaultRow
+    {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)] :
+    SP1Lookup.HasDefaultRow (SP1Clean.ProgramTable : Table (ZMod p) (fields 16)) where
+  defaultRow := #v[0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
+  defaultRow_in_table := by
+    intro _
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    have hp : 2 ^ 17 < p := Fact.out
+    have h65536 : (65536 : ZMod p).val = 65536 := by
+      rw [show (65536 : ZMod p) = ((65536 : ℕ) : ZMod p) from by push_cast; rfl,
+          ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
+    have h32 : (32 : ZMod p).val = 32 := by
+      rw [show (32 : ZMod p) = ((32 : ℕ) : ZMod p) from by push_cast; rfl,
+          ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
+    have h52 : (52 : ZMod p).val = 52 := by
+      rw [show (52 : ZMod p) = ((52 : ℕ) : ZMod p) from by push_cast; rfl,
+          ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
+    have h_zero_lt_32 : (0 : ZMod p) < (32 : ZMod p) := by
+      change (0 : ZMod p).val < (32 : ZMod p).val; simp [h32]
+    have h_zero_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
+      change (0 : ZMod p).val < (65536 : ZMod p).val; simp [h65536]
+    -- The default row's ProgramSpec: discharge each clause.
+    refine ⟨?_, h_zero_lt_32,
+            ⟨h_zero_lt_65536, h_zero_lt_65536, h_zero_lt_65536, h_zero_lt_65536⟩,
+            ⟨h_zero_lt_65536, h_zero_lt_65536, h_zero_lt_65536, h_zero_lt_65536⟩,
+            Or.inr ?_, ?_, Or.inl ?_, Or.inl ?_,
+            ?_, h_zero_lt_65536, h_zero_lt_65536, h_zero_lt_65536⟩
+    -- trusted_instr: row[3] = 52 ⇒ Opcode.UNIMP whose trusted_instr branch is True
+    · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                 List.getElem_cons_succ, h52,
+                 show (Opcode.ofNat 52 : Opcode) = .UNIMP from rfl,
+                 Opcode.trusted_instr]
+    -- op_a_0 = 1 (right disjunct of {0, 1})
+    · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                 List.getElem_cons_succ]
+    -- op_a_0 = 1 ↔ op_a = 0 (both sides are 1 = 1 / 0 = 0 trivially)
+    · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                 List.getElem_cons_succ]
+    -- imm_b = 0 (left disjunct of {0, 1})
+    · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                 List.getElem_cons_succ]
+    -- imm_c = 0 (left disjunct of {0, 1})
+    · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                 List.getElem_cons_succ]
+    -- pc[0] % 4 = 0 (pc[0] = 0)
+    · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero]
+      rw [val_mod_4_eq_zero_iff_zmod]
+      simp
 
 end SP1Clean
