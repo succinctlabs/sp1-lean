@@ -173,8 +173,15 @@ omit [Fact (2 ^ 17 < p)] in
 
 /-! ## Chip-level `FormalSpec`
 
-Composes `MulOp.Spec`, `cpuStateSpec`, `rtypeReaderSpec`, plus the 7
-trailing scalar gates (5 selector binaries + sum binary + op_a_0). -/
+Composes `MulOp.Spec`, `cpuStateSpec`, `rtypeReaderSpec`, the 7 trailing
+scalar gates (5 selector binaries + sum binary + op_a_0), and the 5
+per-variant RV64 BitVec semantic equations (`RV64.mul`/`.mulh`/`.mulhu`/
+`.mulhsu`/`.mulw`, each conditional on its selector being 1). The
+opcode used inside `rtypeReaderSpec` links the selectors to the RV64
+dispatch on the constraint side; the trailing RV64 conjuncts are the
+semantic image of that opcode dispatch (one selector ⇒ one RV64 op).
+Mirror of Add's `is_real = 1 → RV64.add …` conjunct
+(`SP1Clean/AddChip/Cols.lean:204-207`), 5-way for the 5 selectors. -/
 def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let is_real : ZMod p :=
@@ -182,6 +189,9 @@ def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
   let opcode : ZMod p :=
     cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13 +
     cols.is_mulhsu * 14 + cols.is_mulw * 24
+  let bw : BitVec 64 := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
+  let cw : BitVec 64 := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
+  let aw : BitVec 64 := Word.toBitVec64 cols.a_word
   SP1Clean.MulOp.Spec
       ⟨cols.a_word,
        cols.adapter.op_b_memory.prev_value,
@@ -200,6 +210,11 @@ def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
   cols.is_mulhsu * (cols.is_mulhsu - 1) = 0 ∧
   cols.is_mulw * (cols.is_mulw - 1) = 0 ∧
   is_real * (is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  (cols.is_mul    = 1 → aw = RV64.mul    cw bw) ∧
+  (cols.is_mulh   = 1 → aw = RV64.mulh   cw bw) ∧
+  (cols.is_mulhu  = 1 → aw = RV64.mulhu  cw bw) ∧
+  (cols.is_mulhsu = 1 → aw = RV64.mulhsu cw bw) ∧
+  (cols.is_mulw   = 1 → aw = RV64.mulw   cw bw)
 
 end SP1Clean.MulChip
