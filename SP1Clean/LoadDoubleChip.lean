@@ -14,6 +14,8 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Load.LoadDouble.Common
 import SP1Clean.Operations.AddrAddOperation
+import SP1Clean.Operations.AddressShape
+import SP1Clean.Operations.LoadMemoryAccessGated
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -284,5 +286,99 @@ def assertion : FormalAssertion (ZMod p) LoadDoubleCols :=
     Spec := Assertion.FormalSpec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## `AssertionGated` — full sub-circuit composition with gated multiplicities
+
+LoadDouble loads a full 64-bit value with no sub-word selector. Composes
+CPUState, AddrAddOp, AddressShape, ITypeReader, and LoadMemoryAccessGated.
+Multiplicity is `is_real` (the single LD opcode flag). -/
+
+namespace AssertionGated
+
+open Circuit
+
+@[reducible]
+def main (cols : Var LoadDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩,
+       addr_value, addr_top_two_limb_inv,
+       load_prev_value, load_memory_prev_high, load_memory_prev_low,
+       load_memory_flag, load_memory_diff_low, load_memory_diff_high,
+       is_real, _adapter_cols⟩ := cols
+  let clk_low : Expression (ZMod p) := clk_0_16 + clk_16_24 * 65536
+  let opcode : Expression (ZMod p) := is_real * 35
+  -- For LoadDouble, the loaded value is the full prev_value (no selector).
+  let op_a_write_value : Vector (Expression (ZMod p)) 4 :=
+    #v[load_prev_value[0], load_prev_value[1], load_prev_value[2], load_prev_value[3]]
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨op_b_memory.prev_value, op_c_imm, addr_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  SP1Clean.AddressShape.assertion
+    (⟨addr_value, addr_top_two_limb_inv, 0, 0, 0⟩ :
+      Var SP1Clean.AddressShape.Inputs (ZMod p))
+  SP1Clean.ITypeReader.assertion
+    (⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ :
+      Var SP1Clean.ITypeReader.Inputs (ZMod p))
+  SP1Clean.LoadMemoryAccessGated.assertion
+    (⟨clk_high, clk_low, addr_value, load_prev_value,
+       load_memory_prev_high, load_memory_prev_low,
+       load_memory_diff_low, load_memory_diff_high,
+       load_memory_flag, is_real⟩ :
+      Var SP1Clean.LoadMemoryAccessGated.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) LoadDoubleCols unit where
+  name := "SP1Clean.LoadDouble.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : LoadDoubleCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : LoadDoubleCols (ZMod p)) : Prop :=
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let opcode : ZMod p := cols.is_real * 35
+  let op_a_write_value : Vector (ZMod p) 4 :=
+    #v[cols.load_prev_value[0], cols.load_prev_value[1],
+       cols.load_prev_value[2], cols.load_prev_value[3]]
+  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
+  SP1Clean.AddrAddOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
+  SP1Clean.AddressShape.Assertion.Spec
+    ⟨cols.addr_value, cols.addr_top_two_limb_inv, 0, 0, 0⟩ ∧
+  SP1Clean.ITypeReader.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, op_a_write_value, cols.adapter⟩ ∧
+  SP1Clean.LoadMemoryAccessGated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.load_memory_flag, cols.is_real⟩ ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+end AssertionGated
+
+def assertionGated : FormalAssertion (ZMod p) LoadDoubleCols :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.FormalSpec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.LoadDouble

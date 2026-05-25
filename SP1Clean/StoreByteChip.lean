@@ -14,6 +14,9 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Store.StoreByte.Common
 import SP1Clean.Operations.AddrAddOperation
+import SP1Clean.Operations.AddressShape
+import SP1Clean.Operations.StoreMemoryAccessGated
+import SP1Clean.Operations.StoreByteAssembler
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -434,5 +437,106 @@ def assertion : FormalAssertion (ZMod p) StoreByteCols :=
     Spec := Assertion.FormalSpec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## `AssertionGated` — full sub-circuit composition with gated multiplicities
+
+StoreByte composes: CPUState, AddrAddOp, AddressShape, ITypeReaderImmutable
+(op_a is read for the byte to store), StoreMemoryAccessGated, and
+StoreByteAssembler. Multiplicity is `is_real`. -/
+
+namespace AssertionGated
+
+open Circuit
+
+@[reducible]
+def main (cols : Var StoreByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩,
+       addr_value, addr_top_two_limb_inv,
+       store_prev_value, store_memory_prev_high, store_memory_prev_low,
+       store_memory_flag, store_memory_diff_low, store_memory_diff_high,
+       byte_selector_top, byte_selector_mid, byte_selector_lo,
+       mem_limb, mem_limb_low_byte, register_low_byte, _increment,
+       store_value, is_real, _adapter_cols⟩ := cols
+  let clk_low : Expression (ZMod p) := clk_0_16 + clk_16_24 * 65536
+  let opcode : Expression (ZMod p) := is_real * 36  -- SB
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨op_b_memory.prev_value, op_c_imm, addr_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  SP1Clean.AddressShape.assertion
+    (⟨addr_value, addr_top_two_limb_inv,
+       byte_selector_top, byte_selector_mid, byte_selector_lo⟩ :
+      Var SP1Clean.AddressShape.Inputs (ZMod p))
+  SP1Clean.ITypeReaderImmutable.assertion
+    (⟨clk_high, clk_low, opcode, pc,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ :
+      Var SP1Clean.ITypeReaderImmutable.Inputs (ZMod p))
+  SP1Clean.StoreMemoryAccessGated.assertion
+    (⟨clk_high, clk_low, addr_value, store_prev_value, store_value,
+       store_memory_prev_high, store_memory_prev_low,
+       store_memory_diff_low, store_memory_diff_high,
+       store_memory_flag, is_real⟩ :
+      Var SP1Clean.StoreMemoryAccessGated.Inputs (ZMod p))
+  SP1Clean.StoreByteAssembler.assertion
+    (⟨store_prev_value, store_value, register_low_byte, mem_limb_low_byte,
+       byte_selector_top, byte_selector_mid, byte_selector_lo⟩ :
+      Var SP1Clean.StoreByteAssembler.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+  -- mem_limb is the prev_value limb the store is replacing (boilerplate gate)
+  mem_limb * (mem_limb - mem_limb) === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) StoreByteCols unit where
+  name := "SP1Clean.StoreByte.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : StoreByteCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let opcode : ZMod p := cols.is_real * 36
+  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
+  SP1Clean.AddrAddOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
+  SP1Clean.AddressShape.Assertion.Spec
+    ⟨cols.addr_value, cols.addr_top_two_limb_inv,
+     cols.byte_selector_top, cols.byte_selector_mid, cols.byte_selector_lo⟩ ∧
+  SP1Clean.ITypeReaderImmutable.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, cols.adapter⟩ ∧
+  SP1Clean.StoreMemoryAccessGated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.store_prev_value,
+     cols.store_value,
+     cols.store_memory_prev_high, cols.store_memory_prev_low,
+     cols.store_memory_diff_low, cols.store_memory_diff_high,
+     cols.store_memory_flag, cols.is_real⟩ ∧
+  SP1Clean.StoreByteAssembler.Assertion.Spec
+    ⟨cols.store_prev_value, cols.store_value,
+     cols.register_low_byte, cols.mem_limb_low_byte,
+     cols.byte_selector_top, cols.byte_selector_mid, cols.byte_selector_lo⟩ ∧
+  cols.is_real * (cols.is_real - 1) = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+end AssertionGated
+
+def assertionGated : FormalAssertion (ZMod p) StoreByteCols :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.FormalSpec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.StoreByte

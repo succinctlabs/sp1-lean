@@ -102,10 +102,10 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
       Var SP1Clean.MulOp.Inputs (ZMod p))
   -- 2 AddOp subcircuits (c-neg + rem-neg, borrow-form):
   SP1Clean.AddOp.assertion
-    (⟨c_word, abs_c, aux_post.c_neg_operation.value⟩ :
+    (⟨c_word, abs_c, aux_post.c_neg_operation.value, is_real⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   SP1Clean.AddOp.assertion
-    (⟨remainder_word, abs_remainder, aux_post.rem_neg_operation.value⟩ :
+    (⟨remainder_word, abs_remainder, aux_post.rem_neg_operation.value, is_real⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   -- LtUnsignedOp subcircuit (remainder < divisor):
   SP1Clean.LtUnsignedOp.assertion

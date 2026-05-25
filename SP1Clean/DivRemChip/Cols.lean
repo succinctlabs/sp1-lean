@@ -149,8 +149,8 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
      cols.c_times_quotient_lower.b_sign_extend, cols.c_times_quotient_lower.c_sign_extend,
      mf[0], mf[1], mf[3], mf[2], 0⟩ ∧
   -- 2 AddOp sub-Specs (c-neg + rem-neg) — borrow-form via Assertion.Spec:
-  SP1Clean.AddOp.Spec cols.c cols.abs_c cols.aux_post.c_neg_operation.value ∧
-  SP1Clean.AddOp.Spec cols.remainder cols.abs_remainder
+  SP1Clean.AddOp.RawSpec cols.c cols.abs_c cols.aux_post.c_neg_operation.value ∧
+  SP1Clean.AddOp.RawSpec cols.remainder cols.abs_remainder
     cols.aux_post.rem_neg_operation.value ∧
   -- LtUnsigned sub-Spec (remainder < divisor):
   SP1Clean.LtUnsignedOp.Spec

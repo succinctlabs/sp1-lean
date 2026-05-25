@@ -14,6 +14,8 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Store.StoreDouble.Common
 import SP1Clean.Operations.AddrAddOperation
+import SP1Clean.Operations.AddressShape
+import SP1Clean.Operations.StoreMemoryAccessGated
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -287,5 +289,100 @@ def assertion : FormalAssertion (ZMod p) StoreDoubleCols :=
     Spec := Assertion.FormalSpec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## `AssertionGated` — full sub-circuit composition with gated multiplicities
+
+StoreDouble has no sub-word assembler — the entire 64-bit `op_a` value is
+written to memory. Composes CPUState, AddrAddOp, AddressShape,
+ITypeReaderImmutable, and StoreMemoryAccessGated. Multiplicity is
+`is_real`. -/
+
+namespace AssertionGated
+
+open Circuit
+
+@[reducible]
+def main (cols : Var StoreDoubleCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩,
+       addr_value, addr_top_two_limb_inv,
+       store_prev_value, store_memory_prev_high, store_memory_prev_low,
+       store_memory_flag, store_memory_diff_low, store_memory_diff_high,
+       is_real, _adapter_cols⟩ := cols
+  let clk_low : Expression (ZMod p) := clk_0_16 + clk_16_24 * 65536
+  let opcode : Expression (ZMod p) := is_real * 39  -- SD
+  -- store_value equals the full op_a register value (4 limbs).
+  let store_value : Vector (Expression (ZMod p)) 4 :=
+    #v[op_a_memory.prev_value[0], op_a_memory.prev_value[1],
+       op_a_memory.prev_value[2], op_a_memory.prev_value[3]]
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨op_b_memory.prev_value, op_c_imm, addr_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  SP1Clean.AddressShape.assertion
+    (⟨addr_value, addr_top_two_limb_inv, 0, 0, 0⟩ :
+      Var SP1Clean.AddressShape.Inputs (ZMod p))
+  SP1Clean.ITypeReaderImmutable.assertion
+    (⟨clk_high, clk_low, opcode, pc,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ :
+      Var SP1Clean.ITypeReaderImmutable.Inputs (ZMod p))
+  SP1Clean.StoreMemoryAccessGated.assertion
+    (⟨clk_high, clk_low, addr_value, store_prev_value, store_value,
+       store_memory_prev_high, store_memory_prev_low,
+       store_memory_diff_low, store_memory_diff_high,
+       store_memory_flag, is_real⟩ :
+      Var SP1Clean.StoreMemoryAccessGated.Inputs (ZMod p))
+  is_real * (is_real - 1) === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) StoreDoubleCols unit where
+  name := "SP1Clean.StoreDouble.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : StoreDoubleCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let opcode : ZMod p := cols.is_real * 39
+  let store_value : Vector (ZMod p) 4 :=
+    #v[cols.adapter.op_a_memory.prev_value[0], cols.adapter.op_a_memory.prev_value[1],
+       cols.adapter.op_a_memory.prev_value[2], cols.adapter.op_a_memory.prev_value[3]]
+  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
+  SP1Clean.AddrAddOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
+  SP1Clean.AddressShape.Assertion.Spec
+    ⟨cols.addr_value, cols.addr_top_two_limb_inv, 0, 0, 0⟩ ∧
+  SP1Clean.ITypeReaderImmutable.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, cols.adapter⟩ ∧
+  SP1Clean.StoreMemoryAccessGated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, cols.addr_value,
+     cols.store_prev_value, store_value,
+     cols.store_memory_prev_high, cols.store_memory_prev_low,
+     cols.store_memory_diff_low, cols.store_memory_diff_high,
+     cols.store_memory_flag, cols.is_real⟩ ∧
+  cols.is_real * (cols.is_real - 1) = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+end AssertionGated
+
+def assertionGated : FormalAssertion (ZMod p) StoreDoubleCols :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.FormalSpec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.StoreDouble

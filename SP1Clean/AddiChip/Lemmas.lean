@@ -57,7 +57,7 @@ the structural pieces of `FormalSpec`. -/
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 30) (h_is_real : Main[29] = 1) :
     (_root_.Addi.constraints Main).allHold ↔
-      (SP1Clean.AddOp.Spec
+      (SP1Clean.AddOp.RawSpec
           #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[21], Main[22], Main[23], Main[24]]
           #v[Main[25], Main[26], Main[27], Main[28]] ∧

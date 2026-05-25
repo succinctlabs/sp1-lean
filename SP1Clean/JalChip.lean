@@ -99,11 +99,12 @@ def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
        next_pc, op_a_write_value, is_real, _adapter_cols⟩ := cols
   -- AddOperation for jump target: pc + op_b_imm = next_pc.
   SP1Clean.AddOp.assertion
-    (⟨pc.push 0, op_b_imm, #v[next_pc[0], next_pc[1], next_pc[2], next_pc[3]]⟩ :
+    (⟨pc.push 0, op_b_imm, #v[next_pc[0], next_pc[1], next_pc[2], next_pc[3]],
+      is_real⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   -- AddOperation for return address: pc + 4 = op_a_write_value.
   SP1Clean.AddOp.assertion
-    (⟨pc.push 0, #v[4, 0, 0, 0], op_a_write_value⟩ :
+    (⟨pc.push 0, #v[4, 0, 0, 0], op_a_write_value, is_real⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   -- CPUState: clk_0_16 progression and clk_16_24 byte bound.
   lookup ByteOpcodeTable
@@ -145,8 +146,8 @@ per-fragment specs:
 The state-bus content beyond what ProgramTable.Spec gives (PC alignment,
 PC limb bounds) is empty per-row — see the file docstring. -/
 def TraceSpec (cols : JalCols (ZMod p)) : Prop :=
-  SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
-  SP1Clean.AddOp.Spec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
+  SP1Clean.AddOp.RawSpec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
+  SP1Clean.AddOp.RawSpec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.memoryAccessSpec
     (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 4
@@ -400,10 +401,11 @@ def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   -- Jump target: pc + op_b_imm = next_pc.
   SP1Clean.AddOp.assertion
-    (⟨pc.push 0, op_b_imm, next_pc⟩ : Var SP1Clean.AddOp.Inputs (ZMod p))
+    (⟨pc.push 0, op_b_imm, next_pc, is_real⟩ :
+      Var SP1Clean.AddOp.Inputs (ZMod p))
   -- Return address: pc + 4 = op_a_write_value.
   SP1Clean.AddOp.assertion
-    (⟨pc.push 0, #v[4, 0, 0, 0], op_a_write_value⟩ :
+    (⟨pc.push 0, #v[4, 0, 0, 0], op_a_write_value, is_real⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   -- Program-bus interaction (opcode = 46 = JAL).
   SP1Clean.ProgramTable.assertion
@@ -422,15 +424,22 @@ def main (cols : Var JalCols (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) JalCols unit where
   name := "SP1Clean.Jal"
   main := main
-  localLength _ := 0
+  -- Computed from main; AddOp.assertion now allocates 16 hint witnesses each.
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
 
 def Assumptions (_ : JalCols (ZMod p)) : Prop := True
 
 def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.AddOp.Spec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
-  SP1Clean.AddOp.Spec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
+  SP1Clean.AddOp.RawSpec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
+  SP1Clean.AddOp.RawSpec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc, opcode := 46, op_a := cols.adapter.op_a,
       op_b := cols.adapter.op_b_imm, op_c := cols.adapter.op_c_imm,
