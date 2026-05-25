@@ -179,7 +179,7 @@ can reference it without importing the full circuit construction:
   `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
 def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.AddOp.Spec
+  SP1Clean.AddOp.RawSpec
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm
       cols.op_a_write_value ∧
   SP1Clean.CPUState.Gated.Assertion.Spec

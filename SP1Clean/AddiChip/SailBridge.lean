@@ -45,7 +45,7 @@ theorem sail_correct_of_formalSpec
   have h_isreal' : (toMain cols)[29] = 1 := h_is_real
   -- Reconstruct SP1's `allHold` on `toMain cols` from the new Gated
   -- FormalSpec conjuncts via `fromMain (toMain cols)` ≡ `cols`.
-  have h_addop' : SP1Clean.AddOp.Spec
+  have h_addop' : SP1Clean.AddOp.RawSpec
         (fromMain (toMain cols)).adapter.op_b_memory.prev_value
         (fromMain (toMain cols)).adapter.op_c_imm
         (fromMain (toMain cols)).op_a_write_value := by

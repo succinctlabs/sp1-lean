@@ -56,7 +56,8 @@ def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
        adapter, op_a_write_value, is_real, adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
-    (⟨adapter.op_b_memory.prev_value, adapter.op_c_imm, op_a_write_value⟩ :
+    (⟨adapter.op_b_memory.prev_value, adapter.op_c_imm, op_a_write_value,
+      is_real⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
   SP1Clean.CPUState.Gated.assertion
     (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,

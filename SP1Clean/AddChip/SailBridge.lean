@@ -58,7 +58,7 @@ theorem sail_correct_of_formalSpec
   -- `(fromMain (toMain cols)).Y` projections then unfold to the matching
   -- `(toMain cols)[k]` / `#v[…]` forms by `@[reducible]` on `fromMain`/`toMain`,
   -- lining up with the goal `allHold_iff_structural` produces.
-  have h_addop' : SP1Clean.AddOp.Spec
+  have h_addop' : SP1Clean.AddOp.RawSpec
         (fromMain (toMain cols)).adapter.op_b_memory.prev_value
         (fromMain (toMain cols)).adapter.op_c_memory.prev_value
         (fromMain (toMain cols)).op_a_write_value := by
