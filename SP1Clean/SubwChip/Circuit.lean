@@ -97,14 +97,29 @@ theorem soundness :
   -- produces) to the natural-form `Spec` that `FormalSpec` carries.
   have h_subwop := (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp
     (h_subwop_sub trivial)
-  refine ⟨h_subwop, h_cpu_sub trivial, ?_, h_op_a_0⟩
-  -- Bridge `RTypeReader.Gated.assertion.Spec` (lowercase) → matching
-  -- `RTypeReader.Gated.Assertion.Spec` (uppercase) form via simp on the
-  -- assertion definition.
-  have h := h_rtr_sub trivial
-  simpa [SP1Clean.RTypeReader.Gated.assertion,
-         SP1Clean.RTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
-         Vector.getElem_map] using h
+  have h_rtr := h_rtr_sub trivial
+  refine ⟨h_subwop, h_cpu_sub trivial, ?_, h_op_a_0, ?_⟩
+  · -- Bridge `RTypeReader.Gated.assertion.Spec` (lowercase) → matching
+    -- `RTypeReader.Gated.Assertion.Spec` (uppercase) form via simp on the
+    -- assertion definition.
+    simpa [SP1Clean.RTypeReader.Gated.assertion,
+           SP1Clean.RTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
+           Vector.getElem_map] using h_rtr
+  · -- BitVec `RV64.subw` conjunct: discharge from `SubwOp.Spec` (natural-form)
+    -- + the per-operand `Word.isU64` bounds for op_b/op_c — inside
+    -- `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec` sub-conjuncts.
+    intro h_is_real_eq
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
+    change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real_eq
+    have h_ir_ne_zero :
+        (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
+      rw [h_is_real_eq]; exact one_ne_zero
+    have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
+      (h_ra_b.resolve_left h_ir_ne_zero).2.2
+    have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
+      (h_ra_c.resolve_left h_ir_ne_zero).2.2
+    exact rv64_subw_eq_of_subwop_spec _ _ _ _ h_isU64_b h_isU64_c h_subwop
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -112,7 +127,7 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_subw_value, e_subw_msb, e_is_real, e_ac⟩
     := h_input
   subst_eqs
-  obtain ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩ := h_spec
+  obtain ⟨h_subwop, h_cpu, h_rtr, h_op_a_0, _h_rv64subw⟩ := h_spec
   unfold id at *
   -- Reverse bridge: natural-form `Spec` → borrow-form `Assertion.Spec` for
   -- the SubwOp completeness obligation.

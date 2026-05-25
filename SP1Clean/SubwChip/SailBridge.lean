@@ -34,7 +34,7 @@ theorem sail_correct_of_formalSpec
                              (.Regidx (sp1_op_b_cols cols))
                              (.Regidx (sp1_op_a_cols cols))).run s := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩ := h_spec
+  obtain ⟨h_subwop, h_cpu, h_rtr, h_op_a_0, _h_rv64subw⟩ := h_spec
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_state := h_init (toMain cols) h_round_trip
   have h_isreal' : (toMain cols)[31] = 1 := h_is_real

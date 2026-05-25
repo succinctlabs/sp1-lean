@@ -3,6 +3,7 @@ import SP1Operations.Operation.SubwOperation.SubwOperation
 import SP1Clean.Operations.SubwOperation
 import SP1Clean.Reader.RTypeReader
 import SP1Chips.Subw.Common
+import RISCV.Instructions
 
 /-! # `SubwChip` cols-level lemmas
 
@@ -95,5 +96,60 @@ lemma allHold_iff_structural
   · rintro ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩
     refine ⟨h_subwop, h_cpu, h_rtr, ?_, h_op_a_0⟩
     ring
+
+/-- Bridge the `SubwOperation.spec` 32-bit BitVec equation +
+sign-extension MSB to the 64-bit `RV64.subw` semantic. Given the
+natural-form `SubwOp.Spec` plus operand `Word.isU64` bounds, the
+sign-extended Word `#v[value[0], value[1], msb*65535, msb*65535]`
+equals `RV64.subw c.toBitVec64 b.toBitVec64`. Used by
+`Assertion.soundness` to discharge the BitVec conjunct of
+`FormalSpec`. -/
+lemma rv64_subw_eq_of_subwop_spec
+    (b c : Word (ZMod p)) (value : HWord (ZMod p)) (msb : ZMod p)
+    (h_isU64_b : b.isU64) (h_isU64_c : c.isU64)
+    (h_subwop : SP1Clean.SubwOp.Spec b c
+      ({ value := value, msb := { msb := msb } } : SubwOperation (ZMod p))) :
+    Word.toBitVec64 #v[value[0], value[1], msb * 65535, msb * 65535] =
+      RV64.subw c.toBitVec64 b.toBitVec64 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  -- Bridge the natural-form Spec to `SubwOperation.constraints.allHold`,
+  -- then apply `SubwOperation.spec` for the 32-bit equation + msb fact.
+  have h_allHold : (SubwOperation.constraints b c
+        { value := value, msb := { msb := msb } } 1).allHold :=
+    (SP1Clean.SubwOp.iff_sp1 _ _ _).mpr h_subwop
+  obtain ⟨h_isU32_v, h_subw_bv, h_msb_eq⟩ :=
+    SubwOperation.spec h_isU64_b h_isU64_c h_allHold
+  -- Unfold `RV64.subw` and bridge `BitVec.extractLsb' 0 32 ·.toBitVec64`
+  -- to `·.low.toBitVec32` via `Word.setWidth_eq_low` (which uses
+  -- `BitVec.setWidth`; the two are defeq for narrowing).
+  simp only [RV64.subw]
+  have h_b_low :
+      BitVec.extractLsb' 0 32 b.toBitVec64 = b.low.toBitVec32 := by
+    rw [show BitVec.extractLsb' 0 32 b.toBitVec64 =
+          BitVec.setWidth 32 b.toBitVec64 from rfl]
+    exact Word.setWidth_eq_low h_isU64_b
+  have h_c_low :
+      BitVec.extractLsb' 0 32 c.toBitVec64 = c.low.toBitVec32 := by
+    rw [show BitVec.extractLsb' 0 32 c.toBitVec64 =
+          BitVec.setWidth 32 c.toBitVec64 from rfl]
+    exact Word.setWidth_eq_low h_isU64_c
+  rw [h_b_low, h_c_low]
+  -- Substitute the SubwOperation.spec equation:
+  --   value.toBitVec32 = b.low.toBitVec32 - c.low.toBitVec32
+  -- but the unfolded `RV64.subw` form uses `BitVec.sub` instead of `HSub.hSub`;
+  -- bridge both directions.
+  rw [show b.low.toBitVec32.sub c.low.toBitVec32 = HWord.toBitVec32 value by
+    rw [h_subw_bv]; rfl]
+  -- Apply `sign_extend_32_to_64_msb`: signExtend 64 value.toBitVec32 equals
+  -- the Word with high limbs `if msb then 65535 else 0`. Combined with
+  -- `msb = if … then 1 else 0`, the high limbs match `msb * 65535`.
+  -- Reduce the `{ value, msb }` projections in `h_msb_eq` first.
+  simp only at h_msb_eq h_isU32_v
+  rw [HWord.sign_extend_32_to_64_msb h_isU32_v]
+  -- Discharge `msb * 65535 = if … then 65535 else 0` via `h_msb_eq`.
+  rw [h_msb_eq]
+  by_cases h : (HWord.toBitVec32 value).msb = true
+  · simp [h]
+  · simp [h]
 
 end SP1Clean.Subw

@@ -146,11 +146,12 @@ The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
 can reference it without importing the full circuit construction:
 SUBW carry-chain arithmetic (`SubwOp.Spec`, Inputs-shape) plus the
 flag-threaded sub-circuit composition (`CPUState.Gated` +
-`RTypeReader.Gated`, opcode 20) plus the chip-level `op_a_0 = 0` gate.
+`RTypeReader.Gated`, opcode 20) plus the chip-level `op_a_0 = 0` gate
+plus a pure BitVec `RV64.subw` semantic (conditional on `is_real = 1`).
 The free `is_real * (is_real - 1) = 0` gate now lives inside both
-Gated.Specs' first conjuncts. Mirrors `SP1Clean/AddwChip/Cols.lean`'s
-`FormalSpec` but with `RTypeReader.Gated.Assertion.Spec` in place of
-`ALUTypeReader.Gated.Assertion.Spec` (Subw is RType-only, no SUBIW). -/
+Gated.Specs' first conjuncts. Mirrors `SP1Clean/SubChip/Cols.lean`'s
+`FormalSpec` with the W-style sign-extended result shape
+(`#v[value[0], value[1], msb*65535, msb*65535]`). -/
 def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let op_a_write_value : Word (ZMod p) :=
@@ -167,6 +168,10 @@ def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
       ⟨cols.state.clk_high, clk_low, 20, cols.state.pc,
        op_a_write_value, cols.adapter,
        cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  (cols.is_real = 1 →
+    Word.toBitVec64 op_a_write_value =
+      RV64.subw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
 end SP1Clean.Subw

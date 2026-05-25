@@ -3,6 +3,7 @@ import SP1Operations.Operation.AddwOperation.AddwOperation
 import SP1Clean.Operations.AddwOperation
 import SP1Clean.Reader.ALUTypeReader
 import SP1Chips.Addw.Common
+import RISCV.Instructions
 
 /-! # `AddwChip` cols-level lemmas
 
@@ -107,5 +108,54 @@ lemma allHold_iff_structural
   · rintro ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩
     refine ⟨h_addwop, h_cpu, h_alu, ?_, h_op_a_0⟩
     ring
+
+/-- Bridge the `AddwOperation.spec` 32-bit BitVec equation +
+sign-extension MSB to the 64-bit `RV64.addw` semantic. Given the
+natural-form `AddwOp.Spec` plus operand `Word.isU64` bounds, the
+sign-extended Word `#v[value[0], value[1], msb*65535, msb*65535]`
+equals `RV64.addw c.toBitVec64 b.toBitVec64`. Used by
+`Assertion.soundness` to discharge the ADDW BitVec conjunct of
+`FormalSpec`. -/
+lemma rv64_addw_eq_of_addwop_spec
+    (b c : Word (ZMod p)) (value : HWord (ZMod p)) (msb : ZMod p)
+    (h_isU64_b : b.isU64) (h_isU64_c : c.isU64)
+    (h_addwop : SP1Clean.AddwOp.Spec ⟨b, c, value, msb⟩) :
+    Word.toBitVec64 #v[value[0], value[1], msb * 65535, msb * 65535] =
+      RV64.addw c.toBitVec64 b.toBitVec64 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_allHold : (AddwOperation.constraints b c
+        { value := value, msb := { msb := msb } } 1).allHold :=
+    (SP1Clean.AddwOp.iff_sp1 ⟨b, c, value, msb⟩).mp h_addwop
+  obtain ⟨h_isU32_v, h_addw_bv, h_msb_eq⟩ :=
+    AddwOperation.spec h_isU64_b h_isU64_c h_allHold
+  simp only [RV64.addw]
+  have h_b_low :
+      BitVec.extractLsb' 0 32 b.toBitVec64 = b.low.toBitVec32 := by
+    rw [show BitVec.extractLsb' 0 32 b.toBitVec64 =
+          BitVec.setWidth 32 b.toBitVec64 from rfl]
+    exact Word.setWidth_eq_low h_isU64_b
+  have h_c_low :
+      BitVec.extractLsb' 0 32 c.toBitVec64 = c.low.toBitVec32 := by
+    rw [show BitVec.extractLsb' 0 32 c.toBitVec64 =
+          BitVec.setWidth 32 c.toBitVec64 from rfl]
+    exact Word.setWidth_eq_low h_isU64_c
+  rw [h_b_low, h_c_low]
+  -- `execute_RTYPEW_pure_32_w b c .ADDW = b.low + c.low` (definitionally).
+  -- After `simp only [RV64.addw]` the goal uses `BitVec.add` instead of `HAdd.hAdd`.
+  rw [show b.low.toBitVec32.add c.low.toBitVec32 = HWord.toBitVec32 value by
+    rw [h_addw_bv]; rfl]
+  simp only at h_msb_eq h_isU32_v
+  rw [HWord.sign_extend_32_to_64_msb h_isU32_v]
+  rw [h_msb_eq]
+  by_cases h : (HWord.toBitVec32 value).msb = true
+  · simp [h]
+  · simp [h]
+
+-- Note: an `rv64_addiw_eq_of_addwop_spec` companion (lifting the same
+-- AddwOperation.spec result to `RV64.addiw` for the `imm_c = 1` arm) is
+-- planned for Phase 1.1 once `ALUTypeReader.Gated.Assertion.Spec` exposes
+-- the trusted-instruction immediate sign-extension contract that the
+-- bridge needs (currently bundled inside `ProgramGated.Spec`'s opaque
+-- program-table lookup).
 
 end SP1Clean.Addw

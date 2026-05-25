@@ -88,7 +88,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) AddwCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-def Assumptions (_ : AddwCols (ZMod p)) : Prop := True
+/-- The chip is the `UserMode` variant (`M = UserMode` in upstream Rust),
+so its `adapter_cols.is_trusted` payload is structurally equal to `is_real`
+(both alias `Main[35]` in the constraint compiler's emission). -/
+def Assumptions (cols : AddwCols (ZMod p)) : Prop :=
+  cols.adapter_cols.is_trusted = cols.is_real
 
 /-- The unified chip Spec is defined in `Cols.lean` (`SP1Clean.Addw.FormalSpec`)
 so `Lemmas.lean` can reference it. Re-exported here for the
@@ -103,13 +107,44 @@ theorem soundness :
   subst_eqs
   obtain ⟨h_addwop_sub, h_cpu_sub, h_alu_sub, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨h_addwop_sub trivial, h_cpu_sub trivial, ?_, h_op_a_0⟩
-  -- ALU's Gated.Spec normalizes `(a - b)` to `(a + -b)` via its own
-  -- soundness's `simp only [Spec, sub_eq_add_neg, ...]`; bridge back here.
-  have h := h_alu_sub trivial
-  simpa [SP1Clean.ALUTypeReader.Gated.assertion,
-         SP1Clean.ALUTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
-         Vector.getElem_map] using h
+  have h_addwop := h_addwop_sub trivial
+  have h_alu := h_alu_sub trivial
+  refine ⟨h_addwop, h_cpu_sub trivial, ?_, h_op_a_0, ?_⟩
+  · -- Bridge ALU Gated `assertion.Spec` (lowercase) → `Gated.Assertion.Spec`
+    -- (uppercase) form via simp on the assertion definition.
+    simpa [SP1Clean.ALUTypeReader.Gated.assertion,
+           SP1Clean.ALUTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
+           Vector.getElem_map] using h_alu
+  · -- BitVec `RV64.addw` conjunct (ADDW arm, imm_c = 0).
+    intro h_is_real_eq h_imm_c_eq
+    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+    -- Unfold the Gated.Assertion.Spec wrapper + RegisterAccess.Assertion.Spec
+    -- wrapper so the disjunctive `mult = 0 ∨ <byte facts>` form is exposed
+    -- for `.resolve_left` extraction below.
+    simp only [SP1Clean.ALUTypeReader.Gated.assertion,
+               SP1Clean.ALUTypeReader.Gated.Assertion.Spec,
+               SP1Clean.RegisterAccess.Assertion.Spec,
+               SP1Clean.OperandAccess.AssertionGated.Spec,
+               sub_eq_add_neg, Vector.getElem_map] at h_alu
+    obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _,
+            _, _, _, _⟩ := h_alu
+    change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real_eq
+    change (Expression.eval env input_adapter_imm_c : ZMod p) = 0 at h_imm_c_eq
+    have h_ir_ne_zero :
+        (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
+      rw [h_is_real_eq]; exact one_ne_zero
+    have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
+      (h_ra_b.resolve_left h_ir_ne_zero).2.2
+    -- For ADDW (imm_c = 0), op_c's RegisterAccess has multiplicity
+    -- `is_real - imm_c = 1 - 0 = 1`, so the byte-bus lookup fires
+    -- and gives isU64 of `op_c_memory.prev_value`.
+    have h_ir_imm_ne_zero :
+        (Expression.eval env input_var_is_real : ZMod p)
+          + -(Expression.eval env input_adapter_imm_c : ZMod p) ≠ 0 := by
+      rw [h_is_real_eq, h_imm_c_eq]; simp
+    have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
+      (h_ra_c.resolve_left h_ir_imm_ne_zero).2.2
+    exact rv64_addw_eq_of_addwop_spec _ _ _ _ h_isU64_b h_isU64_c h_addwop
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -117,7 +152,7 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22⟩ := h_input
   subst_eqs
-  obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩ := h_spec
+  obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0, _h_rv64addw⟩ := h_spec
   unfold id at *
   refine ⟨⟨trivial, h_addwop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, ?_⟩, h_op_a_0⟩
   simpa [SP1Clean.ALUTypeReader.Gated.assertion,

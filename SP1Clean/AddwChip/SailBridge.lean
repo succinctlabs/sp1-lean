@@ -5,27 +5,15 @@ import SP1Chips.Soundness
 
 AddwChip bundles two RV64IM variants — ADDW (R-type) and ADDIW (I-type) —
 behind the shared `imm_c` flag at `cols.adapter.imm_c`. This file provides
-two on-demand Sail-equivalence bridges, one per variant. Both consume a
-cols-level `TraceSpec` (the conjunction of `AddwOp.Spec`, `cpuStateSpec`,
-`aluTypeReaderSpec`, and the two trailing scalar gates) and produce the
-monadic Sail equivalence to `_root_.Addw.spec_addw` / `_root_.Addiw.spec_addiw`.
+two on-demand Sail-equivalence bridges, one per variant. Both consume the
+chip-level `FormalSpec` (defined in `Cols.lean`) and produce the monadic
+Sail equivalence to `_root_.Addw.spec_addw` / `_root_.Addiw.spec_addiw`.
 
-`TraceSpec` is strictly stronger than `FormalSpec` from `Circuit.lean`:
-- `FormalSpec` carries only the byte/program-lookup-derivable subset
-  (CPUState + ProgramTable + 3 OperandAccess + 2 scalar gates).
-- `TraceSpec` additionally requires `AddwOp.Spec` (the carry-chain
-  consequence) and the full `aluTypeReaderSpec` (which includes the
-  imm_c-conditional clauses).
-
-The architectural split — Circuit.lean for the lookup-derivable
-FormalAssertion, SailBridge.lean for the full Sail bridge — mirrors the
-flat-file pattern in `SP1Clean/AddwChip.lean`.
-
-The bridges compose:
+Both bridges compose:
 - `fromMain_toMain` (round-trip on the cols struct under the UserMode
-  TrustMode marker),
+  TrustMode marker, supplied by the chip's `Assumptions`),
 - `allHold_iff_structural` (reconstruct `(Addw.constraints (toMain cols)).allHold`
-  from the structural conjuncts of `TraceSpec`),
+  from the structural conjuncts of `FormalSpec`),
 - `_root_.Addw.correct_addw` or `_root_.Addiw.correct_addw` (the
   Main-level Sail-equivalence proof). -/
 
@@ -36,41 +24,16 @@ namespace SP1Clean.Addw
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Cols-level full trace spec for AddwChip. Post-Gated-migration shape:
-structural conjunction of the carry-chain, the Gated CPUState sub-Spec,
-the Gated ALUTypeReader sub-Spec, and the chip-level `op_a_0 = 0` gate.
-Mirrors the new chip-level `FormalSpec` (`Cols.lean`); the free
-`is_real * (is_real - 1) = 0` gate is absorbed into the Gated sub-Specs. -/
-def TraceSpec (cols : AddwCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let op_a_write_value : Word (ZMod p) :=
-    #v[cols.addw_value[0], cols.addw_value[1],
-       cols.addw_msb * 65535, cols.addw_msb * 65535]
-  SP1Clean.AddwOp.Spec
-      ⟨cols.adapter.op_b_memory.prev_value,
-       cols.adapter.op_c_memory.prev_value,
-       cols.addw_value,
-       cols.addw_msb⟩ ∧
-  SP1Clean.CPUState.Gated.Assertion.Spec
-      ⟨cols.state,
-       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-       8, cols.is_real⟩ ∧
-  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
-      ⟨cols.state.clk_high, clk_low, 19, cols.state.pc,
-       op_a_write_value, cols.adapter,
-       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.adapter.op_a_0 = 0
-
 /-- Common bridge: reconstruct `(_root_.Addw.constraints (toMain cols)).allHold`
-from a cols-level `TraceSpec` and the UserMode TrustMode marker. -/
-private theorem allHold_of_traceSpec
+from the chip-level `FormalSpec` and the UserMode TrustMode marker. -/
+private theorem allHold_of_formalSpec
     (cols : AddwCols (ZMod p))
-    (h_spec : TraceSpec cols)
+    (h_spec : Assertion.FormalSpec cols)
     (h_assumptions : cols.adapter_cols.is_trusted = cols.is_real)
     (h_is_real : cols.is_real = 1) :
     (_root_.Addw.constraints (toMain cols)).allHold := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩ := h_spec
+  obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0, _h_rv64addw⟩ := h_spec
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_isreal' : (toMain cols)[35] = 1 := h_is_real
   -- Re-state each cols-level Spec hypothesis through `fromMain (toMain cols)`
@@ -105,9 +68,9 @@ private theorem allHold_of_traceSpec
   exact ⟨h_addwop', h_cpu', h_alu', h_op_a_0⟩
 
 /-- Cols-level Sail bridge for ADDW (R-type, `imm_c = 0`). -/
-theorem sail_correct_addw_of_traceSpec
+theorem sail_correct_addw_of_formalSpec
     (cols : AddwCols (ZMod p))
-    (h_spec : TraceSpec cols)
+    (h_spec : Assertion.FormalSpec cols)
     (h_assumptions : cols.adapter_cols.is_trusted = cols.is_real)
     (h_is_real : cols.is_real = 1)
     (h_is_addw : cols.adapter.imm_c = 0)
@@ -120,7 +83,7 @@ theorem sail_correct_addw_of_traceSpec
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_state := h_init (toMain cols) h_round_trip
-  have h_allHold := allHold_of_traceSpec cols h_spec h_assumptions h_is_real
+  have h_allHold := allHold_of_formalSpec cols h_spec h_assumptions h_is_real
   have h_isreal' : (toMain cols)[35] = 1 := h_is_real
   have h_is_addw' : (toMain cols)[31] = 0 := h_is_addw
   -- Apply Main-level `Addw.correct_addw`; the result reads `sp1_X (toMain cols)`,
@@ -129,9 +92,9 @@ theorem sail_correct_addw_of_traceSpec
       h_state).symm
 
 /-- Cols-level Sail bridge for ADDIW (I-type, `imm_c = 1`). -/
-theorem sail_correct_addiw_of_traceSpec
+theorem sail_correct_addiw_of_formalSpec
     (cols : AddwCols (ZMod p))
-    (h_spec : TraceSpec cols)
+    (h_spec : Assertion.FormalSpec cols)
     (h_assumptions : cols.adapter_cols.is_trusted = cols.is_real)
     (h_is_real : cols.is_real = 1)
     (h_is_addiw : cols.adapter.imm_c = 1)
@@ -144,7 +107,7 @@ theorem sail_correct_addiw_of_traceSpec
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_state := h_init (toMain cols) h_round_trip
-  have h_allHold := allHold_of_traceSpec cols h_spec h_assumptions h_is_real
+  have h_allHold := allHold_of_formalSpec cols h_spec h_assumptions h_is_real
   have h_isreal' : (toMain cols)[35] = 1 := h_is_real
   have h_is_addiw' : (toMain cols)[31] = 1 := h_is_addiw
   exact (_root_.Addiw.correct_addw (toMain cols) s h_allHold h_isreal' h_is_addiw'
