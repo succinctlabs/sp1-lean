@@ -372,6 +372,97 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
+/-- Bridge from SP1-native `JTypeReader.constraints.allHold` (under
+`is_real = is_trusted = 1` pinning) to the literal sub-circuit conjunction
+`Gated.Assertion.Spec ⟨..., 1, 1⟩`. Mirrors the pinned-form bridge
+`ALUTypeReader.Gated.Assertion.Spec_iff_sp1`; used by chip-level
+`allHold_iff_structural` proofs that specialize the chip's J-type reader
+call (`Main[N-1] Main[N-1]`) under the chip's `is_real = 1` column
+equation. -/
+theorem Assertion.Spec_iff_sp1
+    {clk_high clk_low opcode : ZMod p}
+    {pc : Vector (ZMod p) 3}
+    {op_a_write_value : Word (ZMod p)}
+    {cols : _root_.JTypeReader (ZMod p)} :
+    (_root_.JTypeReader.constraints clk_high clk_low pc opcode
+        op_a_write_value cols 1 1).allHold ↔
+      Assertion.Spec ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+                       cols, 1, 1⟩ := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [jtypeReaderSpec_iff_sp1]
+  have h_0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
+    change (0 : ZMod p).val < (65536 : ZMod p).val; simp
+  simp only [Assertion.Spec, jtypeReaderSpec,
+    SP1Clean.ProgramGated.Spec, SP1Clean.ProgramSpec,
+    SP1Clean.RegisterAccess.Assertion.Spec,
+    SP1Clean.OperandAccess.AssertionGated.Spec,
+    Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  refine ⟨?_, ?_⟩
+  -- → direction.
+  · rintro ⟨h_ti, h_op_a,
+            h_ob0, h_ob1, h_ob2, h_ob3,
+            h_oc0, h_oc1, h_oc2, h_oc3,
+            h_op_a_0_bin, h_op_a_0_iff,
+            h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt,
+            h_diff_a, h_ts_a, h_isU64_a, h_op_a_0_imp⟩
+    have h_z0 : cols.op_a_0 * op_a_write_value[0] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).1]; ring
+    have h_z1 : cols.op_a_0 * op_a_write_value[1] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.1]; ring
+    have h_z2 : cols.op_a_0 * op_a_write_value[2] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.2.1]; ring
+    have h_z3 : cols.op_a_0 * op_a_write_value[3] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.2.2]; ring
+    refine ⟨by ring, ?_, ?_, h_z0, h_z1, h_z2, h_z3⟩
+    -- ProgramGated.Spec ⟨..., 1⟩: `1 = 0 ∨ ProgramSpec`.
+    · right
+      exact ⟨h_ti, h_op_a,
+             ⟨h_ob0, h_ob1, h_ob2, h_ob3⟩,
+             ⟨h_oc0, h_oc1, h_oc2, h_oc3⟩,
+             h_op_a_0_bin, h_op_a_0_iff,
+             Or.inr trivial, Or.inr trivial,
+             h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩
+    -- RegisterAccess.Spec ⟨..., 1⟩ for op_a (offset +4).
+    · right
+      exact ⟨h_diff_a, h_ts_a,
+             (SP1Clean.JTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_a⟩
+  -- ← direction.
+  · rintro ⟨_h_ir_bin, h_prog_disj, h_ra_a_disj, h_z0, h_z1, h_z2, h_z3⟩
+    have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
+    have h_ps := h_prog_disj.resolve_left h_one_ne_zero
+    obtain ⟨h_ti, h_op_a,
+            ⟨h_ob0, h_ob1, h_ob2, h_ob3⟩,
+            ⟨h_oc0, h_oc1, h_oc2, h_oc3⟩,
+            h_op_a_0_bin, h_op_a_0_iff,
+            _h_imm_b_bin, _h_imm_c_bin,
+            h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩ := h_ps
+    have h_a := h_ra_a_disj.resolve_left h_one_ne_zero
+    have h_op_a_0_imp : cols.op_a_0 ≠ 0 →
+        op_a_write_value[0] = 0 ∧ op_a_write_value[1] = 0 ∧
+        op_a_write_value[2] = 0 ∧ op_a_write_value[3] = 0 := by
+      intro h_op_a_0_ne
+      exact ⟨(mul_eq_zero.mp h_z0).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z1).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z2).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z3).resolve_left h_op_a_0_ne⟩
+    exact ⟨h_ti, h_op_a,
+           h_ob0, h_ob1, h_ob2, h_ob3,
+           h_oc0, h_oc1, h_oc2, h_oc3,
+           h_op_a_0_bin, h_op_a_0_iff,
+           h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt,
+           h_a.1, h_a.2.1,
+           (SP1Clean.JTypeReader.Assertion.isU64_iff_index_form _).mp h_a.2.2,
+           h_op_a_0_imp⟩
+
 end Gated
 
 end SP1Clean.JTypeReader

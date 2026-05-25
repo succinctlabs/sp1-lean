@@ -204,9 +204,10 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
       cols.adapter.op_b_imm
       { value := cols.add_result }
       (cols.is_real - cols.adapter.op_a_0)).allHold ∧
-  SP1Clean.JTypeReader.jtypeReaderSpec clk_low opcode_e cols.state.pc
-      cols.add_result cols.adapter ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  SP1Clean.JTypeReader.Gated.Assertion.Spec
+      ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
+       cols.add_result, cols.adapter,
+       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
   cols.addend[0] - cols.is_auipc * cols.state.pc[0] = 0 ∧
   cols.addend[1] - cols.is_auipc * cols.state.pc[1] = 0 ∧
