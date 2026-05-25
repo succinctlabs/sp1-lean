@@ -8,6 +8,63 @@ namespace Lt
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
+set_option linter.unusedSectionVars false in
+-- Canonical .allHold-form iff (post-AddChip refactor, see
+-- `CLEAN_PILOT_ROADMAP.md` §4). Exposes 3 sub-allHolds
+-- (LtOperationSigned/CPUState/ALUTypeReader) + 4 trailing scalar gates
+-- (2 selector binaries + sum binary + op_a_0). Consumed by SP1Clean's
+-- chip-level `allHold_iff_structural` bridge.
+lemma allHold_constraints_iff
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (Main : Vector (ZMod p) 44) :
+    (constraints Main).allHold ↔
+    SP1ConstraintList.allHold
+        (LtOperationSigned.constraints (F := ZMod p)
+          #v[Main[15], Main[16], Main[17], Main[18]]
+          #v[Main[25], Main[26], Main[27], Main[28]]
+          { result := { u16_compare_operation := { bit := Main[34] },
+                        u16_flags := #v[Main[35], Main[36], Main[37], Main[38]],
+                        not_eq_inv := Main[39],
+                        comparison_limbs := #v[Main[40], Main[41]] },
+            b_msb := { msb := Main[42] },
+            c_msb := { msb := Main[43] } }
+          Main[32] (Main[32] + Main[33])) ∧
+    SP1ConstraintList.allHold
+        (_root_.CPUState.constraints
+          (CPUState.mk Main[0] Main[1] Main[2] #v[Main[3], Main[4], Main[5]])
+          #v[Main[3] + 4, Main[4], Main[5]] 8 (Main[32] + Main[33])) ∧
+    SP1ConstraintList.allHold
+        (ALUTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
+          #v[Main[3], Main[4], Main[5]]
+          (Main[32] * 9 + Main[33] * 10)
+          #v[0 + Main[34], 0, 0, 0]
+          { op_a := Main[6],
+            op_a_memory :=
+              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                access_timestamp := { prev_low := Main[11], diff_low_limb := Main[12] } },
+            op_a_0 := Main[13], op_b := Main[14],
+            op_b_memory :=
+              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                access_timestamp := { prev_low := Main[19], diff_low_limb := Main[20] } },
+            op_c := #v[Main[21], Main[22], Main[23], Main[24]],
+            op_c_memory :=
+              { prev_value := #v[Main[25], Main[26], Main[27], Main[28]],
+                access_timestamp := { prev_low := Main[29], diff_low_limb := Main[30] } },
+            imm_c := Main[31] }
+          (Main[32] + Main[33]) (Main[32] + Main[33])) ∧
+    Main[32] * (Main[32] - 1) = 0 ∧
+    Main[33] * (Main[33] - 1) = 0 ∧
+    (Main[32] + Main[33]) * (Main[32] + Main[33] - 1) = 0 ∧
+    Main[13] = 0 := by
+  -- Mirrors AddChip's iff; trailing `push_cast; rfl` cleans the
+  -- `↑9` literal cast residue introduced by `Main[32] * 9 + Main[33] * 10`
+  -- (the literals `9`/`10` are field-typed in the constraints body but
+  -- the hand-typed RHS elaborates the leading `9` as `ℕ`).
+  simp only [constraints, List.forall_append, List.Forall, SP1Constraint.toProp,
+    and_assoc]
+  push_cast
+  rfl
+
 lemma allHold_constraints_iff_slt
     {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
     (Main : Vector (ZMod p) 44) (h : is_slt Main) :

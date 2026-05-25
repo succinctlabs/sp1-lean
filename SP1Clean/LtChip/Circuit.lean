@@ -104,13 +104,37 @@ def Assumptions (cols : LtCols (ZMod p)) : Prop :=
 (`SP1Clean.LtChip.FormalSpec`). -/
 abbrev FormalSpec := @SP1Clean.LtChip.FormalSpec p
 
+-- BLOCKED on byte-range gap: the chip's FormalSpec carries conditional
+-- BitVec semantic clauses (RV64.slt / RV64.sltu) that require
+-- `LtOperationSigned.spec.signed` / `.unsigned`. Those theorems take the
+-- full SP1 `LtOperationSigned.constraints.allHold` (including U16MSB /
+-- U16Compare byte-range sends) plus `Word.isU64` on op_b/op_c. The
+-- current `GatedLtSignedOp.Spec` (gate=1 case) drops the byte-range
+-- facts, so we can't reconstruct the full SP1 allHold from the chip's
+-- holds. Path forward: strengthen `GatedLtUnsignedOp.Spec` +
+-- `GatedLtSignedOp.Spec` with U16Compare / U16MSB byte-range conjuncts
+-- (Option A from the sunbeam plan) and add matching `byteOpcodeGated`
+-- emissions to their `main`. Tracked alongside [[multiplicity-bus-GatedLt-migration]].
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   sorry
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨h_lt, h_cpu, h_alu, h_slt_bin, h_sltu_bin, h_real_bin, h_op_a_0,
+          _h_slt_sem, _h_sltu_sem⟩ := h_spec
+  unfold id at *
+  -- Three sub-circuits' completeness premises (`⟨assumption, spec⟩`) plus
+  -- 4 scalar gates. The is_real binary disjunction in h_real_bin recovers
+  -- `is_real * (is_real - 1) = 0` via `Or.elim`.
+  refine ⟨⟨trivial, h_lt⟩, ⟨trivial, h_cpu⟩, ⟨trivial, h_alu⟩,
+          ?_, ?_, ?_, h_op_a_0⟩
+  · linear_combination h_slt_bin
+  · linear_combination h_sltu_bin
+  · rcases h_real_bin with h_zero | h_one
+    · linear_combination (input_is_slt + input_is_sltu - 1) * h_zero
+    · linear_combination (input_is_slt + input_is_sltu) * h_one
 
 end Assertion
 
