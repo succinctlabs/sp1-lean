@@ -17,7 +17,7 @@ import SP1Clean.AddChip.SailBridge
 import SP1Clean.SubChip.SailBridge
 import SP1Clean.SubwChip.SailBridge
 import SP1Clean.AddwChip.SailBridge
-import SP1Clean.UTypeChip
+import SP1Clean.UTypeChip.SailBridge
 import SP1Clean.JalrChip
 import SP1Clean.LtChip
 import SP1Clean.StoreWordChip
