@@ -364,13 +364,51 @@ def FormalSpec (cols : LoadDoubleCols (ZMod p)) : Prop :=
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0
 
+set_option maxHeartbeats 800000 in
+-- Five sub-circuits + 2 inline gates (no Selector since LoadDouble loads
+-- full 64-bit). Mirrors LoadByteChip / LoadHalfChip / LoadWordChip.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub,
+          _h_lmag_sub, h_isreal, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_addr_sub trivial
+  · exact h_addr_shape_sub trivial
+  -- ITypeReader arm: op_a_write_value uses `load_prev_value[i]` indexing;
+  -- convert bridges the syntactic gap (chip cols projection vs vector
+  -- literal of projections).
+  · convert h_itr_sub trivial using 4
+    simp
+  · exact Or.inr trivial
+  · linear_combination h_isreal
+  · exact h_op_a_0
 
+set_option maxHeartbeats 800000 in
+-- Mirrors soundness destructure; circuit_proof_start unfolds 5 sub-circuits + 2 gates.
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, _h_lmag, h_isreal, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_addr⟩
+  · exact ⟨trivial, h_addr_shape⟩
+  · refine ⟨trivial, ?_⟩
+    convert h_itr using 4
+    simp
+  · exact ⟨trivial, Or.inr trivial⟩
+  · linear_combination h_isreal
+  · exact h_op_a_0
 
 end AssertionGated
 

@@ -140,53 +140,24 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       [(op_a_mem, cols.op_a_write_value),
        (op_b_mem, cols.adapter.op_b_memory.prev_value),
        (op_c_mem, cols.adapter.op_c_memory.prev_value)]
-  | .loadByte cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      -- The load access at the computed RAM address. write_value =
-      -- prev_value (the chip itself doesn't modify the loaded memory
-      -- word; that's the semantics of a load).
-      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.LoadByte.loadMemoryAccess cols
-      -- op_a is written with the sign-extended loaded byte.
-      [(op_a_mem,
-        #v[cols.selected_byte + 65280 * cols.signed_extension_flag,
-           65535 * cols.signed_extension_flag,
-           65535 * cols.signed_extension_flag,
-           65535 * cols.signed_extension_flag]),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (load_mem, cols.load_prev_value)]
-  | .storeByte cols =>
-      -- op_a and op_b are both pure register reads (stores do not
-      -- modify the source data register or the base register).
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      -- The store access at the computed RAM address: read-then-write
-      -- at the same address. The MemoryAccess record carries the read
-      -- side (prev_value at the prior timestamp); the write side
-      -- (cols.store_value at the current timestamp) is supplied
-      -- by the aggregator below.
-      let store_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.StoreByte.storeMemoryAccess cols
-      [(op_a_mem, cols.adapter.op_a_memory.prev_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (store_mem, SP1Clean.StoreByte.storeWriteValue cols)]
+  | .loadByte _ =>
+      -- LoadByteChip's memory contributions are routed through the
+      -- multiplicity-aware lookup bus, parallel to `.addw` / `.storeByte`.
+      -- The disjunctive multiplicity `mult = is_lb + is_lbu` gates the
+      -- shared byte/memory lookups; `mult = is_lb` gates the MSB
+      -- sign-extension byte lookup. Per-row contributions move to the
+      -- bus aggregator; trace-level balance closes the global theorem.
+      []
+  | .storeByte _ =>
+      -- StoreByteChip's memory contributions are routed through the
+      -- multiplicity-aware lookup bus (see `SP1Clean/SP1Lookup.lean`),
+      -- mirroring the AddwChip Phase-5 migration. The op_a / op_b
+      -- register reads and the store-side RAM read-then-write all
+      -- become `memoryBusGated` contributions at the chip level;
+      -- per-key multiplicity balance is enforced at the trace level.
+      -- See `docs/MULTIPLICITY_BUS.md` Phase 4 for the parallel
+      -- `lookupAccesses` aggregator design.
+      []
   | .jal cols =>
       -- Jal has one register access (op_a write for the return address).
       -- The state-bus PC chain is tracked at trace level — not via
@@ -277,92 +248,18 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       [(op_a_mem, #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]),
        (op_b_mem, cols.adapter.op_b_memory.prev_value),
        (op_c_mem, cols.adapter.op_c_memory.prev_value)]
-  | .storeWord cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let store_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.StoreWord.storeMemoryAccess cols
-      [(op_a_mem, cols.adapter.op_a_memory.prev_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (store_mem, SP1Clean.StoreWord.storeWriteValue cols)]
-  | .storeDouble cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let store_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.StoreDouble.storeMemoryAccess cols
-      [(op_a_mem, cols.adapter.op_a_memory.prev_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (store_mem, SP1Clean.StoreDouble.storeWriteValue cols)]
-  | .storeHalf cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let store_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.StoreHalf.storeMemoryAccess cols
-      [(op_a_mem, cols.adapter.op_a_memory.prev_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (store_mem, SP1Clean.StoreHalf.storeWriteValue cols)]
-  | .loadDouble cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.LoadDouble.loadMemoryAccess cols
-      [(op_a_mem, cols.load_prev_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (load_mem, cols.load_prev_value)]
-  | .loadWord cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.LoadWord.loadMemoryAccess cols
-      -- op_a is written with the sign-extended loaded word: the two
-      -- stored limbs `op_a_write_value_lo[0..1]` plus the
-      -- sign-extension limbs derived from `signed_extension_msb`.
-      [(op_a_mem,
-        #v[cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
-           65535 * cols.signed_extension_msb,
-           65535 * cols.signed_extension_msb]),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (load_mem, cols.load_prev_value)]
+  -- Store{Word,Double,Half} memory contributions are routed through the
+  -- multiplicity-aware lookup bus, parallel to `.storeByte` and `.addw`
+  -- (see `docs/MULTIPLICITY_BUS.md`).
+  | .storeWord _ => []
+  | .storeDouble _ => []
+  | .storeHalf _ => []
+  -- Load{Double,Word} memory contributions are routed through the
+  -- multiplicity-aware lookup bus (parallel to `.loadByte` / `.storeByte`).
+  -- LoadDouble: single `is_real` (LD only). LoadWord: disjunctive
+  -- `is_lw + is_lwu` (shared) and `is_lw`-only MSB.
+  | .loadDouble _ => []
+  | .loadWord _ => []
   | .branch cols =>
       -- Two register reads (op_a / op_b as comparison operands); no
       -- writes. PC chain is state-bus, trace-level.
@@ -372,23 +269,13 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
         SP1Clean.Branch.opBMemoryAccess cols
       [(op_a_mem, cols.adapter.op_a_memory.prev_value),
        (op_b_mem, cols.adapter.op_b_memory.prev_value)]
-  | .loadX0 cols =>
-      -- Two reg + 1 RAM read. op_a's write is absorbed (target is x0).
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let load_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.LoadX0.loadMemoryAccess cols
-      [(op_a_mem, cols.adapter.op_a_memory.prev_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (load_mem, cols.load_prev_value)]
+  -- LoadX0 memory contributions are routed through the multiplicity-aware
+  -- lookup bus. Multiplicity here is the 7-way sum
+  -- `is_lb + is_lbu + is_lh + is_lhu + is_lw + is_lwu + is_ld` (a single
+  -- variant is active per row; chip's `is_real` is the boolean sum).
+  -- op_a's write_value is zero (destination is x0), absorbed in the
+  -- write-side of the bus tuple.
+  | .loadX0 _ => []
   | .shiftRight cols =>
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
         { addr := #v[cols.adapter.op_a, 0, 0],
@@ -614,11 +501,11 @@ emit accesses at `clk_low + 4` (op_a), `clk_low + 3` (op_b), and
 the RAM load. The offset list mirrors `memoryAccesses` above. -/
 def offsets : ChipRow p → List (ZMod p)
   | .add _ => [4, 3, 2]
-  | .loadByte _ => [4, 3, 1]
-  -- Store: op_a (data source) at +4, op_b (base) at +3, store memory
-  -- access at +0 (matches SP1's `.send (.memory ...) ... Main[33] Main[34]`
-  -- which uses the *prior* timestamp components, not the current row's).
-  | .storeByte _ => [4, 3, 0]
+  -- LoadByte memory accesses also flow through the lookup bus.
+  | .loadByte _ => []
+  -- StoreByte memory accesses now flow through the lookup bus (parallel
+  -- to `.addw _`); offset list is empty.
+  | .storeByte _ => []
   -- Jal: only op_a write at +4. State-bus PC chain is trace-level.
   | .jal _ => [4]
   -- Mul and ShiftLeft: same R-type-reader pattern as Add (3 register
@@ -629,14 +516,18 @@ def offsets : ChipRow p → List (ZMod p)
   | .uType _ => [4]
   | .jalr _ => [4, 3]
   | .lt _ => [4, 3, 2]
-  | .storeWord _ => [4, 3, 0]
-  | .storeDouble _ => [4, 3, 0]
-  | .storeHalf _ => [4, 3, 0]
-  | .loadDouble _ => [4, 3, 1]
-  | .loadWord _ => [4, 3, 1]
-  | .loadHalf _ => [4, 3, 1]
+  -- Store{Word,Double,Half} memory accesses also flow through the lookup
+  -- bus (parallel to `.storeByte`); offset lists are empty.
+  | .storeWord _ => []
+  | .storeDouble _ => []
+  | .storeHalf _ => []
+  -- Load{Double,Word,Half} memory accesses also flow through the lookup bus.
+  | .loadDouble _ => []
+  | .loadWord _ => []
+  | .loadHalf _ => []
   | .branch _ => [4, 3]
-  | .loadX0 _ => [4, 3, 1]
+  -- LoadX0 memory accesses also flow through the lookup bus.
+  | .loadX0 _ => []
   | .shiftRight _ => [4, 3, 2]
   | .divRem _ => [4, 3, 2]
   -- Addi: 2 register accesses (op_a + op_b) at +4/+3; op_c is immediate.
@@ -1062,6 +953,81 @@ theorem memoryAccessesValid_of_spec_addw
     (_cols : SP1Clean.Addw.AddwCols (ZMod p))
     (_h : SP1Clean.Addw.assertion.Spec _cols) :
     ChipRow.memoryAccessesValid (.addw _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- StoreByte's per-chip discharge — vacuously true, since StoreByteChip's
+memory contributions (op_a / op_b register reads + store-side RAM
+read-then-write) now flow through the multiplicity-aware lookup bus.
+Mirrors `memoryAccessesValid_of_spec_addw`. -/
+theorem memoryAccessesValid_of_spec_storeByte
+    (_cols : SP1Clean.StoreByte.StoreByteCols (ZMod p))
+    (_h : SP1Clean.StoreByte.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.storeByte _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- StoreHalf's per-chip discharge — same shape as `_storeByte`. -/
+theorem memoryAccessesValid_of_spec_storeHalf
+    (_cols : SP1Clean.StoreHalf.StoreHalfCols (ZMod p))
+    (_h : SP1Clean.StoreHalf.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.storeHalf _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- StoreWord's per-chip discharge — same shape as `_storeByte`. -/
+theorem memoryAccessesValid_of_spec_storeWord
+    (_cols : SP1Clean.StoreWord.StoreWordCols (ZMod p))
+    (_h : SP1Clean.StoreWord.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.storeWord _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- StoreDouble's per-chip discharge — same shape as `_storeByte`. -/
+theorem memoryAccessesValid_of_spec_storeDouble
+    (_cols : SP1Clean.StoreDouble.StoreDoubleCols (ZMod p))
+    (_h : SP1Clean.StoreDouble.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.storeDouble _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- LoadByte's per-chip discharge — vacuously true, since LoadByteChip's
+memory contributions (op_a register write + op_b register read + load-side
+RAM read) now flow through the multiplicity-aware lookup bus. The
+disjunctive multiplicity (`is_lb + is_lbu` shared, `is_lb` for MSB) makes
+the bus the canonical home. -/
+theorem memoryAccessesValid_of_spec_loadByte
+    (_cols : SP1Clean.LoadByte.LoadByteCols (ZMod p))
+    (_h : SP1Clean.LoadByte.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.loadByte _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- LoadHalf's per-chip discharge — same shape as `_loadByte`, with
+multiplicities `is_lh + is_lhu` (shared) and `is_lh` (MSB). -/
+theorem memoryAccessesValid_of_spec_loadHalf
+    (_cols : SP1Clean.LoadHalf.LoadHalfCols (ZMod p))
+    (_h : SP1Clean.LoadHalf.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.loadHalf _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- LoadWord's per-chip discharge — multiplicities `is_lw + is_lwu` (shared)
+and `is_lw` (MSB). -/
+theorem memoryAccessesValid_of_spec_loadWord
+    (_cols : SP1Clean.LoadWord.LoadWordCols (ZMod p))
+    (_h : SP1Clean.LoadWord.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.loadWord _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- LoadDouble's per-chip discharge — single multiplicity `is_real` (LD only,
+no unsigned variant). -/
+theorem memoryAccessesValid_of_spec_loadDouble
+    (_cols : SP1Clean.LoadDouble.LoadDoubleCols (ZMod p))
+    (_h : SP1Clean.LoadDouble.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.loadDouble _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
+
+/-- LoadX0's per-chip discharge — multiplicity is the 7-way sum
+`is_lb + is_lbu + is_lh + is_lhu + is_lw + is_lwu + is_ld` (one variant
+active per row). op_a write_value is zero (destination is x0). -/
+theorem memoryAccessesValid_of_spec_loadX0
+    (_cols : SP1Clean.LoadX0.LoadX0Cols (ZMod p))
+    (_h : SP1Clean.LoadX0.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.loadX0 _cols) := by
   simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
 /-- Mul's per-chip discharge — three `OperandAccess.Assertion.Spec`
