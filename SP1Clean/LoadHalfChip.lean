@@ -15,6 +15,9 @@ import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Load.LoadHalf.Common
 import SP1Clean.Operations.AddrAddOperation
+import SP1Clean.Operations.AddressShape
+import SP1Clean.Operations.LoadMemoryAccessGated
+import SP1Clean.Operations.LoadHalfSelector
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -399,5 +402,122 @@ def assertion : FormalAssertion (ZMod p) LoadHalfCols :=
     Spec := Assertion.FormalSpec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## `AssertionGated` — full sub-circuit composition with gated multiplicities
+
+Sister of `Assertion`. Composes `CPUState`, `AddrAddOp`, `AddressShape`,
+`ITypeReader`, `LoadMemoryAccessGated`, and `LoadHalfSelector` as
+`FormalAssertion` sub-circuits. Multiplicity for gated parts is
+`is_real = is_lh + is_lhu`. Soundness/completeness are `sorry`. -/
+
+namespace AssertionGated
+
+open Circuit
+
+@[reducible]
+def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩,
+       addr_value, addr_top_two_limb_inv,
+       load_prev_value, load_memory_prev_high, load_memory_prev_low,
+       load_memory_flag, load_memory_diff_low, load_memory_diff_high,
+       offset_bit_1, offset_bit_0, op_a_write_value_lo,
+       signed_extension_msb, is_lh, is_lhu, _adapter_cols⟩ := cols
+  let is_real : Expression (ZMod p) := is_lh + is_lhu
+  let clk_low : Expression (ZMod p) := clk_0_16 + clk_16_24 * 65536
+  let opcode : Expression (ZMod p) := is_lh * 30 + is_lhu * 33
+  -- LoadHalf assembles op_a_write_value as: low 16-bit limb = op_a_write_value_lo,
+  -- and the upper limbs sign-extended via signed_extension_msb.
+  let op_a_write_value : Vector (Expression (ZMod p)) 4 :=
+    #v[op_a_write_value_lo,
+       65535 * signed_extension_msb,
+       65535 * signed_extension_msb,
+       65535 * signed_extension_msb]
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨op_b_memory.prev_value, op_c_imm, addr_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  SP1Clean.AddressShape.assertion
+    (⟨addr_value, addr_top_two_limb_inv,
+       0, offset_bit_1, offset_bit_0⟩ :
+      Var SP1Clean.AddressShape.Inputs (ZMod p))
+  SP1Clean.ITypeReader.assertion
+    (⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ :
+      Var SP1Clean.ITypeReader.Inputs (ZMod p))
+  SP1Clean.LoadMemoryAccessGated.assertion
+    (⟨clk_high, clk_low, addr_value, load_prev_value,
+       load_memory_prev_high, load_memory_prev_low,
+       load_memory_diff_low, load_memory_diff_high,
+       load_memory_flag, is_real⟩ :
+      Var SP1Clean.LoadMemoryAccessGated.Inputs (ZMod p))
+  SP1Clean.LoadHalfSelector.assertion
+    (⟨load_prev_value, 0, offset_bit_1, offset_bit_0,
+       op_a_write_value_lo, signed_extension_msb, is_lhu⟩ :
+      Var SP1Clean.LoadHalfSelector.Inputs (ZMod p))
+  is_lh * (is_lh - 1) === 0
+  is_lhu * (is_lhu - 1) === 0
+  (is_lh + is_lhu) * (is_lh + is_lhu - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) LoadHalfCols unit where
+  name := "SP1Clean.LoadHalf.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : LoadHalfCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : LoadHalfCols (ZMod p)) : Prop :=
+  let is_real : ZMod p := cols.is_lh + cols.is_lhu
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let opcode : ZMod p := cols.is_lh * 30 + cols.is_lhu * 33
+  let op_a_write_value : Vector (ZMod p) 4 :=
+    #v[cols.op_a_write_value_lo,
+       65535 * cols.signed_extension_msb,
+       65535 * cols.signed_extension_msb,
+       65535 * cols.signed_extension_msb]
+  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
+  SP1Clean.AddrAddOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
+  SP1Clean.AddressShape.Assertion.Spec
+    ⟨cols.addr_value, cols.addr_top_two_limb_inv,
+     0, cols.offset_bit_1, cols.offset_bit_0⟩ ∧
+  SP1Clean.ITypeReader.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, op_a_write_value, cols.adapter⟩ ∧
+  SP1Clean.LoadMemoryAccessGated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.load_memory_flag, is_real⟩ ∧
+  SP1Clean.LoadHalfSelector.Assertion.Spec
+    ⟨cols.load_prev_value, 0, cols.offset_bit_1, cols.offset_bit_0,
+     cols.op_a_write_value_lo, cols.signed_extension_msb, cols.is_lhu⟩ ∧
+  cols.is_lh * (cols.is_lh - 1) = 0 ∧
+  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
+  (cols.is_lh + cols.is_lhu) * (cols.is_lh + cols.is_lhu - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+end AssertionGated
+
+def assertionGated : FormalAssertion (ZMod p) LoadHalfCols :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.FormalSpec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.LoadHalf

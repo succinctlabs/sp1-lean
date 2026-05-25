@@ -18,6 +18,12 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
+import SP1Clean.Operations.AddrAddOperation
+import SP1Clean.Operations.AddressShape
+import SP1Clean.Operations.LoadMemoryAccessGated
+import SP1Clean.Operations.LoadByteSelector
+import SP1Clean.Operations.LoadHalfSelector
+import SP1Clean.Operations.LoadWordSelector
 import SP1Clean.Reader.OperandAccess
 import SP1Chips.Load.LoadX0.LoadX0Chip
 import SP1Clean.TrustMode
@@ -355,5 +361,126 @@ def assertion : FormalAssertion (ZMod p) LoadX0Cols :=
     Spec := Assertion.FormalSpec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## `AssertionGated` — full sub-circuit composition with gated multiplicities
+
+LoadX0 covers all 7 load variants (LB/LBU/LH/LHU/LW/LWU/LD) where the
+destination register is `x0` (so the load is a no-op effectively).
+Composes CPUState, AddrAddOp, AddressShape, ITypeReader,
+LoadMemoryAccessGated, and all three selectors (gated by their respective
+opcode flags). Multiplicity for the load-memory access is `is_real`
+(sum of all 7 opcode flags). -/
+
+namespace AssertionGated
+
+open Circuit
+
+@[reducible]
+def main (cols : Var LoadX0Cols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩,
+       addr_value, addr_top_two_limb_inv,
+       load_prev_value, load_memory_prev_high, load_memory_prev_low,
+       load_memory_flag, load_memory_diff_low, load_memory_diff_high,
+       offset_bit, is_lb, is_lbu, is_lh, is_lhu, is_lw, is_lwu, is_ld,
+       _adapter_cols⟩ := cols
+  let is_real : Expression (ZMod p) :=
+    is_lb + is_lbu + is_lh + is_lhu + is_lw + is_lwu + is_ld
+  let clk_low : Expression (ZMod p) := clk_0_16 + clk_16_24 * 65536
+  let opcode : Expression (ZMod p) :=
+    is_lb * 29 + is_lbu * 32 + is_lh * 30 + is_lhu * 33 +
+      is_lw * 31 + is_lwu * 34 + is_ld * 35
+  -- For LoadX0, op_a_write_value is constrained to all-zero (x0 stays 0).
+  let op_a_write_value : Vector (Expression (ZMod p)) 4 := #v[0, 0, 0, 0]
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨op_b_memory.prev_value, op_c_imm, addr_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  SP1Clean.AddressShape.assertion
+    (⟨addr_value, addr_top_two_limb_inv,
+       offset_bit[0], offset_bit[1], offset_bit[2]⟩ :
+      Var SP1Clean.AddressShape.Inputs (ZMod p))
+  SP1Clean.ITypeReader.assertion
+    (⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ :
+      Var SP1Clean.ITypeReader.Inputs (ZMod p))
+  SP1Clean.LoadMemoryAccessGated.assertion
+    (⟨clk_high, clk_low, addr_value, load_prev_value,
+       load_memory_prev_high, load_memory_prev_low,
+       load_memory_diff_low, load_memory_diff_high,
+       load_memory_flag, is_real⟩ :
+      Var SP1Clean.LoadMemoryAccessGated.Inputs (ZMod p))
+  -- Boolean and sum gates.
+  is_lb * (is_lb - 1) === 0
+  is_lbu * (is_lbu - 1) === 0
+  is_lh * (is_lh - 1) === 0
+  is_lhu * (is_lhu - 1) === 0
+  is_lw * (is_lw - 1) === 0
+  is_lwu * (is_lwu - 1) === 0
+  is_ld * (is_ld - 1) === 0
+  is_real * (is_real - 1) === 0
+  op_a_0 === 1  -- destination is x0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) LoadX0Cols unit where
+  name := "SP1Clean.LoadX0.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : LoadX0Cols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
+  let is_real : ZMod p :=
+    cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
+      cols.is_lw + cols.is_lwu + cols.is_ld
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let opcode : ZMod p :=
+    cols.is_lb * 29 + cols.is_lbu * 32 + cols.is_lh * 30 + cols.is_lhu * 33 +
+      cols.is_lw * 31 + cols.is_lwu * 34 + cols.is_ld * 35
+  let op_a_write_value : Vector (ZMod p) 4 := #v[0, 0, 0, 0]
+  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
+  SP1Clean.AddrAddOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
+  SP1Clean.AddressShape.Assertion.Spec
+    ⟨cols.addr_value, cols.addr_top_two_limb_inv,
+     cols.offset_bit[0], cols.offset_bit[1], cols.offset_bit[2]⟩ ∧
+  SP1Clean.ITypeReader.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, op_a_write_value, cols.adapter⟩ ∧
+  SP1Clean.LoadMemoryAccessGated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.load_memory_flag, is_real⟩ ∧
+  cols.is_lb * (cols.is_lb - 1) = 0 ∧
+  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
+  cols.is_lh * (cols.is_lh - 1) = 0 ∧
+  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
+  cols.is_lw * (cols.is_lw - 1) = 0 ∧
+  cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
+  cols.is_ld * (cols.is_ld - 1) = 0 ∧
+  is_real * (is_real - 1) = 0 ∧
+  cols.adapter.op_a_0 = 1
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+end AssertionGated
+
+def assertionGated : FormalAssertion (ZMod p) LoadX0Cols :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.FormalSpec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.LoadX0

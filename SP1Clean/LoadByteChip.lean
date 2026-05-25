@@ -14,6 +14,9 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Load.LoadByte.Common
 import SP1Clean.Operations.AddrAddOperation
+import SP1Clean.Operations.AddressShape
+import SP1Clean.Operations.LoadMemoryAccessGated
+import SP1Clean.Operations.LoadByteSelector
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
@@ -526,5 +529,138 @@ def assertion : FormalAssertion (ZMod p) LoadByteCols :=
     Spec := Assertion.FormalSpec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## `AssertionGated` — full sub-circuit composition with gated multiplicities
+
+Parallel to `Assertion`, but composes the *full* SP1 constraint graph as
+Clean sub-circuits with `is_real`-gated multiplicities:
+- `CPUState.assertion`
+- `AddrAddOp.assertion` (address arithmetic — currently dropped in `Assertion`)
+- `AddressShape.assertion` (offset-bit decomp + inv check — new sub-circuit)
+- `ITypeReader.assertion` (gives gated register accesses internally via
+  `RegisterAccess.assertionGated`)
+- `LoadMemoryAccessGated.assertion` (gated RAM access — closes the
+  `load-store-ram-access-deferred` gap; new sub-circuit)
+- `LoadByteSelector.assertion` (byte-selection + sign-extension; new)
+- Inline scalar gates for the opcode selectors
+
+`FormalSpec` is the direct conjunction of each sub-circuit's `.Spec` (no
+`List.Forall toProp` envelope), per `CLAUDE.md`'s faithful-sub-circuit-
+composition principle. Soundness/completeness are `sorry` placeholders —
+discharging them is follow-up work tracked alongside the sub-circuit
+sorries. -/
+
+namespace AssertionGated
+
+open Circuit
+
+@[reducible]
+def main (cols : Var LoadByteCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩,
+       addr_value, addr_top_two_limb_inv,
+       load_prev_value, load_memory_prev_high, load_memory_prev_low,
+       load_memory_flag, load_memory_diff_low, load_memory_diff_high,
+       offset_bit_2, offset_bit_1, offset_bit_0,
+       selected_limb, selected_limb_low_byte, selected_byte,
+       signed_extension_flag, is_lb, is_lbu, _adapter_cols⟩ := cols
+  let is_real : Expression (ZMod p) := is_lb + is_lbu
+  let clk_low : Expression (ZMod p) := clk_0_16 + clk_16_24 * 65536
+  let opcode : Expression (ZMod p) := is_lb * 29 + is_lbu * 32
+  let op_a_write_value : Vector (Expression (ZMod p)) 4 :=
+    #v[selected_byte + 65280 * signed_extension_flag,
+       65535 * signed_extension_flag,
+       65535 * signed_extension_flag,
+       65535 * signed_extension_flag]
+  SP1Clean.CPUState.assertion
+    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+  SP1Clean.AddrAddOp.assertion
+    (⟨op_b_memory.prev_value, op_c_imm, addr_value⟩ :
+      Var SP1Clean.AddrAddOp.Inputs (ZMod p))
+  SP1Clean.AddressShape.assertion
+    (⟨addr_value, addr_top_two_limb_inv,
+       offset_bit_2, offset_bit_1, offset_bit_0⟩ :
+      Var SP1Clean.AddressShape.Inputs (ZMod p))
+  SP1Clean.ITypeReader.assertion
+    (⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ :
+      Var SP1Clean.ITypeReader.Inputs (ZMod p))
+  SP1Clean.LoadMemoryAccessGated.assertion
+    (⟨clk_high, clk_low, addr_value, load_prev_value,
+       load_memory_prev_high, load_memory_prev_low,
+       load_memory_diff_low, load_memory_diff_high,
+       load_memory_flag, is_real⟩ :
+      Var SP1Clean.LoadMemoryAccessGated.Inputs (ZMod p))
+  SP1Clean.LoadByteSelector.assertion
+    (⟨load_prev_value, offset_bit_2, offset_bit_1, offset_bit_0,
+       selected_limb, selected_limb_low_byte, selected_byte,
+       signed_extension_flag, is_lbu⟩ :
+      Var SP1Clean.LoadByteSelector.Inputs (ZMod p))
+  is_lb * (is_lb - 1) === 0
+  is_lbu * (is_lbu - 1) === 0
+  (is_lb + is_lbu) * (is_lb + is_lbu - 1) === 0
+  op_a_0 === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) LoadByteCols unit where
+  name := "SP1Clean.LoadByte.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : LoadByteCols (ZMod p)) : Prop := True
+
+def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
+  let is_real : ZMod p := cols.is_lb + cols.is_lbu
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let opcode : ZMod p := cols.is_lb * 29 + cols.is_lbu * 32
+  let op_a_write_value : Vector (ZMod p) 4 :=
+    #v[cols.selected_byte + 65280 * cols.signed_extension_flag,
+       65535 * cols.signed_extension_flag,
+       65535 * cols.signed_extension_flag,
+       65535 * cols.signed_extension_flag]
+  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
+  SP1Clean.AddrAddOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm,
+     cols.addr_value⟩ ∧
+  SP1Clean.AddressShape.Assertion.Spec
+    ⟨cols.addr_value, cols.addr_top_two_limb_inv,
+     cols.offset_bit_2, cols.offset_bit_1, cols.offset_bit_0⟩ ∧
+  SP1Clean.ITypeReader.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, op_a_write_value,
+     cols.adapter⟩ ∧
+  SP1Clean.LoadMemoryAccessGated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.load_memory_flag, is_real⟩ ∧
+  SP1Clean.LoadByteSelector.Assertion.Spec
+    ⟨cols.load_prev_value, cols.offset_bit_2, cols.offset_bit_1, cols.offset_bit_0,
+     cols.selected_limb, cols.selected_limb_low_byte, cols.selected_byte,
+     cols.signed_extension_flag, cols.is_lbu⟩ ∧
+  cols.is_lb * (cols.is_lb - 1) = 0 ∧
+  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
+  (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  sorry
+
+end AssertionGated
+
+def assertionGated : FormalAssertion (ZMod p) LoadByteCols :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.FormalSpec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.LoadByte
