@@ -3,16 +3,23 @@ import SP1Chips.Soundness
 import RISCV.SailToRV64
 import RISCV.SailPureToInstructions
 
-/-! # External Sail-equivalence bridge for `SubChip` (directory-form scaffold)
+/-! # External Sail-equivalence bridge for `SubChip`
 
-Composes `fromMain_toMain` + `allHold_iff_structural` + the Main-level
-`_root_.Sub.correct_sub` to bridge the chip's cols-level `FormalSpec` to
-the Sail-monadic equivalence `_root_.Sub.spec_sub (sp1_*).run s =
-(sp1_sub_cols cols).run s`. Mirrors `SP1Clean/AddChip/SailBridge.lean`
-1-for-1.
+The chip's `Assertion.FormalSpec` (`Circuit.lean`) carries only a pure
+BitVec `RV64.sub` fact for the ALU semantic; the monadic Sail equivalence
+to `_root_.Sub.spec_sub` is *not* in `FormalSpec`. This file provides the
+on-demand bridge that downstream trace-Sail proofs invoke to recover the
+Sail-monadic form.
 
-Proof body is `sorry` for the scaffolding phase — the AddChip proof
-recipe ports directly. -/
+`sail_correct_of_formalSpec` composes:
+- `fromMain_toMain` (round-trip on the cols struct, conditional on the
+  UserMode TrustMode marker from `Assumptions`),
+- `allHold_iff_structural` (reconstruct `(Sub.constraints (toMain cols)).allHold`
+  from the structural conjuncts of `FormalSpec`),
+- `_root_.Sub.correct_sub` (the Main-level Sail-equivalence proof in
+  `SP1Chips/Sub/SubChip.lean`).
+
+Mirrors `SP1Clean/AddChip/SailBridge.lean` 1-for-1 with `Add` → `Sub`. -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
@@ -32,6 +39,44 @@ theorem sail_correct_of_formalSpec
       (_root_.Sub.spec_sub (.Regidx (sp1_op_c_cols cols))
                            (.Regidx (sp1_op_b_cols cols))
                            (.Regidx (sp1_op_a_cols cols))).run s := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨h_subop, h_cpu, h_rtr, h_op_a_0, _h_rv64sub⟩ := h_spec
+  have h_round_trip := fromMain_toMain cols h_assumptions
+  have h_state := h_init (toMain cols) h_round_trip
+  have h_isreal' : (toMain cols)[32] = 1 := h_is_real
+  -- Reconstruct SP1's `allHold` on `toMain cols` from the structural conjuncts
+  -- of the Gated FormalSpec. Each `h_X` cols-level Spec gets re-stated
+  -- through `fromMain (toMain cols)` (≡ cols by h_round_trip); the
+  -- `(fromMain (toMain cols)).Y` projections then unfold to the matching
+  -- `(toMain cols)[k]` / `#v[…]` forms by `@[reducible]` on `fromMain`/`toMain`,
+  -- lining up with the goal `allHold_iff_structural` produces.
+  have h_subop' : SP1Clean.SubOp.Spec
+        (fromMain (toMain cols)).adapter.op_b_memory.prev_value
+        (fromMain (toMain cols)).adapter.op_c_memory.prev_value
+        (fromMain (toMain cols)).op_a_write_value := by
+    rw [h_round_trip]; exact h_subop
+  have h_cpu' : SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨(fromMain (toMain cols)).state,
+         #v[(fromMain (toMain cols)).state.pc[0] + 4,
+            (fromMain (toMain cols)).state.pc[1],
+            (fromMain (toMain cols)).state.pc[2]],
+         8, (fromMain (toMain cols)).is_real⟩ := by
+    rw [h_round_trip]; exact h_cpu
+  have h_rtr' : SP1Clean.RTypeReader.Gated.Assertion.Spec
+        ⟨(fromMain (toMain cols)).state.clk_high,
+         (fromMain (toMain cols)).state.clk_0_16 +
+            (fromMain (toMain cols)).state.clk_16_24 * 65536, 2,
+         (fromMain (toMain cols)).state.pc,
+         (fromMain (toMain cols)).op_a_write_value,
+         (fromMain (toMain cols)).adapter,
+         (fromMain (toMain cols)).is_real,
+         (fromMain (toMain cols)).adapter_cols.is_trusted⟩ := by
+    rw [h_round_trip]; exact h_rtr
+  have h_allHold : (_root_.Sub.constraints (toMain cols)).allHold := by
+    rw [allHold_iff_structural (toMain cols) h_isreal']
+    exact ⟨h_subop', h_cpu', h_rtr', h_op_a_0⟩
+  -- Apply Main-level `Sub.correct_sub`; the result reads `sp1_X (toMain cols)`,
+  -- which is definitionally `sp1_X_cols cols` for each helper.
+  exact (_root_.Sub.correct_sub (toMain cols) s h_allHold h_isreal' h_state).symm
 
 end SP1Clean.SubChip
