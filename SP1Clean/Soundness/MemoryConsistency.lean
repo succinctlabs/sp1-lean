@@ -7,7 +7,7 @@ import SP1Clean.JalChip
 import SP1Clean.MulChip
 import SP1Clean.ShiftLeftChip
 import SP1Clean.AddwChip.SailBridge
-import SP1Clean.UTypeChip
+import SP1Clean.UTypeChip.SailBridge
 import SP1Clean.JalrChip
 import SP1Clean.LtChip
 import SP1Clean.StoreWordChip
@@ -680,14 +680,26 @@ theorem memoryAccessesValid_of_spec_uType
     (h : SP1Clean.UType.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.uType cols) := by
   change SP1Clean.UType.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_isauipc, _h_op_a_0,
-          h_oa_a⟩ := h
+  -- New FormalSpec shape: ⟨cpuStateSpec, AddOp .allHold, jtypeReaderSpec,
+  -- 6 scalar gates, BitVec conjunct⟩. OperandAccess.Spec is now derived
+  -- from jtypeReaderSpec rather than appearing as a separate conjunct, so
+  -- we extract it from `h_jtr` instead of directly.
+  obtain ⟨_h_cpu, _h_addop, h_jtr, _h_isreal, _h_isauipc,
+          _h_a0, _h_a1, _h_a2, _h_op_a_0, _h_bitvec⟩ := h
+  -- `jtypeReaderSpec`'s 17th-19th conjuncts (diff_low_limb < 65536,
+  -- timestamp scaled < 256, Word.isU64 prev_value) match
+  -- `OperandAccess.Assertion.Spec`'s conjuncts.
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+          h_diff, h_ts, h_isU64, _⟩ := h_jtr
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
   subst h_mem
-  exact h_oa_a
+  -- Bridge `Word.isU64 #v[v[0], v[1], v[2], v[3]]` (jtypeReaderSpec form)
+  -- to `Word.isU64 v` (OperandAccess.Spec form) via `Vector.ext`.
+  refine ⟨h_diff, h_ts, ?_⟩
+  exact (SP1Clean.JTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64
 
 /-- Jal's per-chip discharge — projects the single
 `OperandAccess.Assertion.Spec` conjunct. Jal has only the op_a register
