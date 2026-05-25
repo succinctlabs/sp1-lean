@@ -336,4 +336,167 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
+/-! ## Flag-threaded variant (`Gated`)
+
+Mirrors Rust's `eval_r_type(cols, ..., is_real, is_trusted)`. `is_real` and
+`is_trusted` are first-class `Inputs` fields; sub-circuit emissions are
+gated by the appropriate flag (`is_trusted` for the program-bus lookup;
+`is_real` for the three per-operand `RegisterAccess` calls).
+
+The FormalAssertion's `Spec` is the **literal conjunction of sub-circuit
+`Spec`s** (per CLAUDE.md's "Faithful sub-circuit composition" principle).
+Chip consumers destructure this 9-tuple:
+
+1. `is_real * (is_real - 1) = 0` — binary gate (collapses the 4 redundant
+   SP1-native copies into one Clean emission).
+2. `programGated.Spec` = `is_trusted = 0 ∨ ProgramSpec entry`.
+3–5. Three `RegisterAccess.assertion.Spec` = `is_real = 0 ∨ <byte facts>`
+   (each delegates to `OperandAccess.AssertionGated.Spec`).
+6–9. Four scalar `op_a_0 * op_a_write_value[i] = 0` gates (not gated by
+   `is_real` in SP1).
+
+This is a parallel API to the legacy `assertion` above — the unconditional
+form (pinned at `is_real = is_trusted = 1`) continues to serve any chips
+that haven't migrated to the gated form yet. -/
+
+namespace Gated
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Bundled inputs. Mirrors `_root_.RTypeReader.constraints(... is_real
+is_trusted)` with the flags as first-class fields. -/
+structure Inputs (F : Type) where
+  clk_high : F
+  clk_low : F
+  opcode : F
+  pc : Vector F 3
+  op_a_write_value : Vector F 4
+  cols : _root_.RTypeReader F
+  is_real : F
+  is_trusted : F
+deriving ProvableStruct
+
+namespace Assertion
+
+open Circuit
+
+/-- Clean-side flag-threaded R-type reader circuit. Mirrors Rust
+`eval_r_type` shape: one `programGated` (gated by `is_trusted`) + three
+`RegisterAccess.assertion` calls (gated by `is_real`) + binary gate +
+four `op_a_0` zeroing gates. -/
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
+       is_real, is_trusted⟩ := input
+  -- Binary gate (single emission collapses SP1-native's 4 redundant copies).
+  is_real * (is_real - 1) === 0
+  -- Program-bus lookup, gated by is_trusted.
+  SP1Clean.programGated
+    (⟨#v[pc[0], pc[1], pc[2], opcode, op_a, op_b, 0, 0, 0,
+         op_c, 0, 0, 0, op_a_0, 0, 0],
+       is_trusted⟩ : Var SP1Clean.ProgramGated.Inputs (ZMod p))
+  -- Three per-operand register-access subcircuits, gated by is_real.
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 4, op_a, op_a_memory.prev_value, op_a_write_value,
+       op_a_memory.access_timestamp.prev_low,
+       op_a_memory.access_timestamp.diff_low_limb, is_real⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 3, op_b, op_b_memory.prev_value, op_b_memory.prev_value,
+       op_b_memory.access_timestamp.prev_low,
+       op_b_memory.access_timestamp.diff_low_limb, is_real⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 2, op_c, op_c_memory.prev_value, op_c_memory.prev_value,
+       op_c_memory.access_timestamp.prev_low,
+       op_c_memory.access_timestamp.diff_low_limb, is_real⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- Four op_a_0 zeroing gates (not gated by is_real per SP1).
+  op_a_0 * op_a_write_value[0] === 0
+  op_a_0 * op_a_write_value[1] === 0
+  op_a_0 * op_a_write_value[2] === 0
+  op_a_0 * op_a_write_value[3] === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.RTypeReader.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+/-- The `Spec` is the literal conjunction of sub-circuit `Spec`s — one
+per emission in `main`. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       cols, is_real, is_trusted⟩ := input
+  is_real * (is_real - 1) = 0 ∧
+  SP1Clean.ProgramGated.Spec
+    ⟨#v[pc[0], pc[1], pc[2], opcode, cols.op_a, cols.op_b, 0, 0, 0,
+        cols.op_c, 0, 0, 0, cols.op_a_0, 0, 0],
+     is_trusted⟩ ∧
+  SP1Clean.RegisterAccess.Assertion.Spec
+    ⟨clk_high, clk_low, 4, cols.op_a, cols.op_a_memory.prev_value,
+     op_a_write_value, cols.op_a_memory.access_timestamp.prev_low,
+     cols.op_a_memory.access_timestamp.diff_low_limb, is_real⟩ ∧
+  SP1Clean.RegisterAccess.Assertion.Spec
+    ⟨clk_high, clk_low, 3, cols.op_b, cols.op_b_memory.prev_value,
+     cols.op_b_memory.prev_value, cols.op_b_memory.access_timestamp.prev_low,
+     cols.op_b_memory.access_timestamp.diff_low_limb, is_real⟩ ∧
+  SP1Clean.RegisterAccess.Assertion.Spec
+    ⟨clk_high, clk_low, 2, cols.op_c, cols.op_c_memory.prev_value,
+     cols.op_c_memory.prev_value, cols.op_c_memory.access_timestamp.prev_low,
+     cols.op_c_memory.access_timestamp.diff_low_limb, is_real⟩ ∧
+  cols.op_a_0 * op_a_write_value[0] = 0 ∧
+  cols.op_a_0 * op_a_write_value[1] = 0 ∧
+  cols.op_a_0 * op_a_write_value[2] = 0 ∧
+  cols.op_a_0 * op_a_write_value[3] = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨e_ckh, e_cl, e_opc, e_pc, e_oawv, e_oa,
+          ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
+          ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oc,
+          ⟨e_pv_c, e_pl_c, e_dll_c⟩, e_ir, e_it⟩ := h_input
+  subst_eqs
+  obtain ⟨h_gate, h_prog_sub, h_ra_a_sub, h_ra_b_sub, h_ra_c_sub,
+          h_z0, h_z1, h_z2, h_z3⟩ := h_holds
+  -- Normalize `a - b` ↔ `a + -b` and `(map f v)[i]` ↔ `f v[i]` so the
+  -- Spec target's destructured-Inputs form matches the sub-circuit hyps.
+  simp only [Spec, sub_eq_add_neg, Vector.getElem_map]
+  exact ⟨h_gate, h_prog_sub trivial, h_ra_a_sub trivial, h_ra_b_sub trivial,
+         h_ra_c_sub trivial, h_z0, h_z1, h_z2, h_z3⟩
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨e_ckh, e_cl, e_opc, e_pc, e_oawv, e_oa,
+          ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
+          ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oc,
+          ⟨e_pv_c, e_pl_c, e_dll_c⟩, e_ir, e_it⟩ := h_input
+  subst_eqs
+  simp only [Spec, sub_eq_add_neg, Vector.getElem_map] at h_spec
+  obtain ⟨h_gate, h_prog, h_ra_a, h_ra_b, h_ra_c, h_z0, h_z1, h_z2, h_z3⟩ := h_spec
+  exact ⟨h_gate, ⟨trivial, h_prog⟩, ⟨trivial, h_ra_a⟩, ⟨trivial, h_ra_b⟩,
+         ⟨trivial, h_ra_c⟩, h_z0, h_z1, h_z2, h_z3⟩
+
+end Assertion
+
+/-- The flag-threaded Clean `FormalAssertion` for the R-type reader.
+Spec is the literal conjunction of sub-circuit Specs. -/
+def assertion : FormalAssertion (ZMod p) Inputs :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.Spec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
+end Gated
+
 end SP1Clean.RTypeReader

@@ -383,4 +383,152 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
+/-! ## Flag-threaded variant (`Gated`)
+
+Mirrors Rust's `eval_alu_type(cols, ..., is_real, is_trusted)`. The op_c
+register-access multiplicity is `is_real - imm_c` (mirrors `alu_type.rs:142`).
+On rows with `imm_c = 1` the op_c memory access is vacuous; on `imm_c = 0`
+and `is_real = 1` it's active. -/
+
+namespace Gated
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+structure Inputs (F : Type) where
+  clk_high : F
+  clk_low : F
+  opcode : F
+  pc : Vector F 3
+  op_a_write_value : Vector F 4
+  cols : _root_.ALUTypeReader F
+  is_real : F
+  is_trusted : F
+deriving ProvableStruct
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩,
+       is_real, is_trusted⟩ := input
+  is_real * (is_real - 1) === 0
+  SP1Clean.programGated
+    (⟨#v[pc[0], pc[1], pc[2], opcode, op_a, op_b, 0, 0, 0,
+         op_c[0], op_c[1], op_c[2], op_c[3], op_a_0, 0, imm_c],
+       is_trusted⟩ : Var SP1Clean.ProgramGated.Inputs (ZMod p))
+  -- op_a: write, gated by is_real
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 4, op_a, op_a_memory.prev_value, op_a_write_value,
+       op_a_memory.access_timestamp.prev_low,
+       op_a_memory.access_timestamp.diff_low_limb, is_real⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- op_b: read, gated by is_real
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 3, op_b, op_b_memory.prev_value, op_b_memory.prev_value,
+       op_b_memory.access_timestamp.prev_low,
+       op_b_memory.access_timestamp.diff_low_limb, is_real⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- op_c: read, gated by `is_real - imm_c` (mirrors Rust alu_type.rs:142)
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 2, op_c[0], op_c_memory.prev_value, op_c_memory.prev_value,
+       op_c_memory.access_timestamp.prev_low,
+       op_c_memory.access_timestamp.diff_low_limb, is_real - imm_c⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  op_a_0 * op_a_write_value[0] === 0
+  op_a_0 * op_a_write_value[1] === 0
+  op_a_0 * op_a_write_value[2] === 0
+  op_a_0 * op_a_write_value[3] === 0
+  imm_c * (op_c_memory.prev_value[0] - op_c[0]) === 0
+  imm_c * (op_c_memory.prev_value[1] - op_c[1]) === 0
+  imm_c * (op_c_memory.prev_value[2] - op_c[2]) === 0
+  imm_c * (op_c_memory.prev_value[3] - op_c[3]) === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.ALUTypeReader.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+       cols, is_real, is_trusted⟩ := input
+  is_real * (is_real - 1) = 0 ∧
+  SP1Clean.ProgramGated.Spec
+    ⟨#v[pc[0], pc[1], pc[2], opcode, cols.op_a, cols.op_b, 0, 0, 0,
+        cols.op_c[0], cols.op_c[1], cols.op_c[2], cols.op_c[3],
+        cols.op_a_0, 0, cols.imm_c],
+     is_trusted⟩ ∧
+  SP1Clean.RegisterAccess.Assertion.Spec
+    ⟨clk_high, clk_low, 4, cols.op_a, cols.op_a_memory.prev_value,
+     op_a_write_value, cols.op_a_memory.access_timestamp.prev_low,
+     cols.op_a_memory.access_timestamp.diff_low_limb, is_real⟩ ∧
+  SP1Clean.RegisterAccess.Assertion.Spec
+    ⟨clk_high, clk_low, 3, cols.op_b, cols.op_b_memory.prev_value,
+     cols.op_b_memory.prev_value, cols.op_b_memory.access_timestamp.prev_low,
+     cols.op_b_memory.access_timestamp.diff_low_limb, is_real⟩ ∧
+  SP1Clean.RegisterAccess.Assertion.Spec
+    ⟨clk_high, clk_low, 2, cols.op_c[0], cols.op_c_memory.prev_value,
+     cols.op_c_memory.prev_value, cols.op_c_memory.access_timestamp.prev_low,
+     cols.op_c_memory.access_timestamp.diff_low_limb, is_real - cols.imm_c⟩ ∧
+  cols.op_a_0 * op_a_write_value[0] = 0 ∧
+  cols.op_a_0 * op_a_write_value[1] = 0 ∧
+  cols.op_a_0 * op_a_write_value[2] = 0 ∧
+  cols.op_a_0 * op_a_write_value[3] = 0 ∧
+  cols.imm_c * (cols.op_c_memory.prev_value[0] - cols.op_c[0]) = 0 ∧
+  cols.imm_c * (cols.op_c_memory.prev_value[1] - cols.op_c[1]) = 0 ∧
+  cols.imm_c * (cols.op_c_memory.prev_value[2] - cols.op_c[2]) = 0 ∧
+  cols.imm_c * (cols.op_c_memory.prev_value[3] - cols.op_c[3]) = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨e_ckh, e_cl, e_opc, e_pc, e_oawv,
+          ⟨e_oa, ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
+           ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oc,
+           ⟨e_pv_c, e_pl_c, e_dll_c⟩, e_immc⟩,
+          e_ir, e_it⟩ := h_input
+  subst_eqs
+  obtain ⟨h_gate, h_prog_sub, h_ra_a_sub, h_ra_b_sub, h_ra_c_sub,
+          h_z0, h_z1, h_z2, h_z3, h_im0, h_im1, h_im2, h_im3⟩ := h_holds
+  simp only [Spec, sub_eq_add_neg, Vector.getElem_map]
+  exact ⟨h_gate, h_prog_sub trivial, h_ra_a_sub trivial, h_ra_b_sub trivial,
+         h_ra_c_sub trivial, h_z0, h_z1, h_z2, h_z3,
+         h_im0, h_im1, h_im2, h_im3⟩
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨e_ckh, e_cl, e_opc, e_pc, e_oawv,
+          ⟨e_oa, ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
+           ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oc,
+           ⟨e_pv_c, e_pl_c, e_dll_c⟩, e_immc⟩,
+          e_ir, e_it⟩ := h_input
+  subst_eqs
+  simp only [Spec, sub_eq_add_neg, Vector.getElem_map] at h_spec
+  obtain ⟨h_gate, h_prog, h_ra_a, h_ra_b, h_ra_c,
+          h_z0, h_z1, h_z2, h_z3, h_im0, h_im1, h_im2, h_im3⟩ := h_spec
+  exact ⟨h_gate, ⟨trivial, h_prog⟩, ⟨trivial, h_ra_a⟩, ⟨trivial, h_ra_b⟩,
+         ⟨trivial, h_ra_c⟩, h_z0, h_z1, h_z2, h_z3,
+         h_im0, h_im1, h_im2, h_im3⟩
+
+end Assertion
+
+def assertion : FormalAssertion (ZMod p) Inputs :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.Spec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
+end Gated
+
 end SP1Clean.ALUTypeReader

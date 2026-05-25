@@ -26,6 +26,7 @@ import SP1Operations.Compare.IsZeroWordOperation.IsZeroWordOperation
 import SP1Operations.Compare.IsEqualWordOperation.IsEqualWordOperation
 import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.StateBusTable
 
 /-! # Reusable `CPUState` Spec helper
 
@@ -262,5 +263,178 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     Spec := Assertion.Spec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## Flag-threaded variant (`Gated`)
+
+Mirrors Rust's `eval_cpu_state(cols, next_pc, clk_increment, is_real)` (see
+`sp1/crates/core/machine/src/adapter/state.rs`). The full 4-field `cols`
+struct (clk_high, clk_16_24, clk_0_16, pc[3]) plus the three Rust-side
+parameters (`next_pc`, `clk_increment`, `is_real`) live in `Gated.Inputs`,
+and `Gated.assertion`'s `main` emits all 5 SP1-native constraints (binary
+gate + 2 state-bus + 2 byte lookups, each gated by `is_real`).
+
+The `Spec` is **disjunctive**: `(is_real = 0 ∨ is_real = 1) ∧
+(is_real = 0 ∨ <range/U8 facts>)`. On rows where `is_real = 0`, every
+gated lookup is vacuous (matches SP1's bus semantics); on real rows, the
+right disjunct's facts hold unconditionally. The state-bus emissions
+contribute nothing to the row-level `Spec` (their per-row `Spec` is
+trivially `True`); per-key balance is enforced at the trace level by
+`pcChainProp` over `aggregateStateAccesses`.
+
+This is a **parallel** API to the legacy 2-field `assertion` above — the
+22 existing consumers (Branch, Load*, Store*, Div*, Shift*, Sub*, Mul,
+Jal*, Lt) continue to use the legacy form pinned at `is_real = 1`. Phase
+4 chips (Add, Addi, Addw) opt into the gated form. -/
+
+namespace Gated
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+-- Derive `Fact (p > 512)` from `Fact (2 ^ 17 < p)` for byteOpcodeGated.
+instance : Fact (p > 512) := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
+
+/-- Bundled inputs mirroring Rust `eval_cpu_state(cols, next_pc,
+clk_increment, is_real)`. -/
+structure Inputs (F : Type) where
+  cols : _root_.CPUState F
+  next_pc : Vector F 3
+  clk_increment : F
+  is_real : F
+deriving ProvableStruct
+
+namespace Assertion
+
+open Circuit
+
+/-- Clean-side gated CPUState circuit. Mirrors the 5 SP1-native constraints
+in `_root_.CPUState.constraints`:
+1. `is_real * (is_real - 1) === 0` — binary gate.
+2. `stateBusGated` (receive at current pc) with `mult = is_real`.
+3. `stateBusGated` (send at next_pc, clock + clk_increment) with `mult = is_real`.
+4. `byteOpcodeGated` Range-13 on `(clk_0_16 - 1) * 8⁻¹` with `mult = is_real`.
+5. `byteOpcodeGated` U8Range on `clk_16_24` with `mult = is_real`. -/
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨cols, next_pc, clk_increment, is_real⟩ := input
+  let clk_combined := cols.clk_0_16 + cols.clk_16_24 * 65536
+  is_real * (is_real - 1) === 0
+  SP1Lookup.stateBusGated
+    ⟨#v[cols.clk_high, clk_combined, cols.pc[0], cols.pc[1], cols.pc[2]], is_real⟩
+  SP1Lookup.stateBusGated
+    ⟨#v[cols.clk_high, clk_combined + clk_increment, next_pc[0], next_pc[1], next_pc[2]], is_real⟩
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(6 : Expression (ZMod p)), (cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0], is_real⟩
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(3 : Expression (ZMod p)), 0, cols.clk_16_24, 0], is_real⟩
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.CPUState.Gated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+/-- The `Spec` is the literal conjunction of sub-circuit `Spec`s — one
+per emission in `main`. Chip consumers destructure this 5-tuple and
+access each sub-Spec by direct field. Aligns with CLAUDE.md's "Faithful
+sub-circuit composition" principle. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  let cols := input.cols
+  let clk_combined := cols.clk_0_16 + cols.clk_16_24 * 65536
+  input.is_real * (input.is_real - 1) = 0 ∧
+  SP1Lookup.StateBusGated.Spec
+    ⟨#v[cols.clk_high, clk_combined, cols.pc[0], cols.pc[1], cols.pc[2]],
+     input.is_real⟩ ∧
+  SP1Lookup.StateBusGated.Spec
+    ⟨#v[cols.clk_high, clk_combined + input.clk_increment,
+        input.next_pc[0], input.next_pc[1], input.next_pc[2]],
+     input.is_real⟩ ∧
+  SP1Lookup.ByteOpcodeGated.Spec
+    ⟨#v[(6 : ZMod p), (cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹, 13, 0],
+     input.is_real⟩ ∧
+  SP1Lookup.ByteOpcodeGated.Spec
+    ⟨#v[(3 : ZMod p), 0, cols.clk_16_24, 0],
+     input.is_real⟩
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨⟨e_ch, e_c16, e_c0, e_pc⟩, e_npc, e_ci, e_ir⟩ := h_input
+  subst_eqs
+  obtain ⟨h_gate, h_sr_sub, h_ss_sub, h_b13_sub, h_b8r_sub⟩ := h_holds
+  -- `Expression.eval` reduces `(a - b)` to `(a + -b)`; normalize Spec target
+  -- to match the form the sub-circuit hyps carry.
+  simp only [Spec, sub_eq_add_neg]
+  exact ⟨h_gate, h_sr_sub trivial, h_ss_sub trivial,
+         h_b13_sub trivial, h_b8r_sub trivial⟩
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨⟨e_ch, e_c16, e_c0, e_pc⟩, e_npc, e_ci, e_ir⟩ := h_input
+  subst_eqs
+  simp only [Spec, sub_eq_add_neg] at h_spec
+  obtain ⟨h_gate, h_sr, h_ss, h_b13, h_b8r⟩ := h_spec
+  exact ⟨h_gate, ⟨trivial, h_sr⟩, ⟨trivial, h_ss⟩,
+         ⟨trivial, h_b13⟩, ⟨trivial, h_b8r⟩⟩
+
+end Assertion
+
+/-- The flag-threaded Clean `FormalAssertion` for CPUState. Mirrors Rust
+`eval_cpu_state` shape; emits all 5 SP1-native constraints gated by
+`is_real`. `Spec` is the literal conjunction of sub-circuit `Spec`s. -/
+def assertion : FormalAssertion (ZMod p) Inputs :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.Spec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
+/-! ### Semantic view + SP1 bridge
+
+`cpuStateSpec` is the row-level semantic predicate (binary gate + the
+disjunctive `is_real = 0 ∨ <range/U8 facts>`). `cpuStateSpec_iff_sp1`
+bridges to the SP1-native `allHold` form. Chip consumers can either
+destructure `Assertion.Spec` directly (sub-circuit composition) or
+apply `cpuStateSpec_of_assertionSpec` to get the semantic form. -/
+
+/-- The flag-threaded semantic RHS — disjunctive form. -/
+def cpuStateSpec
+    (cols : _root_.CPUState (ZMod p)) (is_real : ZMod p) : Prop :=
+  (is_real = 0 ∨ is_real = 1) ∧
+  (is_real = 0 ∨
+    (((cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 8192 ∧
+      cols.clk_16_24 < (256 : ZMod p)))
+
+/-- The flag-aware bridge: `(SP1-native constraints).allHold ↔ cpuStateSpec`,
+no `is_real = 1` pinning. Converts the SP1-native lemma's implication form
+into the disjunctive form classically. -/
+theorem cpuStateSpec_iff_sp1
+    {cols : _root_.CPUState (ZMod p)} {next_pc : Vector (ZMod p) 3}
+    {clk_increment is_real : ZMod p} :
+    (_root_.CPUState.constraints cols next_pc clk_increment is_real).allHold ↔
+      cpuStateSpec cols is_real := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [show (_root_.CPUState.constraints cols next_pc clk_increment is_real).allHold
+        = List.Forall SP1Constraint.toProp
+            (_root_.CPUState.constraints cols next_pc clk_increment is_real) from rfl]
+  rw [_root_.CPUState.allHold_constraints_iff]
+  simp only [cpuStateSpec]
+  constructor
+  · rintro ⟨h_bin, h_imp⟩
+    refine ⟨h_bin, ?_⟩
+    by_cases h : is_real = 0
+    · exact Or.inl h
+    · exact Or.inr (h_imp h)
+  · rintro ⟨h_bin, h_disj⟩
+    refine ⟨h_bin, fun h_ne => ?_⟩
+    exact h_disj.resolve_left h_ne
+
+end Gated
 
 end SP1Clean.CPUState
