@@ -224,4 +224,79 @@ instance ProgramTable.hasDefaultRow
       rw [val_mod_4_eq_zero_iff_zmod]
       simp
 
+/-! ## `programGated` — `lookupGated` for `ProgramTable` as a `FormalAssertion`
+
+Mirrors the `byteOpcodeGated` wrapper in `SP1Lookup.lean`. Wraps a single
+`lookupGated` call on `ProgramTable` into a `FormalAssertion` so chip
+readers (RType/IType/ALU-Type/JType) can compose it as a subcircuit with
+their `is_trusted` multiplicity. -/
+
+namespace ProgramGated
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Inputs: the 16-element row and the shared multiplicity. -/
+structure Inputs (F : Type) where
+  entry : Vector F 16
+  mult : F
+deriving ProvableStruct
+
+@[reducible, circuit_norm]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit :=
+  SP1Lookup.lookupGated SP1Clean.ProgramTable input.entry input.mult
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.ProgramGated"
+  main := main
+  localLength _ := 16
+  localLength_eq _ _ := by simp only [main, circuit_norm]
+  subcircuitsConsistent _ _ := by simp +arith only [main, circuit_norm]
+
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+/-- Disjunctive Spec: vacuous when `mult = 0`; otherwise asserts the row
+satisfies `ProgramSpec`. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  input.mult = 0 ∨ SP1Clean.ProgramSpec input.entry
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  intro offset env input_var input h_input _ h_holds
+  have h := SP1Lookup.lookupGated_implies_disjunctive
+    SP1Clean.ProgramTable input_var.entry input_var.mult env offset h_holds
+  subst h_input
+  change (eval env input_var).mult = 0 ∨ SP1Clean.ProgramSpec (eval env input_var).entry
+  simp only [circuit_norm]
+  rcases h with h_zero | h_in_table
+  · exact Or.inl h_zero
+  · right; convert h_in_table; funext x; simp [circuit_norm]
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  intro offset env input_var h_env input h_input _ h_spec
+  apply SP1Lookup.lookupGated_completeness_of_disjunctive
+    SP1Clean.ProgramTable input_var.entry input_var.mult env offset h_env
+  subst h_input
+  change (eval env input_var).mult = 0 ∨
+      SP1Clean.ProgramSpec (eval env input_var).entry at h_spec
+  simp only [circuit_norm] at h_spec
+  rcases h_spec with h_zero | h_in_table
+  · exact Or.inl h_zero
+  · right; convert h_in_table; funext x; simp [circuit_norm]
+
+end ProgramGated
+
+/-- Multiplicity-gated single-row program lookup, as a Clean
+`FormalAssertion`. The chip-level Spec is the disjunctive form
+`mult = 0 ∨ ProgramSpec entry`. -/
+@[reducible]
+def programGated {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)] :
+    FormalAssertion (ZMod p) ProgramGated.Inputs :=
+  { ProgramGated.elaborated with
+    Assumptions := ProgramGated.Assumptions,
+    Spec := ProgramGated.Spec,
+    soundness := ProgramGated.soundness,
+    completeness := ProgramGated.completeness }
+
 end SP1Clean
