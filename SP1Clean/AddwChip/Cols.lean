@@ -8,6 +8,8 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Addw.AddwChip
 import SP1Clean.Reader.CPUState
+import SP1Clean.Reader.ALUTypeReader
+import SP1Clean.Operations.AddwOperation
 import SP1Clean.TrustMode
 
 /-! # `AddwChip` cols-level surface
@@ -154,5 +156,29 @@ omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
 omit [Fact (2 ^ 17 < p)] in
 @[simp] lemma sp1_addw_cols_fromMain (Main : Vector (ZMod p) 36) :
     sp1_addw_cols (fromMain Main) = _root_.Addw.sp1_addw Main := rfl
+
+/-! ## Chip-level `FormalSpec`
+
+The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
+can reference it without importing the full circuit construction:
+the ADDW carry-chain arithmetic (`AddwOp.Spec`, Inputs-shape) plus the
+byte/program-lookup-derivable subset (CPUState + ALUTypeReader's full
+spec) plus two trailing scalar gates. SailBridge consumes this directly
+to derive Sail equivalence. -/
+def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let op_a_write_value : Word (ZMod p) :=
+    #v[cols.addw_value[0], cols.addw_value[1],
+       cols.addw_msb * 65535, cols.addw_msb * 65535]
+  SP1Clean.AddwOp.Spec
+      ⟨cols.adapter.op_b_memory.prev_value,
+       cols.adapter.op_c_memory.prev_value,
+       cols.addw_value,
+       cols.addw_msb⟩ ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
+  SP1Clean.ALUTypeReader.aluTypeReaderSpec clk_low 19 cols.state.pc
+    op_a_write_value cols.adapter ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0
 
 end SP1Clean.Addw

@@ -11,6 +11,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.Reader.RegisterAccess
 import SP1Clean.SP1Lookup
 
 /-! # Reusable `ALUTypeReader` Spec helper + FormalAssertion
@@ -21,23 +22,27 @@ having `op_c` as a 4-limb `Word` and carrying an `imm_c` flag that gates the
 op_c memory access (`imm_c = 0` ⇒ register read; `imm_c = 1` ⇒ immediate, with
 `op_c_memory.prev_value` constrained to equal `op_c`).
 
-Provides a complete `FormalAssertion` bundle that captures the full
-`aluTypeReaderSpec`:
+Provides a complete `FormalAssertion` bundle:
 - `ProgramTable.assertion` covering `trusted_instr`, register bounds, the
   4 op_c limb bounds, `op_a_0` binary/iff, `imm_c` binary, PC alignment.
-- Three `OperandAccess.assertionGated` calls (op_a/+4, op_b/+3 with mult=1;
+- Three `RegisterAccess.assertion` calls (op_a/+4, op_b/+3 with mult=1;
   op_c/+2 with `mult := 1 - imm_c`). The op_c gating mirrors SP1's
   `alu_type.rs:142` (multiplicity `is_real - imm_c`); since the reader pins
-  `is_real = 1`, this is equivalent to `1 - imm_c`.
+  `is_real = 1`, this is equivalent to `1 - imm_c`. Each call bundles the
+  byte-bus content (via `OperandAccess.assertionGated`) with two memory-bus
+  emissions (send `prev_value`, receive `write_value`). For op_b/op_c
+  (read-only) `write_value = prev_value`; for op_a (write)
+  `write_value = op_a_write_value`.
 - Four `op_a_0 * op_a_write_value[i] = 0` gates (enforcing the
   `op_a_0 ≠ 0 → op_a_write_value = 0` clause of the spec).
 - Four `imm_c * (op_c_memory.prev_value[i] - op_c[i]) = 0` gates
   (enforcing the `imm_c = 1 → prev_value = op_c` clause; mirrors SP1's
   `alu_type.rs:170–177`).
 
-All three add chips (`Add`, `Addi`, `Addw`) now route their byte/program
-lookups through a uniform reader subcircuit: `Add` → `RTypeReader.assertion`,
-`Addi` → `ITypeReader.assertion`, `Addw` → `ALUTypeReader.assertion`. -/
+All three add chips (`Add`, `Addi`, `Addw`) now route their byte/program/
+memory lookups through a uniform reader subcircuit: `Add` →
+`RTypeReader.assertion`, `Addi` → `ITypeReader.assertion`, `Addw` →
+`ALUTypeReader.assertion`. -/
 
 namespace SP1Clean.ALUTypeReader
 
@@ -110,12 +115,14 @@ theorem aluTypeReaderSpec_iff_sp1
 
 /-! ## `FormalAssertion` promotion
 
-The bundle covers ProgramTable + 3 OperandAccess.assertionGated calls (op_a
-and op_b with mult=1, op_c with mult = `1 - imm_c`) + 4 op_a_0 gates + 4
-imm_c-equality gates. The full `aluTypeReaderSpec` is the Spec. -/
+The bundle covers ProgramTable + 3 RegisterAccess calls (op_a/op_b with
+mult=1, op_c with mult = `1 - imm_c`) + 4 op_a_0 gates + 4 imm_c-equality
+gates. The full `aluTypeReaderSpec` is the Spec. -/
 
-/-- Bundled inputs for the ALUTypeReader assertion. -/
+/-- Bundled inputs for the ALUTypeReader assertion. `clk_high` is threaded
+through to the memory-bus emissions inside `RegisterAccess.assertion`. -/
 structure Inputs (F : Type) where
+  clk_high : F
   clk_low : F
   opcode : F
   pc : Vector F 3
@@ -127,34 +134,36 @@ namespace Assertion
 
 open Circuit
 
-/-- Clean-side circuit: ProgramTable + 3 OperandAccess.assertionGated +
-4 op_a_0 gates + 4 imm_c-equality gates. -/
+/-- Clean-side circuit: ProgramTable + 3 RegisterAccess.assertion + 4
+op_a_0 gates + 4 imm_c-equality gates. -/
 @[reducible]
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨clk_low, opcode, pc, op_a_write_value,
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩⟩ := input
   -- Program-bus interaction.
   SP1Clean.ProgramTable.assertion
     (⟨pc, opcode, op_a, #v[op_b, 0, 0, 0], op_c, op_a_0, 0, imm_c⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- Three per-operand byte-bus assertions via `assertionGated`.
-  -- op_a/op_b: mult=1 (uniform with R/I-Type readers). op_c: mult=1-imm_c
-  -- (vacuous on ADDIW rows where imm_c=1, matching SP1's `alu_type.rs:142`).
-  SP1Clean.OperandAccess.assertionGated
-    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low,
-       op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value, 1⟩ :
-      Var SP1Clean.OperandAccess.AssertionGated.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertionGated
-    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low,
-       op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value, 1⟩ :
-      Var SP1Clean.OperandAccess.AssertionGated.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertionGated
-    (⟨clk_low, 2, op_c_memory.access_timestamp.prev_low,
-       op_c_memory.access_timestamp.diff_low_limb,
-       op_c_memory.prev_value, 1 - imm_c⟩ :
-      Var SP1Clean.OperandAccess.AssertionGated.Inputs (ZMod p))
+  -- op_a: register-access write (mirrors Rust eval_register_access_write).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 4, op_a, op_a_memory.prev_value, op_a_write_value,
+       op_a_memory.access_timestamp.prev_low,
+       op_a_memory.access_timestamp.diff_low_limb, 1⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- op_b: register-access read (mirrors Rust eval_register_access_read).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 3, op_b, op_b_memory.prev_value, op_b_memory.prev_value,
+       op_b_memory.access_timestamp.prev_low,
+       op_b_memory.access_timestamp.diff_low_limb, 1⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- op_c: register-access read gated by `1 - imm_c` (vacuous on rows
+  -- where imm_c=1, matching alu_type.rs:142). The Rust side uses
+  -- `op_c[0]` as the register index (alu_type.rs:140).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 2, op_c[0], op_c_memory.prev_value, op_c_memory.prev_value,
+       op_c_memory.access_timestamp.prev_low,
+       op_c_memory.access_timestamp.diff_low_limb, 1 - imm_c⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
   -- Four assertZero gates: op_a_0 * op_a_write_value[i] = 0.
   op_a_0 * op_a_write_value[0] === 0
   op_a_0 * op_a_write_value[1] === 0
@@ -171,7 +180,6 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   name := "SP1Clean.ALUTypeReader"
   main := main
-  -- Computed from main: 3 assertionGated × 24 witnesses = 72.
   localLength input := (main input).localLength 0
   output _ _ := ()
   localLength_eq input offset := by
@@ -209,20 +217,20 @@ lemma isU64_iff_index_form [NeZero p] (w : Word (ZMod p)) :
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨e_clk, e_opc, e_pc, e_oawv, e_oa,
+  obtain ⟨e_ckh, e_clk, e_opc, e_pc, e_oawv, e_oa,
           ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
           ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oc,
           ⟨e_pv_c, e_pl_c, e_dll_c⟩, e_immc⟩ := h_input
   subst_eqs
-  obtain ⟨h_prog_sub, h_oa_a_sub, h_oa_b_sub, h_oa_c_sub,
+  obtain ⟨h_prog_sub, h_ra_a_sub, h_ra_b_sub, h_ra_c_sub,
           h_z0, h_z1, h_z2, h_z3,
           h_im0, h_im1, h_im2, h_im3⟩ := h_holds
   have h_prog := h_prog_sub trivial
   -- op_a/op_b: mult=1, resolve via one_ne_zero.
-  have h_oa_a := (h_oa_a_sub trivial).resolve_left one_ne_zero
-  have h_oa_b := (h_oa_b_sub trivial).resolve_left one_ne_zero
+  have h_ra_a := (h_ra_a_sub trivial).resolve_left one_ne_zero
+  have h_ra_b := (h_ra_b_sub trivial).resolve_left one_ne_zero
   -- op_c: mult = 1 - imm_c; the disjunction stays.
-  have h_oa_c_disj := h_oa_c_sub trivial
+  have h_ra_c_disj := h_ra_c_sub trivial
   simp only [SP1Clean.ProgramTable.assertion, SP1Clean.ProgramTable.Spec,
              SP1Clean.ProgramSpec, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ] at h_prog
@@ -230,22 +238,22 @@ theorem soundness :
           ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
           h_op_a_0_bin, h_op_a_0_iff, _, h_imm_c_bin,
           h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩ := h_prog
-  simp only [Spec, aluTypeReaderSpec]
+  simp only [aluTypeReaderSpec]
   refine ⟨h_ti, h_op_a_lt, h_op_b_lt,
           ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
           h_op_a_0_bin, h_op_a_0_iff, h_imm_c_bin,
           h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt,
-          h_oa_a.1, h_oa_b.1, h_oa_b.2.1, h_oa_a.2.1,
-          (isU64_iff_index_form _).mp h_oa_a.2.2,
-          (isU64_iff_index_form _).mp h_oa_b.2.2,
+          h_ra_a.1, h_ra_b.1, h_ra_b.2.1, h_ra_a.2.1,
+          (isU64_iff_index_form _).mp h_ra_a.2.2,
+          (isU64_iff_index_form _).mp h_ra_b.2.2,
           ?_, ?_, ?_⟩
   -- Clause: `imm_c = 0 → op_c memory byte/timestamp/U64 bounds`.
   · intro h_immc_zero
-    -- mult = 1 - imm_c = 1 - 0 = 1 ≠ 0; extract right disjunct of h_oa_c_disj.
+    -- mult = 1 - imm_c = 1 - 0 = 1 ≠ 0; extract right disjunct of h_ra_c_disj.
     have h_mult_ne : (1 + -Expression.eval env input_var_cols_imm_c) ≠ 0 := by
       rw [h_immc_zero]; simp
-    have h_oa_c := h_oa_c_disj.resolve_left h_mult_ne
-    refine ⟨h_oa_c.2.1, h_oa_c.1, (isU64_iff_index_form _).mp h_oa_c.2.2⟩
+    have h_ra_c := h_ra_c_disj.resolve_left h_mult_ne
+    refine ⟨h_ra_c.2.1, h_ra_c.1, (isU64_iff_index_form _).mp h_ra_c.2.2⟩
   -- Clause: `op_a_0 ≠ 0 → op_a_write_value[i] = 0`.
   · intro h_ne
     simp only [Vector.getElem_map]
@@ -257,8 +265,6 @@ theorem soundness :
   -- Clause: `imm_c ≠ 0 → op_c_memory.prev_value = op_c`.
   · intro h_ne
     simp only [Vector.getElem_map]
-    -- h_im_i : imm_c * (prev_value[i] + -op_c[i]) = 0. Resolve to the diff = 0
-    -- side via mul_eq_zero, then convert `+ -` to `-` and use add_neg_eq_zero.
     refine ⟨?_, ?_, ?_, ?_⟩
     · exact add_neg_eq_zero.mp ((mul_eq_zero.mp h_im0).resolve_left h_ne)
     · exact add_neg_eq_zero.mp ((mul_eq_zero.mp h_im1).resolve_left h_ne)
@@ -268,12 +274,12 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨e_clk, e_opc, e_pc, e_oawv, e_oa,
+  obtain ⟨e_ckh, e_clk, e_opc, e_pc, e_oawv, e_oa,
           ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
           ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oc,
           ⟨e_pv_c, e_pl_c, e_dll_c⟩, e_immc⟩ := h_input
   subst_eqs
-  simp only [Spec, aluTypeReaderSpec] at h_spec
+  simp only [aluTypeReaderSpec] at h_spec
   obtain ⟨h_ti, h_op_a_lt, h_op_b_lt,
           ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
           h_op_a_0_bin, h_op_a_0_iff, h_imm_c_bin,
@@ -298,22 +304,23 @@ theorem completeness :
            ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
            h_op_a_0_bin, h_op_a_0_iff, Or.inl trivial, h_imm_c_bin,
            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
-  -- OperandAccess for op_a (offset 4, mult=1) — right disjunct of assertionGated.Spec
+  -- RegisterAccess for op_a (offset 4, mult=1) — right disjunct of
+  -- OperandAccess.AssertionGated.Spec.
   · refine ⟨trivial, ?_⟩
     right
     exact ⟨h_diff_a, h_ts_a, (isU64_iff_index_form _).mpr h_isU64_a⟩
-  -- OperandAccess for op_b (offset 3, mult=1)
+  -- RegisterAccess for op_b (offset 3, mult=1)
   · refine ⟨trivial, ?_⟩
     right
     exact ⟨h_diff_b, h_ts_b, (isU64_iff_index_form _).mpr h_isU64_b⟩
-  -- OperandAccess for op_c (offset 2, mult=1-imm_c) — case-split on imm_c=0
+  -- RegisterAccess for op_c (offset 2, mult=1-imm_c) — case-split on imm_c=0
   · refine ⟨trivial, ?_⟩
     by_cases h_immc_zero : Expression.eval env input_var_cols_imm_c = 0
     · -- mult = 1 - 0 = 1 ≠ 0; provide the right disjunct via h_oc_imp.
       right
       obtain ⟨h_ts_c, h_diff_c, h_isU64_c⟩ := h_oc_imp h_immc_zero
       exact ⟨h_diff_c, h_ts_c, (isU64_iff_index_form _).mpr h_isU64_c⟩
-    · -- mult = 1 - imm_c ≠ 0? Well actually if imm_c ≠ 0 and imm_c is binary (0 or 1),
+    · -- mult = 1 - imm_c ≠ 0? If imm_c ≠ 0 and imm_c is binary (0 or 1),
       -- then imm_c = 1, so mult = 0 — left disjunct.
       left
       rcases h_imm_c_bin with h0 | h1
@@ -366,7 +373,7 @@ end Assertion
 
 /-- The Clean `FormalAssertion` for the full ALU-type reader spec
 (`aluTypeReaderSpec`). Composes `ProgramTable.assertion`, three
-`OperandAccess.assertionGated` calls (op_a/op_b with mult=1, op_c with
+`RegisterAccess.assertion` calls (op_a/op_b with mult=1, op_c with
 mult=1-imm_c), four `op_a_0 * op_a_write_value[i] = 0` scalar gates, and
 four `imm_c * (op_c_memory.prev_value[i] - op_c[i]) = 0` scalar gates. -/
 def assertion : FormalAssertion (ZMod p) Inputs :=

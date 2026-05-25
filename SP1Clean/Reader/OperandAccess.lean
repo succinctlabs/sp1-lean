@@ -12,42 +12,37 @@ import SP1Foundations.Word
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
+import SP1Clean.Reader.RegisterAccessTimestamp
+import SP1Clean.Reader.WordRange
 import SP1Clean.SP1Lookup
 
-/-! # `OperandAccess.assertion` — single-operand memory-access byte-bus primitive
+/-! # `OperandAccess.assertion` — per-operand memory-access byte-bus primitive
 
-The SP1 R-Type / I-Type / Load / Store readers each emit, per memory-operand,
-a fixed set of byte lookups that constrain the operand's
-`(diff_low_limb, prev_low, prev_value)` triple. This file packages those
-lookups into a single Clean `FormalAssertion` so chip-level `Assertion.main`
-blocks can compose memory-bus byte content without duplicating lookups.
+The constraint surface is 6 byte lookups, conceptually splitting into:
 
-## Constraint surface (6 byte lookups per operand)
+- **Timestamp byte lookups** — `diff_low_limb < 65536` and the scaled
+  timestamp `< 256`. This mirrors Rust's `eval_register_access_timestamp`
+  (`crates/core/machine/src/air/memory.rs:332`).
+- **Word range checks** — each `prev_value[i] < 65536`, i.e. `Word.isU64`.
 
-For a memory operand with the given `(clk_low, offset, prev_low,
-diff_low_limb, prev_value)` triple:
+Two FormalAssertions are exposed:
 
-- `diff_low_limb` is in `Range 16` (lookup opcode 6, bound 16) ⇒
-  `diff_low_limb.val < 65536`.
-- The scaled timestamp `(clk_low + offset - prev_low - 1 - diff_low_limb) *
-  65536⁻¹` is in `U8Range` (lookup opcode 3) ⇒ value `< 256`.
-- Each `prev_value[i]` (i = 0..3) is in `Range 16` ⇒ all four limbs `< 65536`,
-  which is exactly `Word.isU64 prev_value`.
+- `OperandAccess.assertion` (ungated) — emits 6 inline `lookup ByteOpcodeTable`
+  calls; `localLength = 0`. Used directly by ~21 chip files (Branch, DivRem,
+  Load*, Store*, Bitwise, Mul, Shift*, Lt, Sub*, UType, Jal, Jalr…). Spec:
+  `diff < 65536 ∧ ts < 256 ∧ Word.isU64 prev_value`.
 
-## Spec
+- `OperandAccess.assertionGated` (multiplicity-aware) — composes the two
+  Rust-aligned leaves `RegisterAccessTimestamp.assertion` and
+  `WordRange.assertion` with a shared `mult`; the leaves use
+  `byteOpcodeGated` and therefore witness cells, so `localLength = 24`.
+  Used by `RegisterAccess.assertion` (and indirectly by all RType/IType/
+  ALU-Type reader composition). Spec: `mult = 0 ∨ <byte facts>`.
 
-`Spec input ≡ memoryAccessSpec input.clk_low input.offset
-  ⟨#v[0,0,0], input.prev_value, input.prev_low, input.diff_low_limb⟩`
-
-The address (`addr`) is `#v[0,0,0]` here because it isn't byte-bus content
-— the chip's program-table and state-bus interactions establish the
-register or RAM address. `OperandAccess.assertion` only covers the
-byte-bus side; downstream memory-bus aggregation handles the address.
-
-The chip-level caller threads the real address into the trace-level
-`MemoryAccess` record via `MemoryAccess.toAccessTuple`; the per-row
-`memoryAccessSpec` here just provides the bounds the aggregator needs.
--/
+The two forms expose the same byte-bus Spec contract (modulo the gated
+`Or`), so they're interchangeable from a chip-level reasoning standpoint.
+The split exists because the gated form needs witness cells to encode the
+disjunction, while the ungated form doesn't. -/
 
 namespace SP1Clean.OperandAccess
 
@@ -207,7 +202,8 @@ theorem completeness :
 end Assertion
 
 /-- The full Clean `FormalAssertion` for a single memory-operand's
-byte-bus side: 6 byte lookups ⇒ `memoryAccessSpec` consequences. -/
+byte-bus side: 6 byte lookups ⇒ `memoryAccessSpec` consequences.
+`localLength = 0` (inline lookups, no witness cells). -/
 def assertion : FormalAssertion (ZMod p) Assertion.Inputs :=
   { Assertion.elaborated with
     Assumptions := Assertion.Assumptions,
@@ -215,28 +211,19 @@ def assertion : FormalAssertion (ZMod p) Assertion.Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
-/-! ## Gated variant — multiplicity-aware byte-bus assertion
+/-! ## Gated variant — multiplicity-aware byte-bus assertion via sub-circuit composition
 
 A drop-in replacement for `OperandAccess.assertion` that takes an extra
-`mult : F` field. When `mult = 0`, the assertion contributes nothing
-(the chip can fill arbitrary garbage in the operand columns). When
-`mult ≠ 0`, the assertion forces the same 6 byte facts as the
-unconditional variant.
+`mult : F` field. When `mult = 0`, the assertion contributes nothing; when
+`mult ≠ 0`, it forces the same 6 byte facts as the unconditional variant.
 
-This mirrors SP1's gated emissions (e.g., AddwChip's op_c with
-`mult = is_real - imm_c` from `alu_type.rs:142`).
-
-See `SP1Clean/SP1Lookup.lean` for the underlying `lookupGated`
-primitive and its `lookupGated_implies_disjunctive` /
-`lookupGated_completeness_of_disjunctive` bridge lemmas. -/
+Composes the two Rust-aligned leaves `RegisterAccessTimestamp.assertion`
+(mirrors Rust's `eval_register_access_timestamp`) and `WordRange.assertion`
+(`Word.isU64` range checks), threading `mult` through both. -/
 
 namespace AssertionGated
 
 open Circuit
-
--- byteOpcodeGated needs `Fact (p > 512)`, which is derivable from `Fact (2^17 < p)`.
--- We declare it as an instance for this namespace.
-instance : Fact (p > 512) := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
 
 /-- Inputs to the gated per-operand byte-bus assertion. Same as
 `Assertion.Inputs` plus a shared multiplicity `mult`. -/
@@ -249,32 +236,26 @@ structure Inputs (F : Type) where
   mult : F
 deriving ProvableStruct
 
-/-- Emit 6 gated byte lookups via `byteOpcodeGated` (the FormalAssertion
-wrapper of `lookupGated` for ByteOpcodeTable), all sharing `input.mult`. -/
+/-- Compose the two leaf sub-circuits with a shared `mult`. -/
 @[reducible]
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
-  SP1Lookup.byteOpcodeGated
-    ⟨#v[(6 : Expression (ZMod p)), input.diff_low_limb, 16, 0], input.mult⟩
-  SP1Lookup.byteOpcodeGated
-    ⟨#v[(3 : Expression (ZMod p)), 0,
-        (input.clk_low + input.offset - input.prev_low - 1 -
-          input.diff_low_limb) * (65536 : ZMod p)⁻¹, 0], input.mult⟩
-  SP1Lookup.byteOpcodeGated
-    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[0], 16, 0], input.mult⟩
-  SP1Lookup.byteOpcodeGated
-    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[1], 16, 0], input.mult⟩
-  SP1Lookup.byteOpcodeGated
-    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[2], 16, 0], input.mult⟩
-  SP1Lookup.byteOpcodeGated
-    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[3], 16, 0], input.mult⟩
+  SP1Clean.RegisterAccessTimestamp.assertion
+    (⟨input.clk_low, input.offset, input.prev_low,
+       input.diff_low_limb, input.mult⟩ :
+      Var SP1Clean.RegisterAccessTimestamp.Assertion.Inputs (ZMod p))
+  SP1Clean.WordRange.assertion
+    (⟨input.prev_value, input.mult⟩ :
+      Var SP1Clean.WordRange.Assertion.Inputs (ZMod p))
 
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   name := "SP1Clean.OperandAccessGated"
   main := main
-  -- 6 byteOpcodeGated subcircuit calls × 4 witnesses each.
-  localLength _ := 24
-  localLength_eq _ _ := by simp only [main, circuit_norm]
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
   subcircuitsConsistent _ _ := by simp +arith only [main, circuit_norm]
 
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
@@ -291,31 +272,18 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
   circuit_proof_start
-  -- Pull out the per-field h_input equalities and substitute them.
   obtain ⟨h_clk_low_eq, h_offset_eq, h_prev_low_eq, h_diff_low_eq,
           h_prev_value_eq, h_mult_eq⟩ := h_input
   subst_eqs
-  obtain ⟨d1, d2, d3, d4, d5, d6⟩ := h_holds
-  simp only [SP1Lookup.ByteOpcodeGated.Spec, SP1Lookup.ByteOpcodeGated.Assumptions,
-             true_implies, forall_const] at d1 d2 d3 d4 d5 d6
+  obtain ⟨h_ts_sub, h_wr_sub⟩ := h_holds
+  have h_ts := h_ts_sub trivial
+  have h_wr := h_wr_sub trivial
   by_cases h_mult : Expression.eval env input_var_mult = 0
   · exact Or.inl h_mult
   right
-  have r1 := d1.resolve_left h_mult
-  have r2 := d2.resolve_left h_mult
-  have r3 := d3.resolve_left h_mult
-  have r4 := d4.resolve_left h_mult
-  have r5 := d5.resolve_left h_mult
-  have r6 := d6.resolve_left h_mult
-  refine ⟨?_, ?_, ?_⟩
-  · exact Assertion.byteOpcodeSpec_range16 _ r1
-  · have h := SP1Clean.CPUState.Assertion.byteOpcodeSpec_u8range _ r2
-    convert h using 1; ring
-  · apply Word.isU64_of_cases
-    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r3
-    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r4
-    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r5
-    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r6
+  have h_ts' := h_ts.resolve_left h_mult
+  have h_wr' := h_wr.resolve_left h_mult
+  exact ⟨h_ts'.1, h_ts'.2, h_wr'⟩
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
@@ -323,30 +291,17 @@ theorem completeness :
   obtain ⟨h_clk_low_eq, h_offset_eq, h_prev_low_eq, h_diff_low_eq,
           h_prev_value_eq, h_mult_eq⟩ := h_input
   subst_eqs
-  rcases h_spec with h_mult_zero | ⟨h_dll, h_ts, h_isU64⟩
-  · simp only [SP1Lookup.ByteOpcodeGated.Spec, SP1Lookup.ByteOpcodeGated.Assumptions,
-               and_true, true_and]
-    refine ⟨Or.inl h_mult_zero, Or.inl h_mult_zero,
-            Or.inl h_mult_zero, Or.inl h_mult_zero,
-            Or.inl h_mult_zero, Or.inl h_mult_zero⟩
-  · obtain ⟨h_pv0, h_pv1, h_pv2, h_pv3⟩ := Word.lt_cases_of_isU64 h_isU64
-    rw [Vector.getElem_map] at h_pv0 h_pv1 h_pv2 h_pv3
-    simp only [SP1Lookup.ByteOpcodeGated.Spec, SP1Lookup.ByteOpcodeGated.Assumptions,
-               and_true, true_and]
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
-    · right; convert Assertion.byteOpcodeSpec_range16_of_lt _ h_dll
-    · right
-      have := SP1Clean.CPUState.Assertion.byteOpcodeSpec_u8range_of_lt _ h_ts
-      convert this using 3; ring_nf
-    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv0
-    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv1
-    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv2
-    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv3
+  rcases h_spec with h_mult_zero | ⟨h_diff, h_ts, h_isU64⟩
+  · refine ⟨⟨trivial, Or.inl h_mult_zero⟩, ⟨trivial, Or.inl h_mult_zero⟩⟩
+  · refine ⟨⟨trivial, ?_⟩, ⟨trivial, ?_⟩⟩
+    · right; exact ⟨h_diff, h_ts⟩
+    · right; exact h_isU64
 
 end AssertionGated
 
-/-- Gated variant: same 6-byte-lookup payload as `assertion`, but each lookup
-is gated by a shared multiplicity. The spec is `mult = 0 ∨ <Assertion.Spec>`. -/
+/-- Gated variant: same Spec contract as `assertion`, but threads a
+shared `mult` through `RegisterAccessTimestamp.assertion` and
+`WordRange.assertion`. Spec is `mult = 0 ∨ <byte facts>`. -/
 def assertionGated : FormalAssertion (ZMod p) AssertionGated.Inputs :=
   { AssertionGated.elaborated with
     Assumptions := AssertionGated.Assumptions,

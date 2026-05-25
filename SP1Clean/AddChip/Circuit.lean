@@ -85,31 +85,10 @@ round-trip. -/
 def Assumptions (cols : AddCols (ZMod p)) : Prop :=
   cols.adapter_cols.is_trusted = cols.is_real
 
-/-- The unified chip Spec:
-- `AddOp.Spec` — `op_b + op_c = op_a_write_value` (carry chain).
-- `cpuStateSpec` — `clk_0_16`/`clk_16_24` byte bounds.
-- `rtypeReaderSpec` — full R-type reader spec (program + memory + bounds).
-- `is_real * (is_real - 1) = 0` — `is_real` binary.
-- `adapter.op_a_0 = 0` — `op_a_0` zero gate.
-- Pure BitVec `RV64.add` equation (conditional on `is_real = 1`) — the
-  RISC-V `add` semantic. Auditable at a glance:
-  `op_a_write_value (as BitVec64) = RV64.add op_c_bv op_b_bv`. The
-  monadic Sail equivalence to `_root_.Add.spec_add` is recovered
-  externally via `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
-def FormalSpec (cols : AddCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.AddOp.Spec
-      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
-      cols.op_a_write_value ∧
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.RTypeReader.rtypeReaderSpec clk_low 0 cols.state.pc
-      cols.op_a_write_value cols.adapter ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  (cols.is_real = 1 →
-    Word.toBitVec64 cols.op_a_write_value =
-      RV64.add (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
-               (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
+/-- The unified chip Spec is defined in `Cols.lean` (`SP1Clean.Add.FormalSpec`)
+so `Lemmas.lean` can reference it. Re-exported here for the
+`FormalAssertion` glue. -/
+abbrev FormalSpec := @SP1Clean.Add.FormalSpec p
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

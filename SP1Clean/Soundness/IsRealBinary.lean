@@ -80,18 +80,14 @@ theorem is_real_binary_add (cols : SP1Clean.Add.AddCols (ZMod p))
 theorem is_real_binary_addi (cols : SP1Clean.Addi.AddiCols (ZMod p))
     (h : SP1Clean.Addi.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
-  change SP1Clean.Addi.Assertion.FormalSpec cols at h
-  unfold SP1Clean.Addi.Assertion.FormalSpec at h
-  tauto
+  change SP1Clean.Addi.FormalSpec cols at h
+  exact binary_of_assertZero _ h.2.2.2.1
 
 theorem is_real_binary_addw (cols : SP1Clean.Addw.AddwCols (ZMod p))
     (h : SP1Clean.Addw.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
-  change SP1Clean.Addw.Assertion.FormalSpec cols at h
-  unfold SP1Clean.Addw.Assertion.FormalSpec at h
-  tauto
+  change SP1Clean.Addw.FormalSpec cols at h
+  exact binary_of_assertZero _ h.2.2.2.1
 
 theorem is_real_binary_bitwise (cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
     (h : SP1Clean.Bitwise.assertion.Spec cols) :

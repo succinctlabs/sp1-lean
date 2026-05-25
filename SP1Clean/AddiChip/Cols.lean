@@ -8,7 +8,10 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ITypeReader.ITypeReader
 import SP1Chips.Addi.AddiChip
 import SP1Clean.Reader.CPUState
+import SP1Clean.Reader.ITypeReader
+import SP1Clean.Operations.AddOperation
 import SP1Clean.TrustMode
+import RISCV.Instructions
 
 /-! # `AddiChip` cols-level surface
 
@@ -155,5 +158,34 @@ omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
 omit [Fact (2 ^ 17 < p)] in
 @[simp] lemma sp1_addi_cols_fromMain (Main : Vector (ZMod p) 30) :
     sp1_addi_cols (fromMain Main) = _root_.Addi.sp1_addi Main := rfl
+
+/-! ## Chip-level `FormalSpec`
+
+The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
+can reference it without importing the full circuit construction:
+- `AddOp.Spec` — `op_b + op_c_imm = op_a_write_value` (carry chain).
+- `cpuStateSpec` — `clk_0_16`/`clk_16_24` byte bounds.
+- `itypeReaderSpec` — full I-type reader spec (program + memory + bounds).
+- `is_real * (is_real - 1) = 0` — `is_real` binary.
+- `adapter.op_a_0 = 0` — `op_a_0` zero gate.
+- Pure BitVec `RV64.addi` equation (conditional on `is_real = 1`). The
+  sign-extension identity is enforced inside `itypeReaderSpec`'s
+  `Opcode.trusted_instr` clause; the monadic Sail equivalence to
+  `_root_.Addi.spec_addi` is recovered externally via
+  `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
+def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.AddOp.Spec
+      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm
+      cols.op_a_write_value ∧
+  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
+  SP1Clean.ITypeReader.itypeReaderSpec clk_low 1 cols.state.pc
+      cols.op_a_write_value cols.adapter ∧
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
+  (cols.is_real = 1 →
+    Word.toBitVec64 cols.op_a_write_value =
+      RV64.addi (BitVec.ofNat 12 cols.adapter.op_c_imm[0].val)
+                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
 end SP1Clean.Addi

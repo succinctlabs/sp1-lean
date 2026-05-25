@@ -57,7 +57,7 @@ OperandAccess + 4 op_a_0 gates + 4 imm_c-equality gates) + 2 trailing
 scalar gates. -/
 @[reducible]
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, adapter,
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩, adapter,
        addw_value, addw_msb, is_real, _adapter_cols⟩ := cols
   let clk_low := clk_0_16 + clk_16_24 * 65536
   let op_a_write_value : Vector (Expression (ZMod p)) 4 :=
@@ -69,7 +69,7 @@ def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ALUTypeReader.assertion
-    (⟨clk_low, 19, pc, op_a_write_value, adapter⟩ :
+    (⟨clk_high, clk_low, 19, pc, op_a_write_value, adapter⟩ :
       Var SP1Clean.ALUTypeReader.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   adapter.op_a_0 === 0
@@ -87,25 +87,10 @@ instance elaborated : ElaboratedCircuit (ZMod p) AddwCols unit where
 
 def Assumptions (_ : AddwCols (ZMod p)) : Prop := True
 
-/-- Full chip-level spec: the ADDW carry-chain arithmetic (`AddwOp.Spec`,
-Inputs-shape) plus the byte/program-lookup-derivable subset (CPUState +
-ALUTypeReader's full spec) plus two trailing scalar gates. SailBridge
-consumes this directly to derive Sail equivalence. -/
-def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let op_a_write_value : Word (ZMod p) :=
-    #v[cols.addw_value[0], cols.addw_value[1],
-       cols.addw_msb * 65535, cols.addw_msb * 65535]
-  SP1Clean.AddwOp.Spec
-      ⟨cols.adapter.op_b_memory.prev_value,
-       cols.adapter.op_c_memory.prev_value,
-       cols.addw_value,
-       cols.addw_msb⟩ ∧
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ALUTypeReader.aluTypeReaderSpec clk_low 19 cols.state.pc
-    op_a_write_value cols.adapter ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+/-- The unified chip Spec is defined in `Cols.lean` (`SP1Clean.Addw.FormalSpec`)
+so `Lemmas.lean` can reference it. Re-exported here for the
+`FormalAssertion` glue. -/
+abbrev FormalSpec := @SP1Clean.Addw.FormalSpec p
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

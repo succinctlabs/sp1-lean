@@ -11,6 +11,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.Reader.RegisterAccess
 
 /-! # Reusable `ITypeReader` Spec helper + FormalAssertion
 
@@ -19,16 +20,22 @@ as a named predicate `itypeReaderSpec`. Differs from `rtypeReaderSpec` by
 having `op_c_imm` as a 4-limb immediate (with no memory access) instead of
 the register `op_c` with its full memory-access substruct.
 
-Also provides a full `FormalAssertion` bundle (mirroring
+Provides a full `FormalAssertion` bundle (mirroring
 `SP1Clean.RTypeReader.assertion`) that chip-level `Assertion.main` blocks
 can compose as a single subcircuit. The bundle composes one
 `ProgramTable.assertion` (covering `trusted_instr`, register bounds, the
 4 immediate-limb bounds, `op_a_0` binary/iff, PC alignment) and two
-`OperandAccess.assertion` calls at sub-clock offsets +4/+3 (op_a/op_b —
+`RegisterAccess.assertion` calls at sub-clock offsets +4/+3 (op_a/op_b —
 no op_c memory access because op_c is the immediate), plus four scalar
 `op_a_0 * op_a_write_value[i] = 0` gates encoding the
 `op_a_0 ≠ 0 → op_a_write_value = 0` last conjunct of `itypeReaderSpec`.
--/
+
+Each `RegisterAccess.assertion` call bundles the byte-bus content (via
+`OperandAccess.assertionGated`) with the two memory-bus emissions (send
+`prev_value`, receive `write_value`). For op_b (read-only) `write_value =
+prev_value`; for op_a (write) `write_value = op_a_write_value`. Mirrors
+Rust's `i_type.rs:99-115` (`eval_register_access_write` for op_a,
+`eval_register_access_read` for op_b). -/
 
 namespace SP1Clean.ITypeReader
 
@@ -91,16 +98,15 @@ theorem itypeReaderSpec_iff_sp1
 Wraps the byte/program-lookup-derivable surface of
 `_root_.ITypeReader.constraints` (under `is_real = is_trusted = 1`) into a
 single Clean `FormalAssertion`. Composes one `SP1Clean.ProgramTable.assertion`
-(supplying `trusted_instr`, register bounds, the 4 immediate-limb bounds,
-`op_a_0` binary/iff, PC alignment) and two `SP1Clean.OperandAccess.assertion`
-calls at sub-clock offsets +4/+3 (op_a/op_b — no op_c memory access), plus
-four scalar `op_a_0 * op_a_write_value[i] = 0` gates that encode the
-`op_a_0 ≠ 0 → op_a_write_value = 0` last conjunct of `itypeReaderSpec`. -/
+and two `SP1Clean.RegisterAccess.assertion` calls (op_a write at +4, op_b
+read at +3), plus four scalar `op_a_0 * op_a_write_value[i] = 0` gates. -/
 
 /-- Bundled inputs for the ITypeReader assertion. Mirrors the call signature
 of `_root_.ITypeReader.constraints clk_high clk_low pc opcode op_a_write_value
-cols 1 1` modulo the unused `clk_high` and the pinned `is_real = is_trusted = 1`. -/
+cols 1 1` modulo the pinned `is_real = is_trusted = 1`. `clk_high` is
+threaded through to the memory-bus emissions inside `RegisterAccess.assertion`. -/
 structure Inputs (F : Type) where
+  clk_high : F
   clk_low : F
   opcode : F
   pc : Vector F 3
@@ -112,34 +118,39 @@ namespace Assertion
 
 open Circuit
 
-/-- Clean-side circuit. Emits exactly the byte/program lookups inside
+/-- Clean-side circuit. Emits the byte/program/memory lookups inside
 `_root_.ITypeReader.constraints` under `is_real = is_trusted = 1`.
 
-The 2 per-operand byte-bus assertions use `OperandAccess.assertionGated`
-with `mult := 1` (uniform with AddwChip's op_c which uses a real
-multiplicity). The `mult = 1` disjunctive Spec collapses back to the
-unconditional form via `one_ne_zero` in the soundness/completeness
-proofs below — external chips that call `ITypeReader.assertion` see
-the same unconditional `itypeReaderSpec`. -/
+The 2 per-operand sub-circuits use `RegisterAccess.assertion` with
+`mult := 1`. Each call bundles the byte-bus content (via
+`OperandAccess.assertionGated`) with two memory-bus interactions
+(send `prev_value`, receive `write_value`). For op_b (read-only) the
+receive uses `prev_value`; for op_a (write) it uses `op_a_write_value`.
+
+The row-level `itypeReaderSpec` is unchanged from the previous
+`OperandAccess.assertionGated`-based version — per-key memory-bus
+multiplicity balance is enforced at the trace level. -/
 @[reducible]
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨clk_low, opcode, pc, op_a_write_value,
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ := input
   -- Program-bus interaction.
   SP1Clean.ProgramTable.assertion
     (⟨pc, opcode, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- Two per-operand byte-bus assertions via `assertionGated mult=1`.
-  SP1Clean.OperandAccess.assertionGated
-    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low,
-       op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value, 1⟩ :
-      Var SP1Clean.OperandAccess.AssertionGated.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertionGated
-    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low,
-       op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value, 1⟩ :
-      Var SP1Clean.OperandAccess.AssertionGated.Inputs (ZMod p))
+  -- op_a: register-access write (mirrors Rust eval_register_access_write).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 4, op_a, op_a_memory.prev_value, op_a_write_value,
+       op_a_memory.access_timestamp.prev_low,
+       op_a_memory.access_timestamp.diff_low_limb, 1⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- op_b: register-access read (mirrors Rust eval_register_access_read);
+  -- write_value = prev_value (value passes through unchanged).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 3, op_b, op_b_memory.prev_value, op_b_memory.prev_value,
+       op_b_memory.access_timestamp.prev_low,
+       op_b_memory.access_timestamp.diff_low_limb, 1⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
   -- Four assertZero gates that, with `op_a_0` field-binary from ProgramSpec,
   -- give `op_a_0 ≠ 0 → op_a_write_value[i] = 0`.
   op_a_0 * op_a_write_value[0] === 0
@@ -151,7 +162,6 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   name := "SP1Clean.ITypeReader"
   main := main
-  -- Computed from main: 2 assertionGated × 24 witnesses = 48.
   localLength input := (main input).localLength 0
   output _ _ := ()
   localLength_eq input offset := by
@@ -191,28 +201,30 @@ lemma isU64_iff_index_form [NeZero p] (w : Word (ZMod p)) :
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨e_clk, e_opc, e_pc, e_oawv, e_oa,
+  obtain ⟨e_ckh, e_clk, e_opc, e_pc, e_oawv, e_oa,
           ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
           ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oci⟩ := h_input
   subst_eqs
-  obtain ⟨h_prog_sub, h_oa_a_sub, h_oa_b_sub,
+  obtain ⟨h_prog_sub, h_ra_a_sub, h_ra_b_sub,
           h_z0, h_z1, h_z2, h_z3⟩ := h_holds
   have h_prog := h_prog_sub trivial
-  -- assertionGated.Spec ⟨..., 1⟩ = (1 = 0 ∨ <byte facts>); 1 ≠ 0 so right disjunct.
-  have h_oa_a := (h_oa_a_sub trivial).resolve_left one_ne_zero
-  have h_oa_b := (h_oa_b_sub trivial).resolve_left one_ne_zero
+  -- RegisterAccess.Spec is OperandAccess.AssertionGated.Spec; with mult=1
+  -- the left disjunct (mult=0) is False, so we get byte facts.
+  have h_ra_a := (h_ra_a_sub trivial).resolve_left one_ne_zero
+  have h_ra_b := (h_ra_b_sub trivial).resolve_left one_ne_zero
   simp only [SP1Clean.ProgramTable.assertion, SP1Clean.ProgramTable.Spec,
              SP1Clean.ProgramSpec, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ] at h_prog
   obtain ⟨h_ti, h_op_a_lt, ⟨h_op_b_lt, _, _, _⟩,
           ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
-          h_op_a_0_bin, h_op_a_0_iff, _, _, h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩ := h_prog
-  simp only [Spec, itypeReaderSpec]
+          h_op_a_0_bin, h_op_a_0_iff, _, _,
+          h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩ := h_prog
+  simp only [itypeReaderSpec]
   refine ⟨h_ti, h_op_a_lt, h_op_b_lt, h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt,
           h_op_a_0_bin, h_op_a_0_iff, h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt,
-          h_oa_a.1, h_oa_b.1, h_oa_b.2.1, h_oa_a.2.1,
-          (isU64_iff_index_form _).mp h_oa_a.2.2,
-          (isU64_iff_index_form _).mp h_oa_b.2.2,
+          h_ra_a.1, h_ra_b.1, h_ra_b.2.1, h_ra_a.2.1,
+          (isU64_iff_index_form _).mp h_ra_a.2.2,
+          (isU64_iff_index_form _).mp h_ra_b.2.2,
           ?_⟩
   intro h_ne
   simp only [Vector.getElem_map]
@@ -225,11 +237,11 @@ theorem soundness :
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨e_clk, e_opc, e_pc, e_oawv, e_oa,
+  obtain ⟨e_ckh, e_clk, e_opc, e_pc, e_oawv, e_oa,
           ⟨e_pv_a, e_pl_a, e_dll_a⟩, e_oa0, e_ob,
           ⟨e_pv_b, e_pl_b, e_dll_b⟩, e_oci⟩ := h_input
   subst_eqs
-  simp only [Spec, itypeReaderSpec] at h_spec
+  simp only [itypeReaderSpec] at h_spec
   obtain ⟨h_ti, h_op_a_lt, h_op_b_lt, h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt,
           h_op_a_0_bin, h_op_a_0_iff, h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt,
           h_diff_a, h_diff_b, h_ts_b, h_ts_a, h_isU64_a, h_isU64_b,
@@ -252,11 +264,11 @@ theorem completeness :
            ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
            h_op_a_0_bin, h_op_a_0_iff, Or.inl trivial, Or.inr trivial,
            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
-  -- OperandAccess for op_a (offset 4) — provide right disjunct of assertionGated.Spec
+  -- RegisterAccess for op_a (offset 4) — right disjunct of OperandAccess.AssertionGated.Spec.
   · refine ⟨trivial, ?_⟩
     right
     exact ⟨h_diff_a, h_ts_a, (isU64_iff_index_form _).mpr h_isU64_a⟩
-  -- OperandAccess for op_b (offset 3)
+  -- RegisterAccess for op_b (offset 3)
   · refine ⟨trivial, ?_⟩
     right
     exact ⟨h_diff_b, h_ts_b, (isU64_iff_index_form _).mpr h_isU64_b⟩
@@ -286,8 +298,8 @@ end Assertion
 
 /-- The Clean `FormalAssertion` for the full I-type reader spec
 (`itypeReaderSpec`). Composes `ProgramTable.assertion`, two
-`OperandAccess.assertion` calls, and four `op_a_0 * op_a_write_value[i] = 0`
-scalar gates. -/
+`RegisterAccess.assertion` calls (op_a write +4, op_b read +3), and four
+`op_a_0 * op_a_write_value[i] = 0` scalar gates. -/
 def assertion : FormalAssertion (ZMod p) Inputs :=
   { Assertion.elaborated with
     Assumptions := Assertion.Assumptions,
