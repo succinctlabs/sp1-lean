@@ -17,7 +17,7 @@ import SP1Chips.Addw.Common
 import SP1Chips.Soundness
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.ALUTypeReader
-import SP1Clean.AddwOperation
+import SP1Clean.Operations.AddwOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess

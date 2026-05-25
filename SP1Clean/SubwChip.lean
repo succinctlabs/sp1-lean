@@ -16,7 +16,7 @@ import SP1Chips.Subw.SubwChip
 import SP1Chips.Subw.Common
 import SP1Chips.Soundness
 import SP1Clean.MemoryAccess
-import SP1Clean.SubwOperation
+import SP1Clean.Operations.SubwOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState

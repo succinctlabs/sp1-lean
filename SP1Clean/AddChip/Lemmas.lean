@@ -1,6 +1,6 @@
 import SP1Clean.AddChip.Cols
 import SP1Operations.Operation.AddOperation.AddOperation
-import SP1Clean.AddOperation
+import SP1Clean.Operations.AddOperation
 import SP1Clean.Reader.RTypeReader
 import SP1Chips.Add.Common
 

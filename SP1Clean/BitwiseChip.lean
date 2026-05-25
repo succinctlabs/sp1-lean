@@ -13,7 +13,7 @@ import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ALUTypeReader.ALUTypeReader
 import SP1Chips.Bitwise.BitwiseChip
 import SP1Chips.Soundness
-import SP1Clean.BitwiseOperation
+import SP1Clean.Operations.BitwiseOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState

@@ -17,7 +17,7 @@ import SP1Chips.Addi.Common
 import SP1Chips.Soundness
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.ITypeReader
-import SP1Clean.AddOperation
+import SP1Clean.Operations.AddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState

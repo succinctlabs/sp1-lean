@@ -13,7 +13,7 @@ import SP1Operations.Operation.AddOperation.AddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Chips.Jal.Common
 import SP1Chips.Soundness
-import SP1Clean.AddOperation
+import SP1Clean.Operations.AddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess

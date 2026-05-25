@@ -12,7 +12,7 @@ import SP1Foundations.Field
 import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Operations.Reader.CPUState.CPUState
-import SP1Clean.AddrAddOperation
+import SP1Clean.Operations.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess

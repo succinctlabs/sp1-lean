@@ -13,9 +13,9 @@ import SP1Operations.Compare.LtOperationSigned.LtOperationSigned
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
 import SP1Chips.Branch.BranchChip
-import SP1Clean.AddrAddOperation
+import SP1Clean.Operations.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
-import SP1Clean.GatedAddOp
+import SP1Clean.Operations.GatedAddOp
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState

@@ -13,7 +13,7 @@ import SP1Operations.Reader.ITypeReader.ITypeReader
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Load.LoadByte.Common
-import SP1Clean.AddrAddOperation
+import SP1Clean.Operations.AddrAddOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess

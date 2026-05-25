@@ -12,7 +12,7 @@ import SP1Foundations.Field
 import SP1Operations.Operation.U16MSBOperation.Operation
 import SP1Operations.Operation.U16MSBOperation.Constraints
 import SP1Clean.ByteOpcodeTable
-import SP1Clean.AddOperation
+import SP1Clean.Operations.AddOperation
 
 /-! # Tier 2a pilot: `U16MSBOperation` mirror
 
