@@ -733,7 +733,7 @@ theorem memoryAccessesValid_of_spec_add
     (h_is_real : cols.is_real = 1) :
     ChipRow.memoryAccessesValid (.add cols) := by
   change SP1Clean.Add.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, h_rtr, _h_op_a_0, _h_rv64add⟩ := h
+  obtain ⟨_h_cpu, h_rtr, _h_op_a_0, _h_rv64add⟩ := h
   -- Unpack RTypeReader.Gated.Spec's per-operand RegisterAccess.Specs
   -- (positions 3/4/5 of the 9-tuple).
   obtain ⟨_h_ir_bin, _h_prog, h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr

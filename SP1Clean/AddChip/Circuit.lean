@@ -88,9 +88,16 @@ so its `adapter_cols.is_trusted` payload is structurally equal to `is_real`
 (both alias `Main[32]` in the constraint compiler's emission). This is a
 type-level / TrustMode-marker fact that the circuit doesn't enforce; it's
 needed by `fromMain_toMain` (`Lemmas.lean`) for the cols→Main→cols
-round-trip. -/
+round-trip.
+
+The `is_real = 1` precondition restricts the FormalAssertion to
+non-padding rows: completeness reconstructs `AddOp.RawSpec` for the
+sub-circuit witness via `AddOp.iff_sp1_full` (which needs the BitVec
+identity from FormalSpec's `is_real = 1 → ...` conjunct), so the chip
+contract is only meaningful on real rows. Trace-soundness drivers
+discharge `is_real = 1` per row before invoking `Add.assertion`. -/
 def Assumptions (cols : AddCols (ZMod p)) : Prop :=
-  cols.adapter_cols.is_trusted = cols.is_real
+  cols.adapter_cols.is_trusted = cols.is_real ∧ cols.is_real = 1
 
 /-- The unified chip Spec is defined in `Cols.lean` (`SP1Clean.Add.FormalSpec`)
 so `Lemmas.lean` can reference it. Re-exported here for the
@@ -107,37 +114,33 @@ theorem soundness :
   have h_addop := h_addop_sub trivial
   have h_cpu := h_cpu_sub trivial
   have h_rtr := h_rtr_sub trivial
-  refine ⟨h_addop, h_cpu, h_rtr, h_op_a_0, ?_⟩
-  -- BitVec `RV64.add` conjunct: discharge from `AddOp.Spec` (the carry
-  -- chain) + the per-operand `Word.isU64` bounds for op_b/op_c — now
-  -- inside `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec`
-  -- sub-conjuncts (whole-Vector form, no `isU64_iff_index_form`
-  -- conversion needed).
+  refine ⟨h_cpu, h_rtr, h_op_a_0, ?_⟩
+  -- Semantic conjunct under `is_real = 1`: produce `Word.isU64 result ∧
+  -- v.toBitVec64 = RV64.add op_c op_b`. Derive both from `AddOp.Spec`
+  -- (carry chain) + the per-operand `Word.isU64` bounds for op_b/op_c
+  -- (inside `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec`
+  -- sub-conjuncts). The carry chain itself is no longer exposed at the
+  -- chip-level FormalSpec — it stays internal to the AddOp sub-circuit.
   intro h_is_real_eq
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
-  -- `h_is_real_eq` has type `<inlined struct>.is_real = 1`; coerce via defeq
-  -- to the eval-Var form so `rw` can find it in subsequent goals/hypotheses.
   change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real_eq
   have h_ir_ne_zero :
       (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
     rw [h_is_real_eq]; exact one_ne_zero
   have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-    (h_ra_b.resolve_left h_ir_ne_zero).2.2
+    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
   have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
-    (h_ra_c.resolve_left h_ir_ne_zero).2.2
-  -- Bridge the cols-level `AddOp.Spec` to SP1's constraint allHold form,
-  -- then to the BitVec equation via `AddOperation.spec`.
+    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  -- Bridge `AddOp.Spec` (= `AddOp.RawSpec`) to SP1's `allHold`, then to
+  -- `(isU64_v ∧ BitVec eq)` via `AddOperation.spec`.
   have h_allHold : (AddOperation.constraints
         input_adapter_op_b_memory_prev_value
         input_adapter_op_c_memory_prev_value
         { value := Vector.map (Expression.eval env) input_var_op_a_write_value }
         1).allHold :=
     (SP1Clean.AddOp.iff_sp1 _ _ _).mpr h_addop
-  have ⟨_, h_bv⟩ := AddOperation.spec h_isU64_b h_isU64_c h_allHold
-  -- `h_bv : op_a_write_value.toBitVec64 = op_b.toBitVec64 + op_c.toBitVec64`.
-  -- Goal after `RV64.add` unfold: same RHS modulo arg order
-  -- (`RV64.add v2 v1 = v1 + v2`). Close by direct substitution.
+  have ⟨h_isU64_v, h_bv⟩ := AddOperation.spec h_isU64_b h_isU64_c h_allHold
+  refine ⟨h_isU64_v, ?_⟩
   simp only [RV64.add]
   exact h_bv
 
@@ -146,8 +149,32 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop, h_cpu, h_rtr, h_op_a_0, _h_rv64add⟩ := h_spec
+  obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
+  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem⟩ := h_spec
   unfold id at *
+  -- Reconstruct `AddOp.RawSpec` for the sub-circuit witness from the
+  -- semantic conjunct in FormalSpec + the `isU64` bounds available from
+  -- `RTypeReader.Gated.Spec`'s `RegisterAccess.Spec` sub-conjuncts.
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
+  have h_ir_ne_zero :
+      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
+    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
+    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  have ⟨h_isU64_v, h_bv⟩ := h_sem h_is_real
+  have h_bv' : Word.toBitVec64
+      (Vector.map (Expression.eval env) input_var_op_a_write_value) =
+      execute_RTYPE_pure_w input_adapter_op_b_memory_prev_value
+                           input_adapter_op_c_memory_prev_value .ADD := by
+    simp only [RV64.add] at h_bv
+    exact h_bv
+  have h_allHold :=
+    (SP1Clean.AddOp.iff_sp1_full h_isU64_b h_isU64_c).mpr
+      ⟨h_isU64_v, h_bv'⟩
+  have h_addop := (SP1Clean.AddOp.iff_sp1 _ _ _).mp h_allHold
   refine ⟨⟨trivial, h_addop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩, h_op_a_0⟩
 
 end Assertion
