@@ -164,13 +164,17 @@ omit [Fact (2 ^ 17 < p)] in
 The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
 can reference it without importing the full circuit construction:
 - `AddOp.Spec` — `op_b + op_c_imm = op_a_write_value` (carry chain).
-- `cpuStateSpec` — `clk_0_16`/`clk_16_24` byte bounds.
-- `itypeReaderSpec` — full I-type reader spec (program + memory + bounds).
-- `is_real * (is_real - 1) = 0` — `is_real` binary.
-- `adapter.op_a_0 = 0` — `op_a_0` zero gate.
+- `CPUState.Gated.Assertion.Spec` — flag-threaded CPUState sub-circuit
+  composition (binary gate + 2 state-bus + 2 byte-opcode, all gated by
+  `cols.is_real`). Absorbs the free `is_real * (is_real - 1) = 0` gate.
+- `ITypeReader.Gated.Assertion.Spec` — flag-threaded I-type reader
+  sub-circuit composition (binary gate + program + 2 register accesses
+  + 4 op_a_0 masked gates), gated by `cols.is_real` /
+  `cols.adapter_cols.is_trusted`.
+- `adapter.op_a_0 = 0` — chip-level `op_a_0` zero gate.
 - Pure BitVec `RV64.addi` equation (conditional on `is_real = 1`). The
-  sign-extension identity is enforced inside `itypeReaderSpec`'s
-  `Opcode.trusted_instr` clause; the monadic Sail equivalence to
+  sign-extension identity is enforced inside the program-bus clause's
+  `Opcode.trusted_instr` predicate; the monadic Sail equivalence to
   `_root_.Addi.spec_addi` is recovered externally via
   `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
 def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
@@ -178,10 +182,14 @@ def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   SP1Clean.AddOp.Spec
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm
       cols.op_a_write_value ∧
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ITypeReader.itypeReaderSpec clk_low 1 cols.state.pc
-      cols.op_a_write_value cols.adapter ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ ∧
+  SP1Clean.ITypeReader.Gated.Assertion.Spec
+      ⟨cols.state.clk_high, clk_low, 1, cols.state.pc,
+       cols.op_a_write_value, cols.adapter,
+       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0 ∧
   (cols.is_real = 1 →
     Word.toBitVec64 cols.op_a_write_value =

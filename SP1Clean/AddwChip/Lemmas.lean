@@ -40,9 +40,10 @@ lemma fromMain_toMain (cols : AddwCols (ZMod p))
   all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
-`Addw.constraints Main` is exactly the conjunction of `AddwOp.Spec`
-(Inputs-shape), `cpuStateSpec`, and `aluTypeReaderSpec` over `fromMain
-Main`, under `is_real = Main[35] = 1`. -/
+`Addw.constraints Main` is exactly the conjunction of `AddwOp.Spec`,
+`CPUState.Gated.Spec`, and `ALUTypeReader.Gated.Spec` over `fromMain Main`,
+under `is_real = Main[35] = 1`. The free `Main[35] * (Main[35] - 1) = 0`
+gate is absorbed into both Gated.Specs' first conjuncts. -/
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 36) (h_is_real : Main[35] = 1) :
     (_root_.Addw.constraints Main).allHold ↔
@@ -51,27 +52,31 @@ lemma allHold_iff_structural
            #v[Main[25], Main[26], Main[27], Main[28]],
            #v[Main[32], Main[33]],
            Main[34]⟩ ∧
-       SP1Clean.CPUState.cpuStateSpec Main[2] Main[1] ∧
-       SP1Clean.ALUTypeReader.aluTypeReaderSpec
-          (Main[2] + Main[1] * 65536) 19 #v[Main[3], Main[4], Main[5]]
-          #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535]
-          { op_a := Main[6],
-            op_a_memory :=
-              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-                access_timestamp :=
-                  { prev_low := Main[11], diff_low_limb := Main[12] } },
-            op_a_0 := Main[13], op_b := Main[14],
-            op_b_memory :=
-              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
-                access_timestamp :=
-                  { prev_low := Main[19], diff_low_limb := Main[20] } },
-            op_c := #v[Main[21], Main[22], Main[23], Main[24]],
-            op_c_memory :=
-              { prev_value := #v[Main[25], Main[26], Main[27], Main[28]],
-                access_timestamp :=
-                  { prev_low := Main[29], diff_low_limb := Main[30] } },
-            imm_c := Main[31] } ∧
-       Main[35] * (Main[35] - 1) = 0 ∧
+       SP1Clean.CPUState.Gated.Assertion.Spec
+          ⟨{ clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+             pc := #v[Main[3], Main[4], Main[5]] },
+           #v[Main[3] + 4, Main[4], Main[5]], 8, Main[35]⟩ ∧
+       SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+          ⟨Main[0], Main[2] + Main[1] * 65536, 19,
+           #v[Main[3], Main[4], Main[5]],
+           #v[Main[32], Main[33], Main[34] * 65535, Main[34] * 65535],
+           { op_a := Main[6],
+             op_a_memory :=
+               { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                 access_timestamp :=
+                   { prev_low := Main[11], diff_low_limb := Main[12] } },
+             op_a_0 := Main[13], op_b := Main[14],
+             op_b_memory :=
+               { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                 access_timestamp :=
+                   { prev_low := Main[19], diff_low_limb := Main[20] } },
+             op_c := #v[Main[21], Main[22], Main[23], Main[24]],
+             op_c_memory :=
+               { prev_value := #v[Main[25], Main[26], Main[27], Main[28]],
+                 access_timestamp :=
+                   { prev_low := Main[29], diff_low_limb := Main[30] } },
+             imm_c := Main[31] },
+           Main[35], Main[35]⟩ ∧
        Main[13] = 0) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   -- Use iff_sp1 at the specific Inputs to bridge `AddwOperation.constraints.allHold`
@@ -92,8 +97,15 @@ lemma allHold_iff_structural
        #v[Main[32], Main[33]],
        Main[34]⟩).symm
   rw [_root_.Addw.allHold_constraints_iff Main, h_is_real,
-    h_addwop_iff,
-    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
-    SP1Clean.ALUTypeReader.aluTypeReaderSpec_iff_sp1]
+      h_addwop_iff,
+      SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1,
+      SP1Clean.ALUTypeReader.Gated.Assertion.Spec_iff_sp1]
+  -- Drop the chip-level redundant `1 * (1 - 1) = 0`; absorbed into Gated.Specs.
+  refine ⟨?_, ?_⟩
+  · rintro ⟨h_addwop, h_cpu, h_alu, _, h_op_a_0⟩
+    exact ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩
+  · rintro ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩
+    refine ⟨h_addwop, h_cpu, h_alu, ?_, h_op_a_0⟩
+    ring
 
 end SP1Clean.Addw

@@ -36,22 +36,29 @@ namespace SP1Clean.Addw
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Cols-level full trace spec for AddwChip. Mirrors the flat-file
-`SP1Clean.Addw.TraceSpec` shape: structural conjunction of the carry-chain,
-CPU-state byte bounds, full ALU-type reader spec, and 2 trailing gates. -/
+/-- Cols-level full trace spec for AddwChip. Post-Gated-migration shape:
+structural conjunction of the carry-chain, the Gated CPUState sub-Spec,
+the Gated ALUTypeReader sub-Spec, and the chip-level `op_a_0 = 0` gate.
+Mirrors the new chip-level `FormalSpec` (`Cols.lean`); the free
+`is_real * (is_real - 1) = 0` gate is absorbed into the Gated sub-Specs. -/
 def TraceSpec (cols : AddwCols (ZMod p)) : Prop :=
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let op_a_write_value : Word (ZMod p) :=
+    #v[cols.addw_value[0], cols.addw_value[1],
+       cols.addw_msb * 65535, cols.addw_msb * 65535]
   SP1Clean.AddwOp.Spec
       ⟨cols.adapter.op_b_memory.prev_value,
        cols.adapter.op_c_memory.prev_value,
        cols.addw_value,
        cols.addw_msb⟩ ∧
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ALUTypeReader.aluTypeReaderSpec
-      (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 19 cols.state.pc
-      #v[cols.addw_value[0], cols.addw_value[1],
-         cols.addw_msb * 65535, cols.addw_msb * 65535]
-      cols.adapter ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ ∧
+  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+      ⟨cols.state.clk_high, clk_low, 19, cols.state.pc,
+       op_a_write_value, cols.adapter,
+       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0
 
 /-- Common bridge: reconstruct `(_root_.Addw.constraints (toMain cols)).allHold`
@@ -63,32 +70,39 @@ private theorem allHold_of_traceSpec
     (h_is_real : cols.is_real = 1) :
     (_root_.Addw.constraints (toMain cols)).allHold := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_addwop, h_cpu, h_alu, h_isreal, h_op_a_0⟩ := h_spec
+  obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩ := h_spec
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_isreal' : (toMain cols)[35] = 1 := h_is_real
   -- Re-state each cols-level Spec hypothesis through `fromMain (toMain cols)`
-  -- (which equals `cols` by h_round_trip). The `(fromMain (toMain cols)).X`
-  -- projections then unfold to the matching `(toMain cols)[k]` / `#v[…]` forms.
+  -- (which equals `cols` by h_round_trip).
   have h_addwop' : SP1Clean.AddwOp.Spec
         ⟨(fromMain (toMain cols)).adapter.op_b_memory.prev_value,
          (fromMain (toMain cols)).adapter.op_c_memory.prev_value,
          (fromMain (toMain cols)).addw_value,
          (fromMain (toMain cols)).addw_msb⟩ := by
     rw [h_round_trip]; exact h_addwop
-  have h_alu' : SP1Clean.ALUTypeReader.aluTypeReaderSpec
-        ((fromMain (toMain cols)).state.clk_0_16 +
-            (fromMain (toMain cols)).state.clk_16_24 * 65536) 19
-        (fromMain (toMain cols)).state.pc
-        #v[(fromMain (toMain cols)).addw_value[0],
-           (fromMain (toMain cols)).addw_value[1],
-           (fromMain (toMain cols)).addw_msb * 65535,
-           (fromMain (toMain cols)).addw_msb * 65535]
-        (fromMain (toMain cols)).adapter := by
+  have h_cpu' : SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨(fromMain (toMain cols)).state,
+         #v[(fromMain (toMain cols)).state.pc[0] + 4,
+            (fromMain (toMain cols)).state.pc[1],
+            (fromMain (toMain cols)).state.pc[2]],
+         8, (fromMain (toMain cols)).is_real⟩ := by
+    rw [h_round_trip]; exact h_cpu
+  have h_alu' : SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+        ⟨(fromMain (toMain cols)).state.clk_high,
+         (fromMain (toMain cols)).state.clk_0_16 +
+            (fromMain (toMain cols)).state.clk_16_24 * 65536, 19,
+         (fromMain (toMain cols)).state.pc,
+         #v[(fromMain (toMain cols)).addw_value[0],
+            (fromMain (toMain cols)).addw_value[1],
+            (fromMain (toMain cols)).addw_msb * 65535,
+            (fromMain (toMain cols)).addw_msb * 65535],
+         (fromMain (toMain cols)).adapter,
+         (fromMain (toMain cols)).is_real,
+         (fromMain (toMain cols)).adapter_cols.is_trusted⟩ := by
     rw [h_round_trip]; exact h_alu
   rw [allHold_iff_structural (toMain cols) h_isreal']
-  refine ⟨h_addwop', h_cpu, h_alu', ?_, h_op_a_0⟩
-  change cols.is_real * (cols.is_real - 1) = 0
-  linear_combination h_isreal
+  exact ⟨h_addwop', h_cpu', h_alu', h_op_a_0⟩
 
 /-- Cols-level Sail bridge for ADDW (R-type, `imm_c = 0`). -/
 theorem sail_correct_addw_of_traceSpec

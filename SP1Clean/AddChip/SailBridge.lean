@@ -45,36 +45,44 @@ theorem sail_correct_of_formalSpec
                            (.Regidx (sp1_op_b_cols cols))
                            (.Regidx (sp1_op_a_cols cols))).run s := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_addop, h_cpu, h_rtr, h_isreal, h_op_a_0, _h_rv64add⟩ := h_spec
+  obtain ⟨h_addop, h_cpu, h_rtr, h_op_a_0, _h_rv64add⟩ := h_spec
   -- Round-trip: `fromMain (toMain cols) = cols`, using the UserMode
   -- TrustMode marker from `Assumptions`.
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_state := h_init (toMain cols) h_round_trip
   -- `(toMain cols)[32] = cols.is_real = 1` reduces by `@[reducible]` toMain.
   have h_isreal' : (toMain cols)[32] = 1 := h_is_real
-  -- Reconstruct SP1's `allHold` on `toMain cols` from the structural conjuncts.
-  -- Trick: re-state each cols-level Spec hypothesis through `fromMain (toMain cols)`
-  -- (which equals `cols` by h_round_trip). The `(fromMain (toMain cols)).X`
-  -- projections then unfold to the matching `(toMain cols)[k]` / `#v[…]` forms
-  -- by `@[reducible]` on `fromMain` and `toMain`, lining up with the goal that
-  -- `allHold_iff_structural` produces.
+  -- Reconstruct SP1's `allHold` on `toMain cols` from the structural conjuncts
+  -- of the new Gated FormalSpec. Each `h_X` cols-level Spec gets re-stated
+  -- through `fromMain (toMain cols)` (≡ cols by h_round_trip); the
+  -- `(fromMain (toMain cols)).Y` projections then unfold to the matching
+  -- `(toMain cols)[k]` / `#v[…]` forms by `@[reducible]` on `fromMain`/`toMain`,
+  -- lining up with the goal `allHold_iff_structural` produces.
   have h_addop' : SP1Clean.AddOp.Spec
         (fromMain (toMain cols)).adapter.op_b_memory.prev_value
         (fromMain (toMain cols)).adapter.op_c_memory.prev_value
         (fromMain (toMain cols)).op_a_write_value := by
     rw [h_round_trip]; exact h_addop
-  have h_rtr' : SP1Clean.RTypeReader.rtypeReaderSpec
-        ((fromMain (toMain cols)).state.clk_0_16 +
-            (fromMain (toMain cols)).state.clk_16_24 * 65536) 0
-        (fromMain (toMain cols)).state.pc
-        (fromMain (toMain cols)).op_a_write_value
-        (fromMain (toMain cols)).adapter := by
+  have h_cpu' : SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨(fromMain (toMain cols)).state,
+         #v[(fromMain (toMain cols)).state.pc[0] + 4,
+            (fromMain (toMain cols)).state.pc[1],
+            (fromMain (toMain cols)).state.pc[2]],
+         8, (fromMain (toMain cols)).is_real⟩ := by
+    rw [h_round_trip]; exact h_cpu
+  have h_rtr' : SP1Clean.RTypeReader.Gated.Assertion.Spec
+        ⟨(fromMain (toMain cols)).state.clk_high,
+         (fromMain (toMain cols)).state.clk_0_16 +
+            (fromMain (toMain cols)).state.clk_16_24 * 65536, 0,
+         (fromMain (toMain cols)).state.pc,
+         (fromMain (toMain cols)).op_a_write_value,
+         (fromMain (toMain cols)).adapter,
+         (fromMain (toMain cols)).is_real,
+         (fromMain (toMain cols)).adapter_cols.is_trusted⟩ := by
     rw [h_round_trip]; exact h_rtr
   have h_allHold : (_root_.Add.constraints (toMain cols)).allHold := by
     rw [allHold_iff_structural (toMain cols) h_isreal']
-    refine ⟨h_addop', h_cpu, h_rtr', ?_, h_op_a_0⟩
-    change cols.is_real * (cols.is_real - 1) = 0
-    linear_combination h_isreal
+    exact ⟨h_addop', h_cpu', h_rtr', h_op_a_0⟩
   -- Apply Main-level `Add.correct_add`; the result reads `sp1_X (toMain cols)`,
   -- which is definitionally `sp1_X_cols cols` for each helper.
   exact (_root_.Add.correct_add (toMain cols) s h_allHold h_isreal' h_state).symm

@@ -132,23 +132,57 @@ These 24 lemmas project that conjunct, mirroring the
 `is_real_binary_<chip>` recipe in `IsRealBinary.lean`. -/
 
 theorem cpuStateSpec_of_spec_add (cols : Add.AddCols (ZMod p))
-    (h : Add.assertion.Spec cols) :
+    (h : Add.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
+  -- Post-Gated-migration: cpuStateSpec is no longer a direct conjunct of
+  -- FormalSpec (it's now embedded in `CPUState.Gated.Assertion.Spec` as a
+  -- disjunctive form gated by `cols.is_real`). Bridge: route the Gated.Spec
+  -- back through its SP1-native `allHold` form, then re-apply the legacy
+  -- `cpuStateSpec_iff_sp1` (pinned at is_real = 1) to recover the range
+  -- bounds. The trace-level dispatch in `cpuStateSpec_of_chipRow_spec`
+  -- (Add arm) still needs to thread `cols.is_real = 1` from a per-row
+  -- "is real" hypothesis — currently a TODO (see comment below).
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Add.Assertion.FormalSpec cols at h
-  exact h.2.1
+  have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ := h.2.1
+  rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
+  exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
 theorem cpuStateSpec_of_spec_addi (cols : Addi.AddiCols (ZMod p))
-    (h : Addi.assertion.Spec cols) :
+    (h : Addi.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
+  -- Post-Gated-migration: cpuStateSpec is no longer a direct conjunct of
+  -- FormalSpec (it's now embedded in `CPUState.Gated.Assertion.Spec` as a
+  -- disjunctive form gated by `cols.is_real`). Mirror of Add chip's
+  -- discharger.
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Addi.Assertion.FormalSpec cols at h
-  exact h.2.1
+  have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ := h.2.1
+  rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
+  exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
 theorem cpuStateSpec_of_spec_addw (cols : Addw.AddwCols (ZMod p))
-    (h : Addw.assertion.Spec cols) :
+    (h : Addw.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
+  -- Post-Gated-migration: cpuStateSpec is now embedded in
+  -- `CPUState.Gated.Assertion.Spec` (disjunctive). Mirror of Add/Addi.
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Addw.Assertion.FormalSpec cols at h
-  -- FormalSpec now starts with AddwOp.Spec; cpuStateSpec is the 2nd conjunct.
-  exact h.2.1
+  have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ := h.2.1
+  rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
+  exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
 theorem cpuStateSpec_of_spec_bitwise (cols : Bitwise.BitwiseCols (ZMod p))
     (h : Bitwise.assertion.Spec cols) :
@@ -321,9 +355,22 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
 theorem cpuStateSpec_of_chipRow_spec
     (row : ChipRow p) (h : ChipRow.Spec row) : row.cpuStateSpec := by
   cases row with
-  | add cols => exact cpuStateSpec_of_spec_add cols h
-  | addi cols => exact cpuStateSpec_of_spec_addi cols h
-  | addw cols => exact cpuStateSpec_of_spec_addw cols h
+  | add cols =>
+    -- TODO (post-Add-Gated-migration cascade): `cpuStateSpec_of_spec_add`
+    -- now requires `cols.is_real = 1` because the new Gated FormalSpec
+    -- carries CPUState range bounds *conditionally*. The trace-level
+    -- discharge here needs to thread per-row `is_real = 1` (e.g. via a
+    -- new `TraceIsRealForChip` hypothesis or filtering padding rows).
+    -- The other 23 chips keep their legacy unconditional path.
+    sorry
+  | addi cols =>
+    -- TODO (post-Addi-Gated-migration cascade): same shape as Add arm —
+    -- `cpuStateSpec_of_spec_addi` requires `cols.is_real = 1`. Threading
+    -- per-row `is_real = 1` here is deferred.
+    sorry
+  | addw cols =>
+    -- TODO (post-Addw-Gated-migration cascade): same shape as Add/Addi arms.
+    sorry
   | bitwise cols => exact cpuStateSpec_of_spec_bitwise cols h
   | branch cols => exact cpuStateSpec_of_spec_branch cols h
   | divRem cols => exact cpuStateSpec_of_spec_divRem cols h

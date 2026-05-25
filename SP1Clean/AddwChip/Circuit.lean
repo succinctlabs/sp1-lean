@@ -51,14 +51,15 @@ namespace Assertion
 open Circuit
 
 /-- Clean-side chip circuit. Composes `AddwOp.assertion` (the 32-bit ADDW
-carry chain + sign-extension MSB) + `CPUState.assertion` +
-`ALUTypeReader.assertion` (which bundles ProgramTable + 3 gated
-OperandAccess + 4 op_a_0 gates + 4 imm_c-equality gates) + 2 trailing
-scalar gates. -/
+carry chain + sign-extension MSB) + `CPUState.Gated.assertion` +
+`ALUTypeReader.Gated.assertion` (which bundles ProgramTable + 3 gated
+OperandAccess + 4 op_a_0 gates + 4 imm_c-equality gates) + chip-level
+`op_a_0 = 0` gate. The free `is_real * (is_real - 1) === 0` gate now
+lives inside both Gated sub-circuits' first conjuncts. -/
 @[reducible]
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩, adapter,
-       addw_value, addw_msb, is_real, _adapter_cols⟩ := cols
+       addw_value, addw_msb, is_real, adapter_cols⟩ := cols
   let clk_low := clk_0_16 + clk_16_24 * 65536
   let op_a_write_value : Vector (Expression (ZMod p)) 4 :=
     #v[addw_value[0], addw_value[1], addw_msb * 65535, addw_msb * 65535]
@@ -66,12 +67,14 @@ def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
        addw_value, addw_msb⟩ :
       Var SP1Clean.AddwOp.Inputs (ZMod p))
-  SP1Clean.CPUState.assertion
-    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  SP1Clean.ALUTypeReader.assertion
-    (⟨clk_high, clk_low, 19, pc, op_a_write_value, adapter⟩ :
-      Var SP1Clean.ALUTypeReader.Inputs (ZMod p))
-  is_real * (is_real - 1) === 0
+  SP1Clean.CPUState.Gated.assertion
+    (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       #v[pc[0] + 4, pc[1], pc[2]], 8, is_real⟩ :
+      Var SP1Clean.CPUState.Gated.Inputs (ZMod p))
+  SP1Clean.ALUTypeReader.Gated.assertion
+    (⟨clk_high, clk_low, 19, pc, op_a_write_value, adapter,
+       is_real, adapter_cols.is_trusted⟩ :
+      Var SP1Clean.ALUTypeReader.Gated.Inputs (ZMod p))
   adapter.op_a_0 === 0
 
 @[reducible]
@@ -98,16 +101,15 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22⟩ := h_input
   subst_eqs
-  obtain ⟨h_addwop_sub, h_cpu_sub, h_alu_sub, h_isreal, h_op_a_0⟩ := h_holds
+  obtain ⟨h_addwop_sub, h_cpu_sub, h_alu_sub, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · -- The subcircuit's Spec is directly AddwOp.Spec on the destructured Inputs.
-    exact h_addwop_sub trivial
-  · exact h_cpu_sub trivial
-  · have h := h_alu_sub trivial
-    simpa [SP1Clean.ALUTypeReader.assertion, SP1Clean.ALUTypeReader.Assertion.Spec] using h
-  · linear_combination h_isreal
-  · exact h_op_a_0
+  refine ⟨h_addwop_sub trivial, h_cpu_sub trivial, ?_, h_op_a_0⟩
+  -- ALU's Gated.Spec normalizes `(a - b)` to `(a + -b)` via its own
+  -- soundness's `simp only [Spec, sub_eq_add_neg, ...]`; bridge back here.
+  have h := h_alu_sub trivial
+  simpa [SP1Clean.ALUTypeReader.Gated.assertion,
+         SP1Clean.ALUTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
+         Vector.getElem_map] using h
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -115,16 +117,12 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22⟩ := h_input
   subst_eqs
-  obtain ⟨h_addwop, h_cpu, h_alu, h_isreal, h_op_a_0⟩ := h_spec
+  obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · -- Pass h_addwop (AddwOp.Spec ⟨…⟩) directly to AddwOp.assertion's completeness.
-    exact ⟨trivial, h_addwop⟩
-  · exact ⟨trivial, h_cpu⟩
-  · refine ⟨trivial, ?_⟩
-    simpa [SP1Clean.ALUTypeReader.assertion, SP1Clean.ALUTypeReader.Assertion.Spec] using h_alu
-  · linear_combination h_isreal
-  · exact h_op_a_0
+  refine ⟨⟨trivial, h_addwop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, ?_⟩, h_op_a_0⟩
+  simpa [SP1Clean.ALUTypeReader.Gated.assertion,
+         SP1Clean.ALUTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
+         Vector.getElem_map] using h_alu
 
 end Assertion
 

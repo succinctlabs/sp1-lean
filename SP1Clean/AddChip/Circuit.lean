@@ -46,23 +46,30 @@ namespace Assertion
 open Circuit
 
 /-- Clean-side chip circuit. Mirrors SP1 Rust's `AddChip::eval(builder, cols)`
-1:1: one `AddOp.assertion` + one `CPUState.assertion` + one
-`RTypeReader.assertion` + two scalar gates. -/
+1:1 via flag-threaded `Gated` sub-circuits: one `AddOp.assertion` +
+one `CPUState.Gated.assertion` (binary gate + state-bus + byte-opcode,
+all gated by `is_real`) + one `RTypeReader.Gated.assertion` (binary gate
++ program-bus + 3 register accesses + op_a_0 masked gates, gated by
+`is_real`/`is_trusted`) + chip-level `op_a_0 = 0` gate. The free
+`is_real * (is_real - 1) === 0` gate now lives inside both Gated
+sub-circuits' first conjuncts (redundant but propositionally fine). -/
 @[reducible]
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
        adapter,
-       op_a_write_value, is_real, _adapter_cols⟩ := cols
+       op_a_write_value, is_real, adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
     (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
       op_a_write_value⟩ :
       Var SP1Clean.AddOp.Inputs (ZMod p))
-  SP1Clean.CPUState.assertion
-    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  SP1Clean.RTypeReader.assertion
-    (⟨clk_high, clk_0_16 + clk_16_24 * 65536, 0, pc, op_a_write_value, adapter⟩ :
-      Var SP1Clean.RTypeReader.Inputs (ZMod p))
-  is_real * (is_real - 1) === 0
+  SP1Clean.CPUState.Gated.assertion
+    (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       #v[pc[0] + 4, pc[1], pc[2]], 8, is_real⟩ :
+      Var SP1Clean.CPUState.Gated.Inputs (ZMod p))
+  SP1Clean.RTypeReader.Gated.assertion
+    (⟨clk_high, clk_0_16 + clk_16_24 * 65536, 0, pc, op_a_write_value, adapter,
+       is_real, adapter_cols.is_trusted⟩ :
+      Var SP1Clean.RTypeReader.Gated.Inputs (ZMod p))
   adapter.op_a_0 === 0
 
 @[reducible]
@@ -95,64 +102,37 @@ theorem soundness :
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop_sub, h_cpu_sub, h_rtr_sub, h_isreal, h_op_a_0⟩ := h_holds
+  obtain ⟨h_addop_sub, h_cpu_sub, h_rtr_sub, h_op_a_0⟩ := h_holds
   unfold id at *
   have h_addop := h_addop_sub trivial
   have h_cpu := h_cpu_sub trivial
   have h_rtr := h_rtr_sub trivial
-  -- Rebind the explicit eval'd-form struct under the name `cols` so the
-  -- helper-cols functions and `addInitialState_cols` references in the
-  -- residual BitVec clause unfold against a single named term rather than
-  -- a giant inlined struct in every position.
-  set cols : AddCols (ZMod p) :=
-    { state :=
-        { clk_high := Expression.eval env input_var_state_clk_high,
-          clk_16_24 := Expression.eval env input_var_state_clk_16_24,
-          clk_0_16 := Expression.eval env input_var_state_clk_0_16,
-          pc := Vector.map (Expression.eval env) input_var_state_pc },
-      adapter :=
-        { op_a := input_adapter_op_a,
-          op_a_memory :=
-            { prev_value := input_adapter_op_a_memory_prev_value,
-              access_timestamp :=
-                { prev_low := input_adapter_op_a_memory_access_timestamp_prev_low,
-                  diff_low_limb := input_adapter_op_a_memory_access_timestamp_diff_low_limb } },
-          op_a_0 := input_adapter_op_a_0, op_b := input_adapter_op_b,
-          op_b_memory :=
-            { prev_value := input_adapter_op_b_memory_prev_value,
-              access_timestamp :=
-                { prev_low := input_adapter_op_b_memory_access_timestamp_prev_low,
-                  diff_low_limb := input_adapter_op_b_memory_access_timestamp_diff_low_limb } },
-          op_c := input_adapter_op_c,
-          op_c_memory :=
-            { prev_value := input_adapter_op_c_memory_prev_value,
-              access_timestamp :=
-                { prev_low := input_adapter_op_c_memory_access_timestamp_prev_low,
-                  diff_low_limb := input_adapter_op_c_memory_access_timestamp_diff_low_limb } } },
-      op_a_write_value := Vector.map (Expression.eval env) input_var_op_a_write_value,
-      is_real := Expression.eval env input_var_is_real,
-      adapter_cols := { is_trusted := Expression.eval env input_var_is_real } }
-    with hcols
-  refine ⟨h_addop, h_cpu, h_rtr, by linear_combination h_isreal, h_op_a_0, ?_⟩
+  refine ⟨h_addop, h_cpu, h_rtr, h_op_a_0, ?_⟩
   -- BitVec `RV64.add` conjunct: discharge from `AddOp.Spec` (the carry
-  -- chain) + `rtypeReaderSpec`'s isU64 bounds for op_b/op_c, via
-  -- `AddOperation.spec`. No `toMain` round-trip, no monadic dispatch.
-  intro _h_is_real_eq
+  -- chain) + the per-operand `Word.isU64` bounds for op_b/op_c — now
+  -- inside `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec`
+  -- sub-conjuncts (whole-Vector form, no `isU64_iff_index_form`
+  -- conversion needed).
+  intro h_is_real_eq
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  -- Extract isU64_b, isU64_c from `rtypeReaderSpec`'s memory-bus tuple
-  -- (positions 8.3.2 and 8.3.3) and convert from index-form to whole-Vector.
-  obtain ⟨_, _, _, _, _, _, _,
-          ⟨_, _, ⟨_h_isU64_a_idx, h_isU64_b_idx, h_isU64_c_idx⟩⟩, _⟩ := h_rtr
-  have h_isU64_b : Word.isU64 cols.adapter.op_b_memory.prev_value :=
-    (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b_idx
-  have h_isU64_c : Word.isU64 cols.adapter.op_c_memory.prev_value :=
-    (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_c_idx
+  obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
+  -- `h_is_real_eq` has type `<inlined struct>.is_real = 1`; coerce via defeq
+  -- to the eval-Var form so `rw` can find it in subsequent goals/hypotheses.
+  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real_eq
+  have h_ir_ne_zero :
+      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
+    rw [h_is_real_eq]; exact one_ne_zero
+  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
+    (h_ra_b.resolve_left h_ir_ne_zero).2.2
+  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
+    (h_ra_c.resolve_left h_ir_ne_zero).2.2
   -- Bridge the cols-level `AddOp.Spec` to SP1's constraint allHold form,
   -- then to the BitVec equation via `AddOperation.spec`.
   have h_allHold : (AddOperation.constraints
-        cols.adapter.op_b_memory.prev_value
-        cols.adapter.op_c_memory.prev_value
-        { value := cols.op_a_write_value } 1).allHold :=
+        input_adapter_op_b_memory_prev_value
+        input_adapter_op_c_memory_prev_value
+        { value := Vector.map (Expression.eval env) input_var_op_a_write_value }
+        1).allHold :=
     (SP1Clean.AddOp.iff_sp1 _ _ _).mpr h_addop
   have ⟨_, h_bv⟩ := AddOperation.spec h_isU64_b h_isU64_c h_allHold
   -- `h_bv : op_a_write_value.toBitVec64 = op_b.toBitVec64 + op_c.toBitVec64`.
@@ -166,10 +146,9 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
-  obtain ⟨h_addop, h_cpu, h_rtr, h_isreal, h_op_a_0, _h_rv64add⟩ := h_spec
+  obtain ⟨h_addop, h_cpu, h_rtr, h_op_a_0, _h_rv64add⟩ := h_spec
   unfold id at *
-  refine ⟨⟨trivial, h_addop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩,
-          by linear_combination h_isreal, h_op_a_0⟩
+  refine ⟨⟨trivial, h_addop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩, h_op_a_0⟩
 
 end Assertion
 

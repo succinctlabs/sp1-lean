@@ -48,8 +48,10 @@ lemma fromMain_toMain (cols : AddiCols (ZMod p))
 
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
 `Addi.constraints Main` is exactly the conjunction of `AddOp.Spec`,
-`cpuStateSpec`, and `itypeReaderSpec` over `fromMain Main`, under
-`is_real = Main[29] = 1`. Used inside the Sail clause's external bridge
+`CPUState.Gated.Assertion.Spec`, and `ITypeReader.Gated.Assertion.Spec`
+over `fromMain Main`, under `is_real = Main[29] = 1`. The chip-level free
+`Main[29] * (Main[29] - 1) = 0` gate is absorbed into both Gated.Specs'
+first conjuncts. Used inside the Sail clause's external bridge
 (`SailBridge.sail_correct_of_formalSpec`) to construct an `allHold` from
 the structural pieces of `FormalSpec`. -/
 lemma allHold_iff_structural
@@ -59,29 +61,38 @@ lemma allHold_iff_structural
           #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[21], Main[22], Main[23], Main[24]]
           #v[Main[25], Main[26], Main[27], Main[28]] ∧
-       SP1Clean.CPUState.cpuStateSpec Main[2] Main[1] ∧
-       SP1Clean.ITypeReader.itypeReaderSpec
-          (Main[2] + Main[1] * 65536) 1 #v[Main[3], Main[4], Main[5]]
-          #v[Main[25], Main[26], Main[27], Main[28]]
-          { op_a := Main[6],
-            op_a_memory :=
-              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-                access_timestamp :=
-                  { prev_low := Main[11], diff_low_limb := Main[12] } },
-            op_a_0 := Main[13], op_b := Main[14],
-            op_b_memory :=
-              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
-                access_timestamp :=
-                  { prev_low := Main[19], diff_low_limb := Main[20] } },
-            op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] } ∧
-       Main[29] * (Main[29] - 1) = 0 ∧
+       SP1Clean.CPUState.Gated.Assertion.Spec
+          ⟨{ clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+             pc := #v[Main[3], Main[4], Main[5]] },
+           #v[Main[3] + 4, Main[4], Main[5]], 8, Main[29]⟩ ∧
+       SP1Clean.ITypeReader.Gated.Assertion.Spec
+          ⟨Main[0], Main[2] + Main[1] * 65536, 1,
+           #v[Main[3], Main[4], Main[5]],
+           #v[Main[25], Main[26], Main[27], Main[28]],
+           { op_a := Main[6],
+             op_a_memory :=
+               { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                 access_timestamp :=
+                   { prev_low := Main[11], diff_low_limb := Main[12] } },
+             op_a_0 := Main[13], op_b := Main[14],
+             op_b_memory :=
+               { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                 access_timestamp :=
+                   { prev_low := Main[19], diff_low_limb := Main[20] } },
+             op_c_imm := #v[Main[21], Main[22], Main[23], Main[24]] },
+           Main[29], Main[29]⟩ ∧
        Main[13] = 0) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [_root_.Addi.allHold_constraints_iff Main, h_is_real,
-    AddOperation.allHold_constraints_iff,
-    SP1Clean.CPUState.cpuStateSpec_iff_sp1,
-    SP1Clean.ITypeReader.itypeReaderSpec_iff_sp1]
-  simp [SP1Clean.AddOp.Spec, SP1Clean.CPUState.cpuStateSpec,
-        SP1Clean.ITypeReader.itypeReaderSpec, and_assoc]
+      SP1Clean.AddOp.iff_sp1,
+      SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1,
+      SP1Clean.ITypeReader.Gated.Assertion.Spec_iff_sp1]
+  -- Drop the chip-level redundant `1 * (1 - 1) = 0`; absorbed into Gated.Specs.
+  refine ⟨?_, ?_⟩
+  · rintro ⟨h_addop, h_cpu, h_itr, _, h_op_a_0⟩
+    exact ⟨h_addop, h_cpu, h_itr, h_op_a_0⟩
+  · rintro ⟨h_addop, h_cpu, h_itr, h_op_a_0⟩
+    refine ⟨h_addop, h_cpu, h_itr, ?_, h_op_a_0⟩
+    ring
 
 end SP1Clean.Addi

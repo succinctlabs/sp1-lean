@@ -435,6 +435,49 @@ theorem cpuStateSpec_iff_sp1
     refine ⟨h_bin, fun h_ne => ?_⟩
     exact h_disj.resolve_left h_ne
 
+/-- Bridge from SP1-native `CPUState.constraints.allHold` to the literal
+sub-circuit conjunction `Assertion.Spec`. Composes `cpuStateSpec_iff_sp1`
+(SP1-native → disjunctive `cpuStateSpec`) with the Clean-side reformulation
+of `cpuStateSpec` as the sub-circuit conjunction (binary gate + 2 trivial
+state-bus disjuncts + 2 byte-opcode disjuncts). The byte-opcode pieces
+reuse `byteOpcodeSpec_range13{,_of_lt}` / `byteOpcodeSpec_u8range{,_of_lt}`
+from the legacy `Assertion` namespace. -/
+theorem Assertion.Spec_iff_sp1
+    {cols : _root_.CPUState (ZMod p)} {next_pc : Vector (ZMod p) 3}
+    {clk_increment is_real : ZMod p} :
+    (_root_.CPUState.constraints cols next_pc clk_increment is_real).allHold ↔
+      Assertion.Spec ⟨cols, next_pc, clk_increment, is_real⟩ := by
+  rw [cpuStateSpec_iff_sp1]
+  simp only [cpuStateSpec, Assertion.Spec,
+    SP1Lookup.StateBusGated.Spec, SP1Lookup.ByteOpcodeGated.Spec]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨h_bin, h_disj⟩
+    refine ⟨?_, Or.inr trivial, Or.inr trivial, ?_, ?_⟩
+    · rcases h_bin with h0 | h1
+      · subst h0; ring
+      · have h_sub : is_real - 1 = 0 := sub_eq_zero.mpr h1
+        rw [h_sub]; ring
+    · rcases h_disj with h0 | ⟨h_r, _⟩
+      · exact Or.inl h0
+      · exact Or.inr
+          (SP1Clean.CPUState.Assertion.byteOpcodeSpec_range13_of_lt _ h_r)
+    · rcases h_disj with h0 | ⟨_, h_u⟩
+      · exact Or.inl h0
+      · exact Or.inr
+          (SP1Clean.CPUState.Assertion.byteOpcodeSpec_u8range_of_lt _ h_u)
+  · rintro ⟨h_mul, _, _, h_r_disj, h_u_disj⟩
+    refine ⟨?_, ?_⟩
+    · rcases mul_eq_zero.mp h_mul with h0 | h_sub
+      · exact Or.inl h0
+      · exact Or.inr (sub_eq_zero.mp h_sub)
+    · rcases h_r_disj with h0 | h_r
+      · exact Or.inl h0
+      · rcases h_u_disj with h0' | h_u
+        · exact Or.inl h0'
+        · exact Or.inr
+            ⟨SP1Clean.CPUState.Assertion.byteOpcodeSpec_range13 _ h_r,
+             SP1Clean.CPUState.Assertion.byteOpcodeSpec_u8range _ h_u⟩
+
 end Gated
 
 end SP1Clean.CPUState

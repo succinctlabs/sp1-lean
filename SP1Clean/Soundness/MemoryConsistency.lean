@@ -830,38 +830,35 @@ def ChipRow.memoryAccessesValid (row : ChipRow p) : Prop :=
 def TraceMemoryAccessesValid (rows : List (ChipRow p)) : Prop :=
   ∀ row ∈ rows, row.memoryAccessesValid
 
-/-- Add's per-chip discharge — projects the memory-bus tuple of
-`rtypeReaderSpec` (FormalSpec position #3) onto the three
-`memoryAccessSpec` clauses for op_a/b/c at offsets +4/+3/+2. -/
+/-- Add's per-chip discharge — projects the per-operand `RegisterAccess.Spec`
+sub-conjuncts of `RTypeReader.Gated.Assertion.Spec` (FormalSpec position #3
+post-Gated migration) onto the three `memoryAccessSpec` clauses for
+op_a/b/c at offsets +4/+3/+2. Takes an `is_real = 1` precondition to
+resolve each `RegisterAccess.Spec`'s `is_real = 0 ∨ <facts>` disjunct
+(memory facts are gated on the real-row flag in the new Gated form). -/
 theorem memoryAccessesValid_of_spec_add
     (cols : SP1Clean.Add.AddCols (ZMod p))
-    (h : SP1Clean.Add.assertion.Spec cols) :
+    (h : SP1Clean.Add.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     ChipRow.memoryAccessesValid (.add cols) := by
   change SP1Clean.Add.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, h_rtr, _h_isreal, _h_op_a_0, _h_rv64add⟩ := h
-  -- Unpack rtypeReaderSpec's nested memory-bus tuple:
-  -- (diff_{a,b,c} < 65536, ts_{c,b,a} scaled < 256, isU64_{a,b,c}).
-  obtain ⟨_h_ti, _h_op_a_lt, _h_op_b_lt, _h_op_c_lt, _h_op_a_0_bin, _h_op_a_0_iff,
-          _h_pc,
-          ⟨⟨h_diff_a, h_diff_b, h_diff_c⟩,
-           ⟨h_ts_c, h_ts_b, h_ts_a⟩,
-           ⟨h_isU64_a, h_isU64_b, h_isU64_c⟩⟩,
-          _h_a0_implies⟩ := h_rtr
+  obtain ⟨_h_addop, _h_cpu, h_rtr, _h_op_a_0, _h_rv64add⟩ := h
+  -- Unpack RTypeReader.Gated.Spec's per-operand RegisterAccess.Specs
+  -- (positions 3/4/5 of the 9-tuple).
+  obtain ⟨_h_ir_bin, _h_prog, h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
+  have h_ir_ne_zero : cols.is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
+  have h_a := h_ra_a.resolve_left h_ir_ne_zero
+  have h_b := h_ra_b.resolve_left h_ir_ne_zero
+  have h_c := h_ra_c.resolve_left h_ir_ne_zero
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rcases h_mem with h | h | h
-  · subst h
-    exact ⟨h_diff_a, h_ts_a,
-      (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_a⟩
-  · subst h
-    exact ⟨h_diff_b, h_ts_b,
-      (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b⟩
-  · subst h
-    exact ⟨h_diff_c, h_ts_c,
-      (SP1Clean.RTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_c⟩
+  · subst h; exact ⟨h_a.1, h_a.2.1, h_a.2.2⟩
+  · subst h; exact ⟨h_b.1, h_b.2.1, h_b.2.2⟩
+  · subst h; exact ⟨h_c.1, h_c.2.1, h_c.2.2⟩
 
 /-- UType's per-chip discharge — projects the single
 `OperandAccess.Assertion.Spec` conjunct (FormalSpec position #7 after
@@ -903,30 +900,25 @@ theorem memoryAccessesValid_of_spec_jal
 is the immediate `op_c_imm`, no memory access). -/
 theorem memoryAccessesValid_of_spec_addi
     (cols : SP1Clean.Addi.AddiCols (ZMod p))
-    (h : SP1Clean.Addi.assertion.Spec cols) :
+    (h : SP1Clean.Addi.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     ChipRow.memoryAccessesValid (.addi cols) := by
   change SP1Clean.Addi.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, h_itr, _h_isreal, _h_op_a_0, _h_rv64add⟩ := h
-  -- Unpack itypeReaderSpec's flat memory-bus clauses
-  -- (op_a + op_b only; op_c is immediate, no memory access).
-  obtain ⟨_h_ti, _h_op_a_lt, _h_op_b_lt,
-          _h_op_c0_lt, _h_op_c1_lt, _h_op_c2_lt, _h_op_c3_lt,
-          _h_op_a_0_bin, _h_op_a_0_iff,
-          _h_pc_mod, _h_pc_0_lt, _h_pc_1_lt, _h_pc_2_lt,
-          h_diff_a, h_diff_b, h_ts_b, h_ts_a, h_isU64_a, h_isU64_b,
-          _h_a0_implies⟩ := h_itr
+  obtain ⟨_h_addop, _h_cpu, h_itr, _h_op_a_0, _h_rv64add⟩ := h
+  -- Unpack ITypeReader.Gated.Spec's per-operand RegisterAccess.Specs
+  -- (positions 3/4 of the 8-tuple; op_c is the immediate, no memory access).
+  obtain ⟨_h_ir_bin, _h_prog, h_ra_a, h_ra_b, _, _, _, _⟩ := h_itr
+  have h_ir_ne_zero : cols.is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
+  have h_a := h_ra_a.resolve_left h_ir_ne_zero
+  have h_b := h_ra_b.resolve_left h_ir_ne_zero
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rcases h_mem with h | h
-  · subst h
-    exact ⟨h_diff_a, h_ts_a,
-      (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_a⟩
-  · subst h
-    exact ⟨h_diff_b, h_ts_b,
-      (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b⟩
+  · subst h; exact ⟨h_a.1, h_a.2.1, h_a.2.2⟩
+  · subst h; exact ⟨h_b.1, h_b.2.1, h_b.2.2⟩
 
 /-- Branch's per-chip discharge — projects the two `OperandAccess.Assertion.Spec`
 conjuncts. Branch emits 2 register reads (op_a/+4, op_b/+3) — no writes;
