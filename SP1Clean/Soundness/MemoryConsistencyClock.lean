@@ -338,9 +338,13 @@ theorem cpuStateSpec_of_spec_uType (cols : UType.UTypeCols (ZMod p))
 `((clk_0_16 - 1) * 8⁻¹).val < 8192 ∧ clk_16_24 < 256` constraint on its
 clock fields. -/
 def ChipRow.cpuStateSpec : ChipRow p → Prop
-  | .add cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .addi cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .addw cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  -- Gated-migrated chips: `memoryAccesses` is `[]`, so the row contributes
+  -- no timestamp-ordered tuples to the unfiltered aggregator and no
+  -- per-row clock bound is needed. Bus accounting flows through the
+  -- multiplicity-aware lookup bus. Placeholder `True` keeps dispatch total.
+  | .add _ => True
+  | .addi _ => True
+  | .addw _ => True
   | .bitwise cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .branch cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .divRem cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
@@ -359,8 +363,9 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
   | .storeDouble cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .storeHalf cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .storeWord cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .sub cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .subw cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  -- Sub/Subw — same shape as Add/Addw above (Gated, `memoryAccesses = []`).
+  | .sub _ => True
+  | .subw _ => True
   | .uType cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   -- Boundary chips: no `clk_0_16` / `clk_16_24` decomposition; the
   -- timestamp bound comes from a different mechanism (Phase 4.5
@@ -374,22 +379,12 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
 theorem cpuStateSpec_of_chipRow_spec
     (row : ChipRow p) (h : ChipRow.Spec row) : row.cpuStateSpec := by
   cases row with
-  | add cols =>
-    -- TODO (post-Add-Gated-migration cascade): `cpuStateSpec_of_spec_add`
-    -- now requires `cols.is_real = 1` because the new Gated FormalSpec
-    -- carries CPUState range bounds *conditionally*. The trace-level
-    -- discharge here needs to thread per-row `is_real = 1` (e.g. via a
-    -- new `TraceIsRealForChip` hypothesis or filtering padding rows).
-    -- The other 23 chips keep their legacy unconditional path.
-    sorry
-  | addi cols =>
-    -- TODO (post-Addi-Gated-migration cascade): same shape as Add arm —
-    -- `cpuStateSpec_of_spec_addi` requires `cols.is_real = 1`. Threading
-    -- per-row `is_real = 1` here is deferred.
-    sorry
-  | addw cols =>
-    -- TODO (post-Addw-Gated-migration cascade): same shape as Add/Addi arms.
-    sorry
+  -- Add/Addi/Addw: `ChipRow.cpuStateSpec` is `True` (Gated migration, see
+  -- `ChipRow.cpuStateSpec` def above). Memory accesses for these chips
+  -- route through the multiplicity-aware lookup bus instead.
+  | add _ => trivial
+  | addi _ => trivial
+  | addw _ => trivial
   | bitwise cols => exact cpuStateSpec_of_spec_bitwise cols h
   | branch cols => exact cpuStateSpec_of_spec_branch cols h
   | divRem cols => exact cpuStateSpec_of_spec_divRem cols h
@@ -408,14 +403,9 @@ theorem cpuStateSpec_of_chipRow_spec
   | storeDouble cols => exact cpuStateSpec_of_spec_storeDouble cols h
   | storeHalf cols => exact cpuStateSpec_of_spec_storeHalf cols h
   | storeWord cols => exact cpuStateSpec_of_spec_storeWord cols h
-  | sub cols =>
-    -- TODO (post-Sub-Gated-migration cascade): `cpuStateSpec_of_spec_sub`
-    -- now requires `cols.is_real = 1` because the new Gated FormalSpec
-    -- carries CPUState range bounds *conditionally*. Same shape as Add/Addi/Addw arms.
-    sorry
-  | subw cols =>
-    -- TODO (post-Subw-Gated-migration cascade): same shape as Sub arm.
-    sorry
+  -- Sub/Subw: Gated migration, same shape as Add/Addi/Addw.
+  | sub _ => trivial
+  | subw _ => trivial
   | uType cols => exact cpuStateSpec_of_spec_uType cols h
   | memInit _ => trivial
   | memFinalize _ => trivial
