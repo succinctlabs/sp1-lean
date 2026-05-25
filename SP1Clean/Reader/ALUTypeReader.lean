@@ -352,22 +352,22 @@ theorem completeness :
     · simp [h]
     · have := (h_imm_c_imp h).1
       rw [Vector.getElem_map, Vector.getElem_map] at this
-      rw [this]; ring
+      rw [this]; ring_nf
   · by_cases h : Expression.eval env input_var_cols_imm_c = 0
     · simp [h]
     · have := (h_imm_c_imp h).2.1
       rw [Vector.getElem_map, Vector.getElem_map] at this
-      rw [this]; ring
+      rw [this]; ring_nf
   · by_cases h : Expression.eval env input_var_cols_imm_c = 0
     · simp [h]
     · have := (h_imm_c_imp h).2.2.1
       rw [Vector.getElem_map, Vector.getElem_map] at this
-      rw [this]; ring
+      rw [this]; ring_nf
   · by_cases h : Expression.eval env input_var_cols_imm_c = 0
     · simp [h]
     · have := (h_imm_c_imp h).2.2.2
       rw [Vector.getElem_map, Vector.getElem_map] at this
-      rw [this]; ring
+      rw [this]; ring_nf
 
 end Assertion
 

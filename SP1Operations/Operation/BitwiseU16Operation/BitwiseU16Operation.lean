@@ -439,4 +439,65 @@ lemma spec.xor {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
   simp only [BitVec.ofNat_add, BitVec.ofNat_mul, BitVec.ofNat_xor]
   bv_decide
 
+/-- Equivalent formulation of constraints given that `is_real = 1`. At
+`is_real = 1` the binarity assertion is vacuous, and the constraint list
+reduces to 8 byte-bitwise checks on the algebraic 8-byte decomposition
+of `b` and `cc` (provided by `U16toU8OperationUnsafe.constraints`,
+which emits no constraints of its own — only the byte vector).
+
+This mirrors `AddOperation.allHold_constraints_iff` /
+`U16MSBOperation.allHold_constraints_iff` in shape. Downstream Clean
+mirrors (`SP1Clean/Operations/BitwiseU16Operation.lean`) bridge their
+`Spec` to this lemma via a `rw`. -/
+lemma allHold_constraints_iff
+    {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    (b cc : Word (ZMod p)) (cols : BitwiseU16Operation (ZMod p))
+    (opcode : ZMod p) :
+    (constraints b cc cols opcode 1).2.allHold ↔
+    ∀ i : Fin 8,
+      (ByteOpcode.ofNat opcode.val).constrain
+        (cols.bitwise_operation.result[i.val]'i.is_lt)
+        ((#v[
+          cols.b_low_bytes.low_bytes[0],
+          (b[0] - cols.b_low_bytes.low_bytes[0]) * (256 : ZMod p)⁻¹,
+          cols.b_low_bytes.low_bytes[1],
+          (b[1] - cols.b_low_bytes.low_bytes[1]) * (256 : ZMod p)⁻¹,
+          cols.b_low_bytes.low_bytes[2],
+          (b[2] - cols.b_low_bytes.low_bytes[2]) * (256 : ZMod p)⁻¹,
+          cols.b_low_bytes.low_bytes[3],
+          (b[3] - cols.b_low_bytes.low_bytes[3]) * (256 : ZMod p)⁻¹
+        ] : Vector (ZMod p) 8)[i.val]'i.is_lt)
+        ((#v[
+          cols.c_low_bytes.low_bytes[0],
+          (cc[0] - cols.c_low_bytes.low_bytes[0]) * (256 : ZMod p)⁻¹,
+          cols.c_low_bytes.low_bytes[1],
+          (cc[1] - cols.c_low_bytes.low_bytes[1]) * (256 : ZMod p)⁻¹,
+          cols.c_low_bytes.low_bytes[2],
+          (cc[2] - cols.c_low_bytes.low_bytes[2]) * (256 : ZMod p)⁻¹,
+          cols.c_low_bytes.low_bytes[3],
+          (cc[3] - cols.c_low_bytes.low_bytes[3]) * (256 : ZMod p)⁻¹
+        ] : Vector (ZMod p) 8)[i.val]'i.is_lt) := by
+  have h1ne : ((1 : ZMod p) ≠ 0) := one_ne_zero
+  simp only [constraints, BitwiseOperation.constraints,
+    U16toU8OperationUnsafe.constraints,
+    SP1ConstraintList.allHold, List.Forall, List.append_eq, List.nil_append,
+    List.append_nil, List.cons_append, SP1Constraint.toProp]
+  constructor
+  · rintro ⟨h0, h1, h2, h3, h4, h5, h6, h7, _⟩ i
+    match i with
+    | ⟨0, _⟩ => exact h0 h1ne
+    | ⟨1, _⟩ => exact h1 h1ne
+    | ⟨2, _⟩ => exact h2 h1ne
+    | ⟨3, _⟩ => exact h3 h1ne
+    | ⟨4, _⟩ => exact h4 h1ne
+    | ⟨5, _⟩ => exact h5 h1ne
+    | ⟨6, _⟩ => exact h6 h1ne
+    | ⟨7, _⟩ => exact h7 h1ne
+  · intro hSpec
+    refine ⟨fun _ => hSpec ⟨0, by omega⟩, fun _ => hSpec ⟨1, by omega⟩,
+            fun _ => hSpec ⟨2, by omega⟩, fun _ => hSpec ⟨3, by omega⟩,
+            fun _ => hSpec ⟨4, by omega⟩, fun _ => hSpec ⟨5, by omega⟩,
+            fun _ => hSpec ⟨6, by omega⟩, fun _ => hSpec ⟨7, by omega⟩, ?_⟩
+    ring
+
 end BitwiseU16Operation
