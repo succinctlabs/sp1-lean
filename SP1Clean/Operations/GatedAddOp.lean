@@ -35,7 +35,7 @@ open Circuit
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Carry-only Spec for a 4-limb gated add. Same shape as
-`SP1Clean.AddOp.Spec` minus the four result-limb range bounds. The
+`SP1Clean.AddOp.RawSpec` minus the four result-limb range bounds. The
 range bounds belong to the consuming chip's legacy `Spec` (carried by
 the chip's `iff_sp1` or a separate trace-level constraint). -/
 def Spec (a b result : Word (ZMod p)) : Prop :=
