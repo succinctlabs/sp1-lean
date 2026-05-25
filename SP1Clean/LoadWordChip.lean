@@ -480,13 +480,57 @@ def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
   (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0 ∧
   cols.adapter.op_a_0 = 0
 
+set_option maxHeartbeats 800000 in
+-- Six sub-circuits + 4 inline gates; LoadMemoryAccessGated and LoadWordSelector
+-- arms are placeholders. Mirrors LoadByteChip.AssertionGated / LoadHalfChip.AssertionGated.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub,
+          _h_lmag_sub, _h_lws_sub,
+          h_is_lw, h_is_lwu, h_sum, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_addr_sub trivial
+  · exact h_addr_shape_sub trivial
+  -- ITypeReader arm: op_a_write_value uses `op_a_write_value_lo[i]` indexing.
+  · convert h_itr_sub trivial using 4
+    simp
+  · exact Or.inr trivial
+  · trivial
+  · linear_combination h_is_lw
+  · linear_combination h_is_lwu
+  · linear_combination h_sum
+  · exact h_op_a_0
 
+set_option maxHeartbeats 800000 in
+-- Mirrors soundness destructure; circuit_proof_start unfolds 6 sub-circuits + 4 gates.
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, _h_lmag, _h_lws,
+          h_is_lw, h_is_lwu, h_sum, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_addr⟩
+  · exact ⟨trivial, h_addr_shape⟩
+  · refine ⟨trivial, ?_⟩
+    convert h_itr using 4
+    simp
+  · exact ⟨trivial, Or.inr trivial⟩
+  · exact ⟨trivial, trivial⟩
+  · linear_combination h_is_lw
+  · linear_combination h_is_lwu
+  · linear_combination h_sum
+  · exact h_op_a_0
 
 end AssertionGated
 

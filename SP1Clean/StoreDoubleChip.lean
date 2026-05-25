@@ -368,13 +368,43 @@ def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
      cols.store_memory_flag, cols.is_real⟩ ∧
   cols.is_real * (cols.is_real - 1) = 0
 
+set_option maxHeartbeats 800000 in
+-- Five sub-circuit calls + 1 inline gate (StoreDouble has no Assembler op
+-- — full 64-bit op_a is written directly). Mirrors StoreByteChip.AssertionGated.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub, h_smag_sub,
+          h_isreal⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_addr_sub trivial
+  · exact h_addr_shape_sub trivial
+  · exact h_itr_sub trivial
+  · exact h_smag_sub trivial
+  · linear_combination h_isreal
 
+set_option maxHeartbeats 800000 in
+-- Mirrors soundness destructure; circuit_proof_start unfolds 5 sub-circuits + 1 gate.
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, h_smag, h_isreal⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_addr⟩
+  · exact ⟨trivial, h_addr_shape⟩
+  · exact ⟨trivial, h_itr⟩
+  · exact ⟨trivial, h_smag⟩
+  · linear_combination h_isreal
 
 end AssertionGated
 

@@ -466,13 +466,66 @@ def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
   is_real * (is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 1
 
+set_option maxHeartbeats 800000 in
+-- Five sub-circuits + 9 inline gates (7 sub-opcode booleans + is_real
+-- boolean + op_a_0 = 1). LoadMemoryAccessGated arm is placeholder. No
+-- Selector since LoadX0's destination is x0 (write_value = 0).
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub, _h_lmag_sub,
+          h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld, h_sum, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact h_cpu_sub trivial
+  · exact h_addr_sub trivial
+  -- AddressShape arm: offset_bit[i] vector indexing requires convert,
+  -- plus `Vector.getElem_map` to unfold the residual indexed-projection.
+  · convert h_addr_shape_sub trivial using 5
+    all_goals simp [Vector.getElem_map]
+  · exact h_itr_sub trivial
+  · exact Or.inr trivial
+  · linear_combination h_lb
+  · linear_combination h_lbu
+  · linear_combination h_lh
+  · linear_combination h_lhu
+  · linear_combination h_lw
+  · linear_combination h_lwu
+  · linear_combination h_ld
+  · linear_combination h_sum
+  · linear_combination h_op_a_0
 
+set_option maxHeartbeats 800000 in
+-- Mirrors soundness destructure.
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
+          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, _h_lmag, h_lb, h_lbu, h_lh,
+          h_lhu, h_lw, h_lwu, h_ld, h_sum, h_op_a_0⟩ := h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · exact ⟨trivial, h_addr⟩
+  · refine ⟨trivial, ?_⟩
+    convert h_addr_shape using 5
+    all_goals simp [Vector.getElem_map]
+  · exact ⟨trivial, h_itr⟩
+  · exact ⟨trivial, Or.inr trivial⟩
+  · linear_combination h_lb
+  · linear_combination h_lbu
+  · linear_combination h_lh
+  · linear_combination h_lhu
+  · linear_combination h_lw
+  · linear_combination h_lwu
+  · linear_combination h_ld
+  · linear_combination h_sum
+  · linear_combination h_op_a_0
 
 end AssertionGated
 

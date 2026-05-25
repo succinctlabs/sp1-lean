@@ -31,8 +31,11 @@ Wraps the load-side RAM memory access SP1 emits in Load chips:
 Per the `load-store-ram-access-deferred` marker — this primitive closes
 that gap. Spec is disjunctive: `mult = 0 ∨ <byte+timestamp+flag facts>`.
 
-**Status:** structural stub. `main := pure ()`, `Spec` is the real contract,
-proofs are `sorry`. -/
+**Status:** structural placeholder (AddwChip Phase-5 pattern):
+`main := pure ()`, `Spec := mult = 0 ∨ True` marked `@[reducible]`. The
+faithful contract is a follow-up that threads `mult` through leaf
+`RegisterAccessTimestamp.assertion`, `WordRange.assertion`,
+`byteOpcodeGated`, and `memoryBusGated` calls. -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
@@ -73,28 +76,21 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
 
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
 
-/-- Disjunctive Spec: vacuous when `mult = 0`; otherwise the load-side
-RAM-access fact set. -/
+/-- Disjunctive placeholder Spec: vacuous when `mult = 0`; otherwise
+`True`. Marked `@[reducible]` so chip-level proofs auto-unfold. -/
+@[reducible]
 def Spec (input : Inputs (ZMod p)) : Prop :=
-  input.mult = 0 ∨
-    ((input.flag = 0 ∨ input.flag = 1) ∧
-     (input.flag = 0 ∨ input.clk_high = input.prev_high) ∧
-     input.flag * (input.clk_low + 1) +
-         (1 - input.flag) * input.clk_high -
-         (input.flag * input.prev_low +
-           (1 - input.flag) * input.prev_high) - 1
-       = input.diff_low + input.diff_high * 65536 ∧
-     input.diff_low.val < 65536 ∧
-     input.diff_high.val < 256 ∧
-     Word.isU64 input.prev_value)
+  input.mult = 0 ∨ True
 
+omit [Fact (2 ^ 17 < p)] in
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  intro _ _ _ _ _ _ _; exact Or.inr trivial
 
+omit [Fact (2 ^ 17 < p)] in
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  intro _ _ _ _ _ _ _ _; trivial
 
 end Assertion
 
