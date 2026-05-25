@@ -51,13 +51,15 @@ def main (_u16_values : Vector (Expression (ZMod p)) 4)
 def Spec (_u16_values : Vector (ZMod p) 4) (_low_bytes : Vector (ZMod p) 4) :
     Prop := True
 
-/-- The bridge to SP1: trivially `True ↔ True`. -/
+omit [Fact (2 ^ 17 < p)] in
+/-- The bridge to SP1: trivially `True ↔ True` since the SP1 constraint
+list is empty and `Spec = True`. -/
 theorem iff_sp1 (u16_values : Vector (ZMod p) 4)
     (cols : U16toU8Operation (ZMod p)) :
     List.Forall SP1Constraint.toProp
       (U16toU8OperationUnsafe.constraints u16_values cols).2 ↔
       Spec u16_values cols.low_bytes := by
-  sorry
+  simp [U16toU8OperationUnsafe.constraints, Spec]
 
 /-! ## Full `FormalAssertion` promotion -/
 
@@ -86,13 +88,15 @@ def Assumptions (_ : Inputs (ZMod p)) : Prop := True
 
 def Spec (_input : Inputs (ZMod p)) : Prop := True
 
+omit [Fact (2 ^ 17 < p)] in
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  circuit_proof_start
 
+omit [Fact (2 ^ 17 < p)] in
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  circuit_proof_start
 
 end Assertion
 

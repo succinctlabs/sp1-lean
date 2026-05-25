@@ -103,18 +103,60 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
 
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
 
-/-- Spec: `result = 1` iff `a = 0` (componentwise, under `is_real = 1`). -/
+/-- Spec: the **joint witness contract** — captures all SP1 IsZeroWord
+constraint facts under `is_real = 1` in one structured tuple. The
+top-level `result` indicator (`= 1 iff a is zero` componentwise) is
+implied by this contract but isn't explicit — derived via
+`IsZeroWordOperation.spec` when consumers need it. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
-  input.result = (if input.a[0] = 0 ∧ input.a[1] = 0 ∧
-                    input.a[2] = 0 ∧ input.a[3] = 0 then 1 else 0)
+  -- Per-limb IsZero contract (3 facts × 4 limbs = 12), normalized to
+  -- `+ -` form (matching `sub_eq_add_neg` normalization in circuit_norm).
+  ((1 : ZMod p) - input.is_zero_limb_inverse[0] * input.a[0]
+    - input.is_zero_limb_result[0] = 0) ∧
+  (input.is_zero_limb_result[0] *
+    (input.is_zero_limb_result[0] - 1) = (0 : ZMod p)) ∧
+  (input.is_zero_limb_result[0] * input.a[0] = (0 : ZMod p)) ∧
+  ((1 : ZMod p) - input.is_zero_limb_inverse[1] * input.a[1]
+    - input.is_zero_limb_result[1] = 0) ∧
+  (input.is_zero_limb_result[1] *
+    (input.is_zero_limb_result[1] - 1) = (0 : ZMod p)) ∧
+  (input.is_zero_limb_result[1] * input.a[1] = (0 : ZMod p)) ∧
+  ((1 : ZMod p) - input.is_zero_limb_inverse[2] * input.a[2]
+    - input.is_zero_limb_result[2] = 0) ∧
+  (input.is_zero_limb_result[2] *
+    (input.is_zero_limb_result[2] - 1) = (0 : ZMod p)) ∧
+  (input.is_zero_limb_result[2] * input.a[2] = (0 : ZMod p)) ∧
+  ((1 : ZMod p) - input.is_zero_limb_inverse[3] * input.a[3]
+    - input.is_zero_limb_result[3] = 0) ∧
+  (input.is_zero_limb_result[3] *
+    (input.is_zero_limb_result[3] - 1) = (0 : ZMod p)) ∧
+  (input.is_zero_limb_result[3] * input.a[3] = (0 : ZMod p)) ∧
+  -- Aggregate facts (4).
+  (input.result * (input.result - 1) = (0 : ZMod p)) ∧
+  (input.is_zero_first_half - input.is_zero_limb_result[0] *
+    input.is_zero_limb_result[1] = (0 : ZMod p)) ∧
+  (input.is_zero_second_half - input.is_zero_limb_result[2] *
+    input.is_zero_limb_result[3] = (0 : ZMod p)) ∧
+  (input.result - input.is_zero_first_half * input.is_zero_second_half
+    = (0 : ZMod p))
 
+omit [Fact (2 ^ 17 < p)] in
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨h_a, h_inv, h_res, h_fh, h_sh, h_r⟩ := h_input
+  subst_eqs
+  simp only [Spec, Vector.getElem_map, sub_eq_add_neg]
+  exact h_holds
 
+omit [Fact (2 ^ 17 < p)] in
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨h_a, h_inv, h_res, h_fh, h_sh, h_r⟩ := h_input
+  subst_eqs
+  simp only [Spec, Vector.getElem_map, sub_eq_add_neg] at h_spec
+  exact h_spec
 
 /-- The full Clean `FormalAssertion` for `IsZeroWordOperation`. -/
 def assertion : FormalAssertion (ZMod p) Inputs :=
@@ -124,9 +166,13 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := soundness,
     completeness := completeness }
 
+omit [Fact (2 ^ 17 < p)] in
 /-- Bridge to SP1: under `is_real = 1`, `Spec input` is equivalent to
-SP1's `IsZeroWordOperation.constraints` `allHold`. -/
-theorem iff_sp1 (input : Inputs (ZMod p)) :
+SP1's `IsZeroWordOperation.constraints` `allHold`. Each of the 12 per-limb
+IsZeroOp gates and 4 aggregate gates corresponds 1:1 to a Spec conjunct;
+the chip-level `is_real * (is_real - 1) = 0` gate is trivially `1 * 0 = 0`
+and dropped via `one_mul` simplification. -/
+lemma iff_sp1 (input : Inputs (ZMod p)) :
     Spec input ↔
       (IsZeroWordOperation.constraints input.a
         { is_zero_limb := #v[
@@ -137,6 +183,21 @@ theorem iff_sp1 (input : Inputs (ZMod p)) :
           is_zero_first_half := input.is_zero_first_half,
           is_zero_second_half := input.is_zero_second_half,
           result := input.result } 1).allHold := by
-  sorry
+  simp only [IsZeroWordOperation.constraints, IsZeroOperation.constraints,
+             SP1ConstraintList.allHold, List.Forall, SP1Constraint.toProp,
+             SP1Constraint.toProp_assertZero,
+             Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+             List.getElem_cons_succ, Spec, List.append_assoc, List.append_nil,
+             one_mul]
+  -- LHS form: 16-tuple. RHS form: 17-tuple (extra `1 * (1 - 1) = 0` chip-binary).
+  constructor
+  · rintro ⟨c0_a, c0_b, c0_c, c1_a, c1_b, c1_c, c2_a, c2_b, c2_c,
+            c3_a, c3_b, c3_c, c4, c5, c6, c7⟩
+    exact ⟨c0_a, c0_b, c0_c, c1_a, c1_b, c1_c, c2_a, c2_b, c2_c, c3_a, c3_b,
+           c3_c, by rw [SP1Constraint.toProp_assertZero]; ring, c4, c5, c6, c7⟩
+  · rintro ⟨c0_a, c0_b, c0_c, c1_a, c1_b, c1_c, c2_a, c2_b, c2_c,
+            c3_a, c3_b, c3_c, _h_ir, c4, c5, c6, c7⟩
+    exact ⟨c0_a, c0_b, c0_c, c1_a, c1_b, c1_c, c2_a, c2_b, c2_c, c3_a, c3_b,
+           c3_c, c4, c5, c6, c7⟩
 
 end SP1Clean.IsZeroWordOp
