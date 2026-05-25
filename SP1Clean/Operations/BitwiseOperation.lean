@@ -12,6 +12,7 @@ import SP1Foundations.Field
 import SP1Operations.Operation.BitwiseOperation.Operation
 import SP1Operations.Operation.BitwiseOperation.Constraints
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.SP1Lookup
 
 /-! # Tier 2c pilot: `BitwiseOperation` mirror
 
@@ -267,3 +268,167 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     completeness := Assertion.completeness }
 
 end SP1Clean.BitwiseOp
+
+/-! # `BitwiseOpGated` — multiplicity-gated form of `BitwiseOp.assertion`
+
+Parallel namespace to `SP1Clean.BitwiseOp`, with the same opcode-parametric
+8-byte bitwise lookup behavior, but each byte lookup is emitted via
+`SP1Lookup.byteOpcodeGated` (multiplicity = `input.mult`) instead of an
+unconditional `lookup`. The chip-level `Spec` becomes disjunctive:
+`mult = 0 ∨ <BitwiseOp.Spec>`. On padding rows where `mult = 0`, all 8
+gated lookups are vacuous (left disjunct); on real rows the inner
+per-byte bitwise spec holds.
+
+Composed by `SP1Clean.BitwiseU16Op` (and any other future chip emitting
+gated byte-bitwise lookups).
+-/
+
+namespace SP1Clean.BitwiseOpGated
+
+open Circuit
+
+variable {p : ℕ} [Fact p.Prime] [Fact (p > 512)]
+
+/-- Bundled FormalAssertion input: the two 8-byte operands, the externally
+supplied 8-byte result, the opcode field, and the multiplicity gate. -/
+structure Inputs (F : Type) where
+  a : fields 8 F
+  b : fields 8 F
+  result : fields 8 F
+  opcode : F
+  mult : F
+deriving ProvableStruct
+
+namespace Assertion
+
+open Circuit
+
+/-- Gated assertion `main`. Each of the 8 byte-table lookups goes through
+`SP1Lookup.byteOpcodeGated` with `mult = input.mult`, making it vacuous
+on padding rows. -/
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[0], input.a[0], input.b[0]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[1], input.a[1], input.b[1]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[2], input.a[2], input.b[2]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[3], input.a[3], input.b[3]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[4], input.a[4], input.b[4]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[5], input.a[5], input.b[5]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[6], input.a[6], input.b[6]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[input.opcode, input.result[7], input.a[7], input.b[7]], input.mult⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.BitwiseOpGated"
+  main := main
+  -- 8 × byteOpcodeGated.localLength (= 4 hint rows each) = 32.
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
+
+/-- No external assumptions: byteOpcodeGated has its own row-validity
+discipline; the bridge to `BitwiseOp.Spec` below adds an `opcode.val < 7`
+side condition where needed. -/
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+/-- Direct Spec: exactly what the 8 `byteOpcodeGated` sub-assertions hand
+back — one disjunction per byte index. No bridging to `BitwiseOp.Spec`
+yet; that's a separate theorem (`spec_iff_bitwiseOp`) for chips that need
+the consolidated form. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  ∀ i : Fin 8,
+    input.mult = 0 ∨ SP1Clean.ByteOpcodeSpec
+      (#v[input.opcode,
+          input.result[i.val]'i.is_lt,
+          input.a[i.val]'i.is_lt,
+          input.b[i.val]'i.is_lt] : Vector (ZMod p) 4)
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq, h_op_eq, h_m_eq⟩ := h_input
+  subst h_a_eq; subst h_b_eq; subst h_r_eq; subst h_op_eq; subst h_m_eq
+  obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7⟩ := h_holds
+  intro i
+  match i with
+  | ⟨0, _⟩ => simpa using h0 trivial
+  | ⟨1, _⟩ => simpa using h1 trivial
+  | ⟨2, _⟩ => simpa using h2 trivial
+  | ⟨3, _⟩ => simpa using h3 trivial
+  | ⟨4, _⟩ => simpa using h4 trivial
+  | ⟨5, _⟩ => simpa using h5 trivial
+  | ⟨6, _⟩ => simpa using h6 trivial
+  | ⟨7, _⟩ => simpa using h7 trivial
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq, h_op_eq, h_m_eq⟩ := h_input
+  subst h_a_eq; subst h_b_eq; subst h_r_eq; subst h_op_eq; subst h_m_eq
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨0, by omega⟩⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨1, by omega⟩⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨2, by omega⟩⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨3, by omega⟩⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨4, by omega⟩⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨5, by omega⟩⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨6, by omega⟩⟩
+  · exact ⟨trivial, by simpa using h_spec ⟨7, by omega⟩⟩
+
+end Assertion
+
+/-- The full Clean `FormalAssertion` for the multiplicity-gated form of
+`BitwiseOperation`. Compose into a chip's `Assertion.main` via
+`SP1Clean.BitwiseOpGated.assertion ⟨a, b, result, opcode, mult⟩`. -/
+def assertion : FormalAssertion (ZMod p) Inputs :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.Spec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
+
+/-- Bridge: the per-byte disjunctive `Spec` is equivalent to the
+consolidated `mult = 0 ∨ BitwiseOp.Spec …` form when the opcode fits
+into the byte-table (`opcode.val < 7`). Used by chip-level `iff_sp1`
+lemmas to bridge from `BitwiseOpGated.Spec` to the SP1-native
+`BitwiseOp.Spec`. -/
+theorem spec_iff_bitwiseOp
+    (a b result : Vector (ZMod p) 8) (opcode mult : ZMod p)
+    (h_op : opcode.val < 7) :
+    Assertion.Spec ⟨a, b, result, opcode, mult⟩ ↔
+      mult = 0 ∨ SP1Clean.BitwiseOp.Spec a b opcode result := by
+  constructor
+  · intro h
+    by_cases h_mult : mult = 0
+    · exact Or.inl h_mult
+    refine Or.inr ?_
+    refine SP1Clean.BitwiseOp.Spec_of_ByteOpcodeSpec_when_lt7 _ _ _ _ h_op ?_
+    intro i
+    exact (h i).resolve_left h_mult
+  · intro h i
+    rcases h with h_mult | h_spec
+    · exact Or.inl h_mult
+    · exact Or.inr (SP1Clean.BitwiseOp.ByteOpcodeSpec_of_Spec_when_lt7
+        _ _ _ _ h_op h_spec i)
+
+end SP1Clean.BitwiseOpGated
