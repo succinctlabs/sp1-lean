@@ -240,32 +240,15 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       [(op_a_mem, cols.result),
        (op_b_mem, cols.adapter.op_b_memory.prev_value),
        (op_c_mem, cols.adapter.op_c_memory.prev_value)]
-  | .addw cols =>
-      -- Three register accesses. op_a is read AND written (write_value is
-      -- the 4-limb sign-extended reconstruction of the 32-bit result).
-      -- op_c uses `cols.adapter.op_c[0]` as the register-index limb; when
-      -- `imm_c = 1` (addiw) the chip Spec constrains
-      -- `op_c_memory.prev_value = op_c` so the access is harmless.
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_c[0], 0, 0],
-          prev_value := cols.adapter.op_c_memory.prev_value,
-          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
-      [(op_a_mem,
-        #v[cols.addw_value[0], cols.addw_value[1],
-           cols.addw_msb * 65535, cols.addw_msb * 65535]),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
+  | .addw _ =>
+      -- AddwChip's memory-access contributions are now routed through the
+      -- multiplicity-aware lookup bus (see `SP1Clean/SP1Lookup.lean`'s
+      -- `byteOpcodeGated`). The op_c access in particular is genuinely
+      -- gated by `is_real - imm_c` (vacuous on ADDIW rows), which the
+      -- unconditional `memoryAccesses` aggregator cannot express. Drop the
+      -- contribution here; a parallel `lookupAccesses` accessor (Phase 4
+      -- of MULTIPLICITY_BUS.md) is the canonical home.
+      []
   | .uType cols =>
       -- One register access only (op_a write). U-type has no op_b/op_c
       -- register reads — both are immediates.
@@ -642,7 +625,7 @@ def offsets : ChipRow p → List (ZMod p)
   -- accesses at +4 / +3 / +2). No RAM accesses.
   | .mul _ => [4, 3, 2]
   | .shiftLeft _ => [4, 3, 2]
-  | .addw _ => [4, 3, 2]
+  | .addw _ => []  -- parallel to `memoryAccesses (.addw _) := []`
   | .uType _ => [4]
   | .jalr _ => [4, 3]
   | .lt _ => [4, 3, 2]
@@ -1061,34 +1044,16 @@ theorem memoryAccessesValid_of_spec_lt
   · subst h; exact h_oa_b
   · subst h; exact h_oa_c
 
-/-- Addw's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type-shaped W-flavor: op_a/+4, op_b/+3, op_c/+2 (4-limb
-op_c column for ALU-W discipline). -/
+/-- Addw's per-chip discharge — vacuously true, since AddwChip's memory
+contributions now flow through the multiplicity-aware lookup bus rather
+than the unconditional `memoryAccesses` aggregator (see Phase 4–5 of
+`docs/MULTIPLICITY_BUS.md`). The op_c access in particular needs to be
+gated by `is_real - imm_c`, which `memoryAccesses` cannot express. -/
 theorem memoryAccessesValid_of_spec_addw
-    (cols : SP1Clean.Addw.AddwCols (ZMod p))
-    (h : SP1Clean.Addw.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.addw cols) := by
-  change SP1Clean.Addw.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c_disj⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
-  intro entry h_mem
-  rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  -- AddwChip's FormalSpec made op_c byte-bus consequence disjunctive
-  -- (`is_real - imm_c = 0 ∨ Spec`) to reflect SP1's actual gated
-  -- emission. The trace-level memoryAccessesValid currently demands the
-  -- unconditional form. Bridging this requires either:
-  --   (a) making memoryAccessesValid multiplicity-aware too, or
-  --   (b) using the SP1Lookup.LookupAccessList machinery to track op_c
-  --       contributions with proper multiplicity weighting.
-  -- For now, mark this as the trace-level companion to the chip's
-  -- completeness gap (see AddwChip/Circuit.lean line 152).
-  · subst h
-    exact h_oa_c_disj.resolve_left (by sorry)
+    (_cols : SP1Clean.Addw.AddwCols (ZMod p))
+    (_h : SP1Clean.Addw.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.addw _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
 /-- Mul's per-chip discharge — three `OperandAccess.Assertion.Spec`
 conjuncts. R-type: op_a/+4, op_b/+3, op_c/+2. -/

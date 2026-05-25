@@ -67,7 +67,12 @@ def main (cols : Var AddiCols (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) AddiCols unit where
   name := "SP1Clean.Addi"
   main := main
-  localLength _ := 0
+  -- Computed from main; ITypeReader contributes 48 (2 assertionGated × 24).
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
 
 /-- The chip is the `UserMode` variant (`M = UserMode` in upstream Rust),
 so its `adapter_cols.is_trusted` payload is structurally equal to `is_real`

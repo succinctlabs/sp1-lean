@@ -1,10 +1,13 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Provable
 import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
+import Clean.Circuit.Loops
 import Clean.Gadgets.Equality
 import Clean.Utils.Field
 import Clean.Utils.Primes
 import Clean.Utils.Tactics
+import Clean.Utils.Tactics.ProvableStructDeriving
 import Mathlib.Data.List.Sort
 import Mathlib.Data.Multiset.Basic
 import SP1Foundations.Field
@@ -453,6 +456,7 @@ to dispatch on the multiplicity. -/
   gates' completeness obligation reduces to `mult * 0 = 0` or
   `0 * (entry - hint) = 0`, both trivial.
 -/
+@[circuit_norm]
 def lookupGated
     {F : Type} [Field F] [DecidableEq F]
     {Row : TypeMap} [ProvableType Row]
@@ -467,10 +471,226 @@ def lookupGated
     else toElements (HasDefaultRow.defaultRow (table := table)))
   -- Emit unconditional lookup of the hint via the underlying lookup table.
   Circuit.lookup table (fromElements hint)
-  -- Per-component gates: mult * (entry[i] - hint[i]) === 0.
-  let entryElems := toElements entry
-  for h : i in [:n] do
-    assertZero (mult * (entryElems[i]'h.2.1 - hint[i]'h.2.1))
+  -- Per-component gates: mult * (entry[i] - hint[i]) === 0 for every i.
+  -- We use `Circuit.forEach` over a zipped vector so the `circuit_norm`
+  -- simp set's `forEach.soundness` / `forEach.completeness` lemmas fire,
+  -- giving us per-`Fin n` access to each gate in the bridge lemmas below.
+  let diffs := ((toElements entry).zip hint).map fun (e, h) => mult * (e - h)
+  Circuit.forEach diffs assertZero
+
+/-! ## Bridge lemmas: lookupGated ↔ disjunctive Spec
+
+These let chip-level `Assertion` definitions that compose multiple
+`lookupGated` calls (see `SP1Clean/Reader/OperandAccess.lean`'s
+`AssertionGated`) discharge the chip-level soundness and completeness
+obligations by case-splitting on `mult.eval env`. The bridge is one-way
+syntactic: the disjunctive Spec is equivalent to the circuit's
+constraints under appropriate witness-extension hypotheses.
+
+The two lemmas correspond to the soundness and completeness directions
+of a `FormalAssertion` whose `Spec` is the disjunctive form. -/
+
+/-- **Soundness bridge.** If `lookupGated`'s circuit constraints hold,
+then either the multiplicity is zero (and the row contributes nothing
+to the bus) or the entry is in the table. -/
+theorem lookupGated_implies_disjunctive
+    {F : Type} [Field F] [DecidableEq F]
+    {Row : TypeMap} [ProvableType Row]
+    (table : Table F Row) [HasDefaultRow table]
+    (entry : Row (Expression F)) (mult : Expression F)
+    (env : Environment F) (offset : ℕ)
+    (h_holds : Circuit.ConstraintsHold.Soundness env
+        ((lookupGated table entry mult).operations offset)) :
+    mult.eval env = 0 ∨
+      table.Soundness (env.data.getTable table) (eval env entry) := by
+  by_cases h_mult : mult.eval env = 0
+  · exact Or.inl h_mult
+  right
+  -- Expose the witness/lookup/gates structure.
+  simp only [lookupGated, circuit_norm] at h_holds
+  obtain ⟨h_lookup, h_gates⟩ := h_holds
+  -- The witnessed `hint` is `Vector.mapRange (size Row) fun i => var ⟨offset + i⟩`.
+  -- From each gate (`mult * (entry[i] - hint[i]) = 0` with `mult ≠ 0`), get
+  -- `hint[i].eval env = entry[i].eval env` elementwise.
+  have h_hint_eq_entry :
+      Vector.map (Expression.eval env)
+          (Vector.mapRange (size Row) fun i => var (F := F) ⟨offset + i⟩) =
+        Vector.map (Expression.eval env) (toElements entry) := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_map, Vector.getElem_map]
+    have h := h_gates ⟨i, hi⟩
+    simp only [Vector.getElem_map, Vector.getElem_zip, Fin.val_mk,
+               Expression.eval] at h
+    -- `h : mult.eval env * (entry[i].eval env + -hint[i].eval env) = 0`
+    have h_diff : (toElements entry)[i].eval env +
+        -(Vector.mapRange (size Row) fun i => var (F := F) ⟨offset + i⟩)[i].eval env
+          = 0 :=
+      (mul_eq_zero.mp h).resolve_left h_mult
+    exact (add_neg_eq_zero.mp h_diff).symm
+  -- Convert `h_lookup` from the underlying `Lookup.Soundness` form to the
+  -- target `table.Soundness ...` form, then rewrite the hint vector to entry.
+  simp only [Lookup.Soundness, Table.toRaw] at h_lookup
+  -- `convert` matches `table.Soundness X Y` up to per-argument equality.
+  -- Arg 1 (`env.data.getTable table`) reduces to the same form; only arg 2 differs.
+  convert h_lookup using 2
+  simp only [CircuitType.eval_expression]
+  exact congrArg fromElements h_hint_eq_entry.symm
+
+/-- **Completeness bridge.** From the disjunctive Spec plus the chip's
+`UsesLocalWitnesses` hypothesis (so the witness compute function is
+honored), `lookupGated`'s circuit constraints are satisfied. -/
+theorem lookupGated_completeness_of_disjunctive
+    {F : Type} [Field F] [DecidableEq F]
+    {Row : TypeMap} [ProvableType Row]
+    (table : Table F Row) [HasDefaultRow table]
+    (entry : Row (Expression F)) (mult : Expression F)
+    (env : ProverEnvironment F) (offset : ℕ)
+    (h_env : env.UsesLocalWitnessesCompleteness offset
+        ((lookupGated table entry mult).operations offset))
+    (h_disj : mult.eval env.toEnvironment = 0 ∨
+      table.Completeness (env.toEnvironment.data.getTable table)
+        (eval env.toEnvironment entry)) :
+    Circuit.ConstraintsHold.Completeness env
+      ((lookupGated table entry mult).operations offset) := by
+  simp only [lookupGated, circuit_norm] at h_env ⊢
+  -- After circuit_norm:
+  -- h_env : ∀ i : Fin n, env.get (offset + i) =
+  --   (if mult.eval env ≠ 0 then toElements (eval env entry)
+  --    else toElements defaultRow)[i.val]
+  -- goal : Lookup.Completeness env ⟨table.toRaw, hint_vars⟩ ∧
+  --        ∀ i : Fin n, (mult * (entry[i] - hint[i])).eval env = 0
+  -- where hint_vars := Vector.mapRange n (fun i => var ⟨offset + i⟩).
+  -- Lemma: each hint var evaluates to the compute function at that index.
+  have h_hint_vals : ∀ (i : Fin (size Row)),
+      (Vector.mapRange (size Row) fun i => var (F := F) ⟨offset + i⟩)[i.val].eval
+          env.toEnvironment =
+        (if mult.eval env.toEnvironment ≠ 0 then
+            toElements (eval env.toEnvironment entry)
+          else toElements (HasDefaultRow.defaultRow (table := table)))[i.val] := by
+    intro i
+    rw [Vector.getElem_mapRange]
+    exact h_env i
+  refine ⟨?_, ?_⟩
+  · -- Lookup completeness.
+    simp only [Lookup.Completeness, Table.toRaw]
+    by_cases h_mult : mult.eval env.toEnvironment = 0
+    · -- Hint witnesses `defaultRow`; HasDefaultRow.defaultRow_in_table closes it.
+      have h_hint_eq_default :
+          Vector.map (Expression.eval env.toEnvironment)
+              (Vector.mapRange (size Row) fun i => var (F := F) ⟨offset + i⟩) =
+            toElements (HasDefaultRow.defaultRow (table := table)) := by
+        apply Vector.ext
+        intro i hi
+        rw [Vector.getElem_map, h_hint_vals ⟨i, hi⟩, if_neg (by simp [h_mult])]
+      rw [h_hint_eq_default, ProvableType.fromElements_toElements]
+      exact HasDefaultRow.defaultRow_in_table _
+    · -- Hint witnesses `entry`; h_disj's right branch closes it.
+      have h_hint_eq_entry :
+          Vector.map (Expression.eval env.toEnvironment)
+              (Vector.mapRange (size Row) fun i => var (F := F) ⟨offset + i⟩) =
+            toElements (eval env.toEnvironment entry) := by
+        apply Vector.ext
+        intro i hi
+        rw [Vector.getElem_map, h_hint_vals ⟨i, hi⟩, if_pos (by simp [h_mult])]
+      rw [h_hint_eq_entry, ProvableType.fromElements_toElements]
+      -- Goal: table.Completeness (data.map fromElements) (eval env entry)
+      -- which matches h_disj's right branch after unfolding ProverData.getTable.
+      exact h_disj.resolve_left h_mult
+  · -- Each gate: `(mult * (entry[i] - hint[i])).eval env = 0`.
+    intro i
+    simp only [Vector.getElem_map, Vector.getElem_zip, Fin.val_mk, Expression.eval]
+    by_cases h_mult : mult.eval env.toEnvironment = 0
+    · rw [show Expression.eval env mult = mult.eval env.toEnvironment from rfl, h_mult]
+      ring
+    · -- hint[i] = entry[i] under env, so the difference is zero.
+      have h := h_hint_vals i
+      rw [if_pos (by simp [h_mult])] at h
+      -- h : hint[i].eval env = (toElements (eval env entry))[i.val]
+      -- Translate (toElements (eval env entry))[i.val] to (toElements entry)[i.val].eval env.
+      have h_entry_unfold :
+          (toElements (eval env.toEnvironment entry))[i.val] =
+            (toElements entry)[i.val].eval env.toEnvironment :=
+        (ProvableType.getElem_eval_toElements entry i.val i.isLt).symm
+      rw [h_entry_unfold] at h
+      rw [show Expression.eval env = Expression.eval env.toEnvironment from rfl]
+      rw [← h]; ring
+
+/-! ## `byteOpcodeGated` — `lookupGated` for `ByteOpcodeTable` as a `FormalAssertion`
+
+Wraps a single `lookupGated` call on `ByteOpcodeTable` into a Clean
+`FormalAssertion` so chips can compose it like any other subcircuit.
+Specialized to `ByteOpcodeTable` because that table's `Soundness` /
+`Completeness` predicates are data-independent (literally `ByteOpcodeSpec
+row`), so the chip-level `Spec` is expressible as `Inputs → Prop`. -/
+
+namespace ByteOpcodeGated
+
+variable {p : ℕ} [Fact p.Prime] [Fact (p > 512)]
+
+/-- Inputs: the 4-element entry row and the shared multiplicity. -/
+structure Inputs (F : Type) where
+  entry : Vector F 4
+  mult : F
+deriving ProvableStruct
+
+@[reducible, circuit_norm]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit :=
+  SP1Lookup.lookupGated SP1Clean.ByteOpcodeTable input.entry input.mult
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.ByteOpcodeGated"
+  main := main
+  localLength _ := 4
+  localLength_eq _ _ := by simp only [main, circuit_norm]
+  subcircuitsConsistent _ _ := by simp +arith only [main, circuit_norm]
+
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+/-- Disjunctive Spec: vacuous when `mult = 0`; otherwise asserts the
+entry satisfies the byte-opcode spec. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  input.mult = 0 ∨ SP1Clean.ByteOpcodeSpec input.entry
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  intro offset env input_var input h_input _ h_holds
+  have h := SP1Lookup.lookupGated_implies_disjunctive
+    SP1Clean.ByteOpcodeTable input_var.entry input_var.mult env offset h_holds
+  subst h_input
+  change (eval env input_var).mult = 0 ∨ SP1Clean.ByteOpcodeSpec (eval env input_var).entry
+  simp only [circuit_norm]
+  rcases h with h_zero | h_in_table
+  · exact Or.inl h_zero
+  · right; convert h_in_table; funext x; simp [circuit_norm]
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  intro offset env input_var h_env input h_input _ h_spec
+  apply SP1Lookup.lookupGated_completeness_of_disjunctive
+    SP1Clean.ByteOpcodeTable input_var.entry input_var.mult env offset h_env
+  subst h_input
+  change (eval env input_var).mult = 0 ∨
+      SP1Clean.ByteOpcodeSpec (eval env input_var).entry at h_spec
+  simp only [circuit_norm] at h_spec
+  rcases h_spec with h_zero | h_in_table
+  · exact Or.inl h_zero
+  · right; convert h_in_table; funext x; simp [circuit_norm]
+
+end ByteOpcodeGated
+
+/-- Multiplicity-gated single-row byte-opcode lookup, as a Clean
+`FormalAssertion`. The chip-level Spec is the disjunctive form
+`mult = 0 ∨ ByteOpcodeSpec entry`. -/
+@[reducible]
+def byteOpcodeGated {p : ℕ} [Fact p.Prime] [Fact (p > 512)] :
+    FormalAssertion (ZMod p) ByteOpcodeGated.Inputs :=
+  { ByteOpcodeGated.elaborated with
+    Assumptions := ByteOpcodeGated.Assumptions,
+    Spec := ByteOpcodeGated.Spec,
+    soundness := ByteOpcodeGated.soundness,
+    completeness := ByteOpcodeGated.completeness }
 
 end SP1Lookup
 

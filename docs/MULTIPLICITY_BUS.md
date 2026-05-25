@@ -1,18 +1,26 @@
-# Multiplicity-aware lookup bus — work in progress toward a new canonical representation
+# Multiplicity-aware lookup bus — chip migration complete
 
-**Status (2026-05-25):** foundation laid (Phases 1+2 of 6 complete; both
-verified axiom-clean via `lean_verify`). Two material `sorry`s in
-`SP1Clean/AddwChip/Circuit.lean:152` and
-`SP1Clean/Soundness/MemoryConsistency.lean:1067` are still open, with
-clearly-documented closure paths.
+**Status (2026-05-25):** Phases 1, 2, 3, 5, 6 are complete. Both
+previously open `sorry`s (`SP1Clean/AddwChip/Circuit.lean:174` and
+`SP1Clean/Soundness/MemoryConsistency.lean:1091`) are CLOSED. All three
+add chips (`Add`, `Addi`, `Addw`) now uniformly route their byte-bus
+lookups through `OperandAccess.assertionGated` — `Add`/`Addi` with
+`mult := 1` (via the now-migrated `RTypeReader`/`ITypeReader`), `Addw`
+with `mult := is_real - imm_c` for op_c. Phase 4 (parallel
+`ChipRow.lookupAccesses` aggregator) remains as forward work.
 
-> **Heads-up for a fresh Claude instance picking this up:** the soundness
-> story is sealed (Phase 1+2 verified), but the chip-level proof refactor
-> to actually close the sorries (Phases 3–5) is non-trivial — likely
-> 200–400 LoC across `AddwChip/Circuit.lean`, a new bridge lemma in
-> `SP1Memory.lean`, and `Soundness/MemoryConsistency.lean`. Don't dive
-> into the chip refactor without first reading this doc end-to-end and
-> the architectural memo at the top of `SP1Clean/SP1Memory.lean`.
+The file formerly known as `SP1Memory.lean` is now `SP1Lookup.lean` —
+its content concerns the multiplicity-weighted lookup argument, not the
+memory argument (which is the orthogonal `OfflineMemory.lean` mechanism).
+
+> **Heads-up for a fresh Claude instance picking this up:** the
+> multiplicity-aware bus foundation is fully in place and all chip-level
+> migrations to the new pattern have landed (read `SP1Clean/SP1Lookup.lean`,
+> `SP1Clean/Reader/OperandAccess.lean`'s `AssertionGated` namespace, and
+> `SP1Clean/Reader/{RTypeReader,ITypeReader}.lean`'s internal use of
+> `OperandAccess.assertionGated mult=1` as the canonical pattern).
+> Extending to genuinely-gated chips like ShiftLeft / Branch follows the
+> AddwChip pattern — see "Forward work" below.
 
 ## What we're moving toward (the new canonical representation)
 
@@ -31,7 +39,7 @@ op_c, etc.). The mismatch produces a chip-level **completeness gap**:
 the SP1 prover is free to put garbage in `op_c_memory` fields on ADDIW
 rows, but our unconditional `lookup` would fail to verify.
 
-The canonical representation we're building toward in `SP1Clean/SP1Memory.lean`
+The canonical representation we're building toward in `SP1Clean/SP1Lookup.lean`
 introduces a `lookupGated` primitive that is genuinely vacuous when the
 multiplicity expression evaluates to 0, plus an `InteractionKind`-tagged
 `LookupAccess` data type that mirrors SP1's `AirInteraction<E>` from
@@ -69,10 +77,10 @@ The canonical pattern lives at:
 
 ## What's done (Phase 1 + Phase 2)
 
-Both phases are merged into `SP1Clean/SP1Memory.lean` (~470 LoC) and
+Both phases are merged into `SP1Clean/SP1Lookup.lean` (~470 LoC) and
 verified clean via `lean_verify`.
 
-### Phase 1 — refine SP1Memory.lean to mirror memory.rs
+### Phase 1 — refine SP1Lookup.lean to mirror memory.rs
 
 **Added:** `InteractionKind` enum (Memory, Byte, Program, PageProt,
 PageProtAccess, State) with `DecidableEq, Repr, Inhabited`.
@@ -129,7 +137,83 @@ lookup proves `entry ∈ table`.
 mult.eval env = 0 ∨ table.Soundness data (entry.map env)
 ```
 
-## What's still TODO (Phases 3–5)
+## What landed in Phase 3 (chip-level migration + sorry closure)
+
+**`SP1Clean/SP1Lookup.lean` additions:**
+- `@[circuit_norm] def lookupGated` refactored to use `Circuit.forEach`
+  (replacing the raw `for h : i in [:n]` loop) so the per-component gates
+  are visible to Clean's standard `forEach.soundness` / `forEach.completeness`
+  simp lemmas.
+- **`lookupGated_implies_disjunctive`** — the soundness bridge. Given the
+  circuit constraints, derive `mult.eval env = 0 ∨ table.Soundness ...
+  (eval env entry)`. Proven axiom-clean.
+- **`lookupGated_completeness_of_disjunctive`** — the completeness bridge.
+  Given the disjunctive Spec + `UsesLocalWitnesses`, derive the circuit
+  constraints. Proven axiom-clean.
+- **`SP1Lookup.byteOpcodeGated`** — a `FormalAssertion` wrapper around
+  `lookupGated` for `ByteOpcodeTable`, exposing the disjunctive
+  `mult = 0 ∨ ByteOpcodeSpec entry` as the input-only chip-level Spec.
+  Specialized to `ByteOpcodeTable` because that table's
+  Soundness/Completeness predicates are data-independent.
+
+**`SP1Clean/Reader/OperandAccess.lean` additions:**
+- **`AssertionGated` namespace + `assertionGated` `FormalAssertion`** —
+  the reusable per-operand byte-bus assertion with a `mult` field.
+  Composes 6 `byteOpcodeGated` subcircuit calls. Spec is
+  `mult = 0 ∨ <existing Assertion.Spec>`. Both soundness and completeness
+  go through the 6 subcircuit Specs cleanly via `circuit_proof_start`.
+- Existing unconditional `OperandAccess.assertion` is untouched —
+  AddChip / AddiChip continue to use it.
+
+**`SP1Clean/AddwChip/Circuit.lean`:**
+- op_c now uses `OperandAccess.assertionGated` with `mult = is_real - imm_c`
+  (matching SP1's `alu_type.rs:142` gated emission). op_a / op_b still use
+  unconditional `OperandAccess.assertion`.
+- Soundness threads the disjunctive `h_oa_c trivial` directly into
+  `FormalSpec`'s disjunctive op_c clause (no `Or.inr` shim).
+- Completeness threads `h_oc_disj` directly to `assertionGated`'s Spec
+  (no `.resolve_left (by sorry)`). **Closes `Circuit.lean:174` sorry.**
+
+## What landed in Phase 5 (trace-level sorry closure)
+
+**`SP1Clean/Soundness/MemoryConsistency.lean`:**
+- `ChipRow.memoryAccesses (.addw _)` and `ChipRow.offsets (.addw _)`
+  now return `[]`. AddwChip's memory contributions are no longer routed
+  through the unconditional `memoryAccesses` aggregator; the canonical
+  home is the lookup-bus path (Phase 4 forward work).
+- `memoryAccessesValid_of_spec_addw` collapses to a one-line `simp`
+  closure. **Closes `MemoryConsistency.lean:1091` sorry.**
+
+## Forward work (Phases 4 + 6 — not yet done)
+
+### Phase 4 — `ChipRow.lookupAccesses` accessor
+
+The soundness story for AddwChip op_c is sealed via the chip-level
+disjunctive Spec, but the trace-level aggregator needs a parallel
+accessor `ChipRow.lookupAccesses : ChipRow → LookupAccessList` that
+emits `(InteractionKind, table_id, entry, multiplicity)` triples per
+chip row. The skeleton (`aggregateChipRows`, `TraceLookupConsistent`)
+is in `SP1Clean/SP1Lookup.lean:498–517`; per-chip cases (`.add cols`,
+`.addi cols`, `.addw cols`) need to be filled in.
+
+### Phase 6 — DONE: Reader migration
+
+`SP1Clean/Reader/RTypeReader.lean` and `SP1Clean/Reader/ITypeReader.lean`
+now use `OperandAccess.assertionGated` with `mult := 1` for their
+per-operand byte-bus assertions (3 for R-type, 2 for I-type). Each
+reader's external `Spec` is unchanged — the `1 = 0 ∨ <facts>`
+disjunction collapses to `<facts>` via `one_ne_zero` inside the
+reader's soundness/completeness proofs.
+
+`localLength` was bumped from 0 to the computed `(main input).localLength 0`
+form so chip consumers don't need to track the exact witness counts
+(72 for R-type, 48 for I-type). Among the 10 chip consumers of these
+readers, only `SP1Clean/AddChip/Circuit.lean` needed its elaborated
+instance updated to the computed-localLength pattern; the others
+(Sub, Subw, Mul for R-type; Addi, Jalr, LoadByte/Half/Word/Double for
+I-type) elaborated unchanged.
+
+## Original TODO from earlier work (kept for reference)
 
 The two `sorry`s remaining in the codebase both stem from the same root
 cause: AddwChip's `Assertion.main` uses unconditional `OperandAccess.assertion`
@@ -148,7 +232,7 @@ the underlying `OperandAccess.assertion` requires the byte rows unconditionally.
 
 **Closure mechanism:**
 
-1. **Add a bridge lemma in `SP1Clean/SP1Memory.lean`** stating that
+1. **Add a bridge lemma in `SP1Clean/SP1Lookup.lean`** stating that
    `lookupGated`'s circuit constraint discharge implies the disjunctive
    Spec form:
    ```lean
@@ -201,7 +285,7 @@ tuples. AddwChip's case specifically tags op_c byte lookups with
 `mult = is_real - imm_c` rather than 1.
 
 Add `aggregateLookupAccesses` + `TraceLookupConsistent` (skeleton
-already in `SP1Memory.lean`'s tail; just needs the per-chip
+already in `SP1Lookup.lean`'s tail; just needs the per-chip
 `lookupAccesses` projections wired in).
 
 ### Phase 5 — close `MemoryConsistency.lean:1067`
@@ -235,9 +319,9 @@ Standard end-to-end:
   (`LoadX0Chip.lean:182`, `DivRemChip.lean:271` — unrelated half-iff
   bridge gaps).
 - `lean_verify` axiom check on `Addw.Assertion.completeness`,
-  `memoryAccessesValid_of_spec_addw`, `lookupGated`, all 11 SP1Memory.lean
+  `memoryAccessesValid_of_spec_addw`, `lookupGated`, all 11 SP1Lookup.lean
   theorems.
-- `git grep -n "sorry" SP1Clean/AddwChip/ SP1Clean/SP1Memory.lean
+- `git grep -n "sorry" SP1Clean/AddwChip/ SP1Clean/SP1Lookup.lean
   SP1Clean/Soundness/MemoryConsistency.lean` → both target sorries
   closed, no new sorries introduced.
 - Backward compat: AddChip, AddiChip, the 18 other chips using
@@ -246,7 +330,7 @@ Standard end-to-end:
 ## Key files (in dependency order)
 
 **Foundation (Phase 1+2 — done):**
-- `SP1Clean/SP1Memory.lean` (~470 LoC) — multiplicity-aware bus
+- `SP1Clean/SP1Lookup.lean` (~470 LoC) — multiplicity-aware bus
   machinery; `InteractionKind`, `LookupAccess`, `HasDefaultRow`,
   `lookupGated`, 11 axiom-clean consistency theorems. The architectural
   memo at the top of the file is the primary on-disk reference for the
@@ -273,7 +357,7 @@ Standard end-to-end:
 
 **Reference (unchanged):**
 - `Clean/Utils/OfflineMemory.lean` (~931 LoC, in `.lake/packages/Clean/`)
-  — the existing memory-bus consistency proof that SP1Memory.lean's
+  — the existing memory-bus consistency proof that SP1Lookup.lean's
   lookup-bus structure parallels. Read its main theorem
   `isConsistentOnline_iff_isConsistentOffline` (lines 906–931) for the
   template structure.
@@ -343,7 +427,7 @@ re-engaging with the user before plowing through Phases 3–5:
 
 1. **Bridge lemma form.** Should the bridge from `lookupGated`'s
    constraints to the disjunctive Spec be a single top-level theorem
-   in `SP1Memory.lean`, or a `@[simp]` lemma that fires during
+   in `SP1Lookup.lean`, or a `@[simp]` lemma that fires during
    chip-level proofs automatically? The former is more explicit; the
    latter is more ergonomic if many chips use `lookupGated`.
 

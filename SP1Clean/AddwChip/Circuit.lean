@@ -8,33 +8,29 @@ import SP1Foundations.ByteOpcode
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Operations.AddwOperation
 import SP1Clean.MemoryAccess
-import SP1Clean.SP1Memory
+import SP1Clean.SP1Lookup
 import RISCV.Instructions
 
 /-! # `AddwChip` Clean circuit + `FormalAssertion`
 
-Composes CPUState + ProgramTable + 3 `OperandAccess.assertion` (op_a/op_b
-unconditional, op_c structurally over-constrained at the per-row level) +
-2 trailing scalar gates.
+Composes `CPUState.assertion` + `ALUTypeReader.assertion` (which itself
+bundles ProgramTable + 3 gated OperandAccess + 4 op_a_0 gates + 4
+imm_c-equality gates) + 2 trailing scalar gates. Mirrors the pattern of
+`AddChip` (which uses `RTypeReader.assertion`) and `AddiChip` (which uses
+`ITypeReader.assertion`).
 
-**Multiplicity-aware semantics for op_c.** The chip's `FormalSpec` states
-the op_c byte-bus consequence in the **disjunctive form**
-`(is_real - imm_c) = 0 ∨ OperandAccess.Spec ...`, matching SP1's actual
-gated emission (`alu_type.rs:142` — `eval_register_access_read` with
-multiplicity `is_real - imm_c`). On ADDIW rows (`imm_c = 1`, hence
-`is_real - imm_c = 0`), the conjunct is vacuous.
-
-**Per-row circuit vs Spec gap.** The underlying `OperandAccess.assertion`
-emits the op_c byte lookups unconditionally — stronger than SP1's actual
-gated emission. Per-row soundness is therefore stronger than the
-disjunctive Spec demands (provable via `Or.inr` on the unconditional
-OperandAccess.Spec). The completeness side has a real gap: on ADDIW
-rows, the prover may set the op_c byte values to garbage, but the
-unconditional lookup would fail. Native `lookupGated` support
-(`SP1Memory.lookupGated`, Phase 2) closes this by emitting a
-witness-hint pattern so the lookup is vacuous when multiplicity is 0.
+**Multiplicity-aware semantics for op_c.** The gating mechanism lives in
+`ALUTypeReader.assertion`'s internal `OperandAccess.assertionGated` call
+with `mult := 1 - imm_c` (the reader pins is_real = 1, so this is
+`is_real - imm_c` semantically). On ADDIW rows (`imm_c = 1`, hence
+`mult = 0`), the op_c byte-bus lookup is vacuous, matching SP1's actual
+emission (`alu_type.rs:142`). The chip-level `FormalSpec` exposes the
+full `aluTypeReaderSpec` which captures both the unconditional clauses
+and the `imm_c = 0 → byte facts` / `imm_c = 1 → prev_value = op_c`
+implications.
 
 The AddwOp carry chain is *not* emitted via subcircuit composition — its
 `Assertion.Spec` inlines U16MSB clauses in a form that doesn't directly
@@ -54,80 +50,62 @@ namespace Assertion
 
 open Circuit
 
-/-- Clean-side chip circuit. -/
+/-- Clean-side chip circuit. Composes `AddwOp.assertion` (the 32-bit ADDW
+carry chain + sign-extension MSB) + `CPUState.assertion` +
+`ALUTypeReader.assertion` (which bundles ProgramTable + 3 gated
+OperandAccess + 4 op_a_0 gates + 4 imm_c-equality gates) + 2 trailing
+scalar gates. -/
 @[reducible]
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩,
-       _addw_value, _addw_msb, is_real, _adapter_cols⟩ := cols
+  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩, adapter,
+       addw_value, addw_msb, is_real, _adapter_cols⟩ := cols
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  let op_a_write_value : Vector (Expression (ZMod p)) 4 :=
+    #v[addw_value[0], addw_value[1], addw_msb * 65535, addw_msb * 65535]
+  SP1Clean.AddwOp.assertion
+    (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
+       addw_value, addw_msb⟩ :
+      Var SP1Clean.AddwOp.Inputs (ZMod p))
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  SP1Clean.ProgramTable.assertion
-    (⟨pc, 19, op_a, #v[op_b, 0, 0, 0], op_c, op_a_0, 0, imm_c⟩ :
-      Var SP1Clean.ProgramTable.Inputs (ZMod p))
+  SP1Clean.ALUTypeReader.assertion
+    (⟨clk_low, 19, pc, op_a_write_value, adapter⟩ :
+      Var SP1Clean.ALUTypeReader.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
-  op_a_0 === 0
-  let clk_low := clk_0_16 + clk_16_24 * 65536
-  -- op_a (unconditional)
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low,
-       op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  -- op_b (unconditional)
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low,
-       op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  -- op_c at +2 — semantically gated by `mult_c = is_real - imm_c`
-  -- (SP1 source: alu_type.rs:142). Circuit emits unconditionally
-  -- (over-constrains); the disjunctive Spec form below captures the
-  -- intended multiplicity-aware semantics.
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 2, op_c_memory.access_timestamp.prev_low,
-       op_c_memory.access_timestamp.diff_low_limb,
-       op_c_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  adapter.op_a_0 === 0
 
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) AddwCols unit where
   name := "SP1Clean.Addw"
   main := main
-  localLength _ := 0
+  -- Computed from main; ALUTypeReader contributes 72 (3 assertionGated × 24).
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
 
 def Assumptions (_ : AddwCols (ZMod p)) : Prop := True
 
-/-- The byte/program-lookup-derivable subset of TraceSpec.
-
-The op_c byte-bus consequence is stated in the **disjunctive
-multiplicity-aware form**: either `is_real - imm_c = 0` (gated off,
-ADDIW row), or the byte-bus bounds hold. This matches SP1's actual
-emission semantics (`alu_type.rs:142`). -/
+/-- Full chip-level spec: the ADDW carry-chain arithmetic (`AddwOp.Spec`,
+Inputs-shape) plus the byte/program-lookup-derivable subset (CPUState +
+ALUTypeReader's full spec) plus two trailing scalar gates. SailBridge
+consumes this directly to derive Sail equivalence. -/
 def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let mult_c : ZMod p := cols.is_real - cols.adapter.imm_c
+  let op_a_write_value : Word (ZMod p) :=
+    #v[cols.addw_value[0], cols.addw_value[1],
+       cols.addw_msb * 65535, cols.addw_msb * 65535]
+  SP1Clean.AddwOp.Spec
+      ⟨cols.adapter.op_b_memory.prev_value,
+       cols.adapter.op_c_memory.prev_value,
+       cols.addw_value,
+       cols.addw_msb⟩ ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 19, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
+  SP1Clean.ALUTypeReader.aluTypeReaderSpec clk_low 19 cols.state.pc
+    op_a_write_value cols.adapter ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low,
-     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low,
-     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  (mult_c = 0 ∨
-    SP1Clean.OperandAccess.Assertion.Spec
-      ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low,
-       cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-       cols.adapter.op_c_memory.prev_value⟩)
+  cols.adapter.op_a_0 = 0
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -135,19 +113,16 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_isreal, h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
+  obtain ⟨h_addwop_sub, h_cpu_sub, h_alu_sub, h_isreal, h_op_a_0⟩ := h_holds
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · -- The subcircuit's Spec is directly AddwOp.Spec on the destructured Inputs.
+    exact h_addwop_sub trivial
   · exact h_cpu_sub trivial
-  · exact h_prog_sub trivial
+  · have h := h_alu_sub trivial
+    simpa [SP1Clean.ALUTypeReader.assertion, SP1Clean.ALUTypeReader.Assertion.Spec] using h
   · linear_combination h_isreal
   · exact h_op_a_0
-  · exact h_oa_a trivial
-  · exact h_oa_b trivial
-  -- Disjunctive op_c clause: discharge via `Or.inr` using the
-  -- unconditional OperandAccess.Spec we got from the subcircuit.
-  · exact Or.inr (h_oa_c trivial)
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -155,23 +130,16 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_prog, h_isreal, h_op_a_0,
-          h_oa_a, h_oa_b, h_oc_disj⟩ := h_spec
+  obtain ⟨h_addwop, h_cpu, h_alu, h_isreal, h_op_a_0⟩ := h_spec
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · -- Pass h_addwop (AddwOp.Spec ⟨…⟩) directly to AddwOp.assertion's completeness.
+    exact ⟨trivial, h_addwop⟩
   · exact ⟨trivial, h_cpu⟩
-  · exact ⟨trivial, h_prog⟩
+  · refine ⟨trivial, ?_⟩
+    simpa [SP1Clean.ALUTypeReader.assertion, SP1Clean.ALUTypeReader.Assertion.Spec] using h_alu
   · linear_combination h_isreal
   · exact h_op_a_0
-  · exact ⟨trivial, h_oa_a⟩
-  · exact ⟨trivial, h_oa_b⟩
-  -- Completeness gap for op_c: the disjunctive Spec admits `mult_c = 0`
-  -- with no claim on the byte-bus rows. But the unconditional
-  -- OperandAccess.assertion requires the byte-bus rows to hold. So
-  -- completeness only works when h_oc_disj selects the right disjunct.
-  -- Native lookupGated (Phase 2) would close this by witness-hint pattern.
-  · refine ⟨trivial, ?_⟩
-    exact h_oc_disj.resolve_left (by sorry)
 
 end Assertion
 

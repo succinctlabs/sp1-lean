@@ -89,8 +89,17 @@ under `docs/`, look at the matching entry below.
   multiplicity-gating + `is_real` binarity) delivers and what
   discharge work + chip promotions remain.
 
+- **CLAUDE.md § "Faithful sub-circuit composition"** (not a separate
+  doc — lives in the repo-root `CLAUDE.md`). Codifies the SP1Clean
+  invariant: each `SP1Clean/Operations/<Op>.lean` and
+  `SP1Clean/<Chip>Chip/Circuit.lean` exposes exactly one `main` and one
+  `Spec`, composes sub-operations as `FormalAssertion` subcircuits
+  (never inlining sub-constraints), and references sub-Specs by direct
+  field application (never via `List.Forall SP1Constraint.toProp ...`
+  envelopes). Read before adding a new Clean operation or chip.
+
 - **`MULTIPLICITY_BUS.md`** — **work-in-progress** doc for the
-  multiplicity-aware lookup bus refactor (`SP1Clean/SP1Memory.lean`).
+  multiplicity-aware lookup bus refactor (`SP1Clean/SP1Lookup.lean`).
   Read this when the AddwChip op_c completeness `sorry` blocks you,
   when you need to extend `lookupGated` to a new gated lookup site,
   or when you need to understand SP1's `InteractionKind`-tagged

@@ -11,6 +11,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.Reader.RegisterAccess
 
 /-! # Reusable `RTypeReader` Spec helper
 
@@ -110,9 +111,10 @@ and three `SP1Clean.OperandAccess.assertion` calls at sub-clock offsets +4/+3/+2
 
 /-- Bundled inputs for the RTypeReader assertion. Mirrors the call signature
 of `_root_.RTypeReader.constraints clk_high clk_low pc opcode op_a_write_value
-cols 1 1` modulo the unused `clk_high` (only `clk_low` participates in any
-lookup) and the pinned `is_real = is_trusted = 1`. -/
+cols 1 1` modulo the pinned `is_real = is_trusted = 1`. `clk_high` is
+threaded through to the memory-bus emissions inside `RegisterAccess.assertion`. -/
 structure Inputs (F : Type) where
+  clk_high : F
   clk_low : F
   opcode : F
   pc : Vector F 3
@@ -124,35 +126,48 @@ namespace Assertion
 
 open Circuit
 
-/-- Clean-side circuit. Emits exactly the byte/program lookups inside
-`_root_.RTypeReader.constraints` under `is_real = is_trusted = 1`. -/
+/-- Clean-side circuit. Emits the byte/program/memory lookups inside
+`_root_.RTypeReader.constraints` under `is_real = is_trusted = 1`.
+
+The 3 per-operand sub-circuits use `RegisterAccess.assertion` with
+`mult := 1`. Each `RegisterAccess.assertion` call bundles the byte-bus
+content (via `OperandAccess.assertionGated`) with the two memory-bus
+interactions (a send of `prev_value` and a receive of `write_value`).
+For read-only operands (op_b, op_c) the receive uses `prev_value` as
+the write — the value passes through unchanged. For op_a the receive
+uses `op_a_write_value` (the chip's computed result).
+
+External chips calling `RTypeReader.assertion` see the same
+unconditional `rtypeReaderSpec` as before — the memory-bus emissions
+don't add row-level facts (per-key multiplicity balance is enforced at
+the trace level). -/
 @[reducible]
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨clk_low, opcode, pc, op_a_write_value,
+  let ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩⟩ := input
-  -- Program-bus interaction (covers trusted_instr + register bounds +
-  -- op_a_0 binary/iff + PC alignment+bounds). R-type discipline: op_b/op_c
-  -- single-limb register indices with limbs 1–3 zero; imm_b = imm_c = 0.
+  -- Program-bus interaction.
   SP1Clean.ProgramTable.assertion
     (⟨pc, opcode, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- Three per-operand byte-bus assertions. Sub-clock offsets follow the
-  -- R-type convention: op_a at +4, op_b at +3, op_c at +2.
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low,
-       op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low,
-       op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 2, op_c_memory.access_timestamp.prev_low,
-       op_c_memory.access_timestamp.diff_low_limb,
-       op_c_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  -- Three per-operand register-access subcircuits (byte bus + memory bus).
+  -- op_a: read prev_value, write op_a_write_value (the result).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 4, op_a, op_a_memory.prev_value, op_a_write_value,
+       op_a_memory.access_timestamp.prev_low,
+       op_a_memory.access_timestamp.diff_low_limb, 1⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- op_b: read prev_value, write prev_value (read-only, value passes through).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 3, op_b, op_b_memory.prev_value, op_b_memory.prev_value,
+       op_b_memory.access_timestamp.prev_low,
+       op_b_memory.access_timestamp.diff_low_limb, 1⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
+  -- op_c: read prev_value, write prev_value (read-only).
+  SP1Clean.RegisterAccess.assertion
+    (⟨clk_high, clk_low, 2, op_c, op_c_memory.prev_value, op_c_memory.prev_value,
+       op_c_memory.access_timestamp.prev_low,
+       op_c_memory.access_timestamp.diff_low_limb, 1⟩ :
+      Var SP1Clean.RegisterAccess.Assertion.Inputs (ZMod p))
   -- Four assertZero gates that, with `op_a_0` field-binary from ProgramSpec,
   -- give `op_a_0 ≠ 0 → op_a_write_value[i] = 0`.
   op_a_0 * op_a_write_value[0] === 0
@@ -164,7 +179,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   name := "SP1Clean.RTypeReader"
   main := main
-  localLength _ := 0
+  -- Computed from main: 3 assertionGated × 24 witnesses = 72.
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
 
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
 
@@ -178,7 +198,8 @@ omit [Fact (2 ^ 17 < p)] [Fact (Nat.Prime p)] in
 /-- `Word.isU64` on a whole `Vector` is equivalent to `Word.isU64` on its
 `#v[w[0], w[1], w[2], w[3]]` re-indexed form (the shape `rtypeReaderSpec`
 uses for its memory-bus clauses). Used by trace-level discharges that need
-to bridge `rtypeReaderSpec` extracts back to whole-`Vector` `memoryAccessSpec`. -/
+to bridge `rtypeReaderSpec` extracts back to whole-`Vector` `memoryAccessSpec`.
+TODO: move this to Word.lean or something like that -/
 lemma isU64_iff_index_form [NeZero p] (w : Word (ZMod p)) :
     Word.isU64 w ↔ Word.isU64 #v[w[0], w[1], w[2], w[3]] := by
   constructor
@@ -208,14 +229,13 @@ theorem soundness :
   obtain ⟨h_prog_sub, h_oa_a_sub, h_oa_b_sub, h_oa_c_sub,
           h_z0, h_z1, h_z2, h_z3⟩ := h_holds
   have h_prog := h_prog_sub trivial
-  have h_oa_a := h_oa_a_sub trivial
-  have h_oa_b := h_oa_b_sub trivial
-  have h_oa_c := h_oa_c_sub trivial
+  -- assertionGated.Spec ⟨..., 1⟩ = (1 = 0 ∨ <byte facts>); 1 ≠ 0 so right disjunct.
+  have h_oa_a := (h_oa_a_sub trivial).resolve_left one_ne_zero
+  have h_oa_b := (h_oa_b_sub trivial).resolve_left one_ne_zero
+  have h_oa_c := (h_oa_c_sub trivial).resolve_left one_ne_zero
   simp only [SP1Clean.ProgramTable.assertion, SP1Clean.ProgramTable.Spec,
              SP1Clean.ProgramSpec, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ] at h_prog
-  simp only [SP1Clean.OperandAccess.assertion, SP1Clean.OperandAccess.Assertion.Spec]
-    at h_oa_a h_oa_b h_oa_c
   obtain ⟨h_ti, h_op_a_lt, ⟨h_op_b_lt, _, _, _⟩, ⟨h_op_c_lt, _, _, _⟩,
           h_op_a_0_bin, h_op_a_0_iff, _, _, h_pc⟩ := h_prog
   simp only [Spec, rtypeReaderSpec]
@@ -267,17 +287,17 @@ theorem completeness :
            ⟨h_op_c_lt, h_zero_lt, h_zero_lt, h_zero_lt⟩,
            h_op_a_0_bin, h_op_a_0_iff, Or.inl trivial, Or.inl trivial,
            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
-  -- OperandAccess for op_a (offset 4)
+  -- OperandAccess for op_a (offset 4) — right disjunct of assertionGated.Spec
   · refine ⟨trivial, ?_⟩
-    simp only [SP1Clean.OperandAccess.assertion, SP1Clean.OperandAccess.Assertion.Spec]
+    right
     exact ⟨h_diff_a, h_ts_a, (isU64_iff_index_form _).mpr h_isU64_a⟩
   -- OperandAccess for op_b (offset 3)
   · refine ⟨trivial, ?_⟩
-    simp only [SP1Clean.OperandAccess.assertion, SP1Clean.OperandAccess.Assertion.Spec]
+    right
     exact ⟨h_diff_b, h_ts_b, (isU64_iff_index_form _).mpr h_isU64_b⟩
   -- OperandAccess for op_c (offset 2)
   · refine ⟨trivial, ?_⟩
-    simp only [SP1Clean.OperandAccess.assertion, SP1Clean.OperandAccess.Assertion.Spec]
+    right
     exact ⟨h_diff_c, h_ts_c, (isU64_iff_index_form _).mpr h_isU64_c⟩
   -- 4 assertZero gates: op_a_0 * op_a_write_value[i] = 0
   -- Convert h_op_a_0_imp's `(Vector.map ...)[i]` form to match the goal's

@@ -50,7 +50,7 @@ open Circuit
 `RTypeReader.assertion` + two scalar gates. -/
 @[reducible]
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
        adapter,
        op_a_write_value, is_real, _adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
@@ -60,7 +60,7 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.RTypeReader.assertion
-    (⟨clk_0_16 + clk_16_24 * 65536, 0, pc, op_a_write_value, adapter⟩ :
+    (⟨clk_high, clk_0_16 + clk_16_24 * 65536, 0, pc, op_a_write_value, adapter⟩ :
       Var SP1Clean.RTypeReader.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   adapter.op_a_0 === 0
@@ -69,7 +69,12 @@ def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) AddCols unit where
   name := "SP1Clean.Add"
   main := main
-  localLength _ := 0
+  -- Computed from main; RTypeReader contributes 72 (3 assertionGated × 24).
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
 
 /-- The chip is the `UserMode` variant (`M = UserMode` in upstream Rust),
 so its `adapter_cols.is_trusted` payload is structurally equal to `is_real`

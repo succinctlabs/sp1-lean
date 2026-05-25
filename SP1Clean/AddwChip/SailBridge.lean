@@ -41,8 +41,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 CPU-state byte bounds, full ALU-type reader spec, and 2 trailing gates. -/
 def TraceSpec (cols : AddwCols (ZMod p)) : Prop :=
   SP1Clean.AddwOp.Spec
-      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
-      { value := cols.addw_value, msb := { msb := cols.addw_msb } } ∧
+      ⟨cols.adapter.op_b_memory.prev_value,
+       cols.adapter.op_c_memory.prev_value,
+       cols.addw_value,
+       cols.addw_msb⟩ ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ALUTypeReader.aluTypeReaderSpec
       (cols.state.clk_0_16 + cols.state.clk_16_24 * 65536) 19 cols.state.pc
@@ -68,10 +70,10 @@ private theorem allHold_of_traceSpec
   -- (which equals `cols` by h_round_trip). The `(fromMain (toMain cols)).X`
   -- projections then unfold to the matching `(toMain cols)[k]` / `#v[…]` forms.
   have h_addwop' : SP1Clean.AddwOp.Spec
-        (fromMain (toMain cols)).adapter.op_b_memory.prev_value
-        (fromMain (toMain cols)).adapter.op_c_memory.prev_value
-        { value := (fromMain (toMain cols)).addw_value,
-          msb := { msb := (fromMain (toMain cols)).addw_msb } } := by
+        ⟨(fromMain (toMain cols)).adapter.op_b_memory.prev_value,
+         (fromMain (toMain cols)).adapter.op_c_memory.prev_value,
+         (fromMain (toMain cols)).addw_value,
+         (fromMain (toMain cols)).addw_msb⟩ := by
     rw [h_round_trip]; exact h_addwop
   have h_alu' : SP1Clean.ALUTypeReader.aluTypeReaderSpec
         ((fromMain (toMain cols)).state.clk_0_16 +

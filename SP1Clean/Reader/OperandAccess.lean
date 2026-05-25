@@ -12,6 +12,7 @@ import SP1Foundations.Word
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
+import SP1Clean.SP1Lookup
 
 /-! # `OperandAccess.assertion` — single-operand memory-access byte-bus primitive
 
@@ -213,5 +214,144 @@ def assertion : FormalAssertion (ZMod p) Assertion.Inputs :=
     Spec := Assertion.Spec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## Gated variant — multiplicity-aware byte-bus assertion
+
+A drop-in replacement for `OperandAccess.assertion` that takes an extra
+`mult : F` field. When `mult = 0`, the assertion contributes nothing
+(the chip can fill arbitrary garbage in the operand columns). When
+`mult ≠ 0`, the assertion forces the same 6 byte facts as the
+unconditional variant.
+
+This mirrors SP1's gated emissions (e.g., AddwChip's op_c with
+`mult = is_real - imm_c` from `alu_type.rs:142`).
+
+See `SP1Clean/SP1Lookup.lean` for the underlying `lookupGated`
+primitive and its `lookupGated_implies_disjunctive` /
+`lookupGated_completeness_of_disjunctive` bridge lemmas. -/
+
+namespace AssertionGated
+
+open Circuit
+
+-- byteOpcodeGated needs `Fact (p > 512)`, which is derivable from `Fact (2^17 < p)`.
+-- We declare it as an instance for this namespace.
+instance : Fact (p > 512) := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
+
+/-- Inputs to the gated per-operand byte-bus assertion. Same as
+`Assertion.Inputs` plus a shared multiplicity `mult`. -/
+structure Inputs (F : Type) where
+  clk_low : F
+  offset : F
+  prev_low : F
+  diff_low_limb : F
+  prev_value : Vector F 4
+  mult : F
+deriving ProvableStruct
+
+/-- Emit 6 gated byte lookups via `byteOpcodeGated` (the FormalAssertion
+wrapper of `lookupGated` for ByteOpcodeTable), all sharing `input.mult`. -/
+@[reducible]
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(6 : Expression (ZMod p)), input.diff_low_limb, 16, 0], input.mult⟩
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(3 : Expression (ZMod p)), 0,
+        (input.clk_low + input.offset - input.prev_low - 1 -
+          input.diff_low_limb) * (65536 : ZMod p)⁻¹, 0], input.mult⟩
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[0], 16, 0], input.mult⟩
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[1], 16, 0], input.mult⟩
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[2], 16, 0], input.mult⟩
+  SP1Lookup.byteOpcodeGated
+    ⟨#v[(6 : Expression (ZMod p)), input.prev_value[3], 16, 0], input.mult⟩
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
+  name := "SP1Clean.OperandAccessGated"
+  main := main
+  -- 6 byteOpcodeGated subcircuit calls × 4 witnesses each.
+  localLength _ := 24
+  localLength_eq _ _ := by simp only [main, circuit_norm]
+  subcircuitsConsistent _ _ := by simp +arith only [main, circuit_norm]
+
+def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+
+/-- Per-operand gated byte-bus spec. The disjunction makes the assertion
+vacuous when `mult = 0`. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  input.mult = 0 ∨
+    (input.diff_low_limb.val < 65536 ∧
+     (input.clk_low + input.offset - input.prev_low - 1 - input.diff_low_limb)
+        * (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
+     Word.isU64 input.prev_value)
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  -- Pull out the per-field h_input equalities and substitute them.
+  obtain ⟨h_clk_low_eq, h_offset_eq, h_prev_low_eq, h_diff_low_eq,
+          h_prev_value_eq, h_mult_eq⟩ := h_input
+  subst_eqs
+  obtain ⟨d1, d2, d3, d4, d5, d6⟩ := h_holds
+  simp only [SP1Lookup.ByteOpcodeGated.Spec, SP1Lookup.ByteOpcodeGated.Assumptions,
+             true_implies, forall_const] at d1 d2 d3 d4 d5 d6
+  by_cases h_mult : Expression.eval env input_var_mult = 0
+  · exact Or.inl h_mult
+  right
+  have r1 := d1.resolve_left h_mult
+  have r2 := d2.resolve_left h_mult
+  have r3 := d3.resolve_left h_mult
+  have r4 := d4.resolve_left h_mult
+  have r5 := d5.resolve_left h_mult
+  have r6 := d6.resolve_left h_mult
+  refine ⟨?_, ?_, ?_⟩
+  · exact Assertion.byteOpcodeSpec_range16 _ r1
+  · have h := SP1Clean.CPUState.Assertion.byteOpcodeSpec_u8range _ r2
+    convert h using 1; ring
+  · apply Word.isU64_of_cases
+    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r3
+    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r4
+    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r5
+    · rw [Vector.getElem_map]; exact Assertion.byteOpcodeSpec_range16 _ r6
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨h_clk_low_eq, h_offset_eq, h_prev_low_eq, h_diff_low_eq,
+          h_prev_value_eq, h_mult_eq⟩ := h_input
+  subst_eqs
+  rcases h_spec with h_mult_zero | ⟨h_dll, h_ts, h_isU64⟩
+  · simp only [SP1Lookup.ByteOpcodeGated.Spec, SP1Lookup.ByteOpcodeGated.Assumptions,
+               and_true, true_and]
+    refine ⟨Or.inl h_mult_zero, Or.inl h_mult_zero,
+            Or.inl h_mult_zero, Or.inl h_mult_zero,
+            Or.inl h_mult_zero, Or.inl h_mult_zero⟩
+  · obtain ⟨h_pv0, h_pv1, h_pv2, h_pv3⟩ := Word.lt_cases_of_isU64 h_isU64
+    rw [Vector.getElem_map] at h_pv0 h_pv1 h_pv2 h_pv3
+    simp only [SP1Lookup.ByteOpcodeGated.Spec, SP1Lookup.ByteOpcodeGated.Assumptions,
+               and_true, true_and]
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    · right; convert Assertion.byteOpcodeSpec_range16_of_lt _ h_dll
+    · right
+      have := SP1Clean.CPUState.Assertion.byteOpcodeSpec_u8range_of_lt _ h_ts
+      convert this using 3; ring_nf
+    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv0
+    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv1
+    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv2
+    · right; exact Assertion.byteOpcodeSpec_range16_of_lt _ h_pv3
+
+end AssertionGated
+
+/-- Gated variant: same 6-byte-lookup payload as `assertion`, but each lookup
+is gated by a shared multiplicity. The spec is `mult = 0 ∨ <Assertion.Spec>`. -/
+def assertionGated : FormalAssertion (ZMod p) AssertionGated.Inputs :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.Spec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.OperandAccess

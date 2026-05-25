@@ -147,7 +147,8 @@ theorem cpuStateSpec_of_spec_addw (cols : Addw.AddwCols (ZMod p))
     (h : Addw.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Addw.Assertion.FormalSpec cols at h
-  exact h.1
+  -- FormalSpec now starts with AddwOp.Spec; cpuStateSpec is the 2nd conjunct.
+  exact h.2.1
 
 theorem cpuStateSpec_of_spec_bitwise (cols : Bitwise.BitwiseCols (ZMod p))
     (h : Bitwise.assertion.Spec cols) :

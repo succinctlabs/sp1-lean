@@ -13,15 +13,23 @@ import SP1Operations.Operation.AddwOperation.AddwOperation
 import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.Operations.AddOperation
+import SP1Clean.Operations.U16MSBOperation
 
-/-! # `AddwOperation` gadget mirror — Assertion style
+/-! # `AddwOperation` Clean mirror — faithful sub-circuit composition
 
-SP1's `AddwOperation` is a 2-limb carry-chain 32-bit add plus a
-`U16MSBOperation` sub-fragment on the high result limb. The natural-form
-iff lemma `AddwOperation.allHold_constraints_iff` exposes both: a
-`List.Forall ... U16MSBOperation.constraints` clause on `(cols.value[1],
-cols.msb)` plus the carry+limb-bound clauses for the two result limbs.
--/
+SP1's `AddwOperation.constraints` is a 2-limb carry-chain 32-bit add plus
+a sub-call to `U16MSBOperation.constraints` on the high result limb
+(see `SP1Operations/Operation/AddwOperation/Constraints.lean`). This
+Clean mirror faithfully reproduces that composition: `main` calls
+`SP1Clean.U16MSBOp.assertion` as a true subcircuit, and `Spec` composes
+`U16MSBOp.Assertion.Spec` by direct field reference.
+
+There is exactly one `main`, one `Spec`, one `assertion`, and one
+`iff_sp1` bridge to SP1's `allHold`. No standalone top-level Circuit
+form, no `InlinedSpec`, no `assertion_spec_to_spec` bridging helpers —
+the file's structure mirrors the SP1 composition graph directly.
+
+See `CLAUDE.md` § "Faithful sub-circuit composition" for the principle. -/
 
 namespace SP1Clean.AddwOp
 
@@ -29,60 +37,8 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Clean-side circuit. Asserts the 2-limb carry chain, byte-bounds each
-result limb, and emits the `U16MSBOperation` sub-fragment for `value[1]`
-with witnessed `msb`. -/
-def main (a b : Vector (Expression (ZMod p)) 4)
-    (result : Vector (Expression (ZMod p)) 2)
-    (msb : Expression (ZMod p)) : Circuit (ZMod p) Unit := do
-  let c0 := (a[0] + b[0] - result[0]) * (65536 : ZMod p)⁻¹
-  let c1 := (a[1] + b[1] - result[1] + c0) * (65536 : ZMod p)⁻¹
-  c0 * (c0 - 1) === 0
-  c1 * (c1 - 1) === 0
-  lookup ByteOpcodeTable
-    (#v[(6 : Expression (ZMod p)), result[0], 16, 0] : Vector (Expression (ZMod p)) 4)
-  lookup ByteOpcodeTable
-    (#v[(6 : Expression (ZMod p)), result[1], 16, 0] : Vector (Expression (ZMod p)) 4)
-  -- U16MSBOperation sub-fragment on `result[1]` with witness `msb`.
-  msb * (msb - 1) === 0
-  lookup ByteOpcodeTable
-    (#v[(6 : Expression (ZMod p)),
-        (2 : Expression (ZMod p)) * result[1] - msb * 65536, 16, 0]
-      : Vector (Expression (ZMod p)) 4)
-
-/-- Pilot Spec, mirroring `AddwOperation.allHold_constraints_iff` RHS
-verbatim: a `U16MSBOperation` constraints clause plus 2 natural-form
-carries are boolean plus each result limb fits in `< 65536`. -/
-def Spec (a b : Word (ZMod p)) (cols : _root_.AddwOperation (ZMod p)) : Prop :=
-  let carry0 : ZMod p := (a[0] + b[0] - cols.value[0]) * 65536⁻¹
-  let carry1 : ZMod p := (a[1] + b[1] - cols.value[1] + carry0) * 65536⁻¹
-  List.Forall SP1Constraint.toProp
-      (_root_.U16MSBOperation.constraints cols.value[1] { msb := cols.msb.msb } 1) ∧
-  (carry0 = 0 ∨ carry0 = 1) ∧
-  (carry1 = 0 ∨ carry1 = 1) ∧
-  cols.value[0].val < 65536 ∧
-  cols.value[1].val < 65536
-
-/-- The bridge to SP1: SP1's `allHold` under `is_real = 1` is exactly
-the pilot `Spec`. Direct re-export of
-`AddwOperation.allHold_constraints_iff`. -/
-theorem iff_sp1 (a b : Word (ZMod p)) (cols : _root_.AddwOperation (ZMod p)) :
-    (_root_.AddwOperation.constraints a b cols 1).allHold ↔
-      Spec a b cols :=
-  _root_.AddwOperation.allHold_constraints_iff a b cols
-
-/-! ## Full `FormalAssertion` promotion
-
-Wraps the assertion-style `main` above (which already takes `msb` as a
-parameter) into a Clean `FormalAssertion`. The `Assertion.Spec` inlines
-the U16MSB clauses (`msb` boolean + the `2*result[1] - msb*65536` Range
-bound) rather than re-using the `List.Forall SP1Constraint.toProp`
-wrapping from the top-level `Spec` — this keeps the FormalAssertion
-self-contained and avoids unwrapping the SP1 constraint list inside the
-proofs. -/
-
-/-- Bundled FormalAssertion input: the two operand words, the 2-limb
-result, and the externally supplied msb bit. -/
+/-- Bundled inputs for the AddwOperation FormalAssertion: the two operand
+words, the 2-limb result, and the externally-supplied msb bit. -/
 structure Inputs (F : Type) where
   a : fields 4 F
   b : fields 4 F
@@ -90,14 +46,25 @@ structure Inputs (F : Type) where
   msb : F
 deriving ProvableStruct
 
-namespace Assertion
-
-open Circuit
-
-/-- Wrapper around `SP1Clean.AddwOp.main` that destructures a `Var Inputs`. -/
+/-- Clean-side circuit: 2-limb carry chain + byte-bounds on result limbs +
+`U16MSBOp.assertion` as a true sub-circuit on the high result limb
+(mirrors SP1's `AddwOperation.constraints` composition of
+`U16MSBOperation.constraints`). -/
 @[reducible]
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit :=
-  SP1Clean.AddwOp.main input.a input.b input.result input.msb
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
+  let c0 := (input.a[0] + input.b[0] - input.result[0]) * (65536 : ZMod p)⁻¹
+  let c1 := (input.a[1] + input.b[1] - input.result[1] + c0) * (65536 : ZMod p)⁻¹
+  c0 * (c0 - 1) === 0
+  c1 * (c1 - 1) === 0
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), input.result[0], 16, 0]
+      : Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable
+    (#v[(6 : Expression (ZMod p)), input.result[1], 16, 0]
+      : Vector (Expression (ZMod p)) 4)
+  -- U16MSB as a true sub-circuit (not inlined).
+  SP1Clean.U16MSBOp.assertion
+    (⟨input.result[1], input.msb⟩ : Var SP1Clean.U16MSBOp.Inputs (ZMod p))
 
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
@@ -108,20 +75,18 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
 /-- No external assumptions. -/
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
 
-/-- The FormalAssertion's spec, inlining the U16MSB clauses in natural
-form: 2 carry-boolean clauses, 2 result-limb range bounds, the msb
-boolean, and the `2*result[1] - msb*65536` Range bound. -/
+/-- Single canonical Spec. Composes `U16MSBOp.Assertion.Spec` for the high
+result limb's MSB sub-fragment by direct field reference — no
+`List.Forall toProp` SP1-native envelope. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   let carry0 : ZMod p := (input.a[0] + input.b[0] - input.result[0]) * 65536⁻¹
   let carry1 : ZMod p :=
     (input.a[1] + input.b[1] - input.result[1] + carry0) * 65536⁻¹
-  let msb_check : ZMod p := 2 * input.result[1] - input.msb * 65536
   (carry0 = 0 ∨ carry0 = 1) ∧
   (carry1 = 0 ∨ carry1 = 1) ∧
   input.result[0].val < 65536 ∧
   input.result[1].val < 65536 ∧
-  input.msb * (input.msb - 1) = 0 ∧
-  msb_check.val < 65536
+  SP1Clean.U16MSBOp.Assertion.Spec ⟨input.result[1], input.msb⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
@@ -131,22 +96,26 @@ theorem soundness :
   subst h_b_eq
   subst h_r_eq
   subst h_m_eq
-  simp only [SP1Clean.AddwOp.main, circuit_norm, Lookup.Soundness, Table.toRaw,
+  haveI : NeZero p := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
+  simp only [main, circuit_norm, Lookup.Soundness, Table.toRaw,
              SP1Clean.ByteOpcodeTable] at h_holds
-  obtain ⟨h_c0, h_c1, h_l0, h_l1, h_msb, h_lmsb⟩ := h_holds
-  simp only [Vector.getElem_map, sub_eq_add_neg]
+  obtain ⟨h_c0, h_c1, h_l0, h_l1, h_u16_sub⟩ := h_holds
+  have h_u16 := h_u16_sub trivial
+  simp only [Spec, Vector.getElem_map, sub_eq_add_neg]
   unfold id at *
   refine ⟨?_, ?_,
           SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_l0,
           SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_l1,
-          by linear_combination h_msb,
-          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_lmsb⟩
+          ?_⟩
   · obtain h | h := mul_eq_zero.mp h_c0
     · exact Or.inl (by linear_combination h)
     · exact Or.inr (by linear_combination h)
   · obtain h | h := mul_eq_zero.mp h_c1
     · exact Or.inl (by linear_combination h)
     · exact Or.inr (by linear_combination h)
+  · -- U16MSBOp sub-circuit's Spec is exactly what we need for the last
+    -- conjunct (modulo the `+ -` vs `-` normalization in the inputs).
+    convert h_u16 using 2
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
@@ -156,28 +125,56 @@ theorem completeness :
   subst h_b_eq
   subst h_r_eq
   subst h_m_eq
-  simp only [Vector.getElem_map, sub_eq_add_neg] at h_spec
-  obtain ⟨hb0, hb1, hr0, hr1, hmsb, hlmsb⟩ := h_spec
-  simp only [SP1Clean.AddwOp.main, circuit_norm, Lookup.Completeness, Table.toRaw,
+  haveI : NeZero p := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
+  simp only [Spec, Vector.getElem_map, sub_eq_add_neg] at h_spec
+  obtain ⟨hb0, hb1, hr0, hr1, h_u16⟩ := h_spec
+  simp only [main, circuit_norm, Lookup.Completeness, Table.toRaw,
              SP1Clean.ByteOpcodeTable]
   unfold id at *
   refine ⟨?_, ?_,
           SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr0,
           SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr1,
-          by linear_combination hmsb,
-          SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hlmsb⟩
+          ?_⟩
   · rcases hb0 with h | h <;> rw [h] <;> ring
   · rcases hb1 with h | h <;> rw [h] <;> ring
+  · refine ⟨trivial, ?_⟩
+    convert h_u16 using 2
 
-end Assertion
-
-/-- The full Clean `FormalAssertion` for `AddwOperation`: soundness +
-completeness against the inlined `Assertion.Spec`. -/
+/-- The full Clean `FormalAssertion` for `AddwOperation`. The single
+canonical spec composes `U16MSBOp.Assertion.Spec` directly. -/
 def assertion : FormalAssertion (ZMod p) Inputs :=
-  { Assertion.elaborated with
-    Assumptions := Assertion.Assumptions,
-    Spec := Assertion.Spec,
-    soundness := Assertion.soundness,
-    completeness := Assertion.completeness }
+  { elaborated with
+    Assumptions := Assumptions,
+    Spec := Spec,
+    soundness := soundness,
+    completeness := completeness }
+
+/-- Bridge to SP1: the `Inputs`-shaped `Spec` is equivalent to SP1's
+`AddwOperation.constraints` `allHold` form. Chains `AddwOperation`'s
+top-level iff with `U16MSBOperation`'s iff to bridge the sub-component. -/
+theorem iff_sp1 (input : Inputs (ZMod p)) :
+    Spec input ↔
+      (_root_.AddwOperation.constraints input.a input.b
+        { value := input.result, msb := { msb := input.msb } } 1).allHold := by
+  haveI : NeZero p := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
+  rw [_root_.AddwOperation.allHold_constraints_iff]
+  -- The SP1-native RHS now has the form:
+  -- `List.Forall toProp (U16MSBOperation.constraints …)` ∧ carries ∧ ranges
+  -- Our `Spec` has:
+  -- carries ∧ ranges ∧ `U16MSBOp.Assertion.Spec`
+  -- Bridge the U16MSB conjunct via `U16MSBOperation.allHold_constraints_iff`,
+  -- plus the `msb * (msb-1) = 0 ↔ msb ∈ {0,1}` field-arithmetic step.
+  unfold Spec SP1Clean.U16MSBOp.Assertion.Spec
+  rw [U16MSBOperation.allHold_constraints_iff]
+  constructor
+  · rintro ⟨h_c0, h_c1, h_r0, h_r1, h_msb_bin, h_msb_range⟩
+    refine ⟨⟨Or.inr rfl, ?_, fun _ => h_msb_range⟩, h_c0, h_c1, h_r0, h_r1⟩
+    rcases mul_eq_zero.mp h_msb_bin with h | h
+    · exact Or.inl h
+    · exact Or.inr (by linear_combination h)
+  · rintro ⟨⟨_, h_msb_bin, h_msb_range⟩, h_c0, h_c1, h_r0, h_r1⟩
+    refine ⟨h_c0, h_c1, h_r0, h_r1, ?_, h_msb_range one_ne_zero⟩
+    change input.msb = 0 ∨ input.msb = 1 at h_msb_bin
+    rcases h_msb_bin with h | h <;> rw [h] <;> ring
 
 end SP1Clean.AddwOp

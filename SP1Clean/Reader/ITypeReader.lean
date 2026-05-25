@@ -113,31 +113,33 @@ namespace Assertion
 open Circuit
 
 /-- Clean-side circuit. Emits exactly the byte/program lookups inside
-`_root_.ITypeReader.constraints` under `is_real = is_trusted = 1`. -/
+`_root_.ITypeReader.constraints` under `is_real = is_trusted = 1`.
+
+The 2 per-operand byte-bus assertions use `OperandAccess.assertionGated`
+with `mult := 1` (uniform with AddwChip's op_c which uses a real
+multiplicity). The `mult = 1` disjunctive Spec collapses back to the
+unconditional form via `one_ne_zero` in the soundness/completeness
+proofs below — external chips that call `ITypeReader.assertion` see
+the same unconditional `itypeReaderSpec`. -/
 @[reducible]
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨clk_low, opcode, pc, op_a_write_value,
        ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c_imm⟩⟩ := input
-  -- Program-bus interaction (covers trusted_instr + register bounds +
-  -- 4 immediate-limb bounds + op_a_0 binary/iff + PC alignment+bounds).
-  -- I-type discipline: op_b single-limb register index, op_c_imm 4-limb
-  -- immediate, imm_b = 0, imm_c = 1.
+  -- Program-bus interaction.
   SP1Clean.ProgramTable.assertion
     (⟨pc, opcode, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- Two per-operand byte-bus assertions. Sub-clock offsets follow the
-  -- I-type convention: op_a at +4, op_b at +3 (op_c_imm is the immediate,
-  -- so no memory access).
-  SP1Clean.OperandAccess.assertion
+  -- Two per-operand byte-bus assertions via `assertionGated mult=1`.
+  SP1Clean.OperandAccess.assertionGated
     (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low,
        op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
+       op_a_memory.prev_value, 1⟩ :
+      Var SP1Clean.OperandAccess.AssertionGated.Inputs (ZMod p))
+  SP1Clean.OperandAccess.assertionGated
     (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low,
        op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+       op_b_memory.prev_value, 1⟩ :
+      Var SP1Clean.OperandAccess.AssertionGated.Inputs (ZMod p))
   -- Four assertZero gates that, with `op_a_0` field-binary from ProgramSpec,
   -- give `op_a_0 ≠ 0 → op_a_write_value[i] = 0`.
   op_a_0 * op_a_write_value[0] === 0
@@ -149,7 +151,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   name := "SP1Clean.ITypeReader"
   main := main
-  localLength _ := 0
+  -- Computed from main: 2 assertionGated × 24 witnesses = 48.
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
 
 def Assumptions (_ : Inputs (ZMod p)) : Prop := True
 
@@ -191,13 +198,12 @@ theorem soundness :
   obtain ⟨h_prog_sub, h_oa_a_sub, h_oa_b_sub,
           h_z0, h_z1, h_z2, h_z3⟩ := h_holds
   have h_prog := h_prog_sub trivial
-  have h_oa_a := h_oa_a_sub trivial
-  have h_oa_b := h_oa_b_sub trivial
+  -- assertionGated.Spec ⟨..., 1⟩ = (1 = 0 ∨ <byte facts>); 1 ≠ 0 so right disjunct.
+  have h_oa_a := (h_oa_a_sub trivial).resolve_left one_ne_zero
+  have h_oa_b := (h_oa_b_sub trivial).resolve_left one_ne_zero
   simp only [SP1Clean.ProgramTable.assertion, SP1Clean.ProgramTable.Spec,
              SP1Clean.ProgramSpec, Vector.getElem_mk, List.getElem_toArray,
              List.getElem_cons_zero, List.getElem_cons_succ] at h_prog
-  simp only [SP1Clean.OperandAccess.assertion, SP1Clean.OperandAccess.Assertion.Spec]
-    at h_oa_a h_oa_b
   obtain ⟨h_ti, h_op_a_lt, ⟨h_op_b_lt, _, _, _⟩,
           ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
           h_op_a_0_bin, h_op_a_0_iff, _, _, h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩ := h_prog
@@ -246,13 +252,13 @@ theorem completeness :
            ⟨h_op_c0_lt, h_op_c1_lt, h_op_c2_lt, h_op_c3_lt⟩,
            h_op_a_0_bin, h_op_a_0_iff, Or.inl trivial, Or.inr trivial,
            h_pc_mod, h_pc_0_lt, h_pc_1_lt, h_pc_2_lt⟩
-  -- OperandAccess for op_a (offset 4)
+  -- OperandAccess for op_a (offset 4) — provide right disjunct of assertionGated.Spec
   · refine ⟨trivial, ?_⟩
-    simp only [SP1Clean.OperandAccess.assertion, SP1Clean.OperandAccess.Assertion.Spec]
+    right
     exact ⟨h_diff_a, h_ts_a, (isU64_iff_index_form _).mpr h_isU64_a⟩
   -- OperandAccess for op_b (offset 3)
   · refine ⟨trivial, ?_⟩
-    simp only [SP1Clean.OperandAccess.assertion, SP1Clean.OperandAccess.Assertion.Spec]
+    right
     exact ⟨h_diff_b, h_ts_b, (isU64_iff_index_form _).mpr h_isU64_b⟩
   -- 4 assertZero gates: op_a_0 * op_a_write_value[i] = 0
   · by_cases h : Expression.eval env.toEnvironment input_var_cols_op_a_0 = 0
