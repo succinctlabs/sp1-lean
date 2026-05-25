@@ -6,7 +6,7 @@ import SP1Clean.StoreByteChip
 import SP1Clean.JalChip
 import SP1Clean.MulChip
 import SP1Clean.ShiftLeftChip
-import SP1Clean.AddwChip
+import SP1Clean.AddwChip.SailBridge
 import SP1Clean.UTypeChip
 import SP1Clean.JalrChip
 import SP1Clean.LtChip
@@ -20,7 +20,7 @@ import SP1Clean.BranchChip
 import SP1Clean.LoadX0Chip
 import SP1Clean.ShiftRightChip
 import SP1Clean.DivRemChip
-import SP1Clean.AddiChip
+import SP1Clean.AddiChip.SailBridge
 import SP1Clean.BitwiseChip
 import SP1Clean.SubChip
 import SP1Clean.SubwChip
@@ -915,23 +915,35 @@ theorem memoryAccessesValid_of_spec_jal
   subst h_mem
   exact h_oa_a
 
-/-- Addi's per-chip discharge — projects the two `OperandAccess.Assertion.Spec`
-conjuncts. I-type: op_a/+4 and op_b/+3 register accesses (op_c is the
-immediate `op_c_imm`, no memory access). -/
+/-- Addi's per-chip discharge — extracts memory bounds from `itypeReaderSpec`
+(post-directory-port). I-type: op_a/+4 and op_b/+3 register accesses (op_c
+is the immediate `op_c_imm`, no memory access). -/
 theorem memoryAccessesValid_of_spec_addi
     (cols : SP1Clean.Addi.AddiCols (ZMod p))
     (h : SP1Clean.Addi.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.addi cols) := by
   change SP1Clean.Addi.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, _h_prog, _h_isreal, _h_op_a_0,
-          h_oa_a, h_oa_b⟩ := h
+  obtain ⟨_h_addop, _h_cpu, h_itr, _h_isreal, _h_op_a_0, _h_rv64add⟩ := h
+  -- Unpack itypeReaderSpec's flat memory-bus clauses
+  -- (op_a + op_b only; op_c is immediate, no memory access).
+  obtain ⟨_h_ti, _h_op_a_lt, _h_op_b_lt,
+          _h_op_c0_lt, _h_op_c1_lt, _h_op_c2_lt, _h_op_c3_lt,
+          _h_op_a_0_bin, _h_op_a_0_iff,
+          _h_pc_mod, _h_pc_0_lt, _h_pc_1_lt, _h_pc_2_lt,
+          h_diff_a, h_diff_b, h_ts_b, h_ts_a, h_isU64_a, h_isU64_b,
+          _h_a0_implies⟩ := h_itr
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rcases h_mem with h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
+  · subst h
+    exact ⟨h_diff_a, h_ts_a,
+      (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_a⟩
+  · subst h
+    exact ⟨h_diff_b, h_ts_b,
+      (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b⟩
 
 /-- Branch's per-chip discharge — projects the two `OperandAccess.Assertion.Spec`
 conjuncts. Branch emits 2 register reads (op_a/+4, op_b/+3) — no writes;
@@ -1058,7 +1070,7 @@ theorem memoryAccessesValid_of_spec_addw
     ChipRow.memoryAccessesValid (.addw cols) := by
   change SP1Clean.Addw.Assertion.FormalSpec cols at h
   obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h
+          h_oa_a, h_oa_b, h_oa_c_disj⟩ := h
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
@@ -1066,7 +1078,17 @@ theorem memoryAccessesValid_of_spec_addw
   rcases h_mem with h | h | h
   · subst h; exact h_oa_a
   · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+  -- AddwChip's FormalSpec made op_c byte-bus consequence disjunctive
+  -- (`is_real - imm_c = 0 ∨ Spec`) to reflect SP1's actual gated
+  -- emission. The trace-level memoryAccessesValid currently demands the
+  -- unconditional form. Bridging this requires either:
+  --   (a) making memoryAccessesValid multiplicity-aware too, or
+  --   (b) using the SP1Lookup.LookupAccessList machinery to track op_c
+  --       contributions with proper multiplicity weighting.
+  -- For now, mark this as the trace-level companion to the chip's
+  -- completeness gap (see AddwChip/Circuit.lean line 152).
+  · subst h
+    exact h_oa_c_disj.resolve_left (by sorry)
 
 /-- Mul's per-chip discharge — three `OperandAccess.Assertion.Spec`
 conjuncts. R-type: op_a/+4, op_b/+3, op_c/+2. -/

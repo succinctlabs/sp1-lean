@@ -84,11 +84,15 @@ def Assumptions (cols : AddiCols (ZMod p)) : Prop :=
 - `itypeReaderSpec` — full I-type reader spec (program + memory + bounds).
 - `is_real * (is_real - 1) = 0` — `is_real` binary.
 - `adapter.op_a_0 = 0` — `op_a_0` zero gate.
-- Pure BitVec `RV64.add` equation (conditional on `is_real = 1`) — the
+- Pure BitVec `RV64.addi` equation (conditional on `is_real = 1`) — the
   RISC-V `addi` semantic at the BitVec level. Auditable at a glance:
-  `op_a_write_value (as BitVec64) = RV64.add op_c_imm_bv op_b_bv`. The
-  monadic Sail equivalence to `_root_.Addi.spec_addi` is recovered
-  externally via `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
+  `op_a_write_value (as BitVec64) = RV64.addi imm12 op_b_bv` where
+  `imm12 = BitVec.ofNat 12 cols.adapter.op_c_imm[0].val`. The sign-extension
+  identity `op_c_imm_bv = signExtend 64 imm12` is enforced by
+  `itypeReaderSpec`'s `Opcode.trusted_instr` clause (third conjunct of
+  `i_type_constraints`). The monadic Sail equivalence to
+  `_root_.Addi.spec_addi` is recovered externally via
+  `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
 def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.AddOp.Spec
@@ -101,8 +105,8 @@ def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0 ∧
   (cols.is_real = 1 →
     Word.toBitVec64 cols.op_a_write_value =
-      RV64.add (Word.toBitVec64 cols.adapter.op_c_imm)
-               (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
+      RV64.addi (BitVec.ofNat 12 cols.adapter.op_c_imm[0].val)
+                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -115,15 +119,29 @@ theorem soundness :
   have h_cpu := h_cpu_sub trivial
   have h_itr := h_itr_sub trivial
   refine ⟨h_addop, h_cpu, h_itr, by linear_combination h_isreal, h_op_a_0, ?_⟩
-  -- BitVec `RV64.add` conjunct: discharge from `AddOp.Spec` (the carry
-  -- chain) + `itypeReaderSpec`'s isU64 bounds for op_b/op_c_imm, via
-  -- `AddOperation.spec`.
+  -- BitVec `RV64.addi` conjunct: combine AddOp.spec (carry chain →
+  -- `+` equation) with i_type_constraints' sign-extension identity
+  -- (`op_c_imm_bv = signExtend 64 imm12`) to recover the addi form.
   intro _h_is_real_eq
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  -- Extract isU64_b from `itypeReaderSpec`'s memory-bus tuple, and isU64
-  -- of op_c_imm from the 4 immediate-limb field bounds.
-  obtain ⟨_, _, _, h_c0_lt, h_c1_lt, h_c2_lt, h_c3_lt, _, _, _, _, _, _,
+  -- Unpack itypeReaderSpec to get (a) the trusted_instr clause for the
+  -- sign-extension fact, and (b) isU64 of op_b plus the 4 op_c_imm
+  -- limb bounds.
+  obtain ⟨h_ti, _, _, h_c0_lt, h_c1_lt, h_c2_lt, h_c3_lt, _, _, _, _, _, _,
           _h_diff_a, _h_diff_b, _h_ts_b, _h_ts_a, _h_isU64_a_idx, h_isU64_b_idx, _⟩ := h_itr
+  -- Sign-extension fact from i_type_constraints' third conjunct:
+  -- `Word.toBitVec64 op_c_imm = signExtend 64 (BitVec.ofNat 12 op_c_imm[0].val)`.
+  -- The trusted_instr predicate unfolds via @[simp] to
+  -- (imm_consts) ∧ (op_b_consts) ∧ (sign_ext_eq); `.2.2` projects the sign_ext_eq.
+  have h_signExt : Word.toBitVec64
+        #v[input_adapter_op_c_imm[0], input_adapter_op_c_imm[1],
+           input_adapter_op_c_imm[2], input_adapter_op_c_imm[3]] =
+      BitVec.signExtend 64 (BitVec.ofNat 12 input_adapter_op_c_imm[0].val) := by
+    have := h_ti
+    simp only [Opcode.trusted_instr, Opcode.ofNat, ZMod.val_one,
+               i_type_constraints] at this
+    exact this.2.2
+  -- Convert isU64_b from the index-form to whole-Word form.
   have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
     (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b_idx
   -- Convert the 4 immediate-limb field bounds into the underlying .val < 65536
@@ -151,9 +169,29 @@ theorem soundness :
         input_adapter_op_c_imm
         { value := Vector.map (Expression.eval env) input_var_op_a_write_value } 1).allHold :=
     (SP1Clean.AddOp.iff_sp1 _ _ _).mpr h_addop
+  -- AddOperation.spec gives `op_a_write_value.toBitVec64 = execute_RTYPE_pure_w b c .ADD`
+  -- which reduces (by rfl) to `b.toBitVec64 + c.toBitVec64`.
   have ⟨_, h_bv⟩ := AddOperation.spec h_isU64_b h_isU64_c h_allHold
-  simp only [RV64.add]
-  exact h_bv
+  rw [show execute_RTYPE_pure_w input_adapter_op_b_memory_prev_value
+            input_adapter_op_c_imm rop.ADD =
+            input_adapter_op_b_memory_prev_value.toBitVec64 +
+              input_adapter_op_c_imm.toBitVec64 from rfl] at h_bv
+  -- `Word.toBitVec64 op_c_imm = Word.toBitVec64 #v[op_c_imm[0..3]]` by
+  -- whole-Vector vs indexed equivalence. Combined with h_signExt this
+  -- converts the 4-limb form to signExtend 64 (12-bit imm).
+  have h_op_c_unfold :
+      Word.toBitVec64 input_adapter_op_c_imm =
+        Word.toBitVec64
+          #v[input_adapter_op_c_imm[0], input_adapter_op_c_imm[1],
+             input_adapter_op_c_imm[2], input_adapter_op_c_imm[3]] := by
+    congr 1
+    apply Vector.ext
+    intro i hi
+    interval_cases i <;> rfl
+  -- RV64.addi imm rs1 = BitVec.add rs1 (signExtend 64 imm) = rs1 + signExtend 64 imm.
+  simp only [RV64.addi]
+  rw [h_bv, h_op_c_unfold, h_signExt]
+  rfl
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by

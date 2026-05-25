@@ -89,6 +89,20 @@ under `docs/`, look at the matching entry below.
   multiplicity-gating + `is_real` binarity) delivers and what
   discharge work + chip promotions remain.
 
+- **`MULTIPLICITY_BUS.md`** — **work-in-progress** doc for the
+  multiplicity-aware lookup bus refactor (`SP1Clean/SP1Memory.lean`).
+  Read this when the AddwChip op_c completeness `sorry` blocks you,
+  when you need to extend `lookupGated` to a new gated lookup site,
+  or when you need to understand SP1's `InteractionKind`-tagged
+  multiset bus model (mirrors
+  `sp1/crates/core/machine/src/air/memory.rs`). Documents the Phase
+  1+2 foundation that's landed (`InteractionKind`, `HasDefaultRow`,
+  real hint-witness `lookupGated`; all theorems axiom-clean) plus the
+  Phase 3–5 roadmap for closing the two remaining `sorry`s in
+  `AddwChip/Circuit.lean:152` and `MemoryConsistency.lean:1067`.
+  Designed as a hand-off doc — start here if you're picking this work
+  up cold.
+
 ## Auto-memory mirror
 
 `docs/memory/` is **not** part of this documentation set — it's a

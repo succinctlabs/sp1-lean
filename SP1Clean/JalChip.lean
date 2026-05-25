@@ -345,6 +345,7 @@ universal preconditions; `raw_to_semantic` discharges allHold via
 def RawSpec (Main : Vector (ZMod p) 31) : Prop :=
   List.Forall SP1Constraint.toProp (_root_.Jal.constraints Main)
 
+omit [Fact (2 ^ 17 < p)] in
 theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 31) :
     (_root_.Jal.constraints Main).allHold ↔ RawSpec Main := Iff.rfl
 
@@ -362,7 +363,7 @@ def SemanticSpec (Main : Vector (ZMod p) 31) : Prop :=
         (.Regidx (_root_.Jal.sp1_op_a Main cstrs h_is_real))).run s)
 
 theorem raw_to_semantic (Main : Vector (ZMod p) 31) (h_is_real : Main[30] = 1)
-    (h_op_a_0 : Main[13] = 0) (h_spec : TraceSpec (fromMain Main))
+    (_h_op_a_0 : Main[13] = 0) (h_spec : TraceSpec (fromMain Main))
     (h_raw : RawSpec Main) : SemanticSpec Main := by
   refine ⟨h_spec, ?_⟩
   intro _cstrs _h_is_real s state_cstrs hs
