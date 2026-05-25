@@ -47,6 +47,8 @@ Read `SP1Chips/Add/AddChip.lean` + `SP1Chips/Add/Constraints.lean` as the canoni
 
 The proof skeleton is: unfold `constraints`, destructure the conjunction, specialize the `CPUState`/Reader `allHold_constraints_iff_is_real` lemmas, extract initial-state facts, then rewrite the monadic forms via `simp [spec_*, sp1_*, execute, execute_<TYPE>']` and close with arithmetic lemmas from the corresponding `Operation`.
 
+Most chips ship a `<Chip>/Common.lean` with a polymorphic `allHold_constraints_iff` that splits the flat constraint list into sub-`.allHold` conjuncts. **For ALU chips, the canonical shape going forward is the one used in `SP1Chips/Add/Common.lean` — both sides of the iff in `.allHold` form (not `List.Forall SP1Constraint.toProp`), so the matching SP1Clean Layer-2 `allHold_iff_structural` (see `SP1Clean/AddChip/Lemmas.lean`) collapses to a flat `rw` chain.** Existing chip Commons (Sub, Addi, etc.) still use the older `List.Forall` form — migrate opportunistically. See `docs/CLEAN_PILOT_ROADMAP.md` §4 "Canonical ALU-chip Layer-0/Layer-2 shape" for the full template and the two literal-elaboration caveats it carries.
+
 ### Constraints datatype
 
 `SP1Constraint` is `assertZero (x : Fin KB) | send interaction mult | receive interaction mult`. `toProp` turns propositional constraints (arithmetic, lookup multiplicities) into `Prop`; `toStateProp s` turns interactions about initial register/memory state into facts about a `SailState`. A chip's constraint list has both layers, so proofs consume both `h_cstrs.allHold` and `state_cstrs.initialState s`.

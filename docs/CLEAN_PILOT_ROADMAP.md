@@ -400,6 +400,70 @@ a generic field (the `Field F` instance). Clean's `Expression.eval`
 evaluates in `ZMod p`. **No `BitVec`-to-`ZMod` conversion needed at the
 bridge layer.** Pure win.
 
+### Canonical ALU-chip Layer-0/Layer-2 shape (post-AddChip refactor, 2026-05-24)
+
+`SP1Chips/Add/Common.lean` is the reference template for chip-level
+`allHold_constraints_iff` lemmas going forward. Two structural choices
+matter:
+
+1. **State both sides of the iff in `.allHold` form, not
+   `List.Forall SP1Constraint.toProp`.** The two are reducibly equal,
+   but `rw` doesn't unfold reducibles during pattern matching — keeping
+   `.allHold` form lets downstream operation/reader `iff_sp1` lemmas
+   (which all match on `.allHold`) fire directly without an inline
+   form-bridge.
+
+   ```lean
+   lemma allHold_constraints_iff (Main : Vector (ZMod p) 33) :
+       (constraints Main).allHold ↔
+       SP1ConstraintList.allHold (AddOperation.constraints …) ∧
+       SP1ConstraintList.allHold (_root_.CPUState.constraints …) ∧
+       SP1ConstraintList.allHold (RTypeReader.constraints …) ∧
+       <trailing assertZero gates as `e = 0` clauses> := by
+     simp only [constraints, List.forall_append, List.Forall,
+       SP1Constraint.toProp, and_assoc]
+   ```
+
+2. **The matching SP1Clean Layer-2 `allHold_iff_structural` collapses to
+   a flat rewrite chain.** `SP1Clean/AddChip/Lemmas.lean#allHold_iff_structural`
+   is the reference:
+
+   ```lean
+   rw [_root_.Add.allHold_constraints_iff Main, h_is_real,
+     AddOperation.allHold_constraints_iff,
+     SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+     SP1Clean.RTypeReader.rtypeReaderSpec_iff_sp1]
+   simp [SP1Clean.AddOp.Spec, SP1Clean.CPUState.cpuStateSpec,
+         SP1Clean.RTypeReader.rtypeReaderSpec, and_assoc]
+   ```
+
+   No `show … from by simp [constraints, …]` block, no manual constraint
+   re-derivation, no inline `List.Forall ↔ .allHold` bridge. Every ALU
+   chip's Layer-2 proof should look this clean.
+
+Existing chip Common.lean files (Sub, Addi, Addw, Subw, Mul, Bitwise,
+Branch, DivRem, Jal, Jalr, Lt, ShiftLeft, ShiftRight) still use the
+older `List.Forall SP1Constraint.toProp (...)` form on both sides.
+Migrate to the `.allHold` form opportunistically — when touching a
+chip's Common.lean for another reason — rather than as a flag-day
+sweep. **New ALU chip Commons** (whether added because a constraint
+regen introduces a chip, or because a chip's Common.lean is created
+for the first time, as Add just was) **should start in the canonical
+shape.**
+
+Two caveats observed during the AddChip migration that the template
+silently handles but a new chip's author should know:
+
+- **Trailing `assertZero` clauses can need `(0 : ZMod p)` / `(1 : ZMod p)`
+  ascriptions** on bare literals (`0 - (Main[k] * 0 + (1 - Main[k]) * 0)
+  = 0`) — Lean's left-to-right literal elaboration otherwise picks `ℕ`
+  for the leading `0`/`1`, projecting `Main[k].val` and breaking the
+  `simp only` close. UType/Common.lean carries this fix.
+- **The `simp only` close can leave `↑48` / `↑1` cast residue** when a
+  reader op-arg expression mixes `Main[k] * 48 + (1 - Main[k]) * 49`
+  patterns. Append `push_cast; rfl` after the `simp only` (mirrors
+  Mul/Common.lean's tail).
+
 ### Friction the bridge layer must guard against
 
 1. **`↑↑` cast residue.** When an SP1 `_poly` RHS contains `(n : F p)`
