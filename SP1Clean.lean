@@ -13,7 +13,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.RTypeReader
 import SP1Clean.AddiChip
-import SP1Clean.AddChip
+import SP1Clean.AddChip.SailBridge
 import SP1Clean.SubChip
 import SP1Clean.SubwChip
 import SP1Clean.AddwChip

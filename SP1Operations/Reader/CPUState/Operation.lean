@@ -1,5 +1,6 @@
 import SP1Foundations
 
+@[ext]
 structure CPUState (F : Type*) where
   clk_high : F
   clk_16_24 : F

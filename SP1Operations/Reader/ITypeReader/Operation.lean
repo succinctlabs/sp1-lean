@@ -1,5 +1,6 @@
 import SP1Foundations
 
+@[ext]
 structure ITypeReader (F : Type) where
   op_a : F
   op_a_memory : MemoryAccessInSharedCols F

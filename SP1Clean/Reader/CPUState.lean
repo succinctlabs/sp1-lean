@@ -250,7 +250,7 @@ theorem completeness :
   refine ⟨?_, byteOpcodeSpec_u8range_of_lt _ h_u8range⟩
   have h := byteOpcodeSpec_range13_of_lt _ h_range13
   convert h using 3
-  ring
+  ring_nf
 
 end Assertion
 

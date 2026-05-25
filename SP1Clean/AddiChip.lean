@@ -249,7 +249,6 @@ def RawSpec (Main : Vector (ZMod p) 30) : Prop :=
 
 theorem rawSpec_iff_allHold (Main : Vector (ZMod p) 30) :
     (_root_.Addi.constraints Main).allHold ↔ RawSpec Main := by
-  change List.Forall SP1Constraint.toProp (_root_.Addi.constraints Main) ↔ _
   rw [_root_.Addi.allHold_constraints_iff]
   rfl
 

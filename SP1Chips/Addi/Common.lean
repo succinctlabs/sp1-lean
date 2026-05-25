@@ -12,20 +12,21 @@ namespace Addi
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option linter.unusedSectionVars false in
--- Polymorphic iff lemma mirroring `Mul.allHold_constraints_iff`.
+-- Polymorphic iff lemma mirroring `Add.allHold_constraints_iff` (canonical
+-- `.allHold` form, post-2026-05-24 pilot refactor).
 -- Exposes 3 sub-allHolds (AddOp/CPUState/ITypeReader) + 2 chip-list assertZeros.
 lemma allHold_constraints_iff (Main : Vector (ZMod p) 30) :
-    List.Forall SP1Constraint.toProp (constraints Main) ↔
-    List.Forall SP1Constraint.toProp
+    (constraints Main).allHold ↔
+    SP1ConstraintList.allHold
         (AddOperation.constraints (F := ZMod p)
           #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[21], Main[22], Main[23], Main[24]]
           { value := #v[Main[25], Main[26], Main[27], Main[28]] } Main[29]) ∧
-    List.Forall SP1Constraint.toProp
+    SP1ConstraintList.allHold
         (_root_.CPUState.constraints
           (CPUState.mk Main[0] Main[1] Main[2] #v[Main[3], Main[4], Main[5]])
           #v[Main[3] + 4, Main[4], Main[5]] 8 Main[29]) ∧
-    List.Forall SP1Constraint.toProp
+    SP1ConstraintList.allHold
         (ITypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
           #v[Main[3], Main[4], Main[5]] 1
           #v[Main[25], Main[26], Main[27], Main[28]]

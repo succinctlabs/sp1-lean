@@ -193,7 +193,7 @@ theorem completeness :
   refine ⟨byteOpcodeSpec_range16_of_lt _ h_diff, ?_, ?_, ?_, ?_, ?_⟩
   · have := SP1Clean.CPUState.Assertion.byteOpcodeSpec_u8range_of_lt _ h_ts
     convert this using 3
-    ring
+    ring_nf
   · rw [Vector.getElem_map] at h_pv0
     exact byteOpcodeSpec_range16_of_lt _ h_pv0
   · rw [Vector.getElem_map] at h_pv1

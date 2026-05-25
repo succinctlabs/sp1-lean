@@ -1,6 +1,6 @@
 import Clean.Utils.OfflineMemory
 import SP1Clean.MemoryAccess
-import SP1Clean.AddChip
+import SP1Clean.AddChip.Circuit
 import SP1Clean.LoadByteChip
 import SP1Clean.StoreByteChip
 import SP1Clean.JalChip
@@ -855,7 +855,7 @@ theorem memoryAccessesValid_of_spec_add
     (h : SP1Clean.Add.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.add cols) := by
   change SP1Clean.Add.Assertion.FormalSpec cols at h
-  obtain ⟨_h_addop, _h_cpu, h_rtr, _h_isreal, _h_op_a_0, _h_sail⟩ := h
+  obtain ⟨_h_addop, _h_cpu, h_rtr, _h_isreal, _h_op_a_0, _h_rv64add⟩ := h
   -- Unpack rtypeReaderSpec's nested memory-bus tuple:
   -- (diff_{a,b,c} < 65536, ts_{c,b,a} scaled < 256, isU64_{a,b,c}).
   obtain ⟨_h_ti, _h_op_a_lt, _h_op_b_lt, _h_op_c_lt, _h_op_a_0_bin, _h_op_a_0_iff,

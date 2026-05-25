@@ -1,6 +1,7 @@
 import SP1Foundations
 
 --- A Reader that only accesses values of type `T`.
+@[ext]
 structure RTypeReader (F : Type) where
   op_a : F
   op_a_memory : MemoryAccessInSharedCols F

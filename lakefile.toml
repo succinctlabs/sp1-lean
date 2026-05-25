@@ -1,5 +1,5 @@
 name = "sp1-lean"
-version = "0.1.0"
+version = "6.2.2"
 keywords = ["math"]
 defaultTargets = ["SP1Operations", "SP1Chips", "SP1Clean"]
 
@@ -18,17 +18,20 @@ name = "mathlib"
 scope = "leanprover-community"
 rev = "v4.29.0"
 
-# Fork of `https://github.com/opencompl/sail-riscv-lean` with custom `Platform.lean`.
 [[require]]
 name = "LeanRV64D"
 git = "https://github.com/succinctlabs/sail-riscv-lean"
-rev = "v6.1.0"
+rev = "v6.2.2"
 
-# Pilot dep on Verified-zkEVM/clean (use case B from docs/CLEAN_DSL_EVALUATION.md).
-# Tracks a sibling checkout at ../clean on the bump-lean-4.29 branch.
+[[require]]
+name = "RISCV"
+git = "https://github.com/succinctlabs/riscv-lean"
+rev = "v6.2.2"
+
 [[require]]
 name = "Clean"
-path = "../clean"
+git = "https://github.com/succinctlabs/clean"
+rev = "v6.2.2"
 
 [[lean_lib]]
 name = "SP1Foundations"

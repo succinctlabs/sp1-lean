@@ -37,6 +37,7 @@ deriving DecidableEq, Repr
 /-- Mirrors Rust `UserModeReaderCols<T>`
 (`sp1/crates/core/machine/src/lib.rs:78-82`). The single column controls
 whether the reader emits its trusted-program lookup at this row. -/
+@[ext]
 structure UserModeReaderCols (T : Type) where
   is_trusted : T
 deriving ProvableStruct
