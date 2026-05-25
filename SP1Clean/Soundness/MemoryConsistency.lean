@@ -22,8 +22,8 @@ import SP1Clean.ShiftRightChip
 import SP1Clean.DivRemChip
 import SP1Clean.AddiChip.SailBridge
 import SP1Clean.BitwiseChip
-import SP1Clean.SubChip
-import SP1Clean.SubwChip
+import SP1Clean.SubChip.SailBridge
+import SP1Clean.SubwChip.SailBridge
 import SP1Clean.MemoryGlobalChip
 
 /-! # Trace-level OfflineMemory bridge
@@ -102,7 +102,7 @@ inductive ChipRow (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   | addi (cols : SP1Clean.Addi.AddiCols (ZMod p))
   | bitwise (cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
   | sub (cols : SP1Clean.Sub.SubCols (ZMod p))
-  | subw (cols : SP1Clean.Sub.W.SubwCols (ZMod p))
+  | subw (cols : SP1Clean.Subw.SubwCols (ZMod p))
   /-- Memory-bus boundary: initialization records. Closes the bus at
   the lowest timestamp by claiming `prev_value = 0` for each address
   the trace ever accesses. See `SP1Clean/MemoryGlobalChip.lean`. -/
@@ -603,7 +603,7 @@ def Spec : ChipRow p → Prop
   | .addi cols => SP1Clean.Addi.assertion.Spec cols
   | .bitwise cols => SP1Clean.Bitwise.assertion.Spec cols
   | .sub cols => SP1Clean.Sub.assertion.Spec cols
-  | .subw cols => SP1Clean.Sub.W.assertion.Spec cols
+  | .subw cols => SP1Clean.Subw.assertion.Spec cols
   -- Boundary chips: Phase 4 placeholder Spec := True.
   | .memInit cols => SP1Clean.MemoryGlobal.Spec cols
   | .memFinalize cols => SP1Clean.MemoryGlobal.Spec cols
@@ -960,41 +960,58 @@ theorem memoryAccessesValid_of_spec_jalr
   · subst h; exact h_oa_a
   · subst h; exact h_oa_b
 
-/-- Sub's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type: op_a/+4, op_b/+3, op_c/+2. -/
+/-- Sub's per-chip discharge — projects the Gated `RTypeReader.Spec`'s
+three `RegisterAccess.Spec` conjuncts (post-directory-port). R-type:
+op_a/+4, op_b/+3, op_c/+2. Mirrors `memoryAccessesValid_of_spec_add`. -/
 theorem memoryAccessesValid_of_spec_sub
     (cols : SP1Clean.Sub.SubCols (ZMod p))
-    (h : SP1Clean.Sub.assertion.Spec cols) :
+    (h : SP1Clean.Sub.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     ChipRow.memoryAccessesValid (.sub cols) := by
   change SP1Clean.Sub.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h
+  obtain ⟨_h_subop, _h_cpu, h_rtr, _h_op_a_0, _h_rv64sub⟩ := h
+  -- Unpack RTypeReader.Gated.Spec's per-operand RegisterAccess.Specs
+  -- (positions 3/4/5 of the 9-tuple).
+  obtain ⟨_h_ir_bin, _h_prog, h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
+  have h_ir_ne_zero : cols.is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
+  have h_a := h_ra_a.resolve_left h_ir_ne_zero
+  have h_b := h_ra_b.resolve_left h_ir_ne_zero
+  have h_c := h_ra_c.resolve_left h_ir_ne_zero
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+  · subst h; exact ⟨h_a.1, h_a.2.1, h_a.2.2⟩
+  · subst h; exact ⟨h_b.1, h_b.2.1, h_b.2.2⟩
+  · subst h; exact ⟨h_c.1, h_c.2.1, h_c.2.2⟩
 
-/-- Subw's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type variant (W-flavor): op_a/+4, op_b/+3, op_c/+2. -/
+/-- Subw's per-chip discharge — projects the Gated `RTypeReader.Spec`'s
+three `RegisterAccess.Spec` conjuncts (post-directory-port). R-type
+variant (W-flavor): op_a/+4, op_b/+3, op_c/+2. Mirrors
+`memoryAccessesValid_of_spec_sub`. -/
 theorem memoryAccessesValid_of_spec_subw
-    (cols : SP1Clean.Sub.W.SubwCols (ZMod p))
-    (h : SP1Clean.Sub.W.assertion.Spec cols) :
+    (cols : SP1Clean.Subw.SubwCols (ZMod p))
+    (h : SP1Clean.Subw.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     ChipRow.memoryAccessesValid (.subw cols) := by
-  change SP1Clean.Sub.W.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_isreal, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h
+  change SP1Clean.Subw.Assertion.FormalSpec cols at h
+  obtain ⟨_h_subwop, _h_cpu, h_rtr, _h_op_a_0⟩ := h
+  obtain ⟨_h_ir_bin, _h_prog, h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
+  have h_ir_ne_zero : cols.is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
+  have h_a := h_ra_a.resolve_left h_ir_ne_zero
+  have h_b := h_ra_b.resolve_left h_ir_ne_zero
+  have h_c := h_ra_c.resolve_left h_ir_ne_zero
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+  · subst h; exact ⟨h_a.1, h_a.2.1, h_a.2.2⟩
+  · subst h; exact ⟨h_b.1, h_b.2.1, h_b.2.2⟩
+  · subst h; exact ⟨h_c.1, h_c.2.1, h_c.2.2⟩
 
 /-- Bitwise's per-chip discharge — three `OperandAccess.Assertion.Spec`
 conjuncts. R-type-shaped: op_a/+4, op_b/+3, op_c/+2 (the chip's `op_c`

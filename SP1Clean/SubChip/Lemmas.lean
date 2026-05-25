@@ -27,7 +27,7 @@ Mirrors `SP1Clean/AddChip/Lemmas.lean` 1-for-1, swapping `AddOp`/`AddOperation`
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-namespace SP1Clean.SubChip
+namespace SP1Clean.Sub
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -97,4 +97,4 @@ lemma allHold_iff_structural
     refine ⟨h_subop, h_cpu, h_rtr, ?_, h_op_a_0⟩
     ring
 
-end SP1Clean.SubChip
+end SP1Clean.Sub

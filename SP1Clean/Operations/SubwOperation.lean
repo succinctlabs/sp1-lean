@@ -186,4 +186,62 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
+/-- Bridge between the borrow-form `Assertion.Spec` (matching `main`'s `d_i`
+expressions verbatim) and the natural-form `Spec` (which `iff_sp1` bridges
+to SP1's allHold). Mirrors `SubwOperation.allHold_constraints_iff`'s
+internal d↔c carry-swap + U16MSB conversion, but localized to Clean's
+two Spec forms. -/
+theorem Assertion_Spec_iff_Spec (a b : Word (ZMod p)) (value : Vector (ZMod p) 2)
+    (msb : ZMod p) :
+    Assertion.Spec ⟨a, b, value, msb⟩ ↔
+      Spec a b { value := value, msb := { msb := msb } } := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hbridge : (65536 : ZMod p)⁻¹ * (65536 : ZMod p) = 1 :=
+    inv_mul_cancel₀ val_65536_ne_zero
+  refine ⟨?_, ?_⟩
+  · rintro ⟨h_d0, h_d1, hr0, hr1, h_msb_bin, h_msb_check⟩
+    refine ⟨?_, ?_, ?_, hr0, hr1⟩
+    · -- U16MSB: bridge `(msb_bin ∧ msb_check_range)` to
+      -- `List.Forall toProp (U16MSBOperation.constraints …)`.
+      rw [_root_.U16MSBOperation.allHold_constraints_iff (is_real := 1)]
+      refine ⟨Or.inr rfl, ?_, fun _ => h_msb_check⟩
+      rcases mul_eq_zero.mp h_msb_bin with h | h
+      · exact Or.inl h
+      · exact Or.inr (by linear_combination h)
+    · -- carry0 ∈ {0,1}: linear_combination on h_d0 and hbridge.
+      rcases h_d0 with h | h
+      · exact Or.inr (by linear_combination -h + hbridge)
+      · exact Or.inl (by linear_combination -h + hbridge)
+    · -- carry1 ∈ {0,1}: chained linear_combination (depends on carry0's bridge).
+      rcases h_d1 with h | h
+      · exact Or.inr (by
+          linear_combination -h + (1 + (65536 : ZMod p)⁻¹) * hbridge)
+      · exact Or.inl (by
+          linear_combination -h + (1 + (65536 : ZMod p)⁻¹) * hbridge)
+  · rintro ⟨h_u16, h_c0, h_c1, hr0, hr1⟩
+    -- Extract borrow-form msb_bin + msb_check_range from the SP1-style
+    -- U16MSB allHold clause via `U16MSBOperation.allHold_constraints_iff`.
+    rw [_root_.U16MSBOperation.allHold_constraints_iff (is_real := 1)] at h_u16
+    obtain ⟨_, h_msb_bin_or, h_msb_check_imp⟩ := h_u16
+    have h_msb_check : (2 * value[1] - msb * 65536 : ZMod p).val < 65536 :=
+      h_msb_check_imp one_ne_zero
+    have h_msb_bin : msb * (msb - 1) = 0 := by
+      -- h_msb_bin_or has the struct-projection form `{...}.msb.msb ∈ {0,1}`;
+      -- reduce to bare `msb ∈ {0,1}` before substituting.
+      have h_msb_bin_or' : msb = 0 ∨ msb = 1 := h_msb_bin_or
+      rcases h_msb_bin_or' with h | h
+      · rw [h]; ring
+      · rw [h]; ring
+    refine ⟨?_, ?_, hr0, hr1, h_msb_bin, h_msb_check⟩
+    · -- d0 ∈ {0,1} from c0 ∈ {0,1} via reverse bridge.
+      rcases h_c0 with h | h
+      · exact Or.inr (by linear_combination -h + hbridge)
+      · exact Or.inl (by linear_combination -h + hbridge)
+    · -- d1 ∈ {0,1} from c1 ∈ {0,1} via reverse bridge.
+      rcases h_c1 with h | h
+      · exact Or.inr (by
+          linear_combination -h + (1 + (65536 : ZMod p)⁻¹) * hbridge)
+      · exact Or.inl (by
+          linear_combination -h + (1 + (65536 : ZMod p)⁻¹) * hbridge)
+
 end SP1Clean.SubwOp

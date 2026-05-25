@@ -15,7 +15,7 @@ import RISCV.Instructions
 
 /-! # `SubwChip` cols-level surface (directory-form scaffold)
 
-Entry-point module for `SP1Clean.SubwChip`: defines the `SubwCols` column
+Entry-point module for `SP1Clean.Subw`: defines the `SubwCols` column
 struct, `fromMain`/`toMain` projections, and cols-level Sail-side helpers.
 
 **Important divergence from `AddwChip`:** Subw uses `RTypeReader`, NOT
@@ -29,14 +29,12 @@ column (`Main[30]`). The 4-limb `op_a_write_value` fed into RTypeReader
 is reconstructed as `[subw_value[0], subw_value[1], subw_msb * 65535,
 subw_msb * 65535]` (sign-extension).
 
-NOTE: this directory uses namespace `SP1Clean.SubwChip` to coexist with
-the legacy single-file `SP1Clean/SubwChip.lean` whose namespace is
-`SP1Clean.Sub.W`. -/
+Mirrors the `SP1Clean.Subw` template 1-for-1 (RType reader, opcode 20). -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-namespace SP1Clean.SubwChip
+namespace SP1Clean.Subw
 
 open Circuit ProvableType
 
@@ -144,11 +142,15 @@ omit [Fact (2 ^ 17 < p)] in
 
 /-! ## Chip-level `FormalSpec`
 
-The unified chip Spec: ADDW-style carry chain reused for SUBW
-(`SubwOp.Spec`), CPU-state byte bounds, full R-type reader spec, two
-trailing scalar gates. Mirrors `SP1Clean/AddwChip/Cols.lean`'s `FormalSpec`
-but with `SubwOp.Spec` and `rtypeReaderSpec` (R-type) in place of
-`AddwOp.Spec` and `aluTypeReaderSpec`. -/
+The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
+can reference it without importing the full circuit construction:
+SUBW carry-chain arithmetic (`SubwOp.Spec`, Inputs-shape) plus the
+flag-threaded sub-circuit composition (`CPUState.Gated` +
+`RTypeReader.Gated`, opcode 20) plus the chip-level `op_a_0 = 0` gate.
+The free `is_real * (is_real - 1) = 0` gate now lives inside both
+Gated.Specs' first conjuncts. Mirrors `SP1Clean/AddwChip/Cols.lean`'s
+`FormalSpec` but with `RTypeReader.Gated.Assertion.Spec` in place of
+`ALUTypeReader.Gated.Assertion.Spec` (Subw is RType-only, no SUBIW). -/
 def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let op_a_write_value : Word (ZMod p) :=
@@ -157,10 +159,14 @@ def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
   SP1Clean.SubwOp.Spec
       cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
       { value := cols.subw_value, msb := { msb := cols.subw_msb } } ∧
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.RTypeReader.rtypeReaderSpec clk_low 20 cols.state.pc
-      op_a_write_value cols.adapter ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ ∧
+  SP1Clean.RTypeReader.Gated.Assertion.Spec
+      ⟨cols.state.clk_high, clk_low, 20, cols.state.pc,
+       op_a_write_value, cols.adapter,
+       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0
 
-end SP1Clean.SubwChip
+end SP1Clean.Subw

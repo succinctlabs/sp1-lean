@@ -15,13 +15,13 @@ import RISCV.Instructions
 
 /-! # `SubChip` cols-level surface (directory-form scaffold)
 
-Entry-point module for `SP1Clean.SubChip`: defines the `SubCols` column
+Entry-point module for `SP1Clean.Sub`: defines the `SubCols` column
 struct (mirroring SP1's Rust `SubCols<T, M: TrustMode>` under
 `M = UserMode`), the `fromMain`/`toMain` projections between the flat
 SP1 row and the structured `SubCols` view, and the `cols`-level Sail-side
 helpers (`sp1_op_{a,b,c}_cols`, `sp1_sub_cols`, `subInitialState_cols`).
 
-NOTE: this directory currently uses namespace `SP1Clean.SubChip` (matching
+NOTE: this directory currently uses namespace `SP1Clean.Sub` (matching
 the module path) to coexist with the legacy single-file
 `SP1Clean/SubChip.lean` whose namespace is `SP1Clean.Sub`. Once that file
 is deleted, this namespace can be renamed to `SP1Clean.Sub` to match the
@@ -31,17 +31,17 @@ Mirrors the `SP1Clean.Add` template 1-for-1 (RType reader, opcode 2 swapping
 in for opcode 0). Row width: **33** (`is_real = Main[32]`).
 
 Imported (in order) by:
-- `SP1Clean.SubChip.Lemmas` — non-trivial lemmas about cols
+- `SP1Clean.Sub.Lemmas` — non-trivial lemmas about cols
   (`fromMain_toMain`, `allHold_iff_structural`).
-- `SP1Clean.SubChip.Circuit` — `Assertion.main`, `FormalSpec`,
+- `SP1Clean.Sub.Circuit` — `Assertion.main`, `FormalSpec`,
   soundness/completeness, and the `assertion : FormalAssertion`.
-- `SP1Clean.SubChip.SailBridge` — the external
+- `SP1Clean.Sub.SailBridge` — the external
   `sail_correct_of_formalSpec` Sail-equivalence bridge. -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-namespace SP1Clean.SubChip
+namespace SP1Clean.Sub
 
 open Circuit ProvableType
 
@@ -174,4 +174,4 @@ def FormalSpec (cols : SubCols (ZMod p)) : Prop :=
       RV64.sub (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
-end SP1Clean.SubChip
+end SP1Clean.Sub

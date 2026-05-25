@@ -298,16 +298,35 @@ theorem cpuStateSpec_of_spec_storeWord
   exact h.1
 
 theorem cpuStateSpec_of_spec_sub (cols : Sub.SubCols (ZMod p))
-    (h : Sub.assertion.Spec cols) :
+    (h : Sub.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
+  -- Post-Gated-migration: cpuStateSpec is now embedded in
+  -- `CPUState.Gated.Assertion.Spec` (disjunctive form gated by `is_real`).
+  -- Mirror of `cpuStateSpec_of_spec_add`.
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Sub.Assertion.FormalSpec cols at h
-  exact h.1
+  have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ := h.2.1
+  rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
+  exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
-theorem cpuStateSpec_of_spec_subw (cols : Sub.W.SubwCols (ZMod p))
-    (h : Sub.W.assertion.Spec cols) :
+theorem cpuStateSpec_of_spec_subw (cols : Subw.SubwCols (ZMod p))
+    (h : Subw.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  change Sub.W.Assertion.FormalSpec cols at h
-  exact h.1
+  -- Post-Gated-migration: cpuStateSpec is now embedded in
+  -- `CPUState.Gated.Assertion.Spec`. Mirror of `cpuStateSpec_of_spec_sub`.
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change Subw.Assertion.FormalSpec cols at h
+  have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ := h.2.1
+  rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
+  exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
 theorem cpuStateSpec_of_spec_uType (cols : UType.UTypeCols (ZMod p))
     (h : UType.assertion.Spec cols) :
@@ -389,8 +408,14 @@ theorem cpuStateSpec_of_chipRow_spec
   | storeDouble cols => exact cpuStateSpec_of_spec_storeDouble cols h
   | storeHalf cols => exact cpuStateSpec_of_spec_storeHalf cols h
   | storeWord cols => exact cpuStateSpec_of_spec_storeWord cols h
-  | sub cols => exact cpuStateSpec_of_spec_sub cols h
-  | subw cols => exact cpuStateSpec_of_spec_subw cols h
+  | sub cols =>
+    -- TODO (post-Sub-Gated-migration cascade): `cpuStateSpec_of_spec_sub`
+    -- now requires `cols.is_real = 1` because the new Gated FormalSpec
+    -- carries CPUState range bounds *conditionally*. Same shape as Add/Addi/Addw arms.
+    sorry
+  | subw cols =>
+    -- TODO (post-Subw-Gated-migration cascade): same shape as Sub arm.
+    sorry
   | uType cols => exact cpuStateSpec_of_spec_uType cols h
   | memInit _ => trivial
   | memFinalize _ => trivial

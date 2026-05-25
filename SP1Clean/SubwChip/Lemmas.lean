@@ -4,31 +4,52 @@ import SP1Clean.Operations.SubwOperation
 import SP1Clean.Reader.RTypeReader
 import SP1Chips.Subw.Common
 
-/-! # `SubwChip` cols-level lemmas (directory-form scaffold)
+/-! # `SubwChip` cols-level lemmas
 
-Two non-trivial lemmas. Mirrors `SP1Clean/AddwChip/Lemmas.lean` but with
-`RTypeReader.rtypeReaderSpec` in place of `aluTypeReaderSpec` (no
-`imm_c` switch — Subw is RType-only). Bodies are `sorry`. -/
+Two non-trivial lemmas that bridge cols-level data to SP1's flat-row
+machinery:
+
+- `fromMain_toMain` — `fromMain (toMain cols) = cols` (cols → Main → cols
+  round-trip), conditional on the UserMode TrustMode marker
+  `cols.adapter_cols.is_trusted = cols.is_real`.
+- `allHold_iff_structural` — bridges `(_root_.Subw.constraints Main).allHold`
+  under `is_real = 1` to the conjunction of `SubwOp.Spec`,
+  `CPUState.Gated.Spec`, `RTypeReader.Gated.Spec`, and the trailing
+  `Main[13] = 0` op_a_0 gate. Used downstream by `SailBridge.lean` to
+  reconstruct `(Subw.constraints (toMain cols)).allHold` from the
+  structural conjuncts of `FormalSpec`.
+
+Mirrors `SP1Clean/SubChip/Lemmas.lean` for the W-style result shape
+(`{ value := #v[Main[28], Main[29]], msb := { msb := Main[30] } }`) and
+opcode `20` (SUBW). -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-namespace SP1Clean.SubwChip
+namespace SP1Clean.Subw
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-/-- `fromMain` is a left inverse of `toMain`, conditional on
-`cols.adapter_cols.is_trusted = cols.is_real`. -/
+/-- `fromMain` is a left inverse of `toMain` (cols → Main → cols round-trip),
+conditional on `cols.adapter_cols.is_trusted = cols.is_real`. -/
 lemma fromMain_toMain (cols : SubwCols (ZMod p))
     (h_trusted : cols.adapter_cols.is_trusted = cols.is_real) :
     fromMain (toMain cols) = cols := by
-  sorry
+  rcases cols with ⟨state, adapter, subw_value, subw_msb, is_real, adapter_cols⟩
+  have : adapter_cols.is_trusted = is_real := by simpa using h_trusted
+  simp [this, SubwCols.ext_iff, CPUState.ext_iff,
+    RTypeReader.ext_iff, MemoryAccessInSharedCols.ext_iff,
+    UserModeReaderCols.ext_iff]
+  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_⟩
+  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
 `Subw.constraints Main` is exactly the conjunction of `SubwOp.Spec`,
-`cpuStateSpec`, and `rtypeReaderSpec` over `fromMain Main`, under
-`is_real = Main[31] = 1`. -/
+`CPUState.Gated.Assertion.Spec`, and `RTypeReader.Gated.Assertion.Spec`
+over `fromMain Main`, under `is_real = Main[31] = 1`. The chip-level
+free `Main[31] * (Main[31] - 1) = 0` gate is absorbed into both
+Gated.Specs' first conjuncts. -/
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 32) (h_is_real : Main[31] = 1) :
     (_root_.Subw.constraints Main).allHold ↔
@@ -36,27 +57,43 @@ lemma allHold_iff_structural
           #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[22], Main[23], Main[24], Main[25]]
           { value := #v[Main[28], Main[29]], msb := { msb := Main[30] } } ∧
-       SP1Clean.CPUState.cpuStateSpec Main[2] Main[1] ∧
-       SP1Clean.RTypeReader.rtypeReaderSpec
-          (Main[2] + Main[1] * 65536) 20 #v[Main[3], Main[4], Main[5]]
-          #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535]
-          { op_a := Main[6],
-            op_a_memory :=
-              { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-                access_timestamp :=
-                  { prev_low := Main[11], diff_low_limb := Main[12] } },
-            op_a_0 := Main[13], op_b := Main[14],
-            op_b_memory :=
-              { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
-                access_timestamp :=
-                  { prev_low := Main[19], diff_low_limb := Main[20] } },
-            op_c := Main[21],
-            op_c_memory :=
-              { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
-                access_timestamp :=
-                  { prev_low := Main[26], diff_low_limb := Main[27] } } } ∧
-       Main[31] * (Main[31] - 1) = 0 ∧
+       SP1Clean.CPUState.Gated.Assertion.Spec
+          ⟨{ clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+             pc := #v[Main[3], Main[4], Main[5]] },
+           #v[Main[3] + 4, Main[4], Main[5]], 8, Main[31]⟩ ∧
+       SP1Clean.RTypeReader.Gated.Assertion.Spec
+          ⟨Main[0], Main[2] + Main[1] * 65536, 20,
+           #v[Main[3], Main[4], Main[5]],
+           #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535],
+           { op_a := Main[6],
+             op_a_memory :=
+               { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                 access_timestamp :=
+                   { prev_low := Main[11], diff_low_limb := Main[12] } },
+             op_a_0 := Main[13], op_b := Main[14],
+             op_b_memory :=
+               { prev_value := #v[Main[15], Main[16], Main[17], Main[18]],
+                 access_timestamp :=
+                   { prev_low := Main[19], diff_low_limb := Main[20] } },
+             op_c := Main[21],
+             op_c_memory :=
+               { prev_value := #v[Main[22], Main[23], Main[24], Main[25]],
+                 access_timestamp :=
+                   { prev_low := Main[26], diff_low_limb := Main[27] } } },
+           Main[31], Main[31]⟩ ∧
        Main[13] = 0) := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [_root_.Subw.allHold_constraints_iff Main, h_is_real,
+      SP1Clean.SubwOp.iff_sp1,
+      SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1,
+      SP1Clean.RTypeReader.Gated.Assertion.Spec_iff_sp1]
+  -- Drop the trivial `1 * (1 - 1) = 0` conjunct — both Gated.Specs already
+  -- carry their own `is_real * (is_real - 1) = 0`.
+  refine ⟨?_, ?_⟩
+  · rintro ⟨h_subwop, h_cpu, h_rtr, _, h_op_a_0⟩
+    exact ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩
+  · rintro ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩
+    refine ⟨h_subwop, h_cpu, h_rtr, ?_, h_op_a_0⟩
+    ring
 
-end SP1Clean.SubwChip
+end SP1Clean.Subw

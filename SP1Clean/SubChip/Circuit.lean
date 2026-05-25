@@ -31,7 +31,7 @@ and the upstream Rust `SubChip::eval`'s `RTypeReader::eval` invocation 1:1.
 
 The per-row Sail-monadic equivalence to `_root_.Sub.spec_sub` is *not*
 inside `FormalSpec`; it's derived externally via
-`SP1Clean.SubChip.SailBridge.sail_correct_of_formalSpec`.
+`SP1Clean.Sub.SailBridge.sail_correct_of_formalSpec`.
 
 Mirrors `SP1Clean/AddChip/Circuit.lean` 1-for-1 with `AddOp` → `SubOp` and
 opcode `0` → `2`. -/
@@ -39,7 +39,7 @@ opcode `0` → `2`. -/
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-namespace SP1Clean.SubChip
+namespace SP1Clean.Sub
 
 open Circuit ProvableType
 
@@ -92,8 +92,8 @@ def Assumptions (cols : SubCols (ZMod p)) : Prop :=
   cols.adapter_cols.is_trusted = cols.is_real
 
 /-- The unified chip Spec is defined in `Cols.lean`
-(`SP1Clean.SubChip.FormalSpec`). -/
-abbrev FormalSpec := @SP1Clean.SubChip.FormalSpec p
+(`SP1Clean.Sub.FormalSpec`). -/
+abbrev FormalSpec := @SP1Clean.Sub.FormalSpec p
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -164,4 +164,4 @@ def assertion : FormalAssertion (ZMod p) SubCols :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
-end SP1Clean.SubChip
+end SP1Clean.Sub

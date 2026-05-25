@@ -265,18 +265,18 @@ theorem is_real_binary_storeWord
 theorem is_real_binary_sub (cols : SP1Clean.Sub.SubCols (ZMod p))
     (h : SP1Clean.Sub.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.Sub.Assertion.FormalSpec cols at h
-  unfold SP1Clean.Sub.Assertion.FormalSpec at h
-  tauto
+  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
+  -- first conjunct (mirror of Add).
+  exact binary_of_assertZero _ h.2.1.1
 
-theorem is_real_binary_subw (cols : SP1Clean.Sub.W.SubwCols (ZMod p))
-    (h : SP1Clean.Sub.W.assertion.Spec cols) :
+theorem is_real_binary_subw (cols : SP1Clean.Subw.SubwCols (ZMod p))
+    (h : SP1Clean.Subw.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
-  change SP1Clean.Sub.W.Assertion.FormalSpec cols at h
-  unfold SP1Clean.Sub.W.Assertion.FormalSpec at h
-  tauto
+  change SP1Clean.Subw.Assertion.FormalSpec cols at h
+  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
+  -- first conjunct (mirror of Add).
+  exact binary_of_assertZero _ h.2.1.1
 
 theorem is_real_binary_uType (cols : SP1Clean.UType.UTypeCols (ZMod p))
     (h : SP1Clean.UType.assertion.Spec cols) :

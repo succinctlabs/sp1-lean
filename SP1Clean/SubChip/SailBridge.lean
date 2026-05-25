@@ -24,7 +24,7 @@ Mirrors `SP1Clean/AddChip/SailBridge.lean` 1-for-1 with `Add` → `Sub`. -/
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-namespace SP1Clean.SubChip
+namespace SP1Clean.Sub
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -79,4 +79,4 @@ theorem sail_correct_of_formalSpec
   -- which is definitionally `sp1_X_cols cols` for each helper.
   exact (_root_.Sub.correct_sub (toMain cols) s h_allHold h_isreal' h_state).symm
 
-end SP1Clean.SubChip
+end SP1Clean.Sub

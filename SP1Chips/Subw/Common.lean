@@ -12,19 +12,22 @@ namespace Subw
 variable {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 set_option linter.unusedSectionVars false in
+-- Polymorphic iff lemma mirroring `Sub.allHold_constraints_iff` (canonical
+-- ALU-chip shape: both sides in `.allHold` form, not `List.Forall toProp`).
+-- Exposes 3 sub-allHolds (SubwOp/CPUState/RTypeReader) + 2 chip-list assertZeros.
 lemma allHold_constraints_iff (Main : Vector (ZMod p) 32) :
-    List.Forall SP1Constraint.toProp (constraints Main) ↔
-    List.Forall SP1Constraint.toProp
+    (constraints Main).allHold ↔
+    SP1ConstraintList.allHold
         (SubwOperation.constraints (F := ZMod p)
           #v[Main[15], Main[16], Main[17], Main[18]]
           #v[Main[22], Main[23], Main[24], Main[25]]
           { value := #v[Main[28], Main[29]], msb := { msb := Main[30] } }
           Main[31]) ∧
-    List.Forall SP1Constraint.toProp
+    SP1ConstraintList.allHold
         (_root_.CPUState.constraints
           (CPUState.mk Main[0] Main[1] Main[2] #v[Main[3], Main[4], Main[5]])
           #v[Main[3] + 4, Main[4], Main[5]] 8 Main[31]) ∧
-    List.Forall SP1Constraint.toProp
+    SP1ConstraintList.allHold
         (RTypeReader.constraints Main[0] (Main[2] + Main[1] * 65536)
           #v[Main[3], Main[4], Main[5]] 20
           #v[Main[28], Main[29], Main[30] * 65535, Main[30] * 65535]
