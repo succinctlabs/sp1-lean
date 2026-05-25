@@ -75,19 +75,27 @@ theorem is_real_binary_add (cols : SP1Clean.Add.AddCols (ZMod p))
     (h : SP1Clean.Add.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   change SP1Clean.Add.Assertion.FormalSpec cols at h
-  exact binary_of_assertZero _ h.2.2.2.1
+  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
+  -- first conjunct (the binary-gate sub-circuit emission). Path:
+  -- h.2 = (CPUState.Gated.Spec ∧ …); h.2.1 = CPUState.Gated.Spec;
+  -- h.2.1.1 = `cols.is_real * (cols.is_real - 1) = 0`.
+  exact binary_of_assertZero _ h.2.1.1
 
 theorem is_real_binary_addi (cols : SP1Clean.Addi.AddiCols (ZMod p))
     (h : SP1Clean.Addi.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   change SP1Clean.Addi.FormalSpec cols at h
-  exact binary_of_assertZero _ h.2.2.2.1
+  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
+  -- first conjunct (mirror of Add).
+  exact binary_of_assertZero _ h.2.1.1
 
 theorem is_real_binary_addw (cols : SP1Clean.Addw.AddwCols (ZMod p))
     (h : SP1Clean.Addw.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   change SP1Clean.Addw.FormalSpec cols at h
-  exact binary_of_assertZero _ h.2.2.2.1
+  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
+  -- first conjunct (mirror of Add/Addi).
+  exact binary_of_assertZero _ h.2.1.1
 
 theorem is_real_binary_bitwise (cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
     (h : SP1Clean.Bitwise.assertion.Spec cols) :

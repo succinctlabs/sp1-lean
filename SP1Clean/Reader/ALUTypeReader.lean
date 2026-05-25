@@ -529,6 +529,170 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
+/-- Bridge from SP1-native `ALUTypeReader.constraints.allHold` (under
+`is_real = is_trusted = 1` pinning) to the literal sub-circuit conjunction
+`Gated.Assertion.Spec ⟨..., 1, 1⟩`. The pinned form is sufficient for
+chip-level `allHold_iff_structural` proofs (which always specialize via
+`h_is_real : Main[N-1] = 1`).
+
+Unlike R/I-type, the ALU bridge is necessarily pinned: SP1's
+`_root_.ALUTypeReader.allHold_constraints_iff` carries two extra conjuncts
+(`is_real = 0 → imm_c = 0` and `(is_real - imm_c) * (is_real - imm_c - 1)
+= 0`) that the flag-threaded `Gated.Spec` does NOT carry — they become
+trivial / derivable from `ProgramSpec`'s `imm_c` binary clause under
+`is_real = 1`. -/
+theorem Assertion.Spec_iff_sp1
+    {clk_high clk_low opcode : ZMod p}
+    {pc : Vector (ZMod p) 3}
+    {op_a_write_value : Word (ZMod p)}
+    {cols : _root_.ALUTypeReader (ZMod p)} :
+    (_root_.ALUTypeReader.constraints clk_high clk_low pc opcode op_a_write_value
+        cols 1 1).allHold ↔
+      Assertion.Spec ⟨clk_high, clk_low, opcode, pc, op_a_write_value, cols,
+                      1, 1⟩ := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [aluTypeReaderSpec_iff_sp1]
+  have h_0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
+    change (0 : ZMod p).val < (65536 : ZMod p).val; simp
+  simp only [Assertion.Spec, aluTypeReaderSpec,
+    SP1Clean.ProgramGated.Spec, SP1Clean.ProgramSpec,
+    SP1Clean.RegisterAccess.Assertion.Spec,
+    SP1Clean.OperandAccess.AssertionGated.Spec,
+    Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  refine ⟨?_, ?_⟩
+  -- → direction.
+  · rintro ⟨h_ti, h_op_a, h_op_b, ⟨h_oc0, h_oc1, h_oc2, h_oc3⟩,
+            h_op_a_0_bin, h_op_a_0_iff, h_immc_bin,
+            h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt,
+            h_diff_a, h_diff_b, h_ts_b, h_ts_a, h_isU64_a, h_isU64_b,
+            h_immc_zero_facts, h_op_a_0_imp, h_immc_eq⟩
+    have h_z0 : cols.op_a_0 * op_a_write_value[0] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).1]; ring
+    have h_z1 : cols.op_a_0 * op_a_write_value[1] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.1]; ring
+    have h_z2 : cols.op_a_0 * op_a_write_value[2] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.2.1]; ring
+    have h_z3 : cols.op_a_0 * op_a_write_value[3] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.2.2]; ring
+    have h_imc0 : cols.imm_c * (cols.op_c_memory.prev_value[0] - cols.op_c[0]) = 0 := by
+      by_cases h0 : cols.imm_c = 0
+      · rw [h0]; ring
+      · have h_eq := (h_immc_eq h0).1
+        linear_combination cols.imm_c * h_eq
+    have h_imc1 : cols.imm_c * (cols.op_c_memory.prev_value[1] - cols.op_c[1]) = 0 := by
+      by_cases h0 : cols.imm_c = 0
+      · rw [h0]; ring
+      · have h_eq := (h_immc_eq h0).2.1
+        linear_combination cols.imm_c * h_eq
+    have h_imc2 : cols.imm_c * (cols.op_c_memory.prev_value[2] - cols.op_c[2]) = 0 := by
+      by_cases h0 : cols.imm_c = 0
+      · rw [h0]; ring
+      · have h_eq := (h_immc_eq h0).2.2.1
+        linear_combination cols.imm_c * h_eq
+    have h_imc3 : cols.imm_c * (cols.op_c_memory.prev_value[3] - cols.op_c[3]) = 0 := by
+      by_cases h0 : cols.imm_c = 0
+      · rw [h0]; ring
+      · have h_eq := (h_immc_eq h0).2.2.2
+        linear_combination cols.imm_c * h_eq
+    refine ⟨by ring, ?_, ?_, ?_, ?_,
+            h_z0, h_z1, h_z2, h_z3, h_imc0, h_imc1, h_imc2, h_imc3⟩
+    -- ProgramGated.Spec ⟨..., 1⟩ = `1 = 0 ∨ ProgramSpec entry` ↔ ProgramSpec entry.
+    · right
+      exact ⟨h_ti, h_op_a,
+             ⟨h_op_b, h_0_lt_65536, h_0_lt_65536, h_0_lt_65536⟩,
+             ⟨h_oc0, h_oc1, h_oc2, h_oc3⟩,
+             h_op_a_0_bin, h_op_a_0_iff, Or.inl trivial, h_immc_bin,
+             h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩
+    -- RegisterAccess.Spec ⟨..., 1⟩ for op_a (offset +4).
+    · right
+      exact ⟨h_diff_a, h_ts_a,
+             (SP1Clean.ALUTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_a⟩
+    -- RegisterAccess.Spec ⟨..., 1⟩ for op_b (offset +3).
+    · right
+      exact ⟨h_diff_b, h_ts_b,
+             (SP1Clean.ALUTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b⟩
+    -- RegisterAccess.Spec ⟨..., 1 - imm_c⟩ for op_c (offset +2).
+    · by_cases h_imm_c_one : (1 : ZMod p) - cols.imm_c = 0
+      · exact Or.inl h_imm_c_one
+      · right
+        -- 1 - imm_c ≠ 0 ↔ imm_c ≠ 1 ↔ imm_c = 0 (under binary).
+        have h_imm_c_zero : cols.imm_c = 0 := by
+          rcases h_immc_bin with h | h
+          · exact h
+          · exfalso; apply h_imm_c_one; rw [h]; ring
+        obtain ⟨h_ts_c, h_diff_c, h_isU64_c⟩ := h_immc_zero_facts h_imm_c_zero
+        exact ⟨h_diff_c, h_ts_c,
+               (SP1Clean.ALUTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_c⟩
+  -- ← direction.
+  · rintro ⟨_h_ir_bin, h_prog_disj, h_ra_a_disj, h_ra_b_disj, h_ra_c_disj,
+            h_z0, h_z1, h_z2, h_z3, h_imc0, h_imc1, h_imc2, h_imc3⟩
+    -- Resolve ProgramGated.Spec: 1 ≠ 0, so disjunct gives ProgramSpec.
+    have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
+    have h_ps := h_prog_disj.resolve_left h_one_ne_zero
+    obtain ⟨h_ti, h_op_a, ⟨h_op_b, _, _, _⟩, ⟨h_oc0, h_oc1, h_oc2, h_oc3⟩,
+            h_op_a_0_bin, h_op_a_0_iff, _h_imm_b_bin, h_immc_bin,
+            h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩ := h_ps
+    -- Resolve op_a/op_b RegisterAccess.Specs (mult = 1 ≠ 0).
+    have h_a := h_ra_a_disj.resolve_left h_one_ne_zero
+    have h_b := h_ra_b_disj.resolve_left h_one_ne_zero
+    -- op_a_0 zero-tuple from 4× mul gates.
+    have h_op_a_0_imp : cols.op_a_0 ≠ 0 →
+        op_a_write_value[0] = 0 ∧ op_a_write_value[1] = 0 ∧
+        op_a_write_value[2] = 0 ∧ op_a_write_value[3] = 0 := by
+      intro h_op_a_0_ne
+      exact ⟨(mul_eq_zero.mp h_z0).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z1).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z2).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z3).resolve_left h_op_a_0_ne⟩
+    -- imm_c → op_c = prev_value: from 4× imm_c mul gates.
+    have h_immc_eq : ¬cols.imm_c = 0 →
+        cols.op_c_memory.prev_value[0] = cols.op_c[0] ∧
+        cols.op_c_memory.prev_value[1] = cols.op_c[1] ∧
+        cols.op_c_memory.prev_value[2] = cols.op_c[2] ∧
+        cols.op_c_memory.prev_value[3] = cols.op_c[3] := by
+      intro h_immc_ne
+      have h0 : cols.op_c_memory.prev_value[0] - cols.op_c[0] = 0 :=
+        (mul_eq_zero.mp h_imc0).resolve_left h_immc_ne
+      have h1 : cols.op_c_memory.prev_value[1] - cols.op_c[1] = 0 :=
+        (mul_eq_zero.mp h_imc1).resolve_left h_immc_ne
+      have h2 : cols.op_c_memory.prev_value[2] - cols.op_c[2] = 0 :=
+        (mul_eq_zero.mp h_imc2).resolve_left h_immc_ne
+      have h3 : cols.op_c_memory.prev_value[3] - cols.op_c[3] = 0 :=
+        (mul_eq_zero.mp h_imc3).resolve_left h_immc_ne
+      exact ⟨sub_eq_zero.mp h0, sub_eq_zero.mp h1, sub_eq_zero.mp h2,
+             sub_eq_zero.mp h3⟩
+    -- imm_c = 0 → op_c facts: extract from op_c's RegisterAccess.Spec.
+    have h_immc_zero_facts : cols.imm_c = 0 →
+        (clk_low + 2 - cols.op_c_memory.access_timestamp.prev_low - 1 -
+              cols.op_c_memory.access_timestamp.diff_low_limb) *
+            (65536 : ZMod p)⁻¹ < (256 : ZMod p) ∧
+        cols.op_c_memory.access_timestamp.diff_low_limb.val < 65536 ∧
+        Word.isU64 #v[cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1],
+          cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]] := by
+      intro h_imm_c_zero
+      -- Under imm_c = 0, `1 - imm_c = 1 ≠ 0`, resolves op_c disjunct.
+      have h_one_sub_ne : (1 : ZMod p) - cols.imm_c ≠ 0 := by
+        rw [h_imm_c_zero, sub_zero]; exact one_ne_zero
+      have h_c := h_ra_c_disj.resolve_left h_one_sub_ne
+      exact ⟨h_c.2.1, h_c.1,
+             (SP1Clean.ALUTypeReader.Assertion.isU64_iff_index_form _).mp h_c.2.2⟩
+    exact ⟨h_ti, h_op_a, h_op_b, ⟨h_oc0, h_oc1, h_oc2, h_oc3⟩,
+           h_op_a_0_bin, h_op_a_0_iff, h_immc_bin,
+           h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt,
+           h_a.1, h_b.1, h_b.2.1, h_a.2.1,
+           (SP1Clean.ALUTypeReader.Assertion.isU64_iff_index_form _).mp h_a.2.2,
+           (SP1Clean.ALUTypeReader.Assertion.isU64_iff_index_form _).mp h_b.2.2,
+           h_immc_zero_facts, h_op_a_0_imp, h_immc_eq⟩
+
 end Gated
 
 end SP1Clean.ALUTypeReader

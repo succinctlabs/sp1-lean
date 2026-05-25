@@ -433,6 +433,126 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
 
+/-- Bridge from SP1-native `ITypeReader.constraints.allHold` to the literal
+sub-circuit conjunction `Gated.Assertion.Spec`. Composes the unpinned
+`_root_.ITypeReader.allHold_constraints_iff` (4-conjunct: binary, program,
+memory, op_a_0 zero) with the Clean-side rearrangement into the 8-tuple
+`Gated.Spec` form (binary, `ProgramGated.Spec`, 2× `RegisterAccess.Spec`,
+4× `op_a_0 * op_a_write_value[i] = 0`).
+
+Used by I-type chip-level `allHold_iff_structural` proofs (Addi, …) to
+bridge SP1's flat `allHold` to the chip `FormalSpec`'s structured
+sub-circuit composition. -/
+theorem Assertion.Spec_iff_sp1
+    {clk_high clk_low opcode : ZMod p}
+    {pc : Vector (ZMod p) 3}
+    {op_a_write_value : Word (ZMod p)}
+    {cols : _root_.ITypeReader (ZMod p)}
+    {is_real is_trusted : ZMod p} :
+    (_root_.ITypeReader.constraints clk_high clk_low pc opcode
+        op_a_write_value cols is_real is_trusted).allHold ↔
+      Assertion.Spec ⟨clk_high, clk_low, opcode, pc, op_a_write_value, cols,
+                      is_real, is_trusted⟩ := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [show (_root_.ITypeReader.constraints clk_high clk_low pc opcode
+            op_a_write_value cols is_real is_trusted).allHold =
+       List.Forall SP1Constraint.toProp
+        (_root_.ITypeReader.constraints clk_high clk_low pc opcode
+          op_a_write_value cols is_real is_trusted) from rfl]
+  rw [_root_.ITypeReader.allHold_constraints_iff]
+  have h_0_lt_65536 : (0 : ZMod p) < (65536 : ZMod p) := by
+    change (0 : ZMod p).val < (65536 : ZMod p).val; simp
+  simp only [Assertion.Spec, SP1Clean.ProgramGated.Spec, SP1Clean.ProgramSpec,
+    SP1Clean.RegisterAccess.Assertion.Spec,
+    SP1Clean.OperandAccess.AssertionGated.Spec,
+    Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  refine ⟨?_, ?_⟩
+  -- → direction.
+  · rintro ⟨h_bin, h_prog_imp, h_mem_imp, h_op_a_0_imp⟩
+    have h_ir_mul : is_real * (is_real - 1) = 0 := by
+      rcases h_bin with h0 | h1
+      · subst h0; ring
+      · have h_sub : is_real - 1 = 0 := sub_eq_zero.mpr h1
+        rw [h_sub]; ring
+    have h_z0 : cols.op_a_0 * op_a_write_value[0] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).1]; ring
+    have h_z1 : cols.op_a_0 * op_a_write_value[1] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.1]; ring
+    have h_z2 : cols.op_a_0 * op_a_write_value[2] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.2.1]; ring
+    have h_z3 : cols.op_a_0 * op_a_write_value[3] = 0 := by
+      by_cases h0 : cols.op_a_0 = 0
+      · rw [h0]; ring
+      · rw [(h_op_a_0_imp h0).2.2.2]; ring
+    refine ⟨h_ir_mul, ?_, ?_, ?_, h_z0, h_z1, h_z2, h_z3⟩
+    -- ProgramGated.Spec: I-type has 4-limb op_c_imm, imm_b = 0, imm_c = 1.
+    · by_cases h_t : is_trusted = 0
+      · exact Or.inl h_t
+      · right
+        obtain ⟨h_ti, h_op_a, h_op_b, h_oci0, h_oci1, h_oci2, h_oci3,
+                h_op_a_0_bin, h_op_a_0_iff,
+                h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩ := h_prog_imp h_t
+        refine ⟨h_ti, h_op_a,
+                ⟨h_op_b, h_0_lt_65536, h_0_lt_65536, h_0_lt_65536⟩,
+                ⟨h_oci0, h_oci1, h_oci2, h_oci3⟩,
+                h_op_a_0_bin, h_op_a_0_iff, Or.inl trivial, ?_,
+                h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩
+        -- imm_c = 1: row[15] = 1, so `1 = 0 ∨ 1 = 1` → after simp,
+        -- `False ∨ True` ↔ `True`; discharge with `trivial`.
+        exact Or.inr trivial
+    -- RegisterAccess.Spec op_a (offset = 4).
+    · by_cases h_r : is_real = 0
+      · exact Or.inl h_r
+      · right
+        obtain ⟨h_diff_a, _, _, h_ts_a, h_isU64_a, _⟩ := h_mem_imp h_r
+        exact ⟨h_diff_a, h_ts_a,
+               (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_a⟩
+    -- RegisterAccess.Spec op_b (offset = 3).
+    · by_cases h_r : is_real = 0
+      · exact Or.inl h_r
+      · right
+        obtain ⟨_, h_diff_b, h_ts_b, _, _, h_isU64_b⟩ := h_mem_imp h_r
+        exact ⟨h_diff_b, h_ts_b,
+               (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64_b⟩
+  -- ← direction.
+  · rintro ⟨h_ir_mul, h_prog_disj, h_ra_a_disj, h_ra_b_disj, h_z0, h_z1, h_z2, h_z3⟩
+    refine ⟨?_, ?_, ?_, ?_⟩
+    -- is_real binary.
+    · rcases mul_eq_zero.mp h_ir_mul with h | h_sub
+      · exact Or.inl h
+      · exact Or.inr (sub_eq_zero.mp h_sub)
+    -- Program clause.
+    · intro h_t_ne
+      rcases h_prog_disj with h0 | h_ps
+      · exact absurd h0 h_t_ne
+      obtain ⟨h_ti, h_op_a, ⟨h_op_b, _, _, _⟩,
+              ⟨h_oci0, h_oci1, h_oci2, h_oci3⟩,
+              h_op_a_0_bin, h_op_a_0_iff, _, _,
+              h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩ := h_ps
+      exact ⟨h_ti, h_op_a, h_op_b, h_oci0, h_oci1, h_oci2, h_oci3,
+             h_op_a_0_bin, h_op_a_0_iff,
+             h_pc0_mod, h_pc0_lt, h_pc1_lt, h_pc2_lt⟩
+    -- Memory clause from 2× RegisterAccess.Spec.
+    · intro h_r_ne
+      have h_a := h_ra_a_disj.resolve_left h_r_ne
+      have h_b := h_ra_b_disj.resolve_left h_r_ne
+      exact ⟨h_a.1, h_b.1, h_b.2.1, h_a.2.1,
+             (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mp h_a.2.2,
+             (SP1Clean.ITypeReader.Assertion.isU64_iff_index_form _).mp h_b.2.2⟩
+    -- op_a_0 zero-tuple.
+    · intro h_op_a_0_ne
+      exact ⟨(mul_eq_zero.mp h_z0).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z1).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z2).resolve_left h_op_a_0_ne,
+             (mul_eq_zero.mp h_z3).resolve_left h_op_a_0_ne⟩
+
 end Gated
 
 end SP1Clean.ITypeReader
