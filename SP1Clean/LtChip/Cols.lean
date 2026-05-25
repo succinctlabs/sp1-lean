@@ -11,6 +11,7 @@ import SP1Chips.Lt.LtChip
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Operations.LtOperationSigned
+import SP1Clean.Operations.GatedLtSignedOp
 import SP1Clean.TrustMode
 import RISCV.Instructions
 
@@ -161,26 +162,48 @@ omit [Fact (2 ^ 17 < p)] in
 
 /-! ## Chip-level `FormalSpec`
 
-Composes `LtSignedOp.Spec`, `cpuStateSpec`, `aluTypeReaderSpec`, plus
-the 4 trailing scalar gates (2 selector binaries + sum binary + op_a_0). -/
+The unified chip Spec. Composes `GatedLtSignedOp.Assertion.FormalSpec`
+(carries its own `gate = 0 ∨ ...` disjunction; gate is `is_slt + is_sltu`),
+`CPUState.Gated.Assertion.Spec`, and `ALUTypeReader.Gated.Assertion.Spec`,
+plus the 3 chip-level selector gates (2 selector binaries + sum binary)
+and the `op_a_0 = 0` zero gate, plus pure BitVec `RV64.slt`/`RV64.sltu`
+semantic clauses (conditional on each selector). The free
+`is_real * (is_real - 1) = 0` gate now lives inside the Gated.Specs'
+first conjuncts. -/
 def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let is_real : ZMod p := cols.is_slt + cols.is_sltu
   let op_a_write_value : Word (ZMod p) := #v[cols.compare_bit, 0, 0, 0]
-  SP1Clean.LtSignedOp.Spec
+  SP1Clean.GatedLtSignedOp.Assertion.FormalSpec
       ⟨cols.adapter.op_b_memory.prev_value,
        cols.adapter.op_c_memory.prev_value,
        cols.is_slt,
        cols.compare_bit, cols.u16_flags, cols.not_eq_inv,
        cols.comparison_limbs,
-       cols.b_msb, cols.c_msb⟩ ∧
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ALUTypeReader.aluTypeReaderSpec clk_low
-      (cols.is_slt * 9 + cols.is_sltu * 10)
-      cols.state.pc op_a_write_value cols.adapter ∧
+       cols.b_msb, cols.c_msb,
+       is_real⟩ ∧
+  SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, is_real⟩ ∧
+  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+      ⟨cols.state.clk_high, clk_low,
+       cols.is_slt * 9 + cols.is_sltu * 10, cols.state.pc,
+       op_a_write_value, cols.adapter,
+       is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.is_slt * (cols.is_slt - 1) = 0 ∧
   cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
   (is_real = 0 ∨ is_real - 1 = 0) ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  -- Pure BitVec semantic for SLT (signed).
+  (cols.is_slt = 1 →
+    Word.toBitVec64 op_a_write_value =
+      RV64.slt (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+               (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)) ∧
+  -- Pure BitVec semantic for SLTU (unsigned).
+  (cols.is_sltu = 1 →
+    Word.toBitVec64 op_a_write_value =
+      RV64.sltu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
 end SP1Clean.LtChip

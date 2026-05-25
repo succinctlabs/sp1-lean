@@ -10,6 +10,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Operations.LtOperationSigned
+import SP1Clean.Operations.GatedLtSignedOp
 import SP1Clean.MemoryAccess
 import RISCV.Instructions
 
@@ -41,43 +42,63 @@ namespace Assertion
 
 open Circuit
 
-/-- Clean-side chip circuit. -/
+/-- Clean-side chip circuit. Mirrors SP1 Rust's `LtChip::eval(builder, cols)`
+1:1 via flag-threaded `Gated` sub-circuits:
+- `GatedLtSignedOp.assertion` (carries its own `gate = is_slt + is_sltu`),
+- `CPUState.Gated.assertion` (binary gate + state-bus + byte-opcode),
+- `ALUTypeReader.Gated.assertion` (program + memory + imm_c switch),
+- 3 chip-level selector gates (`is_slt` / `is_sltu` binary + sum binary)
+  and `op_a_0 = 0`. The free `is_real * (is_real - 1) === 0` gate now
+  lives inside both Gated.Specs' first conjuncts (redundant but
+  propositionally fine). -/
 @[reducible]
 def main (cols : Var LtCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩, adapter,
        compare_bit, u16_flags, not_eq_inv, comparison_limbs,
-       b_msb, c_msb, is_slt, is_sltu, _adapter_cols⟩ := cols
+       b_msb, c_msb, is_slt, is_sltu, adapter_cols⟩ := cols
   let clk_low := clk_0_16 + clk_16_24 * 65536
+  let is_real := is_slt + is_sltu
   let op_a_write_value : Vector (Expression (ZMod p)) 4 := #v[compare_bit, 0, 0, 0]
-  SP1Clean.LtSignedOp.assertion
+  SP1Clean.GatedLtSignedOp.assertion
     (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
        is_slt,
        compare_bit, u16_flags, not_eq_inv, comparison_limbs,
-       b_msb, c_msb⟩ : Var SP1Clean.LtSignedOp.Inputs (ZMod p))
-  SP1Clean.CPUState.assertion
-    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  SP1Clean.ALUTypeReader.assertion
-    (⟨clk_high, clk_low, is_slt * 9 + is_sltu * 10, pc, op_a_write_value, adapter⟩ :
-      Var SP1Clean.ALUTypeReader.Inputs (ZMod p))
+       b_msb, c_msb, is_real⟩ : Var SP1Clean.GatedLtSignedOp.Inputs (ZMod p))
+  SP1Clean.CPUState.Gated.assertion
+    (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       #v[pc[0] + 4, pc[1], pc[2]], 8, is_real⟩ :
+      Var SP1Clean.CPUState.Gated.Inputs (ZMod p))
+  SP1Clean.ALUTypeReader.Gated.assertion
+    (⟨clk_high, clk_low, is_slt * 9 + is_sltu * 10, pc, op_a_write_value,
+       adapter, is_real, adapter_cols.is_trusted⟩ :
+      Var SP1Clean.ALUTypeReader.Gated.Inputs (ZMod p))
   is_slt * (is_slt - 1) === 0
   is_sltu * (is_sltu - 1) === 0
-  (is_slt + is_sltu) * (is_slt + is_sltu - 1) === 0
+  is_real * (is_real - 1) === 0
   adapter.op_a_0 === 0
 
--- 3 subcircuits (one recursively composing 3 more — LtSignedOp) + 4
--- scalar gates. The default `subcircuitsConsistent` derivation
--- exponentially times out on this nesting depth; supply it as `sorry`
--- for the scaffold (along with the other proof bodies).
+set_option maxHeartbeats 3200000 in
+-- Sub-circuit chain (GatedLtSignedOp → GatedLtUnsignedOp) + 4 scalar
+-- gates exceeds default `subcircuitsConsistent` synth budget by a
+-- substantial margin (the nested gating multiplies the search depth).
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) LtCols unit where
   name := "SP1Clean.Lt"
   main := main
   localLength input := (main input).localLength 0
   output _ _ := ()
-  localLength_eq _ _ := by sorry
-  subcircuitsConsistent _ _ := by sorry
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp only [main, circuit_norm]
+    refine ⟨by omega, by omega, by omega, by omega⟩
 
-def Assumptions (_ : LtCols (ZMod p)) : Prop := True
+/-- The chip is the `UserMode` variant; the adapter's `is_trusted`
+payload is structurally equal to the aggregate `is_real = is_slt + is_sltu`.
+Same TrustMode marker as AddChip's `Assumptions`. -/
+def Assumptions (cols : LtCols (ZMod p)) : Prop :=
+  cols.adapter_cols.is_trusted = cols.is_slt + cols.is_sltu
 
 /-- The unified chip Spec is defined in `Cols.lean`
 (`SP1Clean.LtChip.FormalSpec`). -/
