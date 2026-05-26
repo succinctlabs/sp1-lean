@@ -174,4 +174,117 @@ theorem spec
     rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   omega
 
+set_option maxHeartbeats 16000000 in
+-- Mirrors `AddOperation.spec_inv`'s budget; the 4 `linear_combination`
+-- carry rearrangements + ZMod-cast lifts + `interval_cases` discharges
+-- land in the 4–8M heartbeat range; 16M leaves headroom.
+/-- Inverse direction of `SubOperation.spec`: given that the operand and
+result Words all fit in 64 bits and the BitVec subtraction identity
+holds, the 8-conjunct `SubOperation.constraints` evaluates to `allHold`.
+Witnesses the unique base-65536 borrow-chain decomposition. -/
+theorem spec_inv {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b : Word (ZMod p)} {cols : SubOperation (ZMod p)}
+    (h_isU64_a : a.isU64) (h_isU64_b : b.isU64)
+    (h_isU64_v : cols.value.isU64)
+    (h_bv : cols.value.toBitVec64 = execute_RTYPE_pure_w a b .SUB) :
+    SP1ConstraintList.allHold (SubOperation.constraints a b cols 1) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  rw [SubOperation.allHold_constraints_iff]
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 h_isU64_a
+  obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 h_isU64_b
+  obtain ⟨hv0, hv1, hv2, hv3⟩ := Word.lt_cases_of_isU64 h_isU64_v
+  rw [show execute_RTYPE_pure_w a b .SUB =
+        a.toBitVec64 - b.toBitVec64 from rfl,
+      BitVec.eq_sub_iff_add_eq, ← BitVec.toNat_inj, BitVec.toNat_add,
+      Word.toBitVec64_toNat h_isU64_v,
+      Word.toBitVec64_toNat h_isU64_b,
+      Word.toBitVec64_toNat h_isU64_a,
+      Word.toNat_def, Word.toNat_def, Word.toNat_def] at h_bv
+  set q0 : ℕ := (cols.value[0].val + b[0].val) / 65536 with hq0_def
+  set q1 : ℕ := (cols.value[1].val + b[1].val + q0) / 65536 with hq1_def
+  set q2 : ℕ := (cols.value[2].val + b[2].val + q1) / 65536 with hq2_def
+  set q3 : ℕ := (cols.value[3].val + b[3].val + q2) / 65536 with hq3_def
+  have h_chain :
+      q0 ≤ 1 ∧ q1 ≤ 1 ∧ q2 ≤ 1 ∧ q3 ≤ 1 ∧
+      cols.value[0].val + b[0].val = a[0].val + q0 * 65536 ∧
+      cols.value[1].val + b[1].val + q0 = a[1].val + q1 * 65536 ∧
+      cols.value[2].val + b[2].val + q1 = a[2].val + q2 * 65536 ∧
+      cols.value[3].val + b[3].val + q2 = a[3].val + q3 * 65536 := by
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [hq0_def, hq1_def, hq2_def, hq3_def] <;> omega
+  obtain ⟨hq0, hq1, hq2, hq3, e0n, e1n, e2n, e3n⟩ := h_chain
+  have hc0_lift : (cols.value[0] : ZMod p) + b[0] =
+      a[0] + (q0 : ZMod p) * 65536 := by
+    have hcast := congrArg (Nat.cast : ℕ → ZMod p) e0n
+    push_cast at hcast
+    rwa [ZMod.natCast_zmod_val, ZMod.natCast_zmod_val, ZMod.natCast_zmod_val] at hcast
+  have hc1_lift : (cols.value[1] : ZMod p) + b[1] + (q0 : ZMod p) =
+      a[1] + (q1 : ZMod p) * 65536 := by
+    have hcast := congrArg (Nat.cast : ℕ → ZMod p) e1n
+    push_cast at hcast
+    rwa [ZMod.natCast_zmod_val, ZMod.natCast_zmod_val, ZMod.natCast_zmod_val] at hcast
+  have hc2_lift : (cols.value[2] : ZMod p) + b[2] + (q1 : ZMod p) =
+      a[2] + (q2 : ZMod p) * 65536 := by
+    have hcast := congrArg (Nat.cast : ℕ → ZMod p) e2n
+    push_cast at hcast
+    rwa [ZMod.natCast_zmod_val, ZMod.natCast_zmod_val, ZMod.natCast_zmod_val] at hcast
+  have hc3_lift : (cols.value[3] : ZMod p) + b[3] + (q2 : ZMod p) =
+      a[3] + (q3 : ZMod p) * 65536 := by
+    have hcast := congrArg (Nat.cast : ℕ → ZMod p) e3n
+    push_cast at hcast
+    rwa [ZMod.natCast_zmod_val, ZMod.natCast_zmod_val, ZMod.natCast_zmod_val] at hcast
+  have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
+    mul_inv_cancel₀ val_65536_ne_zero
+  have hc0_eq : (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹ =
+      (q0 : ZMod p) := by
+    have h : b[0] + cols.value[0] - a[0] = (q0 : ZMod p) * 65536 := by
+      linear_combination hc0_lift
+    rw [h, mul_assoc, h65inv, mul_one]
+  have hc1_eq : (b[1] + cols.value[1] - a[1] +
+      (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹) *
+      (65536 : ZMod p)⁻¹ = (q1 : ZMod p) := by
+    rw [hc0_eq]
+    have h : b[1] + cols.value[1] - a[1] + (q0 : ZMod p) =
+        (q1 : ZMod p) * 65536 := by
+      linear_combination hc1_lift
+    rw [h, mul_assoc, h65inv, mul_one]
+  have hc2_eq : (b[2] + cols.value[2] - a[2] + ((b[1] + cols.value[1] - a[1] +
+      (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹) *
+      (65536 : ZMod p)⁻¹)) * (65536 : ZMod p)⁻¹ = (q2 : ZMod p) := by
+    rw [hc1_eq]
+    have h : b[2] + cols.value[2] - a[2] + (q1 : ZMod p) =
+        (q2 : ZMod p) * 65536 := by
+      linear_combination hc2_lift
+    rw [h, mul_assoc, h65inv, mul_one]
+  have hc3_eq : (b[3] + cols.value[3] - a[3] + ((b[2] + cols.value[2] - a[2] +
+      ((b[1] + cols.value[1] - a[1] +
+      (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹) *
+      (65536 : ZMod p)⁻¹)) * (65536 : ZMod p)⁻¹)) *
+      (65536 : ZMod p)⁻¹ = (q3 : ZMod p) := by
+    rw [hc2_eq]
+    have h : b[3] + cols.value[3] - a[3] + (q2 : ZMod p) =
+        (q3 : ZMod p) * 65536 := by
+      linear_combination hc3_lift
+    rw [h, mul_assoc, h65inv, mul_one]
+  refine ⟨?_, ?_, ?_, ?_, hv0, hv1, hv2, hv3⟩
+  · rw [hc0_eq]; interval_cases q0 <;> simp
+  · rw [hc1_eq]; interval_cases q1 <;> simp
+  · rw [hc2_eq]; interval_cases q2 <;> simp
+  · rw [hc3_eq]; interval_cases q3 <;> simp
+
+/-- Bidirectional bridge between `SubOperation.allHold` (with multiplicity
+fixed to `1`) and the BitVec semantic: a fully-bounded operand pair
+satisfies the constraints iff the result is also bounded and the BitVec
+subtraction identity holds. -/
+theorem iff_sp1_full {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b : Word (ZMod p)} {cols : SubOperation (ZMod p)}
+    (h_isU64_a : a.isU64) (h_isU64_b : b.isU64) :
+    (SubOperation.constraints a b cols 1).allHold ↔
+      (cols.value.isU64 ∧
+       cols.value.toBitVec64 = execute_RTYPE_pure_w a b .SUB) :=
+  ⟨SubOperation.spec h_isU64_a h_isU64_b,
+   fun ⟨h_isU64_v, h_bv⟩ =>
+     SubOperation.spec_inv h_isU64_a h_isU64_b h_isU64_v h_bv⟩
+
 end SubOperation

@@ -52,7 +52,7 @@ axiom-clean. Closes ~5–7 sorries.
 | **p2-addw** | AddwChip | `SP1Clean/AddwChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | helper-1 | open |
 | **p2-jalr** | JalrChip | `SP1Clean/JalrChip.lean` | helper-2 | open |
 | **p2-utype** | UTypeChip (also Phase 3 — CPUState Gated promotion) | `SP1Clean/UTypeChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | main | open |
-| **p2-main-iff_sp1_full** (prereq for p2-sub / p2-subw / p2-addw / p2-jal / p2-jalr / p2-utype) | Add `<Op>.iff_sp1_full` + `spec_inv` to SP1Operations | `SP1Operations/Operation/{SubOperation/SubOperation,SubwOperation/SubwOperation,AddwOperation/AddwOperation}.lean` | main | open (blocks helper rows above) |
+| **p2-main-iff_sp1_full** (prereq for p2-sub / p2-subw / p2-addw / p2-jal / p2-jalr / p2-utype) | Add `<Op>.iff_sp1_full` + `spec_inv` to SP1Operations | `SP1Operations/Operation/{SubOperation/SubOperation,SubwOperation/SubwOperation,AddwOperation/AddwOperation,U16MSBOperation/U16MSBOperation}.lean` | main | merged |
 | **p2-soundness** | Trace-soundness driver shape updates | `SP1Clean/Soundness/{IsRealBinary,MemoryConsistency,MemoryConsistencyClock,StateConsistency}.lean` | main | open (after all p2-* helper rows merge) |
 
 ## Phase 3 — Reader-level Gated migration
