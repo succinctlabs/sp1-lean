@@ -421,47 +421,21 @@ instance elaborated : ElaboratedCircuit (ZMod p) ShiftLeftCols unit where
 
 def Assumptions (_ : ShiftLeftCols (ZMod p)) : Prop := True
 
+-- TODO(Spec-canonical-2026-05-26): `FormalSpec` was rewritten to the
+-- canonical (a) shape (CPUState.Gated + ALUTypeReader.Gated + scalar
+-- gates + RV64.sll/sllw semantic dispatch). The prior 9-conjunct
+-- `refine` shape no longer matches the new Spec — reconstruct via
+-- `CPUState.Gated.Assertion.Spec_iff_sp1` + `ALUTypeReader.Gated.Assertion.Spec_iff_sp1`
+-- + the chip's 50-gate inline shift correctness lemma (see
+-- `AddChip/Lemmas.lean` for the canonical template).
 theorem soundness :
-    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
-          e31⟩ := h_input
-  subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_sll, h_sllw, h_sum,
-          h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
-  unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact h_cpu_sub trivial
-  · exact h_prog_sub trivial
-  · linear_combination h_sll
-  · linear_combination h_sllw
-  · linear_combination h_sum
-  · exact h_op_a_0
-  · exact h_oa_a trivial
-  · exact h_oa_b trivial
-  · exact h_oa_c trivial
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec :=
+  sorry
 
+-- TODO(Spec-canonical-2026-05-26): see `soundness` above.
 theorem completeness :
-    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
-          e31⟩ := h_input
-  subst_eqs
-  obtain ⟨h_cpu, h_prog, h_sll, h_sllw, h_sum, h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
-  unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact ⟨trivial, h_cpu⟩
-  · exact ⟨trivial, h_prog⟩
-  · linear_combination h_sll
-  · linear_combination h_sllw
-  · linear_combination h_sum
-  · exact h_op_a_0
-  · exact ⟨trivial, h_oa_a⟩
-  · exact ⟨trivial, h_oa_b⟩
-  · exact ⟨trivial, h_oa_c⟩
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec :=
+  sorry
 
 end Assertion
 

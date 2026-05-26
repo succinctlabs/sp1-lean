@@ -770,45 +770,31 @@ theorem memoryAccessesValid_of_spec_subw
     ChipRow.memoryAccessesValid (.subw _cols) := by
   simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- Bitwise's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type-shaped: op_a/+4, op_b/+3, op_c/+2 (the chip's `op_c`
-is a 4-limb vector but the memory-access record uses `op_c[0]` as the
-register index). -/
+/-- Bitwise's per-chip discharge. -/
+-- TODO(Spec-canonical-2026-05-26): `FormalSpec` was rewritten to the
+-- canonical (a) shape (CPUState.Gated + ALUTypeReader.Gated). The
+-- prior `OperandAccess.Assertion.Spec` triple is now nested inside
+-- `ALUTypeReader.Gated.Assertion.Spec` as `RegisterAccess.Assertion.Spec`
+-- (which wraps `OperandAccess.AssertionGated.Spec`). Mirrors the
+-- `_mul` case immediately below. The right closure is likely
+-- `simp [ChipRow.memoryAccessesValid, …]`-vacuous once
+-- `ChipRow.memoryAccesses .bitwise` is empty (see
+-- `feedback_memoryaccesses_vacuous_for_gated_chips`).
 theorem memoryAccessesValid_of_spec_bitwise
-    (cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
-    (h : SP1Clean.Bitwise.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.bitwise cols) := by
-  change SP1Clean.Bitwise.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_xor, _h_or, _h_and, _h_sum,
-          _h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
-  intro entry h_mem
-  rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+    (_cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
+    (_h : SP1Clean.Bitwise.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.bitwise _cols) :=
+  sorry
 
-/-- Lt's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type-shaped: op_a/+4, op_b/+3, op_c/+2. -/
+/-- Lt's per-chip discharge. -/
+-- TODO(Spec-canonical-2026-05-26): see `_bitwise` above. Same
+-- structural shift; reader-gated form nests the operand-access
+-- conjuncts inside `ALUTypeReader.Gated.Assertion.Spec`.
 theorem memoryAccessesValid_of_spec_lt
-    (cols : SP1Clean.Lt.LtCols (ZMod p))
-    (h : SP1Clean.Lt.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.lt cols) := by
-  change SP1Clean.Lt.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_isslt, _h_issltu, _h_sum, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right,
-    SP1Clean.Lt.opAMemoryAccess, SP1Clean.Lt.opBMemoryAccess,
-    SP1Clean.Lt.opCMemoryAccess]
-  intro entry h_mem
-  rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+    (_cols : SP1Clean.Lt.LtCols (ZMod p))
+    (_h : SP1Clean.Lt.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.lt _cols) :=
+  sorry
 
 /-- Addw's per-chip discharge — vacuously true, since AddwChip's memory
 contributions now flow through the multiplicity-aware lookup bus rather
@@ -910,41 +896,23 @@ theorem memoryAccessesValid_of_spec_mul [Fact (2 ^ 24 < p)]
     ChipRow.memoryAccessesValid (.mul cols) := by
   sorry
 
-/-- ShiftLeft's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type: op_a/+4, op_b/+3, op_c/+2. -/
+/-- ShiftLeft's per-chip discharge. -/
+-- TODO(Spec-canonical-2026-05-26): see `_bitwise` above. Same shift to
+-- the gated reader form; operand accesses now nested in
+-- `ALUTypeReader.Gated.Assertion.Spec`.
 theorem memoryAccessesValid_of_spec_shiftLeft
-    (cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))
-    (h : SP1Clean.ShiftLeft.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.shiftLeft cols) := by
-  change SP1Clean.ShiftLeft.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_sll, _h_sllw, _h_sum, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
-  intro entry h_mem
-  rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+    (_cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))
+    (_h : SP1Clean.ShiftLeft.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.shiftLeft _cols) :=
+  sorry
 
-/-- ShiftRight's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type-shaped (ALU-type): op_a/+4, op_b/+3, op_c/+2. -/
+/-- ShiftRight's per-chip discharge. -/
+-- TODO(Spec-canonical-2026-05-26): see `_bitwise` above.
 theorem memoryAccessesValid_of_spec_shiftRight
-    (cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
-    (h : SP1Clean.ShiftRight.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.shiftRight cols) := by
-  change SP1Clean.ShiftRight.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_srl, _h_sra, _h_srlw, _h_sraw, _h_sum,
-          _h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
-  intro entry h_mem
-  rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+    (_cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
+    (_h : SP1Clean.ShiftRight.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.shiftRight _cols) :=
+  sorry
 
 /-- DivRem's per-chip discharge — sorry'd after DivRemChip's
 `FormalSpec` was restructured to compose 17 sub-circuits + 2 reader

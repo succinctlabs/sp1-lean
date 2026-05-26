@@ -345,37 +345,49 @@ namespace SP1Clean.Bitwise
 
 namespace Assertion
 
-/-- The byte- and program-lookup-derivable subset of `Spec`. Includes
-the two sub-assertion consequences plus the four trailing assert
-clauses. Drops the BitwiseU16 carry chain + `aluTypeReaderSpec`
-content, which is not derivable from `main`'s lookups alone. -/
+/-- The unified chip Spec for `BitwiseChip`. Canonical (a) shape:
+`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition with
+opcode `is_xor * 3 + is_or * 4 + is_and * 5`, the chip-level
+`op_a_0 = 0` gate, three selector + sum binarities, and a
+selector-dispatched RV64 semantic conjunct (`xor`/`or`/`and`)
+gated on `is_real = 1`.
+
+`op_a_write_value` is synthesized from the `bitwise_operation.result :
+Vector T 8` byte pairs: the SP1 constraint compiler computes
+`E44 + E45*256, E46 + E47*256, …` (pairs of u8 results packed into u16
+limbs) and feeds them to the ALUTypeReader as the result Word. The
+`BitwiseU16Operation` byte-decomposition is *not* exposed here; it's
+the implementation detail of the sub-circuit and is reconstructed on
+demand via the chip's eventual `iff_sp1` proof. -/
 def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
+  let is_real : ZMod p := cols.is_xor + cols.is_or + cols.is_and
+  let opcode_e : ZMod p := cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc,
-      opcode := cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5,
-      op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
+  let bres := cols.bitwise_operation.bitwise_operation.result
+  let op_a_write_value : Word (ZMod p) :=
+    #v[bres[0] + bres[1] * 256,
+       bres[2] + bres[3] * 256,
+       bres[4] + bres[5] * 256,
+       bres[6] + bres[7] * 256]
+  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
+  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
+  let aw := Word.toBitVec64 op_a_write_value
+  SP1Clean.CPUState.Gated.Assertion.Spec
+    ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+     8, is_real⟩ ∧
+  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
+     op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.is_xor * (cols.is_xor - 1) = 0 ∧
-  cols.is_or * (cols.is_or - 1) = 0 ∧
+  cols.is_or  * (cols.is_or  - 1) = 0 ∧
   cols.is_and * (cols.is_and - 1) = 0 ∧
-  (cols.is_xor + cols.is_or + cols.is_and)
-    * (cols.is_xor + cols.is_or + cols.is_and - 1) = 0 ∧
+  is_real * (is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
+  (is_real = 1 →
+    Word.isU64 op_a_write_value ∧
+    (cols.is_xor = 1 → aw = RV64.xor cw bw) ∧
+    (cols.is_or  = 1 → aw = RV64.or  cw bw) ∧
+    (cols.is_and = 1 → aw = RV64.and cw bw))
 
 end Assertion
 
@@ -440,32 +452,38 @@ namespace SP1Clean.ShiftLeft
 
 namespace Assertion
 
+/-- The unified chip Spec for `ShiftLeftChip`. Canonical (a) shape:
+`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition with
+opcode `is_sll * 8 + is_sllw * 14`, the chip-level `op_a_0 = 0` gate,
+two selector + sum binarities, and a 2-way selector-dispatched RV64
+semantic conjunct (`RV64.sll` for SLL/SLLI, `RV64.sllw` for SLLW/SLLIW)
+gated on `is_real = 1`. The 50+ inline shift-correctness gates that
+SP1 emits (c_bits decomposition, byte-shift selectors, shift_pow
+chain, limb_result arithmetic, the embedded `U16MSBOperation` MSB
+witness) are *not* exposed here; they're the implementation details
+of the shift sub-circuit and are reconstructed on demand via the
+chip's eventual `iff_sp1` proof. -/
 def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
+  let is_real : ZMod p := cols.is_sll + cols.is_sllw
+  let opcode_e : ZMod p := cols.is_sll * 8 + cols.is_sllw * 14
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := cols.is_sll * 8 + cols.is_sllw * 14,
-      op_a := cols.adapter.op_a, op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  cols.is_sll * (cols.is_sll - 1) = 0 ∧
+  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
+  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
+  let aw := Word.toBitVec64 cols.result
+  SP1Clean.CPUState.Gated.Assertion.Spec
+    ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+     8, is_real⟩ ∧
+  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
+     cols.result, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
+  cols.is_sll  * (cols.is_sll  - 1) = 0 ∧
   cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
-  (cols.is_sll + cols.is_sllw) * (cols.is_sll + cols.is_sllw - 1) = 0 ∧
+  is_real * (is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low,
-     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low,
-     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low,
-     cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
+  (is_real = 1 →
+    Word.isU64 cols.result ∧
+    (cols.is_sll  = 1 → aw = RV64.sll  cw bw) ∧
+    (cols.is_sllw = 1 → aw = RV64.sllw cw bw))
 
 end Assertion
 
@@ -475,34 +493,44 @@ namespace SP1Clean.ShiftRight
 
 namespace Assertion
 
+/-- The unified chip Spec for `ShiftRightChip`. Canonical (a) shape:
+`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition with
+opcode `is_srl * 7 + is_sra * 8 + is_srlw * 22 + is_sraw * 23`, the
+chip-level `op_a_0 = 0` gate, four selector + sum binarities, and a
+4-way selector-dispatched RV64 semantic conjunct
+(`RV64.srl`/`RV64.sra`/`RV64.srlw`/`RV64.sraw`) gated on `is_real = 1`.
+The 50+ inline shift-correctness gates plus the three embedded
+`U16MSBOperation` MSB witnesses (for SRA/SRAW sign-extension and op_b
+high-bit witness) are *not* exposed here; they're implementation
+details of the shift sub-circuit and are reconstructed on demand via
+the chip's eventual `iff_sp1` proof. -/
 def FormalSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   let is_real : ZMod p :=
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw
   let opcode_e : ZMod p :=
     cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  cols.is_srl * (cols.is_srl - 1) = 0 ∧
-  cols.is_sra * (cols.is_sra - 1) = 0 ∧
+  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
+  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
+  let aw := Word.toBitVec64 cols.op_a_write_value
+  SP1Clean.CPUState.Gated.Assertion.Spec
+    ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+     8, is_real⟩ ∧
+  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
+     cols.op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
+  cols.is_srl  * (cols.is_srl  - 1) = 0 ∧
+  cols.is_sra  * (cols.is_sra  - 1) = 0 ∧
   cols.is_srlw * (cols.is_srlw - 1) = 0 ∧
   cols.is_sraw * (cols.is_sraw - 1) = 0 ∧
   is_real * (is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
+  (is_real = 1 →
+    Word.isU64 cols.op_a_write_value ∧
+    (cols.is_srl  = 1 → aw = RV64.srl  cw bw) ∧
+    (cols.is_sra  = 1 → aw = RV64.sra  cw bw) ∧
+    (cols.is_srlw = 1 → aw = RV64.srlw cw bw) ∧
+    (cols.is_sraw = 1 → aw = RV64.sraw cw bw))
 
 end Assertion
 
@@ -512,34 +540,40 @@ namespace SP1Clean.Lt
 
 namespace Assertion
 
-/-- The chip's Circuit-derivable spec: byte-lookup consequences for the
-clock-decomposition gadget, the program-bus existential witness, and the
-four scalar trailing assertZero gates. -/
+/-- The unified chip Spec for `LtChip`. Canonical (a) shape: flag-threaded
+`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition, the
+chip-level `op_a_0 = 0` gate, the selector + sum binarities, and a
+selector-dispatched RV64 semantic conjunct gated on `is_real = 1`.
+
+The `LtOperationSigned` byte-decomposition that SP1 threads internally
+is *not* exposed here; it's the implementation detail of the
+`LtOperationSigned` sub-circuit and is reconstructed on demand via the
+chip's eventual `iff_sp1` proof. The result is a single bit
+(`lt_operation.result.u16_compare_operation.bit`) packed into the low
+limb of a zero-padded `op_a_write_value` Word. -/
 def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
+  let is_real : ZMod p := cols.is_slt + cols.is_sltu
+  let opcode_e : ZMod p := cols.is_slt * 9 + cols.is_sltu * 10
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc,
-      opcode := cols.is_slt * 9 + cols.is_sltu * 10,
-      op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  cols.is_slt * (cols.is_slt - 1) = 0 ∧
+  let op_a_write_value : Vector (ZMod p) 4 :=
+    #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]
+  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
+  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
+  let aw := Word.toBitVec64 op_a_write_value
+  SP1Clean.CPUState.Gated.Assertion.Spec
+    ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+     8, is_real⟩ ∧
+  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
+     op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
+  cols.is_slt  * (cols.is_slt  - 1) = 0 ∧
   cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
-  (cols.is_slt + cols.is_sltu) * (cols.is_slt + cols.is_sltu - 1) = 0 ∧
+  is_real * (is_real - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
+  (is_real = 1 →
+    Word.isU64 op_a_write_value ∧
+    (cols.is_slt  = 1 → aw = RV64.slt  cw bw) ∧
+    (cols.is_sltu = 1 → aw = RV64.sltu cw bw))
 
 end Assertion
 
@@ -549,12 +583,25 @@ namespace SP1Clean.DivRem
 
 namespace Assertion
 
-/-- Faithful sub-circuit-composed `FormalSpec`: one conjunct per emission
-in `main`. Sub-Specs are referenced by direct field application per
-CLAUDE.md principle #2 — no `RawSpec` / `List.Forall SP1Constraint.toProp`
-envelopes. -/
+/-- The unified chip Spec for `DivRemChip`. Canonical (a) shape:
+`CPUState.Gated` + `RTypeReader.Gated` sub-circuit composition with
+opcode dispatched from the 8 `aux_post.mode_flags`, the chip-level
+`is_real` binarity + `op_a_0 = 0` gates, and an 8-way
+selector-dispatched RV64 semantic conjunct
+(`RV64.{div,divu,rem,remu,divw,remw,divuw,remuw}`) gated on
+`is_real = 1`.
+
+All 11 mid-level sub-op specs that the prior shape exposed
+(`MulOp.Spec` × 2, `IsEqualWordOp.Spec` × 4, `IsZeroWordOp.Spec`,
+`AddOp.Assertion.Spec` × 2, `LtUnsignedOp.Spec`,
+`U16MSBOp.Assertion.Spec` × 7) and the 117 inline aux-gates are *not*
+exposed here; they're implementation details of the div/rem
+sub-circuit (quotient verification, overflow detection, sign-flip
+boundary cases, byte-MSB witnesses) and are reconstructed on demand
+via the chip's eventual `iff_sp1` proof. The mode-flag binarities and
+8-way one-hot constraint live inside `RTypeReader.Gated.Spec`
+(opcode-dispatched) and the chip's `aux_post` invariants. -/
 def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let is_div   : ZMod p := cols.aux_post.mode_flags[0]
   let is_divu  : ZMod p := cols.aux_post.mode_flags[1]
   let is_rem_f : ZMod p := cols.aux_post.mode_flags[2]
@@ -563,12 +610,13 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
   let is_remw  : ZMod p := cols.aux_post.mode_flags[5]
   let is_divuw : ZMod p := cols.aux_post.mode_flags[6]
   let is_remuw : ZMod p := cols.aux_post.mode_flags[7]
-  let e92      : ZMod p := is_div + is_rem_f
-  let e93      : ZMod p := is_divu + is_remu
   let opcode_e : ZMod p :=
     is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
       + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28
-  -- Reader Specs.
+  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
+  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
+  let aw := Word.toBitVec64 cols.op_a_write_value
   SP1Clean.CPUState.Gated.Assertion.Spec
     ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
      8, cols.is_real⟩ ∧
@@ -576,131 +624,18 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
     ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
      cols.op_a_write_value, cols.adapter, cols.is_real,
      cols.adapter_cols.is_trusted⟩ ∧
-  -- Arithmetic sub-fragment Specs (CS0–CS16).
-  SP1Clean.MulOp.Spec
-    ⟨#v[cols.c_times_quotient[0], cols.c_times_quotient[1],
-        cols.c_times_quotient[2], cols.c_times_quotient[3]],
-     cols.quotient_comp, cols.c,
-     cols.c_times_quotient_lower.carry, cols.c_times_quotient_lower.product,
-     cols.c_times_quotient_lower.b_lower_byte.low_bytes,
-     cols.c_times_quotient_lower.c_lower_byte.low_bytes,
-     cols.c_times_quotient_lower.b_msb, cols.c_times_quotient_lower.c_msb,
-     cols.c_times_quotient_lower.product_msb.msb,
-     cols.c_times_quotient_lower.b_sign_extend,
-     cols.c_times_quotient_lower.c_sign_extend,
-     cols.is_real, 0, 0, 0, 0⟩ ∧
-  SP1Clean.MulOp.Spec
-    ⟨#v[cols.c_times_quotient[4], cols.c_times_quotient[5],
-        cols.c_times_quotient[6], cols.c_times_quotient[7]],
-     cols.quotient_comp, cols.c,
-     cols.c_times_quotient_upper.carry, cols.c_times_quotient_upper.product,
-     cols.c_times_quotient_upper.b_lower_byte.low_bytes,
-     cols.c_times_quotient_upper.c_lower_byte.low_bytes,
-     cols.c_times_quotient_upper.b_msb, cols.c_times_quotient_upper.c_msb,
-     cols.c_times_quotient_upper.product_msb.msb,
-     cols.c_times_quotient_upper.b_sign_extend,
-     cols.c_times_quotient_upper.c_sign_extend,
-     0, e92, e93, 0, 0⟩ ∧
-  SP1Clean.IsEqualWordOp.Spec
-    ⟨cols.adapter.op_b_memory.prev_value, #v[0, 0, 0, 32768],
-     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].inverse,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].inverse,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].inverse,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].inverse],
-     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].result,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].result,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].result,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].result],
-     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_first_half,
-     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_second_half,
-     cols.aux_post.is_overflow_b.is_diff_zero.result⟩ ∧
-  SP1Clean.IsEqualWordOp.Spec
-    ⟨cols.adapter.op_c_memory.prev_value, #v[65535, 65535, 65535, 65535],
-     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].inverse,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].inverse,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].inverse,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].inverse],
-     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].result,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].result,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].result,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].result],
-     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_first_half,
-     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_second_half,
-     cols.aux_post.is_overflow_c.is_diff_zero.result⟩ ∧
-  SP1Clean.IsEqualWordOp.Spec
-    ⟨#v[cols.adapter.op_b_memory.prev_value[0], cols.adapter.op_b_memory.prev_value[1], 0, 0],
-     #v[0, 32768, 0, 0],
-     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].inverse,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].inverse,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].inverse,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].inverse],
-     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].result,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].result,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].result,
-        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].result],
-     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_first_half,
-     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_second_half,
-     cols.aux_post.is_overflow_b.is_diff_zero.result⟩ ∧
-  SP1Clean.IsEqualWordOp.Spec
-    ⟨#v[cols.adapter.op_c_memory.prev_value[0], cols.adapter.op_c_memory.prev_value[1], 0, 0],
-     #v[65535, 65535, 0, 0],
-     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].inverse,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].inverse,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].inverse,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].inverse],
-     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].result,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].result,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].result,
-        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].result],
-     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_first_half,
-     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_second_half,
-     cols.aux_post.is_overflow_c.is_diff_zero.result⟩ ∧
-  SP1Clean.IsZeroWordOp.Spec
-    ⟨cols.c,
-     #v[cols.aux_post.is_c_0.is_zero_limb[0].inverse,
-        cols.aux_post.is_c_0.is_zero_limb[1].inverse,
-        cols.aux_post.is_c_0.is_zero_limb[2].inverse,
-        cols.aux_post.is_c_0.is_zero_limb[3].inverse],
-     #v[cols.aux_post.is_c_0.is_zero_limb[0].result,
-        cols.aux_post.is_c_0.is_zero_limb[1].result,
-        cols.aux_post.is_c_0.is_zero_limb[2].result,
-        cols.aux_post.is_c_0.is_zero_limb[3].result],
-     cols.aux_post.is_c_0.is_zero_first_half,
-     cols.aux_post.is_c_0.is_zero_second_half,
-     cols.aux_post.is_c_0.result⟩ ∧
-  SP1Clean.AddOp.Assertion.Spec
-    ⟨cols.c, cols.abs_c, cols.aux_post.c_neg_operation.value, cols.abs_c_alu_event⟩ ∧
-  SP1Clean.AddOp.Assertion.Spec
-    ⟨cols.remainder_comp, cols.abs_remainder,
-     cols.aux_post.rem_neg_operation.value, cols.abs_rem_alu_event⟩ ∧
-  SP1Clean.LtUnsignedOp.Spec
-    ⟨cols.abs_remainder, cols.max_abs_c_or_1,
-     cols.aux_post.remainder_lt_operation.u16_compare_operation.bit,
-     cols.aux_post.remainder_lt_operation.u16_flags,
-     cols.aux_post.remainder_lt_operation.not_eq_inv,
-     cols.aux_post.remainder_lt_operation.comparison_limbs⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.adapter.op_b_memory.prev_value[3], cols.aux_post.b_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.adapter.op_c_memory.prev_value[3], cols.aux_post.c_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.remainder[3], cols.aux_post.rem_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.adapter.op_b_memory.prev_value[1], cols.aux_post.b_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.adapter.op_c_memory.prev_value[1], cols.aux_post.c_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.remainder[1], cols.aux_post.rem_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.quotient[1], cols.aux_post.quot_msb.msb⟩ ∧
-  -- Chip-level scalar gates.
-  cols.c_neg             * (cols.c_neg             - 1) = 0 ∧
-  cols.abs_c_alu_event   * (cols.abs_c_alu_event   - 1) = 0 ∧
-  cols.abs_rem_alu_event * (cols.abs_rem_alu_event - 1) = 0 ∧
-  cols.is_real           * (cols.is_real           - 1) = 0 ∧
-  cols.remainder_check_multiplicity *
-    (cols.remainder_check_multiplicity - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0 ∧
+  (cols.is_real = 1 →
+    Word.isU64 cols.op_a_write_value ∧
+    (is_div   = 1 → aw = RV64.div   cw bw) ∧
+    (is_divu  = 1 → aw = RV64.divu  cw bw) ∧
+    (is_rem_f = 1 → aw = RV64.rem   cw bw) ∧
+    (is_remu  = 1 → aw = RV64.remu  cw bw) ∧
+    (is_divw  = 1 → aw = RV64.divw  cw bw) ∧
+    (is_remw  = 1 → aw = RV64.remw  cw bw) ∧
+    (is_divuw = 1 → aw = RV64.divuw cw bw) ∧
+    (is_remuw = 1 → aw = RV64.remuw cw bw))
 
 end Assertion
 
