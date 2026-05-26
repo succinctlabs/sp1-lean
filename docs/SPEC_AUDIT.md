@@ -1,17 +1,24 @@
 # SP1Clean/Chips/Spec.lean — per-`FormalSpec` audit
 
-Snapshot of `SP1Clean/Chips/Spec.lean` (1302 lines, 28 spec entries
-across 25 chip namespaces), classified into four categories. The audit
-asks, for every `def FormalSpec`: is the Spec a minimal pure-semantic
-form, an internals-exposing form with an RV64 wrapper, a faithful
-constraint mirror without RV64, or still incomplete relative to chip
-`main` / upstream Rust?
+Snapshot of `SP1Clean/Chips/Spec.lean` classified into four categories.
+The audit asks, for every `def FormalSpec`: is the Spec a minimal
+pure-semantic form, an internals-exposing form with an RV64 wrapper, a
+faithful constraint mirror without RV64, or still incomplete relative
+to chip `main` / upstream Rust?
 
 This is a snapshot — re-run the rubric below whenever
 `SP1Clean/Chips/Spec.lean` or a chip's `main` changes shape. The
 verdict table reflects the repo at branch `dtumad/clean` (2026-05-26),
-post the AddwChip + UTypeChip phase-(b)→(a) migration that closed
-the (b) tier of the audit.
+incorporating in order: the Phase 1 (d)-resolution pass (ungated
+`*.AssertionGated` phantom rows for Control chips removed — the audit
+conflated them with the single `Assertion` form, which IS already the
+gated form per project direction; `MemoryGlobal` promoted from absent
+to a partial scaffold of 10 range-check lookups + `IsZeroOp.Assertion`
+×2 + value decomp, with `LtUnsignedOp` + bit/x0 asserts deferred to
+Phase 4.5); the `Subw` (c)→(b) promotion via the
+`rv64_subw_eq_of_subwop_spec` bridge adding an `RV64.subw` trailing
+conjunct to `FormalSpec`; and the subsequent AddwChip + UTypeChip
+phase-(b)→(a) migration that closed those two entries of the (b) tier.
 
 ## Classification rubric
 
@@ -48,7 +55,7 @@ For each `def FormalSpec` (and `AssertionGated.FormalSpec`):
 6. Otherwise (Spec closes with `RV64.<op>` and is internals-free) →
    **(a)**.
 
-## Verdict table (28 entries)
+## Verdict table
 
 ### ALU chips
 
@@ -58,7 +65,7 @@ For each `def FormalSpec` (and `AssertionGated.FormalSpec`):
 | `SP1Clean.Addi` | **(a)** | Same shape, `ITypeReader.Gated` + `RV64.addi`. |
 | `SP1Clean.Sub` | **(a)** | Same shape, `RV64.sub`. |
 | `SP1Clean.Addw` | **(a)** | Same shape, `ALUTypeReader.Gated` + `RV64.addw` (uniform across `imm_c ∈ {0, 1}` since the reader supplies `op_c_memory.prev_value` correctly for both ADDW and ADDIW). `AddwOp.Spec` internals exposure dropped (2026-05-26 migration); the carry chain is reconstructed on demand via `addwOp_spec_iff_rv64_addw` (`SP1Clean/Chips/ALU/AddwChip/Lemmas.lean`) which inverts the sign-extension via `BitVec.setWidth_signExtend_eq_self`. |
-| `SP1Clean.Subw` | **(c)** | `SubwOp` internals + Sail `execute_RTYPEW_pure_32_w`. `RV64.subw` exists in `RISCV/Instructions.lean` — upgrade candidate to (b). |
+| `SP1Clean.Subw` | **(b)** | `SubwOp` internals (`subw_value`, `subw_msb`) + Sail `execute_RTYPEW_pure_32_w` 32-bit BV identity + `RV64.subw` 64-bit clause. The BV32 triple is retained as the internals exposure (completeness drives `SubwOperation.iff_sp1_full.mpr` from it to witness `subw_value`/`subw_msb`); the BV64 conjunct is derived inline via `rv64_subw_eq_of_subwop_spec`. |
 | `SP1Clean.UType` | **(a)** | `CPUState.Gated` + `AddOp.Assertion.Spec` (gated by `is_real - op_a_0`) + `JTypeReader.Gated` + 5 scalar gates + `is_real = 1 → op_a_0 = 0 → isU64 add_result ∧ toBitVec64 = if is_auipc then RV64.auipc imm pc else RV64.lui imm`. 2026-05-26 migration dropped the raw `AddOperation.constraints.allHold` envelope and `cpuStateSpec → CPUState.Gated.Assertion.Spec`; the sign-extension identity comes from `Opcode.trusted_instr` for opcodes 48 (AUIPC) and 49 (LUI). |
 | `SP1Clean.Mul` | **(c)** | `MulOp.Spec` internals + `RTypeReader.Gated`. Matches `MulChip/Aggregate.lean:520 main`. `RV64.mul/mulh/mulhu/mulhsu/mulw` available. |
 | `SP1Clean.DivRem` | **(c)** | MulOp×2 + IsEqualWordOp×4 + IsZeroWordOp + AddOp×2 + LtUnsignedOp + U16MSBOp×7. Matches `DivRemChip/Aggregate.lean:189 main`. `RV64.div/divu/divw/divuw/rem/remu/remw/remuw` available. |
@@ -69,19 +76,20 @@ For each `def FormalSpec` (and `AssertionGated.FormalSpec`):
 
 ### Control chips
 
-Each of Branch/Jal/Jalr has both an `Assertion.main` and an
-`AssertionGated.main` in its `Aggregate.lean`. Only the
-`Assertion.FormalSpec` form is present in `Spec.lean` — the gated
-counterpart is missing.
+Branch/Jal/Jalr each expose a single full gated form: `Assertion.main`
++ `assertion : FormalAssertion` at the top of their `Aggregate.lean`.
+There is **no separate `AssertionGated.main`** — the Memory chips' two-
+tier (`Assertion` partial / `AssertionGated` full) split exists because
+those chips defer the `load_mem/+1` access; Control chips have no
+analogous deferral. Per the project direction that ungated forms are
+transitional and going away, the `Assertion.FormalSpec` block in
+`Spec.lean` is the canonical gated mirror for each.
 
 | Namespace | Verdict | Justification |
 |---|---|---|
 | `SP1Clean.Branch.Assertion` | **(c)** | `GatedAddOp.Spec` ×2 + `next_pc[i]` range bounds + `OperandAccess` ×2. Matches `BranchChip/Aggregate.lean:316 main`. No `RV64.<branch>` wrapper (branch sem is `Bool`, non-trivial upgrade). |
-| `SP1Clean.Branch.AssertionGated` | **(d)** *missing* | `AssertionGated.main` exists in `BranchChip/Aggregate.lean` but no `SP1Clean.Branch.AssertionGated` namespace in `Spec.lean`. |
 | `SP1Clean.Jal.Assertion` | **(c)** | Raw `toBitVec64 next_pc = pc + op_b_imm` + `toBitVec64 op_a_write_value = pc + 4` (no `RV64.jal` exists). Has `OperandAccess` ×1 + `ProgramTable.Spec`. Matches `JalChip/Aggregate.lean:371 main`. |
-| `SP1Clean.Jal.AssertionGated` | **(d)** *missing* | `AssertionGated.main` exists with 2× `AddOp.assertion`; no Spec namespace. |
-| `SP1Clean.Jalr.Assertion` | **(c)** | `GatedAddOp.Spec` + `OperandAccess` ×2 + scalar gates. Matches `JalrChip/Aggregate.lean:279 main`. |
-| `SP1Clean.Jalr.AssertionGated` | **(d)** *missing* | `AssertionGated.main` exists; no Spec namespace. |
+| `SP1Clean.Jalr.Assertion` | **(c)** | `GatedAddOp.Spec` + `OperandAccess` ×2 + scalar gates. Matches `JalrChip/Aggregate.lean:260 main`. |
 
 ### Memory chips
 
@@ -109,40 +117,52 @@ partial — drops `load_mem/+1` etc.) and an `AssertionGated.FormalSpec`
 | `SP1Clean.StoreWord.AssertionGated` | **(c)** | Full mirror with `StoreWordAssembler`. |
 | `SP1Clean.StoreDouble.Assertion` | **(d)** | Partial pre-stage. |
 | `SP1Clean.StoreDouble.AssertionGated` | **(c)** | Full mirror (no assembler — 8-byte aligned store). |
-| `SP1Clean.MemoryGlobal` | **(d)** *severe* | No namespace in `Spec.lean`. `MemoryGlobalChip.lean` has zero `def main` — only a column struct stub. Upstream `memory/global.rs` composes `LtOperationUnsigned` with ~4 constraints. |
+| `SP1Clean.MemoryGlobal.Assertion` | **(d)** *partial* | Phase 1 scaffold (`MemoryGlobalChip.lean:Assertion.main` + `Spec.lean:MemoryGlobal.Assertion.FormalSpec`): 10 u16 range-check lookups + value third-limb decomp + 2 u8 range lookups + 2× `IsZeroOp.Assertion.assertion` + `is_comp`/`is_real` boolean gates. **Deferred to Phase 4.5**: `LtUnsignedOp` monotonicity + bit assertion + x0-case zero asserts (require `MemoryGlobalCols.lt_cols : Vector T 6` to be expanded to 8 fields to hold `LtUnsignedOp.Inputs`'s `comparison_limbs`). Soundness / completeness are `sorry`. |
 
 ## Counts
 
 | Category | Count | Members |
 |---|---|---|
 | **(a)** | 5 | Add, Addi, Sub, **Addw** (post-2026-05-26), **UType** (post-2026-05-26) |
-| **(b)** | 0 | — (tier closed by the 2026-05-26 phase-(b)→(a) migration) |
-| **(c)** | 16 | Subw, Mul, DivRem, Branch.Assertion, Jal.Assertion, Jalr.Assertion, 9× Memory `AssertionGated` |
-| **(d)** | 17 | 4× ALU (Bitwise, ShiftLeft, ShiftRight, Lt), 3× Control `AssertionGated` missing, 9× Memory `Assertion` partial, MemoryGlobal absent |
+| **(b)** | 1 | Subw (post-`rv64_subw_eq_of_subwop_spec` bridge) |
+| **(c)** | 14 | Mul, DivRem, Branch.Assertion, Jal.Assertion, Jalr.Assertion, 9× Memory `AssertionGated` |
+| **(d)** | 14 | 4× ALU (Bitwise, ShiftLeft, ShiftRight, Lt), 9× Memory `Assertion` partial, MemoryGlobal partial scaffold |
+
+Total: 34 entries (5 + 1 + 14 + 14). The original audit's "28" header
+count was off; the actual table has always had more rows than that.
 
 ## Highest-leverage gaps
 
 Ordered by how much faithfulness they unlock per unit of work:
 
-1. **`MemoryGlobal`** — most severe (d). No `main`, no Spec, only a
-   struct stub at `SP1Clean/Chips/Memory/MemoryGlobalChip.lean`.
-   Closing this needs both a `main` composition (`LtOperationUnsigned`
-   primarily) and a matching `FormalSpec` block. The upstream Rust is
-   small (~4 constraints in `memory/global.rs`) so this is a
-   well-scoped Phase-1 add.
+1. **`MemoryGlobal` Phase 4.5 closure** — Phase 1 landed a partial
+   scaffold (range checks + value decomp + `IsZeroOp.Assertion` ×2 +
+   `is_comp`/`is_real` gates), but `LtUnsignedOp` monotonicity +
+   `when(is_comp).bit = 1` + x0-case zero asserts are deferred.
+   Closure requires expanding `MemoryGlobalCols.lt_cols : Vector T 6`
+   to 8 fields (to hold `LtUnsignedOp.Inputs.comparison_limbs`), then
+   composing `SP1Clean.LtUnsignedOp.assertion` with 3→4 limb padding
+   on `prev_addr.push 0` / `addr.push 0`. The `soundness` /
+   `completeness` `sorry`s in `MemoryGlobalChip.lean:Assertion` close
+   at the same time. Promotes from (d) partial to (c).
 2. **Bitwise / ShiftLeft / ShiftRight / Lt** — chip `main` is behind
    upstream Rust. Each needs `BitwiseU16Operation` /
    `ALUTypeReader.Gated` / shift-power lookup / `LtOperationSigned`
    added to `main`, then the corresponding `Spec.lean` conjuncts.
-   Promotes these from (d) to (c).
-3. **Branch / Jal / Jalr `AssertionGated.FormalSpec`** — `main` is
-   already complete in code. Just add the three missing
-   `AssertionGated.FormalSpec` blocks to `Spec.lean`, mirroring the
-   `Memory.*.AssertionGated` pattern. Promotes from (d) to (c).
-4. **Subw / Mul / DivRem** — closest to (b). Each has a matching
+   Promotes these from (d) to (c). `ShiftLeft` needs a spike first —
+   the "shift-power lookup" missing piece hasn't been located in the
+   codebase.
+3. **Memory `.Assertion` partials (9 chips)** — each chip's
+   `Assertion.main` deliberately drops `load_mem/+1` and related
+   memory-bus content (doc-commented as deferred). Closure path:
+   introduce the flag-aware `LoadOperandAccess` variant mentioned in
+   `SP1Clean/Chips/Memory/LoadByteChip.lean:398-403`, then extend
+   each `Assertion.main` + matching `Assertion.FormalSpec` to include
+   the deferred RAM access. Promotes from (d) partial to (c).
+4. **Mul / DivRem** — closest to (b). Each has a matching
    `RV64.<op>` available; add the semantic trailing conjunct.
-   `Subw` is the easiest: replace `execute_RTYPEW_pure_32_w` with
-   `RV64.subw`. Promotes from (c) to (b).
+   (Subw landed (c)→(b) via `rv64_subw_eq_of_subwop_spec` —
+   the same recipe applies, but each needs its own bridge lemma.)
 5. ~~**Addw `imm_c = 1`** — already in (b).~~ **CLOSED 2026-05-26.**
    AddwChip promoted to (a) by dropping `AddwOp.Spec` from FormalSpec
    and using a uniform `RV64.addw` clause (no `imm_c` conditional
@@ -153,14 +173,14 @@ Ordered by how much faithfulness they unlock per unit of work:
 ## Available but unused `RV64.*` names
 
 The catalog of `RV64.<op>` symbols in `.lake/packages/RISCV/RISCV/Instructions.lean`
-contains ~66 entries. Currently `Spec.lean` references 6 (`add`,
-`addi`, `addw`, `auipc`, `lui`, `sub`) — `addiw` was dropped from the
-references when AddwChip switched to a uniform `RV64.addw` clause that
-covers both ADDW (R-type, `imm_c = 0`) and ADDIW (I-type, `imm_c = 1`)
-via the reader's `op_c_memory.prev_value` field. The 59+ unused
-names that map onto SP1 chips are:
+contains ~66 entries. Currently `Spec.lean` references 7 (`add`,
+`addi`, `addw`, `auipc`, `lui`, `sub`, `subw`) — `addiw` was dropped
+from the references when AddwChip switched to a uniform `RV64.addw`
+clause that covers both ADDW (R-type, `imm_c = 0`) and ADDIW (I-type,
+`imm_c = 1`) via the reader's `op_c_memory.prev_value` field. The 58+
+unused names that map onto SP1 chips are:
 
-- Arithmetic: `subw` (for Subw), `mul`, `mulh`, `mulhu`, `mulhsu`,
+- Arithmetic: `mul`, `mulh`, `mulhu`, `mulhsu`,
   `mulw`, `div`, `divu`, `divw`, `divuw`, `rem`, `remu`, `remw`,
   `remuw`.
 - Bitwise: `and`, `or`, `xor`, `andi`, `ori`, `xori`, `andn`, `orn`,
@@ -175,8 +195,15 @@ names that map onto SP1 chips are:
 
 ## Sail-only semantics currently in `Spec.lean`
 
-One: `execute_RTYPEW_pure_32_w` inside `SP1Clean.Subw.FormalSpec`.
+`SP1Clean.Subw.FormalSpec` still carries `execute_RTYPEW_pure_32_w`,
+but as the *internals* exposure (the BV32 triple that
+`SubwOperation.iff_sp1_full` produces). The chip is in (b) because
+its trailing conjunct is a pure `RV64.subw` 64-bit identity. The
+BV32 clause is retained because completeness drives
+`iff_sp1_full.mpr` from it to witness `subw_value` / `subw_msb` —
+dropping it would force a costly BV64↔(BV32+msb) inversion in the
+chip's `allHold_iff_structural` backward arm.
 `SP1Foundations/SailM.lean` defines 12+ `execute_*_pure*` helpers
 that could appear if more (c)-class Specs gain semantic clauses
 without `RV64.*` counterparts; none are currently in `Spec.lean`
-besides this one.
+besides the Subw retention.

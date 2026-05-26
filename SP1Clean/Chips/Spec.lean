@@ -228,21 +228,20 @@ end SP1Clean.Sub
 
 namespace SP1Clean.Subw
 
-/-- The unified chip Spec for `SubwChip`. Semantic-only contract: the
-byte-borrow + sign-extension decomposition that the SP1 `SubwOperation`
-circuit threads internally is *not* exposed here; it's the
-implementation detail of the `SubwOp` sub-circuit and is reconstructed
-on demand via `SubwOperation.iff_sp1_full` (see `Lemmas.lean`). The
-flag-threaded sub-circuit composition (`CPUState.Gated` + `RTypeReader.Gated`,
-opcode 20) plus the chip-level `op_a_0 = 0` gate plus the trailing
-semantic conjunct (the 32-bit BV identity + the msb sign-extension bit,
-conditional on `is_real = 1`, matching `SubwOperation.iff_sp1_full`'s
-RHS verbatim). Diverges in shape from `SP1Clean/SubChip/Cols.lean`'s
-BV64 form because SubwChip's storage is BV32 + msb, not a 4-limb Word:
-keeping the FormalSpec semantic shape aligned with `iff_sp1_full`
-avoids a costly BV64↔BV32+msb inversion in the `allHold_iff_structural`
-backward arm. The BV64 narrative used by the Sail bridge is derived
-externally via `rv64_subw_eq_of_subwop_spec`. -/
+/-- The unified chip Spec for `SubwChip`: the flag-threaded sub-circuit
+composition (`CPUState.Gated` + `RTypeReader.Gated`, opcode 20), the
+chip-level `op_a_0 = 0` gate, the 32-bit Sail-form internals triple
+(`isU32 ∧ BV32 identity ∧ msb sign-extension bit`, matching
+`SubwOperation.iff_sp1_full`'s RHS verbatim), and the trailing pure
+BitVec `RV64.subw` semantic clause (gated on `is_real = 1`).
+
+Diverges in shape from `SP1Clean/SubChip/Cols.lean`'s BV64-only form
+because SubwChip's storage is BV32 + msb, not a 4-limb Word: the BV32
+triple is kept as the internals exposure so completeness can drive
+`SubwOperation.iff_sp1_full.mpr` to witness `subw_value` / `subw_msb`
+without a costly BV64↔BV32+msb inversion. The `RV64.subw` 64-bit
+clause is derived inline from the BV32 triple via the bridge
+`rv64_subw_eq_of_subwop_spec` (see `Lemmas.lean`). -/
 def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let op_a_write_value : Word (ZMod p) :=
@@ -263,7 +262,15 @@ def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
       execute_RTYPEW_pure_32_w cols.adapter.op_b_memory.prev_value
                                 cols.adapter.op_c_memory.prev_value .SUBW ∧
     cols.subw_msb =
-      if (HWord.toBitVec32 cols.subw_value).msb then 1 else 0)
+      if (HWord.toBitVec32 cols.subw_value).msb then 1 else 0) ∧
+  -- Pure BitVec semantic for SUBW. Derived inline from the BV32 triple
+  -- above via `rv64_subw_eq_of_subwop_spec`, using the operand
+  -- `Word.isU64` bounds exposed by `RTypeReader.Gated.Assertion.Spec`'s
+  -- `RegisterAccess.Spec` sub-conjuncts.
+  (cols.is_real = 1 →
+    Word.toBitVec64 op_a_write_value =
+      RV64.subw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
+                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
 end SP1Clean.Subw
 
@@ -1323,3 +1330,41 @@ def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
 end AssertionGated
 
 end SP1Clean.StoreDouble
+
+/-! ## Boundary memory chip -/
+
+namespace SP1Clean.MemoryGlobal
+
+namespace Assertion
+
+/-- Phase 1 scaffold FormalSpec mirroring the partial `main` composition in
+`SP1Clean/Chips/Memory/MemoryGlobalChip.lean`. The `LtUnsignedOp` /
+monotonicity / x0-case conjuncts are deferred to Phase 4.5 pending the
+`MemoryGlobalCols.lt_cols` struct expansion documented in the chip file. -/
+def FormalSpec (cols : MemoryGlobalCols (ZMod p)) : Prop :=
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.value[0]).val < 65536 ∧
+  (cols.value[1]).val < 65536 ∧
+  (cols.value[2]).val < 65536 ∧
+  (cols.value[3]).val < 65536 ∧
+  (cols.prev_addr[0]).val < 65536 ∧
+  (cols.prev_addr[1]).val < 65536 ∧
+  (cols.prev_addr[2]).val < 65536 ∧
+  (cols.addr[0]).val < 65536 ∧
+  (cols.addr[1]).val < 65536 ∧
+  (cols.addr[2]).val < 65536 ∧
+  cols.value[2] - (cols.value_lower + 256 * cols.value_upper) = 0 ∧
+  (cols.value_lower).val < 256 ∧
+  (cols.value_upper).val < 256 ∧
+  SP1Clean.IsZeroOp.Assertion.Spec
+    ⟨cols.prev_addr[0] + cols.prev_addr[1] + cols.prev_addr[2],
+     cols.is_prev_addr_zero[0], cols.is_prev_addr_zero[1]⟩ ∧
+  SP1Clean.IsZeroOp.Assertion.Spec
+    ⟨cols.index, cols.is_index_zero[0], cols.is_index_zero[1]⟩ ∧
+  cols.is_comp - cols.is_real *
+    (1 - cols.is_prev_addr_zero[1] * cols.is_index_zero[1]) = 0 ∧
+  cols.is_comp * (cols.is_comp - 1) = 0
+
+end Assertion
+
+end SP1Clean.MemoryGlobal
