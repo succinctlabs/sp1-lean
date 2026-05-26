@@ -10,14 +10,15 @@ to the named branch, ping main to merge.
 
 - **Main owns this file.** Helpers don't write to it directly; they
   announce claims via chat ("Claiming p2-addi") and main flips the cell.
-- **Status flow**: `open` → `claimed:<helper-id>` → `pr:<branch>` →
-  `merged`. (`merged` rows can be deleted in a future pruning pass.)
-- **Branch naming**: `dtumad/clean-<phase>-<task-id>` (e.g.
-  `dtumad/clean-p2-addi`).
+- **Status flow**: `open` → `in-progress:<helper-id>` → `merged`.
+  (`merged` rows can be deleted in a future pruning pass.)
+- **Branching**: commits land directly on `dtumad/clean` — no per-task
+  branches. Helpers commit-and-push when work is green; main pulls.
+  Reverts are by `git revert <sha>` against `dtumad/clean`.
 - **Disjoint file scope**: every row's `files` column lists the exact
-  files it touches. Two simultaneously-claimed tasks must have disjoint
-  file sets. Reader prereq tasks (PR-*) for Phase 3 may need to land
-  first; helpers wait.
+  files it touches. Two simultaneously-in-progress tasks must have
+  disjoint file sets. Reader prereq tasks (PR-*) for Phase 3 may need to
+  land first; helpers wait.
 - **Reserved by main, never claimed by helpers**:
   `SP1Clean/Soundness/*`, `SP1Clean/AddChip/*`, `SP1Foundations/*`,
   `SP1Operations/*` (main absorbs `iff_sp1_full` additions there),
@@ -44,7 +45,7 @@ axiom-clean. Closes ~5–7 sorries.
 
 | task-id | target | files | claim | status |
 |---------|--------|-------|-------|--------|
-| **p2-addi** | AddiChip | `SP1Clean/AddiChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | helper-1 | open |
+| **p2-addi** | AddiChip | `SP1Clean/AddiChip/{Cols,Circuit,Lemmas,SailBridge}.lean` (+ AddiChip-specific shape fixes in `SP1Clean/Soundness/{IsRealBinary,MemoryConsistencyClock}.lean`) | main | merged (`4656a5d`) |
 | **p2-jal** | JalChip | `SP1Clean/JalChip.lean` | helper-2 | open |
 | **p2-sub** | SubChip | `SP1Clean/SubChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | helper-1 | open |
 | **p2-subw** | SubwChip | `SP1Clean/SubwChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | helper-2 | open |
@@ -145,4 +146,4 @@ After Phases 2–6 land, scan for un-gated operation/reader decls whose only cal
 3. Read AddChip canonical reference: `SP1Clean/AddChip/{Cols,Circuit,Lemmas,SailBridge}.lean` (one example is worth a thousand recipes).
 4. Read `docs/MULTIPLICITY_BUS.md` §"Operation contract template" if your task is Phase 2 or 5 (operation-level).
 5. Read `MEMORY.md` for project-wide gotchas — especially `feedback_memoryaccesses_vacuous_for_gated_chips.md` if you're touching Soundness.
-6. Push to `dtumad/clean-<phase>-<task-id>`; ping main for merge.
+6. Commit directly on `dtumad/clean` (no per-task branches); push when green; ping main so the worklist row gets flipped to `merged`.
