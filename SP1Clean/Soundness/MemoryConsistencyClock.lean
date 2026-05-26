@@ -53,10 +53,10 @@ Both fields are stated at the `MemoryAccess`-tuple level (not on
 encoded clocks directly) to keep the bridge to upstream OfflineMemory's
 `Pairwise timestamp_ordering` direct.
 
-A future discharge lemma (see `docs/CLEAN_PILOT_NOTES.md` Phase A.3.2)
-will derive `TraceClkValid` from per-chip `Spec`s (`cpuStateSpec` plus
-`memoryAccessSpec`) given a strict clock-monotonicity trace assumption
-on `ChipRow.encodedClk`. -/
+A discharge lemma derives `TraceClkValid` from per-chip `Spec`s
+(`cpuStateSpec` plus `memoryAccessSpec`) given a strict
+clock-monotonicity trace assumption on `ChipRow.encodedClk`; see
+`docs/CLEAN_OVERVIEW.md` "Trace-level scaffolding". -/
 structure TraceClkValid (rows : List (ChipRow p)) : Prop where
   /-- Within each chip row, its per-row access list is sorted in
   strictly decreasing timestamp order (the chip's `offsets` field is
@@ -104,7 +104,7 @@ theorem aggregateMemoryAccesses_Notimestampdup
 
 The remaining content of this file derives `TraceClkValid` from per-row
 chip `Spec`s plus a single chronological clock-link hypothesis
-(`TraceClkLink`). This is §3a of `docs/TRACE_SOUNDNESS_STATUS.md`.
+(`TraceClkLink`). See `docs/CLEAN_OVERVIEW.md` "Trace-level scaffolding".
 
 The discharge requires the field to be larger than `2^24` so that the
 encoded clock `clk_high.val * 2^24 + clk_low.val` plus a small offset
@@ -198,7 +198,7 @@ theorem cpuStateSpec_of_spec_branch (cols : Branch.BranchCols (ZMod p))
   exact h.1
 
 -- Sorry'd: DivRem's new `FormalSpec` first conjunct is
--- `CPUState.Gated.Assertion.Spec` (CLEAN_AUDIT alignment) not the flat
+-- `CPUState.Gated.Assertion.Spec` (CLEAN_FUTURE alignment) not the flat
 -- `cpuStateSpec`. The bound is still recoverable by digging into the
 -- Gated Spec's internals — follow-up.
 theorem cpuStateSpec_of_spec_divRem [Fact (2 ^ 24 < p)]
@@ -257,7 +257,7 @@ theorem cpuStateSpec_of_spec_lt (cols : Lt.LtCols (ZMod p))
   exact h.1
 
 -- Sorry'd: Mul's new `FormalSpec` first conjunct is
--- `CPUState.Gated.Assertion.Spec` (CLEAN_AUDIT alignment) not the flat
+-- `CPUState.Gated.Assertion.Spec` (CLEAN_FUTURE alignment) not the flat
 -- `cpuStateSpec`. The bound is still recoverable by digging into the
 -- Gated Spec's internals — follow-up.
 theorem cpuStateSpec_of_spec_mul [Fact (2 ^ 24 < p)]

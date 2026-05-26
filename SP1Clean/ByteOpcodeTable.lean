@@ -8,12 +8,13 @@ import SP1Foundations.ByteOpcode
 This file defines the lookup table that mirrors SP1's
 `send (.byte op a b c) mult` / `receive (.byte op a b c) mult` interactions.
 
-Per `docs/CLEAN_DSL_EVALUATION.md` §4 and the pilot plan, the encoding chosen
-is a **stateless** `Table` rather than a multiplicity-aware `Channel`. SP1's
-`mult` is dropped here; per-row this is sound because every SP1 chip carries
-an `is_real ≠ 0` discharger on every send. The cost is that this encoding
-can't witness the global "balanced multiplicities" property — a known
-limitation to revisit if we ever lift the pilot to a full chip mirror.
+Per `docs/CLEAN_FUTURE.md` "Open risks — multiplicity tracking", the encoding
+chosen is a **stateless** `Table` rather than a multiplicity-aware `Channel`.
+SP1's `mult` is dropped here; per-row this is sound because every SP1 chip
+carries an `is_real ≠ 0` discharger on every send. The cost is that this
+encoding can't witness the global "balanced multiplicities" property — a
+known limitation; see also `docs/MULTIPLICITY_BUS.md` for the parallel
+hint-witness `lookupGated` primitive that closes part of this gap.
 
 The row layout is `#v[op, a, b, c]` to match `AirInteraction.byte op a b c`
 from `SP1Foundations/Constraint.lean:9-22`, with `op` encoded as a field

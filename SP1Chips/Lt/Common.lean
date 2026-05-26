@@ -10,7 +10,8 @@ set_option linter.style.longLine false
 
 set_option linter.unusedSectionVars false in
 -- Canonical .allHold-form iff (post-AddChip refactor, see
--- `CLEAN_PILOT_ROADMAP.md` §4). Exposes 3 sub-allHolds
+-- `docs/CLEAN_FUTURE.md` "Canonical ALU-chip Layer-0/Layer-2 shape").
+-- Exposes 3 sub-allHolds
 -- (LtOperationSigned/CPUState/ALUTypeReader) + 4 trailing scalar gates
 -- (2 selector binaries + sum binary + op_a_0). Consumed by SP1Clean's
 -- chip-level `allHold_iff_structural` bridge.

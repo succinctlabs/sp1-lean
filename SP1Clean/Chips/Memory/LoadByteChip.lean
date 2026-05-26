@@ -200,8 +200,8 @@ bridge; the lighter-weight `Spec` above remains for the OfflineMemory
 trace bridge (which consumes `loadMemoryAccess` directly, not `Spec`).
 
 The `AddrAddOperation.constraints` clause stays in raw `.allHold` form
-because no Clean-side mirror of that operation exists yet (Phase-B per
-`docs/CLEAN_PILOT_ROADMAP.md` §3). -/
+because no Clean-side mirror of that operation exists yet (Phase B per
+`docs/CLEAN_FUTURE.md` "Phased migration plan"). -/
 
 /-- Iff RHS for the signed Load Byte (LB) variant, mirroring
 `_root_.Load.LoadByte.allHold_constraints_iff_of_is_lb`. -/

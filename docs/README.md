@@ -45,33 +45,24 @@ under `docs/`, look at the matching entry below.
   silent-success bug in `lake env lean` discovered during DivRem
   `_poly` work.
 
-- **`CLEAN_PILOT_INTRO.md`** — friendly onboarding for the SP1Clean
-  pilot. Read this first if you've heard the pilot mentioned but
-  don't yet know what `SP1Clean/` is, how it differs from the
-  existing `SP1Chips/` / `SP1Operations/` formalization, or why
-  it exists in parallel. Side-by-side Add example, three-layer
-  bridging story, what's built today, what benefits are realized
-  vs. speculative. Background context for the roadmap.
+- **`CLEAN_OVERVIEW.md`** — onboarding and current state for the
+  SP1Clean pilot. Read this first if you've heard "Clean" or
+  "SP1Clean" without knowing what they refer to, how the parallel
+  formalization differs from `SP1Chips/` / `SP1Operations/`, or what's
+  built today. Covers the three proof layers (dirty `correct_*` /
+  Clean `FormalAssertion` / trace), per-chip status across all 24
+  chips, three-layer bridging discipline, faithful sub-circuit
+  composition, and the canonical AddChip/AddOp pattern reference.
 
-- **`CLEAN_PILOT_ROADMAP.md`** — strategic roadmap for the SP1Clean
-  pilot. Inventory of mirrored chips / FormalAssertion bundles / True-
-  placeholder Specs / missing operations; concrete iter-5 work list;
-  phased plan (gating combinator → heavy ops → reader promotion →
-  write-back tooling) for adopting Clean as the source of truth with
-  SP1 constraints as a validator; the three-layer bridging discipline
-  for reusing SP1's `_poly` proofs without rewriting. Read after
-  `CLEAN_PILOT_INTRO.md` when planning the next pilot iteration or
-  evaluating where Clean fits long-term. Lives alongside the
-  per-iter retrospectives (`CLEAN_PILOT_NOTES.md`,
-  `CLEAN_PILOT_ITER2/3/4/5.md`) and the original tradeoff doc
-  (`CLEAN_DSL_EVALUATION.md`).
-
-- **`CLEAN_PILOT_ITER5.md`** — iter-5 retrospective. Documents the
-  `iff_sp1` sweep across 8 Load/Store/UType chips (19 of 23 mirrored
-  chips now have an iff_sp1) and the first Phase-A gating combinator
-  (`GatedAddOp.assertion`), including the lookup-restriction caveat
-  that blocks a polymorphic combinator and the JalrChip Path-1.5
-  re-promotion that partially closes the iter-4 Tier-2 finding.
+- **`CLEAN_FUTURE.md`** — open work and roadmap for the SP1Clean
+  pilot. Per-chip sorry register with verdicts (canonical /
+  mechanical / needs-Gated / needs-memory-routing / scope-fence);
+  phased plan (Phase A gating combinator → Phase B heavy ops → Phase
+  C reader promotion → Phase D write-back tooling); critical-path
+  steps to a single end-to-end ensemble soundness + completeness
+  theorem; bridging hard SP1 proofs without rewriting; durable
+  lessons distilled from iter-1 through iter-8 retrospectives. Read
+  this when planning the next iteration of pilot work.
 
 - **`STRUCT_DIVERGENCE.md`** — field-level snapshot of how far
   `SP1Clean/` column structs and `SP1Operations/` operation structs
@@ -79,15 +70,6 @@ under `docs/`, look at the matching entry below.
   sync, evaluating coverage gaps (privilege/trap, paging, syscalls,
   lookup tables, etc.), or before any porting work that depends on
   upstream struct shape. Focuses on shape only — no constraint logic.
-
-- **`TRACE_SOUNDNESS_STATUS.md`** — consolidated status across the
-  three proof layers (dirty `correct_*`, Clean `FormalAssertion`,
-  trace-level aggregator) per chip, plus the remaining gaps for a
-  single end-to-end ensemble soundness + completeness theorem. Read
-  when scoping the next planning session on full trace-level closure.
-  Records what the Phase A–D scaffolding (memory bus + state bus +
-  multiplicity-gating + `is_real` binarity) delivers and what
-  discharge work + chip promotions remain.
 
 - **CLAUDE.md § "Faithful sub-circuit composition"** (not a separate
   doc — lives in the repo-root `CLAUDE.md`). Codifies the SP1Clean
@@ -111,14 +93,3 @@ under `docs/`, look at the matching entry below.
   `AddwChip/Circuit.lean:152` and `MemoryConsistency.lean:1067`.
   Designed as a hand-off doc — start here if you're picking this work
   up cold.
-
-## Auto-memory mirror
-
-`docs/memory/` is **not** part of this documentation set — it's a
-mirror of Claude Code's per-machine project memory, persisted in the
-repo so context survives a machine switch. The live memory lives at
-`~/.claude/projects/<slug>/memory/`. See `docs/memory/README.md` for
-the restore-on-new-machine recipe. Lessons from memory that are
-durable across sessions get promoted *out* of memory into the
-canonical docs above (typically into `FIELD_GENERIC.md`'s polymorphic
-patterns section or `PROOF_PATTERNS.md`).

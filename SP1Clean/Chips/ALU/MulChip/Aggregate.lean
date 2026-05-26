@@ -506,7 +506,7 @@ chip-level boolean variant gates and `op_a_0 === 0` scalar gate. This
 matches the SP1 Rust `MulChip::eval` shape exactly (one
 `eval_r_type` + one `eval_cpu_state` + one `MulOperation::eval` call).
 Soundness/completeness proofs are stubbed with `sorry` — this lands the
-structural CLEAN_AUDIT D2/D3 alignment only. -/
+structural CLEAN_FUTURE D2/D3 alignment only. -/
 
 namespace Assertion
 

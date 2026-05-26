@@ -208,7 +208,7 @@ directly). The structural correspondence is straightforward in principle
 (soundness + completeness already close axiom-clean) but the Lean
 elaboration friction is high enough that we don't burn time on it for
 a theorem with zero downstream consumers. See
-`docs/CLEAN_PILOT_ROADMAP.md` for the broader sorries punch-list. -/
+`docs/CLEAN_FUTURE.md` for the broader sorries punch-list. -/
 theorem iff_sp1 (input : Inputs (ZMod p)) (h_is_signed : input.is_signed = 1) :
     Spec input ↔
       (LtOperationSigned.constraints input.b input.c

@@ -171,7 +171,7 @@ collapsing the SP1 `eval_cpu_state` + `eval_r_type` calls, matching the
 canonical AddChip pattern.
 
 Soundness/completeness are stubbed with `sorry` — this lands the
-structural CLEAN_AUDIT D2/D3 alignment only. Caveat: the 7 U16MSB
+structural CLEAN_FUTURE D2/D3 alignment only. Caveat: the 7 U16MSB
 calls use the always-on `U16MSBOp.assertion` because no
 `U16MSBOp.Gated.assertion` exists yet; SP1's mult-arg (`Main[239]`,
 `E2`) is dropped at the Clean call site. Adding `U16MSBOp.Gated` is a

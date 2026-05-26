@@ -36,7 +36,8 @@ This file wires per-chip `MemoryAccess` records into the
 the upstream `_root_.MemoryAccess` / `_root_.MemoryAccessList`
 (`Clean.Utils.OfflineMemory`).
 
-The design (per `docs/CLEAN_PILOT_NOTES.md` and the plan
+The design (per `docs/CLEAN_OVERVIEW.md` "What SP1Clean adds — composable
+interaction layer" and the plan
 `/home/dtumad/.claude/plans/make-a-plan-to-stateful-cookie.md`):
 
 1. Each chip's `Spec` includes one or more `SP1Clean.memoryAccessSpec`
@@ -917,7 +918,7 @@ theorem memoryAccessesValid_of_spec_loadX0
 
 /-- Mul's per-chip discharge — sorry'd after MulChip's `FormalSpec` was
 restructured to compose `MulOp.assertion` + `CPUState.Gated` +
-`RTypeReader.Gated` (CLEAN_AUDIT D2/D3 alignment). The OperandAccess
+`RTypeReader.Gated` (CLEAN_FUTURE D2/D3 alignment). The OperandAccess
 conjuncts that this destructure extracted are now nested inside
 `RTypeReader.Gated.Assertion.Spec` as `RegisterAccess.Assertion.Spec`
 (which wraps `OperandAccess.AssertionGated.Spec`). Re-deriving the
@@ -967,7 +968,7 @@ theorem memoryAccessesValid_of_spec_shiftRight
 
 /-- DivRem's per-chip discharge — sorry'd after DivRemChip's
 `FormalSpec` was restructured to compose 17 sub-circuits + 2 reader
-Gated assertions (CLEAN_AUDIT D2/D3 alignment). See the parallel
+Gated assertions (CLEAN_FUTURE D2/D3 alignment). See the parallel
 comment on `memoryAccessesValid_of_spec_mul`. -/
 theorem memoryAccessesValid_of_spec_divRem [Fact (2 ^ 24 < p)]
     (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
