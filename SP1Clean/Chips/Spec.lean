@@ -1309,3 +1309,41 @@ def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
 end AssertionGated
 
 end SP1Clean.StoreDouble
+
+/-! ## Boundary memory chip -/
+
+namespace SP1Clean.MemoryGlobal
+
+namespace Assertion
+
+/-- Phase 1 scaffold FormalSpec mirroring the partial `main` composition in
+`SP1Clean/Chips/Memory/MemoryGlobalChip.lean`. The `LtUnsignedOp` /
+monotonicity / x0-case conjuncts are deferred to Phase 4.5 pending the
+`MemoryGlobalCols.lt_cols` struct expansion documented in the chip file. -/
+def FormalSpec (cols : MemoryGlobalCols (ZMod p)) : Prop :=
+  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.value[0]).val < 65536 ∧
+  (cols.value[1]).val < 65536 ∧
+  (cols.value[2]).val < 65536 ∧
+  (cols.value[3]).val < 65536 ∧
+  (cols.prev_addr[0]).val < 65536 ∧
+  (cols.prev_addr[1]).val < 65536 ∧
+  (cols.prev_addr[2]).val < 65536 ∧
+  (cols.addr[0]).val < 65536 ∧
+  (cols.addr[1]).val < 65536 ∧
+  (cols.addr[2]).val < 65536 ∧
+  cols.value[2] - (cols.value_lower + 256 * cols.value_upper) = 0 ∧
+  (cols.value_lower).val < 256 ∧
+  (cols.value_upper).val < 256 ∧
+  SP1Clean.IsZeroOp.Assertion.Spec
+    ⟨cols.prev_addr[0] + cols.prev_addr[1] + cols.prev_addr[2],
+     cols.is_prev_addr_zero[0], cols.is_prev_addr_zero[1]⟩ ∧
+  SP1Clean.IsZeroOp.Assertion.Spec
+    ⟨cols.index, cols.is_index_zero[0], cols.is_index_zero[1]⟩ ∧
+  cols.is_comp - cols.is_real *
+    (1 - cols.is_prev_addr_zero[1] * cols.is_index_zero[1]) = 0 ∧
+  cols.is_comp * (cols.is_comp - 1) = 0
+
+end Assertion
+
+end SP1Clean.MemoryGlobal

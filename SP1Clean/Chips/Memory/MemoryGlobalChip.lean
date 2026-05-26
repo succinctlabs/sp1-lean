@@ -1,11 +1,20 @@
 import Clean.Circuit.Basic
 import Clean.Circuit.Provable
+import Clean.Circuit.Lookup
+import Clean.Circuit.Subcircuit
 import Clean.Utils.Field
 import Clean.Utils.Tactics.ProvableStructDeriving
+import SP1Foundations.ByteOpcode
 import SP1Foundations.Field
 import SP1Foundations.Word
+import SP1Clean.ByteOpcodeTable
 import SP1Clean.MemoryAccess
+import SP1Clean.Operations.IsZeroOperation
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
+
+set_option linter.style.setOption false
+set_option linter.style.longLine false
 
 /-! # Boundary memory chips: `MemoryGlobalInit` and `MemoryGlobalFinalize`
 
@@ -95,5 +104,136 @@ reading `cols.value` as the final value. -/
 def finalizeMemoryAccesses (_cols : MemoryGlobalCols (ZMod p)) :
     List ((SP1Clean.MemoryAccess (ZMod p)) × Word (ZMod p)) :=
   []
+
+/-! ## `Assertion` — Phase 1 scaffold of the full sub-circuit composition
+
+Promotes `MemoryGlobalCols` from a column-struct stub to a partial
+`FormalAssertion`, mirroring the upstream Rust constraint shape
+(`crates/core/machine/src/memory/global.rs:300-460`). Composes the
+sub-operations whose Clean wrappers exist + whose column layouts fit the
+current `MemoryGlobalCols` struct:
+
+- 10 `ByteOpcodeTable` u16 range-check lookups on `value` (4 limbs),
+  `prev_addr` (3 limbs), `addr` (3 limbs).
+- Inline `assertZero` for the third-limb decomposition
+  `value[2] = value_lower + 256 * value_upper`.
+- 2 `ByteOpcodeTable` u8 range-check lookups on `value_lower`/`upper`.
+- 2× `SP1Clean.IsZeroOp.Assertion.assertion` — one on
+  `prev_addr.sum`, one on `index`. Witness columns: `is_prev_addr_zero[0]`
+  = inverse, `is_prev_addr_zero[1]` = result (symmetric for `is_index_zero`).
+- Inline `assertZero` for the `is_comp` composition equation, the
+  `is_comp` binary gate, and the `is_real` binary gate.
+
+**Deferred to Phase 4.5** (struct expansion required, documented in the
+soundness sorry):
+
+- `LtUnsignedOp.Assertion.assertion` for `prev_addr < addr` monotonicity.
+  Current `lt_cols : Vector T 6` is missing the 2 `comparison_limbs` fields
+  that `LtUnsignedOp.Assertion.Inputs` requires (8 columns total). Phase
+  4.5 lifts `lt_cols` to 8 fields and threads `prev_addr.push 0` /
+  `addr.push 0` (3→4 limb padding) through `LtUnsignedOp.assertion`.
+- `when(is_comp).assert_one(lt_cols.u16_compare_operation.bit)` —
+  depends on the expanded `lt_cols` layout.
+- `when(is_not_comp)`-gated zero asserts on `addr` / `value` for the
+  boundary-row x0 special case.
+
+Soundness / completeness are `sorry` placeholders matching the
+`LoadByte.AssertionGated` initial-commit pattern. -/
+
+namespace Assertion
+
+open Circuit
+
+@[reducible]
+def main (cols : Var MemoryGlobalCols (ZMod p)) : Circuit (ZMod p) Unit := do
+  let ⟨_clk_high, _clk_low, index, prev_addr, addr, _lt_cols, value,
+       value_lower, value_upper, is_real, is_comp, _prev_valid,
+       is_prev_addr_zero, is_index_zero⟩ := cols
+  let one_expr : Expression (ZMod p) := 1
+  -- `is_real` binary gate.
+  is_real * (is_real - one_expr) === 0
+  -- u16 range checks on `value` (4 limbs).
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), value[0], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), value[1], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), value[2], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), value[3], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  -- u16 range checks on `prev_addr` (3 limbs).
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), prev_addr[0], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), prev_addr[1], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), prev_addr[2], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  -- u16 range checks on `addr` (3 limbs).
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), addr[0], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), addr[1], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), addr[2], 16, 0] :
+    Vector (Expression (ZMod p)) 4)
+  -- Third-limb decomposition: `value[2] = value_lower + 256 * value_upper`.
+  (value[2] - (value_lower + (256 : Expression (ZMod p)) * value_upper)) === 0
+  -- u8 range checks on `value_lower`, `value_upper`.
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), value_lower, 8, 0] :
+    Vector (Expression (ZMod p)) 4)
+  lookup ByteOpcodeTable (#v[(6 : Expression (ZMod p)), value_upper, 8, 0] :
+    Vector (Expression (ZMod p)) 4)
+  -- IsZero check on `prev_addr` (sum of 3 limbs).
+  SP1Clean.IsZeroOp.assertion
+    (⟨prev_addr[0] + prev_addr[1] + prev_addr[2],
+      is_prev_addr_zero[0], is_prev_addr_zero[1]⟩ :
+      Var SP1Clean.IsZeroOp.Assertion.Inputs (ZMod p))
+  -- IsZero check on `index`.
+  SP1Clean.IsZeroOp.assertion
+    (⟨index, is_index_zero[0], is_index_zero[1]⟩ :
+      Var SP1Clean.IsZeroOp.Assertion.Inputs (ZMod p))
+  -- `is_comp = is_real * (1 - is_prev_addr_zero.result * is_index_zero.result)`.
+  (is_comp - is_real *
+    (one_expr - is_prev_addr_zero[1] * is_index_zero[1])) === 0
+  -- `is_comp` binary gate.
+  is_comp * (is_comp - one_expr) === 0
+
+set_option maxHeartbeats 800000 in
+-- 14 inline gates + 12 lookups + 2 IsZero sub-circuits; default
+-- `localLength_eq` synthesis exceeds the 200k cap.
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) MemoryGlobalCols unit where
+  name := "SP1Clean.MemoryGlobal"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
+
+def Assumptions (_ : MemoryGlobalCols (ZMod p)) : Prop := True
+
+/-- Soundness: scaffolding placeholder pending the `lt_cols` struct
+expansion + `LtUnsignedOp` composition (Phase 4.5). Matches the
+`LoadByte.AssertionGated` initial-commit pattern. -/
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec :=
+  sorry
+
+/-- Completeness: scaffolding placeholder pending Phase 4.5. -/
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec :=
+  sorry
+
+end Assertion
+
+/-- The Phase 1 scaffold `FormalAssertion` for `MemoryGlobal`. -/
+def assertion : FormalAssertion (ZMod p) MemoryGlobalCols :=
+  { Assertion.elaborated with
+    Assumptions := Assertion.Assumptions,
+    Spec := Assertion.FormalSpec,
+    soundness := Assertion.soundness,
+    completeness := Assertion.completeness }
 
 end SP1Clean.MemoryGlobal
