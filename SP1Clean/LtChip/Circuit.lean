@@ -104,6 +104,13 @@ def Assumptions (cols : LtCols (ZMod p)) : Prop :=
 (`SP1Clean.LtChip.FormalSpec`). -/
 abbrev FormalSpec := @SP1Clean.LtChip.FormalSpec p
 
+-- TODO[clean-master-plan-phase-3,p3-lt-gated-iff-sp1]: blocked on the same
+-- missing operation-level iff_sp1 bridges that block `Lemmas.lean:55`
+-- (see breadcrumb there). Note `GatedLtUnsignedOp.Spec` already carries
+-- the byte-range conjunct (`gate = 0 ∨ ByteOpcodeSpec ...` for the
+-- U16Compare lookup, lines 87-90); the older inline comment below predates
+-- that addition. The remaining gap is the iff_sp1 bridge, not a missing
+-- byte-range fact.
 -- BLOCKED on byte-range gap: the chip's FormalSpec carries conditional
 -- BitVec semantic clauses (RV64.slt / RV64.sltu) that require
 -- `LtOperationSigned.spec.signed` / `.unsigned`. Those theorems take the

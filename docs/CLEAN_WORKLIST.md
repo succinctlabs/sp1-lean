@@ -69,7 +69,8 @@ prereq.** Closes ~15–25 sorries.
 | **p3-shl** | ShiftLeftChip | `SP1Clean/ShiftLeftChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | p3-prereq-readers | helper-2 | open |
 | **p3-shr** | ShiftRightChip | `SP1Clean/ShiftRightChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | p3-prereq-readers | helper-1 | open |
 | **p3-bitwise** | BitwiseChip | `SP1Clean/BitwiseChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | p3-prereq-readers | helper-2 | open |
-| **p3-lt-sail** | LtChip Sail-bridge closure (chip body mostly canonical already) | `SP1Clean/LtChip/{Circuit,Lemmas,SailBridge}.lean` | — | helper-1 | open |
+| **p3-lt-gated-iff-sp1** (NEW — prereq for p3-lt-sail) | `GatedLtUnsignedOp.iff_sp1` + `GatedLtSignedOp.iff_sp1` bridges (FormalSpec ↔ SP1 `constraints.allHold` under `gate = 1`). Discovered 2026-05-25 during p3-lt-sail breadcrumb pass — chip body cannot close without these. Est. ~300-500 lines combined. | `SP1Clean/Operations/GatedLtUnsignedOp.lean`, `SP1Clean/Operations/GatedLtSignedOp.lean` | — | helper-1 | open |
+| **p3-lt-sail** | LtChip Sail-bridge closure (chip body mostly canonical already) — **scope partial**: all 7 sorries breadcrumbed (commit pending) but none closed; closure path blocked on `p3-lt-gated-iff-sp1`. The "mechanical" rating in the original audit is inaccurate. | `SP1Clean/LtChip/{Circuit,Lemmas,SailBridge}.lean` | p3-lt-gated-iff-sp1 | helper-1 | partial:breadcrumbs |
 
 ## Phase 4 — Memory-routing migration (Load* / Store*)
 
