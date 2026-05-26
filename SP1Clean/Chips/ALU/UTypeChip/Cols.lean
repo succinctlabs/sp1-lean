@@ -17,6 +17,7 @@ import SP1Clean.Reader.OperandAccess
 import SP1Clean.Operations.AddOperation
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 import RISCV.Instructions
 
 /-! # `UTypeChip` cols-level surface (LUI / AUIPC, bundled)
@@ -113,59 +114,5 @@ omit [Fact (2 ^ 17 < p)] in
 @[simp] lemma sp1_utype_cols_fromMain (Main : Vector (ZMod p) 31) :
     sp1_utype_cols (fromMain Main) = _root_.UType.sp1_utype Main := by
   rfl
-
-/-! ## Chip-level `FormalSpec`
-
-The unified chip Spec. Composes the granular subcircuit Specs that
-`Assertion.main` emits, matching the monolith's TraceSpec shape (cpuStateSpec
-+ raw AddOp `.allHold` + jtypeReaderSpec + scalar gates) and adding the
-new pure BitVec conjunct so the chip's per-row RV64 semantics are visible
-at a glance. The AddOp clause stays in raw `.allHold` form (with the
-conditional gate `is_real - op_a_0`) because `AddOperation.allHold_constraints_iff`
-is only stated at `is_real_arg = 1` — keeping the raw form here lets
-`allHold_iff_structural` (Lemmas.lean) bridge to SP1's flat constraint list
-without a case split on `op_a_0`.
-
-Conjuncts:
-- `cpuStateSpec` — the two clock-field byte-bound consequences.
-- AddOp `.allHold` — raw 4-limb carry chain over `addend` + `op_b_imm` =
-  `add_result`, gated by `is_real - op_a_0` (matches SP1's emission).
-- `jtypeReaderSpec` — full J-type reader spec at `is_real = is_trusted = 1`
-  (composes `trusted_instr`, register-index bounds, op_a_0 binary, op_a
-  iff, pc bounds, timestamp, `Word.isU64` on prev_value, and the
-  op_a_0-masked write-value gates).
-- Six scalar trailing gates (`is_real`/`is_auipc` binary, three addend
-  gates `addend[i] - is_auipc * pc[i] = 0`, and `(is_real - 1) * op_a_0 = 0`).
-- Pure BitVec equation (conditional on `is_real = 1 ∧ op_a_0 = 0`):
-  `add_result = if is_auipc = 1 then RV64.auipc imm pc else RV64.lui imm`.
-  The sign-extension identity is enforced inside the program-bus clause's
-  `Opcode.trusted_instr` predicate; the per-row Sail-monadic equivalence
-  to `_root_.UType.spec_lui` / `spec_auipc` is recovered externally via
-  `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
-def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
-  let opcode_e : ZMod p := cols.is_auipc * 48 + (1 - cols.is_auipc) * 49
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  (_root_.AddOperation.constraints (F := ZMod p)
-      #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
-      cols.adapter.op_b_imm
-      { value := cols.add_result }
-      (cols.is_real - cols.adapter.op_a_0)).allHold ∧
-  SP1Clean.JTypeReader.Gated.Assertion.Spec
-      ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
-       cols.add_result, cols.adapter,
-       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
-  cols.addend[0] - cols.is_auipc * cols.state.pc[0] = 0 ∧
-  cols.addend[1] - cols.is_auipc * cols.state.pc[1] = 0 ∧
-  cols.addend[2] - cols.is_auipc * cols.state.pc[2] = 0 ∧
-  (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
-  (cols.is_real = 1 → cols.adapter.op_a_0 = 0 →
-    Word.toBitVec64 cols.add_result =
-      (if cols.is_auipc = 1
-       then RV64.auipc (sp1_op_b_cols cols)
-                       (Word.toBitVec64
-                          #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)])
-       else RV64.lui (sp1_op_b_cols cols)))
 
 end SP1Clean.UType

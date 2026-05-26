@@ -21,6 +21,7 @@ import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `BitwiseChip` mirror — bundled 6-variant ALU chip
 
@@ -363,38 +364,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) BitwiseCols unit where
   localLength _ := 0
 
 def Assumptions (_ : BitwiseCols (ZMod p)) : Prop := True
-
-/-- The byte- and program-lookup-derivable subset of `Spec`. Includes
-the two sub-assertion consequences plus the four trailing assert
-clauses. Drops the BitwiseU16 carry chain + `aluTypeReaderSpec`
-content, which is not derivable from `main`'s lookups alone. -/
-def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc,
-      opcode := cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5,
-      op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  cols.is_xor * (cols.is_xor - 1) = 0 ∧
-  cols.is_or * (cols.is_or - 1) = 0 ∧
-  cols.is_and * (cols.is_and - 1) = 0 ∧
-  (cols.is_xor + cols.is_or + cols.is_and)
-    * (cols.is_xor + cols.is_or + cols.is_and - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

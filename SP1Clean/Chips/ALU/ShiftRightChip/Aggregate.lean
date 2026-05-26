@@ -20,6 +20,7 @@ import SP1Clean.Reader.OperandAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `ShiftRightChip` mirror — bundled 4-variant right shift
 
@@ -420,35 +421,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) ShiftRightCols unit where
   localLength _ := 0
 
 def Assumptions (_ : ShiftRightCols (ZMod p)) : Prop := True
-
-def FormalSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
-  let is_real : ZMod p :=
-    cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw
-  let opcode_e : ZMod p :=
-    cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  cols.is_srl * (cols.is_srl - 1) = 0 ∧
-  cols.is_sra * (cols.is_sra - 1) = 0 ∧
-  cols.is_srlw * (cols.is_srlw - 1) = 0 ∧
-  cols.is_sraw * (cols.is_sraw - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

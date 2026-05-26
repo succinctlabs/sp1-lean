@@ -24,6 +24,7 @@ import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `BranchChip` mirror — bundled 6-variant conditional branch
 
@@ -379,49 +380,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) BranchCols unit where
   localLength _ := 0
 
 def Assumptions (_ : BranchCols (ZMod p)) : Prop := True
-
-def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
-  let is_real : ZMod p :=
-    cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
-      cols.is_bltu + cols.is_bgeu
-  let opcode_e : ZMod p :=
-    cols.is_beq * 40 + cols.is_bne * 41 + cols.is_blt * 42 +
-      cols.is_bge * 43 + cols.is_bltu * 44 + cols.is_bgeu * 45
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_beq * (cols.is_beq - 1) = 0 ∧
-  cols.is_bne * (cols.is_bne - 1) = 0 ∧
-  cols.is_blt * (cols.is_blt - 1) = 0 ∧
-  cols.is_bge * (cols.is_bge - 1) = 0 ∧
-  cols.is_bltu * (cols.is_bltu - 1) = 0 ∧
-  cols.is_bgeu * (cols.is_bgeu - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
-  cols.is_branching * (cols.is_branching - 1) = 0 ∧
-  -- State-bus next_pc grounding: two gated carry chains targeting the
-  -- same committed `next_pc` (padded to 4 limbs with high limb 0).
-  -- Mirrors upstream's `when(is_branching) / when(is_real - is_branching)`
-  -- conditional carry checks in `../sp1/.../control_flow/branch/air.rs`.
-  (cols.is_branching = 0 ∨ SP1Clean.GatedAddOp.Spec
-    (cols.state.pc.push 0) cols.adapter.op_c_imm (cols.next_pc.push 0)) ∧
-  (1 - cols.is_branching = 0 ∨ SP1Clean.GatedAddOp.Spec
-    (cols.state.pc.push 0) #v[4, 0, 0, 0] (cols.next_pc.push 0)) ∧
-  -- Range bounds on `next_pc[i]` (replaces the lookups previously
-  -- carried by `AddrAddOp.assertion`).
-  (cols.next_pc[0]).val < 65536 ∧
-  (cols.next_pc[1]).val < 65536 ∧
-  (cols.next_pc[2]).val < 65536 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- Branch emits 2 register accesses: op_a/+4 and op_b/+3 (pure reads).
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

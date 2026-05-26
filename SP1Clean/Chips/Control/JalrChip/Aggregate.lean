@@ -25,6 +25,7 @@ import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `JalrChip` mirror — JALR (I-type indirect jump)
 
@@ -314,27 +315,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) JalrCols unit where
   localLength _ := 0
 
 def Assumptions (_ : JalrCols (ZMod p)) : Prop := True
-
-def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 47, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  (cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
-    cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm cols.jump_target) ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.lsb * (cols.lsb - 1) = 0 ∧
-  (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- Jalr emits 2 register accesses: op_a/+4 and op_b/+3.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

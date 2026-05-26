@@ -12,6 +12,7 @@ import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Operations.AddwOperation
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 import RISCV.Instructions
 
 /-! # `AddwChip` cols-level surface
@@ -92,46 +93,5 @@ omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
 omit [Fact (2 ^ 17 < p)] in
 @[simp] lemma sp1_addw_cols_fromMain (Main : Vector (ZMod p) 36) :
     sp1_addw_cols (fromMain Main) = _root_.Addw.sp1_addw Main := rfl
-
-/-! ## Chip-level `FormalSpec`
-
-The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
-can reference it without importing the full circuit construction:
-the ADDW carry-chain arithmetic (`AddwOp.Spec`, Inputs-shape) plus the
-flag-threaded sub-circuit composition (`CPUState.Gated` + `ALUTypeReader.Gated`)
-plus the chip-level `op_a_0 = 0` gate plus the two pure BitVec semantic
-clauses (`RV64.addw` when `imm_c = 0`, `RV64.addiw` when `imm_c = 1`).
-The free `is_real * (is_real - 1) = 0` gate now lives inside both
-Gated.Specs' first conjuncts. -/
-def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let op_a_write_value : Word (ZMod p) :=
-    #v[cols.addw_value[0], cols.addw_value[1],
-       cols.addw_msb * 65535, cols.addw_msb * 65535]
-  SP1Clean.AddwOp.Spec
-      ⟨cols.adapter.op_b_memory.prev_value,
-       cols.adapter.op_c_memory.prev_value,
-       cols.addw_value,
-       cols.addw_msb⟩ ∧
-  SP1Clean.CPUState.Gated.Assertion.Spec
-      ⟨cols.state,
-       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-       8, cols.is_real⟩ ∧
-  SP1Clean.ALUTypeReader.Gated.Assertion.Spec
-      ⟨cols.state.clk_high, clk_low, 19, cols.state.pc,
-       op_a_write_value, cols.adapter,
-       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.adapter.op_a_0 = 0 ∧
-  -- Pure BitVec semantic for ADDW (imm_c = 0). The ADDIW variant
-  -- (imm_c = 1) is intentionally deferred: closing it requires the
-  -- ALUTypeReader's `Gated.Assertion.Spec` to expose the trusted
-  -- instruction's immediate sign-extension contract (currently bundled
-  -- inside ProgramGated.Spec's opaque table lookup). Tracked under
-  -- Phase 1.1 of the canonicalization plan — promote the reader to
-  -- surface the sign-ext fact, then add a parallel RV64.addiw conjunct.
-  (cols.is_real = 1 → cols.adapter.imm_c = 0 →
-    Word.toBitVec64 op_a_write_value =
-      RV64.addw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
-                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
 end SP1Clean.Addw

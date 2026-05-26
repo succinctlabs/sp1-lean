@@ -24,6 +24,7 @@ import SP1Chips.Mul.Common
 import SP1Chips.Soundness
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `MulChip` mirror — heavy-arithmetic scaling test
 
@@ -572,44 +573,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) MulCols unit where
   subcircuitsConsistent _ _ := by sorry
 
 def Assumptions (_ : MulCols (ZMod p)) : Prop := True
-
-/-- Faithful sub-circuit-composed `FormalSpec`: one conjunct per emission
-in `main`. References each sub-circuit's `.Assertion.Spec` (Gated) or
-`.Spec` (operations) by direct field application — no `RawSpec` /
-`List.Forall SP1Constraint.toProp` envelopes (CLAUDE.md principle #2). -/
-def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
-  -- Summand order matches `SP1Clean.Soundness.IsRealBinary.is_real_binary_mul`'s
-  -- goal expression so `tauto` keeps finding the binary conjunct downstream.
-  let is_real : ZMod p :=
-    cols.is_mul + cols.is_mulh + cols.is_mulw + cols.is_mulhsu + cols.is_mulhu
-  let opcode_e : ZMod p :=
-    cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulw * 13
-      + cols.is_mulhsu * 14 + cols.is_mulhu * 24
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.Gated.Assertion.Spec
-    ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-     8, is_real⟩ ∧
-  SP1Clean.RTypeReader.Gated.Assertion.Spec
-    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
-     cols.op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
-  SP1Clean.MulOp.Spec
-    ⟨cols.op_a_write_value,
-     cols.adapter.op_b_memory.prev_value,
-     cols.adapter.op_c_memory.prev_value,
-     cols.mul_operation.carry, cols.mul_operation.product,
-     cols.mul_operation.b_lower_byte.low_bytes,
-     cols.mul_operation.c_lower_byte.low_bytes,
-     cols.mul_operation.b_msb, cols.mul_operation.c_msb,
-     cols.mul_operation.product_msb.msb,
-     cols.mul_operation.b_sign_extend, cols.mul_operation.c_sign_extend,
-     cols.is_mul, cols.is_mulh, cols.is_mulhu, cols.is_mulhsu, cols.is_mulw⟩ ∧
-  cols.is_mul    * (cols.is_mul    - 1) = 0 ∧
-  cols.is_mulh   * (cols.is_mulh   - 1) = 0 ∧
-  cols.is_mulhu  * (cols.is_mulhu  - 1) = 0 ∧
-  cols.is_mulhsu * (cols.is_mulhsu - 1) = 0 ∧
-  cols.is_mulw   * (cols.is_mulw   - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

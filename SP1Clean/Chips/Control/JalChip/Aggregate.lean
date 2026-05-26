@@ -21,6 +21,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 import SP1Chips.Jal.JalChip
 
 /-! # Chip-level `JalChip` mirror — first chip with PC control flow
@@ -420,36 +421,6 @@ def Assumptions (cols : JalCols (ZMod p)) : Prop :=
   cols.is_real = 1 ∧
   Word.isU64 (cols.state.pc.push 0) ∧
   Word.isU64 cols.adapter.op_b_imm
-
-/-- Chip-level FormalSpec mirroring AddChip's canonical pattern
-(commit `b82c79e`): the two AddOp sub-circuit conjuncts are now stated
-semantically (`is_real = 1 → isU64 result ∧ result.toBitVec64 = a + b`),
-matching `AddOp.Assertion.Spec`'s shape directly. The carry-chain
-implementation detail is reconstructed on demand via `AddOp.iff_sp1_full`
-when bridging back to SP1's `allHold` at the trace level. -/
-def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  (cols.is_real = 1 →
-    Word.isU64 cols.next_pc ∧
-    Word.toBitVec64 cols.next_pc =
-      Word.toBitVec64 (cols.state.pc.push 0) +
-      Word.toBitVec64 cols.adapter.op_b_imm) ∧
-  (cols.is_real = 1 →
-    Word.isU64 cols.op_a_write_value ∧
-    Word.toBitVec64 cols.op_a_write_value =
-      Word.toBitVec64 (cols.state.pc.push 0) +
-      Word.toBitVec64 (#v[4, 0, 0, 0] : Vector (ZMod p) 4)) ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 46, op_a := cols.adapter.op_a,
-      op_b := cols.adapter.op_b_imm, op_c := cols.adapter.op_c_imm,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 1, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequence.
-  -- Jal emits a single op_a register access at offset +4.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩
 
 /-- Soundness of `Jal.assertion`. Mirrors AddChip's canonical recipe
 (commit `b82c79e`): each AddOp sub-circuit Spec under `is_real = 1` is

@@ -23,6 +23,7 @@ import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `LtChip` mirror — bundled signed/unsigned compare
 
@@ -320,35 +321,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) LtCols unit where
   localLength _ := 0
 
 def Assumptions (_ : LtCols (ZMod p)) : Prop := True
-
-/-- The chip's Circuit-derivable spec: byte-lookup consequences for the
-clock-decomposition gadget, the program-bus existential witness, and the
-four scalar trailing assertZero gates. -/
-def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc,
-      opcode := cols.is_slt * 9 + cols.is_sltu * 10,
-      op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := cols.adapter.op_c,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := cols.adapter.imm_c } ∧
-  cols.is_slt * (cols.is_slt - 1) = 0 ∧
-  cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
-  (cols.is_slt + cols.is_sltu) * (cols.is_slt + cols.is_sltu - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type-shaped: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by

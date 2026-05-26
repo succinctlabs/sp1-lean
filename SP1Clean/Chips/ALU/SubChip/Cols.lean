@@ -12,6 +12,7 @@ import SP1Clean.Reader.RTypeReader
 import SP1Clean.Operations.SubOperation
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 import RISCV.Instructions
 
 /-! # `SubChip` cols-level surface (directory-form scaffold)
@@ -87,36 +88,5 @@ omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
 omit [Fact (2 ^ 17 < p)] in
 @[simp] lemma sp1_sub_cols_fromMain (Main : Vector (ZMod p) 33) :
     sp1_sub_cols (fromMain Main) = _root_.Sub.sp1_sub Main := rfl
-
-/-! ## Chip-level `FormalSpec`
-
-Mirrors `SP1Clean.Add.FormalSpec` swapping `AddOp` → `SubOp`, opcode `0`
-→ `2`, `RV64.add` → `RV64.sub`. Semantic-only contract: the byte-borrow
-decomposition that the SP1 `SubOperation` circuit threads internally is
-*not* exposed here; it's the implementation detail of the `SubOp`
-sub-circuit and is reconstructed on demand via
-`SubOperation.iff_sp1_full` (see `Lemmas.lean`). The pure BitVec `RV64.sub`
-semantic is the trailing conjunct (conditional on `is_real = 1`); the
-monadic Sail equivalence to `_root_.Sub.spec_sub` is recovered externally
-via `sail_correct_of_formalSpec` in `SailBridge.lean`. The standalone
-`is_real * (is_real - 1) = 0` binary gate is absorbed into both
-`CPUState.Gated.Assertion.Spec` and `RTypeReader.Gated.Assertion.Spec`'s
-first conjuncts. -/
-def FormalSpec (cols : SubCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.Gated.Assertion.Spec
-      ⟨cols.state,
-       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-       8, cols.is_real⟩ ∧
-  SP1Clean.RTypeReader.Gated.Assertion.Spec
-      ⟨cols.state.clk_high, clk_low, 2, cols.state.pc,
-       cols.op_a_write_value, cols.adapter,
-       cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.adapter.op_a_0 = 0 ∧
-  (cols.is_real = 1 →
-    Word.isU64 cols.op_a_write_value ∧
-    Word.toBitVec64 cols.op_a_write_value =
-      RV64.sub (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
-               (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
 
 end SP1Clean.Sub

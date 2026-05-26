@@ -25,6 +25,7 @@ import SP1Clean.Reader.ITypeReaderImmutable
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `StoreDoubleChip` mirror — 64-bit store
 
@@ -207,21 +208,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreDoubleCols unit where
 
 def Assumptions (_ : StoreDoubleCols (ZMod p)) : Prop := True
 
-def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 39, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩
-
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -318,30 +304,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreDoubleCols unit where
 
 def Assumptions (_ : StoreDoubleCols (ZMod p)) : Prop := True
 
-def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let opcode : ZMod p := cols.is_real * 39
-  let store_value : Vector (ZMod p) 4 :=
-    #v[cols.adapter.op_a_memory.prev_value[0], cols.adapter.op_a_memory.prev_value[1],
-       cols.adapter.op_a_memory.prev_value[2], cols.adapter.op_a_memory.prev_value[3]]
-  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
-  SP1Clean.AddrAddOp.Assertion.Spec
-    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
-  SP1Clean.AddressShape.Assertion.Spec
-    ⟨cols.addr_value, cols.addr_top_two_limb_inv, 0, 0, 0⟩ ∧
-  SP1Clean.ITypeReaderImmutable.Assertion.Spec
-    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, cols.adapter⟩ ∧
-  SP1Clean.StoreMemoryAccessGated.Assertion.Spec
-    ⟨cols.state.clk_high, clk_low, cols.addr_value,
-     cols.store_prev_value, store_value,
-     cols.store_memory_prev_high, cols.store_memory_prev_low,
-     cols.store_memory_diff_low, cols.store_memory_diff_high,
-     cols.store_memory_flag, cols.is_real⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0
-
-set_option maxHeartbeats 800000 in
--- Five sub-circuit calls + 1 inline gate (StoreDouble has no Assembler op
--- — full 64-bit op_a is written directly). Mirrors StoreByteChip.AssertionGated.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start

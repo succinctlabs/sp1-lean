@@ -28,6 +28,7 @@ import SP1Clean.Reader.OperandAccess
 import SP1Chips.Load.LoadX0.LoadX0Chip
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Structs
+import SP1Clean.Chips.Spec
 
 /-! # Chip-level `LoadX0Chip` mirror — load-when-op_a-is-x0 fast path
 
@@ -239,34 +240,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadX0Cols unit where
 
 def Assumptions (_ : LoadX0Cols (ZMod p)) : Prop := True
 
-def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
-  let is_real : ZMod p :=
-    cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
-      cols.is_lw + cols.is_lwu + cols.is_ld
-  let opcode_e : ZMod p :=
-    cols.is_lb * 29 + cols.is_lbu * 32 + cols.is_lh * 30 + cols.is_lhu * 33 +
-      cols.is_lw * 31 + cols.is_lwu * 34 + cols.is_ld * 35
-  let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_lb * (cols.is_lb - 1) = 0 ∧
-  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
-  cols.is_lh * (cols.is_lh - 1) = 0 ∧
-  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
-  cols.is_lw * (cols.is_lw - 1) = 0 ∧
-  cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  cols.is_ld * (cols.is_ld - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩
-
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -394,42 +367,6 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadX0Cols unit where
 
 def Assumptions (_ : LoadX0Cols (ZMod p)) : Prop := True
 
-def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
-  let is_real : ZMod p :=
-    cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
-      cols.is_lw + cols.is_lwu + cols.is_ld
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let opcode : ZMod p :=
-    cols.is_lb * 29 + cols.is_lbu * 32 + cols.is_lh * 30 + cols.is_lhu * 33 +
-      cols.is_lw * 31 + cols.is_lwu * 34 + cols.is_ld * 35
-  let op_a_write_value : Vector (ZMod p) 4 := #v[0, 0, 0, 0]
-  SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
-  SP1Clean.AddrAddOp.Assertion.Spec
-    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
-  SP1Clean.AddressShape.Assertion.Spec
-    ⟨cols.addr_value, cols.addr_top_two_limb_inv,
-     cols.offset_bit[0], cols.offset_bit[1], cols.offset_bit[2]⟩ ∧
-  SP1Clean.ITypeReader.Assertion.Spec
-    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, op_a_write_value, cols.adapter⟩ ∧
-  SP1Clean.LoadMemoryAccessGated.Assertion.Spec
-    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
-     cols.load_memory_prev_high, cols.load_memory_prev_low,
-     cols.load_memory_diff_low, cols.load_memory_diff_high,
-     cols.load_memory_flag, is_real⟩ ∧
-  cols.is_lb * (cols.is_lb - 1) = 0 ∧
-  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
-  cols.is_lh * (cols.is_lh - 1) = 0 ∧
-  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
-  cols.is_lw * (cols.is_lw - 1) = 0 ∧
-  cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  cols.is_ld * (cols.is_ld - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 1
-
-set_option maxHeartbeats 800000 in
--- Five sub-circuits + 9 inline gates (7 sub-opcode booleans + is_real
--- boolean + op_a_0 = 1). LoadMemoryAccessGated arm is placeholder. No
--- Selector since LoadX0's destination is x0 (write_value = 0).
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
