@@ -475,3 +475,106 @@ full Phase 0–6 breakdown including the deferred Phase 1 items
 (MemoryAccessTimestamp, eval_memory_access_*). When picking this work
 up, read that plan first for the structural overview, then this doc
 for the concrete on-disk progress and gotchas.
+
+---
+
+## Operation contract template (canonical pattern from commit `b82c79e` + this PR)
+
+For any `SP1Clean/Operations/<Op>.lean` migrating to multiplicity-gated
+emissions (mirror of SP1's `InteractionKind::Byte` send shape), the
+**FormalAssertion contract should be semantic-only**, not constraint-form.
+The pattern landed for `AddOp` and is the canonical shape to copy.
+
+### Anatomy
+
+1. **`RawSpec a b result : Prop`** — top-level helper, pure
+   constraint form (carry-bool conjuncts + range bounds). Mirrors SP1's
+   `<Op>.allHold_constraints_iff` RHS verbatim. *Not* part of the
+   FormalAssertion's contract — kept for chip-level FormalSpecs that
+   want the carry view (legacy AddiChip/JalChip/DivRemChip still
+   reference it; future migration to the AddChip pattern is mechanical).
+
+2. **`SemanticSpec a b result : Prop`** — top-level helper, pure BitVec
+   form (e.g. `toBitVec64 result = toBitVec64 a + toBitVec64 b` for
+   AddOp). No `is_real` gating; meaningful under operand U64 bounds.
+
+3. **`iff_sp1`** — re-exports SP1's `<Op>Operation.allHold_constraints_iff`
+   (`RawSpec ↔ allHold` under `is_real = 1`). One-line.
+
+4. **`iff_sp1_full`** — bidirectional bridge in
+   `SP1Operations/Operation/<Op>/<Op>.lean` (alongside `spec` /
+   `spec_inv`): `allHold ↔ (isU64 result ∧ SemanticSpec)` under
+   `isU64 a, isU64 b`. Self-contained in SP1Operations; no Clean
+   dependency.
+
+5. **`Inputs` ProvableStruct** with fields `a, b, result, is_real`.
+
+6. **`main`** — gated emissions:
+   - Binarity gate `is_real * (is_real - 1) === 0`
+   - N gated quadratics (carry-bool: `is_real * (c_k * (c_k - 1)) === 0`)
+   - M `SP1Lookup.byteOpcodeGated` calls with `mult = is_real`.
+
+7. **`Assertion.Assumptions`** — bipartite:
+   ```
+   def Assumptions (input : Inputs (ZMod p)) : Prop :=
+     (input.is_real = 0 ∨ input.is_real = 1) ∧
+     (input.is_real = 1 → (Word.isU64 input.a ∧ Word.isU64 input.b))
+   ```
+   The binarity disjunction is required by completeness to discharge
+   the binarity gate from the right (real-row) branch. The conditional
+   operand bounds come from the consuming chip's reader sub-circuit.
+
+8. **`Assertion.Spec`** — semantic-only:
+   ```
+   def Spec (input : Inputs (ZMod p)) : Prop :=
+     input.is_real = 1 →
+       Word.isU64 input.result ∧
+       Word.toBitVec64 input.result =
+         <BV operation on input.a, input.b>
+   ```
+   Vacuous on padding rows. The carry-chain decomposition is *not*
+   exposed.
+
+9. **Proof recipe**:
+   - Soundness: case-split on `is_real ≠ 0`; binarity gives `is_real = 1`;
+     extract `c_k` boolean / `byteOpcodeSpec` via `resolve_left`;
+     assemble `RawSpec`; bridge to `allHold` via `iff_sp1.mpr`; lift to
+     `(isU64 result ∧ BV)` via `<Op>Operation.spec`.
+   - Completeness: case-split on `is_real = 0` (everything trivializes
+     via `rw [h]; ring` and `Or.inl h` for each `byteOpcodeGated`) vs
+     `is_real = 1` branch (recover `RawSpec` from chip's `(isU64_v, BV)`
+     via `iff_sp1_full.mpr` + `iff_sp1.mp`; discharge each gate from
+     RawSpec's carry-bool + range conjuncts).
+
+### Chip-side contract (matching AddChip's `b82c79e`)
+
+- Chip `Assumptions` should include `cols.is_real = 1` (chip is
+  "real-rows only" at the FormalAssertion layer; trace-soundness
+  drivers filter to real rows).
+- Chip `FormalSpec` should carry the BV semantic conjunct, **not**
+  `RawSpec`. Mirrors the operation-level contract.
+- Chip soundness: discharge `<Op>.assertion`'s Assumptions from
+  `Or.inr h_is_real_eq` plus reader-derived bounds; the resulting
+  `<Op>.Spec h_is_real_eq` gives `(isU64_v, BV)` directly. No
+  `iff_sp1`/`iff_sp1_full` chain at the chip layer.
+- Chip completeness: package
+  `⟨⟨Or.inr h_is_real, fun _ => ⟨h_isU64_a, h_isU64_b⟩⟩,
+   fun h_ir => ⟨h_isU64_v, h_bv⟩⟩` to discharge `<Op>.assertion`'s
+  `Assumptions ∧ Spec` from the chip's BV conjunct.
+
+### Migration status (as of this PR)
+
+| File | Status |
+|------|--------|
+| `SP1Clean/Operations/AddOperation.lean` | ✅ Canonical contract |
+| `SP1Operations/Operation/AddOperation/AddOperation.lean` | ✅ `spec_inv`, `iff_sp1_full` relocated here |
+| `SP1Clean/AddChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | ✅ Threaded against new contract |
+| `SP1Clean/AddiChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | ⚠️ Legacy `FormalSpec` still references `AddOp.RawSpec`; 1 documented soundness-gap sorry in chip soundness (padding-row case) |
+| `SP1Clean/JalChip.lean` | ⚠️ Same gap; 4 documented sorries (jump-target + return-address × {soundness, completeness}) |
+| `SP1Clean/DivRemChip/{Cols,Circuit}.lean` | ⚠️ Chip soundness already sorry'd; call sites still pass `is_real` correctly |
+
+The Addi/Jal/DivRem `RawSpec`-removal is mechanical: follow the AddChip
+recipe (drop the `RawSpec` conjunct from `Cols.FormalSpec`, restate as
+`isU64 + BV` under `is_real = 1`, update `allHold_iff_structural` in
+`Lemmas.lean` to bridge via `iff_sp1_full`, and re-thread the chip-side
+soundness/completeness without the `iff_sp1` chain).

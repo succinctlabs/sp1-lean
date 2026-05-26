@@ -664,42 +664,43 @@ def TraceMemoryAccessesValid (rows : List (ChipRow p)) : Prop :=
 
 /-- Add's per-chip discharge — vacuously true, since AddChip's memory
 contributions now flow through the multiplicity-aware lookup bus emitted
-inside `RTypeReader.Gated.assertion`. Mirrors `memoryAccessesValid_of_spec_addw`. -/
+inside `RTypeReader.Gated.assertion`. Mirrors `memoryAccessesValid_of_spec_addw`,
+`_sub`, `_subw`, `_addi`. -/
 theorem memoryAccessesValid_of_spec_add
     (_cols : SP1Clean.Add.AddCols (ZMod p))
     (_h : SP1Clean.Add.assertion.Spec _cols) :
     ChipRow.memoryAccessesValid (.add _cols) := by
   simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- UType's per-chip discharge — projects the single
-`OperandAccess.Assertion.Spec` conjunct (FormalSpec position #7 after
-the Phase-1 widening) onto the matching `memoryAccessSpec` clause. UType
-has only the op_a register access at offset +4. -/
+/-- UType's per-chip discharge — extracts the op_a `RegisterAccess.Spec`
+from `JTypeReader.Gated.Assertion.Spec` (FormalSpec position #3 after the
+Phase 4 refactor to `JTypeReader.Gated.assertion`). The RegisterAccess
+disjunct is resolved under `cols.is_real ≠ 0`. UType emits only the op_a
+register access at offset +4. -/
 theorem memoryAccessesValid_of_spec_uType
     (cols : SP1Clean.UType.UTypeCols (ZMod p))
-    (h : SP1Clean.UType.assertion.Spec cols) :
+    (h : SP1Clean.UType.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     ChipRow.memoryAccessesValid (.uType cols) := by
   change SP1Clean.UType.Assertion.FormalSpec cols at h
-  -- New FormalSpec shape: ⟨cpuStateSpec, AddOp .allHold, jtypeReaderSpec,
-  -- 6 scalar gates, BitVec conjunct⟩. OperandAccess.Spec is now derived
-  -- from jtypeReaderSpec rather than appearing as a separate conjunct, so
-  -- we extract it from `h_jtr` instead of directly.
-  obtain ⟨_h_cpu, _h_addop, h_jtr, _h_isreal, _h_isauipc,
-          _h_a0, _h_a1, _h_a2, _h_op_a_0, _h_bitvec⟩ := h
-  -- `jtypeReaderSpec`'s 17th-19th conjuncts (diff_low_limb < 65536,
-  -- timestamp scaled < 256, Word.isU64 prev_value) match
-  -- `OperandAccess.Assertion.Spec`'s conjuncts.
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
-          h_diff, h_ts, h_isU64, _⟩ := h_jtr
+  -- FormalSpec shape: ⟨cpuStateSpec, AddOp .allHold, JTypeReader.Gated.Spec,
+  -- 4 scalar gates (is_auipc binary + 3 addend), op_a_0 gate, BitVec⟩.
+  obtain ⟨_h_cpu, _h_addop, h_jtr, _h_isauipc,
+          _h_a0, _h_a1, _h_a2, _h_op_a_0_gate, _h_bitvec⟩ := h
+  -- JTypeReader.Gated.Spec layout: ⟨is_real_bin, ProgramGated.Spec,
+  -- RegisterAccess.Spec (op_a), 4 op_a_0 mask gates⟩. Pull the
+  -- RegisterAccess and resolve under is_real ≠ 0.
+  obtain ⟨_h_ir_bin, _h_prog, h_ra_a, _h_z0, _h_z1, _h_z2, _h_z3⟩ := h_jtr
+  have h_ir_ne_zero : cols.is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
+  have h_a := h_ra_a.resolve_left h_ir_ne_zero
   simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
     ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
     List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
   intro entry h_mem
   subst h_mem
-  -- Bridge `Word.isU64 #v[v[0], v[1], v[2], v[3]]` (jtypeReaderSpec form)
-  -- to `Word.isU64 v` (OperandAccess.Spec form) via `Vector.ext`.
-  refine ⟨h_diff, h_ts, ?_⟩
-  exact (SP1Clean.JTypeReader.Assertion.isU64_iff_index_form _).mpr h_isU64
+  -- `RegisterAccess.Assertion.Spec` (post-resolve) is the 3-tuple
+  -- ⟨diff_low_limb < 65536, ts < 256, Word.isU64 prev_value⟩.
+  exact ⟨h_a.1, h_a.2.1, h_a.2.2⟩
 
 /-- Jal's per-chip discharge — projects the single
 `OperandAccess.Assertion.Spec` conjunct. Jal has only the op_a register

@@ -148,7 +148,7 @@ theorem cpuStateSpec_of_spec_add (cols : Add.AddCols (ZMod p))
   have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
       ⟨cols.state,
        #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-       8, cols.is_real⟩ := h.2.1
+       8, cols.is_real⟩ := h.1
   rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
   exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 

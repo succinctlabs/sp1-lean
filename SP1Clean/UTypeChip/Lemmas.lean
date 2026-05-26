@@ -61,13 +61,16 @@ set_option maxHeartbeats 800000 in
 -- assertZeros) and applies the CPUState/JTypeReader Spec rewrites.
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
 `UType.constraints Main` is exactly the conjunction of `cpuStateSpec`, the
-raw `AddOperation` `.allHold`, `jtypeReaderSpec`, and six scalar gates over
-`fromMain Main`, under `is_real = Main[30] = 1`. The AddOperation clause is
-preserved in raw `.allHold` form on both sides (the is_real argument
-`Main[30] - Main[13]` is the conditional `is_real - op_a_0` rather than the
-bare `1`, so the operation-level iff lemma cannot fire). The 4th trailing
-addend gate `0 - 0 = 0` (the unused 4th-limb slot, always trivially true)
-is absorbed into the iff via `True_and` simplification. -/
+raw `AddOperation` `.allHold`, `JTypeReader.Gated.Assertion.Spec` (with
+both `is_real` and `is_trusted` instantiated to `Main[30]`), and four
+scalar gates over `fromMain Main`, under `is_real = Main[30] = 1`. The
+AddOperation clause stays in raw `.allHold` form on both sides because
+its is_real argument is the conditional `Main[30] - Main[13]`
+(= `is_real - op_a_0`), so the operation-level `iff_sp1` cannot fire. The
+free chip-level `Main[30] * (Main[30] - 1) = 0` and `(Main[30] - 1) *
+Main[13] = 0` gates are absorbed into `JTypeReader.Gated.Assertion.Spec`
+(into its first conjunct and into `ProgramSpec`'s op_a_0 binary clause
+respectively, both under `Main[30] = 1`). -/
 theorem allHold_iff_structural
     (Main : Vector (ZMod p) 31) (h_is_real : Main[30] = 1) :
     (_root_.UType.constraints Main).allHold ↔
@@ -77,25 +80,31 @@ theorem allHold_iff_structural
            #v[Main[14], Main[15], Main[16], Main[17]]
            { value := #v[Main[25], Main[26], Main[27], Main[28]] }
            (1 - Main[13])).allHold ∧
-       SP1Clean.JTypeReader.jtypeReaderSpec
-           (Main[2] + Main[1] * 65536)
-           (Main[29] * 48 + (1 - Main[29]) * 49)
-           #v[Main[3], Main[4], Main[5]]
-           #v[Main[25], Main[26], Main[27], Main[28]]
-           { op_a := Main[6],
-             op_a_memory :=
-               { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
-                 access_timestamp :=
-                   { prev_low := Main[11], diff_low_limb := Main[12] } },
-             op_a_0 := Main[13],
-             op_b_imm := #v[Main[14], Main[15], Main[16], Main[17]],
-             op_c_imm := #v[Main[18], Main[19], Main[20], Main[21]] } ∧
+       SP1Clean.JTypeReader.Gated.Assertion.Spec
+           ⟨Main[0], Main[2] + Main[1] * 65536,
+            Main[29] * 48 + (1 - Main[29]) * 49,
+            #v[Main[3], Main[4], Main[5]],
+            #v[Main[25], Main[26], Main[27], Main[28]],
+            { op_a := Main[6],
+              op_a_memory :=
+                { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                  access_timestamp :=
+                    { prev_low := Main[11], diff_low_limb := Main[12] } },
+              op_a_0 := Main[13],
+              op_b_imm := #v[Main[14], Main[15], Main[16], Main[17]],
+              op_c_imm := #v[Main[18], Main[19], Main[20], Main[21]] },
+            1, 1⟩ ∧
        Main[29] * (Main[29] - 1) = 0 ∧
        Main[22] - Main[29] * Main[3] = 0 ∧
        Main[23] - Main[29] * Main[4] = 0 ∧
-       Main[24] - Main[29] * Main[5] = 0) := by
+       Main[24] - Main[29] * Main[5] = 0 ∧
+       (1 - 1) * Main[13] = 0) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  -- Step 1: expand UType.constraints via Common.lean polymorphic iff.
+  -- Step 1: expand UType.constraints into its 3 sub-`.allHold` pieces +
+  -- 7 chip-level trailing scalar gates. Uses an inline `show` block (rather
+  -- than `UType.allHold_constraints_iff` directly) so each sub-clause is
+  -- in `.allHold` (not `List.Forall SP1Constraint.toProp`) form — needed
+  -- for the `_iff_sp1` rewrites below to fire syntactically.
   rw [show (_root_.UType.constraints Main).allHold ↔
         ((_root_.CPUState.constraints (F := ZMod p)
             { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
@@ -130,11 +139,12 @@ theorem allHold_iff_structural
         List.forall_append, List.Forall, SP1Constraint.toProp]]
   -- Step 2: apply h_is_real (Main[30] = 1) everywhere.
   rw [h_is_real]
-  -- Step 3: apply CPUState/JTypeReader Spec rewrites.
+  -- Step 3: apply CPUState semantic Spec + JTypeReader Gated Spec bridges.
   rw [SP1Clean.CPUState.cpuStateSpec_iff_sp1,
-      SP1Clean.JTypeReader.jtypeReaderSpec_iff_sp1]
-  -- Step 4: cleanup — fold the chip-level `1 * 0 = 0` away, simplify
-  -- `(1 - 1) * Main[13]`, fold `(1 - Main[29]) * 0` away (3 addend gates).
-  simp [and_assoc]
+      SP1Clean.JTypeReader.Gated.Assertion.Spec_iff_sp1]
+  -- Step 4: cleanup — fold redundant `1 * 0 = 0`, drop redundant
+  -- `(1 - 1) * Main[13] = 0` (absorbed into Gated.Spec under Main[30] = 1),
+  -- and fold the `(1 - Main[29]) * 0` away (3 addend gates).
+  simp
 
 end SP1Clean.UType

@@ -45,8 +45,8 @@ theorem sail_correct_of_formalSpec
        else (_root_.UType.spec_lui (sp1_op_b_cols cols)
               (.Regidx (sp1_op_a_cols cols))).run s) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_cpu, h_addop, h_jtr, _h_isr_bin, h_isa_bin,
-          h_addend0, h_addend1, h_addend2, _h_op_a_0, _h_bitvec⟩ := h_spec
+  obtain ⟨h_cpu, h_addop, h_jtr, h_isa_bin,
+          h_addend0, h_addend1, h_addend2, h_op_a_0_gate, _h_bitvec⟩ := h_spec
   -- Round-trip: `fromMain (toMain cols) = cols`, using the UserMode
   -- TrustMode marker from `Assumptions`.
   have h_round_trip := fromMain_toMain cols h_assumptions
@@ -90,14 +90,17 @@ theorem sail_correct_of_formalSpec
         show (1 : ZMod p) - cols.adapter.op_a_0
             = cols.is_real - cols.adapter.op_a_0 from by rw [h_is_real]]
     exact h_addop
-  have h_jtr' : SP1Clean.JTypeReader.jtypeReaderSpec
-      ((fromMain (toMain cols)).state.clk_0_16 +
-         (fromMain (toMain cols)).state.clk_16_24 * 65536)
-      ((fromMain (toMain cols)).is_auipc * 48 +
-         (1 - (fromMain (toMain cols)).is_auipc) * 49)
-      (fromMain (toMain cols)).state.pc
-      (fromMain (toMain cols)).add_result
-      (fromMain (toMain cols)).adapter := by
+  have h_jtr' : SP1Clean.JTypeReader.Gated.Assertion.Spec
+      ⟨(fromMain (toMain cols)).state.clk_high,
+       (fromMain (toMain cols)).state.clk_0_16 +
+         (fromMain (toMain cols)).state.clk_16_24 * 65536,
+       (fromMain (toMain cols)).is_auipc * 48 +
+         (1 - (fromMain (toMain cols)).is_auipc) * 49,
+       (fromMain (toMain cols)).state.pc,
+       (fromMain (toMain cols)).add_result,
+       (fromMain (toMain cols)).adapter,
+       (fromMain (toMain cols)).is_real,
+       (fromMain (toMain cols)).adapter_cols.is_trusted⟩ := by
     rw [h_round_trip]; exact h_jtr
   have h_isa_bin' : (fromMain (toMain cols)).is_auipc *
       ((fromMain (toMain cols)).is_auipc - 1) = 0 := by
@@ -111,15 +114,41 @@ theorem sail_correct_of_formalSpec
   have h_addend2' : (fromMain (toMain cols)).addend[2] -
       (fromMain (toMain cols)).is_auipc * (fromMain (toMain cols)).state.pc[2] = 0 := by
     rw [h_round_trip]; exact h_addend2
+  -- Under is_real = 1 and Assumption (is_trusted = is_real), the chip's
+  -- `(is_real - 1) * op_a_0 = 0` collapses to a trivial `0 * op_a_0 = 0`.
+  -- The Gated.Spec on `fromMain (toMain cols)` is at `is_real = is_trusted = 1`.
+  -- Reshape Gated.Spec to the `1, 1` form so the pinned `Spec_iff_sp1` fires.
+  have h_jtr_pinned : SP1Clean.JTypeReader.Gated.Assertion.Spec
+      ⟨(fromMain (toMain cols)).state.clk_high,
+       (fromMain (toMain cols)).state.clk_0_16 +
+         (fromMain (toMain cols)).state.clk_16_24 * 65536,
+       (fromMain (toMain cols)).is_auipc * 48 +
+         (1 - (fromMain (toMain cols)).is_auipc) * 49,
+       (fromMain (toMain cols)).state.pc,
+       (fromMain (toMain cols)).add_result,
+       (fromMain (toMain cols)).adapter,
+       1, 1⟩ := by
+    -- `(fromMain (toMain cols)).is_real = cols.is_real = 1`
+    -- `(fromMain (toMain cols)).adapter_cols.is_trusted = cols.adapter_cols.is_trusted
+    --  = cols.is_real = 1` (via h_assumptions)
+    have h1 : (fromMain (toMain cols)).is_real = 1 := by rw [h_round_trip]; exact h_is_real
+    have h2 : (fromMain (toMain cols)).adapter_cols.is_trusted = 1 := by
+      rw [h_round_trip]; rw [h_assumptions]; exact h_is_real
+    have := h_jtr'
+    rw [h1, h2] at this
+    exact this
   -- Assemble the structural conjunction matching `allHold_iff_structural`'s
   -- RHS shape and lift to SP1's `.allHold`. The Common.lean iff's
   -- `push_cast; rfl` close inserts `Nat.cast` on the 48 / 1 literals;
   -- `push_cast` here unifies the cast asymmetry on the J-type clause.
   have h_allHold : (_root_.UType.constraints (toMain cols)).allHold := by
     rw [allHold_iff_structural (toMain cols) h_isreal']
-    refine ⟨h_cpu', h_addop', ?_, h_isa_bin', h_addend0', h_addend1', h_addend2'⟩
-    push_cast
-    exact h_jtr'
+    refine ⟨h_cpu', h_addop', ?_, h_isa_bin', h_addend0', h_addend1', h_addend2',
+            ?_⟩
+    · push_cast
+      exact h_jtr_pinned
+    · -- `(1 - 1) * Main[13] = 0` trivially.
+      ring
   -- Dispatch on `is_auipc`. The chip's binary gate (in `h_isa_bin`) pins
   -- `is_auipc ∈ {0, 1}`; route to the corresponding `correct_*`.
   by_cases h_au : cols.is_auipc = 1
