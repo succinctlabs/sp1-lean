@@ -62,7 +62,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 given per-row chip `Spec`s plus the bundled trace-shape facts, the
 aggregated memory accesses admit an offline-consistent permutation
 and the state bus's PC chain holds. -/
-theorem trace_soundness_aggregateMemory
+theorem trace_soundness_aggregateMemory [Fact (2 ^ 24 < p)]
     (rows : List (ChipRow p))
     (clkIncrement : ZMod p)
     (h_specs : ∀ row ∈ rows, ChipRow.Spec row)
@@ -87,7 +87,7 @@ which ties the first row's `pc` to a committed `initial_pc` and the
 last row's `next_pc` to `final_pc`. This is the version with closed
 state bus — combined with the existing PC chain, the trace witnesses
 a complete `initial_pc → final_pc` execution path. -/
-theorem trace_soundness_with_boundary
+theorem trace_soundness_with_boundary [Fact (2 ^ 24 < p)]
     (rows : List (ChipRow p))
     (clkIncrement : ZMod p) (initial_pc final_pc : Vector (ZMod p) 3)
     (h_specs : ∀ row ∈ rows, ChipRow.Spec row)

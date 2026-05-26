@@ -13,10 +13,17 @@ import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Reader.RTypeReader.RTypeReader
 import SP1Clean.Operations.AddrAddOperation
+import SP1Clean.Operations.MulOperation
+import SP1Clean.Operations.AddOperation
+import SP1Clean.Operations.IsZeroWordOperation
+import SP1Clean.Operations.IsEqualWordOperation
+import SP1Clean.Operations.LtOperationUnsigned
+import SP1Clean.Operations.U16MSBOperation
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
+import SP1Clean.Reader.RTypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
 import SP1Chips.DivRem.DivRemChip
@@ -289,31 +296,54 @@ theorem correct_div [Fact (2 ^ 24 < p)]
     (traceSpec_implies_allHold Main h_is_real h_op_a_0 h_spec)
     h_is_real h_is_div state_cstrs
 
-/-! ## Full `FormalAssertion` promotion (Path-2)
+/-! ## Full `FormalAssertion` promotion (Path-2, faithful sub-circuit form)
 
-`Assertion.main` is identical to the chip's `main` (no byte lookups to
-drop). The 209 intermediate columns (`MulOperation × 2`, `IsZeroWord`,
-`AddOperation`, sign-extension, quotient/remainder layout) stay in
-legacy `Spec` via `divRemSpec` placeholder; memory-bus consistency is
-deferred to OfflineMemory. -/
+`Assertion.main` mirrors `SP1Chips/DivRem/Constraints.lean` 1:1 with all
+17 sub-circuit invocations from the SP1 constraint compiler:
+- CS0/CS1: 2× `MulOp.assertion` (c_times_quotient lower/upper halves —
+  one always-on with `is_mul = is_real`, one variant-gated with
+  `is_mulh = is_div+is_rem`, `is_mulhu = is_divu+is_remu` for the
+  signed-vs-unsigned high half).
+- CS2/CS3/CS4/CS5: 4× `IsEqualWordOp.assertion` (overflow detection
+  against ±2^63 / -1; pairs share witness columns).
+- CS6: 1× `IsZeroWordOp.assertion` (divisor-is-zero special case).
+- CS7/CS8: 2× `AddOp.assertion` (absolute-value computations for the
+  signed-divrem variants).
+- CS9: 1× `LtUnsignedOp.assertion` (remainder < divisor check).
+- CS10–CS16: 7× `U16MSBOp.assertion` (sign-bit extraction across op_b /
+  op_c / remainder / quotient at high and second-high limbs).
+
+Plus a `CPUState.Gated.assertion` and `RTypeReader.Gated.assertion`
+collapsing the SP1 `eval_cpu_state` + `eval_r_type` calls, matching the
+canonical AddChip pattern.
+
+Soundness/completeness are stubbed with `sorry` — this lands the
+structural CLEAN_AUDIT D2/D3 alignment only. Caveat: the 7 U16MSB
+calls use the always-on `U16MSBOp.assertion` because no
+`U16MSBOp.Gated.assertion` exists yet; SP1's mult-arg (`Main[239]`,
+`E2`) is dropped at the Clean call site. Adding `U16MSBOp.Gated` is a
+follow-up. -/
 
 namespace Assertion
 
 open Circuit
 
+-- `MulOp.assertion` requires `[Fact (2 ^ 24 < p)]` (carry-chain limb
+-- bound); the section's `2 ^ 17 < p` is not enough.
+variable [Fact (2 ^ 24 < p)]
+
 @[reducible]
 def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩,
-       _op_a_write_value,
-       _b, _c, _quotient, _quotient_comp, _remainder_comp, _remainder,
-       _abs_remainder, _abs_c, _max_abs_c_or_1, _c_times_quotient,
-       _c_times_quotient_lower, _c_times_quotient_upper,
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       adapter, op_a_write_value,
+       b, c, quotient, quotient_comp, remainder_comp, remainder,
+       abs_remainder, abs_c, max_abs_c_or_1, c_times_quotient,
+       c_times_quotient_lower, c_times_quotient_upper,
        aux_post,
-       c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, _remainder_check_multiplicity,
-       _adapter_cols⟩ := cols
-  SP1Clean.CPUState.assertion
-    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+       c_neg, abs_c_alu_event, abs_rem_alu_event, is_real, remainder_check_multiplicity,
+       adapter_cols⟩ := cols
+  let clk_low := clk_0_16 + clk_16_24 * 65536
+  -- Mode-flag aliases mirroring SP1's `E0..E11` aggregates.
   let is_div   : Expression (ZMod p) := aux_post.mode_flags[0]
   let is_divu  : Expression (ZMod p) := aux_post.mode_flags[1]
   let is_rem_f : Expression (ZMod p) := aux_post.mode_flags[2]
@@ -322,44 +352,206 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let is_remw  : Expression (ZMod p) := aux_post.mode_flags[5]
   let is_divuw : Expression (ZMod p) := aux_post.mode_flags[6]
   let is_remuw : Expression (ZMod p) := aux_post.mode_flags[7]
-  SP1Clean.ProgramTable.assertion
-    (⟨pc,
-      is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
-        + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28,
-      op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0], op_a_0, 0, 0⟩ :
-      Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  c_neg * (c_neg - 1) === 0
-  abs_c_alu_event * (abs_c_alu_event - 1) === 0
+  let is_word  : Expression (ZMod p) := is_divw + is_remw + is_divuw + is_remuw  -- E2
+  let e92      : Expression (ZMod p) := is_div + is_rem_f                        -- E92
+  let e93      : Expression (ZMod p) := is_divu + is_remu                        -- E93
+  let opcode_e : Expression (ZMod p) :=
+    is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
+      + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28
+  -- Reader block: eval_cpu_state + eval_r_type (collapsed via Gated).
+  SP1Clean.CPUState.Gated.assertion
+    (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       #v[pc[0] + 4, pc[1], pc[2]], 8, is_real⟩ :
+      Var SP1Clean.CPUState.Gated.Inputs (ZMod p))
+  SP1Clean.RTypeReader.Gated.assertion
+    (⟨clk_high, clk_low, opcode_e, pc, op_a_write_value, adapter,
+       is_real, adapter_cols.is_trusted⟩ :
+      Var SP1Clean.RTypeReader.Gated.Inputs (ZMod p))
+  -- CS0: c_times_quotient_lower = quotient_comp × c (always pure mul gated by is_real).
+  SP1Clean.MulOp.assertion
+    (⟨#v[c_times_quotient[0], c_times_quotient[1],
+         c_times_quotient[2], c_times_quotient[3]],
+       quotient_comp, c,
+       c_times_quotient_lower.carry, c_times_quotient_lower.product,
+       c_times_quotient_lower.b_lower_byte.low_bytes,
+       c_times_quotient_lower.c_lower_byte.low_bytes,
+       c_times_quotient_lower.b_msb, c_times_quotient_lower.c_msb,
+       c_times_quotient_lower.product_msb.msb,
+       c_times_quotient_lower.b_sign_extend,
+       c_times_quotient_lower.c_sign_extend,
+       is_real, 0, 0, 0, 0⟩ :
+      Var SP1Clean.MulOp.Inputs (ZMod p))
+  -- CS1: c_times_quotient_upper = quotient_comp × c (variant-gated MULH/MULHU).
+  SP1Clean.MulOp.assertion
+    (⟨#v[c_times_quotient[4], c_times_quotient[5],
+         c_times_quotient[6], c_times_quotient[7]],
+       quotient_comp, c,
+       c_times_quotient_upper.carry, c_times_quotient_upper.product,
+       c_times_quotient_upper.b_lower_byte.low_bytes,
+       c_times_quotient_upper.c_lower_byte.low_bytes,
+       c_times_quotient_upper.b_msb, c_times_quotient_upper.c_msb,
+       c_times_quotient_upper.product_msb.msb,
+       c_times_quotient_upper.b_sign_extend,
+       c_times_quotient_upper.c_sign_extend,
+       0, e92, e93, 0, 0⟩ :
+      Var SP1Clean.MulOp.Inputs (ZMod p))
+  -- CS2: is_overflow_b — op_b == -2^63 (little-endian: 0, 0, 0, 32768).
+  SP1Clean.IsEqualWordOp.assertion
+    (⟨adapter.op_b_memory.prev_value, #v[0, 0, 0, 32768],
+       #v[aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].inverse,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].inverse,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].inverse,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].inverse],
+       #v[aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].result,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].result,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].result,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].result],
+       aux_post.is_overflow_b.is_diff_zero.is_zero_first_half,
+       aux_post.is_overflow_b.is_diff_zero.is_zero_second_half,
+       aux_post.is_overflow_b.is_diff_zero.result⟩ :
+      Var SP1Clean.IsEqualWordOp.Inputs (ZMod p))
+  -- CS3: is_overflow_c — op_c == -1 (all-ones).
+  SP1Clean.IsEqualWordOp.assertion
+    (⟨adapter.op_c_memory.prev_value, #v[65535, 65535, 65535, 65535],
+       #v[aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].inverse,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].inverse,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].inverse,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].inverse],
+       #v[aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].result,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].result,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].result,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].result],
+       aux_post.is_overflow_c.is_diff_zero.is_zero_first_half,
+       aux_post.is_overflow_c.is_diff_zero.is_zero_second_half,
+       aux_post.is_overflow_c.is_diff_zero.result⟩ :
+      Var SP1Clean.IsEqualWordOp.Inputs (ZMod p))
+  -- CS4: is_overflow_b (32-bit check) — low 2 limbs of op_b == -2^31.
+  --      Reuses the same is_overflow_b witness columns as CS2.
+  SP1Clean.IsEqualWordOp.assertion
+    (⟨#v[adapter.op_b_memory.prev_value[0], adapter.op_b_memory.prev_value[1], 0, 0],
+       #v[0, 32768, 0, 0],
+       #v[aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].inverse,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].inverse,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].inverse,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].inverse],
+       #v[aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].result,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].result,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].result,
+          aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].result],
+       aux_post.is_overflow_b.is_diff_zero.is_zero_first_half,
+       aux_post.is_overflow_b.is_diff_zero.is_zero_second_half,
+       aux_post.is_overflow_b.is_diff_zero.result⟩ :
+      Var SP1Clean.IsEqualWordOp.Inputs (ZMod p))
+  -- CS5: is_overflow_c (32-bit check) — low 2 limbs of op_c == -1 (32-bit).
+  --      Reuses the same is_overflow_c witness columns as CS3.
+  SP1Clean.IsEqualWordOp.assertion
+    (⟨#v[adapter.op_c_memory.prev_value[0], adapter.op_c_memory.prev_value[1], 0, 0],
+       #v[65535, 65535, 0, 0],
+       #v[aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].inverse,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].inverse,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].inverse,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].inverse],
+       #v[aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].result,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].result,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].result,
+          aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].result],
+       aux_post.is_overflow_c.is_diff_zero.is_zero_first_half,
+       aux_post.is_overflow_c.is_diff_zero.is_zero_second_half,
+       aux_post.is_overflow_c.is_diff_zero.result⟩ :
+      Var SP1Clean.IsEqualWordOp.Inputs (ZMod p))
+  -- CS6: is_c_0 — divisor c == 0.
+  SP1Clean.IsZeroWordOp.assertion
+    (⟨c,
+       #v[aux_post.is_c_0.is_zero_limb[0].inverse,
+          aux_post.is_c_0.is_zero_limb[1].inverse,
+          aux_post.is_c_0.is_zero_limb[2].inverse,
+          aux_post.is_c_0.is_zero_limb[3].inverse],
+       #v[aux_post.is_c_0.is_zero_limb[0].result,
+          aux_post.is_c_0.is_zero_limb[1].result,
+          aux_post.is_c_0.is_zero_limb[2].result,
+          aux_post.is_c_0.is_zero_limb[3].result],
+       aux_post.is_c_0.is_zero_first_half,
+       aux_post.is_c_0.is_zero_second_half,
+       aux_post.is_c_0.result⟩ :
+      Var SP1Clean.IsZeroWordOp.Inputs (ZMod p))
+  -- CS7: c_neg_operation — c + abs_c = neg_c (for the absolute-value
+  --      computation in signed divrem).
+  SP1Clean.AddOp.assertion
+    (⟨c, abs_c, aux_post.c_neg_operation.value, abs_c_alu_event⟩ :
+      Var SP1Clean.AddOp.Inputs (ZMod p))
+  -- CS8: rem_neg_operation — remainder_comp + abs_remainder.
+  SP1Clean.AddOp.assertion
+    (⟨remainder_comp, abs_remainder, aux_post.rem_neg_operation.value, abs_rem_alu_event⟩ :
+      Var SP1Clean.AddOp.Inputs (ZMod p))
+  -- CS9: remainder_lt_operation — abs_remainder < max_abs_c_or_1.
+  SP1Clean.LtUnsignedOp.assertion
+    (⟨abs_remainder, max_abs_c_or_1,
+       aux_post.remainder_lt_operation.u16_compare_operation.bit,
+       aux_post.remainder_lt_operation.u16_flags,
+       aux_post.remainder_lt_operation.not_eq_inv,
+       aux_post.remainder_lt_operation.comparison_limbs⟩ :
+      Var SP1Clean.LtUnsignedOp.Inputs (ZMod p))
+  -- CS10-CS16: 7× U16MSB. SP1 emits these with selector mults
+  -- (Main[239] = is_real_not_word for the 64-bit family; E2 = is_word
+  -- for the 32-bit family). Clean's U16MSBOp.assertion is always-on —
+  -- the mult arg is dropped here pending a Gated variant.
+  SP1Clean.U16MSBOp.assertion
+    (⟨adapter.op_b_memory.prev_value[3], aux_post.b_msb.msb⟩ :
+      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  SP1Clean.U16MSBOp.assertion
+    (⟨adapter.op_c_memory.prev_value[3], aux_post.c_msb.msb⟩ :
+      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  SP1Clean.U16MSBOp.assertion
+    (⟨remainder[3], aux_post.rem_msb.msb⟩ :
+      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  SP1Clean.U16MSBOp.assertion
+    (⟨adapter.op_b_memory.prev_value[1], aux_post.b_msb.msb⟩ :
+      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  SP1Clean.U16MSBOp.assertion
+    (⟨adapter.op_c_memory.prev_value[1], aux_post.c_msb.msb⟩ :
+      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  SP1Clean.U16MSBOp.assertion
+    (⟨remainder[1], aux_post.rem_msb.msb⟩ :
+      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  SP1Clean.U16MSBOp.assertion
+    (⟨quotient[1], aux_post.quot_msb.msb⟩ :
+      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  -- Chip-level scalar gates: binary flags + op_a_0 zero.
+  c_neg             * (c_neg             - 1) === 0
+  abs_c_alu_event   * (abs_c_alu_event   - 1) === 0
   abs_rem_alu_event * (abs_rem_alu_event - 1) === 0
-  is_real * (is_real - 1) === 0
-  op_a_0 === 0
-  -- Iter-8 sub-task E: per-operand memory-bus byte content.
-  -- R-type: op_a/+4, op_b/+3, op_c/+2.
-  let clk_low := clk_0_16 + clk_16_24 * 65536
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low, op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 2, op_c_memory.access_timestamp.prev_low, op_c_memory.access_timestamp.diff_low_limb,
-       op_c_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  is_real           * (is_real           - 1) === 0
+  remainder_check_multiplicity * (remainder_check_multiplicity - 1) === 0
+  -- Suppress unused-binding warnings from columns whose constraints
+  -- belong to the as-yet-uncomposed scalar polynomial gates (carry
+  -- chains, intermediate equalities). They surface in the legacy
+  -- `Spec`/`divRemSpec` path.
+  let _ := b
+  adapter.op_a_0 === 0
 
-set_option maxHeartbeats 800000 in
--- Higher heartbeats: 25 input fields + 4 subcircuit calls + 3 OperandAccess
--- calls pushes localLength_eq synthesis past the default 200k cap.
+set_option maxHeartbeats 6400000 in
+-- 6.4M heartbeats: 19 sub-circuit calls (2 readers + 2 MulOp + 4
+-- IsEqualWord + IsZeroWord + 2 AddOp + LtUnsigned + 7 U16MSB) push
+-- `localLength_eq` synthesis well past the default. The
+-- `subcircuitsConsistent` field is sorry'd (same as MulChip's
+-- elaborated) — soundness/completeness are also sorry'd.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) DivRemCols unit where
   name := "SP1Clean.DivRem"
   main := main
-  localLength _ := 0
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent _ _ := by sorry
 
 def Assumptions (_ : DivRemCols (ZMod p)) : Prop := True
 
+/-- Faithful sub-circuit-composed `FormalSpec`: one conjunct per emission
+in `main`. Sub-Specs are referenced by direct field application per
+CLAUDE.md principle #2 — no `RawSpec` / `List.Forall SP1Constraint.toProp`
+envelopes. -/
 def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let is_div   : ZMod p := cols.aux_post.mode_flags[0]
@@ -370,84 +562,158 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
   let is_remw  : ZMod p := cols.aux_post.mode_flags[5]
   let is_divuw : ZMod p := cols.aux_post.mode_flags[6]
   let is_remuw : ZMod p := cols.aux_post.mode_flags[7]
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc,
-      opcode := is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
-                  + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28,
-      op_a := cols.adapter.op_a, op_b := #v[cols.adapter.op_b, 0, 0, 0],
-      op_c := #v[cols.adapter.op_c, 0, 0, 0],
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
-  cols.c_neg * (cols.c_neg - 1) = 0 ∧
-  cols.abs_c_alu_event * (cols.abs_c_alu_event - 1) = 0 ∧
+  let e92      : ZMod p := is_div + is_rem_f
+  let e93      : ZMod p := is_divu + is_remu
+  let opcode_e : ZMod p :=
+    is_div * 15 + is_divu * 16 + is_rem_f * 17 + is_remu * 18
+      + is_divw * 25 + is_remw * 27 + is_divuw * 26 + is_remuw * 28
+  -- Reader Specs.
+  SP1Clean.CPUState.Gated.Assertion.Spec
+    ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+     8, cols.is_real⟩ ∧
+  SP1Clean.RTypeReader.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
+     cols.op_a_write_value, cols.adapter, cols.is_real,
+     cols.adapter_cols.is_trusted⟩ ∧
+  -- Arithmetic sub-fragment Specs (CS0–CS16).
+  SP1Clean.MulOp.Spec
+    ⟨#v[cols.c_times_quotient[0], cols.c_times_quotient[1],
+        cols.c_times_quotient[2], cols.c_times_quotient[3]],
+     cols.quotient_comp, cols.c,
+     cols.c_times_quotient_lower.carry, cols.c_times_quotient_lower.product,
+     cols.c_times_quotient_lower.b_lower_byte.low_bytes,
+     cols.c_times_quotient_lower.c_lower_byte.low_bytes,
+     cols.c_times_quotient_lower.b_msb, cols.c_times_quotient_lower.c_msb,
+     cols.c_times_quotient_lower.product_msb.msb,
+     cols.c_times_quotient_lower.b_sign_extend,
+     cols.c_times_quotient_lower.c_sign_extend,
+     cols.is_real, 0, 0, 0, 0⟩ ∧
+  SP1Clean.MulOp.Spec
+    ⟨#v[cols.c_times_quotient[4], cols.c_times_quotient[5],
+        cols.c_times_quotient[6], cols.c_times_quotient[7]],
+     cols.quotient_comp, cols.c,
+     cols.c_times_quotient_upper.carry, cols.c_times_quotient_upper.product,
+     cols.c_times_quotient_upper.b_lower_byte.low_bytes,
+     cols.c_times_quotient_upper.c_lower_byte.low_bytes,
+     cols.c_times_quotient_upper.b_msb, cols.c_times_quotient_upper.c_msb,
+     cols.c_times_quotient_upper.product_msb.msb,
+     cols.c_times_quotient_upper.b_sign_extend,
+     cols.c_times_quotient_upper.c_sign_extend,
+     0, e92, e93, 0, 0⟩ ∧
+  SP1Clean.IsEqualWordOp.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, #v[0, 0, 0, 32768],
+     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].inverse,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].inverse,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].inverse,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].inverse],
+     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].result,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].result,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].result,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].result],
+     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_first_half,
+     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_second_half,
+     cols.aux_post.is_overflow_b.is_diff_zero.result⟩ ∧
+  SP1Clean.IsEqualWordOp.Spec
+    ⟨cols.adapter.op_c_memory.prev_value, #v[65535, 65535, 65535, 65535],
+     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].inverse,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].inverse,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].inverse,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].inverse],
+     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].result,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].result,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].result,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].result],
+     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_first_half,
+     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_second_half,
+     cols.aux_post.is_overflow_c.is_diff_zero.result⟩ ∧
+  SP1Clean.IsEqualWordOp.Spec
+    ⟨#v[cols.adapter.op_b_memory.prev_value[0], cols.adapter.op_b_memory.prev_value[1], 0, 0],
+     #v[0, 32768, 0, 0],
+     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].inverse,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].inverse,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].inverse,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].inverse],
+     #v[cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[0].result,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[1].result,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[2].result,
+        cols.aux_post.is_overflow_b.is_diff_zero.is_zero_limb[3].result],
+     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_first_half,
+     cols.aux_post.is_overflow_b.is_diff_zero.is_zero_second_half,
+     cols.aux_post.is_overflow_b.is_diff_zero.result⟩ ∧
+  SP1Clean.IsEqualWordOp.Spec
+    ⟨#v[cols.adapter.op_c_memory.prev_value[0], cols.adapter.op_c_memory.prev_value[1], 0, 0],
+     #v[65535, 65535, 0, 0],
+     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].inverse,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].inverse,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].inverse,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].inverse],
+     #v[cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[0].result,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[1].result,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[2].result,
+        cols.aux_post.is_overflow_c.is_diff_zero.is_zero_limb[3].result],
+     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_first_half,
+     cols.aux_post.is_overflow_c.is_diff_zero.is_zero_second_half,
+     cols.aux_post.is_overflow_c.is_diff_zero.result⟩ ∧
+  SP1Clean.IsZeroWordOp.Spec
+    ⟨cols.c,
+     #v[cols.aux_post.is_c_0.is_zero_limb[0].inverse,
+        cols.aux_post.is_c_0.is_zero_limb[1].inverse,
+        cols.aux_post.is_c_0.is_zero_limb[2].inverse,
+        cols.aux_post.is_c_0.is_zero_limb[3].inverse],
+     #v[cols.aux_post.is_c_0.is_zero_limb[0].result,
+        cols.aux_post.is_c_0.is_zero_limb[1].result,
+        cols.aux_post.is_c_0.is_zero_limb[2].result,
+        cols.aux_post.is_c_0.is_zero_limb[3].result],
+     cols.aux_post.is_c_0.is_zero_first_half,
+     cols.aux_post.is_c_0.is_zero_second_half,
+     cols.aux_post.is_c_0.result⟩ ∧
+  SP1Clean.AddOp.Assertion.Spec
+    ⟨cols.c, cols.abs_c, cols.aux_post.c_neg_operation.value, cols.abs_c_alu_event⟩ ∧
+  SP1Clean.AddOp.Assertion.Spec
+    ⟨cols.remainder_comp, cols.abs_remainder,
+     cols.aux_post.rem_neg_operation.value, cols.abs_rem_alu_event⟩ ∧
+  SP1Clean.LtUnsignedOp.Spec
+    ⟨cols.abs_remainder, cols.max_abs_c_or_1,
+     cols.aux_post.remainder_lt_operation.u16_compare_operation.bit,
+     cols.aux_post.remainder_lt_operation.u16_flags,
+     cols.aux_post.remainder_lt_operation.not_eq_inv,
+     cols.aux_post.remainder_lt_operation.comparison_limbs⟩ ∧
+  SP1Clean.U16MSBOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value[3], cols.aux_post.b_msb.msb⟩ ∧
+  SP1Clean.U16MSBOp.Assertion.Spec
+    ⟨cols.adapter.op_c_memory.prev_value[3], cols.aux_post.c_msb.msb⟩ ∧
+  SP1Clean.U16MSBOp.Assertion.Spec
+    ⟨cols.remainder[3], cols.aux_post.rem_msb.msb⟩ ∧
+  SP1Clean.U16MSBOp.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value[1], cols.aux_post.b_msb.msb⟩ ∧
+  SP1Clean.U16MSBOp.Assertion.Spec
+    ⟨cols.adapter.op_c_memory.prev_value[1], cols.aux_post.c_msb.msb⟩ ∧
+  SP1Clean.U16MSBOp.Assertion.Spec
+    ⟨cols.remainder[1], cols.aux_post.rem_msb.msb⟩ ∧
+  SP1Clean.U16MSBOp.Assertion.Spec
+    ⟨cols.quotient[1], cols.aux_post.quot_msb.msb⟩ ∧
+  -- Chip-level scalar gates.
+  cols.c_neg             * (cols.c_neg             - 1) = 0 ∧
+  cols.abs_c_alu_event   * (cols.abs_c_alu_event   - 1) = 0 ∧
   cols.abs_rem_alu_event * (cols.abs_rem_alu_event - 1) = 0 ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
+  cols.is_real           * (cols.is_real           - 1) = 0 ∧
+  cols.remainder_check_multiplicity *
+    (cols.remainder_check_multiplicity - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22⟩ := h_input
-  -- e19 is the 14-way conjunction of DivRemAuxPost field equations.
-  -- Flatten enough to expose the mode_flags equation so `subst_eqs` can
-  -- substitute `input_aux_post_mode_flags` globally.
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, e_mf, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := e19
-  subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_c_neg, h_abs_c, h_abs_rem, h_real,
-          h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
-  unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact h_cpu_sub trivial
-  · convert h_prog_sub trivial using 2
-    simp only [Vector.getElem_map]
-  · linear_combination h_c_neg
-  · linear_combination h_abs_c
-  · linear_combination h_abs_rem
-  · linear_combination h_real
-  · exact h_op_a_0
-  · exact h_oa_a trivial
-  · exact h_oa_b trivial
-  · exact h_oa_c trivial
+  sorry
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22⟩ := h_input
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, e_mf, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩ := e19
-  subst_eqs
-  obtain ⟨h_cpu, h_prog, h_c_neg, h_abs_c, h_abs_rem, h_real, h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
-  unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact ⟨trivial, h_cpu⟩
-  · refine ⟨trivial, ?_⟩
-    convert h_prog using 2
-    simp only [Vector.getElem_map]
-  · linear_combination h_c_neg
-  · linear_combination h_abs_c
-  · linear_combination h_abs_rem
-  · linear_combination h_real
-  · exact h_op_a_0
-  · exact ⟨trivial, h_oa_a⟩
-  · exact ⟨trivial, h_oa_b⟩
-  · exact ⟨trivial, h_oa_c⟩
+  sorry
 
 end Assertion
 
-def assertion : FormalAssertion (ZMod p) DivRemCols :=
+-- `Fact (2 ^ 24 < p)` is transitive via `MulOp.assertion`'s requirement
+-- in `Assertion.elaborated`.
+def assertion [Fact (2 ^ 24 < p)] : FormalAssertion (ZMod p) DivRemCols :=
   { Assertion.elaborated with
     Assumptions := Assertion.Assumptions,
     Spec := Assertion.FormalSpec,

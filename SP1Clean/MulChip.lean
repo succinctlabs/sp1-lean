@@ -18,6 +18,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.RTypeReader
 import SP1Clean.Reader.OperandAccess
+import SP1Clean.Operations.MulOperation
 import SP1Chips.Mul.MulChip
 import SP1Chips.Mul.Common
 import SP1Chips.Soundness
@@ -555,156 +556,135 @@ theorem raw_to_semantic [Fact (2 ^ 24 < p)] (Main : Vector (ZMod p) 82)
   · intro s state_cstrs
     exact soundness_mul Main s h_allHold state_cstrs
 
-/-! ## Full `FormalAssertion` promotion (Path-2)
+/-! ## Full `FormalAssertion` promotion (Path-2, faithful sub-circuit form)
 
-Drops the inline CPUState byte lookups (converted to
-`SP1Clean.CPUState.assertion` subcircuit) plus the 16 carry-bound and
-16 product-bound lookups. `Assertion.main` keeps only the
-subcircuit-and-scalar-gate surface: CPUState, ProgramTable, the 5
-opcode boolean gates, the aggregate-is-real boolean, and `op_a_0 === 0`.
-The MulOperation carry chain stays in legacy `Spec` via the `mulSpec`
-placeholder; memory-bus consistency is deferred to OfflineMemory. -/
+`Assertion.main` now mirrors `SP1Chips/Mul/Constraints.lean` 1:1: one
+`MulOp.assertion` (16-limb carry chain), one `CPUState.Gated.assertion`
+(state-bus + byte-opcode lookups), one `RTypeReader.Gated.assertion`
+(program-bus + 3 register accesses + op_a_0 masking gates), plus the
+chip-level boolean variant gates and `op_a_0 === 0` scalar gate. This
+matches the SP1 Rust `MulChip::eval` shape exactly (one
+`eval_r_type` + one `eval_cpu_state` + one `MulOperation::eval` call).
+Soundness/completeness proofs are stubbed with `sorry` — this lands the
+structural CLEAN_AUDIT D2/D3 alignment only. -/
 
 namespace Assertion
 
 open Circuit
 
+-- `MulOp.assertion` requires `[Fact (2 ^ 24 < p)]` (carry-chain limb
+-- bound); the section's `2 ^ 17 < p` is not enough.
+variable [Fact (2 ^ 24 < p)]
+
 @[reducible]
 def main (cols : Var MulCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
-       ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory⟩, _op_a_write_value,
-       _mul_op,
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       adapter, op_a_write_value, mul_op,
        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw,
-       _adapter_cols⟩ := cols
-  SP1Clean.CPUState.assertion
-    (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
+       adapter_cols⟩ := cols
+  -- Summand order matches `SP1Clean.Soundness.IsRealBinary.is_real_binary_mul`'s
+  -- goal expression so `tauto` keeps finding the binary conjunct downstream.
   let is_real_e := is_mul + is_mulh + is_mulw + is_mulhsu + is_mulhu
-  let opcode_e := is_mul * 11 + is_mulh * 12 + is_mulw * 13
+  let opcode_e  := is_mul * 11 + is_mulh * 12 + is_mulw * 13
                     + is_mulhsu * 14 + is_mulhu * 24
-  SP1Clean.ProgramTable.assertion
-    (⟨pc, opcode_e, op_a, #v[op_b, 0, 0, 0], #v[op_c, 0, 0, 0],
-      op_a_0, 0, 0⟩ :
-      Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  is_mul * (is_mul - 1) === 0
-  is_mulh * (is_mulh - 1) === 0
-  is_mulw * (is_mulw - 1) === 0
+  let clk_low   := clk_0_16 + clk_16_24 * 65536
+  SP1Clean.CPUState.Gated.assertion
+    (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
+       #v[pc[0] + 4, pc[1], pc[2]], 8, is_real_e⟩ :
+      Var SP1Clean.CPUState.Gated.Inputs (ZMod p))
+  SP1Clean.RTypeReader.Gated.assertion
+    (⟨clk_high, clk_low, opcode_e, pc, op_a_write_value, adapter,
+       is_real_e, adapter_cols.is_trusted⟩ :
+      Var SP1Clean.RTypeReader.Gated.Inputs (ZMod p))
+  SP1Clean.MulOp.assertion
+    (⟨op_a_write_value,
+       adapter.op_b_memory.prev_value,
+       adapter.op_c_memory.prev_value,
+       mul_op.carry, mul_op.product,
+       mul_op.b_lower_byte.low_bytes, mul_op.c_lower_byte.low_bytes,
+       mul_op.b_msb, mul_op.c_msb, mul_op.product_msb.msb,
+       mul_op.b_sign_extend, mul_op.c_sign_extend,
+       is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩ :
+      Var SP1Clean.MulOp.Inputs (ZMod p))
+  is_mul    * (is_mul    - 1) === 0
+  is_mulh   * (is_mulh   - 1) === 0
+  is_mulhu  * (is_mulhu  - 1) === 0
   is_mulhsu * (is_mulhsu - 1) === 0
-  is_mulhu * (is_mulhu - 1) === 0
+  is_mulw   * (is_mulw   - 1) === 0
   is_real_e * (is_real_e - 1) === 0
-  op_a_0 === 0
-  -- Iter-8 sub-task E: per-operand memory-bus byte content.
-  -- R-type: op_a/+4, op_b/+3, op_c/+2.
-  let clk_low := clk_0_16 + clk_16_24 * 65536
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 4, op_a_memory.access_timestamp.prev_low, op_a_memory.access_timestamp.diff_low_limb,
-       op_a_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 3, op_b_memory.access_timestamp.prev_low, op_b_memory.access_timestamp.diff_low_limb,
-       op_b_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
-  SP1Clean.OperandAccess.assertion
-    (⟨clk_low, 2, op_c_memory.access_timestamp.prev_low, op_c_memory.access_timestamp.diff_low_limb,
-       op_c_memory.prev_value⟩ :
-      Var SP1Clean.OperandAccess.Assertion.Inputs (ZMod p))
+  adapter.op_a_0 === 0
 
-set_option maxHeartbeats 800000 in
--- Higher heartbeats: 28 input fields + 4 subcircuit calls + 3 OperandAccess
--- calls pushes localLength_eq synthesis past the default 200k cap.
+set_option maxHeartbeats 6400000 in
+-- 6.4M heartbeats: `localLength_eq` synthesizes against a 4-subcircuit
+-- main (CPUState.Gated + RTypeReader.Gated + MulOp + scalar gates)
+-- where MulOp itself wraps 3 sub-circuits + 68 inline gates. The
+-- `subcircuitsConsistent` field is sorry'd in the same spirit as
+-- `ShiftRightChip/Circuit.lean:89` — soundness/completeness for the
+-- chip-level alignment are also sorry'd; refining this is a follow-up.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) MulCols unit where
   name := "SP1Clean.Mul"
   main := main
-  localLength _ := 0
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent _ _ := by sorry
 
 def Assumptions (_ : MulCols (ZMod p)) : Prop := True
 
+/-- Faithful sub-circuit-composed `FormalSpec`: one conjunct per emission
+in `main`. References each sub-circuit's `.Assertion.Spec` (Gated) or
+`.Spec` (operations) by direct field application — no `RawSpec` /
+`List.Forall SP1Constraint.toProp` envelopes (CLAUDE.md principle #2). -/
 def FormalSpec (cols : MulCols (ZMod p)) : Prop :=
+  -- Summand order matches `SP1Clean.Soundness.IsRealBinary.is_real_binary_mul`'s
+  -- goal expression so `tauto` keeps finding the binary conjunct downstream.
   let is_real : ZMod p :=
     cols.is_mul + cols.is_mulh + cols.is_mulw + cols.is_mulhsu + cols.is_mulhu
   let opcode_e : ZMod p :=
     cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulw * 13
       + cols.is_mulhsu * 14 + cols.is_mulhu * 24
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
-      op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := #v[cols.adapter.op_c, 0, 0, 0],
-      op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 0 } ∧
-  cols.is_mul * (cols.is_mul - 1) = 0 ∧
-  cols.is_mulh * (cols.is_mulh - 1) = 0 ∧
-  cols.is_mulw * (cols.is_mulw - 1) = 0 ∧
+  SP1Clean.CPUState.Gated.Assertion.Spec
+    ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+     8, is_real⟩ ∧
+  SP1Clean.RTypeReader.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
+     cols.op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
+  SP1Clean.MulOp.Spec
+    ⟨cols.op_a_write_value,
+     cols.adapter.op_b_memory.prev_value,
+     cols.adapter.op_c_memory.prev_value,
+     cols.mul_operation.carry, cols.mul_operation.product,
+     cols.mul_operation.b_lower_byte.low_bytes,
+     cols.mul_operation.c_lower_byte.low_bytes,
+     cols.mul_operation.b_msb, cols.mul_operation.c_msb,
+     cols.mul_operation.product_msb.msb,
+     cols.mul_operation.b_sign_extend, cols.mul_operation.c_sign_extend,
+     cols.is_mul, cols.is_mulh, cols.is_mulhu, cols.is_mulhsu, cols.is_mulw⟩ ∧
+  cols.is_mul    * (cols.is_mul    - 1) = 0 ∧
+  cols.is_mulh   * (cols.is_mulh   - 1) = 0 ∧
+  cols.is_mulhu  * (cols.is_mulhu  - 1) = 0 ∧
   cols.is_mulhsu * (cols.is_mulhsu - 1) = 0 ∧
-  cols.is_mulhu * (cols.is_mulhu - 1) = 0 ∧
+  cols.is_mulw   * (cols.is_mulw   - 1) = 0 ∧
   is_real * (is_real - 1) = 0 ∧
-  cols.adapter.op_a_0 = 0 ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
-  -- R-type: op_a/+4, op_b/+3, op_c/+2.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 3, cols.adapter.op_b_memory.access_timestamp.prev_low, cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_b_memory.prev_value⟩ ∧
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 2, cols.adapter.op_c_memory.access_timestamp.prev_low, cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_memory.prev_value⟩
+  cols.adapter.op_a_0 = 0
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  circuit_proof_start
-  -- Substitute all input-eval equations so the goal matches the subcircuit
-  -- specs (which reference `Expression.eval env input_var_X` of pc/etc).
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
-          e31, e32, e33⟩ := h_input
-  subst_eqs
-  obtain ⟨h_cpu_sub, h_prog_sub, h_mul, h_mulh, h_mulw, h_mulhsu,
-          h_mulhu, h_real, h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h_holds
-  unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact h_cpu_sub trivial
-  · exact h_prog_sub trivial
-  · linear_combination h_mul
-  · linear_combination h_mulh
-  · linear_combination h_mulw
-  · linear_combination h_mulhsu
-  · linear_combination h_mulhu
-  · linear_combination h_real
-  · exact h_op_a_0
-  · exact h_oa_a trivial
-  · exact h_oa_b trivial
-  · exact h_oa_c trivial
+  sorry
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  circuit_proof_start
-  obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
-          e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29, e30,
-          e31, e32, e33⟩ := h_input
-  subst_eqs
-  obtain ⟨h_cpu, h_prog, h_mul, h_mulh, h_mulw, h_mulhsu, h_mulhu,
-          h_real, h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h_spec
-  unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · exact ⟨trivial, h_cpu⟩
-  · exact ⟨trivial, h_prog⟩
-  · linear_combination h_mul
-  · linear_combination h_mulh
-  · linear_combination h_mulw
-  · linear_combination h_mulhsu
-  · linear_combination h_mulhu
-  · linear_combination h_real
-  · exact h_op_a_0
-  · exact ⟨trivial, h_oa_a⟩
-  · exact ⟨trivial, h_oa_b⟩
-  · exact ⟨trivial, h_oa_c⟩
+  sorry
 
 end Assertion
 
-def assertion : FormalAssertion (ZMod p) MulCols :=
+-- `Fact (2 ^ 24 < p)` is transitive via `MulOp.assertion`'s requirement
+-- in `Assertion.elaborated`.
+def assertion [Fact (2 ^ 24 < p)] : FormalAssertion (ZMod p) MulCols :=
   { Assertion.elaborated with
     Assumptions := Assertion.Assumptions,
     Spec := Assertion.FormalSpec,

@@ -118,7 +118,8 @@ theorem is_real_binary_branch (cols : SP1Clean.Branch.BranchCols (ZMod p))
   unfold SP1Clean.Branch.Assertion.FormalSpec at h
   tauto
 
-theorem is_real_binary_divRem (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
+theorem is_real_binary_divRem [Fact (2 ^ 24 < p)]
+    (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
     (h : SP1Clean.DivRem.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
@@ -197,7 +198,8 @@ theorem is_real_binary_lt (cols : SP1Clean.Lt.LtCols (ZMod p))
   unfold SP1Clean.Lt.Assertion.FormalSpec at h
   tauto
 
-theorem is_real_binary_mul (cols : SP1Clean.Mul.MulCols (ZMod p))
+theorem is_real_binary_mul [Fact (2 ^ 24 < p)]
+    (cols : SP1Clean.Mul.MulCols (ZMod p))
     (h : SP1Clean.Mul.assertion.Spec cols) :
     cols.is_mul + cols.is_mulh + cols.is_mulw +
       cols.is_mulhsu + cols.is_mulhu = 0 ∨
@@ -303,7 +305,8 @@ theorem is_real_binary_memInitFinalize
 /-- The full discharge: every chip-row `Spec` implies `is_real ∈ {0, 1}`
 on the row's `stateAccess`. Replaces the previously-bundled
 `TraceIsRealBinary` hypothesis with a constructive proof. -/
-theorem traceIsRealBinary_of_chip_specs (rows : List (ChipRow p))
+theorem traceIsRealBinary_of_chip_specs [Fact (2 ^ 24 < p)]
+    (rows : List (ChipRow p))
     (h_specs : ∀ row ∈ rows, ChipRow.Spec row) :
     TraceIsRealBinary rows := by
   intro row h_mem

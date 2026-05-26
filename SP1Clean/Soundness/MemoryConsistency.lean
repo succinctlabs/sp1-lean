@@ -405,8 +405,11 @@ def clockComponents : ChipRow p → ZMod p × ZMod p
   | .memFinalize cols => (cols.clk_high, cols.clk_low)
 
 /-- The chip-row's natural Spec predicate (the propositional content the
-chip's FormalAssertion / iff_sp1 establishes). -/
-def Spec : ChipRow p → Prop
+chip's FormalAssertion / iff_sp1 establishes). The `Fact (2 ^ 24 < p)`
+instance is required by `SP1Clean.Mul.assertion` and
+`SP1Clean.DivRem.assertion` (transitive via their `MulOp.assertion`
+sub-circuit). -/
+def Spec [Fact (2 ^ 24 < p)] : ChipRow p → Prop
   | .add cols => SP1Clean.Add.assertion.Spec cols
   | .loadByte cols => SP1Clean.LoadByte.assertion.Spec cols
   | .storeByte cols => SP1Clean.StoreByte.assertion.Spec cols
@@ -613,7 +616,7 @@ The two trace-shape hypotheses (`h_sorted`, `h_nodup`) are discharged
 from `h_specs` plus a clock-monotonicity assumption in
 `SP1Clean/Soundness/MemoryConsistencyClock.lean` (Phase A.3 of the
 trace-soundness plan). -/
-theorem chip_specs_admit_offline_bridge
+theorem chip_specs_admit_offline_bridge [Fact (2 ^ 24 < p)]
     (rows : List (ChipRow p))
     (_h_specs : ∀ row ∈ rows, row.Spec)
     (h_sorted : (aggregateMemoryAccesses rows).isTimestampSorted)
@@ -912,24 +915,19 @@ theorem memoryAccessesValid_of_spec_loadX0
     ChipRow.memoryAccessesValid (.loadX0 _cols) := by
   simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- Mul's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type: op_a/+4, op_b/+3, op_c/+2. -/
-theorem memoryAccessesValid_of_spec_mul
+/-- Mul's per-chip discharge — sorry'd after MulChip's `FormalSpec` was
+restructured to compose `MulOp.assertion` + `CPUState.Gated` +
+`RTypeReader.Gated` (CLEAN_AUDIT D2/D3 alignment). The OperandAccess
+conjuncts that this destructure extracted are now nested inside
+`RTypeReader.Gated.Assertion.Spec` as `RegisterAccess.Assertion.Spec`
+(which wraps `OperandAccess.AssertionGated.Spec`). Re-deriving the
+flat `OperandAccess.Assertion.Spec` from there is a follow-up; the
+sorry tracks the structural gap. -/
+theorem memoryAccessesValid_of_spec_mul [Fact (2 ^ 24 < p)]
     (cols : SP1Clean.Mul.MulCols (ZMod p))
     (h : SP1Clean.Mul.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.mul cols) := by
-  change SP1Clean.Mul.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_mul, _h_mulh, _h_mulw, _h_mulhsu,
-          _h_mulhu, _h_real, _h_op_a_0,
-          h_oa_a, h_oa_b, h_oa_c⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
-  intro entry h_mem
-  rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+  sorry
 
 /-- ShiftLeft's per-chip discharge — three `OperandAccess.Assertion.Spec`
 conjuncts. R-type: op_a/+4, op_b/+3, op_c/+2. -/
@@ -967,23 +965,15 @@ theorem memoryAccessesValid_of_spec_shiftRight
   · subst h; exact h_oa_b
   · subst h; exact h_oa_c
 
-/-- DivRem's per-chip discharge — three `OperandAccess.Assertion.Spec`
-conjuncts. R-type: op_a/+4, op_b/+3, op_c/+2. -/
-theorem memoryAccessesValid_of_spec_divRem
+/-- DivRem's per-chip discharge — sorry'd after DivRemChip's
+`FormalSpec` was restructured to compose 17 sub-circuits + 2 reader
+Gated assertions (CLEAN_AUDIT D2/D3 alignment). See the parallel
+comment on `memoryAccessesValid_of_spec_mul`. -/
+theorem memoryAccessesValid_of_spec_divRem [Fact (2 ^ 24 < p)]
     (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
     (h : SP1Clean.DivRem.assertion.Spec cols) :
     ChipRow.memoryAccessesValid (.divRem cols) := by
-  change SP1Clean.DivRem.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_prog, _h_signed, _h_w, _h_rem, _h_real,
-          _h_op_a_0, h_oa_a, h_oa_b, h_oa_c⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
-  intro entry h_mem
-  rcases h_mem with h | h | h
-  · subst h; exact h_oa_a
-  · subst h; exact h_oa_b
-  · subst h; exact h_oa_c
+  sorry
 
 /-- Trace-level memory-bus grounding: from per-row chip Specs + a
 verifier-supplied `TraceMemoryAccessesValid` bundle for the 23 chips whose
@@ -993,7 +983,7 @@ its `FormalSpec` via `memoryAccessesValid_of_spec_add`.
 The discharge architecture: at completion of sub-task E (widening 23 more
 chips' `FormalSpec`s with `OperandAccess.Assertion.Spec` conjuncts), the
 `h_link` hypothesis becomes derivable and can be dropped. -/
-theorem traceMemoryAccessesValid_of_chip_specs
+theorem traceMemoryAccessesValid_of_chip_specs [Fact (2 ^ 24 < p)]
     (rows : List (ChipRow p))
     (_h_specs : ∀ row ∈ rows, ChipRow.Spec row)
     (h_link : TraceMemoryAccessesValid rows) :

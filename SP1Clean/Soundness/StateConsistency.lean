@@ -358,7 +358,7 @@ The per-row witness is exposed by `nextPcValid_of_chipRow_spec` below,
 and the trace-level wrapper `traceNextPcValid_of_chip_specs` aggregates
 across all rows. `traceStateValid_of_chip_specs` itself remains the
 adjacency-bundling step. -/
-theorem traceStateValid_of_chip_specs
+theorem traceStateValid_of_chip_specs [Fact (2 ^ 24 < p)]
     (rows : List (ChipRow p)) (clkIncrement : ZMod p)
     (_h_specs : ∀ row ∈ rows, ChipRow.Spec row)
     (h_link : TraceStateLink rows clkIncrement) :
