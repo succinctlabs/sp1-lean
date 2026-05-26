@@ -698,35 +698,42 @@ namespace SP1Clean.Jal
 
 namespace Assertion
 
-/-- Chip-level FormalSpec mirroring AddChip's canonical pattern
-(commit `b82c79e`): the two AddOp sub-circuit conjuncts are now stated
-semantically (`is_real = 1 → isU64 result ∧ result.toBitVec64 = a + b`),
-matching `AddOp.Assertion.Spec`'s shape directly. The carry-chain
-implementation detail is reconstructed on demand via `AddOp.iff_sp1_full`
-when bridging back to SP1's `allHold` at the trace level. -/
+/-- The unified chip Spec for `JalChip`. Canonical (a) shape mirroring
+`SP1Clean.UType.FormalSpec`: flag-threaded `CPUState.Gated` +
+`JTypeReader.Gated` sub-circuit composition (opcode 46 = JAL), two
+`AddOp.Assertion.Spec` semantic conjuncts (jump-target `pc + op_b_imm =
+next_pc` gated by `is_real`, return-address `pc + 4 = op_a_write_value`
+gated by `is_real - op_a_0`), and four trailing scalar gates
+(`next_pc[3] = 0`, `op_a_write_value[3] = 0`, `(is_real - 1) * op_a_0 =
+0` rephrased as `is_real = 1 ∨ op_a_0 = 0`, plus the jump-target
+4-alignment consequence `(next_pc[0] / 4).val < 16384` derived from the
+chip's PC-alignment byte send — control-flow specific and not subsumed
+by CPUState/JTypeReader). The byte-carry decomposition that SP1's two
+`AddOperation` invocations thread internally is *not* exposed here; it's
+the implementation detail of the `AddOp` sub-circuit and is reconstructed
+on demand via `AddOperation.iff_sp1_full` when bridging back to SP1's
+`allHold` at the trace level. The per-row Sail-monadic equivalence to
+`_root_.Jal.spec_jal` is recovered externally via
+`sail_correct_of_formalSpec` (`SailBridge.lean`). -/
 def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  (cols.is_real = 1 →
-    Word.isU64 cols.next_pc ∧
-    Word.toBitVec64 cols.next_pc =
-      Word.toBitVec64 (cols.state.pc.push 0) +
-      Word.toBitVec64 cols.adapter.op_b_imm) ∧
-  (cols.is_real = 1 →
-    Word.isU64 cols.op_a_write_value ∧
-    Word.toBitVec64 cols.op_a_write_value =
-      Word.toBitVec64 (cols.state.pc.push 0) +
-      Word.toBitVec64 (#v[4, 0, 0, 0] : Vector (ZMod p) 4)) ∧
-  SP1Clean.ProgramTable.Spec
-    { pc := cols.state.pc, opcode := 46, op_a := cols.adapter.op_a,
-      op_b := cols.adapter.op_b_imm, op_c := cols.adapter.op_c_imm,
-      op_a_0 := cols.adapter.op_a_0, imm_b := 1, imm_c := 1 } ∧
-  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
-  -- Iter-8 sub-task E: per-operand memory-bus byte-content consequence.
-  -- Jal emits a single op_a register access at offset +4.
-  SP1Clean.OperandAccess.Assertion.Spec
-    ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_memory.prev_value⟩
+  SP1Clean.CPUState.Gated.Assertion.Spec
+    ⟨cols.state,
+     #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]],
+     8, cols.is_real⟩ ∧
+  SP1Clean.AddOp.Assertion.Spec
+    ⟨cols.state.pc.push 0, cols.adapter.op_b_imm, cols.next_pc, cols.is_real⟩ ∧
+  SP1Clean.AddOp.Assertion.Spec
+    ⟨cols.state.pc.push 0, #v[4, 0, 0, 0], cols.op_a_write_value,
+     cols.is_real - cols.adapter.op_a_0⟩ ∧
+  SP1Clean.JTypeReader.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, 46, cols.state.pc,
+     cols.op_a_write_value, cols.adapter,
+     cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
+  cols.next_pc[3] = 0 ∧
+  cols.op_a_write_value[3] = 0 ∧
+  (cols.is_real = 1 ∨ cols.adapter.op_a_0 = 0) ∧
+  (cols.is_real = 1 → (cols.next_pc[0] * (4 : ZMod p)⁻¹).val < 16384)
 
 end Assertion
 
