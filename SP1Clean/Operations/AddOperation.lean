@@ -225,6 +225,45 @@ lemma byteOpcodeSpec_range16_of_lt
     rw [h16]
     exact hx
 
+/-- Generic variant of `byteOpcodeSpec_range16` parametric in the bound `b`:
+unwrap a `ByteOpcodeSpec` row of the form `#v[6, x, b, c]` into
+`x.val < 2 ^ b.val`. The `c` slot is ignored by the `Range` opcode. -/
+lemma byteOpcodeSpec_range
+    (x b c : ZMod p)
+    (h : SP1Clean.ByteOpcodeSpec (#v[(6 : ZMod p), x, b, c])) :
+    x.val < 2 ^ b.val := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  obtain ⟨bop, hbop, hconstr⟩ := h
+  have h_eq : bop = .Range := by
+    have h6 : (6 : ZMod p) = ((6 : ℕ) : ZMod p) := by push_cast; rfl
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hbop
+    rw [h6] at hbop
+    apply_fun ZMod.val at hbop
+    have h_lt : bop.toNat < 7 := by cases bop <;> simp [ByteOpcode.toNat]
+    rw [ZMod.val_natCast, ZMod.val_natCast,
+        Nat.mod_eq_of_lt (by omega : bop.toNat < p),
+        Nat.mod_eq_of_lt (by omega : (6 : ℕ) < p)] at hbop
+    cases bop <;> simp [ByteOpcode.toNat] at hbop
+    rfl
+  subst h_eq
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+             List.getElem_cons_zero, ByteOpcode.constrain_Range] at hconstr
+  exact hconstr
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Generic completeness helper: given `x.val < 2 ^ b.val`, build a
+`ByteOpcodeSpec` witnessed by `bop = Range`. -/
+lemma byteOpcodeSpec_range_of_lt
+    (x b c : ZMod p) (hx : x.val < 2 ^ b.val) :
+    SP1Clean.ByteOpcodeSpec (#v[(6 : ZMod p), x, b, c]) := by
+  refine ⟨.Range, ?_, ?_⟩
+  · simp only [ByteOpcode.toNat, Vector.getElem_mk, List.getElem_toArray,
+               List.getElem_cons_zero, Nat.cast_ofNat]
+  · simp only [ByteOpcode.constrain_Range, Vector.getElem_mk, List.getElem_toArray,
+               List.getElem_cons_zero, List.getElem_cons_succ]
+    exact hx
+
 /-- Soundness of `SP1Clean.AddOp.assertion`. Under `is_real = 1`, the
 circuit's gated emissions reduce (via `mul_eq_zero` + `resolve_left`) to
 the carry-bool form plus result-limb ranges from each
