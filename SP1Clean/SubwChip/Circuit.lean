@@ -76,10 +76,18 @@ instance elaborated : ElaboratedCircuit (ZMod p) SubwCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-/-- The chip is the `UserMode` variant. Its `adapter_cols.is_trusted`
-payload is structurally equal to `is_real`. -/
+/-- The chip is the `UserMode` variant (`M = UserMode` in upstream Rust),
+so its `adapter_cols.is_trusted` payload is structurally equal to
+`is_real` (both alias `Main[31]`). The `is_real = 1` precondition
+restricts the FormalAssertion to non-padding rows: completeness
+reconstructs `SubwOp.Assertion.Spec` for the sub-circuit witness via
+the `Assertion_Spec_iff_Spec ↔ iff_sp1 ↔ iff_sp1_full` round-trip
+(which needs the BitVec triple from FormalSpec's `is_real = 1 → ...`
+conjunct + operand bounds), so the chip contract is only meaningful on
+real rows. Trace-soundness drivers discharge `is_real = 1` per row
+before invoking `Subw.assertion`. -/
 def Assumptions (cols : SubwCols (ZMod p)) : Prop :=
-  cols.adapter_cols.is_trusted = cols.is_real
+  cols.adapter_cols.is_trusted = cols.is_real ∧ cols.is_real = 1
 
 /-- The unified chip Spec is defined in `Cols.lean`
 (`SP1Clean.Subw.FormalSpec`). -/
@@ -91,35 +99,38 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_subw_value, e_subw_msb, e_is_real, e_ac⟩
     := h_input
   subst_eqs
+  obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
   obtain ⟨h_subwop_sub, h_cpu_sub, h_rtr_sub, h_op_a_0⟩ := h_holds
   unfold id at *
-  -- Bridge SubwOp's borrow-form `Assertion.Spec` (which `circuit_proof_start`
-  -- produces) to the natural-form `Spec` that `FormalSpec` carries.
-  have h_subwop := (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp
-    (h_subwop_sub trivial)
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_cpu := h_cpu_sub trivial
   have h_rtr := h_rtr_sub trivial
-  refine ⟨h_subwop, h_cpu_sub trivial, ?_, h_op_a_0, ?_⟩
+  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
+  refine ⟨h_cpu, ?_, h_op_a_0, ?_⟩
   · -- Bridge `RTypeReader.Gated.assertion.Spec` (lowercase) → matching
-    -- `RTypeReader.Gated.Assertion.Spec` (uppercase) form via simp on the
-    -- assertion definition.
+    -- `RTypeReader.Gated.Assertion.Spec` (uppercase) form via simp.
     simpa [SP1Clean.RTypeReader.Gated.assertion,
            SP1Clean.RTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
            Vector.getElem_map] using h_rtr
-  · -- BitVec `RV64.subw` conjunct: discharge from `SubwOp.Spec` (natural-form)
-    -- + the per-operand `Word.isU64` bounds for op_b/op_c — inside
-    -- `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec` sub-conjuncts.
-    intro h_is_real_eq
-    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
-    change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real_eq
+  · -- Semantic conjunct: bridge SubwOp's borrow-form `Assertion.Spec` →
+    -- natural-form `Spec` → SP1's `allHold` → `iff_sp1_full`'s RHS triple
+    -- `(isU32 ∧ BV32 eq ∧ msb_eq)`.
+    intro _h_is_real_eq
+    -- Discharge operand `isU64` bounds from `RTypeReader.Gated.Spec`'s 4th/5th
+    -- `RegisterAccess.Spec` sub-conjuncts (op_b / op_c).
     have h_ir_ne_zero :
         (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-      rw [h_is_real_eq]; exact one_ne_zero
+      rw [h_is_real]; exact one_ne_zero
+    obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
     have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
       (h_ra_b.resolve_left h_ir_ne_zero).2.2
     have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
       (h_ra_c.resolve_left h_ir_ne_zero).2.2
-    exact rv64_subw_eq_of_subwop_spec _ _ _ _ h_isU64_b h_isU64_c h_subwop
+    have h_subwop_nat := (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp
+      (h_subwop_sub trivial)
+    have h_subwop_allHold :=
+      (SP1Clean.SubwOp.iff_sp1 _ _ _).mpr h_subwop_nat
+    exact (SubwOperation.iff_sp1_full h_isU64_b h_isU64_c).mp h_subwop_allHold
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -127,11 +138,32 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_subw_value, e_subw_msb, e_is_real, e_ac⟩
     := h_input
   subst_eqs
-  obtain ⟨h_subwop, h_cpu, h_rtr, h_op_a_0, _h_rv64subw⟩ := h_spec
+  obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
+  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem⟩ := h_spec
   unfold id at *
-  -- Reverse bridge: natural-form `Spec` → borrow-form `Assertion.Spec` for
-  -- the SubwOp completeness obligation.
-  have h_subwop' := (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mpr h_subwop
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
+  have h_ir_ne_zero :
+      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
+    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
+    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  -- Reverse bridge: chip semantic triple → SP1's `allHold` → natural-form
+  -- `Spec` → borrow-form `Assertion.Spec` for the SubwOp obligation.
+  have ⟨h_isU32, h_bv32, h_msb_eq⟩ := h_sem h_is_real
+  have h_subwop_allHold :=
+    (SubwOperation.iff_sp1_full
+        (cols := { value := input_var_subw_value.map
+                              (Expression.eval env.toEnvironment),
+                   msb := { msb := Expression.eval env.toEnvironment
+                                    input_var_subw_msb } })
+        h_isU64_b h_isU64_c).mpr
+      ⟨h_isU32, h_bv32, h_msb_eq⟩
+  have h_subwop_nat := (SP1Clean.SubwOp.iff_sp1 _ _ _).mp h_subwop_allHold
+  have h_subwop' :=
+    (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mpr h_subwop_nat
   refine ⟨⟨trivial, h_subwop'⟩, ⟨trivial, h_cpu⟩, ⟨trivial, ?_⟩, h_op_a_0⟩
   simpa [SP1Clean.RTypeReader.Gated.assertion,
          SP1Clean.RTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,

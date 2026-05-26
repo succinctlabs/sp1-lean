@@ -142,24 +142,25 @@ omit [Fact (2 ^ 17 < p)] in
 
 /-! ## Chip-level `FormalSpec`
 
-The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
-can reference it without importing the full circuit construction:
-SUBW carry-chain arithmetic (`SubwOp.Spec`, Inputs-shape) plus the
-flag-threaded sub-circuit composition (`CPUState.Gated` +
-`RTypeReader.Gated`, opcode 20) plus the chip-level `op_a_0 = 0` gate
-plus a pure BitVec `RV64.subw` semantic (conditional on `is_real = 1`).
-The free `is_real * (is_real - 1) = 0` gate now lives inside both
-Gated.Specs' first conjuncts. Mirrors `SP1Clean/SubChip/Cols.lean`'s
-`FormalSpec` with the W-style sign-extended result shape
-(`#v[value[0], value[1], msb*65535, msb*65535]`). -/
+Semantic-only contract: the byte-borrow + sign-extension decomposition
+that the SP1 `SubwOperation` circuit threads internally is *not* exposed
+here; it's the implementation detail of the `SubwOp` sub-circuit and is
+reconstructed on demand via `SubwOperation.iff_sp1_full` (see
+`Lemmas.lean`). The flag-threaded sub-circuit composition
+(`CPUState.Gated` + `RTypeReader.Gated`, opcode 20) plus the chip-level
+`op_a_0 = 0` gate plus the trailing semantic conjunct (the 32-bit BV
+identity + the msb sign-extension bit, conditional on `is_real = 1`,
+matching `SubwOperation.iff_sp1_full`'s RHS verbatim). Diverges in shape
+from `SP1Clean/SubChip/Cols.lean`'s BV64 form because SubwChip's storage
+is BV32 + msb, not a 4-limb Word: keeping the FormalSpec semantic shape
+aligned with `iff_sp1_full` avoids a costly BV64↔BV32+msb inversion in
+the `allHold_iff_structural` backward arm. The BV64 narrative used by
+the Sail bridge is derived externally via `rv64_subw_eq_of_subwop_spec`. -/
 def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let op_a_write_value : Word (ZMod p) :=
     #v[cols.subw_value[0], cols.subw_value[1],
        cols.subw_msb * 65535, cols.subw_msb * 65535]
-  SP1Clean.SubwOp.Spec
-      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
-      { value := cols.subw_value, msb := { msb := cols.subw_msb } } ∧
   SP1Clean.CPUState.Gated.Assertion.Spec
       ⟨cols.state,
        #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
@@ -170,8 +171,11 @@ def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
        cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0 ∧
   (cols.is_real = 1 →
-    Word.toBitVec64 op_a_write_value =
-      RV64.subw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
-                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
+    HWord.isU32 cols.subw_value ∧
+    HWord.toBitVec32 cols.subw_value =
+      execute_RTYPEW_pure_32_w cols.adapter.op_b_memory.prev_value
+                                cols.adapter.op_c_memory.prev_value .SUBW ∧
+    cols.subw_msb =
+      if (HWord.toBitVec32 cols.subw_value).msb then 1 else 0)
 
 end SP1Clean.Subw

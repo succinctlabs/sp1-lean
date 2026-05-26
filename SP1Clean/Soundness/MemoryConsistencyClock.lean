@@ -325,14 +325,16 @@ theorem cpuStateSpec_of_spec_subw (cols : Subw.SubwCols (ZMod p))
     (h : Subw.assertion.Spec cols)
     (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  -- Post-Gated-migration: cpuStateSpec is now embedded in
-  -- `CPUState.Gated.Assertion.Spec`. Mirror of `cpuStateSpec_of_spec_sub`.
+  -- Post-p2-subw migration: cpuStateSpec is embedded in
+  -- `CPUState.Gated.Assertion.Spec`, now at `h.1` (was `h.2.1` pre-migration
+  -- when SubwOp.Spec was the leading conjunct). Mirror of
+  -- `cpuStateSpec_of_spec_sub`.
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Subw.Assertion.FormalSpec cols at h
   have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
       ⟨cols.state,
        #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-       8, cols.is_real⟩ := h.2.1
+       8, cols.is_real⟩ := h.1
   rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
   exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 

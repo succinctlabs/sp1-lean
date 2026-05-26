@@ -277,9 +277,10 @@ theorem is_real_binary_subw (cols : SP1Clean.Subw.SubwCols (ZMod p))
     (h : SP1Clean.Subw.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   change SP1Clean.Subw.Assertion.FormalSpec cols at h
-  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
-  -- first conjunct (mirror of Add).
-  exact binary_of_assertZero _ h.2.1.1
+  -- New post-p2-subw Gated FormalSpec (SubwOp.Spec conjunct dropped):
+  -- is_real binarity lives in `CPUState.Gated.Spec`'s first conjunct,
+  -- now at `h.1.1` (was `h.2.1.1` pre-migration). Mirror of Sub.
+  exact binary_of_assertZero _ h.1.1
 
 theorem is_real_binary_uType (cols : SP1Clean.UType.UTypeCols (ZMod p))
     (h : SP1Clean.UType.assertion.Spec cols) :

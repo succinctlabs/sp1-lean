@@ -14,15 +14,17 @@ machinery:
   round-trip), conditional on the UserMode TrustMode marker
   `cols.adapter_cols.is_trusted = cols.is_real`.
 - `allHold_iff_structural` — bridges `(_root_.Subw.constraints Main).allHold`
-  under `is_real = 1` to the conjunction of `SubwOp.Spec`,
-  `CPUState.Gated.Spec`, `RTypeReader.Gated.Spec`, and the trailing
-  `Main[13] = 0` op_a_0 gate. Used downstream by `SailBridge.lean` to
-  reconstruct `(Subw.constraints (toMain cols)).allHold` from the
-  structural conjuncts of `FormalSpec`.
+  under `is_real = 1` to the conjunction of `CPUState.Gated.Spec`,
+  `RTypeReader.Gated.Spec`, the trailing `Main[13] = 0` op_a_0 gate, and
+  the semantic-only (`HWord.isU32 ∧ BV32 eq ∧ msb_eq`) triple from
+  `SubwOperation.iff_sp1_full`'s RHS. The byte-borrow + sign-extension
+  decomposition that SP1's `SubwOperation` threads internally is *not*
+  exposed; it's reconstructed on demand via
+  `SubwOperation.iff_sp1_full`. Used downstream by `SailBridge.lean`.
 
-Mirrors `SP1Clean/SubChip/Lemmas.lean` for the W-style result shape
-(`{ value := #v[Main[28], Main[29]], msb := { msb := Main[30] } }`) and
-opcode `20` (SUBW). -/
+Mirrors `SP1Clean/SubChip/Lemmas.lean` post-migration, diverging only in
+the semantic-clause shape (BV32 + msb_eq vs Sub's BV64 + isU64) to match
+the W-form storage and avoid a costly BV64↔BV32+msb inversion. -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
@@ -46,19 +48,23 @@ lemma fromMain_toMain (cols : SubwCols (ZMod p))
   all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
-`Subw.constraints Main` is exactly the conjunction of `SubwOp.Spec`,
-`CPUState.Gated.Assertion.Spec`, and `RTypeReader.Gated.Assertion.Spec`
-over `fromMain Main`, under `is_real = Main[31] = 1`. The chip-level
-free `Main[31] * (Main[31] - 1) = 0` gate is absorbed into both
-Gated.Specs' first conjuncts. -/
+`Subw.constraints Main` is exactly the conjunction of
+`CPUState.Gated.Assertion.Spec`, `RTypeReader.Gated.Assertion.Spec`,
+`Main[13] = 0` (the chip-level `op_a_0` zero gate), and the
+semantic-only triple `(HWord.isU32 ⟨#v[Main[28], Main[29]]⟩ ∧ BV32 eq ∧
+msb_eq)` from `SubwOperation.iff_sp1_full`'s RHS, under
+`is_real = Main[31] = 1`. The byte-borrow + sign-extension
+decomposition that SP1's `SubwOperation` threads internally is *not*
+exposed in the RHS — it's reconstructed via `SubwOperation.iff_sp1_full`
+which needs the `Word.isU64` bounds of op_b / op_c (available from
+`RTypeReader.Gated.Spec`'s `RegisterAccess.Spec` sub-conjuncts). Used
+inside the Sail clause's external bridge
+(`SailBridge.sail_correct_of_formalSpec`) to construct an `allHold`
+from the structural pieces of `FormalSpec`. -/
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 32) (h_is_real : Main[31] = 1) :
     (_root_.Subw.constraints Main).allHold ↔
-      (SP1Clean.SubwOp.Spec
-          #v[Main[15], Main[16], Main[17], Main[18]]
-          #v[Main[22], Main[23], Main[24], Main[25]]
-          { value := #v[Main[28], Main[29]], msb := { msb := Main[30] } } ∧
-       SP1Clean.CPUState.Gated.Assertion.Spec
+      (SP1Clean.CPUState.Gated.Assertion.Spec
           ⟨{ clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
              pc := #v[Main[3], Main[4], Main[5]] },
            #v[Main[3] + 4, Main[4], Main[5]], 8, Main[31]⟩ ∧
@@ -82,18 +88,43 @@ lemma allHold_iff_structural
                  access_timestamp :=
                    { prev_low := Main[26], diff_low_limb := Main[27] } } },
            Main[31], Main[31]⟩ ∧
-       Main[13] = 0) := by
+       Main[13] = 0 ∧
+       HWord.isU32 (p := p) #v[Main[28], Main[29]] ∧
+       HWord.toBitVec32 (p := p) #v[Main[28], Main[29]] =
+         execute_RTYPEW_pure_32_w
+           #v[Main[15], Main[16], Main[17], Main[18]]
+           #v[Main[22], Main[23], Main[24], Main[25]] .SUBW ∧
+       Main[30] =
+         if (HWord.toBitVec32 (p := p) #v[Main[28], Main[29]]).msb
+         then 1 else 0) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [_root_.Subw.allHold_constraints_iff Main, h_is_real,
-      SP1Clean.SubwOp.iff_sp1,
       SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1,
       SP1Clean.RTypeReader.Gated.Assertion.Spec_iff_sp1]
-  -- Drop the trivial `1 * (1 - 1) = 0` conjunct — both Gated.Specs already
-  -- carry their own `is_real * (is_real - 1) = 0`.
   refine ⟨?_, ?_⟩
-  · rintro ⟨h_subwop, h_cpu, h_rtr, _, h_op_a_0⟩
-    exact ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩
-  · rintro ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩
+  · -- Forward: allHold → structural conjuncts + (isU32 ∧ BV32 eq ∧ msb_eq).
+    rintro ⟨h_subwop, h_cpu, h_rtr, _, h_op_a_0⟩
+    have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
+    have h_isU64_b : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] :=
+      (h_rtr.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have h_isU64_c : Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] :=
+      (h_rtr.2.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have ⟨h_isU32_v, h_bv32, h_msb_eq⟩ :=
+      (SubwOperation.iff_sp1_full h_isU64_b h_isU64_c).mp h_subwop
+    exact ⟨h_cpu, h_rtr, h_op_a_0, h_isU32_v, h_bv32, h_msb_eq⟩
+  · -- Backward: structural conjuncts + (isU32 ∧ BV32 eq ∧ msb_eq) → allHold.
+    rintro ⟨h_cpu, h_rtr, h_op_a_0, h_isU32_v, h_bv32, h_msb_eq⟩
+    have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
+    have h_isU64_b : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] :=
+      (h_rtr.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have h_isU64_c : Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] :=
+      (h_rtr.2.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have h_subwop :=
+      (SubwOperation.iff_sp1_full
+          (cols := { value := #v[Main[28], Main[29]],
+                     msb := { msb := Main[30] } })
+          h_isU64_b h_isU64_c).mpr
+        ⟨h_isU32_v, h_bv32, h_msb_eq⟩
     refine ⟨h_subwop, h_cpu, h_rtr, ?_, h_op_a_0⟩
     ring
 
