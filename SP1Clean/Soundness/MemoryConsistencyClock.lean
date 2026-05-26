@@ -212,11 +212,23 @@ theorem cpuStateSpec_of_spec_divRem [Fact (2 ^ 24 < p)]
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   sorry
 
+/-- Post-(a)-shape migration: `cpuStateSpec` is no longer a direct FormalSpec
+conjunct (was position 1). Position 1 is now `CPUState.Gated.Assertion.Spec`;
+bridge to cpuStateSpec via `_iff_sp1` under `is_real = 1`. Mirror of UType.
+Unused after `ChipRow.cpuStateSpec (.jal _)` was switched to `True` (Gated
+migration), but kept as a documented artifact. -/
 theorem cpuStateSpec_of_spec_jal (cols : Jal.JalCols (ZMod p))
-    (h : Jal.assertion.Spec cols) :
+    (h : Jal.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Jal.Assertion.FormalSpec cols at h
-  exact h.1
+  have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]],
+       8, cols.is_real⟩ := h.1
+  rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
+  exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
 theorem cpuStateSpec_of_spec_jalr (cols : Jalr.JalrCols (ZMod p))
     (h : Jalr.assertion.Spec cols) :
@@ -375,7 +387,9 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
   | .bitwise cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .branch cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .divRem cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .jal cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  -- Jal — Gated migration: `memoryAccesses` routed through the
+  -- multiplicity-aware lookup bus, parallel to `.uType` / `.add`.
+  | .jal _ => True
   | .jalr cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .loadByte cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .loadDouble cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
@@ -417,7 +431,7 @@ theorem cpuStateSpec_of_chipRow_spec [Fact (2 ^ 24 < p)]
   | bitwise cols => exact cpuStateSpec_of_spec_bitwise cols h
   | branch cols => exact cpuStateSpec_of_spec_branch cols h
   | divRem cols => exact cpuStateSpec_of_spec_divRem cols h
-  | jal cols => exact cpuStateSpec_of_spec_jal cols h
+  | jal _ => trivial
   | jalr cols => exact cpuStateSpec_of_spec_jalr cols h
   | loadByte cols => exact cpuStateSpec_of_spec_loadByte cols h
   | loadDouble cols => exact cpuStateSpec_of_spec_loadDouble cols h

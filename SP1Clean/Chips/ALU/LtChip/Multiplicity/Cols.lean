@@ -162,14 +162,25 @@ omit [Fact (2 ^ 17 < p)] in
 
 /-! ## Chip-level `FormalSpec`
 
-The unified chip Spec. Composes `GatedLtSignedOp.Assertion.FormalSpec`
-(carries its own `gate = 0 ∨ ...` disjunction; gate is `is_slt + is_sltu`),
-`CPUState.Gated.Assertion.Spec`, and `ALUTypeReader.Gated.Assertion.Spec`,
-plus the 3 chip-level selector gates (2 selector binaries + sum binary)
-and the `op_a_0 = 0` zero gate, plus pure BitVec `RV64.slt`/`RV64.sltu`
-semantic clauses (conditional on each selector). The free
-`is_real * (is_real - 1) = 0` gate now lives inside the Gated.Specs'
-first conjuncts. -/
+The unified chip Spec, structured as a flat conjunction of facts about
+`cols`, one per sub-circuit emission in `main` (plus 4 scalar gates):
+
+- `GatedLtSignedOp.Assertion.FormalSpec` — comparison arithmetic on the
+  64-bit operands. Carries its own `gate = 0 ∨ <byte-range + carry>`
+  disjunction; gate is `is_slt + is_sltu`.
+- `CPUState.Gated.Assertion.Spec` — flag-threaded CPUState assertion
+  (binary gate + state-bus + byte-opcode, all gated by `is_real`).
+- `ALUTypeReader.Gated.Assertion.Spec` — program + 3 OperandAccess +
+  imm_c switch, gated by `is_real`/`is_trusted`.
+- 2 selector binaries (`is_slt`, `is_sltu` ∈ {0, 1}), the `is_real`
+  sum-binary disjunction, and `op_a_0 = 0`.
+
+No BitVec `RV64.slt`/`RV64.sltu` semantic clauses live here — bridging
+the byte-level facts to the BitVec semantic would require going through
+`LtOperationSigned.spec.signed`/`.unsigned` (SP1Operations side) via an
+`iff_sp1` translation, which is exactly the legacy bridge we are
+avoiding. Chip consumers that need the BitVec semantic derive it
+externally (e.g. via a separate `sail_correct_*` theorem). -/
 def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let is_real : ZMod p := cols.is_slt + cols.is_sltu
@@ -194,16 +205,6 @@ def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   cols.is_slt * (cols.is_slt - 1) = 0 ∧
   cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
   (is_real = 0 ∨ is_real - 1 = 0) ∧
-  cols.adapter.op_a_0 = 0 ∧
-  -- Pure BitVec semantic for SLT (signed).
-  (cols.is_slt = 1 →
-    Word.toBitVec64 op_a_write_value =
-      RV64.slt (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
-               (Word.toBitVec64 cols.adapter.op_b_memory.prev_value)) ∧
-  -- Pure BitVec semantic for SLTU (unsigned).
-  (cols.is_sltu = 1 →
-    Word.toBitVec64 op_a_write_value =
-      RV64.sltu (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
-                (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
+  cols.adapter.op_a_0 = 0
 
 end SP1Clean.LtChip

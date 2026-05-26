@@ -3,7 +3,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Chips.ALU.AddChip.Circuit
 import SP1Clean.Chips.Memory.LoadByteChip
 import SP1Clean.Chips.Memory.StoreByteChip
-import SP1Clean.Chips.Control.JalChip.Aggregate
+import SP1Clean.Chips.Control.JalChip.Circuit
 import SP1Clean.Chips.ALU.MulChip.Aggregate
 import SP1Clean.Chips.ALU.ShiftLeftChip.Aggregate
 import SP1Clean.Chips.ALU.AddwChip.SailBridge
@@ -144,13 +144,12 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       -- See `docs/MULTIPLICITY_BUS.md` Phase 4 for the parallel
       -- `lookupAccesses` aggregator design.
       []
-  | .jal cols =>
-      -- Jal has one register access (op_a write for the return address).
-      -- The state-bus PC chain is tracked at trace level — not via
-      -- MemoryAccess records.
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.Jal.opAMemoryAccess cols
-      [(op_a_mem, cols.op_a_write_value)]
+  | .jal _ =>
+      -- JalChip's memory contributions now flow through the multiplicity-aware
+      -- lookup bus emitted inside `JTypeReader.Gated.assertion` (parallel to
+      -- `.uType _` after the canonical-(a) FormalSpec migration). The
+      -- state-bus PC chain is still tracked at trace level.
+      []
   | .mul cols =>
       -- Three register accesses. op_a is read AND written (write_value =
       -- op_a_write_value, holding whatever the carry-chain produced —
@@ -451,8 +450,9 @@ def offsets : ChipRow p → List (ZMod p)
   -- StoreByte memory accesses now flow through the lookup bus (parallel
   -- to `.addw _`); offset list is empty.
   | .storeByte _ => []
-  -- Jal: only op_a write at +4. State-bus PC chain is trace-level.
-  | .jal _ => [4]
+  -- Jal: memory contributions flow through the lookup bus (parallel to
+  -- `.uType _` after canonical-(a) FormalSpec migration); offsets empty.
+  | .jal _ => []
   -- Mul and ShiftLeft: same R-type-reader pattern as Add (3 register
   -- accesses at +4 / +3 / +2). No RAM accesses.
   | .mul _ => [4, 3, 2]
@@ -686,22 +686,15 @@ theorem memoryAccessesValid_of_spec_uType
     ChipRow.memoryAccessesValid (.uType _cols) := by
   simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- Jal's per-chip discharge — projects the single
-`OperandAccess.Assertion.Spec` conjunct. Jal has only the op_a register
-access at offset +4 (return-address write). -/
+/-- Jal's per-chip discharge — vacuously true, since JalChip's memory
+contributions now flow through the multiplicity-aware lookup bus emitted
+inside `JTypeReader.Gated.assertion` (canonical-(a) FormalSpec migration).
+Mirrors `memoryAccessesValid_of_spec_uType`. -/
 theorem memoryAccessesValid_of_spec_jal
-    (cols : SP1Clean.Jal.JalCols (ZMod p))
-    (h : SP1Clean.Jal.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.jal cols) := by
-  change SP1Clean.Jal.Assertion.FormalSpec cols at h
-  obtain ⟨_h_cpu, _h_jump, _h_ret, _h_prog, _h_isreal, h_oa_a⟩ := h
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right,
-    SP1Clean.Jal.opAMemoryAccess]
-  intro entry h_mem
-  subst h_mem
-  exact h_oa_a
+    (_cols : SP1Clean.Jal.JalCols (ZMod p))
+    (_h : SP1Clean.Jal.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.jal _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
 /-- Addi's per-chip discharge — vacuously true, since AddiChip's memory
 contributions now flow through the multiplicity-aware lookup bus emitted
