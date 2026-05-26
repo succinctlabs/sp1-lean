@@ -104,6 +104,15 @@ so `Lemmas.lean` can reference it. Re-exported here for the
 `FormalAssertion` glue. -/
 abbrev FormalSpec := @SP1Clean.Add.FormalSpec p
 
+/-- Soundness collapses to a single application of the structural
+mirror lemma `formalSpec_of_subcircuit_specs` (`Lemmas.lean`) once
+`circuit_proof_start` peels back the Clean elaboration plumbing and the
+`h_input` / `h_assumptions` / `h_holds` destructure surfaces the four
+sub-circuit witnesses (`AddOp` Spec implication, `CPUState.Gated` Spec,
+`RTypeReader.Gated` Spec, scalar `op_a_0 = 0` gate). All the
+sub-circuit composition logic — including the `Word.isU64 op_b/op_c`
+extraction from `h_rtr` needed to discharge `AddOp.Assumptions` — lives
+inside the named lemma. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -112,59 +121,28 @@ theorem soundness :
   obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
   obtain ⟨h_addop_sub, h_cpu_sub, h_rtr_sub, h_op_a_0⟩ := h_holds
   unfold id at *
-  have h_cpu := h_cpu_sub trivial
-  have h_rtr := h_rtr_sub trivial
-  -- Discharge AddOp.assertion's new Assumptions from the chip-level
-  -- `is_real = 1` + the per-operand `Word.isU64` bounds available inside
-  -- `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec` sub-conjuncts.
-  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h_ir_ne_zero :
-      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-    rw [h_is_real]; exact one_ne_zero
-  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
-  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
-    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
-  have h_addop := h_addop_sub
-    ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩
-  refine ⟨h_cpu, h_rtr, h_op_a_0, ?_⟩
-  -- AddOp.Spec under `is_real = 1` gives `(isU64 result ∧ result = a + b)`
-  -- directly. The chip-level FormalSpec wants `RV64.add op_c op_b` which is
-  -- `op_b + op_c` definitionally — exactly what AddOp gives us since the
-  -- chip passes `Inputs.a := op_b, Inputs.b := op_c`.
-  intro h_is_real_eq
-  have ⟨h_isU64_v, h_bv⟩ := h_addop h_is_real_eq
-  refine ⟨h_isU64_v, ?_⟩
-  simp only [RV64.add]
-  exact h_bv
+  exact formalSpec_of_subcircuit_specs _ h_is_real
+    h_addop_sub (h_cpu_sub trivial) (h_rtr_sub trivial) h_op_a_0
 
+/-- Completeness peels `h_spec` (= `FormalSpec input`) via
+`subcircuit_specs_of_formalSpec` into the four sub-circuit `Spec`s, then
+re-wraps each as the `(Assumptions, Spec)` pair the corresponding
+`FormalAssertion.completeness` expects. The `Word.isU64 op_b/op_c`
+bounds needed for `AddOp.Assumptions` come from
+`isU64_operands_of_spec`. -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
   obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
-  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem⟩ := h_spec
   unfold id at *
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
-  have h_ir_ne_zero :
-      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-    rw [h_is_real]; exact one_ne_zero
-  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
-  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
-    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
-  -- Discharge AddOp.assertion's Assumptions + Spec directly from the
-  -- chip's `h_sem` semantic conjunct and the operand bounds.
-  refine ⟨⟨⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩, ?_⟩,
-          ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩, h_op_a_0⟩
-  intro h_is_real_eq
-  have ⟨h_isU64_v, h_bv⟩ := h_sem h_is_real_eq
-  refine ⟨h_isU64_v, ?_⟩
-  simp only [RV64.add] at h_bv
-  exact h_bv
+  obtain ⟨h_addop, h_cpu, h_rtr, h_op_a_0⟩ :=
+    subcircuit_specs_of_formalSpec _ h_is_real h_spec
+  obtain ⟨h_isU64_b, h_isU64_c⟩ :=
+    SP1Clean.RTypeReader.Gated.Assertion.isU64_operands_of_spec h_is_real h_rtr
+  exact ⟨⟨⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩, h_addop⟩,
+         ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩, h_op_a_0⟩
 
 end Assertion
 

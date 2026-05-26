@@ -629,6 +629,36 @@ theorem Assertion.Spec_iff_sp1
              (mul_eq_zero.mp h_z2).resolve_left h_op_a_0_ne,
              (mul_eq_zero.mp h_z3).resolve_left h_op_a_0_ne⟩
 
+/-- Extract `Word.isU64` of the two read operands (`op_b`, `op_c`) from a
+witness of `Gated.Assertion.Spec` under `is_real = 1`. The bounds live
+inside the 3rd/4th `RegisterAccess.Assertion.Spec` sub-conjuncts (op_b at
+offset 3, op_c at offset 2), each of which unfolds to an
+`OperandAccess.AssertionGated.Spec` disjunction `mult = 0 ∨ (… ∧ … ∧
+Word.isU64 prev_value)`; under `is_real ≠ 0` (forced by `is_real = 1`)
+the disjunction's left branch is closed and the `Word.isU64` projection
+falls out by `.2.2`.
+
+Shared by every ALU chip whose `FormalAssertion` composes
+`RTypeReader.Gated.assertion`: the same `Word.isU64 op_b/op_c` extraction
+is needed to discharge `AddOp.Assumptions` / `SubOp.Assumptions` /
+`MulOp.Assumptions` / etc. in chip-level soundness and completeness. -/
+lemma Assertion.isU64_operands_of_spec
+    {clk_high clk_low opcode : ZMod p}
+    {pc : Vector (ZMod p) 3}
+    {op_a_write_value : Vector (ZMod p) 4}
+    {cols : _root_.RTypeReader (ZMod p)}
+    {is_real is_trusted : ZMod p}
+    (h_is_real : is_real = 1)
+    (h_spec : Assertion.Spec
+        ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+         cols, is_real, is_trusted⟩) :
+    Word.isU64 cols.op_b_memory.prev_value ∧
+    Word.isU64 cols.op_c_memory.prev_value := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_ne : is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
+  exact ⟨(h_spec.2.2.2.1.resolve_left h_ne).2.2,
+         (h_spec.2.2.2.2.1.resolve_left h_ne).2.2⟩
+
 end Gated
 
 end SP1Clean.RTypeReader
