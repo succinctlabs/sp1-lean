@@ -205,10 +205,11 @@ theorem is_real_binary_mul [Fact (2 ^ 24 < p)]
       cols.is_mulhsu + cols.is_mulhu = 0 ∨
     cols.is_mul + cols.is_mulh + cols.is_mulw +
       cols.is_mulhsu + cols.is_mulhu = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.Mul.Assertion.FormalSpec cols at h
-  unfold SP1Clean.Mul.Assertion.FormalSpec at h
-  tauto
+  -- Post-spec-cleanup FormalSpec: is_real binarity lives in
+  -- `CPUState.Gated.Spec`'s first conjunct, which is the first chip-level
+  -- conjunct (mirror of Add / Addi).
+  exact binary_of_assertZero _ h.1.1
 
 theorem is_real_binary_shiftLeft
     (cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))

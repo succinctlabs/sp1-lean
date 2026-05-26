@@ -259,45 +259,79 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+/-- Assumptions: the binarity of the aggregate `is_real` selector sum is
+asserted by `main` via the in-circuit `(sum) * (sum - 1) === 0` gate, but
+completeness can't extract that from `Spec` alone, so chip callers must
+witness binarity externally. The conditional operand bounds carry the U64
+facts on the two operands when `is_real = 1`; chips supply these from
+their reader sub-circuit's `RegisterAccess.Spec`. Mirrors AddOp's
+`Assumptions` shape with the only difference being that `is_real` here
+is the selector sum, not a standalone field. -/
+def Assumptions (input : Inputs (ZMod p)) : Prop :=
+  let is_real : ZMod p :=
+    input.is_mul + input.is_mulh + input.is_mulhu + input.is_mulhsu + input.is_mulw
+  (is_real = 0 ∨ is_real = 1) ∧
+  (is_real = 1 → Word.isU64 input.b_word ∧ Word.isU64 input.c_word)
 
-/-- Semantic Spec. Mirrors the conclusions of the 5 SP1-side lemmas
-`MulOperation.spec.{mul,mulh,mulhu,mulhsu,mulw}` (`SP1Operations/
-Operation/MulOperation/Constraints.lean:1761,1910,2021,2124,2231`):
-under U64 bounds on `b_word`/`c_word`, the result word equals the
-BitVec-pure `execute_MUL_pure` / `execute_MULW_pure` of the operands
-whenever the matching selector is 1, and the result is itself U64. -/
+/-- The FormalAssertion's semantic contract — surface only the RV64
+fact, mirroring `SP1Clean.AddOp.Spec` one variant deeper: vacuous on
+padding rows (`is_real = 0`); on real rows (`is_real = 1`) asserts
+`isU64` on the result and the BitVec product identity for whichever of
+the five variants is active. The carry chain / product table / byte
+decomposition are implementation details of `main` (re-emitted at the
+chip level only for SP1-faithful 1:1 mirror) and never reach the
+contract.
+
+The five `RV64.{mul,mulh,mulhu,mulhsu,mulw}` are from `RISCV.Instructions`
+(operand order `rs2 rs1` matches the SP1 lower-Sail convention). When
+the bridge to SP1's `MulOperation.spec.{mul,…}` is closed (those return
+`execute_MUL_pure / execute_MULW_pure`), the equality
+`execute_MUL_pure b c .MUL = RV64.mul c b` (and analogues for the other
+variants) is provided by RISCV's `SailPureToInstructions`-style
+`SailRV64.mul ≡ RV64.mul` bridges plus BitVec arithmetic. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
-  Word.isU64 input.b_word → Word.isU64 input.c_word →
-    let bw : BitVec 64 := Word.toBitVec64 input.b_word
-    let cw : BitVec 64 := Word.toBitVec64 input.c_word
-    let aw : BitVec 64 := Word.toBitVec64 input.a_word
-    (input.is_mul    = 1 → Word.isU64 input.a_word ∧ aw = execute_MUL_pure  bw cw .MUL)    ∧
-    (input.is_mulh   = 1 → Word.isU64 input.a_word ∧ aw = execute_MUL_pure  bw cw .MULH)   ∧
-    (input.is_mulhu  = 1 → Word.isU64 input.a_word ∧ aw = execute_MUL_pure  bw cw .MULHU)  ∧
-    (input.is_mulhsu = 1 → Word.isU64 input.a_word ∧ aw = execute_MUL_pure  bw cw .MULHSU) ∧
-    (input.is_mulw   = 1 → Word.isU64 input.a_word ∧ aw = execute_MULW_pure bw cw)
+  let is_real : ZMod p :=
+    input.is_mul + input.is_mulh + input.is_mulhu + input.is_mulhsu + input.is_mulw
+  let bw : BitVec 64 := Word.toBitVec64 input.b_word
+  let cw : BitVec 64 := Word.toBitVec64 input.c_word
+  let aw : BitVec 64 := Word.toBitVec64 input.a_word
+  is_real = 1 →
+    Word.isU64 input.a_word ∧
+    (input.is_mul    = 1 → aw = RV64.mul    cw bw) ∧
+    (input.is_mulh   = 1 → aw = RV64.mulh   cw bw) ∧
+    (input.is_mulhu  = 1 → aw = RV64.mulhu  cw bw) ∧
+    (input.is_mulhsu = 1 → aw = RV64.mulhsu cw bw) ∧
+    (input.is_mulw   = 1 → aw = RV64.mulw   cw bw)
 
 /-- Bridge: SP1's `MulOperation.constraints.allHold` (with the
 operation's `is_real` slot pinned to 1) implies the semantic `Spec`.
-A 5-way refine over the 5 `MulOperation.spec.<variant>` lemmas. The
-reverse direction is false: the semantic Spec does not pin down the
-`carry`/`product`/byte witnesses. -/
+Forward direction only; the reverse needs hint construction of
+`carry`/`product`/byte witnesses from the BitVec equation.
+
+Closure path (currently `sorry`'d):
+1. From `h_assumptions`, under `is_real = 1`, get `isU64_bw` and
+   `isU64_cw`.
+2. From `h_allHold`, the 5 individual selector binarities and the sum
+   binarity are inside `MulOperation.constraints`'s emitted gates.
+   Combined with `is_real = 1` this gives: exactly one selector is 1.
+3. For the `isU64 a_word` conjunct: dispatch on the active selector;
+   each `MulOperation.spec.X` returns `(is_X = 1 → isU64 a ∧ aw = ...)`
+   so the active variant's `.1` gives `isU64 a`.
+4. For each per-selector implication: `MulOperation.spec.X _ _ _ h` gives
+   `aw = execute_MUL_pure bw cw .X` (or `execute_MULW_pure bw cw` for
+   mulw). Bridge to `RV64.mulX cw bw` via the
+   `execute_MUL_pure ≡ RV64.mulX` lemmas (BitVec arithmetic; available
+   via `simp [RV64.mul]` + `BitVec.mul_comm` for MUL, more involved for
+   the high-product variants). -/
 theorem of_sp1 (input : Inputs (ZMod p))
+    (h_assumptions : Assumptions input)
     (h_allHold :
       (MulOperation.constraints
         input.a_word input.b_word input.c_word (toCols input)
         1 input.is_mul input.is_mulh input.is_mulw input.is_mulhu
         input.is_mulhsu).allHold) :
     Spec input := by
-  intro isU64_bw isU64_cw
-  simp only [SP1ConstraintList.allHold] at h_allHold
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · exact MulOperation.spec.mul    isU64_bw isU64_cw h_allHold
-  · exact MulOperation.spec.mulh   isU64_bw isU64_cw h_allHold
-  · exact MulOperation.spec.mulhu  isU64_bw isU64_cw h_allHold
-  · exact MulOperation.spec.mulhsu isU64_bw isU64_cw h_allHold
-  · exact MulOperation.spec.mulw   isU64_bw isU64_cw h_allHold
+  sorry
 
 /-- Bridge from Clean's `main` post-conditions to SP1's `allHold` form.
 The intended signature takes one named hypothesis per constraint emitted
