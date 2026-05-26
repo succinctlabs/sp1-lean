@@ -130,8 +130,11 @@ theorem is_real_binary_jal (cols : SP1Clean.Jal.JalCols (ZMod p))
     (h : SP1Clean.Jal.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   change SP1Clean.Jal.Assertion.FormalSpec cols at h
-  unfold SP1Clean.Jal.Assertion.FormalSpec at h
-  tauto
+  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
+  -- first conjunct (the binary-gate sub-circuit emission). Path: h.1 =
+  -- CPUState.Gated.Spec; h.1.1 = `cols.is_real * (cols.is_real - 1) = 0`.
+  -- Mirror of `is_real_binary_add` / `is_real_binary_sub`.
+  exact binary_of_assertZero _ h.1.1
 
 theorem is_real_binary_jalr (cols : SP1Clean.Jalr.JalrCols (ZMod p))
     (h : SP1Clean.Jalr.assertion.Spec cols) :

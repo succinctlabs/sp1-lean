@@ -34,7 +34,8 @@ import SP1Clean.Reader.JTypeReader
 import SP1Clean.Chips.ALU.BitwiseChip.Aggregate
 import SP1Clean.Chips.Memory.LoadByteChip
 import SP1Clean.Chips.Memory.StoreByteChip
-import SP1Clean.Chips.Control.JalChip.Aggregate
+import SP1Clean.Chips.Control.JalChip.Circuit
+import SP1Clean.Chips.Control.JalChip.SailBridge
 import SP1Clean.Chips.ALU.MulChip.Aggregate
 import SP1Clean.Chips.ALU.ShiftLeftChip.Aggregate
 import SP1Clean.Multiplicity

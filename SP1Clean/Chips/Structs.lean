@@ -936,6 +936,30 @@ the index map in `SP1Chips/Jal/Constraints.lean` (31 columns). -/
    Main[30],
    ⟨Main[30]⟩⟩
 
+/-- Right inverse of `fromMain`: pack a `JalCols` into a 31-element flat
+row using the same index map as `fromMain`. Slot 30 carries both `is_real`
+and `adapter_cols.is_trusted` (matching `fromMain`'s aliasing), so the
+round-trip lemma requires `cols.adapter_cols.is_trusted = cols.is_real`. -/
+@[reducible] def toMain (cols : JalCols (ZMod p)) : Vector (ZMod p) 31 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b_imm[0], cols.adapter.op_b_imm[1],
+     cols.adapter.op_b_imm[2], cols.adapter.op_b_imm[3],
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.next_pc[0], cols.next_pc[1], cols.next_pc[2], cols.next_pc[3],
+     cols.op_a_write_value[0], cols.op_a_write_value[1],
+     cols.op_a_write_value[2], cols.op_a_write_value[3],
+     cols.is_real]
+
 end SP1Clean.Jal
 
 namespace SP1Clean.Jalr
