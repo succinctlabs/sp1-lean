@@ -42,6 +42,25 @@ lemma fromMain_toMain (cols : LtCols (ZMod p))
   refine ⟨?_, ⟨?_, ?_, ?_, ?_⟩, ?_, ?_⟩
   all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
+-- TODO[clean-master-plan-phase-3,p3-lt-gated-iff-sp1]: blocked on missing
+-- operation-level bridges between `GatedLtSignedOp.Assertion.FormalSpec` and
+-- `LtOperationSigned.constraints.allHold` (similarly for the embedded
+-- `GatedLtUnsignedOp`). Neither `GatedLtSignedOp.iff_sp1` nor
+-- `GatedLtUnsignedOp.iff_sp1` exists today (verified 2026-05-25); only
+-- `U16MSBOp.iff_sp1`, `U16CompareOp.iff_sp1`, and `LtOperationUnsigned`'s
+-- direct `allHold_constraints_iff` are available.
+--
+-- Closure path (proposed new worklist row `p3-lt-gated-iff-sp1`):
+--   1. Add `GatedLtUnsignedOp.iff_sp1 : Spec input ↔ allHold` under
+--      `h_gate : input.gate = 1`, using `LtOperationUnsigned.allHold_constraints_iff`
+--      + `U16CompareOp.iff_sp1` + per-conjunct `mul_eq_zero`/`sub_eq_zero`
+--      rewrites. Est. ~150-200 lines.
+--   2. Add `GatedLtSignedOp.iff_sp1 : Spec input ↔ allHold` under `h_gate := 1`,
+--      composing `GatedLtUnsignedOp.iff_sp1` + 2× `U16MSBOp.iff_sp1` via
+--      `LtOperationSigned.allHold_constraints_iff`. Est. ~100-150 lines.
+--   3. Use both here + `CPUState.Assertion.Spec_iff_sp1` +
+--      `ALUTypeReader.Assertion.Spec_iff_sp1` + `LtOperationSigned.spec.signed`/`.unsigned`
+--      to bridge LHS ↔ RHS. Est. ~50-80 lines.
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
 `Lt.constraints Main` is the chip's canonical `FormalSpec`, under
 `is_real = Main[32] + Main[33] = 1`. The RHS mirrors `LtChip.FormalSpec`

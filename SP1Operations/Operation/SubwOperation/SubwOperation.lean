@@ -144,4 +144,115 @@ theorem spec
     rw [Nat.mod_eq_of_lt h_sum_lt]
     split_ifs <;> simp_all <;> omega
 
+set_option maxHeartbeats 16000000 in
+-- Mirrors `SubOperation.spec_inv` for the 2-limb HWord case, plus
+-- composes `U16MSBOperation.spec_inv` on `value[1]` for the MSB clause.
+/-- Inverse direction of `SubwOperation.spec`. -/
+theorem spec_inv {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b : Word (ZMod p)} {cols : SubwOperation (ZMod p)}
+    (h_isU64_a : a.isU64) (h_isU64_b : b.isU64)
+    (h_isU32_v : HWord.isU32 cols.value)
+    (h_bv : HWord.toBitVec32 cols.value = execute_RTYPEW_pure_32_w a b .SUBW)
+    (h_msb_eq : cols.msb.msb =
+      if (HWord.toBitVec32 cols.value).msb then 1 else 0) :
+    SP1ConstraintList.allHold (SubwOperation.constraints a b cols 1) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  obtain ⟨ha0, ha1, _, _⟩ := Word.lt_cases_of_isU64 h_isU64_a
+  obtain ⟨hbb0, hbb1, _, _⟩ := Word.lt_cases_of_isU64 h_isU64_b
+  obtain ⟨hv0, hv1⟩ := HWord.lt_cases_of_isU32 h_isU32_v
+  -- Convert `h_msb_eq` from BitVec-msb form to val-form for U16MSB spec_inv.
+  have h_msb_val :
+      cols.msb.msb = if cols.value[1].val ≥ 32768 then 1 else 0 := by
+    rw [h_msb_eq]
+    simp only [HWord.toBitVec32, HWord.toNat, BitVec.msb_eq_toNat,
+      BitVec.toNat_ofNat]
+    rw [Nat.mod_eq_of_lt (by omega :
+      cols.value[0].val + cols.value[1].val * 2 ^ 16 < 2 ^ 32)]
+    split_ifs <;> simp_all <;> omega
+  -- Reduce h_bv to Nat-level limb equation.
+  rw [show execute_RTYPEW_pure_32_w a b .SUBW =
+        a.low.toBitVec32 - b.low.toBitVec32 from rfl,
+      BitVec.eq_sub_iff_add_eq, ← BitVec.toNat_inj, BitVec.toNat_add,
+      HWord.toBitVec32_toNat h_isU32_v,
+      HWord.toBitVec32_toNat (Word.isU64_low_isU32 h_isU64_b),
+      HWord.toBitVec32_toNat (Word.isU64_low_isU32 h_isU64_a)] at h_bv
+  simp only [HWord.toNat, Word.low, Vector.getElem_mk,
+    List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ] at h_bv
+  rw [SubwOperation.allHold_constraints_iff]
+  refine ⟨U16MSBOperation.spec_inv hv1 h_msb_val, ?_, ?_, hv0, hv1⟩
+  · -- carry0 ∈ {0, 1}
+    set q0 : ℕ := (cols.value[0].val + b[0].val) / 65536 with hq0_def
+    set q1 : ℕ := (cols.value[1].val + b[1].val + q0) / 65536 with hq1_def
+    have h_chain :
+        q0 ≤ 1 ∧ q1 ≤ 1 ∧
+        cols.value[0].val + b[0].val = a[0].val + q0 * 65536 ∧
+        cols.value[1].val + b[1].val + q0 = a[1].val + q1 * 65536 := by
+      refine ⟨?_, ?_, ?_, ?_⟩ <;>
+        simp only [hq0_def, hq1_def] <;> omega
+    obtain ⟨hq0_le, _, e0n, _⟩ := h_chain
+    have hc0_lift : (cols.value[0] : ZMod p) + b[0] =
+        a[0] + (q0 : ZMod p) * 65536 := by
+      have hcast := congrArg (Nat.cast : ℕ → ZMod p) e0n
+      push_cast at hcast
+      rwa [ZMod.natCast_zmod_val, ZMod.natCast_zmod_val, ZMod.natCast_zmod_val] at hcast
+    have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
+      mul_inv_cancel₀ val_65536_ne_zero
+    have hc0_eq : (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹ =
+        (q0 : ZMod p) := by
+      have h : b[0] + cols.value[0] - a[0] = (q0 : ZMod p) * 65536 := by
+        linear_combination hc0_lift
+      rw [h, mul_assoc, h65inv, mul_one]
+    rw [hc0_eq]; interval_cases q0 <;> simp
+  · -- carry1 ∈ {0, 1}
+    set q0 : ℕ := (cols.value[0].val + b[0].val) / 65536 with hq0_def
+    set q1 : ℕ := (cols.value[1].val + b[1].val + q0) / 65536 with hq1_def
+    have h_chain :
+        q0 ≤ 1 ∧ q1 ≤ 1 ∧
+        cols.value[0].val + b[0].val = a[0].val + q0 * 65536 ∧
+        cols.value[1].val + b[1].val + q0 = a[1].val + q1 * 65536 := by
+      refine ⟨?_, ?_, ?_, ?_⟩ <;>
+        simp only [hq0_def, hq1_def] <;> omega
+    obtain ⟨_, hq1_le, e0n, e1n⟩ := h_chain
+    have hc0_lift : (cols.value[0] : ZMod p) + b[0] =
+        a[0] + (q0 : ZMod p) * 65536 := by
+      have hcast := congrArg (Nat.cast : ℕ → ZMod p) e0n
+      push_cast at hcast
+      rwa [ZMod.natCast_zmod_val, ZMod.natCast_zmod_val, ZMod.natCast_zmod_val] at hcast
+    have hc1_lift : (cols.value[1] : ZMod p) + b[1] + (q0 : ZMod p) =
+        a[1] + (q1 : ZMod p) * 65536 := by
+      have hcast := congrArg (Nat.cast : ℕ → ZMod p) e1n
+      push_cast at hcast
+      rwa [ZMod.natCast_zmod_val, ZMod.natCast_zmod_val, ZMod.natCast_zmod_val] at hcast
+    have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
+      mul_inv_cancel₀ val_65536_ne_zero
+    have hc0_eq : (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹ =
+        (q0 : ZMod p) := by
+      have h : b[0] + cols.value[0] - a[0] = (q0 : ZMod p) * 65536 := by
+        linear_combination hc0_lift
+      rw [h, mul_assoc, h65inv, mul_one]
+    have hc1_eq : (b[1] + cols.value[1] - a[1] +
+        (b[0] + cols.value[0] - a[0]) * (65536 : ZMod p)⁻¹) *
+        (65536 : ZMod p)⁻¹ = (q1 : ZMod p) := by
+      rw [hc0_eq]
+      have h : b[1] + cols.value[1] - a[1] + (q0 : ZMod p) =
+          (q1 : ZMod p) * 65536 := by
+        linear_combination hc1_lift
+      rw [h, mul_assoc, h65inv, mul_one]
+    rw [hc1_eq]; interval_cases q1 <;> simp
+
+/-- Bidirectional bridge between `SubwOperation.allHold` (with multiplicity
+fixed to `1`) and the BitVec + MSB semantic. -/
+theorem iff_sp1_full {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {a b : Word (ZMod p)} {cols : SubwOperation (ZMod p)}
+    (h_isU64_a : a.isU64) (h_isU64_b : b.isU64) :
+    (SubwOperation.constraints a b cols 1).allHold ↔
+      (HWord.isU32 cols.value ∧
+       HWord.toBitVec32 cols.value = execute_RTYPEW_pure_32_w a b .SUBW ∧
+       cols.msb.msb =
+         if (HWord.toBitVec32 cols.value).msb then 1 else 0) :=
+  ⟨SubwOperation.spec h_isU64_a h_isU64_b,
+   fun ⟨h_isU32_v, h_bv, h_msb⟩ =>
+     SubwOperation.spec_inv h_isU64_a h_isU64_b h_isU32_v h_bv h_msb⟩
+
 end SubwOperation

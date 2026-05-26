@@ -68,6 +68,39 @@ lemma spec.U64
   simp [Word.isNegative]
   exact this
 
+/-- Inverse direction of `U16MSBOperation.spec`: given that `a` fits in
+16 bits and `cols.msb` equals the high-bit indicator, the U16MSB
+constraints (binarity + byte-range send on `2*a - msb*65536`) hold. -/
+lemma spec_inv
+  {p : ℕ} [Fact (Nat.Prime p)] [hp17 : Fact (2 ^ 17 < p)]
+  {a : ZMod p}
+  {cols : U16MSBOperation (ZMod p)}
+  (h_a_isU16 : a.val < 65536)
+  (h_msb : cols.msb = if a.val ≥ 32768 then 1 else 0) :
+  List.Forall SP1Constraint.toProp (constraints a cols 1) := by
+  have hp_lt : 2 ^ 17 < p := hp17.out
+  haveI hp_neZero : NeZero p := ⟨by omega⟩
+  have h2_val : (2 : ZMod p).val = 2 := val_2_zmod_p
+  have h65536_val : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  have h_2a_val : (2 * a).val = 2 * a.val := by
+    rw [ZMod.val_mul_of_lt (by rw [h2_val]; omega), h2_val]
+  rw [allHold_constraints_iff]
+  refine ⟨Or.inr rfl, ?_, ?_⟩
+  · -- cols.msb ∈ {0, 1}
+    split_ifs at h_msb with h32k
+    · exact Or.inr h_msb
+    · exact Or.inl h_msb
+  · -- range bound on (2 * a - msb * 65536).val
+    intro _
+    split_ifs at h_msb with h32k
+    · -- msb = 1; need (2*a - 65536).val < 65536
+      rw [h_msb, one_mul, val_sub_cases, h_2a_val, h65536_val,
+        if_pos (by omega)]
+      omega
+    · -- msb = 0; need (2*a).val < 65536
+      rw [h_msb, zero_mul, sub_zero, h_2a_val]
+      omega
+
 section gen
 
 lemma spec.gen
