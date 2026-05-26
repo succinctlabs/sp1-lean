@@ -11,6 +11,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.RTypeReader
 import SP1Clean.Operations.SubwOperation
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 import RISCV.Instructions
 
 /-! # `SubwChip` cols-level surface (directory-form scaffold)
@@ -39,64 +40,6 @@ namespace SP1Clean.Subw
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `SubwCols<T, M: TrustMode>`. -/
-@[ext]
-structure SubwCols (T : Type) where
-  state : CPUState T
-  adapter : RTypeReader T
-  subw_value : Vector T 2
-  subw_msb : T
-  is_real : T
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
-
-/-- Project a raw SP1 row into the structured `SubwCols` view. Mirrors
-`SP1Chips/Subw/Constraints.lean`'s index map: state[0..5], RTypeReader's
-operand-register triple [6..27], subw_value[28..29], subw_msb[30],
-is_real[31]. `adapter_cols.is_trusted` aliases `Main[31]`. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 32) : SubwCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-   ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    Main[21],
-    ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
-   #v[Main[28], Main[29]],
-   Main[30], Main[31],
-   ⟨Main[31]⟩⟩
-
-/-- Right inverse of `fromMain`: pack a `SubwCols` into a 32-element flat row. -/
-@[reducible] def toMain (cols : SubwCols (ZMod p)) : Vector (ZMod p) 32 :=
-  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
-     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
-     cols.adapter.op_a,
-     cols.adapter.op_a_memory.prev_value[0],
-     cols.adapter.op_a_memory.prev_value[1],
-     cols.adapter.op_a_memory.prev_value[2],
-     cols.adapter.op_a_memory.prev_value[3],
-     cols.adapter.op_a_memory.access_timestamp.prev_low,
-     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_0,
-     cols.adapter.op_b,
-     cols.adapter.op_b_memory.prev_value[0],
-     cols.adapter.op_b_memory.prev_value[1],
-     cols.adapter.op_b_memory.prev_value[2],
-     cols.adapter.op_b_memory.prev_value[3],
-     cols.adapter.op_b_memory.access_timestamp.prev_low,
-     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c,
-     cols.adapter.op_c_memory.prev_value[0],
-     cols.adapter.op_c_memory.prev_value[1],
-     cols.adapter.op_c_memory.prev_value[2],
-     cols.adapter.op_c_memory.prev_value[3],
-     cols.adapter.op_c_memory.access_timestamp.prev_low,
-     cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
-     cols.subw_value[0], cols.subw_value[1],
-     cols.subw_msb,
-     cols.is_real]
 
 /-! ## Cols-level Sail-side helpers -/
 

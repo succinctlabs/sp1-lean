@@ -22,6 +22,7 @@ import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `LtChip` mirror — bundled signed/unsigned compare
 
@@ -48,16 +49,6 @@ namespace SP1Clean.Lt
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `LtCols<T>`. -/
-structure LtCols (T : Type) where
-  state : CPUState T
-  adapter : ALUTypeReader T
-  is_slt : T
-  is_sltu : T
-  lt_operation : LtOperationSigned T
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 /-- Clean-side circuit. Emits CPUState range lookups, the program-bus
 interaction (opcode = `is_slt * 9 + is_sltu * 10`), and the trailing
@@ -121,31 +112,6 @@ def TraceSpec (cols : LtCols (ZMod p)) : Prop :=
   (cols.is_slt + cols.is_sltu) * (cols.is_slt + cols.is_sltu - 1) = 0 ∧
   cols.adapter.op_a_0 = 0 ∧
   cols.adapter_cols.is_trusted = 1
-
-/-- Project a raw SP1 row into the structured `LtCols` view. Mirrors
-the index map in `SP1Chips/Lt/Constraints.lean` (44 columns; the
-`lt_operation` sub-struct is packed from `Main[34..43]`). -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 44) : LtCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]],
-    ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
-    Main[31]⟩, Main[32], Main[33],
-   { result :=
-       { u16_compare_operation := { bit := Main[34] },
-         u16_flags := #v[Main[35], Main[36], Main[37], Main[38]],
-         not_eq_inv := Main[39],
-         comparison_limbs := #v[Main[40], Main[41]] },
-     b_msb := { msb := Main[42] },
-     c_msb := { msb := Main[43] } },
-   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
-   -- (`Main[32]+Main[33]`), matching upstream's ALUTypeReader receiving
-   -- the same sum for both `is_real` and `is_trusted`.
-   ⟨Main[32] + Main[33]⟩⟩
 
 set_option maxHeartbeats 800000 in
 -- Two-arm case-split (slt vs sltu) under is_real_sum = 1 + boolean gates,

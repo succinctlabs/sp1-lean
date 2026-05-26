@@ -23,6 +23,7 @@ import SP1Chips.Mul.MulChip
 import SP1Chips.Mul.Common
 import SP1Chips.Soundness
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `MulChip` mirror — heavy-arithmetic scaling test
 
@@ -69,39 +70,6 @@ namespace SP1Clean.Mul
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `MulCols<T>` over
-82 field elements. Field order matches the `Main[k]` indexing in
-`SP1Chips/Mul/Constraints.lean`. The struct groups the 16-limb carry
-and product vectors into `Vector T 16` fields; the `U16toU8OperationSafe`
-sub-fragments are inlined as `Vector T 4` (the SP1 struct's
-`low_bytes` field). -/
-structure MulCols (T : Type) where
-  state : CPUState T
-  adapter : RTypeReader T
-  op_a_write_value : Vector T 4             -- Main[28..31] (== mul_operation.product[0..3])
-  -- Phase 3c: MulOperation (45 cells) nested as a single field, replacing
-  -- the previous 5 flat fields (carry:16, product:16, b_low_bytes:4,
-  -- c_low_bytes:4, mul_aux_bits:5). The 5-field `mul_aux_bits` collapse
-  -- (which existed to keep the struct under the 33-field ProvableStruct
-  -- elaboration ceiling) is no longer needed; MulOperation's 9 nested
-  -- fields naturally expose b_msb/c_msb/product_msb/b_sign_extend/c_sign_extend
-  -- without flattening.
-  mul_operation : MulOperation T            -- Main[32..76]
-  -- Slot order matches upstream's `MulCols<T, M>` field declaration order in
-  -- alu/mul/mod.rs (is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw). The
-  -- previous Lean order put is_mulw at Main[79] and is_mulhu at Main[81] —
-  -- bug: the constraint compiler emits the Rust struct order, so the Lean
-  -- destructure was reading upstream's is_mulhu as is_mulw (and vice versa).
-  -- Opcode mux `is_mulw * 13 + is_mulhu * 24` then dispatched the wrong
-  -- variants. Fixed 2026-05-23.
-  is_mul : T                                -- Main[77]
-  is_mulh : T                               -- Main[78]
-  is_mulhu : T                              -- Main[79]
-  is_mulhsu : T                             -- Main[80]
-  is_mulw : T                               -- Main[81]
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 /-- The aggregate is-real flag for Mul: any of the five opcode
 selectors active. -/
@@ -261,35 +229,6 @@ def TraceSpec (cols : MulCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0 ∧
   mulSpec cols ∧
   cols.adapter_cols.is_trusted = 1
-
-/-- Project a raw SP1 row into the structured `MulCols` view.
-82 columns; `carry : Vector T 16`, `product : Vector T 16`,
-`b_low_bytes/c_low_bytes : Vector T 4`, `mul_aux_bits : Vector T 5`
-packed from contiguous Main slots. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 82) : MulCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    Main[21],
-    ⟨#v[Main[22], Main[23], Main[24], Main[25]], ⟨Main[26], Main[27]⟩⟩⟩,
-   #v[Main[28], Main[29], Main[30], Main[31]],
-   ⟨#v[Main[32], Main[33], Main[34], Main[35], Main[36], Main[37], Main[38],
-       Main[39], Main[40], Main[41], Main[42], Main[43], Main[44], Main[45],
-       Main[46], Main[47]],
-    #v[Main[48], Main[49], Main[50], Main[51], Main[52], Main[53], Main[54],
-       Main[55], Main[56], Main[57], Main[58], Main[59], Main[60], Main[61],
-       Main[62], Main[63]],
-    ⟨#v[Main[64], Main[65], Main[66], Main[67]]⟩,
-    ⟨#v[Main[68], Main[69], Main[70], Main[71]]⟩,
-    Main[72], Main[73], ⟨Main[74]⟩, Main[75], Main[76]⟩,
-   Main[77], Main[78], Main[79], Main[80], Main[81],
-   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
-   -- (`Main[77]+...+Main[81]`), matching the upstream RTypeReader receiving
-   -- `E3 E3` (is_real, is_trusted) where `E3` is that sum.
-   ⟨Main[77] + Main[78] + Main[79] + Main[80] + Main[81]⟩⟩
 
 set_option maxHeartbeats 1600000 in
 -- Heartbeats elevated for the 10-conjunct refine + cpuStateSpec_iff_sp1 +

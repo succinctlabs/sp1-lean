@@ -25,6 +25,7 @@ import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.ITypeReaderImmutable
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `StoreWordChip` mirror — 32-bit store
 
@@ -44,24 +45,6 @@ namespace SP1Clean.StoreWord
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `StoreWordCols<T>`. -/
-structure StoreWordCols (T : Type) where
-  state : CPUState T
-  adapter : ITypeReader T
-  addr_value : Vector T 3                   -- Main[25..27]
-  addr_top_two_limb_inv : T                 -- Main[28]
-  store_prev_value : Vector T 4             -- Main[29..32]
-  store_memory_prev_high : T                -- Main[33]
-  store_memory_prev_low : T                 -- Main[34]
-  store_memory_flag : T                     -- Main[35]
-  store_memory_diff_low : T                 -- Main[36]
-  store_memory_diff_high : T                -- Main[37]
-  offset_bit : T                      -- Main[38]
-  store_value : Vector T 4            -- Main[39..42]
-  is_real : T                               -- Main[43]
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 /-- Clean-side circuit. CPUState range lookups + store-memory timestamp
 range lookups + program-bus + is_real boolean. -/
@@ -131,23 +114,6 @@ def storeMemoryAccess (cols : StoreWordCols (ZMod p)) : SP1Clean.MemoryAccess (Z
 /-- The 4-limb `write_value` for the store-side access. -/
 def storeWriteValue (cols : StoreWordCols (ZMod p)) : Word (ZMod p) :=
   cols.store_value
-
-/-- Project a raw SP1 row into the structured `StoreWordCols` view. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 44) : StoreWordCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]]⟩,
-   #v[Main[25], Main[26], Main[27]],
-   Main[28],
-   #v[Main[29], Main[30], Main[31], Main[32]],
-   Main[33], Main[34], Main[35], Main[36], Main[37],
-   Main[38],
-   #v[Main[39], Main[40], Main[41], Main[42]],
-   Main[43], ⟨Main[43]⟩⟩
 
 /-- Iff RHS for the Store Word (SW) variant, mirroring
 `_root_.Store.StoreWord.allHold_constraints_iff_of_is_real`. SW writes

@@ -11,6 +11,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Operations.AddOperation
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 import RISCV.Instructions
 
 /-! # `AddiChip` cols-level surface
@@ -41,67 +42,6 @@ namespace SP1Clean.Addi
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `AddiCols<T, M: TrustMode>`.
-The `adapter_cols : UserModeReaderCols T` slot is the last field, matching
-Rust under `M = UserMode`. We don't carry an explicit `M` type parameter on
-the struct because `deriving ProvableStruct` can't reduce through an abstract
-`M`; future SupervisorMode chips would use a separate `*ColsSupervisor`
-struct with `adapter_cols : EmptyCols T`. -/
-@[ext]
-structure AddiCols (T : Type) where
-  state : CPUState T
-  adapter : ITypeReader T
-  op_a_write_value : Vector T 4
-  is_real : T
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
-
-/-- Project a raw SP1 row into the structured `AddiCols` view. Mirrors the
-index map in `SP1Chips/Addi/Constraints.lean`. `adapter_cols.is_trusted`
-aliases `Main[29]` (= `is_real`) because the current extractor passes
-`Main[29] Main[29]` to `ITypeReader.constraints`. When upstream regen lands
-a separate `is_trusted` Main column, switch to that index. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 30) : AddiCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-   ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]]⟩,
-   #v[Main[25], Main[26], Main[27], Main[28]],
-   Main[29],
-   ⟨Main[29]⟩⟩
-
-/-- Right inverse of `fromMain`: pack an `AddiCols` into a 30-element flat
-row using the same index map as `fromMain`. Index 29 (= `is_real`) is also
-the `adapter_cols.is_trusted` slot, matching `fromMain`'s aliasing (so the
-round-trip lemma requires `cols.adapter_cols.is_trusted = cols.is_real`,
-which is the chip's `Assumptions`). -/
-@[reducible] def toMain (cols : AddiCols (ZMod p)) : Vector (ZMod p) 30 :=
-  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
-     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
-     cols.adapter.op_a,
-     cols.adapter.op_a_memory.prev_value[0],
-     cols.adapter.op_a_memory.prev_value[1],
-     cols.adapter.op_a_memory.prev_value[2],
-     cols.adapter.op_a_memory.prev_value[3],
-     cols.adapter.op_a_memory.access_timestamp.prev_low,
-     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_a_0,
-     cols.adapter.op_b,
-     cols.adapter.op_b_memory.prev_value[0],
-     cols.adapter.op_b_memory.prev_value[1],
-     cols.adapter.op_b_memory.prev_value[2],
-     cols.adapter.op_b_memory.prev_value[3],
-     cols.adapter.op_b_memory.access_timestamp.prev_low,
-     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
-     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
-     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
-     cols.op_a_write_value[0], cols.op_a_write_value[1],
-     cols.op_a_write_value[2], cols.op_a_write_value[3],
-     cols.is_real]
 
 /-! ## Cols-level Sail-side helpers
 

@@ -20,6 +20,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `BitwiseChip` mirror — bundled 6-variant ALU chip
 
@@ -50,17 +51,6 @@ namespace SP1Clean.Bitwise
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `BitwiseCols<T>`. -/
-structure BitwiseCols (T : Type) where
-  state : CPUState T
-  adapter : ALUTypeReader T
-  bitwise_operation : BitwiseU16Operation T
-  is_xor : T
-  is_or : T
-  is_and : T
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors SP1 Rust's `BitwiseChip::eval(builder, cols)`
 at the level the FormalAssertion below proves: emits the `CPUState.assertion`
@@ -163,26 +153,6 @@ def TraceSpec (cols : BitwiseCols (ZMod p)) : Prop :=
     cols.is_xor + cols.is_or + cols.is_and - 1 = 0) ∧
   cols.adapter.op_a_0 = 0 ∧
   cols.adapter_cols.is_trusted = 1
-
-/-- Project a raw SP1 row into the structured `BitwiseCols` view. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 51) : BitwiseCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]],
-    ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
-    Main[31]⟩,
-   ⟨⟨#v[Main[32], Main[33], Main[34], Main[35]]⟩,
-    ⟨#v[Main[36], Main[37], Main[38], Main[39]]⟩,
-    ⟨#v[Main[40], Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47]]⟩⟩,
-   Main[48], Main[49], Main[50],
-   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
-   -- (`Main[48]+Main[49]+Main[50]`), matching upstream's ALUTypeReader
-   -- receiving the same sum for both `is_real` and `is_trusted`.
-   ⟨Main[48] + Main[49] + Main[50]⟩⟩
 
 set_option maxHeartbeats 800000 in
 -- Chip-level bridge: SP1's `allHold` over the flat row equals

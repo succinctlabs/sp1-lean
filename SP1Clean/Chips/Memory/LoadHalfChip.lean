@@ -25,6 +25,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReader
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `LoadHalfChip` mirror — 16-bit signed/unsigned load
 
@@ -44,26 +45,6 @@ namespace SP1Clean.LoadHalf
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-structure LoadHalfCols (T : Type) where
-  state : CPUState T
-  adapter : ITypeReader T
-  addr_value : Vector T 3                   -- Main[25..27]
-  addr_top_two_limb_inv : T                 -- Main[28]
-  load_prev_value : Vector T 4              -- Main[29..32]
-  load_memory_prev_high : T                 -- Main[33]
-  load_memory_prev_low : T                  -- Main[34]
-  load_memory_flag : T                      -- Main[35]
-  load_memory_diff_low : T                  -- Main[36]
-  load_memory_diff_high : T                 -- Main[37]
-  offset_bit_1 : T                      -- Main[38] (sub-word selector, weight 2)
-  offset_bit_0 : T                      -- Main[39] (sub-double selector, weight 4)
-  op_a_write_value_lo : T                   -- Main[40] (selected 16-bit half)
-  signed_extension_msb : T                  -- Main[41] (MSB for sign-extension)
-  is_lh : T                                 -- Main[42]
-  is_lhu : T                                -- Main[43]
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 def main (cols : Var LoadHalfCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨_clk_high, clk_16_24, clk_0_16, pc⟩,
@@ -126,22 +107,6 @@ def loadMemoryAccess (cols : LoadHalfCols (ZMod p)) : SP1Clean.MemoryAccess (ZMo
     prev_value := cols.load_prev_value,
     prev_low := cols.load_memory_prev_low,
     diff_low_limb := cols.load_memory_diff_low }
-
-/-- Project a raw SP1 row into the structured `LoadHalfCols` view. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 44) : LoadHalfCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]]⟩,
-   #v[Main[25], Main[26], Main[27]],
-   Main[28],
-   #v[Main[29], Main[30], Main[31], Main[32]],
-   Main[33], Main[34], Main[35], Main[36], Main[37],
-   Main[38], Main[39], Main[40], Main[41], Main[42], Main[43],
-   ⟨Main[42] + Main[43]⟩⟩
 
 /-- Iff RHS for the signed Load Half (LH) variant, mirroring
 `_root_.Load.LoadHalf.allHold_constraints_iff_of_is_lh`. -/

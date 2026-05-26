@@ -27,6 +27,7 @@ import SP1Clean.Operations.LoadWordSelector
 import SP1Clean.Reader.OperandAccess
 import SP1Chips.Load.LoadX0.LoadX0Chip
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `LoadX0Chip` mirror — load-when-op_a-is-x0 fast path
 
@@ -49,28 +50,6 @@ namespace SP1Clean.LoadX0
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-structure LoadX0Cols (T : Type) where
-  state : CPUState T
-  adapter : ITypeReader T
-  addr_value : Vector T 3                   -- Main[25..27]
-  addr_top_two_limb_inv : T                 -- Main[28]
-  load_prev_value : Vector T 4              -- Main[29..32]
-  load_memory_prev_high : T                 -- Main[33]
-  load_memory_prev_low : T                  -- Main[34]
-  load_memory_flag : T                      -- Main[35]
-  load_memory_diff_low : T                  -- Main[36]
-  load_memory_diff_high : T                 -- Main[37]
-  offset_bit : Vector T 3        -- Main[38..40] (byte-position selectors)
-  is_lb : T                                 -- Main[41]
-  is_lbu : T                                -- Main[42]
-  is_lh : T                                 -- Main[43]
-  is_lhu : T                                -- Main[44]
-  is_lw : T                                 -- Main[45]
-  is_lwu : T                                -- Main[46]
-  is_ld : T                                 -- Main[47]
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 def isRealExpr (cols : Var LoadX0Cols (ZMod p)) : Expression (ZMod p) :=
   cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
@@ -161,25 +140,6 @@ def loadMemoryAccess (cols : LoadX0Cols (ZMod p)) : SP1Clean.MemoryAccess (ZMod 
     prev_value := cols.load_prev_value,
     prev_low := cols.load_memory_prev_low,
     diff_low_limb := cols.load_memory_diff_low }
-
-/-- Project a raw SP1 row into the structured `LoadX0Cols` view.
-Mirrors the index map in `SP1Chips/Load/LoadX0/Constraints.lean`
-(48 columns). -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 48) : LoadX0Cols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]]⟩,
-   #v[Main[25], Main[26], Main[27]],
-   Main[28],
-   #v[Main[29], Main[30], Main[31], Main[32]],
-   Main[33], Main[34], Main[35], Main[36], Main[37],
-   #v[Main[38], Main[39], Main[40]],
-   Main[41], Main[42], Main[43], Main[44], Main[45], Main[46], Main[47],
-   ⟨Main[41] + Main[42] + Main[43] + Main[44] + Main[45] + Main[46] + Main[47]⟩⟩
 
 /-- The chip-level half-iff bridge (LoadX0): under the active-variant
 hypothesis (one of `is_lb..is_ld = 1`, the rest zero), `Spec` implies

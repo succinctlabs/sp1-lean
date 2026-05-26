@@ -20,6 +20,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 import SP1Chips.Jal.JalChip
 
 /-! # Chip-level `JalChip` mirror — first chip with PC control flow
@@ -68,18 +69,6 @@ namespace SP1Clean.Jal
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `JalCols<T>` over
-31 field elements. Field order matches the `Main[k]` indexing in
-`SP1Chips/Jal/Constraints.lean`. -/
-structure JalCols (T : Type) where
-  state : CPUState T
-  adapter : JTypeReader T
-  next_pc : Vector T 4                      -- Main[22..25] (jump target, Main[25] is high limb)
-  op_a_write_value : Vector T 4             -- Main[26..29] (return address = pc + 4)
-  is_real : T                               -- Main[30]
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 /-- Clean-side circuit. Mirrors the SP1 source's emissions for JAL:
 two `AddOperation` subcircuits (PC + op_b_imm = next_pc; PC + 4 = return
@@ -180,20 +169,6 @@ def opAMemoryAccess (cols : JalCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :
     prev_value := cols.adapter.op_a_memory.prev_value,
     prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
     diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-
-/-- Project a raw SP1 row into the structured `JalCols` view. Mirrors
-the index map in `SP1Chips/Jal/Constraints.lean` (31 columns). -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 31) : JalCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    #v[Main[14], Main[15], Main[16], Main[17]],
-    #v[Main[18], Main[19], Main[20], Main[21]]⟩,
-   #v[Main[22], Main[23], Main[24], Main[25]],
-   #v[Main[26], Main[27], Main[28], Main[29]],
-   Main[30],
-   ⟨Main[30]⟩⟩
 
 /-- The chip-level half-iff bridge: under `is_real = 1 ∧ op_a_0 = 0`,
 the Clean-flavored `Spec` implies SP1's `allHold` over the flat row.

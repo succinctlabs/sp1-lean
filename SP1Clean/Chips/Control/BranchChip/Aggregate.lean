@@ -23,6 +23,7 @@ import SP1Clean.Reader.ITypeReader
 import SP1Clean.Compare.LtOperationSigned
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `BranchChip` mirror — bundled 6-variant conditional branch
 
@@ -49,27 +50,6 @@ namespace SP1Clean.Branch
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `BranchCols<T>`. -/
-structure BranchCols (T : Type) where
-  state : CPUState T
-  adapter : ITypeReader T
-  next_pc : Vector T 3                      -- Main[25..27]
-  is_beq : T                                -- Main[28]
-  is_bne : T                                -- Main[29]
-  is_blt : T                                -- Main[30]
-  is_bge : T                                -- Main[31]
-  is_bltu : T                               -- Main[32]
-  is_bgeu : T                               -- Main[33]
-  -- Main[34] mirrors upstream's `is_branching: T` — forced equal under `is_real`
-  -- to `is_beq*(b==c) + is_bne*(b!=c) + (is_bge+is_bgeu)*(b>=c) + (is_blt+is_bltu)*(b<c)`
-  -- by the bridge's E94/E96 assertZeros. The previous Lean name `lt_is_signed`
-  -- was a misnomer: this column is NOT the `is_signed` arg to LtOperationSigned
-  -- (which is `is_blt + is_bge`); it is the branch-taken predicate output.
-  is_branching : T                          -- Main[34] (Rust-aligned name)
-  compare_operation : LtOperationSigned T   -- Main[35..44]
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 /-- Aggregate is-real flag: sum of 6 selectors. -/
 def isRealExpr (cols : Var BranchCols (ZMod p)) : Expression (ZMod p) :=
@@ -247,30 +227,6 @@ def opBMemoryAccess (cols : BranchCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p
     prev_value := cols.adapter.op_b_memory.prev_value,
     prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
     diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-
-/-- Project a raw SP1 row into the structured `BranchCols` view.
-45 columns; `compare_operation : LtOperationSigned T` packed from
-Main[35..44]. Note: `is_branching` at Main[34] *is* on the row
-(Rust-aligned name; previously misnamed `lt_is_signed`). -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 45) : BranchCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]]⟩,
-   #v[Main[25], Main[26], Main[27]],
-   Main[28], Main[29], Main[30], Main[31], Main[32], Main[33],
-   Main[34],
-   { result :=
-       { u16_compare_operation := { bit := Main[35] },
-         u16_flags := #v[Main[36], Main[37], Main[38], Main[39]],
-         not_eq_inv := Main[40],
-         comparison_limbs := #v[Main[41], Main[42]] },
-     b_msb := { msb := Main[43] },
-     c_msb := { msb := Main[44] } },
-   ⟨Main[28] + Main[29] + Main[30] + Main[31] + Main[32] + Main[33]⟩⟩
 
 set_option maxHeartbeats 2400000 in
 -- Heartbeats elevated for the ~24-conjunct iff RHS refine on 45 cols.

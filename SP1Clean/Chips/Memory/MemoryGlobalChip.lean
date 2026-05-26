@@ -5,6 +5,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Field
 import SP1Foundations.Word
 import SP1Clean.MemoryAccess
+import SP1Clean.Chips.Structs
 
 /-! # Boundary memory chips: `MemoryGlobalInit` and `MemoryGlobalFinalize`
 
@@ -46,56 +47,6 @@ namespace SP1Clean.MemoryGlobal
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- Column struct for the boundary memory chips, mirroring SP1's
-`MemoryInitCols<T>` at
-`crates/core/machine/src/memory/global.rs:256-298`. Used by both
-`MemoryGlobalInit` and `MemoryGlobalFinalize` — the two chips share
-column layouts and differ only in the interaction-kind they emit on
-(Init: `MemoryGlobalInitControl` / kind 14; Finalize:
-`MemoryGlobalFinalizeControl` / kind 15) and in the direction of the
-address-monotonicity check.
-
-The `lt_cols`, `is_prev_addr_zero`, `is_index_zero` sub-operation
-fields are kept as opaque field-element placeholders here — Phase 4's
-scope is the column shape, not the internal constraint structure.
-A follow-up sub-iter will promote `MemoryGlobalCols` to a full
-`FormalAssertion` that includes the `LtOperationUnsigned` and
-`IsZeroOperation` sub-circuits properly. -/
-structure MemoryGlobalCols (T : Type) where
-  /-- Top bits of the timestamp of the memory access. -/
-  clk_high : T
-  /-- Low bits of the timestamp of the memory access. -/
-  clk_low : T
-  /-- The index of the memory access (within the boundary bus). -/
-  index : T
-  /-- The address of the previous memory access in the boundary chain. -/
-  prev_addr : Vector T 3
-  /-- The address of this memory access. -/
-  addr : Vector T 3
-  /-- Comparison columns for `prev_addr < addr` (LtOperationUnsigned
-  layout in SP1; opaque placeholder here). 6 field elements. -/
-  lt_cols : Vector T 6
-  /-- The value of the memory access. -/
-  value : Word T
-  /-- Lower half of the third limb of `value`. -/
-  value_lower : T
-  /-- Upper half of the third limb of `value`. -/
-  value_upper : T
-  /-- Whether the memory access is a real access. -/
-  is_real : T
-  /-- Whether we are making the `prev_addr < addr` assertion. -/
-  is_comp : T
-  /-- Validity of the previous state. The unique invalid state is
-  when the chip only initializes address 0 once. -/
-  prev_valid : T
-  /-- Witness for `is_prev_addr_zero` (IsZeroOperation layout in SP1;
-  3 field elements as opaque placeholder). -/
-  is_prev_addr_zero : Vector T 3
-  /-- Witness for `is_index_zero` (IsZeroOperation layout in SP1;
-  3 field elements as opaque placeholder). -/
-  is_index_zero : Vector T 3
-deriving ProvableStruct
 
 /-- Minimal `Spec` for boundary chips. Phase 4 ships only the
 `is_real * (is_real - 1) = 0` binary gate — the gate that SP1's source

@@ -19,6 +19,7 @@ import SP1Clean.MemoryAccess
 import SP1Clean.Reader.OperandAccess
 import SP1Clean.Reader.CPUState
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `ShiftRightChip` mirror — bundled 4-variant right shift
 
@@ -40,39 +41,6 @@ namespace SP1Clean.ShiftRight
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-structure ShiftRightCols (T : Type) where
-  state : CPUState T
-  adapter : ALUTypeReader T
-  op_a_write_value : Vector T 4             -- Main[32..35] (= upstream `a : Word<T>`)
-  -- Phase 3e: aux:28 decomposed into 11 named upstream sub-fields.
-  -- Slot mapping verified against `SP1Chips/ShiftRight/Constraints.lean`
-  -- (the U16MSBOperation calls at lines 191-197 pin Main[36]/[37], the
-  -- bit-boolean asserts pin Main[38..43], the shift-pow chain E124-E135
-  -- pins Main[45..47], the limb arithmetic pins Main[48..63]).
-  b_msb : U16MSBOperation T                 -- Main[36]
-  srw_msb : U16MSBOperation T               -- Main[37]
-  c_bits : Vector T 6                       -- Main[38..43]
-  sra_msb_v0123 : T                         -- Main[44]
-  v_0123 : T                                -- Main[45]
-  v_012 : T                                 -- Main[46]
-  v_01 : T                                  -- Main[47]
-  lower_limb : Vector T 4                   -- Main[48..51]
-  higher_limb : Vector T 4                  -- Main[52..55]
-  limb_result : Vector T 4                  -- Main[56..59]
-  shift_u16 : Vector T 4                    -- Main[60..63]
-  is_srl : T                                -- Main[64]
-  is_sra : T                                -- Main[65]
-  is_srlw : T                               -- Main[66]
-  is_sraw : T                               -- Main[67]
-  -- `is_w_imm = (is_srlw + is_sraw) * imm_c` (forced by bridge E47).
-  -- Matches upstream's `is_w_imm: T` in `alu/sr/mod.rs:104`; the
-  -- prior Lean name `sign_extend` was a misnomer — this is a
-  -- W-variant immediate flag (used in opcode adjustment), not a
-  -- sign-extension witness.
-  is_w_imm : T                              -- Main[68] (was sign_extend)
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 def isRealExpr (cols : Var ShiftRightCols (ZMod p)) : Expression (ZMod p) :=
   cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw
@@ -304,35 +272,6 @@ def TraceSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0 ∧
   shiftSpec cols ∧
   cols.adapter_cols.is_trusted = 1
-
-/-- Project a raw SP1 row into the structured `ShiftRightCols` view.
-69 columns; `intermediates_aux : Vector T 28` packed from Main[36..63]. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 69) : ShiftRightCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-      ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]],
-    ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
-    Main[31]⟩,
-   #v[Main[32], Main[33], Main[34], Main[35]],
-   ⟨Main[36]⟩,                          -- b_msb : U16MSBOperation
-   ⟨Main[37]⟩,                          -- srw_msb : U16MSBOperation
-   #v[Main[38], Main[39], Main[40], Main[41], Main[42], Main[43]],  -- c_bits
-   Main[44],                            -- sra_msb_v0123
-   Main[45],                            -- v_0123
-   Main[46],                            -- v_012
-   Main[47],                            -- v_01
-   #v[Main[48], Main[49], Main[50], Main[51]],  -- lower_limb
-   #v[Main[52], Main[53], Main[54], Main[55]],  -- higher_limb
-   #v[Main[56], Main[57], Main[58], Main[59]],  -- limb_result
-   #v[Main[60], Main[61], Main[62], Main[63]],  -- shift_u16
-   Main[64], Main[65], Main[66], Main[67], Main[68],
-   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
-   -- (`Main[64]+Main[65]+Main[66]+Main[67]`).
-   ⟨Main[64] + Main[65] + Main[66] + Main[67]⟩⟩
 
 set_option maxHeartbeats 4000000 in
 -- Heartbeats elevated for the ~75-conjunct iff RHS refine on 69 cols.

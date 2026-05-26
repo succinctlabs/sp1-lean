@@ -19,6 +19,7 @@ import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.OperandAccess
 import SP1Chips.ShiftLeft.ShiftLeftChip
 import SP1Clean.TrustMode
+import SP1Clean.Chips.Structs
 
 /-! # Chip-level `ShiftLeftChip` mirror — second heavy-arithmetic scaling probe
 
@@ -51,51 +52,6 @@ namespace SP1Clean.ShiftLeft
 open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The chip's column struct, mirroring SP1's Rust `ShiftLeftCols<T>`
-over 65 field elements. The non-reader columns are grouped into named
-Vector blocks where SP1's emission already treats them as a unit
-(`c_bits`, `shift_u16`, `shifted_limbs`, `result`). -/
-structure ShiftLeftCols (T : Type) where
-  state : CPUState T
-  -- Nested ALUTypeReader (Main[6..31]). `op_c : Word T` (4 limbs) and
-  -- `imm_c : T` are part of this adapter, matching upstream's
-  -- `adapter: ALUTypeReader<T>` field count + ordering. Replaces the
-  -- prior 9-field inlining + 3 misnamed `shift_imm_low/shift_imm_high/msb`
-  -- padding cells; see `SP1Chips/ShiftLeft/Constraints.lean:215` (the
-  -- CS2 line that uses `op_c := #v[Main[21..24]]` and `imm_c := Main[31]`).
-  adapter : ALUTypeReader T
-  -- The 4-limb shifted result (committed to op_a register).
-  result : Vector T 4                       -- Main[32..35]
-  -- 6-bit decomposition of the shift amount mod 64 (Main[36..41]).
-  c_bits : Vector T 6                       -- Main[36..41]
-  -- Shift-power intermediates (Main[42..44]). Upstream Rust names these
-  -- as three named scalars (`v_01, v_012, v_0123`) rather than a 3-vector.
-  -- Phase 2.3 decomposition (open-question #4): split for name alignment.
-  v_01 : T                                  -- Main[42] (was shift_pow[0])
-  v_012 : T                                 -- Main[43] (was shift_pow[1])
-  v_0123 : T                                -- Main[44] (was shift_pow[2])
-  -- One-hot byte-shift selector over 4 byte positions (Main[45..48]).
-  shift_u16 : Vector T 4                    -- Main[45..48]
-  -- Shifted-limb intermediates (Main[49..56]). Upstream Rust names the
-  -- two halves as `lower_limb: Word<T>` and `higher_limb: Word<T>`.
-  -- Phase 2.3 decomposition (open-question #4): split the 8-vector.
-  lower_limb : Vector T 4                   -- Main[49..52] (was limb_shift[0..3])
-  higher_limb : Vector T 4                  -- Main[53..56] (was limb_shift[4..7])
-  -- Intermediate result columns (Main[57..61]). Upstream Rust splits this
-  -- into `limb_result: Word<T>` (4 cells) and `sllw_msb: U16MSBOperation<T>`
-  -- (1 cell, the MSB witness for SLLW sign-extension fed to U16MSBOperation
-  -- in the bridge — see CS0 in SP1Chips/ShiftLeft/Constraints.lean).
-  -- Phase 2.3 decomposition (open-question #4): split the 5-vector.
-  limb_result : Vector T 4                  -- Main[57..60] (was result_intermediate[0..3])
-  sllw_msb : U16MSBOperation T              -- Main[61] (was result_intermediate[4])
-  is_sll : T                                -- Main[62]
-  is_sllw : T                               -- Main[63]
-  -- Renamed from `sign_extend` to upstream's `is_sllw_imm` (Phase 2.3).
-  -- Bridge: Main[64] = Main[63] * Main[31] = is_sllw * imm_c = is_slliw.
-  is_sllw_imm : T                           -- Main[64] (was sign_extend)
-  adapter_cols : SP1Clean.UserModeReaderCols T
-deriving ProvableStruct
 
 /-- The aggregate is-real flag: at least one of the two shift variants
 active. -/
@@ -316,34 +272,6 @@ def TraceSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   cols.adapter.op_a_0 = 0 ∧
   shiftSpec cols ∧
   cols.adapter_cols.is_trusted = 1
-
-/-- Project a raw SP1 row into the structured `ShiftLeftCols` view.
-65 columns. Post-Phase-2.3 decomposition: `v_01/v_012/v_0123` are scalars
-(Main[42..44]), `lower_limb`/`higher_limb` split the former 8-vector
-(Main[49..56]), `limb_result`+`sllw_msb` split the former 5-vector
-(Main[57..61]), and `is_sllw_imm` replaces the old `sign_extend`. -/
-@[reducible] def fromMain (Main : Vector (ZMod p) 65) : ShiftLeftCols (ZMod p) :=
-  ⟨⟨Main[0], Main[1], Main[2], #v[Main[3], Main[4], Main[5]]⟩,
-   ⟨Main[6],
-    ⟨#v[Main[7], Main[8], Main[9], Main[10]], ⟨Main[11], Main[12]⟩⟩,
-    Main[13],
-    Main[14],
-    ⟨#v[Main[15], Main[16], Main[17], Main[18]], ⟨Main[19], Main[20]⟩⟩,
-    #v[Main[21], Main[22], Main[23], Main[24]],
-    ⟨#v[Main[25], Main[26], Main[27], Main[28]], ⟨Main[29], Main[30]⟩⟩,
-    Main[31]⟩,
-   #v[Main[32], Main[33], Main[34], Main[35]],
-   #v[Main[36], Main[37], Main[38], Main[39], Main[40], Main[41]],
-   Main[42], Main[43], Main[44],
-   #v[Main[45], Main[46], Main[47], Main[48]],
-   #v[Main[49], Main[50], Main[51], Main[52]],
-   #v[Main[53], Main[54], Main[55], Main[56]],
-   #v[Main[57], Main[58], Main[59], Main[60]],
-   { msb := Main[61] },
-   Main[62], Main[63], Main[64],
-   -- `adapter_cols.is_trusted` aliases the aggregate is_real sum
-   -- (`Main[62]+Main[63]`).
-   ⟨Main[62] + Main[63]⟩⟩
 
 set_option maxHeartbeats 2400000 in
 -- Heartbeats elevated for the ~65-conjunct iff RHS refine on 65 cols.
