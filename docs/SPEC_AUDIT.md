@@ -15,6 +15,9 @@ the single `Assertion` form, which IS already the gated form per
 project direction); `MemoryGlobal` promoted from absent to a partial
 scaffold (10 range-check lookups + `IsZeroOp.Assertion` ×2 + value
 decomp; `LtUnsignedOp` + bit/x0 asserts deferred to Phase 4.5).
+Subsequently `Subw` promoted (c)→(b) by adding an `RV64.subw`
+trailing conjunct to `FormalSpec` (the existing
+`rv64_subw_eq_of_subwop_spec` bridge already exists).
 
 ## Classification rubric
 
@@ -61,7 +64,7 @@ For each `def FormalSpec` (and `AssertionGated.FormalSpec`):
 | `SP1Clean.Addi` | **(a)** | Same shape, `ITypeReader.Gated` + `RV64.addi`. |
 | `SP1Clean.Sub` | **(a)** | Same shape, `RV64.sub`. |
 | `SP1Clean.Addw` | **(b)** partial | `AddwOp.Spec` internals (`addw_value`, `addw_msb`) + `RV64.addw`. `imm_c = 1` branch (`RV64.addiw`) intentionally deferred per doc comment. |
-| `SP1Clean.Subw` | **(c)** | `SubwOp` internals + Sail `execute_RTYPEW_pure_32_w`. `RV64.subw` exists in `RISCV/Instructions.lean` — upgrade candidate to (b). |
+| `SP1Clean.Subw` | **(b)** | `SubwOp` internals (`subw_value`, `subw_msb`) + Sail `execute_RTYPEW_pure_32_w` 32-bit BV identity + `RV64.subw` 64-bit clause. The BV32 triple is retained as the internals exposure (completeness drives `SubwOperation.iff_sp1_full.mpr` from it to witness `subw_value`/`subw_msb`); the BV64 conjunct is derived inline via `rv64_subw_eq_of_subwop_spec`. |
 | `SP1Clean.UType` | **(b)** | Raw `AddOperation.constraints.allHold` (internals `addend`, `add_result`) + `RV64.auipc` / `RV64.lui`. |
 | `SP1Clean.Mul` | **(c)** | `MulOp.Spec` internals + `RTypeReader.Gated`. Matches `MulChip/Aggregate.lean:520 main`. `RV64.mul/mulh/mulhu/mulhsu/mulw` available. |
 | `SP1Clean.DivRem` | **(c)** | MulOp×2 + IsEqualWordOp×4 + IsZeroWordOp + AddOp×2 + LtUnsignedOp + U16MSBOp×7. Matches `DivRemChip/Aggregate.lean:189 main`. `RV64.div/divu/divw/divuw/rem/remu/remw/remuw` available. |
@@ -120,8 +123,8 @@ partial — drops `load_mem/+1` etc.) and an `AssertionGated.FormalSpec`
 | Category | Count | Members |
 |---|---|---|
 | **(a)** | 3 | Add, Addi, Sub |
-| **(b)** | 2 | Addw (partial RV64), UType |
-| **(c)** | 15 | Subw, Mul, DivRem, Branch.Assertion, Jal.Assertion, Jalr.Assertion, 9× Memory `AssertionGated` |
+| **(b)** | 3 | Addw (partial RV64), Subw, UType |
+| **(c)** | 14 | Mul, DivRem, Branch.Assertion, Jal.Assertion, Jalr.Assertion, 9× Memory `AssertionGated` |
 | **(d)** | 14 | 4× ALU (Bitwise, ShiftLeft, ShiftRight, Lt), 9× Memory `Assertion` partial, MemoryGlobal partial scaffold |
 
 Total: 34 entries (3 + 2 + 15 + 14). The original audit's "28" header
@@ -155,10 +158,10 @@ Ordered by how much faithfulness they unlock per unit of work:
    `SP1Clean/Chips/Memory/LoadByteChip.lean:398-403`, then extend
    each `Assertion.main` + matching `Assertion.FormalSpec` to include
    the deferred RAM access. Promotes from (d) partial to (c).
-4. **Subw / Mul / DivRem** — closest to (b). Each has a matching
+4. **Mul / DivRem** — closest to (b). Each has a matching
    `RV64.<op>` available; add the semantic trailing conjunct.
-   `Subw` is the easiest: replace `execute_RTYPEW_pure_32_w` with
-   `RV64.subw`. Promotes from (c) to (b).
+   (Subw landed (c)→(b) via `rv64_subw_eq_of_subwop_spec` —
+   the same recipe applies, but each needs its own bridge lemma.)
 5. **Addw `imm_c = 1`** — already in (b). Add the
    `cols.is_real = 1 → cols.adapter.imm_c = 1 → … = RV64.addiw …`
    clause to complete RV64 coverage. Closes the doc-comment-flagged
@@ -171,7 +174,7 @@ contains ~66 entries. Currently `Spec.lean` references only 7
 (`add`, `addi`, `addiw`, `addw`, `auipc`, `lui`, `sub`). The 59 unused
 names that map onto SP1 chips are:
 
-- Arithmetic: `subw` (for Subw), `mul`, `mulh`, `mulhu`, `mulhsu`,
+- Arithmetic: `mul`, `mulh`, `mulhu`, `mulhsu`,
   `mulw`, `div`, `divu`, `divw`, `divuw`, `rem`, `remu`, `remw`,
   `remuw`.
 - Bitwise: `and`, `or`, `xor`, `andi`, `ori`, `xori`, `andn`, `orn`,
@@ -186,8 +189,15 @@ names that map onto SP1 chips are:
 
 ## Sail-only semantics currently in `Spec.lean`
 
-One: `execute_RTYPEW_pure_32_w` inside `SP1Clean.Subw.FormalSpec`.
+`SP1Clean.Subw.FormalSpec` still carries `execute_RTYPEW_pure_32_w`,
+but as the *internals* exposure (the BV32 triple that
+`SubwOperation.iff_sp1_full` produces). The chip is in (b) because
+its trailing conjunct is a pure `RV64.subw` 64-bit identity. The
+BV32 clause is retained because completeness drives
+`iff_sp1_full.mpr` from it to witness `subw_value` / `subw_msb` —
+dropping it would force a costly BV64↔(BV32+msb) inversion in the
+chip's `allHold_iff_structural` backward arm.
 `SP1Foundations/SailM.lean` defines 12+ `execute_*_pure*` helpers
 that could appear if more (c)-class Specs gain semantic clauses
 without `RV64.*` counterparts; none are currently in `Spec.lean`
-besides this one.
+besides the Subw retention.

@@ -106,7 +106,22 @@ theorem soundness :
   have h_cpu := h_cpu_sub trivial
   have h_rtr := h_rtr_sub trivial
   change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
-  refine ⟨h_cpu, ?_, h_op_a_0, ?_⟩
+  -- Discharge operand `isU64` bounds from `RTypeReader.Gated.Spec`'s 4th/5th
+  -- `RegisterAccess.Spec` sub-conjuncts (op_b / op_c). Hoisted above the
+  -- `refine` so the BV32 and RV64 conjuncts can both reuse the witnesses.
+  have h_ir_ne_zero :
+      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  -- `have` (not `obtain`) so the first bullet's `simpa … using h_rtr` keeps
+  -- the original h_rtr hypothesis available.
+  have ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
+  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
+    (h_ra_b.resolve_left h_ir_ne_zero).2.2
+  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
+    (h_ra_c.resolve_left h_ir_ne_zero).2.2
+  have h_subwop_nat := (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp
+    (h_subwop_sub trivial)
+  refine ⟨h_cpu, ?_, h_op_a_0, ?_, ?_⟩
   · -- Bridge `RTypeReader.Gated.assertion.Spec` (lowercase) → matching
     -- `RTypeReader.Gated.Assertion.Spec` (uppercase) form via simp.
     simpa [SP1Clean.RTypeReader.Gated.assertion,
@@ -116,21 +131,13 @@ theorem soundness :
     -- natural-form `Spec` → SP1's `allHold` → `iff_sp1_full`'s RHS triple
     -- `(isU32 ∧ BV32 eq ∧ msb_eq)`.
     intro _h_is_real_eq
-    -- Discharge operand `isU64` bounds from `RTypeReader.Gated.Spec`'s 4th/5th
-    -- `RegisterAccess.Spec` sub-conjuncts (op_b / op_c).
-    have h_ir_ne_zero :
-        (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-      rw [h_is_real]; exact one_ne_zero
-    obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
-    have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-      (h_ra_b.resolve_left h_ir_ne_zero).2.2
-    have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
-      (h_ra_c.resolve_left h_ir_ne_zero).2.2
-    have h_subwop_nat := (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp
-      (h_subwop_sub trivial)
     have h_subwop_allHold :=
       (SP1Clean.SubwOp.iff_sp1 _ _ _).mpr h_subwop_nat
     exact (SubwOperation.iff_sp1_full h_isU64_b h_isU64_c).mp h_subwop_allHold
+  · -- Pure BitVec `RV64.subw` clause: bridge natural-form `SubwOp.Spec` to
+    -- the sign-extended 64-bit identity via `rv64_subw_eq_of_subwop_spec`.
+    intro _h_is_real_eq
+    exact rv64_subw_eq_of_subwop_spec _ _ _ _ h_isU64_b h_isU64_c h_subwop_nat
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -139,7 +146,7 @@ theorem completeness :
     := h_input
   subst_eqs
   obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
-  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem⟩ := h_spec
+  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem, _h_rv64⟩ := h_spec
   unfold id at *
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
