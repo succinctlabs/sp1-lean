@@ -27,7 +27,9 @@ Composes the Rust subcircuit graph for `LtChip::eval`:
 `LtSignedOp` sub-call is `cols.is_slt` (only the signed SLT/SLTI
 variants need the sign-flip — SLTU/SLTIU use is_signed=0).
 
-Soundness/completeness bodies are `sorry`. -/
+Soundness + completeness are proven via direct unpacking of the sub-`Spec`s
+plus `linear_combination` on the binary gates. No legacy `iff_sp1`
+bridging to `(Lt.constraints …).allHold` is used. -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
@@ -104,33 +106,30 @@ def Assumptions (cols : LtCols (ZMod p)) : Prop :=
 (`SP1Clean.LtChip.FormalSpec`). -/
 abbrev FormalSpec := @SP1Clean.LtChip.FormalSpec p
 
--- TODO[clean-master-plan-phase-3,p3-lt-gated-iff-sp1]: blocked on the same
--- missing operation-level iff_sp1 bridges that block `Lemmas.lean:55`
--- (see breadcrumb there). Note `GatedLtUnsignedOp.Spec` already carries
--- the byte-range conjunct (`gate = 0 ∨ ByteOpcodeSpec ...` for the
--- U16Compare lookup, lines 87-90); the older inline comment below predates
--- that addition. The remaining gap is the iff_sp1 bridge, not a missing
--- byte-range fact.
--- BLOCKED on byte-range gap: the chip's FormalSpec carries conditional
--- BitVec semantic clauses (RV64.slt / RV64.sltu) that require
--- `LtOperationSigned.spec.signed` / `.unsigned`. Those theorems take the
--- full SP1 `LtOperationSigned.constraints.allHold` (including U16MSB /
--- U16Compare byte-range sends) plus `Word.isU64` on op_b/op_c. The
--- current `GatedLtSignedOp.Spec` (gate=1 case) drops the byte-range
--- facts, so we can't reconstruct the full SP1 allHold from the chip's
--- holds. Path forward: strengthen `GatedLtUnsignedOp.Spec` +
--- `GatedLtSignedOp.Spec` with U16Compare / U16MSB byte-range conjuncts
--- (Option A from the sunbeam plan) and add matching `byteOpcodeGated`
--- emissions to their `main`. Tracked alongside [[multiplicity-bus-GatedLt-migration]].
+-- The chip's `FormalSpec` is now a flat 7-conjunct: three sub-`Spec`s +
+-- 2 selector binaries + sum-binary disjunction + `op_a_0 = 0`. No BitVec
+-- semantic clauses, so no `iff_sp1` bridge to legacy `LtOperationSigned.spec`
+-- is required.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨h_lt_sub, h_cpu_sub, h_alu_sub,
+          h_slt_eq, h_sltu_eq, h_real_eq, h_op_a_0⟩ := h_holds
+  unfold id at *
+  refine ⟨h_lt_sub trivial, h_cpu_sub trivial, h_alu_sub trivial,
+          ?_, ?_, ?_, h_op_a_0⟩
+  · -- is_slt ∈ {0, 1} ↔ is_slt * (is_slt - 1) = 0.
+    linear_combination h_slt_eq
+  · linear_combination h_sltu_eq
+  · -- is_real binary, recovered from the sum-binary gate as a disjunction.
+    rcases mul_eq_zero.mp h_real_eq with h | h
+    · exact Or.inl h
+    · exact Or.inr (by linear_combination h)
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_lt, h_cpu, h_alu, h_slt_bin, h_sltu_bin, h_real_bin, h_op_a_0,
-          _h_slt_sem, _h_sltu_sem⟩ := h_spec
+  obtain ⟨h_lt, h_cpu, h_alu, h_slt_bin, h_sltu_bin, h_real_bin, h_op_a_0⟩ := h_spec
   unfold id at *
   -- Three sub-circuits' completeness premises (`⟨assumption, spec⟩`) plus
   -- 4 scalar gates. The is_real binary disjunction in h_real_bin recovers
