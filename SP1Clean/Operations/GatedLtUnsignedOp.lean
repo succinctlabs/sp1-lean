@@ -6,9 +6,11 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.Field
 import SP1Clean.Operations.LtOperationUnsigned
+import SP1Clean.Operations.U16CompareOperation
 import SP1Clean.Operations.Gated
 import SP1Clean.SP1Lookup
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.Multiplicity
 
 /-! # `GatedLtUnsignedOp` — gated form of `LtUnsignedOp.assertion`
 
@@ -287,5 +289,144 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     Spec := Assertion.FormalSpec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## Bridge to SP1-native form
+
+`Spec_iff_sp1` bridges the Gated Spec to SP1's `LtOperationUnsigned.constraints.allHold`
+form (with `is_real := 1`). Used by chip-level `allHold_iff_structural` bridges
+in consumer chips (currently `LtChip`).
+
+The bridge handles two structural shape differences between SP1's form and the
+Gated Spec under `gate = 1`:
+
+1. SP1's `(is_real - flag) * (b - c) = 0` simp-normalizes to
+   `is_real = flag ∨ b = c`; with `is_real = 1` this becomes
+   `flag = 1 ∨ b = c`, equivalent to the Gated form's
+   `(1 - flag) * (b - c) = 0` via `mul_eq_zero` + `sub_eq_zero`.
+2. SP1's U16CompareOperation byte-send bridges to the Gated form's
+   `gate = 0 ∨ ByteOpcodeSpec entry` via `U16CompareOp.iff_sp1` plus the
+   `gate = 1` disjunction resolution.
+
+The proof unfolds `LtOperationUnsigned.allHold_constraints_iff` on the LHS,
+then `U16CompareOp.iff_sp1` on the U16CompareOperation sub-allHold, then
+substitutes `h_gate` and discharges each conjunct via `tauto`/`grind`-style
+matching modulo `mul_eq_zero` / `sub_eq_zero` / `neg_eq_zero` rewrites. -/
+
+omit [Fact (p > 512)] in
+theorem Spec_iff_sp1 {input : Inputs (ZMod p)} (h_gate : input.gate = 1) :
+    Spec input ↔
+      (LtOperationUnsigned.constraints input.b input.c
+          { u16_compare_operation := { bit := input.compare_bit },
+            u16_flags := input.u16_flags,
+            not_eq_inv := input.not_eq_inv,
+            comparison_limbs := input.comparison_limbs } 1).allHold := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [show
+    (LtOperationUnsigned.constraints (F := ZMod p) input.b input.c
+      { u16_compare_operation := { bit := input.compare_bit },
+        u16_flags := input.u16_flags,
+        not_eq_inv := input.not_eq_inv,
+        comparison_limbs := input.comparison_limbs } 1).allHold
+    = List.Forall SP1Constraint.toProp
+        (LtOperationUnsigned.constraints input.b input.c
+          { u16_compare_operation := { bit := input.compare_bit },
+            u16_flags := input.u16_flags,
+            not_eq_inv := input.not_eq_inv,
+            comparison_limbs := input.comparison_limbs } 1) from rfl,
+    _root_.LtOperationUnsigned.allHold_constraints_iff]
+  -- Bridge the embedded U16CompareOperation sub-constraints via iff_sp1.
+  rw [show
+    List.Forall SP1Constraint.toProp
+      (U16CompareOperation.constraints (F := ZMod p)
+        input.comparison_limbs[0] input.comparison_limbs[1]
+        { bit := input.compare_bit } 1)
+    = (U16CompareOperation.constraints (F := ZMod p)
+        input.comparison_limbs[0] input.comparison_limbs[1]
+        { bit := input.compare_bit } 1).allHold from rfl,
+    SP1Clean.U16CompareOp.iff_sp1, SP1Clean.U16CompareOp.Spec]
+  -- Unfold the Gated Spec. After unfold, both sides are explicit conjunctions.
+  -- `dsimp only [Spec]` definitionally unfolds the `let one := 1` binding.
+  -- We DON'T simplify the byte-range disjunction here — handle it in the rcases
+  -- branches below.
+  dsimp only [Spec]
+  rw [h_gate]
+  -- Normalize via mul_eq_zero / sub_eq_zero / neg_eq_zero so each side matches.
+  -- The conjuncts map 1-1 (modulo conjunct ordering and the `1 = flag ↔ flag = 1`
+  -- symmetry that `tauto` handles).
+  constructor
+  · -- Spec → SP1 disjunctive form.
+    rintro ⟨h_bit_bin, h_f0, h_f1, h_f2, h_f3, h_s, h_x3, h_x2, h_x1, h_x0,
+            h_cl0, h_cl1, h_nei, h_byte⟩
+    refine ⟨⟨h_bit_bin, ?_⟩, Or.inr rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+            by linear_combination h_cl0, by linear_combination h_cl1, ?_⟩
+    · -- byte-range: from h_byte (gate = 1 → ByteOpcodeSpec → range).
+      -- After `rw [h_gate]`, h_byte's left disjunct is `(1 : ZMod p) = 0`.
+      rcases h_byte with h_g | h_byte
+      · exact absurd h_g one_ne_zero
+      · -- h_byte : ByteOpcodeSpec #v[6, cl0 - cl1 + bit * 65536, 16, 0]
+        -- Goal: (cl0 - cl1 + bit * 65536).val < 65536
+        exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_byte
+    · exact (mul_eq_zero.mp h_f0).imp (fun h => h)
+              (fun h => by linear_combination h)
+    · exact (mul_eq_zero.mp h_f1).imp (fun h => h)
+              (fun h => by linear_combination h)
+    · exact (mul_eq_zero.mp h_f2).imp (fun h => h)
+              (fun h => by linear_combination h)
+    · exact (mul_eq_zero.mp h_f3).imp (fun h => h)
+              (fun h => by linear_combination h)
+    · exact (mul_eq_zero.mp h_s).imp (fun h => h)
+              (fun h => by linear_combination h)
+    · -- x3: (1 - flag_3) * (b[3] - c[3]) = 0 → 1 = flag_3 ∨ b[3] = c[3]
+      exact (mul_eq_zero.mp h_x3).imp (fun h => by linear_combination h)
+              (fun h => by linear_combination h)
+    · exact (mul_eq_zero.mp h_x2).imp (fun h => by linear_combination h)
+              (fun h => by linear_combination h)
+    · exact (mul_eq_zero.mp h_x1).imp (fun h => by linear_combination h)
+              (fun h => by linear_combination h)
+    · exact (mul_eq_zero.mp h_x0).imp (fun h => by linear_combination h)
+              (fun h => by linear_combination h)
+    · -- nei: (-s) * (not_eq_inv * (cl0 - cl1) - 1) = 0
+      --     → -s = 0 ∨ not_eq_inv * (cl0 - cl1) = 1
+      exact (mul_eq_zero.mp h_nei).imp
+              (fun h => by linear_combination h)
+              (fun h => by linear_combination h)
+  · -- SP1 disjunctive form → Spec.
+    rintro ⟨⟨h_bit_bin, h_range⟩, _h_irbin, h_f0, h_f1, h_f2, h_f3, h_s,
+            h_x3, h_x2, h_x1, h_x0, h_cl0, h_cl1, h_nei⟩
+    refine ⟨h_bit_bin, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+            by linear_combination h_cl0, by linear_combination h_cl1, ?_, ?_⟩
+    · rcases h_f0 with h | h
+      · exact mul_eq_zero.mpr (Or.inl h)
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_f1 with h | h
+      · exact mul_eq_zero.mpr (Or.inl h)
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_f2 with h | h
+      · exact mul_eq_zero.mpr (Or.inl h)
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_f3 with h | h
+      · exact mul_eq_zero.mpr (Or.inl h)
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_s with h | h
+      · exact mul_eq_zero.mpr (Or.inl h)
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_x3 with h | h
+      · exact mul_eq_zero.mpr (Or.inl (by linear_combination h))
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_x2 with h | h
+      · exact mul_eq_zero.mpr (Or.inl (by linear_combination h))
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_x1 with h | h
+      · exact mul_eq_zero.mpr (Or.inl (by linear_combination h))
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_x0 with h | h
+      · exact mul_eq_zero.mpr (Or.inl (by linear_combination h))
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · rcases h_nei with h | h
+      · exact mul_eq_zero.mpr (Or.inl (by linear_combination h))
+      · exact mul_eq_zero.mpr (Or.inr (by linear_combination h))
+    · -- byte-range disjunct: goal is `1 = 0 ∨ ByteOpcodeSpec ...`. Take the
+      -- right branch via Or.inr and provide ByteOpcodeSpec from h_range.
+      exact Or.inr (SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_range)
 
 end SP1Clean.GatedLtUnsignedOp
