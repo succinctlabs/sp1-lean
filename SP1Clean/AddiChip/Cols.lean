@@ -163,7 +163,6 @@ omit [Fact (2 ^ 17 < p)] in
 
 The unified chip Spec, lifted here from `Circuit.lean` so `Lemmas.lean`
 can reference it without importing the full circuit construction:
-- `AddOp.Spec` — `op_b + op_c_imm = op_a_write_value` (carry chain).
 - `CPUState.Gated.Assertion.Spec` — flag-threaded CPUState sub-circuit
   composition (binary gate + 2 state-bus + 2 byte-opcode, all gated by
   `cols.is_real`). Absorbs the free `is_real * (is_real - 1) = 0` gate.
@@ -172,16 +171,18 @@ can reference it without importing the full circuit construction:
   + 4 op_a_0 masked gates), gated by `cols.is_real` /
   `cols.adapter_cols.is_trusted`.
 - `adapter.op_a_0 = 0` — chip-level `op_a_0` zero gate.
-- Pure BitVec `RV64.addi` equation (conditional on `is_real = 1`). The
-  sign-extension identity is enforced inside the program-bus clause's
-  `Opcode.trusted_instr` predicate; the monadic Sail equivalence to
-  `_root_.Addi.spec_addi` is recovered externally via
-  `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
+- Semantic RV64 conjunct (conditional on `is_real = 1`): the result
+  fits in 64 bits AND equals the BitVec `RV64.addi` of the sign-extended
+  immediate and `op_b` operand. The byte-carry decomposition that the
+  SP1 `AddOperation` circuit threads internally is *not* exposed here;
+  it's the implementation detail of the `AddOp` sub-circuit and is
+  reconstructed on demand via `SP1Clean.AddOp.iff_sp1_full` (see
+  `Lemmas.lean`). The sign-extension identity is enforced inside the
+  program-bus clause's `Opcode.trusted_instr` predicate; the monadic
+  Sail equivalence to `_root_.Addi.spec_addi` is recovered externally
+  via `sail_correct_of_formalSpec` (`SailBridge.lean`). -/
 def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.AddOp.RawSpec
-      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm
-      cols.op_a_write_value ∧
   SP1Clean.CPUState.Gated.Assertion.Spec
       ⟨cols.state,
        #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
@@ -192,6 +193,7 @@ def FormalSpec (cols : AddiCols (ZMod p)) : Prop :=
        cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0 ∧
   (cols.is_real = 1 →
+    Word.isU64 cols.op_a_write_value ∧
     Word.toBitVec64 cols.op_a_write_value =
       RV64.addi (BitVec.ofNat 12 cols.adapter.op_c_imm[0].val)
                 (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))

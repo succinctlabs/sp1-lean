@@ -158,14 +158,15 @@ theorem cpuStateSpec_of_spec_addi (cols : Addi.AddiCols (ZMod p))
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   -- Post-Gated-migration: cpuStateSpec is no longer a direct conjunct of
   -- FormalSpec (it's now embedded in `CPUState.Gated.Assertion.Spec` as a
-  -- disjunctive form gated by `cols.is_real`). Mirror of Add chip's
-  -- discharger.
+  -- disjunctive form gated by `cols.is_real`). After the AddOp semantic-
+  -- only migration, the CPU Gated.Spec is the first chip-level conjunct.
+  -- Mirror of Add chip's discharger.
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Addi.Assertion.FormalSpec cols at h
   have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
       ⟨cols.state,
        #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-       8, cols.is_real⟩ := h.2.1
+       8, cols.is_real⟩ := h.1
   rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
   exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 

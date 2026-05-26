@@ -85,9 +85,10 @@ theorem is_real_binary_addi (cols : SP1Clean.Addi.AddiCols (ZMod p))
     (h : SP1Clean.Addi.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   change SP1Clean.Addi.FormalSpec cols at h
-  -- New Gated FormalSpec: is_real binarity lives in `CPUState.Gated.Spec`'s
-  -- first conjunct (mirror of Add).
-  exact binary_of_assertZero _ h.2.1.1
+  -- Semantic-only FormalSpec (post-AddOp-migration): is_real binarity lives
+  -- in `CPUState.Gated.Spec`'s first conjunct, which is now the first
+  -- chip-level conjunct (mirror of Add).
+  exact binary_of_assertZero _ h.1.1
 
 theorem is_real_binary_addw (cols : SP1Clean.Addw.AddwCols (ZMod p))
     (h : SP1Clean.Addw.assertion.Spec cols) :
