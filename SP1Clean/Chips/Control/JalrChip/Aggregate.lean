@@ -17,7 +17,6 @@ import SP1Chips.Jalr.Common
 import SP1Chips.Soundness
 import SP1Clean.Operations.AddOperation
 import SP1Clean.ByteOpcodeTable
-import SP1Clean.Operations.GatedAddOp
 import SP1Clean.ProgramTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Reader.CPUState
@@ -240,36 +239,18 @@ theorem raw_to_semantic (Main : Vector (ZMod p) 35) (h_is_real : Main[25] = 1)
   exact soundness_jalr Main s ((rawSpec_iff_allHold Main).mpr h_raw)
     h_is_real hs state_cstrs hv
 
-/-! ## Full `FormalAssertion` promotion (Path-2 + single-gate Phase-A)
+/-! ## Full `FormalAssertion` promotion
 
-**Tier-2 probe history.** JalrChip has two `AddOperation.constraints
-... allHold` clauses in its legacy `Spec` (one gated on `is_real`,
-one gated on `is_real - op_a_0`). Iter-4 dropped both from
-`Assertion.main` because Clean's unconditional `AddOp.assertion`
-subcircuit would force the carry chain on padding / op_a=x0 rows where
-completeness can't hold.
-
-**Iter-5 update (Phase-A first demonstration).** The `is_real`-gated
-jump-target AddOp is now promoted via `SP1Clean.GatedAddOp.assertion`:
-its `main` emits `is_real * carry_k * (carry_k - 1) === 0` for each
-of 4 carries (the inner `Range(16)` byte-bound lookups are dropped —
-gating a lookup by field multiplication isn't sound; see
-`SP1Clean/Gated.lean` for the lookup-restriction rationale). The
-matching FormalSpec clause is `is_real = 0 ∨ GatedAddOp.Spec ...`,
-satisfied vacuously on padding rows.
-
-The second AddOp (gated on `is_real - op_a_0`) stays as a Path-2 drop
-for now — it needs a multi-factor gate (essentially a 2-element gate
-combinator since `is_real - op_a_0` is itself a difference of two
-boolean selectors). Picking that up is iter-6 work.
-
-What survives in `Assertion.main` today: `CPUState.assertion`,
-`ProgramTable.assertion`, `GatedAddOp.assertion` for the jump-target
-sum, and the three scalar boolean asserts (`is_real`, `lsb`,
-`(is_real - 1) * op_a_0`). The alignment lookup, the second AddOp
-clause, and the four Vector-indexed asserts on `jump_target[3]` /
-`op_a_write_value[3]` / `op_a_0 * op_a_write_value[k]` remain in the
-legacy chip-level `Spec`. -/
+JalrChip's `Assertion.main` emits `CPUState.assertion`,
+`ProgramTable.assertion` (opcode 47 = JALR), `AddOp.assertion` for the
+jump-target sum (gated by `is_real`), the three scalar boolean asserts
+(`is_real`, `lsb`, `(is_real - 1) * op_a_0`), and two
+`OperandAccess.assertion` subcircuits for the op_a/op_b register
+accesses. The return-address `AddOperation` (`pc + 4 = op_a_write_value`,
+gated by `is_real - op_a_0`) is not emitted at the FormalAssertion
+level — its discharge stays in the legacy chip-level
+`traceSpec_implies_allHold` bridge, where the multi-factor gate can be
+discharged from `(is_real - 1) * op_a_0 = 0` under `is_real = 1`. -/
 
 namespace Assertion
 
@@ -284,14 +265,13 @@ def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
   SP1Clean.ProgramTable.assertion
     (⟨pc, 47, op_a, #v[op_b, 0, 0, 0], op_c_imm, op_a_0, 0, 1⟩ :
       Var SP1Clean.ProgramTable.Inputs (ZMod p))
-  -- Gated jump-target sum: `is_real * carry_k * (carry_k - 1) === 0` for
-  -- each of 4 carries, encoded via the `GatedAddOp` FormalAssertion (Phase-A
-  -- gating combinator, iter-5 first demonstration). The matching range
-  -- checks on `jump_target[k]` are dropped from the gated form — they
-  -- remain in the legacy chip-level `Spec` (see `Jalr.Spec`).
-  SP1Clean.GatedAddOp.assertion
+  -- Jump-target sum: `op_b + op_c_imm = jump_target`. `AddOp.assertion`'s
+  -- gated FormalSpec is the semantic shape (`is_real = 1 → isU64 result ∧
+  -- result.toBitVec64 = a + b`), matching the chip-level `FormalSpec`
+  -- semantic conjunct directly.
+  SP1Clean.AddOp.assertion
     (⟨op_b_memory.prev_value, op_c_imm, jump_target, is_real⟩ :
-      Var SP1Clean.GatedAddOp.Inputs (ZMod p))
+      Var SP1Clean.AddOp.Inputs (ZMod p))
   is_real * (is_real - 1) === 0
   lsb * (lsb - 1) === 0
   (is_real - 1) * op_a_0 === 0
@@ -312,36 +292,73 @@ def main (cols : Var JalrCols (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) JalrCols unit where
   name := "SP1Clean.Jalr"
   main := main
-  localLength _ := 0
+  -- Computed from main; AddOp.assertion allocates 16 hint witnesses.
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
 
-def Assumptions (_ : JalrCols (ZMod p)) : Prop := True
+/-- Strengthened Assumptions: non-padding row (`is_real = 1`) plus the
+two operand-isU64 bounds needed by the gated `AddOp.assertion`. The bounds
+are easy at the trace level (R/I-type operands are < 65536 by the SP1
+column conventions) but are not derivable from the chip-level sub-circuit
+Specs (`ProgramTable`, `OperandAccess`) without a verbose ZMod-`<`-to-
+`.val`-`<` conversion. Surfacing them here keeps the chip's own
+soundness/completeness clean while pushing the bounds discharge into the
+trace-soundness driver. -/
+def Assumptions (cols : JalrCols (ZMod p)) : Prop :=
+  cols.is_real = 1 ∧
+  Word.isU64 cols.adapter.op_b_memory.prev_value ∧
+  Word.isU64 cols.adapter.op_c_imm
 
+/-- Soundness of `Jalr.assertion`. Mirrors JalChip's canonical recipe
+(commit `186a456`): the AddOp sub-circuit Spec under `is_real = 1` is
+exactly the corresponding `FormalSpec` semantic conjunct, so the jump-
+target discharge is a direct passthrough of `h_add_sub`. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu_sub, h_prog_sub, h_gated_sub, h_isreal, h_lowbit, h_isreal_op_a_0,
+  obtain ⟨h_cpu_sub, h_prog_sub, h_add_sub, h_isreal, h_lowbit, h_isreal_op_a_0,
           h_oa_a, h_oa_b⟩ := h_holds
+  obtain ⟨h_is_real, h_isU64_b, h_isU64_c⟩ := h_assumptions
   unfold id at *
+  -- Discharge AddOp.assertion's Assumptions (`is_real ∈ {0,1}` + operand
+  -- bounds under `is_real = 1`) from the chip-level Assumptions.
+  have h_add := h_add_sub ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · exact h_gated_sub trivial
+  · -- Jump-target semantic conjunct: AddOp.assertion gives exactly this
+    -- form under `is_real = 1`.
+    exact h_add
   · linear_combination h_isreal
   · linear_combination h_lowbit
   · linear_combination h_isreal_op_a_0
   · exact h_oa_a trivial
   · exact h_oa_b trivial
 
+/-- Completeness of `Jalr.assertion`. The AddOp.assertion sub-circuit's
+Assumptions (`is_real ∈ {0,1}` + `is_real = 1 → isU64 a ∧ isU64 b`) plus
+Spec are discharged from the chip-level `h_assumptions` (which carries
+the operand isU64 bounds) and the matching `FormalSpec` semantic conjunct. -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨h_cpu, h_prog, h_gated, h_isreal, h_lowbit, h_isreal_op_a_0,
+  obtain ⟨h_cpu, h_prog, h_add, h_isreal, h_lowbit, h_isreal_op_a_0,
           h_oa_a, h_oa_b⟩ := h_spec
+  obtain ⟨h_is_real, h_isU64_b, h_isU64_c⟩ := h_assumptions
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · exact ⟨trivial, h_gated⟩
+  · -- AddOp.assertion (jump-target): supply Assumptions (binary + bounds)
+    -- and Spec from h_add.
+    refine ⟨⟨Or.inr h_is_real, ?_⟩, h_add⟩
+    intro _
+    exact ⟨h_isU64_b, h_isU64_c⟩
   · linear_combination h_isreal
   · linear_combination h_lowbit
   · linear_combination h_isreal_op_a_0

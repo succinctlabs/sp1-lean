@@ -771,6 +771,12 @@ namespace SP1Clean.Jalr
 
 namespace Assertion
 
+/-- Chip-level FormalSpec mirroring JalChip's canonical semantic-only pattern
+(commit `186a456`): the jump-target `AddOperation` is now stated semantically
+(`is_real = 1 → isU64 jump_target ∧ jump_target.toBitVec64 = b + c_imm`),
+matching `AddOp.Assertion.Spec`'s shape directly. The carry-chain
+implementation detail is reconstructed on demand via `AddOperation.iff_sp1_full`
+when bridging back to SP1's `allHold` at the trace level. -/
 def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
@@ -778,8 +784,11 @@ def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 47, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  (cols.is_real = 0 ∨ SP1Clean.GatedAddOp.Spec
-    cols.adapter.op_b_memory.prev_value cols.adapter.op_c_imm cols.jump_target) ∧
+  (cols.is_real = 1 →
+    Word.isU64 cols.jump_target ∧
+    Word.toBitVec64 cols.jump_target =
+      Word.toBitVec64 cols.adapter.op_b_memory.prev_value +
+      Word.toBitVec64 cols.adapter.op_c_imm) ∧
   cols.is_real * (cols.is_real - 1) = 0 ∧
   cols.lsb * (cols.lsb - 1) = 0 ∧
   (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
