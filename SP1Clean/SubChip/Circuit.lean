@@ -64,7 +64,7 @@ def main (cols : Var SubCols (ZMod p)) : Circuit (ZMod p) Unit := do
        op_a_write_value, is_real, adapter_cols⟩ := cols
   SP1Clean.SubOp.assertion
     (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
-      op_a_write_value⟩ :
+      op_a_write_value, is_real⟩ :
       Var SP1Clean.SubOp.Inputs (ZMod p))
   SP1Clean.CPUState.Gated.assertion
     (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
@@ -86,10 +86,17 @@ instance elaborated : ElaboratedCircuit (ZMod p) SubCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-/-- The chip is the `UserMode` variant. Its `adapter_cols.is_trusted`
-payload is structurally equal to `is_real`. -/
+/-- The chip is the `UserMode` variant (`M = UserMode` in upstream Rust),
+so its `adapter_cols.is_trusted` payload is structurally equal to `is_real`
+(both alias `Main[32]` in the constraint compiler's emission). The
+`is_real = 1` precondition restricts the FormalAssertion to non-padding
+rows: completeness reconstructs `SubOp.RawSpec` for the sub-circuit
+witness via `SubOperation.iff_sp1_full` (which needs the BitVec identity
+from FormalSpec's `is_real = 1 → ...` conjunct), so the chip contract is
+only meaningful on real rows. Trace-soundness drivers discharge
+`is_real = 1` per row before invoking `Sub.assertion`. -/
 def Assumptions (cols : SubCols (ZMod p)) : Prop :=
-  cols.adapter_cols.is_trusted = cols.is_real
+  cols.adapter_cols.is_trusted = cols.is_real ∧ cols.is_real = 1
 
 /-- The unified chip Spec is defined in `Cols.lean`
 (`SP1Clean.Sub.FormalSpec`). -/
@@ -100,43 +107,33 @@ theorem soundness :
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
+  obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
   obtain ⟨h_subop_sub, h_cpu_sub, h_rtr_sub, h_op_a_0⟩ := h_holds
   unfold id at *
-  have h_subop := h_subop_sub trivial
   have h_cpu := h_cpu_sub trivial
   have h_rtr := h_rtr_sub trivial
-  refine ⟨h_subop, h_cpu, h_rtr, h_op_a_0, ?_⟩
-  -- BitVec `RV64.sub` conjunct: discharge from `SubOp.Spec` (natural-form
-  -- carry chain) + the per-operand `Word.isU64` bounds for op_b/op_c —
-  -- inside `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec`
-  -- sub-conjuncts.
-  intro h_is_real_eq
+  -- Discharge SubOp.assertion's new Assumptions from the chip-level
+  -- `is_real = 1` + the per-operand `Word.isU64` bounds available inside
+  -- `RTypeReader.Gated.Spec`'s 4th/5th `RegisterAccess.Spec` sub-conjuncts.
+  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
-  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real_eq
   have h_ir_ne_zero :
       (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-    rw [h_is_real_eq]; exact one_ne_zero
+    rw [h_is_real]; exact one_ne_zero
   have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-    (h_ra_b.resolve_left h_ir_ne_zero).2.2
+    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
   have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
-    (h_ra_c.resolve_left h_ir_ne_zero).2.2
-  -- Bridge the cols-level `SubOp.Spec` to SP1's constraint allHold form,
-  -- then to the BitVec equation via `SubOperation.spec`.
-  have h_allHold : (SubOperation.constraints
-        input_adapter_op_b_memory_prev_value
-        input_adapter_op_c_memory_prev_value
-        { value := Vector.map (Expression.eval env) input_var_op_a_write_value }
-        1).allHold :=
-    (SP1Clean.SubOp.iff_sp1 _ _ _).mpr h_subop
-  have ⟨_, h_bv⟩ := SubOperation.spec h_isU64_b h_isU64_c h_allHold
-  -- `h_bv : op_a_write_value.toBitVec64 =
-  --          op_b.toBitVec64 - op_c.toBitVec64` (from `execute_RTYPE_pure_w
-  --          op_b op_c .SUB = op_b - op_c`).
-  -- Goal after `RV64.sub` unfold: `op_a_write_value.toBitVec64 =
-  --   RV64.sub (op_c.toBitVec64) (op_b.toBitVec64)`. Sail's `execute_RTYPE`
-  --   takes `rs2 rs1` order, so `RV64.sub op_c op_b = op_b - op_c`. Match
-  --   by direct substitution.
+    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  have h_subop := h_subop_sub
+    ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩
+  refine ⟨h_cpu, h_rtr, h_op_a_0, ?_⟩
+  -- SubOp.Spec under `is_real = 1` gives `(isU64 result ∧ toBitVec64 result =
+  -- op_b.toBitVec64 - op_c.toBitVec64)` directly. The chip-level FormalSpec
+  -- wants `RV64.sub op_c op_b` = `op_b - op_c` (Sail's `execute_RTYPE` takes
+  -- `rs2 rs1` order; the chip passes `Inputs.a := op_b, Inputs.b := op_c`).
+  intro h_is_real_eq
+  have ⟨h_isU64_v, h_bv⟩ := h_subop h_is_real_eq
+  refine ⟨h_isU64_v, ?_⟩
   simp only [RV64.sub]
   exact h_bv
 
@@ -145,9 +142,27 @@ theorem completeness :
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
-  obtain ⟨h_subop, h_cpu, h_rtr, h_op_a_0, _h_rv64sub⟩ := h_spec
+  obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
+  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem⟩ := h_spec
   unfold id at *
-  refine ⟨⟨trivial, h_subop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩, h_op_a_0⟩
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
+  have h_ir_ne_zero :
+      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
+    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
+    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
+  -- Discharge SubOp.assertion's Assumptions + Spec directly from the
+  -- chip's `h_sem` semantic conjunct and the operand bounds.
+  refine ⟨⟨⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩, ?_⟩,
+          ⟨trivial, h_cpu⟩, ⟨trivial, h_rtr⟩, h_op_a_0⟩
+  intro h_is_real_eq
+  have ⟨h_isU64_v, h_bv⟩ := h_sem h_is_real_eq
+  refine ⟨h_isU64_v, ?_⟩
+  simp only [RV64.sub] at h_bv
+  exact h_bv
 
 end Assertion
 

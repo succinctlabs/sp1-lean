@@ -46,19 +46,21 @@ lemma fromMain_toMain (cols : SubCols (ZMod p))
   all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
-`Sub.constraints Main` is exactly the conjunction of `SubOp.Spec`,
-`CPUState.Gated.Assertion.Spec`, and `RTypeReader.Gated.Assertion.Spec`
-over `fromMain Main`, under `is_real = Main[32] = 1`. The chip-level
-free `Main[32] * (Main[32] - 1) = 0` gate is absorbed into both
-Gated.Specs' first conjuncts. -/
+`Sub.constraints Main` is exactly the conjunction of
+`CPUState.Gated.Assertion.Spec`, `RTypeReader.Gated.Assertion.Spec`,
+`Main[13] = 0` (the chip-level `op_a_0` zero gate), and the semantic
+RV64-sub conjunct (`isU64` of the result + the BitVec equation), under
+`is_real = Main[32] = 1`. The byte-borrow decomposition that SP1's
+`SubOperation` threads internally is *not* exposed in the RHS — it's
+reconstructed from the BitVec equation and the `isU64` bounds of op_b /
+op_c (available from `RTypeReader.Gated.Spec`'s `RegisterAccess.Spec`
+sub-conjuncts) via `SubOperation.iff_sp1_full`. Used inside the Sail
+clause's external bridge (`SailBridge.sail_correct_of_formalSpec`) to
+construct an `allHold` from the structural pieces of `FormalSpec`. -/
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 33) (h_is_real : Main[32] = 1) :
     (_root_.Sub.constraints Main).allHold ↔
-      (SP1Clean.SubOp.Spec
-          #v[Main[15], Main[16], Main[17], Main[18]]
-          #v[Main[22], Main[23], Main[24], Main[25]]
-          #v[Main[28], Main[29], Main[30], Main[31]] ∧
-       SP1Clean.CPUState.Gated.Assertion.Spec
+      (SP1Clean.CPUState.Gated.Assertion.Spec
           ⟨{ clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
              pc := #v[Main[3], Main[4], Main[5]] },
            #v[Main[3] + 4, Main[4], Main[5]], 8, Main[32]⟩ ∧
@@ -82,19 +84,47 @@ lemma allHold_iff_structural
                  access_timestamp :=
                    { prev_low := Main[26], diff_low_limb := Main[27] } } },
            Main[32], Main[32]⟩ ∧
-       Main[13] = 0) := by
+       Main[13] = 0 ∧
+       Word.isU64 #v[Main[28], Main[29], Main[30], Main[31]] ∧
+       Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] =
+         RV64.sub (Word.toBitVec64 #v[Main[22], Main[23], Main[24], Main[25]])
+                  (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]])) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   rw [_root_.Sub.allHold_constraints_iff Main, h_is_real,
-      SP1Clean.SubOp.iff_sp1,
       SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1,
       SP1Clean.RTypeReader.Gated.Assertion.Spec_iff_sp1]
-  -- Drop the trivial `1 * (1 - 1) = 0` conjunct — both Gated.Specs already
-  -- carry their own `is_real * (is_real - 1) = 0`.
   refine ⟨?_, ?_⟩
-  · rintro ⟨h_subop, h_cpu, h_rtr, _, h_op_a_0⟩
-    exact ⟨h_subop, h_cpu, h_rtr, h_op_a_0⟩
-  · rintro ⟨h_subop, h_cpu, h_rtr, h_op_a_0⟩
-    refine ⟨h_subop, h_cpu, h_rtr, ?_, h_op_a_0⟩
+  · -- Forward: allHold → structural conjuncts + (isU64 ∧ RV64.sub eq).
+    rintro ⟨h_op, h_cpu, h_rtr, _, h_op_a_0⟩
+    have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
+    have h_isU64_b : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] :=
+      (h_rtr.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have h_isU64_c : Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] :=
+      (h_rtr.2.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have ⟨h_isU64_v, h_bv⟩ :=
+      (SubOperation.iff_sp1_full h_isU64_b h_isU64_c).mp h_op
+    refine ⟨h_cpu, h_rtr, h_op_a_0, h_isU64_v, ?_⟩
+    -- `h_bv : v.toBitVec64 = execute_RTYPE_pure_w op_b op_c .SUB`
+    --       = op_b.toBitVec64 - op_c.toBitVec64`.
+    -- Goal: `v.toBitVec64 = RV64.sub op_c.toBitVec64 op_b.toBitVec64`
+    --       = `op_b.toBitVec64 - op_c.toBitVec64`. Closes by `RV64.sub` defeq.
+    simp only [RV64.sub]
+    exact h_bv
+  · -- Backward: structural conjuncts + (isU64 ∧ RV64.sub eq) → allHold.
+    rintro ⟨h_cpu, h_rtr, h_op_a_0, h_isU64_v, h_bv⟩
+    have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
+    have h_isU64_b : Word.isU64 #v[Main[15], Main[16], Main[17], Main[18]] :=
+      (h_rtr.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have h_isU64_c : Word.isU64 #v[Main[22], Main[23], Main[24], Main[25]] :=
+      (h_rtr.2.2.2.2.1.resolve_left h_one_ne_zero).2.2
+    have h_bv' : Word.toBitVec64 #v[Main[28], Main[29], Main[30], Main[31]] =
+        execute_RTYPE_pure_w #v[Main[15], Main[16], Main[17], Main[18]]
+                             #v[Main[22], Main[23], Main[24], Main[25]] .SUB := by
+      simp only [RV64.sub] at h_bv
+      exact h_bv
+    have h_op :=
+      (SubOperation.iff_sp1_full h_isU64_b h_isU64_c).mpr ⟨h_isU64_v, h_bv'⟩
+    refine ⟨h_op, h_cpu, h_rtr, ?_, h_op_a_0⟩
     ring
 
 end SP1Clean.Sub

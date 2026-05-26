@@ -40,8 +40,9 @@ theorem sail_correct_of_formalSpec
                            (.Regidx (sp1_op_b_cols cols))
                            (.Regidx (sp1_op_a_cols cols))).run s := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_subop, h_cpu, h_rtr, h_op_a_0, _h_rv64sub⟩ := h_spec
-  have h_round_trip := fromMain_toMain cols h_assumptions
+  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem⟩ := h_spec
+  obtain ⟨h_trusted, _⟩ := h_assumptions
+  have h_round_trip := fromMain_toMain cols h_trusted
   have h_state := h_init (toMain cols) h_round_trip
   have h_isreal' : (toMain cols)[32] = 1 := h_is_real
   -- Reconstruct SP1's `allHold` on `toMain cols` from the structural conjuncts
@@ -50,11 +51,6 @@ theorem sail_correct_of_formalSpec
   -- `(fromMain (toMain cols)).Y` projections then unfold to the matching
   -- `(toMain cols)[k]` / `#v[…]` forms by `@[reducible]` on `fromMain`/`toMain`,
   -- lining up with the goal `allHold_iff_structural` produces.
-  have h_subop' : SP1Clean.SubOp.Spec
-        (fromMain (toMain cols)).adapter.op_b_memory.prev_value
-        (fromMain (toMain cols)).adapter.op_c_memory.prev_value
-        (fromMain (toMain cols)).op_a_write_value := by
-    rw [h_round_trip]; exact h_subop
   have h_cpu' : SP1Clean.CPUState.Gated.Assertion.Spec
         ⟨(fromMain (toMain cols)).state,
          #v[(fromMain (toMain cols)).state.pc[0] + 4,
@@ -72,9 +68,18 @@ theorem sail_correct_of_formalSpec
          (fromMain (toMain cols)).is_real,
          (fromMain (toMain cols)).adapter_cols.is_trusted⟩ := by
     rw [h_round_trip]; exact h_rtr
+  have h_sem' :
+      Word.isU64 (fromMain (toMain cols)).op_a_write_value ∧
+      Word.toBitVec64 (fromMain (toMain cols)).op_a_write_value =
+        RV64.sub
+          (Word.toBitVec64
+            (fromMain (toMain cols)).adapter.op_c_memory.prev_value)
+          (Word.toBitVec64
+            (fromMain (toMain cols)).adapter.op_b_memory.prev_value) := by
+    rw [h_round_trip]; exact h_sem h_is_real
   have h_allHold : (_root_.Sub.constraints (toMain cols)).allHold := by
     rw [allHold_iff_structural (toMain cols) h_isreal']
-    exact ⟨h_subop', h_cpu', h_rtr', h_op_a_0⟩
+    exact ⟨h_cpu', h_rtr', h_op_a_0, h_sem'.1, h_sem'.2⟩
   -- Apply Main-level `Sub.correct_sub`; the result reads `sp1_X (toMain cols)`,
   -- which is definitionally `sp1_X_cols cols` for each helper.
   exact (_root_.Sub.correct_sub (toMain cols) s h_allHold h_isreal' h_state).symm
