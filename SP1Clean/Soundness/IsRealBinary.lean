@@ -283,10 +283,11 @@ theorem is_real_binary_uType (cols : SP1Clean.UType.UTypeCols (ZMod p))
     cols.is_real = 0 ∨ cols.is_real = 1 := by
   apply binary_of_assertZero
   change SP1Clean.UType.Assertion.FormalSpec cols at h
-  -- The new FormalSpec layout: ⟨cpuStateSpec, AddOp .allHold, jtypeReaderSpec,
-  -- `is_real` binary, `is_auipc` binary, 3 addend gates, op_a_0 gate, BitVec⟩.
-  -- The is_real binary fact is at position 4 (= `h.2.2.2.1`).
-  exact h.2.2.2.1
+  -- FormalSpec layout (post Phase 4 refactor to JTypeReader.Gated):
+  -- ⟨cpuStateSpec, AddOp .allHold, JTypeReader.Gated.Spec, is_auipc binary,
+  --  3 addend gates, op_a_0 gate, BitVec⟩. The free is_real binary now lives
+  -- inside Gated.Spec's first conjunct (h.2.2.1.1).
+  exact h.2.2.1.1
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Boundary chip discharge: the `is_real * (is_real - 1) = 0` clause is
