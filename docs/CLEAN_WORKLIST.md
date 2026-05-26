@@ -46,7 +46,7 @@ axiom-clean. Closes ~5–7 sorries.
 | task-id | target | files | claim | status |
 |---------|--------|-------|-------|--------|
 | **p2-addi** | AddiChip | `SP1Clean/AddiChip/{Cols,Circuit,Lemmas,SailBridge}.lean` (+ AddiChip-specific shape fixes in `SP1Clean/Soundness/{IsRealBinary,MemoryConsistencyClock}.lean`) | main | merged (`4656a5d`) |
-| **p2-jal** | JalChip | `SP1Clean/JalChip.lean` | helper-2 | open |
+| **p2-jal** | JalChip | `SP1Clean/JalChip.lean` | main | merged |
 | **p2-sub** | SubChip | `SP1Clean/SubChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | helper-1 | open |
 | **p2-subw** | SubwChip | `SP1Clean/SubwChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | helper-2 | open |
 | **p2-addw** | AddwChip | `SP1Clean/AddwChip/{Cols,Circuit,Lemmas,SailBridge}.lean` | helper-1 | open |

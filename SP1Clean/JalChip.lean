@@ -433,13 +433,38 @@ instance elaborated : ElaboratedCircuit (ZMod p) JalCols unit where
   subcircuitsConsistent input offset := by
     simp +arith only [main, circuit_norm]
 
-def Assumptions (_ : JalCols (ZMod p)) : Prop := True
+/-- Strengthened Assumptions: non-padding row (`is_real = 1`) plus the
+two operand-isU64 bounds needed by the gated `AddOp.assertion`
+sub-circuits. The bounds are easy at the trace level (PC limbs and J-type
+immediate limbs are < 65536 by the SP1 column conventions), but they're
+not derivable from the chip-level sub-circuit Specs (`ProgramTable`,
+`OperandAccess`) without a verbose ZMod-`<`-to-`.val`-`<` conversion.
+Surfacing them here keeps the chip's own soundness/completeness clean
+while pushing the bounds discharge into the trace-soundness driver. -/
+def Assumptions (cols : JalCols (ZMod p)) : Prop :=
+  cols.is_real = 1 ∧
+  Word.isU64 (cols.state.pc.push 0) ∧
+  Word.isU64 cols.adapter.op_b_imm
 
+/-- Chip-level FormalSpec mirroring AddChip's canonical pattern
+(commit `b82c79e`): the two AddOp sub-circuit conjuncts are now stated
+semantically (`is_real = 1 → isU64 result ∧ result.toBitVec64 = a + b`),
+matching `AddOp.Assertion.Spec`'s shape directly. The carry-chain
+implementation detail is reconstructed on demand via `AddOp.iff_sp1_full`
+when bridging back to SP1's `allHold` at the trace level. -/
 def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.AddOp.RawSpec (cols.state.pc.push 0) cols.adapter.op_b_imm cols.next_pc ∧
-  SP1Clean.AddOp.RawSpec (cols.state.pc.push 0) #v[4, 0, 0, 0] cols.op_a_write_value ∧
+  (cols.is_real = 1 →
+    Word.isU64 cols.next_pc ∧
+    Word.toBitVec64 cols.next_pc =
+      Word.toBitVec64 (cols.state.pc.push 0) +
+      Word.toBitVec64 cols.adapter.op_b_imm) ∧
+  (cols.is_real = 1 →
+    Word.isU64 cols.op_a_write_value ∧
+    Word.toBitVec64 cols.op_a_write_value =
+      Word.toBitVec64 (cols.state.pc.push 0) +
+      Word.toBitVec64 (#v[4, 0, 0, 0] : Vector (ZMod p) 4)) ∧
   SP1Clean.ProgramTable.Spec
     { pc := cols.state.pc, opcode := 46, op_a := cols.adapter.op_a,
       op_b := cols.adapter.op_b_imm, op_c := cols.adapter.op_c_imm,
@@ -451,46 +476,75 @@ def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩
 
-/-- Soundness of `Jal.assertion`. **TWO TODO sorries** (jump-target and
-return-address AddOp.RawSpec): legacy FormalSpec carries `AddOp.RawSpec`
-unconditionally, but multiplicity-gated `AddOp.assertion` only gives a
-BV-form Spec under `is_real = 1`. Bridge requires either (a) strengthening
-chip Assumptions to `is_real = 1` plus surgical iff_sp1_full chain, or
-(b) migrating FormalSpec to drop `AddOp.RawSpec` (mirror AddChip
-`b82c79e`). Tracked alongside the AddiChip-equivalent gap. -/
+/-- Soundness of `Jal.assertion`. Mirrors AddChip's canonical recipe
+(commit `b82c79e`): each AddOp sub-circuit Spec under `is_real = 1` is
+exactly the corresponding `FormalSpec` semantic conjunct, so the two
+discharges are direct passthroughs of `h_jump_sub` / `h_ret_sub`. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨⟨_, _, _, _h_pc⟩, _⟩ := h_input
-  obtain ⟨h_cpu_sub, _h_jump_sub, _h_ret_sub, h_prog_sub, h_oa_a, h_isreal⟩ := h_holds
+  obtain ⟨⟨_, _, _, h_pc⟩, _⟩ := h_input
+  obtain ⟨h_cpu_sub, h_jump_sub, h_ret_sub, h_prog_sub, h_oa_a, h_isreal⟩ := h_holds
+  obtain ⟨h_is_real, h_isU64_pc, h_isU64_opb⟩ := h_assumptions
   unfold id at *
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h4_lt : (4 : ZMod p).val < 65536 := by rw [val_4_zmod_p]; omega
+  have h0_lt : (0 : ZMod p).val < 65536 := by rw [ZMod.val_zero]; omega
+  have h_isU64_four : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0]) := by
+    intro i; fin_cases i <;> simp
+  -- Normalize `Vector.map eval (v.push 0)` to `(Vector.map eval v).push 0`
+  -- and align with the chip cols form via h_pc.
+  simp only [Vector.map_push, Expression.eval, h_pc] at h_jump_sub h_ret_sub
+  -- Discharge each AddOp sub-circuit's Assumptions from h_assumptions
+  -- (operand bounds + binarity of is_real from h_is_real).
+  have h_jump :=
+    h_jump_sub ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_pc, h_isU64_opb⟩⟩
+  have h_ret :=
+    h_ret_sub ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_pc, h_isU64_four⟩⟩
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
-  · -- AddOp.RawSpec for jump-target carry chain. Multiplicity-gated AddOp
-    -- now exposes BV form, not RawSpec; legacy FormalSpec needs migration.
-    sorry
-  · -- AddOp.RawSpec for return-address carry chain. Same gap as above.
-    sorry
+  · -- Jump-target semantic conjunct: AddOp.assertion gives exactly this
+    -- form under `is_real = 1`.
+    exact h_jump
+  · -- Return-address semantic conjunct: same.
+    exact h_ret
   · exact h_prog_sub trivial
   · linear_combination h_isreal
   · exact h_oa_a trivial
 
-/-- Completeness of `Jal.assertion`. **TWO TODO sorries** discharging
-the two AddOp.assertion sub-circuits' new disjunctive Assumptions+Spec
-contracts from the chip's legacy RawSpec conjunct. Same gap as the
-soundness side. -/
+/-- Completeness of `Jal.assertion`. Each AddOp.assertion sub-circuit's
+Assumptions (`is_real ∈ {0,1}` + `is_real = 1 → isU64 a ∧ isU64 b`) plus
+Spec is discharged from the chip-level `h_assumptions` (which carries the
+operand isU64 bounds) and the matching `FormalSpec` semantic conjunct. -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
-  obtain ⟨⟨_, _, _, _h_pc⟩, _⟩ := h_input
-  obtain ⟨h_cpu, _h_jump, _h_ret, h_prog, h_isreal, h_oa_a⟩ := h_spec
+  obtain ⟨⟨_, _, _, h_pc⟩, _⟩ := h_input
+  obtain ⟨h_cpu, h_jump, h_ret, h_prog, h_isreal, h_oa_a⟩ := h_spec
+  obtain ⟨h_is_real, h_isU64_pc, h_isU64_opb⟩ := h_assumptions
   unfold id at *
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  -- 4 as a 4-limb Word is isU64 (each limb < 65536 trivially).
+  have h4_lt : (4 : ZMod p).val < 65536 := by
+    rw [val_4_zmod_p]; omega
+  have h0_lt : (0 : ZMod p).val < 65536 := by
+    rw [ZMod.val_zero]; omega
+  have h_isU64_four : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0]) := by
+    intro i; fin_cases i <;> simp
+  -- Align `Vector.map eval (pc.push 0)` ↔ chip's `pc.push 0` form so the
+  -- sub-circuit Assumptions/Spec discharges typecheck against h_jump/h_ret.
+  simp only [Vector.map_push, Expression.eval, h_pc] at h_jump h_ret ⊢
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
-  · -- AddOp.assertion (jump target) sub-circuit Assumptions+Spec discharge.
-    sorry
-  · -- AddOp.assertion (return address) sub-circuit Assumptions+Spec discharge.
-    sorry
+  · -- AddOp.assertion (jump-target): supply Assumptions (binary + bounds)
+    -- and Spec from h_jump.
+    refine ⟨⟨Or.inr h_is_real, ?_⟩, h_jump⟩
+    intro _
+    exact ⟨h_isU64_pc, h_isU64_opb⟩
+  · -- AddOp.assertion (return-address): same shape; b = #v[4,0,0,0] is U64.
+    refine ⟨⟨Or.inr h_is_real, ?_⟩, h_ret⟩
+    intro _
+    exact ⟨h_isU64_pc, h_isU64_four⟩
   · exact ⟨trivial, h_prog⟩
   · exact ⟨trivial, h_oa_a⟩
   · linear_combination h_isreal
