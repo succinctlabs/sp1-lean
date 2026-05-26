@@ -80,6 +80,16 @@ under `docs/`, look at the matching entry below.
   field application (never via `List.Forall SP1Constraint.toProp ...`
   envelopes). Read before adding a new Clean operation or chip.
 
+- **`SPEC_AUDIT.md`** — per-`FormalSpec` classification of every
+  entry in `SP1Clean/Chips/Spec.lean` into four categories: (a)
+  minimal semantic + `RV64.*`, (b) internals + `RV64.*`, (c) faithful
+  mirror without `RV64.*`, (d) Spec or `main` still incomplete vs
+  upstream Rust. Read before deciding which chip Spec to upgrade
+  next, or to understand the gap between a chip's `main`, its
+  `FormalSpec`, and what the upstream constraint compiler emits.
+  Ends with a "highest-leverage gaps" list ordered by faithfulness
+  unlocked per unit of work.
+
 - **`MULTIPLICITY_BUS.md`** — **work-in-progress** doc for the
   multiplicity-aware lookup bus refactor (`SP1Clean/SP1Lookup.lean`).
   Read this when the AddwChip op_c completeness `sorry` blocks you,
