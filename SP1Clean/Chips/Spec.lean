@@ -146,23 +146,35 @@ end SP1Clean.Addi
 
 namespace SP1Clean.Addw
 
-/-- The unified chip Spec for `AddwChip`: the ADDW carry-chain arithmetic
-(`AddwOp.Spec`, Inputs-shape) plus the flag-threaded sub-circuit
-composition (`CPUState.Gated` + `ALUTypeReader.Gated`) plus the
-chip-level `op_a_0 = 0` gate plus the two pure BitVec semantic clauses
-(`RV64.addw` when `imm_c = 0`, `RV64.addiw` when `imm_c = 1`). The free
-`is_real * (is_real - 1) = 0` gate now lives inside both Gated.Specs'
+/-- The unified chip Spec for `AddwChip`: the canonical (a) shape from
+the SPEC_AUDIT.md classification — flag-threaded sub-circuit composition
+(`CPUState.Gated` + `ALUTypeReader.Gated`, opcode 19) plus the
+chip-level `op_a_0 = 0` gate plus a pure BitVec `RV64.addw` semantic
+conjunct conditional on `is_real = 1`. The byte-decomposition +
+sign-extension MSB witness threaded internally by `AddwOperation` is
+*not* exposed here; it's the implementation detail of the `AddwOp`
+sub-circuit and is reconstructed on demand via
+`AddwOperation.iff_sp1_full` (see `Lemmas.lean`).
+
+The 4-limb result Word `#v[addw_value[0], addw_value[1], msb*65535,
+msb*65535]` is reconstructed inline from the chip-internal `addw_value`
+(2 BV16 limbs) and `addw_msb` (sign-extension witness) — these are the
+canonical Rust-side storage form. The Spec's semantic conjunct sees
+only the result `Word`, not the individual columns; the `RV64.addw`
+clause is uniform for both ADDW (R-type, `imm_c = 0`) and ADDIW (I-type,
+`imm_c = 1`) because the reader supplies `op_c_memory.prev_value`
+matching the immediate or register operand as appropriate (so the BV64
+equation is the same regardless of `imm_c`). The per-row Sail-monadic
+equivalence to `_root_.Addw.spec_addw` / `_root_.Addiw.spec_addiw` is
+recovered externally via `sail_correct_addw_of_formalSpec` /
+`sail_correct_addiw_of_formalSpec` (`SailBridge.lean`). The free
+`is_real * (is_real - 1) = 0` gate lives inside both Gated.Specs'
 first conjuncts. -/
 def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let op_a_write_value : Word (ZMod p) :=
     #v[cols.addw_value[0], cols.addw_value[1],
        cols.addw_msb * 65535, cols.addw_msb * 65535]
-  SP1Clean.AddwOp.Spec
-      ⟨cols.adapter.op_b_memory.prev_value,
-       cols.adapter.op_c_memory.prev_value,
-       cols.addw_value,
-       cols.addw_msb⟩ ∧
   SP1Clean.CPUState.Gated.Assertion.Spec
       ⟨cols.state,
        #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
@@ -172,14 +184,8 @@ def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
        op_a_write_value, cols.adapter,
        cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0 ∧
-  -- Pure BitVec semantic for ADDW (imm_c = 0). The ADDIW variant
-  -- (imm_c = 1) is intentionally deferred: closing it requires the
-  -- ALUTypeReader's `Gated.Assertion.Spec` to expose the trusted
-  -- instruction's immediate sign-extension contract (currently bundled
-  -- inside ProgramGated.Spec's opaque table lookup). Tracked under
-  -- Phase 1.1 of the canonicalization plan — promote the reader to
-  -- surface the sign-ext fact, then add a parallel RV64.addiw conjunct.
-  (cols.is_real = 1 → cols.adapter.imm_c = 0 →
+  (cols.is_real = 1 →
+    Word.isU64 op_a_write_value ∧
     Word.toBitVec64 op_a_write_value =
       RV64.addw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)
                 (Word.toBitVec64 cols.adapter.op_b_memory.prev_value))
@@ -263,26 +269,30 @@ end SP1Clean.Subw
 
 namespace SP1Clean.UType
 
-/-- Chip-level Spec for `UTypeChip`. Mirrors what `Assertion.main`
-emits, matching the monolith's TraceSpec shape (cpuStateSpec
-+ raw AddOp `.allHold` + jtypeReaderSpec + scalar gates) and adding the
-new pure BitVec conjunct so the chip's per-row RV64 semantics are visible
-at a glance. The AddOp clause stays in raw `.allHold` form (with the
-conditional gate `is_real - op_a_0`) because `AddOperation.allHold_constraints_iff`
-is only stated at `is_real_arg = 1` — keeping the raw form here lets
-`allHold_iff_structural` (Lemmas.lean) bridge to SP1's flat constraint list
-without a case split on `op_a_0`.
+/-- Chip-level Spec for `UTypeChip` — canonical (a) shape per SPEC_AUDIT.md.
+The raw `AddOperation.constraints.allHold` envelope is replaced by
+`AddOp.Assertion.Spec` as a subcircuit composition (gated on
+`is_real - op_a_0`), and the `cpuStateSpec` is promoted to
+`CPUState.Gated.Assertion.Spec`. The byte-carry decomposition that SP1's
+`AddOperation` threads internally is *not* exposed here; it's the
+implementation detail of the `AddOp` sub-circuit and is reconstructed on
+demand via `SP1Clean.AddOp.iff_sp1_full` (see `Lemmas.lean`).
 
 Conjuncts:
-- `cpuStateSpec` — the two clock-field byte-bound consequences.
-- AddOp `.allHold` — raw 4-limb carry chain over `addend` + `op_b_imm` =
-  `add_result`, gated by `is_real - op_a_0` (matches SP1's emission).
-- `jtypeReaderSpec` — full J-type reader spec at `is_real = is_trusted = 1`
-  (composes `trusted_instr`, register-index bounds, op_a_0 binary, op_a
-  iff, pc bounds, timestamp, `Word.isU64` on prev_value, and the
-  op_a_0-masked write-value gates).
-- Six scalar trailing gates (`is_real`/`is_auipc` binary, three addend
-  gates `addend[i] - is_auipc * pc[i] = 0`, and `(is_real - 1) * op_a_0 = 0`).
+- `CPUState.Gated.Assertion.Spec` — flag-threaded CPUState sub-circuit
+  composition (binary gate + 2 state-bus + 2 byte-opcode, all gated by
+  `cols.is_real`). Absorbs the free `is_real * (is_real - 1) = 0` gate.
+- `AddOp.Assertion.Spec` — gated by `is_real - op_a_0` (= 1 when
+  `(is_real, op_a_0) = (1, 0)`, the only case where AUIPC/LUI's PC-relative
+  addition fires). The conditional Spec form: `gate = 1 → isU64 result ∧
+  result.toBitVec64 = addend.toBitVec64 + op_b_imm.toBitVec64`.
+- `JTypeReader.Gated.Assertion.Spec` — full J-type reader spec at
+  `is_real = is_trusted = 1` (composes `trusted_instr`, register-index
+  bounds, op_a_0 binary, op_a iff, pc bounds, timestamp, `Word.isU64`
+  on prev_value, and the op_a_0-masked write-value gates).
+- Five scalar trailing gates (`is_auipc` binary, three addend gates
+  `addend[i] - is_auipc * pc[i] = 0`, and the chip-level conditional
+  `(is_real - 1) * op_a_0 = 0` ensuring `op_a_0 ≤ is_real`).
 - Pure BitVec equation (conditional on `is_real = 1 ∧ op_a_0 = 0`):
   `add_result = if is_auipc = 1 then RV64.auipc imm pc else RV64.lui imm`.
   The sign-extension identity is enforced inside the program-bus clause's
@@ -292,12 +302,15 @@ Conjuncts:
 def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
   let opcode_e : ZMod p := cols.is_auipc * 48 + (1 - cols.is_auipc) * 49
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  (_root_.AddOperation.constraints (F := ZMod p)
-      #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
-      cols.adapter.op_b_imm
-      { value := cols.add_result }
-      (cols.is_real - cols.adapter.op_a_0)).allHold ∧
+  SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ ∧
+  SP1Clean.AddOp.Assertion.Spec
+      ⟨#v[cols.addend[0], cols.addend[1], cols.addend[2], 0],
+       cols.adapter.op_b_imm,
+       cols.add_result,
+       cols.is_real - cols.adapter.op_a_0⟩ ∧
   SP1Clean.JTypeReader.Gated.Assertion.Spec
       ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
        cols.add_result, cols.adapter,
@@ -308,6 +321,7 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
   cols.addend[2] - cols.is_auipc * cols.state.pc[2] = 0 ∧
   (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
   (cols.is_real = 1 → cols.adapter.op_a_0 = 0 →
+    Word.isU64 cols.add_result ∧
     Word.toBitVec64 cols.add_result =
       (let imm : BitVec 20 :=
         BitVec.ofNat 20 (cols.adapter.op_b_imm[0].val / 4096 +

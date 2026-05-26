@@ -206,12 +206,12 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       -- contribution here; a parallel `lookupAccesses` accessor (Phase 4
       -- of MULTIPLICITY_BUS.md) is the canonical home.
       []
-  | .uType cols =>
-      -- One register access only (op_a write). U-type has no op_b/op_c
-      -- register reads — both are immediates.
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.UType.opAMemoryAccess cols
-      [(op_a_mem, cols.add_result)]
+  | .uType _ =>
+      -- UType memory-access contributions are now routed through the
+      -- multiplicity-aware lookup bus (per the canonical-(a) FormalSpec
+      -- migration: `JTypeReader.Gated.assertion` composes an `OperandAccess`
+      -- subcircuit for op_a write). Parallel to `.addw _`'s bus-routing.
+      []
   | .jalr cols =>
       -- Two register accesses: op_a write (return address), op_b read
       -- (jump-target base register). op_c is an I-type immediate.
@@ -458,7 +458,7 @@ def offsets : ChipRow p → List (ZMod p)
   | .mul _ => [4, 3, 2]
   | .shiftLeft _ => [4, 3, 2]
   | .addw _ => []  -- parallel to `memoryAccesses (.addw _) := []`
-  | .uType _ => [4]
+  | .uType _ => []  -- parallel to `memoryAccesses (.addw _) := []`
   | .jalr _ => [4, 3]
   | .lt _ => [4, 3, 2]
   -- Store{Word,Double,Half} memory accesses also flow through the lookup
@@ -676,35 +676,15 @@ theorem memoryAccessesValid_of_spec_add
     ChipRow.memoryAccessesValid (.add _cols) := by
   simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- UType's per-chip discharge — extracts the op_a `RegisterAccess.Spec`
-from `JTypeReader.Gated.Assertion.Spec` (FormalSpec position #3 after the
-Phase 4 refactor to `JTypeReader.Gated.assertion`). The RegisterAccess
-disjunct is resolved under `cols.is_real ≠ 0`. UType emits only the op_a
-register access at offset +4. -/
+/-- UType's per-chip discharge — vacuously true, since UTypeChip's
+memory contributions now flow through the multiplicity-aware lookup bus
+emitted inside `JTypeReader.Gated.assertion` (Phase 4 + (a)-shape
+migration). Mirrors `memoryAccessesValid_of_spec_addi`. -/
 theorem memoryAccessesValid_of_spec_uType
-    (cols : SP1Clean.UType.UTypeCols (ZMod p))
-    (h : SP1Clean.UType.assertion.Spec cols)
-    (h_is_real : cols.is_real = 1) :
-    ChipRow.memoryAccessesValid (.uType cols) := by
-  change SP1Clean.UType.Assertion.FormalSpec cols at h
-  -- FormalSpec shape: ⟨cpuStateSpec, AddOp .allHold, JTypeReader.Gated.Spec,
-  -- 4 scalar gates (is_auipc binary + 3 addend), op_a_0 gate, BitVec⟩.
-  obtain ⟨_h_cpu, _h_addop, h_jtr, _h_isauipc,
-          _h_a0, _h_a1, _h_a2, _h_op_a_0_gate, _h_bitvec⟩ := h
-  -- JTypeReader.Gated.Spec layout: ⟨is_real_bin, ProgramGated.Spec,
-  -- RegisterAccess.Spec (op_a), 4 op_a_0 mask gates⟩. Pull the
-  -- RegisterAccess and resolve under is_real ≠ 0.
-  obtain ⟨_h_ir_bin, _h_prog, h_ra_a, _h_z0, _h_z1, _h_z2, _h_z3⟩ := h_jtr
-  have h_ir_ne_zero : cols.is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
-  have h_a := h_ra_a.resolve_left h_ir_ne_zero
-  simp only [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses,
-    ChipRow.offsets, ChipRow.clockComponents, List.zip_cons_cons,
-    List.mem_cons, List.not_mem_nil, or_false, List.zip_nil_right]
-  intro entry h_mem
-  subst h_mem
-  -- `RegisterAccess.Assertion.Spec` (post-resolve) is the 3-tuple
-  -- ⟨diff_low_limb < 65536, ts < 256, Word.isU64 prev_value⟩.
-  exact ⟨h_a.1, h_a.2.1, h_a.2.2⟩
+    (_cols : SP1Clean.UType.UTypeCols (ZMod p))
+    (_h : SP1Clean.UType.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.uType _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
 /-- Jal's per-chip discharge — projects the single
 `OperandAccess.Assertion.Spec` conjunct. Jal has only the op_a register

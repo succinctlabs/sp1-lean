@@ -9,8 +9,9 @@ constraint mirror without RV64, or still incomplete relative to chip
 
 This is a snapshot — re-run the rubric below whenever
 `SP1Clean/Chips/Spec.lean` or a chip's `main` changes shape. The
-verdict table reflects the repo at branch `dtumad/clean` commit
-`8409e59` (2026-05-26).
+verdict table reflects the repo at branch `dtumad/clean` (2026-05-26),
+post the AddwChip + UTypeChip phase-(b)→(a) migration that closed
+the (b) tier of the audit.
 
 ## Classification rubric
 
@@ -56,9 +57,9 @@ For each `def FormalSpec` (and `AssertionGated.FormalSpec`):
 | `SP1Clean.Add` | **(a)** | `CPUState.Gated` + `RTypeReader.Gated` + `op_a_0 = 0` + `is_real = 1 → isU64 ∧ toBitVec64 = RV64.add …`. |
 | `SP1Clean.Addi` | **(a)** | Same shape, `ITypeReader.Gated` + `RV64.addi`. |
 | `SP1Clean.Sub` | **(a)** | Same shape, `RV64.sub`. |
-| `SP1Clean.Addw` | **(b)** partial | `AddwOp.Spec` internals (`addw_value`, `addw_msb`) + `RV64.addw`. `imm_c = 1` branch (`RV64.addiw`) intentionally deferred per doc comment. |
+| `SP1Clean.Addw` | **(a)** | Same shape, `ALUTypeReader.Gated` + `RV64.addw` (uniform across `imm_c ∈ {0, 1}` since the reader supplies `op_c_memory.prev_value` correctly for both ADDW and ADDIW). `AddwOp.Spec` internals exposure dropped (2026-05-26 migration); the carry chain is reconstructed on demand via `addwOp_spec_iff_rv64_addw` (`SP1Clean/Chips/ALU/AddwChip/Lemmas.lean`) which inverts the sign-extension via `BitVec.setWidth_signExtend_eq_self`. |
 | `SP1Clean.Subw` | **(c)** | `SubwOp` internals + Sail `execute_RTYPEW_pure_32_w`. `RV64.subw` exists in `RISCV/Instructions.lean` — upgrade candidate to (b). |
-| `SP1Clean.UType` | **(b)** | Raw `AddOperation.constraints.allHold` (internals `addend`, `add_result`) + `RV64.auipc` / `RV64.lui`. |
+| `SP1Clean.UType` | **(a)** | `CPUState.Gated` + `AddOp.Assertion.Spec` (gated by `is_real - op_a_0`) + `JTypeReader.Gated` + 5 scalar gates + `is_real = 1 → op_a_0 = 0 → isU64 add_result ∧ toBitVec64 = if is_auipc then RV64.auipc imm pc else RV64.lui imm`. 2026-05-26 migration dropped the raw `AddOperation.constraints.allHold` envelope and `cpuStateSpec → CPUState.Gated.Assertion.Spec`; the sign-extension identity comes from `Opcode.trusted_instr` for opcodes 48 (AUIPC) and 49 (LUI). |
 | `SP1Clean.Mul` | **(c)** | `MulOp.Spec` internals + `RTypeReader.Gated`. Matches `MulChip/Aggregate.lean:520 main`. `RV64.mul/mulh/mulhu/mulhsu/mulw` available. |
 | `SP1Clean.DivRem` | **(c)** | MulOp×2 + IsEqualWordOp×4 + IsZeroWordOp + AddOp×2 + LtUnsignedOp + U16MSBOp×7. Matches `DivRemChip/Aggregate.lean:189 main`. `RV64.div/divu/divw/divuw/rem/remu/remw/remuw` available. |
 | `SP1Clean.Bitwise` | **(d)** | Spec matches the gated `main` at `BitwiseChip/Aggregate.lean:316`, but **both** drop `BitwiseU16Operation` + `ALUTypeReader` that upstream Rust `alu/bitwise/mod.rs` emits. Self-flagged in the doc comment. `RV64.and/or/xor` available. |
@@ -114,8 +115,8 @@ partial — drops `load_mem/+1` etc.) and an `AssertionGated.FormalSpec`
 
 | Category | Count | Members |
 |---|---|---|
-| **(a)** | 3 | Add, Addi, Sub |
-| **(b)** | 2 | Addw (partial RV64), UType |
+| **(a)** | 5 | Add, Addi, Sub, **Addw** (post-2026-05-26), **UType** (post-2026-05-26) |
+| **(b)** | 0 | — (tier closed by the 2026-05-26 phase-(b)→(a) migration) |
 | **(c)** | 16 | Subw, Mul, DivRem, Branch.Assertion, Jal.Assertion, Jalr.Assertion, 9× Memory `AssertionGated` |
 | **(d)** | 17 | 4× ALU (Bitwise, ShiftLeft, ShiftRight, Lt), 3× Control `AssertionGated` missing, 9× Memory `Assertion` partial, MemoryGlobal absent |
 
@@ -142,16 +143,21 @@ Ordered by how much faithfulness they unlock per unit of work:
    `RV64.<op>` available; add the semantic trailing conjunct.
    `Subw` is the easiest: replace `execute_RTYPEW_pure_32_w` with
    `RV64.subw`. Promotes from (c) to (b).
-5. **Addw `imm_c = 1`** — already in (b). Add the
-   `cols.is_real = 1 → cols.adapter.imm_c = 1 → … = RV64.addiw …`
-   clause to complete RV64 coverage. Closes the doc-comment-flagged
-   deferral.
+5. ~~**Addw `imm_c = 1`** — already in (b).~~ **CLOSED 2026-05-26.**
+   AddwChip promoted to (a) by dropping `AddwOp.Spec` from FormalSpec
+   and using a uniform `RV64.addw` clause (no `imm_c` conditional
+   needed — the reader supplies `op_c_memory.prev_value` correctly
+   for both ADDW and ADDIW). UTypeChip similarly promoted to (a) and
+   its 2 outstanding sorries closed in the same migration.
 
 ## Available but unused `RV64.*` names
 
 The catalog of `RV64.<op>` symbols in `.lake/packages/RISCV/RISCV/Instructions.lean`
-contains ~66 entries. Currently `Spec.lean` references only 7
-(`add`, `addi`, `addiw`, `addw`, `auipc`, `lui`, `sub`). The 59 unused
+contains ~66 entries. Currently `Spec.lean` references 6 (`add`,
+`addi`, `addw`, `auipc`, `lui`, `sub`) — `addiw` was dropped from the
+references when AddwChip switched to a uniform `RV64.addw` clause that
+covers both ADDW (R-type, `imm_c = 0`) and ADDIW (I-type, `imm_c = 1`)
+via the reader's `op_c_memory.prev_value` field. The 59+ unused
 names that map onto SP1 chips are:
 
 - Arithmetic: `subw` (for Subw), `mul`, `mulh`, `mulhu`, `mulhsu`,

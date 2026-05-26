@@ -33,17 +33,11 @@ private theorem allHold_of_formalSpec
     (h_is_real : cols.is_real = 1) :
     (_root_.Addw.constraints (toMain cols)).allHold := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0, _h_rv64addw⟩ := h_spec
+  obtain ⟨h_cpu, h_alu, h_op_a_0, h_sem⟩ := h_spec
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_isreal' : (toMain cols)[35] = 1 := h_is_real
   -- Re-state each cols-level Spec hypothesis through `fromMain (toMain cols)`
   -- (which equals `cols` by h_round_trip).
-  have h_addwop' : SP1Clean.AddwOp.Spec
-        ⟨(fromMain (toMain cols)).adapter.op_b_memory.prev_value,
-         (fromMain (toMain cols)).adapter.op_c_memory.prev_value,
-         (fromMain (toMain cols)).addw_value,
-         (fromMain (toMain cols)).addw_msb⟩ := by
-    rw [h_round_trip]; exact h_addwop
   have h_cpu' : SP1Clean.CPUState.Gated.Assertion.Spec
         ⟨(fromMain (toMain cols)).state,
          #v[(fromMain (toMain cols)).state.pc[0] + 4,
@@ -64,8 +58,25 @@ private theorem allHold_of_formalSpec
          (fromMain (toMain cols)).is_real,
          (fromMain (toMain cols)).adapter_cols.is_trusted⟩ := by
     rw [h_round_trip]; exact h_alu
+  -- Apply h_sem under `is_real = 1` to recover the (isU64, BV64) pair.
+  have h_pair := h_sem h_is_real
+  obtain ⟨h_isU64_v, h_bv64⟩ := h_pair
+  have h_isU64_v' : Word.isU64
+      (#v[(toMain cols)[32], (toMain cols)[33],
+          (toMain cols)[34] * 65535, (toMain cols)[34] * 65535]
+        : Word (ZMod p)) := h_isU64_v
+  have h_bv64' :
+      Word.toBitVec64 (#v[(toMain cols)[32], (toMain cols)[33],
+                           (toMain cols)[34] * 65535, (toMain cols)[34] * 65535]
+        : Word (ZMod p)) =
+      RV64.addw (Word.toBitVec64 (#v[(toMain cols)[25], (toMain cols)[26],
+                                      (toMain cols)[27], (toMain cols)[28]]
+                  : Word (ZMod p)))
+                (Word.toBitVec64 (#v[(toMain cols)[15], (toMain cols)[16],
+                                      (toMain cols)[17], (toMain cols)[18]]
+                  : Word (ZMod p))) := h_bv64
   rw [allHold_iff_structural (toMain cols) h_isreal']
-  exact ⟨h_addwop', h_cpu', h_alu', h_op_a_0⟩
+  exact ⟨h_cpu', h_alu', h_op_a_0, h_isU64_v', h_bv64'⟩
 
 /-- Cols-level Sail bridge for ADDW (R-type, `imm_c = 0`). -/
 theorem sail_correct_addw_of_formalSpec

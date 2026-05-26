@@ -174,14 +174,15 @@ theorem cpuStateSpec_of_spec_addw (cols : Addw.AddwCols (ZMod p))
     (h : Addw.assertion.Spec cols)
     (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  -- Post-Gated-migration: cpuStateSpec is now embedded in
-  -- `CPUState.Gated.Assertion.Spec` (disjunctive). Mirror of Add/Addi.
+  -- Post-Gated-migration AND post-(a)-shape migration: `AddwOp.Spec` is
+  -- no longer a FormalSpec conjunct, so `CPUState.Gated.Assertion.Spec`
+  -- is now position 1. Mirror of Add/Addi.
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change Addw.Assertion.FormalSpec cols at h
   have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
       ⟨cols.state,
        #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
-       8, cols.is_real⟩ := h.2.1
+       8, cols.is_real⟩ := h.1
   rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
   exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
@@ -339,10 +340,22 @@ theorem cpuStateSpec_of_spec_subw (cols : Subw.SubwCols (ZMod p))
   exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
 theorem cpuStateSpec_of_spec_uType (cols : UType.UTypeCols (ZMod p))
-    (h : UType.assertion.Spec cols) :
+    (h : UType.assertion.Spec cols)
+    (h_is_real : cols.is_real = 1) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
+  -- Post-(a)-shape migration: `cpuStateSpec` is no longer a direct FormalSpec
+  -- conjunct (was position 1). Position 1 is now `CPUState.Gated.Assertion.Spec`;
+  -- bridge to cpuStateSpec via `_iff_sp1` under `is_real = 1`. Mirror of Addw.
+  -- This lemma is unused after `ChipRow.cpuStateSpec` was switched to `True`
+  -- for uType (Gated migration), but kept as a documented artifact.
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   change UType.Assertion.FormalSpec cols at h
-  exact h.1
+  have h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨cols.state,
+       #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+       8, cols.is_real⟩ := h.1
+  rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
+  exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
 /-- Row-level cpuStateSpec predicate: every chip carries the same
 `((clk_0_16 - 1) * 8⁻¹).val < 8192 ∧ clk_16_24 < 256` constraint on its
@@ -376,7 +389,9 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
   -- Sub/Subw — same shape as Add/Addw above (Gated, `memoryAccesses = []`).
   | .sub _ => True
   | .subw _ => True
-  | .uType cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  -- UType — Gated migration: `memoryAccesses` routed through the
+  -- multiplicity-aware lookup bus, parallel to `.add` / `.addw`.
+  | .uType _ => True
   -- Boundary chips: no `clk_0_16` / `clk_16_24` decomposition; the
   -- timestamp bound comes from a different mechanism (Phase 4.5
   -- follow-up). Placeholder `True` here keeps the dispatch total.
@@ -416,7 +431,7 @@ theorem cpuStateSpec_of_chipRow_spec [Fact (2 ^ 24 < p)]
   -- Sub/Subw: Gated migration, same shape as Add/Addi/Addw.
   | sub _ => trivial
   | subw _ => trivial
-  | uType cols => exact cpuStateSpec_of_spec_uType cols h
+  | uType _ => trivial
   | memInit _ => trivial
   | memFinalize _ => trivial
 

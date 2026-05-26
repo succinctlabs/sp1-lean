@@ -48,8 +48,8 @@ theorem sail_correct_of_formalSpec
   obtain ⟨h_cpu, h_addop, h_jtr, h_isa_bin,
           h_addend0, h_addend1, h_addend2, h_op_a_0_gate, _h_bitvec⟩ := h_spec
   -- Round-trip: `fromMain (toMain cols) = cols`, using the UserMode
-  -- TrustMode marker from `Assumptions`.
-  have h_round_trip := fromMain_toMain cols h_assumptions
+  -- TrustMode marker from `Assumptions` (now a triple; .1 = is_trusted = is_real).
+  have h_round_trip := fromMain_toMain cols h_assumptions.1
   have h_state := h_init (toMain cols) h_round_trip
   -- `(toMain cols)[30] = cols.is_real = 1` reduces by `@[reducible]` toMain.
   have h_isreal' : (toMain cols)[30] = 1 := h_is_real
@@ -57,38 +57,39 @@ theorem sail_correct_of_formalSpec
   -- whose @[reducible] projections unfold to `#v[(toMain cols)[k], …]` — the
   -- exact literal-Vector form of `allHold_iff_structural`'s RHS. After
   -- `rw [h_round_trip]`, the goal collapses to the cols-side h_spec form.
-  have h_cpu' : SP1Clean.CPUState.cpuStateSpec
-      (fromMain (toMain cols)).state.clk_0_16
-      (fromMain (toMain cols)).state.clk_16_24 := by
+  have h_cpu' : SP1Clean.CPUState.Gated.Assertion.Spec
+      ⟨(fromMain (toMain cols)).state,
+       #v[(fromMain (toMain cols)).state.pc[0] + 4, (fromMain (toMain cols)).state.pc[1],
+          (fromMain (toMain cols)).state.pc[2]],
+       8, (fromMain (toMain cols)).is_real⟩ := by
     rw [h_round_trip]; exact h_cpu
-  have h_addop' : (_root_.AddOperation.constraints (F := ZMod p)
-        #v[(toMain cols)[22], (toMain cols)[23], (toMain cols)[24], 0]
-        #v[(toMain cols)[14], (toMain cols)[15], (toMain cols)[16], (toMain cols)[17]]
-        { value := #v[(toMain cols)[25], (toMain cols)[26], (toMain cols)[27], (toMain cols)[28]] }
-        (1 - (toMain cols)[13])).allHold := by
-    -- Step 1: collapse `Nat.cast 1` casts that the Lemmas.lean rewrite chain
-    -- inserted, restoring bare `(1 : ZMod p)` form for the gate argument.
-    push_cast
-    -- Step 2: bridge Word ↔ Vector-literal-of-projections via Vector.ext.
+  have h_addop' : SP1Clean.AddOp.Assertion.Spec
+      ⟨#v[(toMain cols)[22], (toMain cols)[23], (toMain cols)[24], 0],
+       #v[(toMain cols)[14], (toMain cols)[15], (toMain cols)[16], (toMain cols)[17]],
+       #v[(toMain cols)[25], (toMain cols)[26], (toMain cols)[27], (toMain cols)[28]],
+       (1 : ZMod p) - (toMain cols)[13]⟩ := by
+    -- Reshape `cols.adapter.op_b_imm` / `cols.add_result` (the original
+    -- h_addop input) into Vector-literal forms via `Vector.ext`.
     have e_op_b : (#v[cols.adapter.op_b_imm[0], cols.adapter.op_b_imm[1],
                       cols.adapter.op_b_imm[2], cols.adapter.op_b_imm[3]]
                   : Vector (ZMod p) 4)
                  = cols.adapter.op_b_imm := by
       apply Vector.ext; intro i hi; interval_cases i <;> rfl
     have e_addr : (#v[cols.add_result[0], cols.add_result[1],
-                       cols.add_result[2], cols.add_result[3]] : Vector (ZMod p) 4)
-                 = cols.add_result := by
+                       cols.add_result[2], cols.add_result[3]]
+                   : Vector (ZMod p) 4) = cols.add_result := by
       apply Vector.ext; intro i hi; interval_cases i <;> rfl
-    change (_root_.AddOperation.constraints (F := ZMod p)
-        #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
-        #v[cols.adapter.op_b_imm[0], cols.adapter.op_b_imm[1],
-           cols.adapter.op_b_imm[2], cols.adapter.op_b_imm[3]]
-        { value := #v[cols.add_result[0], cols.add_result[1],
-                       cols.add_result[2], cols.add_result[3]] }
-        (1 - cols.adapter.op_a_0)).allHold
-    rw [e_op_b, e_addr,
-        show (1 : ZMod p) - cols.adapter.op_a_0
-            = cols.is_real - cols.adapter.op_a_0 from by rw [h_is_real]]
+    have h_gate_eq : (1 : ZMod p) - cols.adapter.op_a_0
+        = cols.is_real - cols.adapter.op_a_0 := by rw [h_is_real]
+    -- The goal unfolds via `@[reducible] toMain` to the cols-side form below.
+    change SP1Clean.AddOp.Assertion.Spec
+        ⟨#v[cols.addend[0], cols.addend[1], cols.addend[2], 0],
+         #v[cols.adapter.op_b_imm[0], cols.adapter.op_b_imm[1],
+            cols.adapter.op_b_imm[2], cols.adapter.op_b_imm[3]],
+         #v[cols.add_result[0], cols.add_result[1],
+            cols.add_result[2], cols.add_result[3]],
+         (1 : ZMod p) - cols.adapter.op_a_0⟩
+    rw [e_op_b, e_addr, h_gate_eq]
     exact h_addop
   have h_jtr' : SP1Clean.JTypeReader.Gated.Assertion.Spec
       ⟨(fromMain (toMain cols)).state.clk_high,
@@ -133,7 +134,7 @@ theorem sail_correct_of_formalSpec
     --  = cols.is_real = 1` (via h_assumptions)
     have h1 : (fromMain (toMain cols)).is_real = 1 := by rw [h_round_trip]; exact h_is_real
     have h2 : (fromMain (toMain cols)).adapter_cols.is_trusted = 1 := by
-      rw [h_round_trip]; rw [h_assumptions]; exact h_is_real
+      rw [h_round_trip]; rw [h_assumptions.1]; exact h_is_real
     have := h_jtr'
     rw [h1, h2] at this
     exact this
@@ -143,12 +144,12 @@ theorem sail_correct_of_formalSpec
   -- `push_cast` here unifies the cast asymmetry on the J-type clause.
   have h_allHold : (_root_.UType.constraints (toMain cols)).allHold := by
     rw [allHold_iff_structural (toMain cols) h_isreal']
-    refine ⟨h_cpu', h_addop', ?_, h_isa_bin', h_addend0', h_addend1', h_addend2',
-            ?_⟩
+    refine ⟨h_cpu', ?_, ?_, h_isa_bin', h_addend0', h_addend1', h_addend2'⟩
+    · -- Bridge `↑1 - (toMain cols)[13]` (in iff RHS) ↔ `1 - (toMain cols)[13]`
+      -- (in h_addop') via Nat.cast_one.
+      push_cast at h_addop' ⊢; exact h_addop'
     · push_cast
       exact h_jtr_pinned
-    · -- `(1 - 1) * Main[13] = 0` trivially.
-      ring
   -- Dispatch on `is_auipc`. The chip's binary gate (in `h_isa_bin`) pins
   -- `is_auipc ∈ {0, 1}`; route to the corresponding `correct_*`.
   by_cases h_au : cols.is_auipc = 1
