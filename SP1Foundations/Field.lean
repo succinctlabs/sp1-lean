@@ -260,6 +260,39 @@ lemma inv_4_zero_or_one [Fact (Nat.Prime p)] (x : ZMod p) :
   rw [mul_inv_eq_one₀ val_4_ne_zero, mul_eq_zero]
   aesop
 
+/-- Polynomial-form binary gate ↔ disjunction. The SP1 constraint
+compiler emits binarity as `x * (x - 1) = 0`; chip `FormalSpec`s now
+expose this as `x = 0 ∨ x = 1` (pre-applied `mul_eq_zero` +
+`sub_eq_zero`). Used both directions inside each chip's
+`soundness` / `completeness` proofs. -/
+lemma mul_sub_one_eq_zero_iff {R : Type*} [Ring R] [NoZeroDivisors R]
+    (x : R) : x * (x - 1) = 0 ↔ x = 0 ∨ x = 1 := by
+  rw [mul_eq_zero, sub_eq_zero]
+
+/-- Variant of `mul_sub_one_eq_zero_iff` for the `x + -1` shape that
+`circuit_proof_start` produces after ring normalization. -/
+lemma mul_add_neg_one_eq_zero_iff {R : Type*} [Ring R] [NoZeroDivisors R]
+    (x : R) : x * (x + -1) = 0 ↔ x = 0 ∨ x = 1 := by
+  rw [← sub_eq_add_neg, mul_sub_one_eq_zero_iff]
+
+/-- Form B variant: conditional gate `(x + -1) * y = 0 ↔ x = 1 ∨ y = 0`.
+Used by UType/Jalr `(is_real - 1) * op_a_0 = 0` after the spec refactor. -/
+lemma add_neg_one_mul_eq_zero_iff {R : Type*} [Ring R] [NoZeroDivisors R]
+    (x y : R) : (x + -1) * y = 0 ↔ x = 1 ∨ y = 0 := by
+  rw [← sub_eq_add_neg, mul_eq_zero, sub_eq_zero]
+
+/-- Discharge a binary-gate goal in either direction, given a hypothesis
+of the corresponding form. Used to bridge between SP1's polynomial form
+(`x * (x + -1) = 0` for Form A, `(x + -1) * y = 0` for Form B) and the
+disjunction form (`x = 0 ∨ x = 1` / `x = 1 ∨ y = 0`) inside chip
+soundness/completeness proofs after the Form A/B spec refactor. -/
+macro "binary_iff" h:term : tactic =>
+  `(tactic| first
+    | exact (mul_add_neg_one_eq_zero_iff _).mp $h
+    | exact (mul_add_neg_one_eq_zero_iff _).mpr $h
+    | exact (add_neg_one_mul_eq_zero_iff _ _).mp $h
+    | exact (add_neg_one_mul_eq_zero_iff _ _).mpr $h)
+
 /-- Small-literal equality bridge for `ZMod p` under `[Fact (2^17 < p)]`.
 Converts `(n : ZMod p) = (m : ZMod p)` to `n = m` (Nat-level) for any
 `n, m < 2^17`. Used in the LtOperationUnsigned/Signed `` proofs to

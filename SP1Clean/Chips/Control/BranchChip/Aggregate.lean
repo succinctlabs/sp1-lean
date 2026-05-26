@@ -396,14 +396,14 @@ theorem soundness :
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · linear_combination h_beq
-  · linear_combination h_bne
-  · linear_combination h_blt
-  · linear_combination h_bge
-  · linear_combination h_bltu
-  · linear_combination h_bgeu
-  · linear_combination h_sum
-  · linear_combination h_branching_bool
+  · binary_iff h_beq
+  · binary_iff h_bne
+  · binary_iff h_blt
+  · binary_iff h_bge
+  · binary_iff h_bltu
+  · binary_iff h_bgeu
+  · binary_iff h_sum
+  · binary_iff h_branching_bool
   · exact h_gated_b trivial
   · rcases h_gated_u trivial with h | h
     · exact Or.inl (by linear_combination h)
@@ -431,14 +431,14 @@ theorem completeness :
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · linear_combination h_beq
-  · linear_combination h_bne
-  · linear_combination h_blt
-  · linear_combination h_bge
-  · linear_combination h_bltu
-  · linear_combination h_bgeu
-  · linear_combination h_sum
-  · linear_combination h_branching_bool
+  · binary_iff h_beq
+  · binary_iff h_bne
+  · binary_iff h_blt
+  · binary_iff h_bge
+  · binary_iff h_bltu
+  · binary_iff h_bgeu
+  · binary_iff h_sum
+  · binary_iff h_branching_bool
   · exact ⟨trivial, h_gated_b⟩
   · refine ⟨trivial, ?_⟩
     rcases h_gated_u with h | h

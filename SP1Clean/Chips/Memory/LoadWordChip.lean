@@ -305,9 +305,9 @@ theorem soundness :
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · linear_combination h_lw
-  · linear_combination h_lwu
-  · linear_combination h_sum
+  · binary_iff h_lw
+  · binary_iff h_lwu
+  · binary_iff h_sum
   · exact h_oa_a trivial
   · exact h_oa_b trivial
 
@@ -322,9 +322,9 @@ theorem completeness :
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · linear_combination h_lw
-  · linear_combination h_lwu
-  · linear_combination h_sum
+  · binary_iff h_lw
+  · binary_iff h_lwu
+  · binary_iff h_sum
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩
 
@@ -418,9 +418,9 @@ theorem soundness :
     simp
   · exact Or.inr trivial
   · trivial
-  · linear_combination h_is_lw
-  · linear_combination h_is_lwu
-  · linear_combination h_sum
+  · binary_iff h_is_lw
+  · binary_iff h_is_lwu
+  · binary_iff h_sum
   · exact h_op_a_0
 
 set_option maxHeartbeats 800000 in
@@ -443,9 +443,9 @@ theorem completeness :
     simp
   · exact ⟨trivial, Or.inr trivial⟩
   · exact ⟨trivial, trivial⟩
-  · linear_combination h_is_lw
-  · linear_combination h_is_lwu
-  · linear_combination h_sum
+  · binary_iff h_is_lw
+  · binary_iff h_is_lwu
+  · binary_iff h_sum
   · exact h_op_a_0
 
 end AssertionGated

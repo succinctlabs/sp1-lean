@@ -102,7 +102,6 @@ theorem is_real_binary_bitwise (cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
     (h : SP1Clean.Bitwise.assertion.Spec cols) :
     cols.is_xor + cols.is_or + cols.is_and = 0 ∨
     cols.is_xor + cols.is_or + cols.is_and = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.Bitwise.Assertion.FormalSpec cols at h
   unfold SP1Clean.Bitwise.Assertion.FormalSpec at h
   tauto
@@ -113,16 +112,16 @@ theorem is_real_binary_branch (cols : SP1Clean.Branch.BranchCols (ZMod p))
       cols.is_bltu + cols.is_bgeu = 0 ∨
     cols.is_beq + cols.is_bne + cols.is_blt + cols.is_bge +
       cols.is_bltu + cols.is_bgeu = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.Branch.Assertion.FormalSpec cols at h
-  unfold SP1Clean.Branch.Assertion.FormalSpec at h
-  tauto
+  -- The sum binarity is the 9th conjunct of FormalSpec (after cpuStateSpec,
+  -- ProgramTable.Spec, and the 6 individual selector binarities). Project
+  -- directly to avoid `tauto` blowup on the 14+ conjunct body.
+  exact h.2.2.2.2.2.2.2.2.1
 
 theorem is_real_binary_divRem [Fact (2 ^ 24 < p)]
     (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
     (h : SP1Clean.DivRem.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.DivRem.Assertion.FormalSpec cols at h
   unfold SP1Clean.DivRem.Assertion.FormalSpec at h
   tauto
@@ -130,7 +129,6 @@ theorem is_real_binary_divRem [Fact (2 ^ 24 < p)]
 theorem is_real_binary_jal (cols : SP1Clean.Jal.JalCols (ZMod p))
     (h : SP1Clean.Jal.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.Jal.Assertion.FormalSpec cols at h
   unfold SP1Clean.Jal.Assertion.FormalSpec at h
   tauto
@@ -138,7 +136,6 @@ theorem is_real_binary_jal (cols : SP1Clean.Jal.JalCols (ZMod p))
 theorem is_real_binary_jalr (cols : SP1Clean.Jalr.JalrCols (ZMod p))
     (h : SP1Clean.Jalr.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.Jalr.Assertion.FormalSpec cols at h
   unfold SP1Clean.Jalr.Assertion.FormalSpec at h
   tauto
@@ -146,7 +143,6 @@ theorem is_real_binary_jalr (cols : SP1Clean.Jalr.JalrCols (ZMod p))
 theorem is_real_binary_loadByte (cols : SP1Clean.LoadByte.LoadByteCols (ZMod p))
     (h : SP1Clean.LoadByte.assertion.Spec cols) :
     cols.is_lb + cols.is_lbu = 0 ∨ cols.is_lb + cols.is_lbu = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.LoadByte.Assertion.FormalSpec cols at h
   unfold SP1Clean.LoadByte.Assertion.FormalSpec at h
   tauto
@@ -155,7 +151,6 @@ theorem is_real_binary_loadDouble
     (cols : SP1Clean.LoadDouble.LoadDoubleCols (ZMod p))
     (h : SP1Clean.LoadDouble.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.LoadDouble.Assertion.FormalSpec cols at h
   unfold SP1Clean.LoadDouble.Assertion.FormalSpec at h
   tauto
@@ -164,7 +159,6 @@ theorem is_real_binary_loadHalf
     (cols : SP1Clean.LoadHalf.LoadHalfCols (ZMod p))
     (h : SP1Clean.LoadHalf.assertion.Spec cols) :
     cols.is_lh + cols.is_lhu = 0 ∨ cols.is_lh + cols.is_lhu = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.LoadHalf.Assertion.FormalSpec cols at h
   unfold SP1Clean.LoadHalf.Assertion.FormalSpec at h
   tauto
@@ -173,7 +167,6 @@ theorem is_real_binary_loadWord
     (cols : SP1Clean.LoadWord.LoadWordCols (ZMod p))
     (h : SP1Clean.LoadWord.assertion.Spec cols) :
     cols.is_lw + cols.is_lwu = 0 ∨ cols.is_lw + cols.is_lwu = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.LoadWord.Assertion.FormalSpec cols at h
   unfold SP1Clean.LoadWord.Assertion.FormalSpec at h
   tauto
@@ -185,7 +178,6 @@ theorem is_real_binary_loadX0
       cols.is_lw + cols.is_lwu + cols.is_ld = 0 ∨
     cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
       cols.is_lw + cols.is_lwu + cols.is_ld = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.LoadX0.Assertion.FormalSpec cols at h
   unfold SP1Clean.LoadX0.Assertion.FormalSpec at h
   tauto
@@ -193,7 +185,6 @@ theorem is_real_binary_loadX0
 theorem is_real_binary_lt (cols : SP1Clean.Lt.LtCols (ZMod p))
     (h : SP1Clean.Lt.assertion.Spec cols) :
     cols.is_slt + cols.is_sltu = 0 ∨ cols.is_slt + cols.is_sltu = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.Lt.Assertion.FormalSpec cols at h
   unfold SP1Clean.Lt.Assertion.FormalSpec at h
   tauto
@@ -215,7 +206,6 @@ theorem is_real_binary_shiftLeft
     (cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))
     (h : SP1Clean.ShiftLeft.assertion.Spec cols) :
     cols.is_sll + cols.is_sllw = 0 ∨ cols.is_sll + cols.is_sllw = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.ShiftLeft.Assertion.FormalSpec cols at h
   unfold SP1Clean.ShiftLeft.Assertion.FormalSpec at h
   tauto
@@ -225,7 +215,6 @@ theorem is_real_binary_shiftRight
     (h : SP1Clean.ShiftRight.assertion.Spec cols) :
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 ∨
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.ShiftRight.Assertion.FormalSpec cols at h
   unfold SP1Clean.ShiftRight.Assertion.FormalSpec at h
   tauto
@@ -234,7 +223,6 @@ theorem is_real_binary_storeByte
     (cols : SP1Clean.StoreByte.StoreByteCols (ZMod p))
     (h : SP1Clean.StoreByte.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.StoreByte.Assertion.FormalSpec cols at h
   unfold SP1Clean.StoreByte.Assertion.FormalSpec at h
   tauto
@@ -243,7 +231,6 @@ theorem is_real_binary_storeDouble
     (cols : SP1Clean.StoreDouble.StoreDoubleCols (ZMod p))
     (h : SP1Clean.StoreDouble.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.StoreDouble.Assertion.FormalSpec cols at h
   unfold SP1Clean.StoreDouble.Assertion.FormalSpec at h
   tauto
@@ -252,7 +239,6 @@ theorem is_real_binary_storeHalf
     (cols : SP1Clean.StoreHalf.StoreHalfCols (ZMod p))
     (h : SP1Clean.StoreHalf.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.StoreHalf.Assertion.FormalSpec cols at h
   unfold SP1Clean.StoreHalf.Assertion.FormalSpec at h
   tauto
@@ -261,7 +247,6 @@ theorem is_real_binary_storeWord
     (cols : SP1Clean.StoreWord.StoreWordCols (ZMod p))
     (h : SP1Clean.StoreWord.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.StoreWord.Assertion.FormalSpec cols at h
   unfold SP1Clean.StoreWord.Assertion.FormalSpec at h
   tauto
@@ -286,13 +271,12 @@ theorem is_real_binary_subw (cols : SP1Clean.Subw.SubwCols (ZMod p))
 theorem is_real_binary_uType (cols : SP1Clean.UType.UTypeCols (ZMod p))
     (h : SP1Clean.UType.assertion.Spec cols) :
     cols.is_real = 0 ∨ cols.is_real = 1 := by
-  apply binary_of_assertZero
   change SP1Clean.UType.Assertion.FormalSpec cols at h
   -- FormalSpec layout (post Phase 4 refactor to JTypeReader.Gated):
   -- ⟨cpuStateSpec, AddOp .allHold, JTypeReader.Gated.Spec, is_auipc binary,
-  --  3 addend gates, op_a_0 gate, BitVec⟩. The free is_real binary now lives
-  -- inside Gated.Spec's first conjunct (h.2.2.1.1).
-  exact h.2.2.1.1
+  --  3 addend gates, op_a_0 gate, BitVec⟩. The free is_real binary still lives
+  -- inside Gated.Spec's first conjunct as the polynomial form (h.2.2.1.1).
+  exact binary_of_assertZero _ h.2.2.1.1
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Boundary chip discharge: the `is_real * (is_real - 1) = 0` clause is

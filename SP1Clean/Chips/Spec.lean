@@ -322,11 +322,11 @@ def FormalSpec (cols : UTypeCols (ZMod p)) : Prop :=
       ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
        cols.add_result, cols.adapter,
        cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.is_auipc * (cols.is_auipc - 1) = 0 ∧
-  cols.addend[0] - cols.is_auipc * cols.state.pc[0] = 0 ∧
-  cols.addend[1] - cols.is_auipc * cols.state.pc[1] = 0 ∧
-  cols.addend[2] - cols.is_auipc * cols.state.pc[2] = 0 ∧
-  (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
+  (cols.is_auipc = 0 ∨ cols.is_auipc = 1) ∧
+  cols.addend[0] = cols.is_auipc * cols.state.pc[0] ∧
+  cols.addend[1] = cols.is_auipc * cols.state.pc[1] ∧
+  cols.addend[2] = cols.is_auipc * cols.state.pc[2] ∧
+  (cols.is_real = 1 ∨ cols.adapter.op_a_0 = 0) ∧
   (cols.is_real = 1 → cols.adapter.op_a_0 = 0 →
     Word.isU64 cols.add_result ∧
     Word.toBitVec64 cols.add_result =
@@ -378,10 +378,10 @@ def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
   SP1Clean.ALUTypeReader.Gated.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
      op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.is_xor * (cols.is_xor - 1) = 0 ∧
-  cols.is_or  * (cols.is_or  - 1) = 0 ∧
-  cols.is_and * (cols.is_and - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
+  (cols.is_xor = 0 ∨ cols.is_xor = 1) ∧
+  (cols.is_or = 0 ∨ cols.is_or = 1) ∧
+  (cols.is_and = 0 ∨ cols.is_and = 1) ∧
+  (is_real = 0 ∨ is_real = 1) ∧
   cols.adapter.op_a_0 = 0 ∧
   (is_real = 1 →
     Word.isU64 op_a_write_value ∧
@@ -476,9 +476,9 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   SP1Clean.ALUTypeReader.Gated.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
      cols.result, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.is_sll  * (cols.is_sll  - 1) = 0 ∧
-  cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
+  (cols.is_sll = 0 ∨ cols.is_sll = 1) ∧
+  (cols.is_sllw = 0 ∨ cols.is_sllw = 1) ∧
+  (is_real = 0 ∨ is_real = 1) ∧
   cols.adapter.op_a_0 = 0 ∧
   (is_real = 1 →
     Word.isU64 cols.result ∧
@@ -519,11 +519,11 @@ def FormalSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   SP1Clean.ALUTypeReader.Gated.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
      cols.op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.is_srl  * (cols.is_srl  - 1) = 0 ∧
-  cols.is_sra  * (cols.is_sra  - 1) = 0 ∧
-  cols.is_srlw * (cols.is_srlw - 1) = 0 ∧
-  cols.is_sraw * (cols.is_sraw - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
+  (cols.is_srl = 0 ∨ cols.is_srl = 1) ∧
+  (cols.is_sra = 0 ∨ cols.is_sra = 1) ∧
+  (cols.is_srlw = 0 ∨ cols.is_srlw = 1) ∧
+  (cols.is_sraw = 0 ∨ cols.is_sraw = 1) ∧
+  (is_real = 0 ∨ is_real = 1) ∧
   cols.adapter.op_a_0 = 0 ∧
   (is_real = 1 →
     Word.isU64 cols.op_a_write_value ∧
@@ -566,9 +566,9 @@ def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   SP1Clean.ALUTypeReader.Gated.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
      op_a_write_value, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
-  cols.is_slt  * (cols.is_slt  - 1) = 0 ∧
-  cols.is_sltu * (cols.is_sltu - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
+  (cols.is_slt = 0 ∨ cols.is_slt = 1) ∧
+  (cols.is_sltu = 0 ∨ cols.is_sltu = 1) ∧
+  (is_real = 0 ∨ is_real = 1) ∧
   cols.adapter.op_a_0 = 0 ∧
   (is_real = 1 →
     Word.isU64 op_a_write_value ∧
@@ -624,7 +624,7 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
     ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
      cols.op_a_write_value, cols.adapter, cols.is_real,
      cols.adapter_cols.is_trusted⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   cols.adapter.op_a_0 = 0 ∧
   (cols.is_real = 1 →
     Word.isU64 cols.op_a_write_value ∧
@@ -660,14 +660,14 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_beq * (cols.is_beq - 1) = 0 ∧
-  cols.is_bne * (cols.is_bne - 1) = 0 ∧
-  cols.is_blt * (cols.is_blt - 1) = 0 ∧
-  cols.is_bge * (cols.is_bge - 1) = 0 ∧
-  cols.is_bltu * (cols.is_bltu - 1) = 0 ∧
-  cols.is_bgeu * (cols.is_bgeu - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
-  cols.is_branching * (cols.is_branching - 1) = 0 ∧
+  (cols.is_beq = 0 ∨ cols.is_beq = 1) ∧
+  (cols.is_bne = 0 ∨ cols.is_bne = 1) ∧
+  (cols.is_blt = 0 ∨ cols.is_blt = 1) ∧
+  (cols.is_bge = 0 ∨ cols.is_bge = 1) ∧
+  (cols.is_bltu = 0 ∨ cols.is_bltu = 1) ∧
+  (cols.is_bgeu = 0 ∨ cols.is_bgeu = 1) ∧
+  (is_real = 0 ∨ is_real = 1) ∧
+  (cols.is_branching = 0 ∨ cols.is_branching = 1) ∧
   -- State-bus next_pc grounding: two gated carry chains targeting the
   -- same committed `next_pc` (padded to 4 limbs with high limb 0).
   -- Mirrors upstream's `when(is_branching) / when(is_real - is_branching)`
@@ -721,7 +721,7 @@ def FormalSpec (cols : JalCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 46, op_a := cols.adapter.op_a,
       op_b := cols.adapter.op_b_imm, op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 1, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequence.
   -- Jal emits a single op_a register access at offset +4.
   SP1Clean.OperandAccess.Assertion.Spec
@@ -754,9 +754,9 @@ def FormalSpec (cols : JalrCols (ZMod p)) : Prop :=
     Word.toBitVec64 cols.jump_target =
       Word.toBitVec64 cols.adapter.op_b_memory.prev_value +
       Word.toBitVec64 cols.adapter.op_c_imm) ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
-  cols.lsb * (cols.lsb - 1) = 0 ∧
-  (cols.is_real - 1) * cols.adapter.op_a_0 = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
+  (cols.lsb = 0 ∨ cols.lsb = 1) ∧
+  (cols.is_real = 1 ∨ cols.adapter.op_a_0 = 0) ∧
   -- Iter-8 sub-task E: per-operand memory-bus byte-content consequences.
   -- Jalr emits 2 register accesses: op_a/+4 and op_b/+3.
   SP1Clean.OperandAccess.Assertion.Spec
@@ -784,9 +784,9 @@ def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
       op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_lb * (cols.is_lb - 1) = 0 ∧
-  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
-  (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
+  (cols.is_lb = 0 ∨ cols.is_lb = 1) ∧
+  (cols.is_lbu = 0 ∨ cols.is_lbu = 1) ∧
+  (cols.is_lb + cols.is_lbu = 0 ∨ cols.is_lb + cols.is_lbu = 1) ∧
   cols.adapter.op_a_0 = 0 ∧
   -- Iter-8 sub-task E (partial). Register-side memory-bus byte content:
   -- op_a/+4, op_b/+3. The load_mem/+1 access is deferred.
@@ -829,9 +829,9 @@ def FormalSpec (cols : LoadByteCols (ZMod p)) : Prop :=
     ⟨cols.load_prev_value, cols.offset_bit_2, cols.offset_bit_1, cols.offset_bit_0,
      cols.selected_limb, cols.selected_limb_low_byte, cols.selected_byte,
      cols.signed_extension_flag, cols.is_lbu⟩ ∧
-  cols.is_lb * (cols.is_lb - 1) = 0 ∧
-  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
-  (cols.is_lb + cols.is_lbu) * (cols.is_lb + cols.is_lbu - 1) = 0 ∧
+  (cols.is_lb = 0 ∨ cols.is_lb = 1) ∧
+  (cols.is_lbu = 0 ∨ cols.is_lbu = 1) ∧
+  (cols.is_lb + cols.is_lbu = 0 ∨ cols.is_lb + cols.is_lbu = 1) ∧
   cols.adapter.op_a_0 = 0
 
 end AssertionGated
@@ -850,9 +850,9 @@ def FormalSpec (cols : LoadHalfCols (ZMod p)) : Prop :=
       op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_lh * (cols.is_lh - 1) = 0 ∧
-  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
-  (cols.is_lh + cols.is_lhu) * (cols.is_lh + cols.is_lhu - 1) = 0 ∧
+  (cols.is_lh = 0 ∨ cols.is_lh = 1) ∧
+  (cols.is_lhu = 0 ∨ cols.is_lhu = 1) ∧
+  (cols.is_lh + cols.is_lhu = 0 ∨ cols.is_lh + cols.is_lhu = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -889,9 +889,9 @@ def FormalSpec (cols : LoadHalfCols (ZMod p)) : Prop :=
   SP1Clean.LoadHalfSelector.Assertion.Spec
     ⟨cols.load_prev_value, 0, cols.offset_bit_1, cols.offset_bit_0,
      cols.op_a_write_value_lo, cols.signed_extension_msb, cols.is_lhu⟩ ∧
-  cols.is_lh * (cols.is_lh - 1) = 0 ∧
-  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
-  (cols.is_lh + cols.is_lhu) * (cols.is_lh + cols.is_lhu - 1) = 0 ∧
+  (cols.is_lh = 0 ∨ cols.is_lh = 1) ∧
+  (cols.is_lhu = 0 ∨ cols.is_lhu = 1) ∧
+  (cols.is_lh + cols.is_lhu = 0 ∨ cols.is_lh + cols.is_lhu = 1) ∧
   cols.adapter.op_a_0 = 0
 
 end AssertionGated
@@ -910,9 +910,9 @@ def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
       op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_lw * (cols.is_lw - 1) = 0 ∧
-  cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0 ∧
+  (cols.is_lw = 0 ∨ cols.is_lw = 1) ∧
+  (cols.is_lwu = 0 ∨ cols.is_lwu = 1) ∧
+  (cols.is_lw + cols.is_lwu = 0 ∨ cols.is_lw + cols.is_lwu = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -948,9 +948,9 @@ def FormalSpec (cols : LoadWordCols (ZMod p)) : Prop :=
     ⟨cols.load_prev_value, cols.offset_bit, 0, 0,
      cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
      cols.signed_extension_msb, cols.is_lwu⟩ ∧
-  cols.is_lw * (cols.is_lw - 1) = 0 ∧
-  cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  (cols.is_lw + cols.is_lwu) * (cols.is_lw + cols.is_lwu - 1) = 0 ∧
+  (cols.is_lw = 0 ∨ cols.is_lw = 1) ∧
+  (cols.is_lwu = 0 ∨ cols.is_lwu = 1) ∧
+  (cols.is_lw + cols.is_lwu = 0 ∨ cols.is_lw + cols.is_lwu = 1) ∧
   cols.adapter.op_a_0 = 0
 
 end AssertionGated
@@ -968,7 +968,7 @@ def FormalSpec (cols : LoadDoubleCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 35, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -998,7 +998,7 @@ def FormalSpec (cols : LoadDoubleCols (ZMod p)) : Prop :=
      cols.load_memory_prev_high, cols.load_memory_prev_low,
      cols.load_memory_diff_low, cols.load_memory_diff_high,
      cols.load_memory_flag, cols.is_real⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   cols.adapter.op_a_0 = 0
 
 end AssertionGated
@@ -1022,14 +1022,14 @@ def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := opcode_e, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_lb * (cols.is_lb - 1) = 0 ∧
-  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
-  cols.is_lh * (cols.is_lh - 1) = 0 ∧
-  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
-  cols.is_lw * (cols.is_lw - 1) = 0 ∧
-  cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  cols.is_ld * (cols.is_ld - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
+  (cols.is_lb = 0 ∨ cols.is_lb = 1) ∧
+  (cols.is_lbu = 0 ∨ cols.is_lbu = 1) ∧
+  (cols.is_lh = 0 ∨ cols.is_lh = 1) ∧
+  (cols.is_lhu = 0 ∨ cols.is_lhu = 1) ∧
+  (cols.is_lw = 0 ∨ cols.is_lw = 1) ∧
+  (cols.is_lwu = 0 ∨ cols.is_lwu = 1) ∧
+  (cols.is_ld = 0 ∨ cols.is_ld = 1) ∧
+  (is_real = 0 ∨ is_real = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -1063,14 +1063,14 @@ def FormalSpec (cols : LoadX0Cols (ZMod p)) : Prop :=
      cols.load_memory_prev_high, cols.load_memory_prev_low,
      cols.load_memory_diff_low, cols.load_memory_diff_high,
      cols.load_memory_flag, is_real⟩ ∧
-  cols.is_lb * (cols.is_lb - 1) = 0 ∧
-  cols.is_lbu * (cols.is_lbu - 1) = 0 ∧
-  cols.is_lh * (cols.is_lh - 1) = 0 ∧
-  cols.is_lhu * (cols.is_lhu - 1) = 0 ∧
-  cols.is_lw * (cols.is_lw - 1) = 0 ∧
-  cols.is_lwu * (cols.is_lwu - 1) = 0 ∧
-  cols.is_ld * (cols.is_ld - 1) = 0 ∧
-  is_real * (is_real - 1) = 0 ∧
+  (cols.is_lb = 0 ∨ cols.is_lb = 1) ∧
+  (cols.is_lbu = 0 ∨ cols.is_lbu = 1) ∧
+  (cols.is_lh = 0 ∨ cols.is_lh = 1) ∧
+  (cols.is_lhu = 0 ∨ cols.is_lhu = 1) ∧
+  (cols.is_lw = 0 ∨ cols.is_lw = 1) ∧
+  (cols.is_lwu = 0 ∨ cols.is_lwu = 1) ∧
+  (cols.is_ld = 0 ∨ cols.is_ld = 1) ∧
+  (is_real = 0 ∨ is_real = 1) ∧
   cols.adapter.op_a_0 = 1
 
 end AssertionGated
@@ -1088,7 +1088,7 @@ def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 36, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -1121,7 +1121,7 @@ def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
     ⟨cols.store_prev_value, cols.store_value,
      cols.register_low_byte, cols.mem_limb_low_byte,
      cols.byte_selector_top, cols.byte_selector_mid, cols.byte_selector_lo⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  (cols.is_real = 0 ∨ cols.is_real = 1)
 
 end AssertionGated
 
@@ -1138,7 +1138,7 @@ def FormalSpec (cols : StoreHalfCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 37, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -1171,7 +1171,7 @@ def FormalSpec (cols : StoreHalfCols (ZMod p)) : Prop :=
   SP1Clean.StoreHalfAssembler.Assertion.Spec
     ⟨cols.store_prev_value, cols.store_value, store_halfword,
      0, cols.offset_bit_1, cols.offset_bit_0⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  (cols.is_real = 0 ∨ cols.is_real = 1)
 
 end AssertionGated
 
@@ -1188,7 +1188,7 @@ def FormalSpec (cols : StoreWordCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 38, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -1221,7 +1221,7 @@ def FormalSpec (cols : StoreWordCols (ZMod p)) : Prop :=
   SP1Clean.StoreWordAssembler.Assertion.Spec
     ⟨cols.store_prev_value, cols.store_value, store_low, store_high,
      cols.offset_bit, 0, 0⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  (cols.is_real = 0 ∨ cols.is_real = 1)
 
 end AssertionGated
 
@@ -1238,7 +1238,7 @@ def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
     { pc := cols.state.pc, opcode := 39, op_a := cols.adapter.op_a,
       op_b := #v[cols.adapter.op_b, 0, 0, 0], op_c := cols.adapter.op_c_imm,
       op_a_0 := cols.adapter.op_a_0, imm_b := 0, imm_c := 1 } ∧
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   SP1Clean.OperandAccess.Assertion.Spec
     ⟨clk_low, 4, cols.adapter.op_a_memory.access_timestamp.prev_low, cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
      cols.adapter.op_a_memory.prev_value⟩ ∧
@@ -1269,7 +1269,7 @@ def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
      cols.store_memory_prev_high, cols.store_memory_prev_low,
      cols.store_memory_diff_low, cols.store_memory_diff_high,
      cols.store_memory_flag, cols.is_real⟩ ∧
-  cols.is_real * (cols.is_real - 1) = 0
+  (cols.is_real = 0 ∨ cols.is_real = 1)
 
 end AssertionGated
 
@@ -1286,7 +1286,7 @@ namespace Assertion
 monotonicity / x0-case conjuncts are deferred to Phase 4.5 pending the
 `MemoryGlobalCols.lt_cols` struct expansion documented in the chip file. -/
 def FormalSpec (cols : MemoryGlobalCols (ZMod p)) : Prop :=
-  cols.is_real * (cols.is_real - 1) = 0 ∧
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   (cols.value[0]).val < 65536 ∧
   (cols.value[1]).val < 65536 ∧
   (cols.value[2]).val < 65536 ∧
@@ -1307,7 +1307,7 @@ def FormalSpec (cols : MemoryGlobalCols (ZMod p)) : Prop :=
     ⟨cols.index, cols.is_index_zero[0], cols.is_index_zero[1]⟩ ∧
   cols.is_comp - cols.is_real *
     (1 - cols.is_prev_addr_zero[1] * cols.is_index_zero[1]) = 0 ∧
-  cols.is_comp * (cols.is_comp - 1) = 0
+  (cols.is_comp = 0 ∨ cols.is_comp = 1)
 
 end Assertion
 

@@ -355,7 +355,7 @@ theorem soundness :
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact h_oa_a trivial
   · exact h_oa_b trivial
 
@@ -370,7 +370,7 @@ theorem completeness :
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩
 
@@ -460,7 +460,7 @@ theorem soundness :
   · exact h_itr_sub trivial
   · exact h_smag_sub trivial
   · exact h_sba_sub trivial
-  · linear_combination h_isreal
+  · binary_iff h_isreal
 
 set_option maxHeartbeats 800000 in
 -- Same destructure as soundness; circuit_proof_start unfolds the 6
@@ -480,7 +480,7 @@ theorem completeness :
   · exact ⟨trivial, h_itr⟩
   · exact ⟨trivial, h_smag⟩
   · exact ⟨trivial, h_sba⟩
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   -- Trailing `mem_limb * (mem_limb - mem_limb) === 0` is `x * 0 = 0` — `ring`.
   · ring
 

@@ -455,7 +455,7 @@ theorem soundness :
   · -- Return-address semantic conjunct: same.
     exact h_ret
   · exact h_prog_sub trivial
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact h_oa_a trivial
 
 /-- Completeness of `Jal.assertion`. Each AddOp.assertion sub-circuit's
@@ -493,7 +493,7 @@ theorem completeness :
     exact ⟨h_isU64_pc, h_isU64_four⟩
   · exact ⟨trivial, h_prog⟩
   · exact ⟨trivial, h_oa_a⟩
-  · linear_combination h_isreal
+  · binary_iff h_isreal
 
 end Assertion
 

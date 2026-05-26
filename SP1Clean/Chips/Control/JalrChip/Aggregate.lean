@@ -334,9 +334,9 @@ theorem soundness :
   · -- Jump-target semantic conjunct: AddOp.assertion gives exactly this
     -- form under `is_real = 1`.
     exact h_add
-  · linear_combination h_isreal
-  · linear_combination h_lowbit
-  · linear_combination h_isreal_op_a_0
+  · binary_iff h_isreal
+  · binary_iff h_lowbit
+  · binary_iff h_isreal_op_a_0
   · exact h_oa_a trivial
   · exact h_oa_b trivial
 
@@ -359,9 +359,9 @@ theorem completeness :
     refine ⟨⟨Or.inr h_is_real, ?_⟩, h_add⟩
     intro _
     exact ⟨h_isU64_b, h_isU64_c⟩
-  · linear_combination h_isreal
-  · linear_combination h_lowbit
-  · linear_combination h_isreal_op_a_0
+  · binary_iff h_isreal
+  · binary_iff h_lowbit
+  · binary_iff h_isreal_op_a_0
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩
 

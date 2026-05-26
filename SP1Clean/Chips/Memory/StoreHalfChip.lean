@@ -236,7 +236,7 @@ theorem soundness :
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact h_oa_a trivial
   · exact h_oa_b trivial
 
@@ -251,7 +251,7 @@ theorem completeness :
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩
 
@@ -334,7 +334,7 @@ theorem soundness :
   · exact h_itr_sub trivial
   · exact Or.inr trivial  -- placeholder Spec @[reducible] reduces to `mult = 0 ∨ True`
   · trivial               -- placeholder Spec @[reducible] reduces to `True`
-  · linear_combination h_isreal
+  · binary_iff h_isreal
 
 set_option maxHeartbeats 800000 in
 -- Mirrors soundness destructure; circuit_proof_start unfolds 6 sub-circuits + 1 gate.
@@ -353,7 +353,7 @@ theorem completeness :
   · exact ⟨trivial, h_itr⟩
   · exact ⟨trivial, Or.inr trivial⟩
   · exact ⟨trivial, trivial⟩
-  · linear_combination h_isreal
+  · binary_iff h_isreal
 
 end AssertionGated
 

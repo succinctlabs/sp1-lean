@@ -105,16 +105,16 @@ theorem sail_correct_of_formalSpec
     rw [h_round_trip]; exact h_jtr
   have h_isa_bin' : (fromMain (toMain cols)).is_auipc *
       ((fromMain (toMain cols)).is_auipc - 1) = 0 := by
-    rw [h_round_trip]; exact h_isa_bin
+    rw [h_round_trip]; exact (mul_sub_one_eq_zero_iff _).mpr h_isa_bin
   have h_addend0' : (fromMain (toMain cols)).addend[0] -
       (fromMain (toMain cols)).is_auipc * (fromMain (toMain cols)).state.pc[0] = 0 := by
-    rw [h_round_trip]; exact h_addend0
+    rw [h_round_trip]; exact sub_eq_zero.mpr h_addend0
   have h_addend1' : (fromMain (toMain cols)).addend[1] -
       (fromMain (toMain cols)).is_auipc * (fromMain (toMain cols)).state.pc[1] = 0 := by
-    rw [h_round_trip]; exact h_addend1
+    rw [h_round_trip]; exact sub_eq_zero.mpr h_addend1
   have h_addend2' : (fromMain (toMain cols)).addend[2] -
       (fromMain (toMain cols)).is_auipc * (fromMain (toMain cols)).state.pc[2] = 0 := by
-    rw [h_round_trip]; exact h_addend2
+    rw [h_round_trip]; exact sub_eq_zero.mpr h_addend2
   -- Under is_real = 1 and Assumption (is_trusted = is_real), the chip's
   -- `(is_real - 1) * op_a_0 = 0` collapses to a trivial `0 * op_a_0 = 0`.
   -- The Gated.Spec on `fromMain (toMain cols)` is at `is_real = is_trusted = 1`.
@@ -159,9 +159,9 @@ theorem sail_correct_of_formalSpec
     exact (_root_.UType.correct_auipc (toMain cols) s h_allHold h_isreal' h_au' h_state).symm
   · -- LUI branch: derive `is_auipc = 0` from binary + ne.
     have h_lui : cols.is_auipc = 0 := by
-      rcases mul_eq_zero.mp h_isa_bin with h0 | h1
+      rcases h_isa_bin with h0 | h1
       · exact h0
-      · exact absurd (sub_eq_zero.mp h1) h_au
+      · exact absurd h1 h_au
     have h_lui' : (toMain cols)[29] = 0 := h_lui
     rw [h_lui, if_neg (show ¬((0 : ZMod p) = 1) from zero_ne_one)]
     exact (_root_.UType.correct_lui (toMain cols) s h_allHold h_isreal' h_lui' h_state).symm

@@ -216,7 +216,7 @@ theorem soundness :
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_prog_sub trivial
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact h_oa_a trivial
   · exact h_oa_b trivial
 
@@ -231,7 +231,7 @@ theorem completeness :
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_prog⟩
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact ⟨trivial, h_oa_a⟩
   · exact ⟨trivial, h_oa_b⟩
 
@@ -319,7 +319,7 @@ theorem soundness :
   · convert h_itr_sub trivial using 4
     simp
   · exact Or.inr trivial
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact h_op_a_0
 
 set_option maxHeartbeats 800000 in
@@ -340,7 +340,7 @@ theorem completeness :
     convert h_itr using 4
     simp
   · exact ⟨trivial, Or.inr trivial⟩
-  · linear_combination h_isreal
+  · binary_iff h_isreal
   · exact h_op_a_0
 
 end AssertionGated
