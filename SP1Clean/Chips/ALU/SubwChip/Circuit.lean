@@ -93,6 +93,20 @@ def Assumptions (cols : SubwCols (ZMod p)) : Prop :=
 (`SP1Clean.Subw.FormalSpec`). -/
 abbrev FormalSpec := @SP1Clean.Subw.FormalSpec p
 
+/-- Soundness collapses to a single application of the structural
+mirror lemma `formalSpec_of_subcircuit_specs` (`Lemmas.lean`) once
+`circuit_proof_start` peels back the Clean elaboration plumbing and the
+`h_input` / `h_assumptions` / `h_holds` destructure surfaces the four
+sub-circuit witnesses (`SubwOp.Assertion.Spec`, `CPUState.Gated` Spec,
+`RTypeReader.Gated` Spec, scalar `op_a_0 = 0` gate). The lowercase
+`RTypeReader.Gated.assertion.Spec` produced by `circuit_proof_start`
+needs a one-line `simpa` bridge to the uppercase
+`Gated.Assertion.Spec` form because the inline-constructed
+`op_a_write_value` (`#v[subw_value[0], subw_value[1], subw_msb*65535,
+subw_msb*65535]`) goes through `Vector.map (Expression.eval env)` and
+doesn't reduce automatically. All other sub-circuit composition logic —
+including the `Word.isU64 op_b/op_c` extraction from `h_rtr` and the
+BV32 / RV64.subw clause construction — lives inside the named lemma. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -102,43 +116,26 @@ theorem soundness :
   obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
   obtain ⟨h_subwop_sub, h_cpu_sub, h_rtr_sub, h_op_a_0⟩ := h_holds
   unfold id at *
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h_cpu := h_cpu_sub trivial
-  have h_rtr := h_rtr_sub trivial
-  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
-  -- Discharge operand `isU64` bounds from `RTypeReader.Gated.Spec`'s 4th/5th
-  -- `RegisterAccess.Spec` sub-conjuncts (op_b / op_c). Hoisted above the
-  -- `refine` so the BV32 and RV64 conjuncts can both reuse the witnesses.
-  have h_ir_ne_zero :
-      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-    rw [h_is_real]; exact one_ne_zero
-  -- `have` (not `obtain`) so the first bullet's `simpa … using h_rtr` keeps
-  -- the original h_rtr hypothesis available.
-  have ⟨_h_ir_bin, _h_prog, _h_ra_a, h_ra_b, h_ra_c, _, _, _, _⟩ := h_rtr
-  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-    (h_ra_b.resolve_left h_ir_ne_zero).2.2
-  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
-    (h_ra_c.resolve_left h_ir_ne_zero).2.2
-  have h_subwop_nat := (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp
-    (h_subwop_sub trivial)
-  refine ⟨h_cpu, ?_, h_op_a_0, ?_, ?_⟩
-  · -- Bridge `RTypeReader.Gated.assertion.Spec` (lowercase) → matching
-    -- `RTypeReader.Gated.Assertion.Spec` (uppercase) form via simp.
-    simpa [SP1Clean.RTypeReader.Gated.assertion,
-           SP1Clean.RTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
-           Vector.getElem_map] using h_rtr
-  · -- Semantic conjunct: bridge SubwOp's borrow-form `Assertion.Spec` →
-    -- natural-form `Spec` → SP1's `allHold` → `iff_sp1_full`'s RHS triple
-    -- `(isU32 ∧ BV32 eq ∧ msb_eq)`.
-    intro _h_is_real_eq
-    have h_subwop_allHold :=
-      (SP1Clean.SubwOp.iff_sp1 _ _ _).mpr h_subwop_nat
-    exact (SubwOperation.iff_sp1_full h_isU64_b h_isU64_c).mp h_subwop_allHold
-  · -- Pure BitVec `RV64.subw` clause: bridge natural-form `SubwOp.Spec` to
-    -- the sign-extended 64-bit identity via `rv64_subw_eq_of_subwop_spec`.
-    intro _h_is_real_eq
-    exact rv64_subw_eq_of_subwop_spec _ _ _ _ h_isU64_b h_isU64_c h_subwop_nat
+  -- Bridge the lowercase `RTypeReader.Gated.assertion.Spec` produced by
+  -- `circuit_proof_start` (with `Vector.map (Expression.eval env)` views of
+  -- the inline-constructed `op_a_write_value`) to the uppercase
+  -- `Gated.Assertion.Spec` form (with `cols.subw_value[i]` /
+  -- `cols.subw_msb` projections) expected by
+  -- `formalSpec_of_subcircuit_specs`. The same simp set is used both sides.
+  refine formalSpec_of_subcircuit_specs _ h_is_real
+    (h_subwop_sub trivial) (h_cpu_sub trivial) ?_ h_op_a_0
+  simpa [SP1Clean.RTypeReader.Gated.assertion,
+         SP1Clean.RTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
+         Vector.getElem_map] using h_rtr_sub trivial
 
+/-- Completeness peels `h_spec` (= `FormalSpec input`) via
+`subcircuit_specs_of_formalSpec` into the four sub-circuit `Spec`s, then
+re-wraps each as the `(Assumptions, Spec)` pair the corresponding
+`FormalAssertion.completeness` expects. The lowercase
+`RTypeReader.Gated.assertion.Spec` expected by the `FormalAssertion`
+machinery needs a one-line `simpa` bridge from the uppercase
+`Gated.Assertion.Spec` produced by the named lemma (mirror of the
+soundness bridge). -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -146,32 +143,10 @@ theorem completeness :
     := h_input
   subst_eqs
   obtain ⟨_h_trusted, h_is_real⟩ := h_assumptions
-  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem, _h_rv64⟩ := h_spec
   unfold id at *
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real
-  have h_ir_ne_zero :
-      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-    rw [h_is_real]; exact one_ne_zero
-  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-    (h_rtr.2.2.2.1.resolve_left h_ir_ne_zero).2.2
-  have h_isU64_c : Word.isU64 input_adapter_op_c_memory_prev_value :=
-    (h_rtr.2.2.2.2.1.resolve_left h_ir_ne_zero).2.2
-  -- Reverse bridge: chip semantic triple → SP1's `allHold` → natural-form
-  -- `Spec` → borrow-form `Assertion.Spec` for the SubwOp obligation.
-  have ⟨h_isU32, h_bv32, h_msb_eq⟩ := h_sem h_is_real
-  have h_subwop_allHold :=
-    (SubwOperation.iff_sp1_full
-        (cols := { value := input_var_subw_value.map
-                              (Expression.eval env.toEnvironment),
-                   msb := { msb := Expression.eval env.toEnvironment
-                                    input_var_subw_msb } })
-        h_isU64_b h_isU64_c).mpr
-      ⟨h_isU32, h_bv32, h_msb_eq⟩
-  have h_subwop_nat := (SP1Clean.SubwOp.iff_sp1 _ _ _).mp h_subwop_allHold
-  have h_subwop' :=
-    (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mpr h_subwop_nat
-  refine ⟨⟨trivial, h_subwop'⟩, ⟨trivial, h_cpu⟩, ⟨trivial, ?_⟩, h_op_a_0⟩
+  obtain ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩ :=
+    subcircuit_specs_of_formalSpec _ h_is_real h_spec
+  refine ⟨⟨trivial, h_subwop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, ?_⟩, h_op_a_0⟩
   simpa [SP1Clean.RTypeReader.Gated.assertion,
          SP1Clean.RTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
          Vector.getElem_map] using h_rtr

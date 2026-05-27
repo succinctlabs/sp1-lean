@@ -101,6 +101,14 @@ so `Lemmas.lean` can reference it. Re-exported here for the
 `FormalAssertion` glue. -/
 abbrev FormalSpec := @SP1Clean.Addi.FormalSpec p
 
+/-- Soundness collapses to a single application of the structural
+mirror lemma `formalSpec_of_subcircuit_specs` (`Lemmas.lean`) once
+`circuit_proof_start` peels back the Clean elaboration plumbing. All
+sub-circuit composition logic — including the `Word.isU64 op_b`
+extraction from `h_itr` via `ITypeReader.Gated.Assertion.isU64_op_b_of_spec`,
+the `Word.isU64 op_c_imm` reconstruction from `ProgramSpec`'s byte
+range conjunct, and the sign-extension bridge to `RV64.addi` — lives
+inside the named lemma. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -108,141 +116,27 @@ theorem soundness :
   subst_eqs
   obtain ⟨h_addop_sub, h_cpu_sub, h_itr_sub, h_op_a_0⟩ := h_holds
   unfold id at *
-  have h_cpu := h_cpu_sub trivial
-  have h_itr := h_itr_sub trivial
-  -- Semantic-only FormalSpec: structural sub-circuit Specs + scalar gate +
-  -- one `is_real = 1 → (isU64 ∧ BV)` conjunct. Padding-row case is vacuous
-  -- (the BV conjunct is gated by `is_real = 1`). Real-row case discharges
-  -- AddOp.assertion with bounds, extracts (isU64, BV) from its new Spec,
-  -- and bridges `exec_RTYPE .ADD = a + b` to `RV64.addi (signExt12 imm) op_b`
-  -- via sign-extension from the program-bus `trusted_instr` predicate.
-  refine ⟨h_cpu, h_itr, h_op_a_0, ?_⟩
-  intro h_is_real_eq
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  change (Expression.eval env input_var_is_real : ZMod p) = 1 at h_is_real_eq
-  have h_ir_ne_zero :
-      (Expression.eval env input_var_is_real : ZMod p) ≠ 0 := by
-    rw [h_is_real_eq]; exact one_ne_zero
-  obtain ⟨_h_ir_bin, h_prog_disj, _h_ra_a, h_ra_b, _, _, _, _⟩ := h_itr
-  have h_ps := h_prog_disj.resolve_left h_ir_ne_zero
-  obtain ⟨h_ti, _h_op_a, _h_op_b, ⟨h_c0_lt, h_c1_lt, h_c2_lt, h_c3_lt⟩,
-          _, _, _, _, _, _, _, _⟩ := h_ps
-  have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-    (h_ra_b.resolve_left h_ir_ne_zero).2.2
-  have h65 : (65536 : ZMod p).val = 65536 := by
-    have hp : 2 ^ 17 < p := Fact.out
-    rw [show (65536 : ZMod p) = ((65536 : ℕ) : ZMod p) from by push_cast; rfl,
-        ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
-  have h_isU64_c : Word.isU64 input_adapter_op_c_imm :=
-    Word.isU64_of_cases
-      (by have : input_adapter_op_c_imm[0].val < (65536 : ZMod p).val := h_c0_lt; rwa [h65] at this)
-      (by have : input_adapter_op_c_imm[1].val < (65536 : ZMod p).val := h_c1_lt; rwa [h65] at this)
-      (by have : input_adapter_op_c_imm[2].val < (65536 : ZMod p).val := h_c2_lt; rwa [h65] at this)
-      (by have : input_adapter_op_c_imm[3].val < (65536 : ZMod p).val := h_c3_lt; rwa [h65] at this)
-  have h_signExt : Word.toBitVec64
-        #v[input_adapter_op_c_imm[0], input_adapter_op_c_imm[1],
-           input_adapter_op_c_imm[2], input_adapter_op_c_imm[3]] =
-      BitVec.signExtend 64 (BitVec.ofNat 12 input_adapter_op_c_imm[0].val) := by
-    have := h_ti
-    simp only [Opcode.trusted_instr, Opcode.ofNat, ZMod.val_one,
-               i_type_constraints, Vector.getElem_mk, List.getElem_toArray,
-               List.getElem_cons_zero, List.getElem_cons_succ] at this
-    exact this.2.2
-  have h_addop := h_addop_sub
-    ⟨Or.inr h_is_real_eq, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩
-  have ⟨h_isU64_v, h_bv⟩ := h_addop h_is_real_eq
-  refine ⟨h_isU64_v, ?_⟩
-  -- `h_bv : result.toBitVec64 = op_b.toBitVec64 + op_c_imm.toBitVec64`
-  -- Goal: `result.toBitVec64 = RV64.addi (signExt12 imm[0]) op_b.toBitVec64`
-  have h_op_c_unfold :
-      Word.toBitVec64 input_adapter_op_c_imm =
-        Word.toBitVec64
-          #v[input_adapter_op_c_imm[0], input_adapter_op_c_imm[1],
-             input_adapter_op_c_imm[2], input_adapter_op_c_imm[3]] := by
-    congr 1
-    apply Vector.ext
-    intro i hi
-    interval_cases i <;> rfl
-  simp only [RV64.addi]
-  rw [h_bv, h_op_c_unfold, h_signExt]
-  rfl
+  -- `circuit_proof_start` has already substituted `is_trusted := is_real`
+  -- into the goal via `subst_eqs` on `h_input`'s `e_ac` field, so the
+  -- chip-level `h_trusted` obligation reduces to `rfl`.
+  exact formalSpec_of_subcircuit_specs _ rfl
+    h_addop_sub (h_cpu_sub trivial) (h_itr_sub trivial) h_op_a_0
 
+/-- Completeness peels `h_spec` (= `FormalSpec input`) via
+`subcircuit_specs_of_formalSpec` into the (AddOp Assumptions ∧ Spec)
+pair plus the three remaining sub-circuit `Spec`s, then re-wraps each
+as the `(Assumptions, Spec)` pair the corresponding
+`FormalAssertion.completeness` expects. The same isU64/signExt bridging
+that soundness needs is inside the named lemma. -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
   obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_oawv, e_is_real, e_ac⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_itr, h_op_a_0, h_bv⟩ := h_spec
   unfold id at *
-  -- Discharge AddOp.assertion's Assumptions + Spec. Assumptions: binarity
-  -- + (is_real = 1 → bounds on operands). Spec: is_real = 1 → (isU64 result
-  -- ∧ result.toBitVec64 = a + b), recovered from `h_bv` (which carries the
-  -- `RV64.addi` form) via the inverse sign-extension bridge.
-  refine ⟨⟨⟨?_, ?_⟩, ?_⟩, ⟨trivial, h_cpu⟩, ⟨trivial, h_itr⟩, h_op_a_0⟩
-  · -- is_real ∈ {0, 1} from h_itr's binarity gate
-    obtain ⟨h_ir_bin, _⟩ := h_itr
-    rcases mul_eq_zero.mp h_ir_bin with h | h
-    · exact Or.inl h
-    · exact Or.inr (by linear_combination h)
-  · -- is_real = 1 → operand bounds from h_itr
-    intro h_is_real_eq
-    change (Expression.eval env.toEnvironment input_var_is_real : ZMod p) = 1 at h_is_real_eq
-    have h_ir_ne_zero :
-        (Expression.eval env.toEnvironment input_var_is_real : ZMod p) ≠ 0 := by
-      rw [h_is_real_eq]; exact one_ne_zero
-    obtain ⟨_h_ir_bin, h_prog_disj, _h_ra_a, h_ra_b, _, _, _, _⟩ := h_itr
-    have h_ps := h_prog_disj.resolve_left h_ir_ne_zero
-    obtain ⟨_h_ti, _h_op_a, _h_op_b, ⟨h_c0_lt, h_c1_lt, h_c2_lt, h_c3_lt⟩,
-            _, _, _, _, _, _, _, _⟩ := h_ps
-    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    have h_isU64_b : Word.isU64 input_adapter_op_b_memory_prev_value :=
-      (h_ra_b.resolve_left h_ir_ne_zero).2.2
-    have h65 : (65536 : ZMod p).val = 65536 := by
-      have hp : 2 ^ 17 < p := Fact.out
-      rw [show (65536 : ZMod p) = ((65536 : ℕ) : ZMod p) from by push_cast; rfl,
-          ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
-    exact ⟨h_isU64_b, Word.isU64_of_cases
-      (by have : input_adapter_op_c_imm[0].val < (65536 : ZMod p).val := h_c0_lt; rwa [h65] at this)
-      (by have : input_adapter_op_c_imm[1].val < (65536 : ZMod p).val := h_c1_lt; rwa [h65] at this)
-      (by have : input_adapter_op_c_imm[2].val < (65536 : ZMod p).val := h_c2_lt; rwa [h65] at this)
-      (by have : input_adapter_op_c_imm[3].val < (65536 : ZMod p).val := h_c3_lt; rwa [h65] at this)⟩
-  · -- AddOp.Spec: is_real = 1 → (isU64 result ∧ result.toBitVec64 = a + b)
-    -- Recover from chip's `h_bv` (RV64.addi form) by inverting sign-extension.
-    intro h_is_real_eq
-    change (Expression.eval env.toEnvironment input_var_is_real : ZMod p) = 1 at h_is_real_eq
-    have h_ir_ne_zero :
-        (Expression.eval env.toEnvironment input_var_is_real : ZMod p) ≠ 0 := by
-      rw [h_is_real_eq]; exact one_ne_zero
-    obtain ⟨_h_ir_bin, h_prog_disj, _, _, _, _, _, _⟩ := h_itr
-    have h_ps := h_prog_disj.resolve_left h_ir_ne_zero
-    obtain ⟨h_ti, _h_op_a, _h_op_b, _, _, _, _, _, _, _, _, _⟩ := h_ps
-    haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-    have h_signExt : Word.toBitVec64
-          #v[input_adapter_op_c_imm[0], input_adapter_op_c_imm[1],
-             input_adapter_op_c_imm[2], input_adapter_op_c_imm[3]] =
-        BitVec.signExtend 64 (BitVec.ofNat 12 input_adapter_op_c_imm[0].val) := by
-      have := h_ti
-      simp only [Opcode.trusted_instr, Opcode.ofNat, ZMod.val_one,
-                 i_type_constraints, Vector.getElem_mk, List.getElem_toArray,
-                 List.getElem_cons_zero, List.getElem_cons_succ] at this
-      exact this.2.2
-    have ⟨h_isU64_v, h_bv'⟩ := h_bv h_is_real_eq
-    refine ⟨h_isU64_v, ?_⟩
-    -- Goal: result.toBitVec64 = op_b.toBitVec64 + op_c_imm.toBitVec64
-    -- h_bv': result.toBitVec64 = RV64.addi (signExt12 imm[0]) op_b.toBitVec64
-    have h_op_c_unfold :
-        Word.toBitVec64 input_adapter_op_c_imm =
-          Word.toBitVec64
-            #v[input_adapter_op_c_imm[0], input_adapter_op_c_imm[1],
-               input_adapter_op_c_imm[2], input_adapter_op_c_imm[3]] := by
-      congr 1
-      apply Vector.ext
-      intro i hi
-      interval_cases i <;> rfl
-    rw [h_bv']
-    simp only [RV64.addi]
-    rw [h_op_c_unfold, h_signExt]
-    rfl
+  obtain ⟨h_addop_pair, h_cpu, h_itr, h_op_a_0⟩ :=
+    subcircuit_specs_of_formalSpec _ rfl h_spec
+  exact ⟨h_addop_pair, ⟨trivial, h_cpu⟩, ⟨trivial, h_itr⟩, h_op_a_0⟩
 
 end Assertion
 

@@ -693,6 +693,108 @@ theorem Assertion.Spec_iff_sp1
            (SP1Clean.ALUTypeReader.Assertion.isU64_iff_index_form _).mp h_b.2.2,
            h_immc_zero_facts, h_op_a_0_imp, h_immc_eq⟩
 
+/-- Extract `Word.isU64` of `op_b_memory.prev_value` from a witness of
+`Gated.Assertion.Spec` under `is_real = 1`. The bound lives inside the
+4th conjunct (op_b `RegisterAccess.Assertion.Spec`, offset 3), which
+unfolds to an `OperandAccess.AssertionGated.Spec` disjunction `mult = 0
+∨ (… ∧ … ∧ Word.isU64 prev_value)`; under `is_real ≠ 0` (forced by
+`is_real = 1`) the disjunction's left branch is closed and the
+`Word.isU64` projection falls out by `.2.2`.
+
+Mirrors `RTypeReader.Gated.Assertion.isU64_operands_of_spec`, but only
+the `op_b` extraction (the analogous `op_c` extraction needs a case
+split on `imm_c`; see `isU64_op_c_memory_of_spec`). Shared by every ALU
+chip whose `FormalAssertion` composes `ALUTypeReader.Gated.assertion`. -/
+lemma Assertion.isU64_op_b_of_spec
+    {clk_high clk_low opcode : ZMod p}
+    {pc : Vector (ZMod p) 3}
+    {op_a_write_value : Vector (ZMod p) 4}
+    {cols : _root_.ALUTypeReader (ZMod p)}
+    {is_real is_trusted : ZMod p}
+    (h_is_real : is_real = 1)
+    (h_spec : Assertion.Spec
+        ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+         cols, is_real, is_trusted⟩) :
+    Word.isU64 cols.op_b_memory.prev_value := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_ne : is_real ≠ 0 := by rw [h_is_real]; exact one_ne_zero
+  exact (h_spec.2.2.2.1.resolve_left h_ne).2.2
+
+/-- Extract `Word.isU64` of `op_c_memory.prev_value` from a witness of
+`Gated.Assertion.Spec` under `is_real = 1` ∧ `is_trusted = 1`. The
+bound is derived by case-splitting on `imm_c ∈ {0, 1}` (binary fact
+from `ProgramSpec`):
+- `imm_c = 0`: op_c is a register operand, gate `is_real - imm_c = 1 ≠
+  0` resolves the 5th conjunct's `RegisterAccess.Spec` disjunction and
+  yields `Word.isU64 prev_value` directly via `.2.2`.
+- `imm_c = 1`: the four trailing `imm_c * (prev_value[i] - op_c[i]) = 0`
+  gates force `prev_value = op_c`, and `op_c`'s byte bounds (from
+  `ProgramSpec.op_c_lt`) reconstruct `Word.isU64 op_c` via
+  `Word.isU64_of_cases`. Both branches yield the same conclusion.
+
+The `h_trusted` hypothesis (`is_trusted = 1`) is needed to navigate the
+`ProgramGated.Spec` disjunction so the inner `ProgramSpec`'s op_c byte
+bounds and `imm_c` binary fact are accessible. Used by every ALU-type
+chip's `FormalAssertion` to discharge `AddwOp.Assumptions` /
+`SubwOp.Assumptions` `Word.isU64 c` obligations. -/
+lemma Assertion.isU64_op_c_memory_of_spec
+    {clk_high clk_low opcode : ZMod p}
+    {pc : Vector (ZMod p) 3}
+    {op_a_write_value : Vector (ZMod p) 4}
+    {cols : _root_.ALUTypeReader (ZMod p)}
+    {is_real is_trusted : ZMod p}
+    (h_is_real : is_real = 1)
+    (h_trusted : is_trusted = 1)
+    (h_spec : Assertion.Spec
+        ⟨clk_high, clk_low, opcode, pc, op_a_write_value,
+         cols, is_real, is_trusted⟩) :
+    Word.isU64 cols.op_c_memory.prev_value := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_t_ne : is_trusted ≠ 0 := by rw [h_trusted]; exact one_ne_zero
+  -- Unpack to expose the named sub-conjuncts.
+  obtain ⟨_h_ir_bin, h_prog, _h_ra_a, _h_ra_b, h_ra_c, _, _, _, _,
+          h_im0, h_im1, h_im2, h_im3⟩ := h_spec
+  have h_ps := h_prog.resolve_left h_t_ne
+  obtain ⟨_h_ti, _h_op_a_lt, _h_op_b_lt, h_op_c_lt,
+          _, _, _h_imm_b_bin, h_imm_c_bin, _⟩ := h_ps
+  obtain ⟨h_oc0_lt, h_oc1_lt, h_oc2_lt, h_oc3_lt⟩ := h_op_c_lt
+  by_cases h_imm_c : cols.imm_c = 0
+  · -- imm_c = 0: op_c is a register operand; gate `is_real - imm_c = 1` ≠ 0.
+    have h_ir_imm_ne_zero : is_real - cols.imm_c ≠ 0 := by
+      rw [h_is_real, h_imm_c]; simp
+    exact (h_ra_c.resolve_left h_ir_imm_ne_zero).2.2
+  · -- imm_c = 1: prev_value = op_c via the four imm_c masked gates; op_c
+    -- byte bounds give Word.isU64 op_c.
+    have h_imm_c_one : cols.imm_c = (1 : ZMod p) := by
+      rcases h_imm_c_bin with h | h
+      · exact absurd (by simpa using h) h_imm_c
+      · simpa using h
+    have h_pv0 : cols.op_c_memory.prev_value[0] = cols.op_c[0] := by
+      rw [h_imm_c_one, one_mul] at h_im0; linear_combination h_im0
+    have h_pv1 : cols.op_c_memory.prev_value[1] = cols.op_c[1] := by
+      rw [h_imm_c_one, one_mul] at h_im1; linear_combination h_im1
+    have h_pv2 : cols.op_c_memory.prev_value[2] = cols.op_c[2] := by
+      rw [h_imm_c_one, one_mul] at h_im2; linear_combination h_im2
+    have h_pv3 : cols.op_c_memory.prev_value[3] = cols.op_c[3] := by
+      rw [h_imm_c_one, one_mul] at h_im3; linear_combination h_im3
+    have h_65536_val : (65536 : ZMod p).val = 65536 := by
+      rw [show (65536 : ZMod p) = ((65536 : ℕ) : ZMod p) from by push_cast; rfl]
+      have hp : 2 ^ 17 < p := Fact.out
+      rw [ZMod.val_natCast_of_lt (by omega)]
+    apply Word.isU64_of_cases
+    · simp only [h_pv0]
+      have : cols.op_c[0].val < (65536 : ZMod p).val := h_oc0_lt
+      rw [h_65536_val] at this; exact (by simpa using this)
+    · simp only [h_pv1]
+      have : cols.op_c[1].val < (65536 : ZMod p).val := h_oc1_lt
+      rw [h_65536_val] at this; exact (by simpa using this)
+    · simp only [h_pv2]
+      have : cols.op_c[2].val < (65536 : ZMod p).val := h_oc2_lt
+      rw [h_65536_val] at this; exact (by simpa using this)
+    · simp only [h_pv3]
+      have : cols.op_c[3].val < (65536 : ZMod p).val := h_oc3_lt
+      rw [h_65536_val] at this; exact (by simpa using this)
+
 end Gated
 
 end SP1Clean.ALUTypeReader

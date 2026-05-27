@@ -499,4 +499,105 @@ lemma allHold_iff_structural
 -- bridge needs (currently bundled inside `ProgramGated.Spec`'s opaque
 -- program-table lookup).
 
+/-! ## Chip-level FormalSpec ↔ sub-circuit Specs
+
+The two lemmas below name the *stable midpoint* of `AddwChip`'s
+`soundness` / `completeness` proofs: after `circuit_proof_start`
+unfolds the Clean elaboration plumbing and the proof destructures
+`h_input` / `h_assumptions` / `h_holds` (or `h_spec`), the proof state
+contains exactly four named hypotheses — one per `main` sub-circuit
+emission (`AddwOp.assertion`, `CPUState.Gated.assertion`,
+`ALUTypeReader.Gated.assertion`, `op_a_0 === 0`).
+
+AddwChip-specific divergence from AddChip/SubChip: `AddwOp.Assertion.
+Assumptions = True` (so the witness arrives in `Spec` form directly,
+not as an `Assumptions → Spec` function) and the `Word.isU64 op_c`
+extraction from `h_alu` requires the imm_c case split, factored into
+`ALUTypeReader.Gated.Assertion.isU64_op_c_memory_of_spec`. The
+semantic conjunct `(isU64 ∧ BV64 = RV64.addw)` is bridged from
+`AddwOp.Spec` via the existing `addwOp_spec_iff_rv64_addw`. -/
+
+set_option maxHeartbeats 800000 in
+-- Mirrors `allHold_iff_structural` above: `addwOp_spec_iff_rv64_addw.mp`
+-- elaboration involves the heavy `RV64.addw c b` BitVec expression and
+-- defeq matching during the inferred-type check is expensive.
+/-- **Forward** (soundness midpoint): assemble the chip-level
+`FormalSpec` from the per-sub-circuit Specs returned by `h_holds`.
+Discharges the BV64 `RV64.addw` conjunct internally via
+`addwOp_spec_iff_rv64_addw` using operand `Word.isU64` bounds extracted
+from `h_alu` via `ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec` /
+`isU64_op_c_memory_of_spec`. -/
+lemma formalSpec_of_subcircuit_specs
+    (cols : AddwCols (ZMod p))
+    (h_is_real : cols.is_real = 1)
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real)
+    (h_addwop : SP1Clean.AddwOp.Spec
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.addw_value, cols.addw_msb⟩)
+    (h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨cols.state,
+         #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+         8, cols.is_real⟩)
+    (h_alu : SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+        ⟨cols.state.clk_high,
+         cols.state.clk_0_16 + cols.state.clk_16_24 * 65536, 19,
+         cols.state.pc,
+         #v[cols.addw_value[0], cols.addw_value[1],
+            cols.addw_msb * 65535, cols.addw_msb * 65535],
+         cols.adapter, cols.is_real, cols.adapter_cols.is_trusted⟩)
+    (h_op_a_0 : cols.adapter.op_a_0 = 0) :
+    FormalSpec cols := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_trusted_one : cols.adapter_cols.is_trusted = 1 := h_trusted.trans h_is_real
+  have h_isU64_b :=
+    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec h_is_real h_alu
+  have h_isU64_c :=
+    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_c_memory_of_spec
+      h_is_real h_trusted_one h_alu
+  refine ⟨h_cpu, h_alu, h_op_a_0, fun _h_is_real_eq => ?_⟩
+  exact (addwOp_spec_iff_rv64_addw h_isU64_b h_isU64_c).mp h_addwop
+
+set_option maxHeartbeats 800000 in
+-- Mirrors the forward midpoint: `addwOp_spec_iff_rv64_addw.mpr` is
+-- the inverse elaboration cost (BitVec defeq matching during the
+-- inferred-type check on the heavy `RV64.addw c b` expression).
+/-- **Backward** (completeness midpoint): peel the chip-level
+`FormalSpec` apart into per-sub-circuit `Spec`s. Reverse bridge through
+`addwOp_spec_iff_rv64_addw` reconstructs `AddwOp.Spec` from the
+`(isU64 ∧ BV64 = RV64.addw)` pair under the operand isU64 bounds. -/
+lemma subcircuit_specs_of_formalSpec
+    (cols : AddwCols (ZMod p))
+    (h_is_real : cols.is_real = 1)
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real)
+    (h_spec : FormalSpec cols) :
+    SP1Clean.AddwOp.Spec
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.addw_value, cols.addw_msb⟩ ∧
+    SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨cols.state,
+         #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+         8, cols.is_real⟩ ∧
+    SP1Clean.ALUTypeReader.Gated.Assertion.Spec
+        ⟨cols.state.clk_high,
+         cols.state.clk_0_16 + cols.state.clk_16_24 * 65536, 19,
+         cols.state.pc,
+         #v[cols.addw_value[0], cols.addw_value[1],
+            cols.addw_msb * 65535, cols.addw_msb * 65535],
+         cols.adapter, cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
+    cols.adapter.op_a_0 = 0 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_trusted_one : cols.adapter_cols.is_trusted = 1 := h_trusted.trans h_is_real
+  obtain ⟨h_cpu, h_alu, h_op_a_0, h_sem⟩ := h_spec
+  have h_isU64_b :=
+    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec h_is_real h_alu
+  have h_isU64_c :=
+    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_c_memory_of_spec
+      h_is_real h_trusted_one h_alu
+  have h_pair := h_sem h_is_real
+  have h_addwop :=
+    (addwOp_spec_iff_rv64_addw h_isU64_b h_isU64_c).mpr h_pair
+  exact ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩
+
 end SP1Clean.Addw
