@@ -25,7 +25,16 @@ lemma fromMain_toMain (cols : BitwiseCols (ZMod p))
     (h_trusted : cols.adapter_cols.is_trusted =
       cols.is_xor + cols.is_or + cols.is_and) :
     fromMain (toMain cols) = cols := by
-  sorry
+  rcases cols with ⟨state, adapter, bitwise_operation, is_xor, is_or, is_and, adapter_cols⟩
+  have h_trust : adapter_cols.is_trusted = is_xor + is_or + is_and := by
+    simpa using h_trusted
+  simp [h_trust, BitwiseCols.ext_iff, CPUState.ext_iff,
+    ALUTypeReader.ext_iff, MemoryAccessInSharedCols.ext_iff,
+    UserModeReaderCols.ext_iff, BitwiseU16Operation.ext_iff,
+    U16toU8Operation.ext_iff, BitwiseOperation.ext_iff,
+    Array.ext_iff]
+  refine ⟨?_, ⟨?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
+  all_goals (intro i hi₁ hi₂; interval_cases i <;> rfl)
 
 /-- The chip-level structural bridge: SP1's `allHold` over the flat row
 `Bitwise.constraints Main` is exactly the conjunction of the
@@ -80,6 +89,28 @@ lemma allHold_iff_structural
        (Main[50] = 0 ∨ Main[50] = 1) ∧
        (is_real = 0 ∨ is_real - 1 = 0) ∧
        Main[13] = 0) := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [show ((Bitwise.constraints Main).allHold)
+        = List.Forall SP1Constraint.toProp (Bitwise.constraints Main) from rfl,
+      Bitwise.allHold_constraints_iff]
+  rw [h_is_real]
+  -- Vector-4 eta to align ALUTypeReader's `op_a_write_value` shape: SP1's
+  -- `allHold_constraints_iff` produces `#v[ret_val[0..3]]`, our Spec uses
+  -- the raw `ret_val`.
+  have h_vec4 : ∀ (v : Word (ZMod p)), #v[v[0], v[1], v[2], v[3]] = v := by
+    intro v; ext i; fin_cases i <;> rfl
+  simp only [show ∀ (cols : _root_.CPUState (ZMod p))
+                    (next_pc : Vector (ZMod p) 3) (ci : ZMod p),
+        List.Forall SP1Constraint.toProp
+            (_root_.CPUState.constraints cols next_pc ci 1) ↔
+          SP1Clean.CPUState.cpuStateSpec cols.clk_0_16 cols.clk_16_24
+      from fun _ _ _ => SP1Clean.CPUState.cpuStateSpec_iff_sp1,
+    show ∀ (ch cl op : ZMod p) (pc : Vector (ZMod p) 3)
+           (oaw : Word (ZMod p)) (cols : _root_.ALUTypeReader (ZMod p)),
+        List.Forall SP1Constraint.toProp
+            (_root_.ALUTypeReader.constraints ch cl pc op oaw cols 1 1) ↔
+          SP1Clean.ALUTypeReader.aluTypeReaderSpec cl op pc oaw cols
+      from fun _ _ _ _ _ _ => SP1Clean.ALUTypeReader.aluTypeReaderSpec_iff_sp1,
+    h_vec4]
 
 end SP1Clean.BitwiseChip

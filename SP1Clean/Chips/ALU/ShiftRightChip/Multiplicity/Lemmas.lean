@@ -18,7 +18,17 @@ lemma fromMain_toMain (cols : ShiftRightCols (ZMod p))
     (h_trusted : cols.adapter_cols.is_trusted =
       cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw) :
     fromMain (toMain cols) = cols := by
-  sorry
+  rcases cols with ⟨state, adapter, result, b_msb, srw_msb, c_bits,
+                    v_01, v_012, v_0123, shifted_intermediates,
+                    limb_result, shift_u16, is_srl, is_sra, is_srlw,
+                    is_sraw, is_w_imm, adapter_cols⟩
+  have h_trust : adapter_cols.is_trusted = is_srl + is_sra + is_srlw + is_sraw := by
+    simpa using h_trusted
+  simp [h_trust, ShiftRightCols.ext_iff, CPUState.ext_iff,
+    ALUTypeReader.ext_iff, MemoryAccessInSharedCols.ext_iff,
+    UserModeReaderCols.ext_iff, Array.ext_iff]
+  refine ⟨?_, ⟨?_, ?_, ?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
+  all_goals (intro i hi₁ hi₂; interval_cases i <;> rfl)
 
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 69)

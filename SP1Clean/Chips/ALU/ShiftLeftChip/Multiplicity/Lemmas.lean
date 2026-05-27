@@ -20,7 +20,16 @@ omit [Fact (2 ^ 17 < p)] in
 lemma fromMain_toMain (cols : ShiftLeftCols (ZMod p))
     (h_trusted : cols.adapter_cols.is_trusted = cols.is_sll + cols.is_sllw) :
     fromMain (toMain cols) = cols := by
-  sorry
+  rcases cols with ⟨state, adapter, result, c_bits, v_01, v_012, v_0123,
+                    shift_u16, lower_limb, higher_limb, limb_result, sllw_msb,
+                    is_sll, is_sllw, is_sllw_imm, adapter_cols⟩
+  have h_trust : adapter_cols.is_trusted = is_sll + is_sllw := by
+    simpa using h_trusted
+  simp [h_trust, ShiftLeftCols.ext_iff, CPUState.ext_iff,
+    ALUTypeReader.ext_iff, MemoryAccessInSharedCols.ext_iff,
+    UserModeReaderCols.ext_iff, Array.ext_iff]
+  refine ⟨?_, ⟨?_, ?_, ?_, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  all_goals (intro i hi₁ hi₂; interval_cases i <;> rfl)
 
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 65)

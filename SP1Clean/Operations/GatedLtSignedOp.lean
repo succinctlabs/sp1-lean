@@ -59,7 +59,10 @@ deriving ProvableStruct
 /-- Carry-and-lookup Spec for the gated signed-less-than operation. The
 embedded GatedLtUnsignedOp's FormalSpec stays disjunctive (already
 `gate = 0 ∨ ...`); the surrounding 5 gates are inlined as equalities;
-the 2 new U16MSB byte-range lookups appear as disjunctive conjuncts. -/
+the 2 U16MSB byte-range lookups appear as disjunctive conjuncts gated by
+`gate * is_signed` — matching SP1's `U16MSBOperation.constraints _ _
+is_signed` multiplicity (the lookup is vacuous in SLTU mode where
+`is_signed = 0`, even with `gate = 1`). -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   let one : ZMod p := 1
   let b3' := input.b[3] + input.is_signed * 32768 - 65536 * input.b_msb
@@ -77,13 +80,13 @@ def Spec (input : Inputs (ZMod p)) : Prop :=
   input.is_signed * (input.is_signed - one) = 0 ∧
   (input.is_signed - one) * input.b_msb = 0 ∧
   (input.is_signed - one) * input.c_msb = 0 ∧
-  -- 2 disjunctive U16MSB byte-range conjuncts (vacuous on `gate = 0`).
-  -- The `X * 2 - Y * 65536` form matches `main`'s `Expression`-typed
-  -- multiplications; downstream chip-level `iff_sp1` bridges to the
-  -- SP1-native `2 * X - 65536 * Y` form via `ring`.
-  (input.gate = 0 ∨ SP1Clean.ByteOpcodeSpec
+  -- 2 disjunctive U16MSB byte-range conjuncts (vacuous when either
+  -- `gate = 0` (padding rows) or `is_signed = 0` (SLTU mode)). Mirrors
+  -- SP1's `U16MSBOperation.constraints _ _ is_signed` whose multiplicity
+  -- naturally vanishes in SLTU mode.
+  (input.gate * input.is_signed = 0 ∨ SP1Clean.ByteOpcodeSpec
     (#v[6, input.b[3] * 2 - input.b_msb * 65536, 16, 0] : Vector (ZMod p) 4)) ∧
-  (input.gate = 0 ∨ SP1Clean.ByteOpcodeSpec
+  (input.gate * input.is_signed = 0 ∨ SP1Clean.ByteOpcodeSpec
     (#v[6, input.c[3] * 2 - input.c_msb * 65536, 16, 0] : Vector (ZMod p) 4))
 
 namespace Assertion
@@ -114,14 +117,19 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   gate * (input.is_signed * (input.is_signed - one_expr)) === 0
   gate * ((input.is_signed - one_expr) * input.b_msb) === 0
   gate * ((input.is_signed - one_expr) * input.c_msb) === 0
-  -- 2× U16MSB byte-range lookups, gated by `gate`. Expression on the
+  -- 2× U16MSB byte-range lookups, gated by `gate * is_signed` — matches
+  -- SP1's `U16MSBOperation.constraints _ _ is_signed` multiplicity. The
+  -- `gate` factor adds the chip-level on/off (SP1 enforces this via the
+  -- `(is_real - 1) * is_signed = 0` companion gate). Expression on the
   -- left side of `*` so the literal `2`/`65536` can be coerced into
   -- `Expression (ZMod p)` (the `ℕ * Expression` form has no HMul instance).
   SP1Lookup.byteOpcodeGated
-    (⟨#v[6, input.b[3] * 2 - input.b_msb * 65536, 16, 0], gate⟩ :
+    (⟨#v[6, input.b[3] * 2 - input.b_msb * 65536, 16, 0],
+       gate * input.is_signed⟩ :
       Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
   SP1Lookup.byteOpcodeGated
-    (⟨#v[6, input.c[3] * 2 - input.c_msb * 65536, 16, 0], gate⟩ :
+    (⟨#v[6, input.c[3] * 2 - input.c_msb * 65536, 16, 0],
+       gate * input.is_signed⟩ :
       Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
 
 set_option maxHeartbeats 1200000 in
@@ -191,9 +199,15 @@ theorem soundness :
     -- `Vector.map` shape of `b`/`c` after `subst`.
     convert h_sub using 2
   · -- b[3] U16MSB byte-range from byteOpcodeGated.soundness.
-    simpa using h_b_byte
+    -- `h_b_byte : ByteOpcodeGated.Spec ⟨…, gate * is_signed⟩` ↔
+    -- `gate * is_signed = 0 ∨ ByteOpcodeSpec _`. The Spec's matching
+    -- conjunct is the same disjunction; bridge via the `ByteOpcodeGated.Spec`
+    -- unfold.
+    change SP1Lookup.ByteOpcodeGated.Spec _ at h_b_byte
+    simpa [SP1Lookup.ByteOpcodeGated.Spec] using h_b_byte
   · -- c[3] U16MSB byte-range from byteOpcodeGated.soundness.
-    simpa using h_c_byte
+    change SP1Lookup.ByteOpcodeGated.Spec _ at h_c_byte
+    simpa [SP1Lookup.ByteOpcodeGated.Spec] using h_c_byte
 
 omit [Fact (2 ^ 17 < p)] in
 theorem completeness :
@@ -225,10 +239,10 @@ theorem completeness :
     · rw [h_gate]; ring
     · rw [h_gate]; ring
     · rw [h_gate]; ring
-    · -- byteOpcodeGated on b[3]: gate = 0 branch.
-      exact ⟨trivial, Or.inl h_gate⟩
+    · -- byteOpcodeGated on b[3]: gate = 0 branch (so gate * is_signed = 0).
+      exact ⟨trivial, Or.inl (by rw [h_gate]; ring)⟩
     · -- byteOpcodeGated on c[3]: gate = 0 branch.
-      exact ⟨trivial, Or.inl h_gate⟩
+      exact ⟨trivial, Or.inl (by rw [h_gate]; ring)⟩
   · -- Inner Spec holds: each inline gate by multiplication; sub-FormalSpec
     -- comes from the inner Spec directly; byte-range subcircuits discharge
     -- from the 2 new disjunctive conjuncts.
@@ -245,10 +259,12 @@ theorem completeness :
     · linear_combination g * h_bmsb_v'
     · linear_combination g * h_cmsb_v'
     · refine ⟨trivial, ?_⟩
-      change g = 0 ∨ ByteOpcodeSpec _
+      change g * Expression.eval env.toEnvironment input_var_is_signed = 0 ∨
+        ByteOpcodeSpec _
       simpa [sub_eq_add_neg] using h_b_byte'
     · refine ⟨trivial, ?_⟩
-      change g = 0 ∨ ByteOpcodeSpec _
+      change g * Expression.eval env.toEnvironment input_var_is_signed = 0 ∨
+        ByteOpcodeSpec _
       simpa [sub_eq_add_neg] using h_c_byte'
 
 end Assertion

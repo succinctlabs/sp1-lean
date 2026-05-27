@@ -185,12 +185,14 @@ def assertion : FormalAssertion (ZMod p) Inputs :=
     soundness := soundness,
     completeness := completeness }
 
-/-- Bridge to SP1: `Spec input` is equivalent to SP1's
-`LtOperationSigned.constraints` `allHold` form under `is_real = 1` AND
-`is_signed = 1`. The proof is structural — SP1's `allHold_constraints_iff`
-exposes 3 sub-CS + 3 disjunctive scalar gates; each sub-CS bridges via
-the matching op's `iff_sp1`; the 3 scalar gates trivialize under
-`is_signed = 1`.
+/-- Bridge `Spec input` to SP1's `allHold` form under `is_signed = 1`.
+Composes `U16MSBOp.iff_sp1` ×2 + `LtUnsignedOp.iff_sp1` on the
+sign-shifted operand vectors, plus Vector-4/2 eta to align the
+`u16_flags` / `comparison_limbs` reshape that SP1's `Constraints.lean`
+emits as explicit `#v[v[0], …, v[k]]` literals. Under `is_signed = 1`
+the three trailing scalar gates from SP1's RHS (`is_signed` binary +
+two sign-vacuity disjunctions) collapse to `True`, and our `Spec`'s
+matching three trailing gates collapse to trivial `0 = 0`.
 
 The `is_signed = 1` hypothesis is necessary because: when `is_signed = 0`,
 SP1's `CS0`/`CS1` (`U16MSBOperation.constraints`, gated by `is_signed`)
@@ -198,17 +200,7 @@ become vacuous; but `main` here unconditionally invokes
 `U16MSBOp.assertion`, making `Spec` strictly stronger than SP1's allHold
 for the unsigned-mode case. Chip-level callers that need the unsigned
 mode go through `GatedLtSignedOp` (the disjunctive form), not this
-non-gated `LtSignedOp` mirror.
-
-**Note.** The bridge body is `sorry` pending resolution of the Vector
-unification between SP1's `allHold_constraints_iff` RHS (which projects
-through `cols.b_msb.msb`, `cols.result.u16_flags[0]`, etc.) and our
-`Inputs`-shaped Spec (which uses `input.b_msb`, `input.u16_flags`
-directly). The structural correspondence is straightforward in principle
-(soundness + completeness already close axiom-clean) but the Lean
-elaboration friction is high enough that we don't burn time on it for
-a theorem with zero downstream consumers. See
-`docs/CLEAN_FUTURE.md` for the broader sorries punch-list. -/
+non-gated `LtSignedOp` mirror. -/
 theorem iff_sp1 (input : Inputs (ZMod p)) (h_is_signed : input.is_signed = 1) :
     Spec input ↔
       (LtOperationSigned.constraints input.b input.c
@@ -219,6 +211,62 @@ theorem iff_sp1 (input : Inputs (ZMod p)) (h_is_signed : input.is_signed = 1) :
           b_msb := { msb := input.b_msb },
           c_msb := { msb := input.c_msb } }
         input.is_signed 1).allHold := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  haveI : Fact (p > 65536) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  haveI : Fact (p > 512) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [show ((LtOperationSigned.constraints input.b input.c _ input.is_signed 1).allHold)
+        = List.Forall SP1Constraint.toProp
+            (LtOperationSigned.constraints input.b input.c _ input.is_signed 1) from rfl,
+      LtOperationSigned.allHold_constraints_iff, h_is_signed]
+  simp only [show (1 : ZMod p) = 0 ↔ False from by simp,
+             show (1 : ZMod p) = 1 ↔ True from by simp,
+             or_true, true_or, true_and, and_true]
+  -- Bridge both U16MSB sub-CS to their Clean `Spec` form.
+  rw [show ∀ (a m : ZMod p),
+        List.Forall SP1Constraint.toProp
+          (U16MSBOperation.constraints (F := ZMod p) a {msb := m} 1) ↔
+        U16MSBOp.Spec a m
+      from fun a m => U16MSBOp.iff_sp1 a {msb := m},
+      show ∀ (a m : ZMod p),
+        List.Forall SP1Constraint.toProp
+          (U16MSBOperation.constraints (F := ZMod p) a {msb := m} 1) ↔
+        U16MSBOp.Spec a m
+      from fun a m => U16MSBOp.iff_sp1 a {msb := m}]
+  -- Align the `#v[u16_flags[0..3]]` / `#v[comparison_limbs[0..1]]` reshape
+  -- that SP1 emits with our `input.u16_flags` / `input.comparison_limbs`.
+  have h_vec4 : #v[input.u16_flags[0], input.u16_flags[1], input.u16_flags[2],
+                   input.u16_flags[3]] = input.u16_flags := by
+    ext i; fin_cases i <;> rfl
+  have h_vec2 : #v[input.comparison_limbs[0], input.comparison_limbs[1]]
+                  = input.comparison_limbs := by
+    ext i; fin_cases i <;> rfl
+  rw [h_vec4, h_vec2]
+  -- Unfold Spec, collapse 3 trailing trivial gates, bridge the LtUnsigned sub-CS.
+  unfold Spec
+  rw [h_is_signed]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨h_u16_b, h_u16_c, h_lt_spec, _, _, _⟩
+    refine ⟨h_u16_b, h_u16_c, ?_⟩
+    exact (LtUnsignedOp.iff_sp1
+      (⟨#v[input.b[0], input.b[1], input.b[2],
+            input.b[3] + 1 * 32768 - 65536 * input.b_msb],
+        #v[input.c[0], input.c[1], input.c[2],
+            input.c[3] + 1 * 32768 - 65536 * input.c_msb],
+        input.compare_bit, input.u16_flags,
+        input.not_eq_inv, input.comparison_limbs⟩
+       : LtUnsignedOp.Inputs (ZMod p))).mp h_lt_spec
+  · rintro ⟨h_u16_b, h_u16_c, h_lt⟩
+    refine ⟨h_u16_b, h_u16_c, ?_, ?_, ?_, ?_⟩
+    · exact (LtUnsignedOp.iff_sp1
+        (⟨#v[input.b[0], input.b[1], input.b[2],
+              input.b[3] + 1 * 32768 - 65536 * input.b_msb],
+          #v[input.c[0], input.c[1], input.c[2],
+              input.c[3] + 1 * 32768 - 65536 * input.c_msb],
+          input.compare_bit, input.u16_flags,
+          input.not_eq_inv, input.comparison_limbs⟩
+         : LtUnsignedOp.Inputs (ZMod p))).mpr h_lt
+    · ring
+    · ring
+    · ring
 
 end SP1Clean.LtSignedOp
