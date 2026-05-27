@@ -127,4 +127,93 @@ lemma allHold_iff_structural
     refine ⟨h_op, h_cpu, h_rtr, ?_, h_op_a_0⟩
     ring
 
+/-! ## Chip-level FormalSpec ↔ sub-circuit Specs
+
+The two lemmas below name the *stable midpoint* of `SubChip`'s
+`soundness` / `completeness` proofs: after `circuit_proof_start`
+unfolds the Clean elaboration plumbing and the proof destructures
+`h_input` / `h_assumptions` / `h_holds` (or `h_spec`), the proof state
+contains exactly four named hypotheses — one per `main` sub-circuit
+emission (`SubOp.assertion`, `CPUState.Gated.assertion`,
+`RTypeReader.Gated.assertion`, `op_a_0 === 0`). Surfacing that midpoint
+as top-level named theorems decouples the sub-circuit composition graph
+from `circuit_proof_start`'s opaque output, and lets `Circuit.lean`'s
+proofs collapse to "destructure → invoke the named lemma".
+
+Mirrors the SP1-side `allHold_iff_structural` above (which names the same
+midpoint on the flat-row `(Sub.constraints Main).allHold` side), and
+mirrors `SP1Clean/Chips/ALU/AddChip/Lemmas.lean` 1-for-1, swapping
+`AddOp` → `SubOp`, opcode `0` → `2`, `RV64.add` → `RV64.sub`. -/
+
+/-- **Forward** (soundness midpoint): assemble the chip-level
+`FormalSpec` from the per-sub-circuit Specs returned by `h_holds`. The
+`SubOp` hypothesis is kept in its `Assumptions → Spec` function form —
+the literal shape of `h_holds.1` after `circuit_proof_start`'s
+`subcircuit_norm` unfolding — and discharged internally using `is_real
+= 1` plus the `Word.isU64 op_b/op_c` bounds pulled from `h_rtr` via
+`RTypeReader.Gated.Assertion.isU64_operands_of_spec`. -/
+lemma formalSpec_of_subcircuit_specs
+    (cols : SubCols (ZMod p))
+    (h_is_real : cols.is_real = 1)
+    (h_subop : SP1Clean.SubOp.Assertion.Assumptions
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.op_a_write_value, cols.is_real⟩ →
+      SP1Clean.SubOp.Assertion.Spec
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.op_a_write_value, cols.is_real⟩)
+    (h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨cols.state,
+         #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+         8, cols.is_real⟩)
+    (h_rtr : SP1Clean.RTypeReader.Gated.Assertion.Spec
+        ⟨cols.state.clk_high,
+         cols.state.clk_0_16 + cols.state.clk_16_24 * 65536, 2,
+         cols.state.pc, cols.op_a_write_value, cols.adapter,
+         cols.is_real, cols.adapter_cols.is_trusted⟩)
+    (h_op_a_0 : cols.adapter.op_a_0 = 0) :
+    FormalSpec cols := by
+  obtain ⟨h_isU64_b, h_isU64_c⟩ :=
+    SP1Clean.RTypeReader.Gated.Assertion.isU64_operands_of_spec h_is_real h_rtr
+  refine ⟨h_cpu, h_rtr, h_op_a_0, fun h_ir => ?_⟩
+  have ⟨h_isU64_v, h_bv⟩ :=
+    h_subop ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩ h_ir
+  refine ⟨h_isU64_v, ?_⟩
+  simp only [RV64.sub]
+  exact h_bv
+
+/-- **Backward** (completeness midpoint): peel the chip-level
+`FormalSpec` apart into per-sub-circuit `Spec`s. The `SubOp` conjunct
+is returned in its post-discharge form (`SubOp.Spec ⟨...⟩`, i.e. the
+`is_real = 1 → isU64 ∧ BitVec eq` implication) rather than packaged as
+`Assumptions ∧ Spec`; chip-level completeness re-assembles the
+`Assumptions` half from `is_real = 1` + the `Word.isU64 op_b/op_c`
+bounds from `RTypeReader.Gated.Assertion.isU64_operands_of_spec`. -/
+lemma subcircuit_specs_of_formalSpec
+    (cols : SubCols (ZMod p))
+    (_h_is_real : cols.is_real = 1)
+    (h_spec : FormalSpec cols) :
+    SP1Clean.SubOp.Assertion.Spec
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.op_a_write_value, cols.is_real⟩ ∧
+    SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨cols.state,
+         #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
+         8, cols.is_real⟩ ∧
+    SP1Clean.RTypeReader.Gated.Assertion.Spec
+        ⟨cols.state.clk_high,
+         cols.state.clk_0_16 + cols.state.clk_16_24 * 65536, 2,
+         cols.state.pc, cols.op_a_write_value, cols.adapter,
+         cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
+    cols.adapter.op_a_0 = 0 := by
+  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem⟩ := h_spec
+  refine ⟨?_, h_cpu, h_rtr, h_op_a_0⟩
+  intro h_ir
+  have ⟨h_isU64_v, h_bv⟩ := h_sem h_ir
+  refine ⟨h_isU64_v, ?_⟩
+  simp only [RV64.sub] at h_bv
+  exact h_bv
+
 end SP1Clean.Sub
