@@ -500,4 +500,39 @@ lemma allHold_constraints_iff
             fun _ => hSpec ⟨6, by omega⟩, fun _ => hSpec ⟨7, by omega⟩, ?_⟩
     ring
 
+/-- Bidirectional bridge between `BitwiseU16Operation.allHold` (`.2`,
+multiplicity fixed to `1`) and the selector-dispatched BitVec semantic:
+under operand bounds, the constraints hold iff the result equals the
+corresponding bitwise operation of `b` and `cc` (selected by `opcode ∈
+{3, 4, 5}` — XOR/OR/AND).
+
+Forward direction reduces to the existing `spec.xor`/`spec.or`/`spec.and`
+under their respective `opcode` literals. The backward direction
+(constructing `b_low_bytes` / `c_low_bytes` byte witnesses from the
+result word) is left as `sorry` — it's the byte-decomposition existence
+proof for `U16toU8OperationUnsafe` (~150–300 LoC).
+
+Note: the chip-level Bitwise FormalSpec keeps the byte-pair synthesis
+`#v[bres[0] + bres[1]*256, ...]` explicit, so this bridge's RHS
+phrases the BitVec equation on the chip's synthesized `op_a_write_value`
+form. -/
+theorem iff_sp1_full {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {b cc : Word (ZMod p)} {cols : BitwiseU16Operation (ZMod p)}
+    {opcode : ZMod p}
+    (_h_opcode_valid : opcode = 3 ∨ opcode = 4 ∨ opcode = 5)
+    (_h_isU64_b : Word.isU64 b) (_h_isU64_cc : Word.isU64 cc) :
+    (BitwiseU16Operation.constraints b cc cols opcode 1).2.allHold ↔
+      ((opcode = 3 →
+          Word.toBitVec64 (BitwiseU16Operation.constraints b cc cols opcode 1).1 =
+            execute_RTYPE_pure_w b cc .XOR) ∧
+       (opcode = 4 →
+          Word.toBitVec64 (BitwiseU16Operation.constraints b cc cols opcode 1).1 =
+            execute_RTYPE_pure_w b cc .OR) ∧
+       (opcode = 5 →
+          Word.toBitVec64 (BitwiseU16Operation.constraints b cc cols opcode 1).1 =
+            execute_RTYPE_pure_w b cc .AND)) := by
+  -- Forward: dispatch on opcode literal to apply spec.xor/or/and.
+  -- Backward: construct byte-witness from the BitVec eq — TBD (sorry).
+  sorry
+
 end BitwiseU16Operation

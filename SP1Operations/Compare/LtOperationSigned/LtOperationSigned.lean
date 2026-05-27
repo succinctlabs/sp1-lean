@@ -491,4 +491,41 @@ lemma spec.branch
     have h_signed := spec.signed h_b_isU64 h_d_isU64 h_cstrs
     split_ifs with hcond <;> simp [hcond] at h_signed <;> exact h_signed
 
+/-- Bidirectional bridge between `LtOperationSigned.allHold` (with
+multiplicity fixed to `1`) and the BitVec semantic: under `is_signed
+∈ {0, 1}` plus operand bounds, the constraints hold iff the result
+bit equals the corresponding (signed or unsigned) less-than indicator.
+
+Forward direction composes `spec.unsigned` (for `is_signed = 0`) and
+`spec.signed` (for `is_signed = 1`). The backward direction
+(witness reconstruction: build `comparison_limbs`, `u16_flags`,
+`not_eq_inv`, `b_msb`, `c_msb` from the boolean result + operand
+bounds) is left as `sorry` — it's an existence proof over the byte
+decomposition that mirrors `LtOperationUnsigned.spec_inv` chained
+through the `U16MSBOperation` MSB witnesses, ~300–500 LoC of dense
+arithmetic. -/
+theorem iff_sp1_full {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
+    {b d : Word (ZMod p)} {cols : LtOperationSigned (ZMod p)}
+    {is_signed : ZMod p}
+    (_h_is_signed_bin : is_signed = 0 ∨ is_signed = 1)
+    (h_isU64_b : Word.isU64 b) (h_isU64_d : Word.isU64 d) :
+    (LtOperationSigned.constraints b d cols is_signed 1).allHold ↔
+      ((is_signed = 0 →
+          cols.result.u16_compare_operation.bit =
+            (if b.toNat < d.toNat then (1 : ZMod p) else 0)) ∧
+       (is_signed = 1 →
+          cols.result.u16_compare_operation.bit =
+            (if b.toInt < d.toInt then (1 : ZMod p) else 0))) := by
+  refine ⟨?_, ?_⟩
+  · intro h_allHold
+    refine ⟨?_, ?_⟩
+    · intro h_sgn0; subst h_sgn0
+      exact LtOperationSigned.spec.unsigned h_isU64_b h_isU64_d h_allHold
+    · intro h_sgn1; subst h_sgn1
+      exact LtOperationSigned.spec.signed h_isU64_b h_isU64_d h_allHold
+  · -- Backward direction: reconstruct byte-decomp witness from the bit.
+    -- See doc comment above; existence proof TBD.
+    intro _h_sem
+    sorry
+
 end LtOperationSigned
