@@ -11,6 +11,7 @@ import SP1Chips.Bitwise.BitwiseChip
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ALUTypeReader
 import SP1Clean.Operations.BitwiseOperation
+import SP1Clean.Operations.BitwiseU16Operation
 import SP1Clean.TrustMode
 import RISCV.Instructions
 
@@ -165,30 +166,44 @@ omit [Fact (2 ^ 17 < p)] in
 
 /-! ## Chip-level `FormalSpec`
 
-Mirrors the legacy single-file's `TraceSpec` shape:
-- A propositional clause for the `BitwiseU16Operation` sub-fragment
-  (no Clean wrapper yet — would compose `SP1Clean.BitwiseU16Op.assertion`
-  once written; currently inlined as `List.Forall SP1Constraint.toProp`).
-- CPU-state byte bounds.
-- Full ALU-type reader spec (covers ProgramTable + 3 OperandAccess +
-  imm_c switch).
-- Boolean disjunctions on the 3 opcode selectors + their sum + `op_a_0`. -/
+Flat conjunction of facts about `cols`. Each conjunct mirrors one
+sub-circuit call in `main` (or one scalar gate):
+
+- `BitwiseU16Op.Assertion.Spec` — the 8 byte-table lookups (gated by
+  `is_real`) plus the `is_real` binary gate. Per-byte `ByteOpcodeSpec`
+  on the algebraic 8-byte decomposition of `op_b` / `op_c`.
+- `CPUState.Assertion.Spec` — clk byte bounds (Range-13 + U8Range),
+  expanding (by definition) to `cpuStateSpec cols.state.clk_0_16
+  cols.state.clk_16_24`.
+- `ALUTypeReader.Assertion.Spec` — ProgramTable lookup + 3 OperandAccess
+  sub-Specs + imm_c switch. Expands (by definition) to
+  `aluTypeReaderSpec clk_low opcode pc op_a_write_value cols`.
+- 3 selector disjunctions (`is_xor`, `is_or`, `is_and` ∈ {0, 1}),
+  the sum-binary gate, and `op_a_0 = 0`.
+
+The result word fed to the reader is the 4-limb u16 reconstruction of
+the 8-byte `bitwise_operation.result`. -/
 def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let opcode_bw : ZMod p := cols.is_xor * 2 + cols.is_or * 1 + cols.is_and * 0
   let is_real : ZMod p := cols.is_xor + cols.is_or + cols.is_and
+  let res := cols.bitwise_operation.bitwise_operation.result
   let ret_val : Word (ZMod p) :=
-    (BitwiseU16Operation.constraints (F := ZMod p)
-      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
-      cols.bitwise_operation opcode_bw is_real).1
-  List.Forall SP1Constraint.toProp
-    (BitwiseU16Operation.constraints (F := ZMod p)
-      cols.adapter.op_b_memory.prev_value cols.adapter.op_c_memory.prev_value
-      cols.bitwise_operation opcode_bw is_real).2 ∧
-  SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  SP1Clean.ALUTypeReader.aluTypeReaderSpec clk_low
-      (cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5)
-      cols.state.pc ret_val cols.adapter ∧
+    #v[res[0] + res[1] * 256, res[2] + res[3] * 256,
+       res[4] + res[5] * 256, res[6] + res[7] * 256]
+  (SP1Clean.BitwiseU16Op.assertion : FormalAssertion (ZMod p) _).Spec
+    ⟨cols.adapter.op_b_memory.prev_value,
+     cols.adapter.op_c_memory.prev_value,
+     cols.bitwise_operation.b_low_bytes.low_bytes,
+     cols.bitwise_operation.c_low_bytes.low_bytes,
+     cols.bitwise_operation.bitwise_operation.result,
+     opcode_bw, is_real⟩ ∧
+  (SP1Clean.CPUState.assertion : FormalAssertion (ZMod p) _).Spec
+    ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
+  (SP1Clean.ALUTypeReader.assertion : FormalAssertion (ZMod p) _).Spec
+    ⟨cols.state.clk_high, clk_low,
+     cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5,
+     cols.state.pc, ret_val, cols.adapter⟩ ∧
   (cols.is_xor = 0 ∨ cols.is_xor = 1) ∧
   (cols.is_or = 0 ∨ cols.is_or = 1) ∧
   (cols.is_and = 0 ∨ cols.is_and = 1) ∧
