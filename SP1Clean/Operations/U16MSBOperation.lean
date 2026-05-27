@@ -12,6 +12,7 @@ import SP1Foundations.Field
 import SP1Operations.Operation.U16MSBOperation.Operation
 import SP1Operations.Operation.U16MSBOperation.Constraints
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.SP1Lookup
 import SP1Clean.Operations.AddOperation
 
 /-! # Tier 2a pilot: `U16MSBOperation` mirror
@@ -95,13 +96,16 @@ theorem iff_sp1 (a : ZMod p) (cols : U16MSBOperation (ZMod p)) :
       rw [range_at_sixteen]
       exact h_range
 
-/-! ## Full `FormalAssertion` promotion
+/-! ## Full `FormalAssertion` promotion (multiplicity-gated)
 
 The top-level `main` above witnesses `msb` internally — it is a
 `Circuit (ZMod p) (Expression (ZMod p))`, FormalCircuit-shape. For chip
 composition we additionally want a pure-assertion form where `msb` is
 supplied as a parameter (the chip provides it as a dedicated column). The
-`Assertion.main` below mirrors `SP1Clean.AddOp.Assertion` exactly.
+`Assertion.main` below mirrors `SP1Clean.AddOp.Assertion` exactly:
+`is_real` gates both the msb-bool quadratic and the byte-range lookup,
+so the contract is vacuous on padding rows and matches SP1's
+`InteractionKind::Byte` per-row multiplicity contribution.
 
 The assertion requires `Fact (2 ^ 17 < p)` (a strictly stronger field
 hypothesis than the file's `Fact (p > 65536)`); chips that compose this
@@ -186,5 +190,113 @@ def assertion [Fact (2 ^ 17 < p)] : FormalAssertion (ZMod p) Inputs :=
     Spec := Assertion.Spec,
     soundness := Assertion.soundness,
     completeness := Assertion.completeness }
+
+/-! ## Multiplicity-gated `AssertionGated` form
+
+Parallel to the unconditional `Assertion` namespace above. The
+`AssertionGated` form threads a multiplicity expression `is_real` and
+gates both the msb-bool quadratic and the byte-range lookup by it, so
+every emitted constraint vanishes on padding rows. Used by the new
+`Chips/.../Multiplicity/` chip mirrors and by gated operation forms
+landing in Phase 2 of the migration.
+
+The `Assertion` form will be removed once all callers (current
+`Aggregate.lean` chips + W-arith ops) migrate to this. -/
+
+/-- Multiplicity-aware input: operand, externally-supplied msb bit, and
+the gating multiplicity `is_real`. -/
+structure InputsGated (F : Type) where
+  a : F
+  msb : F
+  is_real : F
+deriving ProvableStruct
+
+namespace AssertionGated
+
+open Circuit
+
+variable [Fact (2 ^ 17 < p)]
+
+/-- Multiplicity-gated `main`: gates both the msb-bool quadratic and the
+byte-range lookup by `is_real`. -/
+@[reducible]
+def main (input : Var InputsGated (ZMod p)) : Circuit (ZMod p) Unit := do
+  input.is_real * (input.msb * (input.msb - 1)) === 0
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[(6 : Expression (ZMod p)),
+         2 * input.a - input.msb * 65536, 16, 0], input.is_real⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) InputsGated unit where
+  name := "SP1Clean.U16MSBOpGated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
+
+/-- Binarity of `is_real`. The chip-side `is_real * (is_real - 1) = 0`
+gate establishes this externally. -/
+def Assumptions (input : InputsGated (ZMod p)) : Prop :=
+  input.is_real = 0 ∨ input.is_real = 1
+
+/-- Semantic contract: vacuous on padding rows, asserts both the boolean
+msb and the 16-bit range on real rows. -/
+def Spec (input : InputsGated (ZMod p)) : Prop :=
+  input.is_real = 1 →
+    input.msb * (input.msb - 1) = 0 ∧
+    (2 * input.a - input.msb * 65536).val < 65536
+
+omit [Fact (p > 65536)] in
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_a_eq, h_msb_eq, h_ir_eq⟩ := h_input
+  subst h_a_eq; subst h_msb_eq; subst h_ir_eq
+  obtain ⟨h_gbool, h_l_sub⟩ := h_holds
+  intro h_is_real
+  unfold id at *
+  simp only [sub_eq_add_neg]
+  have h_ir_ne_zero : Expression.eval env input_var_is_real ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  have h_bool := (mul_eq_zero.mp h_gbool).resolve_left h_ir_ne_zero
+  have h_range_spec := (h_l_sub trivial).resolve_left h_ir_ne_zero
+  refine ⟨h_bool, SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ ?_⟩
+  exact h_range_spec
+
+omit [Fact (p > 65536)] in
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_a_eq, h_msb_eq, h_ir_eq⟩ := h_input
+  subst h_a_eq; subst h_msb_eq; subst h_ir_eq
+  unfold id at *
+  rcases h_assumptions with h_ir0 | h_ir1
+  · -- Padding row: is_real = 0; both gated emissions trivialize.
+    refine ⟨?_, ?_⟩
+    · rw [h_ir0]; ring
+    · exact ⟨trivial, Or.inl h_ir0⟩
+  · -- Real row: recover msb-bool + range from Spec.
+    simp only [sub_eq_add_neg] at h_spec
+    obtain ⟨h_bool, h_range⟩ := h_spec h_ir1
+    refine ⟨?_, ?_⟩
+    · rw [h_ir1]; linear_combination h_bool
+    · refine ⟨trivial, Or.inr ?_⟩
+      exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_range
+
+end AssertionGated
+
+/-- Multiplicity-gated FormalAssertion for `U16MSBOperation`. Compose
+via `U16MSBOp.assertionGated input` in `Chips/.../Multiplicity/` mirrors. -/
+def assertionGated [Fact (2 ^ 17 < p)] : FormalAssertion (ZMod p) InputsGated :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.Spec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.U16MSBOp

@@ -152,12 +152,12 @@ def FormalSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   -- 3 U16MSB sub-Specs (b_high on Main[18] gated by is_sra,
   -- b_low on Main[16] gated by is_sraw,
   -- result_high on Main[33] gated by (is_srlw + is_sraw)):
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.adapter.op_b_memory.prev_value[3], cols.b_msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.adapter.op_b_memory.prev_value[1], cols.b_msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec
-    ⟨cols.result[1], cols.srw_msb⟩ ∧
+  SP1Clean.U16MSBOp.AssertionGated.Spec
+    ⟨cols.adapter.op_b_memory.prev_value[3], cols.b_msb, cols.is_sra⟩ ∧
+  SP1Clean.U16MSBOp.AssertionGated.Spec
+    ⟨cols.adapter.op_b_memory.prev_value[1], cols.b_msb, cols.is_sraw⟩ ∧
+  SP1Clean.U16MSBOp.AssertionGated.Spec
+    ⟨cols.result[1], cols.srw_msb, cols.is_srlw + cols.is_sraw⟩ ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ALUTypeReader.aluTypeReaderSpec clk_low opcode cols.state.pc
       cols.result cols.adapter ∧

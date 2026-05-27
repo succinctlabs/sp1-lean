@@ -115,19 +115,22 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
        aux_post.remainder_lt_operation.not_eq_inv,
        aux_post.remainder_lt_operation.comparison_limbs⟩ :
       Var SP1Clean.LtUnsignedOp.Inputs (ZMod p))
-  -- 4 U16MSB subcircuits (b/c/rem/quot high-limb MSBs):
-  SP1Clean.U16MSBOp.assertion
-    (⟨b_word[3], aux_post.b_msb.msb⟩ :
-      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
-  SP1Clean.U16MSBOp.assertion
-    (⟨c_word[3], aux_post.c_msb.msb⟩ :
-      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
-  SP1Clean.U16MSBOp.assertion
-    (⟨remainder_word[3], aux_post.rem_msb.msb⟩ :
-      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
-  SP1Clean.U16MSBOp.assertion
-    (⟨quotient_word[3], aux_post.quot_msb.msb⟩ :
-      Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  -- 4 U16MSB subcircuits (b/c/rem/quot high-limb MSBs).
+  -- Gated by `is_real` (64-bit family selector — SP1's exact gating is
+  -- the 64-bit subset `is_div + is_divu + is_rem_f + is_remu`; we use
+  -- `is_real` here as a structural placeholder while proofs are sorry'd).
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨b_word[3], aux_post.b_msb.msb, is_real⟩ :
+      Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨c_word[3], aux_post.c_msb.msb, is_real⟩ :
+      Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨remainder_word[3], aux_post.rem_msb.msb, is_real⟩ :
+      Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨quotient_word[3], aux_post.quot_msb.msb, is_real⟩ :
+      Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
   -- IsZeroWord (c = 0):
   SP1Clean.IsZeroWordOp.assertion
     (⟨c_word,

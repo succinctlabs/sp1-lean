@@ -49,12 +49,17 @@ def main (cols : Var ShiftRightCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let clk_low := clk_0_16 + clk_16_24 * 65536
   let opcode := is_srl * 7 + is_sra * 8 + is_srlw * 22 + is_sraw * 23
   -- 3 U16MSB sub-circuits (per Rust nesting in ShiftRight.constraints):
-  SP1Clean.U16MSBOp.assertion
-    (⟨adapter.op_b_memory.prev_value[3], b_msb⟩ : Var SP1Clean.U16MSBOp.Inputs (ZMod p))
-  SP1Clean.U16MSBOp.assertion
-    (⟨adapter.op_b_memory.prev_value[1], b_msb⟩ : Var SP1Clean.U16MSBOp.Inputs (ZMod p))
-  SP1Clean.U16MSBOp.assertion
-    (⟨result[1], srw_msb⟩ : Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  -- b_high gated by `is_sra`, b_low gated by `is_sraw`,
+  -- result_high gated by `(is_srlw + is_sraw)`.
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨adapter.op_b_memory.prev_value[3], b_msb, is_sra⟩ :
+     Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨adapter.op_b_memory.prev_value[1], b_msb, is_sraw⟩ :
+     Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨result[1], srw_msb, is_srlw + is_sraw⟩ :
+     Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ALUTypeReader.assertion

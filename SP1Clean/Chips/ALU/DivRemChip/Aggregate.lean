@@ -346,8 +346,10 @@ def main (cols : Var DivRemCols (ZMod p)) : Circuit (ZMod p) Unit := do
       Var SP1Clean.LtUnsignedOp.Inputs (ZMod p))
   -- CS10-CS16: 7× U16MSB. SP1 emits these with selector mults
   -- (Main[239] = is_real_not_word for the 64-bit family; E2 = is_word
-  -- for the 32-bit family). Clean's U16MSBOp.assertion is always-on —
-  -- the mult arg is dropped here pending a Gated variant.
+  -- for the 32-bit family). Clean's `U16MSBOp.assertion` is the
+  -- unconditional form; the multiplicity-gated `U16MSBOp.assertionGated`
+  -- variant is used by the new Multiplicity/ chip mirrors. This
+  -- Aggregate file is scheduled for deletion in Phase 4 of the migration.
   SP1Clean.U16MSBOp.assertion
     (⟨adapter.op_b_memory.prev_value[3], aux_post.b_msb.msb⟩ :
       Var SP1Clean.U16MSBOp.Inputs (ZMod p))

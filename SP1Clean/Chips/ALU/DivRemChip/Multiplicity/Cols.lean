@@ -159,11 +159,15 @@ def FormalSpec (cols : DivRemCols (ZMod p)) : Prop :=
      cols.aux_post.remainder_lt_operation.u16_flags,
      cols.aux_post.remainder_lt_operation.not_eq_inv,
      cols.aux_post.remainder_lt_operation.comparison_limbs⟩ ∧
-  -- 4 U16MSB sub-Specs (b, c, rem, quot — high limbs):
-  SP1Clean.U16MSBOp.Assertion.Spec ⟨cols.b[3], cols.aux_post.b_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec ⟨cols.c[3], cols.aux_post.c_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec ⟨cols.remainder[3], cols.aux_post.rem_msb.msb⟩ ∧
-  SP1Clean.U16MSBOp.Assertion.Spec ⟨cols.quotient[3], cols.aux_post.quot_msb.msb⟩ ∧
+  -- 4 U16MSB sub-Specs (b, c, rem, quot — high limbs). Gated by `is_real`.
+  SP1Clean.U16MSBOp.AssertionGated.Spec
+    ⟨cols.b[3], cols.aux_post.b_msb.msb, cols.is_real⟩ ∧
+  SP1Clean.U16MSBOp.AssertionGated.Spec
+    ⟨cols.c[3], cols.aux_post.c_msb.msb, cols.is_real⟩ ∧
+  SP1Clean.U16MSBOp.AssertionGated.Spec
+    ⟨cols.remainder[3], cols.aux_post.rem_msb.msb, cols.is_real⟩ ∧
+  SP1Clean.U16MSBOp.AssertionGated.Spec
+    ⟨cols.quotient[3], cols.aux_post.quot_msb.msb, cols.is_real⟩ ∧
   -- IsZeroWord (c = 0):
   SP1Clean.IsZeroWordOp.Spec
     ⟨cols.c,

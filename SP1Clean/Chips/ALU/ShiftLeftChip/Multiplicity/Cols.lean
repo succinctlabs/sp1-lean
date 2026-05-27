@@ -157,7 +157,7 @@ def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   let is_real : ZMod p := cols.is_sll + cols.is_sllw
   let opcode : ZMod p := cols.is_sll * 6 + cols.is_sllw * 21
   -- Sub-Spec composition (faithful):
-  SP1Clean.U16MSBOp.Assertion.Spec ⟨cols.result[1], cols.sllw_msb⟩ ∧
+  SP1Clean.U16MSBOp.AssertionGated.Spec ⟨cols.result[1], cols.sllw_msb, cols.is_sllw⟩ ∧
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
   SP1Clean.ALUTypeReader.aluTypeReaderSpec clk_low opcode cols.state.pc
       cols.result cols.adapter ∧

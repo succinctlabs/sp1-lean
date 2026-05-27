@@ -50,8 +50,10 @@ def main (cols : Var ShiftLeftCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let clk_low := clk_0_16 + clk_16_24 * 65536
   let opcode := is_sll * 6 + is_sllw * 21
   -- U16MSBOp sub-circuit (SLLW sign witness on result[1]).
-  SP1Clean.U16MSBOp.assertion
-    (⟨result[1], sllw_msb⟩ : Var SP1Clean.U16MSBOp.Inputs (ZMod p))
+  -- Gated by `is_sllw` (only meaningful on SLLW rows).
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨result[1], sllw_msb, is_sllw⟩ :
+     Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
   SP1Clean.ALUTypeReader.assertion
