@@ -990,23 +990,31 @@ namespace AssertionGated
 def FormalSpec (cols : LoadDoubleCols (ZMod p)) : Prop :=
   let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let opcode : ZMod p := cols.is_real * 35
-  let op_a_write_value : Vector (ZMod p) 4 :=
-    #v[cols.load_prev_value[0], cols.load_prev_value[1],
-       cols.load_prev_value[2], cols.load_prev_value[3]]
   SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
   SP1Clean.AddrAddOp.Assertion.Spec
     ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
   SP1Clean.AddressShape.Assertion.Spec
     ⟨cols.addr_value, cols.addr_top_two_limb_inv, 0, 0, 0⟩ ∧
+  -- ITypeReader is called with `cols.load_prev_value` as op_a_write_value (no
+  -- selector/sign-extension for LD).
   SP1Clean.ITypeReader.Assertion.Spec
-    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, op_a_write_value, cols.adapter⟩ ∧
+    ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, cols.load_prev_value,
+     cols.adapter⟩ ∧
   SP1Clean.LoadMemoryAccessGated.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
      cols.load_memory_prev_high, cols.load_memory_prev_low,
      cols.load_memory_diff_low, cols.load_memory_diff_high,
      cols.load_memory_flag, cols.is_real⟩ ∧
   (cols.is_real = 0 ∨ cols.is_real = 1) ∧
-  cols.adapter.op_a_0 = 0
+  cols.adapter.op_a_0 = 0 ∧
+  -- Semantic RV64 conjunct (conditional on `is_real = 1`): the loaded doubleword
+  -- is a valid `Word` (Word.isU64). For LD there is no byte selection or
+  -- sign-extension — the loaded value `cols.load_prev_value` IS what gets
+  -- written to the destination register. The isU64 bound transports through
+  -- from `LoadMemoryAccessGated.Contract`. Mirrors the AddChip canonical
+  -- pattern (`SP1Clean/Chips/Spec.lean:99-103`), specialized to the trivial
+  -- (identity) RV64 op.
+  (cols.is_real = 1 → Word.isU64 cols.load_prev_value)
 
 end AssertionGated
 
@@ -1129,6 +1137,11 @@ def FormalSpec (cols : StoreByteCols (ZMod p)) : Prop :=
      cols.register_low_byte, cols.mem_limb_low_byte,
      cols.byte_selector_top, cols.byte_selector_mid, cols.byte_selector_lo⟩ ∧
   (cols.is_real = 0 ∨ cols.is_real = 1)
+  -- Note: no semantic Word.isU64 conjunct here. Unlike StoreDouble (which
+  -- writes op_a_memory.prev_value directly), StoreByte composes bytes into
+  -- `cols.store_value` (via the byte-selector + assembler sub-circuits). The
+  -- Sail equivalence is handled in `SailBridge.lean` via `_root_.Store.StoreByte.correct`
+  -- — the byte-composition correctness lives there, not in `FormalSpec`.
 
 end AssertionGated
 
@@ -1179,6 +1192,7 @@ def FormalSpec (cols : StoreHalfCols (ZMod p)) : Prop :=
     ⟨cols.store_prev_value, cols.store_value, store_halfword,
      0, cols.offset_bit_1, cols.offset_bit_0⟩ ∧
   (cols.is_real = 0 ∨ cols.is_real = 1)
+  -- Note: see StoreByte FormalSpec note re: no semantic conjunct.
 
 end AssertionGated
 
@@ -1229,6 +1243,7 @@ def FormalSpec (cols : StoreWordCols (ZMod p)) : Prop :=
     ⟨cols.store_prev_value, cols.store_value, store_low, store_high,
      cols.offset_bit, 0, 0⟩ ∧
   (cols.is_real = 0 ∨ cols.is_real = 1)
+  -- Note: see StoreByte FormalSpec note re: no semantic conjunct.
 
 end AssertionGated
 
@@ -1260,9 +1275,6 @@ namespace AssertionGated
 def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
   let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let opcode : ZMod p := cols.is_real * 39
-  let store_value : Vector (ZMod p) 4 :=
-    #v[cols.adapter.op_a_memory.prev_value[0], cols.adapter.op_a_memory.prev_value[1],
-       cols.adapter.op_a_memory.prev_value[2], cols.adapter.op_a_memory.prev_value[3]]
   SP1Clean.CPUState.Assertion.Spec ⟨cols.state.clk_0_16, cols.state.clk_16_24⟩ ∧
   SP1Clean.AddrAddOp.Assertion.Spec
     ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_imm, cols.addr_value⟩ ∧
@@ -1270,13 +1282,21 @@ def FormalSpec (cols : StoreDoubleCols (ZMod p)) : Prop :=
     ⟨cols.addr_value, cols.addr_top_two_limb_inv, 0, 0, 0⟩ ∧
   SP1Clean.ITypeReaderImmutable.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, opcode, cols.state.pc, cols.adapter⟩ ∧
+  -- StoreDouble: write_value is the whole op_a register value (no byte split).
   SP1Clean.StoreMemoryAccessGated.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, cols.addr_value,
-     cols.store_prev_value, store_value,
+     cols.store_prev_value, cols.adapter.op_a_memory.prev_value,
      cols.store_memory_prev_high, cols.store_memory_prev_low,
      cols.store_memory_diff_low, cols.store_memory_diff_high,
      cols.store_memory_flag, cols.is_real⟩ ∧
-  (cols.is_real = 0 ∨ cols.is_real = 1)
+  (cols.is_real = 0 ∨ cols.is_real = 1) ∧
+  -- Semantic RV64 conjunct (conditional on `is_real = 1`): the data being
+  -- written to memory is a valid `Word` (Word.isU64). For SD there is no
+  -- byte selection — the whole `op_a_memory.prev_value` is the write data.
+  -- The isU64 bound transports through from `StoreMemoryAccessGated.Contract`'s
+  -- `Word.isU64 write_value` clause. Mirrors `LoadDouble.FormalSpec`'s
+  -- analogous semantic clause.
+  (cols.is_real = 1 → Word.isU64 cols.adapter.op_a_memory.prev_value)
 
 end AssertionGated
 

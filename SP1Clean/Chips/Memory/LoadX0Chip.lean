@@ -142,27 +142,28 @@ def loadMemoryAccess (cols : LoadX0Cols (ZMod p)) : SP1Clean.MemoryAccess (ZMod 
     prev_low := cols.load_memory_prev_low,
     diff_low_limb := cols.load_memory_diff_low }
 
-/-- The chip-level half-iff bridge (LoadX0): under the active-variant
-hypothesis (one of `is_lb..is_ld = 1`, the rest zero), `Spec` implies
-SP1's `allHold`. **Proof body sorry'd** — see
-`feedback_path2_correct_bridge_costs.md`. -/
-theorem traceSpec_implies_allHold (Main : Vector (ZMod p) 48)
-    (h_is_real : Main[41] + Main[42] + Main[43] + Main[44] + Main[45] +
-                 Main[46] + Main[47] = 1)
-    (h_spec : TraceSpec (fromMain Main)) :
-    (_root_.Load.LoadX0.constraints Main).allHold := by
-  sorry
+/-! ## Cols-level wrappers around the 7 `_root_.Load.LoadX0.correct_loadX0_*`
+proofs.
+
+Mirrors the Phase 2-4 pattern (LoadDouble/LoadByte etc.): each
+`correct_loadX0_<variant>` is a thin wrapper that takes
+`(LoadX0.constraints Main).allHold` directly (trace-level callers
+discharge this) plus the Sail-side preconditions, and forwards to the
+corresponding SP1Chips correctness theorem.
+
+Each variant is keyed off `Main[i] = 1` for the appropriate sub-opcode
+index (LB:41, LBU:42, LH:43, LHU:44, LW:45, LWU:46, LD:47). All 7
+share the same `sp1_loadX0` projector — the destination is x0, so the
+write is a no-op and only `nextPC := PC + 4` is observable. -/
 
 /-- Clean-side `correct_loadX0_ld`: 64-bit doubleword load to x0. -/
 theorem correct_loadX0_ld
     (Main : Vector (ZMod p) 48) (s : SailState)
     (hs : SailState.isInitialized s)
     (hs_config : SailState.isValidMemConfig s hs)
-    (h_is_loadX0_ld : Main[47] = 1)
-    (h_others_zero : Main[41] = 0 ∧ Main[42] = 0 ∧ Main[43] = 0 ∧
-                     Main[44] = 0 ∧ Main[45] = 0 ∧ Main[46] = 0)
-    (h_spec : TraceSpec (fromMain Main))
+    (h_cstrs : (_root_.Load.LoadX0.constraints Main).allHold)
     (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_is_loadX0_ld : Main[47] = 1)
     (h_fits_in_mem :
       let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
       let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
@@ -175,12 +176,146 @@ theorem correct_loadX0_ld
     let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
     (_root_.Load.LoadX0.spec_loadX0_ld imm_c (.Regidx op_b) (.Regidx op_a)).run s =
       (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
-  _root_.Load.LoadX0.correct_loadX0_ld Main s hs hs_config
-    (traceSpec_implies_allHold Main
-      (by obtain ⟨h41, h42, h43, h44, h45, h46⟩ := h_others_zero
-          rw [h41, h42, h43, h44, h45, h46, h_is_loadX0_ld]; ring)
-      h_spec)
+  _root_.Load.LoadX0.correct_loadX0_ld Main s hs hs_config h_cstrs
     state_cstrs h_is_loadX0_ld h_fits_in_mem h_is_aligned
+
+/-- Clean-side `correct_loadX0_lwu`: 32-bit unsigned word load to x0. -/
+theorem correct_loadX0_lwu
+    (Main : Vector (ZMod p) 48) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_cstrs : (_root_.Load.LoadX0.constraints Main).allHold)
+    (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_is_loadX0_lwu : Main[46] = 1)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
+      reg_val + offset + 4 < 2 ^ 64)
+    (h_is_aligned : LeanRV64D.Functions.is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 4 = true) :
+    let op_a := _root_.Load.LoadX0.sp1_op_a Main
+    let op_b := _root_.Load.LoadX0.sp1_ob_b Main
+    let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
+    (_root_.Load.LoadX0.spec_loadX0_lwu imm_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
+  _root_.Load.LoadX0.correct_loadX0_lwu Main s hs hs_config h_cstrs
+    state_cstrs h_is_loadX0_lwu h_fits_in_mem h_is_aligned
+
+/-- Clean-side `correct_loadX0_lw`: 32-bit signed word load to x0. -/
+theorem correct_loadX0_lw
+    (Main : Vector (ZMod p) 48) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_cstrs : (_root_.Load.LoadX0.constraints Main).allHold)
+    (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_is_loadX0_lw : Main[45] = 1)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
+      reg_val + offset + 4 < 2 ^ 64)
+    (h_is_aligned : LeanRV64D.Functions.is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 4 = true) :
+    let op_a := _root_.Load.LoadX0.sp1_op_a Main
+    let op_b := _root_.Load.LoadX0.sp1_ob_b Main
+    let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
+    (_root_.Load.LoadX0.spec_loadX0_lw imm_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
+  _root_.Load.LoadX0.correct_loadX0_lw Main s hs hs_config h_cstrs
+    state_cstrs h_is_loadX0_lw h_fits_in_mem h_is_aligned
+
+/-- Clean-side `correct_loadX0_lhu`: 16-bit unsigned halfword load to x0. -/
+theorem correct_loadX0_lhu
+    (Main : Vector (ZMod p) 48) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_cstrs : (_root_.Load.LoadX0.constraints Main).allHold)
+    (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_is_loadX0_lhu : Main[44] = 1)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
+      reg_val + offset + 2 < 2 ^ 64)
+    (h_is_aligned : LeanRV64D.Functions.is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 2 = true) :
+    let op_a := _root_.Load.LoadX0.sp1_op_a Main
+    let op_b := _root_.Load.LoadX0.sp1_ob_b Main
+    let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
+    (_root_.Load.LoadX0.spec_loadX0_lhu imm_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
+  _root_.Load.LoadX0.correct_loadX0_lhu Main s hs hs_config h_cstrs
+    state_cstrs h_is_loadX0_lhu h_fits_in_mem h_is_aligned
+
+/-- Clean-side `correct_loadX0_lh`: 16-bit signed halfword load to x0. -/
+theorem correct_loadX0_lh
+    (Main : Vector (ZMod p) 48) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_cstrs : (_root_.Load.LoadX0.constraints Main).allHold)
+    (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_is_loadX0_lh : Main[43] = 1)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
+      reg_val + offset + 2 < 2 ^ 64)
+    (h_is_aligned : LeanRV64D.Functions.is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 2 = true) :
+    let op_a := _root_.Load.LoadX0.sp1_op_a Main
+    let op_b := _root_.Load.LoadX0.sp1_ob_b Main
+    let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
+    (_root_.Load.LoadX0.spec_loadX0_lh imm_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
+  _root_.Load.LoadX0.correct_loadX0_lh Main s hs hs_config h_cstrs
+    state_cstrs h_is_loadX0_lh h_fits_in_mem h_is_aligned
+
+/-- Clean-side `correct_loadX0_lbu`: 8-bit unsigned byte load to x0. -/
+theorem correct_loadX0_lbu
+    (Main : Vector (ZMod p) 48) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_cstrs : (_root_.Load.LoadX0.constraints Main).allHold)
+    (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_is_loadX0_lbu : Main[42] = 1)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
+      reg_val + offset + 1 < 2 ^ 64)
+    (h_is_aligned : LeanRV64D.Functions.is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 1 = true) :
+    let op_a := _root_.Load.LoadX0.sp1_op_a Main
+    let op_b := _root_.Load.LoadX0.sp1_ob_b Main
+    let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
+    (_root_.Load.LoadX0.spec_loadX0_lbu imm_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
+  _root_.Load.LoadX0.correct_loadX0_lbu Main s hs hs_config h_cstrs
+    state_cstrs h_is_loadX0_lbu h_fits_in_mem h_is_aligned
+
+/-- Clean-side `correct_loadX0_lb`: 8-bit signed byte load to x0. -/
+theorem correct_loadX0_lb
+    (Main : Vector (ZMod p) 48) (s : SailState)
+    (hs : SailState.isInitialized s)
+    (hs_config : SailState.isValidMemConfig s hs)
+    (h_cstrs : (_root_.Load.LoadX0.constraints Main).allHold)
+    (state_cstrs : (_root_.Load.LoadX0.constraints Main).initialState s)
+    (h_is_loadX0_lb : Main[41] = 1)
+    (h_fits_in_mem :
+      let reg_val := (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]]).toNat
+      let offset := (BitVec.signExtend 64 (_root_.Load.LoadX0.sp1_imm_c Main)).toNat
+      reg_val + offset + 1 < 2 ^ 64)
+    (h_is_aligned : LeanRV64D.Functions.is_aligned_vaddr (virtaddr.Virtaddr
+      (Word.toBitVec64 #v[Main[15], Main[16], Main[17], Main[18]] + BitVec.signExtend 64
+        (BitVec.ofNat 12 Main[21].val))) 1 = true) :
+    let op_a := _root_.Load.LoadX0.sp1_op_a Main
+    let op_b := _root_.Load.LoadX0.sp1_ob_b Main
+    let imm_c := _root_.Load.LoadX0.sp1_imm_c Main
+    (_root_.Load.LoadX0.spec_loadX0_lb imm_c (.Regidx op_b) (.Regidx op_a)).run s =
+      (_root_.Load.LoadX0.sp1_loadX0 Main).run s :=
+  _root_.Load.LoadX0.correct_loadX0_lb Main s hs hs_config h_cstrs
+    state_cstrs h_is_loadX0_lb h_fits_in_mem h_is_aligned
 
 /-! ## Full `FormalAssertion` promotion (Path-2)
 
@@ -365,7 +500,19 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadX0Cols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-def Assumptions (_ : LoadX0Cols (ZMod p)) : Prop := True
+/-- Chip-level Assumptions: the load-memory contract for the multi-opcode
+LoadX0 chip. No selector contracts (LoadX0 doesn't carry sub-word
+extraction). `is_real` is the sum of all 7 opcode flags. -/
+def Assumptions (cols : LoadX0Cols (ZMod p)) : Prop :=
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let is_real : ZMod p :=
+    cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
+      cols.is_lw + cols.is_lwu + cols.is_ld
+  SP1Clean.LoadMemoryAccessGated.Assertion.Contract
+    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.load_memory_flag, is_real⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -373,7 +520,7 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub, _h_lmag_sub,
+  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub, h_lmag_sub,
           h_lb, h_lbu, h_lh, h_lhu, h_lw, h_lwu, h_ld, h_sum, h_op_a_0⟩ := h_holds
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -384,7 +531,7 @@ theorem soundness :
   · convert h_addr_shape_sub trivial using 5
     all_goals simp [Vector.getElem_map]
   · exact h_itr_sub trivial
-  · exact Or.inr trivial
+  · exact h_lmag_sub h_assumptions
   · binary_iff h_lb
   · binary_iff h_lbu
   · binary_iff h_lh
@@ -403,7 +550,7 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, _h_lmag, h_lb, h_lbu, h_lh,
+  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, h_lmag, h_lb, h_lbu, h_lh,
           h_lhu, h_lw, h_lwu, h_ld, h_sum, h_op_a_0⟩ := h_spec
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -413,7 +560,7 @@ theorem completeness :
     convert h_addr_shape using 5
     all_goals simp [Vector.getElem_map]
   · exact ⟨trivial, h_itr⟩
-  · exact ⟨trivial, Or.inr trivial⟩
+  · exact ⟨h_lmag, h_lmag⟩
   · binary_iff h_lb
   · binary_iff h_lbu
   · binary_iff h_lh
