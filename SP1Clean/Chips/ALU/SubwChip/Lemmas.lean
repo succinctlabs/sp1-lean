@@ -190,36 +190,38 @@ The two lemmas below name the *stable midpoint* of `SubwChip`'s
 unfolds the Clean elaboration plumbing and the proof destructures
 `h_input` / `h_assumptions` / `h_holds` (or `h_spec`), the proof state
 contains exactly four named hypotheses — one per `main` sub-circuit
-emission (`SubwOp.assertion`, `CPUState.Gated.assertion`,
+emission (`SubwOp.assertionGated`, `CPUState.Gated.assertion`,
 `RTypeReader.Gated.assertion`, `op_a_0 === 0`). Surfacing that midpoint
 as top-level named theorems decouples the sub-circuit composition graph
 from `circuit_proof_start`'s opaque output, and lets `Circuit.lean`'s
 proofs collapse to "destructure → invoke the named lemma".
 
-Mirrors `SP1Clean/Chips/ALU/SubChip/Lemmas.lean`, with two
-SubwChip-specific differences: `SubwOp.Assertion.Assumptions = True`
-(so the sub-circuit witness is taken in `Spec` form directly, not the
-`Assumptions → Spec` function form Add/Sub use), and the chip
-`FormalSpec` has an extra `(is_real = 1 → BV32 triple)` conjunct
-matching `SubwOperation.iff_sp1_full`'s RHS plus a trailing
-`(is_real = 1 → RV64.subw eq)` clause derived inline via
+Mirrors `SP1Clean/Chips/ALU/AddChip/Lemmas.lean`'s canonical shape: the
+`SubwOp` hypothesis is taken in `Assumptions → Spec` function form for
+soundness (the literal shape `circuit_proof_start` produces from
+`SubwOp.assertionGated`), and returned in pure `Spec` form (the BV32
+triple, definitionally `SubwOp.AssertionGated.Spec ⟨…⟩`) by completeness.
+The trailing `(is_real = 1 → RV64.subw eq)` clause is derived inline via
 `rv64_subw_eq_of_subwop_spec`. -/
 
 /-- **Forward** (soundness midpoint): assemble the chip-level
-`FormalSpec` from the per-sub-circuit Specs. The `SubwOp` hypothesis is
-taken in its borrow-form `Assertion.Spec` directly (since
-`SubwOp.Assertion.Assumptions = True`, no `Assumptions → Spec` function
-form is needed). The semantic BV32 triple and `RV64.subw` clauses are
-constructed internally using `is_real = 1` plus the `Word.isU64
-op_b/op_c` bounds pulled from `h_rtr` via
+`FormalSpec` from the per-sub-circuit Specs returned by `h_holds`. The
+`SubwOp` hypothesis is kept in its `Assumptions → Spec` function form —
+the literal shape of `h_holds.1` after `circuit_proof_start`'s
+`subcircuit_norm` unfolding — and discharged internally using `is_real
+= 1` plus the `Word.isU64 op_b/op_c` bounds pulled from `h_rtr` via
 `RTypeReader.Gated.Assertion.isU64_operands_of_spec`. -/
 lemma formalSpec_of_subcircuit_specs
     (cols : SubwCols (ZMod p))
     (h_is_real : cols.is_real = 1)
-    (h_subwop : SP1Clean.SubwOp.Assertion.Spec
+    (h_subwop : SP1Clean.SubwOp.AssertionGated.Assumptions
         ⟨cols.adapter.op_b_memory.prev_value,
          cols.adapter.op_c_memory.prev_value,
-         cols.subw_value, cols.subw_msb⟩)
+         cols.subw_value, cols.subw_msb, cols.is_real⟩ →
+      SP1Clean.SubwOp.AssertionGated.Spec
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.subw_value, cols.subw_msb, cols.is_real⟩)
     (h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
         ⟨cols.state,
          #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
@@ -236,28 +238,34 @@ lemma formalSpec_of_subcircuit_specs
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨h_isU64_b, h_isU64_c⟩ :=
     SP1Clean.RTypeReader.Gated.Assertion.isU64_operands_of_spec h_is_real h_rtr
-  have h_subwop_nat :=
-    (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp h_subwop
-  refine ⟨h_cpu, h_rtr, h_op_a_0, ?_, ?_⟩
-  · intro _h_is_real_eq
-    have h_subwop_allHold := (SP1Clean.SubwOp.iff_sp1 _ _ _).mpr h_subwop_nat
-    exact (SubwOperation.iff_sp1_full h_isU64_b h_isU64_c).mp h_subwop_allHold
-  · intro _h_is_real_eq
-    exact rv64_subw_eq_of_subwop_spec _ _ _ _ h_isU64_b h_isU64_c h_subwop_nat
+  have h_subwop_gated :=
+    h_subwop ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩
+  refine ⟨h_cpu, h_rtr, h_op_a_0, h_subwop_gated, ?_⟩
+  -- BV64 consequence: bridge the BV32 triple inside `h_subwop_gated`
+  -- through the natural-form `SubwOp.Spec` to `rv64_subw_eq_of_subwop_spec`.
+  intro h_ir
+  have ⟨h_isU32, h_bv32, h_msb_eq⟩ := h_subwop_gated h_ir
+  have h_subwop_allHold :=
+    (SubwOperation.iff_sp1_full
+        (cols := { value := cols.subw_value,
+                   msb := { msb := cols.subw_msb } })
+        h_isU64_b h_isU64_c).mpr
+      ⟨h_isU32, h_bv32, h_msb_eq⟩
+  have h_subwop_nat := (SP1Clean.SubwOp.iff_sp1 _ _ _).mp h_subwop_allHold
+  exact rv64_subw_eq_of_subwop_spec _ _ _ _ h_isU64_b h_isU64_c h_subwop_nat
 
 /-- **Backward** (completeness midpoint): peel the chip-level
 `FormalSpec` apart into per-sub-circuit `Spec`s. The `SubwOp` conjunct
-is returned in its borrow-form `Assertion.Spec`, reconstructed from the
-BV32 triple stored in `FormalSpec`'s `is_real = 1 → ...` conjunct via
-`iff_sp1_full.mpr` and the round-trip `iff_sp1.mp ∘ Assertion_Spec_iff_Spec.mpr`. -/
+is returned in its semantic `AssertionGated.Spec` form (the BV32
+triple), which is exactly one of `FormalSpec`'s conjuncts. -/
 lemma subcircuit_specs_of_formalSpec
     (cols : SubwCols (ZMod p))
-    (h_is_real : cols.is_real = 1)
+    (_h_is_real : cols.is_real = 1)
     (h_spec : FormalSpec cols) :
-    SP1Clean.SubwOp.Assertion.Spec
+    SP1Clean.SubwOp.AssertionGated.Spec
         ⟨cols.adapter.op_b_memory.prev_value,
          cols.adapter.op_c_memory.prev_value,
-         cols.subw_value, cols.subw_msb⟩ ∧
+         cols.subw_value, cols.subw_msb, cols.is_real⟩ ∧
     SP1Clean.CPUState.Gated.Assertion.Spec
         ⟨cols.state,
          #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
@@ -270,20 +278,7 @@ lemma subcircuit_specs_of_formalSpec
             cols.subw_msb * 65535, cols.subw_msb * 65535],
          cols.adapter, cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
     cols.adapter.op_a_0 = 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_sem, _h_rv64⟩ := h_spec
-  obtain ⟨h_isU64_b, h_isU64_c⟩ :=
-    SP1Clean.RTypeReader.Gated.Assertion.isU64_operands_of_spec h_is_real h_rtr
-  have ⟨h_isU32, h_bv32, h_msb_eq⟩ := h_sem h_is_real
-  have h_subwop_allHold :=
-    (SubwOperation.iff_sp1_full
-        (cols := { value := cols.subw_value,
-                   msb := { msb := cols.subw_msb } })
-        h_isU64_b h_isU64_c).mpr
-      ⟨h_isU32, h_bv32, h_msb_eq⟩
-  have h_subwop_nat := (SP1Clean.SubwOp.iff_sp1 _ _ _).mp h_subwop_allHold
-  have h_subwop :=
-    (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mpr h_subwop_nat
-  exact ⟨h_subwop, h_cpu, h_rtr, h_op_a_0⟩
+  obtain ⟨h_cpu, h_rtr, h_op_a_0, h_subwop_gated, _h_rv64⟩ := h_spec
+  exact ⟨h_subwop_gated, h_cpu, h_rtr, h_op_a_0⟩
 
 end SP1Clean.Subw

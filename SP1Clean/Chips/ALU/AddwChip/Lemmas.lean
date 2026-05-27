@@ -506,35 +506,47 @@ The two lemmas below name the *stable midpoint* of `AddwChip`'s
 unfolds the Clean elaboration plumbing and the proof destructures
 `h_input` / `h_assumptions` / `h_holds` (or `h_spec`), the proof state
 contains exactly four named hypotheses — one per `main` sub-circuit
-emission (`AddwOp.assertion`, `CPUState.Gated.assertion`,
+emission (`AddwOp.assertionGated`, `CPUState.Gated.assertion`,
 `ALUTypeReader.Gated.assertion`, `op_a_0 === 0`).
 
-AddwChip-specific divergence from AddChip/SubChip: `AddwOp.Assertion.
-Assumptions = True` (so the witness arrives in `Spec` form directly,
-not as an `Assumptions → Spec` function) and the `Word.isU64 op_c`
-extraction from `h_alu` requires the imm_c case split, factored into
-`ALUTypeReader.Gated.Assertion.isU64_op_c_memory_of_spec`. The
-semantic conjunct `(isU64 ∧ BV64 = RV64.addw)` is bridged from
-`AddwOp.Spec` via the existing `addwOp_spec_iff_rv64_addw`. -/
+Mirrors `SP1Clean/Chips/ALU/AddChip/Lemmas.lean`'s canonical shape: the
+`AddwOp` hypothesis is taken in `Assumptions → Spec` function form for
+soundness (the literal shape `circuit_proof_start` produces from
+`AddwOp.assertionGated`), and returned in pure `Spec` form (the BV32
+triple, definitionally `AddwOp.AssertionGated.Spec ⟨…⟩`) by completeness.
+The trailing `(is_real = 1 → isU64 ∧ BV64 = RV64.addw)` conjunct is
+derived inline via `AddwOperation.spec_inv` → `iff_sp1.mp` →
+`addwOp_spec_iff_rv64_addw.mp`, using operand `Word.isU64` bounds
+extracted from `h_alu` via
+`ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec` /
+`isU64_op_c_memory_of_spec` (the latter case-splits on `imm_c` to
+handle ADDIW). -/
 
 set_option maxHeartbeats 800000 in
 -- Mirrors `allHold_iff_structural` above: `addwOp_spec_iff_rv64_addw.mp`
 -- elaboration involves the heavy `RV64.addw c b` BitVec expression and
 -- defeq matching during the inferred-type check is expensive.
 /-- **Forward** (soundness midpoint): assemble the chip-level
-`FormalSpec` from the per-sub-circuit Specs returned by `h_holds`.
-Discharges the BV64 `RV64.addw` conjunct internally via
-`addwOp_spec_iff_rv64_addw` using operand `Word.isU64` bounds extracted
-from `h_alu` via `ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec` /
-`isU64_op_c_memory_of_spec`. -/
+`FormalSpec` from the per-sub-circuit Specs returned by `h_holds`. The
+`AddwOp` hypothesis is kept in its `Assumptions → Spec` function form —
+the literal shape of `h_holds.1` after `circuit_proof_start`'s
+`subcircuit_norm` unfolding — and discharged internally using `is_real
+= 1` plus the `Word.isU64 op_b/op_c` bounds pulled from `h_alu`. The
+BV64 `RV64.addw` conjunct is then derived via
+`addwOp_spec_iff_rv64_addw` after routing the semantic triple back
+through `AddwOperation.spec_inv` and `iff_sp1.mp`. -/
 lemma formalSpec_of_subcircuit_specs
     (cols : AddwCols (ZMod p))
     (h_is_real : cols.is_real = 1)
     (h_trusted : cols.adapter_cols.is_trusted = cols.is_real)
-    (h_addwop : SP1Clean.AddwOp.Spec
+    (h_addwop : SP1Clean.AddwOp.AssertionGated.Assumptions
         ⟨cols.adapter.op_b_memory.prev_value,
          cols.adapter.op_c_memory.prev_value,
-         cols.addw_value, cols.addw_msb⟩)
+         cols.addw_value, cols.addw_msb, cols.is_real⟩ →
+      SP1Clean.AddwOp.AssertionGated.Spec
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.addw_value, cols.addw_msb, cols.is_real⟩)
     (h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
         ⟨cols.state,
          #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
@@ -555,26 +567,43 @@ lemma formalSpec_of_subcircuit_specs
   have h_isU64_c :=
     SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_c_memory_of_spec
       h_is_real h_trusted_one h_alu
-  refine ⟨h_cpu, h_alu, h_op_a_0, fun _h_is_real_eq => ?_⟩
-  exact (addwOp_spec_iff_rv64_addw h_isU64_b h_isU64_c).mp h_addwop
+  have h_addwop_gated :=
+    h_addwop ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩
+  refine ⟨h_cpu, h_alu, h_op_a_0, h_addwop_gated, ?_⟩
+  -- BV64 consequence: route the semantic BV32 triple inside
+  -- `h_addwop_gated` back through `spec_inv` → `iff_sp1.mp` → the
+  -- existing `addwOp_spec_iff_rv64_addw.mp` bridge.
+  intro _h_is_real_eq
+  have ⟨h_isU32, h_bv32, h_msb_eq⟩ := h_addwop_gated h_is_real
+  have h_allHold :=
+    _root_.AddwOperation.spec_inv
+      (cols := { value := cols.addw_value,
+                 msb := { msb := cols.addw_msb } })
+      h_isU64_b h_isU64_c h_isU32 h_bv32 h_msb_eq
+  have h_addwop_nat :=
+    (SP1Clean.AddwOp.iff_sp1
+        ⟨cols.adapter.op_b_memory.prev_value,
+         cols.adapter.op_c_memory.prev_value,
+         cols.addw_value, cols.addw_msb⟩).mpr h_allHold
+  exact (addwOp_spec_iff_rv64_addw h_isU64_b h_isU64_c).mp h_addwop_nat
 
 set_option maxHeartbeats 800000 in
 -- Mirrors the forward midpoint: `addwOp_spec_iff_rv64_addw.mpr` is
 -- the inverse elaboration cost (BitVec defeq matching during the
 -- inferred-type check on the heavy `RV64.addw c b` expression).
 /-- **Backward** (completeness midpoint): peel the chip-level
-`FormalSpec` apart into per-sub-circuit `Spec`s. Reverse bridge through
-`addwOp_spec_iff_rv64_addw` reconstructs `AddwOp.Spec` from the
-`(isU64 ∧ BV64 = RV64.addw)` pair under the operand isU64 bounds. -/
+`FormalSpec` apart into per-sub-circuit `Spec`s. The `AddwOp` conjunct
+is returned in its semantic `AssertionGated.Spec` form (the BV32
+triple), which is exactly one of `FormalSpec`'s conjuncts. -/
 lemma subcircuit_specs_of_formalSpec
     (cols : AddwCols (ZMod p))
-    (h_is_real : cols.is_real = 1)
-    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real)
+    (_h_is_real : cols.is_real = 1)
+    (_h_trusted : cols.adapter_cols.is_trusted = cols.is_real)
     (h_spec : FormalSpec cols) :
-    SP1Clean.AddwOp.Spec
+    SP1Clean.AddwOp.AssertionGated.Spec
         ⟨cols.adapter.op_b_memory.prev_value,
          cols.adapter.op_c_memory.prev_value,
-         cols.addw_value, cols.addw_msb⟩ ∧
+         cols.addw_value, cols.addw_msb, cols.is_real⟩ ∧
     SP1Clean.CPUState.Gated.Assertion.Spec
         ⟨cols.state,
          #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
@@ -587,17 +616,7 @@ lemma subcircuit_specs_of_formalSpec
             cols.addw_msb * 65535, cols.addw_msb * 65535],
          cols.adapter, cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
     cols.adapter.op_a_0 = 0 := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  have h_trusted_one : cols.adapter_cols.is_trusted = 1 := h_trusted.trans h_is_real
-  obtain ⟨h_cpu, h_alu, h_op_a_0, h_sem⟩ := h_spec
-  have h_isU64_b :=
-    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec h_is_real h_alu
-  have h_isU64_c :=
-    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_c_memory_of_spec
-      h_is_real h_trusted_one h_alu
-  have h_pair := h_sem h_is_real
-  have h_addwop :=
-    (addwOp_spec_iff_rv64_addw h_isU64_b h_isU64_c).mpr h_pair
-  exact ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩
+  obtain ⟨h_cpu, h_alu, h_op_a_0, h_addwop_gated, _h_rv64⟩ := h_spec
+  exact ⟨h_addwop_gated, h_cpu, h_alu, h_op_a_0⟩
 
 end SP1Clean.Addw

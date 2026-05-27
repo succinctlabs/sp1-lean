@@ -33,7 +33,7 @@ private theorem allHold_of_formalSpec
     (h_is_real : cols.is_real = 1) :
     (_root_.Addw.constraints (toMain cols)).allHold := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨h_cpu, h_alu, h_op_a_0, h_sem⟩ := h_spec
+  obtain ⟨h_cpu, h_alu, h_op_a_0, _h_addwop_gated, h_sem⟩ := h_spec
   have h_round_trip := fromMain_toMain cols h_assumptions
   have h_isreal' : (toMain cols)[35] = 1 := h_is_real
   -- Re-state each cols-level Spec hypothesis through `fromMain (toMain cols)`
