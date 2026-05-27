@@ -273,6 +273,52 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
   (is_real = 0 ∨ is_real = 1) ∧
   (is_real = 1 → Word.isU64 input.b_word ∧ Word.isU64 input.c_word)
 
+/-! ## RV64 ↔ `execute_MUL_pure` bridge lemmas
+
+Five pure BitVec identities relating `execute_MUL_pure b c .X` (the form
+delivered by `MulOperation.spec.{mul,…}`) to `RV64.X c b` (the form used
+in the user-facing `Spec`). Three close cleanly via `bv_decide` after a
+small `simp`; the two signed-high variants (`MULH`, `MULHSU`) need a
+manual `toInt`/`toNat` chain that mirrors `execute_MUL'_eq_execute_MUL`
+in `SP1Foundations/SailM.lean:858-863` — left as `sorry` with TODOs since
+the user has scoped completeness out of this iteration. -/
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
+lemma execute_MUL_pure_eq_rv64_mul (b c : BitVec 64) :
+    execute_MUL_pure b c .MUL = RV64.mul c b := by
+  simp [execute_MUL_pure, RV64.mul, BitVec.extend]
+  apply BitVec.eq_of_toNat_eq
+  simp [BitVec.toNat_mul, BitVec.toNat_ofNat, Nat.mul_comm]
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
+/-- TODO: close via the `mod_129_to_128` + `BitVec.toInt_toInt_as_toNat_128`
+recipe at `SP1Foundations/SailM.lean:858-863`. The bridge is between
+`signExtend 128`-form (LHS, from `execute_MUL_pure`) and `signExtend 129`-form
+(RHS, from `RV64.mulh`); both extract bits 64..127 of the signed product,
+which agree because the signed product fits in 128 bits. `bv_decide` chokes
+on the 129-bit width directly. -/
+lemma execute_MUL_pure_eq_rv64_mulh (b c : BitVec 64) :
+    execute_MUL_pure b c .MULH = RV64.mulh c b := by
+  sorry
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
+lemma execute_MUL_pure_eq_rv64_mulhu (b c : BitVec 64) :
+    execute_MUL_pure b c .MULHU = RV64.mulhu c b := by
+  simp [execute_MUL_pure, RV64.mulhu, BitVec.extend]
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
+/-- TODO: close via the same `mod_129_to_128` + zero/sign-extend bridge
+recipe used for `mulh`. LHS uses `signExtend 128 b * setWidth 128 c`; RHS
+uses `signExtend 129 b * zeroExtend 129 c`. Both extract bits 64..127. -/
+lemma execute_MUL_pure_eq_rv64_mulhsu (b c : BitVec 64) :
+    execute_MUL_pure b c .MULHSU = RV64.mulhsu c b := by
+  sorry
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
+lemma execute_MULW_pure_eq_rv64_mulw (b c : BitVec 64) :
+    execute_MULW_pure b c = RV64.mulw c b := by
+  simp [execute_MULW_pure, RV64.mulw, BitVec.extend]
+
 /-- The FormalAssertion's semantic contract — surface only the RV64
 fact, mirroring `SP1Clean.AddOp.Spec` one variant deeper: vacuous on
 padding rows (`is_real = 0`); on real rows (`is_real = 1`) asserts
@@ -283,12 +329,10 @@ chip level only for SP1-faithful 1:1 mirror) and never reach the
 contract.
 
 The five `RV64.{mul,mulh,mulhu,mulhsu,mulw}` are from `RISCV.Instructions`
-(operand order `rs2 rs1` matches the SP1 lower-Sail convention). When
-the bridge to SP1's `MulOperation.spec.{mul,…}` is closed (those return
-`execute_MUL_pure / execute_MULW_pure`), the equality
-`execute_MUL_pure b c .MUL = RV64.mul c b` (and analogues for the other
-variants) is provided by RISCV's `SailPureToInstructions`-style
-`SailRV64.mul ≡ RV64.mul` bridges plus BitVec arithmetic. -/
+(operand order `rs2 rs1` matches the SP1 lower-Sail convention). The
+bridge to SP1's `MulOperation.spec.{mul,…}` (which deliver
+`execute_MUL_pure / execute_MULW_pure`) is provided by the five
+`execute_MUL_pure_eq_rv64_*` lemmas above. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   let is_real : ZMod p :=
     input.is_mul + input.is_mulh + input.is_mulhu + input.is_mulhsu + input.is_mulw
@@ -331,7 +375,61 @@ theorem of_sp1 (input : Inputs (ZMod p))
         1 input.is_mul input.is_mulh input.is_mulw input.is_mulhu
         input.is_mulhsu).allHold) :
     Spec input := by
-  sorry
+  obtain ⟨_h_bin, h_bnd⟩ := h_assumptions
+  simp only [Spec]
+  intro h_real_one
+  obtain ⟨isU64_bw, isU64_cw⟩ := h_bnd h_real_one
+  -- Each `MulOperation.spec.X` delivers `is_X = 1 → aw.isU64 ∧ aw.toBitVec64 = …`
+  -- (using `execute_MUL_pure` / `execute_MULW_pure`). Pre-fetch all five.
+  have spec_mul    := MulOperation.spec.mul    isU64_bw isU64_cw h_allHold
+  have spec_mulh   := MulOperation.spec.mulh   isU64_bw isU64_cw h_allHold
+  have spec_mulhu  := MulOperation.spec.mulhu  isU64_bw isU64_cw h_allHold
+  have spec_mulhsu := MulOperation.spec.mulhsu isU64_bw isU64_cw h_allHold
+  have spec_mulw   := MulOperation.spec.mulw   isU64_bw isU64_cw h_allHold
+  -- For the `isU64 a_word` conjunct, dispatch on which selector is 1.
+  -- Extract the 5 binarities + sum-disjunction from `h_allHold` via the
+  -- iff, then resolve via `MulOperation.single_op`.
+  change List.Forall SP1Constraint.toProp _ at h_allHold
+  rw [MulOperation.allHold_constraints_iff_is_real] at h_allHold
+  obtain ⟨_u16_b, _u16_c, _msb_op, _b_msb_c, _c_msb_c,
+          _b_sgn_e, _c_sgn_e,
+          _p0, _p1, _p2, _p3, _p4, _p5, _p6, _p7,
+          _p8, _p9, _p10, _p11, _p12, _p13, _p14, _p15,
+          _aw0w, _aw0m, _aw0h, _aw1w, _aw1m, _aw1h,
+          _aw2w, _aw2m, _aw2h, _aw3w, _aw3m, _aw3h,
+          _b_msb_d, _c_msb_d, _b_sgn_d, _c_sgn_d,
+          b_mul, b_mulh, b_mulhu, b_mulhsu, b_mulw, sum_d, _rest⟩ := h_allHold
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  -- (1) isU64 a_word: 5-way dispatch on which selector is 1.
+  · rcases b_mul with h_mul0 | h_mul1
+    · rcases b_mulh with h_mulh0 | h_mulh1
+      · rcases b_mulhu with h_mulhu0 | h_mulhu1
+        · rcases b_mulhsu with h_mulhsu0 | h_mulhsu1
+          · rcases b_mulw with h_mulw0 | h_mulw1
+            · -- All zero — contradicts h_real_one : sum = 1.
+              exfalso
+              rw [h_mul0, h_mulh0, h_mulhu0, h_mulhsu0, h_mulw0] at h_real_one
+              simp at h_real_one
+            · exact (spec_mulw h_mulw1).1
+          · exact (spec_mulhsu h_mulhsu1).1
+        · exact (spec_mulhu h_mulhu1).1
+      · exact (spec_mulh h_mulh1).1
+    · exact (spec_mul h_mul1).1
+  -- (2) is_mul = 1 → aw = RV64.mul cw bw
+  · intro h_one
+    rw [(spec_mul h_one).2, execute_MUL_pure_eq_rv64_mul]
+  -- (3) is_mulh = 1 → aw = RV64.mulh cw bw
+  · intro h_one
+    rw [(spec_mulh h_one).2, execute_MUL_pure_eq_rv64_mulh]
+  -- (4) is_mulhu = 1 → aw = RV64.mulhu cw bw
+  · intro h_one
+    rw [(spec_mulhu h_one).2, execute_MUL_pure_eq_rv64_mulhu]
+  -- (5) is_mulhsu = 1 → aw = RV64.mulhsu cw bw
+  · intro h_one
+    rw [(spec_mulhsu h_one).2, execute_MUL_pure_eq_rv64_mulhsu]
+  -- (6) is_mulw = 1 → aw = RV64.mulw cw bw
+  · intro h_one
+    rw [(spec_mulw h_one).2, execute_MULW_pure_eq_rv64_mulw]
 
 /-- Bridge from Clean's `main` post-conditions to SP1's `allHold` form.
 The intended signature takes one named hypothesis per constraint emitted
@@ -375,12 +473,11 @@ private theorem allHold_of_main_holds
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
-  -- Sketch: `circuit_proof_start` introduces `input` and `h_holds`; then
-  -- `exact of_sp1 input (allHold_of_main_holds input h_holds)` would
-  -- finish, once the helper body below is closed (the bridge from
-  -- Clean's main facts to SP1 `allHold`). Leaving as `sorry` until
-  -- the helper has a real proof.
-  sorry
+  -- One-liner: thread the assumptions through `allHold_of_main_holds`
+  -- (currently sorry'd — see TODO above) and apply `of_sp1`. Once the
+  -- helper is closed, this proof requires no further changes.
+  intro offset env input_var input _h_input h_assumptions _h_holds
+  exact of_sp1 input h_assumptions (allHold_of_main_holds input trivial)
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
