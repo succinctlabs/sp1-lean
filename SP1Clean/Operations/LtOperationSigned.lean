@@ -269,4 +269,220 @@ theorem iff_sp1 (input : Inputs (ZMod p)) (h_is_signed : input.is_signed = 1) :
     · ring
     · ring
 
+/-! ## Multiplicity-gated `AssertionGated` form
+
+Parallel to the unconditional `Assertion` namespace above. The
+`AssertionGated` form threads a multiplicity expression `is_real` and
+gates the three sub-circuits + the four trailing scalar gates (strict
+gating; matches the U16CompareOp/AddwOp/LtUnsignedOp.AssertionGated
+convention).
+
+The two U16MSB sub-calls use multiplicity = `is_signed` (matching SP1's
+`U16MSBOperation.constraints b[3] {...} is_signed`); the LtUnsignedOp
+sub-call uses multiplicity = `is_real`. On real rows the chip's gate
+`is_signed * (is_signed - 1) = 0` (carried inside the Spec) establishes
+`is_signed`'s binarity, satisfying the U16MSB sub-assumption.
+
+Spec is **literal-conjunction under `is_real = 1 →`** — the BV-collapsed
+semantic form is unavailable because `LtOperationSigned.iff_sp1_full.mpr`
+contains a `sorry` (no `spec_inv` exists for signed-`<`). -/
+
+/-- Multiplicity-aware input: same fields as `Inputs` plus the gating
+multiplicity `is_real`. -/
+structure InputsGated (F : Type) where
+  b : fields 4 F
+  c : fields 4 F
+  is_signed : F
+  compare_bit : F
+  u16_flags : fields 4 F
+  not_eq_inv : F
+  comparison_limbs : fields 2 F
+  b_msb : F
+  c_msb : F
+  is_real : F
+deriving ProvableStruct
+
+namespace AssertionGated
+
+open Circuit
+
+/-- Multiplicity-gated `main`: composes three gated sub-assertions
+(`U16MSBOp.assertionGated` ×2 with multiplicity = `is_signed`,
+`LtUnsignedOp.assertionGated` with multiplicity = `is_real`) plus the
+four trailing scalar gates each multiplied by `is_real`. -/
+@[reducible]
+def main (input : Var InputsGated (ZMod p)) : Circuit (ZMod p) Unit := do
+  -- Binarity of `is_real`.
+  input.is_real * (input.is_real - 1) === 0
+  -- Sub-circuit 1: U16MSB on b[3] (sign bit of high limb), gated by is_signed.
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨input.b[3], input.b_msb, input.is_signed⟩ :
+      Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+  -- Sub-circuit 2: U16MSB on c[3], gated by is_signed.
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨input.c[3], input.c_msb, input.is_signed⟩ :
+      Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+  -- Sub-circuit 3: unsigned `<` on sign-flipped operands, gated by is_real.
+  let b3' := input.b[3] + input.is_signed * 32768 - 65536 * input.b_msb
+  let c3' := input.c[3] + input.is_signed * 32768 - 65536 * input.c_msb
+  SP1Clean.LtUnsignedOp.assertionGated
+    (⟨#v[input.b[0], input.b[1], input.b[2], b3'],
+       #v[input.c[0], input.c[1], input.c[2], c3'],
+       input.compare_bit,
+       input.u16_flags,
+       input.not_eq_inv,
+       input.comparison_limbs,
+       input.is_real⟩ :
+      Var SP1Clean.LtUnsignedOp.InputsGated (ZMod p))
+  -- 3 trailing scalar gates, each gated by is_real.
+  input.is_real * (input.is_signed * (input.is_signed - 1)) === 0
+  input.is_real * ((input.is_signed - 1) * input.b_msb) === 0
+  input.is_real * ((input.is_signed - 1) * input.c_msb) === 0
+
+set_option maxHeartbeats 800000 in
+-- 3 subcircuits + 4 scalar gates exceeds default `subcircuitsConsistent`.
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) InputsGated unit where
+  name := "SP1Clean.LtSignedOpGated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
+
+/-- Three chip-side invariants the caller must establish:
+1. `is_real` binarity (chip-side `is_real * (is_real - 1) = 0` gate).
+2. `is_signed` binarity (chip-side selector sum, e.g. `is_blt + is_bge`).
+3. Padding implies unsigned mode (`is_real = 0 → is_signed = 0`) — true
+   by chip-level selector arithmetic since `is_signed ≤ sum_of_selectors
+   = is_real`. Used to discharge the U16MSB sub-circuit's Spec
+   (`is_signed = 1 → ...`) on padding rows. -/
+def Assumptions (input : InputsGated (ZMod p)) : Prop :=
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_signed = 0 ∨ input.is_signed = 1) ∧
+  (input.is_real = 0 → input.is_signed = 0)
+
+/-- Semantic contract: vacuous on padding rows, references the three gated
+sub-Specs opaquely (matching what each sub's FormalAssertion returns) +
+the three trailing scalar facts on real rows. -/
+def Spec (input : InputsGated (ZMod p)) : Prop :=
+  input.is_real = 1 →
+    let one : ZMod p := 1
+    SP1Clean.U16MSBOp.AssertionGated.Spec
+      ⟨input.b[3], input.b_msb, input.is_signed⟩ ∧
+    SP1Clean.U16MSBOp.AssertionGated.Spec
+      ⟨input.c[3], input.c_msb, input.is_signed⟩ ∧
+    (let b3' := input.b[3] + input.is_signed * 32768 - 65536 * input.b_msb
+     let c3' := input.c[3] + input.is_signed * 32768 - 65536 * input.c_msb
+     SP1Clean.LtUnsignedOp.AssertionGated.Spec
+      ⟨#v[input.b[0], input.b[1], input.b[2], b3'],
+       #v[input.c[0], input.c[1], input.c[2], c3'],
+       input.compare_bit,
+       input.u16_flags,
+       input.not_eq_inv,
+       input.comparison_limbs,
+       input.is_real⟩) ∧
+    input.is_signed * (input.is_signed - one) = 0 ∧
+    (input.is_signed - one) * input.b_msb = 0 ∧
+    (input.is_signed - one) * input.c_msb = 0
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_b_eq, h_c_eq, h_is_signed_eq, h_bit_eq, h_f_eq, h_nei_eq,
+          h_cl_eq, h_bmsb_eq, h_cmsb_eq, h_ir_eq⟩ := h_input
+  subst h_b_eq; subst h_c_eq; subst h_is_signed_eq; subst h_bit_eq
+  subst h_f_eq; subst h_nei_eq; subst h_cl_eq; subst h_bmsb_eq
+  subst h_cmsb_eq; subst h_ir_eq
+  obtain ⟨h_ir_bin, h_u16_b_sub, h_u16_c_sub, h_lt_sub, h_sb, h_bvac, h_cvac⟩ :=
+    h_holds
+  obtain ⟨h_ir_binary, h_is_signed_or, _h_padding_unsigned⟩ := h_assumptions
+  intro h_is_real
+  unfold id at *
+  have h_ir_ne_zero : Expression.eval env input_var_is_real ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  -- Trailing scalar facts on real rows (after factoring out is_real).
+  have h_is_signed_bin :=
+    (mul_eq_zero.mp h_sb).resolve_left h_ir_ne_zero
+  have h_b_vacuity :=
+    (mul_eq_zero.mp h_bvac).resolve_left h_ir_ne_zero
+  have h_c_vacuity :=
+    (mul_eq_zero.mp h_cvac).resolve_left h_ir_ne_zero
+  -- LtUnsignedOp sub-assumption is is_real binarity (Or.inr branch).
+  have h_lt_assumps :
+      Expression.eval env input_var_is_real = 0 ∨
+      Expression.eval env input_var_is_real = 1 := Or.inr h_is_real
+  -- U16MSB / LtUnsigned subs hand back their gated Specs.
+  have h_u16_b_spec := h_u16_b_sub h_is_signed_or
+  have h_u16_c_spec := h_u16_c_sub h_is_signed_or
+  have h_lt_spec := h_lt_sub h_lt_assumps
+  simp only [Spec, Vector.getElem_map]
+  refine ⟨h_u16_b_spec, h_u16_c_spec, ?_, ?_, ?_, ?_⟩
+  · -- LtUnsignedOp.AssertionGated.Spec on sign-flipped operands. Both
+    -- h_lt_spec and the goal have the same Spec form; the only diff is
+    -- `a - b` (goal, from our `let b3'`) vs `a + -b` (h_lt_spec, from
+    -- circuit_norm's sub_eq_add_neg normalization).
+    convert h_lt_spec using 4 <;> ring
+  · linear_combination h_is_signed_bin
+  · linear_combination h_b_vacuity
+  · linear_combination h_c_vacuity
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_b_eq, h_c_eq, h_is_signed_eq, h_bit_eq, h_f_eq, h_nei_eq,
+          h_cl_eq, h_bmsb_eq, h_cmsb_eq, h_ir_eq⟩ := h_input
+  subst h_b_eq; subst h_c_eq; subst h_is_signed_eq; subst h_bit_eq
+  subst h_f_eq; subst h_nei_eq; subst h_cl_eq; subst h_bmsb_eq
+  subst h_cmsb_eq; subst h_ir_eq
+  unfold id at *
+  obtain ⟨h_ir_binary, h_is_signed_or, h_padding_unsigned⟩ := h_assumptions
+  rcases h_ir_binary with h_ir0 | h_ir1
+  · -- Padding row: is_real = 0; gates trivialize.
+    have h_is_signed_zero : Expression.eval env input_var_is_signed = 0 :=
+      h_padding_unsigned h_ir0
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · rw [h_ir0]; ring
+    · -- U16MSB.assertionGated on b[3]: ⟨SubAssumptions, SubSpec⟩.
+      -- SubSpec `is_signed = 1 → ...` is vacuous since is_signed = 0.
+      refine ⟨h_is_signed_or, fun h_contra => ?_⟩
+      exact absurd (h_is_signed_zero.symm.trans h_contra) zero_ne_one
+    · refine ⟨h_is_signed_or, fun h_contra => ?_⟩
+      exact absurd (h_is_signed_zero.symm.trans h_contra) zero_ne_one
+    · -- LtUnsignedOp.assertionGated: ⟨SubAssumptions, SubSpec⟩.
+      refine ⟨Or.inl h_ir0, fun h_contra => ?_⟩
+      exact absurd (h_ir0.symm.trans h_contra) zero_ne_one
+    · rw [h_ir0]; ring
+    · rw [h_ir0]; ring
+    · rw [h_ir0]; ring
+  · -- Real row: recover all facts from Spec.
+    simp only [Spec, Vector.getElem_map] at h_spec
+    obtain ⟨h_u16_b, h_u16_c, h_lt, h_sb, h_bvac, h_cvac⟩ := h_spec h_ir1
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · rw [h_ir1]; ring
+    · -- U16MSB.assertionGated: ⟨SubAssumptions, h_u16_b⟩.
+      exact ⟨h_is_signed_or, h_u16_b⟩
+    · exact ⟨h_is_signed_or, h_u16_c⟩
+    · -- LtUnsignedOp.assertionGated: ⟨Or.inr h_ir1, h_lt⟩ modulo sub_eq_add_neg.
+      refine ⟨Or.inr h_ir1, ?_⟩
+      convert h_lt using 4 <;> ring
+    · rw [h_ir1]; linear_combination h_sb
+    · rw [h_ir1]; linear_combination h_bvac
+    · rw [h_ir1]; linear_combination h_cvac
+
+end AssertionGated
+
+/-- Multiplicity-gated FormalAssertion for `LtOperationSigned`. Compose
+via `LtSignedOp.assertionGated input` in `Chips/.../Multiplicity/`
+mirrors. -/
+def assertionGated : FormalAssertion (ZMod p) InputsGated :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.Spec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
+
 end SP1Clean.LtSignedOp
