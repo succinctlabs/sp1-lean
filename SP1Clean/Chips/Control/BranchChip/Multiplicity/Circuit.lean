@@ -11,6 +11,7 @@ import SP1Clean.ProgramTable
 import SP1Clean.Reader.CPUState
 import SP1Clean.Reader.ITypeReaderImmutable
 import SP1Clean.Operations.GatedAddOp
+import SP1Clean.Operations.LtOperationSigned
 import SP1Clean.SP1Lookup
 import SP1Clean.TrustMode
 import SP1Clean.Chips.Control.BranchChip.Multiplicity.Cols
@@ -52,27 +53,27 @@ Sub-circuits composed (in `air.rs` source order):
 10. `SP1Lookup.byteOpcodeGated` — `next_pc[1] ∈ Range16`, `mult := Σ`.
 11. `SP1Lookup.byteOpcodeGated` — `next_pc[2] ∈ Range16`, `mult := Σ`.
 
-## TODOs (stubs to discharge in follow-up)
+## Status (2026-05-27 — Phase 2B.5 + 2C + 3B partial)
 
-1. **`SP1Clean.ITypeReaderImmutable.Gated.assertion` does not exist.**
-   `SP1Clean/Reader/ITypeReaderImmutable.lean` exposes a non-gated
-   `FormalAssertion` (`assertion`); `SP1Clean/Reader/ITypeReader.lean:
-   317-436` is the template for adding a `Gated` namespace. The non-gated
-   form is used here as a stub. Promoting to a true `.Gated` variant
-   will (i) add `is_real`/`is_trusted` fields to its `Inputs`, (ii)
-   thread them through `RegisterAccess`/`ProgramTable` gating, and
-   (iii) update the Spec to the disjunctive `is_real = 0 ∨ …` form.
-2. **`LtOperationSigned` Clean `FormalAssertion` does not exist.**
-   `SP1Clean/Compare/LtOperationSigned.lean` only derives
-   `ProvableStruct` instances; the actual comparison sub-circuit
-   (`U16MSBOperation` × 2 + `LtOperationUnsigned`-style limb compares)
-   is not yet ported to a Clean subcircuit composition. The comparison
-   constraints are intentionally **omitted** from `main` and
-   `FormalSpec` here; they remain carried by the iter-9 baseline
-   `SP1Clean/BranchChip.lean`'s legacy `TraceSpec` until ported.
-3. **Soundness / completeness** are sorry-stubbed. The structural
-   pattern mirrors `SP1Clean/Jalr/Circuit.lean:163-196`; once the two
-   stubs above land, the proof body should fall out by analogy.
+1. **`SP1Clean.ITypeReaderImmutable.Gated.assertion`** — **LANDED**
+   (`SP1Clean/Reader/ITypeReaderImmutable.lean:283-502`). `main` and
+   `FormalSpec` here now compose it directly via
+   `Gated.Assertion.Spec ⟨…, is_real := sum, is_trusted := sum⟩`.
+2. **`LtOperationSigned` gated Clean `FormalAssertion`** — **LANDED**
+   as `SP1Clean.LtSignedOp.assertionGated` (Phase 2C,
+   `SP1Clean/Operations/LtOperationSigned.lean`). `main` here now
+   composes the gated subcircuit + adds the `LtSignedOp.AssertionGated.Spec`
+   conjunct to `FormalSpec`, with operands wired from `adapter.op_a_memory.
+   prev_value` / `adapter.op_b_memory.prev_value`, witness columns from
+   `compare_operation.*`, `is_signed := is_blt + is_bge`, and
+   `is_real := sum`.
+3. **Soundness / completeness** — **STILL sorry-stubbed.** The blocker is
+   discharging `LtSignedOp.AssertionGated.Assumptions` (which requires
+   `is_blt + is_bge ∈ {0, 1}` and `sum = 0 → is_blt + is_bge = 0`) from
+   the chip-level selector + sum binarity gates. This needs a
+   field-characteristic case bash (`(k)(k-1) ≠ 0` in `ZMod p` for
+   `k ∈ {2..6}` under `Fact (2 ^ 17 < p)`). Pattern otherwise mirrors
+   `Aggregate.lean:384-454`. Tracked as Phase 3B residual work.
 -/
 
 set_option linter.style.setOption false
@@ -121,13 +122,12 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   -- (4) CPUState clock-fields range bounds.
   SP1Clean.CPUState.assertion
     (⟨clk_0_16, clk_16_24⟩ : Var SP1Clean.CPUState.Inputs (ZMod p))
-  -- (5) ITypeReaderImmutable (program-bus + op_a/op_b register reads).
-  -- STUB (multiplicity-aware Branch sibling): using the non-gated
-  -- `assertion`; promote to `ITypeReaderImmutable.Gated.assertion` once
-  -- that variant is built (see TODO 1 above).
-  SP1Clean.ITypeReaderImmutable.assertion
-    (⟨clk_high, clk_low, opcode_e, pc, adapter⟩ :
-      Var SP1Clean.ITypeReaderImmutable.Inputs (ZMod p))
+  -- (5) ITypeReaderImmutable.Gated (program-bus + op_a/op_b register reads),
+  -- gated by `sum` for both `is_real` and `is_trusted` (Branch is User-mode
+  -- unconditionally; both gate together).
+  SP1Clean.ITypeReaderImmutable.Gated.assertion
+    (⟨clk_high, clk_low, opcode_e, pc, adapter, sum, sum⟩ :
+      Var SP1Clean.ITypeReaderImmutable.Gated.Inputs (ZMod p))
   -- (6) is_branching outcome equation. Σu16_flags + bit are the
   -- comparison witnesses surfaced by the `compare_operation` struct.
   let u16_sum := compare_operation.result.u16_flags[0] +
@@ -138,6 +138,19 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
   sum * (is_branching -
     (is_beq * (1 - u16_sum) + is_bne * u16_sum +
      (is_bge + is_bgeu) * (1 - bit) + (is_blt + is_bltu) * bit)) === 0
+  -- (6.5) LtSignedOp comparison sub-circuit. Operands are the op_a/op_b
+  -- register reads (from adapter); is_signed = is_blt + is_bge (signed
+  -- variants only). Multiplicity = sum (aggregate is_real).
+  SP1Clean.LtSignedOp.assertionGated
+    (⟨adapter.op_a_memory.prev_value, adapter.op_b_memory.prev_value,
+       is_blt + is_bge,
+       compare_operation.result.u16_compare_operation.bit,
+       compare_operation.result.u16_flags,
+       compare_operation.result.not_eq_inv,
+       compare_operation.result.comparison_limbs,
+       compare_operation.b_msb.msb,
+       compare_operation.c_msb.msb,
+       sum⟩ : Var SP1Clean.LtSignedOp.InputsGated (ZMod p))
   -- (7) Branch-taken arm: pc + op_c_imm = next_pc, gated by is_branching.
   SP1Clean.GatedAddOp.assertion
     (⟨pc.push 0, adapter.op_c_imm, next_pc.push 0, is_branching⟩ :
@@ -160,10 +173,10 @@ def main (cols : Var BranchCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (⟨#v[(6 : Expression (ZMod p)), next_pc[2], 16, 0], sum⟩ :
       Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
 
-set_option maxHeartbeats 800000 in
--- Higher heartbeats: Branch has 13 top-level Cols fields (Cols struct
--- flattens to ~45 input bits) + 4 subcircuit calls + 3 lookups;
--- localLength_eq synthesis hits the 200k cap.
+set_option maxHeartbeats 2000000 in
+-- Higher heartbeats: Branch has 13 top-level Cols fields + 5 subcircuit
+-- calls + 3 lookups; localLength_eq + subcircuitsConsistent synthesis
+-- exceeds the default cap.
 @[reducible]
 instance elaborated : ElaboratedCircuit (ZMod p) BranchCols unit where
   name := "SP1Clean.Branch"
@@ -173,6 +186,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) BranchCols unit where
   localLength_eq input offset := by
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
 
 def Assumptions (_ : BranchCols (ZMod p)) : Prop := True
 
@@ -209,14 +224,27 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
   cols.is_branching * (cols.is_branching - 1) = 0 ∧
   -- (4) CPUState range bounds.
   SP1Clean.CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 ∧
-  -- (5) ITypeReaderImmutable Spec (non-gated stub form). TODO 1.
-  SP1Clean.ITypeReaderImmutable.itypeReaderImmutableSpec
-    clk_low opcode_e cols.state.pc cols.adapter ∧
+  -- (5) ITypeReaderImmutable.Gated Spec (literal-conjunction).
+  SP1Clean.ITypeReaderImmutable.Gated.Assertion.Spec
+    ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc, cols.adapter,
+     sum, sum⟩ ∧
   -- (6) is_branching outcome equation.
   sum * (cols.is_branching -
     (cols.is_beq * (1 - u16_sum) + cols.is_bne * u16_sum +
      (cols.is_bge + cols.is_bgeu) * (1 - bit) +
      (cols.is_blt + cols.is_bltu) * bit)) = 0 ∧
+  -- (6.5) LtSignedOp comparison sub-Spec (implicational on sum = 1).
+  SP1Clean.LtSignedOp.AssertionGated.Spec
+    ⟨cols.adapter.op_a_memory.prev_value,
+     cols.adapter.op_b_memory.prev_value,
+     cols.is_blt + cols.is_bge,
+     cols.compare_operation.result.u16_compare_operation.bit,
+     cols.compare_operation.result.u16_flags,
+     cols.compare_operation.result.not_eq_inv,
+     cols.compare_operation.result.comparison_limbs,
+     cols.compare_operation.b_msb.msb,
+     cols.compare_operation.c_msb.msb,
+     sum⟩ ∧
   -- (7) Branch-taken sum.
   SP1Clean.GatedAddOp.Assertion.FormalSpec
     ⟨cols.state.pc.push 0, cols.adapter.op_c_imm, cols.next_pc.push 0,
@@ -235,18 +263,23 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
   SP1Lookup.ByteOpcodeGated.Spec
     ⟨#v[(6 : ZMod p), cols.next_pc[2], 16, 0], sum⟩
 
--- STUB (multiplicity-aware Branch sibling): soundness deferred until
--- TODO 1 (`ITypeReaderImmutable.Gated`) and TODO 2 (`LtOperationSigned`
--- subcircuit) land. Proof pattern mirrors `SP1Clean/Jalr/Circuit.lean:
--- 163-179`: `circuit_proof_start` then destructure `h_input`/`h_holds`
--- and `refine ⟨…⟩` over the eleven sub-Specs.
+-- STUB (Phase 3B partial — 2026-05-27): the chip-level `main` and
+-- `FormalSpec` have been rewired to use the new gated subcircuits
+-- (Phase 2B.5: `LtUnsignedOp.AssertionGated`; Phase 2C:
+-- `LtSignedOp.AssertionGated`) and `ITypeReaderImmutable.Gated.assertion`
+-- (already landed). The soundness/completeness closure remains deferred:
+-- discharging `LtSignedOp.AssertionGated.Assumptions` requires proving
+-- `is_blt + is_bge ∈ {0, 1}` from the six selector-binarity gates plus
+-- the aggregate `sum * (sum - 1) = 0` gate. The proof needs a
+-- field-characteristic case bash (showing that `sum * (sum - 1) ≠ 0`
+-- when `sum ∈ {2, 3, 4, 5, 6}` in `ZMod p` with `Fact (2 ^ 17 < p)`),
+-- plus an analogous discharge for `is_real = 0 → is_signed = 0`. The
+-- proof pattern otherwise mirrors `Aggregate.lean:384-454` — destructure
+-- `h_holds` / `h_spec`, refine over the new 14-conjunct FormalSpec.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   sorry
 
--- STUB (multiplicity-aware Branch sibling): completeness deferred,
--- same rationale as `soundness`. Proof pattern mirrors
--- `SP1Clean/Jalr/Circuit.lean:181-196`.
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   sorry

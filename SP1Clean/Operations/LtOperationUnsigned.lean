@@ -279,4 +279,220 @@ theorem iff_sp1 (input : Inputs (ZMod p)) :
     · linear_combination h_cl1
     · linear_combination h_nei
 
+/-! ## Multiplicity-gated `AssertionGated` form
+
+Parallel to the unconditional `Assertion` namespace above. The
+`AssertionGated` form threads a multiplicity expression `is_real` and
+gates every emitted constraint by it (strict gating, matching the
+convention used by `U16CompareOp.AssertionGated` / `AddwOp.AssertionGated`
+in earlier phases). The inner `U16CompareOp` sub-call is the gated form.
+
+The contract is literal-conjunction under `is_real = 1 →` (the gated
+analogue of the unconditional `Spec` above), not a BV-collapsed semantic
+form — `LtOperationUnsigned` has no `iff_sp1_full` / `spec_inv` to bridge
+through. The chip composes this `Spec` directly. -/
+
+/-- Multiplicity-aware input: same fields as `Inputs` plus the gating
+multiplicity `is_real`. -/
+structure InputsGated (F : Type) where
+  b : fields 4 F
+  c : fields 4 F
+  compare_bit : F
+  u16_flags : fields 4 F
+  not_eq_inv : F
+  comparison_limbs : fields 2 F
+  is_real : F
+deriving ProvableStruct
+
+namespace AssertionGated
+
+open Circuit
+
+/-- Multiplicity-gated `main`: gates every emission by `is_real`. Inner
+`U16CompareOp` sub-call uses `assertionGated` with `is_real` wired
+through. -/
+@[reducible]
+def main (input : Var InputsGated (ZMod p)) : Circuit (ZMod p) Unit := do
+  input.is_real * (input.is_real - 1) === 0
+  -- Inner gated byte-comparison (gates its own bit-bool + lookup).
+  SP1Clean.U16CompareOp.assertionGated
+    (⟨input.comparison_limbs[0], input.comparison_limbs[1],
+       input.compare_bit, input.is_real⟩ :
+      Var SP1Clean.U16CompareOp.InputsGated (ZMod p))
+  -- 4 one-hot flag booleans (gated).
+  input.is_real * (input.u16_flags[0] * (input.u16_flags[0] - 1)) === 0
+  input.is_real * (input.u16_flags[1] * (input.u16_flags[1] - 1)) === 0
+  input.is_real * (input.u16_flags[2] * (input.u16_flags[2] - 1)) === 0
+  input.is_real * (input.u16_flags[3] * (input.u16_flags[3] - 1)) === 0
+  -- Sum-of-flags binary (gated).
+  let sum_flags := input.u16_flags[0] + input.u16_flags[1] +
+    input.u16_flags[2] + input.u16_flags[3]
+  input.is_real * (sum_flags * (sum_flags - 1)) === 0
+  -- Cross-limb selection ×4 (MSB→LSB cumulative), gated.
+  let one_expr : Expression (ZMod p) := 1
+  let cum3 := input.u16_flags[3]
+  let cum2 := cum3 + input.u16_flags[2]
+  let cum1 := cum2 + input.u16_flags[1]
+  input.is_real * ((one_expr - cum3) * (input.b[3] - input.c[3])) === 0
+  input.is_real * ((one_expr - cum2) * (input.b[2] - input.c[2])) === 0
+  input.is_real * ((one_expr - cum1) * (input.b[1] - input.c[1])) === 0
+  input.is_real *
+    ((one_expr - (cum1 + input.u16_flags[0])) * (input.b[0] - input.c[0])) === 0
+  -- comparison_limbs derivation ×2 (gated).
+  let cl0_expected := input.b[3] * input.u16_flags[3] +
+    input.b[2] * input.u16_flags[2] +
+    input.b[1] * input.u16_flags[1] +
+    input.b[0] * input.u16_flags[0]
+  let cl1_expected := input.c[3] * input.u16_flags[3] +
+    input.c[2] * input.u16_flags[2] +
+    input.c[1] * input.u16_flags[1] +
+    input.c[0] * input.u16_flags[0]
+  input.is_real * (cl0_expected - input.comparison_limbs[0]) === 0
+  input.is_real * (cl1_expected - input.comparison_limbs[1]) === 0
+  -- not_eq_inv discipline (gated).
+  input.is_real *
+    ((-sum_flags) * (input.not_eq_inv *
+      (input.comparison_limbs[0] - input.comparison_limbs[1]) - one_expr)) === 0
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) InputsGated unit where
+  name := "SP1Clean.LtUnsignedOpGated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
+
+/-- Binarity of `is_real`. The chip-side `is_real * (is_real - 1) = 0`
+gate establishes this externally. -/
+def Assumptions (input : InputsGated (ZMod p)) : Prop :=
+  input.is_real = 0 ∨ input.is_real = 1
+
+/-- Semantic contract: vacuous on padding rows, asserts the full
+literal-conjunction form of the non-gated `Spec` on real rows. -/
+def Spec (input : InputsGated (ZMod p)) : Prop :=
+  input.is_real = 1 →
+    let one : ZMod p := 1
+    SP1Clean.U16CompareOp.Assertion.Spec
+      ⟨input.comparison_limbs[0], input.comparison_limbs[1], input.compare_bit⟩ ∧
+    input.u16_flags[0] * (input.u16_flags[0] - one) = 0 ∧
+    input.u16_flags[1] * (input.u16_flags[1] - one) = 0 ∧
+    input.u16_flags[2] * (input.u16_flags[2] - one) = 0 ∧
+    input.u16_flags[3] * (input.u16_flags[3] - one) = 0 ∧
+    (let sum_flags := input.u16_flags[0] + input.u16_flags[1] +
+       input.u16_flags[2] + input.u16_flags[3]
+     sum_flags * (sum_flags - one) = 0) ∧
+    (one - input.u16_flags[3]) * (input.b[3] - input.c[3]) = 0 ∧
+    (one - (input.u16_flags[3] + input.u16_flags[2])) *
+      (input.b[2] - input.c[2]) = 0 ∧
+    (one - (input.u16_flags[3] + input.u16_flags[2] + input.u16_flags[1])) *
+      (input.b[1] - input.c[1]) = 0 ∧
+    (one - (input.u16_flags[3] + input.u16_flags[2] +
+          input.u16_flags[1] + input.u16_flags[0])) *
+      (input.b[0] - input.c[0]) = 0 ∧
+    (input.b[3] * input.u16_flags[3] + input.b[2] * input.u16_flags[2] +
+      input.b[1] * input.u16_flags[1] + input.b[0] * input.u16_flags[0]) -
+        input.comparison_limbs[0] = 0 ∧
+    (input.c[3] * input.u16_flags[3] + input.c[2] * input.u16_flags[2] +
+      input.c[1] * input.u16_flags[1] + input.c[0] * input.u16_flags[0]) -
+        input.comparison_limbs[1] = 0 ∧
+    (let sum_flags := input.u16_flags[0] + input.u16_flags[1] +
+       input.u16_flags[2] + input.u16_flags[3]
+     (-sum_flags) * (input.not_eq_inv *
+       (input.comparison_limbs[0] - input.comparison_limbs[1]) - one) = 0)
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_b_eq, h_c_eq, h_bit_eq, h_f_eq, h_nei_eq, h_cl_eq, h_ir_eq⟩ := h_input
+  subst h_b_eq; subst h_c_eq; subst h_bit_eq; subst h_f_eq; subst h_nei_eq
+  subst h_cl_eq; subst h_ir_eq
+  obtain ⟨h_ir_bin, h_u16_sub, h_f0, h_f1, h_f2, h_f3, h_s, h_x3, h_x2, h_x1,
+          h_x0, h_cl0, h_cl1, h_nei⟩ := h_holds
+  intro h_is_real
+  unfold id at *
+  have h_ir_ne_zero : Expression.eval env input_var_is_real ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  -- Inner U16CompareOp.assertionGated under is_real = 1 yields its Spec.
+  have h_u16_assumps :
+      Expression.eval env input_var_is_real = 0 ∨
+      Expression.eval env input_var_is_real = 1 := Or.inr h_is_real
+  have ⟨h_bit_bool, h_range_val⟩ := (h_u16_sub h_u16_assumps) h_is_real
+  simp only [Spec, Vector.getElem_map]
+  refine ⟨⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · -- U16CompareOp.Assertion.Spec field 1 — bit boolean.
+    exact h_bit_bool
+  · -- U16CompareOp.Assertion.Spec field 2 — range.
+    exact h_range_val
+  · -- 4 flag-bool gates: extract via mul_eq_zero.mp + resolve_left.
+    linear_combination (mul_eq_zero.mp h_f0).resolve_left h_ir_ne_zero
+  · linear_combination (mul_eq_zero.mp h_f1).resolve_left h_ir_ne_zero
+  · linear_combination (mul_eq_zero.mp h_f2).resolve_left h_ir_ne_zero
+  · linear_combination (mul_eq_zero.mp h_f3).resolve_left h_ir_ne_zero
+  · -- sum-of-flags binary.
+    linear_combination (mul_eq_zero.mp h_s).resolve_left h_ir_ne_zero
+  · -- 4 cross-limb gates.
+    linear_combination (mul_eq_zero.mp h_x3).resolve_left h_ir_ne_zero
+  · linear_combination (mul_eq_zero.mp h_x2).resolve_left h_ir_ne_zero
+  · linear_combination (mul_eq_zero.mp h_x1).resolve_left h_ir_ne_zero
+  · linear_combination (mul_eq_zero.mp h_x0).resolve_left h_ir_ne_zero
+  · -- 2 cl-derivation gates.
+    linear_combination (mul_eq_zero.mp h_cl0).resolve_left h_ir_ne_zero
+  · linear_combination (mul_eq_zero.mp h_cl1).resolve_left h_ir_ne_zero
+  · -- not_eq_inv discipline.
+    linear_combination (mul_eq_zero.mp h_nei).resolve_left h_ir_ne_zero
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_b_eq, h_c_eq, h_bit_eq, h_f_eq, h_nei_eq, h_cl_eq, h_ir_eq⟩ := h_input
+  subst h_b_eq; subst h_c_eq; subst h_bit_eq; subst h_f_eq; subst h_nei_eq
+  subst h_cl_eq; subst h_ir_eq
+  unfold id at *
+  rcases h_assumptions with h_ir0 | h_ir1
+  · -- Padding row: is_real = 0; all gated emissions trivialize.
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · rw [h_ir0]; ring
+    · -- Inner U16CompareOp.assertionGated: ⟨SubAssumptions, SubSpec⟩.
+      refine ⟨Or.inl h_ir0, fun h_contra => ?_⟩
+      exact absurd (h_ir0.symm.trans h_contra) zero_ne_one
+    all_goals rw [h_ir0]; ring
+  · -- Real row: recover all 13 facts from Spec.
+    simp only [Spec, Vector.getElem_map] at h_spec
+    obtain ⟨⟨h_bit_bool, h_range_val⟩, h_f0, h_f1, h_f2, h_f3, h_s, h_x3, h_x2,
+            h_x1, h_x0, h_cl0, h_cl1, h_nei⟩ := h_spec h_ir1
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · rw [h_ir1]; ring
+    · -- Inner U16CompareOp.assertionGated: ⟨SubAssumptions, SubSpec⟩.
+      refine ⟨Or.inr h_ir1, fun _ => ⟨?_, ?_⟩⟩
+      · exact h_bit_bool
+      · exact h_range_val
+    · rw [h_ir1]; linear_combination h_f0
+    · rw [h_ir1]; linear_combination h_f1
+    · rw [h_ir1]; linear_combination h_f2
+    · rw [h_ir1]; linear_combination h_f3
+    · rw [h_ir1]; linear_combination h_s
+    · rw [h_ir1]; linear_combination h_x3
+    · rw [h_ir1]; linear_combination h_x2
+    · rw [h_ir1]; linear_combination h_x1
+    · rw [h_ir1]; linear_combination h_x0
+    · rw [h_ir1]; linear_combination h_cl0
+    · rw [h_ir1]; linear_combination h_cl1
+    · rw [h_ir1]; linear_combination h_nei
+
+end AssertionGated
+
+/-- Multiplicity-gated FormalAssertion for `LtOperationUnsigned`. Compose
+via `LtUnsignedOp.assertionGated input` in `Chips/.../Multiplicity/`
+mirrors. -/
+def assertionGated : FormalAssertion (ZMod p) InputsGated :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.Spec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
+
 end SP1Clean.LtUnsignedOp
