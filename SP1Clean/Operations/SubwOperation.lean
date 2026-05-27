@@ -244,4 +244,21 @@ theorem Assertion_Spec_iff_Spec (a b : Word (ZMod p)) (value : Vector (ZMod p) 2
       · exact Or.inl (by
           linear_combination -h + (1 + (65536 : ZMod p)⁻¹) * hbridge)
 
+/-! ## Multiplicity-gated `AssertionGated` form — DEFERRED
+
+`SubwOp.assertionGated` is deferred to a follow-up commit (Phase 2B of
+the multiplicity-bus migration plan). The parallel `AddwOp.assertionGated`
+landed in this commit; SubwOp's borrow-form / natural-form / U16MSB
+inline structure creates a Spec-shape mismatch with the goal under
+`circuit_proof_start`'s `sub_eq_add_neg` normalization that needs more
+careful proof engineering than the AddwOp pattern transports. No current
+chip Multiplicity file calls SubwOp.assertionGated, so deferring keeps
+this commit focused.
+
+Tracking issue: when adding it, the cleanest approach is likely to
+bypass `Assertion.Spec` and assemble the natural `Spec` directly from
+gated emissions via `linear_combination` bridges through the borrow ↔
+natural-form identity (`SP1Clean.SubwOp.Assertion_Spec_iff_Spec`'s
+proof technique). -/
+
 end SP1Clean.SubwOp
