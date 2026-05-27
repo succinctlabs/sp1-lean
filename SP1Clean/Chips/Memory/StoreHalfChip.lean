@@ -13,6 +13,7 @@ import SP1Operations.Reader.ITypeReaderImmutable.ITypeReaderImmutable
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Store.StoreHalf.Common
+import SP1Chips.Store.StoreHalf.StoreHalfChip
 import SP1Clean.Operations.AddrAddOperation
 import SP1Clean.Operations.AddressShape
 import SP1Clean.Operations.StoreMemoryAccessGated
@@ -39,6 +40,8 @@ Opcode: `37 = SH` (Store Half).
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
+
+open LeanRV64D.Functions Sail SailState
 
 namespace SP1Clean.StoreHalf
 
@@ -316,7 +319,16 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreHalfCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-def Assumptions (_ : StoreHalfCols (ZMod p)) : Prop := True
+/-- Chip-level Assumptions: store-memory contract. StoreHalfAssembler stays
+a trivial-Spec stub. -/
+def Assumptions (cols : StoreHalfCols (ZMod p)) : Prop :=
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  SP1Clean.StoreMemoryAccessGated.Assertion.Contract
+    ⟨cols.state.clk_high, clk_low, cols.addr_value,
+     cols.store_prev_value, cols.store_value,
+     cols.store_memory_prev_high, cols.store_memory_prev_low,
+     cols.store_memory_diff_low, cols.store_memory_diff_high,
+     cols.store_memory_flag, cols.is_real⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -324,16 +336,16 @@ theorem soundness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub, _h_smag_sub,
-          _h_sha_sub, h_isreal⟩ := h_holds
+  obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub, h_smag_sub,
+          h_sha_sub, h_isreal⟩ := h_holds
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact h_cpu_sub trivial
   · exact h_addr_sub trivial
   · exact h_addr_shape_sub trivial
   · exact h_itr_sub trivial
-  · exact Or.inr trivial  -- placeholder Spec @[reducible] reduces to `mult = 0 ∨ True`
-  · trivial               -- placeholder Spec @[reducible] reduces to `True`
+  · exact h_smag_sub h_assumptions
+  · exact h_sha_sub trivial
   · binary_iff h_isreal
 
 set_option maxHeartbeats 800000 in
@@ -344,15 +356,15 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, _h_smag, _h_sha, h_isreal⟩ := h_spec
+  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, h_smag, h_sha, h_isreal⟩ := h_spec
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact ⟨trivial, h_cpu⟩
   · exact ⟨trivial, h_addr⟩
   · exact ⟨trivial, h_addr_shape⟩
   · exact ⟨trivial, h_itr⟩
-  · exact ⟨trivial, Or.inr trivial⟩
-  · exact ⟨trivial, trivial⟩
+  · exact ⟨h_smag, h_smag⟩
+  · exact ⟨trivial, h_sha⟩
   · binary_iff h_isreal
 
 end AssertionGated
@@ -363,5 +375,70 @@ def assertionGated : FormalAssertion (ZMod p) StoreHalfCols :=
     Spec := AssertionGated.FormalSpec,
     soundness := AssertionGated.soundness,
     completeness := AssertionGated.completeness }
+
+/-! ## Cols-level Sail helpers + structural bridge (Phase 4 SailBridge prep)
+
+Sibling of `SP1Clean.StoreByte`'s Phase 4 helpers, width 2 (SH). Opcode 37. -/
+
+@[reducible] def sp1_op_a_cols (cols : StoreHalfCols (ZMod p)) : BitVec 5 :=
+  BitVec.ofNat 5 cols.adapter.op_a.val
+
+@[reducible] def sp1_op_b_cols (cols : StoreHalfCols (ZMod p)) : BitVec 5 :=
+  BitVec.ofNat 5 cols.adapter.op_b.val
+
+@[reducible] def sp1_imm_c_cols (cols : StoreHalfCols (ZMod p)) : BitVec 12 :=
+  BitVec.ofNat 12 (Word.toNat cols.adapter.op_c_imm)
+
+@[reducible] def sp1_sb_cols (cols : StoreHalfCols (ZMod p)) :
+    SailM ExecutionResult := do
+  let op_a := sp1_op_a_cols cols
+  Sail.writeReg Register.nextPC
+    (Word.toBitVec64
+      #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)])
+  let addr : BitVec 64 := Word.toBitVec64
+    #v[cols.addr_value[0], cols.addr_value[1], cols.addr_value[2], (0 : ZMod p)]
+  Sail.ConcurrencyInterfaceV1.write_ram 64 2 0#64 addr
+    (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)
+  return RETIRE_SUCCESS
+
+def storeHalfInitialState_cols (cols : StoreHalfCols (ZMod p))
+    (s : SailState) : Prop :=
+  ∀ Main : Vector (ZMod p) 45, fromMain Main = cols →
+    (_root_.Store.StoreHalf.constraints Main).initialState s
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 45) :
+    sp1_op_a_cols (fromMain Main) = _root_.Store.StoreHalf.sp1_op_a Main := rfl
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 45) :
+    sp1_op_b_cols (fromMain Main) = _root_.Store.StoreHalf.sp1_ob_b Main := rfl
+
+omit [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_imm_c_cols_fromMain (Main : Vector (ZMod p) 45) :
+    sp1_imm_c_cols (fromMain Main) = _root_.Store.StoreHalf.sp1_imm_c Main := rfl
+
+omit [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_sb_cols_fromMain (Main : Vector (ZMod p) 45) :
+    sp1_sb_cols (fromMain Main) = _root_.Store.StoreHalf.sp1_sb Main := rfl
+
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
+lemma fromMain_toMain (cols : StoreHalfCols (ZMod p))
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real) :
+    fromMain (toMain cols) = cols := by
+  rcases cols with ⟨state, adapter, addr_value, addr_top_two_limb_inv,
+                    store_prev_value, smph, smpl, smf, smdl, smdh,
+                    ob1, ob0, store_value, is_real, adapter_cols⟩
+  have : adapter_cols.is_trusted = is_real := by simpa using h_trusted
+  simp [this, StoreHalfCols.ext_iff, CPUState.ext_iff, ITypeReader.ext_iff,
+    MemoryAccessInSharedCols.ext_iff, UserModeReaderCols.ext_iff]
+  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩
+  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
+
+lemma allHold_iff_structural
+    (Main : Vector (ZMod p) 45) (h_is_real : Main[44] = 1) :
+    (_root_.Store.StoreHalf.constraints Main).allHold ↔
+      SpecForIff_of_is_real (fromMain Main) :=
+  iff_sp1_of_is_real Main h_is_real
 
 end SP1Clean.StoreHalf

@@ -1000,6 +1000,7 @@ namespace SP1Clean.LoadByte
 /-- The chip's column struct, mirroring SP1's Rust `LoadByteCols<T>` over
 47 field elements. Field order matches the `Main[k]` indexing in
 `SP1Chips/Load/LoadByte/Constraints.lean`. -/
+@[ext]
 structure LoadByteCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1039,10 +1040,45 @@ deriving ProvableStruct
    Main[38], Main[39], Main[40], Main[41], Main[42], Main[43], Main[44],
    Main[45], Main[46], ⟨Main[45] + Main[46]⟩⟩
 
+/-- Right inverse of `fromMain` for `LoadByteCols` (47 columns). Index 45 + 46
+sum to `is_trusted` (LB+LBU is the chip's `is_real`). -/
+@[reducible] def toMain (cols : LoadByteCols (ZMod p)) : Vector (ZMod p) 47 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.load_prev_value[0], cols.load_prev_value[1],
+     cols.load_prev_value[2], cols.load_prev_value[3],
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_flag,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.offset_bit_2, cols.offset_bit_1, cols.offset_bit_0,
+     cols.selected_limb, cols.selected_limb_low_byte, cols.selected_byte,
+     cols.signed_extension_flag,
+     cols.is_lb, cols.is_lbu]
+
 end SP1Clean.LoadByte
 
 namespace SP1Clean.LoadHalf
 
+@[ext]
 structure LoadHalfCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1079,10 +1115,43 @@ deriving ProvableStruct
    Main[38], Main[39], Main[40], Main[41], Main[42], Main[43],
    ⟨Main[42] + Main[43]⟩⟩
 
+/-- Right inverse of `fromMain` for `LoadHalfCols` (44 columns). -/
+@[reducible] def toMain (cols : LoadHalfCols (ZMod p)) : Vector (ZMod p) 44 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.load_prev_value[0], cols.load_prev_value[1],
+     cols.load_prev_value[2], cols.load_prev_value[3],
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_flag,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.offset_bit_1, cols.offset_bit_0,
+     cols.op_a_write_value_lo, cols.signed_extension_msb,
+     cols.is_lh, cols.is_lhu]
+
 end SP1Clean.LoadHalf
 
 namespace SP1Clean.LoadWord
 
+@[ext]
 structure LoadWordCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1119,10 +1188,44 @@ deriving ProvableStruct
    #v[Main[39], Main[40]],
    Main[41], Main[42], Main[43], ⟨Main[42] + Main[43]⟩⟩
 
+/-- Right inverse of `fromMain` for `LoadWordCols` (44 columns). -/
+@[reducible] def toMain (cols : LoadWordCols (ZMod p)) : Vector (ZMod p) 44 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.load_prev_value[0], cols.load_prev_value[1],
+     cols.load_prev_value[2], cols.load_prev_value[3],
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_flag,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.offset_bit,
+     cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
+     cols.signed_extension_msb,
+     cols.is_lw, cols.is_lwu]
+
 end SP1Clean.LoadWord
 
 namespace SP1Clean.LoadDouble
 
+@[ext]
 structure LoadDoubleCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1152,6 +1255,41 @@ deriving ProvableStruct
    #v[Main[29], Main[30], Main[31], Main[32]],
    Main[33], Main[34], Main[35], Main[36], Main[37],
    Main[38], ⟨Main[38]⟩⟩
+
+/-- Right inverse of `fromMain` for `LoadDoubleCols`. Used by the
+`sail_correct_of_formalSpec` bridge to recover a flat `Main` row from a
+`cols` value. Index 38 is both `is_real` and `adapter_cols.is_trusted`
+(UserMode aliasing), so round-trip requires
+`cols.adapter_cols.is_trusted = cols.is_real` (carried as the chip's
+`Assumptions`-companion). -/
+@[reducible] def toMain (cols : LoadDoubleCols (ZMod p)) : Vector (ZMod p) 39 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.load_prev_value[0], cols.load_prev_value[1],
+     cols.load_prev_value[2], cols.load_prev_value[3],
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_flag,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.is_real]
 
 end SP1Clean.LoadDouble
 
@@ -1205,6 +1343,7 @@ namespace SP1Clean.StoreByte
 /-- The chip's column struct, mirroring SP1's Rust `StoreByteCols<T>` over
 50 field elements. Field order matches the `Main[k]` indexing in
 `SP1Chips/Store/StoreByte/Constraints.lean`. -/
+@[ext]
 structure StoreByteCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1245,10 +1384,46 @@ deriving ProvableStruct
    #v[Main[45], Main[46], Main[47], Main[48]],
    Main[49], ⟨Main[49]⟩⟩
 
+/-- Right inverse of `fromMain` for `StoreByteCols` (50 columns). -/
+@[reducible] def toMain (cols : StoreByteCols (ZMod p)) : Vector (ZMod p) 50 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.store_prev_value[0], cols.store_prev_value[1],
+     cols.store_prev_value[2], cols.store_prev_value[3],
+     cols.store_memory_prev_high, cols.store_memory_prev_low,
+     cols.store_memory_flag,
+     cols.store_memory_diff_low, cols.store_memory_diff_high,
+     cols.byte_selector_top, cols.byte_selector_mid, cols.byte_selector_lo,
+     cols.mem_limb, cols.mem_limb_low_byte, cols.register_low_byte,
+     cols.increment,
+     cols.store_value[0], cols.store_value[1],
+     cols.store_value[2], cols.store_value[3],
+     cols.is_real]
+
 end SP1Clean.StoreByte
 
 namespace SP1Clean.StoreHalf
 
+@[ext]
 structure StoreHalfCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1284,11 +1459,45 @@ deriving ProvableStruct
    #v[Main[40], Main[41], Main[42], Main[43]],
    Main[44], ⟨Main[44]⟩⟩
 
+/-- Right inverse of `fromMain` for `StoreHalfCols` (45 columns). -/
+@[reducible] def toMain (cols : StoreHalfCols (ZMod p)) : Vector (ZMod p) 45 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.store_prev_value[0], cols.store_prev_value[1],
+     cols.store_prev_value[2], cols.store_prev_value[3],
+     cols.store_memory_prev_high, cols.store_memory_prev_low,
+     cols.store_memory_flag,
+     cols.store_memory_diff_low, cols.store_memory_diff_high,
+     cols.offset_bit_1, cols.offset_bit_0,
+     cols.store_value[0], cols.store_value[1],
+     cols.store_value[2], cols.store_value[3],
+     cols.is_real]
+
 end SP1Clean.StoreHalf
 
 namespace SP1Clean.StoreWord
 
 /-- The chip's column struct, mirroring SP1's Rust `StoreWordCols<T>`. -/
+@[ext]
 structure StoreWordCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1323,10 +1532,44 @@ deriving ProvableStruct
    #v[Main[39], Main[40], Main[41], Main[42]],
    Main[43], ⟨Main[43]⟩⟩
 
+/-- Right inverse of `fromMain` for `StoreWordCols` (44 columns). -/
+@[reducible] def toMain (cols : StoreWordCols (ZMod p)) : Vector (ZMod p) 44 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.store_prev_value[0], cols.store_prev_value[1],
+     cols.store_prev_value[2], cols.store_prev_value[3],
+     cols.store_memory_prev_high, cols.store_memory_prev_low,
+     cols.store_memory_flag,
+     cols.store_memory_diff_low, cols.store_memory_diff_high,
+     cols.offset_bit,
+     cols.store_value[0], cols.store_value[1],
+     cols.store_value[2], cols.store_value[3],
+     cols.is_real]
+
 end SP1Clean.StoreWord
 
 namespace SP1Clean.StoreDouble
 
+@[ext]
 structure StoreDoubleCols (T : Type) where
   state : CPUState T
   adapter : ITypeReader T
@@ -1356,6 +1599,39 @@ deriving ProvableStruct
    #v[Main[29], Main[30], Main[31], Main[32]],
    Main[33], Main[34], Main[35], Main[36], Main[37],
    Main[38], ⟨Main[38]⟩⟩
+
+/-- Right inverse of `fromMain` for `StoreDoubleCols`. Same shape as
+LoadDouble (39 columns, identical layout — both use ITypeReader/Immutable
++ memory-access block + is_real). Index 38 is both `is_real` and
+`adapter_cols.is_trusted` (UserMode aliasing). -/
+@[reducible] def toMain (cols : StoreDoubleCols (ZMod p)) : Vector (ZMod p) 39 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c_imm[0], cols.adapter.op_c_imm[1],
+     cols.adapter.op_c_imm[2], cols.adapter.op_c_imm[3],
+     cols.addr_value[0], cols.addr_value[1], cols.addr_value[2],
+     cols.addr_top_two_limb_inv,
+     cols.store_prev_value[0], cols.store_prev_value[1],
+     cols.store_prev_value[2], cols.store_prev_value[3],
+     cols.store_memory_prev_high, cols.store_memory_prev_low,
+     cols.store_memory_flag,
+     cols.store_memory_diff_low, cols.store_memory_diff_high,
+     cols.is_real]
 
 end SP1Clean.StoreDouble
 

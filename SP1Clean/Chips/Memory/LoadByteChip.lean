@@ -13,6 +13,7 @@ import SP1Operations.Reader.ITypeReader.ITypeReader
 import SP1Operations.Reader.CPUState.CPUState
 import SP1Operations.Operation.AddrAddOperation.AddrAddOperation
 import SP1Chips.Load.LoadByte.Common
+import SP1Chips.Load.LoadByte.LoadByteChip
 import SP1Clean.Operations.AddrAddOperation
 import SP1Clean.Operations.AddressShape
 import SP1Clean.Operations.LoadMemoryAccessGated
@@ -54,6 +55,8 @@ and signedness selectors.
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
+
+open LeanRV64D.Functions Sail SailState
 
 namespace SP1Clean.LoadByte
 
@@ -550,7 +553,21 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadByteCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-def Assumptions (_ : LoadByteCols (ZMod p)) : Prop := True
+/-- Chip-level Assumptions: the load-memory and byte-selector contracts
+required by `LoadMemoryAccessGated` / `LoadByteSelector` sub-circuits.
+Both discharged trace-level via `iff_sp1_of_is_lb` / `_is_lbu`. -/
+def Assumptions (cols : LoadByteCols (ZMod p)) : Prop :=
+  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
+  let is_real : ZMod p := cols.is_lb + cols.is_lbu
+  SP1Clean.LoadMemoryAccessGated.Assertion.Contract
+    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
+     cols.load_memory_prev_high, cols.load_memory_prev_low,
+     cols.load_memory_diff_low, cols.load_memory_diff_high,
+     cols.load_memory_flag, is_real⟩ ∧
+  SP1Clean.LoadByteSelector.Assertion.Contract
+    ⟨cols.load_prev_value, cols.offset_bit_2, cols.offset_bit_1, cols.offset_bit_0,
+     cols.selected_limb, cols.selected_limb_low_byte, cols.selected_byte,
+     cols.signed_extension_flag, cols.is_lbu⟩
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -559,7 +576,7 @@ theorem soundness :
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29⟩ := h_input
   subst_eqs
   obtain ⟨h_cpu_sub, h_addr_sub, h_addr_shape_sub, h_itr_sub,
-          _h_lmag_sub, _h_lbs_sub,
+          h_lmag_sub, h_lbs_sub,
           h_is_lb, h_is_lbu, h_sum, h_op_a_0⟩ := h_holds
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -567,8 +584,8 @@ theorem soundness :
   · exact h_addr_sub trivial
   · exact h_addr_shape_sub trivial
   · exact h_itr_sub trivial
-  · exact Or.inr trivial  -- LoadMemoryAccessGated placeholder
-  · trivial               -- LoadByteSelector placeholder
+  · exact h_lmag_sub h_assumptions.1
+  · exact h_lbs_sub h_assumptions.2
   · binary_iff h_is_lb
   · binary_iff h_is_lbu
   · binary_iff h_sum
@@ -582,7 +599,7 @@ theorem completeness :
   obtain ⟨⟨e1, e2, e3, e4⟩, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15, e16,
           e17, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27, e28, e29⟩ := h_input
   subst_eqs
-  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, _h_lmag, _h_lbs,
+  obtain ⟨h_cpu, h_addr, h_addr_shape, h_itr, h_lmag, h_lbs,
           h_is_lb, h_is_lbu, h_sum, h_op_a_0⟩ := h_spec
   unfold id at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -590,8 +607,8 @@ theorem completeness :
   · exact ⟨trivial, h_addr⟩
   · exact ⟨trivial, h_addr_shape⟩
   · exact ⟨trivial, h_itr⟩
-  · exact ⟨trivial, Or.inr trivial⟩
-  · exact ⟨trivial, trivial⟩
+  · exact ⟨h_lmag, h_lmag⟩
+  · exact ⟨h_lbs, h_lbs⟩
   · binary_iff h_is_lb
   · binary_iff h_is_lbu
   · binary_iff h_sum
@@ -605,5 +622,87 @@ def assertionGated : FormalAssertion (ZMod p) LoadByteCols :=
     Spec := AssertionGated.FormalSpec,
     soundness := AssertionGated.soundness,
     completeness := AssertionGated.completeness }
+
+/-! ## Cols-level Sail helpers + structural bridges (Phase 4 SailBridge prep)
+
+LoadByte has two opcode variants: LB (signed, opcode 29) and LBU
+(unsigned, opcode 32). Both share the same `sp1_load_byte` projector
+(which reads the chip-stored `signed_extension_flag` to produce either
+signed-extended or zero-extended write data). Two SailBridge theorems
+(`sail_correct_of_allHold_lb` and `_lbu`) call `correct_lb` and
+`correct_lbu` respectively. -/
+
+@[reducible] def sp1_op_a_cols (cols : LoadByteCols (ZMod p)) : BitVec 5 :=
+  BitVec.ofNat 5 cols.adapter.op_a.val
+
+@[reducible] def sp1_op_b_cols (cols : LoadByteCols (ZMod p)) : BitVec 5 :=
+  BitVec.ofNat 5 cols.adapter.op_b.val
+
+/-- Note: LoadByte's `sp1_imm_c` uses `Main[21].val` directly (not
+`Word.toNat`), unlike Store side. Matches `_root_.Load.LoadByte.sp1_imm_c`. -/
+@[reducible] def sp1_imm_c_cols (cols : LoadByteCols (ZMod p)) : BitVec 12 :=
+  BitVec.ofNat 12 cols.adapter.op_c_imm[0].val
+
+@[reducible] def sp1_load_byte_cols (cols : LoadByteCols (ZMod p)) :
+    SailM ExecutionResult := do
+  let op_a := sp1_op_a_cols cols
+  Sail.writeReg Register.nextPC
+    (Word.toBitVec64
+      #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)] + 4)
+  Sail.write_reg op_a (Word.toBitVec64
+    #v[cols.selected_byte + (65280 : ZMod p) * cols.signed_extension_flag,
+       (65535 : ZMod p) * cols.signed_extension_flag,
+       (65535 : ZMod p) * cols.signed_extension_flag,
+       (65535 : ZMod p) * cols.signed_extension_flag])
+  return RETIRE_SUCCESS
+
+def loadByteInitialState_cols (cols : LoadByteCols (ZMod p))
+    (s : SailState) : Prop :=
+  ∀ Main : Vector (ZMod p) 47, fromMain Main = cols →
+    (_root_.Load.LoadByte.constraints Main).initialState s
+
+omit [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 47) :
+    sp1_op_a_cols (fromMain Main) = _root_.Load.LoadByte.sp1_op_a Main := rfl
+
+omit [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 47) :
+    sp1_op_b_cols (fromMain Main) = _root_.Load.LoadByte.sp1_ob_b Main := rfl
+
+omit [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_imm_c_cols_fromMain (Main : Vector (ZMod p) 47) :
+    sp1_imm_c_cols (fromMain Main) = _root_.Load.LoadByte.sp1_imm_c Main := rfl
+
+omit [Fact (2 ^ 17 < p)] in
+@[simp] lemma sp1_load_byte_cols_fromMain (Main : Vector (ZMod p) 47) :
+    sp1_load_byte_cols (fromMain Main) = _root_.Load.LoadByte.sp1_load_byte Main := rfl
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Cols round-trip. `is_trusted := Main[45] + Main[46] = is_lb + is_lbu`
+(LoadByte's "is_real" is the sum of the two opcode flags). -/
+lemma fromMain_toMain (cols : LoadByteCols (ZMod p))
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_lb + cols.is_lbu) :
+    fromMain (toMain cols) = cols := by
+  rcases cols with ⟨state, adapter, addr_value, addr_top_two_limb_inv,
+                    load_prev_value, lmph, lmpl, lmf, lmdl, lmdh,
+                    ob2, ob1, ob0, sl, sllb, sb, sef,
+                    is_lb, is_lbu, adapter_cols⟩
+  have : adapter_cols.is_trusted = is_lb + is_lbu := by simpa using h_trusted
+  simp [this, LoadByteCols.ext_iff, CPUState.ext_iff, ITypeReader.ext_iff,
+    MemoryAccessInSharedCols.ext_iff, UserModeReaderCols.ext_iff]
+  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_, ?_⟩
+  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
+
+lemma allHold_iff_structural_lb
+    (Main : Vector (ZMod p) 47) (h_is_lb : Main[45] = 1) :
+    (_root_.Load.LoadByte.constraints Main).allHold ↔
+      SpecForIff_of_is_lb (fromMain Main) :=
+  iff_sp1_of_is_lb Main h_is_lb
+
+lemma allHold_iff_structural_lbu
+    (Main : Vector (ZMod p) 47) (h_is_lbu : Main[46] = 1) :
+    (_root_.Load.LoadByte.constraints Main).allHold ↔
+      SpecForIff_of_is_lbu (fromMain Main) :=
+  iff_sp1_of_is_lbu Main h_is_lbu
 
 end SP1Clean.LoadByte

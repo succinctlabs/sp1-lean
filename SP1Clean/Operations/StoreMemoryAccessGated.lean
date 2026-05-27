@@ -13,22 +13,24 @@ import SP1Foundations.Word
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.MemoryBusTable
 
-/-! # `StoreMemoryAccessGated` sub-circuit (placeholder)
+/-! # `StoreMemoryAccessGated` sub-circuit
 
-Mirror of `LoadMemoryAccessGated` for the store side. Differs in that the
-chip supplies an explicit `write_value : Vector F 4` (the bytes being
-written), and the `send/receive .memory` pair carries `write_value` in
-the receive (the post-write value) instead of `prev_value`.
+Mirror of `LoadMemoryAccessGated` for the store side. SP1's Store chips
+emit the same memory-access shape as Load — boolean `flag`, clock-page
+agreement when `flag = 1`, 65536-base timestamp equation, range bounds,
+`Word.isU64` on the prior word — plus an explicit `write_value : Vector F 4`
+(the bytes being written). The send/receive memory-bus pair on the store
+side carries `write_value` in the receive (post-write state) instead of
+`prev_value`.
 
-Closes the `load-store-ram-access-deferred` marker for Store chips.
+## Status: Phase-1 "contract marker" form
 
-**Status:** structural placeholder following the AddwChip Phase-5 pattern:
-`main := pure ()`, `Spec := mult = 0 ∨ True` (trivially provable). The
-faithful contract (flag boolean, clk-equality-when-flag, timestamp
-arithmetic, two byte-bus range lookups for `diff_low / diff_high`, and
-`Word.isU64 prev_value`) is a follow-up that threads `mult` through
-existing leaf assertions (`RegisterAccessTimestamp.assertion`,
-`WordRange.assertion`, `byteOpcodeGated`, `memoryBusGated`). -/
+Same Phase-1 design as `LoadMemoryAccessGated`: `main := pure ()` with
+the faithful contract lifted into both `Assumptions` and `Spec`. The
+chip-level `AssertionGated.soundness` derives the contract from the per-chip
+`iff_sp1_of_*` bridge facts and passes it back as `Assumptions` to invoke
+this sub-circuit's `Spec`. See `SP1Clean/Operations/LoadMemoryAccessGated.lean`
+for the detailed rationale and future-work pointers. -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
@@ -68,41 +70,43 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where
   main := main
   localLength _ := 0
 
-def Assumptions (_ : Inputs (ZMod p)) : Prop := True
+/-- The faithful store-memory-access contract, in disjunctive
+(`mult = 0 ∨ …`) form so the assertion is vacuous on padding rows.
+Mirrors `LoadMemoryAccessGated.Contract` plus an extra `Word.isU64 write_value`
+clause for the bytes being written. -/
+def Contract (input : Inputs (ZMod p)) : Prop :=
+  input.mult = 0 ∨
+    ((input.flag = 0 ∨ input.flag = 1) ∧
+     (input.flag = 0 ∨ input.clk_high = input.prev_high) ∧
+     input.flag * (input.clk_low + 1) + (1 - input.flag) * input.clk_high -
+       (input.flag * input.prev_low + (1 - input.flag) * input.prev_high) - 1 =
+       input.diff_low + input.diff_high * 65536 ∧
+     input.diff_low.val < 65536 ∧
+     input.diff_high < (256 : ZMod p) ∧
+     Word.isU64 input.prev_value ∧
+     Word.isU64 input.write_value)
 
-/-- Disjunctive placeholder Spec: vacuous when `mult = 0`; otherwise `True`.
+/-- Phase-1 caller obligation: the chip composing this sub-circuit must
+discharge the contract from its own `iff_sp1` bridge facts. -/
+def Assumptions (input : Inputs (ZMod p)) : Prop := Contract input
 
-The faithful contract — flag boolean, clk-equality-when-flag, timestamp
-arithmetic, two byte-bus range lookups (`diff_low < 65536`,
-`diff_high < 256`), and the `Word.isU64 prev_value` consequences — is
-intentionally *not* lifted here. Reason: the chip-level
-`StoreByteChip.AssertionGated.main` calls `assertion` with a `pure ()`
-body, so a stronger Spec can't be discharged without rewriting `main`
-to compose the leaf sub-circuits (`RegisterAccessTimestamp.assertion`,
-`WordRange.assertion`, `byteOpcodeGated`, `memoryBusGated`).
-
-The pragmatic AddwChip-Phase-5 pattern: the trace-level memory-bus
-consistency now flows through `memoryBusGated` calls at the chip's
-ungated `main` (or, in the AddwChip pattern, through the empty
-`memoryAccesses (.storeByte _)` case + a parallel `lookupAccesses`
-aggregator). The faithful sub-Spec expansion is a follow-up that
-threads `mult` through the existing leaf assertions.
-
-Marked `@[reducible]` so chip-level proofs auto-unfold to
-`mult = 0 ∨ True`. -/
-@[reducible]
-def Spec (input : Inputs (ZMod p)) : Prop :=
-  input.mult = 0 ∨ True
+/-- Spec is the contract verbatim — soundness is a trivial copy from
+`Assumptions`. -/
+def Spec (input : Inputs (ZMod p)) : Prop := Contract input
 
 omit [Fact (2 ^ 17 < p)] in
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
-  intro _ _ _ _ _ _ _; exact Or.inr trivial
+  -- `main := pure ()` so `h_holds = True`; just relay `Assumptions = Spec = Contract`.
+  intro _ _ _ _ _ h_assumptions _
+  exact h_assumptions
 
 omit [Fact (2 ^ 17 < p)] in
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
-  intro _ _ _ _ _ _ _ _; trivial
+  -- `main := pure ()` — no witnesses to produce.
+  intro _ _ _ _ _ _ _ _
+  trivial
 
 end Assertion
 
