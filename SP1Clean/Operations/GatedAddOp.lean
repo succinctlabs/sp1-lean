@@ -6,7 +6,6 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Foundations.Constraint
 import SP1Foundations.Field
 import SP1Clean.Operations.AddOperation
-import SP1Clean.Operations.Gated
 
 /-! # `GatedAddOp` — gated form of `AddOp.assertion`
 

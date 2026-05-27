@@ -7,7 +7,6 @@ import SP1Foundations.Constraint
 import SP1Foundations.Field
 import SP1Clean.Operations.LtOperationSigned
 import SP1Clean.Operations.GatedLtUnsignedOp
-import SP1Clean.Operations.Gated
 import SP1Clean.SP1Lookup
 import SP1Clean.ByteOpcodeTable
 
