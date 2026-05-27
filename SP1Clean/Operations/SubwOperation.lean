@@ -12,7 +12,9 @@ import SP1Foundations.Field
 import SP1Operations.Operation.SubwOperation.SubwOperation
 import SP1Operations.Operation.U16MSBOperation.U16MSBOperation
 import SP1Clean.ByteOpcodeTable
+import SP1Clean.SP1Lookup
 import SP1Clean.Operations.AddOperation
+import SP1Clean.Operations.U16MSBOperation
 
 /-! # `SubwOperation` gadget mirror — Assertion style
 
@@ -244,21 +246,202 @@ theorem Assertion_Spec_iff_Spec (a b : Word (ZMod p)) (value : Vector (ZMod p) 2
       · exact Or.inl (by
           linear_combination -h + (1 + (65536 : ZMod p)⁻¹) * hbridge)
 
-/-! ## Multiplicity-gated `AssertionGated` form — DEFERRED
+/-! ## Multiplicity-gated `AssertionGated` form
 
-`SubwOp.assertionGated` is deferred to a follow-up commit (Phase 2B of
-the multiplicity-bus migration plan). The parallel `AddwOp.assertionGated`
-landed in this commit; SubwOp's borrow-form / natural-form / U16MSB
-inline structure creates a Spec-shape mismatch with the goal under
-`circuit_proof_start`'s `sub_eq_add_neg` normalization that needs more
-careful proof engineering than the AddwOp pattern transports. No current
-chip Multiplicity file calls SubwOp.assertionGated, so deferring keeps
-this commit focused.
+Parallel to the unconditional `Assertion` namespace above. Adds an
+`is_real` multiplicity gate that vanishes every emitted constraint on
+padding rows, matching SP1's `SubwOperation.constraints` gating pattern.
 
-Tracking issue: when adding it, the cleanest approach is likely to
-bypass `Assertion.Spec` and assemble the natural `Spec` directly from
-gated emissions via `linear_combination` bridges through the borrow ↔
-natural-form identity (`SP1Clean.SubwOp.Assertion_Spec_iff_Spec`'s
-proof technique). -/
+The contract is **semantic-only**: `Spec` carries the BV32 + MSB
+equation directly (matching `SubwOperation.iff_sp1_full`'s RHS verbatim)
+under `is_real = 1`. The borrow-form decomposition stays an
+implementation detail of `main`; the soundness/completeness proofs
+route through the existing `Assertion_Spec_iff_Spec` bridge to swap
+between borrow and natural-form carries, mirroring `AddwOp`'s gated
+proof one level down. -/
+
+/-- Multiplicity-aware input: two operand words, the 2-limb result, the
+externally-supplied msb bit, and the gating multiplicity `is_real`. -/
+structure InputsGated (F : Type) where
+  a : fields 4 F
+  b : fields 4 F
+  result : fields 2 F
+  msb : F
+  is_real : F
+deriving ProvableStruct
+
+namespace AssertionGated
+
+open Circuit
+
+/-- Multiplicity-gated `main`: gates the binarity of `is_real`, the
+2-limb borrow chain quadratics, both byte-range lookups, and the U16MSB
+sub-circuit by `is_real`. The U16MSB sub-fragment is now a true gated
+subcircuit (`U16MSBOp.assertionGated`) rather than inlined as in the
+unconditional `Assertion.main`. -/
+@[reducible]
+def main (input : Var InputsGated (ZMod p)) : Circuit (ZMod p) Unit := do
+  let k65536 : Expression (ZMod p) := 65536
+  let k1 : Expression (ZMod p) := 1
+  input.is_real * (input.is_real - 1) === 0
+  let d0 := (input.a[0] + k65536 - k1 - input.b[0] - input.result[0] + k1)
+              * (65536 : ZMod p)⁻¹
+  let d1 := (input.a[1] + k65536 - k1 - input.b[1] - input.result[1] + d0)
+              * (65536 : ZMod p)⁻¹
+  input.is_real * (d0 * (d0 - 1)) === 0
+  input.is_real * (d1 * (d1 - 1)) === 0
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[(6 : Expression (ZMod p)), input.result[0], 16, 0], input.is_real⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Lookup.byteOpcodeGated
+    (⟨#v[(6 : Expression (ZMod p)), input.result[1], 16, 0], input.is_real⟩ :
+     Var SP1Lookup.ByteOpcodeGated.Inputs (ZMod p))
+  SP1Clean.U16MSBOp.assertionGated
+    (⟨input.result[1], input.msb, input.is_real⟩ :
+     Var SP1Clean.U16MSBOp.InputsGated (ZMod p))
+
+@[reducible]
+instance elaborated : ElaboratedCircuit (ZMod p) InputsGated unit where
+  name := "SP1Clean.SubwOpGated"
+  main := main
+  localLength input := (main input).localLength 0
+  output _ _ := ()
+  localLength_eq input offset := by
+    change (main input).localLength offset = (main input).localLength 0
+    simp only [main, circuit_norm]
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
+
+/-- Binarity of `is_real` (asserted by chip side) plus the operand
+`isU64` bounds needed to bridge the borrow-form Spec to the semantic
+`SubwOperation.iff_sp1_full` RHS. -/
+def Assumptions (input : InputsGated (ZMod p)) : Prop :=
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_real = 1 → Word.isU64 input.a ∧ Word.isU64 input.b)
+
+/-- Semantic contract mirroring `SubwOperation.iff_sp1_full`'s RHS:
+on real rows, the 2-limb result is a u32, its 32-bit BitVec equals the
+32-bit SUBW of the operands, and `msb` is the BitVec-msb-of-result bit. -/
+def Spec (input : InputsGated (ZMod p)) : Prop :=
+  input.is_real = 1 →
+    HWord.isU32 input.result ∧
+    HWord.toBitVec32 input.result =
+      execute_RTYPEW_pure_32_w input.a input.b .SUBW ∧
+    input.msb = (if (HWord.toBitVec32 input.result).msb then 1 else 0)
+
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq, h_m_eq, h_ir_eq⟩ := h_input
+  subst h_a_eq; subst h_b_eq; subst h_r_eq; subst h_m_eq; subst h_ir_eq
+  obtain ⟨h_ir_bin, h_gd0, h_gd1, h_l0_sub, h_l1_sub, h_u16_sub⟩ := h_holds
+  obtain ⟨_h_ir_binary, h_bounds⟩ := h_assumptions
+  intro h_is_real
+  unfold id at *
+  obtain ⟨h_isU64_a, h_isU64_b⟩ := h_bounds h_is_real
+  haveI : NeZero p := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
+  have h_ir_ne_zero : Expression.eval env input_var_is_real ≠ 0 := by
+    rw [h_is_real]; exact one_ne_zero
+  -- Extract ungated borrow/range/U16MSB facts from gated emissions.
+  have h_d0 := (mul_eq_zero.mp h_gd0).resolve_left h_ir_ne_zero
+  have h_d1 := (mul_eq_zero.mp h_gd1).resolve_left h_ir_ne_zero
+  have hr0 :=
+    SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _
+      ((h_l0_sub trivial).resolve_left h_ir_ne_zero)
+  have hr1 :=
+    SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _
+      ((h_l1_sub trivial).resolve_left h_ir_ne_zero)
+  have h_u16_assumps :
+      Expression.eval env input_var_is_real = 0 ∨
+      Expression.eval env input_var_is_real = 1 := Or.inr h_is_real
+  have ⟨h_msb_bin, h_msb_check⟩ := (h_u16_sub h_u16_assumps) h_is_real
+  -- Assemble the borrow-form `SubwOp.Assertion.Spec`.
+  have h_subw_assertion : SP1Clean.SubwOp.Assertion.Spec
+      ⟨Vector.map (Expression.eval env) input_var_a,
+       Vector.map (Expression.eval env) input_var_b,
+       Vector.map (Expression.eval env) input_var_result,
+       Expression.eval env input_var_msb⟩ := by
+    simp only [SP1Clean.SubwOp.Assertion.Spec, Vector.getElem_map, sub_eq_add_neg]
+    refine ⟨?_, ?_, hr0, hr1, ?_, ?_⟩
+    · rcases mul_eq_zero.mp h_d0 with h | h
+      · exact Or.inl (by linear_combination h)
+      · exact Or.inr (by linear_combination h)
+    · rcases mul_eq_zero.mp h_d1 with h | h
+      · exact Or.inl (by linear_combination h)
+      · exact Or.inr (by linear_combination h)
+    · linear_combination h_msb_bin
+    · -- msb_check: bridge `↑2 + -y` (Spec goal after sub_eq_add_neg) to
+      -- `2 - y` (the U16MSB subcircuit's exact form) via convert + ring.
+      convert h_msb_check using 2
+      push_cast
+      ring
+  -- Bridge borrow form → natural form → allHold → semantic triple.
+  have h_subw_natural :=
+    (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mp h_subw_assertion
+  have h_allHold :=
+    (SP1Clean.SubwOp.iff_sp1 _ _ _).mpr h_subw_natural
+  exact (_root_.SubwOperation.iff_sp1_full h_isU64_a h_isU64_b).mp h_allHold
+
+theorem completeness :
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
+  circuit_proof_start [AssertionGated.main]
+  obtain ⟨h_a_eq, h_b_eq, h_r_eq, h_m_eq, h_ir_eq⟩ := h_input
+  subst h_a_eq; subst h_b_eq; subst h_r_eq; subst h_m_eq; subst h_ir_eq
+  obtain ⟨h_ir_binary, h_bounds⟩ := h_assumptions
+  haveI : NeZero p := ⟨by have : 2 ^ 17 < p := Fact.out; omega⟩
+  unfold id at *
+  rcases h_ir_binary with h_ir0 | h_ir1
+  · -- Padding row: is_real = 0; all gated emissions trivialize.
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    · rw [h_ir0]; ring
+    · rw [h_ir0]; ring
+    · rw [h_ir0]; ring
+    · exact ⟨trivial, Or.inl h_ir0⟩
+    · exact ⟨trivial, Or.inl h_ir0⟩
+    · refine ⟨Or.inl h_ir0, fun h_contra => ?_⟩
+      exact absurd (h_ir0.symm.trans h_contra) zero_ne_one
+  · -- Real row: recover SubwOp.Assertion.Spec via spec_inv → iff_sp1.mp →
+    -- Assertion_Spec_iff_Spec.mpr; disassemble; distribute `is_real`.
+    obtain ⟨h_isU64_a, h_isU64_b⟩ := h_bounds h_ir1
+    obtain ⟨h_isU32_v, h_bv, h_msb_eq⟩ := h_spec h_ir1
+    have h_allHold :=
+      _root_.SubwOperation.spec_inv
+        (cols := { value := Vector.map (Expression.eval env) input_var_result,
+                   msb := { msb := Expression.eval env input_var_msb } })
+        h_isU64_a h_isU64_b h_isU32_v h_bv h_msb_eq
+    have h_subw_natural := (SP1Clean.SubwOp.iff_sp1 _ _ _).mp h_allHold
+    have h_subw_assertion :=
+      (SP1Clean.SubwOp.Assertion_Spec_iff_Spec _ _ _ _).mpr h_subw_natural
+    simp only [SP1Clean.SubwOp.Assertion.Spec, Vector.getElem_map, sub_eq_add_neg]
+      at h_subw_assertion
+    obtain ⟨hd0, hd1, hr0, hr1, h_msb_bin, h_msb_check⟩ := h_subw_assertion
+    -- Normalize `↑65536`/`↑1`/`↑2` Nat-casts in the borrow-form hypotheses
+    -- so the `rw [h]` on d0/d1 finds the goal's bare-literal pattern.
+    push_cast at hd0 hd1 h_msb_check
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    · rw [h_ir1]; ring
+    · rw [h_ir1]; rcases hd0 with h | h <;> rw [h] <;> ring
+    · rw [h_ir1]; rcases hd1 with h | h <;> rw [h] <;> ring
+    · exact ⟨trivial,
+             Or.inr (SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr0)⟩
+    · exact ⟨trivial,
+             Or.inr (SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ hr1)⟩
+    · refine ⟨Or.inr h_ir1, fun _ => ⟨?_, ?_⟩⟩
+      · linear_combination h_msb_bin
+      · convert h_msb_check using 2
+        push_cast
+        ring
+
+end AssertionGated
+
+/-- Multiplicity-gated FormalAssertion for `SubwOperation`. Spec is the
+semantic `SubwOperation.iff_sp1_full` RHS (gated on `is_real = 1`),
+identical in shape to `SubOp.assertion`'s contract one level down. -/
+def assertionGated : FormalAssertion (ZMod p) InputsGated :=
+  { AssertionGated.elaborated with
+    Assumptions := AssertionGated.Assumptions,
+    Spec := AssertionGated.Spec,
+    soundness := AssertionGated.soundness,
+    completeness := AssertionGated.completeness }
 
 end SP1Clean.SubwOp
