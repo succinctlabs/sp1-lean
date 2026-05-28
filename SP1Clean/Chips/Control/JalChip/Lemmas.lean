@@ -23,16 +23,16 @@ machinery:
   next_pc[3]=0, `Main[29] = 0` op_a_write_value[3]=0, `Main[30] = 1 ∨ Main[13]
   = 0`, and the jump-target alignment Range14 consequence). Used downstream by
   `SailBridge.lean` to reconstruct SP1's `allHold` from the structural conjuncts
-  of `FormalSpec`. **Structural sorry stub** for now (mirrors `UTypeChip/
-  Circuit.lean`'s sorry'd soundness/completeness — both flow from the new
-  canonical-(a) Spec shape and need the same proof restructuring); the
-  one-directional `formalSpec_implies_allHold` direction can be reconstructed
-  via the legacy `Jal.allHold_constraints_iff` (`SP1Chips/Jal/Common.lean:18`)
-  plus `AddOperation.iff_sp1_full` plus `JTypeReader.Gated.Assertion.Spec_iff_sp1`
-  using the operand `Word.isU64` bound from the JTypeReader's program-bus
-  clause; that closure is mechanical but interacts with the inline-sends shape
-  of `Jal.constraints` (no `CPUState.constraints` / `JTypeReader.constraints`
-  sub-call envelope to bridge through directly). -/
+  of `FormalSpec`. **Closed (axiom-clean).** Because `Jal.constraints` inlines
+  and interleaves the CPUState / JTypeReader sends (no `CPUState.constraints` /
+  `JTypeReader.constraints` sub-call envelope), the decomposition first refolds
+  the flat list into the envelope form by a direct atom-matching `obtain`/`refine`
+  (the atoms agree as a multiset; `tauto` whnf-times-out on the ~50-atom goal),
+  then bridges via `CPUState.Gated.Assertion.Spec_iff_sp1` /
+  `JTypeReader.Gated.Assertion.Spec_iff_sp1` plus `AddOperation.iff_sp1_full`
+  for the two AddOp pieces (operand `Word.isU64` bounds from the JTypeReader
+  program-bus clause; the return-AddOp gate `1 - Main[13]` needs a
+  `Main[13] ∈ {0,1}` case-split). -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
@@ -72,16 +72,15 @@ lemma fromMain_toMain (cols : JalCols (ZMod p))
 under `is_real = Main[30] = 1`. Mirrors UTypeChip's `allHold_iff_structural`
 in role.
 
-**Structural sorry stub.** The forward direction is straightforward via
-`Jal.allHold_constraints_iff` (`SP1Chips/Jal/Common.lean:18`) plus
-`AddOperation.iff_sp1_full`. The reverse direction reconstructs the 24
-inline propositional conjuncts of `Jal.constraints` from the four canonical
-sub-circuit Specs — straightforward once the inline-send shape is mapped to
-the `CPUState.Gated.Assertion.Spec` / `JTypeReader.Gated.Assertion.Spec`
-conjuncts (no `CPUState.constraints` / `JTypeReader.constraints` sub-call
-envelope to bridge through directly, unlike AddChip/UType). Closing this is
-mechanical and tracked alongside the `UTypeChip/Circuit.lean` sorry'd
-soundness/completeness. -/
+Closed axiom-clean. The interleaved inline sends of `Jal.constraints` are
+first refolded into the `CPUState.constraints` / `JTypeReader.constraints`
+envelope form by direct atom-matching (the two sides agree as a multiset of
+propositions; the redundant `Main[30] * (Main[30] - 1) = 0` gate and the
+`Main[13] * (Main[k] - 0)` dups collapse via `sub_zero`/`trivial`). The two
+envelopes then bridge to the Gated Specs via `*.Gated.Assertion.Spec_iff_sp1`,
+and the two AddOp pieces via `AddOperation.iff_sp1_full` (operand `Word.isU64`
+bounds from the JTypeReader program-bus clause; the return-AddOp gate
+`1 - Main[13]` under a `Main[13] ∈ {0,1}` case-split). -/
 theorem allHold_iff_structural
     (Main : Vector (ZMod p) 31) (h_is_real : Main[30] = 1) :
     (_root_.Jal.constraints Main).allHold ↔
@@ -116,7 +115,178 @@ theorem allHold_iff_structural
        Main[29] = 0 ∧
        (Main[30] = 1 ∨ Main[13] = 0) ∧
        (Main[30] = 1 → (Main[22] * (4 : ZMod p)⁻¹).val < 16384)) := by
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  -- Step 1: refold Jal's flat inline-send list into CPUState / two AddOp /
+  -- JTypeReader sub-`.allHold` envelopes plus the trailing scalar gates.
+  -- The inline sends are interleaved (not block-grouped like UType), so the
+  -- iff is proved order-independently via `tauto` after unfolding both sides
+  -- to the same atom set (`CPUState.constraints` / `JTypeReader.constraints`
+  -- unfolded on the RHS too).
+  rw [show (_root_.Jal.constraints Main).allHold ↔
+        ((_root_.CPUState.constraints (F := ZMod p)
+            { clk_high := Main[0], clk_16_24 := Main[1], clk_0_16 := Main[2],
+              pc := #v[Main[3], Main[4], Main[5]] }
+            #v[Main[22], Main[23], Main[24]] 8 Main[30]).allHold ∧
+          (_root_.AddOperation.constraints (F := ZMod p)
+              #v[Main[3], Main[4], Main[5], 0]
+              #v[Main[14], Main[15], Main[16], Main[17]]
+              { value := #v[Main[22], Main[23], Main[24], Main[25]] }
+              Main[30]).allHold ∧
+          (_root_.AddOperation.constraints (F := ZMod p)
+              #v[Main[3], Main[4], Main[5], 0]
+              #v[4, 0, 0, 0]
+              { value := #v[Main[26], Main[27], Main[28], Main[29]] }
+              (Main[30] - Main[13])).allHold ∧
+          (_root_.JTypeReader.constraints (F := ZMod p)
+              Main[0] (Main[2] + Main[1] * 65536)
+              #v[Main[3], Main[4], Main[5]]
+              46
+              #v[Main[26], Main[27], Main[28], Main[29]]
+              { op_a := Main[6],
+                op_a_memory :=
+                  { prev_value := #v[Main[7], Main[8], Main[9], Main[10]],
+                    access_timestamp :=
+                      { prev_low := Main[11], diff_low_limb := Main[12] } },
+                op_a_0 := Main[13],
+                op_b_imm := #v[Main[14], Main[15], Main[16], Main[17]],
+                op_c_imm := #v[Main[18], Main[19], Main[20], Main[21]] }
+              Main[30] Main[30]).allHold ∧
+          (Main[25] = 0 ∧
+           Main[29] = 0 ∧
+           (Main[30] ≠ 0 → (ByteOpcode.ofNat 6).constrain (Main[22] * (4 : ZMod p)⁻¹) 14 0) ∧
+           (Main[30] - 1) * Main[13] = 0)) from by
+      have hval46 : (46 : ZMod p).val = 46 := by
+        rw [show (46 : ZMod p) = ((46 : ℕ) : ZMod p) from by push_cast; rfl,
+            ZMod.val_natCast,
+            Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+      simp only [_root_.Jal.constraints, _root_.CPUState.constraints,
+        _root_.JTypeReader.constraints, SP1ConstraintList.allHold,
+        List.forall_append, List.Forall, SP1Constraint.toProp,
+        Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ, coeHead_zmod_eq_val, hval46, sub_zero, and_assoc]
+      push_cast
+      refine ⟨fun h => ?_, fun h => ?_⟩
+      · obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+          _, _, _, _, _, _, _, _, _, _⟩ := h
+        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+          ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> trivial
+      · obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+          _, _, _, _, _, _⟩ := h
+        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+          ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> trivial]
+  -- Step 2: convert the CPUState / JTypeReader envelopes into their `Gated`
+  -- Specs; collapse the return-AddOp gate `Main[30] - Main[13]` to `1 - Main[13]`.
+  rw [show Main[30] - Main[13] = (1 : ZMod p) - Main[13] from by rw [h_is_real],
+      h_is_real,
+      SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1,
+      SP1Clean.JTypeReader.Gated.Assertion.Spec_iff_sp1]
+  push_cast
+  -- Local helpers used in both directions.
+  haveI h65k : (65536 : ZMod p).val = 65536 := val_65536_zmod_p
+  have lt65k : ∀ (x : ZMod p), x < (65536 : ZMod p) → x.val < 65536 :=
+    fun x h => by have : x.val < (65536 : ZMod p).val := h; rwa [h65k] at this
+  have h_one_ne_zero : (1 : ZMod p) ≠ 0 := one_ne_zero
+  refine ⟨?_, ?_⟩
+  · -- Forward: envelopes → structural spec.
+    rintro ⟨h_cpu, h_addop_jump, h_addop_ret, h_jtr, h_m25, h_m29, h_align, h_ret_gate⟩
+    -- Extract op_b_imm bounds, pc bounds, op_a_0 binarity from JTypeReader Spec.
+    have h_jtr_copy := h_jtr
+    obtain ⟨_, h_prog_disj, _, _, _, _, _⟩ := h_jtr
+    have h_prog := h_prog_disj.resolve_left h_one_ne_zero
+    simp only [SP1Clean.ProgramSpec, Vector.getElem_mk, List.getElem_toArray,
+               List.getElem_cons_zero, List.getElem_cons_succ] at h_prog
+    obtain ⟨_, _, ⟨h_ob0, h_ob1, h_ob2, h_ob3⟩, _, h_op_a_0_bin, _, _, _,
+            h_pc0_mod, h_pc0_lt_raw, h_pc1_lt_raw, h_pc2_lt_raw⟩ := h_prog
+    have h_isU64_op_b : Word.isU64
+        #v[Main[14], Main[15], Main[16], Main[17]] :=
+      Word.isU64_of_cases (lt65k _ h_ob0) (lt65k _ h_ob1)
+                          (lt65k _ h_ob2) (lt65k _ h_ob3)
+    have h_pc0_lt := lt65k _ h_pc0_lt_raw
+    have h_pc1_lt := lt65k _ h_pc1_lt_raw
+    have h_pc2_lt := lt65k _ h_pc2_lt_raw
+    have h_isU64_pc : Word.isU64
+        #v[Main[3], Main[4], Main[5], (0 : ZMod p)] :=
+      Word.isU64_of_cases h_pc0_lt h_pc1_lt h_pc2_lt (by simp [ZMod.val_zero])
+    refine ⟨h_cpu, ?_, ?_, h_jtr_copy, h_m25, h_m29, Or.inl rfl, ?_⟩
+    · -- Jump AddOp Spec (gate 1).
+      intro _
+      exact (AddOperation.iff_sp1_full h_isU64_pc h_isU64_op_b).mp h_addop_jump
+    · -- Return AddOp Spec (gate 1 - Main[13]).
+      intro h_gate
+      have h13_zero : Main[13] = 0 := by linear_combination -h_gate
+      have h_addop_ret' : (_root_.AddOperation.constraints (F := ZMod p)
+            #v[Main[3], Main[4], Main[5], 0]
+            #v[4, 0, 0, 0]
+            { value := #v[Main[26], Main[27], Main[28], Main[29]] } 1).allHold := by
+        have := h_addop_ret
+        rw [h13_zero, sub_zero] at this
+        exact this
+      exact (AddOperation.iff_sp1_full h_isU64_pc Word.four_isU64).mp h_addop_ret'
+    · -- Jump-target alignment Range14 consequence.
+      intro _
+      have h_bc := h_align one_ne_zero
+      have hval14 : (14 : ZMod p).val = 14 := by
+        rw [show (14 : ZMod p) = ((14 : ℕ) : ZMod p) from by push_cast; rfl,
+            ZMod.val_natCast,
+            Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+      simp only [ByteOpcode.ofNat_seven, ByteOpcode.constrain_Range, hval14] at h_bc
+      -- `h_bc : (Main[22] * 4⁻¹).val < 2 ^ 14`; `2 ^ 14 = 16384`.
+      simpa using h_bc
+  · -- Backward: structural spec → envelopes.
+    rintro ⟨h_cpu, h_addop_jump_spec, h_addop_ret_spec, h_jtr, h_m25, h_m29,
+            _h_or, h_align⟩
+    -- Re-extract bounds + op_a_0 binarity from JTypeReader Spec.
+    have h_jtr_copy := h_jtr
+    obtain ⟨_, h_prog_disj, _, _, _, _, _⟩ := h_jtr
+    have h_prog := h_prog_disj.resolve_left h_one_ne_zero
+    simp only [SP1Clean.ProgramSpec, Vector.getElem_mk, List.getElem_toArray,
+               List.getElem_cons_zero, List.getElem_cons_succ] at h_prog
+    obtain ⟨_, _, ⟨h_ob0, h_ob1, h_ob2, h_ob3⟩, _, h_op_a_0_bin, _, _, _,
+            h_pc0_mod, h_pc0_lt_raw, h_pc1_lt_raw, h_pc2_lt_raw⟩ := h_prog
+    have h_isU64_op_b : Word.isU64
+        #v[Main[14], Main[15], Main[16], Main[17]] :=
+      Word.isU64_of_cases (lt65k _ h_ob0) (lt65k _ h_ob1)
+                          (lt65k _ h_ob2) (lt65k _ h_ob3)
+    have h_pc0_lt := lt65k _ h_pc0_lt_raw
+    have h_pc1_lt := lt65k _ h_pc1_lt_raw
+    have h_pc2_lt := lt65k _ h_pc2_lt_raw
+    have h_isU64_pc : Word.isU64
+        #v[Main[3], Main[4], Main[5], (0 : ZMod p)] :=
+      Word.isU64_of_cases h_pc0_lt h_pc1_lt h_pc2_lt (by simp [ZMod.val_zero])
+    -- Jump AddOp envelope (gate 1).
+    have h_addop_jump : (_root_.AddOperation.constraints (F := ZMod p)
+          #v[Main[3], Main[4], Main[5], 0]
+          #v[Main[14], Main[15], Main[16], Main[17]]
+          { value := #v[Main[22], Main[23], Main[24], Main[25]] } 1).allHold :=
+      (AddOperation.iff_sp1_full h_isU64_pc h_isU64_op_b).mpr
+        (h_addop_jump_spec rfl)
+    -- Return AddOp envelope (gate 1 - Main[13]); case-split on Main[13] ∈ {0,1}.
+    have h_addop_ret : (_root_.AddOperation.constraints (F := ZMod p)
+          #v[Main[3], Main[4], Main[5], 0]
+          #v[4, 0, 0, 0]
+          { value := #v[Main[26], Main[27], Main[28], Main[29]] }
+          ((1 : ZMod p) - Main[13])).allHold := by
+      rcases h_op_a_0_bin with h0 | h1
+      · rw [h0, sub_zero]
+        exact (AddOperation.iff_sp1_full h_isU64_pc Word.four_isU64).mpr
+          (h_addop_ret_spec (by rw [h0]; ring))
+      · rw [h1, show (1 : ZMod p) - 1 = 0 from by ring]
+        simp [_root_.AddOperation.constraints, SP1ConstraintList.allHold,
+          List.Forall, SP1Constraint.toProp]
+    -- Reconstruct the alignment byte send from the Range14 consequence.
+    have h_align_byte : (1 : ZMod p) ≠ 0 →
+        (ByteOpcode.ofNat 6).constrain (Main[22] * (4 : ZMod p)⁻¹) 14 0 := by
+      intro _
+      have hlt := h_align rfl
+      have hval14 : (14 : ZMod p).val = 14 := by
+        rw [show (14 : ZMod p) = ((14 : ℕ) : ZMod p) from by push_cast; rfl,
+            ZMod.val_natCast,
+            Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+      simp only [ByteOpcode.ofNat_seven, ByteOpcode.constrain_Range, hval14]
+      -- goal: `(Main[22] * 4⁻¹).val < 2 ^ 14`; `2 ^ 14 = 16384`.
+      simpa using hlt
+    exact ⟨h_cpu, h_addop_jump, h_addop_ret, h_jtr_copy, h_m25, h_m29,
+           h_align_byte, by ring⟩
 
 /-! ## Chip-level FormalSpec ↔ sub-circuit Specs
 
