@@ -123,23 +123,66 @@ AddOp `Spec`s under their gate values (`is_real`, `is_real - op_a_0`)
 deliver the BV64 identity directly; the trailing `next_pc[0]/4 ∈
 Range(14)` clause is derived from `byteOpcodeGated.Spec`'s disjunctive
 form under `is_real = 1`. Mirrors UTypeChip's canonical recipe. -/
--- TODO(Spec-canonical-2026-05-26): close after `Lemmas.allHold_iff_structural`
--- lands. The proof mirrors `SP1Clean.UType.Assertion.soundness` (currently
--- also sorry'd post-Spec-canonicalization). circuit_proof_start gives
--- h_holds as a 5-tuple of subcircuit-Specs + 3 scalar gates; refine into
--- the 8-conjunct FormalSpec.
 theorem soundness :
-    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec :=
-  sorry
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨⟨e_ch, e_c16, e_c0, e_pc⟩, e_adapter, e_next_pc, e_owv, e_is_real,
+          e_ac⟩ := h_input
+  subst_eqs
+  obtain ⟨h_trusted, h_is_real, h_isU64_pc, h_isU64_opb⟩ := h_assumptions
+  obtain ⟨h_cpu_sub, h_addop1_sub, h_addop2_sub, h_jtr_sub, h_byteopcode_sub,
+          h_g1, h_g2, _h_g3⟩ := h_holds
+  unfold id at *
+  simp only [Vector.map_push, ← sub_eq_add_neg] at h_addop1_sub h_addop2_sub
+  exact formalSpec_of_subcircuit_specs _ h_is_real h_trusted h_isU64_pc h_isU64_opb
+    (h_cpu_sub trivial) h_addop1_sub h_addop2_sub (h_jtr_sub trivial)
+    (by simpa only [Vector.getElem_map] using h_byteopcode_sub trivial)
+    (by simpa only [Vector.getElem_map] using h_g1)
+    (by simpa only [Vector.getElem_map] using h_g2)
 
-/-- Completeness of `Jal.assertion`. The 8 conjuncts of `FormalSpec`
-(4 subcircuit Specs + 3 scalar gates + 1 byte-opcode Spec) are
-dispatched to the matching subcircuit input requirement (`⟨Assumptions,
-Spec⟩` form) plus the 3 inline scalar gates. -/
--- TODO(Spec-canonical-2026-05-26): see `soundness` above.
+/-- Completeness of `Jal.assertion`. Destructures `FormalSpec` into the
+per-sub-circuit Specs via `Lemmas.subcircuit_specs_of_formalSpec`, then
+re-wraps each as the subcircuit input requirement (`⟨Assumptions, Spec⟩`),
+bridging the `circuit_proof_start` eval forms with
+`Vector.map_push` / `Vector.getElem_map` / `← sub_eq_add_neg`. -/
 theorem completeness :
-    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec :=
-  sorry
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨⟨e_ch, e_c16, e_c0, e_pc⟩, e_adapter, e_next_pc, e_owv, e_is_real,
+          e_ac⟩ := h_input
+  subst_eqs
+  obtain ⟨h_trusted, h_is_real, h_isU64_pc, h_isU64_opb⟩ := h_assumptions
+  obtain ⟨h_cpu, h_addop1, h_addop2, h_jtr, h_byteopcode, h_op_a_0_bin, h_g1, h_g2⟩ :=
+    subcircuit_specs_of_formalSpec _ h_is_real h_trusted h_spec
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ⟨trivial, h_cpu⟩
+  · refine ⟨⟨Or.inr h_is_real, fun _ => ⟨?_, h_isU64_opb⟩⟩, ?_⟩
+    · simpa only [Vector.map_push] using h_isU64_pc
+    · first
+      | exact h_addop1
+      | simpa only [Vector.map_push, ← sub_eq_add_neg] using h_addop1
+  · refine ⟨⟨?_, fun _ => ⟨?_, Word.four_isU64⟩⟩, ?_⟩
+    · rcases h_op_a_0_bin with h | h
+      · right; linear_combination h_is_real - h
+      · left; linear_combination h_is_real - h
+    · simpa only [Vector.map_push] using h_isU64_pc
+    · first
+      | exact h_addop2
+      | simpa only [Vector.map_push, ← sub_eq_add_neg] using h_addop2
+  · exact ⟨trivial, h_jtr⟩
+  · refine ⟨trivial, ?_⟩
+    first
+    | exact h_byteopcode
+    | simpa only [Vector.getElem_map] using h_byteopcode
+  · first
+    | exact h_g1
+    | simpa only [Vector.getElem_map] using h_g1
+  · first
+    | exact h_g2
+    | simpa only [Vector.getElem_map] using h_g2
+  · apply mul_eq_zero_of_left
+    linear_combination h_is_real
 
 end Assertion
 

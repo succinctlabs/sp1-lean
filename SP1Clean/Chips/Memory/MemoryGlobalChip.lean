@@ -10,6 +10,7 @@ import SP1Foundations.Word
 import SP1Clean.ByteOpcodeTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Operations.IsZeroOperation
+import SP1Clean.Operations.AddOperation
 import SP1Clean.Chips.Structs
 import SP1Clean.Chips.Spec
 
@@ -214,17 +215,102 @@ instance elaborated : ElaboratedCircuit (ZMod p) MemoryGlobalCols unit where
 
 def Assumptions (_ : MemoryGlobalCols (ZMod p)) : Prop := True
 
-/-- Soundness: scaffolding placeholder pending the `lt_cols` struct
-expansion + `LtUnsignedOp` composition (Phase 4.5). Matches the
-`LoadByte.AssertionGated` initial-commit pattern. -/
-theorem soundness :
-    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec :=
-  sorry
+/-- u8 range bound from a `ByteOpcodeSpec #v[6, x, 8, 0]` (opcode 6 = Range,
+bound 8). Specializes `AddOp.Assertion.byteOpcodeSpec_range` from `< 2 ^
+(8 : ZMod p).val` to `< 256`. -/
+private lemma val_8_eq : (8 : ZMod p).val = 8 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  rw [show (8 : ZMod p) = ((8 : ℕ) : ZMod p) from by push_cast; rfl,
+      ZMod.val_natCast, Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
 
-/-- Completeness: scaffolding placeholder pending Phase 4.5. -/
+private lemma byteOpcodeSpec_range8
+    (x : ZMod p) (h : SP1Clean.ByteOpcodeSpec (#v[(6 : ZMod p), x, 8, 0])) :
+    x.val < 256 := by
+  have h' := SP1Clean.AddOp.Assertion.byteOpcodeSpec_range _ _ _ h
+  rw [val_8_eq] at h'
+  exact h'
+
+private lemma byteOpcodeSpec_range8_of_lt
+    (x : ZMod p) (hx : x.val < 256) :
+    SP1Clean.ByteOpcodeSpec (#v[(6 : ZMod p), x, 8, 0]) := by
+  apply SP1Clean.AddOp.Assertion.byteOpcodeSpec_range_of_lt
+  rw [val_8_eq]
+  exact hx
+
+/-- Soundness against the Phase-1 `main` (range checks + third-limb
+decomposition + the two `IsZeroOp` arms + `is_comp`/`is_real` gates). The
+`LtUnsignedOp` monotonicity conjuncts are not part of this `FormalSpec`
+(deferred to Phase 4.5). Mirrors the `LoadX0`/`AddressShape` raw-lookup
+discharge pattern. -/
+theorem soundness :
+    FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_clk_high, h_clk_low, h_index, h_prev_addr, h_addr, h_lt_cols,
+          h_value, h_value_lower, h_value_upper, h_is_real, h_is_comp,
+          h_prev_valid, h_is_prev_addr_zero, h_is_index_zero⟩ := h_input
+  subst_eqs
+  simp only [circuit_norm, Lookup.Soundness, Table.toRaw,
+             SP1Clean.ByteOpcodeTable] at h_holds
+  obtain ⟨h_ir_gate, h_v0, h_v1, h_v2, h_v3, h_pa0, h_pa1, h_pa2,
+          h_a0, h_a1, h_a2, h_decomp, h_vl, h_vu, h_isz_pa, h_isz_idx,
+          h_iscomp_eq, h_iscomp_bin⟩ := h_holds
+  simp only [FormalSpec, Vector.getElem_map, sub_eq_add_neg]
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · binary_iff h_ir_gate
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_v0
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_v1
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_v2
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_v3
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_pa0
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_pa1
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_pa2
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_a0
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_a1
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_a2
+  · linear_combination h_decomp
+  · exact byteOpcodeSpec_range8 _ h_vl
+  · exact byteOpcodeSpec_range8 _ h_vu
+  · exact h_isz_pa trivial
+  · exact h_isz_idx trivial
+  · linear_combination h_iscomp_eq
+  · binary_iff h_iscomp_bin
+
+/-- Completeness against the Phase-1 `main`. Mirrors soundness; the
+`FormalSpec` conjuncts feed each lookup / sub-circuit / gate emission. -/
 theorem completeness :
-    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec :=
-  sorry
+    FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
+  circuit_proof_start
+  obtain ⟨h_clk_high, h_clk_low, h_index, h_prev_addr, h_addr, h_lt_cols,
+          h_value, h_value_lower, h_value_upper, h_is_real, h_is_comp,
+          h_prev_valid, h_is_prev_addr_zero, h_is_index_zero⟩ := h_input
+  subst_eqs
+  simp only [FormalSpec, Vector.getElem_map, sub_eq_add_neg] at h_spec
+  obtain ⟨h_ir_or, h_v0, h_v1, h_v2, h_v3, h_pa0, h_pa1, h_pa2,
+          h_a0, h_a1, h_a2, h_decomp, h_vl, h_vu, h_isz_pa, h_isz_idx,
+          h_iscomp_eq, h_iscomp_bin⟩ := h_spec
+  simp only [circuit_norm, Lookup.Completeness, Table.toRaw,
+             SP1Clean.ByteOpcodeTable]
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rcases h_ir_or with h | h <;> rw [h] <;> ring
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_v0
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_v1
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_v2
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_v3
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_pa0
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_pa1
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_pa2
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_a0
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_a1
+  · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_a2
+  · linear_combination h_decomp
+  · exact byteOpcodeSpec_range8_of_lt _ h_vl
+  · exact byteOpcodeSpec_range8_of_lt _ h_vu
+  · exact ⟨trivial, h_isz_pa⟩
+  · exact ⟨trivial, h_isz_idx⟩
+  · linear_combination h_iscomp_eq
+  · rcases h_iscomp_bin with h | h <;> rw [h] <;> ring
 
 end Assertion
 

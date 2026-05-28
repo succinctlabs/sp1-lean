@@ -488,9 +488,8 @@ Clean sub-circuits with `is_real`-gated multiplicities:
 
 `FormalSpec` is the direct conjunction of each sub-circuit's `.Spec` (no
 `List.Forall toProp` envelope), per `CLAUDE.md`'s faithful-sub-circuit-
-composition principle. Soundness/completeness are `sorry` placeholders —
-discharging them is follow-up work tracked alongside the sub-circuit
-sorries. -/
+composition principle. Soundness/completeness are proven (the
+canonical memory-access-routing pilot). -/
 
 namespace AssertionGated
 

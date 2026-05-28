@@ -118,4 +118,113 @@ theorem allHold_iff_structural
        (Main[30] = 1 → (Main[22] * (4 : ZMod p)⁻¹).val < 16384)) := by
   sorry
 
+/-! ## Chip-level FormalSpec ↔ sub-circuit Specs
+
+Stable midpoint of `JalChip`'s `soundness` / `completeness` proofs, mirroring
+`AddChip`'s eponymous lemmas. JalChip composes *two* `AddOp` sub-circuits
+(jump-target gated by `is_real`, return-address gated by `is_real - op_a_0`):
+the second gate's binarity is recovered from `JTypeReader`'s program-bus
+`op_a_0 ∈ {0,1}` clause, and the operand `Word.isU64` bounds come from the
+chip-level `Assumptions` (`Word.isU64 (pc.push 0)` / `Word.isU64 op_b_imm`). -/
+
+/-- **Forward** (soundness midpoint): assemble the chip-level `FormalSpec`
+from the per-sub-circuit Specs returned by `circuit_proof_start`. -/
+lemma formalSpec_of_subcircuit_specs
+    (cols : JalCols (ZMod p))
+    (h_is_real : cols.is_real = 1)
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real)
+    (h_isU64_pc : Word.isU64 (cols.state.pc.push 0))
+    (h_isU64_opb : Word.isU64 cols.adapter.op_b_imm)
+    (h_cpu : SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨cols.state, #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]], 8,
+         cols.is_real⟩)
+    (h_addop1 : SP1Clean.AddOp.Assertion.Assumptions
+        ⟨cols.state.pc.push 0, cols.adapter.op_b_imm, cols.next_pc, cols.is_real⟩ →
+      SP1Clean.AddOp.Assertion.Spec
+        ⟨cols.state.pc.push 0, cols.adapter.op_b_imm, cols.next_pc, cols.is_real⟩)
+    (h_addop2 : SP1Clean.AddOp.Assertion.Assumptions
+        ⟨cols.state.pc.push 0, #v[4, 0, 0, 0], cols.op_a_write_value,
+         cols.is_real - cols.adapter.op_a_0⟩ →
+      SP1Clean.AddOp.Assertion.Spec
+        ⟨cols.state.pc.push 0, #v[4, 0, 0, 0], cols.op_a_write_value,
+         cols.is_real - cols.adapter.op_a_0⟩)
+    (h_jtr : SP1Clean.JTypeReader.Gated.Assertion.Spec
+        ⟨cols.state.clk_high, cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+         46, cols.state.pc, cols.op_a_write_value, cols.adapter,
+         cols.is_real, cols.adapter_cols.is_trusted⟩)
+    (h_byteopcode : SP1Lookup.ByteOpcodeGated.Spec
+        ⟨#v[(6 : ZMod p), cols.next_pc[0] * (4 : ZMod p)⁻¹, 14, 0], cols.is_real⟩)
+    (h_g1 : cols.next_pc[3] = 0)
+    (h_g2 : cols.op_a_write_value[3] = 0) :
+    Assertion.FormalSpec cols := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have h_trusted1 : cols.adapter_cols.is_trusted = 1 := by rw [h_trusted, h_is_real]
+  -- `op_a_0 ∈ {0,1}` from `JTypeReader`'s `ProgramSpec` clause (under is_trusted = 1).
+  have h_op_a_0_bin : cols.adapter.op_a_0 = 0 ∨ cols.adapter.op_a_0 = 1 := by
+    have h_prog := h_jtr.2.1
+    have h_progspec := h_prog.resolve_left (by rw [h_trusted1]; exact one_ne_zero)
+    exact h_progspec.2.2.2.2.1
+  refine ⟨h_cpu, ?_, ?_, h_jtr, h_g1, h_g2, Or.inl h_is_real, ?_⟩
+  · -- AddOp jump-target Spec.
+    exact h_addop1 ⟨Or.inr h_is_real, fun _ => ⟨h_isU64_pc, h_isU64_opb⟩⟩
+  · -- AddOp return-address Spec; gate `is_real - op_a_0` binarity from op_a_0 ∈ {0,1}.
+    refine h_addop2 ⟨?_, fun _ => ⟨h_isU64_pc, Word.four_isU64⟩⟩
+    rcases h_op_a_0_bin with h | h
+    · right; rw [h, h_is_real]; ring
+    · left; rw [h, h_is_real]; ring
+  · -- Jump-target 4-alignment Range14 from `byteOpcodeGated.Spec` under is_real = 1.
+    intro _
+    have h_bspec := h_byteopcode.resolve_left (by rw [h_is_real]; exact one_ne_zero)
+    have h_range := SP1Clean.AddOp.Assertion.byteOpcodeSpec_range _ _ _ h_bspec
+    have hval14 : (14 : ZMod p).val = 14 := by
+      rw [show (14 : ZMod p) = ((14 : ℕ) : ZMod p) from by push_cast; rfl,
+          ZMod.val_natCast,
+          Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+    rw [hval14] at h_range
+    exact h_range
+
+/-- **Backward** (completeness midpoint): peel the chip-level `FormalSpec` into
+the per-sub-circuit Specs. The `byteOpcodeGated` Spec is reconstructed from the
+`FormalSpec` alignment range (under `is_real = 1`), and `op_a_0 ∈ {0,1}` is
+re-extracted from `JTypeReader`'s `ProgramSpec` clause. -/
+lemma subcircuit_specs_of_formalSpec
+    (cols : JalCols (ZMod p))
+    (h_is_real : cols.is_real = 1)
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real)
+    (h_spec : Assertion.FormalSpec cols) :
+    SP1Clean.CPUState.Gated.Assertion.Spec
+        ⟨cols.state, #v[cols.next_pc[0], cols.next_pc[1], cols.next_pc[2]], 8,
+         cols.is_real⟩ ∧
+    SP1Clean.AddOp.Assertion.Spec
+        ⟨cols.state.pc.push 0, cols.adapter.op_b_imm, cols.next_pc, cols.is_real⟩ ∧
+    SP1Clean.AddOp.Assertion.Spec
+        ⟨cols.state.pc.push 0, #v[4, 0, 0, 0], cols.op_a_write_value,
+         cols.is_real - cols.adapter.op_a_0⟩ ∧
+    SP1Clean.JTypeReader.Gated.Assertion.Spec
+        ⟨cols.state.clk_high, cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+         46, cols.state.pc, cols.op_a_write_value, cols.adapter,
+         cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
+    SP1Lookup.ByteOpcodeGated.Spec
+        ⟨#v[(6 : ZMod p), cols.next_pc[0] * (4 : ZMod p)⁻¹, 14, 0], cols.is_real⟩ ∧
+    (cols.adapter.op_a_0 = 0 ∨ cols.adapter.op_a_0 = 1) ∧
+    cols.next_pc[3] = 0 ∧
+    cols.op_a_write_value[3] = 0 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨h_cpu, h_addop1, h_addop2, h_jtr, h_g1, h_g2, _h_or, h_align⟩ := h_spec
+  refine ⟨h_cpu, h_addop1, h_addop2, h_jtr, ?_, ?_, h_g1, h_g2⟩
+  · -- `byteOpcodeGated.Spec` from the alignment range (real row).
+    right
+    apply SP1Clean.AddOp.Assertion.byteOpcodeSpec_range_of_lt
+    have hval14 : (14 : ZMod p).val = 14 := by
+      rw [show (14 : ZMod p) = ((14 : ℕ) : ZMod p) from by push_cast; rfl,
+          ZMod.val_natCast,
+          Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+    rw [hval14]
+    exact h_align h_is_real
+  · -- `op_a_0 ∈ {0,1}` from `JTypeReader`'s `ProgramSpec` clause.
+    have h_trusted1 : cols.adapter_cols.is_trusted = 1 := by rw [h_trusted, h_is_real]
+    have h_prog := h_jtr.2.1
+    have h_progspec := h_prog.resolve_left (by rw [h_trusted1]; exact one_ne_zero)
+    exact h_progspec.2.2.2.2.1
+
 end SP1Clean.Jal

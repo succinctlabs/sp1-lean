@@ -85,6 +85,50 @@ open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+set_option maxHeartbeats 2000000 in
+/-- Field-characteristic discharge of the non-trivial parts of
+`LtSignedOp.AssertionGated.Assumptions`: from the six selector binarity gates
+plus the aggregate sum-binarity gate, `is_blt + is_bge ∈ {0,1}` and
+`sum = 0 → is_blt + is_bge = 0`. The only obstruction is `is_blt = is_bge = 1`,
+which forces the six-selector ℕ-sum into `{2,…,6}`, contradicting
+`sum * (sum - 1) = 0` since `k(k-1) ≠ 0` in `ZMod p` for `k ∈ {2,…,6}` under
+`Fact (2 ^ 17 < p)`. Proven by a 64-way selector case-bash. -/
+lemma selector_binary
+    (is_beq is_bne is_blt is_bge is_bltu is_bgeu : ZMod p)
+    (h_beq : is_beq * (is_beq - 1) = 0) (h_bne : is_bne * (is_bne - 1) = 0)
+    (h_blt : is_blt * (is_blt - 1) = 0) (h_bge : is_bge * (is_bge - 1) = 0)
+    (h_bltu : is_bltu * (is_bltu - 1) = 0) (h_bgeu : is_bgeu * (is_bgeu - 1) = 0)
+    (h_sum : (is_beq + is_bne + is_blt + is_bge + is_bltu + is_bgeu) *
+        ((is_beq + is_bne + is_blt + is_bge + is_bltu + is_bgeu) - 1) = 0) :
+    (is_blt + is_bge = 0 ∨ is_blt + is_bge = 1) ∧
+    ((is_beq + is_bne + is_blt + is_bge + is_bltu + is_bgeu) = 0 →
+      is_blt + is_bge = 0) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hple : 2 ^ 17 < p := Fact.out
+  have hk : ∀ k : ℕ, 0 < k → k < p → (k : ZMod p) ≠ 0 := by
+    intro k hk0 hkp heq
+    rw [CharP.cast_eq_zero_iff (ZMod p) p k] at heq
+    exact absurd (Nat.le_of_dvd hk0 heq) (by omega)
+  have h2 : (2 : ZMod p) ≠ 0 := by exact_mod_cast hk 2 (by norm_num) (by omega)
+  have h3 : (3 : ZMod p) ≠ 0 := by exact_mod_cast hk 3 (by norm_num) (by omega)
+  have h4 : (4 : ZMod p) ≠ 0 := by exact_mod_cast hk 4 (by norm_num) (by omega)
+  have h5 : (5 : ZMod p) ≠ 0 := by exact_mod_cast hk 5 (by norm_num) (by omega)
+  have h6 : (6 : ZMod p) ≠ 0 := by exact_mod_cast hk 6 (by norm_num) (by omega)
+  have h12 : (12 : ZMod p) ≠ 0 := by exact_mod_cast hk 12 (by norm_num) (by omega)
+  have h20 : (20 : ZMod p) ≠ 0 := by exact_mod_cast hk 20 (by norm_num) (by omega)
+  have h30 : (30 : ZMod p) ≠ 0 := by exact_mod_cast hk 30 (by norm_num) (by omega)
+  have key : ∀ x : ZMod p, x * (x - 1) = 0 → x = 0 ∨ x = 1 := fun x h => by
+    binary_iff (by linear_combination h : x * (x + -1) = 0)
+  clear hk hple
+  rcases key _ h_beq with h | h <;> rcases key _ h_bne with h' | h' <;>
+    rcases key _ h_blt with h'' | h'' <;> rcases key _ h_bge with h₃ | h₃ <;>
+    rcases key _ h_bltu with h₄ | h₄ <;> rcases key _ h_bgeu with h₅ | h₅ <;>
+    subst_vars
+  all_goals exact (by
+    first
+    | (exfalso; revert h_sum; norm_num; assumption)
+    | exact ⟨by norm_num, by norm_num⟩)
+
 namespace Assertion
 
 open Circuit
@@ -276,6 +320,32 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
 -- plus an analogous discharge for `is_real = 0 → is_signed = 0`. The
 -- proof pattern otherwise mirrors `Aggregate.lean:384-454` — destructure
 -- `h_holds` / `h_spec`, refine over the new 14-conjunct FormalSpec.
+-- The selector-binarity blocker (`selector_binary` above) is PROVEN axiom-clean.
+-- With it, 16 of the 17 `FormalSpec` conjuncts close via the standard recipe:
+--   circuit_proof_start
+--   obtain ⟨⟨e_ch,e_c16,e_c0,e_pc⟩, e_adapter, e_npc, e_beq, e_bne, e_blt,
+--           e_bge, e_bltu, e_bgeu, e_br, e_cmp, e_ac⟩ := h_input
+--   subst_eqs
+--   obtain ⟨h_sum, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu, h_br, h_cpu,
+--           h_itr, h_outcome, h_ltsigned, h_gadd1, h_gadd2, h_bo0, h_bo1, h_bo2⟩
+--     := h_holds
+--   simp only [Vector.map_push, ← sub_eq_add_neg] at h_gadd1 h_gadd2
+--   have hsel := selector_binary _ _ _ _ _ _ (by linear_combination h_beq) … (by
+--     linear_combination h_sum)
+--   refine ⟨…, h_cpu trivial, h_itr trivial, ?_, ?_, h_gadd1 trivial,
+--           h_gadd2 trivial, ?_, ?_, ?_⟩
+--   · {8 gate conjuncts}  linear_combination h_{sum,beq,…,br}
+--   · {LtSignedOp arm}    exact h_ltsigned ⟨by binary_iff h_sum, hsel.1, hsel.2⟩
+--   · {byteOpcode arms}   simpa only [Vector.getElem_map] using h_bo{0,1,2} trivial
+-- REMAINING (the only open conjunct): the `is_branching` outcome equation.
+-- `subst_eqs` of the destructured `compare_operation` generalizes the goal's
+-- `u16_flags` to a ZMod `Word` fvar (`input_…_u16_flags[i]`) while `h_outcome`
+-- keeps `eval(input_var_…[i])` — equal but ring-distinct atoms (the
+-- `Vector.map`/`getElem` link equation is consumed by `subst_eqs`). Neither
+-- `linear_combination` (ring, atom-blind) nor `convert` (defeq, no ring) bridges
+-- both gaps. Fix: keep `compare_operation` folded (don't `subst_eqs` its
+-- equation) so both sides stay in `eval input_var` form, then
+-- `simp [Vector.getElem_map]; linear_combination h_outcome`.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   sorry
