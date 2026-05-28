@@ -76,7 +76,7 @@ results in this environment (missing `ripgrep`) — do **not** trust its `[]`; u
 | **Subw** | structural `SubwOp.AssertionGated.Spec` + semantic `RV64.subw` | ✅ verified | ⚠️ structural | ✅ verified | as Addw |
 | **Lt** | structural literal-conjunction | ✅ verified | ❌ blocked | ✅ verified (slt + sltu) | deliberately structural: SP1-side `LtOperationSigned.iff_sp1_full.mpr` is `sorry` (documented at `Operations/LtOperationSigned.lean:286–288`) |
 | **UType** | structural `AddOp.Assertion.Spec` + semantic | ❌ 2 sorries (`Circuit`) | ❌ | present | mechanical envelope reshape |
-| **Bitwise** | structural `BitwiseU16Op.Assertion.Spec` | ❌ 1 sorry (`SailBridge`) + `Multiplicity` | ❌ | sorry | backward byte-witness is SP1-side `BitwiseU16Operation.lean:536` |
+| **Bitwise** | structural `BitwiseU16Op.Assertion.Spec` | ❌ 1 sorry (`SailBridge`) + `Multiplicity` | ❌ → **witness-gen pilot in flight** | sorry | §4 worked pilot: `BitwiseU16OperationWitnessed.lean` (witnessed `FormalCircuit`, skeleton elaborates, 2 documented sorries) |
 | **Mul** | structural | ❌ ~14 sorries | ❌ | sorry | needs `.Gated` reshape + `MulOperation.lean:42` witness |
 | **ShiftLeft** | structural | ❌ ~12 sorries | ❌ | (comment only) | bit-decomp + shift-power chain |
 | **ShiftRight** | structural | ❌ ~12 sorries | ❌ | present | as ShiftLeft |
@@ -206,6 +206,45 @@ soundness hole — weight the remaining work accordingly.
 **Recommended honest interim stance:** drive boundary A (steps 1–2) to completion — it is required for
 any truthful completeness claim — and explicitly document the Rust generator as *trusted* (boundary B
 open) rather than silently assuming the loop is closed.
+
+### Worked pilot: `BitwiseU16Operation` as a witnessed `FormalCircuit`
+
+File: `SP1Clean/Operations/BitwiseU16OperationWitnessed.lean` — **validated skeleton, 2 documented
+`sorry`s** (soundness + completeness). It is an *island* file (not imported by the `SP1Clean` root), so
+it does not affect `lake build SP1Clean`; validate with
+`lake env lean SP1Clean/Operations/BitwiseU16OperationWitnessed.lean` (elaborates: only the 2 expected
+`sorry` warnings).
+
+**Design refinement uncovered by the pilot** (sharpens boundary-A step 1 above): the naive "fill the
+operation's backward `iff_sp1_full.mpr` sorry" is *ill-posed* for the existing `FormalAssertion` shape,
+because that lemma is `∀ cols` over *free* byte columns — a wrong `b_low_bytes` falsifies the LHS while
+the semantic RHS holds. The correct move is to make the aux cells **internally-witnessed** and the
+operation a **`FormalCircuit`** with an *output* (the result word). `FormalCircuit` is viable in
+SP1Clean (`IsZeroOperation.lean:38` proves it); the from-scratch template is `Clean/Gadgets/Xor/Xor64.lean`.
+
+What the skeleton establishes (the hard architectural unknown — resolved):
+- `Inputs := {b, cc, opcode}` (byte/result columns removed from inputs);
+- `main` generates `b_low`/`c_low`/`result` via `witnessVector` (closed-form computes:
+  `b_low[j] = b[j].val % 256`, `result[k] = byteOp opcode (decompB[k]) (decompC[k])`), then the 8
+  `ByteOpcodeTable` lookups over `#v[low, (limb − low)·256⁻¹]`;
+- `localLength := 16`, `output := varFromOffset (fields 8) (i0+8)`;
+- semantic `Spec`: `resultWord = execute_RTYPE_pure_w b cc {AND,OR,XOR}` (all 3 opcodes);
+- the `FormalCircuit` bundle itself type-checks.
+
+Closure roadmap (each `sorry` is annotated inline in the file):
+1. **completeness** (the witness-generation heart, ~100–150 LoC): from `h_env`
+   (`UsesLocalWitnessesCompleteness`) pin each cell to its compute value; prove the high-byte eval
+   `(b[j] − b_low[j])·256⁻¹ = b[j].val/256` (the `AddOperation.spec_inv` ZMod technique:
+   `b[j] = (b[j].val : ZMod)`, `Nat.div_add_mod`, `256·256⁻¹ = 1`); discharge each lookup's
+   `ByteOpcodeSpec` with witness `bop := ByteOpcode.ofNat opcode.val` (opcode.val < 3 round-trips) and a
+   per-byte helper `byteOp op x y < 256 ∧ result.val = x OP y` (`Nat.{and,or,xor}_lt_two_pow`,
+   `interval_cases op`).
+2. **soundness** (~ `spec.{and,or,xor}` content × 3 opcodes): from the Clean lookups get per-byte
+   `(ofNat opcode.val).constrain`, then reconstruct `resultWord = b OP c` via the `spec.and` recipe
+   (`Word.toBitVec64`, byte `.val` arithmetic, `bv_decide`).
+3. **chip propagation** (deferred — riskiest, novel in this repo): thread this `FormalCircuit`'s output
+   into `BitwiseChip` and connect to the SP1 Main-row byte cells (hint-witness bridge). No chip currently
+   composes a `FormalCircuit` sub-output, so expect new plumbing.
 
 ---
 
