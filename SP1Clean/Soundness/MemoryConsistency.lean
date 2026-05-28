@@ -19,7 +19,7 @@ import SP1Clean.Chips.Memory.LoadHalfChip
 import SP1Clean.Chips.Control.BranchChip.Aggregate
 import SP1Clean.Chips.Memory.LoadX0Chip
 import SP1Clean.Chips.ALU.ShiftRightChip.Aggregate
-import SP1Clean.Chips.ALU.DivRemChip.Aggregate
+import SP1Clean.Chips.ALU.DivRemChip.Circuit
 import SP1Clean.Chips.ALU.AddiChip.SailBridge
 import SP1Clean.Chips.ALU.BitwiseChip.Aggregate
 import SP1Clean.Chips.ALU.SubChip.SailBridge
