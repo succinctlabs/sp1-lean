@@ -501,72 +501,229 @@ theorem of_sp1 (input : Inputs (ZMod p))
   · intro h_one
     rw [(spec_mulw h_one).2, execute_MULW_pure_eq_rv64_mulw]
 
-/-- Bridge from Clean's `main` post-conditions to SP1's `allHold` form.
-The intended signature takes one named hypothesis per constraint emitted
-in `main` — 3 sub-circuit Specs (U16toU8OpSafe ×2, U16MSBOp), 2 MSB byte
-lookup facts (opcode 5), 42 inline `_ = 0` facts, 16 carry range lookup
-facts (opcode 6), and 8 product-pair U8Range lookup facts (opcode 3) —
-and discharges the ~70 conjuncts of `MulOperation.allHold_constraints_iff_is_real`
-positionally. The current stub takes a placeholder `True` and is `sorry`.
+/-! ## Soundness helpers
 
-Status: the BV bridges `execute_MUL_pure_eq_rv64_mulh` and
-`execute_MUL_pure_eq_rv64_mulhsu` (consumed by `of_sp1` above) are now
-both proven, so once this helper is closed `soundness` collapses to a
-one-liner without further changes. `completeness` (below) is separately
-sorry'd and out of scope here.
+Three small lemmas used by `soundness` to bridge Clean's `main`
+emissions to the `MulOperation.allHold_constraints_iff_is_real` RHS:
+`vec4_eta` reconciles `#v[v[0],v[1],v[2],v[3]]` with `v` (the iff wraps
+the operand words this way); `byteOpcodeSpec_msb` / `byteOpcodeSpec_u8range_lt`
+unwrap the opcode-5 (`.MSB`) and opcode-3 (`.U8Range`) lookup specs. -/
 
-Closure outline:
-  1. Reshape signature to take 71 named hypotheses matching `main`'s
-     emission order (3 sub-circuit Assumptions→Spec wrappers, 2 MSB byte
-     lookup ByteOpcodeSpecs, 42 inline `_ = 0` facts, 16 carry-range
-     ByteOpcodeSpecs (opcode 6), 8 product-pair U8Range ByteOpcodeSpecs
-     (opcode 3)); have `soundness` destructure `h_holds` post-
-     `circuit_proof_start` and pass each into this helper. The Clean
-     `h_holds` after `simp [main, circuit_norm]` is a ~76KB tuple
-     mirroring this exactly — `obtain ⟨...⟩` destructures positionally.
-  2. `change List.Forall SP1Constraint.toProp _` then
-     `rw [MulOperation.allHold_constraints_iff_is_real]` to expose the
-     iff's RHS conjunction.
-  3. For `List.Forall toProp U16_{b,c}`: use
-     `SP1Clean.U16toU8OpSafe.iff_sp1.mp` (already exists at
-     `SP1Clean/Operations/U16toU8OperationSafe.lean:200`) on each
-     sub-Spec to obtain the SP1 byte sends.
-  4. For `List.Forall toProp (U16MSBOperation.constraints …)`: use
-     `SP1Clean.U16MSBOp.iff_sp1.mpr` (at
-     `SP1Clean/Operations/U16MSBOperation.lean:77`) bridging from
-     `U16MSBOp.Assertion.Spec`.
-  5. For the 2 three-part MSB byte-opcode chunks (`b_msb<256 ∧
-     bbw[7]<256 ∧ b_msb∈{0,1} ∧ (b_msb=1↔128≤bbw[7])`): unfold the
-     opcode-5 `ByteOpcodeSpec` via `constrain_MSB` (the unique
-     `bop.toNat=5` matches `.MSB`).
-  6. 42 inline assertZero gates: each closes by `linear_combination
-     h_<i>` or `mul_eq_zero.mp h_<i>` from the corresponding `_ = 0`
-     fact.
-  7. 16 `carry[i].val < 65536`: use
-     `SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16` on each Range
-     fact.
-  8. 16 `product[i] < 256`: unfold the opcode-3 U8Range ByteOpcodeSpec
-     via `constrain_U8Range` (each opcode-3 row gives two `< 256`
-     bounds — write a small `byteOpcodeSpec_u8range_pair` helper next
-     to `byteOpcodeSpec_range16` in `SP1Clean/Operations/AddOperation.lean`). -/
-private theorem allHold_of_main_holds
-    (input : Inputs (ZMod p)) (h_holds : True) :
-    (MulOperation.constraints
-      input.a_word input.b_word input.c_word (toCols input)
-      1 input.is_mul input.is_mulh input.is_mulw input.is_mulhu
-      input.is_mulhsu).allHold := by
-  sorry
+omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
+lemma vec4_eta {α} (v : Vector α 4) : #v[v[0], v[1], v[2], v[3]] = v := by
+  ext i hi; interval_cases i <;> rfl
 
+omit [Fact (2 ^ 24 < p)] in
+/-- Unwrap an opcode-5 `#v[5, m, x, 0]` ByteOpcodeSpec into the MSB
+constraint chunk. -/
+lemma byteOpcodeSpec_msb (m x : ZMod p)
+    (h : SP1Clean.ByteOpcodeSpec (#v[(5 : ZMod p), m, x, 0])) :
+    (m < 256 ∧ x < 256) ∧ (m = 0 ∨ m = 1) ∧ (m = 1 ↔ 128 ≤ x) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  obtain ⟨bop, hbop, hconstr⟩ := h
+  have h_eq : bop = .MSB := by
+    have h5 : (5 : ZMod p) = ((5 : ℕ) : ZMod p) := by push_cast; rfl
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hbop
+    rw [h5] at hbop
+    apply_fun ZMod.val at hbop
+    have h_lt : bop.toNat < 7 := by cases bop <;> simp [ByteOpcode.toNat]
+    rw [ZMod.val_natCast, ZMod.val_natCast,
+        Nat.mod_eq_of_lt (by omega : bop.toNat < p),
+        Nat.mod_eq_of_lt (by omega : (5 : ℕ) < p)] at hbop
+    cases bop <;> simp [ByteOpcode.toNat] at hbop
+    rfl
+  subst h_eq
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+             List.getElem_cons_zero, ByteOpcode.constrain_MSB] at hconstr
+  obtain ⟨⟨hm, hx, _⟩, hbool, hiff⟩ := hconstr
+  exact ⟨⟨hm, hx⟩, hbool, hiff⟩
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Unwrap an opcode-3 `#v[3, 0, x, y]` ByteOpcodeSpec into the `ZMod`-`<`
+range bounds `x < 256 ∧ y < 256`. -/
+lemma byteOpcodeSpec_u8range_lt (x y : ZMod p)
+    (h : SP1Clean.ByteOpcodeSpec (#v[(3 : ZMod p), 0, x, y])) :
+    x < 256 ∧ y < 256 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  obtain ⟨bop, hbop, hconstr⟩ := h
+  have h_eq : bop = .U8Range := by
+    have h3 : (3 : ZMod p) = ((3 : ℕ) : ZMod p) := by push_cast; rfl
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hbop
+    rw [h3] at hbop
+    apply_fun ZMod.val at hbop
+    have h_lt : bop.toNat < 7 := by cases bop <;> simp [ByteOpcode.toNat]
+    rw [ZMod.val_natCast, ZMod.val_natCast,
+        Nat.mod_eq_of_lt (by omega : bop.toNat < p),
+        Nat.mod_eq_of_lt (by omega : (3 : ℕ) < p)] at hbop
+    cases bop <;> simp [ByteOpcode.toNat] at hbop
+    rfl
+  subst h_eq
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+             List.getElem_cons_zero, ByteOpcode.constrain_U8Range] at hconstr
+  exact ⟨hconstr.2.1, hconstr.2.2⟩
+
+set_option maxHeartbeats 6400000 in
+-- Heartbeats: 16 carry-chain `simp [cp, …]` reductions + an 80-way
+-- conjunction refine over the iff RHS push past the default budget.
+/-- Under `is_real = 1` the Clean `main` emissions are converted to SP1's
+`MulOperation.constraints.allHold` (via `allHold_constraints_iff_is_real`)
+and lifted to the semantic `Spec` by `of_sp1`. The 79 RHS conjuncts are
+discharged positionally from the destructured circuit `h_holds`. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
-  -- One-liner: thread the assumptions through `allHold_of_main_holds`
-  -- (currently sorry'd — see TODO above) and apply `of_sp1`. Once the
-  -- helper is closed, this proof requires no further changes. The BV
-  -- bridges `execute_MUL_pure_eq_rv64_mulh` / `_mulhsu` (used inside
-  -- `of_sp1`) are now both proven; only the Clean→SP1 `allHold`
-  -- construction remains.
-  intro offset env input_var input _h_input h_assumptions _h_holds
-  exact of_sp1 input h_assumptions (allHold_of_main_holds input trivial)
+  circuit_proof_start [SP1Clean.MulOp.main]
+  simp only [circuit_norm, Lookup.Soundness, Table.toRaw, SP1Clean.ByteOpcodeTable] at h_holds
+  obtain ⟨e_aw, e_bw, e_cw, e_carry, e_product, e_blb, e_clb, e_bmsb, e_cmsb,
+          e_pmsb, e_bse, e_cse, e_mul, e_mulh, e_mulhu, e_mulhsu, e_mulw⟩ := h_input
+  subst e_aw e_bw e_cw e_carry e_product e_blb e_clb e_bmsb e_cmsb e_pmsb e_bse
+        e_cse e_mul e_mulh e_mulhu e_mulhsu e_mulw
+  unfold id at *
+  refine of_sp1 ⟨Vector.map (Expression.eval env) input_var_a_word,
+    Vector.map (Expression.eval env) input_var_b_word,
+    Vector.map (Expression.eval env) input_var_c_word,
+    Vector.map (Expression.eval env) input_var_carry,
+    Vector.map (Expression.eval env) input_var_product,
+    Vector.map (Expression.eval env) input_var_b_low_bytes,
+    Vector.map (Expression.eval env) input_var_c_low_bytes,
+    Expression.eval env input_var_b_msb, Expression.eval env input_var_c_msb,
+    Expression.eval env input_var_product_msb,
+    Expression.eval env input_var_b_sign_extend,
+    Expression.eval env input_var_c_sign_extend,
+    Expression.eval env input_var_is_mul, Expression.eval env input_var_is_mulh,
+    Expression.eval env input_var_is_mulhu, Expression.eval env input_var_is_mulhsu,
+    Expression.eval env input_var_is_mulw⟩ h_assumptions ?_
+  obtain ⟨h_u16b, h_u16c, h_msb, h_bmsb, h_cmsb, h_bsedef, h_csedef,
+          h_c0, h_c1, h_c2, h_c3, h_c4, h_c5, h_c6, h_c7,
+          h_c8, h_c9, h_c10, h_c11, h_c12, h_c13, h_c14, h_c15,
+          h_r0, h_r1, h_r2, h_r3, h_r4, h_r5, h_r6, h_r7, h_r8, h_r9, h_r10, h_r11,
+          h_bb, h_cb, h_bse_b, h_cse_b,
+          h_mul_b, h_mulh_b, h_mulhu_b, h_mulhsu_b, h_mulw_b, h_sum_b,
+          h_bcpl, h_ccpl,
+          h_cr0, h_cr1, h_cr2, h_cr3, h_cr4, h_cr5, h_cr6, h_cr7,
+          h_cr8, h_cr9, h_cr10, h_cr11, h_cr12, h_cr13, h_cr14, h_cr15,
+          h_pr0, h_pr1, h_pr2, h_pr3, h_pr4, h_pr5, h_pr6, h_pr7⟩ := h_holds
+  change List.Forall SP1Constraint.toProp _
+  rw [MulOperation.allHold_constraints_iff_is_real]
+  refine ⟨?u16b, ?u16c, ?msb, ?bmsb, ?cmsb, ?bsedef, ?csedef,
+          ?c0, ?c1, ?c2, ?c3, ?c4, ?c5, ?c6, ?c7, ?c8, ?c9, ?c10, ?c11,
+          ?c12, ?c13, ?c14, ?c15,
+          ?r0, ?r1, ?r2, ?r3, ?r4, ?r5, ?r6, ?r7, ?r8, ?r9, ?r10, ?r11,
+          ?bb, ?cb, ?bseb, ?cseb, ?mulb, ?mulhb, ?mulhub, ?mulhsub, ?mulwb, ?sumb,
+          ?bcpl, ?ccpl,
+          ?cr0, ?cr1, ?cr2, ?cr3, ?cr4, ?cr5, ?cr6, ?cr7, ?cr8, ?cr9,
+          ?cr10, ?cr11, ?cr12, ?cr13, ?cr14, ?cr15,
+          ?p0, ?p1, ?p2, ?p3, ?p4, ?p5, ?p6, ?p7, ?p8, ?p9, ?p10, ?p11,
+          ?p12, ?p13, ?p14, ?p15⟩
+  -- Category A: U16 byte-decomposition foralls
+  case u16b => rw [vec4_eta, vec4_eta]; exact (U16toU8OpSafe.iff_sp1 _).mp (h_u16b trivial)
+  case u16c => rw [vec4_eta, vec4_eta]; exact (U16toU8OpSafe.iff_sp1 _).mp (h_u16c trivial)
+  -- Category B: U16MSB sub-constraint list
+  case msb =>
+    have hmsb := h_msb trivial
+    simp only [U16MSBOperation.constraints, SP1ConstraintList.allHold, List.Forall,
+      SP1Constraint.toProp, toCols, U16MSBOp.assertion, U16MSBOp.Assertion.Spec,
+      ByteOpcode.ofNat_seven] at hmsb ⊢
+    refine ⟨by linear_combination h_mulw_b, hmsb.1, fun _ => ?_⟩
+    simp only [Vector.getElem_map, ByteOpcode.constrain_Range]
+    have h16 : ((16 : ZMod p).val) = 16 := by
+      rw [show (16 : ZMod p) = ((16 : ℕ) : ZMod p) from by push_cast; rfl, ZMod.val_natCast,
+        Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+    rw [h16]
+    exact hmsb.2
+  -- Category C: MSB byte-opcode chunks
+  case bmsb =>
+    simp only [toCols, U16toU8OperationSafe.constraints, Vector.getElem_mk,
+      List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
+      Vector.getElem_map, sub_eq_add_neg]
+    exact byteOpcodeSpec_msb _ _ h_bmsb
+  case cmsb =>
+    simp only [toCols, U16toU8OperationSafe.constraints, Vector.getElem_mk,
+      List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ,
+      Vector.getElem_map, sub_eq_add_neg]
+    exact byteOpcodeSpec_msb _ _ h_cmsb
+  -- Category D: sign-extend definitions
+  case bsedef => simp only [toCols]; linear_combination h_bsedef
+  case csedef => simp only [toCols]; linear_combination h_csedef
+  -- Category E: 16-byte carry chain
+  case c0 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c0
+  case c1 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c1
+  case c2 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c2
+  case c3 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c3
+  case c4 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c4
+  case c5 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c5
+  case c6 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c6
+  case c7 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c7
+  case c8 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c8
+  case c9 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c9
+  case c10 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c10
+  case c11 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c11
+  case c12 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c12
+  case c13 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c13
+  case c14 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c14
+  case c15 => simp [cp, Vector.ofFn, Vector.get, U16toU8OperationSafe.constraints, toCols]; linear_combination h_c15
+  -- Category F: per-variant result-limb disjunctions
+  case r0 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r0).imp id (fun h => by linear_combination -h)
+  case r1 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r1).imp id (fun h => by linear_combination -h)
+  case r2 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r2).imp id (fun h => by linear_combination -h)
+  case r3 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r3).imp id (fun h => by linear_combination -h)
+  case r4 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r4).imp id (fun h => by linear_combination -h)
+  case r5 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r5).imp id (fun h => by linear_combination -h)
+  case r6 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r6).imp id (fun h => by linear_combination -h)
+  case r7 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r7).imp id (fun h => by linear_combination -h)
+  case r8 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r8).imp id (fun h => by linear_combination -h)
+  case r9 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r9).imp id (fun h => by linear_combination -h)
+  case r10 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r10).imp id (fun h => by linear_combination -h)
+  case r11 => simp only [toCols, Vector.getElem_map]; exact (mul_eq_zero.mp h_r11).imp id (fun h => by linear_combination -h)
+  -- Category G+H: booleanness gates
+  case bb => simp only [toCols]; exact (mul_eq_zero.mp h_bb).imp id (fun h => by linear_combination h)
+  case cb => simp only [toCols]; exact (mul_eq_zero.mp h_cb).imp id (fun h => by linear_combination h)
+  case bseb => simp only [toCols]; exact (mul_eq_zero.mp h_bse_b).imp id (fun h => by linear_combination h)
+  case cseb => simp only [toCols]; exact (mul_eq_zero.mp h_cse_b).imp id (fun h => by linear_combination h)
+  case mulb => exact (mul_eq_zero.mp h_mul_b).imp id (fun h => by linear_combination h)
+  case mulhb => exact (mul_eq_zero.mp h_mulh_b).imp id (fun h => by linear_combination h)
+  case mulhub => exact (mul_eq_zero.mp h_mulhu_b).imp id (fun h => by linear_combination h)
+  case mulhsub => exact (mul_eq_zero.mp h_mulhsu_b).imp id (fun h => by linear_combination h)
+  case mulwb => exact (mul_eq_zero.mp h_mulw_b).imp id (fun h => by linear_combination h)
+  case sumb => exact (mul_eq_zero.mp h_sum_b).imp id (fun h => by linear_combination h)
+  -- Category I: sign-extend coupling gates
+  case bcpl => simp only [toCols]; exact (mul_eq_zero.mp h_bcpl).imp id (fun h => by linear_combination h)
+  case ccpl => simp only [toCols]; exact (mul_eq_zero.mp h_ccpl).imp id (fun h => by linear_combination h)
+  -- Category J: carry u16-range lookups
+  case cr0 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr0
+  case cr1 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr1
+  case cr2 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr2
+  case cr3 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr3
+  case cr4 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr4
+  case cr5 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr5
+  case cr6 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr6
+  case cr7 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr7
+  case cr8 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr8
+  case cr9 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr9
+  case cr10 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr10
+  case cr11 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr11
+  case cr12 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr12
+  case cr13 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr13
+  case cr14 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr14
+  case cr15 => simp only [toCols, Vector.getElem_map]; exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_cr15
+  -- Category K: product-pair U8Range lookups (8 lookups → 16 bounds)
+  case p0 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr0).1
+  case p1 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr0).2
+  case p2 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr1).1
+  case p3 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr1).2
+  case p4 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr2).1
+  case p5 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr2).2
+  case p6 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr3).1
+  case p7 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr3).2
+  case p8 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr4).1
+  case p9 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr4).2
+  case p10 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr5).1
+  case p11 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr5).2
+  case p12 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr6).1
+  case p13 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr6).2
+  case p14 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr7).1
+  case p15 => simp only [toCols, Vector.getElem_map]; exact (byteOpcodeSpec_u8range_lt _ _ h_pr7).2
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions Spec := by
