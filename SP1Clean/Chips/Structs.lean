@@ -668,6 +668,7 @@ end SP1Clean.ShiftRight
 namespace SP1Clean.Lt
 
 /-- The chip's column struct, mirroring SP1's Rust `LtCols<T>`. -/
+@[ext]
 structure LtCols (T : Type) where
   state : CPUState T
   adapter : ALUTypeReader T
@@ -701,6 +702,51 @@ the index map in `SP1Chips/Lt/Constraints.lean` (44 columns; the
    -- (`Main[32]+Main[33]`), matching upstream's ALUTypeReader receiving
    -- the same sum for both `is_real` and `is_trusted`.
    ⟨Main[32] + Main[33]⟩⟩
+
+/-- Right inverse of `fromMain`: pack an `LtCols` into a 44-element flat row
+using the same index map as `fromMain`. The `adapter_cols.is_trusted` slot
+aliases `Main[32] + Main[33]` (the `is_slt + is_sltu` sum), matching
+`fromMain`'s aliasing; the round-trip lemma requires
+`cols.adapter_cols.is_trusted = cols.is_slt + cols.is_sltu`, which is the
+chip's `Assumptions`. -/
+@[reducible] def toMain (cols : LtCols (ZMod p)) : Vector (ZMod p) 44 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0,
+     cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c[0], cols.adapter.op_c[1],
+     cols.adapter.op_c[2], cols.adapter.op_c[3],
+     cols.adapter.op_c_memory.prev_value[0],
+     cols.adapter.op_c_memory.prev_value[1],
+     cols.adapter.op_c_memory.prev_value[2],
+     cols.adapter.op_c_memory.prev_value[3],
+     cols.adapter.op_c_memory.access_timestamp.prev_low,
+     cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
+     cols.adapter.imm_c,
+     cols.is_slt, cols.is_sltu,
+     cols.lt_operation.result.u16_compare_operation.bit,
+     cols.lt_operation.result.u16_flags[0],
+     cols.lt_operation.result.u16_flags[1],
+     cols.lt_operation.result.u16_flags[2],
+     cols.lt_operation.result.u16_flags[3],
+     cols.lt_operation.result.not_eq_inv,
+     cols.lt_operation.result.comparison_limbs[0],
+     cols.lt_operation.result.comparison_limbs[1],
+     cols.lt_operation.b_msb.msb,
+     cols.lt_operation.c_msb.msb]
 
 end SP1Clean.Lt
 
