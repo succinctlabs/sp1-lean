@@ -150,52 +150,11 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       -- `.uType _` after the canonical-(a) FormalSpec migration). The
       -- state-bus PC chain is still tracked at trace level.
       []
-  | .mul cols =>
-      -- Three register accesses. op_a is read AND written (write_value =
-      -- op_a_write_value, holding whatever the carry-chain produced —
-      -- correctness of that value is the MulOperation surface, which the
-      -- pilot's iff-only mirror leaves at `True`). op_b and op_c are pure
-      -- reads.
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_c, 0, 0],
-          prev_value := cols.adapter.op_c_memory.prev_value,
-          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
-      [(op_a_mem, cols.op_a_write_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
-  | .shiftLeft cols =>
-      -- Three register accesses. op_a is read AND written (write_value =
-      -- `cols.result`, the 4-limb shifted output). op_b and op_c are pure
-      -- reads.
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_c[0], 0, 0],
-          prev_value := cols.adapter.op_c_memory.prev_value,
-          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
-      [(op_a_mem, cols.result),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
+  -- Mul/ShiftLeft register accesses route through the multiplicity-aware
+  -- lookup bus (parallel to `.add` / `.addw`): per-row contributions move
+  -- to the bus aggregator; trace-level balance closes the global theorem.
+  | .mul _ => []
+  | .shiftLeft _ => []
   | .addw _ =>
       -- AddwChip's memory-access contributions are now routed through the
       -- multiplicity-aware lookup bus (see `SP1Clean/SP1Lookup.lean`'s
@@ -220,19 +179,9 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
         SP1Clean.Jalr.opBMemoryAccess cols
       [(op_a_mem, cols.op_a_write_value),
        (op_b_mem, cols.adapter.op_b_memory.prev_value)]
-  | .lt cols =>
-      -- Three register accesses. op_a writes a 1-bit boolean result
-      -- (write_value = `#v[compare_bit, 0, 0, 0]`); op_b / op_c are
-      -- pure reads (write_value = prev_value).
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.Lt.opAMemoryAccess cols
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.Lt.opBMemoryAccess cols
-      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        SP1Clean.Lt.opCMemoryAccess cols
-      [(op_a_mem, #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
+  -- Lt register accesses route through the multiplicity-aware lookup bus
+  -- (parallel to `.add`); per-row contributions move to the bus aggregator.
+  | .lt _ => []
   -- Store{Word,Double,Half} memory contributions are routed through the
   -- multiplicity-aware lookup bus, parallel to `.storeByte` and `.addw`
   -- (see `docs/MULTIPLICITY_BUS.md`).
@@ -261,44 +210,10 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
   -- op_a's write_value is zero (destination is x0), absorbed in the
   -- write-side of the bus tuple.
   | .loadX0 _ => []
-  | .shiftRight cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_c[0], 0, 0],
-          prev_value := cols.adapter.op_c_memory.prev_value,
-          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
-      [(op_a_mem, cols.op_a_write_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
-  | .divRem cols =>
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_c, 0, 0],
-          prev_value := cols.adapter.op_c_memory.prev_value,
-          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
-      [(op_a_mem, cols.op_a_write_value),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
+  -- ShiftRight/DivRem register accesses route through the multiplicity-aware
+  -- lookup bus (parallel to `.add`); per-row contributions move to the bus.
+  | .shiftRight _ => []
+  | .divRem _ => []
   | .loadHalf cols =>
       let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
         { addr := #v[cols.adapter.op_a, 0, 0],
@@ -327,37 +242,9 @@ def memoryAccesses : ChipRow p → List ((SP1Clean.MemoryAccess (ZMod p)) × Wor
       -- through the multiplicity-aware memory bus inside
       -- `ITypeReader.Gated.assertion`. Parallel to `.add`.
       []
-  | .bitwise cols =>
-      -- Three register accesses (op_a write, op_b/op_c pure reads). The
-      -- op_a write value is the 4-limb word reconstruction from the chip's
-      -- 8-limb `bitwise_result` (mirrors the `E19/E21/E23/E25` halfword
-      -- packs in `BitwiseU16Operation.constraints`).
-      let op_a_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_a, 0, 0],
-          prev_value := cols.adapter.op_a_memory.prev_value,
-          prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
-      let op_b_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_b, 0, 0],
-          prev_value := cols.adapter.op_b_memory.prev_value,
-          prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
-      let op_c_mem : SP1Clean.MemoryAccess (ZMod p) :=
-        { addr := #v[cols.adapter.op_c[0], 0, 0],
-          prev_value := cols.adapter.op_c_memory.prev_value,
-          prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
-          diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
-      [(op_a_mem,
-        #v[cols.bitwise_operation.bitwise_operation.result[0] +
-             cols.bitwise_operation.bitwise_operation.result[1] * 256,
-           cols.bitwise_operation.bitwise_operation.result[2] +
-             cols.bitwise_operation.bitwise_operation.result[3] * 256,
-           cols.bitwise_operation.bitwise_operation.result[4] +
-             cols.bitwise_operation.bitwise_operation.result[5] * 256,
-           cols.bitwise_operation.bitwise_operation.result[6] +
-             cols.bitwise_operation.bitwise_operation.result[7] * 256]),
-       (op_b_mem, cols.adapter.op_b_memory.prev_value),
-       (op_c_mem, cols.adapter.op_c_memory.prev_value)]
+  -- Bitwise register accesses route through the multiplicity-aware lookup
+  -- bus (parallel to `.add`); per-row contributions move to the bus.
+  | .bitwise _ => []
   | .sub _ =>
       -- SubChip's three register accesses route through the
       -- multiplicity-aware memory bus inside `RTypeReader.Gated.assertion`.
@@ -453,14 +340,13 @@ def offsets : ChipRow p → List (ZMod p)
   -- Jal: memory contributions flow through the lookup bus (parallel to
   -- `.uType _` after canonical-(a) FormalSpec migration); offsets empty.
   | .jal _ => []
-  -- Mul and ShiftLeft: same R-type-reader pattern as Add (3 register
-  -- accesses at +4 / +3 / +2). No RAM accesses.
-  | .mul _ => [4, 3, 2]
-  | .shiftLeft _ => [4, 3, 2]
+  -- Mul/ShiftLeft register accesses route through the lookup bus (as `.add`).
+  | .mul _ => []
+  | .shiftLeft _ => []
   | .addw _ => []  -- parallel to `memoryAccesses (.addw _) := []`
   | .uType _ => []  -- parallel to `memoryAccesses (.addw _) := []`
   | .jalr _ => [4, 3]
-  | .lt _ => [4, 3, 2]
+  | .lt _ => []
   -- Store{Word,Double,Half} memory accesses also flow through the lookup
   -- bus (parallel to `.storeByte`); offset lists are empty.
   | .storeWord _ => []
@@ -473,11 +359,11 @@ def offsets : ChipRow p → List (ZMod p)
   | .branch _ => [4, 3]
   -- LoadX0 memory accesses also flow through the lookup bus.
   | .loadX0 _ => []
-  | .shiftRight _ => [4, 3, 2]
-  | .divRem _ => [4, 3, 2]
+  | .shiftRight _ => []
+  | .divRem _ => []
   -- Addi/Sub/Subw memory accesses now flow through the lookup bus.
   | .addi _ => []
-  | .bitwise _ => [4, 3, 2]
+  | .bitwise _ => []
   | .sub _ => []
   | .subw _ => []
   -- Boundary chips: empty offset list (no per-access offsets — the
@@ -767,27 +653,22 @@ theorem memoryAccessesValid_of_spec_subw
 -- TODO(Spec-canonical-2026-05-26): `FormalSpec` was rewritten to the
 -- canonical (a) shape (CPUState.Gated + ALUTypeReader.Gated). The
 -- prior `OperandAccess.Assertion.Spec` triple is now nested inside
--- `ALUTypeReader.Gated.Assertion.Spec` as `RegisterAccess.Assertion.Spec`
--- (which wraps `OperandAccess.AssertionGated.Spec`). Mirrors the
--- `_mul` case immediately below. The right closure is likely
--- `simp [ChipRow.memoryAccessesValid, …]`-vacuous once
--- `ChipRow.memoryAccesses .bitwise` is empty (see
--- `feedback_memoryaccesses_vacuous_for_gated_chips`).
+-- `ALUTypeReader.Gated.Assertion.Spec`. The register accesses route
+-- through the multiplicity-aware lookup bus (`ChipRow.memoryAccesses
+-- .bitwise = []`), so this discharge is vacuous — mirrors `_add`.
 theorem memoryAccessesValid_of_spec_bitwise
     (_cols : SP1Clean.Bitwise.BitwiseCols (ZMod p))
     (_h : SP1Clean.Bitwise.assertion.Spec _cols) :
-    ChipRow.memoryAccessesValid (.bitwise _cols) :=
-  sorry
+    ChipRow.memoryAccessesValid (.bitwise _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- Lt's per-chip discharge. -/
--- TODO(Spec-canonical-2026-05-26): see `_bitwise` above. Same
--- structural shift; reader-gated form nests the operand-access
--- conjuncts inside `ALUTypeReader.Gated.Assertion.Spec`.
+/-- Lt's per-chip discharge — vacuous, register accesses route through the
+multiplicity-aware lookup bus (`ChipRow.memoryAccesses .lt = []`). Mirrors `_add`. -/
 theorem memoryAccessesValid_of_spec_lt
     (_cols : SP1Clean.Lt.LtCols (ZMod p))
     (_h : SP1Clean.Lt.assertion.Spec _cols) :
-    ChipRow.memoryAccessesValid (.lt _cols) :=
-  sorry
+    ChipRow.memoryAccessesValid (.lt _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
 /-- Addw's per-chip discharge — vacuously true, since AddwChip's memory
 contributions now flow through the multiplicity-aware lookup bus rather
@@ -875,47 +756,37 @@ theorem memoryAccessesValid_of_spec_loadX0
     ChipRow.memoryAccessesValid (.loadX0 _cols) := by
   simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- Mul's per-chip discharge — sorry'd after MulChip's `FormalSpec` was
-restructured to compose `MulOp.assertion` + `CPUState.Gated` +
-`RTypeReader.Gated` (CLEAN_FUTURE D2/D3 alignment). The OperandAccess
-conjuncts that this destructure extracted are now nested inside
-`RTypeReader.Gated.Assertion.Spec` as `RegisterAccess.Assertion.Spec`
-(which wraps `OperandAccess.AssertionGated.Spec`). Re-deriving the
-flat `OperandAccess.Assertion.Spec` from there is a follow-up; the
-sorry tracks the structural gap. -/
+/-- Mul's per-chip discharge — vacuous, register accesses route through the
+multiplicity-aware lookup bus (`ChipRow.memoryAccesses .mul = []`). Mirrors `_add`. -/
 theorem memoryAccessesValid_of_spec_mul [Fact (2 ^ 24 < p)]
-    (cols : SP1Clean.Mul.MulCols (ZMod p))
-    (h : SP1Clean.Mul.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.mul cols) := by
-  sorry
+    (_cols : SP1Clean.Mul.MulCols (ZMod p))
+    (_h : SP1Clean.Mul.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.mul _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- ShiftLeft's per-chip discharge. -/
--- TODO(Spec-canonical-2026-05-26): see `_bitwise` above. Same shift to
--- the gated reader form; operand accesses now nested in
--- `ALUTypeReader.Gated.Assertion.Spec`.
+/-- ShiftLeft's per-chip discharge — vacuous, register accesses route through
+the multiplicity-aware lookup bus (`ChipRow.memoryAccesses .shiftLeft = []`). -/
 theorem memoryAccessesValid_of_spec_shiftLeft
     (_cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))
     (_h : SP1Clean.ShiftLeft.assertion.Spec _cols) :
-    ChipRow.memoryAccessesValid (.shiftLeft _cols) :=
-  sorry
+    ChipRow.memoryAccessesValid (.shiftLeft _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- ShiftRight's per-chip discharge. -/
--- TODO(Spec-canonical-2026-05-26): see `_bitwise` above.
+/-- ShiftRight's per-chip discharge — vacuous, register accesses route through
+the multiplicity-aware lookup bus (`ChipRow.memoryAccesses .shiftRight = []`). -/
 theorem memoryAccessesValid_of_spec_shiftRight
     (_cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
     (_h : SP1Clean.ShiftRight.assertion.Spec _cols) :
-    ChipRow.memoryAccessesValid (.shiftRight _cols) :=
-  sorry
+    ChipRow.memoryAccessesValid (.shiftRight _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
-/-- DivRem's per-chip discharge — sorry'd after DivRemChip's
-`FormalSpec` was restructured to compose 17 sub-circuits + 2 reader
-Gated assertions (CLEAN_FUTURE D2/D3 alignment). See the parallel
-comment on `memoryAccessesValid_of_spec_mul`. -/
+/-- DivRem's per-chip discharge — vacuous, register accesses route through the
+multiplicity-aware lookup bus (`ChipRow.memoryAccesses .divRem = []`). Mirrors `_add`. -/
 theorem memoryAccessesValid_of_spec_divRem [Fact (2 ^ 24 < p)]
-    (cols : SP1Clean.DivRem.DivRemCols (ZMod p))
-    (h : SP1Clean.DivRem.assertion.Spec cols) :
-    ChipRow.memoryAccessesValid (.divRem cols) := by
-  sorry
+    (_cols : SP1Clean.DivRem.DivRemCols (ZMod p))
+    (_h : SP1Clean.DivRem.assertion.Spec _cols) :
+    ChipRow.memoryAccessesValid (.divRem _cols) := by
+  simp [ChipRow.memoryAccessesValid, ChipRow.memoryAccesses, ChipRow.offsets]
 
 /-- Trace-level memory-bus grounding: from per-row chip Specs + a
 verifier-supplied `TraceMemoryAccessesValid` bundle for the 23 chips whose

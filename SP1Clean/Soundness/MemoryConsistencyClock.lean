@@ -186,31 +186,18 @@ theorem cpuStateSpec_of_spec_addw (cols : Addw.AddwCols (ZMod p))
   rw [← SP1Clean.CPUState.Gated.Assertion.Spec_iff_sp1, h_is_real] at h_cpu
   exact SP1Clean.CPUState.cpuStateSpec_iff_sp1.mp h_cpu
 
--- TODO(Spec-canonical-2026-05-26): BitwiseChip's new `FormalSpec` first
--- conjunct is `CPUState.Gated.Assertion.Spec` (CLEAN_FUTURE alignment),
--- not the flat `cpuStateSpec`. Same pattern as `_divRem` / `_mul`
--- below — recover via `CPUState.Gated.Assertion.Spec_iff_sp1` + an
--- `is_real = 1` premise.
-theorem cpuStateSpec_of_spec_bitwise (cols : Bitwise.BitwiseCols (ZMod p))
-    (h : Bitwise.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  sorry
+-- Bitwise/DivRem/Lt/Mul/ShiftLeft/ShiftRight: no `cpuStateSpec_of_spec_*`
+-- lemma — these chips' `ChipRow.cpuStateSpec` is `True` (Gated migration,
+-- `memoryAccesses = []`), so `cpuStateSpec_of_chipRow_spec` discharges them
+-- with `trivial`. The flat-bound projection through
+-- `CPUState.Gated.Assertion.Spec_iff_sp1` (which needs an `is_real = 1`
+-- premise this dispatcher doesn't thread) is unnecessary for these rows.
 
 theorem cpuStateSpec_of_spec_branch (cols : Branch.BranchCols (ZMod p))
     (h : Branch.assertion.Spec cols) :
     CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
   change Branch.Assertion.FormalSpec cols at h
   exact h.1
-
--- Sorry'd: DivRem's new `FormalSpec` first conjunct is
--- `CPUState.Gated.Assertion.Spec` (CLEAN_FUTURE alignment) not the flat
--- `cpuStateSpec`. The bound is still recoverable by digging into the
--- Gated Spec's internals — follow-up.
-theorem cpuStateSpec_of_spec_divRem [Fact (2 ^ 24 < p)]
-    (cols : DivRem.DivRemCols (ZMod p))
-    (h : DivRem.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  sorry
 
 /-- Post-(a)-shape migration: `cpuStateSpec` is no longer a direct FormalSpec
 conjunct (was position 1). Position 1 is now `CPUState.Gated.Assertion.Spec`;
@@ -267,34 +254,6 @@ theorem cpuStateSpec_of_spec_loadX0 (cols : LoadX0.LoadX0Cols (ZMod p))
   change LoadX0.Assertion.FormalSpec cols at h
   exact h.1
 
--- TODO(Spec-canonical-2026-05-26): see `_bitwise` above.
-theorem cpuStateSpec_of_spec_lt (cols : Lt.LtCols (ZMod p))
-    (h : Lt.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  sorry
-
--- Sorry'd: Mul's new `FormalSpec` first conjunct is
--- `CPUState.Gated.Assertion.Spec` (CLEAN_FUTURE alignment) not the flat
--- `cpuStateSpec`. The bound is still recoverable by digging into the
--- Gated Spec's internals — follow-up.
-theorem cpuStateSpec_of_spec_mul [Fact (2 ^ 24 < p)]
-    (cols : Mul.MulCols (ZMod p))
-    (h : Mul.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  sorry
-
--- TODO(Spec-canonical-2026-05-26): see `_bitwise` above.
-theorem cpuStateSpec_of_spec_shiftLeft (cols : ShiftLeft.ShiftLeftCols (ZMod p))
-    (h : ShiftLeft.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  sorry
-
--- TODO(Spec-canonical-2026-05-26): see `_bitwise` above.
-theorem cpuStateSpec_of_spec_shiftRight
-    (cols : ShiftRight.ShiftRightCols (ZMod p))
-    (h : ShiftRight.assertion.Spec cols) :
-    CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24 := by
-  sorry
 
 theorem cpuStateSpec_of_spec_storeByte (cols : StoreByte.StoreByteCols (ZMod p))
     (h : StoreByte.assertion.Spec cols) :
@@ -384,9 +343,11 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
   | .add _ => True
   | .addi _ => True
   | .addw _ => True
-  | .bitwise cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  -- Bitwise/DivRem — Gated migration: `memoryAccesses = []`, so no per-row
+  -- clock bound is needed (parallel to `.add`). Placeholder `True`.
+  | .bitwise _ => True
   | .branch cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .divRem cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  | .divRem _ => True
   -- Jal — Gated migration: `memoryAccesses` routed through the
   -- multiplicity-aware lookup bus, parallel to `.uType` / `.add`.
   | .jal _ => True
@@ -396,10 +357,12 @@ def ChipRow.cpuStateSpec : ChipRow p → Prop
   | .loadHalf cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .loadWord cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .loadX0 cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .lt cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .mul cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .shiftLeft cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
-  | .shiftRight cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
+  -- Lt/Mul/ShiftLeft/ShiftRight — Gated migration: `memoryAccesses = []`,
+  -- so no per-row clock bound is needed (parallel to `.add`).
+  | .lt _ => True
+  | .mul _ => True
+  | .shiftLeft _ => True
+  | .shiftRight _ => True
   | .storeByte cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .storeDouble cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
   | .storeHalf cols => CPUState.cpuStateSpec cols.state.clk_0_16 cols.state.clk_16_24
@@ -428,9 +391,10 @@ theorem cpuStateSpec_of_chipRow_spec [Fact (2 ^ 24 < p)]
   | add _ => trivial
   | addi _ => trivial
   | addw _ => trivial
-  | bitwise cols => exact cpuStateSpec_of_spec_bitwise cols h
+  -- Bitwise/DivRem: `ChipRow.cpuStateSpec` is `True` (Gated migration).
+  | bitwise _ => trivial
   | branch cols => exact cpuStateSpec_of_spec_branch cols h
-  | divRem cols => exact cpuStateSpec_of_spec_divRem cols h
+  | divRem _ => trivial
   | jal _ => trivial
   | jalr cols => exact cpuStateSpec_of_spec_jalr cols h
   | loadByte cols => exact cpuStateSpec_of_spec_loadByte cols h
@@ -438,10 +402,11 @@ theorem cpuStateSpec_of_chipRow_spec [Fact (2 ^ 24 < p)]
   | loadHalf cols => exact cpuStateSpec_of_spec_loadHalf cols h
   | loadWord cols => exact cpuStateSpec_of_spec_loadWord cols h
   | loadX0 cols => exact cpuStateSpec_of_spec_loadX0 cols h
-  | lt cols => exact cpuStateSpec_of_spec_lt cols h
-  | mul cols => exact cpuStateSpec_of_spec_mul cols h
-  | shiftLeft cols => exact cpuStateSpec_of_spec_shiftLeft cols h
-  | shiftRight cols => exact cpuStateSpec_of_spec_shiftRight cols h
+  -- Lt/Mul/ShiftLeft/ShiftRight: `ChipRow.cpuStateSpec` is `True` (Gated).
+  | lt _ => trivial
+  | mul _ => trivial
+  | shiftLeft _ => trivial
+  | shiftRight _ => trivial
   | storeByte cols => exact cpuStateSpec_of_spec_storeByte cols h
   | storeDouble cols => exact cpuStateSpec_of_spec_storeDouble cols h
   | storeHalf cols => exact cpuStateSpec_of_spec_storeHalf cols h
