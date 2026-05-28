@@ -55,21 +55,15 @@ all gated by `is_real`) + one `RTypeReader.Gated.assertion` (binary gate
 sub-circuits' first conjuncts (redundant but propositionally fine). -/
 @[reducible]
 def main (cols : Var AddCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
-       adapter,
-       op_a_write_value, is_real, adapter_cols⟩ := cols
+  let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩, adapter,
+    op_a_write_value, is_real, adapter_cols⟩ := cols
   SP1Clean.AddOp.assertion
-    (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
-      op_a_write_value, is_real⟩ :
-      Var SP1Clean.AddOp.Inputs (ZMod p))
+    (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value, op_a_write_value, is_real⟩)
   SP1Clean.CPUState.Gated.assertion
-    (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
-       #v[pc[0] + 4, pc[1], pc[2]], 8, is_real⟩ :
-      Var SP1Clean.CPUState.Gated.Inputs (ZMod p))
+    (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩, #v[pc[0] + 4, pc[1], pc[2]], 8, is_real⟩)
   SP1Clean.RTypeReader.Gated.assertion
     (⟨clk_high, clk_0_16 + clk_16_24 * 65536, 0, pc, op_a_write_value, adapter,
-       is_real, adapter_cols.is_trusted⟩ :
-      Var SP1Clean.RTypeReader.Gated.Inputs (ZMod p))
+      is_real, adapter_cols.is_trusted⟩)
   adapter.op_a_0 === 0
 
 @[reducible]
