@@ -54,6 +54,16 @@ under `docs/`, look at the matching entry below.
   chips, three-layer bridging discipline, faithful sub-circuit
   composition, and the canonical AddChip/AddOp pattern reference.
 
+- **`CLEAN_VERIFICATION_STATUS.md`** — the **status of record** for the
+  SP1Clean effort: a ground-truth snapshot (sorry/axiom inventory verified
+  by `grep` + `#print axioms`, not docs), a per-chip closure matrix
+  distinguishing *FormalAssertion-complete* from *actually complete*, the
+  path to soundness-end-to-end, and the witness-generation frontier
+  (boundary A intra-Lean vs boundary B Rust-prover link). Read this when you
+  need *what is actually proven today* rather than narrative or roadmap, or
+  to see why "closed" chips like Lt are complete only in the structural
+  sense. Reconciles drift in `CLEAN_FUTURE.md` / `MULTIPLICITY_BUS.md`.
+
 - **`CLEAN_FUTURE.md`** — open work and roadmap for the SP1Clean
   pilot. Per-chip sorry register with verdicts (canonical /
   mechanical / needs-Gated / needs-memory-routing / scope-fence);
