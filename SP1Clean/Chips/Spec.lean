@@ -466,38 +466,114 @@ namespace SP1Clean.ShiftLeft
 
 namespace Assertion
 
-/-- The unified chip Spec for `ShiftLeftChip`. Canonical (a) shape:
-`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition with
-opcode `is_sll * 8 + is_sllw * 14`, the chip-level `op_a_0 = 0` gate,
-two selector + sum binarities, and a 2-way selector-dispatched RV64
-semantic conjunct (`RV64.sll` for SLL/SLLI, `RV64.sllw` for SLLW/SLLIW)
-gated on `is_real = 1`. The 50+ inline shift-correctness gates that
-SP1 emits (c_bits decomposition, byte-shift selectors, shift_pow
-chain, limb_result arithmetic, the embedded `U16MSBOperation` MSB
-witness) are *not* exposed here; they're the implementation details
-of the shift sub-circuit and are reconstructed on demand via the
-chip's eventual `iff_sp1` proof. -/
+/-- The unified chip Spec for `ShiftLeftChip`. Faithful-composition shape
+(mirrors `_root_.ShiftLeft.allHold_constraints_iff` conjunct-by-conjunct):
+`U16MSBOp.AssertionGated` (the SLLW sign witness on `result[1]`) +
+`CPUState.Gated` + `ALUTypeReader.Gated` (opcode `is_sll·6 + is_sllw·21`),
+followed by the ~50 inline shift gates SP1 emits — the `c_bits` 6-bit
+decomposition + within-shift bound, the `shift_u16` 4-way byte-selector
+one-hot, the `v_01/v_012/v_0123` shift-power chain, the per-limb shift
+decompositions + bounds, the `limb_result` wiring, and the 20 gated output
+equations (16 SLL + 4 SLLW). The shift has no upstream sub-operation, so
+these are exposed inline rather than collapsed to a pure-semantic
+`RV64.sll`/`RV64.sllw` (mandatory for completeness; see
+`docs/CLEAN_FUTURE.md`). The RV64 semantic is recovered on demand from
+this structural spec via `Lemmas.sll_sllw_of_formalSpec`, which the Sail
+bridge consumes. -/
 def FormalSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
   let is_real : ZMod p := cols.is_sll + cols.is_sllw
-  let opcode_e : ZMod p := cols.is_sll * 8 + cols.is_sllw * 14
+  let opcode_e : ZMod p := cols.is_sll * 6 + cols.is_sllw * 21
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
-  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
-  let aw := Word.toBitVec64 cols.result
+  let c6 : ZMod p := cols.c_bits[0] + cols.c_bits[1] * 2 + cols.c_bits[2] * 4
+    + cols.c_bits[3] * 8 + cols.c_bits[4] * 16 + cols.c_bits[5] * 32
+  let c4 : ZMod p := cols.c_bits[0] + cols.c_bits[1] * 2 + cols.c_bits[2] * 4
+    + cols.c_bits[3] * 8
+  let sel : ZMod p := cols.c_bits[4] + cols.c_bits[5] * 2 * cols.is_sll
+  -- Faithful reformulation of the embedded `U16MSBOperation.constraints
+  -- result[1] {sllw_msb} is_sllw` block (the SLLW sign witness). NOTE: this is
+  -- *not* `U16MSBOp.AssertionGated.Spec` — that gated form only pins `msb`
+  -- binary when the gate = 1, whereas SP1 asserts `msb*(msb-1)=0`
+  -- unconditionally, so it would be strictly weaker (the
+  -- `allHold_iff_structural` iff would fail backward on `is_sllw = 0` rows).
+  (cols.is_sllw * (cols.is_sllw - 1) = 0 ∧
+    cols.sllw_msb.msb * (cols.sllw_msb.msb - 1) = 0 ∧
+    (cols.is_sllw ≠ 0 →
+      (2 * cols.result[1] - cols.sllw_msb.msb * 65536 : ZMod p).val < 65536)) ∧
   SP1Clean.CPUState.Gated.Assertion.Spec
     ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
      8, is_real⟩ ∧
   SP1Clean.ALUTypeReader.Gated.Assertion.Spec
     ⟨cols.state.clk_high, clk_low, opcode_e, cols.state.pc,
      cols.result, cols.adapter, is_real, cols.adapter_cols.is_trusted⟩ ∧
+  (is_real = 0 ∨ is_real = 1) ∧
   (cols.is_sll = 0 ∨ cols.is_sll = 1) ∧
   (cols.is_sllw = 0 ∨ cols.is_sllw = 1) ∧
-  (is_real = 0 ∨ is_real = 1) ∧
-  cols.adapter.op_a_0 = 0 ∧
-  (is_real = 1 →
-    Word.isU64 cols.result ∧
-    (cols.is_sll  = 1 → aw = RV64.sll  cw bw) ∧
-    (cols.is_sllw = 1 → aw = RV64.sllw cw bw))
+  (cols.c_bits[0] = 0 ∨ cols.c_bits[0] = 1) ∧
+  (cols.c_bits[1] = 0 ∨ cols.c_bits[1] = 1) ∧
+  (cols.c_bits[2] = 0 ∨ cols.c_bits[2] = 1) ∧
+  (cols.c_bits[3] = 0 ∨ cols.c_bits[3] = 1) ∧
+  (cols.c_bits[4] = 0 ∨ cols.c_bits[4] = 1) ∧
+  (cols.c_bits[5] = 0 ∨ cols.c_bits[5] = 1) ∧
+  (¬is_real = 0 →
+    ((cols.adapter.op_c_memory.prev_value[0] - c6) * ((64 : ZMod p)⁻¹)).val
+      < 2 ^ (10 : ZMod p).val) ∧
+  (cols.shift_u16[0] = 0 ∨ sel = 0) ∧
+  (cols.shift_u16[0] = 0 ∨ cols.shift_u16[0] = 1) ∧
+  (cols.shift_u16[1] = 0 ∨ sel = 1) ∧
+  (cols.shift_u16[1] = 0 ∨ cols.shift_u16[1] = 1) ∧
+  (cols.shift_u16[2] = 0 ∨ sel = 2) ∧
+  (cols.shift_u16[2] = 0 ∨ cols.shift_u16[2] = 1) ∧
+  (cols.shift_u16[3] = 0 ∨ sel = 3) ∧
+  (cols.shift_u16[3] = 0 ∨ cols.shift_u16[3] = 1) ∧
+  (is_real = 0 ∨
+    cols.shift_u16[0] + cols.shift_u16[1] + cols.shift_u16[2] + cols.shift_u16[3] = 1) ∧
+  (cols.v_01 = (cols.c_bits[0] + 1) * (cols.c_bits[1] * 3 + 1)) ∧
+  (cols.v_012 = cols.v_01 * (cols.c_bits[2] * 15 + 1)) ∧
+  (cols.v_0123 = cols.v_012 * (cols.c_bits[3] * 255 + 1)) ∧
+  (¬is_real = 0 → cols.lower_limb[0].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (¬is_real = 0 → cols.higher_limb[0].val < 2 ^ c4.val) ∧
+  (cols.adapter.op_b_memory.prev_value[0] * cols.v_0123
+    = cols.higher_limb[0] * 65536 + cols.lower_limb[0] * cols.v_0123) ∧
+  (¬is_real = 0 → cols.lower_limb[1].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (¬is_real = 0 → cols.higher_limb[1].val < 2 ^ c4.val) ∧
+  (cols.adapter.op_b_memory.prev_value[1] * cols.v_0123
+    = cols.higher_limb[1] * 65536 + cols.lower_limb[1] * cols.v_0123) ∧
+  (¬is_real = 0 → cols.lower_limb[2].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (¬is_real = 0 → cols.higher_limb[2].val < 2 ^ c4.val) ∧
+  (cols.adapter.op_b_memory.prev_value[2] * cols.v_0123
+    = cols.higher_limb[2] * 65536 + cols.lower_limb[2] * cols.v_0123) ∧
+  (¬is_real = 0 → cols.lower_limb[3].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (¬is_real = 0 → cols.higher_limb[3].val < 2 ^ c4.val) ∧
+  (cols.adapter.op_b_memory.prev_value[3] * cols.v_0123
+    = cols.higher_limb[3] * 65536 + cols.lower_limb[3] * cols.v_0123) ∧
+  (cols.limb_result[0] = cols.lower_limb[0] * cols.v_0123) ∧
+  (cols.limb_result[1] = cols.lower_limb[1] * cols.v_0123 + cols.higher_limb[0]) ∧
+  (cols.limb_result[2] = cols.lower_limb[2] * cols.v_0123 + cols.higher_limb[1]) ∧
+  (cols.limb_result[3] = cols.lower_limb[3] * cols.v_0123 + cols.higher_limb[2]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[0] = cols.limb_result[0]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[1] = cols.limb_result[1]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[2] = cols.limb_result[2]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[3] = cols.limb_result[3]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[1] = cols.limb_result[0]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[2] = cols.limb_result[1]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[3] = cols.limb_result[2]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[1] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[2] = cols.limb_result[0]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[2] = 0 ∨ cols.result[3] = cols.limb_result[1]) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[1] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[2] = 0) ∧
+  (cols.is_sll = 0 ∨ cols.shift_u16[3] = 0 ∨ cols.result[3] = cols.limb_result[0]) ∧
+  (cols.is_sllw = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[0] = cols.limb_result[0]) ∧
+  (cols.is_sllw = 0 ∨ cols.shift_u16[0] = 0 ∨ cols.result[1] = cols.limb_result[1]) ∧
+  (cols.is_sllw = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[0] = 0) ∧
+  (cols.is_sllw = 0 ∨ cols.shift_u16[1] = 0 ∨ cols.result[1] = cols.limb_result[0]) ∧
+  (cols.is_sllw = 0 ∨ cols.sllw_msb.msb * 65535 = cols.result[2]) ∧
+  (cols.is_sllw = 0 ∨ cols.sllw_msb.msb * 65535 = cols.result[3]) ∧
+  cols.is_sllw_imm = cols.is_sllw * cols.adapter.imm_c ∧
+  cols.adapter.op_a_0 = 0
 
 end Assertion
 
