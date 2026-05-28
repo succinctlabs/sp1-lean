@@ -53,7 +53,7 @@ Sub-circuits composed (in `air.rs` source order):
 10. `SP1Lookup.byteOpcodeGated` — `next_pc[1] ∈ Range16`, `mult := Σ`.
 11. `SP1Lookup.byteOpcodeGated` — `next_pc[2] ∈ Range16`, `mult := Σ`.
 
-## Status (2026-05-27 — Phase 2B.5 + 2C + 3B partial)
+## Status (2026-05-28 — Phase 2B.5 + 2C + 3B complete)
 
 1. **`SP1Clean.ITypeReaderImmutable.Gated.assertion`** — **LANDED**
    (`SP1Clean/Reader/ITypeReaderImmutable.lean:283-502`). `main` and
@@ -67,13 +67,13 @@ Sub-circuits composed (in `air.rs` source order):
    prev_value` / `adapter.op_b_memory.prev_value`, witness columns from
    `compare_operation.*`, `is_signed := is_blt + is_bge`, and
    `is_real := sum`.
-3. **Soundness / completeness** — **STILL sorry-stubbed.** The blocker is
-   discharging `LtSignedOp.AssertionGated.Assumptions` (which requires
-   `is_blt + is_bge ∈ {0, 1}` and `sum = 0 → is_blt + is_bge = 0`) from
-   the chip-level selector + sum binarity gates. This needs a
-   field-characteristic case bash (`(k)(k-1) ≠ 0` in `ZMod p` for
-   `k ∈ {2..6}` under `Fact (2 ^ 17 < p)`). Pattern otherwise mirrors
-   `Aggregate.lean:384-454`. Tracked as Phase 3B residual work.
+3. **Soundness / completeness** — **CLOSED (axiom-clean).** The
+   `LtSignedOp.AssertionGated.Assumptions` discharge (`is_blt + is_bge ∈ {0,1}`
+   and `sum = 0 → is_blt + is_bge = 0`) is provided by `selector_binary`
+   below; the 17-conjunct `FormalSpec` then closes by the standard
+   `circuit_proof_start` refine, with the `is_branching` outcome conjunct
+   bridged via the `compare_operation` u16-flags leaf equation
+   (`e_flags` + `Vector.getElem_map`).
 -/
 
 set_option linter.style.setOption false
@@ -86,6 +86,7 @@ open Circuit ProvableType
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 set_option maxHeartbeats 2000000 in
+-- The 64-way selector case-bash exceeds the default heartbeat cap.
 /-- Field-characteristic discharge of the non-trivial parts of
 `LtSignedOp.AssertionGated.Assumptions`: from the six selector binarity gates
 plus the aggregate sum-binarity gate, `is_blt + is_bge ∈ {0,1}` and
@@ -307,58 +308,109 @@ def FormalSpec (cols : BranchCols (ZMod p)) : Prop :=
   SP1Lookup.ByteOpcodeGated.Spec
     ⟨#v[(6 : ZMod p), cols.next_pc[2], 16, 0], sum⟩
 
--- STUB (Phase 3B partial — 2026-05-27): the chip-level `main` and
--- `FormalSpec` have been rewired to use the new gated subcircuits
--- (Phase 2B.5: `LtUnsignedOp.AssertionGated`; Phase 2C:
--- `LtSignedOp.AssertionGated`) and `ITypeReaderImmutable.Gated.assertion`
--- (already landed). The soundness/completeness closure remains deferred:
--- discharging `LtSignedOp.AssertionGated.Assumptions` requires proving
--- `is_blt + is_bge ∈ {0, 1}` from the six selector-binarity gates plus
--- the aggregate `sum * (sum - 1) = 0` gate. The proof needs a
--- field-characteristic case bash (showing that `sum * (sum - 1) ≠ 0`
--- when `sum ∈ {2, 3, 4, 5, 6}` in `ZMod p` with `Fact (2 ^ 17 < p)`),
--- plus an analogous discharge for `is_real = 0 → is_signed = 0`. The
--- proof pattern otherwise mirrors `Aggregate.lean:384-454` — destructure
--- `h_holds` / `h_spec`, refine over the new 14-conjunct FormalSpec.
--- The selector-binarity blocker (`selector_binary` above) is PROVEN axiom-clean.
--- With it, 16 of the 17 `FormalSpec` conjuncts close via the standard recipe:
---   circuit_proof_start
---   obtain ⟨⟨e_ch,e_c16,e_c0,e_pc⟩, e_adapter, e_npc, e_beq, e_bne, e_blt,
---           e_bge, e_bltu, e_bgeu, e_br, e_cmp, e_ac⟩ := h_input
---   subst_eqs
---   obtain ⟨h_sum, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu, h_br, h_cpu,
---           h_itr, h_outcome, h_ltsigned, h_gadd1, h_gadd2, h_bo0, h_bo1, h_bo2⟩
---     := h_holds
---   simp only [Vector.map_push, ← sub_eq_add_neg] at h_gadd1 h_gadd2
---   have hsel := selector_binary _ _ _ _ _ _ (by linear_combination h_beq) … (by
---     linear_combination h_sum)
---   refine ⟨…, h_cpu trivial, h_itr trivial, ?_, ?_, h_gadd1 trivial,
---           h_gadd2 trivial, ?_, ?_, ?_⟩
---   · {8 gate conjuncts}  linear_combination h_{sum,beq,…,br}
---   · {LtSignedOp arm}    exact h_ltsigned ⟨by binary_iff h_sum, hsel.1, hsel.2⟩
---   · {byteOpcode arms}   simpa only [Vector.getElem_map] using h_bo{0,1,2} trivial
--- REMAINING (the only open conjunct): the `is_branching` outcome equation.
--- `subst_eqs` of the destructured `compare_operation` generalizes the goal's
--- `u16_flags` to a ZMod `Word` fvar (`input_…_u16_flags[i]`) while `h_outcome`
--- keeps `eval(input_var_…[i])` — equal but ring-distinct atoms (the
--- `Vector.map`/`getElem` link equation is consumed by `subst_eqs`). Neither
--- `linear_combination` (ring, atom-blind) nor `convert` (defeq, no ring) bridges
--- both gaps. Fix: keep `compare_operation` folded (don't `subst_eqs` its
--- equation) so both sides stay in `eval input_var` form, then
--- `simp [Vector.getElem_map]; linear_combination h_outcome`.
+-- Both directions close over the 17-conjunct `FormalSpec`. The
+-- `LtSignedOp.AssertionGated.Assumptions` discharge comes from `selector_binary`
+-- (above). `subst_eqs` leaves `compare_operation`'s equation folded (it is a
+-- conjunction), so most conjuncts match by value directly; only the
+-- `is_branching` outcome conjunct needs the u16-flags leaf equation `e_flags`
+-- (`Vector.map eval … = …`) plus `Vector.getElem_map` to bridge the goal's
+-- value-Word indexing to the eval-of-expression form.
+set_option maxHeartbeats 1600000 in
+-- Branch composes 5 sub-FormalAssertions + 3 lookups; the 17-conjunct refine
+-- plus the selector_binary discharge exceeds the default heartbeat cap.
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e_ch, e_c16, e_c0, e_pc⟩, _e_adapter, e_npc,
+          e_beq, e_bne, e_blt, e_bge, e_bltu, e_bgeu,
+          e_br, e_cmp, e_ac⟩ := h_input
+  subst_eqs
+  obtain ⟨h_sum, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu, h_br, h_cpu,
+          h_itr, h_outcome, h_ltsigned, h_gadd1, h_gadd2, h_bo0, h_bo1, h_bo2⟩ :=
+    h_holds
+  -- `e_cmp` survives `subst_eqs` (it is a conjunction). Break out the u16-flags
+  -- leaf equation; it bridges the goal's value-Word indexing to `h_outcome`'s
+  -- `eval`-of-expression indexing in the outcome conjunct.
+  obtain ⟨⟨_, e_flags, _, _⟩, _, _⟩ := e_cmp
+  have hbin : ∀ x : ZMod p, x * (x - 1) = 0 → (x = 0 ∨ x = 1) := fun x h => by
+    binary_iff (by linear_combination h : x * (x + -1) = 0)
+  -- Normalize the gate hyps from `x + -1` to `x - 1` so they match the
+  -- `selector_binary` / `hbin` parameter shape syntactically.
+  rw [← sub_eq_add_neg] at h_sum h_beq h_bne h_blt h_bge h_bltu h_bgeu
+  have hsel := selector_binary _ _ _ _ _ _
+    h_beq h_bne h_blt h_bge h_bltu h_bgeu h_sum
+  simp only [FormalSpec]
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · linear_combination h_sum
+  · linear_combination h_beq
+  · linear_combination h_bne
+  · linear_combination h_blt
+  · linear_combination h_bge
+  · linear_combination h_bltu
+  · linear_combination h_bgeu
+  · linear_combination h_br
+  · exact h_cpu trivial
+  · exact h_itr trivial
+  · -- is_branching outcome equation: bridge the u16-flags representation.
+    rw [← e_flags]
+    simp only [Vector.getElem_map]
+    linear_combination h_outcome
+  · exact h_ltsigned ⟨hbin _ h_sum, hsel.1, hsel.2⟩
+  · simpa only [Vector.map_push, ← sub_eq_add_neg] using h_gadd1 trivial
+  · simpa only [Vector.map_push, ← sub_eq_add_neg] using h_gadd2 trivial
+  · simpa only [Vector.getElem_map] using h_bo0 trivial
+  · simpa only [Vector.getElem_map] using h_bo1 trivial
+  · simpa only [Vector.getElem_map] using h_bo2 trivial
 
+set_option maxHeartbeats 1600000 in
+-- See `soundness`; completeness is the reverse implication over the same
+-- 17-conjunct FormalSpec.
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e_ch, e_c16, e_c0, e_pc⟩, _e_adapter, e_npc,
+          e_beq, e_bne, e_blt, e_bge, e_bltu, e_bgeu,
+          e_br, e_cmp, e_ac⟩ := h_input
+  subst_eqs
+  obtain ⟨⟨_, e_flags, _, _⟩, _, _⟩ := e_cmp
+  simp only [FormalSpec] at h_spec
+  obtain ⟨h_sum, h_beq, h_bne, h_blt, h_bge, h_bltu, h_bgeu, h_br, h_cpu,
+          h_itr, h_outcome, h_ltsigned, h_gadd1, h_gadd2, h_bo0, h_bo1, h_bo2⟩ :=
+    h_spec
+  have hbin : ∀ x : ZMod p, x * (x - 1) = 0 → (x = 0 ∨ x = 1) := fun x h => by
+    binary_iff (by linear_combination h : x * (x + -1) = 0)
+  have hsel := selector_binary _ _ _ _ _ _
+    h_beq h_bne h_blt h_bge h_bltu h_bgeu h_sum
+  unfold id at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+          ⟨trivial, h_cpu⟩, ⟨trivial, h_itr⟩, ?_,
+          ⟨⟨hbin _ h_sum, hsel.1, hsel.2⟩, h_ltsigned⟩,
+          ⟨trivial, ?_⟩, ⟨trivial, ?_⟩,
+          ⟨trivial, ?_⟩, ⟨trivial, ?_⟩, ⟨trivial, ?_⟩⟩
+  · linear_combination h_sum
+  · linear_combination h_beq
+  · linear_combination h_bne
+  · linear_combination h_blt
+  · linear_combination h_bge
+  · linear_combination h_bltu
+  · linear_combination h_bgeu
+  · linear_combination h_br
+  · -- is_branching outcome equation: bridge the u16-flags representation.
+    rw [← e_flags] at h_outcome
+    simp only [Vector.getElem_map] at h_outcome
+    linear_combination h_outcome
+  · simpa only [Vector.map_push, ← sub_eq_add_neg] using h_gadd1
+  · simpa only [Vector.map_push, ← sub_eq_add_neg] using h_gadd2
+  · simpa only [Vector.getElem_map] using h_bo0
+  · simpa only [Vector.getElem_map] using h_bo1
+  · simpa only [Vector.getElem_map] using h_bo2
 
 end Assertion
 
 /-- The Clean `FormalAssertion` for `BranchChip` rebuilt on the
-multiplicity-aware lookup bus. Stub: see file docstring TODOs and the
-two `sorry`s in `Assertion.soundness`/`Assertion.completeness`. -/
+multiplicity-aware lookup bus. Soundness and completeness are both closed
+(axiom-clean). -/
 def assertion : FormalAssertion (ZMod p) BranchCols :=
   { Assertion.elaborated with
     Assumptions := Assertion.Assumptions,
