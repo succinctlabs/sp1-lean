@@ -167,7 +167,15 @@ the chips that already verify clean.
 A chip can be FormalAssertion-complete (axiom-clean) yet **not actually complete**. Lt is the live
 example: its `completeness` and both SailBridges are `sorryAx`-free, but the Spec is structural, so the
 "a valid `b<c` row exists" step is exactly the SP1-side sorry it routes around. Add/Addi/Sub avoid this
-only because their witness (the carry) is cheap and was genuinely constructed.
+because they have **no free auxiliary columns**: the operation's only committed column is the output
+word, which the semantic spec pins, and the carry is a *derived expression* (asserted boolean), not a
+column — so completeness has nothing to choose. Verified against the SP1 source of truth: in
+`../sp1/crates/core/machine/src/operations/add.rs`, `struct AddOperation<T> { value: Word<T> }` with
+`carry = (a[i] + b[i] - cols.value[i] + carry) * 2⁻¹⁶` and `populate` writing only `value`. By contrast
+`bitwise_u16.rs` commits operand byte-decompositions (`b_low_bytes`, `c_low_bytes`, `result: [T; 8]`)
+that `populate_bitwise` fills and the result word does *not* pin — addition is expressible in field
+arithmetic, but bitwise ops need byte-table lookups, which forces those extra committed witnesses. That
+`populate*` function is precisely the (boundary-B) Rust witness generator.
 
 ### Two distinct boundaries, both "witness generation"
 
