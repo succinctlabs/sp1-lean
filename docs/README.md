@@ -64,6 +64,16 @@ under `docs/`, look at the matching entry below.
   to see why "closed" chips like Lt are complete only in the structural
   sense. Reconciles drift in `CLEAN_FUTURE.md` / `MULTIPLICITY_BUS.md`.
 
+- **`CLEAN_PARALLEL_TRACKS.md`** — the open SP1Clean work partitioned
+  into three **file-disjoint, logically decoupled tracks** for parallel
+  overnight effort: (1) witness generation + combinatorial-ALU closure,
+  (2) non-ALU control/memory chips, (3) final aggregation / soundness
+  end-to-end. Each track names the files it owns, a recommended attack
+  order, and per-track verification. Read this when coordinating
+  multiple machines/sessions, or to see why the three fronts don't block
+  each other (the join points are future, not overnight). Derived from
+  `CLEAN_VERIFICATION_STATUS.md`.
+
 - **`CLEAN_FUTURE.md`** — open work and roadmap for the SP1Clean
   pilot. Per-chip sorry register with verdicts (canonical /
   mechanical / needs-Gated / needs-memory-routing / scope-fence);
