@@ -25,10 +25,11 @@ selector binarity gates + `op_a_0 = 0`.
 (the UserMode TrustMode aliasing) plus `is_slt + is_sltu = 1` (the
 non-padding-row gate).
 
-Completeness is breadcrumbed to the operation-level Layer-0 sorry at
-`SP1Operations/Compare/LtOperationSigned/LtOperationSigned.lean:529`
-(`LtOperationSigned.iff_sp1_full.mpr` requires a `spec_inv` reconstruction
-that is not yet implemented). Soundness closes axiom-clean. -/
+Both soundness and completeness close axiom-clean: the structural
+`FormalSpec` exposes the `LtSignedOp.AssertionGated.Spec` byte-decomp
+witnesses directly, so completeness needs only `subcircuit_specs_of_formalSpec`
+(an unbundling) rather than the `iff_sp1_full.mpr` `spec_inv` reconstruction
+that a pure-semantic spec would have required. -/
 
 set_option linter.style.setOption false
 set_option linter.style.longLine false
@@ -125,17 +126,54 @@ theorem soundness :
   · linear_combination h_is_sltu_bin
   · linear_combination h_sum_bin
 
-/-- Completeness. **Sorry (breadcrumb)** — the chip-level completeness
-ultimately needs `LtOperationSigned.iff_sp1_full.mpr`, which is sorry'd
-at the operation level (`SP1Operations/Compare/LtOperationSigned/LtOperationSigned.lean:529`
-— reconstructing `comparison_limbs` / `u16_flags` / `not_eq_inv` / `b_msb`
-/ `c_msb` witnesses from the BitVec result requires a `LtOperationSigned.spec_inv`
-parallel to `LtOperationUnsigned.spec_inv` which has not yet been
-implemented). Tracked in `docs/CLEAN_FUTURE.md` as a Layer-0 follow-up;
-the chip soundness above closes axiom-clean. -/
+/-- Completeness. Now provable since `FormalSpec` *is* the structural
+bundle: `subcircuit_specs_of_formalSpec` unbundles `h_spec` into the
+three sub-circuit Specs + the 3 binary gates + `op_a_0`, then each gated
+sub-assertion is re-wrapped as `⟨its-Assumptions, its-Spec⟩` and each
+scalar gate re-stated in the `x + -1` normal form. The `LtSignedOp`
+sub-assumptions (is_real binary / is_signed binary / padding-unsigned)
+are discharged from the binary gates + selector arithmetic. -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e1, e2, e3, e4⟩, e_adapter, e_is_slt, e_is_sltu, e_ltop, e_ac⟩ := h_input
+  subst_eqs
+  obtain ⟨h_trusted, h_is_real_sum⟩ := h_assumptions
+  unfold id at *
+  obtain ⟨h_ltop, h_cpu, h_alu, h_slt_bin, h_sltu_bin, h_sum_bin, h_op_a_0⟩ :=
+    subcircuit_specs_of_formalSpec _ h_is_real_sum h_trusted h_spec
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hbin : ∀ x : ZMod p, x * (x - 1) = 0 → (x = 0 ∨ x = 1) := fun x h => by
+    binary_iff (by linear_combination h : x * (x + -1) = 0)
+  have h_slt_or := hbin _ h_slt_bin
+  have h_sltu_or := hbin _ h_sltu_bin
+  have h_sum_or := hbin _ h_sum_bin
+  have h2ne : (2 : ZMod p) ≠ 0 := by
+    have h2lt : (2 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    have h2val : (2 : ZMod p).val = 2 := ZMod.val_natCast_of_lt h2lt
+    intro heq; rw [heq, ZMod.val_zero] at h2val; omega
+  -- `LtSignedOp.assertionGated`: ⟨its-Assumptions, its-Spec⟩; the Assumptions
+  -- type is inferred from the goal. Padding-unsigned uses selector arithmetic.
+  refine ⟨⟨⟨h_sum_or, h_slt_or, fun h_ir0 => ?_⟩, h_ltop⟩,
+          ⟨trivial, h_cpu⟩, ⟨trivial, h_alu⟩, ?_, ?_, ?_, h_op_a_0⟩
+  · -- `h_ir0 : is_real = 0` (is_real = is_slt + is_sltu); the gated input's
+    -- `is_real` projection is defeq to the sum, so `h_ir0` re-types as it.
+    have hsum : Expression.eval env.toEnvironment input_var_is_slt +
+        Expression.eval env.toEnvironment input_var_is_sltu = 0 := h_ir0
+    rcases h_slt_or with h | h
+    · exact h
+    · exfalso
+      dsimp only at h
+      rcases h_sltu_or with h' | h'
+      · dsimp only at h'
+        rw [h, h'] at hsum
+        exact absurd (by linear_combination hsum : (1 : ZMod p) = 0) one_ne_zero
+      · dsimp only at h'
+        rw [h, h'] at hsum
+        exact absurd (by linear_combination hsum : (2 : ZMod p) = 0) h2ne
+  · linear_combination h_slt_bin
+  · linear_combination h_sltu_bin
+  · linear_combination h_sum_bin
 
 end Assertion
 

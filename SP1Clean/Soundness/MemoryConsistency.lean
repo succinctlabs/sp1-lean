@@ -9,7 +9,7 @@ import SP1Clean.Chips.ALU.ShiftLeftChip.Aggregate
 import SP1Clean.Chips.ALU.AddwChip.SailBridge
 import SP1Clean.Chips.ALU.UTypeChip.SailBridge
 import SP1Clean.Chips.Control.JalrChip.Aggregate
-import SP1Clean.Chips.ALU.LtChip.Aggregate
+import SP1Clean.Chips.ALU.LtChip.SailBridge
 import SP1Clean.Chips.Memory.StoreWordChip
 import SP1Clean.Chips.Memory.StoreDoubleChip
 import SP1Clean.Chips.Memory.StoreHalfChip

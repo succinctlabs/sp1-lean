@@ -21,6 +21,7 @@ import SP1Clean.Operations.SubOperation
 import SP1Clean.Operations.SubwOperation
 import SP1Clean.Operations.BitwiseOperation
 import SP1Clean.Operations.U16MSBOperation
+import SP1Clean.Operations.LtOperationSigned
 import SP1Clean.Operations.IsZeroOperation
 import SP1Clean.Operations.IsZeroWordOperation
 import SP1Clean.Operations.IsEqualWordOperation
@@ -549,26 +550,38 @@ namespace SP1Clean.Lt
 
 namespace Assertion
 
-/-- The unified chip Spec for `LtChip`. Canonical (a) shape: flag-threaded
-`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition, the
-chip-level `op_a_0 = 0` gate, the selector + sum binarities, and a
-selector-dispatched RV64 semantic conjunct gated on `is_real = 1`.
+/-- The unified chip Spec for `LtChip`. Faithful-composition shape: one
+conjunct per sub-circuit invoked by `Assertion.main` —
+`LtSignedOp.AssertionGated.Spec` (the byte-decomposition comparison) +
+`CPUState.Gated` + `ALUTypeReader.Gated` — followed by the selector + sum
+binarities and the chip-level `op_a_0 = 0` gate.
 
-The `LtOperationSigned` byte-decomposition that SP1 threads internally
-is *not* exposed here; it's the implementation detail of the
-`LtOperationSigned` sub-circuit and is reconstructed on demand via the
-chip's eventual `iff_sp1` proof. The result is a single bit
-(`lt_operation.result.u16_compare_operation.bit`) packed into the low
-limb of a zero-padded `op_a_write_value` Word. -/
+Unlike the Add-family canonical (a) shape, the `LtOperationSigned`
+byte-decomposition (`u16_flags` one-hot, `comparison_limbs`,
+`not_eq_inv`) is exposed structurally here via `LtSignedOp.AssertionGated.Spec`
+rather than collapsed to a pure-semantic `RV64.slt`/`RV64.sltu` conjunct.
+This is mandatory for completeness: the semantic bit alone does not pin
+those free combinatorial witnesses, so a pure-semantic spec would be
+strictly weaker than the constraints (see `docs/CLEAN_FUTURE.md`). The
+RV64 semantic (`aw = RV64.slt cw bw` etc.) is recovered on demand from
+this structural spec via `Lemmas.slt_sltu_of_formalSpec`, which the Sail
+bridge consumes. -/
 def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   let is_real : ZMod p := cols.is_slt + cols.is_sltu
   let opcode_e : ZMod p := cols.is_slt * 9 + cols.is_sltu * 10
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let op_a_write_value : Vector (ZMod p) 4 :=
     #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]
-  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
-  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
-  let aw := Word.toBitVec64 op_a_write_value
+  SP1Clean.LtSignedOp.AssertionGated.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_memory.prev_value,
+     cols.is_slt,
+     cols.lt_operation.result.u16_compare_operation.bit,
+     cols.lt_operation.result.u16_flags,
+     cols.lt_operation.result.not_eq_inv,
+     cols.lt_operation.result.comparison_limbs,
+     cols.lt_operation.b_msb.msb,
+     cols.lt_operation.c_msb.msb,
+     is_real⟩ ∧
   SP1Clean.CPUState.Gated.Assertion.Spec
     ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
      8, is_real⟩ ∧
@@ -578,11 +591,7 @@ def FormalSpec (cols : LtCols (ZMod p)) : Prop :=
   (cols.is_slt = 0 ∨ cols.is_slt = 1) ∧
   (cols.is_sltu = 0 ∨ cols.is_sltu = 1) ∧
   (is_real = 0 ∨ is_real = 1) ∧
-  cols.adapter.op_a_0 = 0 ∧
-  (is_real = 1 →
-    Word.isU64 op_a_write_value ∧
-    (cols.is_slt  = 1 → aw = RV64.slt  cw bw) ∧
-    (cols.is_sltu = 1 → aw = RV64.sltu cw bw))
+  cols.adapter.op_a_0 = 0
 
 end Assertion
 

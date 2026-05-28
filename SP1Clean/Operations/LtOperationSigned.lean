@@ -473,6 +473,130 @@ theorem completeness :
     · rw [h_ir1]; linear_combination h_bvac
     · rw [h_ir1]; linear_combination h_cvac
 
+/-- Bridge the multiplicity-gated `AssertionGated.Spec` (on real rows,
+`is_real = 1`) to SP1's `LtOperationSigned.constraints … is_signed 1`
+`allHold`. Both `is_signed` branches are handled:
+
+- `is_signed = 1`: the gated sub-Specs collapse to the non-gated
+  `U16MSBOp.Assertion.Spec` / `LtUnsignedOp.Spec` bodies (identical
+  bodies, applied to `1 = 1`), reassembling `LtSignedOp.Spec`, which
+  `LtSignedOp.iff_sp1` bridges to the raw `allHold`.
+- `is_signed = 0`: the two `U16MSBOp` sub-CS are mult-0 vacuous (only the
+  `msb` binarity survives, discharged by the sign-vacuity gates forcing
+  `b_msb = c_msb = 0`); the `LtUnsignedOp` sub-CS matches the gated
+  Spec's `is_real = 1` body modulo the zero-shifted limb-3 collapse.
+
+Consumed by the chip-level `Lemmas.allHold_iff_structural`. -/
+theorem iff_sp1 (input : InputsGated (ZMod p))
+    (h_is_signed_bin : input.is_signed = 0 ∨ input.is_signed = 1)
+    (h_is_real : input.is_real = 1) :
+    AssertionGated.Spec input ↔
+      (LtOperationSigned.constraints input.b input.c
+        { result := { u16_compare_operation := { bit := input.compare_bit },
+                      u16_flags := input.u16_flags,
+                      not_eq_inv := input.not_eq_inv,
+                      comparison_limbs := input.comparison_limbs },
+          b_msb := { msb := input.b_msb },
+          c_msb := { msb := input.c_msb } }
+        input.is_signed 1).allHold := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  -- Unfold the gated Spec at `is_real = 1` to drop the leading implication.
+  have hSpec_iff : AssertionGated.Spec input ↔
+      (SP1Clean.U16MSBOp.AssertionGated.Spec ⟨input.b[3], input.b_msb, input.is_signed⟩ ∧
+       SP1Clean.U16MSBOp.AssertionGated.Spec ⟨input.c[3], input.c_msb, input.is_signed⟩ ∧
+       (let b3' := input.b[3] + input.is_signed * 32768 - 65536 * input.b_msb
+        let c3' := input.c[3] + input.is_signed * 32768 - 65536 * input.c_msb
+        SP1Clean.LtUnsignedOp.AssertionGated.Spec
+          ⟨#v[input.b[0], input.b[1], input.b[2], b3'],
+           #v[input.c[0], input.c[1], input.c[2], c3'],
+           input.compare_bit, input.u16_flags, input.not_eq_inv,
+           input.comparison_limbs, input.is_real⟩) ∧
+       input.is_signed * (input.is_signed - 1) = 0 ∧
+       (input.is_signed - 1) * input.b_msb = 0 ∧
+       (input.is_signed - 1) * input.c_msb = 0) := by
+    simp only [AssertionGated.Spec, h_is_real, forall_const]
+  -- Two helper iffs collapsing the gated sub-Specs to their non-gated forms
+  -- on real rows (`is_real = 1`).
+  have hU : ∀ (a msb : ZMod p),
+      SP1Clean.U16MSBOp.AssertionGated.Spec ⟨a, msb, 1⟩ ↔
+      SP1Clean.U16MSBOp.Assertion.Spec ⟨a, msb⟩ := by
+    intro a msb
+    simp only [SP1Clean.U16MSBOp.AssertionGated.Spec, SP1Clean.U16MSBOp.Assertion.Spec,
+      one_ne_zero, forall_const]
+  -- Gated LtUnsigned Spec at `is_real = 1` ↔ non-gated `LtUnsignedOp.Spec`.
+  have hLt : ∀ (b c : Vector (ZMod p) 4) (cb : ZMod p) (uf : Vector (ZMod p) 4)
+      (nei : ZMod p) (cl : Vector (ZMod p) 2),
+      SP1Clean.LtUnsignedOp.AssertionGated.Spec ⟨b, c, cb, uf, nei, cl, 1⟩ ↔
+      SP1Clean.LtUnsignedOp.Spec ⟨b, c, cb, uf, nei, cl⟩ := by
+    intro b c cb uf nei cl
+    simp only [SP1Clean.LtUnsignedOp.AssertionGated.Spec, SP1Clean.LtUnsignedOp.Spec,
+      one_ne_zero, forall_const]
+  -- Gated LtUnsigned Spec at `is_real = 1` ↔ raw `LtOperationUnsigned.constraints` allHold.
+  have hLtB : ∀ (b c : Vector (ZMod p) 4) (cb : ZMod p) (uf : Vector (ZMod p) 4)
+      (nei : ZMod p) (cl : Vector (ZMod p) 2),
+      SP1Clean.LtUnsignedOp.AssertionGated.Spec ⟨b, c, cb, uf, nei, cl, 1⟩ ↔
+      List.Forall SP1Constraint.toProp (LtOperationUnsigned.constraints b c
+        { u16_compare_operation := { bit := cb }, u16_flags := uf,
+          not_eq_inv := nei, comparison_limbs := cl } 1) := by
+    intro b c cb uf nei cl
+    rw [hLt]
+    exact SP1Clean.LtUnsignedOp.iff_sp1 ⟨b, c, cb, uf, nei, cl⟩
+  -- Raw U16MSB block at mult 0 ↔ msb binarity (the byte send is vacuous).
+  have hU0 : ∀ (a m : ZMod p),
+      List.Forall SP1Constraint.toProp
+        (U16MSBOperation.constraints (F := ZMod p) a { msb := m } 0) ↔ m * (m - 1) = 0 := by
+    intro a m
+    simp only [U16MSBOperation.constraints, List.Forall, SP1Constraint.toProp]
+    constructor
+    · rintro ⟨_, h, _⟩
+      linear_combination h
+    · intro h
+      exact ⟨by ring, by linear_combination h, fun hcon => absurd rfl hcon⟩
+  rw [hSpec_iff]
+  simp only [h_is_real]
+  rcases h_is_signed_bin with h_sgn | h_sgn
+  · -- Unsigned mode (`is_signed = 0`): U16MSB subs vacuous, LtUnsigned active.
+    rw [h_sgn]
+    rw [show ((LtOperationSigned.constraints input.b input.c
+          { result := { u16_compare_operation := { bit := input.compare_bit },
+                        u16_flags := input.u16_flags, not_eq_inv := input.not_eq_inv,
+                        comparison_limbs := input.comparison_limbs },
+            b_msb := { msb := input.b_msb }, c_msb := { msb := input.c_msb } }
+          (0 : ZMod p) 1).allHold) =
+        List.Forall SP1Constraint.toProp (LtOperationSigned.constraints input.b input.c
+          { result := { u16_compare_operation := { bit := input.compare_bit },
+                        u16_flags := input.u16_flags, not_eq_inv := input.not_eq_inv,
+                        comparison_limbs := input.comparison_limbs },
+            b_msb := { msb := input.b_msb }, c_msb := { msb := input.c_msb } }
+          (0 : ZMod p) 1) from rfl, LtOperationSigned.allHold_constraints_iff]
+    dsimp only
+    have hv4 : #v[input.u16_flags[0], input.u16_flags[1], input.u16_flags[2],
+                  input.u16_flags[3]] = input.u16_flags := by ext i; fin_cases i <;> rfl
+    have hv2 : #v[input.comparison_limbs[0], input.comparison_limbs[1]] =
+                  input.comparison_limbs := by ext i; fin_cases i <;> rfl
+    rw [hv4, hv2]
+    simp only [SP1Clean.U16MSBOp.AssertionGated.Spec, zero_ne_one, forall_const,
+      false_implies, true_and, hLtB, hU0]
+    constructor
+    · rintro ⟨hlt, _, hb, hc⟩
+      have hb0 : input.b_msb = 0 := by linear_combination -hb
+      have hc0 : input.c_msb = 0 := by linear_combination -hc
+      refine ⟨?_, ?_, hlt, Or.inl trivial, Or.inr hb0, Or.inr hc0⟩
+      · rw [hb0]; ring
+      · rw [hc0]; ring
+    · rintro ⟨_, _, hlt, _, hb, hc⟩
+      have hb0 : input.b_msb = 0 := hb.resolve_left (by simp)
+      have hc0 : input.c_msb = 0 := hc.resolve_left (by simp)
+      exact ⟨hlt, by ring, by rw [hb0]; ring, by rw [hc0]; ring⟩
+  · -- Signed mode (`is_signed = 1`): all sub-Specs become the non-gated bodies,
+    -- reassembling `LtSignedOp.Spec`, which `LtSignedOp.iff_sp1` bridges.
+    rw [h_sgn]
+    refine Iff.trans ?_ (SP1Clean.LtSignedOp.iff_sp1
+      ⟨input.b, input.c, 1, input.compare_bit, input.u16_flags, input.not_eq_inv,
+       input.comparison_limbs, input.b_msb, input.c_msb⟩ rfl)
+    unfold SP1Clean.LtSignedOp.Spec
+    simp only [hU, hLt]
+
 end AssertionGated
 
 /-- Multiplicity-gated FormalAssertion for `LtOperationSigned`. Compose

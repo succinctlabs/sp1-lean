@@ -91,4 +91,27 @@ omit [Fact (2 ^ 17 < p)] in
 @[simp] lemma sp1_lt_cols_fromMain (Main : Vector (ZMod p) 44) :
     sp1_lt_cols (fromMain Main) = _root_.Lt.sp1_lt Main := rfl
 
+/-! ### Register memory accesses (trace-level OfflineMemory aggregation) -/
+
+/-- The op_a / op_b / op_c register accesses, exposed for trace-level
+OfflineMemory aggregation. op_a writes the 4-limb boolean result
+`#v[compare_bit, 0, 0, 0]`. -/
+def opAMemoryAccess (cols : LtCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
+  { addr := #v[cols.adapter.op_a, 0, 0],
+    prev_value := cols.adapter.op_a_memory.prev_value,
+    prev_low := cols.adapter.op_a_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_a_memory.access_timestamp.diff_low_limb }
+
+def opBMemoryAccess (cols : LtCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
+  { addr := #v[cols.adapter.op_b, 0, 0],
+    prev_value := cols.adapter.op_b_memory.prev_value,
+    prev_low := cols.adapter.op_b_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_b_memory.access_timestamp.diff_low_limb }
+
+def opCMemoryAccess (cols : LtCols (ZMod p)) : SP1Clean.MemoryAccess (ZMod p) :=
+  { addr := #v[cols.adapter.op_c[0], 0, 0],
+    prev_value := cols.adapter.op_c_memory.prev_value,
+    prev_low := cols.adapter.op_c_memory.access_timestamp.prev_low,
+    diff_low_limb := cols.adapter.op_c_memory.access_timestamp.diff_low_limb }
+
 end SP1Clean.Lt
