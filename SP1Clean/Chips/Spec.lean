@@ -148,9 +148,11 @@ namespace SP1Clean.Addw
 
 /-- The unified chip Spec for `AddwChip`: the canonical (a) shape from
 the SPEC_AUDIT.md classification — flag-threaded sub-circuit composition
-(`CPUState.Gated` + `ALUTypeReader.Gated`, opcode 19) plus the
-chip-level `op_a_0 = 0` gate plus a pure BitVec `RV64.addw` semantic
-conjunct conditional on `is_real = 1`. The byte-decomposition +
+(`CPUState.Gated` + `ALUTypeReader.Gated`, opcode 19), the chip-level
+`op_a_0 = 0` gate, the gated `AddwOp.AssertionGated.Spec` sub-Spec
+(semantic 32-bit triple matching `AddwOperation.iff_sp1_full`'s RHS
+verbatim under `is_real = 1`), and a pure BitVec `RV64.addw` semantic
+consequence conditional on `is_real = 1`. The byte-decomposition +
 sign-extension MSB witness threaded internally by `AddwOperation` is
 *not* exposed here; it's the implementation detail of the `AddwOp`
 sub-circuit and is reconstructed on demand via
@@ -159,8 +161,8 @@ sub-circuit and is reconstructed on demand via
 The 4-limb result Word `#v[addw_value[0], addw_value[1], msb*65535,
 msb*65535]` is reconstructed inline from the chip-internal `addw_value`
 (2 BV16 limbs) and `addw_msb` (sign-extension witness) — these are the
-canonical Rust-side storage form. The Spec's semantic conjunct sees
-only the result `Word`, not the individual columns; the `RV64.addw`
+canonical Rust-side storage form. The Spec's BV64 semantic conjunct
+sees only the result `Word`, not the individual columns; the `RV64.addw`
 clause is uniform for both ADDW (R-type, `imm_c = 0`) and ADDIW (I-type,
 `imm_c = 1`) because the reader supplies `op_c_memory.prev_value`
 matching the immediate or register operand as appropriate (so the BV64
@@ -184,6 +186,15 @@ def FormalSpec (cols : AddwCols (ZMod p)) : Prop :=
        op_a_write_value, cols.adapter,
        cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0 ∧
+  SP1Clean.AddwOp.AssertionGated.Spec
+      ⟨cols.adapter.op_b_memory.prev_value,
+       cols.adapter.op_c_memory.prev_value,
+       cols.addw_value, cols.addw_msb, cols.is_real⟩ ∧
+  -- Pure BitVec semantic for ADDW/ADDIW. Derived inline from the BV32
+  -- triple inside `AddwOp.AssertionGated.Spec` via the
+  -- `addwOp_spec_iff_rv64_addw` bridge, using the operand `Word.isU64`
+  -- bounds exposed by `ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec`
+  -- / `isU64_op_c_memory_of_spec`.
   (cols.is_real = 1 →
     Word.isU64 op_a_write_value ∧
     Word.toBitVec64 op_a_write_value =
@@ -230,17 +241,18 @@ namespace SP1Clean.Subw
 
 /-- The unified chip Spec for `SubwChip`: the flag-threaded sub-circuit
 composition (`CPUState.Gated` + `RTypeReader.Gated`, opcode 20), the
-chip-level `op_a_0 = 0` gate, the 32-bit Sail-form internals triple
-(`isU32 ∧ BV32 identity ∧ msb sign-extension bit`, matching
-`SubwOperation.iff_sp1_full`'s RHS verbatim), and the trailing pure
-BitVec `RV64.subw` semantic clause (gated on `is_real = 1`).
+chip-level `op_a_0 = 0` gate, the gated SubwOp sub-Spec
+(`SubwOp.AssertionGated.Spec`, the semantic 32-bit triple matching
+`SubwOperation.iff_sp1_full`'s RHS verbatim under `is_real = 1`), and
+the trailing pure BitVec `RV64.subw` semantic consequence (gated on
+`is_real = 1`).
 
 Diverges in shape from `SP1Clean/SubChip/Cols.lean`'s BV64-only form
 because SubwChip's storage is BV32 + msb, not a 4-limb Word: the BV32
-triple is kept as the internals exposure so completeness can drive
-`SubwOperation.iff_sp1_full.mpr` to witness `subw_value` / `subw_msb`
-without a costly BV64↔BV32+msb inversion. The `RV64.subw` 64-bit
-clause is derived inline from the BV32 triple via the bridge
+triple lives inside `SubwOp.AssertionGated.Spec` so completeness can
+drive `SubwOperation.iff_sp1_full.mpr` to witness `subw_value` /
+`subw_msb` without a costly BV64↔BV32+msb inversion. The `RV64.subw`
+64-bit clause is derived inline from that BV32 triple via the bridge
 `rv64_subw_eq_of_subwop_spec` (see `Lemmas.lean`). -/
 def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
@@ -256,17 +268,14 @@ def FormalSpec (cols : SubwCols (ZMod p)) : Prop :=
        op_a_write_value, cols.adapter,
        cols.is_real, cols.adapter_cols.is_trusted⟩ ∧
   cols.adapter.op_a_0 = 0 ∧
-  (cols.is_real = 1 →
-    HWord.isU32 cols.subw_value ∧
-    HWord.toBitVec32 cols.subw_value =
-      execute_RTYPEW_pure_32_w cols.adapter.op_b_memory.prev_value
-                                cols.adapter.op_c_memory.prev_value .SUBW ∧
-    cols.subw_msb =
-      if (HWord.toBitVec32 cols.subw_value).msb then 1 else 0) ∧
+  SP1Clean.SubwOp.AssertionGated.Spec
+      ⟨cols.adapter.op_b_memory.prev_value,
+       cols.adapter.op_c_memory.prev_value,
+       cols.subw_value, cols.subw_msb, cols.is_real⟩ ∧
   -- Pure BitVec semantic for SUBW. Derived inline from the BV32 triple
-  -- above via `rv64_subw_eq_of_subwop_spec`, using the operand
-  -- `Word.isU64` bounds exposed by `RTypeReader.Gated.Assertion.Spec`'s
-  -- `RegisterAccess.Spec` sub-conjuncts.
+  -- inside `SubwOp.AssertionGated.Spec` via `rv64_subw_eq_of_subwop_spec`,
+  -- using the operand `Word.isU64` bounds exposed by
+  -- `RTypeReader.Gated.Assertion.Spec`'s `RegisterAccess.Spec` sub-conjuncts.
   (cols.is_real = 1 →
     Word.toBitVec64 op_a_write_value =
       RV64.subw (Word.toBitVec64 cols.adapter.op_c_memory.prev_value)

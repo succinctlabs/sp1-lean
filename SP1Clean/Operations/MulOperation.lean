@@ -291,15 +291,54 @@ lemma execute_MUL_pure_eq_rv64_mul (b c : BitVec 64) :
   simp [BitVec.toNat_mul, BitVec.toNat_ofNat, Nat.mul_comm]
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
-/-- TODO: close via the `mod_129_to_128` + `BitVec.toInt_toInt_as_toNat_128`
-recipe at `SP1Foundations/SailM.lean:858-863`. The bridge is between
-`signExtend 128`-form (LHS, from `execute_MUL_pure`) and `signExtend 129`-form
-(RHS, from `RV64.mulh`); both extract bits 64..127 of the signed product,
-which agree because the signed product fits in 128 bits. `bv_decide` chokes
-on the 129-bit width directly. -/
+/-- Bridge from SP1's 128-bit signed-product form (`execute_MUL_pure b c .MULH`)
+to RV64's 129-bit signed-product form (`RV64.mulh c b`). Both extract bits 64..127
+of the signed product; the difference between the two representations is a
+multiple of 2^128, which the shift-and-mod erases. -/
 lemma execute_MUL_pure_eq_rv64_mulh (b c : BitVec 64) :
     execute_MUL_pure b c .MULH = RV64.mulh c b := by
-  sorry
+  simp [execute_MUL_pure, RV64.mulh, BitVec.extend]
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofNat, BitVec.toNat_signExtend, BitVec.toNat_setWidth,
+    Nat.shiftRight_eq_div_pow]
+  have hb : b.toNat < 2^64 := b.isLt
+  have hc : c.toNat < 2^64 := c.isLt
+  rw [Nat.mod_eq_of_lt (show b.toNat < 2^128 by omega),
+      Nat.mod_eq_of_lt (show c.toNat < 2^128 by omega),
+      Nat.mod_eq_of_lt (show b.toNat < 2^129 by omega),
+      Nat.mod_eq_of_lt (show c.toNat < 2^129 by omega)]
+  change _ % 2^128 / 2^64 % 2^64 = _ % 2^129 / 2^64 % 2^64
+  have eq128 : (2 : ℕ)^128 = 2^64 * 2^64 := by norm_num
+  have eq129 : (2 : ℕ)^129 = 2^64 * 2^65 := by norm_num
+  have h_lhs : ∀ x : ℕ, x % 2^128 / 2^64 % 2^64 = x / 2^64 % 2^64 := by
+    intro x; rw [eq128, Nat.mod_mul_right_div_self, Nat.mod_mod]
+  have h_rhs : ∀ x : ℕ, x % 2^129 / 2^64 % 2^64 = x / 2^64 % 2^64 := by
+    intro x; rw [eq129, Nat.mod_mul_right_div_self]
+    exact Nat.mod_mod_of_dvd _ (by norm_num)
+  rw [h_lhs, h_rhs]
+  -- Suffices: RHS_inner − LHS_inner is a multiple of 2^64 * 2^64.
+  suffices h : ∃ k : ℕ,
+      (b.toNat + (if b.msb = true then 2^129 - 2^64 else 0)) *
+        (c.toNat + (if c.msb = true then 2^129 - 2^64 else 0)) =
+      (b.toNat + (if b.msb = true then 2^128 - 2^64 else 0)) *
+        (c.toNat + (if c.msb = true then 2^128 - 2^64 else 0)) + 2^64 * (2^64 * k) by
+    obtain ⟨k, hk⟩ := h
+    rw [hk, Nat.add_mul_div_left _ _ (by norm_num : 0 < 2^64),
+        Nat.add_mul_mod_self_left]
+  rcases hbm : b.msb with _ | _ <;> rcases hcm : c.msb with _ | _ <;>
+    simp only [reduceIte, show (if false = true then (2:ℕ)^128 - 2^64 else 0) = 0
+      from by decide, show (if false = true then (2:ℕ)^129 - 2^64 else 0) = 0 from by decide,
+      Nat.add_zero]
+  · exact ⟨0, by ring⟩
+  · refine ⟨b.toNat, ?_⟩
+    have : (2:ℕ)^129 - 2^64 = (2^128 - 2^64) + 2^128 := by omega
+    rw [this]; ring
+  · refine ⟨c.toNat, ?_⟩
+    have : (2:ℕ)^129 - 2^64 = (2^128 - 2^64) + 2^128 := by omega
+    rw [this]; ring
+  · refine ⟨(b.toNat + (2^128 - 2^64)) + (c.toNat + (2^128 - 2^64)) + 2^128, ?_⟩
+    have : (2:ℕ)^129 - 2^64 = (2^128 - 2^64) + 2^128 := by omega
+    rw [this]; ring
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
 lemma execute_MUL_pure_eq_rv64_mulhu (b c : BitVec 64) :
@@ -307,12 +346,43 @@ lemma execute_MUL_pure_eq_rv64_mulhu (b c : BitVec 64) :
   simp [execute_MUL_pure, RV64.mulhu, BitVec.extend]
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
-/-- TODO: close via the same `mod_129_to_128` + zero/sign-extend bridge
-recipe used for `mulh`. LHS uses `signExtend 128 b * setWidth 128 c`; RHS
-uses `signExtend 129 b * zeroExtend 129 c`. Both extract bits 64..127. -/
+/-- Bridge from SP1's mixed signed/unsigned 128-bit form (`execute_MUL_pure b c
+.MULHSU`) to RV64's 129-bit form (`RV64.mulhsu c b`). Only the signed operand `b`
+introduces the 128-vs-129 sign-extension gap; `c` is zero-extended identically in
+both widths. Same shift-and-mod argument as `mulh`, but only `b.msb` matters. -/
 lemma execute_MUL_pure_eq_rv64_mulhsu (b c : BitVec 64) :
     execute_MUL_pure b c .MULHSU = RV64.mulhsu c b := by
-  sorry
+  simp [execute_MUL_pure, RV64.mulhsu, BitVec.extend]
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofNat, BitVec.toNat_signExtend, BitVec.toNat_setWidth,
+    Nat.shiftRight_eq_div_pow]
+  have hb : b.toNat < 2^64 := b.isLt
+  have hc : c.toNat < 2^64 := c.isLt
+  rw [Nat.mod_eq_of_lt (show b.toNat < 2^128 by omega),
+      Nat.mod_eq_of_lt (show b.toNat < 2^129 by omega)]
+  change _ % 2^128 / 2^64 % 2^64 = _ % 2^129 / 2^64 % 2^64
+  have eq128 : (2 : ℕ)^128 = 2^64 * 2^64 := by norm_num
+  have eq129 : (2 : ℕ)^129 = 2^64 * 2^65 := by norm_num
+  have h_lhs : ∀ x : ℕ, x % 2^128 / 2^64 % 2^64 = x / 2^64 % 2^64 := by
+    intro x; rw [eq128, Nat.mod_mul_right_div_self, Nat.mod_mod]
+  have h_rhs : ∀ x : ℕ, x % 2^129 / 2^64 % 2^64 = x / 2^64 % 2^64 := by
+    intro x; rw [eq129, Nat.mod_mul_right_div_self]
+    exact Nat.mod_mod_of_dvd _ (by norm_num)
+  rw [h_lhs, h_rhs]
+  suffices h : ∃ k : ℕ,
+      (b.toNat + (if b.msb = true then 2^129 - 2^64 else 0)) * c.toNat =
+      (b.toNat + (if b.msb = true then 2^128 - 2^64 else 0)) * c.toNat + 2^64 * (2^64 * k) by
+    obtain ⟨k, hk⟩ := h
+    rw [hk, Nat.add_mul_div_left _ _ (by norm_num : 0 < 2^64),
+        Nat.add_mul_mod_self_left]
+  rcases hbm : b.msb with _ | _ <;>
+    simp only [reduceIte, show (if false = true then (2:ℕ)^128 - 2^64 else 0) = 0
+      from by decide, show (if false = true then (2:ℕ)^129 - 2^64 else 0) = 0 from by decide,
+      Nat.add_zero]
+  · exact ⟨0, by ring⟩
+  · refine ⟨c.toNat, ?_⟩
+    have : (2:ℕ)^129 - 2^64 = (2^128 - 2^64) + 2^128 := by omega
+    rw [this]; ring
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] [Fact (2 ^ 24 < p)] in
 lemma execute_MULW_pure_eq_rv64_mulw (b c : BitVec 64) :
@@ -436,33 +506,49 @@ The intended signature takes one named hypothesis per constraint emitted
 in `main` — 3 sub-circuit Specs (U16toU8OpSafe ×2, U16MSBOp), 2 MSB byte
 lookup facts (opcode 5), 42 inline `_ = 0` facts, 16 carry range lookup
 facts (opcode 6), and 8 product-pair U8Range lookup facts (opcode 3) —
-and discharges the 60+ conjuncts of `MulOperation.allHold_constraints_iff_is_real`
-positionally. The current stub takes a placeholder `True` and is `sorry`;
-see TODO below for the closure plan.
+and discharges the ~70 conjuncts of `MulOperation.allHold_constraints_iff_is_real`
+positionally. The current stub takes a placeholder `True` and is `sorry`.
+
+Status: the BV bridges `execute_MUL_pure_eq_rv64_mulh` and
+`execute_MUL_pure_eq_rv64_mulhsu` (consumed by `of_sp1` above) are now
+both proven, so once this helper is closed `soundness` collapses to a
+one-liner without further changes. `completeness` (below) is separately
+sorry'd and out of scope here.
 
 Closure outline:
-  1. `rw [MulOperation.allHold_constraints_iff_is_real]` to expose the
+  1. Reshape signature to take 71 named hypotheses matching `main`'s
+     emission order (3 sub-circuit Assumptions→Spec wrappers, 2 MSB byte
+     lookup ByteOpcodeSpecs, 42 inline `_ = 0` facts, 16 carry-range
+     ByteOpcodeSpecs (opcode 6), 8 product-pair U8Range ByteOpcodeSpecs
+     (opcode 3)); have `soundness` destructure `h_holds` post-
+     `circuit_proof_start` and pass each into this helper. The Clean
+     `h_holds` after `simp [main, circuit_norm]` is a ~76KB tuple
+     mirroring this exactly — `obtain ⟨...⟩` destructures positionally.
+  2. `change List.Forall SP1Constraint.toProp _` then
+     `rw [MulOperation.allHold_constraints_iff_is_real]` to expose the
      iff's RHS conjunction.
-  2. For the two `List.Forall toProp U16_{b,c}` conjuncts: unfold and
-     discharge each of the 4 sends (opcode 3 = U8Range) using the
-     Clean `U16toU8OpSafe.Spec` low/high val-bounds; the
-     `(0 : ZMod p) < 256` part is `ZMod.val_zero` + `Fact (2^17 < p)`.
-     (Alternatively, first close `SP1Clean.U16toU8OpSafe.iff_sp1`
-     upstream and reuse it here.)
-  3. For the `List.Forall toProp (U16MSBOperation.constraints …)`
-     conjunct: use `U16MSBOperation.allHold_constraints_iff` to bridge
-     from the `U16MSBOp.Assertion.Spec` Clean fact.
-  4. For the 2 three-part MSB byte-opcode RHS chunks: unfold the
-     ByteOpcodeSpec returned by the opcode-5 lookups using
-     `constrain_MSB`.
-  5. For the 16 carry-chain + 12 result-matching + 12 boolean +
-     2 coupling assertZeros: each is a direct `linear_combination` /
-     `mul_eq_zero` step from the corresponding `_ = 0` fact.
-  6. For the 16 `carry[i] < 65536` conjuncts: use
+  3. For `List.Forall toProp U16_{b,c}`: use
+     `SP1Clean.U16toU8OpSafe.iff_sp1.mp` (already exists at
+     `SP1Clean/Operations/U16toU8OperationSafe.lean:200`) on each
+     sub-Spec to obtain the SP1 byte sends.
+  4. For `List.Forall toProp (U16MSBOperation.constraints …)`: use
+     `SP1Clean.U16MSBOp.iff_sp1.mpr` (at
+     `SP1Clean/Operations/U16MSBOperation.lean:77`) bridging from
+     `U16MSBOp.Assertion.Spec`.
+  5. For the 2 three-part MSB byte-opcode chunks (`b_msb<256 ∧
+     bbw[7]<256 ∧ b_msb∈{0,1} ∧ (b_msb=1↔128≤bbw[7])`): unfold the
+     opcode-5 `ByteOpcodeSpec` via `constrain_MSB` (the unique
+     `bop.toNat=5` matches `.MSB`).
+  6. 42 inline assertZero gates: each closes by `linear_combination
+     h_<i>` or `mul_eq_zero.mp h_<i>` from the corresponding `_ = 0`
+     fact.
+  7. 16 `carry[i].val < 65536`: use
      `SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16` on each Range
-     lookup fact.
-  7. For the 16 `product[i] < 256` conjuncts: unfold the U8Range
-     ByteOpcodeSpec via `constrain_U8Range` and project. -/
+     fact.
+  8. 16 `product[i] < 256`: unfold the opcode-3 U8Range ByteOpcodeSpec
+     via `constrain_U8Range` (each opcode-3 row gives two `< 256`
+     bounds — write a small `byteOpcodeSpec_u8range_pair` helper next
+     to `byteOpcodeSpec_range16` in `SP1Clean/Operations/AddOperation.lean`). -/
 private theorem allHold_of_main_holds
     (input : Inputs (ZMod p)) (h_holds : True) :
     (MulOperation.constraints
@@ -475,7 +561,10 @@ theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions Spec := by
   -- One-liner: thread the assumptions through `allHold_of_main_holds`
   -- (currently sorry'd — see TODO above) and apply `of_sp1`. Once the
-  -- helper is closed, this proof requires no further changes.
+  -- helper is closed, this proof requires no further changes. The BV
+  -- bridges `execute_MUL_pure_eq_rv64_mulh` / `_mulhsu` (used inside
+  -- `of_sp1`) are now both proven; only the Clean→SP1 `allHold`
+  -- construction remains.
   intro offset env input_var input _h_input h_assumptions _h_holds
   exact of_sp1 input h_assumptions (allHold_of_main_holds input trivial)
 

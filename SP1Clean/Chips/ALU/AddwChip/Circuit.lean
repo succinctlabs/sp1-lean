@@ -50,12 +50,13 @@ namespace Assertion
 
 open Circuit
 
-/-- Clean-side chip circuit. Composes `AddwOp.assertion` (the 32-bit ADDW
-carry chain + sign-extension MSB) + `CPUState.Gated.assertion` +
-`ALUTypeReader.Gated.assertion` (which bundles ProgramTable + 3 gated
-OperandAccess + 4 op_a_0 gates + 4 imm_c-equality gates) + chip-level
-`op_a_0 = 0` gate. The free `is_real * (is_real - 1) === 0` gate now
-lives inside both Gated sub-circuits' first conjuncts. -/
+/-- Clean-side chip circuit. Composes `AddwOp.assertionGated` (the
+multiplicity-gated 32-bit ADDW carry chain + sign-extension MSB) +
+`CPUState.Gated.assertion` + `ALUTypeReader.Gated.assertion` (which
+bundles ProgramTable + 3 gated OperandAccess + 4 op_a_0 gates + 4
+imm_c-equality gates) + chip-level `op_a_0 = 0` gate. The free
+`is_real * (is_real - 1) === 0` gate now lives inside both Gated
+sub-circuits' first conjuncts. -/
 @[reducible]
 def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let ⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩, adapter,
@@ -63,10 +64,10 @@ def main (cols : Var AddwCols (ZMod p)) : Circuit (ZMod p) Unit := do
   let clk_low := clk_0_16 + clk_16_24 * 65536
   let op_a_write_value : Vector (Expression (ZMod p)) 4 :=
     #v[addw_value[0], addw_value[1], addw_msb * 65535, addw_msb * 65535]
-  SP1Clean.AddwOp.assertion
+  SP1Clean.AddwOp.assertionGated
     (⟨adapter.op_b_memory.prev_value, adapter.op_c_memory.prev_value,
-       addw_value, addw_msb⟩ :
-      Var SP1Clean.AddwOp.Inputs (ZMod p))
+       addw_value, addw_msb, is_real⟩ :
+      Var SP1Clean.AddwOp.InputsGated (ZMod p))
   SP1Clean.CPUState.Gated.assertion
     (⟨⟨clk_high, clk_16_24, clk_0_16, pc⟩,
        #v[pc[0] + 4, pc[1], pc[2]], 8, is_real⟩ :
@@ -130,7 +131,7 @@ theorem soundness :
   obtain ⟨h_addwop_sub, h_cpu_sub, h_alu_sub, h_op_a_0⟩ := h_holds
   unfold id at *
   refine formalSpec_of_subcircuit_specs _ h_is_real h_trusted
-    (h_addwop_sub trivial) (h_cpu_sub trivial) ?_ h_op_a_0
+    h_addwop_sub (h_cpu_sub trivial) ?_ h_op_a_0
   simpa [SP1Clean.ALUTypeReader.Gated.assertion,
          SP1Clean.ALUTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
          Vector.getElem_map] using h_alu_sub trivial
@@ -138,8 +139,10 @@ theorem soundness :
 /-- Completeness peels `h_spec` via `subcircuit_specs_of_formalSpec`
 into the four sub-circuit `Spec`s, then re-wraps each as the
 `(Assumptions, Spec)` pair the corresponding `FormalAssertion.completeness`
-expects. The same lowercase↔uppercase `simpa` bridge is used (mirror of
-the soundness bridge). -/
+expects. The `Word.isU64 op_b/op_c` bounds needed for
+`AddwOp.AssertionGated.Assumptions` come from the ALUTypeReader helpers.
+The same lowercase↔uppercase `simpa` bridge is used (mirror of the
+soundness bridge). -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -148,9 +151,16 @@ theorem completeness :
   subst_eqs
   obtain ⟨h_trusted, h_is_real⟩ := h_assumptions
   unfold id at *
+  have h_trusted_one := h_trusted.trans h_is_real
   obtain ⟨h_addwop, h_cpu, h_alu, h_op_a_0⟩ :=
     subcircuit_specs_of_formalSpec _ h_is_real h_trusted h_spec
-  refine ⟨⟨trivial, h_addwop⟩, ⟨trivial, h_cpu⟩, ⟨trivial, ?_⟩, h_op_a_0⟩
+  have h_isU64_b :=
+    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_b_of_spec h_is_real h_alu
+  have h_isU64_c :=
+    SP1Clean.ALUTypeReader.Gated.Assertion.isU64_op_c_memory_of_spec
+      h_is_real h_trusted_one h_alu
+  refine ⟨⟨⟨Or.inr h_is_real, fun _ => ⟨h_isU64_b, h_isU64_c⟩⟩, h_addwop⟩,
+          ⟨trivial, h_cpu⟩, ⟨trivial, ?_⟩, h_op_a_0⟩
   simpa [SP1Clean.ALUTypeReader.Gated.assertion,
          SP1Clean.ALUTypeReader.Gated.Assertion.Spec, sub_eq_add_neg,
          Vector.getElem_map] using h_alu
