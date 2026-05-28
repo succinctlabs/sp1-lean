@@ -424,6 +424,7 @@ end SP1Clean.UType
 namespace SP1Clean.Bitwise
 
 /-- The chip's column struct, mirroring SP1's Rust `BitwiseCols<T>`. -/
+@[ext]
 structure BitwiseCols (T : Type) where
   state : CPUState T
   adapter : ALUTypeReader T
@@ -453,6 +454,51 @@ deriving ProvableStruct
    -- (`Main[48]+Main[49]+Main[50]`), matching upstream's ALUTypeReader
    -- receiving the same sum for both `is_real` and `is_trusted`.
    ⟨Main[48] + Main[49] + Main[50]⟩⟩
+
+/-- Right inverse of `fromMain`: pack a `BitwiseCols` into a 51-element row. -/
+@[reducible] def toMain (cols : BitwiseCols (ZMod p)) : Vector (ZMod p) 51 :=
+  #v[cols.state.clk_high, cols.state.clk_16_24, cols.state.clk_0_16,
+     cols.state.pc[0], cols.state.pc[1], cols.state.pc[2],
+     cols.adapter.op_a,
+     cols.adapter.op_a_memory.prev_value[0],
+     cols.adapter.op_a_memory.prev_value[1],
+     cols.adapter.op_a_memory.prev_value[2],
+     cols.adapter.op_a_memory.prev_value[3],
+     cols.adapter.op_a_memory.access_timestamp.prev_low,
+     cols.adapter.op_a_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_a_0, cols.adapter.op_b,
+     cols.adapter.op_b_memory.prev_value[0],
+     cols.adapter.op_b_memory.prev_value[1],
+     cols.adapter.op_b_memory.prev_value[2],
+     cols.adapter.op_b_memory.prev_value[3],
+     cols.adapter.op_b_memory.access_timestamp.prev_low,
+     cols.adapter.op_b_memory.access_timestamp.diff_low_limb,
+     cols.adapter.op_c[0], cols.adapter.op_c[1],
+     cols.adapter.op_c[2], cols.adapter.op_c[3],
+     cols.adapter.op_c_memory.prev_value[0],
+     cols.adapter.op_c_memory.prev_value[1],
+     cols.adapter.op_c_memory.prev_value[2],
+     cols.adapter.op_c_memory.prev_value[3],
+     cols.adapter.op_c_memory.access_timestamp.prev_low,
+     cols.adapter.op_c_memory.access_timestamp.diff_low_limb,
+     cols.adapter.imm_c,
+     cols.bitwise_operation.b_low_bytes.low_bytes[0],
+     cols.bitwise_operation.b_low_bytes.low_bytes[1],
+     cols.bitwise_operation.b_low_bytes.low_bytes[2],
+     cols.bitwise_operation.b_low_bytes.low_bytes[3],
+     cols.bitwise_operation.c_low_bytes.low_bytes[0],
+     cols.bitwise_operation.c_low_bytes.low_bytes[1],
+     cols.bitwise_operation.c_low_bytes.low_bytes[2],
+     cols.bitwise_operation.c_low_bytes.low_bytes[3],
+     cols.bitwise_operation.bitwise_operation.result[0],
+     cols.bitwise_operation.bitwise_operation.result[1],
+     cols.bitwise_operation.bitwise_operation.result[2],
+     cols.bitwise_operation.bitwise_operation.result[3],
+     cols.bitwise_operation.bitwise_operation.result[4],
+     cols.bitwise_operation.bitwise_operation.result[5],
+     cols.bitwise_operation.bitwise_operation.result[6],
+     cols.bitwise_operation.bitwise_operation.result[7],
+     cols.is_xor, cols.is_or, cols.is_and]
 
 end SP1Clean.Bitwise
 

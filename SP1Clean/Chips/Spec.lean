@@ -20,6 +20,7 @@ import SP1Clean.Operations.AddwOperation
 import SP1Clean.Operations.SubOperation
 import SP1Clean.Operations.SubwOperation
 import SP1Clean.Operations.BitwiseOperation
+import SP1Clean.Operations.BitwiseU16Operation
 import SP1Clean.Operations.U16MSBOperation
 import SP1Clean.Operations.LtOperationSigned
 import SP1Clean.Operations.IsZeroOperation
@@ -355,23 +356,28 @@ namespace SP1Clean.Bitwise
 
 namespace Assertion
 
-/-- The unified chip Spec for `BitwiseChip`. Canonical (a) shape:
-`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition with
-opcode `is_xor * 3 + is_or * 4 + is_and * 5`, the chip-level
-`op_a_0 = 0` gate, three selector + sum binarities, and a
-selector-dispatched RV64 semantic conjunct (`xor`/`or`/`and`)
-gated on `is_real = 1`.
+/-- The unified chip Spec for `BitwiseChip`. Faithful-composition shape:
+one conjunct per sub-circuit invoked by `Assertion.main` —
+`BitwiseU16Op.Assertion.Spec` (the 8 byte-table lookups on the algebraic
+byte-decomposition of `op_b`/`op_c`, gated by `is_real`) + `CPUState.Gated`
++ `ALUTypeReader.Gated` — followed by the three selector + sum binarities
+and the chip-level `op_a_0 = 0` gate.
+
+Mirrors `SP1Clean.Lt.Assertion.FormalSpec`: the `BitwiseU16Operation`
+byte-decomposition is exposed structurally via `BitwiseU16Op.Assertion.Spec`
+rather than collapsed to a pure-semantic `RV64.{xor,or,and}` conjunct.
+This is mandatory for completeness — the semantic word alone does not pin
+the free byte-decomposition witnesses (`b_low_bytes`, `c_low_bytes`), so a
+pure-semantic spec would be strictly weaker than the constraints. The RV64
+semantic is recovered on demand from this structural spec via the Sail
+bridge (`Bitwise.correct_*` at the Main level).
 
 `op_a_write_value` is synthesized from the `bitwise_operation.result :
-Vector T 8` byte pairs: the SP1 constraint compiler computes
-`E44 + E45*256, E46 + E47*256, …` (pairs of u8 results packed into u16
-limbs) and feeds them to the ALUTypeReader as the result Word. The
-`BitwiseU16Operation` byte-decomposition is *not* exposed here; it's
-the implementation detail of the sub-circuit and is reconstructed on
-demand via the chip's eventual `iff_sp1` proof. -/
+Vector T 8` byte pairs (`E44 + E45*256, …`) and fed to the ALUTypeReader. -/
 def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
   let is_real : ZMod p := cols.is_xor + cols.is_or + cols.is_and
   let opcode_e : ZMod p := cols.is_xor * 3 + cols.is_or * 4 + cols.is_and * 5
+  let opcode_bw : ZMod p := cols.is_xor * 2 + cols.is_or * 1 + cols.is_and * 0
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
   let bres := cols.bitwise_operation.bitwise_operation.result
   let op_a_write_value : Word (ZMod p) :=
@@ -379,9 +385,12 @@ def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
        bres[2] + bres[3] * 256,
        bres[4] + bres[5] * 256,
        bres[6] + bres[7] * 256]
-  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
-  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
-  let aw := Word.toBitVec64 op_a_write_value
+  SP1Clean.BitwiseU16Op.Assertion.Spec
+    ⟨cols.adapter.op_b_memory.prev_value, cols.adapter.op_c_memory.prev_value,
+     cols.bitwise_operation.b_low_bytes.low_bytes,
+     cols.bitwise_operation.c_low_bytes.low_bytes,
+     cols.bitwise_operation.bitwise_operation.result,
+     opcode_bw, is_real⟩ ∧
   SP1Clean.CPUState.Gated.Assertion.Spec
     ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
      8, is_real⟩ ∧
@@ -392,12 +401,7 @@ def FormalSpec (cols : BitwiseCols (ZMod p)) : Prop :=
   (cols.is_or = 0 ∨ cols.is_or = 1) ∧
   (cols.is_and = 0 ∨ cols.is_and = 1) ∧
   (is_real = 0 ∨ is_real = 1) ∧
-  cols.adapter.op_a_0 = 0 ∧
-  (is_real = 1 →
-    Word.isU64 op_a_write_value ∧
-    (cols.is_xor = 1 → aw = RV64.xor cw bw) ∧
-    (cols.is_or  = 1 → aw = RV64.or  cw bw) ∧
-    (cols.is_and = 1 → aw = RV64.and cw bw))
+  cols.adapter.op_a_0 = 0
 
 end Assertion
 

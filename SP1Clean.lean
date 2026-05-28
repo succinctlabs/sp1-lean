@@ -32,7 +32,7 @@ import SP1Clean.Chips.ALU.ShiftRightChip.Aggregate
 import SP1Clean.Chips.ALU.DivRemChip.Circuit
 import SP1Clean.Chips.ALU.DivRemChip.SailBridge
 import SP1Clean.Reader.JTypeReader
-import SP1Clean.Chips.ALU.BitwiseChip.Aggregate
+import SP1Clean.Chips.ALU.BitwiseChip.SailBridge
 import SP1Clean.Chips.Memory.LoadByteChip
 import SP1Clean.Chips.Memory.StoreByteChip
 import SP1Clean.Chips.Control.JalChip.Circuit
