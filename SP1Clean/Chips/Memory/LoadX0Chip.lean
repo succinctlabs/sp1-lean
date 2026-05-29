@@ -503,16 +503,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadX0Cols unit where
 /-- Chip-level Assumptions: the load-memory contract for the multi-opcode
 LoadX0 chip. No selector contracts (LoadX0 doesn't carry sub-word
 extraction). `is_real` is the sum of all 7 opcode flags. -/
-def Assumptions (cols : LoadX0Cols (ZMod p)) : Prop :=
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let is_real : ZMod p :=
-    cols.is_lb + cols.is_lbu + cols.is_lh + cols.is_lhu +
-      cols.is_lw + cols.is_lwu + cols.is_ld
-  SP1Clean.LoadMemoryAccessGated.Assertion.Contract
-    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
-     cols.load_memory_prev_high, cols.load_memory_prev_low,
-     cols.load_memory_diff_low, cols.load_memory_diff_high,
-     cols.load_memory_flag, is_real⟩
+def Assumptions (_ : LoadX0Cols (ZMod p)) : Prop := True
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -531,7 +522,7 @@ theorem soundness :
   · convert h_addr_shape_sub trivial using 5
     all_goals simp [Vector.getElem_map]
   · exact h_itr_sub trivial
-  · exact h_lmag_sub h_assumptions
+  · exact h_lmag_sub trivial
   · binary_iff h_lb
   · binary_iff h_lbu
   · binary_iff h_lh
@@ -560,7 +551,7 @@ theorem completeness :
     convert h_addr_shape using 5
     all_goals simp [Vector.getElem_map]
   · exact ⟨trivial, h_itr⟩
-  · exact ⟨h_lmag, h_lmag⟩
+  · exact ⟨trivial, h_lmag⟩
   · binary_iff h_lb
   · binary_iff h_lbu
   · binary_iff h_lh

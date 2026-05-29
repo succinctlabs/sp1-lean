@@ -39,8 +39,6 @@ Opcode: `35 = LD` (Load Double).
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-open LeanRV64D.Functions Sail SailState
-
 namespace SP1Clean.LoadDouble
 
 open Circuit ProvableType
@@ -301,21 +299,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadDoubleCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-/-- Chip-level Assumptions for `AssertionGated`: the load-memory contract
-required by the `LoadMemoryAccessGated` sub-circuit. Trace-level callers
-discharge this via the existing `iff_sp1_of_is_ld` bridge (which already
-proves the disjunctive contract from `(LoadDouble.constraints Main).allHold`).
-
-The sub-circuit's `main := pure ()` means its `Assumptions = Spec = Contract`,
-so the chip must hand the contract in directly rather than deriving it
-from in-circuit emissions. -/
-def Assumptions (cols : LoadDoubleCols (ZMod p)) : Prop :=
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.LoadMemoryAccessGated.Assertion.Contract
-    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
-     cols.load_memory_prev_high, cols.load_memory_prev_low,
-     cols.load_memory_diff_low, cols.load_memory_diff_high,
-     cols.load_memory_flag, cols.is_real⟩
+/-- Chip-level Assumptions for `AssertionGated`. The `LoadMemoryAccessGated`
+sub-circuit is now a real hint-witnessed circuit (`Assumptions := True`), so
+the chip no longer hands the load-memory contract in — the contract is
+*derived* from the sub-circuit's in-circuit emissions via its returned `Spec`. -/
+def Assumptions (_ : LoadDoubleCols (ZMod p)) : Prop := True
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -331,18 +319,17 @@ theorem soundness :
   · exact h_addr_sub trivial
   · exact h_addr_shape_sub trivial
   · exact h_itr_sub trivial
-  -- LoadMemoryAccessGated slot: discharge the sub-circuit Assumptions
-  -- (= Contract = Spec) from the chip's own Assumptions.
-  · exact h_lmag_sub h_assumptions
+  -- LoadMemoryAccessGated slot: the sub-circuit (Assumptions = True) returns
+  -- its `Spec` (= the disjunctive Contract) directly from `h_holds`.
+  · exact h_lmag_sub trivial
   · binary_iff h_isreal
   · exact h_op_a_0
   -- Semantic clause: under `is_real = 1`, `cols.load_prev_value` is `Word.isU64`.
-  -- Extracted from `LoadMemoryAccessGated.Contract`'s `Word.isU64 prev_value`
-  -- clause (the 6th conjunct of the right disjunct). h_is_real_eq has the
-  -- `cols.is_real = 1` form (struct projection); we just need it to be nonzero.
+  -- Extracted from the sub-circuit's returned `Contract` (the 6th conjunct of
+  -- the right disjunct). h_is_real_eq has `cols.is_real = 1` form; nonzero suffices.
   · intro h_is_real_eq
     have h_ir_ne_zero : _ ≠ (0 : ZMod p) := h_is_real_eq.symm ▸ one_ne_zero
-    exact (h_assumptions.resolve_left h_ir_ne_zero).2.2.2.2.2
+    exact ((h_lmag_sub trivial).resolve_left h_ir_ne_zero).2.2.2.2.2
 
 set_option maxHeartbeats 800000 in
 -- Mirrors soundness destructure; circuit_proof_start unfolds 5 sub-circuits + 3 gates.
@@ -360,9 +347,9 @@ theorem completeness :
   · exact ⟨trivial, h_addr⟩
   · exact ⟨trivial, h_addr_shape⟩
   · exact ⟨trivial, h_itr⟩
-  -- LoadMemoryAccessGated slot: sub-circuit Assumptions = Spec = Contract,
-  -- so the chip's FormalSpec slot (`h_lmag`) is exactly the Assumptions.
-  · exact ⟨h_lmag, h_lmag⟩
+  -- LoadMemoryAccessGated slot: sub-circuit Assumptions = True; provide the
+  -- chip's FormalSpec slot (`h_lmag`, = the Contract) as the sub's `Spec`.
+  · exact ⟨trivial, h_lmag⟩
   · binary_iff h_isreal
   · exact h_op_a_0
 
@@ -374,77 +361,6 @@ def assertionGated : FormalAssertion (ZMod p) LoadDoubleCols :=
     Spec := AssertionGated.FormalSpec,
     soundness := AssertionGated.soundness,
     completeness := AssertionGated.completeness }
-
-/-! ## Cols-level Sail helpers + structural bridge (Phase 2 SailBridge prep)
-
-Mirror of `SP1Clean/Chips/ALU/AddChip/Cols.lean`'s pattern (cols-level
-Sail-side helpers) and `Lemmas.lean` (cols round-trip + structural
-`allHold_iff_structural`). Used by the upcoming `SailBridge.lean` to lift
-SP1's `_root_.Load.LoadDouble.correct_ld` to a cols-parameterized
-equivalence. -/
-
-@[reducible] def sp1_op_a_cols (cols : LoadDoubleCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_a.val
-
-@[reducible] def sp1_op_b_cols (cols : LoadDoubleCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_b.val
-
-@[reducible] def sp1_imm_c_cols (cols : LoadDoubleCols (ZMod p)) : BitVec 12 :=
-  BitVec.ofNat 12 cols.adapter.op_c_imm[0].val
-
-/-- The chip's monadic `sp1_ld` projected off `LoadDoubleCols` fields
-directly. Mirrors `_root_.Load.LoadDouble.sp1_ld Main` exactly on
-`fromMain Main` (closes by `rfl` thanks to `@[reducible]`). -/
-@[reducible] def sp1_ld_cols (cols : LoadDoubleCols (ZMod p)) :
-    SailM ExecutionResult := do
-  let op_a := sp1_op_a_cols cols
-  Sail.writeReg Register.nextPC
-    (Word.toBitVec64
-      #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)] + 4)
-  Sail.write_reg op_a (Word.toBitVec64 cols.load_prev_value)
-  return RETIRE_SUCCESS
-
-/-- The cols-level initial-state precondition for the per-row Sail clause:
-universally lifted over any flat `Main` row that re-projects to the given
-`cols`. (Same shape as `SP1Clean.Add.addInitialState_cols`.) -/
-def loadDoubleInitialState_cols (cols : LoadDoubleCols (ZMod p))
-    (s : SailState) : Prop :=
-  ∀ Main : Vector (ZMod p) 39, fromMain Main = cols →
-    (_root_.Load.LoadDouble.constraints Main).initialState s
-
-/-! ### Round-trip lemmas (`<helper>_cols (fromMain Main) = _root_.Load.LoadDouble.<helper> Main`). -/
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_op_a_cols (fromMain Main) = _root_.Load.LoadDouble.sp1_op_a Main := rfl
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_op_b_cols (fromMain Main) = _root_.Load.LoadDouble.sp1_ob_b Main := rfl
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_imm_c_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_imm_c_cols (fromMain Main) = _root_.Load.LoadDouble.sp1_imm_c Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_ld_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_ld_cols (fromMain Main) = _root_.Load.LoadDouble.sp1_ld Main := rfl
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-/-- `fromMain` is a left inverse of `toMain` (cols → Main → cols round-trip),
-conditional on `cols.adapter_cols.is_trusted = cols.is_real` (the UserMode
-TrustMode marker — `fromMain` aliases `is_trusted := Main[38] = is_real`). -/
-lemma fromMain_toMain (cols : LoadDoubleCols (ZMod p))
-    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real) :
-    fromMain (toMain cols) = cols := by
-  rcases cols with ⟨state, adapter, addr_value, addr_top_two_limb_inv,
-                    load_prev_value, lmph, lmpl, lmf, lmdl, lmdh,
-                    is_real, adapter_cols⟩
-  have : adapter_cols.is_trusted = is_real := by simpa using h_trusted
-  simp [this, LoadDoubleCols.ext_iff, CPUState.ext_iff, ITypeReader.ext_iff,
-    MemoryAccessInSharedCols.ext_iff, UserModeReaderCols.ext_iff]
-  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_, ?_⟩
-  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 /-- Chip-level structural bridge: `(LoadDouble.constraints Main).allHold`
 under `is_real = Main[38] = 1` is exactly `SpecForIff_of_is_ld (fromMain Main)`.

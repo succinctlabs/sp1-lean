@@ -1,4 +1,4 @@
-import SP1Clean.Chips.Memory.LoadWordChip
+import SP1Clean.Chips.Memory.LoadWordSailCols
 
 /-! # External Sail-equivalence bridges for `LoadWordChip` (LW + LWU). -/
 

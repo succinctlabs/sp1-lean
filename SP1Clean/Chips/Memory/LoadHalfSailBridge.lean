@@ -1,4 +1,4 @@
-import SP1Clean.Chips.Memory.LoadHalfChip
+import SP1Clean.Chips.Memory.LoadHalfSailCols
 
 /-! # External Sail-equivalence bridges for `LoadHalfChip` (LH + LHU). -/
 

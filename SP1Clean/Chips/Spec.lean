@@ -1406,10 +1406,12 @@ namespace SP1Clean.MemoryGlobal
 
 namespace Assertion
 
-/-- Phase 1 scaffold FormalSpec mirroring the partial `main` composition in
-`SP1Clean/Chips/Memory/MemoryGlobalChip.lean`. The `LtUnsignedOp` /
-monotonicity / x0-case conjuncts are deferred to Phase 4.5 pending the
-`MemoryGlobalCols.lt_cols` struct expansion documented in the chip file. -/
+/-- Full Phase-4.5 FormalSpec mirroring the `main` composition in
+`SP1Clean/Chips/Memory/MemoryGlobalChip.lean`: the range checks + value-limb
+decomposition + the two `IsZeroOp` witnesses + the `is_comp`/`is_real` gates,
+**plus** the `LtUnsignedOp` address-monotonicity (`prev_addr < addr` gated by
+`is_comp`), the `when(is_comp)` compare-bit assertion, and the `when(¬is_comp)`
+x0-case zero asserts on `addr` / `value`. -/
 def FormalSpec (cols : MemoryGlobalCols (ZMod p)) : Prop :=
   (cols.is_real = 0 ∨ cols.is_real = 1) ∧
   (cols.value[0]).val < 65536 ∧
@@ -1432,7 +1434,23 @@ def FormalSpec (cols : MemoryGlobalCols (ZMod p)) : Prop :=
     ⟨cols.index, cols.is_index_zero[0], cols.is_index_zero[1]⟩ ∧
   cols.is_comp - cols.is_real *
     (1 - cols.is_prev_addr_zero[1] * cols.is_index_zero[1]) = 0 ∧
-  (cols.is_comp = 0 ∨ cols.is_comp = 1)
+  (cols.is_comp = 0 ∨ cols.is_comp = 1) ∧
+  -- LtUnsignedOp monotonicity (`prev_addr < addr`), gated by `is_comp`; the
+  -- 3-limb addresses are padded to 4 limbs (`.push 0`).
+  SP1Clean.LtUnsignedOp.AssertionGated.Spec
+    ⟨#v[cols.prev_addr[0], cols.prev_addr[1], cols.prev_addr[2], 0],
+     #v[cols.addr[0], cols.addr[1], cols.addr[2], 0],
+     cols.lt_cols[0],
+     #v[cols.lt_cols[1], cols.lt_cols[2], cols.lt_cols[3], cols.lt_cols[4]],
+     cols.lt_cols[5], #v[cols.lt_cols[6], cols.lt_cols[7]], cols.is_comp⟩ ∧
+  -- `when(is_comp).assert_one(compare_bit)`.
+  cols.is_comp * (cols.lt_cols[0] - 1) = 0 ∧
+  -- `when(¬is_comp)` x0-case: `addr == 0` and `value == 0`.
+  (cols.is_real - cols.is_comp) * (cols.addr[0] + cols.addr[1] + cols.addr[2]) = 0 ∧
+  (cols.is_real - cols.is_comp) * cols.value[0] = 0 ∧
+  (cols.is_real - cols.is_comp) * cols.value[1] = 0 ∧
+  (cols.is_real - cols.is_comp) * cols.value[2] = 0 ∧
+  (cols.is_real - cols.is_comp) * cols.value[3] = 0
 
 end Assertion
 

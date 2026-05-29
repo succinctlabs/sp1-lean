@@ -43,8 +43,6 @@ Opcodes: `31 = LW`, `34 = LWU`.
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-open LeanRV64D.Functions Sail SailState
-
 namespace SP1Clean.LoadWord
 
 open Circuit ProvableType
@@ -400,15 +398,10 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadWordCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-/-- Chip-level Assumptions: load-memory and word-selector contracts. -/
+/-- Chip-level Assumptions: the word-selector contract. (The load-memory
+contract is now derived from the promoted `LoadMemoryAccessGated` sub-circuit's
+in-circuit emissions, so it is no longer assumed here.) -/
 def Assumptions (cols : LoadWordCols (ZMod p)) : Prop :=
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let is_real : ZMod p := cols.is_lw + cols.is_lwu
-  SP1Clean.LoadMemoryAccessGated.Assertion.Contract
-    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
-     cols.load_memory_prev_high, cols.load_memory_prev_low,
-     cols.load_memory_diff_low, cols.load_memory_diff_high,
-     cols.load_memory_flag, is_real⟩ ∧
   SP1Clean.LoadWordSelector.Assertion.Contract
     ⟨cols.load_prev_value, cols.offset_bit, 0, 0,
      cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
@@ -434,12 +427,12 @@ theorem soundness :
   -- ITypeReader arm: op_a_write_value uses `op_a_write_value_lo[i]` indexing.
   · convert h_itr_sub trivial using 4
     simp
-  · exact h_lmag_sub h_assumptions.1
+  · exact h_lmag_sub trivial
   -- LoadWordSelector slot: the chip's FormalSpec position projects fields from
   -- a cols struct literal; the sub-circuit Spec wants the underlying values.
   -- `convert` matches structurally; the residual indexed-map subgoals close
   -- by Vector.getElem_map.
-  · convert h_lws_sub h_assumptions.2 using 2 <;> simp [Vector.getElem_map]
+  · convert h_lws_sub h_assumptions using 2 <;> simp [Vector.getElem_map]
   · binary_iff h_is_lw
   · binary_iff h_is_lwu
   · binary_iff h_sum
@@ -463,7 +456,7 @@ theorem completeness :
   · refine ⟨trivial, ?_⟩
     convert h_itr using 4
     simp
-  · exact ⟨h_lmag, h_lmag⟩
+  · exact ⟨trivial, h_lmag⟩
   -- LoadWordSelector slot: bridge `{cols_literal}.field` projection +
   -- `(Vector.map f v)[i]` form to the assertion's input shape.
   · refine ⟨?_, ?_⟩ <;>
@@ -481,64 +474,6 @@ def assertionGated : FormalAssertion (ZMod p) LoadWordCols :=
     Spec := AssertionGated.FormalSpec,
     soundness := AssertionGated.soundness,
     completeness := AssertionGated.completeness }
-
-/-! ## Cols-level Sail helpers + structural bridges (LW + LWU). -/
-
-@[reducible] def sp1_op_a_cols (cols : LoadWordCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_a.val
-
-@[reducible] def sp1_op_b_cols (cols : LoadWordCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_b.val
-
-@[reducible] def sp1_imm_c_cols (cols : LoadWordCols (ZMod p)) : BitVec 12 :=
-  BitVec.ofNat 12 cols.adapter.op_c_imm[0].val
-
-@[reducible] def sp1_load_word_cols (cols : LoadWordCols (ZMod p)) :
-    SailM ExecutionResult := do
-  let op_a := sp1_op_a_cols cols
-  Sail.writeReg Register.nextPC
-    (Word.toBitVec64
-      #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)] + 4)
-  Sail.write_reg op_a (Word.toBitVec64
-    #v[cols.op_a_write_value_lo[0], cols.op_a_write_value_lo[1],
-       (65535 : ZMod p) * cols.signed_extension_msb,
-       (65535 : ZMod p) * cols.signed_extension_msb])
-  return RETIRE_SUCCESS
-
-def loadWordInitialState_cols (cols : LoadWordCols (ZMod p))
-    (s : SailState) : Prop :=
-  ∀ Main : Vector (ZMod p) 44, fromMain Main = cols →
-    (_root_.Load.LoadWord.constraints Main).initialState s
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_op_a_cols (fromMain Main) = _root_.Load.LoadWord.sp1_op_a Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_op_b_cols (fromMain Main) = _root_.Load.LoadWord.sp1_ob_b Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_imm_c_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_imm_c_cols (fromMain Main) = _root_.Load.LoadWord.sp1_imm_c Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_load_word_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_load_word_cols (fromMain Main) = _root_.Load.LoadWord.sp1_load_word Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-/-- Cols round-trip. `is_trusted := Main[42] + Main[43] = is_lw + is_lwu`. -/
-lemma fromMain_toMain (cols : LoadWordCols (ZMod p))
-    (h_trusted : cols.adapter_cols.is_trusted = cols.is_lw + cols.is_lwu) :
-    fromMain (toMain cols) = cols := by
-  rcases cols with ⟨state, adapter, addr_value, addr_top_two_limb_inv,
-                    load_prev_value, lmph, lmpl, lmf, lmdl, lmdh,
-                    ob, oawvlo, sem, is_lw, is_lwu, adapter_cols⟩
-  have : adapter_cols.is_trusted = is_lw + is_lwu := by simpa using h_trusted
-  simp [this, LoadWordCols.ext_iff, CPUState.ext_iff, ITypeReader.ext_iff,
-    MemoryAccessInSharedCols.ext_iff, UserModeReaderCols.ext_iff]
-  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩
-  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 lemma allHold_iff_structural_lw
     (Main : Vector (ZMod p) 44) (h_is_lw : Main[42] = 1) :

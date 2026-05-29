@@ -42,8 +42,6 @@ Opcode: `39 = SD` (Store Double).
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-open LeanRV64D.Functions Sail SailState
-
 namespace SP1Clean.StoreDouble
 
 open Circuit ProvableType
@@ -305,14 +303,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreDoubleCols unit where
 
 /-- Chip-level Assumptions: the store-memory contract required by
 `StoreMemoryAccessGated`. Discharged trace-level via `iff_sp1_of_is_real`. -/
-def Assumptions (cols : StoreDoubleCols (ZMod p)) : Prop :=
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.StoreMemoryAccessGated.Assertion.Contract
-    ⟨cols.state.clk_high, clk_low, cols.addr_value,
-     cols.store_prev_value, cols.adapter.op_a_memory.prev_value,
-     cols.store_memory_prev_high, cols.store_memory_prev_low,
-     cols.store_memory_diff_low, cols.store_memory_diff_high,
-     cols.store_memory_flag, cols.is_real⟩
+def Assumptions (_ : StoreDoubleCols (ZMod p)) : Prop := True
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -328,18 +319,16 @@ theorem soundness :
   · exact h_addr_sub trivial
   · exact h_addr_shape_sub trivial
   · exact h_itr_sub trivial
-  -- StoreMemoryAccessGated slot: discharge sub-circuit Assumptions (= Contract = Spec)
-  -- from the chip's own Assumptions.
-  · exact h_smag_sub h_assumptions
+  -- StoreMemoryAccessGated slot: the sub-circuit (Assumptions = True) returns
+  -- its `Spec` (= the disjunctive Contract) directly from `h_holds`.
+  · exact h_smag_sub trivial
   · binary_iff h_isreal
-  -- Semantic clause: under `is_real = 1`, `cols.adapter.op_a_memory.prev_value`
-  -- is `Word.isU64`. Extracted from `StoreMemoryAccessGated.Contract`'s
-  -- `Word.isU64 write_value` clause (the 7th conjunct of the right disjunct;
-  -- StoreMemoryAccessGated.Contract has 7 facts vs LoadMemoryAccessGated's 6
-  -- because Store includes both isU64 prev_value AND isU64 write_value).
+  -- Semantic clause: under `is_real = 1`, the written word is `Word.isU64`.
+  -- Extracted from the sub-circuit's returned `Contract` (the 7th conjunct of
+  -- the right disjunct — Store has both isU64 prev_value AND isU64 write_value).
   · intro h_is_real_eq
     have h_ir_ne_zero : _ ≠ (0 : ZMod p) := h_is_real_eq.symm ▸ one_ne_zero
-    exact (h_assumptions.resolve_left h_ir_ne_zero).2.2.2.2.2.2
+    exact ((h_smag_sub trivial).resolve_left h_ir_ne_zero).2.2.2.2.2.2
 
 set_option maxHeartbeats 800000 in
 -- Mirrors soundness destructure; circuit_proof_start unfolds 5 sub-circuits + 2 gates.
@@ -357,8 +346,8 @@ theorem completeness :
   · exact ⟨trivial, h_addr⟩
   · exact ⟨trivial, h_addr_shape⟩
   · exact ⟨trivial, h_itr⟩
-  -- StoreMemoryAccessGated slot: sub-circuit Assumptions = Spec = Contract.
-  · exact ⟨h_smag, h_smag⟩
+  -- StoreMemoryAccessGated slot: sub-circuit Assumptions = True.
+  · exact ⟨trivial, h_smag⟩
   · binary_iff h_isreal
 
 end AssertionGated
@@ -369,82 +358,6 @@ def assertionGated : FormalAssertion (ZMod p) StoreDoubleCols :=
     Spec := AssertionGated.FormalSpec,
     soundness := AssertionGated.soundness,
     completeness := AssertionGated.completeness }
-
-/-! ## Cols-level Sail helpers + structural bridge (Phase 3 SailBridge prep)
-
-Mirror of `SP1Clean.LoadDouble`'s Phase 2 helpers, swapping Load → Store
-semantics. `_root_.Store.StoreDouble.spec_sb` is the Sail-side reference
-(SP1Chips's misleading `sb` name — the helper is actually for SD width 8).
-The `sp1_sb` projector reads from `Main[7..10]` (the op_a register value)
-and writes via `Sail.ConcurrencyInterfaceV1.write_ram`. -/
-
-@[reducible] def sp1_op_a_cols (cols : StoreDoubleCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_a.val
-
-@[reducible] def sp1_op_b_cols (cols : StoreDoubleCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_b.val
-
-/-- For StoreDouble, the immediate is decoded from the 4-limb `op_c_imm`
-via `Word.toNat`, not just `Main[21].val` (cf. `_root_.Store.StoreDouble.sp1_imm_c`). -/
-@[reducible] def sp1_imm_c_cols (cols : StoreDoubleCols (ZMod p)) : BitVec 12 :=
-  BitVec.ofNat 12 (Word.toNat cols.adapter.op_c_imm)
-
-/-- The chip's monadic `sp1_sb` (a.k.a. SD) projected off `StoreDoubleCols`
-fields directly. Mirrors `_root_.Store.StoreDouble.sp1_sb Main` on
-`fromMain Main` (closes by `rfl` thanks to `@[reducible]`). -/
-@[reducible] def sp1_sb_cols (cols : StoreDoubleCols (ZMod p)) :
-    SailM ExecutionResult := do
-  let op_a := sp1_op_a_cols cols
-  Sail.writeReg Register.nextPC
-    (Word.toBitVec64
-      #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)])
-  let addr : BitVec 64 := Word.toBitVec64
-    #v[cols.addr_value[0], cols.addr_value[1], cols.addr_value[2], (0 : ZMod p)]
-  Sail.ConcurrencyInterfaceV1.write_ram 64 8 0#64 addr
-    (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)
-  return RETIRE_SUCCESS
-
-/-- The cols-level initial-state precondition: universally lifted over any
-flat `Main` row that re-projects to the given `cols`. Same shape as
-`SP1Clean.LoadDouble.loadDoubleInitialState_cols`. -/
-def storeDoubleInitialState_cols (cols : StoreDoubleCols (ZMod p))
-    (s : SailState) : Prop :=
-  ∀ Main : Vector (ZMod p) 39, fromMain Main = cols →
-    (_root_.Store.StoreDouble.constraints Main).initialState s
-
-/-! ### Round-trip lemmas (`<helper>_cols (fromMain Main) = _root_.Store.StoreDouble.<helper> Main`). -/
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_op_a_cols (fromMain Main) = _root_.Store.StoreDouble.sp1_op_a Main := rfl
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_op_b_cols (fromMain Main) = _root_.Store.StoreDouble.sp1_ob_b Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_imm_c_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_imm_c_cols (fromMain Main) = _root_.Store.StoreDouble.sp1_imm_c Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_sb_cols_fromMain (Main : Vector (ZMod p) 39) :
-    sp1_sb_cols (fromMain Main) = _root_.Store.StoreDouble.sp1_sb Main := rfl
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-/-- `fromMain` is a left inverse of `toMain` (cols → Main → cols round-trip),
-conditional on `cols.adapter_cols.is_trusted = cols.is_real` (the UserMode
-TrustMode marker — `fromMain` aliases `is_trusted := Main[38] = is_real`). -/
-lemma fromMain_toMain (cols : StoreDoubleCols (ZMod p))
-    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real) :
-    fromMain (toMain cols) = cols := by
-  rcases cols with ⟨state, adapter, addr_value, addr_top_two_limb_inv,
-                    store_prev_value, smph, smpl, smf, smdl, smdh,
-                    is_real, adapter_cols⟩
-  have : adapter_cols.is_trusted = is_real := by simpa using h_trusted
-  simp [this, StoreDoubleCols.ext_iff, CPUState.ext_iff, ITypeReader.ext_iff,
-    MemoryAccessInSharedCols.ext_iff, UserModeReaderCols.ext_iff]
-  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_, ?_⟩
-  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 /-- Chip-level structural bridge: `(StoreDouble.constraints Main).allHold`
 under `is_real = Main[38] = 1` is exactly `SpecForIff_of_is_real (fromMain Main)`.

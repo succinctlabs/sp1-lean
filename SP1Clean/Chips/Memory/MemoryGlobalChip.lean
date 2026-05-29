@@ -11,6 +11,7 @@ import SP1Clean.ByteOpcodeTable
 import SP1Clean.MemoryAccess
 import SP1Clean.Operations.IsZeroOperation
 import SP1Clean.Operations.AddOperation
+import SP1Clean.Operations.LtOperationUnsigned
 import SP1Clean.Chips.Structs
 import SP1Clean.Chips.Spec
 
@@ -36,15 +37,16 @@ have an INIT record (claiming the initial value) and a FINALIZE record
 (claiming the final value being read out). The boundary chips supply
 these "ghost" first/last records.
 
-## Phase 4 status (iter-8, [[clean-pilot-iter8-table-bridging]])
+## Status
 
-This file ships the **column struct + ChipRow constructors only**. The
-chip's `Spec` is `True` (placeholder); the internal constraint surface
-(range checks on `addr`/`prev_addr`/`value`, the `lt_cols` monotonicity
-assertion, the two `IsZeroOperation` arms on `is_prev_addr_zero` /
-`is_index_zero`) is deferred to a follow-up sub-iter that promotes
-`MemoryGlobalCols` to a full `FormalAssertion` analogous to the
-interior chips.
+`MemoryGlobalCols` is now a full `FormalAssertion` (`Assertion.assertion`,
+axiom-clean) mirroring the upstream Rust constraint surface: u16/u8 range
+checks on `addr`/`prev_addr`/`value`, the value third-limb decomposition,
+the two `IsZeroOperation` arms, the `is_comp`/`is_real` gates, and (Phase
+4.5) the `LtUnsignedOp` `prev_addr < addr` monotonicity + compare-bit +
+x0-case zero asserts. The standalone minimal `def Spec` below remains as
+the `is_real ∈ {0,1}` binary gate used by the trace-soundness
+`TraceIsRealBinary` driver.
 
 The boundary records' contribution to `aggregateMemoryAccesses` is
 likewise minimal in Phase 4: both `memInit` and `memFinalize` emit an
@@ -125,21 +127,18 @@ current `MemoryGlobalCols` struct:
 - Inline `assertZero` for the `is_comp` composition equation, the
   `is_comp` binary gate, and the `is_real` binary gate.
 
-**Deferred to Phase 4.5** (struct expansion required, documented in the
-soundness sorry):
+**Phase 4.5 (CLOSED):** the previously-deferred monotonicity conjuncts are
+now composed, and `lt_cols` has been lifted to 8 fields
+(`[compare_bit, u16_flags[0..3], not_eq_inv, comparison_limbs[0..1]]`):
 
-- `LtUnsignedOp.Assertion.assertion` for `prev_addr < addr` monotonicity.
-  Current `lt_cols : Vector T 6` is missing the 2 `comparison_limbs` fields
-  that `LtUnsignedOp.Assertion.Inputs` requires (8 columns total). Phase
-  4.5 lifts `lt_cols` to 8 fields and threads `prev_addr.push 0` /
-  `addr.push 0` (3→4 limb padding) through `LtUnsignedOp.assertion`.
-- `when(is_comp).assert_one(lt_cols.u16_compare_operation.bit)` —
-  depends on the expanded `lt_cols` layout.
-- `when(is_not_comp)`-gated zero asserts on `addr` / `value` for the
+- `SP1Clean.LtUnsignedOp.assertionGated` for `prev_addr < addr`
+  monotonicity, gated by `is_comp`, with `prev_addr` / `addr` padded
+  `3 → 4` limbs (`.push 0`).
+- `when(is_comp).assert_one(compare_bit)` → `is_comp * (lt_cols[0] - 1) = 0`.
+- `when(¬is_comp)`-gated zero asserts on `addr` / `value` for the
   boundary-row x0 special case.
 
-Soundness / completeness are `sorry` placeholders matching the
-`LoadByte.AssertionGated` initial-commit pattern. -/
+Soundness and completeness are fully proved (axiom-clean). -/
 
 namespace Assertion
 
@@ -147,7 +146,7 @@ open Circuit
 
 @[reducible]
 def main (cols : Var MemoryGlobalCols (ZMod p)) : Circuit (ZMod p) Unit := do
-  let ⟨_clk_high, _clk_low, index, prev_addr, addr, _lt_cols, value,
+  let ⟨_clk_high, _clk_low, index, prev_addr, addr, lt_cols, value,
        value_lower, value_upper, is_real, is_comp, _prev_valid,
        is_prev_addr_zero, is_index_zero⟩ := cols
   let one_expr : Expression (ZMod p) := 1
@@ -197,6 +196,22 @@ def main (cols : Var MemoryGlobalCols (ZMod p)) : Circuit (ZMod p) Unit := do
     (one_expr - is_prev_addr_zero[1] * is_index_zero[1])) === 0
   -- `is_comp` binary gate.
   is_comp * (is_comp - one_expr) === 0
+  -- `LtUnsignedOp` monotonicity (`prev_addr < addr`), gated by `is_comp`.
+  -- The 3-limb addresses are padded to 4 limbs (`.push 0`).
+  SP1Clean.LtUnsignedOp.assertionGated
+    (⟨#v[prev_addr[0], prev_addr[1], prev_addr[2], (0 : Expression (ZMod p))],
+      #v[addr[0], addr[1], addr[2], (0 : Expression (ZMod p))],
+      lt_cols[0], #v[lt_cols[1], lt_cols[2], lt_cols[3], lt_cols[4]],
+      lt_cols[5], #v[lt_cols[6], lt_cols[7]], is_comp⟩ :
+      Var SP1Clean.LtUnsignedOp.InputsGated (ZMod p))
+  -- `when(is_comp).assert_one(compare_bit)`.
+  is_comp * (lt_cols[0] - one_expr) === 0
+  -- `when(¬is_comp)` x0-case: `addr == 0` and `value == 0`.
+  (is_real - is_comp) * (addr[0] + addr[1] + addr[2]) === 0
+  (is_real - is_comp) * value[0] === 0
+  (is_real - is_comp) * value[1] === 0
+  (is_real - is_comp) * value[2] === 0
+  (is_real - is_comp) * value[3] === 0
 
 set_option maxHeartbeats 800000 in
 -- 14 inline gates + 12 lookups + 2 IsZero sub-circuits; default
@@ -237,11 +252,12 @@ private lemma byteOpcodeSpec_range8_of_lt
   rw [val_8_eq]
   exact hx
 
-/-- Soundness against the Phase-1 `main` (range checks + third-limb
-decomposition + the two `IsZeroOp` arms + `is_comp`/`is_real` gates). The
-`LtUnsignedOp` monotonicity conjuncts are not part of this `FormalSpec`
-(deferred to Phase 4.5). Mirrors the `LoadX0`/`AddressShape` raw-lookup
-discharge pattern. -/
+set_option maxHeartbeats 1600000 in
+-- The `LtUnsignedOp` subcircuit + 25-conjunct refine exceeds the default cap.
+/-- Soundness against the full Phase-4.5 `main`: range checks + third-limb
+decomposition + the two `IsZeroOp` arms + `is_comp`/`is_real` gates + the
+`LtUnsignedOp` monotonicity (gated by `is_comp`) + compare-bit + x0-case
+zero asserts. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
   circuit_proof_start
@@ -253,10 +269,18 @@ theorem soundness :
              SP1Clean.ByteOpcodeTable] at h_holds
   obtain ⟨h_ir_gate, h_v0, h_v1, h_v2, h_v3, h_pa0, h_pa1, h_pa2,
           h_a0, h_a1, h_a2, h_decomp, h_vl, h_vu, h_isz_pa, h_isz_idx,
-          h_iscomp_eq, h_iscomp_bin⟩ := h_holds
+          h_iscomp_eq, h_iscomp_bin, h_lt_sub, h_bit, h_azero,
+          h_vz0, h_vz1, h_vz2, h_vz3⟩ := h_holds
   simp only [FormalSpec, Vector.getElem_map, sub_eq_add_neg]
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  -- `is_comp ∈ {0, 1}` as a term (discharges the LtUnsignedOp Assumptions).
+  have h_ic_or : Expression.eval env input_var_is_comp = 0 ∨
+      Expression.eval env input_var_is_comp = 1 := by
+    rcases mul_eq_zero.mp h_iscomp_bin with h | h
+    · exact Or.inl h
+    · exact Or.inr (by linear_combination h)
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+          ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · binary_iff h_ir_gate
   · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_v0
   · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16 _ h_v1
@@ -275,8 +299,17 @@ theorem soundness :
   · exact h_isz_idx trivial
   · linear_combination h_iscomp_eq
   · binary_iff h_iscomp_bin
+  · exact h_lt_sub h_ic_or
+  · linear_combination h_bit
+  · linear_combination h_azero
+  · linear_combination h_vz0
+  · linear_combination h_vz1
+  · linear_combination h_vz2
+  · linear_combination h_vz3
 
-/-- Completeness against the Phase-1 `main`. Mirrors soundness; the
+set_option maxHeartbeats 1600000 in
+-- The `LtUnsignedOp` subcircuit + 25-conjunct refine exceeds the default cap.
+/-- Completeness against the full Phase-4.5 `main`. Mirrors soundness; the
 `FormalSpec` conjuncts feed each lookup / sub-circuit / gate emission. -/
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -288,11 +321,13 @@ theorem completeness :
   simp only [FormalSpec, Vector.getElem_map, sub_eq_add_neg] at h_spec
   obtain ⟨h_ir_or, h_v0, h_v1, h_v2, h_v3, h_pa0, h_pa1, h_pa2,
           h_a0, h_a1, h_a2, h_decomp, h_vl, h_vu, h_isz_pa, h_isz_idx,
-          h_iscomp_eq, h_iscomp_bin⟩ := h_spec
+          h_iscomp_eq, h_iscomp_bin, h_lt, h_bit, h_azero,
+          h_vz0, h_vz1, h_vz2, h_vz3⟩ := h_spec
   simp only [circuit_norm, Lookup.Completeness, Table.toRaw,
              SP1Clean.ByteOpcodeTable]
   unfold id at *
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+          ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rcases h_ir_or with h | h <;> rw [h] <;> ring
   · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_v0
   · exact SP1Clean.AddOp.Assertion.byteOpcodeSpec_range16_of_lt _ h_v1
@@ -311,6 +346,13 @@ theorem completeness :
   · exact ⟨trivial, h_isz_idx⟩
   · linear_combination h_iscomp_eq
   · rcases h_iscomp_bin with h | h <;> rw [h] <;> ring
+  · exact ⟨h_iscomp_bin, h_lt⟩
+  · linear_combination h_bit
+  · linear_combination h_azero
+  · linear_combination h_vz0
+  · linear_combination h_vz1
+  · linear_combination h_vz2
+  · linear_combination h_vz3
 
 end Assertion
 

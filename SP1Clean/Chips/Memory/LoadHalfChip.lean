@@ -42,8 +42,6 @@ Opcodes: `30 = LH`, `33 = LHU`.
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-open LeanRV64D.Functions Sail SailState
-
 namespace SP1Clean.LoadHalf
 
 open Circuit ProvableType
@@ -422,15 +420,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) LoadHalfCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-/-- Chip-level Assumptions: load-memory and half-word selector contracts. -/
+/-- Chip-level Assumptions: the half-word selector contract. (The load-memory
+contract is now derived from the promoted `LoadMemoryAccessGated` sub-circuit.) -/
 def Assumptions (cols : LoadHalfCols (ZMod p)) : Prop :=
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let is_real : ZMod p := cols.is_lh + cols.is_lhu
-  SP1Clean.LoadMemoryAccessGated.Assertion.Contract
-    ⟨cols.state.clk_high, clk_low, cols.addr_value, cols.load_prev_value,
-     cols.load_memory_prev_high, cols.load_memory_prev_low,
-     cols.load_memory_diff_low, cols.load_memory_diff_high,
-     cols.load_memory_flag, is_real⟩ ∧
   SP1Clean.LoadHalfSelector.Assertion.Contract
     ⟨cols.load_prev_value, 0, cols.offset_bit_1, cols.offset_bit_0,
      cols.op_a_write_value_lo, cols.signed_extension_msb, cols.is_lhu⟩
@@ -450,8 +442,8 @@ theorem soundness :
   · exact h_addr_sub trivial
   · exact h_addr_shape_sub trivial
   · exact h_itr_sub trivial
-  · exact h_lmag_sub h_assumptions.1
-  · exact h_lhs_sub h_assumptions.2
+  · exact h_lmag_sub trivial
+  · exact h_lhs_sub h_assumptions
   · binary_iff h_is_lh
   · binary_iff h_is_lhu
   · binary_iff h_sum
@@ -473,7 +465,7 @@ theorem completeness :
   · exact ⟨trivial, h_addr⟩
   · exact ⟨trivial, h_addr_shape⟩
   · exact ⟨trivial, h_itr⟩
-  · exact ⟨h_lmag, h_lmag⟩
+  · exact ⟨trivial, h_lmag⟩
   · exact ⟨h_lhs, h_lhs⟩
   · binary_iff h_is_lh
   · binary_iff h_is_lhu
@@ -488,65 +480,6 @@ def assertionGated : FormalAssertion (ZMod p) LoadHalfCols :=
     Spec := AssertionGated.FormalSpec,
     soundness := AssertionGated.soundness,
     completeness := AssertionGated.completeness }
-
-/-! ## Cols-level Sail helpers + structural bridges (LH + LHU). -/
-
-@[reducible] def sp1_op_a_cols (cols : LoadHalfCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_a.val
-
-@[reducible] def sp1_op_b_cols (cols : LoadHalfCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_b.val
-
-@[reducible] def sp1_imm_c_cols (cols : LoadHalfCols (ZMod p)) : BitVec 12 :=
-  BitVec.ofNat 12 cols.adapter.op_c_imm[0].val
-
-@[reducible] def sp1_load_half_cols (cols : LoadHalfCols (ZMod p)) :
-    SailM ExecutionResult := do
-  let op_a := sp1_op_a_cols cols
-  Sail.writeReg Register.nextPC
-    (Word.toBitVec64
-      #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)] + 4)
-  Sail.write_reg op_a (Word.toBitVec64
-    #v[cols.op_a_write_value_lo,
-       (65535 : ZMod p) * cols.signed_extension_msb,
-       (65535 : ZMod p) * cols.signed_extension_msb,
-       (65535 : ZMod p) * cols.signed_extension_msb])
-  return RETIRE_SUCCESS
-
-def loadHalfInitialState_cols (cols : LoadHalfCols (ZMod p))
-    (s : SailState) : Prop :=
-  ∀ Main : Vector (ZMod p) 44, fromMain Main = cols →
-    (_root_.Load.LoadHalf.constraints Main).initialState s
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_op_a_cols (fromMain Main) = _root_.Load.LoadHalf.sp1_op_a Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_op_b_cols (fromMain Main) = _root_.Load.LoadHalf.sp1_ob_b Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_imm_c_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_imm_c_cols (fromMain Main) = _root_.Load.LoadHalf.sp1_imm_c Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_load_half_cols_fromMain (Main : Vector (ZMod p) 44) :
-    sp1_load_half_cols (fromMain Main) = _root_.Load.LoadHalf.sp1_load_half Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-/-- Cols round-trip. `is_trusted := Main[42] + Main[43] = is_lh + is_lhu`. -/
-lemma fromMain_toMain (cols : LoadHalfCols (ZMod p))
-    (h_trusted : cols.adapter_cols.is_trusted = cols.is_lh + cols.is_lhu) :
-    fromMain (toMain cols) = cols := by
-  rcases cols with ⟨state, adapter, addr_value, addr_top_two_limb_inv,
-                    load_prev_value, lmph, lmpl, lmf, lmdl, lmdh,
-                    ob1, ob0, oawvlo, sem, is_lh, is_lhu, adapter_cols⟩
-  have : adapter_cols.is_trusted = is_lh + is_lhu := by simpa using h_trusted
-  simp [this, LoadHalfCols.ext_iff, CPUState.ext_iff, ITypeReader.ext_iff,
-    MemoryAccessInSharedCols.ext_iff, UserModeReaderCols.ext_iff]
-  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_, ?_⟩
-  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 lemma allHold_iff_structural_lh
     (Main : Vector (ZMod p) 44) (h_is_lh : Main[42] = 1) :
