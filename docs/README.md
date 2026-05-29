@@ -54,6 +54,19 @@ under `docs/`, look at the matching entry below.
   chips, three-layer bridging discipline, faithful sub-circuit
   composition, and the canonical AddChip/AddOp pattern reference.
 
+- **`CLEAN_NATIVE_DIRECTION.md`** — architecture decision brief: is the
+  current structural-`FormalAssertion` + `SailBridge` chip shape the right
+  long-term model, or a compatibility shim forced by `SP1Chips/*` +
+  `update_constraints.py` (which we intend to retire)? Verdict: a reusable
+  stepping-stone, but the structural spec + borrowed `correct_*` are legacy
+  artifacts; the Clean-native end-state is witnessed `FormalCircuit`/
+  `GeneralFormalCircuit` gadgets with **semantic** specs (à la Clean's
+  FemtoCairo example) composed into a `FormalTable`. Includes the decisive
+  STARK fact (every column is committed; `localLength` cells *are* committed
+  columns), a map of what's reusable vs replaced at cutover, and a concrete
+  **single-chip prototype brief** to run in a fresh session. Read this before
+  scaling the current chip pattern or starting the `SP1Chips` retirement.
+
 - **`CLEAN_VERIFICATION_STATUS.md`** — the **status of record** for the
   SP1Clean effort: a ground-truth snapshot (sorry/axiom inventory verified
   by `grep` + `#print axioms`, not docs), a per-chip closure matrix
