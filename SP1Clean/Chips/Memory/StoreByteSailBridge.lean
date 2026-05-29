@@ -1,4 +1,4 @@
-import SP1Clean.Chips.Memory.StoreByteChip
+import SP1Clean.Chips.Memory.StoreByteSailCols
 
 /-! # External Sail-equivalence bridge for `StoreByteChip`
 

@@ -213,6 +213,9 @@ theorem is_real_binary_shiftLeft
   -- (after the U16MSB block + the two `Gated` readers); projecting it
   -- directly avoids `tauto` exploding on the ~60-conjunct structural spec.
   change SP1Clean.ShiftLeft.Assertion.FormalSpec cols at h
+  -- FormalSpec is a ~70-conjunct `∧`; `tauto` blows up on its ~30 disjunctions
+  -- (deterministic whnf timeout). The `is_real = 0 ∨ is_real = 1` clause is the
+  -- 4th top-level conjunct, with `is_real := is_sll + is_sllw` (defeq to goal).
   exact h.2.2.2.1
 
 theorem is_real_binary_shiftRight

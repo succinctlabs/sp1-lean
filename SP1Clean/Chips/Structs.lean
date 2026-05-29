@@ -1755,9 +1755,10 @@ structure MemoryGlobalCols (T : Type) where
   prev_addr : Vector T 3
   /-- The address of this memory access. -/
   addr : Vector T 3
-  /-- Comparison columns for `prev_addr < addr` (LtOperationUnsigned
-  layout in SP1; opaque placeholder here). 6 field elements. -/
-  lt_cols : Vector T 6
+  /-- Comparison columns for `prev_addr < addr` (`LtOperationUnsigned`
+  layout in SP1). 8 field elements: `[compare_bit, u16_flags[0..3],
+  not_eq_inv, comparison_limbs[0..1]]`. -/
+  lt_cols : Vector T 8
   /-- The value of the memory access. -/
   value : Word T
   /-- Lower half of the third limb of `value`. -/

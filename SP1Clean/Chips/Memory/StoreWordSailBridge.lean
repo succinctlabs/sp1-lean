@@ -1,4 +1,4 @@
-import SP1Clean.Chips.Memory.StoreWordChip
+import SP1Clean.Chips.Memory.StoreWordSailCols
 
 /-! # External Sail-equivalence bridge for `StoreWordChip` (width 4). -/
 

@@ -1,4 +1,4 @@
-import SP1Clean.Chips.Memory.LoadByteChip
+import SP1Clean.Chips.Memory.LoadByteSailCols
 
 /-! # External Sail-equivalence bridges for `LoadByteChip` (LB + LBU)
 

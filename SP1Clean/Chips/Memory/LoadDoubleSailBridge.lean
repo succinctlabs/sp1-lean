@@ -1,4 +1,4 @@
-import SP1Clean.Chips.Memory.LoadDoubleChip
+import SP1Clean.Chips.Memory.LoadDoubleSailCols
 
 /-! # External Sail-equivalence bridge for `LoadDoubleChip`
 

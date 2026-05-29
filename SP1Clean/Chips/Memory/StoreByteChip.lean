@@ -58,8 +58,6 @@ selectors.
 set_option linter.style.setOption false
 set_option linter.style.longLine false
 
-open LeanRV64D.Functions Sail SailState
-
 namespace SP1Clean.StoreByte
 
 open Circuit ProvableType
@@ -445,16 +443,10 @@ instance elaborated : ElaboratedCircuit (ZMod p) StoreByteCols unit where
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
 
-/-- Chip-level Assumptions: store-memory contract (StoreByteAssembler stays a
-trivial-Spec stub, so no extra conjunct needed). -/
-def Assumptions (cols : StoreByteCols (ZMod p)) : Prop :=
-  let clk_low : ZMod p := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  SP1Clean.StoreMemoryAccessGated.Assertion.Contract
-    ⟨cols.state.clk_high, clk_low, cols.addr_value,
-     cols.store_prev_value, cols.store_value,
-     cols.store_memory_prev_high, cols.store_memory_prev_low,
-     cols.store_memory_diff_low, cols.store_memory_diff_high,
-     cols.store_memory_flag, cols.is_real⟩
+/-- Chip-level Assumptions. The store-memory contract is now derived from the
+promoted `StoreMemoryAccessGated` sub-circuit; StoreByteAssembler stays a
+trivial-Spec stub. -/
+def Assumptions (_ : StoreByteCols (ZMod p)) : Prop := True
 
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
@@ -470,7 +462,7 @@ theorem soundness :
   · exact h_addr_sub trivial
   · exact h_addr_shape_sub trivial
   · exact h_itr_sub trivial
-  · exact h_smag_sub h_assumptions
+  · exact h_smag_sub trivial
   · exact h_sba_sub trivial
   · binary_iff h_isreal
 
@@ -490,7 +482,7 @@ theorem completeness :
   · exact ⟨trivial, h_addr⟩
   · exact ⟨trivial, h_addr_shape⟩
   · exact ⟨trivial, h_itr⟩
-  · exact ⟨h_smag, h_smag⟩
+  · exact ⟨trivial, h_smag⟩
   · exact ⟨trivial, h_sba⟩
   · binary_iff h_isreal
   -- Trailing `mem_limb * (mem_limb - mem_limb) === 0` is `x * 0 = 0` — `ring`.
@@ -504,69 +496,6 @@ def assertionGated : FormalAssertion (ZMod p) StoreByteCols :=
     Spec := AssertionGated.FormalSpec,
     soundness := AssertionGated.soundness,
     completeness := AssertionGated.completeness }
-
-/-! ## Cols-level Sail helpers + structural bridge (Phase 4 SailBridge prep)
-
-Mirror of `SP1Clean.StoreDouble`'s Phase 3 helpers for StoreByte (SB, width 1).
-Opcode 36. `_root_.Store.StoreByte.correct` lives in the SP1Chips file (the
-`Store.StoreByte` namespace) and verifies width-1 store semantics. -/
-
-@[reducible] def sp1_op_a_cols (cols : StoreByteCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_a.val
-
-@[reducible] def sp1_op_b_cols (cols : StoreByteCols (ZMod p)) : BitVec 5 :=
-  BitVec.ofNat 5 cols.adapter.op_b.val
-
-@[reducible] def sp1_imm_c_cols (cols : StoreByteCols (ZMod p)) : BitVec 12 :=
-  BitVec.ofNat 12 (Word.toNat cols.adapter.op_c_imm)
-
-@[reducible] def sp1_sb_cols (cols : StoreByteCols (ZMod p)) :
-    SailM ExecutionResult := do
-  let op_a := sp1_op_a_cols cols
-  Sail.writeReg Register.nextPC
-    (Word.toBitVec64
-      #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2], (0 : ZMod p)])
-  let addr : BitVec 64 := Word.toBitVec64
-    #v[cols.addr_value[0], cols.addr_value[1], cols.addr_value[2], (0 : ZMod p)]
-  Sail.ConcurrencyInterfaceV1.write_ram 64 1 0#64 addr
-    (Word.toBitVec64 cols.adapter.op_a_memory.prev_value)
-  return RETIRE_SUCCESS
-
-def storeByteInitialState_cols (cols : StoreByteCols (ZMod p))
-    (s : SailState) : Prop :=
-  ∀ Main : Vector (ZMod p) 50, fromMain Main = cols →
-    (_root_.Store.StoreByte.constraints Main).initialState s
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_a_cols_fromMain (Main : Vector (ZMod p) 50) :
-    sp1_op_a_cols (fromMain Main) = _root_.Store.StoreByte.sp1_op_a Main := rfl
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_op_b_cols_fromMain (Main : Vector (ZMod p) 50) :
-    sp1_op_b_cols (fromMain Main) = _root_.Store.StoreByte.sp1_ob_b Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_imm_c_cols_fromMain (Main : Vector (ZMod p) 50) :
-    sp1_imm_c_cols (fromMain Main) = _root_.Store.StoreByte.sp1_imm_c Main := rfl
-
-omit [Fact (2 ^ 17 < p)] in
-@[simp] lemma sp1_sb_cols_fromMain (Main : Vector (ZMod p) 50) :
-    sp1_sb_cols (fromMain Main) = _root_.Store.StoreByte.sp1_sb Main := rfl
-
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-/-- Cols round-trip, conditional on `is_trusted = is_real`. -/
-lemma fromMain_toMain (cols : StoreByteCols (ZMod p))
-    (h_trusted : cols.adapter_cols.is_trusted = cols.is_real) :
-    fromMain (toMain cols) = cols := by
-  rcases cols with ⟨state, adapter, addr_value, addr_top_two_limb_inv,
-                    store_prev_value, smph, smpl, smf, smdl, smdh,
-                    bst, bsm, bsl, ml, mllb, rlb, inc, store_value,
-                    is_real, adapter_cols⟩
-  have : adapter_cols.is_trusted = is_real := by simpa using h_trusted
-  simp [this, StoreByteCols.ext_iff, CPUState.ext_iff, ITypeReader.ext_iff,
-    MemoryAccessInSharedCols.ext_iff, UserModeReaderCols.ext_iff]
-  refine ⟨?_, ⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩
-  all_goals simp [Array.ext_iff]; intro i hi; interval_cases i <;> simp
 
 /-- Structural bridge: re-export of `iff_sp1_of_is_real`. -/
 lemma allHold_iff_structural
