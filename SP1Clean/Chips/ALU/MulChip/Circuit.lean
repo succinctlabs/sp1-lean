@@ -81,13 +81,29 @@ instance elaborated : ElaboratedCircuit (ZMod p) MulCols unit where
   localLength_eq input offset := by
     change (main input).localLength offset = (main input).localLength 0
     simp only [main, circuit_norm]
-  subcircuitsConsistent _ _ := by sorry
+  subcircuitsConsistent input offset := by
+    simp +arith only [main, circuit_norm]
 
 def Assumptions (_ : MulCols (ZMod p)) : Prop := True
 
+/-- Soundness collapses to `formalSpec_of_subcircuit_specs` (`Lemmas.lean`)
+once `circuit_proof_start` peels back the Clean elaboration plumbing and
+the `h_holds` destructure surfaces the three sub-circuit witnesses
+(`CPUState.Gated`, `RTypeReader.Gated`, `MulOp.assertion`) plus the
+selector / sum binarity gates and the `op_a_0 = 0` gate. The selector-sum
+binarity gate (`h_sum_bin`) and the reader's `Word.isU64 op_b/op_c` bounds
+feed the named lemma's internal discharge of `MulOp.Assumptions`. -/
 theorem soundness :
     FormalAssertion.Soundness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e_clk_high, e_clk_16, e_clk_0, e_pc⟩, e_adapter, e_oawv, e_mulop,
+          e_is_mul, e_is_mulh, e_is_mulhu, e_is_mulhsu, e_is_mulw, e_ac⟩ := h_input
+  subst_eqs
+  obtain ⟨h_cpu_sub, h_rtr_sub, h_mul_sub, _h_mul_bin, _h_mulh_bin, _h_mulhu_bin,
+          _h_mulhsu_bin, _h_mulw_bin, _h_sum_bin, h_op_a_0⟩ := h_holds
+  unfold id at *
+  exact formalSpec_of_subcircuit_specs _ h_mul_sub (h_cpu_sub trivial)
+    (h_rtr_sub trivial) h_op_a_0
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
