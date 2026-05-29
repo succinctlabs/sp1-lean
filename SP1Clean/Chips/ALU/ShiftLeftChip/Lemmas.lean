@@ -18,9 +18,31 @@ namespace SP1Clean.ShiftLeft
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-omit [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)] in
-lemma fromMain_toMain (_cols : ShiftLeftCols (ZMod p))
-    (_h_trusted : True) : True := by trivial
+omit [Fact (2 ^ 17 < p)] in
+/-- Round-trip on the cols struct: `toMain` then `fromMain` recovers `cols`,
+given the UserMode TrustMode marker (`adapter_cols.is_trusted` aliases the
+`is_sll + is_sllw` sum, the one non-column cell `fromMain` synthesizes). -/
+lemma fromMain_toMain (cols : ShiftLeftCols (ZMod p))
+    (h_trusted : cols.adapter_cols.is_trusted = cols.is_sll + cols.is_sllw) :
+    fromMain (toMain cols) = cols := by
+  rcases cols with ⟨state, adapter, result, c_bits, v_01, v_012, v_0123, shift_u16,
+    lower_limb, higher_limb, limb_result, sllw_msb, is_sll, is_sllw, is_sllw_imm, adapter_cols⟩
+  rcases state with ⟨clk_high, clk_16_24, clk_0_16, pc⟩
+  rcases adapter with ⟨op_a, op_a_memory, op_a_0, op_b, op_b_memory, op_c, op_c_memory, imm_c⟩
+  rcases op_a_memory with ⟨op_a_pv, op_a_ts⟩; rcases op_a_ts with ⟨op_a_pl, op_a_dll⟩
+  rcases op_b_memory with ⟨op_b_pv, op_b_ts⟩; rcases op_b_ts with ⟨op_b_pl, op_b_dll⟩
+  rcases op_c_memory with ⟨op_c_pv, op_c_ts⟩; rcases op_c_ts with ⟨op_c_pl, op_c_dll⟩
+  rcases sllw_msb with ⟨msb⟩
+  rcases adapter_cols with ⟨is_trusted⟩
+  have h : is_trusted = is_sll + is_sllw := by simpa using h_trusted
+  simp only [h, fromMain, toMain, ShiftLeftCols.mk.injEq, CPUState.mk.injEq,
+    ALUTypeReader.mk.injEq, MemoryAccessInSharedCols.mk.injEq,
+    MemoryAccessInShardTimestamp.mk.injEq, U16MSBOperation.mk.injEq,
+    UserModeReaderCols.mk.injEq, Vector.getElem_mk, List.getElem_toArray,
+    List.getElem_cons_zero, List.getElem_cons_succ, and_self, true_and,
+    and_true, and_assoc]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+    (apply Vector.ext; intro i hi; interval_cases i <;> rfl)
 
 lemma allHold_iff_structural
     (Main : Vector (ZMod p) 65)
@@ -44,17 +66,5 @@ lemma allHold_iff_structural
   · -- ALUTypeReader (gate args normalize to `1 1` via `is_real = 1`)
     rw [h_is_real]
     exact SP1Clean.ALUTypeReader.Gated.Assertion.Spec_iff_sp1
-
-lemma formalSpec_of_subcircuit_specs
-    (cols : ShiftLeftCols (ZMod p))
-    (_h_is_real_sum : cols.is_sll + cols.is_sllw = 1) :
-    Assertion.FormalSpec cols := by
-  sorry
-
-lemma subcircuit_specs_of_formalSpec
-    (cols : ShiftLeftCols (ZMod p))
-    (_h_is_real_sum : cols.is_sll + cols.is_sllw = 1)
-    (_h_spec : Assertion.FormalSpec cols) :
-    True := by trivial
 
 end SP1Clean.ShiftLeft

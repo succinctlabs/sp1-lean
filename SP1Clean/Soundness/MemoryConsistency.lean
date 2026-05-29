@@ -5,7 +5,7 @@ import SP1Clean.Chips.Memory.LoadByteChip
 import SP1Clean.Chips.Memory.StoreByteChip
 import SP1Clean.Chips.Control.JalChip.Circuit
 import SP1Clean.Chips.ALU.MulChip.Aggregate
-import SP1Clean.Chips.ALU.ShiftLeftChip.Aggregate
+import SP1Clean.Chips.ALU.ShiftLeftChip.SailBridge
 import SP1Clean.Chips.ALU.AddwChip.SailBridge
 import SP1Clean.Chips.ALU.UTypeChip.SailBridge
 import SP1Clean.Chips.Control.JalrChip.Aggregate
@@ -18,7 +18,7 @@ import SP1Clean.Chips.Memory.LoadWordChip
 import SP1Clean.Chips.Memory.LoadHalfChip
 import SP1Clean.Chips.Control.BranchChip.Aggregate
 import SP1Clean.Chips.Memory.LoadX0Chip
-import SP1Clean.Chips.ALU.ShiftRightChip.Aggregate
+import SP1Clean.Chips.ALU.ShiftRightChip.SailBridge
 import SP1Clean.Chips.ALU.DivRemChip.Circuit
 import SP1Clean.Chips.ALU.AddiChip.SailBridge
 import SP1Clean.Chips.ALU.BitwiseChip.SailBridge

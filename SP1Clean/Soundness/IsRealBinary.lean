@@ -209,18 +209,22 @@ theorem is_real_binary_shiftLeft
     (cols : SP1Clean.ShiftLeft.ShiftLeftCols (ZMod p))
     (h : SP1Clean.ShiftLeft.assertion.Spec cols) :
     cols.is_sll + cols.is_sllw = 0 ∨ cols.is_sll + cols.is_sllw = 1 := by
+  -- The is-real disjunction is the 4th chip-level conjunct of `FormalSpec`
+  -- (after the U16MSB block + the two `Gated` readers); projecting it
+  -- directly avoids `tauto` exploding on the ~60-conjunct structural spec.
   change SP1Clean.ShiftLeft.Assertion.FormalSpec cols at h
-  unfold SP1Clean.ShiftLeft.Assertion.FormalSpec at h
-  tauto
+  exact h.2.2.2.1
 
 theorem is_real_binary_shiftRight
     (cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
     (h : SP1Clean.ShiftRight.assertion.Spec cols) :
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 0 ∨
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw = 1 := by
+  -- The is-real disjunction is the 10th chip-level conjunct of `FormalSpec`
+  -- (3 U16MSB blocks + 2 `Gated` readers + 4 selector binaries); projecting it
+  -- directly avoids `tauto` exploding on the ~75-conjunct structural spec.
   change SP1Clean.ShiftRight.Assertion.FormalSpec cols at h
-  unfold SP1Clean.ShiftRight.Assertion.FormalSpec at h
-  tauto
+  exact h.2.2.2.2.2.2.2.2.2.1
 
 theorem is_real_binary_storeByte
     (cols : SP1Clean.StoreByte.StoreByteCols (ZMod p))

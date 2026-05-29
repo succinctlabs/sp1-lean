@@ -28,6 +28,49 @@ open Circuit ProvableType
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
+/-- Extract a `Range` bound from a (real-row) gated byte-opcode lookup:
+`ByteOpcodeGated.Spec ⟨#v[6, x, bnd, 0], mult⟩` with `mult ≠ 0` forces the
+witnessed opcode to be `Range`, giving `x.val < 2 ^ bnd.val`. Mirrors
+`SP1Clean.OperandAccess.byteOpcodeSpec_range16` but keeps `bnd` symbolic. -/
+private lemma range_gated_bound {x bnd mult : ZMod p}
+    (h : SP1Lookup.ByteOpcodeGated.Spec ⟨#v[(6 : ZMod p), x, bnd, 0], mult⟩)
+    (hmult : mult ≠ 0) :
+    x.val < 2 ^ bnd.val := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : 2 ^ 17 < p := Fact.out
+  rcases h with h0 | ⟨bop, hbop, hconstr⟩
+  · exact absurd h0 hmult
+  · have h_eq : bop = .Range := by
+      have h6 : (6 : ZMod p) = ((6 : ℕ) : ZMod p) := by push_cast; rfl
+      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero] at hbop
+      rw [h6] at hbop
+      apply_fun ZMod.val at hbop
+      have h_lt : bop.toNat < 7 := by cases bop <;> simp [ByteOpcode.toNat]
+      rw [ZMod.val_natCast, ZMod.val_natCast,
+          Nat.mod_eq_of_lt (by omega : bop.toNat < p),
+          Nat.mod_eq_of_lt (by omega : (6 : ℕ) < p)] at hbop
+      cases bop <;> simp [ByteOpcode.toNat] at hbop
+      rfl
+    subst h_eq
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_succ,
+               List.getElem_cons_zero, ByteOpcode.constrain_Range] at hconstr
+    exact hconstr
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Reverse of `range_gated_bound`: build the gated byte-opcode `Spec`
+(`mult = 0 ∨ ByteOpcodeSpec …`) from the `Range` bound. Used for completeness. -/
+private lemma range_gated_spec {x bnd mult : ZMod p}
+    (h : mult ≠ 0 → x.val < 2 ^ bnd.val) :
+    SP1Lookup.ByteOpcodeGated.Spec ⟨#v[(6 : ZMod p), x, bnd, 0], mult⟩ := by
+  by_cases hm : mult = 0
+  · exact Or.inl hm
+  · refine Or.inr ⟨.Range, ?_, ?_⟩
+    · simp only [ByteOpcode.toNat, Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, Nat.cast_ofNat]
+    · simp only [ByteOpcode.constrain_Range, Vector.getElem_mk, List.getElem_toArray,
+                 List.getElem_cons_zero, List.getElem_cons_succ]
+      exact h hm
+
 namespace Assertion
 
 open Circuit
@@ -185,11 +228,211 @@ theorem soundness :
   subst_eqs
   obtain ⟨h_trusted, h_sum⟩ := h_assumptions
   simp only [FormalSpec, Vector.getElem_map]
-  sorry
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  haveI : Fact (p > 65536) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  obtain ⟨h_msbbin, h_u16rng, h_cpu, h_alu, h_sumbin, h_sllbin, h_sllwbin,
+    h_cb0, h_cb1, h_cb2, h_cb3, h_cb4, h_cb5, h_within, h_s0sel, h_s0bin,
+    h_s1sel, h_s1bin, h_s2sel, h_s2bin, h_s3sel, h_s3bin, h_ssum,
+    h_v01, h_v012, h_v0123, h_ll0, h_hl0, h_ob0, h_ll1, h_hl1, h_ob1,
+    h_ll2, h_hl2, h_ob2, h_ll3, h_hl3, h_ob3, h_lr0, h_lr1, h_lr2, h_lr3,
+    h_o0, h_o1, h_o2, h_o3, h_o4, h_o5, h_o6, h_o7, h_o8, h_o9, h_o10, h_o11,
+    h_o12, h_o13, h_o14, h_o15, h_w0, h_w1, h_w2, h_w3, h_w4, h_w5,
+    h_immeq, h_opa0⟩ := h_holds
+  unfold id at *
+  refine ⟨⟨by linear_combination h_sllwbin, by linear_combination h_msbbin,
+      fun h_ne => ?_⟩,
+    h_cpu trivial, h_alu trivial,
+    (mul_add_neg_one_eq_zero_iff _).mp h_sumbin,
+    (mul_add_neg_one_eq_zero_iff _).mp h_sllbin,
+    (mul_add_neg_one_eq_zero_iff _).mp h_sllwbin,
+    (mul_add_neg_one_eq_zero_iff _).mp h_cb0,
+    (mul_add_neg_one_eq_zero_iff _).mp h_cb1,
+    (mul_add_neg_one_eq_zero_iff _).mp h_cb2,
+    (mul_add_neg_one_eq_zero_iff _).mp h_cb3,
+    (mul_add_neg_one_eq_zero_iff _).mp h_cb4,
+    (mul_add_neg_one_eq_zero_iff _).mp h_cb5,
+    fun h_ne => ?_,
+    mul_eq_zero.mp h_s0sel,
+    (mul_add_neg_one_eq_zero_iff _).mp h_s0bin,
+    (mul_eq_zero.mp h_s1sel).imp id (fun h => by linear_combination h),
+    (mul_add_neg_one_eq_zero_iff _).mp h_s1bin,
+    (mul_eq_zero.mp h_s2sel).imp id (fun h => by linear_combination h),
+    (mul_add_neg_one_eq_zero_iff _).mp h_s2bin,
+    (mul_eq_zero.mp h_s3sel).imp id (fun h => by linear_combination h),
+    (mul_add_neg_one_eq_zero_iff _).mp h_s3bin,
+    (mul_eq_zero.mp h_ssum).imp id (fun h => by linear_combination h),
+    by linear_combination h_v01,
+    by linear_combination h_v012,
+    by linear_combination h_v0123,
+    fun h_ne => ?_,
+    fun h_ne => ?_,
+    by push_cast; linear_combination h_ob0,
+    fun h_ne => ?_,
+    fun h_ne => ?_,
+    by push_cast; linear_combination h_ob1,
+    fun h_ne => ?_,
+    fun h_ne => ?_,
+    by push_cast; linear_combination h_ob2,
+    fun h_ne => ?_,
+    fun h_ne => ?_,
+    by push_cast; linear_combination h_ob3,
+    by linear_combination h_lr0,
+    by linear_combination h_lr1,
+    by linear_combination h_lr2,
+    by linear_combination h_lr3,
+    (mul_eq_zero.mp h_o0).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o1).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o2).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o3).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o4).imp id (fun h => mul_eq_zero.mp h),
+    (mul_eq_zero.mp h_o5).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o6).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o7).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o8).imp id (fun h => mul_eq_zero.mp h),
+    (mul_eq_zero.mp h_o9).imp id (fun h => mul_eq_zero.mp h),
+    (mul_eq_zero.mp h_o10).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o11).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_o12).imp id (fun h => mul_eq_zero.mp h),
+    (mul_eq_zero.mp h_o13).imp id (fun h => mul_eq_zero.mp h),
+    (mul_eq_zero.mp h_o14).imp id (fun h => mul_eq_zero.mp h),
+    (mul_eq_zero.mp h_o15).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_w0).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_w1).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_w2).imp id (fun h => mul_eq_zero.mp h),
+    (mul_eq_zero.mp h_w3).imp id (fun h => (mul_eq_zero.mp h).imp id (fun h' => by linear_combination h')),
+    (mul_eq_zero.mp h_w4).imp id (fun h => by linear_combination h),
+    (mul_eq_zero.mp h_w5).imp id (fun h => by linear_combination h),
+    by linear_combination h_immeq,
+    h_opa0⟩
+  · -- g1c: U16MSB sign-witness range (bound 16 → < 65536)
+    have hb := range_gated_bound (h_u16rng trivial) h_ne
+    have h16 : (16 : ZMod p).val = 16 := by
+      have hp : 2 ^ 17 < p := Fact.out
+      rw [show (16 : ZMod p) = ((16 : ℕ) : ZMod p) from by push_cast; rfl,
+          ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
+    rw [h16] at hb
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using hb
+  · -- g13: within-shift bound
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_within trivial) h_ne
+  · -- g26: lower_limb[0]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_ll0 trivial) h_ne
+  · -- g27: higher_limb[0]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_hl0 trivial) h_ne
+  · -- g29: lower_limb[1]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_ll1 trivial) h_ne
+  · -- g30: higher_limb[1]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_hl1 trivial) h_ne
+  · -- g32: lower_limb[2]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_ll2 trivial) h_ne
+  · -- g33: higher_limb[2]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_hl2 trivial) h_ne
+  · -- g35: lower_limb[3]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_ll3 trivial) h_ne
+  · -- g36: higher_limb[3]
+    simpa only [sub_eq_add_neg, Nat.cast_ofNat] using range_gated_bound (h_hl3 trivial) h_ne
 
 theorem completeness :
     FormalAssertion.Completeness (ZMod p) elaborated Assumptions FormalSpec := by
-  sorry
+  circuit_proof_start
+  obtain ⟨⟨e_ckh, e_c1624, e_c016, e_pc⟩,
+      ⟨e_opa, ⟨e_opapv, e_opapl, e_opadll⟩, e_opa0, e_opb,
+        ⟨e_opbpv, e_opbpl, e_opbdll⟩, e_opc, ⟨e_opcpv, e_opcpl, e_opcdll⟩, e_immc⟩,
+      e_result, e_cbits, e_v01, e_v012, e_v0123, e_shiftu16, e_lower, e_higher,
+      e_limbresult, e_sllwmsb, e_issll, e_issllw, e_issllwimm, e_istrusted⟩ := h_input
+  subst_eqs
+  obtain ⟨h_trusted, h_sum⟩ := h_assumptions
+  unfold id at *
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  haveI : Fact (p > 65536) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  simp only [FormalSpec, Vector.getElem_map] at h_spec
+  obtain ⟨⟨_h_sllw_bin, h_msb_bin, h_u16range⟩, h_cpu, h_alu, h_sum_or, h_sll_or, h_sllw_or,
+    h_cb0_or, h_cb1_or, h_cb2_or, h_cb3_or, h_cb4_or, h_cb5_or, h_within,
+    h_s0sel, h_s0_or, h_s1sel, h_s1_or, h_s2sel, h_s2_or, h_s3sel, h_s3_or,
+    h_ssum, h_v01, h_v012, h_v0123, h_ll0, h_hl0, h_ob0, h_ll1, h_hl1, h_ob1,
+    h_ll2, h_hl2, h_ob2, h_ll3, h_hl3, h_ob3, h_lr0, h_lr1, h_lr2, h_lr3,
+    h_o0, h_o1, h_o2, h_o3, h_o4, h_o5, h_o6, h_o7, h_o8, h_o9, h_o10, h_o11,
+    h_o12, h_o13, h_o14, h_o15, h_w0, h_w1, h_w2, h_w3, h_w4, h_w5,
+    h_immeq, h_opa0⟩ := h_spec
+  refine ⟨by linear_combination h_msb_bin,
+    ⟨trivial, range_gated_spec (fun hm => by
+      have hh := h_u16range hm
+      have h16 : (16 : ZMod p).val = 16 := by
+        rw [show (16 : ZMod p) = ((16 : ℕ) : ZMod p) from by push_cast; rfl,
+            ZMod.val_natCast, Nat.mod_eq_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega)]
+      rw [h16]
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using hh)⟩,
+    ⟨trivial, h_cpu⟩, ⟨trivial, h_alu⟩,
+    by rcases h_sum_or with h | h <;> rw [h] <;> ring,
+    by rcases h_sll_or with h | h <;> rw [h] <;> ring,
+    by rcases h_sllw_or with h | h <;> rw [h] <;> ring,
+    by rcases h_cb0_or with h | h <;> rw [h] <;> ring,
+    by rcases h_cb1_or with h | h <;> rw [h] <;> ring,
+    by rcases h_cb2_or with h | h <;> rw [h] <;> ring,
+    by rcases h_cb3_or with h | h <;> rw [h] <;> ring,
+    by rcases h_cb4_or with h | h <;> rw [h] <;> ring,
+    by rcases h_cb5_or with h | h <;> rw [h] <;> ring,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_within hm)⟩,
+    by rcases h_s0sel with h | h <;> rw [h] <;> ring,
+    by rcases h_s0_or with h | h <;> rw [h] <;> ring,
+    by rcases h_s1sel with h | h <;> rw [h] <;> ring,
+    by rcases h_s1_or with h | h <;> rw [h] <;> ring,
+    by rcases h_s2sel with h | h <;> rw [h] <;> ring,
+    by rcases h_s2_or with h | h <;> rw [h] <;> ring,
+    by rcases h_s3sel with h | h <;> rw [h] <;> ring,
+    by rcases h_s3_or with h | h <;> rw [h] <;> ring,
+    by rcases h_ssum with h | h <;> rw [h] <;> ring,
+    by rw [h_v01]; push_cast; ring,
+    by linear_combination h_v012,
+    by linear_combination h_v0123,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_ll0 hm)⟩,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_hl0 hm)⟩,
+    by rw [h_ob0]; push_cast; ring,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_ll1 hm)⟩,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_hl1 hm)⟩,
+    by rw [h_ob1]; push_cast; ring,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_ll2 hm)⟩,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_hl2 hm)⟩,
+    by rw [h_ob2]; push_cast; ring,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_ll3 hm)⟩,
+    ⟨trivial, range_gated_spec (fun hm => by
+      simpa only [sub_eq_add_neg, Nat.cast_ofNat] using h_hl3 hm)⟩,
+    by rw [h_ob3]; push_cast; ring,
+    by linear_combination h_lr0,
+    by linear_combination h_lr1,
+    by linear_combination h_lr2,
+    by linear_combination h_lr3,
+    by rcases h_o0 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o1 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o2 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o3 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o4 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o5 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o6 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o7 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o8 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o9 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o10 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o11 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o12 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o13 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o14 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_o15 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_w0 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_w1 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_w2 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_w3 with h | h | h <;> rw [h] <;> ring,
+    by rcases h_w4 with h | h <;> first | (rw [h]; ring) | (push_cast at h; rw [h]; ring),
+    by rcases h_w5 with h | h <;> first | (rw [h]; ring) | (push_cast at h; rw [h]; ring),
+    by linear_combination h_immeq,
+    h_opa0⟩
 
 end Assertion
 

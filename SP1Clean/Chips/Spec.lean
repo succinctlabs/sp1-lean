@@ -583,26 +583,57 @@ namespace SP1Clean.ShiftRight
 
 namespace Assertion
 
-/-- The unified chip Spec for `ShiftRightChip`. Canonical (a) shape:
-`CPUState.Gated` + `ALUTypeReader.Gated` sub-circuit composition with
-opcode `is_srl * 7 + is_sra * 8 + is_srlw * 22 + is_sraw * 23`, the
-chip-level `op_a_0 = 0` gate, four selector + sum binarities, and a
-4-way selector-dispatched RV64 semantic conjunct
-(`RV64.srl`/`RV64.sra`/`RV64.srlw`/`RV64.sraw`) gated on `is_real = 1`.
-The 50+ inline shift-correctness gates plus the three embedded
-`U16MSBOperation` MSB witnesses (for SRA/SRAW sign-extension and op_b
-high-bit witness) are *not* exposed here; they're implementation
-details of the shift sub-circuit and are reconstructed on demand via
-the chip's eventual `iff_sp1` proof. -/
+/-- The unified chip Spec for `ShiftRightChip`. **Structural** (witness-aware)
+shape mirroring `_root_.ShiftRight.allHold_constraints_iff` conjunct-by-conjunct
+(4-variant: `srl`/`sra`/`srlw`/`sraw`):
+
+Three embedded `U16MSBOperation` sign witnesses (SRA op_b high limb, SRAW op_b
+mid limb, SRLW/SRAW result high limb) + `CPUState.Gated` + `ALUTypeReader.Gated`
+(opcode `is_srl·7 + is_sra·8 + is_srlw·22 + is_sraw·23`), followed by the ~75
+inline right-shift gates SP1 emits — the `c_bits` 6-bit decomposition + within-shift
+bound, the `is_w_imm` derivation, the `shift_u16` 4-way byte-selector one-hot, the
+*inverse* `v_01/v_012/v_0123` shift-power chain (uses `1 - c_bit_i`), the per-limb
+lower/higher splits + bounds (limbs 2/3 carry the `(is_srl + is_sra)` SRA-propagation
+factor), the `limb_result` wiring, the `b_msb`/`srw_msb` sign gates +
+`sra_msb_v0123 = b_msb·v_0123`, and the 22 gated output equations (16 srl/sra + 6
+srlw/sraw, with `b_msb·65535` / `srw_msb·65535` sign-extend terms).
+
+The shift has no upstream sub-operation, so these are exposed inline rather than
+collapsed to a pure-semantic `RV64.srl`/…/`RV64.sraw` (mandatory for completeness;
+the semantic output does not pin the free witness columns — see
+`docs/CLEAN_FUTURE.md`). The RV64 semantic is recovered on demand from this
+structural spec inside the Sail bridge. The three U16MSB blocks are the *faithful
+reformulation* of `U16MSBOperation.constraints` (`gate*(gate-1)=0` ∧
+`msb*(msb-1)=0` ∧ `gate ≠ 0 → (2·a - msb·65536).val < 65536`), NOT
+`U16MSBOp.AssertionGated.Spec` (which would be strictly weaker — see ShiftLeft). -/
 def FormalSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   let is_real : ZMod p :=
     cols.is_srl + cols.is_sra + cols.is_srlw + cols.is_sraw
   let opcode_e : ZMod p :=
     cols.is_srl * 7 + cols.is_sra * 8 + cols.is_srlw * 22 + cols.is_sraw * 23
   let clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536
-  let bw := Word.toBitVec64 cols.adapter.op_b_memory.prev_value
-  let cw := Word.toBitVec64 cols.adapter.op_c_memory.prev_value
-  let aw := Word.toBitVec64 cols.op_a_write_value
+  let c6 : ZMod p := cols.c_bits[0] + cols.c_bits[1] * 2 + cols.c_bits[2] * 4
+    + cols.c_bits[3] * 8 + cols.c_bits[4] * 16 + cols.c_bits[5] * 32
+  let c4 : ZMod p := cols.c_bits[0] + cols.c_bits[1] * 2 + cols.c_bits[2] * 4
+    + cols.c_bits[3] * 8
+  let sel : ZMod p := cols.c_bits[4] + cols.c_bits[5] * 2 * (cols.is_srl + cols.is_sra)
+  -- 1. U16MSB sign witness: SRA on op_b high limb (prev_value[3]).
+  (cols.is_sra * (cols.is_sra - 1) = 0 ∧
+    cols.b_msb.msb * (cols.b_msb.msb - 1) = 0 ∧
+    (cols.is_sra ≠ 0 →
+      (2 * cols.adapter.op_b_memory.prev_value[3] - cols.b_msb.msb * 65536 : ZMod p).val
+        < 65536)) ∧
+  -- 2. U16MSB sign witness: SRAW on op_b mid limb (prev_value[1]).
+  (cols.is_sraw * (cols.is_sraw - 1) = 0 ∧
+    cols.b_msb.msb * (cols.b_msb.msb - 1) = 0 ∧
+    (cols.is_sraw ≠ 0 →
+      (2 * cols.adapter.op_b_memory.prev_value[1] - cols.b_msb.msb * 65536 : ZMod p).val
+        < 65536)) ∧
+  -- 3. U16MSB sign witness: SRLW/SRAW on result high limb (op_a_write_value[1]).
+  ((cols.is_srlw + cols.is_sraw) * ((cols.is_srlw + cols.is_sraw) - 1) = 0 ∧
+    cols.srw_msb.msb * (cols.srw_msb.msb - 1) = 0 ∧
+    (cols.is_srlw + cols.is_sraw ≠ 0 →
+      (2 * cols.op_a_write_value[1] - cols.srw_msb.msb * 65536 : ZMod p).val < 65536)) ∧
   SP1Clean.CPUState.Gated.Assertion.Spec
     ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
      8, is_real⟩ ∧
@@ -614,13 +645,101 @@ def FormalSpec (cols : ShiftRightCols (ZMod p)) : Prop :=
   (cols.is_srlw = 0 ∨ cols.is_srlw = 1) ∧
   (cols.is_sraw = 0 ∨ cols.is_sraw = 1) ∧
   (is_real = 0 ∨ is_real = 1) ∧
-  cols.adapter.op_a_0 = 0 ∧
-  (is_real = 1 →
-    Word.isU64 cols.op_a_write_value ∧
-    (cols.is_srl  = 1 → aw = RV64.srl  cw bw) ∧
-    (cols.is_sra  = 1 → aw = RV64.sra  cw bw) ∧
-    (cols.is_srlw = 1 → aw = RV64.srlw cw bw) ∧
-    (cols.is_sraw = 1 → aw = RV64.sraw cw bw))
+  (cols.is_w_imm = (cols.is_srlw + cols.is_sraw) * cols.adapter.imm_c) ∧
+  (cols.c_bits[0] = 0 ∨ cols.c_bits[0] = 1) ∧
+  (cols.c_bits[1] = 0 ∨ cols.c_bits[1] = 1) ∧
+  (cols.c_bits[2] = 0 ∨ cols.c_bits[2] = 1) ∧
+  (cols.c_bits[3] = 0 ∨ cols.c_bits[3] = 1) ∧
+  (cols.c_bits[4] = 0 ∨ cols.c_bits[4] = 1) ∧
+  (cols.c_bits[5] = 0 ∨ cols.c_bits[5] = 1) ∧
+  (¬is_real = 0 →
+    ((cols.adapter.op_c_memory.prev_value[0] - c6) * ((64 : ZMod p)⁻¹)).val
+      < 2 ^ (10 : ZMod p).val) ∧
+  (cols.shift_u16[0] = 0 ∨ sel = 0) ∧
+  (cols.shift_u16[0] = 0 ∨ cols.shift_u16[0] = 1) ∧
+  (cols.shift_u16[1] = 0 ∨ sel = 1) ∧
+  (cols.shift_u16[1] = 0 ∨ cols.shift_u16[1] = 1) ∧
+  (cols.shift_u16[2] = 0 ∨ sel = 2) ∧
+  (cols.shift_u16[2] = 0 ∨ cols.shift_u16[2] = 1) ∧
+  (cols.shift_u16[3] = 0 ∨ sel = 3) ∧
+  (cols.shift_u16[3] = 0 ∨ cols.shift_u16[3] = 1) ∧
+  (is_real = 0 ∨
+    cols.shift_u16[0] + cols.shift_u16[1] + cols.shift_u16[2] + cols.shift_u16[3] = 1) ∧
+  (cols.v_01 = (1 - cols.c_bits[0] + 1) * 2 * ((1 - cols.c_bits[1]) * 3 + 1)) ∧
+  (cols.v_012 = cols.v_01 * ((1 - cols.c_bits[2]) * 15 + 1)) ∧
+  (cols.v_0123 = cols.v_012 * ((1 - cols.c_bits[3]) * 255 + 1)) ∧
+  (¬is_real = 0 → cols.lower_limb[0].val < 2 ^ c4.val) ∧
+  (¬is_real = 0 → cols.higher_limb[0].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (cols.adapter.op_b_memory.prev_value[0] * cols.v_0123
+    = cols.higher_limb[0] * 65536 + cols.lower_limb[0] * cols.v_0123) ∧
+  (¬is_real = 0 → cols.lower_limb[1].val < 2 ^ c4.val) ∧
+  (¬is_real = 0 → cols.higher_limb[1].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (cols.adapter.op_b_memory.prev_value[1] * cols.v_0123
+    = cols.higher_limb[1] * 65536 + cols.lower_limb[1] * cols.v_0123) ∧
+  (¬is_real = 0 → cols.lower_limb[2].val < 2 ^ c4.val) ∧
+  (¬is_real = 0 → cols.higher_limb[2].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (cols.adapter.op_b_memory.prev_value[2] * cols.v_0123 * (cols.is_srl + cols.is_sra)
+    = cols.higher_limb[2] * 65536 + cols.lower_limb[2] * cols.v_0123) ∧
+  (¬is_real = 0 → cols.lower_limb[3].val < 2 ^ c4.val) ∧
+  (¬is_real = 0 → cols.higher_limb[3].val < 2 ^ ((16 : ZMod p) - c4).val) ∧
+  (cols.adapter.op_b_memory.prev_value[3] * cols.v_0123 * (cols.is_srl + cols.is_sra)
+    = cols.higher_limb[3] * 65536 + cols.lower_limb[3] * cols.v_0123) ∧
+  (cols.limb_result[0] = cols.higher_limb[0] + cols.lower_limb[1] * cols.v_0123) ∧
+  (cols.limb_result[1] = cols.higher_limb[1] + cols.lower_limb[2] * cols.v_0123) ∧
+  (cols.limb_result[2] = cols.higher_limb[2] + cols.lower_limb[3] * cols.v_0123) ∧
+  (cols.limb_result[3] = cols.higher_limb[3]) ∧
+  (cols.is_srl + cols.is_srlw = 0 ∨ cols.b_msb.msb = 0) ∧
+  (cols.sra_msb_v0123 = cols.b_msb.msb * cols.v_0123) ∧
+  (cols.is_srlw + cols.is_sraw = 1 ∨ cols.srw_msb.msb = 0) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[0]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[1]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[2] = cols.limb_result[2]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[3] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[1]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[2]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[2] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[3] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[2]) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[2] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[2] = 0 ∨
+    cols.op_a_write_value[3] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[3] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[1] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[2] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srl + cols.is_sra = 0 ∨ cols.shift_u16[3] = 0 ∨
+    cols.op_a_write_value[3] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[0]) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[0] = 0 ∨
+    cols.op_a_write_value[1] = cols.limb_result[1] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[0] = cols.limb_result[1] +
+      (cols.b_msb.msb * 65536 - cols.sra_msb_v0123)) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.shift_u16[1] = 0 ∨
+    cols.op_a_write_value[1] = cols.b_msb.msb * 65535) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.op_a_write_value[2] = cols.srw_msb.msb * 65535) ∧
+  (cols.is_srlw + cols.is_sraw = 0 ∨ cols.op_a_write_value[3] = cols.srw_msb.msb * 65535) ∧
+  cols.adapter.op_a_0 = 0
 
 end Assertion
 
