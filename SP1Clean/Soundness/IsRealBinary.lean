@@ -210,8 +210,10 @@ theorem is_real_binary_shiftLeft
     (h : SP1Clean.ShiftLeft.assertion.Spec cols) :
     cols.is_sll + cols.is_sllw = 0 ∨ cols.is_sll + cols.is_sllw = 1 := by
   change SP1Clean.ShiftLeft.Assertion.FormalSpec cols at h
-  unfold SP1Clean.ShiftLeft.Assertion.FormalSpec at h
-  tauto
+  -- FormalSpec is a ~70-conjunct `∧`; `tauto` blows up on its ~30 disjunctions
+  -- (deterministic whnf timeout). The `is_real = 0 ∨ is_real = 1` clause is the
+  -- 4th top-level conjunct, with `is_real := is_sll + is_sllw` (defeq to goal).
+  exact h.2.2.2.1
 
 theorem is_real_binary_shiftRight
     (cols : SP1Clean.ShiftRight.ShiftRightCols (ZMod p))
