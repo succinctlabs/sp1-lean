@@ -1,32 +1,35 @@
-name = "sp1-lean"
-version = "0.1.0"
-keywords = ["math"]
-defaultTargets = ["SP1Operations", "SP1Chips"]
+name = "sp1-clean-native"
+defaultTargets = ["SP1Clean"]
 
 moreLeanArgs = ["--tstack=400000"]
-preferReleaseBuild = true
 
+# Built-in options only (no Mathlib linter options here — those require a Mathlib
+# linter module to be imported before the package -D flags are validated, which a
+# Clean-only file does not pull in; see the sp1-lean Step 0 finding).
 [leanOptions]
-pp.unicode.fun = true # pretty-prints `fun a ↦ b`
-linter.unusedSimpArgs = false
+pp.unicode.fun = true
 synthInstance.maxHeartbeats = 1000000
-# autoImplicit = false -- Might be good to consider this, given the amount of coercions we use
 
+# Public, non-fork dependencies, aligned on Lean 4.28 / Mathlib v4.28.0.
 [[require]]
 name = "mathlib"
-scope = "leanprover-community"
-rev = "v4.23.0-rc2"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.28.0"
 
 [[require]]
-name = "Lean_RV64D"
+name = "Clean"
+git = "https://github.com/Verified-zkEVM/clean"
+rev = "main"
+
+[[require]]
+name = "LeanRV64D"
 git = "https://github.com/succinctlabs/sail-riscv-lean"
-rev = "sp1-lean-air-verification"
+rev = "dtumad/clean-native"
+
+[[require]]
+name = "RISCV"
+git = "https://github.com/succinctlabs/riscv-lean"
+rev = "dtumad/clean-native"
 
 [[lean_lib]]
-name = "SP1Foundations"
-
-[[lean_lib]]
-name = "SP1Operations"
-
-[[lean_lib]]
-name = "SP1Chips"
+name = "SP1Clean"

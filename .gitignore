@@ -1,6 +1,5 @@
-/.lake
-/.claude
-.env
-.env.fish
+build/*
+build.log
 
-.DS_Store
+.lake/*
+.claude/*

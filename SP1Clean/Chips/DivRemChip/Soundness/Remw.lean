@@ -1,0 +1,887 @@
+import SP1Clean.Chips.DivRemChip.Defs
+import SP1Clean.Chips.DivRemChip.Soundness
+import SP1Clean.Chips.DivRemChip.Assembly
+
+/-! # `DivRemChip` — `remw` conjunct soundness (split out for parallel compilation)
+
+The signed-32-bit word REMW conjunct. Proved as its own `GeneralFormalCircuit.Soundness` over a single-conjunct local `Spec`;
+re-running `circuit_proof_start` regenerates the exact context of the monolithic proof, so the
+per-variant block is a verbatim slice. The `?_tail` (`Operations.Requirements`, independent of which
+`Spec` conjunct is taken) is proved alongside; `Formal.lean` reuses one op's tail. -/
+
+namespace SP1Clean.DivRemChip.SoundRemw
+
+open Circuit
+open Extracted (DivRemCols)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
+
+local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+
+/-- The `remw` conjunct of `DivRemChip.Spec`, as a standalone single-conjunct spec. -/
+def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+  input.is_real = 1 →
+    (cols.is_remw = 1 →
+      Word.toBitVec64 cols.a = RV64.remw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
+
+set_option maxHeartbeats 128000000 in
+set_option linter.unusedSimpArgs false in
+/-- Soundness of the `remw` conjunct. -/
+theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
+  circuit_proof_start
+  -- `Assumptions` lives in `Defs` (an enclosing namespace here, not a current-namespace member as in
+  -- `Formal`), so `circuit_proof_start`'s `dsimp only [Assumptions]` doesn't fire; project via
+  -- `.1`/`.2` (whnf-unfolds the `def`) rather than `rcases`/`obtain`.
+  have hbU := h_assumptions.1
+  have hcU := h_assumptions.2
+  obtain ⟨h_mul_lo, h_mul_hi,
+    h_ctq0, h_ctq1, h_ctq2, h_ctq3, h_ctq4, h_ctq5, h_ctq6, h_ctq7,
+    h_eqb, h_eqc, h_eqb2, h_eqc2, h_isc0, h_addc, h_addr, h_lt,
+    h_msb0, h_msb1, h_msb2, h_msb3, h_msb4, h_msb5, h_msb6, h_cpu, h_rtype, h_own,
+    hb_e123, hb_e127, hb_e131, hb_e135, hb_e139, hb_e143, hb_e147, hb_e151,
+    hb_absc0, hb_absc1, hb_absc2, hb_absc3, hb_absr0, hb_absr1, hb_absr2, hb_absr3,
+    hb_q0, hb_q1, hb_q2, hb_q3, hb_r0, hb_r1, hb_r2, hb_r3,
+    hb_ctq0, hb_ctq1, hb_ctq2, hb_ctq3, hb_ctq4, hb_ctq5, hb_ctq6, hb_ctq7,
+    hb_e2r1, hb_e2q1⟩ := h_holds
+  simp only [ownAsserts] at h_own
+  obtain ⟨e13, e15, e17, e19, e20, e21, e22, e23, e29, e35, e41, e47, e48, e49, e51, e54, e57, e59,
+    e61, e64, e67, e69, e70, e71, e73, e76, e79, e81, e83, e86, e89, e91, e96, e99, e103, e105, e107,
+    e109, e111, e113, e115, e117, e119, e154, e157, e160, e163, e167, e171, e175, e179, e184, e189,
+    e194, e199, e204, e209, e214, e219, e225, e228, e230, e232, e234, e236, e238, e240, e242, e244,
+    e247, e250, e253, e256, e259, e262, e265, e268, e270, e272, e274, e276, e278, e280, e282, e284,
+    e286, e288, e299, e300, e301, e302, e305, e307, e309, e311, e313, e315, e317, e319, e321, e323,
+    e325, e327, e329, e331, e333, e335, e337, e339, e341, e343, e345, e347, e349, e351, e353, e355,
+    e357, e359, e367, eopa0⟩ := h_own
+  refine ⟨?_spec, ?_tail⟩
+  · intro hr
+    simp only [circuit_norm] at e325 e327 e329 e331 e333 e335 e337 e339 e367
+    have bd := bool_of_mul_pred e325; have bdu := bool_of_mul_pred e327
+    have br := bool_of_mul_pred e329; have bru := bool_of_mul_pred e331
+    have bdw := bool_of_mul_pred e333; have brw := bool_of_mul_pred e335
+    have bduw := bool_of_mul_pred e337; have bruw := bool_of_mul_pred e339
+    have hvalsum := flags_val_sum bd bdu br bru bdw brw bduw bruw (by linear_combination -e367)
+    -- sign-filled word operands/comp), routed to `cols.a = remainder` (sign-extended low-32).
+    intro hflag
+    have hdw : (env.get (i₀ + 5)).val = 1 := by rw [hflag]; exact ZMod.val_one p
+    have hz_div : env.get i₀ = 0 := (ZMod.val_eq_zero _).mp (by omega)
+    have hz_divu : env.get (i₀ + 1) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+    have hz_rem : env.get (i₀ + 2) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+    have hz_remu : env.get (i₀ + 3) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+    have hz_divw : env.get (i₀ + 4) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+    have hz_divuw : env.get (i₀ + 6) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+    have hz_remuw : env.get (i₀ + 7) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+    set B := i₀ + 8 + 4 + 4 + 45 + 45 with hBdef
+    obtain ⟨h_ob, h_oc, h_oir, -⟩ := h_input
+    have hrneg' : -input_is_real = -1 := by rw [hr]
+    have hbb0 : Expression.eval env input_var_op_b_val[0] = input_op_b_val[0] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hbb2 : Expression.eval env input_var_op_b_val[2] = input_op_b_val[2] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hbb3 : Expression.eval env input_var_op_b_val[3] = input_op_b_val[3] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hcc0 : Expression.eval env input_var_op_c_val[0] = input_op_c_val[0] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hcc1 : Expression.eval env input_var_op_c_val[1] = input_op_c_val[1] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hcc2 : Expression.eval env input_var_op_c_val[2] = input_op_c_val[2] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hcc3 : Expression.eval env input_var_op_c_val[3] = input_op_c_val[3] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hir1 : Expression.eval env input_var_is_real = 1 := by rw [h_oir]; exact hr
+    -- the signed-32 identity on the `quotient_comp` column (= `quotient` for 32-bit, via E48/E49).
+    have hremw_id : BitVec.signExtend 64 (BitVec.extractLsb 31 0 (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+          env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+          env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))))
+        = RV64.remw (Word.toBitVec64 input_op_c_val) (Word.toBitVec64 input_op_b_val) := by
+      simp only [circuit_norm] at e15 e17 e19 e29 e35 e41 e47 e48 e49 e54 e64 e70 e71 e76 e86 e96 e184 e194 e204 e214 e230 e232 e234 e236 e238 e240 e242 e244 e154 e157 e160 e163 e309 e311 e313 e315
+      -- flag sums: `E2 = 1` (word), `E6 = is_divw+is_remw = 1`, `E10 = is_div+is_rem+is_divw+is_remw = 1`.
+      have he2g : env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7) = 1 := by
+        rw [hz_divw, hflag, hz_divuw, hz_remuw]; ring
+      have hE6 : env.get (i₀ + 4) + env.get (i₀ + 5) = 1 := by rw [hz_divw, hflag]; ring
+      have hE10 : env.get i₀ + env.get (i₀ + 2) + env.get (i₀ + 4) + env.get (i₀ + 5) = 1 := by
+        rw [hz_div, hz_rem, hz_divw, hflag]; ring
+      have hihm1 : env.get i₀ + env.get (i₀ + 2) = 0 := by rw [hz_div, hz_rem]; ring
+      have hihmu0 : env.get (i₀ + 1) + env.get (i₀ + 3) = 0 := by rw [hz_divu, hz_remu]; ring
+      -- `quotient_comp` is the byte-checked `quotient` column (E48/E49 low; high two via the sign-fills).
+      have hq0 : (env.get (i₀ + 8)).val < 2 ^ 16 := by
+        rw [show env.get (i₀ + 8) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4) from by linear_combination e48]
+        exact isU16_of_byteRowSpec (hb_q0 hrneg')
+      have hq1 : (env.get (i₀ + 8 + 1)).val < 2 ^ 16 := by
+        rw [show env.get (i₀ + 8 + 1) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 1) from by linear_combination e49]
+        exact isU16_of_byteRowSpec (hb_q1 hrneg')
+      have hr0 : (env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4)).val < 2 ^ 16 := by
+        rw [show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1) from by linear_combination e70]
+        exact isU16_of_byteRowSpec (hb_r0 hrneg')
+      have hr1 : (env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1)).val < 2 ^ 16 := by
+        rw [show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1) from by linear_combination e71]
+        exact isU16_of_byteRowSpec (hb_r1 hrneg')
+      -- the operand limb bridges `bpv[1] = b[1]`, `cpv[1] = c[1]` (E22/E23) for the e2-gated sign gadgets.
+      obtain ⟨_, hb1b, _, _⟩ := Word.lt_cases_of_isU64 hbU
+      obtain ⟨_, hc1b, _, _⟩ := Word.lt_cases_of_isU64 hcU
+      -- sign columns from the e2-gated U16MSB gadgets (msb on limb [1] = bit 31).
+      simp only [circuit_norm] at e20 e21 e22 e23
+      have qb1 : Expression.eval env input_var_adapter_op_b_memory_prev_value[1] = input_op_b_val[1] := by
+        rw [← hbb1]; linear_combination e22
+      have qc1 : Expression.eval env input_var_adapter_op_c_memory_prev_value[1] = input_op_c_val[1] := by
+        rw [← hcc1]; linear_combination e23
+      have hbsign : env.get (B + 1) = if 32768 ≤ input_op_b_val[1].val then 1 else 0 := by
+        have hbm := (h_msb3 ⟨fun _ => by rw [qb1]; exact hb1b, Or.inr he2g⟩).2 he2g
+        dsimp only at hbm
+        have hb1 : env.get (B + 1)
+            = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 4) := by
+          have h := e15; rw [hE10, mul_one] at h; linear_combination -h
+        rw [hb1, hbm, qb1]
+      have hcsign : env.get (B + 6) = if 32768 ≤ input_op_c_val[1].val then 1 else 0 := by
+        have hcm := (h_msb4 ⟨fun _ => by rw [qc1]; exact hc1b, Or.inr he2g⟩).2 he2g
+        dsimp only at hcm
+        have hc1 : env.get (B + 6)
+            = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 4 + 1) := by
+          have h := e19; rw [hE10, mul_one] at h; linear_combination -h
+        rw [hc1, hcm, qc1]
+      -- operand sign-fills (E2 = 1): `b[2] = b[3] = b_neg·65535`, `c[2] = c[3] = c_neg·65535`.
+      rw [hz_divw, hz_divuw, hz_remuw, hflag] at e29 e35 e41 e47
+      have hbf2v : input_op_b_val[2] = env.get (B + 1) * 65535 := by rw [← hbb2]; linear_combination e29
+      have hbf3v : input_op_b_val[3] = env.get (B + 1) * 65535 := by rw [← hbb3]; linear_combination e41
+      have hcf2v : input_op_c_val[2] = env.get (B + 6) * 65535 := by rw [← hcc2]; linear_combination e35
+      have hcf3v : input_op_c_val[3] = env.get (B + 6) * 65535 := by rw [← hcc3]; linear_combination e47
+      have hbf2 : input_op_b_val[2].val = (if 32768 ≤ input_op_b_val[1].val then 65535 else 0) := by
+        rw [hbf2v, hbsign]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      have hbf3 : input_op_b_val[3].val = (if 32768 ≤ input_op_b_val[1].val then 65535 else 0) := by
+        rw [hbf3v, hbsign]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      have hcf2 : input_op_c_val[2].val = (if 32768 ≤ input_op_c_val[1].val then 65535 else 0) := by
+        rw [hcf2v, hcsign]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      have hcf3 : input_op_c_val[3].val = (if 32768 ≤ input_op_c_val[1].val then 65535 else 0) := by
+        rw [hcf3v, hcsign]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      -- quot_msb / rem_msb from the e2-gated U16MSB gadgets (input = output quotient[1]/remainder[1]).
+      have hqo1v : (env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 1)).val < 2 ^ 16 := isU16_of_byteRowSpec (hb_q1 hrneg')
+      have hro1v : (env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1)).val < 2 ^ 16 := isU16_of_byteRowSpec (hb_r1 hrneg')
+      have hqm := (h_msb6 ⟨fun _ => hqo1v, Or.inr he2g⟩).2 he2g
+      dsimp only at hqm
+      have hrm := (h_msb5 ⟨fun _ => hro1v, Or.inr he2g⟩).2 he2g
+      dsimp only at hrm
+      -- comp sign-fills: quotient_comp[2,3] = quot_msb·65535 (E54/E64), remainder_comp[2,3] = rem_msb·65535 (E76/E86).
+      -- and quotient_comp[1] = output quotient[1] (E49), remainder_comp[1] = output remainder[1] (E71).
+      have hqc1eq : env.get (i₀ + 8 + 1)
+          = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 1) := by
+        linear_combination e49
+      have hrc1eq : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1)
+          = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1) := by
+        linear_combination e71
+      have hqc2v : env.get (i₀ + 8 + 2)
+          = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 7) * 65535 := by
+        have h := e54; rw [hE6, one_mul] at h; linear_combination h
+      have hqc3v : env.get (i₀ + 8 + 3)
+          = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 7) * 65535 := by
+        have h := e64; rw [hE6, one_mul] at h; linear_combination h
+      have hrc2v : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2)
+          = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by
+        have h := e76; rw [hE6, one_mul] at h; linear_combination h
+      have hrc3v : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)
+          = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by
+        have h := e86; rw [hE6, one_mul] at h; linear_combination h
+      have hqf2 : (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p))[2].val
+          = (if 32768 ≤ (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p))[1].val then 65535 else 0) := by
+        simp only [circuit_norm, Nat.add_zero]; rw [hqc2v, hqm, hqc1eq]
+        split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      have hqf3 : (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p))[3].val
+          = (if 32768 ≤ (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p))[1].val then 65535 else 0) := by
+        simp only [circuit_norm, Nat.add_zero]; rw [hqc3v, hqm, hqc1eq]
+        split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      have hrf2 : (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))[2].val
+          = (if 32768 ≤ (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))[1].val then 65535 else 0) := by
+        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
+        rw [hrc2v, hrm, hrc1eq]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      have hrf3 : (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))[3].val
+          = (if 32768 ≤ (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))[1].val then 65535 else 0) := by
+        simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
+        rw [hrc3v, hrm, hrc1eq]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      -- isU64 for the quotient/remainder comp Words (low byte-checked, high from the sign-fills).
+      have hqU : Word.isU64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p)) := by
+        apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+        · exact hq0
+        · exact hq1
+        · rw [hqc2v, hqm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+        · rw [hqc3v, hqm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      have hrU : Word.isU64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p)) := by
+        apply Word.isU64_of_cases
+        · exact hr0
+        · exact hr1
+        · rw [hrc2v, hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+        · rw [hrc3v, hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      -- === STAGE 3: 3-way split. ===
+      by_cases hcz : input_op_c_val[0] = 0 ∧ input_op_c_val[1] = 0 ∧ input_op_c_val[2] = 0 ∧ input_op_c_val[3] = 0
+      · -- DIVZERO (low-32 of c is zero): quotient = -1, remainder = b (low halves).
+        have hc0_lo : BitVec.extractLsb 31 0 (Word.toBitVec64 input_op_c_val) = 0#32 := by
+          apply BitVec.eq_of_toNat_eq
+          rw [extractLsb_lo_toNat hcU, hcz.1, hcz.2.1, BitVec.toNat_zero]; simp [ZMod.val_zero]
+        have hsem := IsZeroWordOperation.result_semantic (h_isc0 (Or.inr hr)) hr
+        rw [if_pos hcz] at hsem
+        dsimp only at hsem
+        rw [field_fromElements_one] at hsem
+        simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
+          Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
+        rw [iszeroword_result_proj] at e230 e232 e234 e236 e238 e240 e242 e244
+        simp only [Vector.getElem_mapRange, circuit_norm] at e230 e232 e234 e236 e238 e240 e242 e244
+        rw [hsem, one_mul] at e230 e232 e234 e236 e238 e240 e242 e244
+        have hq_lo : BitVec.extractLsb 31 0 (Word.toBitVec64 (Vector.map (Expression.eval env)
+            (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p))) = -1#32 := by
+          apply BitVec.eq_of_toNat_eq
+          rw [extractLsb_lo_toNat hqU]
+          simp only [circuit_norm, Nat.add_zero]
+          rw [show env.get (i₀ + 8) = (65535 : ZMod p) from by linear_combination e48 + e230,
+              show env.get (i₀ + 8 + 1) = (65535 : ZMod p) from by linear_combination e49 + e232]
+          rw [BitVec.neg_one_eq_allOnes, BitVec.toNat_allOnes]; simp [val_65535_zmod_p]
+        have hr_lo : BitVec.extractLsb 31 0 (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+            env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+            env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p)))
+            = BitVec.extractLsb 31 0 (Word.toBitVec64 input_op_b_val) := by
+          apply extractLsb_lo_congr hrU hbU
+          · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+              List.getElem_cons_succ]; rw [← hbb0]; linear_combination e238
+          · simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+              List.getElem_cons_succ]; rw [← hbb1]; linear_combination e240
+        exact (divw_remw_divzero hc0_lo hq_lo hr_lo).2
+      · by_cases hovf : env.get B = 1
+        · -- OVERFLOW (`is_overflow = 1`): low-32 of b = i32::MIN, c = -1; quotient = b, remainder = 0.
+          simp only [circuit_norm] at e105 e107 e109 e111
+          -- the low-half `IsEqualWordOperation` overflow gate (`e2`-gated), bridging `bpv`→`b`/`cpv`→`c`.
+          have hbsp := h_eqb2 (Or.inr he2g)
+          have hcsp := h_eqc2 (Or.inr he2g)
+          have qb0 : Expression.eval env input_var_adapter_op_b_memory_prev_value[0] = input_op_b_val[0] := by rw [← hbb0]; linear_combination e20
+          have qc0 : Expression.eval env input_var_adapter_op_c_memory_prev_value[0] = input_op_c_val[0] := by rw [← hcc0]; linear_combination e21
+          -- the overflow products pin low-32 `b = i32::MIN`, `c = -1` (`overflow_of_iseqword_word`).
+          have hpair := overflow_of_iseqword_word (b := input_op_b_val) (c := input_op_c_val) hbU hcU he2g
+            (by rw [show (#v[input_op_b_val[0], input_op_b_val[1], (0 : ZMod p), (0 : ZMod p)] : Word (ZMod p))
+                  = #v[Expression.eval env input_var_adapter_op_b_memory_prev_value[0],
+                    Expression.eval env input_var_adapter_op_b_memory_prev_value[1], 0, 0] from by
+                apply Vector.ext; intro i hi; interval_cases i <;>
+                  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                    List.getElem_cons_succ]
+                exacts [qb0.symm, qb1.symm]]; exact hbsp)
+            (by rw [show (#v[input_op_c_val[0], input_op_c_val[1], (0 : ZMod p), (0 : ZMod p)] : Word (ZMod p))
+                  = #v[Expression.eval env input_var_adapter_op_c_memory_prev_value[0],
+                    Expression.eval env input_var_adapter_op_c_memory_prev_value[1], 0, 0] from by
+                apply Vector.ext; intro i hi; interval_cases i <;>
+                  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                    List.getElem_cons_succ]
+                exacts [qc0.symm, qc1.symm]]; exact hcsp)
+            (by
+              rw [iseqword_result_proj, iseqword_result_proj] at e96
+              simp only [Vector.getElem_mapRange, circuit_norm] at e96
+              rw [hovf, hE10, mul_one] at e96
+              dsimp only
+              rw [field_fromElements_one, field_fromElements_one]
+              simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
+                Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm]
+              linear_combination -e96)
+          have hb_im : BitVec.extractLsb 31 0 (Word.toBitVec64 input_op_b_val) = BitVec.intMin 32 := hpair.1
+          have hc_m1 : BitVec.extractLsb 31 0 (Word.toBitVec64 input_op_c_val) = -1#32 := hpair.2
+          -- quotient = b, remainder = 0 (low halves) via E105/E109 (E107/E111) + E48/E49 (E70/E71).
+          have hqa0 : env.get (i₀ + 8) = input_op_b_val[0] := by
+            have h := e105; rw [hovf, one_mul] at h; rw [← hbb0]; linear_combination e48 + h
+          have hqa1 : env.get (i₀ + 8 + 1) = input_op_b_val[1] := by
+            have h := e109; rw [hovf, one_mul] at h; rw [← hbb1]; linear_combination e49 + h
+          have hra0 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4) = 0 := by
+            have h := e107; rw [hovf, one_mul] at h; linear_combination e70 + h
+          have hra1 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1) = 0 := by
+            have h := e111; rw [hovf, one_mul] at h; linear_combination e71 + h
+          have hq_lo : BitVec.extractLsb 31 0 (Word.toBitVec64 (Vector.map (Expression.eval env)
+              (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p)))
+              = BitVec.extractLsb 31 0 (Word.toBitVec64 input_op_b_val) := by
+            apply extractLsb_lo_congr hqU hbU <;> simp only [circuit_norm, Nat.add_zero]
+            exacts [hqa0, hqa1]
+          have hr_lo : BitVec.extractLsb 31 0 (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))) = 0#32 := by
+            apply BitVec.eq_of_toNat_eq
+            rw [extractLsb_lo_toNat hrU, BitVec.toNat_zero]
+            simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+              List.getElem_cons_succ]
+            rw [hra0, hra1]; simp [ZMod.val_zero]
+          exact (divw_remw_overflow hb_im hc_m1 hq_lo hr_lo).2
+        · -- NORMAL: signed Euclidean low-only assembly (`c ≠ 0` low-32, no overflow).
+          have hc0bv : BitVec.extractLsb 31 0 (Word.toBitVec64 input_op_c_val) ≠ 0#32 := by
+            intro h
+            apply hcz
+            have hcl : input_op_c_val[0].val + input_op_c_val[1].val * 2 ^ 16 = 0 := by
+              have := congrArg BitVec.toNat h
+              rwa [extractLsb_lo_toNat hcU, BitVec.toNat_zero] at this
+            obtain ⟨d0, d1, _, _⟩ := Word.lt_cases_of_isU64 hcU
+            have hc0z : input_op_c_val[0] = 0 := (ZMod.val_eq_zero _).mp (by omega)
+            have hc1z : input_op_c_val[1] = 0 := (ZMod.val_eq_zero _).mp (by omega)
+            refine ⟨hc0z, hc1z, ?_, ?_⟩
+            · rw [hcf2v, hcsign, hc1z]; simp [ZMod.val_zero]
+            · rw [hcf3v, hcsign, hc1z]; simp [ZMod.val_zero]
+          simp only [circuit_norm] at e225 e228 e247 e250 e253 e256 e259 e262 e265 e268 e270 e272 e274 e276 e278 e280 e282 e284 e286 e288 e299 e300 e301 e302 e305 e307 e341 e79 e89
+          -- `is_overflow = 0` (binary gate `E341`, and we are not the overflow branch).
+          have hov0 : env.get B = 0 := by
+            rcases bool_of_mul_pred e341 with h | h
+            · exact h
+            · exact absurd h hovf
+          -- the four LOW carry-chain limb equations (`is_overflow = 0`), carry binaries, `c_times_quotient`.
+          rw [hov0] at e154 e157 e160 e163
+          have hcl0 : env.get (B + 7) + env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4) = input_op_b_val[0] + env.get (B + 7 + 8) * 65536 := by rw [← hbb0]; linear_combination e154
+          have hcl1 : env.get (B + 7 + 1) + env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1) + env.get (B + 7 + 8) = input_op_b_val[1] + env.get (B + 7 + 8 + 1) * 65536 := by rw [← hbb1]; linear_combination e157
+          have hcl2 : env.get (B + 7 + 2) + env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2) + env.get (B + 7 + 8 + 1) = input_op_b_val[2] + env.get (B + 7 + 8 + 2) * 65536 := by rw [← hbb2]; linear_combination e160
+          have hcl3 : env.get (B + 7 + 3) + env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3) + env.get (B + 7 + 8 + 2) = input_op_b_val[3] + env.get (B + 7 + 8 + 3) * 65536 := by rw [← hbb3]; linear_combination e163
+          have hc0 := bool_of_mul_pred e309
+          have hc1 := bool_of_mul_pred e311
+          have hc2 := bool_of_mul_pred e313
+          have hc3 := bool_of_mul_pred e315
+          have hrwloU : Word.isU64 (#v[env.get (B + 7), env.get (B + 7 + 1), env.get (B + 7 + 2), env.get (B + 7 + 3)] : Word (ZMod p)) := Word.isU64_of_cases (isU16_of_byteRowSpec (hb_ctq0 hrneg')) (isU16_of_byteRowSpec (hb_ctq1 hrneg')) (isU16_of_byteRowSpec (hb_ctq2 hrneg')) (isU16_of_byteRowSpec (hb_ctq3 hrneg'))
+          -- the low Mul product form (`mul_lower`, `is_mul = is_real = 1`).
+          have hlo := rwlo_product h_mul_lo hqU hcU hr (by simpa only [Vector.getElem_map] using h_ctq0) (by simpa only [Vector.getElem_map] using h_ctq1) (by simpa only [Vector.getElem_map] using h_ctq2) (by simpa only [Vector.getElem_map] using h_ctq3)
+          -- the 64-bit signed Euclidean identity (`b.toInt = quotient·c + remc`), low-only carry chain.
+          have hid := euclid_identity_word_signed
+            (ctqlo := #v[env.get (B + 7), env.get (B + 7 + 1), env.get (B + 7 + 2), env.get (B + 7 + 3)])
+            (b := input_op_b_val)
+            (c := input_op_c_val)
+            (quotient := Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }))
+            (remc := #v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)])
+            (carry := #v[env.get (B + 7 + 8), env.get (B + 7 + 8 + 1), env.get (B + 7 + 8 + 2), env.get (B + 7 + 8 + 3)])
+            hrwloU hbU hcU hqU hrU hbf2 hbf3 hcf2 hcf3 hqf2 hqf3 hrf2 hrf3 hc0 hc1 hc2 hc3
+            hcl0 hcl1 hcl2 hcl3 hlo
+          -- === abs columns, signed remainder range, sign conditions (mirror DIV normal). ===
+          -- sign columns in the **64-bit msb** form (convert from the limb-1 form via `toBitVec64_msb_iff`).
+          have hbneg : env.get (B + 1) = if (Word.toBitVec64 input_op_b_val).msb then 1 else 0 := by
+            rw [hbsign]; refine if_congr ?_ rfl rfl
+            rw [toBitVec64_msb_iff hbU, hbf3]; split <;> omega
+          have hcneg : env.get (B + 6) = if (Word.toBitVec64 input_op_c_val).msb then 1 else 0 := by
+            rw [hcsign]; refine if_congr ?_ rfl rfl
+            rw [toBitVec64_msb_iff hcU, hcf3]; split <;> omega
+          have hrneg : env.get (B + 5)
+              = if (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+                  env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+                  env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))).msb then 1 else 0 := by
+            have hrsign : env.get (B + 5)
+                = if 32768 ≤ (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+                    env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+                    env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))[1].val then 1 else 0 := by
+              simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
+              rw [hrc1eq, ← hrm]
+              have h := e17; rw [hE10, mul_one] at h; linear_combination -h
+            rw [hrsign]; refine if_congr ?_ rfl rfl
+            rw [toBitVec64_msb_iff hrU, hrf3]; split <;> omega
+          have habscU : Word.isU64 (Vector.map (Expression.eval env)
+              (Vector.mapRange 4 fun i => var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + i }) : Word (ZMod p)) := by
+            apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+            exacts [isU16_of_byteRowSpec (hb_absc0 hrneg'), isU16_of_byteRowSpec (hb_absc1 hrneg'),
+              isU16_of_byteRowSpec (hb_absc2 hrneg'), isU16_of_byteRowSpec (hb_absc3 hrneg')]
+          have habsrU : Word.isU64 (Vector.map (Expression.eval env)
+              (Vector.mapRange 4 fun i => var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + i }) : Word (ZMod p)) := by
+            apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+            exacts [isU16_of_byteRowSpec (hb_absr0 hrneg'), isU16_of_byteRowSpec (hb_absr1 hrneg'),
+              isU16_of_byteRowSpec (hb_absr2 hrneg'), isU16_of_byteRowSpec (hb_absr3 hrneg')]
+          -- `abs_c = |op_c|` and `abs_remainder = |remainder_comp|` (signed-abs via `c_neg`/`rem_neg`).
+          have hposc : (Word.toBitVec64 input_op_c_val).msb = false → Word.toBitVec64 (Vector.map
+              (Expression.eval env) (Vector.mapRange 4 fun i => var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + i })
+              : Word (ZMod p)) = Word.toBitVec64 input_op_c_val := by
+            intro hm
+            have hcn0 : env.get (B + 6) = 0 := by rw [hcneg, hm]; simp
+            have heq : (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + i }) : Word (ZMod p)) = input_op_c_val := by
+              apply Vector.ext; intro i hi; interval_cases i
+              · simp only [circuit_norm, Nat.add_zero]; have h := e247; rw [hcn0] at h; rw [← hcc0]; linear_combination h
+              · simp only [circuit_norm, Nat.add_zero]; have h := e253; rw [hcn0] at h; rw [← hcc1]; linear_combination h
+              · simp only [circuit_norm, Nat.add_zero]; have h := e259; rw [hcn0] at h; rw [← hcc2]; linear_combination h
+              · simp only [circuit_norm, Nat.add_zero]; have h := e265; rw [hcn0] at h; rw [← hcc3]; linear_combination h
+            rw [heq]
+          have hnegc : (Word.toBitVec64 input_op_c_val).msb = true → Word.toBitVec64 (Vector.map
+              (Expression.eval env) (Vector.mapRange 4 fun i => var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + i })
+              : Word (ZMod p)) = -Word.toBitVec64 input_op_c_val := by
+            intro hm
+            have hcn1 : env.get (B + 6) = 1 := by rw [hcneg, hm]; simp
+            have hace : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4) = 1 := by
+              have h := e286; rw [hcn1, hir1] at h; linear_combination h
+            have hk0 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4) = 0 := by
+              have h := e270; rw [hace] at h; linear_combination -h
+            have hk1 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 1) = 0 := by
+              have h := e272; rw [hace] at h; linear_combination -h
+            have hk2 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 2) = 0 := by
+              have h := e274; rw [hace] at h; linear_combination -h
+            have hk3 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 3) = 0 := by
+              have h := e276; rw [hace] at h; linear_combination -h
+            have hknoU : Word.isU64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + i }) : Word (ZMod p)) := by
+              apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+              · rw [hk0]; simp
+              · rw [hk1]; simp
+              · rw [hk2]; simp
+              · rw [hk3]; simp
+            have hkno_tb : Word.toBitVec64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + i }) : Word (ZMod p)) = 0#64 := by
+              rw [← BitVec.toNat_inj, Word.toBitVec64_toNat hknoU, BitVec.toNat_zero, Word.toNat_def]
+              simp only [circuit_norm, Nat.add_zero]; rw [hk0, hk1, hk2, hk3]; simp
+            have hadd := ((h_addc ⟨fun _ => ⟨hcU, habscU⟩, Or.inr hace⟩) hace).2
+            dsimp only at hadd
+            rw [hkno_tb] at hadd
+            bv_omega
+          have hrcompU : Word.isU64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+              var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + i }) : Word (ZMod p)) := by
+            apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+            exacts [hr0, hr1,
+              by rw [hrc2v, hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero],
+              by rw [hrc3v, hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]]
+          have hposr : (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))).msb = false →
+              Word.toBitVec64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + i }) : Word (ZMod p))
+              = Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+                env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+                env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p)) := by
+            intro hm
+            have hrn0 : env.get (B + 5) = 0 := by rw [hrneg, hm]; simp
+            have heq : (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + i }) : Word (ZMod p))
+                = #v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+                  env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+                  env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] := by
+              apply Vector.ext; intro i hi; interval_cases i
+              · simp only [circuit_norm, Nat.add_zero, Vector.getElem_mk, List.getElem_toArray,
+                  List.getElem_cons_zero, List.getElem_cons_succ]; have h := e250; rw [hrn0] at h; linear_combination h
+              · simp only [circuit_norm, Nat.add_zero, Vector.getElem_mk, List.getElem_toArray,
+                  List.getElem_cons_zero, List.getElem_cons_succ]; have h := e256; rw [hrn0] at h; linear_combination h
+              · simp only [circuit_norm, Nat.add_zero, Vector.getElem_mk, List.getElem_toArray,
+                  List.getElem_cons_zero, List.getElem_cons_succ]; have h := e262; rw [hrn0] at h; linear_combination h
+              · simp only [circuit_norm, Nat.add_zero, Vector.getElem_mk, List.getElem_toArray,
+                  List.getElem_cons_zero, List.getElem_cons_succ]; have h := e268; rw [hrn0] at h; linear_combination h
+            rw [heq]
+          have hnegr : (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p))).msb = true →
+              Word.toBitVec64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + i }) : Word (ZMod p))
+              = -Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+                env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+                env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p)) := by
+            intro hm
+            have hrn1 : env.get (B + 5) = 1 := by rw [hrneg, hm]; simp
+            have hrae : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 1) = 1 := by
+              have h := e288; rw [hrn1, hir1] at h; linear_combination h
+            have hk0 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4) = 0 := by
+              have h := e278; rw [hrae] at h; linear_combination -h
+            have hk1 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 1) = 0 := by
+              have h := e280; rw [hrae] at h; linear_combination -h
+            have hk2 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 2) = 0 := by
+              have h := e282; rw [hrae] at h; linear_combination -h
+            have hk3 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 3) = 0 := by
+              have h := e284; rw [hrae] at h; linear_combination -h
+            have hknoU : Word.isU64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + i }) : Word (ZMod p)) := by
+              apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+              · rw [hk0]; simp
+              · rw [hk1]; simp
+              · rw [hk2]; simp
+              · rw [hk3]; simp
+            have hkno_tb : Word.toBitVec64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + i }) : Word (ZMod p)) = 0#64 := by
+              rw [← BitVec.toNat_inj, Word.toBitVec64_toNat hknoU, BitVec.toNat_zero, Word.toNat_def]
+              simp only [circuit_norm, Nat.add_zero]; rw [hk0, hk1, hk2, hk3]; simp
+            have hadd := ((h_addr ⟨fun _ => ⟨hrcompU, habsrU⟩, Or.inr hrae⟩) hrae).2
+            dsimp only at hadd
+            rw [hkno_tb] at hadd
+            have hrc_eq : (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+                var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + i }) : Word (ZMod p))
+                = #v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+                  env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+                  env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] := by
+              apply Vector.ext; intro i hi; interval_cases i <;>
+                simp only [circuit_norm, Nat.add_zero, Vector.getElem_mk, List.getElem_toArray,
+                  List.getElem_cons_zero, List.getElem_cons_succ]
+            rw [hrc_eq] at hadd
+            bv_omega
+          -- the unsigned `|remainder| < |c|` from `LtOperationUnsigned`, bridged `max_abs_c_or_1 = abs_c`.
+          have hsem := IsZeroWordOperation.result_semantic (h_isc0 (Or.inr hr)) hr
+          rw [if_neg hcz] at hsem
+          dsimp only at hsem
+          rw [field_fromElements_one] at hsem
+          simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
+            Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
+          rw [iszeroword_result_proj] at e299 e300 e301 e302 e305
+          simp only [Vector.getElem_mapRange, circuit_norm] at e299 e300 e301 e302 e305
+          rw [hsem] at e299 e300 e301 e302 e305
+          have hrcm : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 2) = 1 := by
+            rw [hir1] at e305; linear_combination -e305
+          have hm0 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4)
+              = env.get (B + 7 + 8 + 8 + 11 + 11 + 11) := by linear_combination e299
+          have hm1 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 1)
+              = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 1) := by linear_combination e300
+          have hm2 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 2)
+              = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 2) := by linear_combination e301
+          have hm3 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 3)
+              = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 3) := by linear_combination e302
+          have hmaxU : Word.isU64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+              var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + i }) : Word (ZMod p)) := by
+            apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+            · rw [hm0]; exact isU16_of_byteRowSpec (hb_absc0 hrneg')
+            · rw [hm1]; exact isU16_of_byteRowSpec (hb_absc1 hrneg')
+            · rw [hm2]; exact isU16_of_byteRowSpec (hb_absc2 hrneg')
+            · rw [hm3]; exact isU16_of_byteRowSpec (hb_absc3 hrneg')
+          have hbit := (LtOperationUnsigned.result_semantic habsrU hmaxU hrcm
+            (h_lt ⟨fun _ => ⟨habsrU, hmaxU⟩, Or.inr hrcm⟩)).1
+          have hbiteq : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1)
+              = 1 := by have h := e307; rw [hrcm, one_mul] at h; linear_combination -h
+          rw [hbiteq] at hbit
+          have hcmp0 : Word.toNat (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+              var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + i }) : Word (ZMod p))
+              < Word.toNat (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+              var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + i }) : Word (ZMod p)) := by
+            by_contra hcon; rw [if_neg hcon] at hbit; exact one_ne_zero hbit
+          have hmax_eq : Word.toNat (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+              var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + i }) : Word (ZMod p))
+              = Word.toNat (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i =>
+              var { index := B + 7 + 8 + 8 + 11 + 11 + 11 + i }) : Word (ZMod p)) := by
+            rw [Word.toNat_def, Word.toNat_def]; simp only [circuit_norm, Nat.add_zero]
+            rw [hm0, hm1, hm2, hm3]
+          rw [hmax_eq] at hcmp0
+          have hlt := hlt_signed_of_abs habsrU habscU hposr hnegr hposc hnegc hcmp0
+          -- sign conditions (`E225`/`E228`).
+          have hE225 : env.get (B + 5) = 0 ∨ env.get (B + 1) = 1 := by
+            rcases mul_eq_zero.mp e225 with h | h
+            · exact Or.inl h
+            · exact Or.inr (by linear_combination h)
+          have hE228 : Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
+              env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p)) = 0#64
+              ∨ env.get (B + 5) = 1 ∨ env.get (B + 1) = 0 := by
+            rcases mul_eq_zero.mp e228 with h | h
+            · refine Or.inl ?_
+              obtain ⟨d0, d1, d2, d3⟩ := Word.lt_cases_of_isU64 hrU
+              simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                List.getElem_cons_succ] at d0 d1 d2 d3
+              have hp : (2 ^ 24 : ℕ) < p := Fact.out
+              have he79' : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 2)
+                  = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by
+                have h2 := e79; rw [he2g, one_mul] at h2; linear_combination h2
+              have he89' : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 3)
+                  = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by
+                have h2 := e89; rw [he2g, one_mul] at h2; linear_combination h2
+              rw [show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1)
+                    = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4) from by linear_combination -e70,
+                  show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1)
+                    = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1) from by linear_combination -e71,
+                  show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 2)
+                    = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2) from by linear_combination he79' - hrc2v,
+                  show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 3)
+                    = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3) from by linear_combination he89' - hrc3v] at h
+              set a := env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4) with ha
+              set bb := env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1) with hb
+              set cc := env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2) with hc
+              set dd := env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3) with hd
+              have hsv : a.val + bb.val + cc.val + dd.val = 0 := by
+                have hab : (a + bb : ZMod p).val = a.val + bb.val := ZMod.val_add_of_lt (by omega)
+                have habc : (a + bb + cc : ZMod p).val = a.val + bb.val + cc.val := by
+                  rw [ZMod.val_add_of_lt (by rw [hab]; omega), hab]
+                have habcd : (a + bb + cc + dd : ZMod p).val = a.val + bb.val + cc.val + dd.val := by
+                  rw [ZMod.val_add_of_lt (by rw [habc]; omega), habc]
+                have e := congrArg ZMod.val h
+                rw [habcd, ZMod.val_zero] at e; exact e
+              rw [← BitVec.toNat_inj, Word.toBitVec64_toNat hrU, BitVec.toNat_zero, Word.toNat_def]
+              simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+                List.getElem_cons_succ]
+              omega
+            · rcases mul_eq_zero.mp h with h2 | h2
+              · exact Or.inr (Or.inl (by linear_combination -h2))
+              · exact Or.inr (Or.inr h2)
+          have hc0_64 : Word.toBitVec64 input_op_c_val ≠ 0#64 := by
+            intro h; apply hc0bv; rw [h]; apply BitVec.eq_of_toNat_eq; simp
+          have hsgn := sign_conditions (quotient := Word.toBitVec64 (Vector.map (Expression.eval env)
+              (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }))) hbneg hrneg hE225 hE228 hc0_64
+            (by rw [hid]; ring) hlt
+          exact (assemble_signed_word_normal hbU hcU hqU hrU hbf2 hbf3 hcf2 hcf3 hqf2 hqf3 hrf2 hrf3
+            hc0bv hid hlt hsgn.1 hsgn.2).2
+    -- === STAGE 4: `cols.a = remainder` (output, sign-extended low-32); bridge to
+    -- `signExtend 64 (extractLsb 31 0 remainder_comp)` (= RV64.remw via `assemble_signed_word_normal`). ===
+    simp only [circuit_norm] at e70 e71 e79 e89 e189 e199 e209 e219
+    have hgateRR : env.get (i₀ + 3) + env.get (i₀ + 2) + env.get (i₀ + 5) + env.get (i₀ + 7) = 1 := by rw [hz_remu, hz_rem, hflag, hz_remuw]; ring
+    have he2g : env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7) = 1 := by rw [hz_divw, hflag, hz_divuw, hz_remuw]; ring
+    have hro1v : (env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1)).val < 2 ^ 16 := isU16_of_byteRowSpec (hb_r1 hrneg')
+    have hrm := (h_msb5 ⟨fun _ => hro1v, Or.inr he2g⟩).2 he2g
+    dsimp only at hrm
+    have hr0' : (env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4)).val < 2 ^ 16 := by
+      rw [show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1) from by linear_combination e70]
+      exact isU16_of_byteRowSpec (hb_r0 hrneg')
+    have hr1' : (env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1)).val < 2 ^ 16 := by
+      rw [show env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1) from by linear_combination e71]
+      exact isU16_of_byteRowSpec (hb_r1 hrneg')
+    have hE6' : env.get (i₀ + 4) + env.get (i₀ + 5) = 1 := by rw [hz_divw, hflag]; ring
+    have hrc2v' : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by
+      have h := e76; simp only [circuit_norm] at h; rw [hE6', one_mul] at h; linear_combination h
+    have hrc3v' : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by
+      have h := e86; simp only [circuit_norm] at h; rw [hE6', one_mul] at h; linear_combination h
+    have hrcompU' : Word.isU64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p)) := by
+      apply Word.isU64_of_cases
+      · exact hr0'
+      · exact hr1'
+      · rw [hrc2v', hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      · rw [hrc3v', hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+    have ha0 : env.get (i₀ + 8 + 4) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4) := by have h := e189; rw [hgateRR, one_mul] at h; linear_combination -h - e70
+    have ha1 : env.get (i₀ + 8 + 4 + 1) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1) := by have h := e199; rw [hgateRR, one_mul] at h; linear_combination -h - e71
+    have ha1' : env.get (i₀ + 8 + 4 + 1) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 1) := by have h := e199; rw [hgateRR, one_mul] at h; linear_combination -h
+    have ha2 : env.get (i₀ + 8 + 4 + 2) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 2) := by have h := e209; rw [hgateRR, one_mul] at h; linear_combination -h
+    have ha3 : env.get (i₀ + 8 + 4 + 3) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 3) := by have h := e219; rw [hgateRR, one_mul] at h; linear_combination -h
+    have h79 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 2) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by have h := e79; rw [he2g, one_mul] at h; linear_combination h
+    have h89 : env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 3) = env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 4 + 4 + 4 + 4 + 3 + 2 + 4 + 1 + 1 + 4 + 6) * 65535 := by have h := e89; rw [he2g, one_mul] at h; linear_combination h
+    have haU : Word.isU64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p)) := by
+      apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+      · rw [ha0]; exact hr0'
+      · rw [ha1]; exact hr1'
+      · rw [ha2, h79, hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+      · rw [ha3, h89, hrm]; split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+    have ha2sf : (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p))[2].val = (if 32768 ≤ (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p))[1].val then 65535 else 0) := by
+      simp only [circuit_norm, Nat.add_zero]; rw [ha2, h79, hrm, ha1']
+      split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+    have ha3sf : (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p))[3].val = (if 32768 ≤ (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p))[1].val then 65535 else 0) := by
+      simp only [circuit_norm, Nat.add_zero]; rw [ha3, h89, hrm, ha1']
+      split <;> simp [val_65535_zmod_p, ZMod.val_zero]
+    have hbridge : Word.toBitVec64 (Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + i }) : Word (ZMod p)) = BitVec.signExtend 64 (BitVec.extractLsb 31 0 (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 3)] : Word (ZMod p)))) := by
+      rw [word_eq_signExtend_lo haU ha2sf ha3sf,
+          extractLsb_lo_congr haU hrcompU' (by simp only [circuit_norm, Nat.add_zero]; exact ha0)
+            (by simp only [circuit_norm, Nat.add_zero]; exact ha1)]
+    rw [hbridge]; exact hremw_id
+  · obtain ⟨h_ob, h_oc, h_oir, -⟩ := h_input
+    set B := i₀ + 8 + 4 + 4 + 45 + 45 with hBdef
+    have hbin : input_is_real = 0 ∨ input_is_real = 1 := by
+      have h := e355; simp only [circuit_norm] at h; rw [h_oir] at h; exact bool_of_mul_pred h
+    simp only [circuit_norm] at e325 e327 e329 e331 e333 e335 e337 e339 e367
+    have bd := bool_of_mul_pred e325; have bdu := bool_of_mul_pred e327
+    have br := bool_of_mul_pred e329; have bru := bool_of_mul_pred e331
+    have bdw := bool_of_mul_pred e333; have brw := bool_of_mul_pred e335
+    have bduw := bool_of_mul_pred e337; have bruw := bool_of_mul_pred e339
+    have hvs := flags_val_sum bd bdu br bru bdw brw bduw bruw (by linear_combination -e367)
+    have he2 : env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7) = 0 ∨
+        env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7) = 1 :=
+      group_binary4 bdw brw bduw bruw (by omega)
+    have hsel5 := group_binary4 bdu bru bd br (by omega)
+    have hsel6 := group_binary2 bdw brw (by omega)
+    have hsel7 := group_binary2 bduw bruw (by omega)
+    have hsum567 : env.get (i₀ + 1) + env.get (i₀ + 3) + env.get i₀ + env.get (i₀ + 2)
+        + (env.get (i₀ + 4) + env.get (i₀ + 5)) + (env.get (i₀ + 6) + env.get (i₀ + 7)) = 1 := by
+      linear_combination -e367
+    have hms6 := h_msb6 ⟨fun he2g => isU16_of_byteRowSpec (hb_e2q1 (by linear_combination -he2g)), he2⟩
+    have hms5 := h_msb5 ⟨fun he2g => isU16_of_byteRowSpec (hb_e2r1 (by linear_combination -he2g)), he2⟩
+    have hquotmsb := hms6.1
+    have hremmsb := hms5.1
+    have hqcU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
+        (Vector.mapRange 4 fun i => var { index := i₀ + 8 + i }) : Word (ZMod p)) := by
+      intro hr
+      have hrneg' : -input_is_real = -1 := by rw [hr]
+      simp only [circuit_norm] at e48 e49 e51 e54 e59 e61 e64 e69
+      simp only [neg_zero, add_zero] at e51 e61
+      apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+      · rw [show env.get (i₀ + 8) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4)
+            from by linear_combination e48]
+        exact isU16_of_byteRowSpec (hb_q0 hrneg')
+      · rw [show env.get (i₀ + 8 + 1) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4+1)
+            from by linear_combination e49]
+        exact isU16_of_byteRowSpec (hb_q1 hrneg')
+      · exact comp_limb_isU16 hsel5 hsel6 hsel7 hsum567 e59 e54 e51
+          hquotmsb (isU16_of_byteRowSpec (hb_q2 hrneg'))
+      · exact comp_limb_isU16 hsel5 hsel6 hsel7 hsum567 e69 e64 e61
+          hquotmsb (isU16_of_byteRowSpec (hb_q3 hrneg'))
+    have hrcU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
+        (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11+4+4 + i }) : Word (ZMod p)) := by
+      intro hr
+      have hrneg' : -input_is_real = -1 := by rw [hr]
+      simp only [circuit_norm] at e70 e71 e73 e76 e81 e83 e86 e91
+      simp only [neg_zero, add_zero] at e73 e83
+      apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+      · rw [show env.get (B + 7+8+8+11+11+11+4+4)
+            = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1) from by linear_combination e70]
+        exact isU16_of_byteRowSpec (hb_r0 hrneg')
+      · rw [show env.get (B + 7+8+8+11+11+11+4+4+1)
+            = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+1) from by linear_combination e71]
+        exact isU16_of_byteRowSpec (hb_r1 hrneg')
+      · exact comp_limb_isU16 hsel5 hsel6 hsel7 hsum567 e81 e76 e73
+          hremmsb (isU16_of_byteRowSpec (hb_r2 hrneg'))
+      · exact comp_limb_isU16 hsel5 hsel6 hsel7 hsum567 e91 e86 e83
+          hremmsb (isU16_of_byteRowSpec (hb_r3 hrneg'))
+    have habscU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
+        (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11 + i }) : Word (ZMod p)) := by
+      intro hr
+      have hrneg' : -input_is_real = -1 := by rw [hr]
+      apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+      exacts [isU16_of_byteRowSpec (hb_absc0 hrneg'), isU16_of_byteRowSpec (hb_absc1 hrneg'),
+        isU16_of_byteRowSpec (hb_absc2 hrneg'), isU16_of_byteRowSpec (hb_absc3 hrneg')]
+    have habsrU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
+        (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11+4 + i }) : Word (ZMod p)) := by
+      intro hr
+      have hrneg' : -input_is_real = -1 := by rw [hr]
+      apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+      exacts [isU16_of_byteRowSpec (hb_absr0 hrneg'), isU16_of_byteRowSpec (hb_absr1 hrneg'),
+        isU16_of_byteRowSpec (hb_absr2 hrneg'), isU16_of_byteRowSpec (hb_absr3 hrneg')]
+    have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by
+      rw [← h_ob]; simp [Vector.getElem_map]
+    have hcc1 : Expression.eval env input_var_op_c_val[1] = input_op_c_val[1] := by
+      rw [← h_oc]; simp [Vector.getElem_map]
+    have hbb3 : Expression.eval env input_var_op_b_val[3] = input_op_b_val[3] := by
+      rw [← h_ob]; simp [Vector.getElem_map]
+    have hcc3 : Expression.eval env input_var_op_c_val[3] = input_op_c_val[3] := by
+      rw [← h_oc]; simp [Vector.getElem_map]
+    -- `is_real_not_word` (E13 = `is_real * (1 - e2)`): binary, and `= 1 → is_real = 1 ∧ e2 = 0`.
+    have h13t := e13; simp only [circuit_norm] at h13t; rw [h_oir] at h13t
+    have hirnw : env.get (B + 4) = 0 ∨ env.get (B + 4) = 1 := by
+      rcases hbin with h | h
+      · left; rw [h] at h13t; linear_combination h13t
+      · rcases he2 with h2 | h2
+        · right; rw [h, h2] at h13t; linear_combination h13t
+        · left; rw [h, h2] at h13t; linear_combination h13t
+    have hirnw_imp : env.get (B + 4) = 1 →
+        input_is_real = 1 ∧
+          env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7) = 0 := by
+      intro hir
+      rcases hbin with h | h
+      · exfalso; rw [h, hir] at h13t; exact one_ne_zero (by linear_combination h13t)
+      · rcases he2 with h2 | h2
+        · exact ⟨h, h2⟩
+        · exfalso; rw [h, h2, hir] at h13t; exact one_ne_zero (by linear_combination h13t)
+    -- `max_abs_c_or_1` is `isU64`: `is_c_0 = 1 → #v[1,0,0,0]` (c = 0 branch), else `= abs_c` (E299-302).
+    have hmaxU : input_is_real = 1 → Word.isU64 (Vector.map (Expression.eval env)
+        (Vector.mapRange 4 fun i => var { index := B + 7+8+8+11+11+11+4+4+4 + i }) : Word (ZMod p)) := by
+      intro hr
+      have hrneg' : -input_is_real = -1 := by rw [hr]
+      have hsem := IsZeroWordOperation.result_semantic (h_isc0 (Or.inr hr)) hr
+      have h299 := e299; have h300 := e300; have h301 := e301; have h302 := e302
+      simp only [circuit_norm] at h299 h300 h301 h302
+      rw [iszeroword_result_proj] at h299 h300 h301 h302
+      simp only [Vector.getElem_mapRange, circuit_norm] at h299 h300 h301 h302
+      by_cases hcz : input_op_c_val[0] = 0 ∧ input_op_c_val[1] = 0 ∧ input_op_c_val[2] = 0
+          ∧ input_op_c_val[3] = 0
+      · rw [if_pos hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+        simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
+          Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
+        rw [hsem] at h299 h300 h301 h302
+        apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+        · haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+          rw [show env.get (B + 7+8+8+11+11+11+4+4+4) = 1 from by linear_combination h299,
+            ZMod.val_one]; norm_num
+        · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 1) = 0 from by linear_combination h300]; simp
+        · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 2) = 0 from by linear_combination h301]; simp
+        · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 3) = 0 from by linear_combination h302]; simp
+      · rw [if_neg hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+        simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
+          Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
+        rw [hsem] at h299 h300 h301 h302
+        apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
+        · rw [show env.get (B + 7+8+8+11+11+11+4+4+4) = env.get (B + 7+8+8+11+11+11)
+              from by linear_combination h299]
+          exact isU16_of_byteRowSpec (hb_absc0 hrneg')
+        · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 1) = env.get (B + 7+8+8+11+11+11 + 1)
+              from by linear_combination h300]
+          exact isU16_of_byteRowSpec (hb_absc1 hrneg')
+        · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 2) = env.get (B + 7+8+8+11+11+11 + 2)
+              from by linear_combination h301]
+          exact isU16_of_byteRowSpec (hb_absc2 hrneg')
+        · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 3) = env.get (B + 7+8+8+11+11+11 + 3)
+              from by linear_combination h302]
+          exact isU16_of_byteRowSpec (hb_absc3 hrneg')
+    refine ⟨?mulLo, ?mulHi, ?eqb, ?eqc, ?eqb2, ?eqc2, ?isc0, ?addc, ?addr, ?lt,
+      ?msb0, ?msb1, ?msb2, ?msb3, ?msb4, ?msb5, ?msb6, ?cpu, ?rtype, ?own,
+      ?b0, ?b1, ?b2, ?b3, ?b4, ?b5, ?b6, ?b7, ?b8, ?b9, ?b10, ?b11, ?b12, ?b13, ?b14, ?b15,
+      ?b16, ?b17, ?b18, ?b19, ?b20, ?b21, ?b22, ?b23, ?b24, ?b25, ?b26, ?b27, ?b28, ?b29, ?b30, ?b31,
+      ?b32, ?b33⟩
+    case b0 | b1 | b2 | b3 | b4 | b5 | b6 | b7 | b8 | b9 | b10 | b11 | b12 | b13 | b14 | b15
+      | b16 | b17 | b18 | b19 | b20 | b21 | b22 | b23 | b24 | b25 | b26 | b27 | b28 | b29 | b30 | b31 =>
+        exact Channels.binary_gate_req_vacuous hbin _
+    case b32 | b33 => exact Channels.binary_gate_req_vacuous he2 _
+    case own => simp only [circuit_norm, assertZeros, forAllNoOffset_map_assert]
+    case eqb => exact Or.inl rfl
+    case eqc => exact Or.inl rfl
+    case eqb2 => exact Or.inl rfl
+    case eqc2 => exact Or.inl rfl
+    case isc0 => exact Or.inl rfl
+    case cpu => exact Or.inr hbin
+    case rtype => exact Or.inr hbin
+    case mulLo =>
+      exact Or.inr ⟨fun hr => ⟨hqcU hr, hcU⟩, hbin, fun h => (zero_ne_one h).elim, hbin,
+        Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl, by rcases hbin with h | h <;> simp [h]⟩
+    case mulHi =>
+      refine Or.inr ⟨fun hr => ⟨hqcU hr, hcU⟩, hbin, fun h => (zero_ne_one h).elim, Or.inl rfl,
+        group_binary2 bd br (by omega), group_binary2 bdu bru (by omega), Or.inl rfl, Or.inl rfl, ?_⟩
+      rcases group_binary4 bd br bdu bru (by omega) with h | h
+      · exact Or.inl (by linear_combination h)
+      · exact Or.inr (by linear_combination h)
+    case addc =>
+      refine Or.inr ⟨fun hace => ?_, ?_⟩
+      · have h286 := e286; simp only [circuit_norm] at h286
+        have hr : input_is_real = 1 := by
+          rcases hbin with h | h
+          · exfalso; rw [h_oir, h, mul_zero, neg_zero, add_zero] at h286
+            exact zero_ne_one (h286.symm.trans hace)
+          · exact h
+        exact ⟨hcU, habscU hr⟩
+      · have h := e357; simp only [circuit_norm] at h; exact bool_of_mul_pred h
+    case addr =>
+      refine Or.inr ⟨fun hrae => ?_, ?_⟩
+      · have h288 := e288; simp only [circuit_norm] at h288
+        have hr : input_is_real = 1 := by
+          rcases hbin with h | h
+          · exfalso; rw [h_oir, h, mul_zero, neg_zero, add_zero] at h288
+            exact zero_ne_one (h288.symm.trans hrae)
+          · exact h
+        exact ⟨hrcU hr, habsrU hr⟩
+      · have h := e359; simp only [circuit_norm] at h; exact bool_of_mul_pred h
+    case lt =>
+      -- E305: `remainder_check_multiplicity = (1 - is_c_0.result) * is_real`.
+      have h305 := e305; simp only [circuit_norm] at h305
+      rw [iszeroword_result_proj] at h305
+      simp only [Vector.getElem_mapRange, circuit_norm] at h305
+      rw [h_oir] at h305
+      refine Or.inr ⟨fun hrcm => ?_, ?_⟩
+      · -- rcm = 1 → is_real = 1, then `abs_remainder`/`max_abs_c_or_1` are `isU64`.
+        have hr : input_is_real = 1 := by
+          rcases hbin with h | h
+          · exfalso; rw [h] at h305; exact one_ne_zero (by linear_combination -h305 - hrcm)
+          · exact h
+        exact ⟨habsrU hr, hmaxU hr⟩
+      · -- rcm binary: `(1 - is_c_0) * is_real` with `is_real`/`is_c_0` binary.
+        rcases hbin with h | h
+        · left; rw [h] at h305; linear_combination -h305
+        · have hsem := IsZeroWordOperation.result_semantic (h_isc0 (Or.inr h)) h
+          by_cases hcz : input_op_c_val[0] = 0 ∧ input_op_c_val[1] = 0 ∧ input_op_c_val[2] = 0
+              ∧ input_op_c_val[3] = 0
+          · left
+            rw [if_pos hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+            simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
+              Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
+            rw [h, hsem] at h305; linear_combination -h305
+          · right
+            rw [if_neg hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
+            simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
+              Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
+            rw [h, hsem] at h305; linear_combination -h305
+    case msb0 =>
+      refine Or.inr ⟨fun hirnwg => ?_, hirnw⟩
+      obtain ⟨hr, he2z⟩ := hirnw_imp hirnwg
+      have h41 := e41; simp only [circuit_norm] at h41; rw [he2z] at h41
+      rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[3] = input_op_b_val[3]
+          from by rw [← hbb3]; linear_combination -h41]
+      exact (Word.lt_cases_of_isU64 hbU).2.2.2
+    case msb1 =>
+      refine Or.inr ⟨fun hirnwg => ?_, hirnw⟩
+      obtain ⟨hr, he2z⟩ := hirnw_imp hirnwg
+      have h47 := e47; simp only [circuit_norm] at h47; rw [he2z] at h47
+      rw [show Expression.eval env input_var_adapter_op_c_memory_prev_value[3] = input_op_c_val[3]
+          from by rw [← hcc3]; linear_combination -h47]
+      exact (Word.lt_cases_of_isU64 hcU).2.2.2
+    case msb2 =>
+      refine Or.inr ⟨fun hirnwg => ?_, hirnw⟩
+      obtain ⟨hr, -⟩ := hirnw_imp hirnwg
+      have hrneg' : -input_is_real = -1 := by rw [hr]
+      exact isU16_of_byteRowSpec (hb_r3 hrneg')
+    case msb3 =>
+      refine Or.inr ⟨fun _ => ?_, he2⟩
+      have h22 := e22; simp only [circuit_norm] at h22
+      rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[1] = input_op_b_val[1]
+          from by rw [← hbb1]; linear_combination h22]
+      exact (Word.lt_cases_of_isU64 hbU).2.1
+    case msb4 =>
+      refine Or.inr ⟨fun _ => ?_, he2⟩
+      have h23 := e23; simp only [circuit_norm] at h23
+      rw [show Expression.eval env input_var_adapter_op_c_memory_prev_value[1] = input_op_c_val[1]
+          from by rw [← hcc1]; linear_combination h23]
+      exact (Word.lt_cases_of_isU64 hcU).2.1
+    case msb5 =>
+      exact Or.inr ⟨fun he2g => isU16_of_byteRowSpec (hb_e2r1 (by linear_combination -he2g)), he2⟩
+    case msb6 =>
+      exact Or.inr ⟨fun he2g => isU16_of_byteRowSpec (hb_e2q1 (by linear_combination -he2g)), he2⟩
+
+end SP1Clean.DivRemChip.SoundRemw

@@ -1,0 +1,113 @@
+import SP1Clean.Specs.Chip
+import SP1Clean.Operations.LtOperationSigned
+import SP1Clean.Readers.CPUState
+import SP1Clean.Readers.ALUTypeReader
+import SP1Clean.Foundations.Channels
+import SP1Clean.Extracted.LtChip
+import Clean.Circuit.Basic
+import Clean.Circuit.Subcircuit
+import Clean.Circuit.Channel
+import Clean.Utils.Tactics.ProvableStructDeriving
+
+/-! # The unified `Lt` chip row (SLT + SLTU) as a `GeneralFormalCircuit`
+
+The RISC-V signed/unsigned set-less-than family (`SLT`/`SLTU`) ported as a chip-level
+`GeneralFormalCircuit`, keyed on SP1's **unified** `Extracted.LtCols` (`is_slt`/`is_sltu` selectors,
+composing the signed gadget `LtOperationSigned` — which itself wraps the unsigned core + two
+`U16MSBOperation` sign columns). This **supersedes** the earlier unsigned-only `Chips/LtuChip.lean`
+exemplar, which carried a chip-local `Cols`; the unified chip is the faithful one bound to the
+extraction. It composes the immediate-capable `ALUTypeReader` (the reader-agnostic `Trace.AdapterView`
+end-to-end path, validated in `Chips/LtBridge.lean`'s `ChipKind`).
+
+Per `Extracted/LtChip.lean` the chip's *own* asserts (everything past the composed
+`LtOperationSigned`/`CPUState`/`ALUTypeReader` sub-lists) reduce to the two selector booleans
+(`is_slt`, `is_sltu`), their sum-bound, and `op_a_0 = 0` (`AssertSpec`); the chip's *own* interactions
+tail is **empty**, so `InteractSpec := True`. The semantic, `is_real`/flag-gated `Spec` (the RV64 `slt`
+/`sltu` identities on the result word) is below.
+
+The `main` body composes the `CPUState`/`LtOperationSigned`/`ALUTypeReader` sub-circuits, witnesses the two
+variant flags, emits the flag-boolean + sum-bound `AssertSpec` gates, and gates `is_real`. Soundness and
+completeness are **proven and axiom-clean** (flag-dispatched through `LtOperationSigned`'s `Spec`, mapping
+the gadget's compare `bit` to RV64 `slt`/`sltu`; the composed `LtOperationSigned` gadget is itself fully
+proven). -/
+
+namespace SP1Clean.LtChip
+
+open Circuit
+open Extracted (LtCols)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- The `is_real` selector and the threaded committed reader column blocks `state`/`adapter` (the latter
+an immediate-capable `ALUTypeReader`). The `rs1`/`rs2` operands are projected from the adapter (the
+Memory-bus values) — see `Inputs.op_b_val` below — rather than carried as separate committed columns. -/
+structure Inputs (F : Type) where
+  is_real : F
+  state : Extracted.CPUState F
+  adapter : Extracted.ALUTypeReader F
+deriving ProvableStruct
+
+/-- `rs1` operand = the `op_b` register read (`op_b_memory.prev_value`); `rs2` operand = the ALU operand
+word `adapter.op_c` (the `op_c` register read, or the immediate). -/
+@[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
+@[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c
+
+/-- **Assertion half** — the literal meaning of SP1's `LtCols.asserts` *own* (inline) assertZero tail
+(everything past the composed `LtOperationSigned`/`CPUState`/`ALUTypeReader` sub-lists), in extracted
+order (`Extracted/LtChip.lean`: `E2, E4, E6, op_a_0`): the two variant-flag booleans (`is_slt`,
+`is_sltu`), the sum-bound boolean on `E0 = is_slt + is_sltu`, and the `op_a_0` zeroing flag. The
+signed/unsigned compare arithmetic is *not* here — it is the composed `LtOperationSigned` sub-list. -/
+def AssertSpec (cols : LtCols (ZMod p)) : Prop :=
+  let s := cols.is_slt; let u := cols.is_sltu
+  let sum := s + u
+  s * (s - 1) = 0 ∧
+  u * (u - 1) = 0 ∧
+  sum * (sum - 1) = 0 ∧
+  cols.adapter.op_a_0 = 0
+
+/-- **Interaction half** — SP1's `LtCols.interactions` *own* tail is **empty** (`Extracted/LtChip.lean`
+ends `… ++ [ ]`): every byte-range pull for the compare lives inside the composed `LtOperationSigned`
+sub-list (the unsigned-core limb checks, the `U16MSB` sign-bit ranges), anchored at the operation level.
+So the chip's own interaction meaning is trivial. -/
+def InteractSpec (_cols : LtCols (ZMod p)) : Prop := True
+
+/-- The set-less-than result word the reader writes for `rd`: the compare bit (from the gadget's unsigned
+core) in the low limb, zeros above. -/
+def resultWord (cols : LtCols (ZMod p)) : Word (ZMod p) :=
+  #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]
+
+/-- Compose `Readers.CPUState.circuit` (forms `next_pc = [pc[0]+4, …]`, `clk_inc = 8`), **witness** the
+two variant flags `is_slt`/`is_sltu`, compose the witnessed `LtOperationSigned` gadget (`subcircuit`, the
+`is_signed := is_slt` mode selector), and `Readers.ALUTypeReader.circuit` (opcode `is_slt·9 + is_sltu·10`;
+the `rd` write value is `[bit, 0, 0, 0]` from the gadget's compare bit), gate `is_real`, emit the two flag
+booleans + their sum-bound (`AssertSpec`, needed by soundness to force `is_slt = 0` in the `SLTU` branch),
+and assemble the extracted `LtCols` struct. -/
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) := do
+  assertion Readers.CPUState.circuit
+    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
+  let flags ← witnessVector 2 (fun _ => (#v[0, 0] : Vector (ZMod p) 2))
+  let is_slt := flags[0]; let is_sltu := flags[1]
+  let lt_op ← subcircuit LtOperationSigned.circuit ⟨input.op_b_val, input.op_c_val, is_slt⟩
+  assertion Readers.ALUTypeReader.circuit
+    ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+     input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+     is_slt * 9 + is_sltu * 10,
+     lt_op.result.u16_compare_operation.bit, 0, 0, 0⟩
+  input.is_real * (input.is_real - 1) === 0
+  is_slt * (is_slt - 1) === 0
+  is_sltu * (is_sltu - 1) === 0
+  (is_slt + is_sltu) * ((is_slt + is_sltu) - 1) === 0
+  return ⟨input.state, input.adapter, is_slt, is_sltu, lt_op⟩
+
+set_option maxHeartbeats 1000000 in
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
+  channelsLawful := by simp [circuit_norm, main, LtOperationSigned.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit]
+  -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the two readers are
+  -- `assertion`s (`localLength 0`) over the threaded `state`/`adapter` inputs. 2 + 10 = 12.
+  localLength _ := 12
+  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithRequirements :=
+    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+
+end SP1Clean.LtChip

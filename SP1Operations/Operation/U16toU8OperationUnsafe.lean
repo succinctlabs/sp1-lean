@@ -1,7 +1,0 @@
-import SP1Foundations
-import SP1Operations.Operation.U16toU8OperationUnsafe.Operation
-import SP1Operations.Operation.U16toU8OperationUnsafe.Constraints
-
-namespace U16toU8OperationUnsafe
-
-end U16toU8OperationUnsafe

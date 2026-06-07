@@ -1,0 +1,61 @@
+import Mathlib.Tactic
+import Mathlib.Data.ZMod.Basic
+import SP1Clean.Operations.IsZeroOperation.RawSpec
+import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Extracted.IsZeroOperation
+
+/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (IsZero)
+
+Anchors the native `IsZeroOperation` gadget's `RawSpec` to **SP1's `IsZeroOperation` constraint
+definition** (the generated operation fragment in `Extracted/IsZeroOperation.lean`: three
+`assertZero`s — `result = 1 - inverse*a`, `result` boolean, `result*a = 0`). The anchor
+`isZero_constraints_faithful` proves the SP1 constraint list's `allHold` is **exactly** the native
+gadget's `RawSpec`. No byte sends, so this is the purest `assertZero`-only anchor. -/
+
+namespace SP1Clean.Faithful
+
+open SP1Clean
+open SP1Clean.Extracted
+open scoped SP1Clean.ConstraintCoe
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Carry-bool bridge: `x*(x-1)=0 ↔ x∈{0,1}` (field; `→` via `bool_of_mul_pred`). -/
+private lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) := by
+  rw [sub_eq_add_neg]
+  exact ⟨SP1Clean.bool_of_mul_pred,
+    fun h => by rcases h with h | h <;> rw [h] <;> ring⟩
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **Faithfulness anchor — assertion half.** SP1's `IsZeroOperation` `asserts` list holds iff the
+native gadget's `AssertSpec` holds. (No range bounds here, so `NeZero p` follows from primality
+alone.) -/
+theorem isZero_asserts_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
+    List.Forall (· = 0) (Extracted.IsZeroOperation.asserts a cols 1) ↔
+      SP1Clean.IsZeroOperation.AssertSpec a cols := by
+  haveI : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
+  simp only [Extracted.IsZeroOperation.asserts, List.Forall,
+    SP1Clean.IsZeroOperation.AssertSpec, one_mul, bool_iff]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **Faithfulness anchor — interaction half.** `IsZeroOperation` emits no bus interactions, so its
+(empty) `interactions` list trivially holds, matching the trivial `InteractSpec`. -/
+theorem isZero_interactions_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
+    List.Forall Interaction.toProp (Extracted.IsZeroOperation.interactions a cols 1) ↔
+      SP1Clean.IsZeroOperation.InteractSpec a cols := by
+  simp only [Extracted.IsZeroOperation.interactions, List.Forall,
+    SP1Clean.IsZeroOperation.InteractSpec]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Transitional combined anchor (`asserts ∧ interactions ↔ RawSpec = AssertSpec`) — kept for the
+not-yet-migrated `IsZeroWord`/`IsEqualWord` composed anchors; removed during rollout. -/
+theorem isZero_constraints_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
+    (List.Forall (· = 0) (Extracted.IsZeroOperation.asserts a cols 1) ∧
+      List.Forall Interaction.toProp (Extracted.IsZeroOperation.interactions a cols 1)) ↔
+      SP1Clean.IsZeroOperation.RawSpec a cols := by
+  rw [isZero_asserts_faithful, isZero_interactions_faithful]
+  simp only [SP1Clean.IsZeroOperation.InteractSpec, SP1Clean.IsZeroOperation.AssertSpec,
+    SP1Clean.IsZeroOperation.RawSpec, and_true]
+
+end SP1Clean.Faithful

@@ -1,19 +1,5 @@
 {
   "mcpServers": {
-    "LeanExplore": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "--from",
-        "lean-explore",
-        "leanexplore",
-        "mcp",
-        "serve",
-        "--backend",
-        "local"
-      ],
-      "env": {}
-    },
     "lean-lsp": {
       "type": "stdio",
       "command": "uvx",

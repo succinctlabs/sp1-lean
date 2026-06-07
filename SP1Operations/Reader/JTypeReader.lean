@@ -1,2 +1,0 @@
-import SP1Operations.Reader.JTypeReader.Operation
-import SP1Operations.Reader.JTypeReader.Constraints

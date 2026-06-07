@@ -1,0 +1,648 @@
+import SP1Clean.Operations.MulOperation.RawSpec
+import SP1Clean.Operations.MulOperation.Populate
+import SP1Clean.Operations.MulOperation.Extracted
+import SP1Clean.Foundations.ByteTable
+
+/-! # `MulOperation` contract — `Assumptions` / soundness / completeness / `circuit`. -/
+
+namespace SP1Clean.MulOperation
+
+open Circuit
+open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
+
+/-- Operand words fit in 64 bits, the five variant selectors are boolean, and **at most one** is set
+(the `{0,1}` sum-bound — the chip discharges this unconditionally from the in-circuit sum gate, including
+on padding rows where the sum is `0`). On an active row exactly one flag is set; `mulSemantics_of_raw`
+recovers `sum = 1` per active variant via `sum_eq_one`. -/
+def Assumptions (input : Inputs (ZMod p)) : Prop :=
+  (input.is_real = 1 → Word.isU64 input.b ∧ Word.isU64 input.c) ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_mulw = 1 → input.is_real = 1) ∧
+  (input.is_mul = 0 ∨ input.is_mul = 1) ∧ (input.is_mulh = 0 ∨ input.is_mulh = 1) ∧
+  (input.is_mulhu = 0 ∨ input.is_mulhu = 1) ∧ (input.is_mulhsu = 0 ∨ input.is_mulhsu = 1) ∧
+  (input.is_mulw = 0 ∨ input.is_mulw = 1) ∧
+  (input.is_mul + input.is_mulh + input.is_mulhu + input.is_mulhsu + input.is_mulw = 0 ∨
+    input.is_mul + input.is_mulh + input.is_mulhu + input.is_mulhsu + input.is_mulw = 1)
+
+/-- The **structural** `FormalAssertion` contract (`is_real`-gated): on a real row the columns are exactly
+the schoolbook form — the raw carry-chain (`RawSpec`), the two operand `U16toU8` byte decompositions, and
+the three MSB facts (`b_msb`/`c_msb` unconditional, `product_msb` gated on `is_mulw`). This pins **every**
+column (so completeness `Assumptions ∧ Spec → constraints` holds — the semantic `resultWord = b·c` slice
+alone would *not* pin the high product bytes). The semantic readout is recovered by `result_semantic`,
+which consumers use. A padding row owes nothing. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  -- **Ungated** facts (SP1's `eval` asserts these regardless of `is_real`, so they must hold on padding
+  -- too): the two sign-extend column definitions (`mul.rs:224-225`) and the three MSB booleanities (the
+  -- `U16MSBOperation` sub-`Spec`s carry the bool unconditionally). Completeness needs them on `is_real = 0`.
+  (input.cols.b_sign_extend = (input.is_mulh + input.is_mulhsu) * input.cols.b_msb) ∧
+  (input.cols.c_sign_extend = input.is_mulh * input.cols.c_msb) ∧
+  (input.cols.b_msb = 0 ∨ input.cols.b_msb = 1) ∧
+  (input.cols.c_msb = 0 ∨ input.cols.c_msb = 1) ∧
+  (input.cols.product_msb.msb = 0 ∨ input.cols.product_msb.msb = 1) ∧
+  -- **`is_real`-gated** body: the schoolbook carry-chain + ranges (`RawSpec`), the byte decompositions,
+  -- and the MSB high-bit equations. Pins the product/carry columns on a real row.
+  (input.is_real = 1 →
+    RawSpec input input.cols ∧
+    U16toU8OperationSafe.DecompSpec input.b input.cols.b_lower_byte ∧
+    U16toU8OperationSafe.DecompSpec input.c input.cols.c_lower_byte ∧
+    (input.cols.b_msb = if input.b[3].val ≥ 32768 then 1 else 0) ∧
+    (input.cols.c_msb = if input.c[3].val ≥ 32768 then 1 else 0) ∧
+    (input.cols.product_msb.msb = 0 ∨ input.cols.product_msb.msb = 1) ∧
+    (input.is_mulw = 1 → input.cols.product_msb.msb =
+      if (input.cols.product[2] + input.cols.product[3] * 256).val ≥ 32768 then 1 else 0))
+
+/-- **Semantic readout** (the consumer-facing lemma, mirroring `LtOperationUnsigned.result_semantic`): the
+structural `Spec` + `Assumptions` give the BitVec-product slice for the active variant on a real row. This
+is what `MulChip`/`DivRemChip` consume to reach the RV64 semantics. -/
+theorem result_semantic {input : Inputs (ZMod p)} (h_assum : Assumptions input)
+    (h_spec : Spec input) (hr : input.is_real = 1) : SemanticSpec input input.cols := by
+  obtain ⟨_, _, _, _, _, hgated⟩ := h_spec
+  obtain ⟨h_raw, hb_low, hc_low, hb_msb, hc_msb, hmsb_bool, hmsb⟩ := hgated hr
+  obtain ⟨habc_imp, _, _, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assum
+  obtain ⟨hbU, hcU⟩ := habc_imp hr
+  exact mulSemantics_of_raw hbU hcU hmul_b hmh_b hmhu_b hmhsu_b hmw_b hsum hb_low hc_low
+    hmsb_bool hmsb hb_msb hc_msb h_raw
+
+set_option maxHeartbeats 40000000 in
+set_option linter.unusedSimpArgs false in
+theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨habc_imp, hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
+  obtain ⟨hib, hic, _hicols, hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
+  obtain ⟨hA, hB, hbm, hcm, hpm, hcF0, hcF1, hcF2, hcF3, hcF4, hcF5, hcF6, hcF7, hcF8, hcF9, hcF10,
+    hcF11, hcF12, hcF13, hcF14, hcF15, hpG0, hpG1, hpG2, hpG3, hpG4, hpG5, hpG6, hpG7,
+    hsdb, hsdc, himpb, himpc, hch0, hch1, hch2, hch3, hch4, hch5, hch6, hch7, hch8, hch9, hch10,
+    hch11, hch12, hch13, hch14, hch15⟩ := h_holds
+  refine ⟨?_spec, ?_tail⟩
+  · -- the structural `Spec`: 5 ungated facts (sign-extend defs `hsdb`/`hsdc`, the three MSB bools from
+    -- the `U16MSB` sub-`Spec`s) then the `is_real`-gated body (the under-`hr` proof, unchanged).
+    refine ⟨hsdb, hsdc,
+      (hbm ⟨fun h => by
+        rw [show Expression.eval env input_var_b[3] = input_b[3] from by rw [← hib, Vector.getElem_map]]
+        exact (Word.lt_cases_of_isU64 (habc_imp h).1).2.2.2, hir_bin⟩).1,
+      (hcm ⟨fun h => by
+        rw [show Expression.eval env input_var_c[3] = input_c[3] from by rw [← hic, Vector.getElem_map]]
+        exact (Word.lt_cases_of_isU64 (habc_imp h).2).2.2.2, hir_bin⟩).1,
+      (hpm ⟨fun hmw => by
+        obtain ⟨_, eprod_eq, _, _, _, _, _, _, _⟩ := _hicols
+        have hr1 : input_is_real = 1 := hmw_real hmw
+        have ep2 : Expression.eval env input_var_cols_product[2] = input_cols_product[2] := by
+          rw [← eprod_eq, Vector.getElem_map]
+        have ep3 : Expression.eval env input_var_cols_product[3] = input_cols_product[3] := by
+          rw [← eprod_eq, Vector.getElem_map]
+        have pb2 : input_cols_product[2].val < 2 ^ 8 := by
+          rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).1
+        have pb3 : input_cols_product[3].val < 2 ^ 8 := by
+          rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).2
+        rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega, hmw_b⟩).1,
+      ?_⟩
+    intro hr
+    obtain ⟨hbU, hcU⟩ := habc_imp hr
+    obtain ⟨hbU0, hbU1, hbU2, hbU3⟩ := Word.lt_cases_of_isU64 hbU
+    obtain ⟨hcU0, hcU1, hcU2, hcU3⟩ := Word.lt_cases_of_isU64 hcU
+    have hneg : -input_is_real = -1 := by rw [hr]
+    have h16p : (16 : ℕ) < p := by
+      have h := Fact.out (p := 2 ^ 24 < p); have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
+      omega
+    obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, _, _, _, _, _⟩ := _hicols
+    have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
+    have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
+    have eb2 : Expression.eval env input_var_b[2] = input_b[2] := by rw [← hib, Vector.getElem_map]
+    have eb3 : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib, Vector.getElem_map]
+    have ec0 : Expression.eval env input_var_c[0] = input_c[0] := by rw [← hic, Vector.getElem_map]
+    have ec1 : Expression.eval env input_var_c[1] = input_c[1] := by rw [← hic, Vector.getElem_map]
+    have ec2 : Expression.eval env input_var_c[2] = input_c[2] := by rw [← hic, Vector.getElem_map]
+    have ec3 : Expression.eval env input_var_c[3] = input_c[3] := by rw [← hic, Vector.getElem_map]
+    have ep0 : Expression.eval env input_var_cols_product[0] = input_cols_product[0] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep1 : Expression.eval env input_var_cols_product[1] = input_cols_product[1] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep2 : Expression.eval env input_var_cols_product[2] = input_cols_product[2] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep3 : Expression.eval env input_var_cols_product[3] = input_cols_product[3] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep4 : Expression.eval env input_var_cols_product[4] = input_cols_product[4] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep5 : Expression.eval env input_var_cols_product[5] = input_cols_product[5] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep6 : Expression.eval env input_var_cols_product[6] = input_cols_product[6] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep7 : Expression.eval env input_var_cols_product[7] = input_cols_product[7] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep8 : Expression.eval env input_var_cols_product[8] = input_cols_product[8] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep9 : Expression.eval env input_var_cols_product[9] = input_cols_product[9] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep10 : Expression.eval env input_var_cols_product[10] = input_cols_product[10] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep11 : Expression.eval env input_var_cols_product[11] = input_cols_product[11] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep12 : Expression.eval env input_var_cols_product[12] = input_cols_product[12] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep13 : Expression.eval env input_var_cols_product[13] = input_cols_product[13] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep14 : Expression.eval env input_var_cols_product[14] = input_cols_product[14] := by rw [← eprod_eq, Vector.getElem_map]
+    have ep15 : Expression.eval env input_var_cols_product[15] = input_cols_product[15] := by rw [← eprod_eq, Vector.getElem_map]
+    have ecar0 : Expression.eval env input_var_cols_carry[0] = input_cols_carry[0] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar1 : Expression.eval env input_var_cols_carry[1] = input_cols_carry[1] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar2 : Expression.eval env input_var_cols_carry[2] = input_cols_carry[2] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar3 : Expression.eval env input_var_cols_carry[3] = input_cols_carry[3] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar4 : Expression.eval env input_var_cols_carry[4] = input_cols_carry[4] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar5 : Expression.eval env input_var_cols_carry[5] = input_cols_carry[5] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar6 : Expression.eval env input_var_cols_carry[6] = input_cols_carry[6] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar7 : Expression.eval env input_var_cols_carry[7] = input_cols_carry[7] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar8 : Expression.eval env input_var_cols_carry[8] = input_cols_carry[8] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar9 : Expression.eval env input_var_cols_carry[9] = input_cols_carry[9] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar10 : Expression.eval env input_var_cols_carry[10] = input_cols_carry[10] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar11 : Expression.eval env input_var_cols_carry[11] = input_cols_carry[11] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar12 : Expression.eval env input_var_cols_carry[12] = input_cols_carry[12] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar13 : Expression.eval env input_var_cols_carry[13] = input_cols_carry[13] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar14 : Expression.eval env input_var_cols_carry[14] = input_cols_carry[14] := by rw [← ecar_eq, Vector.getElem_map]
+    have ecar15 : Expression.eval env input_var_cols_carry[15] = input_cols_carry[15] := by rw [← ecar_eq, Vector.getElem_map]
+    have ebl0 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[0] = input_cols_b_lower_byte_low_bytes[0] := by rw [← ebl_eq, Vector.getElem_map]
+    have ebl1 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[1] = input_cols_b_lower_byte_low_bytes[1] := by rw [← ebl_eq, Vector.getElem_map]
+    have ebl2 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[2] = input_cols_b_lower_byte_low_bytes[2] := by rw [← ebl_eq, Vector.getElem_map]
+    have ebl3 : Expression.eval env input_var_cols_b_lower_byte_low_bytes[3] = input_cols_b_lower_byte_low_bytes[3] := by rw [← ebl_eq, Vector.getElem_map]
+    have ecl0 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[0] = input_cols_c_lower_byte_low_bytes[0] := by rw [← ecl_eq, Vector.getElem_map]
+    have ecl1 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[1] = input_cols_c_lower_byte_low_bytes[1] := by rw [← ecl_eq, Vector.getElem_map]
+    have ecl2 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[2] = input_cols_c_lower_byte_low_bytes[2] := by rw [← ecl_eq, Vector.getElem_map]
+    have ecl3 : Expression.eval env input_var_cols_c_lower_byte_low_bytes[3] = input_cols_c_lower_byte_low_bytes[3] := by rw [← ecl_eq, Vector.getElem_map]
+    have cb0 : input_cols_carry[0].val < 2 ^ 16 := by rw [← ecar0]; exact (byteRowSpec_range _ h16p).mp (hcF0 hneg)
+    have cb1 : input_cols_carry[1].val < 2 ^ 16 := by rw [← ecar1]; exact (byteRowSpec_range _ h16p).mp (hcF1 hneg)
+    have cb2 : input_cols_carry[2].val < 2 ^ 16 := by rw [← ecar2]; exact (byteRowSpec_range _ h16p).mp (hcF2 hneg)
+    have cb3 : input_cols_carry[3].val < 2 ^ 16 := by rw [← ecar3]; exact (byteRowSpec_range _ h16p).mp (hcF3 hneg)
+    have cb4 : input_cols_carry[4].val < 2 ^ 16 := by rw [← ecar4]; exact (byteRowSpec_range _ h16p).mp (hcF4 hneg)
+    have cb5 : input_cols_carry[5].val < 2 ^ 16 := by rw [← ecar5]; exact (byteRowSpec_range _ h16p).mp (hcF5 hneg)
+    have cb6 : input_cols_carry[6].val < 2 ^ 16 := by rw [← ecar6]; exact (byteRowSpec_range _ h16p).mp (hcF6 hneg)
+    have cb7 : input_cols_carry[7].val < 2 ^ 16 := by rw [← ecar7]; exact (byteRowSpec_range _ h16p).mp (hcF7 hneg)
+    have cb8 : input_cols_carry[8].val < 2 ^ 16 := by rw [← ecar8]; exact (byteRowSpec_range _ h16p).mp (hcF8 hneg)
+    have cb9 : input_cols_carry[9].val < 2 ^ 16 := by rw [← ecar9]; exact (byteRowSpec_range _ h16p).mp (hcF9 hneg)
+    have cb10 : input_cols_carry[10].val < 2 ^ 16 := by rw [← ecar10]; exact (byteRowSpec_range _ h16p).mp (hcF10 hneg)
+    have cb11 : input_cols_carry[11].val < 2 ^ 16 := by rw [← ecar11]; exact (byteRowSpec_range _ h16p).mp (hcF11 hneg)
+    have cb12 : input_cols_carry[12].val < 2 ^ 16 := by rw [← ecar12]; exact (byteRowSpec_range _ h16p).mp (hcF12 hneg)
+    have cb13 : input_cols_carry[13].val < 2 ^ 16 := by rw [← ecar13]; exact (byteRowSpec_range _ h16p).mp (hcF13 hneg)
+    have cb14 : input_cols_carry[14].val < 2 ^ 16 := by rw [← ecar14]; exact (byteRowSpec_range _ h16p).mp (hcF14 hneg)
+    have cb15 : input_cols_carry[15].val < 2 ^ 16 := by rw [← ecar15]; exact (byteRowSpec_range _ h16p).mp (hcF15 hneg)
+    have pb0 : input_cols_product[0].val < 2 ^ 8 := by rw [← ep0]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).1
+    have pb1 : input_cols_product[1].val < 2 ^ 8 := by rw [← ep1]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG0 hneg)).2
+    have pb2 : input_cols_product[2].val < 2 ^ 8 := by rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 hneg)).1
+    have pb3 : input_cols_product[3].val < 2 ^ 8 := by rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 hneg)).2
+    have pb4 : input_cols_product[4].val < 2 ^ 8 := by rw [← ep4]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG2 hneg)).1
+    have pb5 : input_cols_product[5].val < 2 ^ 8 := by rw [← ep5]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG2 hneg)).2
+    have pb6 : input_cols_product[6].val < 2 ^ 8 := by rw [← ep6]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG3 hneg)).1
+    have pb7 : input_cols_product[7].val < 2 ^ 8 := by rw [← ep7]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG3 hneg)).2
+    have pb8 : input_cols_product[8].val < 2 ^ 8 := by rw [← ep8]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG4 hneg)).1
+    have pb9 : input_cols_product[9].val < 2 ^ 8 := by rw [← ep9]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG4 hneg)).2
+    have pb10 : input_cols_product[10].val < 2 ^ 8 := by rw [← ep10]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG5 hneg)).1
+    have pb11 : input_cols_product[11].val < 2 ^ 8 := by rw [← ep11]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG5 hneg)).2
+    have pb12 : input_cols_product[12].val < 2 ^ 8 := by rw [← ep12]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG6 hneg)).1
+    have pb13 : input_cols_product[13].val < 2 ^ 8 := by rw [← ep13]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG6 hneg)).2
+    have pb14 : input_cols_product[14].val < 2 ^ 8 := by rw [← ep14]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).1
+    have pb15 : input_cols_product[15].val < 2 ^ 8 := by rw [← ep15]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG7 hneg)).2
+    simp only [hr, one_mul, id_eq, ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9, ep10, ep11, ep12, ep13, ep14, ep15, ecar0, ecar1, ecar2, ecar3, ecar4, ecar5, ecar6, ecar7, ecar8, ecar9, ecar10, ecar11, ecar12, ecar13, ecar14, ecar15, ebl0, ebl1, ebl2, ebl3, ecl0, ecl1, ecl2, ecl3, eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3] at hch0 hch1 hch2 hch3 hch4 hch5 hch6 hch7 hch8 hch9 hch10 hch11 hch12 hch13 hch14 hch15
+    have hb_low := (hA ⟨fun _ => ⟨hbU0, hbU1, hbU2, hbU3⟩, Or.inr hr⟩) hr
+    have hc_low := (hB ⟨fun _ => ⟨hcU0, hcU1, hcU2, hcU3⟩, Or.inr hr⟩) hr
+    have hpmspec := hpm ⟨fun _ => by rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega, hmw_b⟩
+    have hmsb_bool : input_cols_product_msb_msb = 0 ∨ input_cols_product_msb_msb = 1 := hpmspec.1
+    have hmsb : input_is_mulw = 1 → input_cols_product_msb_msb =
+        if (input_cols_product[2] + input_cols_product[3] * 256).val ≥ 32768 then 1 else 0 := by
+      intro h; have := hpmspec.2 h; rw [ep2, ep3] at this; exact this
+    have hb_msb : input_cols_b_msb = if input_b[3].val ≥ 32768 then 1 else 0 := by
+      have := (hbm ⟨fun _ => by rw [eb3]; exact hbU3, Or.inr hr⟩).2 hr; rw [eb3] at this; exact this
+    have hc_msb : input_cols_c_msb = if input_c[3].val ≥ 32768 then 1 else 0 := by
+      have := (hcm ⟨fun _ => by rw [ec3]; exact hcU3, Or.inr hr⟩).2 hr; rw [ec3] at this; exact this
+    -- the structural `Spec` 7-tuple: the raw schoolbook form (`?_`, the `RawSpec` below) plus the
+    -- byte decompositions and MSB facts already assembled above.
+    refine ⟨?_, hb_low, hc_low, hb_msb, hc_msb, hmsb_bool, hmsb⟩
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · intro k hk
+      interval_cases k
+      · rw [colSum_0]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch0
+      · rw [colSum_1]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch1
+      · rw [colSum_2]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch2
+      · rw [colSum_3]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch3
+      · rw [colSum_4]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch4
+      · rw [colSum_5]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch5
+      · rw [colSum_6]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch6
+      · rw [colSum_7]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch7
+      · rw [colSum_8]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch8
+      · rw [colSum_9]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch9
+      · rw [colSum_10]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch10
+      · rw [colSum_11]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch11
+      · rw [colSum_12]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch12
+      · rw [colSum_13]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch13
+      · rw [colSum_14]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch14
+      · rw [colSum_15]
+        simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map,
+          Vector.getElem_mapRange]
+        linear_combination hch15
+    · intro k hk
+      interval_cases k <;>
+        simp only [productVal, Nat.reduceLT, dif_pos] <;>
+        first | exact pb0 | exact pb1 | exact pb2 | exact pb3 | exact pb4 | exact pb5 | exact pb6 | exact pb7 | exact pb8 | exact pb9 | exact pb10 | exact pb11 | exact pb12 | exact pb13 | exact pb14 | exact pb15
+    · intro k hk
+      interval_cases k <;>
+        simp only [carryVal, Nat.reduceLT, dif_pos] <;>
+        first | exact cb0 | exact cb1 | exact cb2 | exact cb3 | exact cb4 | exact cb5 | exact cb6 | exact cb7 | exact cb8 | exact cb9 | exact cb10 | exact cb11 | exact cb12 | exact cb13 | exact cb14 | exact cb15
+    · exact hsdb
+    · exact hsdc
+    · have h := (hbm ⟨fun _ => by rw [eb3]; exact hbU3, Or.inr hr⟩).1; exact h
+    · have h := (hcm ⟨fun _ => by rw [ec3]; exact hcU3, Or.inr hr⟩).1; exact h
+    · show input_cols_b_sign_extend = 0 ∨ input_cols_b_sign_extend = 1
+      have hims : input_is_mulh + input_is_mulhsu = 0 ∨ input_is_mulh + input_is_mulhsu = 1 := by
+        rcases hmh_b with h | h
+        · rcases hmhsu_b with h2 | h2 <;> rw [h, h2] <;> simp
+        · have hs1 := sum_eq_one hmul_b (Or.inr h) hmhu_b hmhsu_b hmw_b hsum (Or.inr (Or.inl h))
+          have hs' : input_is_mulh + input_is_mul + input_is_mulhu + input_is_mulhsu + input_is_mulw = 1 := by
+            linear_combination hs1
+          obtain ⟨_, _, h2, _⟩ := rest_zero hmul_b hmhu_b hmhsu_b hmw_b h hs'
+          rw [h, h2]; simp
+      rw [hsdb]; rcases hims with h | h <;> rw [h]
+      · left; ring
+      · rw [one_mul, hb_msb]; split <;> simp
+    · show input_cols_c_sign_extend = 0 ∨ input_cols_c_sign_extend = 1
+      rw [hsdc]; rcases hmh_b with h | h <;> rw [h]
+      · left; ring
+      · rw [one_mul, hc_msb]; split <;> simp
+  · -- the channel-requirement tail: the 2 `U16toU8` + 3 `U16MSB` subcircuit `Assumptions` (gated
+    -- `isU64`/bounds + the binary gate), then the 24 byte-pull padding requirements (vacuous for a
+    -- binary `is_real` via `binary_gate_req_vacuous`).
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+    · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩
+    · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩
+    · refine Or.inr ⟨fun h => ?_, hir_bin⟩
+      have e : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib, Vector.getElem_map]
+      rw [e]; exact (Word.lt_cases_of_isU64 (habc_imp h).1).2.2.2
+    · refine Or.inr ⟨fun h => ?_, hir_bin⟩
+      have e : Expression.eval env input_var_c[3] = input_c[3] := by rw [← hic, Vector.getElem_map]
+      rw [e]; exact (Word.lt_cases_of_isU64 (habc_imp h).2).2.2.2
+    · -- the `product_msb` U16MSB is gated on `is_mulw`; under `is_mulw = 1` we get `is_real = 1`
+      -- (`hmw_real`), so the `is_real`-gated byte pull (`hpG1`) ranges `product[2]`/`product[3]`.
+      refine Or.inr ⟨fun h => ?_, hmw_b⟩
+      have hr1 : input_is_real = 1 := hmw_real h
+      obtain ⟨_, hprod_eq, _, _, _, _, _, _, _⟩ := _hicols
+      have ep2 : Expression.eval env input_var_cols_product[2] = input_cols_product[2] := by
+        rw [← hprod_eq, Vector.getElem_map]
+      have ep3 : Expression.eval env input_var_cols_product[3] = input_cols_product[3] := by
+        rw [← hprod_eq, Vector.getElem_map]
+      have pb2 : input_cols_product[2].val < 2 ^ 8 := by
+        rw [← ep2]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).1
+      have pb3 : input_cols_product[3].val < 2 ^ 8 := by
+        rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).2
+      rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega
+    · and_intros <;> exact binary_gate_req_vacuous hir_bin _
+
+/-- Byte-value bridge: the `k`-th byte of the `ZMod`-level sign/zero-extended operand equals the `ℕ`
+byte stream `extStream` at `k` (used by the witnessed `schoolProduct`/`schoolCarry`). Bytes `0..7` are
+the `U16toU8` decomposition (low byte / high byte of each limb); bytes `8..15` are the sign fill
+`s * 255` (a genuine byte since `s ∈ {0,1}`). -/
+lemma byteAt_extendedBytes_val (w : Word (ZMod p)) (lower : Extracted.U16toU8Operation (ZMod p))
+    (s : ZMod p) (hspec : U16toU8OperationSafe.DecompSpec w lower) (hs : s.val ≤ 1) (i : ℕ) :
+    (byteAt (extendedBytes w lower s) i).val
+      = extStream w[0].val w[1].val w[2].val w[3].val s.val i := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+  have hp : 2 ^ 24 < p := Fact.out
+  have hsign : (s * 255).val = s.val * 255 := by
+    have h255 : (s * 255 : ZMod p) = ((s.val * 255 : ℕ) : ZMod p) := by
+      push_cast [ZMod.natCast_zmod_val]; ring
+    rw [h255, ZMod.val_natCast, Nat.mod_eq_of_lt (by omega)]
+  obtain ⟨hlo0, hhi0, hre0⟩ := hspec 0
+  obtain ⟨hlo1, hhi1, hre1⟩ := hspec 1
+  obtain ⟨hlo2, hhi2, hre2⟩ := hspec 2
+  obtain ⟨hlo3, hhi3, hre3⟩ := hspec 3
+  have c0 : w[0].val = (lower.low_bytes[0]).val + ((w[0] - lower.low_bytes[0]) * 256⁻¹).val * 256 :=
+    byte_compose_val hlo0 hhi0 hre0
+  have c1 : w[1].val = (lower.low_bytes[1]).val + ((w[1] - lower.low_bytes[1]) * 256⁻¹).val * 256 :=
+    byte_compose_val hlo1 hhi1 hre1
+  have c2 : w[2].val = (lower.low_bytes[2]).val + ((w[2] - lower.low_bytes[2]) * 256⁻¹).val * 256 :=
+    byte_compose_val hlo2 hhi2 hre2
+  have c3 : w[3].val = (lower.low_bytes[3]).val + ((w[3] - lower.low_bytes[3]) * 256⁻¹).val * 256 :=
+    byte_compose_val hlo3 hhi3 hre3
+  have hlo0' : (lower.low_bytes[0]).val < 256 := hlo0
+  have hlo1' : (lower.low_bytes[1]).val < 256 := hlo1
+  have hlo2' : (lower.low_bytes[2]).val < 256 := hlo2
+  have hlo3' : (lower.low_bytes[3]).val < 256 := hlo3
+  have hhi0' : ((w[0] - lower.low_bytes[0]) * 256⁻¹).val < 256 := hhi0
+  have hhi1' : ((w[1] - lower.low_bytes[1]) * 256⁻¹).val < 256 := hhi1
+  have hhi2' : ((w[2] - lower.low_bytes[2]) * 256⁻¹).val < 256 := hhi2
+  have hhi3' : ((w[3] - lower.low_bytes[3]) * 256⁻¹).val < 256 := hhi3
+  by_cases hi16 : i < 16
+  · interval_cases i
+    · show (lower.low_bytes[0]).val = w[0].val % 256; omega
+    · show ((w[0] - lower.low_bytes[0]) * 256⁻¹).val = w[0].val / 256; omega
+    · show (lower.low_bytes[1]).val = w[1].val % 256; omega
+    · show ((w[1] - lower.low_bytes[1]) * 256⁻¹).val = w[1].val / 256; omega
+    · show (lower.low_bytes[2]).val = w[2].val % 256; omega
+    · show ((w[2] - lower.low_bytes[2]) * 256⁻¹).val = w[2].val / 256; omega
+    · show (lower.low_bytes[3]).val = w[3].val % 256; omega
+    · show ((w[3] - lower.low_bytes[3]) * 256⁻¹).val = w[3].val / 256; omega
+    all_goals exact hsign
+  · rw [byteAt, dif_neg hi16, ZMod.val_zero, extStream,
+      List.getD_eq_default _ _ (by simp only [List.length_cons, List.length_nil]; omega)]
+
+/-- The `ZMod`-level schoolbook column `colSum` over the sign/zero-extended bytes equals the cast of the
+`ℕ`-level byte convolution `cpNat` over the matching `extStream`s (for `k < 16`). This is the bridge
+from the in-circuit gate (phrased via `colSum`) to the witnessed `schoolProduct`/`schoolCarry` (built
+from `cpNat`). -/
+lemma colSum_eq_cpNat (w w' : Word (ZMod p)) (lower lower' : Extracted.U16toU8Operation (ZMod p))
+    (s s' : ZMod p) (hspec : U16toU8OperationSafe.DecompSpec w lower)
+    (hspec' : U16toU8OperationSafe.DecompSpec w' lower') (hs : s = 0 ∨ s = 1) (hs' : s' = 0 ∨ s' = 1)
+    (k : ℕ) (hk : k < 16) :
+    colSum (extendedBytes w lower s) (extendedBytes w' lower' s') k
+      = ((MulCarryChain.cpNat (extStream w[0].val w[1].val w[2].val w[3].val s.val)
+            (extStream w'[0].val w'[1].val w'[2].val w'[3].val s'.val) k : ℕ) : ZMod p) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+  have hsv : s.val ≤ 1 := by rcases hs with h | h <;> simp [h, ZMod.val_one, ZMod.val_zero]
+  have hsv' : s'.val ≤ 1 := by rcases hs' with h | h <;> simp [h, ZMod.val_one, ZMod.val_zero]
+  have hbb_lt := extendedBytes_byte_lt w lower s (fun i => (hspec i).1) (fun i => (hspec i).2.1) hs
+  have hcc_lt := extendedBytes_byte_lt w' lower' s' (fun i => (hspec' i).1) (fun i => (hspec' i).2.1) hs'
+  have key := byteAt_extendedBytes_val w lower s hspec hsv
+  have key' := byteAt_extendedBytes_val w' lower' s' hspec' hsv'
+  have hval : (colSum (extendedBytes w lower s) (extendedBytes w' lower' s') k).val
+      = MulCarryChain.cpNat (extStream w[0].val w[1].val w[2].val w[3].val s.val)
+          (extStream w'[0].val w'[1].val w'[2].val w'[3].val s'.val) k := by
+    rw [colSum_val _ _ hbb_lt hcc_lt k]
+    simp only [key, key']
+    rw [MulCarryChain.cpNat, ← Finset.sum_filter]
+    apply Finset.sum_congr _ (fun _ _ => rfl)
+    ext i; simp only [Finset.mem_filter, Finset.mem_range]; omega
+  rw [← ZMod.natCast_zmod_val (colSum (extendedBytes w lower s) (extendedBytes w' lower' s') k), hval]
+
+/-- Each `extStream` byte is `≤ 255` (low/high bytes of `< 2^16` limbs; sign fill `sgn * 255` with
+`sgn ≤ 1`). -/
+lemma extStream_le (l0 l1 l2 l3 sgn : ℕ) (hl0 : l0 < 2 ^ 16) (hl1 : l1 < 2 ^ 16) (hl2 : l2 < 2 ^ 16)
+    (hl3 : l3 < 2 ^ 16) (hsgn : sgn ≤ 1) (i : ℕ) : extStream l0 l1 l2 l3 sgn i ≤ 255 := by
+  unfold extStream
+  rcases Nat.lt_or_ge i 16 with h | h
+  · interval_cases i <;> simp <;> omega
+  · rw [List.getD_eq_default _ _ (by simp; omega)]; omega
+
+/-- `extStream` vanishes past index `15` (its backing list has length `16`). -/
+lemma extStream_eq_zero (l0 l1 l2 l3 sgn i : ℕ) (h : 16 ≤ i) :
+    extStream l0 l1 l2 l3 sgn i = 0 := by
+  unfold extStream; rw [List.getD_eq_default _ _ (by simp; omega)]
+
+set_option maxHeartbeats 40000000 in
+set_option linter.unusedSimpArgs false in
+theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
+  circuit_proof_start
+  obtain ⟨habc_imp, hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
+  obtain ⟨hib, hic, hicols, _hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
+  obtain ⟨h_bsd, h_csd, h_bmb, h_cmb, h_pmb, h_gated⟩ := h_spec
+  obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, _ebm, _ecm, _epm, _ebse, _ecse⟩ := hicols
+  have h16p : (16 : ℕ) < p := by
+    have h := Fact.out (p := 2 ^ 24 < p); have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
+    omega
+  -- eval bridges (eval of a `Var`-column element = the corresponding `ZMod` column value)
+  have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
+  have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
+  have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib, Vector.getElem_map]
+  have eb3 : Expression.eval env.toEnvironment input_var_b[3] = input_b[3] := by rw [← hib, Vector.getElem_map]
+  have ec0 : Expression.eval env.toEnvironment input_var_c[0] = input_c[0] := by rw [← hic, Vector.getElem_map]
+  have ec1 : Expression.eval env.toEnvironment input_var_c[1] = input_c[1] := by rw [← hic, Vector.getElem_map]
+  have ec2 : Expression.eval env.toEnvironment input_var_c[2] = input_c[2] := by rw [← hic, Vector.getElem_map]
+  have ec3 : Expression.eval env.toEnvironment input_var_c[3] = input_c[3] := by rw [← hic, Vector.getElem_map]
+  have ep0 : Expression.eval env.toEnvironment input_var_cols_product[0] = input_cols_product[0] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep1 : Expression.eval env.toEnvironment input_var_cols_product[1] = input_cols_product[1] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep2 : Expression.eval env.toEnvironment input_var_cols_product[2] = input_cols_product[2] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep3 : Expression.eval env.toEnvironment input_var_cols_product[3] = input_cols_product[3] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep4 : Expression.eval env.toEnvironment input_var_cols_product[4] = input_cols_product[4] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep5 : Expression.eval env.toEnvironment input_var_cols_product[5] = input_cols_product[5] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep6 : Expression.eval env.toEnvironment input_var_cols_product[6] = input_cols_product[6] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep7 : Expression.eval env.toEnvironment input_var_cols_product[7] = input_cols_product[7] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep8 : Expression.eval env.toEnvironment input_var_cols_product[8] = input_cols_product[8] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep9 : Expression.eval env.toEnvironment input_var_cols_product[9] = input_cols_product[9] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep10 : Expression.eval env.toEnvironment input_var_cols_product[10] = input_cols_product[10] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep11 : Expression.eval env.toEnvironment input_var_cols_product[11] = input_cols_product[11] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep12 : Expression.eval env.toEnvironment input_var_cols_product[12] = input_cols_product[12] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep13 : Expression.eval env.toEnvironment input_var_cols_product[13] = input_cols_product[13] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep14 : Expression.eval env.toEnvironment input_var_cols_product[14] = input_cols_product[14] := by rw [← eprod_eq, Vector.getElem_map]
+  have ep15 : Expression.eval env.toEnvironment input_var_cols_product[15] = input_cols_product[15] := by rw [← eprod_eq, Vector.getElem_map]
+  have ecar0 : Expression.eval env.toEnvironment input_var_cols_carry[0] = input_cols_carry[0] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar1 : Expression.eval env.toEnvironment input_var_cols_carry[1] = input_cols_carry[1] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar2 : Expression.eval env.toEnvironment input_var_cols_carry[2] = input_cols_carry[2] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar3 : Expression.eval env.toEnvironment input_var_cols_carry[3] = input_cols_carry[3] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar4 : Expression.eval env.toEnvironment input_var_cols_carry[4] = input_cols_carry[4] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar5 : Expression.eval env.toEnvironment input_var_cols_carry[5] = input_cols_carry[5] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar6 : Expression.eval env.toEnvironment input_var_cols_carry[6] = input_cols_carry[6] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar7 : Expression.eval env.toEnvironment input_var_cols_carry[7] = input_cols_carry[7] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar8 : Expression.eval env.toEnvironment input_var_cols_carry[8] = input_cols_carry[8] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar9 : Expression.eval env.toEnvironment input_var_cols_carry[9] = input_cols_carry[9] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar10 : Expression.eval env.toEnvironment input_var_cols_carry[10] = input_cols_carry[10] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar11 : Expression.eval env.toEnvironment input_var_cols_carry[11] = input_cols_carry[11] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar12 : Expression.eval env.toEnvironment input_var_cols_carry[12] = input_cols_carry[12] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar13 : Expression.eval env.toEnvironment input_var_cols_carry[13] = input_cols_carry[13] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar14 : Expression.eval env.toEnvironment input_var_cols_carry[14] = input_cols_carry[14] := by rw [← ecar_eq, Vector.getElem_map]
+  have ecar15 : Expression.eval env.toEnvironment input_var_cols_carry[15] = input_cols_carry[15] := by rw [← ecar_eq, Vector.getElem_map]
+  have ebl0 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[0] = input_cols_b_lower_byte_low_bytes[0] := by rw [← ebl_eq, Vector.getElem_map]
+  have ebl1 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[1] = input_cols_b_lower_byte_low_bytes[1] := by rw [← ebl_eq, Vector.getElem_map]
+  have ebl2 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[2] = input_cols_b_lower_byte_low_bytes[2] := by rw [← ebl_eq, Vector.getElem_map]
+  have ebl3 : Expression.eval env.toEnvironment input_var_cols_b_lower_byte_low_bytes[3] = input_cols_b_lower_byte_low_bytes[3] := by rw [← ebl_eq, Vector.getElem_map]
+  have ecl0 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[0] = input_cols_c_lower_byte_low_bytes[0] := by rw [← ecl_eq, Vector.getElem_map]
+  have ecl1 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[1] = input_cols_c_lower_byte_low_bytes[1] := by rw [← ecl_eq, Vector.getElem_map]
+  have ecl2 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[2] = input_cols_c_lower_byte_low_bytes[2] := by rw [← ecl_eq, Vector.getElem_map]
+  have ecl3 : Expression.eval env.toEnvironment input_var_cols_c_lower_byte_low_bytes[3] = input_cols_c_lower_byte_low_bytes[3] := by rw [← ecl_eq, Vector.getElem_map]
+  simp only [eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3, ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9,
+    ep10, ep11, ep12, ep13, ep14, ep15, ecar0, ecar1, ecar2, ecar3, ecar4, ecar5, ecar6, ecar7, ecar8,
+    ecar9, ecar10, ecar11, ecar12, ecar13, ecar14, ecar15, ebl0, ebl1, ebl2, ebl3, ecl0, ecl1, ecl2,
+    ecl3] at *
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+    ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+    ?_, ?_⟩
+  -- 5 subcircuit `⟨Assumptions, Spec⟩` obligations
+  · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩, fun h => (h_gated h).2.1⟩
+  · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩, fun h => (h_gated h).2.2.1⟩
+  · exact ⟨⟨fun h => (Word.lt_cases_of_isU64 (habc_imp h).1).2.2.2, hir_bin⟩,
+      ⟨h_bmb, fun h => (h_gated h).2.2.2.1⟩⟩
+  · exact ⟨⟨fun h => (Word.lt_cases_of_isU64 (habc_imp h).2).2.2.2, hir_bin⟩,
+      ⟨h_cmb, fun h => (h_gated h).2.2.2.2.1⟩⟩
+  · refine ⟨⟨fun hmw => ?_, hmw_b⟩, ⟨h_pmb, fun hmw => (h_gated (hmw_real hmw)).2.2.2.2.2.2 hmw⟩⟩
+    have hr1 : input_is_real = 1 := hmw_real hmw
+    have pb2 : input_cols_product[2].val < 2 ^ 8 := (h_gated hr1).1.2.1 2 (by norm_num)
+    have pb3 : input_cols_product[3].val < 2 ^ 8 := (h_gated hr1).1.2.1 3 (by norm_num)
+    rw [byte_compose_val pb2 pb3 rfl]; omega
+  -- 16 carry `slice_range_check_u16` byte pulls
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 0 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 1 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 2 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 3 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 4 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 5 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 6 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 7 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 8 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 9 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 10 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 11 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 12 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 13 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 14 (by norm_num))
+  · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 15 (by norm_num))
+  -- 8 product `slice_range_check_u8` byte-pair pulls
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 0 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 1 (by norm_num)⟩
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 2 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 3 (by norm_num)⟩
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 4 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 5 (by norm_num)⟩
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 6 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 7 (by norm_num)⟩
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 8 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 9 (by norm_num)⟩
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 10 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 11 (by norm_num)⟩
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 12 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 13 (by norm_num)⟩
+  · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
+      ⟨(h_gated (neg_inj.mp hneg)).1.2.1 14 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 15 (by norm_num)⟩
+  -- 4 sign-extend asserts (the two definitions are the ungated `Spec` facts; the two implications
+  -- follow from those + the MSB booleanities)
+  · exact h_bsd
+  · exact h_csd
+  · rw [h_bsd]; rcases h_bmb with h | h <;> rw [h] <;> simp
+  · rw [h_csd]; rcases h_cmb with h | h <;> rw [h] <;> simp
+  -- 16 `is_real`-gated schoolbook carry-chain product equations (the chain gate, in reverse)
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 0 (by norm_num)
+      rw [colSum_0] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 1 (by norm_num)
+      rw [colSum_1] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 2 (by norm_num)
+      rw [colSum_2] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 3 (by norm_num)
+      rw [colSum_3] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 4 (by norm_num)
+      rw [colSum_4] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 5 (by norm_num)
+      rw [colSum_5] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 6 (by norm_num)
+      rw [colSum_6] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 7 (by norm_num)
+      rw [colSum_7] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 8 (by norm_num)
+      rw [colSum_8] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 9 (by norm_num)
+      rw [colSum_9] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 10 (by norm_num)
+      rw [colSum_10] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 11 (by norm_num)
+      rw [colSum_11] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 12 (by norm_num)
+      rw [colSum_12] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 13 (by norm_num)
+      rw [colSum_13] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 14 (by norm_num)
+      rw [colSum_14] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+  · rcases hir_bin with h | h
+    · simp [h]
+    · have hchain := (h_gated h).1.1 15 (by norm_num)
+      rw [colSum_15] at hchain
+      simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
+      rw [h, one_mul]; linear_combination hchain
+
+/-- SP1's `MulOperation::eval` as a Clean-native `FormalAssertion`: `is_real`-gated multiply-family
+constraints over the `populate`d product/carry columns; no fresh witnesses. -/
+def circuit : FormalAssertion (ZMod p) Inputs :=
+  { main, elaborated,
+    Assumptions := Assumptions,
+    Spec := Spec,
+    soundness := soundness,
+    completeness := completeness }
+
+set_option linter.unusedSectionVars false in
+@[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
+    circuit.localLength x = 0 := rfl
+
+end SP1Clean.MulOperation
