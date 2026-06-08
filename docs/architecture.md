@@ -114,6 +114,35 @@ structural `RawSpec`, soundness/completeness, `circuit`) stays in the per-circui
 moved `Inputs`/`Spec` by name after `import SP1Clean.Specs.<Reader|Operation|Chip>`. The `RawSpec`s
 stay with the proofs that consume them, not in `Specs/`.
 
+## Chip conventions (non-negotiable; standardization pass 2026-06-07)
+
+These keep every chip uniform and each `Spec` auditable on its own. Violations are bugs.
+
+1. **Operands are adapter projections, never committed `Inputs` columns.** An `Inputs` struct carries
+   only `{is_real (or selectors), state, adapter}` plus genuinely-extra witnesses (e.g. Store's
+   `store_value`, Load's `offset_bit`/`selected_*`/`msb`). The operand words are `@[reducible]`
+   projections off the adapter — `Inputs.op_b_val := i.adapter.op_b_memory.prev_value`,
+   `Inputs.op_c_imm := i.adapter.op_c_imm`, `op_c_val := i.adapter.op_c_memory.prev_value` (or
+   `i.adapter.op_c` for the ALU adapter). This makes the chip's operand *definitionally* the value the
+   Memory bus pins — no free column, no extra equality constraint. (Soundness/completeness unfold the
+   projection with `simp only [Inputs.op_b_val, …]` right after `circuit_proof_start`.)
+2. **Each `Spec` is self-contained in `Specs/Chip.lean`.** No shared chip-spec *builder* (the old
+   `RTypeChipSpec` was inlined per chip and deleted) — a reader audits one `Spec` without chasing a
+   shared abstraction. The `Spec`, its `Inputs`, and the helper defs the `Spec` *directly* references
+   live together in `Specs/Chip.lean`; helpers used only by `main`/`Defs` live in `Chips/<Op>Chip/Defs.lean`.
+3. **Variant flags live in the `cols` column struct, read from `cols` in the `Spec`** — never duplicated
+   as `Inputs` fields. (`main` witnesses them; the flag-sum gate binds `is_real = Σ flags`.)
+4. **Range checks go through the byte bus, not `Gadgets.ToBits.rangeCheck`.** A width-`n` range check is a
+   `byteChannel.gatedReceive <gate> (⟨6, value, n, 0⟩ : ByteRow …)` (`ByteOpcode 6 = Range`), matching
+   SP1's extracted `Range(n)` send. Soundness consumes the `byteChannel.Guarantees`/`ByteRowSpec`
+   guarantee (via `byteRowSpec_range`); completeness proves it the same way. (AddressOperation's offset
+   check uses this; `Gadgets.ToBits.rangeCheck` bit-decomposition is *not* faithful to SP1.)
+5. **Extra files in a chip directory only for `Core.lean` (inlined arithmetic kernel reused by
+   soundness+completeness), `Math.lean` (pure `BitVec`/`RV64` lemmas), or a `Soundness/` subdir (proof
+   decomposition)** — justified only when a chip's inlined arithmetic would blow the heartbeat/LSP budget
+   in `Defs`/`Formal`. Fold one-off names into these unless genuinely reused; fold conservatively
+   (the splits exist to avoid timeouts).
+
 ## Layout (mirror-rust)
 
 ```

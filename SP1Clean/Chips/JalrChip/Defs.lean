@@ -37,6 +37,13 @@ def rs1WordI (input : Inputs (ZMod p)) : Word (ZMod p) :=
   #v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
      input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]
 
+/-- The committed, **LSB-cleared** next-pc word the chip feeds `CPUState` — the jump target
+`add_operation.value` with its low bit removed (`value[0] - lsb`), faithful to RISC-V JALR's
+`(rs1 + imm) & ~1` and the Sail `BitVec.update target 0 0#1`. Used by the Sail bridge (not the `Spec`). -/
+def nextPcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
+  #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1],
+     cols.add_operation.value[2], 0]
+
 /-- The jump-target word the chip witnesses for `add_operation.value` (`rs1 + op_c_imm`, base-2^16). -/
 def jumpTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=
   AddOperation.populate (rs1WordI input) input.adapter.op_c_imm

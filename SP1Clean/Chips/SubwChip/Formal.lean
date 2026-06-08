@@ -36,8 +36,8 @@ set_option maxRecDepth 4000 in
 set_option maxHeartbeats 2000000 in
 /-- W-instruction soundness. Landmines: (1) use `.2.1`/`.2.2.1`/`.2.2.2` projections on `h_holds`
 (never `obtain`/`rcases` — the nested `.msb.msb * 65535` sign-fill in the reader's bus emits forces
-deep `ProvableStruct` whnf via the case-motive and blows past 16M heartbeats); (2) keep `Spec` opaque
-(don't pass `[RTypeChipSpec]`) so `RV64.subw` never reaches `circuit_norm`; arith via `rv64_subw_eq`. -/
+deep `ProvableStruct` whnf via the case-motive and blows past 16M heartbeats); (2) the inlined `Spec`
+keeps `RV64.subw` intact through `circuit_proof_start`; arith via `rv64_subw_eq`. -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have h_subw := h_holds.2.1
@@ -49,7 +49,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       { a := input_adapter_op_b_memory_prev_value, b := input_adapter_op_c_memory_prev_value,
         cols := ⟨Vector.map (Expression.eval env) (Vector.mapRange 2 fun i => var { index := i₀ + i }),
           ⟨env.get (i₀ + 2)⟩⟩, is_real := input_is_real } := ⟨ha, hb, h_bin⟩
-  refine ⟨⟨trivial, ?_, h_bin, fun hr => ?_⟩, ?_⟩
+  refine ⟨⟨?_, h_bin, fun hr => ?_⟩, ?_⟩
   · simpa only [Vector.getElem_map] using h_adapter h_bin
   · refine trans ?_ (rv64_subw_eq _ _).symm
     simpa only [SubwOperation.resultWord, Vector.getElem_map] using

@@ -33,35 +33,6 @@ rs2`), so the chip soundness proofs carry over unchanged. For the W-instructions
 function truncates-then-sign-extends, related to the gadget's `setWidth 32`/`signExtend` form by the
 `rv64_addw_eq` / `rv64_subw_eq` lemmas below. -/
 
-namespace SP1Clean
-
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- **Shared R-type-with-readers chip contract.** The semantic `Spec` every register-operand ALU chip
-(Add/Sub, and any future R-type chip) exposes, composed from the sub-circuits' own `Spec`s: a `True`
-placeholder for the CPUState fragment (its clock bounds are established by the reader's soundness, not
-surfaced), the `RTypeReader` sub-`Spec` on the `state`/`adapter` blocks (gated by the statically-known
-`opcode`), the *proven* `is_real`-binary fact, and the `is_real`-gated arithmetic meaning — on real rows
-the result word is the RV64 op of the operands (operand order matches the RV64 signature
-`f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`). Vacuous on padding. Per-chip `Spec`s are
-one-liners that fix `(resultWord, opcode, rv64)`. -/
-def RTypeChipSpec (op_b_val op_c_val : Word (ZMod p)) (is_real : ZMod p)
-    (state : Extracted.CPUState (ZMod p)) (adapter : Extracted.RTypeReader (ZMod p))
-    (resultWord : Word (ZMod p)) (opcode : ZMod p)
-    (rv64 : BitVec 64 → BitVec 64 → BitVec 64) : Prop :=
-  True ∧
-  Readers.RTypeReader.Spec
-    { cols := adapter, is_real := is_real, is_trusted := is_real,
-      clk_high := state.clk_high,
-      clk_low := state.clk_0_16 + state.clk_16_24 * 65536,
-      pc := state.pc, opcode := opcode,
-      wv0 := resultWord[0], wv1 := resultWord[1],
-      wv2 := resultWord[2], wv3 := resultWord[3] } ∧
-  (is_real = 0 ∨ is_real = 1) ∧
-  (is_real = 1 →
-    Word.toBitVec64 resultWord = rv64 (Word.toBitVec64 op_c_val) (Word.toBitVec64 op_b_val))
-
-end SP1Clean
 
 namespace SP1Clean.AddChip
 
@@ -92,8 +63,18 @@ sub-`Spec`s on the `state`/`adapter` blocks, the *proven* `is_real`-binary fact,
 arithmetic meaning — on real rows the result column is the RV64 `ADD` of the operands
 (`RV64.add op_c_val op_b_val = op_b_val + op_c_val`). Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : AddCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  RTypeChipSpec input.op_b_val input.op_c_val input.is_real cols.state cols.adapter
-    cols.add_operation.value 0 RV64.add
+  True ∧
+  Readers.RTypeReader.Spec
+    { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
+      clk_high := cols.state.clk_high,
+      clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+      pc := cols.state.pc, opcode := 0,
+      wv0 := cols.add_operation.value[0], wv1 := cols.add_operation.value[1],
+      wv2 := cols.add_operation.value[2], wv3 := cols.add_operation.value[3] } ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_real = 1 →
+    Word.toBitVec64 cols.add_operation.value
+      = RV64.add (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
 
 end SP1Clean.AddChip
 
@@ -165,8 +146,18 @@ Memory-bus values), projected rather than carried as separate committed columns 
 RV64 `SUB` of the operands (`RV64.sub op_c_val op_b_val = op_b_val - op_c_val`, the fixed `rs1 - rs2`
 order — `SUB` is not commutative). -/
 def Spec (input : Inputs (ZMod p)) (cols : SubCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  RTypeChipSpec input.op_b_val input.op_c_val input.is_real cols.state cols.adapter
-    cols.sub_operation.value 2 RV64.sub
+  True ∧
+  Readers.RTypeReader.Spec
+    { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
+      clk_high := cols.state.clk_high,
+      clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+      pc := cols.state.pc, opcode := 2,
+      wv0 := cols.sub_operation.value[0], wv1 := cols.sub_operation.value[1],
+      wv2 := cols.sub_operation.value[2], wv3 := cols.sub_operation.value[3] } ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_real = 1 →
+    Word.toBitVec64 cols.sub_operation.value
+      = RV64.sub (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
 
 end SP1Clean.SubChip
 
@@ -253,14 +244,24 @@ deriving ProvableStruct
 @[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_memory.prev_value
 
-/-- Semantic contract, via the shared `RTypeChipSpec` builder (SUBW's opcode is `20`). The `op_a` write
+/-- Semantic contract — the inlined R-type-with-readers contract (SUBW's opcode is `20`). The `op_a` write
 value the reader carries is the **sign-extended** W result `[v0, v1, msb·65535, msb·65535]` (the gadget's
 `SubwOperation.resultWord`), and the gated-arith conjunct is `toBitVec64 resultWord = RV64.subw op_c op_b`
 (the low-32 subtract `rs1 - rs2` sign-extended; not commutative). Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : SubwCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  RTypeChipSpec input.op_b_val input.op_c_val input.is_real cols.state cols.adapter
-    #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
-       cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535] 20 RV64.subw
+  True ∧
+  Readers.RTypeReader.Spec
+    { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
+      clk_high := cols.state.clk_high,
+      clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+      pc := cols.state.pc, opcode := 20,
+      wv0 := cols.subw_operation.value[0], wv1 := cols.subw_operation.value[1],
+      wv2 := cols.subw_operation.msb.msb * 65535, wv3 := cols.subw_operation.msb.msb * 65535 } ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_real = 1 →
+    Word.toBitVec64 #v[cols.subw_operation.value[0], cols.subw_operation.value[1],
+        cols.subw_operation.msb.msb * 65535, cols.subw_operation.msb.msb * 65535]
+      = RV64.subw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
 
 end SP1Clean.SubwChip
 
@@ -269,17 +270,14 @@ namespace SP1Clean.ShiftLeftChip
 open Extracted (ShiftLeftCols)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The shift operand word (`rs1`, the value being shifted, read into `op_b_val`), the shift-amount
-source word (`rs2`/immediate, in `op_c_val`), the `is_real` selector, the **variant flags**
-`is_sll`/`is_sllw`/`is_sllw_imm` (aligned with the Rust `ShiftLeftChip::populate` event-derived
-selectors, with `is_real = is_sll + is_sllw`), and the **threaded reader column blocks**
-`state`/`adapter` (the committed CPUState + ALU register-adapter columns the chip reads). `ShiftLeft`
-uses the `ALUTypeReader` because `op_c` may be an immediate (`SLLI`/`SLLIW`). -/
+/-- The `is_real` selector and the **threaded reader column blocks** `state`/`adapter` (the committed
+CPUState + ALU register-adapter columns the chip reads). The shift operand word (`rs1`, `op_b_val`) and
+shift-amount source (`rs2`/immediate, `op_c_val`) are **adapter projections**, not committed columns; the
+**variant flags** `is_sll`/`is_sllw`/`is_sllw_imm` are **witnessed `cols` columns** (read from `cols` in the
+`Spec`, with `is_real = is_sll + is_sllw`), not `Inputs` fields. `ShiftLeft` uses the `ALUTypeReader`
+because `op_c` may be an immediate (`SLLI`/`SLLIW`). -/
 structure Inputs (F : Type) where
   is_real : F
-  is_sll : F
-  is_sllw : F
-  is_sllw_imm : F
   state : Extracted.CPUState F
   adapter : Extracted.ALUTypeReader F
 deriving ProvableStruct
@@ -545,11 +543,6 @@ operand of the chip's `AddOperation` for AUIPC (`pc + imm`). -/
 def pcWord (cols : UTypeColumns (ZMod p)) : Word (ZMod p) :=
   #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
 
-/-- The committed addend as a 4-limb word (the three `addend` limbs + a zero high limb): `pc` for AUIPC,
-`0` for LUI (pinned by the chip's `addend[i] = is_auipc * pc[i]` gates). -/
-def addendWord (cols : UTypeColumns (ZMod p)) : Word (ZMod p) :=
-  #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
-
 /-- The 20-bit U-type immediate recovered from the committed `op_b_imm` limbs (the high 20 bits of the
 constrained 32-bit immediate). Appears identically in the chip's decode `Assumption` (LHS) and the `Spec`
 (the `RV64.lui`/`RV64.auipc` argument), so the proofs never unfold its extraction formula. -/
@@ -607,13 +600,6 @@ def rs1Word (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
 operand of the link `AddOperation` (`pc + 4 = link`). -/
 def pcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
   #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
-
-/-- The committed, **LSB-cleared** next-pc word the chip feeds `CPUState` — the jump target
-`add_operation.value` with its low bit removed (`value[0] - lsb`), faithful to RISC-V JALR's
-`(rs1 + imm) & ~1` and the Sail `BitVec.update target 0 0#1`. -/
-def nextPcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
-  #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1],
-     cols.add_operation.value[2], 0]
 
 /-- Semantic contract for the JALR row, composed from the I-type reader sub-`Spec` plus the
 `is_real`-gated jump/link semantics. On a real row: the jump target `add_operation.value = rs1 + op_c_imm`

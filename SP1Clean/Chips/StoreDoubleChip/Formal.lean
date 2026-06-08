@@ -25,6 +25,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align⟩ := h_assumptions
   obtain ⟨_h_cpu, h_addr, h_mem, h_itype, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
@@ -32,7 +33,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- the `AddressOperation` Assumptions: operand `isU64`s + fits, the offset bits boolean (literal `0`),
   -- and the address-validity (non-reserved + 8-aligned, so the inverse gate / offset range check hold).
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
   refine ⟨⟨h_addr h_addr_as, h_mem h_bin, h_it, h_bin⟩, ?_⟩
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
@@ -59,10 +60,11 @@ set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, hbin, h_cpu, h_mem, h_it⟩ := h_assumptions
   -- eval→value bridge for the nested `pc` vector the CPUState `Spec` references.
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
-      = input_state_pc := h_input.2.2.2.1.2.2.2
+      = input_state_pc := h_input.2.1.2.2.2
   have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0]
       = input_state_pc[0] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
   have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1]
@@ -70,7 +72,7 @@ theorem completeness :
   have epc2 : Expression.eval env.toEnvironment input_var_state_pc[2]
       = input_state_pc[2] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, 0⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, Or.inl rfl, h_ge, by simp only [ZMod.val_zero]; omega⟩
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_⟩
   · exact hbin

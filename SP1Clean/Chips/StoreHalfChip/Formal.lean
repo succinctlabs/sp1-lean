@@ -29,18 +29,19 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 set_option maxHeartbeats 8000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, hob0, hob1, h_off⟩ := h_assumptions
   obtain ⟨_h_cpu, h_addr, h_mem, h_itype, hr0, hr1, hr2, hr3, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   -- eval→value bridges for the nested vectors the RMW equations / subcircuit input reference.
   have hmap_ob : Vector.map (Expression.eval env) input_var_offset_bit = input_offset_bit :=
-    h_input.2.2.2.2.2.2.1
+    h_input.2.2.2.2.1
   have hmap_sv : Vector.map (Expression.eval env) input_var_store_value = input_store_value :=
-    h_input.2.2.2.2.2.2.2
+    h_input.2.2.2.2.2
   have hmap_pv : Vector.map (Expression.eval env) input_var_memory_access_prev_value
-      = input_memory_access_prev_value := h_input.2.2.2.2.2.1.1
+      = input_memory_access_prev_value := h_input.2.2.2.1.1
   have hmap_oap : Vector.map (Expression.eval env) input_var_adapter_op_a_memory_prev_value
-      = input_adapter_op_a_memory_prev_value := h_input.2.2.2.2.1.2.1.1
+      = input_adapter_op_a_memory_prev_value := h_input.2.2.1.2.1.1
   have eob0 : Expression.eval env input_var_offset_bit[0] = input_offset_bit[0] := by
     rw [← hmap_ob]; simp only [Vector.getElem_map]
   have eob1 : Expression.eval env input_var_offset_bit[1] = input_offset_bit[1] := by
@@ -72,10 +73,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       ∨ Expression.eval env input_var_offset_bit[1] = 1 := by rw [eob1]; exact hob1
   have h_off' : (0 : ZMod p).val + 2 * (Expression.eval env input_var_offset_bit[0]).val
         + 4 * (Expression.eval env input_var_offset_bit[1]).val
-      = (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 := by
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     rw [eob0, eob1]; simp only [ZMod.val_zero]; omega
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, 0, Expression.eval env input_var_offset_bit[0],
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, Expression.eval env input_var_offset_bit[0],
           Expression.eval env input_var_offset_bit[1]⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, hob0', hob1', h_ge, h_off'⟩
   have h_addr_spec := h_addr h_addr_as
@@ -121,19 +122,20 @@ set_option maxHeartbeats 8000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_align, hob0, hob1, h_off, hbin, ⟨hr0, hr1, hr2, hr3⟩,
     h_cpu, h_mem, h_it⟩ := h_assumptions
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
-      = input_state_pc := h_input.2.2.2.1.2.2.2
+      = input_state_pc := h_input.2.1.2.2.2
   have hmap_ob : Vector.map (Expression.eval env.toEnvironment) input_var_offset_bit
-      = input_offset_bit := h_input.2.2.2.2.2.2.1
+      = input_offset_bit := h_input.2.2.2.2.1
   have hmap_sv : Vector.map (Expression.eval env.toEnvironment) input_var_store_value
-      = input_store_value := h_input.2.2.2.2.2.2.2
+      = input_store_value := h_input.2.2.2.2.2
   have hmap_pv : Vector.map (Expression.eval env.toEnvironment) input_var_memory_access_prev_value
-      = input_memory_access_prev_value := h_input.2.2.2.2.2.1.1
+      = input_memory_access_prev_value := h_input.2.2.2.1.1
   have hmap_oap : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_a_memory_prev_value
-      = input_adapter_op_a_memory_prev_value := h_input.2.2.2.2.1.2.1.1
+      = input_adapter_op_a_memory_prev_value := h_input.2.2.1.2.1.1
   have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
     rw [← hmap_pc]; simp only [Vector.getElem_map]
   have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
@@ -168,10 +170,10 @@ theorem completeness :
       ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob1]; exact hob1
   have h_off' : (0 : ZMod p).val + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
         + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
-      = (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 := by
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     rw [eob0, eob1]; simp only [ZMod.val_zero]; omega
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, 0, Expression.eval env.toEnvironment input_var_offset_bit[0],
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1]⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, hob0', hob1', h_ge, h_off'⟩
   refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩

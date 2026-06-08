@@ -143,26 +143,23 @@ assemble the extracted `ShiftLeftCols` struct. (The witness generators are still
 faithful `populate` is only needed for completeness, which is deferred; soundness ranges over every
 satisfying assignment regardless of the generators.) -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZMod p)) := do
-  let is_sll := input.is_sll; let is_sllw := input.is_sllw; let is_sllw_imm := input.is_sllw_imm
-  let gate := is_sll + is_sllw
   assertion Readers.CPUState.circuit
-    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, gate⟩
-  -- Honest-prover witness generators (`ShiftLeftCore.pop*`, SP1 `event_to_row`): every column is computed
-  -- from the register read-backs `op_b_memory.prev_value` / `op_c_memory.prev_value`.
-  let bw : ProverEnvironment (ZMod p) → Word (ZMod p) := fun env =>
-    #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
-       env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
-  let cw : ProverEnvironment (ZMod p) → Word (ZMod p) := fun env =>
-    #v[env input.adapter.op_c_memory.prev_value[0], env input.adapter.op_c_memory.prev_value[1],
-       env input.adapter.op_c_memory.prev_value[2], env input.adapter.op_c_memory.prev_value[3]]
-  let a ← witnessVector 4 (fun env => ShiftLeftCore.popA (bw env) (cw env) (env is_sll) (env is_sllw))
-  let c_bits ← witnessVector 6 (fun env => ShiftLeftCore.popCbits (cw env))
-  let v ← witnessVector 3 (fun env => ShiftLeftCore.popV (cw env))
-  let shift_u16 ← witnessVector 4 (fun env => ShiftLeftCore.popShiftU16 (cw env) (env is_sll))
-  let lower_limb ← witnessVector 4 (fun env => ShiftLeftCore.popLower (bw env) (cw env))
-  let higher_limb ← witnessVector 4 (fun env => ShiftLeftCore.popHigher (bw env) (cw env))
-  let limb_result ← witnessVector 4 (fun env => ShiftLeftCore.popLimbResult (bw env) (cw env))
-  let sllw_msb ← witnessVector 1 (fun env => #v[ShiftLeftCore.popMsb (bw env) (cw env) (env is_sllw)])
+    ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
+  -- The shift column block + the variant flags are **witnessed columns** (placeholder-zero generators —
+  -- a faithful `populate` is only needed for the deferred completeness; soundness ranges over every
+  -- satisfying assignment regardless). The three variant flags (`is_sll`/`is_sllw`/`is_sllw_imm`) are
+  -- witnessed **last** (offsets `i₀+30..32`) so they are committed `cols` columns, not `Inputs` fields.
+  let a ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  let c_bits ← witnessVector 6 (fun _ => (#v[0, 0, 0, 0, 0, 0] : Vector (ZMod p) 6))
+  let v ← witnessVector 3 (fun _ => (#v[0, 0, 0] : Vector (ZMod p) 3))
+  let shift_u16 ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  let lower_limb ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  let higher_limb ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  let limb_result ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  let sllw_msb ← witnessVector 1 (fun _ => (#v[0] : Vector (ZMod p) 1))
+  let flags ← witnessVector 3 (fun _ => (#v[0, 0, 0] : Vector (ZMod p) 3))
+  let is_sll := flags[0]; let is_sllw := flags[1]; let is_sllw_imm := flags[2]
+  let gate := is_sll + is_sllw
   assertion U16MSBOperation.circuit ⟨a[1], ⟨sllw_msb[0]⟩, is_sllw⟩
   assertion Readers.ALUTypeReader.circuit
     ⟨input.adapter, gate, gate, input.state.clk_high,
@@ -264,11 +261,12 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZM
   return ⟨input.state, input.adapter, a, c_bits, v[0], v[1], v[2], shift_u16,
     lower_limb, higher_limb, limb_result, ⟨sllw_msb[0]⟩, is_sll, is_sllw, is_sllw_imm⟩
 
+set_option maxHeartbeats 4000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftLeftCols main where
   -- witnesses the shift column block: a(4) + c_bits(6) + v(3) + shift_u16(4) + lower(4) + higher(4)
-  -- + limb_result(4) + sllw_msb(1) = 30; the variant flags are threaded from `Inputs`, and the three
-  -- sub-assertions add no witnesses.
-  localLength _ := 30
+  -- + limb_result(4) + sllw_msb(1) + flags(3) = 33; the variant flags are committed columns (witnessed
+  -- last, `i₀+30..32`), and the three sub-assertions add no witnesses.
+  localLength _ := 33
   localLength_eq := by simp +arith [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]
   subcircuitsConsistent := by simp only [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]; try omega
   channelsWithGuarantees := [byteChannel.toRawGated]
@@ -286,6 +284,6 @@ set_option linter.unusedSectionVars false in
       = [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
-    (elaborated (p := p)).localLength x = 30 := rfl
+    (elaborated (p := p)).localLength x = 33 := rfl
 
 end SP1Clean.ShiftLeftChip

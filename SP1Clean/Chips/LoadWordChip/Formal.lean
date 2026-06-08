@@ -28,6 +28,9 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 set_option maxHeartbeats 4000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
+  -- `op_b_val`/`op_c_imm` are reducible adapter projections (`adapter.op_b_memory.prev_value` /
+  -- `adapter.op_c_imm`), not committed columns — unfold them to the destructured adapter binders.
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, hpv1, hpv3⟩ := h_assumptions
   obtain ⟨_h_cpu, h_addr, h_mem, h_msb, h_itype, hsel0, hsel1, hsel2, hsel3, h_op_a_0,
     h_msbgate, h_lw_gate, h_lwu_gate, h_gate⟩ := h_holds
@@ -36,9 +39,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_lw_bin := bool_of_mul_pred h_lw_gate
   -- eval→value bridges for the nested vector fields the sub-`Spec`s / selection gates reference.
   have hmap_sw : Vector.map (Expression.eval env) input_var_selected_word = input_selected_word :=
-    h_input.2.2.2.2.2.2.2.2.1
+    h_input.2.2.2.2.2.2.1
   have hmap_pv : Vector.map (Expression.eval env) input_var_memory_access_prev_value
-      = input_memory_access_prev_value := h_input.2.2.2.2.2.2.1.1
+      = input_memory_access_prev_value := h_input.2.2.2.2.1.1
   have esw0 : Expression.eval env input_var_selected_word[0] = input_selected_word[0] := by
     rw [← hmap_sw]; simp only [Vector.getElem_map]
   have esw1 : Expression.eval env input_var_selected_word[1] = input_selected_word[1] := by
@@ -59,18 +62,18 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- the `AddressOperation` Assumptions: operand `isU64`s + fits, offset bits boolean (0, 0, the witnessed
   -- `offset_bit`), non-reserved, and the offset decomposition `4·offset_bit = addr % 8`.
   have h_off' : (0 : ZMod p).val + 2 * (0 : ZMod p).val + 4 * input_offset_bit.val
-      = (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 := by
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     simp only [ZMod.val_zero]; omega
   -- `offset_bit` binary, derived from 4-alignment + the offset decomposition bound.
   have h_off_bin : input_offset_bit = 0 ∨ input_offset_bit = 1 := by
-    have h8 : (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 < 8 :=
+    have h8 : (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 < 8 :=
       Nat.mod_lt _ (by norm_num)
     have hv : input_offset_bit.val = 0 ∨ input_offset_bit.val = 1 := by omega
     rcases hv with h | h
     · left; exact (ZMod.val_eq_zero _).mp h
     · right; have := ZMod.natCast_zmod_val input_offset_bit; rw [h, Nat.cast_one] at this; exact this.symm
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, 0, 0, input_offset_bit⟩ : AddressOperation.Inputs (ZMod p)) :=
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, input_offset_bit⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, h_off_bin, h_ge, h_off'⟩
   have h_addr_spec := h_addr h_addr_as
   -- `selected_word[1] < 2^16` on a real `is_lw` row: it equals `prev_value[1]` (offset 0) or
@@ -132,16 +135,17 @@ set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_align, h_off, hpv1, hpv3, h_lw_bin, h_lwu_bin, hbin, h_op_a_0,
     ⟨hsel0, hsel1, hsel2, hsel3⟩, h_msbgate, h_msb_spec, h_cpu, h_mem, h_it⟩ := h_assumptions
   simp only [isReal] at hbin
   -- eval→value bridges for the nested vectors the reader/gadget `Spec`s reference.
   have hmap_pc : Vector.map (Expression.eval env.toEnvironment) input_var_state_pc
-      = input_state_pc := h_input.2.2.2.2.1.2.2.2
+      = input_state_pc := h_input.2.2.1.2.2.2
   have hmap_sw : Vector.map (Expression.eval env.toEnvironment) input_var_selected_word
-      = input_selected_word := h_input.2.2.2.2.2.2.2.2.1
+      = input_selected_word := h_input.2.2.2.2.2.2.1
   have hmap_pv : Vector.map (Expression.eval env.toEnvironment) input_var_memory_access_prev_value
-      = input_memory_access_prev_value := h_input.2.2.2.2.2.2.1.1
+      = input_memory_access_prev_value := h_input.2.2.2.2.1.1
   have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0]
       = input_state_pc[0] := by rw [← hmap_pc]; simp only [Vector.getElem_map]
   have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1]
@@ -162,17 +166,17 @@ theorem completeness :
       = input_memory_access_prev_value[3] := by rw [← hmap_pv]; simp only [Vector.getElem_map]
   -- the `AddressOperation` subcircuit `Assumptions`.
   have h_off' : (0 : ZMod p).val + 2 * (0 : ZMod p).val + 4 * input_offset_bit.val
-      = (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 := by
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     simp only [ZMod.val_zero]; omega
   have h_off_bin : input_offset_bit = 0 ∨ input_offset_bit = 1 := by
-    have h8 : (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 < 8 :=
+    have h8 : (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 < 8 :=
       Nat.mod_lt _ (by norm_num)
     have hv : input_offset_bit.val = 0 ∨ input_offset_bit.val = 1 := by omega
     rcases hv with h | h
     · left; exact (ZMod.val_eq_zero _).mp h
     · right; have := ZMod.natCast_zmod_val input_offset_bit; rw [h, Nat.cast_one] at this; exact this.symm
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, 0, 0, input_offset_bit⟩ : AddressOperation.Inputs (ZMod p)) :=
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, 0, 0, input_offset_bit⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, Or.inl rfl, Or.inl rfl, h_off_bin, h_ge, h_off'⟩
   -- `selected_word[1] < 2^16` (value + eval form), for the `U16MSBOperation` assertion `Assumptions`.
   have h_sel1_lt : input_selected_word[1].val < 2 ^ 16 := by

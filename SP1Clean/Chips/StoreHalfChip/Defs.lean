@@ -37,8 +37,6 @@ the immediate; `state`/`adapter`/`memory_access` are the committed column blocks
 of the address; `store_value` the read-modify-write word actually written. The stored limb is rs2's low
 limb (`adapter.op_a_memory.prev_value[0]`). -/
 structure Inputs (F : Type) where
-  op_b_val : fields 4 F
-  op_c_imm : fields 4 F
   is_real : F
   state : Extracted.CPUState F
   adapter : Extracted.ITypeReader F
@@ -46,6 +44,10 @@ structure Inputs (F : Type) where
   offset_bit : fields 2 F
   store_value : (Word F)
 deriving ProvableStruct
+
+@[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
+@[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
+
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
@@ -90,7 +92,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreHalfColumns 
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreHalfColumns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  localLength _ := 3 + 1 + 13
+  localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,

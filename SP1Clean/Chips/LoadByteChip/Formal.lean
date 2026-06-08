@@ -28,6 +28,7 @@ def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
 set_option maxHeartbeats 16000000 in
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2⟩ := h_assumptions
   obtain ⟨_h_cpu, h_addr, h_mem, hu8, hmsb_rcv, h_itype, hsel0, hsel1, hsel2, hsel3, hmux,
     h_op_a_0, h_msbgate, h_lb_gate, h_lbu_gate, h_gate⟩ := h_holds
@@ -36,7 +37,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_lbu_bin := bool_of_mul_pred h_lbu_gate
   simp only [circuit_norm, byteChannel] at hu8 hmsb_rcv
   -- eval→value bridges (extracted directly from `h_input`; `tauto` over this context is too slow).
-  obtain ⟨_, _, _, _, _, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
+  obtain ⟨_, _, _, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
   have eob0 : Expression.eval env input_var_offset_bit[0] = input_offset_bit[0] := by
     rw [← hmap_ob]; simp only [Vector.getElem_map]
   have eob1 : Expression.eval env input_var_offset_bit[1] = input_offset_bit[1] := by
@@ -93,10 +94,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_off' : (Expression.eval env input_var_offset_bit[0]).val
         + 2 * (Expression.eval env input_var_offset_bit[1]).val
         + 4 * (Expression.eval env input_var_offset_bit[2]).val
-      = (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 := by
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     rw [eob0, eob1, eob2]; exact h_off
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, Expression.eval env input_var_offset_bit[0],
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env input_var_offset_bit[0],
           Expression.eval env input_var_offset_bit[1], Expression.eval env input_var_offset_bit[2]⟩
         : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
@@ -159,11 +160,12 @@ set_option maxHeartbeats 16000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
   haveI : AddGroup (id (ZMod p)) := inferInstanceAs (AddGroup (ZMod p))
   obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_lb_bin, h_lbu_bin, hbin, h_op_a_0,
     hlo_pa, hhi_pa, hbyte_pa, h_msb_bin, h_msb_iff, h_msbgate, ⟨hsel0, hsel1, hsel2, hsel3⟩,
     hmux_pa, h_cpu, h_mem, h_it⟩ := h_assumptions
-  obtain ⟨_, _, _, _, ⟨_, _, _, hmap_pc⟩, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
+  obtain ⟨_, _, ⟨_, _, _, hmap_pc⟩, _, ⟨hmap_pv, _, _, _, _, _⟩, hmap_ob, _, _, _, _⟩ := h_input
   simp only [isReal] at hbin
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h_msb_lt : input_msb.val < 256 := by
@@ -197,10 +199,10 @@ theorem completeness :
   have h_off' : (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
         + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
         + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[2]).val
-      = (Word.toNat input_op_b_val + Word.toNat input_op_c_imm) % 2 ^ 48 % 8 := by
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
     rw [eob0, eob1, eob2]; exact h_off
   have h_addr_as : AddressOperation.circuit.Assumptions
-      (⟨input_op_b_val, input_op_c_imm, Expression.eval env.toEnvironment input_var_offset_bit[0],
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env.toEnvironment input_var_offset_bit[0],
           Expression.eval env.toEnvironment input_var_offset_bit[1],
           Expression.eval env.toEnvironment input_var_offset_bit[2]⟩ : AddressOperation.Inputs (ZMod p)) :=
     ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩

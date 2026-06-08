@@ -1,9 +1,12 @@
 import SP1Clean.Specs.Operation
 import SP1Clean.Foundations.Word
+import SP1Clean.Foundations.ByteTable
+import SP1Clean.Foundations.Channels
 import SP1Clean.Operations.AddrAddOperation.Formal
 import SP1Clean.Extracted.AddressOperation
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
+import Clean.Circuit.Channel
 import Clean.Gadgets.Bits
 import Clean.Utils.Tactics.ProvableStructDeriving
 
@@ -107,15 +110,19 @@ def main (input : Var Inputs (ZMod p)) :
   input.offset_bit1 * (input.offset_bit1 - 1) === 0
   input.offset_bit2 * (input.offset_bit2 - 1) === 0
   inv[0] * (value[1] + value[2]) - 1 === 0
-  Gadgets.ToBits.rangeCheck 13 hn13
-    ((value[0] - 4 * input.offset_bit2 - 2 * input.offset_bit1 - input.offset_bit0)
-      * (8 : ZMod p)⁻¹)
+  -- offset low-3-bits range check via the **byte bus** (SP1's `Range(13)` send,
+  -- `Extracted/AddressOperation.lean`), not a `ToBits` bit-decomposition: the offset decomposition
+  -- `(value[0] - 4·b₂ - 2·b₁ - b₀)/8 < 2^13` as a `byteChannel` `Range` receive (mult `1` — the gadget
+  -- runs at `is_real = 1`, like the composed `AddrAddOperation` assertion's sends).
+  byteChannel.gatedReceive 1
+    (⟨6, (value[0] - 4 * input.offset_bit2 - 2 * input.offset_bit1 - input.offset_bit0) * (8 : ZMod p)⁻¹,
+       Expression.const ((13 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   return ⟨⟨value⟩, inv[0]⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Extracted.AddressOperation main where
-  -- 3 address limbs + 1 inverse witness + 13 offset rangeCheck bits;
-  -- AddrAddOperation (FormalAssertion) adds no cells.
-  localLength _ := 3 + 1 + 13
+  -- 3 address limbs + 1 inverse witness; the offset range check is now a byte-bus `Range` receive
+  -- (witnesses nothing), and AddrAddOperation (FormalAssertion) adds no cells.
+  localLength _ := 3 + 1
   output _ i0 := ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩
   -- byte-bus channels propagated from the AddrAddOperation assertion.
   channelsWithGuarantees := [byteChannel.toRawGated]
@@ -123,7 +130,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Extracted.AddressOperati
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
-    (elaborated (p := p)).localLength x = 3 + 1 + 13 := rfl
+    (elaborated (p := p)).localLength x = 3 + 1 := rfl
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma output_eq (x : Var Inputs (ZMod p)) (i0 : ℕ) :
@@ -143,7 +150,7 @@ set_option maxHeartbeats 4000000 in
 theorem soundness : Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hb, hcc, hfit, _, _, _, _, _⟩ := h_assumptions
-  obtain ⟨h_addrAdd, hob0, hob1, hob2, _h_inv, _h_range⟩ := h_holds
+  obtain ⟨h_addrAdd, hob0, hob1, hob2, _h_inv⟩ := h_holds
   -- The address-sum equation is the composed `AddrAdd` `assertion`'s `Spec` (its `Assumptions →
   -- Spec`, fed the operand `isU64`s + address-fits + `is_real = 1`, then the gated content); the
   -- offset booleans are the three boolean gates. The inverse gate + range check don't enter `Spec`.
@@ -151,7 +158,7 @@ theorem soundness : Soundness (ZMod p) main Assumptions Spec := by
   simp only [circuit_norm] at h_aa
   -- channel-requirement tail: AddrAdd assertion owes its Assumptions (byte-bus pull).
   exact ⟨⟨h_aa.1, bool_of_mul_pred hob0, bool_of_mul_pred hob1, bool_of_mul_pred hob2⟩,
-    Or.inr ⟨hb, hcc, hfit, Or.inr rfl⟩, Or.inl rfl⟩
+    Or.inr ⟨hb, hcc, hfit, Or.inr rfl⟩⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness : Completeness (ZMod p) main Assumptions := by
@@ -219,14 +226,19 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
     rw [h1, show ((A % 2 ^ 16 : ℕ) : ZMod p) + -(4 * input_offset_bit2) + -(2 * input_offset_bit1)
         + -input_offset_bit0 = ((A % 2 ^ 16 : ℕ) : ZMod p) - ((A % 2 ^ 16 % 8 : ℕ) : ZMod p) from by
       linear_combination -h2, ← Nat.cast_sub (Nat.mod_le _ _), h3]
-  refine ⟨⟨⟨hb, hcc, hfit, Or.inr rfl⟩, ?_⟩, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨⟨⟨hb, hcc, hfit, Or.inr rfl⟩, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hval]; exact AddrAddOperation.spec_populate hb hcc (1 : ZMod p)
   · rcases hob0 with h | h <;> rw [h] <;> simp
   · rcases hob1 with h | h <;> rw [h] <;> simp
   · rcases hob2 with h | h <;> rw [h] <;> simp
   · rw [h_inv_def, inv_mul_cancel₀ hsum_ne]; simp
-  · trivial
-  · show ((v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + -input_offset_bit0)
+  · -- the byte-bus `Range(13)` guarantee: `ByteRowSpec ⟨6, arg, 13, 0⟩ ↔ arg.val < 2^13`.
+    have h13p : (13 : ℕ) < p := by omega
+    have c13 : ((13 : ℕ) : ZMod p) = (13 : ZMod p) := by norm_cast
+    simp only [circuit_norm, byteChannel]
+    rw [← c13]
+    refine (byteRowSpec_range _ h13p).mpr ?_
+    show ((v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + -input_offset_bit0)
         * (8 : ZMod p)⁻¹).val < 2 ^ 13
     rw [hdecomp, show ((8 * (A % 2 ^ 16 / 8) : ℕ) : ZMod p)
         = (8 : ZMod p) * ((A % 2 ^ 16 / 8 : ℕ) : ZMod p) from by push_cast; ring,
@@ -245,6 +257,6 @@ def circuit : FormalCircuit (ZMod p) Inputs Extracted.AddressOperation :=
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
-    circuit.localLength x = 3 + 1 + 13 := rfl
+    circuit.localLength x = 3 + 1 := rfl
 
 end SP1Clean.AddressOperation

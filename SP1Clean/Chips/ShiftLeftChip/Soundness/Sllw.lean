@@ -54,6 +54,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     hw00, hw01, hw10, hw11, hwmsb2, hwmsb3,
     _himm, _hopa0,
     hbyte1, hbyte2, hbyte3, hbyte4, hbyte5, hbyte6, hbyte7, hbyte8, hbyte9⟩ := h_holds
+  -- The variant flags are now **witnessed columns** (`flags[0..2]` at offsets `i₀+30..32`), not `Inputs`
+  -- fields; `set` them under their old names so the proof body is unchanged.
+  set input_is_sll := env.get (i₀ + 30) with hsll_def
+  set input_is_sllw := env.get (i₀ + 31) with hsllw_def
   -- The SLLW result limb 1 (`a[1] = env.get (i₀+1)`) is 16-bit whenever `is_sllw = 1`. Proved once here
   -- (self-contained from the byte guarantees + placement), reused for the U16MSB sub-assertion's operand
   -- bound in both the SLLW branch and the channel-requirement tail.
@@ -123,7 +127,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hsll0 : input_is_sll = 0 := by
       have h : input_is_sll + input_is_sllw = 0 + input_is_sllw := by rw [zero_add, hgate1, hsllw]
       exact add_right_cancel h
-    obtain ⟨_, _, _, _, _, _, _, _, _, ⟨hbmem, _, _⟩, _, ⟨hcmem, _, _⟩, _⟩ := h_input
+    obtain ⟨_, _, _, _, _, _, ⟨hbmem, _, _⟩, _, ⟨hcmem, _, _⟩, _⟩ := h_input
     have heb0 : Expression.eval env input_var_adapter_op_b_memory_prev_value[0] = input_adapter_op_b_memory_prev_value[0] := by
       rw [← hbmem, Vector.getElem_map]
     have heb1 : Expression.eval env input_var_adapter_op_b_memory_prev_value[1] = input_adapter_op_b_memory_prev_value[1] := by
@@ -222,7 +226,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     -- `E2`), so each folded value is `0` and the `Range` row `⟨6, 0, width, 0⟩` is in the byte table for
     -- any width (`0 < 2 ^ width.val`).
     simp only [id_eq] at *
-    refine ⟨Or.inr (bool_of_mul_pred _hE2), Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
+    refine ⟨Or.inr (bool_of_mul_pred _hrealbin), Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
       Or.inr (bool_of_mul_pred _hE2), ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     -- the 9 byte padding requirements are vacuous for the binary gate (`toRawGated`, raw values).
     all_goals exact Channels.binary_gate_req_vacuous (bool_of_mul_pred _hE2) _

@@ -43,8 +43,6 @@ opcode; `state`/`adapter`/`memory_access` are the committed CPUState / I-type-ad
 columns, `offset_bit` the low 3 bits of the address. The `address_operation` block is the
 `AddressOperation` sub-circuit's witnessed output, not an input. -/
 structure Inputs (F : Type) where
-  op_b_val : fields 4 F
-  op_c_imm : fields 4 F
   is_lb : F
   is_lbu : F
   is_lh : F
@@ -57,6 +55,10 @@ structure Inputs (F : Type) where
   memory_access : Extracted.MemoryAccessCols F
   offset_bit : fields 3 F
 deriving ProvableStruct
+
+@[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
+@[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
+
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
@@ -115,7 +117,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadX0Columns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks are threaded
   -- inputs and the gates witness nothing.
-  localLength _ := 3 + 1 + 13
+  localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,

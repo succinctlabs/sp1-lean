@@ -37,9 +37,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
-  -- `RTypeChipSpec` is fed to `circuit_proof_start` so it unfolds the shared Spec-builder def,
+  -- The `Spec` is the inlined R-type-with-readers contract; `circuit_proof_start` unfolds it,
   -- re-normalizes `wv*` result-word fields, and drops the leading CPUState `True` fragment.
-  circuit_proof_start [RTypeChipSpec]
+  circuit_proof_start
   obtain ⟨ha, hb⟩ := h_assumptions
   obtain ⟨_, h_add, h_adapter, h_gate⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate

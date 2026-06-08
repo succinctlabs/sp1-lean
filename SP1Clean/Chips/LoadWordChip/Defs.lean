@@ -42,14 +42,14 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The operand reads + threaded reader column blocks. `op_b_val` is the rs1 base-address value, `op_c_imm`
-the sign-extended immediate; `state`/`adapter`/`memory_access` are the committed column blocks; `offset_bit`
-is bit 2 of the address; `selected_word` the selected 32-bit half; `msb` the witnessed high bit (via
-`U16MSBOperation.populate_msb`); `is_lw`/`is_lwu` the signed/unsigned selectors. The `address_operation`
-block is the `AddressOperation` sub-circuit's witnessed output, not an input. -/
+/-- The threaded reader column blocks + chip-specific witnesses. `state`/`adapter`/`memory_access` are the
+committed column blocks; `offset_bit` is bit 2 of the address; `selected_word` the selected 32-bit half;
+`msb` the witnessed high bit (via `U16MSBOperation.populate_msb`); `is_lw`/`is_lwu` the signed/unsigned
+selectors. The `address_operation` block is the `AddressOperation` sub-circuit's witnessed output, not an
+input. The rs1 base-address value (`op_b_val`) and the sign-extended immediate (`op_c_imm`) are **adapter
+projections** (`adapter.op_b_memory.prev_value` / `adapter.op_c_imm`), not committed columns — SP1 reads
+them from the I-type adapter. -/
 structure Inputs (F : Type) where
-  op_b_val : fields 4 F
-  op_c_imm : fields 4 F
   is_lw : F
   is_lwu : F
   state : Extracted.CPUState F
@@ -59,6 +59,11 @@ structure Inputs (F : Type) where
   selected_word : fields 2 F
   msb : F
 deriving ProvableStruct
+
+/-- rs1 base-address value = the `op_b` register read (`op_b_memory.prev_value`). -/
+@[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
+/-- The sign-extended immediate = the I-type adapter's `op_c_imm`. -/
+@[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
@@ -105,7 +110,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadWordColumns (
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadWordColumns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks/gates witness nothing.
-  localLength _ := 3 + 1 + 13
+  localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,

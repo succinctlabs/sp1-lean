@@ -34,7 +34,7 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
 
-/-- Semantic contract, stated against the clean RV64 ISA functions (mirrors `RTypeChipSpec`, here spelled
+/-- Semantic contract, stated against the clean RV64 ISA functions (mirrors the R-type chip contract, here spelled
 inline for the **two-variant** ALU adapter): the `ALUTypeReader` sub-`Spec` on the `state`/`adapter`
 blocks (opcode `is_slt·9 + is_sltu·10`, `rd` write the result word), the proven `is_real`-binary fact, and
 the `is_real`/flag-gated meaning — on real rows the result word is the RV64 `SLT` (when `is_slt = 1`) or

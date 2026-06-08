@@ -34,8 +34,6 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 structure Inputs (F : Type) where
-  op_b_val : fields 4 F
-  op_c_imm : fields 4 F
   is_lb : F
   is_lbu : F
   state : Extracted.CPUState F
@@ -47,6 +45,10 @@ structure Inputs (F : Type) where
   selected_byte : F
   msb : F
 deriving ProvableStruct
+
+@[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
+@[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
+
 
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
   state.clk_0_16 + state.clk_16_24 * 65536
@@ -100,7 +102,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadByteColumns (
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadByteColumns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
-  localLength _ := 3 + 1 + 13
+  localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,

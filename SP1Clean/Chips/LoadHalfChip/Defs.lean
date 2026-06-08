@@ -39,8 +39,6 @@ the sign-extended immediate; `state`/`adapter`/`memory_access` are the committed
 are bits 1–2 of the address; `selected_half` the selected 16-bit limb; `msb` the witnessed high bit (via
 `U16MSBOperation.populate_msb`); `is_lh`/`is_lhu` the signed/unsigned selectors. -/
 structure Inputs (F : Type) where
-  op_b_val : fields 4 F
-  op_c_imm : fields 4 F
   is_lh : F
   is_lhu : F
   state : Extracted.CPUState F
@@ -50,6 +48,10 @@ structure Inputs (F : Type) where
   selected_half : F
   msb : F
 deriving ProvableStruct
+
+@[reducible] def Inputs.op_b_val {F} (i : Inputs F) : Word F := i.adapter.op_b_memory.prev_value
+@[reducible] def Inputs.op_c_imm {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
+
 
 /-- The recombined low clock `clk_0_16 + clk_16_24 · 2^16` (matching SP1's `clk_low`). -/
 @[reducible] def clkLow (state : Extracted.CPUState (ZMod p)) : ZMod p :=
@@ -101,7 +103,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadHalfColumns (
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadHalfColumns main where
   channelsLawful := by simp [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
   -- only the `AddressOperation` subcircuit witnesses (its 65 columns); the other blocks/gates witness nothing.
-  localLength _ := 3 + 1 + 13
+  localLength _ := 3 + 1
   localLength_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
   output input i0 :=
     ⟨input.state, input.adapter,
