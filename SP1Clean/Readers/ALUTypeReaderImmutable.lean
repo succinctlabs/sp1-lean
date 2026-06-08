@@ -11,18 +11,17 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # Native `ALUTypeReaderImmutable` reader — the ALU register-adapter with op_a a **read**
 
-The immutable sibling of `Readers/ALUTypeReader.lean`, mirroring SP1's
-`ALUTypeReader::eval_op_a_immutable` (`crates/core/machine/src/adapter/register/alu_type.rs:150`), used by
-`AluX0Chip` (ALU instructions with `rd = x0`). It is `ALUTypeReader` with op_a a **source read** rather than
-a destination write: there is no `wv*` write value, the op_a memory receive carries the unchanged
-`prev_value`, and the `op_a_0` gates pin the *read* value of `x0` to `0` (`op_a_0 * prev_value_i = 0`, vs the
-mutable reader's `op_a_0 * wv_i = 0`). The op_b/op_c reads and the `imm_c` immediate machinery are unchanged
-from `ALUTypeReader` (op_c gated `is_real - imm_c`).
+Mirrors SP1's `ALUTypeReader::eval_op_a_immutable`
+(`crates/core/machine/src/adapter/register/alu_type.rs:150`), used by `AluX0Chip` (ALU instructions with
+`rd = x0`). op_a is a **source read**: there is no `wv*` write value, the op_a memory receive carries
+`prev_value`, and the `op_a_0` gates pin the read value of `x0` to `0` (`op_a_0 * prev_value_i = 0`).
+The op_b/op_c reads and the `imm_c` immediate machinery (op_c gated `is_real - imm_c`) are as in
+`ALUTypeReader`.
 
-Like the other readers it is a `FormalAssertion` (output `unit`) over the chip-owned `cols` adapter block,
-emitting the Program + Memory buses (`Guarantees := True`); faithfulness to SP1's generated constraint list
-is the chip's `Faithful/AluX0.lean` anchor (the reader's constraints are inlined there, as SP1's
-`eval_op_a_immutable` is a plain method, not an `SP1Operation`). -/
+A `FormalAssertion` (output `unit`) over the chip-owned `cols` adapter block, emitting the Program +
+Memory buses (`Guarantees := True`); faithfulness to SP1's generated constraint list is the chip's
+`Faithful/AluX0.lean` anchor (the reader's constraints are inlined there — `eval_op_a_immutable` is a
+plain method, not an `SP1Operation`). -/
 
 namespace SP1Clean.Readers.ALUTypeReaderImmutable
 

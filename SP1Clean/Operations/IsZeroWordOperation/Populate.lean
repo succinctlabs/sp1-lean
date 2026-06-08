@@ -4,12 +4,9 @@ import SP1Clean.Extracted.IsZeroWordOperation
 
 /-! # `IsZeroWordOperation` — `populate` (the witness generator)
 
-SP1's `IsZeroWordOperation::populate` ported natively: runs `IsZeroOperation.populate` on each of the
-four limbs, recomputes the two half-products and the final `result = first_half * second_half`, and
-packages the whole nested `IsZeroWordOperation` column struct. The composing op (`IsEqualWord`) /
-top-level chip witnesses the columns with this. `isZeroWordWitness` (the `Vector` form) is retained for
-the conformance check in `WitnessTests/IsZeroWordOperationWitness.lean`; `spec_populate` lives in `Formal`
-(it references `Spec`, which — to avoid an import cycle — also lives in `Formal`). -/
+SP1's `IsZeroWordOperation::populate` ported natively. `isZeroWordWitness` (vector form) is retained for
+the conformance check in `WitnessTests/IsZeroWordOperationWitness.lean`. `spec_populate` lives in
+`Formal` to avoid an import cycle. -/
 
 namespace SP1Clean.IsZeroWordOperation
 
@@ -26,10 +23,9 @@ def populate (a : Word (ZMod p)) : Extracted.IsZeroWordOperation (ZMod p) :=
   let sh := l2.result * l3.result
   ⟨l0, l1, l2, l3, fh, sh, fh * sh⟩
 
-/-- Anchor-only native witness mirroring SP1's `IsZeroWordOperation::populate`: runs
-`IsZeroOperation.isZeroWitness` on each of the four limbs and recomputes the half-products and the
-final result. Used only for the conformance check in `WitnessTests/IsZeroWordOperationWitness.lean`.
-Returns `(limb inverses, limb results, first_half, second_half, result)`. -/
+/-- Vector form of the witness, used only for the conformance check in
+`WitnessTests/IsZeroWordOperationWitness.lean`. Returns
+`(limb inverses, limb results, first_half, second_half, result)`. -/
 def isZeroWordWitness (a : Word (ZMod p)) :
     Vector (ZMod p) 4 × Vector (ZMod p) 4 × ZMod p × ZMod p × ZMod p :=
   let z0 := IsZeroOperation.isZeroWitness a[0]

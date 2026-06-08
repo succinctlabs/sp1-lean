@@ -9,19 +9,16 @@ import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.SubOperation
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (Sub)
+/-! # Faithfulness anchor — `SubOperation` constraints ↔ native `RawSpec`
 
-The native `SubOp` gadget's constraints are hand-written; this module anchors them to **SP1's
-`SubOperation` constraint definition** — the operation-level form that the
-`sp1-constraint-compiler` emits and `update_extracted.py` writes to
-`SP1Clean/Extracted/SubOperation.lean`.
+Anchors the native `SubOp` gadget's constraints to SP1's `SubOperation` constraint definition
+(`SP1Clean/Extracted/SubOperation.lean`).
 
 SP1 computes `a - b` as `a + (2^64 - b)` (`sp1/crates/core/machine/src/operations/sub.rs`),
 using `2^16 - 1 - b[i]` as the added limb with the carry **initialized to 1**; the constant
-`65535 = 2^16 - 1` is SP1's `base - one`. The constraint shape is therefore identical to the
-**borrow-form** `RawSpec` (carry `c_i = (a[i] + 65535 - b[i] - value[i] + c_{i-1}) * 65536⁻¹`,
-`c_{-1} = 1`), so — unlike sp1-lean's `SP1Clean`, which needed a `d_i = 1 - c_i` swap bridge —
-the anchor `sub_constraints_faithful` is a trivial `simp`, just like `add_constraints_faithful`.
+`65535 = 2^16 - 1` is SP1's `base - one`. The constraint shape is the **borrow-form** `RawSpec`
+(carry `c_i = (a[i] + 65535 - b[i] - value[i] + c_{i-1}) * 65536⁻¹`, `c_{-1} = 1`), so the
+anchor `sub_constraints_faithful` is a trivial `simp`, just like `add_constraints_faithful`.
 
 The generated `constraints` is field-generic with a `[CoeHead F ℕ]` hypothesis; applying it at
 `ZMod p` uses the scoped `CoeHead (ZMod p) ℕ` instance (`open scoped …ConstraintCoe`). -/
@@ -57,13 +54,10 @@ theorem sub_constraints_faithful (a b value : Word (ZMod p)) :
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
 
-/-- **Faithfulness anchor — interaction half, SYNTACTIC** (the canonical replacement for the `toProp`
-half of `sub_constraints_faithful`). SP1's extracted `SubOperation.interactions` and the Clean circuit's
-emitted byte interactions project — through `Extracted.Interaction.toAccess` /
-`AbstractInteraction.toAccess` — to the **same** `LookupAccess` list. No semantics, just interaction
-modeling: channel, message arg values, signed multiplicity (the byte *pull* sink sign `-is_real`). The
-`a b` operands are ignored by `interactions` (`_a`/`_b`), so passed as `value`. Verbatim sibling of
-`add_interactions_faithful_syntactic` (Sub's byte fragment is identical to Add's). -/
+/-- **Faithfulness anchor — interaction half, SYNTACTIC.** SP1's extracted `SubOperation.interactions`
+and the Clean circuit's emitted byte interactions project to the same `LookupAccess` list. Channel,
+message arg values, signed multiplicity (the byte pull sign `-is_real`). The `a b` operands are
+ignored by `interactions`, so passed as `value`. Sub's byte fragment is identical to Add's. -/
 theorem sub_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var SP1Clean.SubOperation.Inputs (ZMod p)) (offset : ℕ)
     (value : Word (ZMod p)) (is_real : ZMod p)

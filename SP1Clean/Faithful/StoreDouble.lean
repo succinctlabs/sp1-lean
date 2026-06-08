@@ -8,8 +8,8 @@ import SP1Clean.Faithful.ITypeReaderImmutable
 
 /-! # Chip-level faithfulness anchor — SP1's whole `StoreDouble` chip constraint list ↔ combined spec
 
-The capstone of the four-artifact chain for `StoreDouble` (the first memory *write* chip), mirroring
-`Faithful/LoadDouble.lean`. SP1's chip constraints are `CS0 ++ CS1 ++ CS2 ++ [MemoryAccess timestamp
+Anchors the entire generated `Extracted.StoreDoubleColumns.asserts`/`interactions` to the native
+combined spec. SP1's chip constraints are `CS0 ++ CS1 ++ CS2 ++ [MemoryAccess timestamp
 gates]`, where `CS0` = `AddressOperation` (the 3-limb `rs1 + signExtend(imm)` address gadget), `CS1` =
 `CPUState` (`next_pc = pc + 4`, clk + 8), `CS2` = `ITypeReaderImmutable` (opcode `39 = SD`, op_a = rs2
 read / op_b = rs1 read). We split at each `++` and discharge each fragment by its anchor, leaving the
@@ -18,7 +18,7 @@ inlined `MemoryAccess` timestamp constraints (the `compare_low` binary + high/lo
 `diff_high < 2^8`). Unlike LoadDouble there is **no** trailing `op_a_0 = 0` gate (op_a is a read). The
 two `.memory` bus interactions (send the old word `memory_access.prev_value`, receive the new word
 `adapter.op_a_memory.prev_value` = rs2) and the `.program` fetch contribute `True` (their meaning is the
-trace-level buses). Every fragment anchor is `sorry`-free, so this is too. -/
+trace-level buses). Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

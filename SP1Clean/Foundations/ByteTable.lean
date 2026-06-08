@@ -13,10 +13,9 @@ SP1's `ByteChip` (`crates/core/machine/src/bytes/`) is a **preprocessed** table 
 generated once independent of the program. It covers the six byte opcodes
 (`AND`/`OR`/`XOR`/`U8Range`/`LTU`/`MSB`, `byte_table()` in `events/byte.rs`); every chip that needs a
 byte operation does **not** range-check in-circuit but instead `send_byte(opcode, a, b, c, mult)` into
-the Byte bus, and the `ByteChip` *receives* each with a count multiplicity. This is the upstream model
-the project's direct `Gadgets.ToBits.rangeCheck`s diverge from (see `docs/bus-model.md`).
+the Byte bus, and the `ByteChip` *receives* each with a count multiplicity.
 
-This module is the Lean analog of that preprocessed table. We follow Clean's own `ByteXorTable`
+This module is the Lean analog of that preprocessed table, modelled on Clean's own `ByteXorTable`
 (`Clean/Tables/Xor/ByteXorTable.lean`): a `Table` whose membership is a **defining `Contains`
 predicate**, not an enumeration of all `7 * 2^16` rows — so there is no `decide` over a giant table and
 the well-formedness obligations are two-line. The defining predicate is exactly SP1's per-opcode byte
@@ -77,7 +76,7 @@ range check *is* a byte-table lookup. The readers use two forms (`Extracted/{CPU
   Modeled by `byteRangeCheck`.
 
 Each is a `FormalAssertion` mirroring `Gadgets.ToBits.rangeCheck`'s `(n) (hn) (x)` / `(x)` call shape,
-so it drops into the reader call sites, but its meaning is now *table membership* rather than a
+so it drops into the reader call sites; its meaning is *table membership* rather than a
 bit-decomposition. -/
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
@@ -197,12 +196,9 @@ lemma byteRowSpec_msb (m x : ZMod p) :
   · rintro ⟨⟨hm, hx⟩, hbin, hiff⟩
     exact ⟨ByteOpcode.MSB, by norm_cast, ⟨⟨hm, hx, by simp⟩, hbin, hiff⟩⟩
 
-/-! The byte checks are now reached by `byteChannel.pull` (`Foundations/Channels.lean`,
-`Readers/{CPUState,RTypeReader}.lean`), so the in-circuit byte-op correctness is the channel's
-`Guarantees = ByteRowSpec` — the membership characterizations `byteRowSpec_u8range`/`byteRowSpec_range`
-above are what consumers project the pull guarantee through. The earlier `byteRangeCheck`/
-`byteRangeCheckBits` `FormalAssertion` lookup wrappers (the Table-lookup path Option B replaces) were
-removed once both readers migrated; `ByteTable` itself stays as the conceptual preprocessed-`ByteChip`
-analog and the semantic backing for `byteChannel.Guarantees`. -/
+/-! The in-circuit byte-op correctness is the byte channel's `Guarantees = ByteRowSpec` —
+`byteRowSpec_u8range`/`byteRowSpec_range` above are what consumers project the pull guarantee through.
+`ByteTable` is the conceptual preprocessed-`ByteChip` analog and the semantic backing for
+`byteChannel.Guarantees`. -/
 
 end SP1Clean

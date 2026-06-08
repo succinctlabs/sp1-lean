@@ -5,10 +5,7 @@ import Mathlib.Algebra.Order.Group.Int
 
 /-! # Multiplicity-weighted interaction bus (the trace-level lookup-bus core)
 
-This is the **provable, circuit-free** heart of SP1's cross-chip interaction model, ported
-natively from `sp1-lean`'s `SP1Clean/SP1Lookup.lean` (the pure-`List`/`ℤ` portion — the part that
-ships axiom-clean there, untouched by the gated-lookup machinery that was `sorry`-blocked).
-
+The **provable, circuit-free** heart of SP1's cross-chip interaction model.
 SP1's interaction model is a **multiplicity-weighted multiset bus**: every chip row contributes
 `(kind, table_id, entry, multiplicity)` tuples to one of several typed buses (`State`, `Byte`,
 `Program`, `Memory`, …); global soundness reduces to "for every `(kind, table_id, entry)` key, the

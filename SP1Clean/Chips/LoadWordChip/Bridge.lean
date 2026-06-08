@@ -24,7 +24,7 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-! ## Byte-concatenation + extension lemmas (ported from sp1-lean `SP1Foundations/Word.lean`) -/
+/-! ## Byte-concatenation + extension lemmas -/
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- The little-endian concatenation of the four bytes of two 16-bit limbs equals `x + y·2^16`. -/

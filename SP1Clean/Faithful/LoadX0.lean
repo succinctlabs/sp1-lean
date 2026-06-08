@@ -16,7 +16,7 @@ MemoryAccess timestamp gates; the two op_a_0 forcing gates]`, where `CS0` = `Add
 source read). We split at each `++` and discharge each fragment by its anchor. The one-hot hypothesis
 `is_lb + … + is_ld = 1` collapses the umbrella gate `E72` to `1`, so the gated sub-circuit fragments and
 the gated memory/op_a_0 constraints reduce; the seven selector binaries and the three alignment gates are
-ungated and survive verbatim. Every fragment anchor is `sorry`-free, so this is too. -/
+ungated and survive verbatim. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

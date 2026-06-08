@@ -3,23 +3,16 @@ import Clean.Air.FlatEnsemble
 
 /-! # `GatedVm` — a gated, clk-ordered VM ensemble (the data layer)
 
-A **lean, purpose-built** generalization of Clean's `Air.Flat.VmTables` (`Clean/Air/Vm.lean`) that
-models SP1's whole machine as a "main-channel" VM **with gated (`±is_real`) multiplicities**, not
-Clean's constant-`±1` form.
+Models SP1's whole machine as a "main-channel" VM **with gated (`±is_real`) multiplicities**: SP1 gates
+every state-bus interaction by `is_real` (Rust `adapter/state.rs:82-88`), so padding rows contribute
+`mult = 0` and drop out of the LogUp sum. Clean's `VmTables`/balance engine hardwires constant `±1`
+multiplicities (a no-padding VM), so `GatedVm` uses a gated-multiplicity form instead and **omits**
+`VmTables`' exposure obligations (`tables_channel`/`verifier_channel`/`verifier_requirements`) — those
+exist only to feed Clean's VM soundness engine, which is not used here (soundness is supplied at
+instantiation, `GatedVm/Formal.lean`).
 
-Why our own instead of Clean's `VmTables`:
-* SP1 gates every state-bus interaction by `is_real` (Rust `adapter/state.rs:82-88`), so padding rows
-  contribute `mult = 0` and drop out of the LogUp sum. Clean's `VmTables`/balance engine hardwire
-  constant `±1` multiplicities (a no-padding VM), which is unfaithful to a padded multi-table STARK.
-* SP1's transition chain is **clk-ordered** (`clkInjective` + `clkAdvance` on top of balance), whereas
-  Clean derives the chain purely from message-matching balance. We therefore do **not** use Clean's VM
-  soundness engine, and so we **omit** `VmTables`' exposure obligations
-  (`tables_channel`/`verifier_channel`/`verifier_requirements`) — those exist only to feed that engine.
-  Soundness is instead supplied at instantiation (see `GatedVm/Formal.lean`), mirroring how Clean's
-  `SoundVmEnsemble` carries its `soundVmChannel` as a field.
-
-This file is just the **data**: the structure, its `toEnsemble` into a plain Clean `Air.Flat.Ensemble`
-(the multiplicity-general object whose `Statement`/`BalancedChannels` we *do* use), and the
+This file contains the **data**: the structure, its `toEnsemble` into a plain Clean `Air.Flat.Ensemble`
+(the multiplicity-general object whose `Statement`/`BalancedChannels` are consumed), and the
 `circuit_norm` rfl-lemmas. The faithfulness anchor (SP1's boundary is bus-enforced via a constant-`±1`
 verifier on top of gated tables) is discharged in the SP1 instance (`Soundness/SP1GatedVm.lean`). -/
 

@@ -3,7 +3,7 @@ import SP1Clean.Foundations.Channels
 
 /-! # Evaluating an emitted interaction to a trace-level `LookupAccess`
 
-The bridge for the **"emitted = projection"** theorems (`docs/bus-model.md` §2/§7): a circuit's emitted
+The **"emitted = projection"** bridge (`docs/bus-model.md` §2/§7): a circuit's emitted
 `AbstractInteraction`s (expression-valued, over circuit `operations`) evaluate — through an `Environment` —
 to the trace-level `LookupAccess`es that the hand-written `Soundness/*Consistency.lean` projections
 (`stateLookups`/`memoryLookups`/`programLookups`/`byteLookups`) produce. This lets each `*Lookups` shadow be
@@ -101,7 +101,7 @@ omit [NeZero p] in
 /-- The `toRawGated` analog of `toAccess_emitted_state`: a **gated** emit projects to the same
 `LookupAccess` (`toAccess` reads only `.channel.name`/`.msg`/`.mult`, all identical between
 `(stateChannel.emitted …).toRaw` and `stateChannel.emittedGated …` — the gating lives only in the
-obligation, not the projection). This is what `stateLookups_eq_emitted` maps over now that `CPUState`
+obligation, not the projection). What `stateLookups_eq_emitted` maps over since `CPUState`
 emits via `emitGated`. -/
 lemma toAccess_emittedGated_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :

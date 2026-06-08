@@ -17,7 +17,7 @@ def populate_bit (a b : ZMod p) : ZMod p := if a.val < b.val then 1 else 0
 
 set_option linter.unusedSectionVars false in
 /-- `populate_bit` is always boolean — the composing operation uses this to discharge the gadget's
-(now ungated) `bit` booleanness obligation on every row. -/
+(ungated) `bit` booleanness obligation on every row. -/
 theorem populate_bit_bool (a b : ZMod p) : populate_bit a b = 0 ∨ populate_bit a b = 1 := by
   simp only [populate_bit]; split <;> simp
 

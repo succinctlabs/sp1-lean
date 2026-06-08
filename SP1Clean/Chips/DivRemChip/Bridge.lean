@@ -14,19 +14,15 @@ four Sail families (`execute_DIV`/`execute_REM`/`execute_DIVW`/`execute_REMW`) e
 `is_unsigned ∈ {false, true}`: signed/unsigned 64-bit divide (`div`/`divu`), signed/unsigned 64-bit
 remainder (`rem`/`remu`), and the four low-32 sign-extended word variants (`divw`/`divuw`/`remw`/`remuw`).
 
-Like `MulChip/Bridge.lean`, this bridge rides the **RV64 provider library's** connection lemmas
-directly: the execute-level `_root_.{div_eq,divw_eq,rem_*_eq,remw_*_eq}` (`RISCV.SailToRV64`:
-`execute_DIV/… = skeleton_binary … SailRV64.{div,divw,rem,remw}`) chained with the pure
+This bridge uses the **RV64 provider library's** connection lemmas directly:
+`_root_.{div_eq,divw_eq,rem_*_eq,remw_*_eq}` (`RISCV.SailToRV64`) chained with
 `RV64.{div_eq,divu_eq,divw_eq,divuw_eq,rem_eq,remu_eq,remw_eq,remuw_eq}`
-(`RISCV.SailPureToInstructions`: `SailRV64.{div,divw,rem,remw} … = RV64.*`). So each `correct_*_native`
-is pure monad plumbing — the BitVec algebra lives in the imported dep lemmas.
+(`RISCV.SailPureToInstructions`). Each `correct_*_native` is pure monad plumbing — the BitVec
+algebra lives in those dep lemmas.
 
-The chip `Spec` sources its operands from the **inputs** `op_b_val` (rs1) / `op_c_val` (rs2) — `DivRem`
-is an R-type register-register op, operand order matching the RV64 signature `f rs2_val rs1_val` — so the
-bridge's `h_rs1`/`h_rs2` read those. The `ChipKind`'s `sailEquiv` is the **8-way flag-dispatched**
-conjunction, proven from the chip `Spec` by `divrem_chip_reaches_sail`. `DivRem` carries
-`Fact (2 ^ 24 < p)` (the `MulOperation` column-sum bound); the bridge derives the project-standard
-`Fact (2 ^ 17 < p)` locally. -/
+The chip `Spec` sources operands from **inputs** `op_b_val` (rs1) / `op_c_val` (rs2), matching
+the RV64 signature `f rs2_val rs1_val`. The `ChipKind`'s `sailEquiv` is the 8-way flag-dispatched
+conjunction. `DivRem` carries `Fact (2 ^ 24 < p)`; the bridge derives `Fact (2 ^ 17 < p)` locally. -/
 
 namespace SP1Clean.DivRemSail
 
@@ -242,9 +238,8 @@ theorem correct_remuw_native
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_remuw]
 
 omit [Fact (2 ^ 24 < p)] in
-/-- End-to-end: a real `DivRem` chip row reaches the RISC-V Sail divide/remainder, 8-way
-flag-dispatched — the DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW identities flow from the chip `Spec`
-(operands sourced on the inputs `op_b_val` (rs1) / `op_c_val` (rs2)) into `correct_*_native`. -/
+/-- End-to-end: from the chip `Spec`, the 8-way DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW Sail
+identities hold. -/
 theorem divrem_chip_reaches_sail
     (input : DivRemChip.Inputs (ZMod p)) (cols : Extracted.DivRemCols (ZMod p))
     (data : ProverData (ZMod p))
@@ -309,13 +304,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- **The `DivRem` `ChipKind` registration** — the DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW row's entry
-into the heterogeneous trace + soundness capstone. `view` projects the register `RTypeReader` adapter
-through `cols.adapter.toAdapterView`; `rdWrite` is the divide/remainder result word `cols.a`; the
-Program-bus opcode is `is_divu·16 + is_remu·18 + is_div·15 + is_rem·17 + is_divw·25 + is_remw·27 +
-is_divuw·26 + is_remuw·28` (matching `Defs.lean`'s `main`); `sailEquiv` is the 8-way flag-dispatched
-conjunction; `reaches_sail` is `divrem_chip_reaches_sail`. The bridge reads `rs1`/`rs2` off the inputs
-`op_b_val`/`op_c_val`. -/
+/-- `ChipKind` registration for DivRem (DIV/DIVU/REM/REMU/DIVW/DIVUW/REMW/REMUW). `rs1`/`rs2`
+are sourced from inputs `op_b_val`/`op_c_val`. Carries `Fact (2 ^ 24 < p)`. -/
 def kind : Soundness.ChipKind p where
   name := "DivRem"
   Inputs := DivRemChip.Inputs

@@ -55,8 +55,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
   exact ⟨Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
 
-/-- Prover-side row well-formedness (3-arg form). For now the operand `isU64`s + address-fits bound; the
-reader clock/timestamp `Spec`s join when the chip completeness is proven (alongside the address rework). -/
+/-- Prover-side row well-formedness: operand `isU64`s + address-fits bound plus the `is_real` binary selector. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
     (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧

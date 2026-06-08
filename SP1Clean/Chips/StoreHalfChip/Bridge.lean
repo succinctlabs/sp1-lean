@@ -6,14 +6,10 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for StoreHalf (SH)
 
-`correct_store_half_native` proves the RISC-V Sail execution of a width-2 `STORE`
-(`execute_STORE` with `width = 2`) agrees with the SP1 chip's *architectural* emulation: write
-`nextPC = pc + 4` and the two little-endian bytes of `rs2[15:0]` into `mem[addr … addr+1]`, where
-`addr = rs1 + signExtend(imm)` is the (2-aligned) target address. The width-2 analogue of
-`correct_store_word_native`, threading `SailMem.run_vmem_write_of_width_2`.
-
-As with `StoreWord`, the chip's 8-byte read-modify-write `store_value` bus representation is a separate
-trace-level concern (`Soundness/MemoryConsistency.lean`). -/
+`correct_store_half_native` proves Sail's `execute_STORE` (width = 2) agrees with the SP1 chip
+emulation: write `nextPC = pc + 4` and the two little-endian bytes of `rs2[15:0]` into
+`mem[addr … addr+1]`, via `SailMem.run_vmem_write_of_width_2`. The chip's 8-byte read-modify-write
+`store_value` bus representation is a separate trace-level concern. -/
 
 namespace SP1Clean.StoreHalfSail
 
@@ -110,9 +106,8 @@ theorem correct_store_half_native
     hsp_rs2, hwrite]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- **End-to-end composition.** From the `StoreHalf` chip's prover assumptions + decode + register/PC
-reads, the width-2 Sail `STORE` agrees with the SP1 chip emulation writing the two low bytes of `rs2`
-to `mem[addr … addr+1]`. -/
+/-- End-to-end: from chip `Assumptions` + decode + register/PC reads, Sail's `SH` agrees with
+the SP1 chip emulation. -/
 theorem sh_chip_reaches_sail
     (input : StoreHalfChip.Inputs (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
@@ -153,8 +148,7 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **StoreHalf's `ChipKind` registration** (SH). As StoreByte (opcode 37), storing the low 16 bits of
-`rs2`; `reaches_sail` is `sh_chip_reaches_sail`. -/
+/-- `ChipKind` registration for StoreHalf (SH, opcode 37). -/
 def kind : Soundness.ChipKind p where
   name := "StoreHalf"
   Inputs := StoreHalfChip.Inputs

@@ -19,7 +19,7 @@ import Mathlib.Algebra.BigOperators.Fin
 
 The byte/schoolbook helpers (`extendedBytes`/`byteAt`/`colSum`/`carryVal`, the `colSum_k`
 expansions, reassembly lemmas), the literal `RawSpec`, and the soundness core
-`mulSemantics_of_raw : RawSpec → SemanticSpec`. Split out of the old monolith. -/
+`mulSemantics_of_raw : RawSpec → SemanticSpec`. -/
 
 namespace SP1Clean.MulOperation
 

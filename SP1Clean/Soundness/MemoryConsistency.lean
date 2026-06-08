@@ -8,20 +8,19 @@ import Clean.Utils.OfflineMemory
 
 /-! # Trace-level Memory-bus (register read/write) consistency
 
-The trace-level meaning of the `.memory` interactions that `Readers/RTypeReader.lean` + the chip
-commit (sibling of `Soundness/StateConsistency.lean`). SP1's `RTypeReader::eval` emits, per Add row,
-two `.memory` interactions per register operand (`Extracted/RTypeReader.lean:90-101`): a `send` of the
-prior-state value at the previous timestamp and a `receive` of the new-state value at the current
-timestamp — for `op_a` the new value is the `rd` **write** (`= add_operation.value`); for `op_b`/`op_c`
-the new value equals the prior (a **read**). All six are `is_real`-gated.
+The trace-level meaning of the `.memory` interactions that `Readers/RTypeReader.lean` + the chip emit
+(sibling of `Soundness/StateConsistency.lean`). SP1's `RTypeReader::eval` emits, per row, two `.memory`
+interactions per register operand (`Extracted/RTypeReader.lean:90-101`): a `send` of the prior-state
+value at the previous timestamp and a `receive` of the new-state value at the current timestamp — for
+`op_a` the new value is the `rd` **write**; for `op_b`/`op_c` the new value equals the prior (a
+**read**). All six are `is_real`-gated.
 
-We project each row to six signed `LookupAccess` contributions (`Row.memoryLookups`, send `+is_real`,
-receive `−is_real`) feeding the multiset bus, and to a list of `MemEvent`s. The memory-bus consistency
-is the **offline-memory** property: every read returns the value of the most-recent write at that
-address (timestamp-ordered). That property is *order-sensitive* — it is not implied by multiset balance
-alone — so, exactly as `../sp1-lean` defers its OfflineMemory closure, the link is threaded as
-`TraceMemoryLink`. The per-row projection and the padding-gating lemma `memoryLookups_padding` are
-proven natively; together with the (provable) balance side they constitute full memory soundness. -/
+Each row projects to six signed `LookupAccess` contributions (`memoryLookups`, send `+is_real`, receive
+`−is_real`) feeding the multiset bus, and to a list of `MemEvent`s. The memory-bus consistency is the
+**offline-memory** property: every read returns the value of the most-recent write at that address
+(timestamp-ordered). That property is order-sensitive — not implied by multiset balance alone — so the
+link is threaded as `TraceMemoryLink`. The per-row projection and `memoryLookups_padding` are proven;
+together with the (provable) balance side they constitute full memory soundness. -/
 
 namespace SP1Clean.Soundness
 
@@ -35,11 +34,11 @@ CS2 `clk_low` argument. -/
 def rowClkLow (r : Trace.RowView (ZMod p)) : ZMod p :=
   r.state.clk_0_16 + r.state.clk_16_24 * 65536
 
-/-- The six signed Memory-bus contributions an Add row emits — per operand a `send` of the prior value
-at the previous timestamp (`+is_real`) and a `receive` of the new value at `clk_low + offset`
-(`−is_real`). For `op_a` the received value is the `rd` write (`add_operation.value`); for `op_b`/`op_c`
-it is the read-back prior value. 9-tuple entries match `Extracted/RTypeReader.lean:90-101`. On padding
-rows both signs vanish (`memoryLookups_padding`). -/
+/-- The six signed Memory-bus contributions a row emits — per operand a `send` of the prior value at the
+previous timestamp (`+is_real`) and a `receive` of the new value at `clk_low + offset` (`−is_real`). For
+`op_a` the received value is the `rd` write; for `op_b`/`op_c` it is the read-back prior value. 9-tuple
+entries match `Extracted/RTypeReader.lean:90-101`. On padding rows both signs vanish
+(`memoryLookups_padding`). -/
 def memoryLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
   let chk := r.state.clk_high
   let cl := rowClkLow r
@@ -102,8 +101,7 @@ structure MemEvent (F : Type) where
   single-shard, where `clkHigh` is constant; the multi-shard extension generalises). -/
   clkHigh : ℕ
 
--- (`memoryConsistent` — the old `Fin`-indexed placeholder offline-memory predicate — was retired in M5;
--- `TraceMemoryValid`/`TraceMemoryLink` now use the vendored `isConsistentOnline` shape, defined below
+-- (`TraceMemoryValid`/`TraceMemoryLink` use the vendored `isConsistentOnline` shape, defined below
 -- after `isConsistentOnline_of_memBalance`.)
 
 /-- The `op_a` (`rd` write) register event: reads x[rd]'s prior value, writes the result `rdWrite`. -/
@@ -138,9 +136,8 @@ def memEvents (rows : List (Trace.RowView (ZMod p))) : List (MemEvent (ZMod p)) 
 -- (`TraceMemoryValid`/`TraceMemoryLink`/`traceMemoryValid_of_memoryLink` are defined below in the
 -- vendored `isConsistentOnline` shape, after `isConsistentOnline_of_memBalance`.)
 
-/-- **Gating is real.** A padding row (`is_real = 0`) contributes zero to *every* Memory-bus key: all
-six signed contributions have multiplicity 0 (`±0`). This is the per-row fact the old zero-witness
-`adapter` block could not express — the emission is genuinely `is_real`-gated, matching SP1's
+/-- **Gating is real.** A padding row (`is_real = 0`) contributes zero to every Memory-bus key: all six
+signed contributions have multiplicity `±0`. The emission is `is_real`-gated, matching SP1's
 `send/receive … is_real`. -/
 theorem memoryLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (memoryLookups r) k = 0 := by
@@ -211,8 +208,7 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
     have h2 : (2 : ℕ) < 2 ^ 17 := by norm_num
     omega
   -- The three `RegisterAccessCols` sub-assertions emit only `byteChannel`, and the five `op_a_0` Equality
-  -- gates emit nothing — so their `memoryChannel` filter is empty (`filter_interactions_formalAssertion_eq_nil`,
-  -- now that the register-access readers are themselves `FormalAssertion`s).
+  -- gates emit nothing — so their `memoryChannel` filter is empty (`filter_interactions_formalAssertion_eq_nil`).
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit memoryChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])
@@ -235,8 +231,8 @@ The register projections above commit `.memory` interactions at *register* addre
 0`, the operand index in `addr0`). The memory chips (`Chips/{LoadDouble,StoreDouble}Chip.lean`) add one
 more `.memory` access — emitted by the `Readers/MemoryAccess` block — at a **real 48-bit address**
 (`AddressOperation.value`, three 16-bit limbs in `addr0/addr1/addr2`). It is the same send-prior /
-receive-new pair, so it feeds the *same* `multiplicitySum` bus and the *same* `MemEvent` /
-`memoryConsistent` offline-memory model — only the address limbs are now nonzero, and the received word
+receive-new pair, so it feeds the same `multiplicitySum` bus and the same `MemEvent` /
+`isConsistentOnline` offline-memory model — only the address limbs differ (nonzero), and the received word
 is the loaded value (a read: `new = prev`) or the stored `rs2` word (a write: `new = store_value`). The
 projections below are standalone (parameterised by the `MemoryAccess` input data rather than `RowView`,
 which carries no memory-access columns); they compose with the per-row register projections to give a
@@ -344,7 +340,7 @@ link from the Memory-bus balance + a `MemoryProvider` init/finalize receiver (th
 
 **Encoding faithfulness.** All four tuple fields are faithful: `timestamp = clk.val` and `addr = addr.val`
 (drive the sortedness discharge), `readValue = prevValue` (the value read), `writeValue = value` (the value
-left). The read/write split — `MemEvent` now carries the read-old `prevValue` *and* the write-new `value` —
+left). The read/write split — `MemEvent` carries the read-old `prevValue` *and* the write-new `value` —
 is what makes the vendored `isConsistentOnline` check (`readValue = lastWriteValue`) faithful for genuine
 writes: the `rd` write reads x[rd]'s prior value (`op_a_memory.prev_value`) and writes `rdWrite`, so a later
 read of x[rd] returns exactly the written value, matching SP1's offline memory. -/
@@ -362,14 +358,14 @@ def MemEvent.toAccess (e : MemEvent (ZMod p)) : MemoryAccess :=
 
 /-- The trace's memory accesses in the vendored model's **decreasing-timestamp** orientation (head = latest):
 `rows.reverse`, then per row the `rowMemEvents` (already emitted in decreasing offset order `[+4,+3,+2]`),
-encoded. Mirrors `../sp1-lean`'s `aggregateMemoryAccesses`. -/
+encoded via `MemEvent.toAccess`. -/
 def memAccessList (rows : List (Trace.RowView (ZMod p))) : MemoryAccessList :=
   rows.reverse.flatMap (fun r => (rowMemEvents r).map MemEvent.toAccess)
 
 /-- Clock-monotonicity trace-shape bundle: per-row accesses are timestamp-decreasing, and across
 `rows.reverse` every earlier-listed (chronologically later) row's accesses strictly post-date a later-listed
-row's. The native analogue of `../sp1-lean`'s `TraceClkValid` — the single residual trace-shape fact the Full
-pass discharges from per-row Specs + a clock-link (needs `2^24 < p` so the encoded clock does not wrap). -/
+row's. The single residual trace-shape fact dischargeable from per-row Specs + a clock-link (needs `2^24 < p`
+so the encoded clock does not wrap). -/
 structure TraceMemClkValid (rows : List (Trace.RowView (ZMod p))) : Prop where
   intra_row_sorted : ∀ r ∈ rows,
     ((rowMemEvents r).map MemEvent.toAccess).Pairwise timestamp_ordering
@@ -378,8 +374,7 @@ structure TraceMemClkValid (rows : List (Trace.RowView (ZMod p))) : Prop where
       ∀ y ∈ (rowMemEvents r₂).map MemEvent.toAccess, timestamp_ordering x y)
 
 /-- **Sortedness discharge.** Under `TraceMemClkValid`, the encoded access list is timestamp-sorted — the
-hypothesis the vendored closure (`isConsistentOnline_iff_isConsistentOffline`) requires. Ported from
-`../sp1-lean`'s `aggregateMemoryAccesses_isTimestampSorted`. -/
+hypothesis the vendored closure (`isConsistentOnline_iff_isConsistentOffline`) requires. -/
 theorem memAccessList_isTimestampSorted (rows : List (Trace.RowView (ZMod p)))
     (h : TraceMemClkValid rows) : (memAccessList rows).isTimestampSorted := by
   change List.Pairwise timestamp_ordering (rows.reverse.flatMap _)
@@ -389,9 +384,8 @@ theorem memAccessList_isTimestampSorted (rows : List (Trace.RowView (ZMod p)))
   rw [List.mem_reverse] at hr
   exact h.intra_row_sorted r hr
 
-/-- **No-duplicate-timestamps discharge.** Under `TraceMemClkValid`, the encoded access list has no repeated
-timestamps — the closure's second hypothesis. Ported from `../sp1-lean`'s
-`aggregateMemoryAccesses_Notimestampdup`. -/
+/-- **No-duplicate-timestamps discharge.** Under `TraceMemClkValid`, the encoded access list has no
+repeated timestamps — the closure's second hypothesis. -/
 theorem memAccessList_Notimestampdup (rows : List (Trace.RowView (ZMod p)))
     (h : TraceMemClkValid rows) : (memAccessList rows).Notimestampdup := by
   have h_sorted := memAccessList_isTimestampSorted rows h
@@ -535,8 +529,8 @@ theorem mem_opA_read_send_matched [NeZero p]
 
 /-! ## Correspondence + canceller split
 
-Every filtered event's Memory-bus *send* and *receive* keys are functions of the event alone (now that
-`MemEvent` carries `clkHigh`/`prevTs`), so they match the `memoryLookups` keys exactly. The canceller of an
+Every filtered event's Memory-bus *send* and *receive* keys are functions of the event alone
+(`MemEvent` carries `clkHigh`/`prevTs`), so they match the `memoryLookups` keys exactly. The canceller of an
 event's send (from balance) is then either another filtered event's *receive* (the writer) or a `memProv`
 boundary entry. Needs per-row well-formedness (`is_real`/`imm_b`/`imm_c` binary) so the bus multiplicity
 `is_real·(1-imm)` is exactly `±1`, matching one event per access (the chip constrains all three binary). -/
@@ -847,40 +841,29 @@ theorem isConsistentOnline_of_memBalance [NeZero p] (rows : List (Trace.RowView 
   exact isConsistentSingleAddress_congr (filterAddress_memAccessListFiltered rows addr).symm hs _
     (isConsistentSingleAddress_of_balance rows memProv addr hwf h_clk h_prev h_prevlt h_prov h_bal hs)
 
-/-- **Trace-shape Memory invariant (vendored shape, M5).** The bus-backed (filtered) memory accesses are
-offline-online-consistent: every read returns the most-recent write at its address. Bundles the
-clock-monotonicity witness `TraceMemClkValid` so the dependent `isTimestampSorted` proof is self-contained.
-Replaces the retired `Fin`-indexed `memoryConsistent` shape. -/
+/-- **Trace-shape Memory invariant.** The bus-backed (filtered) memory accesses are offline-online-consistent:
+every read returns the most-recent write at its address. Bundles `TraceMemClkValid` so the dependent
+`isTimestampSorted` proof is self-contained. -/
 structure TraceMemoryValid (rows : List (Trace.RowView (ZMod p))) : Prop where
   clk : TraceMemClkValid rows
   online : MemoryAccessList.isConsistentOnline (memAccessListFiltered rows)
     (memAccessListFiltered_isTimestampSorted rows clk)
 
 /-- The threaded Memory link — the vendored offline-online consistency of the bus-backed access list (equal
-to `TraceMemoryValid`). *Derived* from balance by `isConsistentOnline_of_memBalance` (M4) in the
-capstone; threaded where the Memory bus is not yet wired. -/
+to `TraceMemoryValid`). Derived from balance by `isConsistentOnline_of_memBalance`; threaded where the
+Memory bus balance is not yet supplied. -/
 def TraceMemoryLink (rows : List (Trace.RowView (ZMod p))) : Prop := TraceMemoryValid rows
 
 /-- Discharge of `TraceMemoryValid` from the threaded memory link (the identity re-bundling). -/
 theorem traceMemoryValid_of_memoryLink (rows : List (Trace.RowView (ZMod p)))
     (h_link : TraceMemoryLink rows) : TraceMemoryValid rows := h_link
 
-/- `isConsistentOnline_of_memBalance` (above) *derives* the offline-memory link — every read returns the
-most-recent write at its address — from the Memory-bus balance plus ordering/provider side conditions. The
-single-shard Memory result; the closed-bus analogue of `pcChain_of_balance_and_clkInj`. Chain:
+/- `isConsistentOnline_of_memBalance` derives the offline-memory link — every read returns the
+most-recent write at its address — from the Memory-bus balance plus ordering/provider side conditions. Chain:
 `memEvent_canceller` → `isConsistentSingleAddress_of_balance` (per-address via `memPrevLink` +
-`memEventsFiltered_clk_inj` + `getLast_clk_le` + `MemProviderGenesis`) → assemble via
+`memEventsFiltered_clk_inj` + `getLast_clk_le` + `MemProviderGenesis`) → assembled via
 `isConsistent_iff_all_single_address`. The residuals (named hypotheses, never sorry): `TraceMemClkValid`,
-`memPrevLink`, `h_prevlt` (`prev_ts < ts` range check), `MemRowWellFormed` (binary gates), `MemProviderGenesis`
-(init chip = genesis value 0 below all), and `isConsistentBalanced`.
-
-The capstone variant in `MachineSoundness.lean` that DROPS `h_mem` — deriving it via
-`isConsistentOnline_of_memBalance` ∘ `memoryBalance_of_machine'` (3-provider `TraceMachineBalancedWith'`),
-exactly as the State half drops `h_state` — reshapes `TraceMemoryValid`/`TraceMemoryLink` to the vendored
-`(memAccessListFiltered rows).isConsistentOnline …` shape. The wired Add/Sub/Lt traces are register-only (all
-`imm = 0`, all real), so `memAccessListFiltered = memAccessList` and the side conditions discharge from the
-per-row Specs. Real 3-limb load/store addresses are not yet aggregated into `memEventsFiltered` (no Load/Store
-chip is wired into a capstone), so register coverage is complete for the current trace set; those addresses
-wire in when the Load/Store chips land. Until then, `TraceMemoryLink` stays threaded. -/
+`memPrevLink`, `h_prevlt` (`prev_ts < ts` range check), `MemRowWellFormed` (binary gates),
+`MemProviderGenesis` (init chip = genesis value 0 below all), and `isConsistentBalanced`. -/
 
 end SP1Clean.Soundness

@@ -3,17 +3,11 @@ import SP1Clean.Foundations.Word
 import SP1Clean.Chips.AddwChip.Formal
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for ADDW (+ end-to-end composition)
+/-! # Native Sail bridge for ADDW (+ `ChipKind` registration)
 
-`correct_addw_native` proves that the RISC-V Sail execution of `ADDW` (`spec_addw`, calling
-LeanRV64D's `execute_RTYPEW` with `ropw.ADDW`) agrees with the SP1 chip's emulation
-(`sp1_addw`: write `nextPC = pc + 4` and the result register), given the chip's **semantic**
-fact `a_val = sext32→64 (op_b + op_c)` (= `AddwChip.circuit`'s `Spec`) and the register/PC reads.
-
-`addw_chip_reaches_sail` composes the verified `AddwChip.Spec` straight into the bridge, with
-**zero** `_root_.Addw.*` / `AddwOperation.*` / SP1Chips dependency. The W-instruction operates on
-the low 32 bits and sign-extends; the reduction `addw_pure_eq` shows the Sail pure part equals the
-chip Spec's `signExtend 64 (setWidth 32 (b + c))`. -/
+`correct_addw_native` proves the RISC-V Sail `ADDW` execution agrees with the SP1 chip emulation
+given the chip's semantic fact `a_val = sext32→64 (op_b + op_c)` and the register/PC reads.
+`addw_pure_eq` relates the Sail pure part to `signExtend 64 (setWidth 32 (b + c))`. -/
 
 namespace SP1Clean.AddwSail
 
@@ -65,10 +59,8 @@ theorem correct_addw_native
     h_pc, h_rs1, h_rs2, h_addw]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- End-to-end composition: from the (now reader-composed) ADDW chip's verified semantic contract
-(`AddwChip.Spec`'s gated-arith conjunct `.2.2`, on a real row) plus the register/PC reads, the RISC-V Sail
-`ADDW` execution agrees with the SP1 chip emulation writing the sign-extended `AddwChip.resultWord`. The
-addw identity flows from the chip `Spec` through `rv64_addw_eq` into `correct_addw_native`. -/
+/-- End-to-end: from the ADDW chip's verified `Spec` (gated-arith conjunct `.2.2`) plus the
+register/PC reads, the RISC-V Sail `ADDW` agrees with the SP1 emulation; identity via `rv64_addw_eq`. -/
 theorem addw_chip_reaches_sail
     (input : AddwChip.Inputs (ZMod p)) (cols : Extracted.AddwCols (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
@@ -93,10 +85,8 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **ADDW's `ChipKind` registration** — ADDW's entry into the heterogeneous trace + capstone (mirrors
-`SubwChip.kind`, but ADDW's adapter is the immediate-capable `ALUTypeReader`, projected through
-`cols.adapter.toAdapterView`). The row's `op_a` write value / `view` write-word is the sign-extended W
-result `AddwChip.resultWord`; the Program-bus opcode is `19`; `reaches_sail` is `addw_chip_reaches_sail`. -/
+/-- **ADDW's `ChipKind` registration.** Write-word is the sign-extended W result `AddwChip.resultWord`;
+adapter is `ALUTypeReader`, projected via `toAdapterView`; Program-bus opcode `19`. -/
 def kind : Soundness.ChipKind p where
   name := "Addw"
   Inputs := AddwChip.Inputs

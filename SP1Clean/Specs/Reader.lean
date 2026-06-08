@@ -29,8 +29,7 @@ deriving ProvableStruct
 
 /-- Semantic contract: the two timestamp byte bounds, **`is_real`-gated** — the 16-bit `Range` on
 `diff_low_limb` and the `U8Range` (`< 256`) on the scaled high part. Soundness *derives* them from the
-byte-bus pull `Guarantees`; completeness *consumes* them. (Was `True` while this was a witnessing
-`FormalCircuit`; now `cols` is an input, so the bounds become the reader's `Spec`, mirroring `CPUState`.) -/
+byte-bus pull `Guarantees`; completeness *consumes* them. Mirrors `CPUState.Spec`. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   input.is_real = 1 →
     input.cols.diff_low_limb.val < 2 ^ 16 ∧
@@ -85,7 +84,7 @@ structure Inputs (F : Type) where
   wv3 : F
 deriving ProvableStruct
 
-/-- Semantic contract, with the adapter block `cols` now an *input*: the four `op_a_0` zeroing gates
+/-- Semantic contract: the four `op_a_0` zeroing gates
 (`op_a_0 * wv_i = 0`, the `rd = x0 ⇒ write 0` rule) and the `op_a_0` binary fact — genuine local
 `assertZero` constraints, derived in soundness from the imposed gates — plus, per operand, the composed
 `RegisterAccessCols` byte bounds (`is_real`-gated, access clocks `clk_low + 4/3/2`), derived from the byte

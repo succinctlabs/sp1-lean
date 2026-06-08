@@ -2,26 +2,18 @@ import SP1Clean.Foundations.Word
 import RISCV.Instructions
 import Mathlib.Tactic.Linarith
 
-/-! # `DivRemChip` — native divide/remainder arithmetic (Milestone 1: unsigned)
+/-! # `DivRemChip` — native divide/remainder arithmetic
 
-The mathematical core of the `DivRem` chip soundness, co-located with its consumer (the chip-folder
-convention: chip-specific math lives in `Chips/<Op>Chip/`, `Operations/` is for reusable gadgets).
-This file re-derives — natively, from first principles in our `Word`/`toBitVec64` forms — the bridge
-from SP1's constraint bundle to the RV64 divide/remainder ISA functions
+The mathematical core of the `DivRem` chip soundness (chip-specific math in `Chips/<Op>Chip/`,
+reusable gadgets in `Operations/`). Re-derives from first principles in `Word`/`toBitVec64` forms
+the bridge from SP1's constraint bundle to the RV64 divide/remainder ISA functions
 (`RISCV/Instructions.lean`).
 
-This file is **not** a port of sp1-lean's `DivRem/*.lean`; it states the cleanest lemmas for our
-forms and proves them directly. sp1-lean is consulted only for specific hard sub-problems (none were
-needed for the unsigned case — it is plain Euclidean-division uniqueness).
-
-**Milestone 1 (this file, so far): the unsigned variants `DIVU`/`REMU`.** The signed (`DIV`/`REM`,
-sign/abs/overflow) and word (`*W`, 32-bit + sign-extend) variants are added in later milestones.
-
-The chip soundness proof supplies the three hypotheses of `divu_remu_of_identity` from the composed
-sub-circuits + assertZero constraints: the Euclidean identity `b = c·quotient + remainder` (from the
-two `MulOperation`s + the `carry`/`c_times_quotient` columns), the remainder range
-(`remainder < c` when `c ≠ 0`, from `remainder_lt_operation`), and the divide-by-zero branch
-(`c = 0 → quotient` all-ones `∧ remainder = b`, from `is_c_0`). -/
+**Unsigned variants (`DIVU`/`REMU`):** `divu_remu_of_identity` takes the three hypotheses supplied
+by the chip soundness — the Euclidean identity `b = c·quotient + remainder` (from the two
+`MulOperation`s + `carry`/`c_times_quotient` columns), the remainder range (`remainder < c` when
+`c ≠ 0`, from `remainder_lt_operation`), and the divide-by-zero branch (`c = 0 → quotient`
+all-ones `∧ remainder = b`, from `is_c_0`). The signed and word variants follow in §§2–3. -/
 
 namespace SP1Clean.DivRemChip
 
@@ -88,7 +80,7 @@ theorem divu_remu_of_identity {b c quotient remainder : Word (ZMod p)}
   divu_remu_spec (toNat_lt_2_64 hb) (toNat_lt_2_64 hc) (toNat_lt_2_64 hq) (toNat_lt_2_64 hr)
     hid hlt hzero
 
-/-! ## Milestone 2 — the signed variants `DIV`/`REM`
+/-! ## Signed variants `DIV`/`REM`
 
 `RV64.div`/`RV64.rem` are **truncated** (round-toward-zero) signed division on the operands'
 `toInt`: `BitVec.toInt_sdiv`/`toInt_srem` characterize them as `Int.tdiv`/`Int.tmod` (the `sdiv`
@@ -158,7 +150,7 @@ theorem div_rem_overflow {b c quotient remainder : BitVec 64}
   rw [show ((-1#64 : BitVec 64)).toInt = -1 from by decide]
   exact neg_dvd.mpr (one_dvd _)
 
-/-! ## Milestone 3 — the word variants `DIVW`/`REMW`/`DIVUW`/`REMUW`
+/-! ## Word variants `DIVW`/`REMW`/`DIVUW`/`REMUW`
 
 The `*w` instructions operate on the **low 32 bits** of the operands (`BitVec.extractLsb 31 0`) and
 `signExtend` the 32-bit result back to 64. So the arithmetic is the *same core* at width 32, wrapped

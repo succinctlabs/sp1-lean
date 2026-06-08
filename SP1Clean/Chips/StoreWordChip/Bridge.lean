@@ -6,15 +6,10 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for StoreWord (SW)
 
-`correct_store_word_native` proves the RISC-V Sail execution of a width-4 `STORE`
-(`execute_STORE` with `width = 4`) agrees with the SP1 chip's *architectural* emulation: write
-`nextPC = pc + 4` and the four little-endian bytes of `rs2[31:0]` into `mem[addr … addr+3]`, where
-`addr = rs1 + signExtend(imm)` is the (4-aligned) target address. The width-4 analogue of
-`correct_store_double_native`, threading `SailMem.run_vmem_write_of_width_4`.
-
-As with `StoreDouble`, the bridge connects the chip's operand reads (`rs1` base, `rs2` value) to the
-Sail RAM model; the chip's 8-byte read-modify-write `store_value` bus representation is a separate
-trace-level concern (`Soundness/MemoryConsistency.lean`). -/
+`correct_store_word_native` proves Sail's `execute_STORE` (width = 4) agrees with the SP1 chip
+emulation: write `nextPC = pc + 4` and the four little-endian bytes of `rs2[31:0]` into
+`mem[addr … addr+3]`, via `SailMem.run_vmem_write_of_width_4`. The chip's 8-byte read-modify-write
+`store_value` bus representation is a separate trace-level concern. -/
 
 namespace SP1Clean.StoreWordSail
 
@@ -117,10 +112,8 @@ theorem correct_store_word_native
     hsp_rs2, hwrite]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- **End-to-end composition.** From the `StoreWord` chip's prover assumptions + decode + register/PC
-reads, the width-4 Sail `STORE` agrees with the SP1 chip emulation writing the four low bytes of `rs2`
-to `mem[addr … addr+3]`. The base register value is `Word.toBitVec64 input.op_b_val`, the stored value
-`Word.toBitVec64 input.adapter.op_a_memory.prev_value`. -/
+/-- End-to-end: from chip `Assumptions` + decode + register/PC reads, Sail's `SW` agrees with
+the SP1 chip emulation. -/
 theorem sw_chip_reaches_sail
     (input : StoreWordChip.Inputs (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
@@ -161,8 +154,7 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **StoreWord's `ChipKind` registration** (SW). As StoreByte (opcode 38), storing the low 32 bits of
-`rs2`; `reaches_sail` is `sw_chip_reaches_sail`. -/
+/-- `ChipKind` registration for StoreWord (SW, opcode 38). -/
 def kind : Soundness.ChipKind p where
   name := "StoreWord"
   Inputs := StoreWordChip.Inputs

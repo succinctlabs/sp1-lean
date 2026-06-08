@@ -18,11 +18,11 @@ reduce `E0` to `1` (the real-row hypothesis), and discharge each fragment by its
 (`ltSigned_`, `cpustate_`, `alutypereader_constraints_faithful`), leaving the two variant-flag booleans
 (`is_slt`, `is_sltu`), the now-vacuous sum boolean, and the `op_a_0 = 0` register-index gate.
 
-So a single theorem certifies that SP1's generated `Lt` chip constraint lists mean **exactly**: the
+So a single theorem certifies that SP1's generated `Lt` chip constraint lists mean exactly: the
 `LtOperationSigned` raw compare spec on the register-read operands, the two CPUState clock byte bounds,
 the ALUTypeReader per-row well-formedness (the `op_a_0` zeroing on the compare bit, the `imm_c`
 register/immediate multiplexer, and the three operands' timestamp byte bounds), the two variant-flag
-booleans, and `op_a_0 = 0`. Every fragment anchor it composes is `sorry`-free, so this anchor is too. -/
+booleans, and `op_a_0 = 0`. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

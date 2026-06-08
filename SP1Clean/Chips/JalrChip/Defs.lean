@@ -10,28 +10,13 @@ import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # The JALR chip row as a `GeneralFormalCircuit` — register-indirect control flow
+/-! # The JALR chip row as a `GeneralFormalCircuit`
 
-The sibling of `JalChip` for **JALR** (opcode 47, `rd ← pc + 4`, `pc ← (rs1 + imm) & ~1`). Like JAL its
-committed `next_pc` is *computed data*, but the jump base is the **rs1 register value**
-(`adapter.op_b_memory.prev_value`) rather than the program counter, and the target's low bit is **cleared**
-before the jump. Composes, as true Clean subcircuits (mirroring SP1's `Jalr` `air.rs:eval`,
-`Extracted/JalrChip.lean`):
-
-- the `Readers.CPUState` adapter, fed the **LSB-cleared** `next_pc = #v[add_operation.value[0] - lsb,
-  value[1], value[2]]` (RISC-V's `(rs1 + imm) & ~1`) and `clk_inc = 8`;
-- **two** `AddOperation` gadgets — `rs1 + op_c_imm = add_operation.value` (the raw jump target, gated
-  `is_real`) and `pc + 4 = op_a_operation.value` (the return/link address, gated *additively* by
-  `is_real - op_a_0`, so it is not enforced when `rd = x0`);
-- a committed `lsb` witness with the `lsb` binary gate, the low bit removed from the next_pc low limb;
-- the `Readers.ITypeReader` adapter (program fetch at opcode 47, the rs1 read + rd write memory accesses,
-  the `op_a_0` binary + zeroing gates);
-- the 4-byte **alignment** range check on the cleared target (`Range((add_operation.value[0] - lsb)/4, 14)`);
-- the `is_real` binary gate.
-
-The chip `Spec` is the I-type reader sub-`Spec` + the proven `is_real`/`lsb` binary + the `is_real`-gated
-jump (`add_operation.value = rs1 + op_c_imm`) and link (`op_a_0 = 0 → op_a_operation.value = pc + 4`)
-identities. The buses' cross-row meaning lives at the trace level (`Soundness/{State,Memory}Consistency`). -/
+JALR (opcode 47): `rd ← pc + 4`, `pc ← (rs1 + imm) & ~1`. Like JAL, `next_pc` is computed data, but
+the jump base is the rs1 register value and the low bit is cleared before the jump (committed `lsb`
+witness + binary gate). Composes two `AddOperation` gadgets (jump `rs1 + op_c_imm` + link `pc + 4`),
+`CPUState` (LSB-cleared `next_pc`), `ITypeReader`, and a 4-byte alignment range check. Implements
+SP1's `Jalr` `air.rs:eval`. -/
 
 namespace SP1Clean.JalrChip
 
@@ -65,10 +50,9 @@ def linkTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=
 def lsbBit (input : Inputs (ZMod p)) : ZMod p :=
   (((jumpTargetWord input)[0].val % 2 : ℕ) : ZMod p)
 
-/-- Compose the JALR row. Witnesses the two add results (`add_operation.value` = `rs1 + imm`,
-`op_a_operation.value` = `pc + 4`) via `AddOperation.populate`, plus the `lsb` low bit of the target's
-low limb; composes the demoted `AddOperation` gadget as a Clean `assertion` over each whole column struct.
-The `CPUState` reader is fed the **LSB-cleared** `next_pc`; the second add's gate is `is_real - op_a_0`. -/
+/-- Witness the two add results (`add_operation.value` = `rs1 + imm`, `op_a_operation.value` = `pc + 4`)
+and the `lsb` scalar via `populate`, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
+`next_pc`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod p)) := do
   let add_value ← witnessVector 4 (fun env =>
     AddOperation.populate
@@ -86,24 +70,18 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod
        input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]
   let pcWordV : Word (Expression (ZMod p)) :=
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
-  -- lsb binary gate.
   lsb * (lsb - 1) === 0
-  -- CPUState with the **LSB-cleared** next_pc = add_operation.value & ~1.
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[add_value[0] - lsb, add_value[1], add_value[2]], 8, input.is_real⟩
-  -- add_operation: rs1 + op_c_imm = jump target, gated `is_real`.
   assertion AddOperation.circuit ⟨rs1WordV, input.adapter.op_c_imm, { value := add_value }, input.is_real⟩
   add_value[3] === 0
-  -- op_a_operation: pc + 4 = link address, gated additively by `is_real - op_a_0`.
   assertion AddOperation.circuit
     ⟨pcWordV, #v[4, 0, 0, 0], { value := op_a_value }, input.is_real - input.adapter.op_a_0⟩
   op_a_value[3] === 0
-  -- ITypeReader: program fetch (opcode 47), op_a write + op_b read, op_a_0 binary + zeroing gates.
   assertion Readers.ITypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 47,
      op_a_value[0], op_a_value[1], op_a_value[2], op_a_value[3]⟩
-  -- next_pc 4-byte alignment: Range((add_operation.value[0] - lsb) / 4, 14).
   byteChannel.gatedReceive input.is_real
     (⟨6, ((add_value[0] - lsb) * (4 : ZMod p)⁻¹),
       Expression.const ((14 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
@@ -112,7 +90,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit]
-  -- Two add results (8 limbs) + the `lsb` scalar.
+  -- 2 × 4-limb add results + 1 lsb scalar.
   localLength _ := 9
   channelsWithGuarantees := [byteChannel.toRawGated]
   channelsWithRequirements :=

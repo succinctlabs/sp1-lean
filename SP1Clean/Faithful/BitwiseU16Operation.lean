@@ -4,25 +4,17 @@ import SP1Clean.Extracted.BitwiseOperation
 import Mathlib.Tactic
 import Mathlib.Tactic.IntervalCases
 
-/-! # Faithfulness anchor for the Bitwise byte operation
+/-! # Faithfulness anchor — `BitwiseOperation` byte constraints ↔ native per-byte `byteOp`
 
-Anchors the native gadget's per-byte relation to **SP1's `BitwiseOperation` constraint
-definition** — the byte-opcode lookups (`send_byte`) that `BitwiseU16Operation` composes after
-the `U16toU8` decomposition (`operations/bitwise.rs`). The SP1 pieces are no longer re-created
-inline: the `ByteOpcode` datatype lives in the shared `SP1Clean/Foundations/SP1Constraint.lean`
-(its `constrain` carries the real AND/OR/XOR meaning) and the `Interaction` bus vocabulary in
-`SP1Clean/Extracted/ExtractionDSL.lean`, and `BitwiseOperation`'s `interactions` (the eight
-`send_byte`s) is generated into `SP1Clean/Extracted/BitwiseOperation.lean`. The anchor theorem
+Anchors the native gadget's per-byte relation to SP1's `BitwiseOperation` constraint definition
+(the eight `send_byte` lookups composed after the `U16toU8` decomposition). The anchor theorem
 `bitwise_byte_constraints_faithful` proves those constraint lists hold **exactly** iff the native
-per-byte `byteOp` relation the gadget's soundness/completeness run through.
+per-byte `byteOp` relation.
 
-Scope: the byte-opcode core (`BitwiseOperation`). The full `BitwiseU16Operation` additionally
-composes two `U16toU8OperationUnsafe` decompositions; anchoring that layer is future work.
+Scope: the byte-opcode core (`BitwiseOperation`). Anchoring the full `BitwiseU16Operation` (which
+additionally composes two `U16toU8OperationUnsafe` decompositions) is future work.
 
-The generated `constraints` is field-generic with a `[CoeHead F ℕ]` hypothesis; applying it at
-`ZMod p` uses the scoped `CoeHead (ZMod p) ℕ` instance (`open scoped …ConstraintCoe`), whose
-`coe_eq_val` lemma rewrites the dynamic `ByteOpcode.ofNat ↑opcode` to `ByteOpcode.ofNat
-opcode.val`. -/
+`coe_eq_val` rewrites the dynamic `ByteOpcode.ofNat ↑opcode` to `ByteOpcode.ofNat opcode.val`. -/
 
 namespace SP1Clean.FaithfulBitwise
 

@@ -11,17 +11,13 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # The ADDW chip row as a `GeneralFormalCircuit`, output = the extracted column struct
 
-Migrated onto the **reader/bus pattern** (direct mirror of `Chips/SubwChip.lean`): composes
-`Readers.CPUState.circuit`, the witnessed `AddwOperation.circuit`, and `Readers.ALUTypeReader.circuit`
-as Clean subcircuits/assertions, gates the row with `is_real`, and **returns the extracted
-`Extracted.AddwCols` struct**. So an ADDW row now emits the same four buses (State, Byte, Memory,
-Program) and slots into the heterogeneous trace alongside Add/Sub/Subw.
+Composes `Readers.CPUState.circuit`, the witnessed `AddwOperation.circuit`, and
+`Readers.ALUTypeReader.circuit` as Clean subcircuits/assertions, gates `is_real`, and returns the
+extracted `AddwCols` struct (emitting all four buses: State, Byte, Memory, Program).
 
-ADDW is a W-instruction: the gadget's result is a **2-limb value + a sign bit**
-(`addw_operation.value`, `addw_operation.msb.msb`), and the 64-bit `op_a` write value the reader carries
-is the sign-extended word `[v0, v1, msb·65535, msb·65535]` (= `AddwOperation.resultWord`). Unlike SUBW,
-ADDW's adapter is the **immediate-capable `ALUTypeReader`** (SP1's `AddwCols.adapter : ALUTypeReader`); the
-Program-bus opcode is `19`. ADDW operates on the low 32 bits of each operand and sign-extends. -/
+W-instruction: result is 2 limbs + sign bit (`addw_operation.value`/`addw_operation.msb.msb`); the
+64-bit `op_a` write is the sign-extended word `[v0, v1, msb·65535, msb·65535]`. Adapter is the
+immediate-capable `ALUTypeReader` (unlike SUBW's `RTypeReader`); Program-bus opcode is `19`. -/
 
 namespace SP1Clean.AddwChip
 
@@ -59,9 +55,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddwCols) (ZMod 
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
   channelsLawful := by simp [circuit_norm, main, AddwOperation.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit]
-  -- The chip witnesses only the 2 result limbs + 1 sign bit (via `populate`); `AddwOperation` is a
-  -- `FormalAssertion` (its byte/U16MSB constraints are bus pulls). The two readers are `assertion`s
-  -- (`localLength 0`), the binary gate adds 0. 2 + 1 = 3.
+  -- 2 result limbs + 1 sign bit; readers are `assertion`s (`localLength 0`).
   localLength _ := 3
   channelsWithGuarantees := [byteChannel.toRawGated]
   channelsWithRequirements :=

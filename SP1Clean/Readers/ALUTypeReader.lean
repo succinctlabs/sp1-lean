@@ -124,12 +124,6 @@ set_option linter.unusedSectionVars false in
 the two composed `RegisterAccessCols`). The op_c gate `is_real - imm_c` is *proven* binary in-circuit. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
 
--- TODO(reader-start): soundness mirrors `RTypeReader.soundness` — `circuit_proof_start`, then
--- `simp only [circuit_norm, memoryChannel, programChannel, ProgramMsg.Spec] at h_holds ⊢`, destructure the
--- three `RegisterAccessCols` results + the `op_a_0`/`imm_c`/`(is_real-imm_c)` gates + the 4 immediate gates
--- + the 4 zeroing gates, then assemble `Spec`. The op_c `RegisterAccessCols` `Assumptions` is the
--- `(is_real - imm_c) ∈ {0,1}` fact derived from the in-circuit `(is_real-imm_c)`-binary gate via
--- `bool_of_mul_pred`. (Scaffolded; to finish.)
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   -- `sub_eq_add_neg` on the goal aligns its `is_real - 1` / `is_real - imm_c` (HSub) with the `+ -1`
@@ -146,9 +140,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have hpv := h_input.1.2.2.2.2.2.2.1.1
   rw [← hoc, ← hpv]; simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
 
--- TODO(reader-start): completeness mirrors `RTypeReader.completeness` — discharge the three
--- `RegisterAccessCols` ⟨Assumptions, Spec⟩ (op_c with the `(is_real-imm_c)`-binary `Assumptions`), the gates
--- from `Spec`, and the trivial Memory/Program emit obligations. (Scaffolded; to finish.)
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨⟨z0, z1, z2, z3⟩, hbin, h_immc, h_immbin_or, ⟨i0, i1, i2, i3⟩, hrac_a, hrac_b, hrac_c⟩ := h_spec

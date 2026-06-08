@@ -32,11 +32,11 @@ lemma val_256_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (256 : ZMod p) ≠ 0 := b
 /-! ## The byte operation (AND=0, OR=1, XOR=2) -/
 
 /-- Per-byte bitwise op, opcode-indexed (AND=0, OR=1, XOR=2). Matches SP1's
-`ByteOpcode.{AND,OR,XOR}.toNat` and sp1-lean's `byteOp`. -/
+`ByteOpcode.{AND,OR,XOR}.toNat`. -/
 def byteOp (op a b : ℕ) : ℕ :=
   if op = 0 then a &&& b else if op = 1 then a ||| b else a ^^^ b
 
-/-- The byte op of two bytes is a byte. Verbatim from sp1-lean `byteOp_lt256`. -/
+/-- The byte op of two bytes is a byte. -/
 lemma byteOp_lt256 (op a b : ℕ) (ha : a < 256) (hb : b < 256) :
     byteOp op a b < 256 := by
   have ha8 : a < 2 ^ 8 := by omega

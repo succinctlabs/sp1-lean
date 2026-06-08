@@ -33,8 +33,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
   refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, ?_⟩
-  · -- the `is_real`-gated high-bit equation, via `msb_of_raw`.
-    intro hr1eq
+  · intro hr1eq
     have hav := ha hr1eq
     have hneg : -input_is_real = -1 := by rw [hr1eq]
     have R := hr hneg
@@ -42,8 +41,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     refine msb_of_raw hav ?_
     simp only [RawSpec, sub_eq_add_neg]
     exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
-  · -- the byte padding requirement is vacuous for the binary gate (`toRawGated`, raw value).
-    exact binary_gate_req_vacuous hbin _
+  · exact binary_gate_req_vacuous hbin _
 
 set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -55,8 +53,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel]
   refine ⟨?_, ?_, ?_⟩
-  · -- the byte pull completeness obligation (fires only on a real row, `is_real = 1`).
-    intro hneg
+  · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have hav := ha hr1
     have hin_cast : ((input_a.val : ℕ) : ZMod p) = input_a := ZMod.natCast_zmod_val input_a
@@ -72,13 +69,10 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
         rw [Nat.cast_sub (by omega)]; push_cast; rw [hin_cast]; ring
       rw [hsub, ZMod.val_natCast_of_lt (by omega)]; omega
     · rw [if_neg hge, zero_mul, neg_zero, add_zero, h2]; omega
-  · -- SP1's `is_real` boolean gate (`is_real * (is_real - 1) = 0`).
-    rcases hbin with h | h <;> rw [h] <;> simp
-  · -- the ungated `msb` boolean assert — from the `Spec`'s booleanness conjunct.
-    rcases hmsbbool with h | h <;> rw [h] <;> simp
+  · rcases hbin with h | h <;> rw [h] <;> simp
+  · rcases hmsbbool with h | h <;> rw [h] <;> simp
 
-/-- The `U16MSBOperation` gadget as a Clean-native `FormalAssertion`: `is_real`-gated semantic spec,
-byte-bus range check, witnessing nothing. -/
+/-- SP1's `U16MSBOperation::eval_msb` as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions,

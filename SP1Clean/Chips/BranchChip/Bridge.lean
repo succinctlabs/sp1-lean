@@ -4,29 +4,12 @@ import SP1Clean.Chips.BranchChip.Formal
 import SP1Clean.Chips.JalChip.Bridge
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for BRANCH (+ `ChipKind` registration) — conditional control flow
+/-! # Native Sail bridge for BRANCH (+ `ChipKind` registration)
 
-`correct_branch_native` proves the RISC-V Sail execution of a B-type branch (`spec_btype`, calling
-LeanRV64D's `execute_BTYPE`) agrees with the SP1 chip's emulation (`sp1_branch`: set `nextPC` to the
-committed `next_pc` word; branches write no register), given the register/PC reads and the chip-side
-condition that resolves the committed `next_pc` (`pc + sign_extend imm` when the branch is taken, else
-`pc + 4`).
-
-`branch_chip_reaches_sail` composes the verified `BranchChip.Spec` into the bridge, flag-dispatched over
-the six opcodes (BEQ/BNE/BLT/BGE/BLTU/BGEU); `BranchChip.kind` enters BRANCH rows into the heterogeneous
-trace + soundness capstone, its `sailEquiv` quantifying the row's PC/rs1/rs2 reads, the committed-word
-reassembly, the immediate decode, and the committed-pc reassembly internally.
-
-**Control-flow novelty.** Unlike the unconditional jumps the committed `next_pc` is chosen by a *comparison*
-of the two source registers; the chip's `Spec` exposes the choice (the `is_branching`-gated target) and the
-per-opcode decision (`is_branching ↔ condition`), and the bridge dispatches the matching Sail `bop`.
-
-`correct_branch_native` proves the deep `execute_BTYPE` monad equivalence outright, given the Sail state is
-initialized and the committed `next_pc` is 4-byte aligned: the per-`bop` comparison (`==`/`!=`/`zopz0z*`)
-computing `taken` is related to `branchCond op` by the Sail-comparison ↔ `BitVec.slt`/`ult` identities, the
-taken arm's `jump_to (PC + sign_extend imm)` retires via `jump_to_of_mod4_eq_zero`, and both arms land
-`nextPC ← next_pc_word`. The whole chain — chip, `Spec` composition, `kind` — is axiom-clean (modulo the
-chip's own skeletal `LtOperationSigned`). -/
+`correct_branch_native` proves `execute_BTYPE ≡ sp1_branch` given PC/rs1/rs2 reads and the chip-side
+condition resolving `next_pc`. The taken arm's `jump_to` retires via `jump_to_of_mod4_eq_zero`; both arms
+land `nextPC ← next_pc_word`. `BranchChip.kind.sailEquiv` is the six-way BEQ/BNE/BLT/BGE/BLTU/BGEU
+conjunction. The whole chain is axiom-clean. -/
 
 namespace SP1Clean.BranchSail
 
@@ -56,7 +39,7 @@ def branchCond (op : bop) (x y : BitVec 64) : Prop :=
   | .BLTU => x.ult y = true
   | .BGEU => x.ult y = false
 
-/-! ### Sail comparison functions ↔ `BitVec.slt`/`ult` (relating the `execute_BTYPE` `taken` to `branchCond`) -/
+/-! ### Sail comparison functions ↔ `BitVec.slt`/`ult` -/
 
 private lemma zopz0zI_s_eq_slt (x y : BitVec 64) : zopz0zI_s x y = x.slt y := by
   simp [zopz0zI_s, BitVec.slt]
@@ -73,16 +56,8 @@ private lemma zopz0zKzJ_u_true_iff (x y : BitVec 64) :
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
-/-- Native Sail equivalence for a B-type branch. From the PC and the two source-register reads, the
-committed-`next_pc` resolution (`= pc + sign_extend imm` when the branch condition holds, else `= pc + 4`),
-the 4-byte alignment of the committed `next_pc`, and the state being initialized, the RISC-V `BTYPE`
-execution agrees with the SP1 chip emulation.
-
-The proof: `execute_BTYPE` reads rs1/rs2 and computes `taken` via the per-`bop` comparison
-(`==`/`!=`/`zopz0z*`, related to `branchCond op` by the identities above). On `taken` it does
-`jump_to (PC + sign_extend imm)`, retire-success under 4-byte alignment (`jump_to_of_mod4_eq_zero`), the
-committed `next_pc` being `pc + sign_extend imm`; on `¬taken` it retires with the staged `nextPC = pc + 4`,
-the committed `next_pc` being `pc + 4`. Both arms land `nextPC ← next_pc_word`, matching `sp1_branch`. -/
+/-- Native Sail equivalence for a B-type branch. Both arms land `nextPC ← next_pc_word`: taken via
+`jump_to_of_mod4_eq_zero` + the per-`bop` comparison identities, not-taken via the staged write. -/
 theorem correct_branch_native
     (next_pc_word : Word (ZMod p))
     (rs1 rs2 : BitVec 5) (imm : BitVec 13) (pc rs1_val rs2_val : BitVec 64)
@@ -113,12 +88,10 @@ theorem correct_branch_native
     rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
   have hsp_rs2 : SailState.get_reg? sp rs2 = some rs2_val := by
     rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs2
-  -- `execute_BTYPE` lands `nextPC ← next_pc_word` (jump target on taken, staged `pc+4` on fall-through).
   have hexec : EStateM.run (execute_BTYPE imm (.Regidx rs2) (.Regidx rs1) op) sp
       = .ok RETIRE_SUCCESS { s with regs := s.regs.insert Register.nextPC (Word.toBitVec64 next_pc_word) } := by
     rcases em (branchCond op rs1_val rs2_val) with hc | hc
-    · -- taken: `next_pc = pc + sign_extend imm`, 4-aligned ⇒ `jump_to` retires.
-      have hnpc := h_taken hc
+    · have hnpc := h_taken hc
       have htgt4 : (pc + sign_extend (m := 64) imm) % 4#64 = 0 := by
         rw [← hnpc]; apply BitVec.eq_of_toNat_eq; rw [BitVec.toNat_umod]; simpa using h_align
       have hjump := jump_to_of_mod4_eq_zero (pc + sign_extend (m := 64) imm) sp hsp_init htgt4
@@ -129,8 +102,7 @@ theorem correct_branch_native
           hsp.symm, hc]
          simp [hsp, hnpc]
          try (intro x hx; simp [Std.ExtDHashMap.get?_insert, hx]))
-    · -- not taken: `next_pc = pc + 4`, the staged write already holds.
-      have hnpc := h_not_taken hc
+    · have hnpc := h_not_taken hc
       cases op <;> simp only [branchCond, not_not, ne_eq] at hc ⊢ <;>
         (simp [execute_BTYPE, run_rX_bits, hsp_rs1, hsp_rs2, RETIRE_SUCCESS,
           zopz0zI_s_eq_slt, zopz0zI_u_eq_ult, zopz0zKzJ_s_true_iff, zopz0zKzJ_u_true_iff,
@@ -177,7 +149,6 @@ theorem branch_chip_reaches_sail
           = (sp1_branch (BranchChip.nextPcWord cols)).run s) := by
   obtain ⟨_, _, h_flags, h_taken_gated, h_fall_gated, h_decision⟩ := h_chip
   have h_brbin : cols.is_branching = 0 ∨ cols.is_branching = 1 := h_flags.2.2.2.2.2.2
-  -- the common derivation: from `is_branching = 1 ↔ branchCond op`, reach the Sail equivalence.
   have key : ∀ op : bop, (cols.is_branching = 1 ↔ branchCond op rs1_val rs2_val) →
       (spec_btype imm (.Regidx rs2) (.Regidx rs1) op).run s
         = (sp1_branch (BranchChip.nextPcWord cols)).run s := by
@@ -211,12 +182,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **BRANCH's `ChipKind` registration** — enters BRANCH rows into the heterogeneous trace and the
-soundness capstone. `view` threads the **data-dependent** committed `next_pc` (`cols.next_pc`, the chosen
-target) and the immutable I-type adapter (`ITypeReader.toAdapterView`), opcode `Σ is_b*·k`; there is no
-destination write. `sailEquiv` quantifies the PC/rs1/rs2 reads, the committed-word reassembly, the
-immediate decode, and the committed-pc reassembly internally, flag-dispatched over the six opcodes;
-`reaches_sail` is `branch_chip_reaches_sail`. -/
+/-- BRANCH's `ChipKind` registration. `view` threads `next_pc = cols.next_pc`, I-type adapter, opcode
+`Σ is_b*·k`; no destination write. `sailEquiv` is the six-way flag-dispatched conjunction; `reaches_sail`
+is `branch_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Branch"
   Inputs := BranchChip.Inputs

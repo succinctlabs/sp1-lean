@@ -16,11 +16,7 @@ gated state-bus balance (`multiplicitySum = 0` at every state value) is exactly 
 from `src` to `snk` — `exists_trail` — with **no** clock-injectivity or clock-advance side conditions:
 the whole-program transition path is forced by balance alone. The proof is a clean strong induction on
 the edge multiset: take an out-edge of the source, erase it, observe the remainder is balanced with the
-source shifted one step along, recurse.
-
-This replaces the bespoke clk-ordered `pcChain_of_balance_and_clkInj` (which needs `clkInjective` +
-`clkAdvance`) for the capstone spec; that lemma survives only to *recover* the old bundled capstone in
-the migration bridge. -/
+source shifted one step along, recurse. -/
 
 namespace SP1Clean.Soundness
 

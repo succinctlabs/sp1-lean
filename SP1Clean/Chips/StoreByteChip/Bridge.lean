@@ -6,13 +6,10 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for StoreByte (SB)
 
-`correct_store_byte_native` proves the RISC-V Sail execution of a width-1 `STORE`
-(`execute_STORE` with `width = 1`) agrees with the SP1 chip's *architectural* emulation: write
-`nextPC = pc + 4` and the low byte of `rs2` into `mem[addr]`. The width-1 analogue of
-`correct_store_word_native`, threading `SailMem.run_vmem_write_of_width_1`. Bytes have no alignment.
-
-As with the other stores, the chip's 8-byte read-modify-write `store_value` bus representation is a
-separate trace-level concern. -/
+`correct_store_byte_native` proves Sail's `execute_STORE` (width = 1) agrees with the SP1 chip
+emulation: write `nextPC = pc + 4` and the low byte of `rs2` into `mem[addr]`, via
+`SailMem.run_vmem_write_of_width_1`. Bytes have no alignment; the 8-byte read-modify-write
+`store_value` bus representation is a separate trace-level concern. -/
 
 namespace SP1Clean.StoreByteSail
 
@@ -103,9 +100,8 @@ theorem correct_store_byte_native
     hsp_rs2, hwrite]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- **End-to-end composition.** From the `StoreByte` chip's prover assumptions + decode + register/PC
-reads, the width-1 Sail `STORE` agrees with the SP1 chip emulation writing the low byte of `rs2` to
-`mem[addr]`. -/
+/-- End-to-end: from chip `Assumptions` + decode + register/PC reads, Sail's `SB` agrees with
+the SP1 chip emulation. -/
 theorem sb_chip_reaches_sail
     (input : StoreByteChip.Inputs (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
@@ -141,10 +137,7 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **StoreByte's `ChipKind` registration** (SB). Straight-line `view`, I-type adapter, gating selector
-`is_real`, opcode 36; stores write data memory (no rd write-back), so `rdWrite := store_value`. `sailEquiv`
-quantifies the prover `data` and `Assumptions inp data` internally (field stays `data`-free), the decode /
-fits facts, and the rs1/rs2/PC reads; `reaches_sail` is `sb_chip_reaches_sail`. -/
+/-- `ChipKind` registration for StoreByte (SB, opcode 36). -/
 def kind : Soundness.ChipKind p where
   name := "StoreByte"
   Inputs := StoreByteChip.Inputs

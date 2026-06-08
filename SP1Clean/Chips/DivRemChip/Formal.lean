@@ -33,15 +33,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-
--- (The `<Op>.circuit.localLength = N` `circuit_norm` lemmas that used to live here are now co-located
--- with each operation/reader's `def circuit` — `<Op>.circuit_localLength` — so every chip gets them.)
-
--- `Assumptions` (the soundness operand-`isU64` contract) now lives in `Defs` so the per-op soundness
--- split files can import it without a cycle through `Formal`.
-
 /-- Prover-side row well-formedness: the operand `isU64`s plus the `is_real` binary selector. (The
-threaded reader-block `Spec`s would be added here when the soundness/completeness proofs are filled in.) -/
+threaded reader-block `Spec`s would be added here when completeness is filled in.) -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧ (input.is_real = 0 ∨ input.is_real = 1)
@@ -75,8 +68,8 @@ theorem completeness :
 -- a large term — above the default heartbeat budget (cf. the `elaborated` instance in `Defs`).
 set_option maxHeartbeats 16000000 in
 /-- The `DivRem` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `div`/`divu`/`rem`/`remu`/`divw`/
-`remw`/`divuw`/`remuw` semantic contract on the extracted `DivRemCols` column struct.
-Soundness/completeness are skeleton `sorry`s. -/
+`remw`/`divuw`/`remuw` semantic contract on the extracted `DivRemCols` column struct. Soundness is
+proved; completeness is a deferred `sorry`. -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,

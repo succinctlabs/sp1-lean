@@ -5,29 +5,26 @@ import SP1Clean.Chips.ByteChip
 
 /-! # Trace-level Byte-bus consistency
 
-The **trace-level meaning** of the Byte interactions that `Readers/CPUState.lean` and
-`Readers/RTypeReader.lean` now emit on `Foundations/Channels.lean`'s `byteChannel` (the third layer of
-the faithful interaction representation: row emission → bus data → trace consistency), the Byte-bus
-sibling of `Soundness/StateConsistency.lean`. Each Add row sends **eight** byte rows into the
-preprocessed `ByteChip` (SP1's `send_byte`), all gated by `is_real`:
+The trace-level meaning of the Byte interactions that `Readers/CPUState.lean` and
+`Readers/RTypeReader.lean` emit on `Foundations/Channels.lean`'s `byteChannel` (row emission → bus data →
+trace consistency), the Byte-bus sibling of `Soundness/StateConsistency.lean`. Each row sends **eight**
+byte rows into the preprocessed `ByteChip` (SP1's `send_byte`), all gated by `is_real`:
 
 - two from `CPUState` — a 13-bit `Range` on `(clk_0_16 - 1)·8⁻¹` and a `U8Range` on `clk_16_24`; and
 - two per register operand (`rs1`/`rs2`/`rd`) — a 16-bit `Range` on `diff_low_limb` and a `U8Range` on
   the scaled timestamp high part — i.e. six from `RTypeReader`.
 
-We project each row to its eight signed `LookupAccess` sends (positive `is_real`, vacuous on padding —
-`byteLookups_padding`) feeding the multiset bus of `Foundations/InteractionBus.lean`, and to the per-row
-validity predicate `byteAccessValid` (every sent row is a valid `ByteChip` row, `ByteRowSpec`).
+Each row projects to eight signed `LookupAccess` sends (multiplicity `+is_real`, vacuous on padding —
+`byteLookups_padding`) feeding `Foundations/InteractionBus.lean`, and to the per-row validity predicate
+`byteAccessValid` (every sent row is a valid `ByteChip` row, `ByteRowSpec`).
 
 ## Honest scope
 
-`byteRows`, `byteLookups`, `byteAccessValid`, the aggregator, and the padding witness
-`byteLookups_padding` are all proven natively. The deep link **multiset-balance ⟹ `byteAccessValid`**
-(every sent byte row is received by the preprocessed `ByteChip`, whose own constraints make it a valid
-row) needs the provider side — a native `ByteChip` that `push`es the table with count multiplicities —
-which is absent here, exactly as `StateConsistency`'s receiving `ProgramChip` is absent. It is threaded
-as `TraceByteLink`, mirroring `TraceStateLink`: an honest assumption, not a `sorry`/axiom. Note this is a
-*weaker* per-row membership claim than State's cross-row PC chain — there is no inter-row reasoning. -/
+`byteRows`, `byteLookups`, `byteAccessValid`, the aggregator, and `byteLookups_padding` are proven. The
+link **multiset-balance ⟹ `byteAccessValid`** needs the provider side — a native `ByteChip` that pushes
+the table with count multiplicities — absent here, exactly as `StateConsistency`'s receiving `ProgramChip`
+is absent. It is threaded as `TraceByteLink`: an honest assumption, not a `sorry`/axiom. This is a weaker
+per-row membership claim than State's cross-row PC chain — there is no inter-row reasoning. -/
 
 namespace SP1Clean.Soundness
 
@@ -106,8 +103,8 @@ private theorem multiplicitySum_eq_zero_of_multOf {l : LookupAccessList} (k : Lo
 
 omit [NeZero p] in
 /-- **Gating is real.** A padding row (`is_real = 0`) contributes `0` to *every* Byte-bus key: all eight
-sends have multiplicity `is_real.val = 0`. The per-row fact the old zero-witness byte block could not
-express — the emission is genuinely `is_real`-gated, matching SP1's `send_byte(…, is_real)`. -/
+sends have multiplicity `is_real.val = 0`. The emission is genuinely `is_real`-gated, matching SP1's
+`send_byte(…, is_real)`. -/
 theorem byteLookups_padding (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (byteLookups r) k = 0 := by
   intro k
@@ -124,8 +121,8 @@ open SP1Clean.ByteChip (ByteProvider byteRowKey byteRowSpec_of_provider)
 LogUp/GKR fact, the lone remaining threaded assumption), every real row's sent byte rows are valid
 (`byteAccessValid`). The argument: a real send has multiplicity `is_real.val = 1 > 0`; on a balanced bus
 the provider must cancel it (`provider_touches_pos_send`), so it carries an entry at that key; the provider
-only carries valid rows, and the key determines the row, so the sent row is that valid row. This replaces
-the raw `TraceByteLink` assumption with `isConsistentBalanced` + the native `ByteProvider`. -/
+only carries valid rows, and the key determines the row, so the sent row is that valid row. Reduces the
+raw `TraceByteLink` assumption to `isConsistentBalanced` + the native `ByteProvider`. -/
 theorem byteAccessValid_of_balance [Fact (1 < p)]
     (rows : List (Trace.RowView (ZMod p))) (prov : LookupAccessList)
     (h_prov : ByteProvider (p := p) prov)

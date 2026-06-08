@@ -4,16 +4,9 @@ import SP1Clean.Extracted.BitwiseOperation
 
 /-! # `BitwiseOperation` — the arithmetic core (`AssertSpec` / `InteractSpec` + the byteOp lemma)
 
-The byte-level bitwise op has **no algebraic asserts** (every byte fact comes from the byte bus), so
-`AssertSpec` is trivially `True`; `InteractSpec` is the literal meaning of SP1's `interactions` list at
-`is_real = 1` — each result byte is the per-byte `byteOp opcode` of the operand bytes (all genuine
-bytes). `bitwise_of_byteOp` is the soundness core: from the per-byte `byteOp` relation, derive the
-opcode-cased semantic result (AND/OR/XOR over the 8 bytes).
-
-The auto-generated circuit (`Inputs`/`main`/`elaborated`) lives in the sibling `Extracted` module; the
-`FormalAssertion` contract in `Formal`; `Faithful/BitwiseOperation.lean` anchors the extracted
-`constraints` to `AssertSpec`/`InteractSpec`. Mirrors `operations/bitwise.rs` (`send_byte(opcode,
-result, a, b, is_real)` per byte). -/
+`AssertSpec` is trivially `True` (no algebraic asserts, all byte facts via the byte bus). `InteractSpec`
+is the literal `interactions` list at `is_real = 1`; `bitwise_of_byteOp` derives the opcode-cased
+semantic result. Faithful to `operations/bitwise.rs` (`send_byte(opcode, result, a, b, is_real)` per byte). -/
 
 namespace SP1Clean.BitwiseOperation
 
@@ -25,9 +18,7 @@ def AssertSpec (_a _b : Vector (ZMod p) 8) (_opcode : ZMod p)
     (_cols : Extracted.BitwiseOperation (ZMod p)) : Prop := True
 
 /-- **Interaction half** — the literal meaning of SP1's `BitwiseOperation` `interactions` list at
-`is_real = 1`: each result byte is the per-byte `byteOp opcode` of the operand bytes (and all three
-are genuine bytes). This is verbatim the right-hand side of
-`FaithfulBitwise.bitwise_byte_constraints_faithful`. -/
+`is_real = 1`: each result byte is the per-byte `byteOp opcode` of the operand bytes. -/
 def InteractSpec (a b : Vector (ZMod p) 8) (opcode : ZMod p)
     (cols : Extracted.BitwiseOperation (ZMod p)) : Prop :=
   ((cols.result[0].val < 256 ∧ a[0].val < 256 ∧ b[0].val < 256) ∧ cols.result[0].val = byteOp opcode.val a[0].val b[0].val) ∧
@@ -39,11 +30,8 @@ def InteractSpec (a b : Vector (ZMod p) 8) (opcode : ZMod p)
   ((cols.result[6].val < 256 ∧ a[6].val < 256 ∧ b[6].val < 256) ∧ cols.result[6].val = byteOp opcode.val a[6].val b[6].val) ∧
   ((cols.result[7].val < 256 ∧ a[7].val < 256 ∧ b[7].val < 256) ∧ cols.result[7].val = byteOp opcode.val a[7].val b[7].val)
 
-/-- Forward (soundness) core, functional form: from the per-byte `byteOp` relation — the content of
-`InteractSpec` (what each byte pull's `ByteRowSpec` guarantee gives via `byteRowSpec_byteOp`) — derive
-the opcode-cased semantic result. Each opcode case rewrites `opcode.val` to its literal and collapses
-`byteOp` via `byteOp_{zero,one,two}`. Stated over `result : Fin 8 → ZMod p` so its conclusion unifies
-directly with the soundness goal (`result := fun i => input.cols.result[i]`). -/
+/-- Soundness core: from the per-byte `byteOp` relation (each byte pull's `ByteRowSpec` guarantee),
+derive the opcode-cased semantic result (AND/OR/XOR). -/
 theorem bitwise_of_byteOp {a b : Vector (ZMod p) 8} {opcode : ZMod p} {result : Fin 8 → ZMod p}
     (h_byteOp : ∀ i : Fin 8, (result i).val = byteOp opcode.val a[↑i].val b[↑i].val) :
     (opcode = 0 → ∀ i : Fin 8, (result i).val = a[↑i].val &&& b[↑i].val) ∧

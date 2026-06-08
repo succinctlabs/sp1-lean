@@ -1,10 +1,9 @@
 import SP1Clean.Foundations.InteractionBus
 import Mathlib.Data.ZMod.Basic
 
-/-! # The field ⇒ ℤ balance bridge (item-5-proper, core)
+/-! # The field ⇒ ℤ balance bridge
 
-The genuinely novel mathematical core of the Clean `BalancedInteractions` ↔ native
-`isConsistentBalanced` reconciliation (item-5-proper, `docs/roadmap.md` §B5).
+The mathematical core of the Clean `BalancedInteractions` ↔ native `isConsistentBalanced` reconciliation.
 
 Clean's `BalancedInteractions` balances **field** multiplicities (`∑ mult = 0` in `ZMod p`) with only a
 `length < ringChar` count guard; native `isConsistentBalanced` balances **ℤ** multiplicities
@@ -13,11 +12,11 @@ where every multiplicity is `±is_real ∈ {0, ±1}`, the centered representativ
 `{0, ±1}`, so a per-key ℤ-sum that is `≡ 0 (mod p)` and bounded by the row count `< p` is forced to be
 exactly `0`. That is this file's `isConsistentBalanced_of_intCast_zero`.
 
-`hmod` here — `∀ k, (↑(multiplicitySum accesses k) : ZMod p) = 0` — is the *native restatement* of
+`hmod` — `∀ k, (↑(multiplicitySum accesses k) : ZMod p) = 0` — is the *native restatement* of
 Clean's field balance: `↑(signedVal x) = x` in `ZMod p`, so `↑(∑ signedVal) = ∑ mult = balanceOf`
 (Clean). Translating Clean's per-`Array F`-message balance into this per-`LookupKey` form (via `toAccess`
 + `ZMod.val` injectivity), and assembling with the witness↔chipRows correspondence and `weakSoundness`,
-are the remaining (large) parts of item-5-proper. -/
+are the remaining parts of the overall balance bridge. -/
 
 namespace SP1Clean.LookupAccessList
 

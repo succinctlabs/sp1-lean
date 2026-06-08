@@ -1,13 +1,12 @@
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Foundations.Bitwise
 
-/-! # Shared SP1 opcode datatype (re-created, byte-interaction only)
+/-! # Shared SP1 opcode datatype (byte-interaction only)
 
-The single, project-wide port of SP1's `ByteOpcode` / `Opcode` opcode datatypes (and the scoped
+The single, project-wide `ByteOpcode` / `Opcode` opcode datatypes (and the scoped
 `CoeHead (ZMod p) ℕ` coercion), co-designed to match the surface syntax emitted by the
 (field-generic) `sp1-constraint-compiler` `--format lean` backend (`.byte (ByteOpcode.ofNat n) …`,
-`.program … (Opcode.ofNat n) …`). Because the new project is on Lean 4.28 + public Clean and cannot
-import sp1-lean's 4.29 `SP1Foundations`, these are re-created here.
+`.program … (Opcode.ofNat n) …`).
 
 The bus-interaction vocabulary built on these opcodes (`AirInteraction` / `Dir` / `Interaction` +
 `Interaction.toProp`) and the two-list (`asserts` / `interactions`) constraint representation the
@@ -15,9 +14,8 @@ generated modules emit live in `SP1Clean/Extracted/ExtractionDSL.lean`.
 
 The `ByteOpcode` here carries every SP1 opcode under a single unified `constrain` giving the
 **real** meaning for every opcode — `Range` (byte range checks, used by Add), AND/OR/XOR (used by
-Bitwise, via `byteOp`), and `U8Range`/`LTU`/`MSB` (used by the readers, Mul, Load, and Lt) — all
-ported from `../sp1-lean/SP1Foundations/ByteOpcode.lean`, so every per-chip faithfulness anchor
-shares one datatype.
+Bitwise, via `byteOp`), and `U8Range`/`LTU`/`MSB` (used by the readers, Mul, Load, and Lt) — so
+every per-chip faithfulness anchor shares one datatype.
 
 The generated `constraints` defs are field-generic with a `[CoeHead F ℕ]` hypothesis, which
 backs the `ByteOpcode.ofNat opcode` coercion when the opcode is a dynamic field value (e.g.
@@ -53,8 +51,7 @@ SP1's `ByteOpcode` numbering and the inverse the `sp1-constraint-compiler` emitt
 `a.val < 2 ^ b.val`; `U8Range` (used by CPUState's `clk_16_24` byte check) bounds all three
 operands `< 256`; AND/OR/XOR (used by Bitwise) say `a` is the per-byte bitwise op of the
 two byte operands, all bounded `< 256`; `MSB` (used by Mul/LoadByte/signed-Lt) says `a` is the
-boolean top bit of `b` (`a = 1 ↔ 128 ≤ b.val`); `LTU` says `a` is the boolean `b.val < c.val`.
-All ported from `SP1Foundations/ByteOpcode.lean` (in the repo's `.val <`-style). -/
+boolean top bit of `b` (`a = 1 ↔ 128 ≤ b.val`); `LTU` says `a` is the boolean `b.val < c.val`. -/
 def constrain {p : ℕ} [NeZero p] (op : ByteOpcode) (a b c : ZMod p) : Prop :=
   match op with
   | AND => (a.val < 256 ∧ b.val < 256 ∧ c.val < 256) ∧ a.val = b.val &&& c.val
@@ -101,7 +98,7 @@ def Opcode.ofNat (n : ℕ) : Opcode := n
 
 The `AirInteraction` / `Dir` / `Interaction` (+ `Interaction.toProp`) bus vocabulary and the
 two-list (`asserts : List F`, `interactions : List (Interaction F)`) constraint representation the
-generated modules speak now live in `SP1Clean/Extracted/ExtractionDSL.lean` (the
+generated modules use live in `SP1Clean/Extracted/ExtractionDSL.lean` (the
 `SP1Clean.Extracted` namespace), next to the generated files that consume them. This file
 keeps only the shared `ByteOpcode` / `Opcode` opcode datatypes (above) and the scoped `CoeHead`
 coercion (below) those interactions are built from. -/

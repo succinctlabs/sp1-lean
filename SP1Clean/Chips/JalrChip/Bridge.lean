@@ -5,28 +5,12 @@ import SP1Clean.Chips.JalrChip.Formal
 import SP1Clean.Chips.JalChip.Bridge
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for JALR (+ `ChipKind` registration) — register-indirect control flow
+/-! # Native Sail bridge for JALR (+ `ChipKind` registration)
 
-`correct_jalr_native` proves the RISC-V Sail execution of `JALR` (`spec_jalr`, calling LeanRV64D's
-`execute_JALR`) agrees with the SP1 chip's emulation (`sp1_jalr`: set `nextPC` to the committed,
-LSB-cleared jump target and write the link address `pc + 4` to `rd`), given the chip's **semantic** facts
-(the jump/link identities = `JalrChip.circuit`'s `Spec`) plus the register/PC + decode + LSB-clearing
-received facts.
-
-`jalr_chip_reaches_sail` composes the verified `JalrChip.Spec` into the bridge; `JalrChip.kind` enters
-JALR rows into the heterogeneous trace (the generalized `Soundness.ChipKind`, whose `sailEquiv` quantifies
-the row's PC read, the rs1 register read, the immediate decode, the LSB-clearing relation, and the cleared
-target's alignment internally).
-
-**Control-flow novelty.** `JalrChip.kind.view` threads a **data-dependent, LSB-cleared**
-`next_pc = #v[add_operation.value[0] - lsb, …]` (RISC-V's `(rs1 + imm) & ~1`), the jump base being a
-**source register** (rs1) rather than the program counter.
-
-`correct_jalr_native` proves the deep `execute_JALR` monad equivalence outright, given the Sail state is
-initialized with a valid mem config: `update_elp_state` is a no-op (`update_elp_state_of_isInitialized`),
-the `rX_bits` rs1 read survives the staged `nextPC` write, and `jump_to (BitVec.update target 0 0#1)`
-retires under 4-byte alignment (`jump_to_of_mod4_eq_zero`), then `get_next_pc`/`set_next_pc`/`wX_bits`
-reduce to match `sp1_jalr`. The whole chain — chip, `Spec` composition, `kind` — is axiom-clean. -/
+`correct_jalr_native` proves `execute_JALR` agrees with `sp1_jalr` given the chip's jump/link facts and
+LSB-clearing. Key non-obvious moves: `update_elp_state` is a no-op (`update_elp_state_of_isInitialized`);
+`jump_to (BitVec.update target 0 0#1)` retires via `jump_to_of_mod4_eq_zero` (LSB-clearing guarantees
+4-byte alignment). `JalrChip.kind.view` threads `next_pc = add_operation.value[0] - lsb` (LSB-cleared). -/
 
 namespace SP1Clean.JalrSail
 
@@ -49,17 +33,8 @@ def sp1_jalr (rd : regidx) (next_pc_word op_a_word : Word (ZMod p)) : SailM Unit
   wX_bits rd (Word.toBitVec64 op_a_word)
 
 omit [Fact (2 ^ 17 < p)] in
-/-- Native Sail equivalence for JALR. From the rs1 register read (`rs1_val`), the committed LSB-cleared
-jump target (`= (rs1_val + sign_extend imm) & ~1`), the committed link address (`= pc + 4`), the 4-byte
-alignment of the cleared target, the PC read, and the state being initialized + a valid mem config, the
-RISC-V `JALR` execution agrees with the SP1 chip emulation.
-
-The proof: `update_elp_state` (Zicfilp landing-pad bookkeeping) is state-preserving
-(`update_elp_state_of_isInitialized`); `execute_JALR` reads rs1 (`rs1_val`), forms `target = rs1_val +
-sign_extend imm`, and `jump_to (BitVec.update target 0 0#1)` retires successfully because the cleared target
-is 4-byte aligned (`jump_to_of_mod4_eq_zero`); it then reads the staged `nextPC = pc + 4` as the link,
-overwrites `nextPC ← BitVec.update target 0 0#1` via `set_next_pc`, and writes the link to `rd` — matching
-`sp1_jalr` field-for-field (the staged write collapses via `ExtDHashMap_insert_insert_self`). -/
+/-- Native Sail equivalence for JALR: given the committed LSB-cleared jump target, link address, 4-byte
+alignment, PC read, and initialized state with valid mem config, `execute_JALR ≡ sp1_jalr`. -/
 theorem correct_jalr_native
     (_op_c_imm next_pc_word op_a_word : Word (ZMod p))
     (rd rs1 : BitVec 5) (imm : BitVec 12) (pc rs1_val : BitVec 64) (s : SailState)
@@ -88,12 +63,10 @@ theorem correct_jalr_native
       h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_mseccfg_disabled
       h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_htif_disabled
       h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hconfig.h_pma_regions }
-  -- the Zicfilp prefix is a no-op; the rs1 read survives the staged `nextPC` write.
   have hupd : EStateM.run (update_elp_state (.Regidx rs1)) sp = .ok () sp :=
     update_elp_state_of_isInitialized _ sp hsp_init hsp_config
   have hsp_rs1 : SailState.get_reg? sp rs1 = some rs1_val := by
     rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
-  -- the cleared jump target is `next_pc_word`, 4-aligned ⇒ `jump_to` retires.
   have htgt4 : BitVec.update (rs1_val + sign_extend (m := 64) imm) 0 0#1 % 4#64 = 0 := by
     rw [← h_lsbclear]; apply BitVec.eq_of_toNat_eq; rw [BitVec.toNat_umod]; simpa using h_align
   have hjump : EStateM.run (jump_to (BitVec.update (rs1_val + sign_extend (m := 64) imm) 0 0#1)) sp
@@ -145,11 +118,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **JALR's `ChipKind` registration** — enters JALR rows into the heterogeneous trace and the soundness
-capstone. `view` threads the **data-dependent, LSB-cleared** `next_pc = #v[add_operation.value[0] - lsb, …]`
-and the I-type adapter (`ITypeReader.toAdapterView`, `imm_b = 0` rs1 register read, `imm_c = 1` immediate),
-opcode 47. `sailEquiv` quantifies the row's PC read, the rs1 read, the committed-rs1/decode/`op_a_0`/pc/
-LSB-clearing/alignment preconditions internally, and `reaches_sail` is `jalr_chip_reaches_sail`. -/
+/-- JALR's `ChipKind` registration. `view` threads the LSB-cleared `next_pc`, I-type adapter, opcode 47.
+`sailEquiv` quantifies PC/rs1 read, decode, LSB-clearing, and alignment preconditions internally;
+`reaches_sail` is `jalr_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Jalr"
   Inputs := JalrChip.Inputs

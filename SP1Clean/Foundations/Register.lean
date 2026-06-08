@@ -4,7 +4,6 @@ import LeanRV64D
 import SP1Clean.Foundations.Misc
 set_option linter.unusedSimpArgs false
 
--- dt: should this be a macro instead?
 @[simp] abbrev SailState := PreSail.SequentialState RegisterType Sail.trivialChoiceSource
 
 /-- Every register has been initialized to some unspecified value. -/
@@ -27,8 +26,7 @@ section regidx
 
 instance : DecidableEq regidx | .Regidx v, .Regidx v' => decidable_of_iff (v = v') (by simp)
 
-/-- Convert a bitvec into the corresponding `RV64` register.
-dt: some of the lemmas below would be nicer if we just mapped `0#5` and `31#5` to diff values. -/
+/-- Convert a bitvec into the corresponding `RV64` register. -/
 def reg_idx_to_Register (idx : BitVec 5) : Register :=
   match idx with
   | 1#5 => Register.x1

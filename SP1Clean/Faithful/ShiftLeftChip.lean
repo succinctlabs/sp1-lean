@@ -4,19 +4,13 @@ import SP1Clean.Chips.ShiftLeftChip.Formal
 import SP1Clean.Foundations.SP1Constraint
 import SP1Clean.Extracted.ShiftLeftChip
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (ShiftLeft) — skeleton
+/-! # Faithfulness anchor — `ShiftLeftChip` constraints → native `AssertSpec`/`InteractSpec`
 
-Anchors the native `ShiftLeftChip`'s two structural specs (`AssertSpec` / `InteractSpec`) to **SP1's
-`ShiftLeftChip` constraint definition** (`Extracted/ShiftLeftChip.lean`: a composed
+Anchors the native `ShiftLeftChip`'s two structural specs (`AssertSpec` / `InteractSpec`) to SP1's
+`ShiftLeftChip` constraint definition (`Extracted/ShiftLeftChip.lean`: a composed
 `U16MSBOperation ++ CPUState ++ ALUTypeReader` prefix plus the inline shift assertZeros and the nine
-byte-range sends).
-
-Following the two-list split (per `Faithful/AddOperation.lean`'s `add_asserts_faithful` /
-`add_interactions_faithful`), there are two anchor theorems — one per extracted list. They are stated
-here as the **forward** (soundness) direction (the extracted constraints entail the structural specs),
-left as skeleton `sorry`s. The full `↔` form — peeling the composed `U16MSBOperation`/`CPUState`/
-`ALUTypeReader` sub-lists via `forall_append_pair` and their own anchors, à la `Faithful/CPUState.lean`
-— is the deferred fill-in. -/
+byte-range sends). Two anchor theorems, one per extracted list, both proved in the forward (`→`)
+direction; the full `↔` form is future work. -/
 
 namespace SP1Clean.Faithful
 

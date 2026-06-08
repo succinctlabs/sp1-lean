@@ -5,20 +5,17 @@ import Mathlib.Tactic.IntervalCases
 /-! # `SubOperation` — the arithmetic core (`RawSpec` + borrow-chain lemmas)
 
 The structural borrow-bool + limb-range form `RawSpec`, and the two native borrow-chain theorems
-(`subSemantics_of_carries` / `carries_of_subSemantics`) the gadget's soundness/completeness route
-through — re-deriving the borrow chain natively (no SP1Operations borrow).
+(`subSemantics_of_carries` / `carries_of_subSemantics`) the gadget's soundness/completeness route through.
 
 SP1 implements `a - b` as `a + (2^64 - b)`, using `2^16 - 1 - b[i]` as the added limb with the carry
-**initialized to 1** (`sp1/crates/core/machine/src/operations/sub.rs`). So the borrow carry is
-`c_i = (a[i] + 65535 - b[i] - value[i] + c_{i-1}) * 65536⁻¹` (with `c_{-1} = 1`), which is the **borrow
-form** of the constraints verbatim — the `RawSpec` matches SP1's Rust shape, so the faithfulness anchor
-(`Faithful/Sub.lean`) is a trivial `simp`.
+**initialized to 1** (`sp1/crates/core/machine/src/operations/sub.rs`). The borrow carry is
+`c_i = (a[i] + 65535 - b[i] - value[i] + c_{i-1}) * 65536⁻¹` (with `c_{-1} = 1`), matching SP1's Rust
+shape verbatim — the faithfulness anchor (`Faithful/Sub.lean`) is a trivial `simp`.
 
-The arithmetic core feeds the 16-bit complement `bbar := 65535 - b[i]` (a genuine 16-bit value, via
-`val_compl_65535`) into the **unchanged** `limb_lift`, keeping every additive sum `< p` exactly as in Add;
-the BitVec subtraction goal is converted to addition up front with `BitVec.eq_sub_iff_add_eq`, after which
-the endgame `omega` is identical to Add's. The witnessed circuit (`populate` + `main`/`elaborated`) and its
-`FormalAssertion` contract live in the sibling `Elaborated`/`Formal` modules. -/
+The arithmetic routes the 16-bit complement `bbar := 65535 - b[i]` (a genuine 16-bit value, via
+`val_compl_65535`) through `limb_lift`; the BitVec subtraction goal is converted to addition up front with
+`BitVec.eq_sub_iff_add_eq`. The witnessed circuit (`populate` + `main`/`elaborated`) and its `FormalAssertion`
+contract live in the sibling `Elaborated`/`Formal` modules. -/
 
 namespace SP1Clean.SubOperation
 

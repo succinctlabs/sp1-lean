@@ -11,11 +11,8 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # `SubOperation` — `populate` (the witness generator)
 
-SP1's `SubOperation::populate` — the witness generator the composing chip uses to fill `cols.value` —
-ported natively, plus `spec_populate` (the result satisfies the gadget `Spec`). The elaborated
-`SubOperation::eval` circuit (`main` + `ElaboratedCircuit`) is the auto-generated sibling `Extracted`
-module; the arithmetic core is in `RawSpec`; the `FormalAssertion` contract
-(soundness/completeness/`circuit`) in `Formal`. -/
+SP1's `SubOperation::populate` ported natively; `spec_populate` proves the result satisfies `Spec`.
+Circuit in `Extracted`, arithmetic core in `RawSpec`, `FormalAssertion` in `Formal`. -/
 
 namespace SP1Clean.SubOperation
 
@@ -30,12 +27,9 @@ omit [Fact p.Prime] in
 /-- `16 < p`, so the `Range` byte-row width column `16` round-trips through `byteRowSpec_range`. -/
 lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 
-/-- The native witness assignment, **field-generic** over `ZMod p`: given the operand words `a`, `b`,
-the result word whose limbs are the four base-2^16 limbs of `(a - b) mod 2^64` (SP1's `a + (2^64 - b)`
-two's-complement form: `65535 - bᵢ` per limb, carry init `1`). This is SP1's `SubOperation::populate`
-ported to Lean — the bit-decomposition (`.val`, `% / 65536`) is intrinsically over ℕ but stays inside the
-`Word (ZMod p)` domain. The **composing chip** witnesses `value` with it (the gadget itself is a pure
-assertion); `WitnessTests/SubOperationWitness.lean` checks it reproduces SP1's real `populate` at KoalaBear. -/
+/-- Native port of SP1's `SubOperation::populate`: the four base-2^16 limbs of `(a - b) mod 2^64`
+via two's-complement (`65535 - bᵢ` per limb, carry init `1`).
+Conformance to SP1's Rust `populate` checked by `WitnessTests/SubOperationWitness.lean`. -/
 def populate (a b : Word (ZMod p)) : Word (ZMod p) :=
   let s0 := a[0].val + (65535 - b[0].val) + 1
   let s1 := a[1].val + (65535 - b[1].val) + s0 / 65536
@@ -45,9 +39,8 @@ def populate (a b : Word (ZMod p)) : Word (ZMod p) :=
      ((s2 % 65536 : ℕ) : ZMod p), ((s3 % 65536 : ℕ) : ZMod p)]
 
 set_option maxHeartbeats 2000000 in
-/-- The result `value = populate a b` satisfies the gadget `Spec` for any `is_real`. This is the
-witness-reconstruction the composing chip uses to discharge the `assertion SubOperation.circuit`'s
-completeness obligation. -/
+/-- `populate a b` satisfies the gadget `Spec` for any `is_real`. The composing chip uses this to
+discharge its assertion obligation. -/
 theorem spec_populate {a b : Word (ZMod p)} (ha : a.isU64) (hb : b.isU64) (is_real : ZMod p) :
     Spec (⟨a, b, { value := populate a b }, is_real⟩ : Inputs (ZMod p)) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩

@@ -87,9 +87,9 @@ structure TraceProgramValid (rows : List (Trace.RowView (ZMod p)))
     (inROM : ProgramRow (ZMod p) → Prop) : Prop where
   rom_holds : ProgramConsistent inROM (aggregateProgramAccesses rows)
 
-/-- **The crux (threaded).** Instruction-fetch membership in the committed program ROM. It is now
-*discharged* from the native `ProgramProvider` + a balanced Program bus by `programConsistent_of_balance`
-below (the byte-bus pattern), so the only residual assumption is the LogUp/GKR `isConsistentBalanced`. -/
+/-- **The crux (threaded).** Instruction-fetch membership in the committed program ROM. Discharged from
+the native `ProgramProvider` + a balanced Program bus by `programConsistent_of_balance` below; the only
+residual assumption is the LogUp/GKR `isConsistentBalanced`. -/
 def TraceProgramLink (rows : List (Trace.RowView (ZMod p)))
     (inROM : ProgramRow (ZMod p) → Prop) : Prop :=
   ProgramConsistent inROM (aggregateProgramAccesses rows)
@@ -100,10 +100,9 @@ theorem traceProgramValid_of_programLink (rows : List (Trace.RowView (ZMod p)))
     TraceProgramValid rows inROM :=
   ⟨h_link⟩
 
-/-- **Gating is real.** A padding row (`is_real = 0`) contributes zero to *every* Program-bus key: its
-single signed contribution has multiplicity 0. This is the per-row fact the old zero-witness `adapter`
-block could not express — the emission is genuinely `is_real`-gated, matching SP1's `send … is_trusted`
-(`= is_real` on Add). -/
+/-- **Gating is real.** A padding row (`is_real = 0`) contributes zero to every Program-bus key: its
+single signed contribution has multiplicity 0. The emission is `is_real`-gated, matching SP1's
+`send … is_trusted` (`is_trusted = is_real` on Add). -/
 theorem programLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (programLookups r) k = 0 := by
   have hz : ((programAccess r).is_real.val : ℤ) = 0 := by
@@ -163,13 +162,12 @@ theorem programConsistent_of_balance [NeZero p]
 open Circuit SP1Clean.InteractionRecovery
 open SP1Clean.Channels (programChannel ProgramMsg)
 
-/-- **emitted = projection for the Program bus.** The hand-written `programLookups r` is exactly the
-`toAccess`-image of the single Program interaction `Readers/RTypeReader.lean` actually emits at `offset`:
-the recovery drops the three byte-only `RegisterAccessCols` subcircuits (`interactionsWith_main_eq_nil`)
-and the `op_a_0` Equality gates (`filter_interactions_formalAssertion_eq_nil`), leaving the lone program
-fetch, whose `toAccess` (`toAccess_emitted_program`) matches `programLookups` field-for-field under the
-row-realises-circuit hypotheses. So `programLookups` is a derived projection of the real emission, not a
-hand-authored shadow (the Program sibling of `StateConsistency.stateLookups_eq_emitted`). -/
+/-- **emitted = projection for the Program bus.** The hand-written `programLookups r` equals the
+`toAccess`-image of the single Program interaction `Readers/RTypeReader.lean` emits at `offset`: the
+three byte-only `RegisterAccessCols` subcircuits and the `op_a_0` Equality gates are filtered out,
+leaving the lone program fetch whose `toAccess` matches `programLookups` field-for-field under the
+row-realises-circuit hypotheses. So `programLookups` is a derived projection of the real emission
+(the Program sibling of `StateConsistency.stateLookups_eq_emitted`). -/
 theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     (r : Trace.RowView (ZMod p)) (env : Environment (ZMod p)) (offset : ℕ)
     (input : Var Readers.RTypeReader.Inputs (ZMod p))
@@ -191,8 +189,7 @@ theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
       (((Readers.RTypeReader.main input).operations offset).interactionsWith
           programChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   -- The three `RegisterAccessCols` sub-assertions emit only `byteChannel`, and the five `op_a_0` Equality
-  -- gates emit nothing — so their `programChannel` filter is empty (`filter_interactions_formalAssertion_eq_nil`,
-  -- now that the register-access readers are themselves `FormalAssertion`s).
+  -- gates emit nothing — so their `programChannel` filter is empty (`filter_interactions_formalAssertion_eq_nil`).
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil Readers.RegisterAccessCols.circuit programChannel.toRaw
       (n := n) inp (by simp [circuit_norm, Readers.RegisterAccessCols.circuit])

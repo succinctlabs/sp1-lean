@@ -11,21 +11,18 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # Native `ITypeReader` reader — the I-type register-adapter per-row checks as a Clean `FormalAssertion`
 
-The register adapter for **I-type** instructions (loads, and any reg-reg-imm op): a destination write
-`op_a` (= rd), a source read `op_b` (= rs1), and an **immediate** `op_c_imm` (no register read). SP1's
+The register adapter for **I-type** instructions (loads and reg-reg-imm ops): a destination write `op_a`
+(= rd), a source read `op_b` (= rs1), and an **immediate** `op_c_imm` (no op_c register read). SP1's
 `ITypeReader::eval` (`crates/core/machine/src/adapter/register/i_type.rs`, mirrored in
 `Extracted/ITypeReader.lean`) emits per row:
 
-- the **program** send (instruction fetch), gated by `is_trusted`, carrying `op_c_imm` as the operand-`c`
-  word with `imm_c = 1`;
-- per operand (rd write / rs1 read), two **memory** interactions (read prev-state, write/read new-state),
-  gated by `is_real`; and
+- the **program** send (instruction fetch), gated by `is_trusted`, carrying `op_c_imm` with `imm_c = 1`;
+- per operand (rd write / rs1 read), two **memory** interactions, gated by `is_real`; and
 - per operand, two **byte** timestamp checks, gated by `is_real`.
 
-Sibling of `Readers/RTypeReader.lean` — identical structure minus the op_c register access. The genuine
-per-row constraints are the two `RegisterAccessCols` timestamp checks (composed as `subcircuit`s) and the
-`op_a_0` binary + the four `op_a_0 * op_a_write_value_i = 0` zeroing gates (`rd = x0 ⇒ write 0`). The
-`.program`/`.memory` interactions' meaning is the trace-level multiset balance. -/
+The genuine per-row constraints are the two `RegisterAccessCols` timestamp checks (composed as
+`subcircuit`s) and the `op_a_0` binary + the four `op_a_0 * op_a_write_value_i = 0` zeroing gates
+(`rd = x0 ⇒ write 0`). The `.program`/`.memory` interactions' meaning is the trace-level multiset balance. -/
 
 namespace SP1Clean.Readers.ITypeReader
 

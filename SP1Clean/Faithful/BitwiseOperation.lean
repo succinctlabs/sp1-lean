@@ -15,7 +15,7 @@ definition** (`Extracted/BitwiseOperation.lean`: eight per-byte opcode sends). T
 `byteOp` equivalence is already proved, op-uniformly, by
 `FaithfulBitwise.bitwise_byte_constraints_faithful` (in `Faithful/BitwiseU16Operation.lean`); the
 gadget's `RawSpec` is defined to be exactly that lemma's right-hand side, so this anchor is a thin
-restatement — no constraint re-proof, stays axiom-clean. -/
+restatement — no constraint re-proof, axiom-clean. -/
 
 namespace SP1Clean.Faithful
 

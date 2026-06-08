@@ -24,18 +24,11 @@ that, given those inputs, imposes exactly SP1's per-row checks/interactions:
 - the two **State** bus interactions: `receive_state(clk, pc)` (`emit (-is_real)`) and
   `send_state(clk + clk_inc, next_pc)` (`emit (is_real)`).
 
-Earlier this reader was a `FormalCircuit` that *witnessed* its own clk/pc block and baked
-`next_pc = pc + 4` / `clk + 8` in as literals. That was unfaithful for control flow (SP1 passes `next_pc`
-as a parameter, a dedicated column block for branches) and forced the increments to be constants. The
-faithful form here threads `cols`/`next_pc`/`clk_inc` as inputs, exactly as the Rust `eval` signature; the
-chip forms `next_pc` from its own committed `cols.pc`, so there is no circularity.
-
-Because `cols` is now an input (not a witnessed padding value), the byte-pull obligations can no longer be
-discharged by a self-chosen witness — so the `Spec` is the two clock byte bounds (`is_real`-gated, exactly
-`Faithful/CPUState.lean`'s `cpustate_constraints_faithful`): **soundness derives them from the byte-bus
-pull `Guarantees`**, and **completeness consumes them** to discharge the pulls. The composing chip
-witnesses `cols` with a padding-safe clock (`clk_0_16 = 1`, `clk_16_24 = 0`), establishing the bounds. The
-cross-row PC chain stays at the trace level (`Soundness/StateConsistency.lean`). All axiom-clean. -/
+The `Spec` is the two clock byte bounds (`is_real`-gated, exactly `Faithful/CPUState.lean`'s
+`cpustate_constraints_faithful`): **soundness derives them from the byte-bus pull `Guarantees`**, and
+**completeness consumes them** to discharge the pulls. The composing chip witnesses `cols` with a
+padding-safe clock (`clk_0_16 = 1`, `clk_16_24 = 0`), establishing the bounds. The cross-row PC chain
+stays at the trace level (`Soundness/StateConsistency.lean`). -/
 
 namespace SP1Clean.Readers.CPUState
 

@@ -28,7 +28,7 @@ private lemma bool_iff {x : ZMod p} : x * (x - 1) = 0 ↔ (x = 0 ∨ x = 1) := b
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor.** SP1's `IsEqualWordOperation` constraint list holds iff the native
-gadget's `RawSpec` holds. (Unverified pending the upstream `IsZeroWordOperation` deriving fix.) -/
+gadget's `RawSpec` holds. -/
 theorem isEqualWord_constraints_faithful (a b : Word (ZMod p))
     (cols : Extracted.IsEqualWordOperation (ZMod p)) :
     (List.Forall (· = 0) (Extracted.IsEqualWordOperation.asserts a b cols 1) ∧

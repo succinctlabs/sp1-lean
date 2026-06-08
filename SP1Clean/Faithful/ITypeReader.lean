@@ -18,10 +18,9 @@ op_b read, op_c an *immediate* — no op_c register access). SP1's generated `IT
   `Soundness/MemoryConsistency.lean`);
 - four `.assertZero (op_a_0 * (op_a_write_value[i] - 0))` zeroing gates (`rd = x0 ⟹ write 0`).
 
-`itypereader_constraints_faithful` proves the constraint lists hold **exactly** iff the four `op_a_0`
-zeroing equations and the *two* operands' timestamp byte bounds — precisely `Readers.ITypeReader.Spec`
-restricted to `is_real = 1`. So the native ITypeReader reader subcircuit is faithful to SP1's generated
-ITypeReader constraints. -/
+`itypereader_constraints_faithful` proves the constraint lists hold exactly iff the four `op_a_0`
+zeroing equations and the two operands' timestamp byte bounds — `Readers.ITypeReader.Spec` at
+`is_real = 1`. -/
 
 namespace SP1Clean.Faithful
 

@@ -5,16 +5,10 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for the unified `Lt` chip (SLT + SLTU) + `ChipKind`
 
-Supersedes `Chips/LtuBridge.lean`. The SP1 emulation of a set-less-than row is opcode-agnostic
-(`sp1_lt`: write `nextPC = pc + 4` and the result register `rd`); the RISC-V Sail spec differs by
-variant — `spec_sltu` (`rop.SLTU`) vs `spec_slt` (`rop.SLT`).
-
-`correct_sltu_native` (the unsigned branch, carried over verbatim from the old `LtuBridge`) routes the
-chip's semantic RV64 `sltu` fact straight into the Sail `SLTU`; `correct_slt_native` is the **signed**
-sibling, routed through the `execute_RTYPE_pure_slt = RV64.slt` Sail-side identity. Both are proven and
-axiom-clean. The unified `ChipKind`'s `sailEquiv` is the **flag-dispatched** conjunction
-(`is_slt = 1 → SLT-equation` ∧ `is_sltu = 1 → SLTU-equation`), and `lt_chip_reaches_sail` proves both
-from the chip `Spec`. -/
+`sp1_lt` is opcode-agnostic; the RISC-V Sail specs differ by variant (`spec_slt`/`spec_sltu`).
+`correct_sltu_native` and `correct_slt_native` (both proven and axiom-clean) route the chip's
+semantic RV64 `sltu`/`slt` facts into the respective Sail executions. `lt_chip_reaches_sail` proves
+the flag-dispatched conjunction from the chip `Spec`. -/
 
 namespace SP1Clean.LtSail
 
@@ -83,9 +77,8 @@ theorem correct_sltu_native
 
 set_option linter.unusedSimpArgs false in
 omit [Fact (2 ^ 17 < p)] in
-/-- Native Sail equivalence (signed): the chip's semantic RV64 `slt` fact (`h_slt`) plus the
-register/PC reads drive `spec_slt ≡ sp1_lt`, with no SP1Chips borrow. The signed sibling of
-`correct_sltu_native`, routed through the `execute_RTYPE_pure_slt` Sail-side identity. -/
+/-- Native Sail equivalence (signed): `h_slt` plus register/PC reads drive `spec_slt ≡ sp1_lt`,
+via the `execute_RTYPE_pure_slt` Sail-side identity. -/
 theorem correct_slt_native
     (op_b_val op_c_val a_val : Word (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
@@ -102,9 +95,8 @@ theorem correct_slt_native
     h_pc, h_rs1, h_rs2, h_slt]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- End-to-end: a real `Lt` chip row reaches the RISC-V Sail set-less-than, flag-dispatched — the SLT/SLTU
-identities flow from the chip `Spec` into `correct_slt_native`/`correct_sltu_native`. The unsigned
-conjunct is fully proven; the signed conjunct routes through the skeleton `correct_slt_native`. -/
+/-- End-to-end: a real `Lt` chip row reaches the RISC-V Sail set-less-than, flag-dispatched.
+Both SLT and SLTU conjuncts are proven and axiom-clean. -/
 theorem lt_chip_reaches_sail
     (input : LtChip.Inputs (ZMod p)) (cols : Extracted.LtCols (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
@@ -135,11 +127,8 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **The unified `Lt` `ChipKind` registration** — the SLT/SLTU row's entry into the heterogeneous trace
-+ soundness capstone. `view` projects the immediate-capable `ALUTypeReader` adapter through the
-reader-agnostic `cols.adapter.toAdapterView`; `rdWrite` is the set-less-than result word; the Program-bus
-opcode is `is_slt·9 + is_sltu·10`; `sailEquiv` is the flag-dispatched SLT/SLTU conjunction; `reaches_sail`
-is `lt_chip_reaches_sail`. Supersedes `LtuChip.kind`. -/
+/-- **Lt's `ChipKind` registration.** Program-bus opcode `is_slt·9 + is_sltu·10`; `sailEquiv` is the
+flag-dispatched SLT/SLTU conjunction; `reaches_sail` is `lt_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Lt"
   Inputs := LtChip.Inputs

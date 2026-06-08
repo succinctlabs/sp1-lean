@@ -5,16 +5,9 @@ import Mathlib.Tactic.IntervalCases
 
 /-! # `U16MSBOperation` — the arithmetic core (`RawSpec` + the high-bit lemma)
 
-The structural booleanness + range form `RawSpec` (the literal meaning of SP1's `U16MSBOperation`
-constraint list at `is_real = 1`, stated against the result column `cols.msb`), and the native
-high-bit lemma `msb_of_raw` the gadget's soundness routes through: `msb` boolean + `2*a - msb·2^16`
-a genuine 16-bit value force `msb` to be the high bit of `a` (`a.val ≥ 2^15`). The auto-generated
-circuit (`Inputs`/`main`/`elaborated`) lives in the sibling `Extracted` module; the `populate_msb`
-witness in `Populate`; the `FormalAssertion` contract (soundness/completeness/`circuit`) in `Formal`.
-
-Mirrors `sp1/crates/core/machine/src/operations/msb.rs` (the `eval_msb` sends a single
-`ByteOpcode::Range` lookup on `2*a - msb*2^16`); `Faithful/U16MSBOperation.lean` anchors this to the
-extracted `constraints`. -/
+Booleanness + range form `RawSpec`; `msb_of_raw` is the soundness core: `msb` boolean and
+`2*a - msb·2^16` a genuine 16-bit value force `msb` to be the high bit of `a`. Faithful to
+`sp1/crates/core/machine/src/operations/msb.rs` (`eval_msb` sends `ByteOpcode::Range` on `2*a - msb*2^16`). -/
 
 namespace SP1Clean.U16MSBOperation
 

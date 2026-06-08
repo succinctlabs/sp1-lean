@@ -24,7 +24,7 @@ The `.program`/`.memory` interactions are trivial- or off-chip-membership (their
 trace-level multiset balance — `Soundness/ProgramConsistency.lean`, `Soundness/MemoryConsistency.lean`),
 so this reader emits no Clean lookup for them. The genuine per-row constraints it imposes are:
 
-- per operand, the two timestamp byte checks — now **factored into `Readers/RegisterAccessCols.lean`**
+- per operand, the two timestamp byte checks — **factored into `Readers/RegisterAccessCols.lean`**
   and composed here as three `subcircuit`s (the idiomatic fix for the inline-22-column
   `circuit_proof_start` blow-up: each sub-circuit is a `circuit_norm` black box, à la KeccakRound); and
 - the four `op_a_0 * op_a_write_value[i] = 0` gates (the `rd = x0` zeroing rule).
@@ -33,9 +33,9 @@ It is a `FormalCircuit` whose **output is the `Extracted.RTypeReader` column str
 `AddOperation`/`CPUState`): the reader witnesses the four scalar columns (`op_a`, `op_a_0`, `op_b`,
 `op_c`) and composes a `RegisterAccessCols.circuit` per operand for the six register-access columns,
 returning the assembled struct so the chip composes it as a true `subcircuit` and reads the `adapter`
-block straight out of the output. The cross-block values stay **inputs**: `clk_low` (the recombined low
-clock, from the CPUState block) and the four `op_a_write_value` limbs (`wv0..wv3`, the ALU result, for
-the `op_a_0` zeroing gates). Each operand's `RegisterAccessCols.circuit` receives its access clock
+block straight out of the output. The cross-block inputs: `clk_low` (the recombined low clock, from the
+CPUState block) and the four `op_a_write_value` limbs (`wv0..wv3`, the ALU result, for the `op_a_0`
+zeroing gates). Each operand's `RegisterAccessCols.circuit` receives its access clock
 `clk_low + 4/3/2` and witnesses its timestamps from it, which is what makes completeness hold for any
 `clk_low`. The `is_real` binary gate stays on the chip. -/
 
@@ -56,7 +56,7 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 `Extracted.RTypeReader` column struct. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
-  -- The adapter block `cols` is an **input** now (the composing chip witnesses it); this reader witnesses
+  -- The adapter block `cols` is an **input** (the composing chip witnesses it); this reader witnesses
   -- nothing. Compose a `RegisterAccessCols` sub-assertion per operand on the input's nested blocks (access
   -- clocks `clk_low + 4/3/2`) for the timestamp byte checks.
   assertion RegisterAccessCols.circuit ⟨cols.op_a_memory, input.is_real, input.clk_low + 4⟩

@@ -21,10 +21,9 @@ Sibling of `Faithful/CPUState.lean`, for the register-adapter fragment. SP1's ge
   bus, `Soundness/MemoryConsistency.lean`);
 - four `.assertZero (op_a_0 * (op_a_write_value[i] - 0))` zeroing gates (`rd = x0 ⟹ write 0`).
 
-`rtypereader_constraints_faithful` proves the constraint lists hold **exactly** iff the four `op_a_0` zeroing
-equations and the three operands' timestamp byte bounds — which is precisely `Readers.RTypeReader.Spec`
-restricted to `is_real = 1` (the binary clause drops because `is_real` is pinned). So the native
-RTypeReader reader subcircuit is faithful to SP1's generated RTypeReader constraints. -/
+`rtypereader_constraints_faithful` proves the constraint lists hold exactly iff the four `op_a_0`
+zeroing equations and the three operands' timestamp byte bounds — `Readers.RTypeReader.Spec` at
+`is_real = 1` (the binary clause drops because `is_real` is pinned). -/
 
 namespace SP1Clean.Faithful
 

@@ -11,22 +11,11 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # The Bitwise chip row (AND/OR/XOR) as a `GeneralFormalCircuit`, output = the extracted column struct
 
-The RISC-V bitwise family (`AND`/`OR`/`XOR`) ported as a chip-level `GeneralFormalCircuit`, keyed on
-SP1's `Extracted.BitwiseCols` (`is_xor`/`is_or`/`is_and` selectors, composing the witnessed
-`BitwiseU16Operation` gadget). **Structural mirror of `Chips/LtChip`**: it composes the
-`CPUState`/`BitwiseU16Operation`/`ALUTypeReader` sub-circuits as true Clean `assertion`/`subcircuit`s
-(emitting all four buses), witnesses the three variant flags, threads the SP1-derived `byte_opcode`
-(`is_xor·2 + is_or·1 + is_and·0`) into the gadget and `cpu_opcode` (`is_xor·3 + is_or·4 + is_and·5`) into
-the reader, gates `is_real`, emits the flag-boolean + sum-bound + `op_a_0` zeroing gates (`AssertSpec`),
-and assembles the extracted `BitwiseCols` struct.
-
-Per `Extracted/BitwiseChip.lean` the chip's *own* asserts (everything past the composed
-`BitwiseU16Operation`/`CPUState`/`ALUTypeReader` sub-lists) reduce to the three selector booleans, their
-sum-bound, and `op_a_0 = 0` (`AssertSpec`); the chip's *own* interactions tail is **empty**, so
-`InteractSpec := True`. The operands `rs1`/`rs2` are projected from the adapter (the Memory-bus register
-reads `op_b_memory.prev_value`/`op_c_memory.prev_value`) rather than carried as separate columns. The
-semantic, `is_real`/flag-gated `Spec` (the RV64 `and`/`or`/`xor` identities) lives in the sibling `Formal`
-module; the Sail bridge in `Bridge`. -/
+Composes `CPUState`/`BitwiseU16Operation`/`ALUTypeReader` as Clean subcircuits/assertions (emitting all
+four buses), witnesses the three variant flags, threads `byte_opcode` (`is_xor·2 + is_or·1`)
+into the gadget and `cpu_opcode` (`is_xor·3 + is_or·4 + is_and·5`) into the reader, gates `is_real`, and
+assembles the extracted `BitwiseCols` struct. Operands are projected from the adapter's
+`op_b_memory`/`op_c_memory` register reads (not separate columns). Semantic `Spec` in `Formal.lean`. -/
 
 namespace SP1Clean.BitwiseChip
 

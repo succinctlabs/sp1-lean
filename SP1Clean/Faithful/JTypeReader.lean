@@ -19,10 +19,9 @@ SP1's generated `JTypeReader.constraints` (`Extracted/JTypeReader.lean`) emits, 
   bus, `Soundness/MemoryConsistency.lean`);
 - four `.assertZero (op_a_0 * (op_a_write_value[i] - 0))` zeroing gates (`rd = x0 ⟹ write 0`).
 
-`jtypereader_constraints_faithful` proves the constraint lists hold **exactly** iff the four `op_a_0`
-zeroing equations and `op_a`'s timestamp byte bounds — which is precisely the native JTypeReader reader
-spec restricted to `is_real = 1` (the binary clauses drop because `is_real` is pinned). So the native
-JTypeReader reader subcircuit is faithful to SP1's generated JTypeReader constraints. -/
+`jtypereader_constraints_faithful` proves the constraint lists hold exactly iff the four `op_a_0`
+zeroing equations and `op_a`'s timestamp byte bounds — the native JTypeReader reader spec at
+`is_real = 1` (the binary clauses drop because `is_real` is pinned). -/
 
 namespace SP1Clean.Faithful
 

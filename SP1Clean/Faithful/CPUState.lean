@@ -8,21 +8,13 @@ import SP1Clean.Extracted.CPUState
 
 /-! # Faithfulness anchor — SP1's `CPUState` constraint fragment ↔ the native reader spec
 
-Sibling of `Faithful/AddOperation.lean`'s `add_constraints_faithful`, lifted from the operation
-level to the **chip-state fragment**. SP1's generated `CPUState.constraints` (the state-row
-fragment the chip's `<Chip>.constraints` composes — `Extracted/CPUState.lean`) emits, under
-`is_real = 1`:
-
-- `.assertZero (is_real * (is_real - 1))` — the binary gate (vacuous at `is_real = 1`);
-- `.receive (.state …) is_real` and `.send (.state …) is_real` — the two State-bus interactions
-  (per-row meaning `True`; their content is the trace-level PC chain in
-  `Soundness/StateConsistency.lean`);
-- `.send (.byte (ofNat 6) ((clk_0_16 - 1) * 8⁻¹) 13 0) is_real` — the 13-bit `Range` check;
-- `.send (.byte (ofNat 3) 0 clk_16_24 0) is_real` — the `U8Range` (`< 256`) check.
+SP1's generated `CPUState.constraints` (`Extracted/CPUState.lean`) emits, under `is_real = 1`:
+- the binary gate (vacuous);
+- two State-bus interactions (per-row meaning `True`; content is the trace-level PC chain);
+- the 13-bit `Range` clock check and the `U8Range` (`< 256`) clock check.
 
 `cpustate_constraints_faithful` proves the constraint lists hold **exactly** iff the two clock-range
-bounds — which is precisely `Readers.CPUState.Spec`. So the native CPUState reader subcircuit (whose
-soundness/completeness the chip runs through) is faithful to SP1's generated CPUState constraints. -/
+bounds — i.e. `Readers.CPUState.Spec`. -/
 
 namespace SP1Clean.Faithful
 
@@ -79,15 +71,11 @@ theorem cpustate_interactions_faithful
 
 open SP1Clean.Channels (stateChannel byteChannel StateMsg)
 
-/-- **Faithfulness anchor (CPUState fragment) — interaction half, SYNTACTIC.** The reader's *emitted*
-interaction list and SP1's extracted `CPUState.interactions` project — through `AbstractInteraction.toAccess`
-/ `Extracted.Interaction.toAccess` — to the same `LookupAccess` multiset (channel, arg values, signed
-mult), under an `env` realising the `cols`/`next_pc`/`clk_inc`/`is_real` inputs. This exercises the
-**State** bus (the `.receive`/`.send` arms of `Extracted.Interaction.toAccess`) and the **Byte** bus
-together. The relation is `List.Perm`: the reader `main` emits byte,byte,state,state while the oracle
-lists state,state,byte,byte — the LogUp bus is a multiset, so order is irrelevant. (The U8Range byte
-tuple `⟨3, 0, clk_16_24, 0⟩` matches SP1 only after the `Readers/CPUState.lean` slot fix that this
-syntactic anchor's earlier `Perm` mismatch surfaced — the `toProp` form had masked it.) -/
+/-- **Faithfulness anchor (CPUState fragment) — interaction half, SYNTACTIC.** The reader's emitted
+interaction list and SP1's extracted `CPUState.interactions` project to the same `LookupAccess`
+multiset. Exercises both the State and Byte buses; the relation is `List.Perm` (the reader emits
+byte,byte,state,state while the oracle lists state,state,byte,byte). The U8Range tuple
+`⟨3, 0, clk_16_24, 0⟩` slot order matters — `toProp` had masked an earlier mismatch. -/
 theorem cpustate_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var Readers.CPUState.Inputs (ZMod p)) (offset : ℕ)
     (cols : Extracted.CPUState (ZMod p)) (next_pc : Vector (ZMod p) 3) (clk_inc is_real : ZMod p)

@@ -32,8 +32,7 @@ open SP1Clean.SailMem
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
-/-- The little-endian concatenation of the eight bytes of a four-limb word equals the
-word's `toNat`. Ported verbatim from sp1-lean's `LoadDoubleChip.byteConcat8_toNat_eq_Word_toNat`. -/
+/-- The little-endian concatenation of the eight bytes of a four-limb word equals the word's `toNat`. -/
 private lemma byteConcat8_toNat_eq_Word_toNat [NeZero p]
     (a b c d : ZMod p) (ha : a.val < 65536) (hb : b.val < 65536)
     (hc : c.val < 65536) (hd : d.val < 65536) :

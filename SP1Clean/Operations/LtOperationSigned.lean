@@ -19,11 +19,11 @@ sign-adjusted by flipping the high bit (`b[3] + is_signed·2^15 - 2^16·b_msb`, 
 `LtOperationUnsigned`. When `is_signed = 0` the adjustment is the identity and the sign-bit ranges
 are not enforced.
 
-`RawSpec` transcribes the literal meaning at `is_real = 1` with **`is_signed` free**; `ltSigned_of_raw`
-derives the semantic `Spec` from it. The keystone is the **sign-bias** identity (`adj_bias`): biasing the
-top limb by `2^15` is `+2^63 mod 2^64`, so an unsigned `<` of the biased words is the signed `<` (`toInt`)
-of the originals (`toInt_compare_of_bias`). Soundness/completeness of the witnessed `FormalCircuit` are
-**fully proven and axiom-clean**; `Faithful/LtOperationSigned.lean` anchors `RawSpec`. -/
+`RawSpec` transcribes the literal constraint meaning at `is_real = 1` with `is_signed` free;
+`ltSigned_of_raw` derives the semantic `Spec`. The keystone is the sign-bias identity (`adj_bias`):
+biasing the top limb by `2^15` is `+2^63 mod 2^64`, so an unsigned `<` of the biased words is the
+signed `<` (`toInt`) of the originals (`toInt_compare_of_bias`). Soundness and completeness are
+axiom-clean; `Faithful/LtOperationSigned.lean` anchors `RawSpec`. -/
 
 namespace SP1Clean.LtOperationSigned
 
@@ -34,11 +34,11 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 instance : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
 
-/-! ## Sign-bias arithmetic (the signed-compare keystone)
+/-! ## Sign-bias arithmetic
 
-The signed compare is realised by flipping bit 15 of the top limb (bit 63 of the word): the adjusted
-limb `e13 = x + 32768 - 65536·msb` (with `msb` the high bit of `x`) biases the value by `2^63 mod 2^64`,
-so an **unsigned** compare of the adjusted words is the **signed** compare of the originals. -/
+The signed compare flips bit 15 of the top limb (bit 63 of the word): the adjusted limb
+`e13 = x + 32768 - 65536·msb` biases the value by `2^63 mod 2^64`, so an unsigned compare
+of the adjusted words is the signed compare of the originals. -/
 
 /-- The biased top limb `x + 32768 - 65536·msb` (with `msb = [x ≥ 2^15]`) is itself a 16-bit value,
 and its `ℕ`-value lifts to the integer bias `x.val + 2^15 - 2^16·msb`. -/
@@ -138,7 +138,7 @@ theorem ltSigned_of_raw {input : Inputs (ZMod p)} {cols : Extracted.LtOperationS
     have := congrArg ZMod.val h; rw [ZMod.val_zero, ZMod.val_one] at this; exact absurd this (by norm_num)
   simp only [Spec]
   rcases hs1 with hs | hs
-  · -- `is_signed = 0`: `bm = cm = 0`, the unsigned compare of the unbiased words.
+  · -- `is_signed = 0`: `bm = cm = 0`, the unsigned compare on the unbiased words.
     have hbm0 : cols.b_msb.msb = 0 := by have h := h_pb; rw [hs] at h; linear_combination -h
     have hcm0 : cols.c_msb.msb = 0 := by have h := h_pc; rw [hs] at h; linear_combination -h
     rw [hs, hbm0, hcm0] at h_uns
@@ -191,17 +191,16 @@ theorem ltSigned_of_raw {input : Inputs (ZMod p)} {cols : Extracted.LtOperationS
 
 /-! ## The witnessed `FormalCircuit`
 
-Composes the two `U16MSBOperation` sub-gadgets and the `LtOperationUnsigned` sub-gadget on the
-sign-adjusted words. The sign-bit witnesses are **`is_signed`-gated** (`is_signed · populate_msb`), so
-on `is_signed = 0` rows `b_msb = c_msb = 0` and the `(is_signed-1)·msb` gates are satisfiable. -/
+Composes the two `U16MSBOperation` sub-gadgets and `LtOperationUnsigned` on the sign-adjusted words.
+The sign-bit witnesses are `is_signed`-gated (`is_signed · populate_msb`), so on `is_signed = 0`
+rows `b_msb = c_msb = 0` and the `(is_signed-1)·msb` gates are satisfiable. -/
 
-/-- Witness the two MSB sub-gadgets on the high limbs; feed the sign-adjusted words to the unsigned
-compare sub-gadget; assert the selector boolean and the two `(is_signed-1)·msb` constraints.
+/-- Witness the two sign bits (gated), feed the sign-adjusted words to the unsigned compare, assert
+the selector boolean and the two `(is_signed-1)·msb` constraints.
 Returns `⟨result, b_msb, c_msb⟩`. -/
 def main (input : Var Inputs (ZMod p)) :
     Circuit (ZMod p) (Var Extracted.LtOperationSigned (ZMod p)) := do
-  -- witness the two sign bits via `populate_msb`; compose the demoted `U16MSBOperation` as `assertion`s
-  -- (gated by `is_signed` — the sign-bit ranges are only enforced in signed mode).
+  -- sign-bit ranges only enforced in signed mode (`is_signed = 1`)
   let b_msb ← witnessVector 1 (fun env =>
     #v[env input.is_signed * U16MSBOperation.populate_msb (env input.b[3])])
   let c_msb ← witnessVector 1 (fun env =>
@@ -212,8 +211,7 @@ def main (input : Var Inputs (ZMod p)) :
   assertion U16MSBOperation.circuit ⟨input.cc[3], ⟨cm⟩, input.is_signed⟩
   let e13 := input.b[3] + input.is_signed * (32768 : ZMod p) - (65536 : ZMod p) * bm
   let e17 := input.cc[3] + input.is_signed * (32768 : ZMod p) - (65536 : ZMod p) * cm
-  -- `LtOperationUnsigned` is now a `FormalAssertion`: witness its comparison columns here (the
-  -- sign-adjusted words via `populate_unsigned`), then compose it as a Clean `assertion` (`is_real := 1`).
+  -- `LtOperationUnsigned` is a `FormalAssertion`: witness comparison columns on the sign-adjusted words.
   let cl ← witnessVector 2 (fun env =>
     LtOperationUnsigned.comparisonLimbsWitness
       #v[env input.b[0], env input.b[1], env input.b[2],
@@ -243,8 +241,7 @@ def main (input : Var Inputs (ZMod p)) :
 
 set_option maxHeartbeats 1000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Extracted.LtOperationSigned main where
-  -- witnesses the two sign bits (1 each) + the `LtOperationUnsigned` block (8); the two
-  -- `U16MSBOperation`s are now `FormalAssertion`s (`localLength 0`).
+  -- 2 sign bits + LtOperationUnsigned block (8); both U16MSBOperations are FormalAssertions (localLength 0).
   localLength _ := 1 + 1 + (2 + 4 + 1 + 1)
   localLength_eq := by simp +arith [circuit_norm, main, LtOperationUnsigned.circuit, U16MSBOperation.circuit]
   subcircuitsConsistent := by simp only [circuit_norm, main]; try omega
@@ -293,8 +290,7 @@ theorem soundness : Soundness (ZMod p) main Assumptions Spec := by
   simp only [← hbmdef, ← hcmdef] at h_lt h_pb h_pc Sb Sc ⊢
   clear_value bm cm
   rcases h_sbin with hs | hs
-  · -- `is_signed = 0`: the two `(is_signed-1)·msb` gates force `bm = cm = 0`, so the adjusted top limbs
-    -- are the originals and the unsigned compare *is* the spec's unsigned branch.
+  · -- `is_signed = 0`: the two `(is_signed-1)·msb` gates force `bm = cm = 0`.
     subst hs
     have hbm : bm = 0 := by linear_combination -h_pb
     have hcm : cm = 0 := by linear_combination -h_pc
@@ -329,15 +325,14 @@ theorem soundness : Soundness (ZMod p) main Assumptions Spec := by
     obtain ⟨hbit1, hbit2⟩ := hbit
     simp only [hadjb, hadjc] at hbit1
     simp only [hadjb, hadjc, Vector.getElem_map] at hbit2
-    -- the unsigned `Spec`'s flag-sum-binary conjunct (5th), on the (here unbiased) adjusted words.
     have h_uns_spec := h_lt ⟨fun _ => ⟨hbU64, hcU64⟩, Or.inr rfl⟩
     refine ⟨⟨?_, fun _ => ?_, fun _ => ?_⟩, Or.inr hAb, Or.inr hAc, Or.inr ⟨fun _ => ⟨hbU64, hcU64⟩, Or.inr rfl⟩⟩
     · rw [hbit1]; simp only [if_neg h01]
     · rw [toBitVec64_eq_iff hb hcc]; exact hbit2
     · simpa only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
         using h_uns_spec.2.2.2.2.1
-  · -- `is_signed = 1`: the two `U16MSBOperation` specs pin `bm`/`cm` to the sign bits, so the unsigned
-    -- compare of the bit-15-flipped words is the signed compare (`toInt`) of the originals.
+  · -- `is_signed = 1`: `U16MSBOperation` pins `bm`/`cm` to the sign bits; the unsigned compare of the
+    -- bit-15-flipped words is the signed compare (`toInt`) of the originals.
     subst hs
     have hbm : bm = if 32768 ≤ input_b[3].val then 1 else 0 := Sb.2 rfl
     have hcm : cm = if 32768 ≤ input_cc[3].val then 1 else 0 := Sc.2 rfl
@@ -409,8 +404,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
     by rcases h_sbin with h | h <;> rw [h] <;> simp,
     by rw [henvb]; rcases h_sbin with h | h <;> rw [h] <;> simp,
     by rw [henvc]; rcases h_sbin with h | h <;> rw [h] <;> simp⟩
-  -- The composed `LtOperationUnsigned` assertion's `Spec`: the witnessed comparison columns are
-  -- `populate`'s output on the sign-adjusted words, so `spec_populate` discharges it.
+  -- The `LtOperationUnsigned` assertion `Spec`: witnessed columns = `populate` on sign-adjusted words.
   simp only [eb0, eb1, eb2, eb3, ec0, ec1, ec2, ec3, sub_eq_add_neg, circuit_norm] at henvcl henvf henvni henvbit
   have hclv : (Vector.map (Expression.eval env.toEnvironment)
       (Vector.mapRange 2 fun i => var { index := i₀ + 1 + 1 + i }))

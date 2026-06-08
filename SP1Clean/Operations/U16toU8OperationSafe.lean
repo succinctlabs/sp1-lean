@@ -85,10 +85,8 @@ def populate (u16_values : Word (ZMod p)) : Extracted.U16toU8Operation (ZMod p) 
   ⟨#v[((u16_values[0].val % 256 : ℕ) : ZMod p), ((u16_values[1].val % 256 : ℕ) : ZMod p),
       ((u16_values[2].val % 256 : ℕ) : ZMod p), ((u16_values[3].val % 256 : ℕ) : ZMod p)]⟩
 
-/-- SP1's `U16toU8OperationSafe::eval` as a Clean `FormalAssertion`: pull each `⟨U8Range, 0, low_i, high_i⟩`
-byte-bus row (`high_i = (u16_values[i] - cols.low_bytes[i]) * 256⁻¹`), **gated on `is_real`** (faithful to
-SP1's `U16toU8OperationSafeInput::new(word, cols, is_real)`). The low bytes come from the `populate`d `cols`
-(an input), so `main` witnesses nothing — it asserts the four byte pulls over the given columns. -/
+/-- SP1's `U16toU8OperationSafe::eval`: four `is_real`-gated byte pulls over the given low bytes.
+Witnesses nothing (the column struct is an input). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let u16_values := input.u16_values
   let cols := input.cols
@@ -123,9 +121,8 @@ set_option linter.unusedSectionVars false in
     (elaborated (p := p)).localLength x = 0 := rfl
 
 set_option linter.unusedSimpArgs false in
-/-- `populate`'s output satisfies the gadget `Spec` (for any `is_real`): each low byte is a genuine
-byte (`% 256`), each high byte via `high_byte_lt`, and they reassemble. The `< 2^16` limb bounds are
-consumed only under the `is_real = 1` antecedent. The `FormalAssertion` discharge a composing op uses. -/
+/-- `populate u16_values` satisfies the gadget `Spec` for any `is_real`. The composing op uses this
+to discharge its assertion obligation. -/
 theorem spec_populate {u16_values : Word (ZMod p)}
     (h0 : u16_values[0].val < 2 ^ 16) (h1 : u16_values[1].val < 2 ^ 16)
     (h2 : u16_values[2].val < 2 ^ 16) (h3 : u16_values[3].val < 2 ^ 16) (is_real : ZMod p) :

@@ -154,5 +154,7 @@ after installing or toggling.
   setup + `lake update` trap, the Clean-main ↔ Batteries import collision and its fix.
 - `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete landmines.
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
-- `docs/agents/compile-profile.md` — per-module wall-clock compile profile + worst offenders + common threads;
-  re-run with `scripts/profile_compile.sh`.
+- `docs/snapshots/compile-profile.md` — per-module wall-clock compile profile + worst offenders + common threads
+  (point-in-time snapshot); re-run with `scripts/profile_compile.sh`.
+- `docs/snapshots/axiom-ledger.md` — machine-checked `#print axioms` inventory per theorem (point-in-time
+  snapshot; re-generate before release).

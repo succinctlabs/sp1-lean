@@ -24,7 +24,7 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
--- `Assumptions` (the operand `isU64`/register-readback contract) now lives in `Defs` so the per-op
+-- `Assumptions` (the operand `isU64`/register-readback contract) lives in `Defs` so the per-op
 -- `Soundness/<Op>.lean` split files can import it without a cycle through `Formal`.
 
 /-- Prover-side row well-formedness: the operand `isU64`s plus the `is_real` binary selector. (The

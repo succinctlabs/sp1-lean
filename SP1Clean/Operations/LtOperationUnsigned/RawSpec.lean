@@ -8,18 +8,12 @@ import Mathlib.Tactic.LinearCombination
 
 /-! # `LtOperationUnsigned` — structural `RawSpec` + soundness cores
 
-Unsigned word less-than `b <ᵤ cc`. The four `u16_flags` are boolean and sum to `≤ 1`; the unique
-set flag (if any) selects the most-significant differing limb. `comparison_limbs` extract the two
-limbs at that position (`Σ b[i]·flagᵢ`, `Σ cc[i]·flagᵢ`), `not_eq_inv` witnesses they differ, and a
-`U16CompareOperation` on the two limbs yields the result `bit = (b <ᵤ cc)`.
+Unsigned word less-than `b <ᵤ cc`. The `u16_flags` one-hot-select the most-significant differing
+limb; `not_eq_inv` witnesses they differ; a `U16CompareOperation` on the selected limb pair yields
+`bit = (b <ᵤ cc)`. `RawSpec` is the literal constraint list at `is_real = 1`.
 
-`RawSpec` transcribes the literal meaning of the extracted constraint list at `is_real = 1` (the four
-flag booleans, the sum-bound, the four "flag picks the top differing limb" selectors, the two
-limb-extraction equalities, the non-equality witness, and the composed `U16CompareOperation.RawSpec`).
-`Faithful/LtOperationUnsigned.lean` anchors it. The soundness cores (`ltUnsigned_core`,
-`comparison_limbs_lt`, `flags_sum_zero_iff_eq`) live here — they reference `cols` directly (no `Inputs`
-wrapper), so the composing `LtOperationSigned` reuses them via `ltUnsigned_semantic`. The semantic `Spec`
-and the witnessed `FormalAssertion` live in `Formal.lean` (here would be an import cycle). -/
+Soundness cores (`ltUnsigned_core`, `comparison_limbs_lt`, `flags_sum_zero_iff_eq`) live here so
+`LtOperationSigned` can reuse them via `ltUnsigned_semantic` without an import cycle. -/
 
 namespace SP1Clean.LtOperationUnsigned
 

@@ -4,20 +4,15 @@ import SP1Clean.Foundations.Word
 
 /-! # `ChipKind` / `ChipRow` — the heterogeneous trace row, dispatched by *value*
 
-A single ordered trace mixing rows of different chips, the substrate for the multi-chip soundness
-capstone (`Soundness/MachineSoundness.lean`). Every per-row bus projection in `Soundness/*Consistency.lean`
-is defined once over the chip-agnostic `Trace.RowView`; a `ChipRow` maps to its `RowView` via
-`ChipRow.view`, and one `List (ChipRow …)` yields one `List RowView` (`.map ChipRow.view`) whose
-interleaved PC chain / memory consistency are genuinely cross-chip.
+A single ordered trace mixing rows of different chips. Every per-row bus projection in
+`Soundness/*Consistency.lean` is defined once over the chip-agnostic `Trace.RowView`; a `ChipRow` maps to
+its `RowView` via `ChipRow.view`, and one `List (ChipRow …)` yields one `List RowView` whose interleaved
+PC chain / memory consistency are genuinely cross-chip.
 
-**Why a `ChipKind` *structure*, not an inductive.** The previous design made `ChipRow` an
-`inductive add | sub`, so every new chip added a constructor *plus* a match arm in five central sites
-(`.view`, `.chipSpec`, `.opBVal`, `.opCVal`, and the capstone's `cases r` / `sailEquiv`) — a per-chip edit
-of the center, and an N-arm match at N chips. Instead a `ChipKind` is a **structure of functions**: a chip
-registers one `ChipKind` value (its `Inputs`/`Cols` type maps + the five projections + its `reaches_sail`
-proof), a `ChipRow` *names its kind by value*, and the capstone dispatches the Sail step generically via
-`r.kind.reaches_sail` — **no `cases`, no central edit**. Adding a chip touches no file here; it just defines
-its `kind` next to its Sail bridge (`Chips/<Op>Bridge.lean`).
+A `ChipKind` is a **structure of functions**: a chip registers one value (its `Inputs`/`Cols` type maps,
+the five projections, and its `reaches_sail` proof), a `ChipRow` names its kind by value, and the capstone
+dispatches the Sail step generically via `r.kind.reaches_sail` — no `cases`, no central edit. Adding a chip
+touches no file here; it defines its `kind` next to its Sail bridge (`Chips/<Op>Bridge.lean`).
 
 `ChipKind`/`ChipRow` are parameterized **explicitly** by `(p : ℕ) [Fact p.Prime] [Fact (2^17 < p)]`:
 auto-generalizing `p` from a `variable` block breaks inference of the dependent `kind` field at use sites.

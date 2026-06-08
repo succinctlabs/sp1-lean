@@ -11,21 +11,19 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # Native `JTypeReader` reader — the J-type register-adapter per-row checks as a Clean `FormalAssertion`
 
-The register adapter for **J-type** instructions (JAL, and the U-type AUIPC): a destination write `op_a`
-(= rd) plus **two immediates** `op_b_imm`/`op_c_imm` (no register reads). SP1's `JTypeReader::eval`
+The register adapter for **J-type** instructions (JAL, AUIPC): a destination write `op_a` (= rd) plus
+**two immediates** `op_b_imm`/`op_c_imm` (no register reads). SP1's `JTypeReader::eval`
 (`crates/core/machine/src/adapter/register/j_type.rs`, mirrored in `Extracted/JTypeReader.lean`) emits
 per row:
 
-- the **program** send (instruction fetch), gated by `is_trusted`, carrying `op_b_imm`/`op_c_imm` as the
-  operand-`b`/`c` words with `imm_b = imm_c = 1`;
-- for op_a (rd write), two **memory** interactions (read prev-state, write new-state), gated by `is_real`; and
+- the **program** send (instruction fetch), gated by `is_trusted`, carrying `op_b_imm`/`op_c_imm` with
+  `imm_b = imm_c = 1`;
+- for op_a (rd write), two **memory** interactions, gated by `is_real`; and
 - for op_a, two **byte** timestamp checks, gated by `is_real`.
 
-Sibling of `Readers/ITypeReader.lean` — identical structure minus the op_b register access (op_b is an
-immediate too). The genuine per-row constraints are the single `RegisterAccessCols` timestamp check
-(composed as a `subcircuit`) and the `op_a_0` binary + the four `op_a_0 * op_a_write_value_i = 0` zeroing
-gates (`rd = x0 ⇒ write 0`). The `.program`/`.memory` interactions' meaning is the trace-level multiset
-balance. -/
+The genuine per-row constraints are the single `RegisterAccessCols` timestamp check (composed as a
+`subcircuit`) and the `op_a_0` binary + the four `op_a_0 * op_a_write_value_i = 0` zeroing gates
+(`rd = x0 ⇒ write 0`). The `.program`/`.memory` interactions' meaning is the trace-level multiset balance. -/
 
 namespace SP1Clean.Readers.JTypeReader
 

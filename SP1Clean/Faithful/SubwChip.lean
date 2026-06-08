@@ -20,8 +20,7 @@ leaving the two trailing `assertZero`s (the binary gate, vacuous at `is_real = 1
 
 Unlike `Add`/`Sub`, Subw is a W-variant: its result word fed to `RTypeReader` is sign-extended to
 `[value[0], value[1], msb·65535, msb·65535]`, so the `op_a_0 = 0` register-index gates land on those
-sign-extension limbs. Every fragment anchor this composes (`subw_`, `cpustate_`,
-`rtypereader_constraints_faithful`) is `sorry`-free, so this anchor is too. -/
+sign-extension limbs. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

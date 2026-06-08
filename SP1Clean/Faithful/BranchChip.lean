@@ -6,21 +6,16 @@ import SP1Clean.Extracted.BranchChip
 
 /-! # Chip-level faithfulness anchor for BRANCH
 
-Anchors SP1's generated `Extracted.BranchColumns.asserts` / `.interactions` lists (opcodes 40–45,
-`Extracted/BranchChip.lean`) to the native chip's structural specs.
+Anchors SP1's generated `Extracted.BranchColumns.asserts` / `.interactions` lists (opcodes 40–45)
+to the native chip's structural specs (`branchAssertSpec`, `branchInteractSpec`).
 
-Unlike the unconditional jumps, BRANCH's `asserts` list interleaves the composed `CPUState ++
-ITypeReaderImmutable ++ LtOperationSigned` sub-lists with a rich inline tail: the six opcode-flag booleans
-(`E1,E3,…,E11`), the flag sum bound (`E18`), the `is_branching` boolean (`E94`) and its decision
-constraint (`E96` — the `E80–E92` branching logic), and the **two gated carry-chains** for `next_pc`
-(`E97–E124` the taken path `pc + op_c_imm` gated by `is_branching`; `E125–E156` the fall-through `pc + 4`
-gated by `is_real - is_branching`). The `interactions` tail is the three `next_pc` byte-range sends
-(`next_pc[0]/4` range-14, `next_pc[1]`/`next_pc[2]` u16).
+BRANCH's `asserts` list has the composed `CPUState ++ ITypeReaderImmutable ++ LtOperationSigned`
+prefix plus a rich inline tail: the six opcode-flag booleans, the flag sum bound, the `is_branching`
+boolean and its decision constraint, and the two gated `AddOperation` carry-chains for `next_pc`.
+The `interactions` tail is the three `next_pc` byte-range sends.
 
-Both halves are stated against faithful structural specs (`branchAssertSpec`, `branchInteractSpec`)
-and proven by peeling the composed sub-lists (`forall_append`, as in `Faithful/JalChip.lean`) and
-reading off the inline tail. As an implication (constraints ⊢ spec) only the inline tail is needed;
-the kept-opaque sub-lists and the two `AddOperation` carry-chains are discarded. -/
+Both halves are proven in the forward direction (`→`) by peeling the composed sub-lists and reading
+off the inline tail; the kept-opaque sub-lists and carry-chains are discarded. -/
 
 namespace SP1Clean.Faithful
 

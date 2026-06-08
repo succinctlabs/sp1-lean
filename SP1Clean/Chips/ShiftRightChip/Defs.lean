@@ -11,19 +11,19 @@ import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Skeleton — the `ShiftRight` chip row as a `GeneralFormalCircuit` (spec surface)
+/-! # The `ShiftRight` chip row as a `GeneralFormalCircuit`
 
-`ShiftRight` (SRL / SRA / SRLW / SRAW) ported as a chip-level `GeneralFormalCircuit`. As with
-`ShiftLeftChip`, there is no operation-level extraction — the inverted-`v` power encodings, the
-`b_msb`/`srw_msb` sign-extension MSB gadgets, the `lower/higher_limb` bit-split, the `limb_result`
-reassembly, and the four-variant output placement are inlined into `Extracted/ShiftRightChip.lean`.
+`SRL`/`SRA`/`SRLW`/`SRAW`: as with `ShiftLeftChip`, no operation-level extraction — the inverted-`v`
+power encodings, the `b_msb`/`srw_msb` sign-extension MSB gadgets, the `lower/higher_limb` bit-split,
+the `limb_result` reassembly, and the four-variant output placement are inlined into
+`Extracted/ShiftRightChip.lean`.
 
-Same two-distinct-spec discipline: `AssertSpec` (the assertZero list) + `InteractSpec` (the byte-range
-interactions); the semantic flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` `Spec` is in `Specs/Chip.lean`.
-`Faithful/ShiftRightChip.lean` anchors the two structural specs. Soundness/completeness are skeleton
-`sorry`s; `main` composes the readers + the three `U16MSBOperation` gadgets + the witnessed column block
-+ the `is_real` gate (the inline shift assertions of `AssertSpec` and the byte pulls of `InteractSpec`
-are deferred to the proof fill-in). -/
+`AssertSpec` / `InteractSpec` capture the structural meaning of SP1's two extracted constraint lists;
+the semantic flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` `Spec` is in `Specs/Chip.lean`.
+`Faithful/ShiftRightChip.lean` anchors both structural specs.
+
+`main` composes the readers + three `U16MSBOperation` gadgets + the witnessed column block + the
+`is_real` gate. Soundness is proved; completeness is a deferred `sorry`. -/
 
 namespace SP1Clean.ShiftRightChip
 

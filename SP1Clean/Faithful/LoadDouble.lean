@@ -8,9 +8,8 @@ import SP1Clean.Faithful.ITypeReader
 
 /-! # Chip-level faithfulness anchor — SP1's whole `LoadDouble` chip constraint list ↔ combined spec
 
-The capstone of the four-artifact chain for `LoadDouble` (the first memory chip), mirroring
-`Faithful/AddwChip.lean`: where `Faithful/{AddressOperation,CPUState,ITypeReader}` anchor each
-*fragment*, this anchors the **entire** generated `Extracted.LoadDoubleColumns.asserts`/`interactions`.
+Anchors the entire generated `Extracted.LoadDoubleColumns.asserts`/`interactions` to the native
+combined spec, composing the fragment anchors in `Faithful/{AddressOperation,CPUState,ITypeReader}`.
 SP1's chip constraints are `CS0 ++ CS1 ++ CS2 ++ [MemoryAccess timestamp gates + op_a_0]`, where
 `CS0` = `AddressOperation` (the 3-limb `rs1 + signExtend(imm)` address gadget), `CS1` = `CPUState`
 (`next_pc = pc + 4`, clk + 8), `CS2` = `ITypeReader` (opcode `35 = LD`, op_a write / op_b read).
@@ -19,7 +18,7 @@ inlined `MemoryAccess` timestamp constraints (the `compare_low` binary + high/lo
 + `diff = clk − prev − 1` limb decomposition) and the two byte range checks (`diff_low < 2^16`,
 `diff_high < 2^8`), plus the `op_a_0 = 0` register-index gate. The two `.memory` bus interactions and
 the `.program` fetch contribute `True` (their meaning is the trace-level buses,
-`Soundness/{Memory,Program}Consistency.lean`). Every fragment anchor is `sorry`-free, so this is too. -/
+`Soundness/{Memory,Program}Consistency.lean`). Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

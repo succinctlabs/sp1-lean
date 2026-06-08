@@ -9,20 +9,12 @@ import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.AddOperation
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints
+/-! # Faithfulness anchor — `AddOperation` constraints ↔ native `AssertSpec`/`InteractSpec`
 
-The native `AddOp` gadget's constraints are hand-written; this module anchors them to
-**SP1's `AddOperation` constraint definition** — the operation-level form that the
-`sp1-constraint-compiler` emits and `update_extracted.py` writes to
-`SP1Clean/Extracted/AddOperation.lean`.
-
-The previously-inlined re-creations now live in the shared `SP1Clean/Foundations/SP1Constraint.lean`
-(`ByteOpcode`), `SP1Clean/Extracted/ExtractionDSL.lean` (the `Interaction` bus vocabulary), and
-the generated `SP1Clean/Extracted/AddOperation.lean` (the two-list `asserts`/`interactions`). The
-two anchor theorems `add_asserts_faithful` / `add_interactions_faithful` prove those two constraint
-lists hold **exactly** iff the native gadget's `AssertSpec` / `InteractSpec` respectively — so a
-native-gadget proof (whose soundness/completeness route through those two halves) is faithful to SP1's
-operation constraints.
+Anchors the native `AddOp` gadget's hand-written constraints to SP1's generated
+`AddOperation` constraint definition (`Extracted/AddOperation.lean`). The two anchor theorems
+`add_asserts_faithful` / `add_interactions_faithful` prove those two constraint lists hold
+**exactly** iff the native gadget's `AssertSpec` / `InteractSpec` respectively.
 
 The generated `constraints` is field-generic with a `[CoeHead F ℕ]` hypothesis; applying it at
 `ZMod p` uses the scoped `CoeHead (ZMod p) ℕ` instance (`open scoped …ConstraintCoe`). -/
@@ -110,10 +102,9 @@ theorem add_interactions_faithful_syntactic
 
 /-- **Faithfulness anchor — combined.** The two-list pair form of `add_asserts_faithful` /
 `add_interactions_faithful`, for composing `AddOperation` as a fragment inside a chip-level anchor
-via the `faithful_chip` macro (which peels each fragment's `(asserts, interactions)` pair at once).
-**Legacy `toProp` form** — retained as the compat bridge for `AddiChip`/`JalChip`/`JalrChip`/`UTypeChip`
-(and the current `faithful_chip` interaction path) pending the repo-wide syntactic migration; the
-canonical interaction anchor is now `add_interactions_faithful_syntactic`. -/
+via the `faithful_chip` macro. Legacy `toProp` form — retained as the compat bridge for
+`AddiChip`/`JalChip`/`JalrChip`/`UTypeChip`; the canonical interaction anchor is
+`add_interactions_faithful_syntactic`. -/
 theorem add_constraints_faithful (a b value : Word (ZMod p)) :
     (List.Forall (· = 0) (Extracted.AddOperation.asserts a b ⟨value⟩ 1) ∧
         List.Forall Interaction.toProp (Extracted.AddOperation.interactions a b ⟨value⟩ 1)) ↔

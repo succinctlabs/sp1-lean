@@ -3,20 +3,13 @@ import SP1Clean.Foundations.Word
 import SP1Clean.Chips.AddiChip.Formal
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for Addi (+ end-to-end composition)
+/-! # Native Sail bridge for Addi
 
-`correct_addi_native` proves that the RISC-V Sail execution of `ADDI`
-(`spec_addi`, calling LeanRV64D's `execute_ITYPE … iop.ADDI`) agrees with the SP1 chip's emulation
-(`sp1_addi`: write `nextPC = pc + 4` and the result register), given:
-
-* the chip's **semantic** fact `a_val = op_b + signExtend(imm)`,
-* and the register/PC read facts (the rs1 read; in the full system supplied by the reader bus).
-
-`addi_chip_reaches_sail` composes the verified `AddiChip.Spec` straight into the bridge: a real `Addi`
-chip row reaches the RISC-V Sail spec via the gadget/chip `Spec`'s `add` identity plus an immediate-decode
-fact `op_c_val = signExtend(imm)` (the I-type analogue of the second register read). The direct I-type
-analogue of `Chips/AddChip/Bridge.lean` — `execute_ITYPE`'s `.ADDI` arm is `wX_bits rd (rX_bits rs1 +
-signExtend imm)`, which `simp` reduces with the auto `run_rX_bits`/`run_wX_bits` lemmas. -/
+`correct_addi_native` proves Sail's `execute_ITYPE … iop.ADDI` agrees with the SP1 chip
+emulation (`sp1_addi`: write `nextPC = pc + 4` and the result register), given the chip's
+semantic `a_val = op_b + signExtend(imm)` and the rs1/PC reads. `execute_ITYPE`'s `.ADDI` arm
+is `wX_bits rd (rX_bits rs1 + signExtend imm)`, closed by `simp` with the auto
+`run_rX_bits`/`run_wX_bits` lemmas. -/
 
 namespace SP1Clean.AddiSail
 
@@ -53,10 +46,8 @@ theorem correct_addi_native
     h_pc, h_rs1, h_add]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- End-to-end composition: from the `Addi` chip's verified semantic contract (`AddiChip.Spec`, on a real
-row), the rs1/PC reads, and the immediate-decode fact (`op_c_val = signExtend imm`), the RISC-V Sail `ADDI`
-execution agrees with the SP1 chip emulation. The add identity flows from the chip `Spec`
-(`RV64.add op_c op_b` is defeq `op_b + op_c`), and `op_c_val` is the immediate word. -/
+/-- End-to-end: from `AddiChip.Spec`, rs1/PC reads, and the immediate-decode fact, Sail's `ADDI`
+agrees with the SP1 chip emulation. -/
 theorem addi_chip_reaches_sail
     (input : AddiChip.Inputs (ZMod p)) (cols : Extracted.AddiCols (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64) (s : SailState)
@@ -79,12 +70,8 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **Addi's `ChipKind` registration** — enters `ADDI` rows into the heterogeneous trace and the soundness
-capstone. `view` is the straight-line shape (`next_pc = pc + 4`), the I-type adapter
-(`ITypeReader.toAdapterView`: `op_b` the rs1 read, `op_c = op_c_imm` the immediate, `imm_c = 1`), the
-`is_real` selector, the add result `add_operation.value` as the rd write-back, opcode 1. `sailEquiv`
-quantifies the PC/rs1 reads and the immediate-decode fact internally (the I-type analogue of the second
-register read); `reaches_sail` is `addi_chip_reaches_sail`. -/
+/-- `ChipKind` registration for Addi (ADDI, opcode 1). `sailEquiv` carries the immediate-decode
+fact `op_c_val = signExtend imm`. -/
 def kind : Soundness.ChipKind p where
   name := "Addi"
   Inputs := AddiChip.Inputs

@@ -4,15 +4,11 @@ import SP1Clean.Operations.IsZeroWordOperation.Extracted
 
 /-! # `IsZeroWordOperation` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 
-SP1's `IsZeroWordOperation::eval` as a Clean `FormalAssertion` that **composes `IsZeroOperation`** as a
-true Clean `assertion` on each limb. The `Assumptions` (`is_real` binary), the faithful `Spec`
-(referencing the four per-limb `IsZeroOperation.Spec`s by direct field application + the ungated
-booleanness/half-product clauses + the gated AND-tree), the soundness/completeness proofs, the
-`spec_populate` reconstruction lemma, the semantic-exposure lemma `result_semantic`, and the bundled
-`circuit`.
-
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle: the composing
-`IsEqualWordOperation.Extracted` imports this module for `.circuit`. -/
+SP1's `IsZeroWordOperation::eval` as a Clean `FormalAssertion`. Composes `IsZeroOperation` on each
+limb; the `Spec` references the four per-limb `IsZeroOperation.Spec`s by direct field application
+plus the ungated booleanness/half-product clauses and the gated AND-tree. `spec_populate` lets the
+composing operation discharge its `assertion`-side obligation; `result_semantic` exposes the semantic
+readout. `Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle. -/
 
 namespace SP1Clean.IsZeroWordOperation
 
@@ -23,11 +19,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 /-- `is_real` is binary (discharged by the composing op's gate). No operand precondition. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
 
-/-- Faithful semantic contract (equivalent to the constraints). The `result` booleanness and the two
-half-product gluings are SP1's **ungated** asserts (hold on padding too); the four per-limb
-`IsZeroOperation.Spec`s are referenced **by direct field application**; the AND-tree gluing
-`result = first·second` is the one `is_real`-gated assert. The semantic `result = (a = 0)` is recovered
-by `result_semantic`. -/
+/-- Faithful semantic contract (equivalent to the constraints). `result` booleanness and the two
+half-product gluings are ungated (hold on padding too); the four per-limb `IsZeroOperation.Spec`s
+are referenced by direct field application; the AND-tree `result = first·second` is `is_real`-gated.
+The semantic `result = (a = 0)` is recovered by `result_semantic`. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.cols.result = 0 ∨ input.cols.result = 1) ∧
   (input.cols.is_zero_first_half =

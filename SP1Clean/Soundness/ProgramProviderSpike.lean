@@ -2,29 +2,25 @@ import SP1Clean.Soundness.ProgramConsistency
 
 /-! # Provider-chip spike (Program bus) — constructing the `ProgramProvider`, not assuming it
 
-**The workaround this attacks.** `Soundness/ProgramConsistency.lean` threads `TraceProgramLink` (every real
-instruction fetch is in the committed program ROM) as an honest assumption, because the **provider** chip —
-SP1's preprocessed program/decode ROM — is modeled only as a membership *predicate* (`ProgramChip.ProgramProvider`),
-not a real Air. The discharge lemma `programConsistent_of_balance` already reduces that link to
-`ProgramProvider inROM prov` **+** the lone `isConsistentBalanced` (LogUp/GKR) fact — but the
-`ProgramProvider` itself is still a *hypothesis*: nothing yet *produces* it.
+`Soundness/ProgramConsistency.lean` threads `TraceProgramLink` as an honest assumption because the
+**provider** chip — SP1's preprocessed program/decode ROM — is modeled only as a membership *predicate*
+(`ProgramChip.ProgramProvider`), not a real Air. The discharge lemma `programConsistent_of_balance`
+reduces that link to `ProgramProvider inROM prov` **+** the lone `isConsistentBalanced` (LogUp/GKR)
+fact — but the `ProgramProvider` itself is a *hypothesis*.
 
-**What this spike does.** It removes that hypothesis: it **constructs** a `ProgramProvider ProgramRowSpec`
-from any list of valid (`ProgramRowSpec`) ROM rows — `programProvider_of_validRom` — so the end-to-end
+This spike removes that hypothesis: it **constructs** a `ProgramProvider ProgramRowSpec` from any list
+of valid (`ProgramRowSpec`) ROM rows — `programProvider_of_validRom` — so the end-to-end
 `traceProgramLink_of_validRom_and_balance` derives `TraceProgramLink` from just (a) the ROM rows being
-validly decoded and (b) the balanced Program bus, with **no** standalone provider assumption. Everything
-here is axiom-clean.
+validly decoded and (b) the balanced Program bus, with no standalone provider assumption. Everything is
+axiom-clean.
 
-**The trust boundary it isolates (the spike's real output).** After this, the *only* residual on the Program
-link is `∀ row ∈ rom, ProgramRowSpec row` — i.e. the committed program ROM carries only validly-decoded rows
-(register indices `< 32`, pc limbs `< 2^16`, `op_a_0` boolean). That is irreducible *within Clean's
-constraint model*: it is either (a) a **preprocessing/commitment** fact about the verifying key's fixed ROM
-content, or (b) provable by a real **instruction-decode** Air whose in-circuit 5-bit / 16-bit range checks
-would themselves bottom out at the **Byte** bus (re-introducing a byte-provider obligation — the same shape one
-level down). The Byte bus is the exact analog: `Chips/ByteChip.lean`'s `ByteProvider`/`ByteRowSpec` would
-get a `byteProvider_of_validBytes` twin and the same boundary. So a full removal of all four threaded links
-reduces to: a real preprocessed-table Air per bus, bottoming out at preprocessing trust — a much larger,
-architecturally distinct effort than the per-instruction operation chips. -/
+**Trust boundary isolated.** The only residual on the Program link is `∀ row ∈ rom, ProgramRowSpec row`
+— the committed program ROM carries only validly-decoded rows (register indices `< 32`, pc limbs `< 2^16`,
+`op_a_0` boolean). That is irreducible within Clean's constraint model: it is either (a) a
+**preprocessing/commitment** fact about the verifying key's fixed ROM content, or (b) provable by a real
+instruction-decode Air whose in-circuit range checks would themselves bottom out at the **Byte** bus
+(the same shape one level down). A full removal of all four threaded links requires a real
+preprocessed-table Air per bus, bottoming out at preprocessing trust. -/
 
 namespace SP1Clean.Soundness
 
@@ -54,7 +50,7 @@ def romContributions (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod
 omit [NeZero p] in
 /-- **The provider is constructed, not assumed.** A ROM all of whose rows are validly decoded
 (`ProgramRowSpec`) yields a `ProgramProvider ProgramRowSpec`: every contribution sits at the key of a valid
-row (itself). This is the receiver-side fact `programConsistent_of_balance` previously took as a hypothesis. -/
+row (itself). Discharges the `ProgramProvider` hypothesis `programConsistent_of_balance` requires. -/
 theorem programProvider_of_validRom (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
     (h : ∀ row ∈ rom, ProgramRowSpec row) :
     ProgramProvider (p := p) ProgramRowSpec (romContributions rom mult) := by
@@ -65,8 +61,7 @@ theorem programProvider_of_validRom (rom : List (ProgramRow (ZMod p))) (mult : P
 
 /-- **End-to-end: `TraceProgramLink` from ROM-validity + balance, no provider assumption.** Feeding the
 constructed provider into `programConsistent_of_balance` discharges the instruction-fetch membership link
-using only (a) the committed ROM rows being validly decoded and (b) the balanced Program bus. The standalone
-`ProgramProvider` hypothesis of `programConsistent_of_balance` is gone — replaced by the concrete ROM. -/
+using only (a) the committed ROM rows being validly decoded and (b) the balanced Program bus. -/
 theorem traceProgramLink_of_validRom_and_balance
     (rows : List (Trace.RowView (ZMod p)))
     (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)

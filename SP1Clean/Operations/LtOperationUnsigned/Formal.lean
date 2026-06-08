@@ -247,8 +247,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · linear_combination hcl1eq
   · linear_combination hinv
 
-/-- SP1's `LtOperationUnsigned::eval` as a Clean-native `FormalAssertion`: composes the demoted
-`U16CompareOperation`, witnessing nothing. -/
+/-- SP1's `LtOperationUnsigned::eval` as a Clean-native `FormalAssertion`: composes
+`U16CompareOperation` as a sub-assertion, witnessing nothing. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions,

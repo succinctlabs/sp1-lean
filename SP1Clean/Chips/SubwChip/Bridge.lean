@@ -3,16 +3,12 @@ import SP1Clean.Foundations.Word
 import SP1Clean.Chips.SubwChip.Formal
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for SUBW (+ end-to-end composition)
+/-! # Native Sail bridge for SUBW (+ `ChipKind` registration)
 
-`correct_subw_native` proves that the RISC-V Sail execution of `SUBW` (`spec_subw`, calling
-LeanRV64D's `execute_RTYPEW` with `ropw.SUBW`) agrees with the SP1 chip's emulation
-(`sp1_subw`: write `nextPC = pc + 4` and the result register), given the chip's **semantic**
-fact `a_val = sext32→64 (op_b - op_c)` (= `SubwChip.circuit`'s `Spec`) and the register/PC reads.
-
-`execute_RTYPEW rs2 rs1 rd .SUBW` computes `sext (rX(rs1)[31:0] - rX(rs2)[31:0])`, so with
-`rs1 ↦ op_b_val` and `rs2 ↦ op_c_val` the Sail result is `sext (op_b - op_c)`, matching
-`SubwChip.Spec`'s fixed (non-commutative) operand order. -/
+`correct_subw_native` proves the RISC-V Sail `SUBW` execution agrees with the SP1 chip emulation
+given the chip's semantic fact `a_val = sext32→64 (op_b - op_c)` and the register/PC reads.
+`execute_RTYPEW rs2 rs1 rd .SUBW` computes `sext (rX(rs1)[31:0] - rX(rs2)[31:0])`, so
+`rs1 ↦ op_b_val`, `rs2 ↦ op_c_val` — the non-commutative order is load-bearing. -/
 
 namespace SP1Clean.SubwSail
 
@@ -62,11 +58,6 @@ theorem correct_subw_native
     h_pc, h_rs1, h_rs2, h_subw]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- End-to-end composition: from the SUBW chip's verified semantic contract (`SubwChip.Spec`, now the
-shared `RTypeChipSpec` on the migrated `SubwCols`, on a real row) plus the register/PC reads, the RISC-V
-Sail `SUBW` execution agrees with the SP1 chip emulation. The result word is the sign-extended
-`SubwOperation.resultWord` (`[v0, v1, msb·65535, msb·65535]`); the subw identity is `RTypeChipSpec`'s
-gated-arith conjunct (`h_chip.2.2.2`) bridged through `rv64_subw_eq` into `correct_subw_native`. -/
 theorem subw_chip_reaches_sail
     (input : SubwChip.Inputs (ZMod p)) (cols : Extracted.SubwCols (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
@@ -95,9 +86,8 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **SUBW's `ChipKind` registration** — SUBW's entry into the heterogeneous trace + capstone (mirrors
-`SubChip.kind`). The row's `op_a` write value / `view` write-word is the sign-extended W result
-`[v0, v1, msb·65535, msb·65535]`; the Program-bus opcode is `20`; `reaches_sail` is `subw_chip_reaches_sail`. -/
+/-- **SUBW's `ChipKind` registration.** Write-word is the sign-extended W result
+`[v0, v1, msb·65535, msb·65535]`; Program-bus opcode `20`; adapter is `RTypeReader`. -/
 def kind : Soundness.ChipKind p where
   name := "Subw"
   Inputs := SubwChip.Inputs

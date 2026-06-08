@@ -9,20 +9,11 @@ import SP1Clean.Chips.AddwChip.Defs
 
 /-! # Chip-level faithfulness anchor — SP1's whole `Addw` chip constraint list ↔ the combined spec
 
-The capstone of the four-artifact chain for Addw, mirroring `Faithful/SubwChip.lean`: where
-`Faithful/{Addw,CPUState,ALUTypeReader}` anchor each *fragment*, this anchors the **entire** generated
-`Extracted.AddwCols.constraints` list. SP1's chip constraints are `CS0 ++ CS1 ++ CS2 ++ [binary gate,
-op_a_0 = 0]` where `CS0` = `AddwOperation.constraints` (the composed `U16MSB` sign bit + two-limb add
-carry chain), `CS1` = `CPUState.constraints`, `CS2` = `ALUTypeReader.constraints` (opcode `19`). We
-split the list at each `++` (`forall_append_pair`) and discharge each fragment by its fragment anchor,
-leaving the two trailing `assertZero`s (the binary gate, vacuous at `is_real = 1`, and the
-`op_a_0 = 0` register-index gate).
-
-Like Subw, Addw is a W-variant: its result word fed to `ALUTypeReader` is sign-extended to
-`[value[0], value[1], msb·65535, msb·65535]`, so the `op_a_0 = 0` register-index gates land on those
-sign-extension limbs. Unlike Add/Sub, the adapter is `ALUTypeReader` (op_c may be an immediate), so
-this anchor consumes the new `alutypereader_constraints_faithful`. Every fragment anchor this composes
-(`addw_`, `cpustate_`, `alutypereader_constraints_faithful`) is `sorry`-free, so this anchor is too. -/
+Anchors the **entire** generated `Extracted.AddwCols.constraints` list. SP1's chip constraints are
+`AddwOperation ++ CPUState ++ ALUTypeReader ++ [binary gate, op_a_0 = 0]`. Each fragment is
+discharged by its anchor, leaving the two trailing `assertZero`s. Addw is a W-variant: its result
+word is sign-extended to `[value[0], value[1], msb·65535, msb·65535]`, so the `op_a_0 = 0` gates
+land on the sign-extension limbs. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

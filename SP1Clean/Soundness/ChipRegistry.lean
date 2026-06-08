@@ -32,9 +32,9 @@ A single bottom-level hub gathering every chip that has a capstone-integration `
 per-chip heterogeneity (its `Inputs`/`Cols` `TypeMap`s) lives *inside* each value — so `List (ChipKind p)`
 type-checks and `allChipKinds` is the one grep-able enumeration of the wired set.
 
-This file is an enumeration / re-export hub, **not** a dispatch mechanism: the capstone never iterates
-`allChipKinds`; it dispatches each row generically via `r.kind.reaches_sail`. The registry exists for
-**auditability** — one entry ⇔ one wired chip — and gives a single import that pulls in every `kind`.
+This file is an enumeration / re-export hub, **not** a dispatch mechanism: the capstone dispatches each
+row generically via `r.kind.reaches_sail`. The registry exists for **auditability** — one entry ⇔ one
+wired chip — and gives a single import that pulls in every `kind`.
 
 The instruction → chip → Sail **routing/identity** home is `Soundness/Coverage.lean` (the `Opcode` →
 `ChipKind` table mirroring SP1's `tracing.rs`); it is tied back to this registry by
@@ -45,7 +45,7 @@ The instruction → chip → Sail **routing/identity** home is `Soundness/Covera
 * **ALU / R-type:** Add, Addi, Addw, Sub, Subw, Bitwise (AND/OR/XOR), Lt (SLT/SLTU),
   ShiftLeft (SLL/SLLW), ShiftRight (SRL/SRA/SRLW/SRAW), Mul (MUL/MULH/MULHU/MULHSU/MULW), UType (LUI/AUIPC),
   DivRem (DIV/DIVU/REM/REMU/DIVW/REMW/DIVUW/REMUW),
-  AluX0 (any covered ALU op — now incl. the DIV/REM family — with `rd = x0`, result discarded).
+  AluX0 (any covered ALU op — incl. the DIV/REM family — with `rd = x0`, result discarded).
 * **Control flow:** Jal, Jalr, Branch (BEQ/BNE/BLT/BGE/BLTU/BGEU).
 * **Memory:** LoadByte, LoadHalf, LoadWord, LoadDouble, LoadX0 (loads into `x0`), StoreByte, StoreHalf,
   StoreWord, StoreDouble.
@@ -54,7 +54,7 @@ The instruction → chip → Sail **routing/identity** home is `Soundness/Covera
 registry and everything downstream (`sp1Tables`, the capstone, `Coverage`) are stated under
 `[Fact (2 ^ 24 < p)]` with a local `Fact (2 ^ 17 < p)` derived from it; KoalaBear (p ≈ 2³¹) satisfies it.
 
-`DivRem` is now wired (its soundness landed, axiom-clean); only its `completeness` stays `sorry`. -/
+`DivRem` soundness is axiom-clean; only its `completeness` carries a `sorry`. -/
 
 namespace SP1Clean.Soundness
 

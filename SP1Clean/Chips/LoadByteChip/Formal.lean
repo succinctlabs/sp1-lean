@@ -1,11 +1,9 @@
 import SP1Clean.Chips.LoadByteChip.Defs
 
-/-! # `SP1Clean.LoadByteChip` — contract: `Assumptions` / soundness / completeness / `circuit`
+/-! # `SP1Clean.LoadByteChip` — `Assumptions` / soundness / completeness / `circuit`
 
-Split from the monolithic chip file: `main` + the `ElaboratedCircuit` instance live in the
-sibling `Defs` module, the Sail bridge (where present) in `Bridge`. This module holds the
-prover/verifier `Assumptions`, any local `Spec`/helper lemmas, the soundness/completeness
-proofs, and the bundled `circuit`. -/
+`Assumptions`, soundness, completeness, and the bundled `circuit`. (`main` + `ElaboratedCircuit`
+in `Defs`; Sail bridge in `Bridge`.) -/
 
 namespace SP1Clean.LoadByteChip
 

@@ -6,21 +6,10 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for StoreDouble (SD)
 
-`correct_store_double_native` proves that the RISC-V Sail execution of `SD`
-(`spec_sd`, calling LeanRV64D's `execute_STORE` with `width = 8`) agrees with the SP1
-chip's emulation (`sp1_sd`: write `nextPC = pc + 4` and the eight little-endian bytes of
-the stored word `rs2` into `mem[addr … addr+7]`), given:
-
-* the register read of the base address `rs1` (`h_rs1`, `= reg_val`),
-* the register read of the stored value `rs2` (`h_rs2`, `= Word.toBitVec64 stored`),
-* the PC read (`h_pc`),
-* alignment / fits / non-reserved-address facts (`is_aligned` / `_h_does_fit` / `range_subset`),
-
-mirroring `SailMem.run_vmem_write_of_width_8`. This is the write analogue of
-`LoadSail.correct_load_double_native`: the caller supplies the register/PC reads as direct
-hypotheses (in the full system these come from the reader bus), and the eight memory bytes
-pushed by the write are exactly the little-endian limbs of the rs2 word
-(`Word.toBitVec64 stored`), so the final state on both sides matches. -/
+`correct_store_double_native` proves that Sail's `execute_STORE` (width = 8) agrees with the
+SP1 chip emulation (`sp1_sd`: write `nextPC = pc + 4` and the eight little-endian bytes of
+`rs2` into `mem[addr … addr+7]`), via `SailMem.run_vmem_write_of_width_8`. Caller supplies
+register/PC reads and alignment / fits / non-reserved-address facts. -/
 
 namespace SP1Clean.StoreSail
 
@@ -142,30 +131,17 @@ theorem correct_store_double_native
     rw [sp1_sd]
     rw [EStateM.run_bind, run_writeReg]
     rfl
-  -- Reduce the RISC-V side: thread the PC read + `nextPC` write (so the `execute_STORE` runs on `sp`),
-  -- discharge the `width ≤ xlen_bytes` assert, resolve `rX_bits rs2`/`extractLsb`, run the write via
-  -- `hwrite`, and match the resulting `RETIRE_SUCCESS` state against `hsp1`.
   rw [hsp1]
   simp only [spec_sd]
   rw [EStateM.run_bind, run_readReg_of_isInitialized _ _ hs, hpc_get]
   simp only [EStateM.run_bind, run_writeReg]
   rw [show ({ s with regs := s.regs.insert Register.nextPC (pc + 4#64) } : SailState) = sp from rfl]
-  -- Reduce the `execute_STORE` body on `sp`: unfold, discharge the `width ≤ xlen_bytes` assert,
-  -- thread `rX_bits rs2` (`hrx2`) and the `extractLsb`/`setWidth` collapse (`hext`), then run the
-  -- write via `hwrite`; the surviving `RETIRE_SUCCESS` state matches `hsp1` syntactically.
-  -- Unfold `execute_STORE` on `sp`: discharge the `8 ≤b xlen_bytes` assert, thread the rs2 read
-  -- (`hsp_rs2`), collapse the store value (`extractLsb stored 63 0 = stored`, via `hext`), then run
-  -- the write via `hwrite`; the surviving `RETIRE_SUCCESS` state matches `hsp1` syntactically.
   simp [execute_STORE, hse, LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert,
     hsp_rs2, hext, hwrite]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- **End-to-end composition.** From the `StoreDouble` chip's prover assumptions (the operand
-`isU64`s and the valid/aligned/non-reserved 48-bit address) plus the decode + register/PC reads
-plus the store-fits-in-physical-memory bound, the RISC-V Sail `SD` execution agrees with the
-SP1 chip emulation. The stored word is the chip's `adapter.op_a_memory.prev_value` (the rs2
-read value); the base register value is `Word.toBitVec64 input.op_b_val`. The write analogue of
-`LoadSail.ld_chip_reaches_sail`. -/
+/-- End-to-end: from chip `Assumptions` + decode + register/PC reads, Sail's `SD` agrees with
+the SP1 chip emulation. -/
 theorem sd_chip_reaches_sail
     (input : StoreDoubleChip.Inputs (ZMod p)) (_cols : Extracted.StoreDoubleColumns (ZMod p))
     (data : ProverData (ZMod p))
@@ -208,10 +184,7 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **StoreDouble's `ChipKind` registration** (SD). Straight-line `view`, I-type adapter, gating selector
-`is_real`, opcode 39; stores the full 8-byte `rs2` value, so `rdWrite := adapter.op_a_memory.prev_value`.
-`sailEquiv` quantifies the prover `data`, `Assumptions inp data`, the `isU64` stored-value fact, the decode
-/ fits facts, and the rs1/rs2/PC reads; `reaches_sail` is `sd_chip_reaches_sail`. -/
+/-- `ChipKind` registration for StoreDouble (SD, opcode 39). -/
 def kind : Soundness.ChipKind p where
   name := "StoreDouble"
   Inputs := StoreDoubleChip.Inputs

@@ -2,11 +2,8 @@ import SP1Clean.Chips.AluX0Chip.Defs
 
 /-! # `SP1Clean.AluX0Chip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
-Split from the chip `Defs` (which holds `main` + the `ElaboratedCircuit` instance). This module holds the
-prover/verifier `Assumptions`, the soundness/completeness proofs, and the bundled `circuit`. `AluX0` is the
-ALU-into-`x0` chip: it validates the program/register accesses and advances state, discarding the (no-op
-write to `x0`) result. Verifier-side `Assumptions` are trivial (`True`) — soundness derives `is_real` binary
-and the reader contract purely from the in-circuit gates. -/
+Verifier-side `Assumptions` are trivial (`True`) — soundness derives `is_real` binary and the
+reader contract purely from the in-circuit gates. -/
 
 namespace SP1Clean.AluX0Chip
 

@@ -25,9 +25,9 @@ single heterogeneous trace materialises one *homogeneous* `List RowView`, so `Ro
 single concrete type. `AdapterView` is that type: the superset shape (`op_b op_c : Word`, `imm_b imm_c : F`)
 every reader projects into via its `toAdapterView`. A pure R-type reader projects `op_b := #v[op_b, 0, 0, 0]`,
 `op_c := #v[op_c, 0, 0, 0]`, `imm_b := imm_c := 0`, which makes the `is_real * (1 - imm_b/c)` operand gating
-and the `op_b/c[1..3]`/`imm_b/c` Program-bus slots degenerate to exactly the old scalar behaviour. A
-J-type reader (JAL/AUIPC) projects `op_b := op_b_imm` (a full immediate `Word`), `imm_b := 1`, so the op_b
-register access is gated off on every row (`is_real * (1 - 1) = 0`), faithful to SP1 emitting no op_b memory
+and the `op_b/c[1..3]`/`imm_b/c` Program-bus slots degenerate to pure scalar behaviour. A J-type reader
+(JAL/AUIPC) projects `op_b := op_b_imm` (a full immediate `Word`), `imm_b := 1`, so the op_b register
+access is gated off on every row (`is_real * (1 - 1) = 0`), faithful to SP1 emitting no op_b memory
 interaction for an immediate operand. -/
 structure AdapterView (F : Type) where
   op_a : F
@@ -42,7 +42,7 @@ structure AdapterView (F : Type) where
 
 /-- The `RTypeReader` (scalar `op_c`, no immediate) projection: widen `op_c` to `#v[op_c, 0, 0, 0]` and
 pin `imm_c := 0`. The op_c gating `is_real - imm_c` and the `op_c[1..3]`/`imm_c` Program slots then
-collapse to the old R-type behaviour. -/
+collapse to the scalar R-type behaviour. -/
 def _root_.SP1Clean.Extracted.RTypeReader.toAdapterView {F : Type} [Zero F]
     (c : Extracted.RTypeReader F) : AdapterView F :=
   { op_a := c.op_a, op_a_memory := c.op_a_memory, op_a_0 := c.op_a_0,

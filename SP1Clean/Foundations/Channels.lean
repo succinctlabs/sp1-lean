@@ -13,12 +13,8 @@ interaction buses (`builder.send`/`receive`). Each `Channel` here is the Lean an
 re-pointed at `Operations.interactionsWith <channel>` and the projections become theorems
 (`interactionsWith_eq_of_mem_exposedChannels`). See `docs/bus-model.md`.
 
-The feasibility of emitting these inside the witnessed-`FormalCircuit` recipe — axiom-clean, at the
-existing heartbeat floor — was established by `Readers/CPUStateChannelSpike.lean`.
-
-This module carries the **State** bus (the slice already modelled at the trace level by
-`Soundness/StateConsistency.lean`) and the **Byte** bus (SP1's preprocessed `ByteChip`,
-`Foundations/ByteTable.lean`). The `Program`/`Memory` channels join here as their phases land. -/
+This module carries the **State** bus and the **Byte** bus (SP1's preprocessed `ByteChip`,
+`Foundations/ByteTable.lean`), plus the **Program** and **Memory** channels. -/
 
 namespace SP1Clean.Channels
 
@@ -334,8 +330,8 @@ cleanup. The cross-row PC chain stays the trace level (`Soundness/StateConsisten
 def StateMsg.Spec (_ : StateMsg (ZMod p)) : Prop := True
 
 /-- The State channel (SP1 `InteractionKind.State`). `Guarantees := StateMsg.Spec = True`: SP1's State
-send proves no local well-formedness (it range-checks no pc; the clk checks are separate byte sends). Still
-emitted via `emitGated` (`toRawGated`) so the `is_real` multiplicity (`+is_real` send / `-is_real`
+send proves no local well-formedness (it range-checks no pc; the clk checks are separate byte sends).
+Emitted via `emitGated` (`toRawGated`) so the `is_real` multiplicity (`+is_real` send / `-is_real`
 receive / `0` padding) is preserved. The cross-row PC chain stays the trace level
 (`Soundness/StateConsistency.lean`). -/
 def stateChannel : Channel (ZMod p) StateMsg where

@@ -19,10 +19,9 @@ the list at each `++` (`forall_append_pair`) and discharge each fragment by its 
 the two trailing `assertZero`s (the binary gate, vacuous at `is_real = 1`, and the `op_a_0 = 0`
 register-index gate).
 
-So a single theorem certifies that SP1's generated `Sub` chip constraint list means **exactly**: the
+So a single theorem certifies that SP1's generated `Sub` chip constraint list means exactly: the
 `SubOperation` raw arithmetic spec on the register-read operands, the two CPUState clock byte bounds,
-the RTypeReader per-row well-formedness, and `op_a_0 = 0`. Every fragment anchor it composes
-(`sub_`, `cpustate_`, `rtypereader_constraints_faithful`) is `sorry`-free, so this anchor is too. -/
+the RTypeReader per-row well-formedness, and `op_a_0 = 0`. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

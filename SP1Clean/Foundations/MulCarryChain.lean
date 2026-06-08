@@ -15,8 +15,7 @@ witnessed `MulOperation` circuit instantiates `cp` with the concrete byte convol
 `main`'s witness generators and the completeness proof both read off `product`/`carry`.
 
 Everything here is `ℕ` arithmetic closed by `omega` after `Nat.div_add_mod` — no field, no `Clean`,
-no heavy imports (plus a couple of `ZMod` casts at the end). Ported verbatim from
-`sp1-lean/SP1Clean/Operations/MulCarryChain.lean`. -/
+no heavy imports (plus a couple of `ZMod` casts at the end). -/
 
 namespace SP1Clean.MulCarryChain
 

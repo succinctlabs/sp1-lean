@@ -11,9 +11,9 @@ force `result` to be the zero indicator of `a`. The auto-generated circuit (`Inp
 `elaborated`) lives in the sibling `Extracted` module; the `populate` witness in `Populate`; the
 `FormalAssertion` contract (soundness/completeness/`circuit`) in `Formal`.
 
-`Faithful/IsZeroOperation.lean` anchors `AssertSpec` to the extracted `asserts` list. The transitional
-`RawSpec`/`isZero_of_raw` aliases are kept so the composing word-level ops' `RawSpec`s (which reference
-`IsZeroOperation.RawSpec` directly) and their faithfulness anchors still build. -/
+`Faithful/IsZeroOperation.lean` anchors `AssertSpec` to the extracted `asserts` list. The
+`RawSpec`/`isZero_of_raw` aliases (defeq to `AssertSpec`/`isZero_of_assert`) are kept so the composing
+word-level ops' `RawSpec`s and their faithfulness anchors still build. -/
 
 namespace SP1Clean.IsZeroOperation
 
@@ -58,16 +58,15 @@ theorem inverse_of_assert {a : ZMod p} {cols : Extracted.IsZeroOperation (ZMod p
   rw [hr] at h_eq
   linear_combination -h_eq
 
-/-- Transitional alias for `AssertSpec` — kept so the not-yet-fully-migrated composed ops still
-build (they `simp` on `IsZeroOperation.RawSpec`). Defeq to `AssertSpec` (`IsZero` has no
-interactions). -/
+/-- Alias for `AssertSpec` — composing ops and faithfulness anchors `simp` on `IsZeroOperation.RawSpec`;
+keeping this alias means they build without change. Defeq to `AssertSpec` (`IsZero` has no interactions). -/
 def RawSpec (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) : Prop :=
   ((1 - cols.inverse * a) - cols.result = 0) ∧
   (cols.result = 0 ∨ cols.result = 1) ∧
   (cols.result * a = 0)
 
 omit [Fact (2 ^ 17 < p)] in
-/-- Transitional alias for `isZero_of_assert` (see `RawSpec`). Returns the semantic `Spec`. -/
+/-- Alias for `isZero_of_assert` (see `RawSpec`). -/
 theorem isZero_of_raw {a : ZMod p} {cols : Extracted.IsZeroOperation (ZMod p)}
     (h_raw : RawSpec a cols) : cols.result = if a = 0 then 1 else 0 := isZero_of_assert h_raw
 

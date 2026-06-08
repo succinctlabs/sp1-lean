@@ -9,19 +9,11 @@ import SP1Clean.Faithful.ITypeReader
 
 /-! # Chip-level faithfulness anchor — SP1's whole `Addi` chip constraint list ↔ the combined spec
 
-Anchors the **entire** generated `Extracted.AddiCols.{asserts,interactions}` lists
-(`Extracted/AddiChip.lean`) to the native combined spec. SP1's `Addi` chip constraints are
-`AddOperation ++ CPUState ++ ITypeReader ++ [is_real binary gate, op_a_0]` — the immediate add
-(`rs1 + op_c_imm`, where the immediate is read off the `op_c_imm` adapter columns), the straight-line
-state row, the I-type register adapter (one register read `op_b` + one destination write `op_a`), and
-the two trailing scalar gates. We split the two lists at each `++` (`forall_append_pair`) and discharge
-each fragment by its combined fragment anchor (`add_`, `cpustate_`, `itypereader_constraints_faithful`),
-leaving the binary gate (vacuous at `is_real = 1`) and the `op_a_0 = 0` register-index gate.
-
-So a single theorem certifies that SP1's generated `Addi` chip constraint lists mean **exactly**: the
-`AddOperation` raw arithmetic spec (asserts + limb ranges), the two CPUState clock byte bounds, the
-ITypeReader per-row well-formedness (the `op_a_0` zeroing + both operands' timestamp byte bounds), and
-`op_a_0 = 0`. Every fragment anchor it composes is `sorry`-free, so this anchor is too. -/
+Anchors the **entire** generated `Extracted.AddiCols.{asserts,interactions}` lists to the native
+combined spec. SP1's `Addi` chip constraints are `AddOperation ++ CPUState ++ ITypeReader ++ [binary
+gate, op_a_0]`. Each fragment is discharged by its own anchor; a single theorem certifies the lists
+mean **exactly**: the `AddOperation` raw arithmetic spec, the two CPUState clock byte bounds, the
+ITypeReader per-row well-formedness, and `op_a_0 = 0`. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

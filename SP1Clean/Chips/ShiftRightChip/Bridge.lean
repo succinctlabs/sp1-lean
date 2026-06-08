@@ -11,13 +11,11 @@ result register `rd`); the RISC-V Sail spec differs by variant — `spec_srl` (`
 `spec_sra` (`rop.SRA`, 64-bit arithmetic), `spec_srlw` (`ropw.SRLW`, low-32 logical sext), `spec_sraw`
 (`ropw.SRAW`, low-32 arithmetic sext).
 
-`correct_{srl,sra,srlw,sraw}_native` route the chip's semantic RV64 facts straight into the Sail
-execution, through the `execute_RTYPE(W)_pure_* = RV64.*` Sail-side identities (mirrors
-`LtChip/Bridge.lean`/`ShiftLeftChip/Bridge.lean`). Unlike `ShiftLeft`, the chip `Spec` sources its
-operands from the **register read-backs** `adapter.op_b_memory.prev_value` (rs1) /
-`adapter.op_c_memory.prev_value` (rs2) — SP1's shift chip inlines the decomposition of the register read
-— so the bridge's `h_rs1`/`h_rs2` read those adapter columns. The `ChipKind`'s `sailEquiv` is the
-**4-way flag-dispatched** conjunction, proven from the chip `Spec` by `shiftright_chip_reaches_sail`. -/
+`correct_{srl,sra,srlw,sraw}_native` routes the chip's RV64 facts into the Sail execution via the
+`execute_RTYPE(W)_pure_* = RV64.*` Sail-side identities. The chip `Spec` sources operands from the
+**register read-backs** `adapter.op_b_memory.prev_value` (rs1) / `adapter.op_c_memory.prev_value`
+(rs2) — SP1's shift chip inlines the register-read decomposition — so `h_rs1`/`h_rs2` read those
+adapter columns. The `ChipKind`'s `sailEquiv` is the 4-way flag-dispatched conjunction. -/
 
 namespace SP1Clean.ShiftRightSail
 
@@ -166,9 +164,7 @@ theorem correct_sraw_native
     h_pc, h_rs1, h_rs2, h_sraw]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- End-to-end: a real `ShiftRight` chip row reaches the RISC-V Sail shift-right, 4-way flag-dispatched —
-the SRL/SRA/SRLW/SRAW identities flow from the chip `Spec` (sourced on the register read-backs
-`adapter.op_*_memory.prev_value`) into `correct_*_native`. -/
+/-- End-to-end: from the chip `Spec`, the 4-way SRL/SRA/SRLW/SRAW Sail identities hold. -/
 theorem shiftright_chip_reaches_sail
     (input : ShiftRightChip.Inputs (ZMod p)) (cols : Extracted.ShiftRightCols (ZMod p))
     (data : ProverData (ZMod p))
@@ -214,11 +210,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **The `ShiftRight` `ChipKind` registration** — the SRL/SRA/SRLW/SRAW row's entry into the
-heterogeneous trace + soundness capstone. `view` projects the immediate-capable `ALUTypeReader` adapter
-through `cols.adapter.toAdapterView`; `rdWrite` is the shift result word `cols.a`; the Program-bus
-opcode is `is_srl·7 + is_sra·8 + is_srlw·22 + is_sraw·23`; `sailEquiv` is the 4-way flag-dispatched
-conjunction; `reaches_sail` is `shiftright_chip_reaches_sail`. The bridge reads `rs1`/`rs2` off the
+/-- `ChipKind` registration for ShiftRight (SRL/SRA/SRLW/SRAW). `rs1`/`rs2` are read from the
 adapter register read-backs `op_b_memory.prev_value`/`op_c_memory.prev_value`. -/
 def kind : Soundness.ChipKind p where
   name := "ShiftRight"

@@ -12,17 +12,10 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # The `AluX0` chip row as a `GeneralFormalCircuit`
 
-SP1's `AluX0` is the fast path for **ALU instructions whose destination register is `x0`** (the
-hardwired-zero register). Since `x0` discards the result, the chip **does not compute the ALU result** — it
-only validates the program/register accesses and advances state (`nextPC = pc + 4`). One chip handles every
-covered ALU opcode behind a single dynamic `opcode` column (range-checked `< 29` against the ALU opcode
-alphabet). It is the ALU analog of `LoadX0Chip` (loads into `x0`), structurally **simpler**: no address
-gadget, no memory access (nothing is loaded).
-
-Composes — as Clean sub-circuits — the `CPUState` reader (pc+4 / clk+8) and the `ALUTypeReaderImmutable`
-adapter (op_a a source **read** writing 0 to `x0`, op_b/op_c reads, op_c gated `is_real - imm_c`); imposes
-the `opcode < 29` LTU byte-range send, the `is_real` binary gate, and the two `op_a_0` forcing gates (which
-pin `op_a_0 = is_real`, i.e. `op_a = x0` on real rows). Output is the extracted `AluX0Cols`. -/
+Fast path for ALU instructions writing to `x0` (result discarded). Validates program/register accesses
+and advances state only; a single dynamic `opcode` column (range-checked `< 29`) covers every ALU opcode.
+Composes `CPUState` and `ALUTypeReaderImmutable` (op_a reads writing 0 to `x0`, op_c gated by
+`is_real - imm_c`), plus the LTU byte-range send and `op_a_0 = is_real` forcing gates. -/
 
 namespace SP1Clean.AluX0Chip
 
@@ -59,7 +52,6 @@ reader is the committed `opcode` column. Assembles the extracted `AluX0Cols`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  -- LTU byte-range check: `1 = (opcode < 29)`, i.e. the opcode is a valid ALU opcode.
   byteChannel.gatedReceive input.is_real (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
   assertion Readers.ALUTypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,

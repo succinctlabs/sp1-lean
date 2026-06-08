@@ -10,8 +10,8 @@ the `noncomputable` `Operations.interactionsWith` — so it stays axiom-clean an
 
 **Statement layer only.** This makes the multi-chip balance *sayable* and decomposes it per chip
 (`multiplicitySum_busAggregate_cons`); it does **not** prove `busBalance ⟹ pcChainProp` / offline-memory /
-ROM-membership. Those stay threaded as the per-bus `Trace*Link`s in `Soundness/*Consistency.lean`, exactly
-as `../sp1-lean` defers them (`docs/bus-model.md`). `InteractionScope` (multi-shard) is deferred. -/
+ROM-membership. Those stay threaded as the per-bus `Trace*Link`s in `Soundness/*Consistency.lean`
+(`docs/bus-model.md`). `InteractionScope` (multi-shard) is deferred. -/
 
 namespace SP1Clean
 

@@ -156,11 +156,10 @@ theorem balanced_state_bus
 
 /-- **Balance ⇒ a real-row execution trail.** Combining `balanced_state_bus` with the abstract
 `GatedVm.exists_trail`: from the balanced state bus (+ genesis/finalization boundary) there is a walk of
-**real rows** chaining the public initial state to the public final state — each step a row's
-`current → next` transition, the whole trail's rows a sub-multiset of the real rows. No clock injectivity
-or advance. (`DecidableEq` on rows is supplied classically; it only feeds `Multiset.erase` in the
-abstract proof and does not affect the resulting proposition — `Classical.choice` is already in the
-axiom baseline.) -/
+real rows chaining the public initial state to the public final state — each step a row's `current →
+next` transition, the whole trail's rows a sub-multiset of the real rows. No clock injectivity or
+advance. (`DecidableEq` on rows is supplied classically; `Classical.choice` is already in the axiom
+baseline.) -/
 theorem state_trail_of_balance
     (rows : List (Trace.RowView (ZMod p)))
     (hbin : ∀ r ∈ rows, r.is_real = 0 ∨ r.is_real = 1)

@@ -37,9 +37,9 @@ set_option maxHeartbeats 4000000 in
 /-- Soundness of the `sllw` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  -- `op_b_val`/`op_c_val` are now reducible projections (`adapter.op_b_memory.prev_value` /
-  -- `adapter.op_c`), not committed columns. Unfolding them collapses the `op_b_val = op_b_memory.prev_value`
-  -- assumption conjunct to `rfl` (dropped by `simp`), leaving the three real conjuncts.
+  -- `op_b_val`/`op_c_val` are reducible projections (`adapter.op_b_memory.prev_value`/`adapter.op_c`),
+  -- not committed columns. Unfolding them collapses the readback-equality conjunct to `rfl`
+  -- (dropped by `simp`), leaving the three real conjuncts.
   simp only [Inputs.op_b_val, Inputs.op_c_val] at h_assumptions ⊢
   obtain ⟨hb_u64, hc_u64, hc_eq⟩ := h_assumptions
   obtain ⟨_hcpu, hmsb, _halu, _hrealbin, hrealeq,

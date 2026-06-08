@@ -34,9 +34,9 @@ set_option maxHeartbeats 4000000 in
 /-- Soundness of the `sll` conjunct (verbatim slice of the monolithic proof + the shared tail). -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  -- `op_b_val`/`op_c_val` are now reducible projections (`adapter.op_b_memory.prev_value` /
-  -- `adapter.op_c`), not committed columns. Unfolding them collapses the `op_b_val = op_b_memory.prev_value`
-  -- assumption conjunct to `rfl` (dropped by `simp`), leaving the three real conjuncts.
+  -- `op_b_val`/`op_c_val` are reducible projections (`adapter.op_b_memory.prev_value`/`adapter.op_c`),
+  -- not committed columns. Unfolding them collapses the readback-equality conjunct to `rfl`
+  -- (dropped by `simp`), leaving the three real conjuncts.
   simp only [Inputs.op_b_val, Inputs.op_c_val] at h_assumptions ⊢
   obtain ⟨hb_u64, hc_u64, hc_eq⟩ := h_assumptions
   obtain ⟨_hcpu, hmsb, _halu, _hrealbin, hrealeq,
@@ -129,7 +129,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     --   b. From `hbyte2..hbyte9` + `byteRowSpec_range`: the `lower/higher_limb` range bounds (width
     --      `16-bitShift` / `bitShift`; massage `cb_i*1`/`((k:ℕ):ZMod p)` to the `sll_close_*` width form).
     --   c. `hbyte1` + `is_mod_64` → `op_c_memory.prev_value[0].val % 64 = (cb-sum).val`, i.e. the low-6-bit
-    --      shift amount; bridge `RV64.sll` to `… <<< ((toBitVec64 c).toNat % 64)` (cf. sp1-lean `spec.sll`).
+    --      shift amount; bridge `RV64.sll` to `… <<< ((toBitVec64 c).toNat % 64)`.
     --   d. Case-split `byteShift = cb4 + cb5*2` (here `is_sll = 1`) into 0/1/2/3 via `hsu*sel`/`hsu*b`/
     --      `hsusum` one-hot; in each, the `is_sll`-gated `hp*` collapse `a` to `limb_result`, and `hreass*`
     --      put it in `ll*v0123 (+hl)` form; feed the matching `sll_close_cb4cb5_{zero,one_zero,zero_one,

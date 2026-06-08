@@ -2,11 +2,9 @@ import SP1Clean.Chips.BitwiseChip.Defs
 
 /-! # `SP1Clean.BitwiseChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
-Split from the monolithic chip file: `main` + the `ElaboratedCircuit` instance live in the
-sibling `Defs` module, the Sail bridge in `Bridge`. This module holds the prover/verifier
-`Assumptions`, the semantic flag-gated `Spec`, the soundness/completeness proofs (the AND/OR/XOR
-dispatch mirrors `LtChip`'s SLT/SLTU dispatch, organized around the `one_hot3` selector lemma so
-each opcode branch is a self-contained local argument), and the bundled `circuit`. -/
+Semantic `Spec` (binary ∧ flag-gated `RV64.and`/`or`/`xor`), soundness (keyed on `one_hot3`
+selector lemma — each opcode branch is a self-contained local argument), completeness, and the
+bundled `circuit`. -/
 
 namespace SP1Clean.BitwiseChip
 
@@ -21,10 +19,9 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness (mirrors `LtChip.ProverAssumptions`, ALU adapter): operand
-`isU64`s, the `is_real` binary selector, the `op_a_0 = 0` flag, `imm_c = 0` (AND/OR/XOR are
-register-register), the CPUState clock bounds, and the three timestamp `Spec`s (op_c gated by
-`is_real - imm_c`). -/
+/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`,
+`imm_c = 0` (register-register ops), CPUState clock bounds, three timestamp `Spec`s
+(op_c gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -41,12 +38,8 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
 
-/-- Semantic contract (mirrors `LtChip.Spec`, here for the **three-variant** bitwise adapter): the
-proven `is_real`-binary fact and the `is_real`/flag-gated meaning — on real rows the result word is the
-RV64 `AND` (when `is_and = 1`) / `OR` (when `is_or = 1`) / `XOR` (when `is_xor = 1`) of the operands
-(operand order matching the RV64 signature `f rs2_val rs1_val` with `rs1 ↦ op_b_val`). Vacuous on
-padding. The `ALUTypeReader`/`CPUState` sub-circuits are still composed (and emit their buses) in `main`;
-their cross-row guarantees live at the trace level, so they are not re-exposed in the chip `Spec`. -/
+/-- Proven `is_real`-binary + `is_real`/flag-gated RV64 identity on the result word. Vacuous on
+padding. Cross-row bus guarantees live at the trace level and are not re-exposed here. -/
 def Spec (input : Inputs (ZMod p)) (cols : BitwiseCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (input.is_real = 1 →
@@ -98,21 +91,18 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_or_bool := bool_of_mul_pred h_or_bin
   have h_and_bool := bool_of_mul_pred h_and_bin
   have hoh := one_hot3 h_xor_bool h_or_bool h_and_bool h_sum
-  -- the byte opcode passed to the gadget reduces to a literal once the active flag forces the others to 0
+  -- once the active flag forces the others to 0, the byte opcode reduces to a literal
   refine ⟨⟨h_bin, fun _hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩⟩,
     Or.inr h_bin, Or.inl rfl, Or.inr h_bin⟩
-  · -- AND: `is_and = 1` forces `is_xor = is_or = 0`, so `byte_opcode = 0`
-    obtain ⟨hx0, ho0⟩ := hoh.2.2 hand
+  · obtain ⟨hx0, ho0⟩ := hoh.2.2 hand
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0 := by
       rw [hx0, ho0]; ring
     exact (h_bw ⟨ha, hb, by rw [hopc, ZMod.val_zero]; omega⟩).1 hopc
-  · -- OR: `is_or = 1` forces `is_xor = is_and = 0`, so `byte_opcode = 1`
-    obtain ⟨hx0, _ha0⟩ := hoh.2.1 hor
+  · obtain ⟨hx0, _ha0⟩ := hoh.2.1 hor
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1 := by
       rw [hx0, hor]; ring
     exact (h_bw ⟨ha, hb, by rw [hopc, ZMod.val_one]; omega⟩).2.1 hopc
-  · -- XOR: `is_xor = 1` forces `is_or = is_and = 0`, so `byte_opcode = 2`
-    obtain ⟨ho0, _ha0⟩ := hoh.1 hxor
+  · obtain ⟨ho0, _ha0⟩ := hoh.1 hxor
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
       rw [hxor, ho0]; ring
     have h2 : (2 : ZMod p).val < 3 := by

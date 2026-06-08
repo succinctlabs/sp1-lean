@@ -7,15 +7,12 @@ import Clean.Air.FlatEnsemble
 
 /-! # SP1 as a Clean `FormalEnsemble` — the final, gated whole-machine ensemble
 
-The realized whole-machine soundness object for SP1, built on the **gated VM** path (`GatedVm/`). It
-packages the axiom-clean gated capstone `gatedExecution_of_specs_and_balance` (`GatedVm/Capstone.lean`)
-into a Clean `Air.Flat.FormalEnsemble` via `GatedVm.toFormalEnsemble` (`GatedVm/Formal.lean`), carrying a
-**meaningful** spec: from the ensemble `Statement` (per-table constraints + balanced channels) over the
-public initial/final machine state, there is a valid RISC-V-Sail execution trail from the public
-`pc_start` to the public `next_pc`, with every real instruction Sail-correct.
-
-This replaces the earlier `Soundness/FlatEnsemble.lean` plain-path scaffold (`PublicIO := unit`,
-`Spec := True`, two scaffold `sorry`s) — see `docs/roadmap.md` §B5.
+The whole-machine soundness object for SP1, built on the **gated VM** path (`GatedVm/`). Packages the
+axiom-clean gated capstone `gatedExecution_of_specs_and_balance` (`GatedVm/Capstone.lean`) into a Clean
+`Air.Flat.FormalEnsemble` via `GatedVm.toFormalEnsemble` (`GatedVm/Formal.lean`), with a **meaningful**
+spec: from the ensemble `Statement` (per-table constraints + balanced channels) over the public
+initial/final machine state, there is a valid RISC-V-Sail execution trail from `pc_start` to `next_pc`,
+with every real instruction Sail-correct.
 
 **Trust boundary / residue.** The `soundness` *assembly* is sorry-free: it threads the two ensemble
 prerequisites into the gated capstone. The remaining bridge from the Clean ensemble `Statement` to those
@@ -25,8 +22,7 @@ project's checklist §B5 residue:
   `isConsistentBalanced_of_intCast_zero` + `stateLookups_eq_emitted` + the verifier boundary), and
 * (b)+(c) the 22-chip witness → `ChipRow` decode + per-table `Component.weakSoundness` + each chip's
   `isU64` operand-`Assumptions` recovery from the memory-bus balance.
-Closing it yields a fully axiom-clean `sp1FormalEnsemble` with trust *below* the bespoke capstone, with
-no further structural work. -/
+Closing it yields a fully axiom-clean `sp1FormalEnsemble` with no further structural work. -/
 
 namespace SP1Clean.Soundness
 
@@ -129,11 +125,10 @@ def sp1Verifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
 /-! ## The SP1 machine as a gated VM -/
 
 /-- The 24 capstone-wired chips, each a `GeneralFormalCircuit` wrapped as a Clean AIR `Component`
-(`⟨chip.circuit⟩`). Order mirrors `Soundness/AllChips.lean`'s `allChipsTrace`. DivRem is excluded
-exactly as in `ChipRegistry.allChipKinds` (its soundness is still `sorry`). `Mul`'s `circuit` carries a
-completeness `sorry` (like ShiftLeft/ShiftRight/Branch), but the ensemble soundness consumes only each
-`Component`'s constraints/channels, never its `completeness` proof — so it does not enter the capstone
-axioms. -/
+(`⟨chip.circuit⟩`). Order mirrors `Soundness/AllChips.lean`'s `allChipsTrace`. `DivRem` is not included
+here (unlike `ChipRegistry.allChipKinds`, which lists all 25). `Mul`'s `circuit` carries a completeness
+`sorry` (like ShiftLeft/ShiftRight/Branch), but the ensemble soundness consumes only each `Component`'s
+constraints/channels, never its `completeness` proof — so it does not enter the capstone axioms. -/
 def sp1Tables : List (Component (ZMod p)) :=
   [⟨AddChip.circuit⟩, ⟨AddiChip.circuit⟩, ⟨AddwChip.circuit⟩, ⟨SubChip.circuit⟩, ⟨SubwChip.circuit⟩,
    ⟨BitwiseChip.circuit⟩, ⟨LtChip.circuit⟩, ⟨ShiftLeftChip.circuit⟩, ⟨ShiftRightChip.circuit⟩,

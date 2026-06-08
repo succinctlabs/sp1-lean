@@ -108,11 +108,11 @@ def Spec (input : Inputs (ZMod p)) (cols : Extracted.U16toU8Operation (ZMod p)) 
 end SP1Clean.U16toU8OperationUnsafe
 
 -- `IsZeroOperation`, `IsZeroWordOperation`, `IsEqualWordOperation`: these three form a composition
--- chain (`IsEqualWord` composes `IsZeroWord` composes `IsZeroOperation`) and are migrated to the
--- `FormalAssertion` circuit form. A composing op's `Extracted` imports the sub's `Formal` (for
--- `.circuit`), so their `Spec`s cannot live here (it would cycle: `Specs.Operation` → composer
--- `Extracted` → sub `Formal` → … → `Specs.Operation`). Each of the three defines its `Spec` (and
--- `spec_populate`) in its own `Operations/<Op>/Formal.lean` instead.
+-- chain (`IsEqualWord` composes `IsZeroWord` composes `IsZeroOperation`) using the `FormalAssertion`
+-- circuit form. A composing op's `Extracted` imports the sub's `Formal` (for `.circuit`), so their
+-- `Spec`s cannot live here (it would cycle: `Specs.Operation` → composer `Extracted` → sub `Formal`
+-- → … → `Specs.Operation`). Each defines its `Spec` (and `spec_populate`) in its own
+-- `Operations/<Op>/Formal.lean` instead.
 
 namespace SP1Clean.AddrAddOperation
 

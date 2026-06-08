@@ -6,27 +6,17 @@ import SP1Clean.Faithful.CPUState
 
 /-! # Shared chip-faithfulness scaffolding
 
-Two small, high-frequency pieces factored out of the per-chip `Faithful/*Chip.lean` anchors so the
-pattern lives in one place as the chip fleet grows:
+Two pieces shared across the per-chip `Faithful/*Chip.lean` anchors:
 
-* `val_16` / `bool_iff` — the two field-arithmetic helpers every operation-level faithfulness anchor
-  (`Faithful/{AddOperation,Sub,Addw,Subw,…}.lean`) needs, defined once here rather than per anchor.
-* `faithful_chip` — the chip-level anchor proof skeleton. Every `*cols_constraints_faithful` is
-  **identical** modulo five identifiers: the generated `asserts`/`interactions` defs, the `is_real = 1`
-  hypothesis, the operation-fragment anchor, and the register-adapter anchor (`rtypereader_…` for
-  R-type chips, `alutypereader_…` for ALU-type chips). The shared `CPUState` fragment anchor
-  (`cpustate_constraints_faithful`) is the same for all chips, so it is baked in.
+* `val_16` / `bool_iff` — field-arithmetic helpers every operation-level anchor needs.
+* `faithful_chip` — the chip-level proof macro. Every `*cols_constraints_faithful` for the
+  `<op> ++ CPUState ++ <reader>` layout is identical modulo five identifiers; `cpustate_constraints_faithful`
+  is baked in.
 
-**This module lives in `Faithful/`, not `Foundations/`:** the `faithful_chip` macro hard-references
-`SP1Clean.Extracted.forall_append_pair` and `SP1Clean.Faithful.cpustate_constraints_faithful`,
-so it inherently depends on the Extracted + Faithful layers and must import them. A macro-introduced
-identifier resolves against the macro's **definition-site** imported environment (not the expansion site):
-if the defining module is not imported *here*, even a fully-qualified reference fails as
-`…forall_append_pair✝` ("unknown identifier"). Hence the two `import`s above are load-bearing. The Mathlib
-names (`List.Forall`, `sub_self`, …) resolve via `Mathlib.Tactic`/`ZMod.Basic`. The macro never names the
-section variable `p` or a tactic-introduced hypothesis, so it is otherwise hygiene-clean. Establish the
-`NeZero p` instance in the caller (one `haveI` line) before invoking it; the macro's `simp`/`rw` pick it
-up by instance resolution. -/
+This module lives in `Faithful/` (not `Foundations/`) because the `faithful_chip` macro hard-references
+`SP1Clean.Extracted.forall_append_pair` and `SP1Clean.Faithful.cpustate_constraints_faithful` by
+definition-site resolution — both `import`s above are load-bearing. Establish `NeZero p` in the caller
+before invoking the macro. -/
 
 namespace SP1Clean.Faithful
 

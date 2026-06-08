@@ -58,7 +58,7 @@ not a local check here, so this reader imposes none. The only byte-bus checks ar
 inside the composed `RegisterAccessTimestamp` sub-circuit. The timestamp comes from a sub-circuit (an opaque
 output), so no nested struct literal is witnessed and `circuit_norm` stays cheap. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
-  -- `cols` (the `prev_value` + nested timestamp block) is an **input** now; this reader witnesses nothing,
+  -- `cols` (the `prev_value` + nested timestamp block) is an **input**; this reader witnesses nothing,
   -- it just composes the timestamp sub-assertion on the input's nested `access_timestamp` block.
   assertion RegisterAccessTimestamp.circuit
     ⟨input.cols.access_timestamp, input.is_real, input.clk_target⟩
@@ -110,8 +110,8 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness }
 
--- (The emitted=projection helpers for the Memory/Program buses do not apply here: the Memory bus is the
--- *asymmetric* `memoryChannel.toRawGatedAsym memorySendReq`, so `memoryChannel.toRaw`-form lemmas are obsolete.)
+-- The emitted=projection helpers for the Memory/Program buses do not apply here: the Memory bus is the
+-- *asymmetric* `memoryChannel.toRawGatedAsym memorySendReq`, so `memoryChannel.toRaw`-form lemmas do not apply.
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

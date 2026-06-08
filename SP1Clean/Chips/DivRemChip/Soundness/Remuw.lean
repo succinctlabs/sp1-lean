@@ -2,12 +2,10 @@ import SP1Clean.Chips.DivRemChip.Defs
 import SP1Clean.Chips.DivRemChip.Soundness
 import SP1Clean.Chips.DivRemChip.Assembly
 
-/-! # `DivRemChip` — `remuw` conjunct soundness (split out for parallel compilation)
+/-! # `DivRemChip` — `remuw` conjunct soundness (split for parallel compilation)
 
-The unsigned-32-bit word REMUW conjunct. Proved as its own `GeneralFormalCircuit.Soundness` over a single-conjunct local `Spec`;
-re-running `circuit_proof_start` regenerates the exact context of the monolithic proof, so the
-per-variant block is a verbatim slice. The `?_tail` (`Operations.Requirements`, independent of which
-`Spec` conjunct is taken) is proved alongside; `Formal.lean` reuses one op's tail. -/
+Unsigned-32-bit word REMUW conjunct, proved as a standalone `GeneralFormalCircuit.Soundness` over
+a single-conjunct local `Spec`. -/
 
 namespace SP1Clean.DivRemChip.SoundRemuw
 

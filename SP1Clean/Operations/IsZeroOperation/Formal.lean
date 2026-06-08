@@ -4,14 +4,9 @@ import SP1Clean.Operations.IsZeroOperation.Extracted
 
 /-! # `IsZeroOperation` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 
-SP1's `IsZeroOperation::eval` as a Clean `FormalAssertion`: the `Assumptions` (just `is_real` binary —
-no operand precondition), the `is_real`-gated semantic `Spec` (faithful to the constraints: `result`
-is the zero indicator and, off zero, `inverse` is pinned to `a⁻¹`), the soundness/completeness proofs
-(routing through `RawSpec`'s `isZero_of_assert`/`inverse_of_assert`), the `spec_populate`
-reconstruction lemma the composing word-level op uses, and the bundled `circuit`.
-
-The `Spec` and `spec_populate` live here (rather than in `Specs.Operation`) to avoid an import cycle:
-the composing `IsZeroWordOperation.Extracted` imports this module for `.circuit`. -/
+SP1's `IsZeroOperation::eval` as a Clean `FormalAssertion`. The semantic `Spec` is `is_real`-gated:
+`result` is the zero indicator, and off zero `inverse = a⁻¹`. `Spec`/`spec_populate` live here (not
+in `Specs.Operation`) to avoid an import cycle through `IsZeroWordOperation.Extracted`. -/
 
 namespace SP1Clean.IsZeroOperation
 

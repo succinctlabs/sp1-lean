@@ -4,10 +4,9 @@ import SP1Clean.Operations.SubwOperation.Extracted
 
 /-! # `SubwOperation` — the `FormalAssertion` (borrow-form analog of `AddwOperation`)
 
-SP1's `SubwOperation::eval` as a Clean `FormalAssertion` that composes the demoted `U16MSBOperation` on
-the high result limb, pulls the two limb ranges from the byte bus, and asserts the two gated borrows.
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle through the
-composed `U16MSBOperation.Formal`. -/
+SP1's `SubwOperation::eval` as a Clean `FormalAssertion`. Composes `U16MSBOperation` on the high
+result limb, pulls two limb ranges from the byte bus, asserts the two gated borrows. `Spec`/
+`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle. -/
 
 namespace SP1Clean.SubwOperation
 

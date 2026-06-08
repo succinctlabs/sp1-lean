@@ -11,25 +11,10 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # The unified `Lt` chip row (SLT + SLTU) as a `GeneralFormalCircuit`
 
-The RISC-V signed/unsigned set-less-than family (`SLT`/`SLTU`) ported as a chip-level
-`GeneralFormalCircuit`, keyed on SP1's **unified** `Extracted.LtCols` (`is_slt`/`is_sltu` selectors,
-composing the signed gadget `LtOperationSigned` — which itself wraps the unsigned core + two
-`U16MSBOperation` sign columns). This **supersedes** the earlier unsigned-only `Chips/LtuChip.lean`
-exemplar, which carried a chip-local `Cols`; the unified chip is the faithful one bound to the
-extraction. It composes the immediate-capable `ALUTypeReader` (the reader-agnostic `Trace.AdapterView`
-end-to-end path, validated in `Chips/LtBridge.lean`'s `ChipKind`).
-
-Per `Extracted/LtChip.lean` the chip's *own* asserts (everything past the composed
-`LtOperationSigned`/`CPUState`/`ALUTypeReader` sub-lists) reduce to the two selector booleans
-(`is_slt`, `is_sltu`), their sum-bound, and `op_a_0 = 0` (`AssertSpec`); the chip's *own* interactions
-tail is **empty**, so `InteractSpec := True`. The semantic, `is_real`/flag-gated `Spec` (the RV64 `slt`
-/`sltu` identities on the result word) is below.
-
-The `main` body composes the `CPUState`/`LtOperationSigned`/`ALUTypeReader` sub-circuits, witnesses the two
-variant flags, emits the flag-boolean + sum-bound `AssertSpec` gates, and gates `is_real`. Soundness and
-completeness are **proven and axiom-clean** (flag-dispatched through `LtOperationSigned`'s `Spec`, mapping
-the gadget's compare `bit` to RV64 `slt`/`sltu`; the composed `LtOperationSigned` gadget is itself fully
-proven). -/
+Keyed on SP1's unified `Extracted.LtCols` (`is_slt`/`is_sltu` selectors), composing the signed gadget
+`LtOperationSigned` (unsigned core + two `U16MSBOperation` sign columns) and the immediate-capable
+`ALUTypeReader`. Soundness and completeness are proven and axiom-clean (flag-dispatched through
+`LtOperationSigned.Spec`, mapping the compare `bit` to RV64 `slt`/`sltu`). -/
 
 namespace SP1Clean.LtChip
 

@@ -5,10 +5,9 @@ import Std.Data.ExtHashMap
 set_option linter.unusedSimpArgs false
 
 /-!
-# Misc Lemmas Used in Verification
+# Misc lemmas used in verification
 
-File for random lemmas that don't fit anywhere else (e.g. lemmas about nat).
-Would be good to eventually contribute these back to mathlib.
+Lemmas about nat and ZMod that don't belong in a specific file.
 -/
 
 section grind

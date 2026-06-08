@@ -1,17 +1,14 @@
 import SP1Clean.Foundations.Word
 import Mathlib.Tactic
 
-/-! # Shared arithmetic bounds for the shift `within_byte` lemmas
+/-! # Shared `.val`-bridge and bound lemmas for the shift within-byte proofs
 
-Factored-out `.val`-bridge and bound lemmas common to the four `srl_within_byte_shift*`
-(`Chips/ShiftRightChip/Core.lean`) and `sll_within_byte_shift*` (`Chips/ShiftLeftChip/Core.lean`)
-variants. Proving each fact **once** on a small context — rather than inline by `nlinarith` per
-limb, per variant (~100 calls total across both files) — collapses the call sites to
-`exact`/one-liners and runs `nlinarith` only a handful of times. This is the compile-time win
-documented in `docs/agents/compile-profile.md` thread B.
+Common to `srl_within_byte_shift*` (`Chips/ShiftRightChip/Core.lean`) and
+`sll_within_byte_shift*` (`Chips/ShiftLeftChip/Core.lean`). Proving each fact once collapses
+the ~100 `nlinarith` call sites to `exact`/one-liners (compile-time win; see
+`docs/agents/compile-profile.md` thread B).
 
-Every lemma is generic over the byte-decomposition radices `M`, `N` with `M * N = 65536`
-(the within-byte split of a 16-bit limb). -/
+Every lemma is generic over byte-decomposition radices `M`, `N` with `M * N = 65536`. -/
 
 namespace SP1Clean.ShiftBounds
 open SP1Clean
@@ -77,7 +74,7 @@ lemma lo_hi_val {M N : ℕ} {hl ll v : ZMod p} (h_MN : M * N = 65536)
   · rw [h_mul]; nlinarith [h_hl, h_ll, h_MN]
 
 /-- Low·high recombination `.val`, product-first: `(ll * v + hl).val = ll.val * M + hl.val`.
-The `ShiftLeftCore` limb order (product then carry-in), vs. `lo_hi_val`'s `hl + ll * v`. -/
+`ShiftLeftCore` limb order (product then carry-in), vs. `lo_hi_val`'s `hl + ll * v`. -/
 lemma mul_v_add_val {M N : ℕ} {hl ll v : ZMod p} (h_MN : M * N = 65536)
     (h_v : v.val = M) (h_ll : ll.val < N) (h_hl : hl.val < M) :
     (ll * v + hl).val = ll.val * M + hl.val := by

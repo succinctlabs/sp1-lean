@@ -2,13 +2,10 @@ import SP1Clean.Chips.ShiftRightChip.Defs
 import SP1Clean.Chips.ShiftRightChip.Math
 import SP1Clean.Chips.ShiftRightChip.Flags
 
-/-! # `ShiftRightChip` — srlw conjunct soundness (split out for parallel compilation)
+/-! # `ShiftRightChip` — srlw conjunct soundness (split for parallel compilation)
 
-The logical word right-shift (SRLW) conjunct, proved as its own `GeneralFormalCircuit.Soundness` over a single-conjunct local
-`Spec`. Re-running `circuit_proof_start` regenerates the monolithic proof's context (it unfolds the local
-`Spec` and `Assumptions`), so the per-variant block and the shared subcircuit / byte-pull obligation tail
-are verbatim slices of the monolith — the monolith's `refine ⟨fun hsrl => ?_, …⟩` four-way spec split is
-replaced by the single `intro hsrlw` for this conjunct. -/
+Logical word right-shift (SRLW) conjunct, proved as a standalone `GeneralFormalCircuit.Soundness`
+over a single-conjunct local `Spec`. -/
 
 namespace SP1Clean.ShiftRightChip.SoundSrlw
 

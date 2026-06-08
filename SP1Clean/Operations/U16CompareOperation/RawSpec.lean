@@ -4,12 +4,8 @@ import Mathlib.Tactic.LinearCombination
 
 /-! # `U16CompareOperation` — the arithmetic core (`RawSpec` + the order lemma)
 
-The structural booleanness + range form `RawSpec` (the literal meaning of SP1's `U16CompareOperation`
-constraint list at `is_real = 1`, stated against the result column `cols.bit`), and the native order
-lemma `compare_of_raw` the gadget's soundness routes through: `bit` boolean + `(a - b + bit·2^16)` a
-genuine 16-bit value force `bit = (a < b)`. The auto-generated circuit (`Inputs`/`main`/`elaborated`)
-lives in the sibling `Extracted` module; the `populate_bit` witness in `Populate`; the `FormalAssertion`
-contract (soundness/completeness/`circuit`) in `Formal`. -/
+Booleanness + range form `RawSpec`; `compare_of_raw` is the soundness core: `bit` boolean and
+`(a - b + bit·2^16)` a genuine 16-bit value force `bit = (a < b)`. -/
 
 namespace SP1Clean.U16CompareOperation
 

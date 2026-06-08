@@ -3,18 +3,12 @@ import SP1Clean.Operations.BitwiseU16Operation
 import SP1Clean.Chips.BitwiseChip.Formal
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for Bitwise (+ end-to-end composition)
+/-! # Native Sail bridge for Bitwise (+ `ChipKind` registration)
 
-`correct_bitwise_native` proves the RISC-V Sail execution of an R-type bitwise op
-(`spec_bitwise`, calling `execute_RTYPE`) agrees with the SP1 chip emulation
-(`sp1_bitwise`: write `nextPC = pc + 4` and the result register), given the chip's
-**semantic** fact (`h_op`: the reassembled result word equals `execute_RTYPE_pure` of
-the operands) and the register/PC reads. The Sail side is nearly free — SailWrap's
-`execute_RTYPE_pure` already maps `.AND/.OR/.XOR → &&&/|||/^^^`.
-
-`bitwise_chip_reaches_sail_{and,or,xor}` compose `BitwiseChip.Spec`'s opcode-gated
-conjuncts straight into the bridge: a verified Bitwise chip row reaches the RISC-V Sail
-spec with **zero** SP1Chips dependency. -/
+`correct_bitwise_native` proves the RISC-V Sail R-type bitwise execution agrees with the SP1 chip
+emulation given the semantic fact and register/PC reads. `SailWrap.execute_RTYPE_pure` already
+maps `.AND/.OR/.XOR → &&&/|||/^^^`. Three `bitwise_chip_reaches_sail_*` end-to-end lemmas
+compose `BitwiseChip.Spec`'s opcode-gated conjuncts into the bridge. -/
 
 namespace SP1Clean.BitwiseSail
 
@@ -109,15 +103,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **Bitwise's `ChipKind` registration** — the single value that enters Bitwise rows into the
-heterogeneous trace (`Soundness/ChipRow.lean`) and the soundness capstone. `view` sources `state`/`adapter`/
-`next_pc` from `cols`, projecting the immediate-capable `ALUTypeReader` through `cols.adapter.toAdapterView`;
-`rdWrite` is the reassembled bitwise result word and the Program-bus `opcode` is the committed `cpu_opcode`
-`is_xor·3 + is_or·4 + is_and·5` (matching the `ALUTypeReader`'s Program-bus opcode in `main`). Bitwise is
-multi-opcode, so `sailEquiv` is the selector-dispatched AND/OR/XOR conjunction (keyed on the committed
-`cols.is_and`/`is_or`/`is_xor`) and `reaches_sail` dispatches to `bitwise_chip_reaches_sail_{and,or,xor}`
-(its `input.is_real = 1` hypothesis is defeq to the field's `(view inp cols).is_real = 1`). Every bridge
-lemma is sorry-free, so this `kind` is axiom-clean. No central edit. -/
+/-- **Bitwise's `ChipKind` registration.** Program-bus opcode `is_xor·3 + is_or·4 + is_and·5`;
+`sailEquiv` is the selector-dispatched AND/OR/XOR conjunction; `reaches_sail` dispatches to
+`bitwise_chip_reaches_sail_{and,or,xor}`. All bridge lemmas are axiom-clean. -/
 def kind : Soundness.ChipKind p where
   name := "Bitwise"
   Inputs := BitwiseChip.Inputs

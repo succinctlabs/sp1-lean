@@ -13,9 +13,7 @@ namespace SP1Clean.BitwiseOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The native witness assignment, **field-generic** over `ZMod p`: each result byte is `byteOp opcode`
-of the operand bytes (the bit operation is intrinsically over ℕ but never escapes `ZMod p`). SP1's
-`BitwiseOperation` result column, ported. -/
+/-- Native port of SP1's `BitwiseOperation` result column: each result byte is `byteOp opcode a b`. -/
 def populate (a b : Vector (ZMod p) 8) (opcode : ZMod p) : Extracted.BitwiseOperation (ZMod p) :=
   ⟨#v[((byteOp opcode.val a[0].val b[0].val : ℕ) : ZMod p),
       ((byteOp opcode.val a[1].val b[1].val : ℕ) : ZMod p),

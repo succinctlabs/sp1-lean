@@ -5,27 +5,25 @@ import SP1Clean.Readers.CPUState
 
 /-! # Trace-level State-bus (PC-chain) consistency
 
-This is the **trace-level meaning** of the State interactions that `Readers/CPUState.lean` + the
-chip emit — the third layer of the faithful interaction representation (row emission → bus data →
-trace consistency). Each Add row's CPUState fragment contributes two State-bus interactions
-(`Extracted/CPUState.lean`):
+The trace-level meaning of the State interactions that `Readers/CPUState.lean` + the chip emit (row
+emission → bus data → trace consistency). Each row's CPUState fragment contributes two State-bus
+interactions (`Extracted/CPUState.lean`):
 
 - `receive (.state clk_high clk_low pc) is_real` and
 - `send (.state clk_high (clk_low + 8) next_pc) is_real`.
 
-We project each row to a signed pair of `LookupAccess` contributions (`Row.stateLookups`, receive
-negative / send positive, both `is_real`-gated) feeding the multiset bus of
-`Foundations/InteractionBus.lean`, and to a `StateAccess` record whose adjacent-pair consistency is
-the **PC chain** `pcChainProp` (`a.next_pc = b.pc`, clock advances by 8).
+Each row projects to a signed pair of `LookupAccess` contributions (`stateLookups`, receive negative /
+send positive, both `is_real`-gated) feeding `Foundations/InteractionBus.lean`, and to a `StateAccess`
+record whose adjacent-pair consistency is the **PC chain** `pcChainProp` (`a.next_pc = b.pc`, clock
+advances by 8).
 
 ## Honest scope
 
 `pcChainProp`, the projections, the aggregator, `aggregateStateAccesses_pcChain`, and the padding-row
-gating witness `stateLookups_padding` are all proven natively. The deep link
-**multiset-balance ⟹ `pcChainProp`** (the soundness crux) needs whole-trace clock-injectivity
-reasoning and is *not* proven here — it is threaded as `TraceStateLink`, exactly as `../sp1-lean`
-ships it (`Soundness/StateConsistency.lean:traceStateValid_of_chip_specs`). A threaded hypothesis is
-an honest assumption, not a `sorry`/axiom; deriving it natively is the marked next step. -/
+gating witness `stateLookups_padding` are proven. The link
+**multiset-balance ⟹ `pcChainProp`** needs whole-trace clock-injectivity reasoning and is threaded as
+`TraceStateLink`: an honest assumption, not a `sorry`/axiom; deriving it natively is the marked next
+step. -/
 
 namespace SP1Clean.Soundness
 
@@ -101,15 +99,13 @@ theorem aggregateStateAccesses_pcChain (rows : List (Trace.RowView (ZMod p))) (c
     pcChainProp clkIncrement (aggregateStateAccesses rows) :=
   h.chain_holds
 
-/-- **The crux (threaded; residual now named).** The per-adjacent-pair PC handoff + clock advance.
-The order-insensitive half is now native: `state_successor_of_balance` derives, from the multiset-balanced
-State bus (`stateBalance_of_machine`, `InteractionBus.isConsistentBalanced (aggregateChipRows rows
-stateLookups)`) via the closed-bus matching lemma `balanced_pos_has_neg`, that every real row's `(clk+8,
-next_pc)` send key is cancelled by some real row's `(clk, pc)` receive — a `+8` PC-handoff successor
-*exists*. The residual gap to this `pcChainProp` is pinning that successor to the *adjacent* list position:
-`clkInjective` (uniqueness) + an execution-order layout fact, with `TraceStateBoundary` absorbing the
-terminal send (stated as `pcChain_of_balance_and_clkInj`). Until that adjacency induction lands, the chain
-is threaded, exactly as `../sp1-lean` threads `TraceStateValid` whole. -/
+/-- **The crux (threaded; residual named).** The per-adjacent-pair PC handoff + clock advance.
+`state_successor_of_balance` derives, from the balanced State bus via `balanced_pos_has_neg`, that every
+real row's `(clk+8, next_pc)` send key is cancelled by some real row's `(clk, pc)` receive — a `+8`
+PC-handoff successor *exists*. The residual gap to `pcChainProp` is pinning that successor to the
+*adjacent* list position: `clkInjective` (uniqueness) + the clock-advance side condition `TraceClkAdvance`
+(stated as `pcChain_of_balance_and_clkInj`). Until that adjacency induction is closed, the chain is
+threaded as an honest assumption. -/
 def TraceStateLink (rows : List (Trace.RowView (ZMod p))) (clkIncrement : ZMod p) : Prop :=
   pcChainProp clkIncrement (aggregateStateAccesses rows)
 
@@ -119,8 +115,7 @@ theorem traceStateValid_of_stateLink (rows : List (Trace.RowView (ZMod p))) (clk
   ⟨h_link⟩
 
 /-- **Gating is real.** A padding row (`is_real = 0`) contributes zero to *every* State-bus key: both
-its signed contributions have multiplicity 0. This is the per-row fact the old zero-witness `state`
-block could not express — the emission is genuinely `is_real`-gated, matching SP1's
+its signed contributions have multiplicity 0. The emission is genuinely `is_real`-gated, matching SP1's
 `send/receive … is_real`. -/
 theorem stateLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_real = 0) :
     ∀ k, multiplicitySum (stateLookups r) k = 0 := by
@@ -193,15 +188,14 @@ def clkInjective (accs : List (StateAccess (ZMod p))) : Prop :=
 
 /-! ## The PC chain from balance
 
-`state_successor_of_balance` is the provable, order-insensitive half: from the balanced State bus it derives
-that every real row's `(clk+8, next_pc)` send key is matched by *some* real row's `(clk, pc)` receive — a `+8`
-PC-handoff successor *exists*. Below we close the adjacency gap: with whole-trace clock injectivity
-(`clkInjective`, uniqueness) and the **clock-advance** trace-shape fact (`TraceClkAdvance`, consecutive real
-rows' encoded clocks differ by exactly `8`), the successor is pinned to the *adjacent* row, yielding the full
-`pcChainProp`. The split is: the bus balance buys the **PC-handoff** half (`a.next_pc = b.pc`); the
-**clock-advance** half is assumed as `TraceClkAdvance` (it is enforced by the state chip's own `clk_low + 8`
-constraint, not by the bus — a future "clock-link" pass discharges it from per-row Specs). No separate
-"execution-order layout" axiom is needed: it is subsumed by `TraceClkAdvance` + `clkInjective`. -/
+`state_successor_of_balance` is the order-insensitive half: from the balanced State bus it derives that
+every real row's `(clk+8, next_pc)` send key is matched by *some* real row's `(clk, pc)` receive — a `+8`
+PC-handoff successor *exists*. Below the adjacency gap is closed: with whole-trace clock injectivity
+(`clkInjective`) and the **clock-advance** side condition (`TraceClkAdvance`, consecutive real rows'
+encoded clocks differ by exactly `8`), the successor is pinned to the *adjacent* row, yielding the full
+`pcChainProp`. The bus balance supplies the **PC-handoff** half (`a.next_pc = b.pc`); the **clock-advance**
+half is assumed as `TraceClkAdvance` (enforced by the state chip's own `clk_low + 8` constraint, not by
+the bus — a future clock-link pass discharges it from per-row Specs). -/
 
 /-- The per-adjacent-pair relation `pcChainProp` recurses on (the first conjunct of its `a :: b :: rest`
 case): for real rows, the PC handoff `a.next_pc = b.pc` and the encoded-clock advance by `clkIncrement`. -/
@@ -345,9 +339,8 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     stateLookups r =
       (((Readers.CPUState.main (p := p) input_var).operations offset).interactionsWith
           stateChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
-  -- The reader no longer declares `exposedChannels`, so recover the two State interactions directly from
-  -- `main` (unfold + `circuit_norm`; the `byteChannel.toRawGated ≠ stateChannel.toRawGated` distinctness lemmas
-  -- filter out the byte pulls).
+  -- recover the two State interactions from `main` (unfold + `circuit_norm`; the
+  -- `byteChannel.toRawGated ≠ stateChannel.toRawGated` distinctness lemmas filter out the byte pulls).
   simp only [Readers.CPUState.main, circuit_norm]
   -- `hk` is the gated kernel `toAccess_emittedGated_state`; it `rw`s against the recovered interactions.
   have hk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
@@ -358,9 +351,8 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
     fun m s => toAccess_emittedGated_state env m s
   simp only [hk]
-  -- The `cols`/`next_pc`/`clk_inc` are now reader *inputs* (the chip owns the `state` block), so their evals
-  -- are pinned by the binding hypotheses (`h_*`/`h_np*`/`h_clk`) rather than reduced to `env.get` —
-  -- `circuit_norm` distributes `eval` over the `clk_low = clk_0_16 + clk_16_24 * 65536` (+ `clk_inc`) sum.
+  -- `cols`/`next_pc`/`clk_inc` are reader *inputs*; their evals are pinned by the binding hypotheses
+  -- (`h_*`/`h_np*`/`h_clk`); `circuit_norm` distributes `eval` over the `clk_low` sum (+ `clk_inc`).
   simp only [circuit_norm, stateLookups, stateAccess, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2,
     h_np0, h_np1, h_np2, h_clk]
   -- only the multiplicities differ: `signedVal (∓eval is_real)` vs `∓is_real.val`. `h_ir` ties the eval to

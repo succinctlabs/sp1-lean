@@ -3,13 +3,9 @@ import SP1Clean.Operations.BitwiseOperation.Populate
 
 /-! # `BitwiseOperation` — the `FormalAssertion` (soundness / completeness / contract)
 
-SP1's `BitwiseOperation::eval` as a Clean `FormalAssertion`: the byte-level bitwise core composes
-nothing and emits one `send_byte(opcode, result[i], a[i], b[i])` per byte. Like `AddOperation`, the
-result bytes are **threaded in** as `input.cols.result` (witnessed by the composing operation) and the
-gadget witnesses nothing. The `Spec` is `is_real`- and opcode-gated (each result byte is the bitwise
-AND/OR/XOR of the operand bytes). Soundness routes through `RawSpec`'s `bitwise_of_byteOp` (each pull's
-`ByteRowSpec` guarantee gives `result[i].val = byteOp opcode a[i] b[i]`); `Faithful/BitwiseOperation.lean`
-anchors the extracted `constraints` to `AssertSpec`/`InteractSpec`. -/
+SP1's `BitwiseOperation::eval` as a Clean `FormalAssertion`. Emits one
+`send_byte(opcode, result[i], a[i], b[i])` per byte; witnesses nothing (result bytes threaded in).
+Soundness routes through `RawSpec.bitwise_of_byteOp`. -/
 
 namespace SP1Clean.BitwiseOperation
 
@@ -73,7 +69,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R5).2
     · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R6).2
     · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R7).2
-  -- the 8 byte padding requirements are vacuous for the binary gate (`toRawGated`, raw values).
   all_goals exact binary_gate_req_vacuous hbin _
 
 set_option maxHeartbeats 2000000 in
@@ -107,8 +102,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have er5 : Expression.eval env.toEnvironment input_var_cols_result[5] = input_cols_result[5] := by rw [← hir]; simp only [Vector.getElem_map]
   have er6 : Expression.eval env.toEnvironment input_var_cols_result[6] = input_cols_result[6] := by rw [← hir]; simp only [Vector.getElem_map]
   have er7 : Expression.eval env.toEnvironment input_var_cols_result[7] = input_cols_result[7] := by rw [← hir]; simp only [Vector.getElem_map]
-  -- On a real row the threaded result byte equals `byteOp opcode a b` (mapping the opcode-cased `Spec`
-  -- back through `byteOp_{zero,one,two}`), which yields the pull's `ByteRowSpec` guarantee.
   have key : input_is_real = 1 → ∀ i : Fin 8,
       ByteRowSpec (⟨input_opcode, input_cols_result[↑i], input_a[↑i], input_b[↑i]⟩ : ByteRow (ZMod p)) := by
     intro hr1 i

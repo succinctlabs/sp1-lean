@@ -2,15 +2,10 @@ import SP1Clean.Chips.DivRemChip.Extract
 
 /-! # `DivRemChip` — per-family soundness assembly
 
-The *assembly* layer: one "core" lemma per RV64 division family that consumes the structured
-Word-level facts (the carry-chain limb equations, the two `MulOperation` result words in product form,
-the `isU64`s, the remainder range, the divide-by-zero / overflow branches) produced by `Formal.lean`'s
-extraction, and concludes the family's **pair** of RV64 identities (quotient + remainder), exactly as
-the `Math` consumers do. Stated over loose Words; `Formal.lean` does the offset bookkeeping, calls the
-matching `assemble_*`, and routes the pair's `.1`/`.2` to `cols.a` per conjunct.
-
-This file chains the `Soundness` carry-chain bridges into the `Math` consumers, so each `assemble_*` is
-a single named statement of "structured facts ⟹ RV64 identity pair." -/
+One "core" lemma per RV64 division family: consumes the carry-chain limb equations, the two
+`MulOperation` product words, the `isU64`s, the remainder range, and the divide-by-zero /
+overflow branches, and concludes the family's quotient + remainder RV64 identity pair. Stated
+over loose Words; `Formal.lean` does the offset bookkeeping and routes `.1`/`.2` to `cols.a`. -/
 
 namespace SP1Clean.DivRemChip
 

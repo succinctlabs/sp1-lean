@@ -5,8 +5,8 @@ import SP1Clean.Foundations.Misc
 import SP1Clean.Foundations.Register
 set_option linter.unusedSimpArgs false
 
-/-! Trimmed port of sp1-lean SP1Foundations/SailM.lean — RTYPE/register subset
-for the Add Sail bridge (no `pure_w`/`bv_to_w` shift machinery; ADD is definitional). -/
+/-! RTYPE/register subset used by the Add Sail bridge (no `pure_w`/`bv_to_w` shift machinery;
+ADD is definitional). -/
 
 open LeanRV64D.Functions
 

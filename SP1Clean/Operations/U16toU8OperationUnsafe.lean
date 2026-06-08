@@ -7,18 +7,15 @@ import Clean.Circuit.Subcircuit
 import Clean.Gadgets.Bits
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Skeleton — `U16toU8OperationUnsafe` as a Clean-native gadget (spec surface)
+/-! # `U16toU8OperationUnsafe` as a Clean-native gadget
 
-The **unsafe** u16→u8 byte split: for each of four 16-bit limbs `u16_values[i]`, **witness** the
-low byte `low_bytes[i]` and read off the high byte as `(u16_values[i] - low_bytes[i]) * 256⁻¹`;
-the eight output bytes are `[low₀, high₀, …, low₃, high₃]`. "Unsafe" because it imposes **no**
-range constraints — SP1's extracted constraint list for this op is empty, so the low/high split
-is purely the reassembly identity (the `U16toU8OperationSafe` sibling adds the byte bounds).
+The **unsafe** u16→u8 byte split: witness the low byte `low_bytes[i]` for each of four 16-bit
+limbs and read off the high byte as `(u16_values[i] - low_bytes[i]) * 256⁻¹`. "Unsafe" because
+it imposes no range constraints — SP1's extracted constraint list is empty, so the split is
+purely the reassembly identity (the `U16toU8OperationSafe` sibling adds byte bounds).
 
-Skeleton: `RawSpec` (literal meaning of the empty constraint list — `True`) and the semantic
-`Spec` (the reassembly identity) are real; `Faithful/U16toU8OperationUnsafe.lean` anchors
-`RawSpec` to `Extracted.U16toU8OperationUnsafe.constraints`. Soundness core + witnessed
-`FormalCircuit` proofs deferred. -/
+`RawSpec` is `True`; `Faithful/U16toU8OperationUnsafe.lean` anchors it to
+`Extracted.U16toU8OperationUnsafe.constraints`. Soundness and completeness are axiom-clean. -/
 
 namespace SP1Clean.U16toU8OperationUnsafe
 

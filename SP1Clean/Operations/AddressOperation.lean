@@ -9,17 +9,15 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # `AddressOperation` as a Clean-native witnessed `FormalCircuit`
 
-Computes a memory address `b + cc` (via `AddrAddOperation`) together with its 3-bit byte offset:
-the `offset_bit{0,1,2}` are asserted boolean, `top_two_limb_inv` witnesses that the top two address
-limbs are non-... (the `value[1]+value[2]` inverse gate), and the low 3 bits of `value[0]` are
+Computes a memory address `b + cc` (via `AddrAddOperation`) together with its 3-bit byte offset.
+The `offset_bit{0,1,2}` are asserted boolean; `top_two_limb_inv` witnesses that the top two address
+limbs are non-zero (the `value[1]+value[2]` inverse gate); and the low 3 bits of `value[0]` are
 range-checked (`(value[0] - 4·b₂ - 2·b₁ - b₀)/8 < 2^13`) to pin the offset decomposition.
 
-The address limbs are **witnessed here** via `AddrAddOperation.populate` and the `AddrAddOperation`
-gadget (now a `FormalAssertion`) is composed as a Clean `assertion` (`is_real := 1`); the byte-bus
-limb range checks come from that assertion. `RawSpec` **composes** `AddrAddOperation.RawSpec` plus the
-offset constraints; `Faithful/AddressOperation.lean` anchors it to the generated
-`Extracted.AddressOperation.asserts` / `interactions` lists. Soundness and completeness are complete
-and axiom-clean. -/
+Address limbs are witnessed via `AddrAddOperation.populate`; `AddrAddOperation` (a `FormalAssertion`)
+is composed as a Clean `assertion` (`is_real := 1`). `RawSpec` composes `AddrAddOperation.RawSpec`
+plus the offset constraints; `Faithful/AddressOperation.lean` anchors it to the generated
+`Extracted.AddressOperation.asserts`/`interactions` lists. Soundness and completeness are axiom-clean. -/
 
 namespace SP1Clean.AddressOperation
 
@@ -92,13 +90,9 @@ theorem addressSemantics_of_raw {input : Inputs (ZMod p)}
 
 /-! ## The witnessed `FormalCircuit`
 
-`AddrAddOperation` is now a `FormalAssertion` (a pure assertion over a witnessed `value`), so this
-operation **witnesses the address limbs itself** via `AddrAddOperation.populate` and composes the
-gadget as a Clean `assertion` (mirroring how `AddChip` composes `AddOperation`) — passing `is_real :=
-1` (an address computation is always live). The byte-bus limb range checks come from the gadget's
-`assertion`, not a local `rangeCheck`; the offset booleans, the top-two-limb inverse gate, and the
-low-3-bits offset range check stay here. `AddressOperation` itself remains a `FormalCircuit` with the
-same external `Inputs`/`Spec`/output, so its composing memory chips are unaffected. -/
+Witnesses the address limbs via `AddrAddOperation.populate` and composes the gadget as a Clean
+`assertion` (`is_real := 1`). Byte-bus limb range checks come from the gadget's `assertion`;
+the offset booleans, the top-two-limb inverse gate, and the low-3-bits offset range check stay here. -/
 
 def main (input : Var Inputs (ZMod p)) :
     Circuit (ZMod p) (Var Extracted.AddressOperation (ZMod p)) := do
@@ -119,14 +113,11 @@ def main (input : Var Inputs (ZMod p)) :
   return ⟨⟨value⟩, inv[0]⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs Extracted.AddressOperation main where
-  -- witness the 3 address limbs (`value`) + the `top_two_limb_inv` (1) + the offset `rangeCheck` bits
-  -- (13); the `AddrAddOperation` `assertion` adds no witnesses (`FormalAssertion`, `localLength 0`).
+  -- 3 address limbs + 1 inverse witness + 13 offset rangeCheck bits;
+  -- AddrAddOperation (FormalAssertion) adds no cells.
   localLength _ := 3 + 1 + 13
-  -- `addr_operation` is the witnessed 3-limb `value` at offset `i0`; `top_two_limb_inv` is the `inv`
-  -- witness right after it at `i0 + 3` (the `assertion` adds no cells).
   output _ i0 := ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩
-  -- propagated from the `AddrAddOperation` `assertion`'s byte-bus pulls (in both lists, like `Add`);
-  -- the offset `rangeCheck` and the bit/inverse gates emit no channels.
+  -- byte-bus channels propagated from the AddrAddOperation assertion.
   channelsWithGuarantees := [byteChannel.toRawGated]
   channelsWithRequirements := [byteChannel.toRawGated]
 
@@ -158,8 +149,7 @@ theorem soundness : Soundness (ZMod p) main Assumptions Spec := by
   -- offset booleans are the three boolean gates. The inverse gate + range check don't enter `Spec`.
   have h_aa := (h_addrAdd ⟨hb, hcc, hfit, Or.inr rfl⟩) rfl
   simp only [circuit_norm] at h_aa
-  -- `Spec` (sum + offset booleans), then the channel-requirement tail: the `AddrAdd` assertion owes
-  -- its `Assumptions` (byte-bus pull), the offset `rangeCheck` owes nothing (`[] ∨ _`).
+  -- channel-requirement tail: AddrAdd assertion owes its Assumptions (byte-bus pull).
   exact ⟨⟨h_aa.1, bool_of_mul_pred hob0, bool_of_mul_pred hob1, bool_of_mul_pred hob2⟩,
     Or.inr ⟨hb, hcc, hfit, Or.inr rfl⟩, Or.inl rfl⟩
 
@@ -170,8 +160,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
   obtain ⟨hbi, hci, -, -, -⟩ := h_input
   obtain ⟨h_value, h_inv_def⟩ := h_env
   have hp : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-  -- the witnessed `value` is `populate b cc` (`h_value` per-limb): discharges the `AddrAdd` `assertion`
-  -- obligation (`Assumptions ∧ Spec`) via `spec_populate`, and supplies the address sum + limb ranges.
+  -- the witnessed `value` = `populate b cc`: discharges the AddrAdd assertion via `spec_populate`.
   have hbeq : (#v[Expression.eval env.toEnvironment input_var_b[0],
       Expression.eval env.toEnvironment input_var_b[1],
       Expression.eval env.toEnvironment input_var_b[2],
@@ -204,7 +193,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
   set v1 := env.get (i₀ + 1) with hv1d
   set v2 := env.get (i₀ + 2) with hv2d
   set A := (Word.toNat input_b + Word.toNat input_cc) % 2 ^ 48 with hAd
-  -- `v0` is the low 16 bits of the address; the address is non-reserved (`A ≥ 2^16` ⟹ `v1 + v2 ≠ 0`).
+  -- `v0` is the low 16 bits of the address; `A ≥ 2^16` ⟹ `v1 + v2 ≠ 0` (non-reserved).
   have hv0_eq : v0.val = A % 2 ^ 16 := by omega
   have hv12pos : 0 < v1.val + v2.val := by omega
   have hsum_ne : v1 + v2 ≠ 0 := by
@@ -218,7 +207,7 @@ theorem completeness : Completeness (ZMod p) main Assumptions := by
   have hcast0 : ((input_offset_bit0.val : ℕ) : ZMod p) = input_offset_bit0 := ZMod.natCast_zmod_val _
   have hcast1 : ((input_offset_bit1.val : ℕ) : ZMod p) = input_offset_bit1 := ZMod.natCast_zmod_val _
   have hcast2 : ((input_offset_bit2.val : ℕ) : ZMod p) = input_offset_bit2 := ZMod.natCast_zmod_val _
-  -- the range-check argument decomposes as `8 · (v0 / 8)` (offset bits = low 3 bits of `v0`).
+  -- range-check argument decomposes as `8 · (v0 / 8)` (offset bits = low 3 bits of `v0`).
   have hmod8 : A % 8 = A % 2 ^ 16 % 8 := (Nat.mod_mod_of_dvd A (by norm_num)).symm
   have hdecomp : v0 + -(4 * input_offset_bit2) + -(2 * input_offset_bit1) + -input_offset_bit0
       = ((8 * (A % 2 ^ 16 / 8) : ℕ) : ZMod p) := by

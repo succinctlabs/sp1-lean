@@ -9,17 +9,13 @@ import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.AddwOperation
 import SP1Clean.Faithful.U16MSBOperation
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (ADDW)
+/-! # Faithfulness anchor — `AddwOperation` constraints ↔ native raw spec
 
-The native `AddwOp` gadget's constraints are hand-written; this module anchors them to **SP1's
-`AddwOperation` constraint definition** — the operation-level form the `sp1-constraint-compiler`
-emits and `update_extracted.py` writes to `SP1Clean/Extracted/AddwOperation.lean`. SP1's
-`AddwOperation` **composes** `U16MSBOperation` (its `constraints` is `U16MSB.constraints … ++
-[two-limb add carry chain]`), so the anchor splits the list at the `++`: the `U16MSB` fragment is
-discharged by `u16msb_constraints_faithful`, and the two-limb add fragment by the same
-`ByteOpcode.Range`/`bool_iff` simp as `add_constraints_faithful`. The native gadget's
-soundness/completeness run through exactly `U16MSBOperation.RawSpec` and `AddwOperation.RawSpec`,
-so the gadget proofs are faithful to SP1's operation constraints. -/
+Anchors the native `AddwOperation` gadget's constraints to SP1's generated `AddwOperation`
+constraint definition (`Extracted/AddwOperation.lean`). SP1's `AddwOperation` composes
+`U16MSBOperation` (`U16MSB.constraints ++ [two-limb add carry chain]`); the anchor splits at the
+`++`: the `U16MSB` fragment is discharged by `u16msb_constraints_faithful`, the two-limb add
+fragment by `ByteOpcode.Range`/`bool_iff` simp. -/
 
 namespace SP1Clean.Faithful
 
@@ -61,11 +57,10 @@ theorem addw_constraints_faithful (a b : Word (ZMod p)) (cols : Extracted.AddwOp
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
 
-/-- **Faithfulness anchor — interaction half, SYNTACTIC (HYBRID composition + inline).** `AddwOperation`
-emits its byte interactions from TWO sources in the same order as the oracle: the composed
-`U16MSBOperation` sub on `value[1]` (the sign-bit limb), then two inline `Range` pulls on `value[0]`/`value[1]`.
-So the byte image splits (`congr 1`) into the `u16msb` syntactic anchor + the two inline leaf pulls. The
-thirteen `=== 0` gates drop. Template for `Subw` (sibling) and the other mixed composed ops. -/
+/-- **Faithfulness anchor — interaction half, SYNTACTIC.** `AddwOperation` emits byte interactions
+from two sources: the composed `U16MSBOperation` sub on `value[1]` (sign-bit limb), then two inline
+`Range` pulls on `value[0]`/`value[1]`. The byte image splits (`congr 1`) into the `u16msb`
+syntactic anchor + the two inline leaf pulls; the thirteen `=== 0` gates drop. -/
 theorem addw_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var SP1Clean.AddwOperation.Inputs (ZMod p)) (offset : ℕ)
     (a b : Word (ZMod p)) (cols : Extracted.AddwOperation (ZMod p)) (is_real : ZMod p)

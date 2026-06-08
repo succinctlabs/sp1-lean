@@ -121,8 +121,8 @@ proofs that manipulate the adapter slot see through it. -/
 register read). Projected from the adapter rather than carried as a separate committed column. -/
 @[reducible] def Inputs.op_c_val {F} (i : Inputs F) : Word F := i.adapter.op_c_imm
 
-/-- Semantic contract, composed from the sub-circuits' own `Spec`s (cf. `RTypeChipSpec`, here spelled
-inline because `Addi` reads the **I-type** adapter): the `ITypeReader` sub-`Spec` on the `state`/`adapter`
+/-- Semantic contract, composed from the sub-circuits' own `Spec`s (inline because `Addi` reads the
+**I-type** adapter): the `ITypeReader` sub-`Spec` on the `state`/`adapter`
 blocks (gated by the `ADDI` opcode `1`, `wv* = add_operation.value`), the *proven* `is_real`-binary fact,
 and the `is_real`-gated arithmetic meaning — on real rows the result column is the RV64 `ADD` of the
 register operand and the immediate (`RV64.add op_c_val op_b_val = op_b_val + op_c_val`). Vacuous on
@@ -207,8 +207,8 @@ def resultWord (cols : AddwCols (ZMod p)) : Word (ZMod p) :=
   #v[cols.addw_operation.value[0], cols.addw_operation.value[1],
      cols.addw_operation.msb.msb * 65535, cols.addw_operation.msb.msb * 65535]
 
-/-- Semantic contract, mirroring `LtChip.Spec` (inline for the **ALU** adapter, since ADDW's adapter is the
-immediate-capable `ALUTypeReader`): the `ALUTypeReader` sub-`Spec` on the `state`/`adapter` blocks (opcode
+/-- Semantic contract (inline for the **ALU** adapter, since ADDW's adapter is the immediate-capable
+`ALUTypeReader`): the `ALUTypeReader` sub-`Spec` on the `state`/`adapter` blocks (opcode
 `19`, `rd` write the sign-extended W result `resultWord`), the proven `is_real`-binary fact, and the
 `is_real`-gated arithmetic meaning — on real rows the result word is the RV64 `ADDW` of the operands
 (`RV64.addw op_c_val op_b_val` — the low-32 add sign-extended to 64). Vacuous on padding. -/
@@ -322,9 +322,9 @@ result column `cols.a` is the RV64 right-shift selected by the committed flag (`
 logical, `cols.is_sra → RV64.sra` arithmetic, `cols.is_srlw → RV64.srlw` low-32 logical sign-extended,
 `cols.is_sraw → RV64.sraw` low-32 arithmetic sign-extended). The operands are the **register reads** the
 chip actually decomposes — `rs1 ↦ adapter.op_b_memory.prev_value` (the shifted value), `rs2 ↦
-adapter.op_c_memory.prev_value` (the shift amount) — stated directly on the adapter columns (as
-`BranchChip`), since SP1's shift chip inlines the decomposition of the register read rather than passing
-a separate operand word to an operation gadget. Operand order `f rs2 rs1`. Vacuous on padding. -/
+adapter.op_c_memory.prev_value` (the shift amount) — stated directly on the adapter columns, since SP1's
+shift chip inlines the decomposition of the register read rather than passing a separate operand word to
+an operation gadget. Operand order `f rs2 rs1`. Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : ShiftRightCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   let rs1 := input.adapter.op_b_memory.prev_value
   let rs2 := input.adapter.op_c_memory.prev_value
@@ -455,9 +455,8 @@ signed remainder; `cols.is_remu → RV64.remu`, unsigned; and the four `*w` word
 `divuw`/`remuw`, 32-bit operated then sign-extended to 64). Operand order matches the RV64 signature
 `f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`. Vacuous on padding.
 
-Basic skeleton: this is the headline meaning the chip's soundness/completeness target; the threaded
-reader sub-`Spec`s and the per-flag overflow/divide-by-zero side conditions (SP1's `DivRemCols.eval`)
-are not yet folded in — they join here when the deferred proofs are filled. -/
+The threaded reader sub-`Spec`s and per-flag overflow/divide-by-zero side conditions
+(SP1's `DivRemCols.eval`) are not yet folded in. -/
 def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   input.is_real = 1 →
     (cols.is_div = 1 →
@@ -552,15 +551,14 @@ def addendWord (cols : UTypeColumns (ZMod p)) : Word (ZMod p) :=
   #v[cols.addend[0], cols.addend[1], cols.addend[2], 0]
 
 /-- The 20-bit U-type immediate recovered from the committed `op_b_imm` limbs (the high 20 bits of the
-constrained 32-bit immediate). Port of `sp1-lean`'s `sp1_op_b_cols`. It appears identically in the
-chip's decode `Assumption` (LHS) and the `Spec` (the `RV64.lui`/`RV64.auipc` argument), so the proofs
-never unfold its extraction formula. -/
+constrained 32-bit immediate). Appears identically in the chip's decode `Assumption` (LHS) and the `Spec`
+(the `RV64.lui`/`RV64.auipc` argument), so the proofs never unfold its extraction formula. -/
 def immOf (adapter : Extracted.JTypeReader (ZMod p)) : BitVec 20 :=
   BitVec.ofNat 20 (adapter.op_b_imm[0].val / 4096 + adapter.op_b_imm[1].val * 16)
 
 /-- Semantic contract for the U-type row, composed from the J-type reader sub-`Spec` plus the
-`is_real`-gated, flag-gated `RV64.lui`/`RV64.auipc` semantics (mirroring `MulChip`'s flag-gated form and
-the `sp1-lean` reference `add_result = if is_auipc then RV64.auipc imm pc else RV64.lui imm`). On a real
+`is_real`-gated, flag-gated `RV64.lui`/`RV64.auipc` semantics (mirroring `MulChip`'s flag-gated form).
+On a real
 row with `rd ≠ x0` (`op_a_0 = 0`, where the additive `is_real - op_a_0` gate fires): LUI (`is_auipc = 0`)
 writes `RV64.lui imm`, AUIPC (`is_auipc = 1`) writes `RV64.auipc imm pc`, with `imm := immOf adapter` and
 `pc := toBitVec64 pcWord`. The `op_b_imm` ↔ `imm` decode relation is a chip `Assumption` (a trace/program-ROM

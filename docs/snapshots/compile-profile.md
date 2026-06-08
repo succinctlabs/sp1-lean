@@ -1,19 +1,16 @@
+> **Point-in-time snapshot — regenerate before relying on it.**
+
 # Compile-time profile — SP1Clean
 
 Per-module wall-clock elaboration profile of the whole library, with per-tactic attribution for the
 worst offenders and the common threads behind them. Measured June 2026 (Lean v4.28.0, warm olean cache).
 
-> **Snapshot.** These are point-in-time numbers; treat them as a historical baseline, not current truth.
 > Re-run `scripts/profile_compile.sh` to refresh.
 
-> **Recent optimizations (nlinarith dedup + `tauto` outliers).** The repeated
-> per-limb `.val`/bound `nlinarith` goals in the `srl_/sll_within_byte_shift*` variants were factored
-> into `Operations/ShiftBounds.lean` (proved once, applied by `exact`), and the three `Faithful/` `tauto`
-> outliers were swapped to `itauto`. Measured isolated `lake env lean` times (no profiler overhead) after
-> the change: **ShiftRightMath 110s→44s, ShiftLeftCore 49s→32s, AddressOperation 37s→9s,
-> LtOperationUnsigned 18s→6s, LtOperationSigned 13s→4s** (~227s→~94s across the five). All five stay
-> axiom-clean; ShiftRightMath's ceiling dropped 100M→8M. The figures in the tables below are the
-> pre-optimization profiler snapshot and are kept for reference.
+The ShiftRight/ShiftLeft nlinarith goals are factored into `Operations/ShiftBounds.lean` (proved once,
+applied by `exact`), and the `Faithful/` `tauto` outliers use `itauto`. Post-optimization baselines:
+ShiftRightMath 44s, ShiftLeftCore 32s, AddressOperation 9s, LtOperationUnsigned 6s, LtOperationSigned 4s.
+The figures in the offender tables below are from the pre-optimization profiler snapshot.
 
 ## How to re-run
 
@@ -137,14 +134,11 @@ pure elaboration of one huge term plus the linter tax (thread C). Splitting the 
 
 ## Where to optimize first (by leverage)
 
-1. ~~**`nlinarith` in ShiftRightMath + ShiftLeftCore** (thread B)~~ — **done.** Factored the
-   repeated `.val`/bound goals into `Operations/ShiftBounds.lean`; ShiftRightMath 110s→44s, ShiftLeftCore
-   49s→32s.
-2. **Giant-goal shape in Mul/Branch/Shift/Lt** (thread A) — the structural fix (avoid building one
-   monolithic goal) attacks the top 4 offenders at once. Largest absolute prize, largest effort. *Still open.*
-3. ~~**`tauto` outliers** (thread D)~~ — **done.** `tauto`→`itauto` in `Faithful/AddressOperation`
-   (37s→9s), `LtOperationUnsigned` (18s→6s), `LtOperationSigned` (13s→4s).
-4. **Disable linters on `Extracted/`** (threads C+E) — library-wide, low-risk. *Still open.*
+1. **Giant-goal shape in Mul/Branch/Shift/Lt** (thread A) — the structural fix (avoid building one
+   monolithic goal) attacks the top 4 offenders at once. Largest absolute prize, largest effort. *Open.*
+2. **Disable linters on `Extracted/`** (threads C+E) — library-wide, low-risk. *Open.*
+3. (`nlinarith` in ShiftRightMath + ShiftLeftCore (thread B) — factored into `Operations/ShiftBounds.lean`.)
+4. (`tauto` outliers (thread D) — replaced with `itauto` in the three `Faithful/` files.)
 
 ## Verification of this run
 

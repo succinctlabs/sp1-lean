@@ -1,17 +1,16 @@
 import SP1Clean.Soundness.ChipRow
 
-/-! # Per-chip Sail dispatch (item 3 core)
+/-! # Per-chip Sail dispatch
 
-The reusable "every real row reaches its RISC-V Sail spec" dispatch, factored out of the inline
-construction in `Soundness/MachineSoundness.lean` (`traceValid_of_specs_and_balance''.sail`,
-`:155`). Each row carries its chip's verified Sail step in `r.kind.reaches_sail`, so the dispatch is
-**generic** — no `cases`, no per-chip arm; adding a chip never touches this lemma.
+The reusable "every real row reaches its RISC-V Sail spec" dispatch. Each row carries its chip's
+verified Sail step in `r.kind.reaches_sail`, so the dispatch is **generic** — no `cases`, no per-chip
+arm; adding a chip never touches this lemma.
 
 This is the per-row layer of the GatedVm capstone's Sail conjunct: given each row's in-circuit `Spec`
 (`r.chipSpec data`), every real row's `sailEquiv` holds for any honouring Sail state. The *source* of
 `h_spec` at the ensemble level — each chip table's `Spec` recovered from `witness.Constraints` via
 `Component.weakSoundness`, whose `FullGuarantees` come from the gated bus balance — is the coupled
-balance→guarantees bridge (the item-5 reconciliation), supplied separately. -/
+balance→guarantees bridge, supplied separately. -/
 
 namespace SP1Clean.Soundness
 

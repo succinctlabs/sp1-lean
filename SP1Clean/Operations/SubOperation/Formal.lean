@@ -115,7 +115,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       -- The generated `main` decomposes the borrow constant as `+ 65536 - 1`; fold to RawSpec's `65535`.
       have c65535 : ∀ x : ZMod p, x + 65536 + -1 = x + 65535 := fun x => by ring
       simp only [c65535]
-      -- Five conjuncts now: SP1's `is_real` boolean gate then the four borrows.
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · simp
       · rw [one_mul]; rcases hc0 with h | h <;> rw [h] <;> simp
@@ -123,8 +122,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       · rw [one_mul]; rcases hc2 with h | h <;> rw [h] <;> simp
       · rw [one_mul]; rcases hc3 with h | h <;> rw [h] <;> simp
 
-/-- SP1's `SubOperation::eval` as a Clean-native `FormalAssertion`: `is_real`-gated semantic spec,
-native borrow-chain proofs, byte-bus range checks, no SP1Operations borrow. -/
+/-- SP1's `SubOperation::eval` as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions,

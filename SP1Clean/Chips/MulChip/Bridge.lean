@@ -14,19 +14,15 @@ product), `spec_mulh` (high 64, signed×signed), `spec_mulhu` (high 64, unsigned
 (high 64, signed×unsigned), `spec_mulw` (low-32 product sign-extended). The five variants are the four
 `MUL` `mul_op` records (Low/High × the signedness pair) plus `MULW`.
 
-Unlike the other chips' bridges — which roll their own `SailWrap.execute_RTYPE(W)_pure` reduction — this
-bridge rides the **RV64 provider library's** connection lemmas directly: `_root_.mul_eq`/`_root_.mulw_eq`
-(`RISCV.SailToRV64`: `execute_MUL/MULW = skeleton_binary … SailRV64.mul/mulw`, by `rfl`) chained with
-`RV64.{mul,mulh,mulhu,mulhsu,mulw}_eq` (`RISCV.SailPureToInstructions`: `SailRV64.mul {…} = RV64.mul*`,
-fully proven incl. the MULHSU signed×unsigned high half). So `correct_mul*_native` is pure monad
-plumbing — the BitVec algebra lives in the imported dep lemmas.
+This bridge uses the **RV64 provider library's** connection lemmas directly:
+`_root_.mul_eq`/`_root_.mulw_eq` (`RISCV.SailToRV64`) chained with
+`RV64.{mul,mulh,mulhu,mulhsu,mulw}_eq` (`RISCV.SailPureToInstructions`, fully proven incl. the
+MULHSU signed×unsigned high half). `correct_mul*_native` is pure monad plumbing — the BitVec
+algebra lives in those dep lemmas.
 
-The chip `Spec` sources its operands from the **inputs** `op_b_val` (rs1) / `op_c_val` (rs2) — `Mul` is an
-R-type register-register op, operand order matching the RV64 signature `f rs2_val rs1_val` — so the
-bridge's `h_rs1`/`h_rs2` read those. The `ChipKind`'s `sailEquiv` is the **5-way flag-dispatched**
-conjunction, proven from the chip `Spec` by `mul_chip_reaches_sail`. `Mul` carries `Fact (2 ^ 24 < p)`
-(the `MulOperation` column-sum bound); the bridge derives the project-standard `Fact (2 ^ 17 < p)`
-locally. -/
+The chip `Spec` sources operands from **inputs** `op_b_val` (rs1) / `op_c_val` (rs2), matching
+the RV64 signature `f rs2_val rs1_val`. The `ChipKind`'s `sailEquiv` is the 5-way flag-dispatched
+conjunction. `Mul` carries `Fact (2 ^ 24 < p)`; the bridge derives `Fact (2 ^ 17 < p)` locally. -/
 
 namespace SP1Clean.MulSail
 
@@ -170,9 +166,7 @@ theorem correct_mulw_native
     SailState.get_reg?_insert_nextPC, h_pc, h_rs1, h_rs2, h_mulw]
 
 omit [Fact (2 ^ 24 < p)] in
-/-- End-to-end: a real `Mul` chip row reaches the RISC-V Sail multiply, 5-way flag-dispatched —
-the MUL/MULH/MULHU/MULHSU/MULW identities flow from the chip `Spec` (operands sourced on the inputs
-`op_b_val` (rs1) / `op_c_val` (rs2)) into `correct_*_native`. -/
+/-- End-to-end: from the chip `Spec`, the 5-way MUL/MULH/MULHU/MULHSU/MULW Sail identities hold. -/
 theorem mul_chip_reaches_sail
     (input : MulChip.Inputs (ZMod p)) (cols : Extracted.MulCols (ZMod p))
     (data : ProverData (ZMod p))
@@ -221,12 +215,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- **The `Mul` `ChipKind` registration** — the MUL/MULH/MULHU/MULHSU/MULW row's entry into the
-heterogeneous trace + soundness capstone. `view` projects the register `RTypeReader` adapter through
-`cols.adapter.toAdapterView`; `rdWrite` is the multiply result word `cols.a`; the Program-bus opcode is
-`is_mul·11 + is_mulh·12 + is_mulhu·13 + is_mulhsu·14 + is_mulw·24` (matching `Defs.lean`'s `main`);
-`sailEquiv` is the 5-way flag-dispatched conjunction; `reaches_sail` is `mul_chip_reaches_sail`. The
-bridge reads `rs1`/`rs2` off the inputs `op_b_val`/`op_c_val`. -/
+/-- `ChipKind` registration for Mul (MUL/MULH/MULHU/MULHSU/MULW). `rs1`/`rs2` are sourced from
+inputs `op_b_val`/`op_c_val`. Carries `Fact (2 ^ 24 < p)`. -/
 def kind : Soundness.ChipKind p where
   name := "Mul"
   Inputs := MulChip.Inputs

@@ -3,16 +3,9 @@ import SP1Clean.Foundations.Word
 
 /-! # `DivRemChip` — soundness bridge lemmas
 
-The *machinery* layer of the `DivRem` chip soundness: the carry-chain → ℕ/Int reassembly lemmas and
-the flag bookkeeping that bridge the chip's composed sub-circuit `Spec`s + `ownAsserts` constraints to
-the hypotheses of the pure-arithmetic consumers in `Math.lean`. Kept out of `Formal.lean` so the
-soundness proof body there reads as a thin assembly and each bridge lemma is an independently-checkable
-named statement.
-
-**Milestone 1 (this section): the unsigned core.** `euclid_identity_unsigned` turns the eight
-base-`2^16` carry-chain limb equations (`c·quotient + remainder = b`, the b-pinning de-gated on the
-non-overflow branch) plus the 128-bit product value into the ℕ Euclidean identity
-`b = c·quotient + remainder` that `Math.divu_remu_of_identity` consumes. -/
+Carry-chain → ℕ/Int reassembly lemmas bridging the chip's composed sub-circuit `Spec`s + `ownAsserts`
+to the pure-arithmetic consumers in `Math.lean`. Kept separate so each bridge lemma is independently
+checkable and `Formal.lean` reads as a thin assembly. -/
 
 namespace SP1Clean.DivRemChip
 
@@ -89,7 +82,7 @@ lemma euclid_identity_unsigned
   -- the product is bounded by `(2^64-1)^2`, ruling out the top carry.
   have hpb : cn * qn ≤ (2 ^ 64 - 1) * (2 ^ 64 - 1) := Nat.mul_le_mul (by omega) (by omega)
   rw [Word.toNat_def, Word.toNat_def]
-  -- everything is now linear in the limb `.val`s; telescope + rule out the top carry.
+  -- linear in limb `.val`s; telescope + rule out the top carry.
   omega
 
 omit [Fact p.Prime] in
@@ -192,12 +185,11 @@ lemma flags_val_sum {f0 f1 f2 f3 f4 f5 f6 f7 : ZMod p}
     _ = (1 : ZMod p).val := by rw [key]
     _ = 1 := ZMod.val_one p
 
-/-! ## Milestone 2 — signed `DIV`/`REM`
+/-! ## Signed `DIV`/`REM` bridges
 
-The signed variants need the operands' `toInt` (truncated division), so the bridge supplies the
-`toInt`-level hypotheses of `Math.div_rem_of_identity`: the abs columns give `|·|` (range), the sign
-bits give the dividend-sign conditions, and the carry chain with the `b_neg`/`rem_neg` sign fills gives
-the signed Euclidean identity. The two foundational lemmas below port `sp1-lean`'s `sum_zero_abs` core. -/
+The signed variants need the operands' `toInt` (truncated division): abs columns give `|·|` (range),
+sign bits give the dividend-sign conditions, and the carry chain with `b_neg`/`rem_neg` sign fills gives
+the signed Euclidean identity fed to `Math.div_rem_of_identity`. -/
 
 omit [Fact p.Prime] in
 /-- **Absolute value, magnitude form.** The chip's `abs_c`/`abs_remainder` columns are the
@@ -366,7 +358,7 @@ lemma euclid_identity_signed
         + remc.toNat + rem_neg.val * (2 ^ 128 - 2 ^ 64)
       = b.toNat + b_neg.val * (2 ^ 128 - 2 ^ 64) + carry[7].val * 2 ^ 128 := by
     rw [hsplit]; simp only [Word.toNat_def]; omega
-  -- the limb equations are now subsumed by `hT`; clear them so the final integrality omega sees only
+  -- the limb equations are subsumed by `hT`; clear them so the final integrality omega sees only
   -- the clean relation (otherwise the redundant limb system confuses it).
   clear hl0 hl1 hl2 hl3 hh4 hh5 hh6 hh7 L0 L1 L2 L3 H4 H5 H6 H7 hsplit hrnv hbnv hrnf hbnf
     lo0 lo1 lo2 lo3 hi0 hi1 hi2 hi3 rc0 rc1 rc2 rc3 bb0 bb1 bb2 bb3
@@ -527,13 +519,11 @@ lemma neg_one_of_toNat {c : Word (ZMod p)} (hcU : c.isU64) (h : c.toNat = 2 ^ 64
   rw [← BitVec.toNat_inj, Word.toBitVec64_toNat hcU, h, BitVec.neg_one_eq_allOnes,
     BitVec.toNat_allOnes]
 
-/-! ## Milestone 2/3 — low-32 projection bridges for the word variants (`*W`)
+/-! ## `*W` projection bridges
 
-The `*W` instructions operate on the low 32 bits then sign-extend. The chip realises this by sign/zero-
-extending the operand/comp columns: `DIVUW`/`REMUW` zero-extend (top two limbs `0`), `DIVW`/`REMW`
-sign-extend (top two limbs the sign fill `m·65535` of bit 31). The bridges below turn the 64-bit
-carry-chain identity over those columns into the 32-bit `extractLsb 31 0` identity the `Math.*w`
-consumers want, and the output column into a `signExtend 64 (low-32)`. -/
+`DIVUW`/`REMUW` zero-extend (top two limbs `0`); `DIVW`/`REMW` sign-extend (top two limbs
+`m·65535` of bit 31). The lemmas below project the 64-bit carry-chain identity to the
+32-bit `extractLsb 31 0` form consumed by `Math.*w`, and the output column to `signExtend 64 (low-32)`. -/
 
 omit [Fact p.Prime] in
 /-- low-32 `toNat` of an `extractLsb` in terms of the bottom two limbs. -/

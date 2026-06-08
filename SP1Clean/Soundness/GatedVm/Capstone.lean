@@ -1,27 +1,20 @@
 import SP1Clean.Soundness.GatedVm.SailDispatch
 import SP1Clean.Soundness.GatedVm.StateBridge
 
-/-! # The gated whole-program execution capstone (path b, assembled)
+/-! # The gated whole-program execution capstone (assembled)
 
-The meaningful whole-machine result, assembled from the two axiom-clean halves built in
-`SailDispatch.lean` (`chipRows_step_sound`) and `StateBridge.lean` (`state_trail_of_balance`):
+The whole-machine result, assembled from the two axiom-clean halves built in `SailDispatch.lean`
+(`chipRows_step_sound`) and `StateBridge.lean` (`state_trail_of_balance`):
 
   per-row chip `Spec`s  +  gated state-bus balance  ⟹  every real instruction is RISC-V-Sail-correct
                                                        ∧  ∃ an execution trail `pc_start → … → next_pc`
 
-Compared with the bespoke `traceValid_of_specs_and_balance''`, this **drops
-every trace-shape side condition** — `clkInjective`, `TraceClkAdvance`, `TraceMemClkValid`,
-`memPrevLink`, `prevTs < clk`, `MemRowWellFormed`, `MemProviderGenesis` — because the transition path
-is forced by the gated state-bus balance *alone* (the Eulerian `exists_trail`), not reconstructed from a
-clk-ordered adjacency. So it is **strictly ≥ bespoke** (same conclusion content — a valid execution from
-the public initial pc to the public final pc — under a strictly smaller hypothesis set), built on the
-reusable `GatedVm` machinery rather than `TraceValid`.
+The transition path is forced by the gated state-bus balance *alone* (the Eulerian `exists_trail`),
+with **no** clock-injectivity, clock-advance, or memory side conditions.
 
 **Trust boundary.** `h_bal` (the native `isConsistentBalanced` of the state bus + boundary) is the
-LogUp/GKR backend assumption — *exactly* the trust boundary the bespoke capstone already takes (inside
-`TraceMachineBalancedWith'`). Deriving it instead from Clean's ensemble `Statement.BalancedChannels`
-(the `FormalEnsemble` wrapping) is a documented *strengthening beyond bespoke*, tracked as future work;
-it is not needed for ≥-bespoke parity. -/
+LogUp/GKR backend assumption. Deriving it from Clean's ensemble `Statement.BalancedChannels` (the
+`FormalEnsemble` wrapping) is tracked as future work. -/
 
 namespace SP1Clean.Soundness
 

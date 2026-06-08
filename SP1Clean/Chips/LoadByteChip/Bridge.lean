@@ -6,14 +6,13 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for LoadByte (LB / LBU)
 
-`correct_load_byte_native` proves the RISC-V Sail execution of a width-1 `LOAD`
-(`execute_LOAD` with `width = 1`, `is_unsigned` = false for `LB` / true for `LBU`) agrees with the SP1
-chip's emulation (write `nextPC = pc + 4` and the extended byte into `rd`). The width-1 analogue of
-`correct_load_half_native`, threading `SailMem.run_vmem_read_of_width_1'`. Bytes have no alignment.
+`correct_load_byte_native` proves Sail's `execute_LOAD` (width = 1) agrees with the SP1 chip
+emulation (write `nextPC = pc + 4` and the extended byte into `rd`), via
+`SailMem.run_vmem_read_of_width_1'`. Bytes have no alignment.
 
-`lb_chip_reaches_sail` discharges the `extend_value` equation: the selected byte `selected_byte` and its
-sign bit `msb` extend (sign for `LB`, zero for `LBU`) to `#v[selected_byte + 65280·msb, 65535·msb,
-65535·msb, 65535·msb]` — note the sign fills bits 8–63, so the *low* limb already carries `65280·msb`. -/
+`lb_chip_reaches_sail` discharges the `extend_value` equation: `selected_byte` and sign bit `msb`
+extend to `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` — the sign fills bits
+8–63, so the low limb already carries `65280·msb`. -/
 
 namespace SP1Clean.LoadByteSail
 
@@ -158,9 +157,8 @@ theorem correct_load_byte_native
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
     LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread, hext]
 
-/-- **End-to-end composition.** From the `LoadByte` chip + decode + register/PC reads + the selected
-memory byte, a width-1 Sail `LOAD` (sign-extended for `LB`, zero-extended for `LBU`) agrees with the SP1
-chip emulation writing `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` to `rd`. -/
+/-- End-to-end: from chip + decode + register/PC reads + selected memory byte, Sail's `LB`/`LBU`
+agrees with the SP1 chip emulation. -/
 theorem lb_chip_reaches_sail
     (input : LoadByteChip.Inputs (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
@@ -210,10 +208,8 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **LoadByte's `ChipKind` registration** (LB / LBU). Straight-line `view` (`next_pc = pc + 4`), I-type
-adapter, gating selector `is_real = is_lb + is_lbu`, rd write-back the sign/zero-extended byte
-`#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]`, opcode `29·is_lb + 32·is_lbu`. Bytes are
-unaligned, so `sailEquiv` has no alignment hypothesis; `reaches_sail` is `lb_chip_reaches_sail`. -/
+/-- `ChipKind` registration for LoadByte (LB / LBU, opcodes 29 / 32). Bytes are unaligned, so
+`sailEquiv` has no alignment hypothesis. -/
 def kind : Soundness.ChipKind p where
   name := "LoadByte"
   Inputs := LoadByteChip.Inputs

@@ -23,7 +23,7 @@ The interaction half (`jalcols_interactions_faithful`) is proved directly: JAL i
 state/program/memory/timestamp sends (it does not compose `JTypeReader.interactions`), so the trailing
 list reduces by the `Interaction.toProp_*` lemmas to the two `AddOperation` limb-range specs, the
 `Range(add_operation.value[0]/4, 14)` jump-target alignment, the two CPUState clock bounds, and `op_a`'s
-timestamp byte bounds. Both halves are `sorry`-free, reusing the axiom-clean fragment anchors. -/
+timestamp byte bounds. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

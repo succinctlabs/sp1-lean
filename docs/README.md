@@ -9,7 +9,8 @@ The docs split into two audiences:
   `architecture.md`, `release-audit.md`, `roadmap.md`, `bus-model.md`.
 - **Contributor / agent-facing** (the fiddly proof/build techniques used while working on the proofs) — these
   live under [`agents/`](agents/README.md): `porting-recipe.md`, `proof-patterns.md`, `lean-sail-notes.md`,
-  `extraction.md`, `axiom-ledger.md`, `compile-profile.md`, `mul-operation-learnings.md`.
+  `extraction.md`, `mul-operation-learnings.md`. Point-in-time snapshots live under
+  [`snapshots/`](snapshots/): `axiom-ledger.md`, `compile-profile.md`.
 
 ## What to read first
 
@@ -36,6 +37,6 @@ recording the worked Add example's six steps end-to-end. The docs here distill i
 - [agents/proof-patterns.md](agents/proof-patterns.md) — soundness/completeness skeleton for witnessed gadgets; `ZMod p` / `Word` / `circuit_proof_start` landmines; `maxHeartbeats` floors.
 - [agents/lean-sail-notes.md](agents/lean-sail-notes.md) — Lean 4.28 + public Clean `main` + the GitHub-fetched Sail deps; the `lake update` toolchain-bump trap; the Clean-main ↔ Batteries `Fin.foldl` collision and the import-narrowing fix.
 - [agents/extraction.md](agents/extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
-- [agents/axiom-ledger.md](agents/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem (re-generate from a green build before release).
-- [agents/compile-profile.md](agents/compile-profile.md) — per-module elaboration profile + worst offenders (a point-in-time snapshot).
+- [snapshots/axiom-ledger.md](snapshots/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem (re-generate from a green build before release).
+- [snapshots/compile-profile.md](snapshots/compile-profile.md) — per-module elaboration profile + worst offenders (a point-in-time snapshot).
 - [agents/mul-operation-learnings.md](agents/mul-operation-learnings.md) — Mul-specific soundness/completeness pitfalls (the 16-limb schoolbook multiply).

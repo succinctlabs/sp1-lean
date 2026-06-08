@@ -11,6 +11,7 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 - [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; `maxHeartbeats` floors; the `ElaboratedCircuit` field-obligation recipe.
 - [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.28 environment: toolchain pins, why public Clean `main`, the GitHub-fetched Sail deps, the `lake update` toolchain-bump trap, and the Clean-main ↔ Batteries `Fin.foldl` collision and its fix.
 - [extraction.md](extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
-- [axiom-ledger.md](axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem (re-generate from a green build before release).
-- [compile-profile.md](compile-profile.md) — per-module elaboration profile + worst offenders + common threads (a point-in-time snapshot).
+Point-in-time snapshots (regenerate before release) live under [`../snapshots/`](../snapshots/):
+- [../snapshots/axiom-ledger.md](../snapshots/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem.
+- [../snapshots/compile-profile.md](../snapshots/compile-profile.md) — per-module elaboration profile + worst offenders + common threads.
 - [mul-operation-learnings.md](mul-operation-learnings.md) — Mul-specific soundness/completeness pitfalls (the 16-limb schoolbook multiply).

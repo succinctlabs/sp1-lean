@@ -9,8 +9,8 @@ Sibling of `Faithful/ITypeReader.lean`, for the **immutable** I-type register-ad
 stores (op_a = rs2 *read*, op_b = rs1 read, op_c an immediate). SP1's generated
 `ITypeReaderImmutable.constraints` (`Extracted/ITypeReaderImmutable.lean`) is `ITypeReader` with op_a a
 read: the four `op_a_0` zeroing gates pin the **read** value of `x0` to `0`
-(`op_a_0 * op_a_memory.prev_value[i] = 0`), and the op_a memory `.receive` carries the unchanged
-`prev_value` (no write value). Under `is_real = is_trusted = 1` it emits three `is_real` binary gates
+(`op_a_0 * op_a_memory.prev_value[i] = 0`), and the op_a memory `.receive` carries `prev_value`
+(no write value). Under `is_real = is_trusted = 1` it emits three `is_real` binary gates
 (vacuous), the `.program` fetch (per-row meaning `True`), and per register operand (op_a, op_b) a
 `.byte Range`/`.byte U8Range` timestamp check + a `.memory` send/receive pair (meaning `True`).
 

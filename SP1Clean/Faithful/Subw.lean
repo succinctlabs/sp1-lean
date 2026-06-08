@@ -9,16 +9,14 @@ import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.SubwOperation
 import SP1Clean.Faithful.U16MSBOperation
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (SUBW)
+/-! # Faithfulness anchor — `SubwOperation` constraints ↔ native combined raw spec
 
-The native `SubwOp` gadget's constraints are hand-written; this module anchors them to **SP1's
-`SubwOperation` constraint definition** — the operation-level form the `sp1-constraint-compiler`
-emits and `update_extracted.py` writes to `SP1Clean/Extracted/SubwOperation.lean`. SP1's
-`SubwOperation` **composes** `U16MSBOperation` (its `constraints` is `U16MSB.constraints … ++
-[two-limb borrow chain]`), so the anchor splits at the `++`: the `U16MSB` fragment is discharged
-by `u16msb_constraints_faithful`, and the two-limb borrow fragment by the same simp + `ring_nf` as
-`sub_constraints_faithful` (the generated chain uses `a[i] + 65536 - 1` where `RawSpec` uses
-`a[i] + 65535`; these are ring-equal). -/
+Anchors SP1's `SubwOperation` constraint definition (`SP1Clean/Extracted/SubwOperation.lean`) to
+the native gadget's combined raw spec. SP1's `SubwOperation` composes `U16MSBOperation` (its
+`constraints` is `U16MSB.constraints … ++ [two-limb borrow chain]`), so the anchor splits at the
+`++`: the `U16MSB` fragment is discharged by `u16msb_constraints_faithful`, and the two-limb borrow
+fragment by the same simp + `ring_nf` as `sub_constraints_faithful` (the generated chain uses
+`a[i] + 65536 - 1` where `RawSpec` uses `a[i] + 65535`; ring-equal). -/
 
 namespace SP1Clean.Faithful
 
@@ -62,10 +60,9 @@ theorem subw_constraints_faithful (a b : Word (ZMod p)) (cols : Extracted.SubwOp
 open SP1Clean.Channels (byteChannel)
 open SP1Clean.InteractionRecovery
 
-/-- **Faithfulness anchor — interaction half, SYNTACTIC (HYBRID composition + inline).** Verbatim sibling
-of `addw_interactions_faithful_syntactic`: the composed `U16MSBOperation` sub on `value[1]` then two inline
-`Range` pulls on `value[0]`/`value[1]`, same order as the oracle, so the byte image splits (`congr 1`) into
-the `u16msb` anchor + the two inline leaf pulls; the `=== 0` gates drop. -/
+/-- **Faithfulness anchor — interaction half, SYNTACTIC.** The composed `U16MSBOperation` sub on
+`value[1]` then two inline `Range` pulls on `value[0]`/`value[1]`, same order as the oracle, so the
+byte image splits (`congr 1`) into the `u16msb` anchor + the two inline leaf pulls. -/
 theorem subw_interactions_faithful_syntactic
     (env : Environment (ZMod p)) (input : Var SP1Clean.SubwOperation.Inputs (ZMod p)) (offset : ℕ)
     (a b : Word (ZMod p)) (cols : Extracted.SubwOperation (ZMod p)) (is_real : ZMod p)

@@ -3,24 +3,12 @@ import SP1Clean.Foundations.Word
 import SP1Clean.Chips.SubChip.Formal
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for Sub (+ end-to-end composition)
+/-! # Native Sail bridge for Sub (+ `ChipKind` registration)
 
-`correct_sub_native` proves that the RISC-V Sail execution of `SUB`
-(`spec_sub`, calling LeanRV64D's `execute_RTYPE` with `rop.SUB`) agrees with the SP1 chip's
-emulation (`sp1_sub`: write `nextPC = pc + 4` and the result register), given:
-
-* the chip's **semantic** fact `a_val = op_b - op_c` (= `SubChip.circuit`'s `Spec`),
-* and the register/PC read facts (the analog of the legacy `state_cstrs.initialState` — in the
-  full system supplied by the reader bus + memory consistency).
-
-`sub_chip_reaches_sail` then composes the verified `SubChip.Spec` straight into the bridge: a
-real Sub chip row reaches the RISC-V Sail spec with **zero** `_root_.Sub.*` / `SubOperation.*` /
-SP1Chips dependency anywhere in the chain. The sub identity flows from the gadget/chip `Spec`,
-not from `SubOperation.spec` or `_root_.Sub.correct_sub`.
-
-`execute_RTYPE rs2 rs1 rd .SUB` computes `rX(rs1) - rX(rs2)`, so with `rs1 ↦ op_b_val` and
-`rs2 ↦ op_c_val` the Sail result is `op_b_val - op_c_val`, matching `SubChip.Spec`'s fixed
-(non-commutative) operand order. -/
+`correct_sub_native` proves the RISC-V Sail `SUB` execution agrees with the SP1 chip emulation
+given the chip's semantic fact `a_val = op_b - op_c` and the register/PC reads.
+`execute_RTYPE rs2 rs1 rd .SUB` computes `rX(rs1) - rX(rs2)`, so `rs1 ↦ op_b_val`,
+`rs2 ↦ op_c_val` — the non-commutative order is load-bearing. -/
 
 namespace SP1Clean.SubSail
 
@@ -59,9 +47,6 @@ theorem correct_sub_native
     h_pc, h_rs1, h_rs2, h_sub]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- End-to-end composition: from the Sub chip's verified semantic contract (`SubChip.Spec`, on a
-real row) plus the register/PC reads, the RISC-V Sail `SUB` execution agrees with the SP1 chip
-emulation. The sub identity flows from the chip `Spec` straight into `correct_sub_native`. -/
 theorem sub_chip_reaches_sail
     (input : SubChip.Inputs (ZMod p)) (cols : Extracted.SubCols (ZMod p)) (data : ProverData (ZMod p))
     (rs1_idx rs2_idx rd_idx : BitVec 5) (pc : BitVec 64) (s : SailState)
@@ -84,9 +69,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **Sub's `ChipKind` registration** — Sub's entry into the heterogeneous trace + capstone, mirroring
-`AddChip.kind`. `sailEquiv` is the old `MachineSoundness` `.sub` arm; `reaches_sail` is
-`sub_chip_reaches_sail` verbatim. The Program-bus opcode is `2` (vs Add's `0`). -/
+/-- **Sub's `ChipKind` registration.** Program-bus opcode `2`; `reaches_sail` is `sub_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Sub"
   Inputs := SubChip.Inputs

@@ -15,25 +15,16 @@ import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Skeleton — the `DivRem` chip row as a `GeneralFormalCircuit` (spec surface)
+/-! # The `DivRem` chip row as a `GeneralFormalCircuit`
 
-The RISC-V divide/remainder family (`DIV`/`DIVU`/`REM`/`REMU` + the four `*W` word variants) ported as
-a chip-level `GeneralFormalCircuit`. The semantic, `is_real`/flag-gated `Spec` (the RV64
-`div`/`divu`/`rem`/`remu`/`divw`/`remw`/`divuw`/`remuw` identities on the result column `cols.a`) lives
-in `Specs/Chip.lean`; the output column struct is the extracted `Extracted.DivRemCols` (246 columns).
+`DIV`/`DIVU`/`REM`/`REMU`/`DIVW`/`REMW`/`DIVUW`/`REMUW`: flag-gated `Spec` (RV64 div/rem identities on
+`cols.a`) in `Specs/Chip.lean`; output is the extracted `DivRemCols` (246 columns).
 
-**Skeleton status.** Unlike `AddChip`/`MulChip` — which compose the real witnessed gadgets as Clean
-`subcircuit`s — this `main` is a *basic* skeleton: it **witnesses the whole `DivRemCols` output block**
-(padding-safe zeros) and emits only the `is_real` binary gate, so it typechecks and yields a valid
-`Var DivRemCols` without yet wiring SP1's `DivRemCols.eval` constraints. The deferred proof-fill step
-replaces the single output witness with the composed sub-circuits — `CPUState`/`RTypeReader` readers,
-the two `MulOperation`s (`c·quotient` low/high), the two `AddOperation` negations, `LtOperationUnsigned`
-(remainder range), `IsZeroWordOperation` (divide-by-zero), the two `IsEqualWordOperation`s (overflow),
-and the four `U16MSBOperation`s (sign bits) — plus the flag/sign/overflow assertZero constraints; the
-soundness/completeness proofs in `Formal` are `sorry` until then.
-
-(`main` + the `ElaboratedCircuit` instance; the `Assumptions`/soundness/completeness/`circuit` live in
-the sibling `Formal` module.) -/
+`main` composes the full constraint set: two `MulOperation` `c·quotient` products (low/high),
+`IsEqualWordOperation`×4 (overflow), `IsZeroWordOperation` (divide-by-zero), `AddOperation`×2 (negation),
+`LtOperationUnsigned` (remainder range), `U16MSBOperation`×7 (sign bits), `CPUState`/`RTypeReader`
+readers, and the chip's own assertZero tail (`ownAsserts`). Soundness is proved; completeness is a
+deferred `sorry`. (`Assumptions`/soundness/completeness/`circuit` in `Formal`.) -/
 
 namespace SP1Clean.DivRemChip
 
@@ -48,26 +39,21 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- Operands are 64-bit values (true on real and zero-padded rows). The soundness `Assumptions`; lives
-here (not in `Formal`) so the per-op soundness split files (`Soundness/<Op>.lean`) can import it without
-a cycle through `Formal`. -/
+/-- Operand `isU64` contract; lives in `Defs` (not `Formal`) so `Soundness/<Op>.lean` split files can
+import it without a cycle. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Zero placeholder for any column block (`Var` of a `ProvableType`) — the all-zero `fromElements`.
-Used for the not-yet-wired column groups while `main` is built up incrementally (each build stage
-replaces a batch of these with the real witnessed/composed columns). -/
+/-- All-zero `fromElements` placeholder for any column block. -/
 @[irreducible] def zc {α : TypeMap} [ProvableType α] : Var α (ZMod p) :=
   ProvableType.fromElements (F := Expression (ZMod p)) (.replicate _ 0)
 
-/-- Emit a whole list of zero-asserts in a single circuit bind (`es.map .assert`). Used for the chip's
-own `ownAsserts cols` list so the ~115 constraints attach in one operation. -/
+/-- Emit a list of zero-asserts in one circuit bind (`es.map .assert`). Used for `ownAsserts cols`. -/
 def assertZeros (es : List (Expression (ZMod p))) : Circuit (ZMod p) Unit :=
   fun _ => ((), es.map (fun e => .assert e))
 
--- `circuit_norm` lemmas so the `ElaboratedCircuit` obligations close on `assertZeros es` WITHOUT
--- unfolding the (opaque, 360-step) `es = ownAsserts cols`: a list of `.assert` ops adds no length, no
--- subcircuit-offset content, and no channels.
+-- `circuit_norm` lemmas so `ElaboratedCircuit` obligations close on `assertZeros es` without unfolding
+-- the opaque `ownAsserts cols`: a list of `.assert` ops contributes 0 length, 0 subcircuit offsets, no channels.
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_map_assert (es : List (Expression (ZMod p))) :
     Operations.localLength (es.map fun e => (Operation.assert e)) = 0 := by
@@ -131,31 +117,23 @@ set_option linter.unusedSectionVars false in
   | cons e es ih => simp [Operations.shallowInteractions, List.map_cons, ih]
 
 set_option maxHeartbeats 16000000 in
-/-- `main` — built incrementally toward the full `DivRemCols.eval`, emitting operations in the order of
-`Extracted/DivRemChip.lean`'s `asserts`/`interactions` lists (looking toward native extraction).
-
-**Stage 3 (in progress):** the sub-gadgets are composed in the **extracted `asserts`/`interactions`
-order** (`MulOperation` ×2 first, then `IsEqualWordOperation` ×4 → `IsZeroWordOperation` →
-`AddOperation` ×2 → `LtOperationUnsigned` → `U16MSBOperation` ×7, then the `CPUState`/`RTypeReader`
-readers near the end), each replacing its `zc` placeholder with the real composed column block. So far:
-the two `c_times_quotient` `MulOperation`s — `lower` (the low-64 product, gated `is_mul = is_real`) and
-`upper` (the high-64 product, gated `is_mulh = is_div + is_rem` signed / `is_mulhu = is_divu + is_remu`
-unsigned), both of `quotient_comp × c`. The remaining gadgets, the chip's own `=== 0` asserts
-(`E13…E367`, `op_a_0`), and the byte-range `.send` tail follow. Soundness stays `sorry` until the
-constraints pinning `a` are in. -/
+/-- `main` — composes all sub-gadgets in `Extracted/DivRemChip.lean` `asserts`/`interactions` order:
+the two `c_times_quotient` `MulOperation`s (`lower`: low-64, gated `is_mul = is_real`; `upper`:
+high-64, gated `is_mulh = is_div + is_rem` signed / `is_mulhu = is_divu + is_remu` unsigned), the four
+`IsEqualWordOperation` overflow checks, `IsZeroWordOperation`, two `AddOperation` negations,
+`LtOperationUnsigned`, seven `U16MSBOperation` sign-bit gadgets, the `CPUState`/`RTypeReader` readers,
+the chip's own `=== 0` asserts (`ownAsserts`), and the byte-range tail. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod p)) := do
   let flags ← witnessVector 8 (fun _ => (#v[0, 0, 0, 0, 0, 0, 0, 0] : Vector (ZMod p) 8))
   let is_div := flags[0]; let is_divu := flags[1]; let is_rem := flags[2]; let is_remu := flags[3]
   let is_divw := flags[4]; let is_remw := flags[5]; let is_divuw := flags[6]; let is_remuw := flags[7]
   let quotient_comp ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
   let a ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  -- gadgets in extracted order — (1,2) the two `c_times_quotient` products of `quotient_comp × c`.
-  -- `MulOperation` is now a `FormalAssertion`: witness its column structs via `populate`, then compose as
-  -- Clean `assertion`s gated by `is_real` (SP1's `divrem/mod.rs:721` passes `local.is_real`). `mul_lower`
-  -- is the low product (`is_mul = is_real`); `mul_upper` the high product (`is_mulh = is_div + is_rem`,
-  -- `is_mulhu = is_divu + is_remu`). Both have `is_mulw = 0`, so the operation's `is_mulw → is_real`
-  -- precondition is vacuous, and on a padding row (`is_real = 0`) the `isU64 quotient_comp` precondition is
-  -- vacuous too — exactly what makes the witnessed-operand soundness go through.
+  -- (1,2) The two `c_times_quotient` products of `quotient_comp × c`. Witness each `MulOperation`
+  -- column struct via `populate`, then compose as a Clean `assertion` gated by `is_real`
+  -- (`divrem/mod.rs:721`). `mul_lower` = low product (`is_mul = is_real`); `mul_upper` = high product
+  -- (`is_mulh = is_div + is_rem`, `is_mulhu = is_divu + is_remu`). Both have `is_mulw = 0`, so
+  -- `is_mulw → is_real` is vacuous; the `isU64 quotient_comp` precondition is vacuous on padding rows.
   let mul_lower ← ProvableType.witness (fun env =>
     MulOperation.populate
       #v[env quotient_comp[0], env quotient_comp[1], env quotient_comp[2], env quotient_comp[3]]
@@ -170,12 +148,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
     ⟨quotient_comp, input.op_c_val, mul_lower, input.is_real, input.is_real, 0, 0, 0, 0⟩
   assertion MulOperation.circuit
     ⟨quotient_comp, input.op_c_val, mul_upper, input.is_real, 0, is_div + is_rem, is_divu + is_remu, 0, 0⟩
-  -- gadgets (3-7): the two `IsEqualWordOperation` overflow checks (`is_overflow_b` vs `i64::MIN`,
+  -- (3-7) The two `IsEqualWordOperation` overflow checks (`is_overflow_b` vs `i64::MIN`,
   -- `is_overflow_c` vs `-1`), each asserted twice — full-word @ `is_real_not_word`, low-half @ `E2`
-  -- (the word-variant gate) — and the `IsZeroWordOperation` divide-by-zero check on `c`. The nested
-  -- cols structs are witnessed FLAT (`witnessVector 11`, placeholder values — only completeness/
-  -- conformance use them, both out of scope) and rebuilt with `fromElements (F := …)`; see the A0
-  -- elaboration note. `E2` = the word-variant flag sum; `irnw` = `is_real_not_word = is_real·(1-E2)`.
+  -- (word-variant gate) — and `IsZeroWordOperation` on `c`. Nested cols witnessed flat via
+  -- `fromElements (F := …)`. `E2` = word-variant flag sum; `irnw` = `is_real_not_word = is_real·(1-E2)`.
   let e2 := is_divw + is_remw + is_divuw + is_remuw
   -- witnessed scalar sign/gate columns + the `c_times_quotient`/`carry` byte vectors (placeholder
   -- values; pinned by the own-asserts `E13/E15/…` and the carry chain `E121…E151`).
@@ -222,12 +198,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
      fromElements (F := Expression (ZMod p)) w_ovc, e2⟩
   assertion IsZeroWordOperation.circuit
     ⟨input.op_c_val, fromElements (F := Expression (ZMod p)) w_is_c_0, input.is_real⟩
-  -- gadgets (8-10): the two `AddOperation` two's-complement negations (`|c|`, `|remainder|`) and the
-  -- `LtOperationUnsigned` remainder range check (`|remainder| < max(|c|,1)`). `LtOperationUnsigned` is now a
-  -- `FormalAssertion` (witnesses nothing): we witness its comparison columns here via the `populate_*`
-  -- helpers on `abs_remainder`/`max_abs_c_or_1`, then compose it as a Clean `assertion` gated by
-  -- `remainder_check_multiplicity` (SP1's `is_real·(1 − is_c_0)` selector). `AddOperation` cols =
-  -- `{value : Word}` (witnessed flat).
+  -- (8-10) Two `AddOperation` two's-complement negations (`|c|`, `|remainder|`), and
+  -- `LtOperationUnsigned` (`|remainder| < max(|c|,1)`). `LtOperationUnsigned` witnesses its comparison
+  -- columns here via `populate_*`, then is composed as a Clean `assertion` gated by
+  -- `remainder_check_multiplicity` (`is_real·(1 − is_c_0)`).
   let abs_c ← witnessVector 4 (fun _ => .replicate 4 0)
   let abs_remainder ← witnessVector 4 (fun _ => .replicate 4 0)
   let remainder_comp ← witnessVector 4 (fun _ => .replicate 4 0)
@@ -255,8 +229,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   let lt_out : Var Extracted.LtOperationUnsigned (ZMod p) := ⟨⟨bit[0]⟩, f, not_eq_inv[0], cl⟩
   assertion LtOperationUnsigned.circuit
     ⟨abs_remainder, max_abs_c_or_1, lt_out, remainder_check_multiplicity⟩
-  -- gadgets (11-17): the seven `U16MSBOperation` sign-bit extractions — b/c/remainder high u16 (full-word
-  -- @ `irnw`), then b/c/remainder/quotient low-half-high u16 (@ `E2`). cols = `{msb : F}` (witnessed flat).
+  -- (11-17) Seven `U16MSBOperation` sign-bit extractions — b/c/remainder high u16 (@ `irnw`),
+  -- b/c/remainder/quotient low-half-high u16 (@ `E2`).
   let remainder ← witnessVector 4 (fun _ => .replicate 4 0)
   let quotient ← witnessVector 4 (fun _ => .replicate 4 0)
   let w_bmsb ← witnessVector 1 (fun _ => .replicate 1 0)
@@ -270,7 +244,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   assertion U16MSBOperation.circuit ⟨cpv[1], ⟨w_cmsb[0]⟩, e2⟩
   assertion U16MSBOperation.circuit ⟨remainder[1], ⟨w_remmsb[0]⟩, e2⟩
   assertion U16MSBOperation.circuit ⟨quotient[1], ⟨w_quotmsb[0]⟩, e2⟩
-  -- readers (extracted-order: after the arithmetic gadgets) — `E382` opcode + result-word write:
+  -- Readers (after the arithmetic gadgets, extracted order — `E382` opcode + result-word write):
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   assertion Readers.RTypeReader.circuit
@@ -279,8 +253,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
      is_divu * 16 + is_remu * 18 + is_div * 15 + is_rem * 17 + is_divw * 25 + is_remw * 27
        + is_divuw * 26 + is_remuw * 28,
      a[0], a[1], a[2], a[3]⟩
-  -- assemble the full `DivRemCols` row, then emit the chip's own assertZero constraints (the
-  -- `[E13…E367, op_a_0]` tail — incl. the binary gates like `is_real·(is_real-1)` = E355) via `ownAsserts`.
+  -- Assemble `DivRemCols`, then emit the chip's own assertZero constraints (`E13…E367`, `op_a_0`, incl.
+  -- the binary gates like `is_real·(is_real-1)` = E355) via `ownAsserts`.
   let cols : Var DivRemCols (ZMod p) := ⟨input.state, input.adapter, a, input.op_b_val, input.op_c_val,
     quotient, quotient_comp, remainder_comp, remainder, abs_remainder, abs_c,
     max_abs_c_or_1, c_times_quotient, mul_lower, mul_upper, ⟨w_cneg⟩, ⟨w_rneg⟩, lt_out,
@@ -292,9 +266,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
     b_neg, b_neg_not_overflow, b_not_neg_not_overflow, is_real_not_word, rem_neg, c_neg,
     abs_c_alu_event, abs_rem_alu_event, input.is_real, remainder_check_multiplicity⟩
   assertZeros (ownAsserts cols)
-  -- byte-range `.send` tail (ByteOpcode `Range` = 6, all gated `is_real`): the 8 carry-chain u16 limbs
-  -- (`E123…E151` of the `c·quotient + remainder` sum) + the `abs_c`/`abs_remainder`/`quotient`/
-  -- `remainder`/`c_times_quotient` limbs. `rn := rem_neg·65535` (`E120`) is the high-limb addend.
+  -- Byte-range tail (opcode `Range` = 6, all gated `is_real`): the 8 carry-chain u16 limbs
+  -- (`E123…E151`) and `abs_c`/`abs_remainder`/`quotient`/`remainder`/`c_times_quotient` limbs.
+  -- `rn := rem_neg·65535` (`E120`) is the high-limb addend.
   let rn : Expression (ZMod p) := rem_neg * (65535 : Expression (ZMod p))
   let e123 : Expression (ZMod p) := c_times_quotient[0] + remainder_comp[0] - carry[0] * (65536 : Expression (ZMod p))
   let e127 : Expression (ZMod p) := c_times_quotient[1] + remainder_comp[1] - carry[1] * (65536 : Expression (ZMod p)) + carry[0]
@@ -337,19 +311,16 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   byteChannel.gatedReceive g (⟨6, c_times_quotient[5], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.gatedReceive g (⟨6, c_times_quotient[6], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.gatedReceive g (⟨6, c_times_quotient[7], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  -- Two extra `e2`-gated u16 range checks on `remainder[1]`/`quotient[1]`: the word-variant low-half MSB
-  -- gadgets (`U16MSBOperation` on `remainder[1]`/`quotient[1]`, gated on the word selector `e2`) need their
-  -- operand `< 2^16` to discharge `Assumptions` even on a padding word row (`is_real = 0`, a word flag set),
-  -- where the main `is_real`-gated quotient/remainder checks are off. Soundness-only (DivRem faithfulness is
-  -- deferred): SP1's `eval_msb` instead leans on the operand's own `is_real`-gated range check.
+  -- Two extra `e2`-gated u16 range checks on `remainder[1]`/`quotient[1]`: the word-variant MSB
+  -- gadgets need `< 2^16` even on padding word rows (`is_real = 0`, word flag set), where the main
+  -- `is_real`-gated checks are off. SP1's `eval_msb` relies on the operand's own gated range check instead.
   byteChannel.gatedReceive e2 (⟨6, remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.gatedReceive e2 (⟨6, quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   return cols
 
 set_option maxHeartbeats 16000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs DivRemCols main where
-  -- the two `MulOperation`s are now `FormalAssertion`s (0 witnesses); the chip witnesses their column
-  -- structs (`Extracted.MulOperation`, 45 cols each) instead. 977 − 2·429 (old subcircuits) + 2·45 = 209.
+  -- MulOperation FormalAssertions witness 45 cols each; total: 209.
   localLength _ := 209
   localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]; try omega

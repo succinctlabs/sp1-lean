@@ -9,30 +9,16 @@ import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Skeleton — the `Mul` chip row as a `GeneralFormalCircuit` (spec surface)
+/-! # The `Mul` chip row as a `GeneralFormalCircuit`
 
-The RISC-V multiply family (`MUL`/`MULH`/`MULHU`/`MULHSU`/`MULW`) ported as a chip-level
-`GeneralFormalCircuit`. Unlike the shift chips — whose arithmetic is inlined into the extracted chip —
-`Mul` has a **real operation-level extraction**: `Operations/MulOperation.lean` is a `FormalAssertion`
-(SP1's `MulOperation::eval` — the 16-column schoolbook product, the `U16toU8`/`U16MSB` byte/sign
-sub-gadgets, the `is_real`-gated byte-bus range checks). Accordingly this chip **witnesses the
-`MulOperation` column struct via `MulOperation.populate` and composes `MulOperation.circuit` as a Clean
-`assertion`** (à la `AddChip` composing `AddOperation` + `RTypeReader`), gated by the **flag-sum** as SP1
-(`alu/mul/mod.rs:234`: `is_real = is_mul + … + is_mulw`), rather than re-deriving the product constraints.
+`MUL`/`MULH`/`MULHU`/`MULHSU`/`MULW`: witnesses the `MulOperation` column struct via
+`MulOperation.populate` and composes `MulOperation.circuit` (a `FormalAssertion`) as a Clean `assertion`,
+gated by the flag-sum `is_real = is_mul + … + is_mulw` (`alu/mul/mod.rs:234`). The semantic, flag-gated
+`Spec` (RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw` identities on `cols.a`) is in `Specs/Chip.lean`.
 
-Per `Extracted/MulChip.lean` the chip's *own* asserts (everything past the composed
-`MulOperation`/`CPUState`/`RTypeReader` sublists) reduce to just the five variant-flag booleans, their
-sum-bound, and `op_a_0 = 0` (`AssertSpec`); the chip's *own* interactions tail is **empty** — all
-byte-range pulls live inside `MulOperation` — so `InteractSpec := True`. The semantic, `is_real`/
-flag-gated `Spec` (the RV64 `mul`/`mulh`/`mulhu`/`mulhsu`/`mulw` identities on the result column `cols.a`)
-lives in `Specs/Chip.lean`. `Faithful/MulChip.lean` anchors the two structural specs to SP1's extracted
-lists.
-
-Skeleton status: `AssertSpec`/`InteractSpec`/`Spec`/`main`/`elaborated`/`circuit` are real and build; the
-`main` body composes the `CPUState`/`MulOperation`/`RTypeReader` sub-circuits, witnesses the result word
-`a` and the five variant flags, and gates `is_real` — the six booleans + `op_a_0` (captured in
-`AssertSpec`) and the soundness/completeness proofs are deferred (`sorry`). `Mul` carries the `2^24 < p`
-field bound (the `MulOperation` column-sum bound), unlike the `2^17` of the other chips. -/
+The chip's own `AssertSpec` tail is the five variant-flag booleans, their sum-bound, and `op_a_0 = 0`;
+`InteractSpec` is `True` — all byte-range pulls live inside `MulOperation`. Carries `Fact (2^24 < p)`
+(the `MulOperation` column-sum bound). Soundness is proved; completeness is a deferred `sorry`. -/
 
 namespace SP1Clean.MulChip
 
@@ -44,12 +30,10 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- **Assertion half** — the literal meaning of SP1's `MulCols.asserts` *own* (inline) assertZero tail
-(everything past the composed `MulOperation`/`CPUState`/`RTypeReader` sub-lists), in extracted order
-(`Extracted/MulChip.lean`: `E5,E7,E9,E11,E13,E15, op_a_0`): the five variant-flag booleans (`is_mul`,
-`is_mulh`, `is_mulhu`, `is_mulw`, `is_mulhsu` — note SP1's extraction order), the sum-bound boolean on
-`E3 = is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw`, and the `op_a_0` zeroing flag. The heavy
-schoolbook arithmetic is *not* here — it is the composed `MulOperation` sub-list. -/
+/-- The literal meaning of SP1's `MulCols.asserts` own (inline) assertZero tail
+(`Extracted/MulChip.lean` `E5,E7,E9,E11,E13,E15,op_a_0`): the five variant-flag booleans (in SP1's
+extraction order), the flag-sum boolean, and `op_a_0 = 0`. The schoolbook arithmetic belongs to
+`MulOperation`, not here. -/
 def AssertSpec (cols : MulCols (ZMod p)) : Prop :=
   let m := cols.is_mul; let mh := cols.is_mulh; let mhu := cols.is_mulhu
   let mhsu := cols.is_mulhsu; let mw := cols.is_mulw
@@ -62,52 +46,33 @@ def AssertSpec (cols : MulCols (ZMod p)) : Prop :=
   sum * (sum - 1) = 0 ∧
   cols.adapter.op_a_0 = 0
 
-/-- **Interaction half** — SP1's `MulCols.interactions` *own* tail is **empty** (`Extracted/MulChip.lean`
-ends `… ++ [ ]`): every byte-range pull for the multiply lives inside the composed `MulOperation`
-sub-list (the `U16toU8` decompositions, the product/carry byte checks), anchored at the operation level.
-So the chip's own interaction meaning is trivial. -/
+/-- SP1's `MulCols.interactions` own tail is empty: every byte-range pull lives inside `MulOperation`. -/
 def InteractSpec (_cols : MulCols (ZMod p)) : Prop := True
 
-/-- Compose the threaded `CPUState`/`RTypeReader` reader blocks and the witnessed `MulOperation` gadget
-as Clean sub-circuits, **witness** the result word `a` and the five variant flags, gate `is_real`, and
-assemble the extracted `MulCols` struct. The `RTypeReader` carries `Mul`'s opcode
-`is_mul·11 + is_mulh·12 + is_mulhu·13 + is_mulhsu·14 + is_mulw·24` (`Extracted/MulChip.lean` E16–E23) and
-the `op_a_write_value` limbs `a[0..3]`.
-
-Skeleton note: the six booleans + `op_a_0` (`AssertSpec`) are **not yet emitted** in `main` — the
-witnessed `a`/flags are currently unconstrained beyond the composed sub-circuits. The **`a = MulOperation.resultWord`
-linkage** is also deferred: the native `MulOperation.circuit` reconstructs `resultWord` internally (it
-does *not* take `a` as input), whereas SP1's `MulOperation.asserts` takes `a_word` and ties product→`a`;
-the eventual soundness proof must add that per-variant link. Filling these in (and a faithful `populate`
-for the witnesses) is the deferred proof-fill step; the byte channel is already carried by the
-`MulOperation` sub-circuit. -/
+/-- Compose the `CPUState`/`RTypeReader` readers and the witnessed `MulOperation` as Clean sub-circuits.
+Witnesses result word `a` and the five variant flags; gates `is_real`; assembles `MulCols`.
+`RTypeReader` carries the flag-weighted opcode (`E16–E23`). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVector 5 (fun _ => (#v[0, 0, 0, 0, 0] : Vector (ZMod p) 5))
   let is_mul := flags[0]; let is_mulh := flags[1]; let is_mulhu := flags[2]
   let is_mulhsu := flags[3]; let is_mulw := flags[4]
-  -- The chip **witnesses the whole `MulOperation` column struct** via the operation's `populate`
-  -- (anchored to SP1's real `populate` by `WitnessTests/MulOperationWitness.lean`), then composes the
-  -- demoted `MulOperation` gadget as a Clean `assertion` over `⟨b, c, cols, is_real, flags…⟩` (SP1's
-  -- `MulOperation::eval`). `populate` takes `(b, c, is_mulh, is_mulhsu, is_mulw)`. Mirrors SP1's chip =
-  -- row-populate (calls the operation populate) + eval (calls the operation eval).
+  -- The chip witnesses the `MulOperation` column struct via `populate` (conformance-checked in
+  -- `WitnessTests/MulOperationWitness.lean`), then composes `MulOperation.circuit` as a Clean
+  -- `assertion`. `populate` takes `(b, c, is_mulh, is_mulhsu, is_mulw)`.
   let cols ← ProvableType.witness (fun env =>
     MulOperation.populate
       #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
       #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
       (env is_mulh) (env is_mulhsu) (env is_mulw))
-  -- gate `MulOperation` by the **flag-sum** (`is_mul + … + is_mulw`), exactly as SP1
-  -- (`alu/mul/mod.rs:234`: `let is_real = local.is_mul + … + local.is_mulw`). This is what makes the
-  -- operation's `is_mulw → is_real` precondition discharge (`is_mulw = 1 → sum = 1`).
+  -- Gate `MulOperation` by the flag-sum (`alu/mul/mod.rs:234`): `is_mulw = 1 → sum = 1`.
   assertion MulOperation.circuit
     ⟨input.op_b_val, input.op_c_val, cols, is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw,
       is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩
-  -- **`a`↔`resultWord` linkage** (`MulOperation.aSelector`, inlined over the witnessed `cols` product
-  -- columns): the register-write word `a` is the flag-weighted product slice — `MUL`/`MULW` low bytes,
-  -- the `MULH*` family bytes 8..15, `MULW`'s upper limbs the product sign bit `* 65535`. Witnessed and
-  -- gated so soundness ties `cols.a = resultWord` (via `aSelector_eq_resultWord`) and completeness
-  -- populates it directly. Mirrors SP1's `MulOperation.asserts` product→`a` tie (lifted to the chip).
+  -- `a`↔`resultWord` linkage (`MulOperation.aSelector`): the register-write word is the flag-weighted
+  -- product slice — `MUL`/`MULW` low bytes, `MULH*` bytes 8..15, `MULW` upper limbs sign-filled `* 65535`.
+  -- Soundness uses `aSelector_eq_resultWord`; matches SP1's `MulOperation.asserts` product→`a` tie.
   let c256 : Expression (ZMod p) := 256
   let c65535 : Expression (ZMod p) := 65535
   let s0 : Expression (ZMod p) := is_mul * (cols.product[0] + cols.product[1] * c256)
@@ -145,9 +110,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p))
 
 set_option maxHeartbeats 4000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs MulCols main where
-  -- witnesses flags(5) + the `MulOperation` column struct `cols`(45) + a(4) = 54; the composed
-  -- `MulOperation` is now a `FormalAssertion` (0 witnesses — `cols` is an input), and the
-  -- `CPUState`/`RTypeReader` assertions add no witnesses. 5 + 45 + 4 = 54.
+  -- flags(5) + MulOperation cols(45) + a(4) = 54; MulOperation is a FormalAssertion (0 witnesses).
   localLength _ := 54
   localLength_eq := by simp +arith [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]
   subcircuitsConsistent := by simp only [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]; try omega

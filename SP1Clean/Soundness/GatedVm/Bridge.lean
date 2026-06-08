@@ -4,15 +4,8 @@ import SP1Clean.Soundness.AllChips
 /-! # The gated capstone on the 24-chip machine
 
 `gatedExecution_allChips` — the gated capstone (`GatedVm/Capstone.lean`) instantiated on
-`allChipsTrace`, the heterogeneous trace carrying one row of **every** wired chip (the 24 of
-`ChipRegistry.allChipKinds`). Demonstrates the gated whole-program execution result holds for the full
-SP1 chip set on one shared trace.
-
-(The earlier `wholeProgramExecution_of_gatedExecution` ≥-bespoke bridge — recovering the bespoke
-clk-ordered `WholeProgramExecution` from a `GatedExecution` — was removed when the whole-program fold
-layer (`ProgramFold.lean`) was retired: the gated `GatedExecution` (Eulerian trail) is now the sole
-whole-program statement, and its hypotheses are a strict subset of the bespoke capstone's, as documented
-in `GatedVm/Capstone.lean`. The parity record lives in git history.) -/
+`allChipsTrace`, the heterogeneous trace carrying one row of every chip in `allChipsTrace`. Demonstrates
+the gated whole-program execution result holds for the full SP1 chip set on one shared trace. -/
 
 namespace SP1Clean.Soundness
 

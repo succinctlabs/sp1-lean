@@ -2,10 +2,7 @@ import SP1Clean.Chips.AddwChip.Defs
 
 /-! # `SP1Clean.AddwChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
-Migrated onto the reader/bus pattern (mirrors `SubwChip` for the W-arithmetic discipline, `LtChip` for the
-**ALU** adapter). This module holds the prover/verifier `Assumptions`, the soundness/completeness proofs,
-and the bundled `circuit`. The headline `Spec` (inline `ALUTypeReader.Spec` ∧ binary ∧ gated `RV64.addw`)
-lives in `Specs/Chip.lean`. -/
+`Spec` (ALUTypeReader.Spec ∧ binary ∧ gated `RV64.addw`) in `Specs/Chip.lean`. -/
 
 namespace SP1Clean.AddwChip
 
@@ -20,9 +17,9 @@ soundness from the in-circuit gate; only completeness needs it as a precondition
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness (mirrors `LtChip.ProverAssumptions`, ALU adapter): operand `isU64`s,
-the `is_real` binary selector, `op_a_0 = 0`, `imm_c = 0` (ADDW is register-register), the CPUState clock
-bounds, and the three timestamp `Spec`s (op_c gated by `is_real - imm_c`). -/
+/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`,
+`imm_c = 0` (register-register op), CPUState clock bounds, and three timestamp `Spec`s
+(op_c gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -41,11 +38,9 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
 
 set_option maxRecDepth 4000 in
 set_option maxHeartbeats 2000000 in
-/-- **W-instruction soundness** — same two `circuit_proof_start` landmines as `SubwChip` (the nested
-sign-fill `(output).msb.msb * 65535` is threaded through the reader's bus emits): use `.2.1`/`.2.2.1`/
-`.2.2.2` projections, never `obtain`/`rcases`/`cases` on `h_holds`, and keep the `Spec` opaque (don't pass
-`[Spec]`) so `RV64.addw` never reaches `circuit_norm` — the arith goes through `rv64_addw_eq` by hand.
-ADDW's adapter is the `ALUTypeReader` (the `Spec`'s first conjunct), as in `LtChip`. -/
+/-- W-instruction soundness. Landmines: use `.2.1`/`.2.2.1`/`.2.2.2` projections on `h_holds` (never
+`obtain`/`rcases`), keep `Spec` opaque so `RV64.addw` stays out of `circuit_norm`; arith goes via
+`rv64_addw_eq` by hand. -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have h_addw := h_holds.2.1
@@ -58,22 +53,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         cols := ⟨Vector.map (Expression.eval env) (Vector.mapRange 2 fun i => var { index := i₀ + i }),
           ⟨env.get (i₀ + 2)⟩⟩, is_real := input_is_real } := ⟨ha, hb, h_bin⟩
   refine ⟨⟨?_, h_bin, fun hr => ?_⟩, ?_⟩
-  · -- reader conjunct: `wv* := (resultWord cols)[i]` reduce to the four limbs `main` passed.
-    simpa only [resultWord, Vector.getElem_map] using h_adapter h_bin
-  · -- the `is_real`-gated W arith: bridge the gadget's `signExtend` equation to `RV64.addw`.
-    refine trans ?_ (rv64_addw_eq _ _).symm
+  · simpa only [resultWord, Vector.getElem_map] using h_adapter h_bin
+  · refine trans ?_ (rv64_addw_eq _ _).symm
     simpa only [resultWord, AddwOperation.resultWord, Vector.getElem_map] using
       ((h_addw h_as).2 hr).2
-  · -- channel-requirement tail (the readers carry the binary fact; `AddwOperation` emits the byte bus).
-    and_intros <;> first | exact Or.inl rfl | exact Or.inr h_bin | exact Or.inr h_as
+  · and_intros <;> first | exact Or.inl rfl | exact Or.inr h_bin | exact Or.inr h_as
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨ha, hb, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c⟩ := h_assumptions
-  -- `op_b_val`/`op_c_val` are now the adapter's `op_b_memory`/`op_c_memory` register-read slots (no
-  -- separate committed columns); their realisations are the `prev_value` leaves of those groups of
-  -- `h_input` (the ALU adapter block — `op_c_memory` is *grouped* since `imm_c` is the final field).
+  -- `op_c_memory` is grouped since `imm_c` is the final field of the ALU adapter block.
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, -, ⟨hoc, -, -⟩, -⟩ := h_input
   obtain ⟨h_env_val, h_env_msb⟩ := h_env
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]

@@ -2,12 +2,11 @@ import SP1Clean.Chips.DivRemChip.Defs
 import SP1Clean.Chips.DivRemChip.Soundness
 import SP1Clean.Chips.DivRemChip.Assembly
 
-/-! # `DivRemChip` — `div` conjunct soundness (split out for parallel compilation)
+/-! # `DivRemChip` — `div` conjunct soundness (split for parallel compilation)
 
-The signed-64-bit DIV conjunct. Proved as its own `GeneralFormalCircuit.Soundness` over a single-conjunct local `Spec`;
-re-running `circuit_proof_start` regenerates the exact context of the monolithic proof, so the
-per-variant block is a verbatim slice. The `?_tail` (`Operations.Requirements`, independent of which
-`Spec` conjunct is taken) is proved alongside; `Formal.lean` reuses one op's tail. -/
+Signed-64-bit DIV conjunct, proved as a standalone `GeneralFormalCircuit.Soundness` over a
+single-conjunct local `Spec`. The `?_tail` (`Operations.Requirements`) is proved alongside;
+`Formal.lean` reuses it from here. -/
 
 namespace SP1Clean.DivRemChip.SoundDiv
 

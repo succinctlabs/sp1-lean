@@ -20,10 +20,9 @@ for how the model is structured.
   - **`RangeChip` split** (`Chips/ByteChip.lean`): SP1 receives the Byte bus with *two* preprocessed chips
     (`ByteChip` non-`Range` ⊕ `RangeChip` opcode-6), both via `receive_byte` — there is **no** separate
     `Range` `InteractionKind`. Modeled as `ByteOpRowSpec`/`RangeRowSpec` + `byteProvider_of_split`.
-  - **Machine closure** (bespoke `Soundness/MachineConsistency.lean`'s `traceLinks_of_machineBalance` —
-    discharging `TraceByteLink ∧ TraceProgramLink` from a single `TraceMachineBalancedWith` via
-    `InteractionKind`-disjointness — was **retired 2026-06-05** with the bespoke `TraceValid` capstone; the
-    gated capstone `Soundness/GatedVm/` derives the execution trail from the State-bus balance alone). The
+  - **Machine closure** (bespoke `Soundness/MachineConsistency.lean`'s `traceLinks_of_machineBalance`
+    was retired with the bespoke `TraceValid` capstone; the gated capstone `Soundness/GatedVm/` derives
+    the execution trail from the State-bus balance alone). The
     lone residual is `isConsistentBalanced` (the LogUp/GKR fact Clean can't model). Memory stays threaded
     (`TraceMemoryLink`, order-sensitive offline-memory) and State (`TraceStateLink`, whole-trace clock
     injectivity) — both genuinely not balance-derivable (= the §6 deferred math).
@@ -57,17 +56,10 @@ for how the model is structured.
   decode facts are *received*, on `ProgramChip.ProgramRowSpec`). So the `<Msg>.Spec` enrichment
   is settled: rich facts live on the **receive** side (the provider predicates), not forced onto sends.
 
-## 1. The current model is two *disconnected* representations
+## 1. The "emitted = projection" gap — design rationale
 
-> **Note:** §1 describes the *pre-channel baseline* this design record started from, retained for context.
-> The State `Channel` (in `Readers/CPUState.lean` + `Chips/AddChip.lean`) and the static byte table
-> (`Foundations/ByteTable.lean` + `byteChannel`) are in place — see §5. So (a) below is no longer literally
-> true: `CPUState` now `push`/`pull`s `stateChannel`, and `RegisterAccessTimestamp`'s timestamp checks
-> are `ByteTable` lookups rather than `Gadgets.ToBits.rangeCheck`. The `byteChannel` (in both
-> readers) and `memoryChannel` + `programChannel` (both `emit`ted by `Readers/RTypeReader.lean`)
-> are likewise in place, so **all four buses now emit in-circuit**. The remaining *gap* §1 identifies — the
-> "emitted = projection" link (in-circuit emission vs. trace-level `*Lookups`) — is the only remaining
-> disconnect.
+> All four buses now emit in-circuit (see §0 / §5). The remaining gap is the "emitted = projection" link
+> (in-circuit emission vs. trace-level `*Lookups`); §1 motivates why it matters.
 
 **(a) In-circuit — what actually constrains the prover.** The readers
 (`Readers/CPUState.lean`, `Readers/RTypeReader.lean`) emit only `is_real`-gated
@@ -357,10 +349,8 @@ The components below build up the in-circuit bus, each axiom-clean
   `isConsistentBalanced` — SP1's cross-chip Σsends = Σreceives, *expressed* not derived), with
   `busAggregate_cons`/`_nil` + `multiplicitySum_busAggregate_cons` (per-chip key-sum decomposition). Built on
   the computable `InteractionBus` core (`aggregateChipRows`/`multiplicitySum`/`isConsistentBalanced`), never
-  the `noncomputable interactionsWith`. (The bespoke `Soundness/MachineConsistency.lean`, which defined the
-  four per-bus `ChipAir`s for the Add slice, the `addBuses` `Machine`, `TraceMachineBalanced`, and
-  `multiplicitySum_addBuses`, was retired 2026-06-05 with the bespoke `TraceValid` capstone; the `ChipAir`
-  foundation in `Foundations/ChipAir.lean` remains.) Receiver chips
+  the `noncomputable interactionsWith`. (The per-bus `ChipAir` examples from the bespoke `MachineConsistency.lean` were retired with that capstone;
+  the `ChipAir` foundation in `Foundations/ChipAir.lean` remains.) Receiver chips
   (`ByteChip` provider, ROM, memory argument) append to the `Machine`. `InteractionScope`
   (multi-shard) is deferred. **Gotcha:** `Machine` is an `abbrev` for `List`, so `m.busAggregate` dot-notation
   resolves to `List.busAggregate` (error) — call `Machine.busAggregate m` explicitly.

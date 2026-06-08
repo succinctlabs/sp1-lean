@@ -49,9 +49,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     neg_zero, add_zero] at h_holds ⊢
   obtain ⟨hr0, hr1, hr2, _hbool, hgc0, hgc1, hgc2, hgc3⟩ := h_holds
   refine ⟨?_, ?_, ?_, ?_⟩
-  · -- `Spec`: on a real row, the value equation (via `addrAddSemantics_of_carries`) + the three
-    -- byte ranges.
-    intro hr1eq
+  · intro hr1eq
     have hneg : -input_is_real = -1 := by rw [hr1eq]
     have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg
     rw [← c16] at R0 R1 R2
@@ -64,7 +62,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2,
       bool_of_mul_pred hgc3, by rw [← h65536]; exact Rb0, by rw [← h65536]; exact Rb1,
       by rw [← h65536]; exact Rb2⟩
-  -- the three byte padding requirements are vacuous for a binary `is_real`.
   · exact binary_gate_req_vacuous hbin _
   · exact binary_gate_req_vacuous hbin _
   · exact binary_gate_req_vacuous hbin _
@@ -89,7 +86,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3, ev0, ev1, ev2,
     neg_zero, add_zero]
   refine ⟨?_, ?_, ?_, ?_⟩
-  -- the three byte pull completeness obligations (fire only on real rows, `is_real = 1`).
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨_, hrng0, _, _⟩ := h_spec hr1
@@ -102,7 +98,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     obtain ⟨_, _, _, hrng2⟩ := h_spec hr1
     rw [← c16]; exact (byteRowSpec_range _ h16p).mpr hrng2
-  -- the carry asserts: vacuous on padding / from `carries_of_addrAddSemantics` on real rows.
   · rcases hbin with h0 | h1
     · simp [h0]
     · obtain ⟨heq, hrng0, hrng1, hrng2⟩ := h_spec h1
@@ -111,7 +106,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       simp only [RawSpec, sub_eq_add_neg] at hraw
       obtain ⟨hc0, hc1, hc2, hc3, _, _, _⟩ := hraw
       rw [h1]
-      -- five conjuncts: SP1's `is_real` boolean gate then the four carries.
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · simp
       · rw [one_mul]; rcases hc0 with h | h <;> rw [h] <;> simp
@@ -119,8 +113,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       · rw [one_mul]; rcases hc2 with h | h <;> rw [h] <;> simp
       · rw [one_mul]; rcases hc3 with h | h <;> rw [h] <;> simp
 
-/-- SP1's `AddrAddOperation::eval` as a Clean-native `FormalAssertion`: `is_real`-gated semantic spec,
-native carry-chain proofs, byte-bus range checks. -/
+/-- SP1's `AddrAddOperation::eval` as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions,

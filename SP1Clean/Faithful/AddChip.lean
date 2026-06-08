@@ -10,18 +10,16 @@ import SP1Clean.Chips.AddChip.Defs
 
 /-! # Chip-level faithfulness anchor — SP1's whole `Add` chip constraint list ↔ the combined spec
 
-The capstone of the four-artifact chain for Add: where `Faithful/{AddOperation,CPUState,RTypeReader}`
-anchor each *fragment*, this anchors the **entire** generated `Extracted.AddCols.constraints` list.
-SP1's chip constraints are `CS0 ++ CS1 ++ CS2 ++ [binary gate, op_a_0 = 0]` where `CS0` =
-`AddOperation.constraints` (on the rs1/rs2 register-read columns → the result word), `CS1` =
-`CPUState.constraints`, `CS2` = `RTypeReader.constraints`. We split the list at each `++`
-(`forall_append_pair`) and discharge each fragment by its fragment anchor, leaving the two trailing
-`assertZero`s (the binary gate, vacuous at `is_real = 1`, and the `op_a_0 = 0` register-index gate).
+Where `Faithful/{AddOperation,CPUState,RTypeReader}` anchor each *fragment*, this anchors the **entire**
+generated `Extracted.AddCols.constraints` list. SP1's chip constraints are
+`CS0 ++ CS1 ++ CS2 ++ [binary gate, op_a_0 = 0]` (`CS0` = `AddOperation.constraints` on the register-read
+columns, `CS1` = `CPUState.constraints`, `CS2` = `RTypeReader.constraints`); splitting at each `++`
+(`forall_append_pair`) discharges each fragment by its anchor, leaving the two trailing `assertZero`s
+(the binary gate, vacuous at `is_real = 1`, and the `op_a_0 = 0` register-index gate).
 
-So a single theorem certifies that SP1's generated `Add` chip constraint list means **exactly**: the
-`AddOperation` raw arithmetic spec on the register-read operands, the two CPUState clock byte bounds,
-the RTypeReader per-row well-formedness, and `op_a_0 = 0`. Every fragment anchor it composes
-(`add_`, `cpustate_`, `rtypereader_constraints_faithful`) is `sorry`-free, so this anchor is too. -/
+So one theorem certifies SP1's generated `Add` chip constraint list means **exactly**: the `AddOperation`
+raw arithmetic spec on the register-read operands, the two CPUState clock byte bounds, the RTypeReader
+per-row well-formedness, and `op_a_0 = 0`. -/
 
 namespace SP1Clean.Faithful
 

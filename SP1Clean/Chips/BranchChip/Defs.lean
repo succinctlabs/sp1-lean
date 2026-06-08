@@ -11,34 +11,14 @@ import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # The BRANCH chip row as a `GeneralFormalCircuit` — conditional control flow
+/-! # The BRANCH chip row as a `GeneralFormalCircuit`
 
-The conditional sibling of `JalChip`/`JalrChip` (opcodes 40–45: BEQ/BNE/BLT/BGE/BLTU/BGEU). Like the jumps
-its committed `next_pc` is *computed data*, but the target is chosen by a **comparison** of the two source
-registers: `next_pc = pc + sign_extend(imm)` when the branch is taken, else `next_pc = pc + 4`. Composes, as
-true Clean subcircuits (mirroring SP1's `Branch` `air.rs:eval`, `Extracted/BranchChip.lean`):
-
-- the `Readers.CPUState` adapter, fed the **data-dependent** selected `next_pc` and `clk_inc = 8`;
-- the witnessed signed-compare gadget `LtOperationSigned` over the two register reads `rs1 = op_a` /
-  `rs2 = op_b`, mode selector `is_signed = is_blt + is_bge`;
-- **two** `AddOperation` gadgets — `pc + op_c_imm = branch_value` (the taken target, gated `is_branching`)
-  and `pc + 4 = fall_value` (the fall-through, gated `is_real - is_branching`) — with `next_pc` selected
-  algebraically between them;
-- the six opcode-flag booleans, their sum bound (`is_real = Σ is_b*`), and the `is_branching` decision
-  derived from the compare result + flags (`E80–E96`);
-- the `Readers.ITypeReaderImmutable` adapter (program fetch at opcode `Σ is_b*·k`, the two source-register
-  reads, no destination write);
-- the three `next_pc` byte-range sends (`next_pc[0]/4` aligned, `next_pc[1]`/`next_pc[2]` u16).
-
-The chip `Spec` (`Specs/Chip.lean`) is the immutable I-type reader sub-`Spec` + the proven binary facts +
-the `is_branching`-gated next_pc value (provable from the `AddOperation`s) + the six-way flag-dispatched
-branch decision (compare-dependent). **Soundness is fully proven and axiom-clean** (the six-way decision
-routes through `LtOperationSigned`'s proven `Spec`, mapping the compare `bit`/flags-equality to the RV64
-`slt`/`ult`/equality conditions). **Completeness is also fully proven and axiom-clean** — `main` witnesses
-the opcode flags / `is_branching` from honest `ProverHint` values (`hintFlags`/`hintBranching`; the branch
-opcode is not an `Inputs` field, so it is threaded through the hint), and `ProverAssumptions` states their
-honest-prover contract (one-hot flags summing to `is_real`, the per-opcode branch decision). See the
-`completeness` doc-comment. -/
+Conditional control flow (opcodes 40–45: BEQ/BNE/BLT/BGE/BLTU/BGEU): `next_pc` is data-dependent
+(`pc + sign_extend(imm)` taken, `pc + 4` fall-through, chosen by the compare). Composes
+`LtOperationSigned` (mode `is_blt + is_bge`), two `AddOperation` gadgets (gates `is_branching` /
+`is_real - is_branching`), `CPUState`, `ITypeReaderImmutable`, and three next_pc byte-range sends. The
+six opcode flags sum to `is_real` (one-hot); the branch opcode is threaded via `ProverHint`. Implements
+SP1's `Branch` `air.rs:eval`. -/
 
 namespace SP1Clean.BranchChip
 
@@ -91,14 +71,11 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   let rs2WordV : Word (Expression (ZMod p)) :=
     #v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
        input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]
-  -- the six opcode flags + the branch decision: honest prover values, supplied via `ProverHint`
-  -- (the branch opcode is not an `Inputs` field). Soundness is unaffected (it never reads the
-  -- witness closures); these only feed witness generation for completeness.
+  -- six opcode flags + is_branching: threaded via ProverHint (not an Inputs field).
   let flags ← witnessVector 6 (fun env => hintFlags env.hint)
   let is_beq := flags[0]; let is_bne := flags[1]; let is_blt := flags[2]
   let is_bge := flags[3]; let is_bltu := flags[4]; let is_bgeu := flags[5]
   let is_branching ← witnessField (fun env => hintBranching env.hint)
-  -- the two add targets.
   let branch_value ← witnessVector 4 (fun env =>
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
@@ -108,17 +85,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
     AddOperation.populate
       #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
       #v[4, 0, 0, 0])
-  -- the committed next_pc (three limbs): branch target when taken, else fall-through, selected
-  -- algebraically `is_branching·branch + (is_real - is_branching)·fall` (matches the asserts below).
+  -- next_pc: `is_branching·branch + (is_real - is_branching)·fall` (matches selection asserts below).
   let next_pc ← witnessVector 3 (fun env =>
     let br := env is_branching
     let re := env input.is_real
     #v[br * env branch_value[0] + (re - br) * env fall_value[0],
        br * env branch_value[1] + (re - br) * env fall_value[1],
        br * env branch_value[2] + (re - br) * env fall_value[2]])
-  -- the signed/unsigned compare over rs1, rs2 (mode `is_blt + is_bge`).
   let cmp ← subcircuit LtOperationSigned.circuit ⟨rs1WordV, rs2WordV, is_blt + is_bge⟩
-  -- the six flag booleans + sum bound; bind `is_real` to the flag sum (E16).
   is_beq * (is_beq - 1) === 0
   is_bne * (is_bne - 1) === 0
   is_blt * (is_blt - 1) === 0
@@ -128,7 +102,6 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   let sum := is_beq + is_bne + is_blt + is_bge + is_bltu + is_bgeu
   input.is_real === sum
   sum * (sum - 1) === 0
-  -- the branch decision (E80–E96): `is_eq = 1 - Σ u16_flags`, `bit` is the unsigned-less-than indicator.
   let is_eq := (1 : Expression (ZMod p)) - (cmp.result.u16_flags[0] + cmp.result.u16_flags[1]
     + cmp.result.u16_flags[2] + cmp.result.u16_flags[3])
   let bit := cmp.result.u16_compare_operation.bit
@@ -136,29 +109,22 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
     + (is_bge + is_bgeu) * (1 - bit) + (is_blt + is_bltu) * bit
   is_branching * (is_branching - 1) === 0
   input.is_real * (is_branching - decision) === 0
-  -- padding convention (SP1's all-zero padding rows): `is_real = 0 → is_branching = 0`, so the
-  -- fall-through `is_real - is_branching` `AddOperation` gate is binary on every row.
+  -- padding: `is_real = 0 → is_branching = 0` keeps `is_real - is_branching` binary.
   (input.is_real - 1) * is_branching === 0
-  -- CPUState with the **data-dependent** selected next_pc.
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[next_pc[0], next_pc[1], next_pc[2]], 8, input.is_real⟩
-  -- branch target: pc + op_c_imm = branch_value, gated `is_branching`.
   assertion AddOperation.circuit ⟨pcWordV, input.adapter.op_c_imm, { value := branch_value }, is_branching⟩
   branch_value[3] === 0
-  -- fall-through: pc + 4 = fall_value, gated `is_real - is_branching`.
   assertion AddOperation.circuit
     ⟨pcWordV, #v[4, 0, 0, 0], { value := fall_value }, input.is_real - is_branching⟩
   fall_value[3] === 0
-  -- next_pc selection: `next_pc = is_branching·branch_value + (is_real - is_branching)·fall_value`.
   next_pc[0] === is_branching * branch_value[0] + (input.is_real - is_branching) * fall_value[0]
   next_pc[1] === is_branching * branch_value[1] + (input.is_real - is_branching) * fall_value[1]
   next_pc[2] === is_branching * branch_value[2] + (input.is_real - is_branching) * fall_value[2]
-  -- ITypeReaderImmutable: program fetch (opcode Σ is_b*·k), the two source reads, no write.
   let opcode := is_beq * 40 + is_bne * 41 + is_blt * 42 + is_bge * 43 + is_bltu * 44 + is_bgeu * 45
   assertion Readers.ITypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, opcode⟩
-  -- next_pc validation: Range(next_pc[0] / 4, 14), and u16 ranges on next_pc[1], next_pc[2].
   byteChannel.gatedReceive input.is_real
     (⟨6, (next_pc[0] * (4 : ZMod p)⁻¹), Expression.const ((14 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
@@ -174,8 +140,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
 set_option maxHeartbeats 4000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs BranchColumns main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]
-  -- six flags (6) + is_branching (1) + two add targets (8) + next_pc (3) = 18 local witnesses;
-  -- the `LtOperationSigned` subcircuit block is 1 + 1 + 8 = 10; the readers/adds are `assertion`s.
+  -- 6 flags + 1 is_branching + 8 add targets + 3 next_pc + 10 (LtOperationSigned subcircuit).
   localLength _ := 18 + 10
   localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]; try omega

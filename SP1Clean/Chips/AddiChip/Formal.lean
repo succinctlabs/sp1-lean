@@ -1,11 +1,6 @@
 import SP1Clean.Chips.AddiChip.Defs
 
-/-! # `SP1Clean.AddiChip` — contract: `Assumptions` / soundness / completeness / `circuit`
-
-Split from the monolithic chip file: `main` + the `ElaboratedCircuit` instance live in the
-sibling `Defs` module, the Sail bridge (where present) in `Bridge`. This module holds the
-prover/verifier `Assumptions`, any local `Spec`/helper lemmas, the soundness/completeness
-proofs, and the bundled `circuit`. -/
+/-! # `SP1Clean.AddiChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
 namespace SP1Clean.AddiChip
 
@@ -20,10 +15,9 @@ zero-padded rows). -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness (mirrors `AddChip.ProverAssumptions`, I-type adapter): the operand
-`isU64`s, the `is_real` binary selector, the `op_a_0 = 0` flag, and the `is_real`-gated CPUState clock
-bounds + the two register-access timestamp bounds (op_a write at `clk_low + 4`, op_b read at
-`clk_low + 3`; no op_c access — it is the immediate). -/
+/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`, CPUState clock
+bounds, and the two register-access timestamp bounds (op_a write `clk_low + 4`, op_b read `clk_low + 3`;
+no op_c access — it is the immediate). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -51,9 +45,6 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨ha, hb, hbin, hop_a_0, h_cpu, hrac_a, hrac_b⟩ := h_assumptions
-  -- `op_b_val` is the adapter's `op_b_memory.prev_value` register-read slot (no separate committed
-  -- column), so its realisation is the `prev_value` leaf of the op_b group of `h_input`; `op_c_val` is the
-  -- adapter's `op_c_imm` immediate (the last top-level adapter conjunct).
   obtain ⟨-, -, -, -, -, -, ⟨hob, -, -⟩, hoc⟩ := h_input
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   have hbeq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],

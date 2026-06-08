@@ -86,7 +86,7 @@ theorem ltUnsigned_interactions_faithful_syntactic
   simp only [SP1Clean.LtOperationUnsigned.main, circuit_norm,
     FormalAssertion.toSubcircuit_interactions, SP1Clean.U16CompareOperation.circuit,
     Gadgets.Equality.main, List.filter_nil, List.append_nil]
-  -- both sides are now the two sides of the U16Compare syntactic anchor at the threaded sub-input.
+  -- both sides are the two sides of the U16Compare syntactic anchor at the threaded sub-input.
   exact u16compare_interactions_faithful_syntactic env
     ⟨input.cols.comparison_limbs[0], input.cols.comparison_limbs[1],
       input.cols.u16_compare_operation, input.is_real⟩ _

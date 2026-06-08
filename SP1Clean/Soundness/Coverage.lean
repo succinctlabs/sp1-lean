@@ -4,8 +4,7 @@ import SP1Clean.Soundness.Opcode
 /-! # `Coverage` — the one auditable instruction → chip → Sail table
 
 The single grep-able answer to "which RISC-V instructions does this VM cover, which chip handles each,
-and which Sail op does it reach?" — replacing the previously-implicit coverage scattered as one
-`ChipKind` per `Chips/<Op>Chip/Bridge.lean`. It mirrors SP1's two-part structure:
+and which Sail op does it reach?" It mirrors SP1's two-part structure:
 
 * **`RiscvAir` enum** (`$SP1_DIR/.../riscv/mod.rs`) — the master chip list ↔ our `ChipRegistry.allChipKinds`.
 * **`tracing.rs` opcode → event-list dispatch** ↔ our `routeOf`/`routeName` below, keyed on
@@ -135,9 +134,8 @@ def coveredOpcodes : List Opcode :=
    .BEQ, .BNE, .BLT, .BGE, .BLTU, .BGEU, .JAL, .JALR, .AUIPC, .LUI,
    .DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW]
 
-/-- The opcodes **not** ported: only the system traps (`ECALL/EBREAK/UNIMP`). (The DivRem family is now
-covered — it routes to `DivRem` for `rd ≠ x0` and `AluX0` for `rd = x0`; ALU ops with `rd = x0` route to
-`AluX0`, the result-discarding fast path.) -/
+/-- The opcodes not covered: only the system traps (`ECALL/EBREAK/UNIMP`). The DivRem family routes to
+`DivRem` for `rd ≠ x0` and `AluX0` for `rd = x0`; ALU ops with `rd = x0` route to `AluX0`. -/
 def uncoveredOpcodes : List Opcode :=
   [.ECALL, .EBREAK, .UNIMP]
 

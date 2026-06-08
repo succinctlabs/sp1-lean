@@ -216,13 +216,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **`AluX0`'s `ChipKind` registration.** `view` projects the row onto the shared bus view: the rd write is
-the **zero word** (`x0` discards the result) and the committed `opcode` is the dynamic ALU opcode (so the
-`Emits` relation `view.opcode = i.opcode.toNat` holds for whichever ALU opcode routed here). `sailEquiv` is
-the ungated 29-way conjunction — for every covered ALU opcode, its real RISC-V Sail execution into `x0`
-agrees with `sp1_aluX0` (advance `nextPC`, write nothing); `reaches_sail` discharges all 29 via the five
-generic family-core lemmas (the no-op-write collapse). The register reads (`h_rs1`/`h_rs2`) only make the
-Sail reads succeed — their values are discarded. -/
+/-- `AluX0`'s `ChipKind` registration. `view.wr` is the zero word (`x0` discards the result);
+`sailEquiv` is the 29-way Sail conjunction (all covered ALU opcodes into `x0`), discharged via the
+five family-core lemmas. Register reads (`h_rs1`/`h_rs2`) are needed only to make Sail reads succeed. -/
 def kind : Soundness.ChipKind p where
   name := "AluX0"
   Inputs := AluX0Chip.Inputs

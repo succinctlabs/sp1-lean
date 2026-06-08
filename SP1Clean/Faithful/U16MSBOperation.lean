@@ -8,19 +8,12 @@ import SP1Clean.Foundations.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.U16MSBOperation
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (U16MSB)
+/-! # Faithfulness anchor — `U16MSBOperation` constraints ↔ native `RawSpec`
 
-The native `U16MSBOperation` gadget's constraints are hand-written; this module anchors them to
-**SP1's `U16MSBOperation` constraint definition** — the operation-level form the
-`sp1-constraint-compiler` emits and `update_extracted.py` writes to
-`SP1Clean/Extracted/U16MSBOperation.lean` (`eval_msb`: an `is_real` bool, an `msb` bool,
-and one `ByteOpcode.Range` send on `2*a - msb*2^16`). The anchor `u16msb_constraints_faithful`
-proves the SP1 constraint lists hold **exactly** iff the native gadget's `RawSpec` — so a
-native-gadget proof (whose soundness runs through `RawSpec` via `msb_of_raw`) is faithful to
-SP1's operation constraints.
-
-The generated `constraints` is field-generic with a `[CoeHead F ℕ]` hypothesis; applying it at
-`ZMod p` uses the scoped `CoeHead (ZMod p) ℕ` instance (`open scoped …ConstraintCoe`). -/
+Anchors SP1's `U16MSBOperation` constraint definition (`SP1Clean/Extracted/U16MSBOperation.lean`:
+an `is_real` bool, an `msb` bool, and one `ByteOpcode.Range` send on `2*a - msb*2^16`) to the
+native gadget's `RawSpec`. The generated `constraints` is field-generic; applying at `ZMod p`
+uses `open scoped …ConstraintCoe`. -/
 
 namespace SP1Clean.Faithful
 

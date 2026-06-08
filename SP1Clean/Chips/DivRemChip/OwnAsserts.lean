@@ -1,14 +1,9 @@
 import SP1Clean.Extracted.DivRemChip
 import Clean.Circuit.Basic
 
-/-! # `DivRemChip` — the chip's OWN assertZero constraints (the `[E13…E367, op_a_0]` list).
+/-! # `DivRemChip` — the chip's own assertZero constraints (the `[E13…E367, op_a_0]` list).
 
-Verbatim port of `Extracted.DivRemCols.asserts`' own-constraint tail (the `++ [E13, …]` list after the
-composed sub-operation asserts), as a PURE `Var DivRemCols → List (Expression …)` function. Kept pure
-(no `Circuit` monad) so the ~360-step `let E…` chain elaborates without the per-operation offset whnf
-of a `do`-block; `Defs.main` emits the result with one `assertZeros`. The `E`-defs reference `cols.*`
-exactly as extracted; numerals are pinned to `Expression` by the per-binding `: Expression (ZMod p)`
-ascription (and leading-numeral subterms by `(n : Expression (ZMod p))`). -/
+The `Extracted.DivRemCols.asserts` own-constraint tail, as a pure `Var DivRemCols → List (Expression …)` function. Kept pure (no `Circuit` monad) so the ~360-step `let E…` chain elaborates without the per-operation offset whnf of a `do`-block; `Defs.main` emits it with one `assertZeros`. Numerals are pinned to `Expression` by per-binding ascriptions. -/
 
 namespace SP1Clean.DivRemChip
 

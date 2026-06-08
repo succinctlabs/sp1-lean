@@ -4,11 +4,6 @@ import Mathlib.Tactic.LinearCombination
 
 /-! # Minimal numeric foundations
 
-Re-created here (the new project is on Lean 4.28 + public Clean and cannot import
-sp1-lean's 4.29 `SP1Foundations`). Ported verbatim-in-spirit from
-`sp1-lean/SP1Foundations/{Word,Field}.lean` and the `private limb_lift` of
-`sp1-lean/SP1Operations/Operation/AddOperation/AddOperation.lean`.
-
 A `Word` is four little-endian 16-bit limbs of a field element; `toBitVec64`
 reassembles the 64-bit value. Everything is field-generic over `ZMod p` with
 `Fact (2 ^ 17 < p)` (so each limb and small constant stays `< p`). -/

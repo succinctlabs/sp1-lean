@@ -3,24 +3,11 @@ import SP1Clean.Foundations.Word
 import SP1Clean.Chips.JalChip.Formal
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for JAL (+ `ChipKind` registration) — control-flow proof of concept
+/-! # Native Sail bridge for JAL (+ `ChipKind` registration)
 
-`correct_jal_native` proves the RISC-V Sail execution of `JAL` (`spec_jal`, calling LeanRV64D's
-`execute_JAL`) agrees with the SP1 chip's emulation (`sp1_jal`: set `nextPC` to the committed jump target
-and write the link address `pc + 4` to `rd`), given the chip's **semantic** facts (the jump/link
-identities = `JalChip.circuit`'s `Spec`) and the register/PC + decode received facts.
-
-`jal_chip_reaches_sail` composes the verified `JalChip.Spec` into the bridge; `JalChip.kind` enters JAL
-rows into the heterogeneous trace (the generalized `Soundness.ChipKind`, whose `sailEquiv` quantifies
-the row's PC read + immediate-decode preconditions internally — JAL reads no source registers).
-
-**Control-flow novelty.** `JalChip.kind.view` threads a **data-dependent** `next_pc = add_operation.value`
-(the jump target), the first chip whose `RowView.next_pc` is computed data rather than `pc + 4`.
-
-`correct_jal_native` proves the deep `execute_JAL` monad equivalence outright (the `jump_to` retire-success
-under 4-byte alignment via `jump_to_of_mod4_eq_zero`, plus the `get_next_pc`/`set_next_pc`/`wX_bits`
-reduction), given the Sail state is initialized. The whole chain — chip, `Spec` composition, `kind` — is
-axiom-clean. -/
+`correct_jal_native` proves the RISC-V `execute_JAL` execution agrees with `sp1_jal` given the chip's
+jump/link semantic facts and 4-byte alignment. `JalChip.kind.view` threads a **data-dependent**
+`next_pc = add_operation.value` — `RowView.next_pc` is computed data, not `pc + 4`. -/
 
 namespace SP1Clean.JalSail
 
@@ -42,15 +29,9 @@ def sp1_jal (rd : regidx) (_pc : BitVec 64) (next_pc_word op_a_word : Word (ZMod
   wX_bits rd (Word.toBitVec64 op_a_word)
 
 omit [Fact (2 ^ 17 < p)] in
-/-- Native Sail equivalence for JAL. From the committed jump target (`= PC + sign_extend imm`), the
-committed link address (`= PC + 4`), the 4-byte alignment of the jump target, the PC read, and the
-state being initialized, the RISC-V `JAL` execution agrees with the SP1 chip emulation.
-
-The proof: `jump_to (pc + sign_extend imm)` retires successfully because the target is 4-byte aligned
-(`jump_to_of_mod4_eq_zero`: low two bits `0`, so neither the `bit 0` assert nor the `bit 1`/`Zca`
-misalignment branch fires), then `execute_JAL` reads the staged `nextPC = pc + 4` as the link, overwrites
-`nextPC ← pc + sign_extend imm` via `set_next_pc`, and writes the link to `rd` — matching `sp1_jal`
-field-for-field (the staged write collapses via `ExtDHashMap_insert_insert_self`). -/
+/-- Native Sail equivalence for JAL. The `jump_to` call retires via `jump_to_of_mod4_eq_zero` (4-byte
+alignment ⇒ low-two-bits pass), then `execute_JAL` reads the staged `nextPC = pc + 4`, overwrites it
+with the jump target, and writes the link to `rd`, matching `sp1_jal` field-for-field. -/
 theorem correct_jal_native
     (_op_b_imm next_pc_word op_a_word : Word (ZMod p))
     (rd : BitVec 5) (imm : BitVec 21) (pc : BitVec 64) (s : SailState)
@@ -76,7 +57,6 @@ theorem correct_jal_native
   have hsp_npc : sp.regs.get Register.nextPC (hsp_init _) = pc + 4#64 := by
     show (s.regs.insert Register.nextPC (pc + 4#64)).get Register.nextPC _ = _
     rw [Std.ExtDHashMap.get_insert]; simp
-  -- the jump target reduces: `pc + sign_extend imm = next_pc_word`, 4-aligned ⇒ `jump_to` retires.
   have htgt4 : Word.toBitVec64 next_pc_word % 4#64 = 0 := by
     apply BitVec.eq_of_toNat_eq; rw [BitVec.toNat_umod]; simpa using h_align
   have hjump : EStateM.run (jump_to (pc + sign_extend (m := 64) imm)) sp
@@ -135,11 +115,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **JAL's `ChipKind` registration** — enters JAL rows into the heterogeneous trace and the soundness
-capstone. `view` threads the **data-dependent** `next_pc = add_operation.value` (the jump target) and the
-J-type adapter (`JTypeReader.toAdapterView`, `imm_b = imm_c = 1`), opcode 46. `sailEquiv` quantifies the
-row's PC read + the committed-pc/decode/`op_a_0`/alignment preconditions internally (JAL reads no source
-registers), and `reaches_sail` is `jal_chip_reaches_sail`. -/
+/-- JAL's `ChipKind` registration. `view` threads `next_pc = add_operation.value` (the data-dependent
+jump target), J-type adapter, opcode 46. `sailEquiv` quantifies the PC/decode/alignment preconditions
+internally (JAL reads no source registers); `reaches_sail` is `jal_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Jal"
   Inputs := JalChip.Inputs

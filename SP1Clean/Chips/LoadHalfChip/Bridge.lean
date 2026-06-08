@@ -6,16 +6,13 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for LoadHalf (LH / LHU)
 
-`correct_load_half_native` proves the RISC-V Sail execution of a width-2 `LOAD`
-(`execute_LOAD` with `width = 2`, `is_unsigned` = false for `LH` / true for `LHU`) agrees with the SP1
-chip's emulation (write `nextPC = pc + 4` and the extended loaded half into `rd`), given the register/PC
-reads, the two selected memory bytes, alignment/fits/range facts, and the `extend_value` equation tying
-the read to the written word. The width-2 analogue of `correct_load_word_native`, threading
+`correct_load_half_native` proves Sail's `execute_LOAD` (width = 2) agrees with the SP1 chip
+emulation (write `nextPC = pc + 4` and the extended half into `rd`), via
 `SailMem.run_vmem_read_of_width_2'`.
 
-`lh_chip_reaches_sail` then discharges the `extend_value` equation from the `LoadHalfChip` columns: the
-selected 16-bit limb `selected_half` and its high bit `msb` extend (sign for `LH`, zero for `LHU`) to the
-written word `#v[selected_half, 65535·msb, 65535·msb, 65535·msb]`. -/
+`lh_chip_reaches_sail` discharges the `extend_value` equation: `selected_half` and its high bit
+`msb` extend (sign for `LH`, zero for `LHU`) to `#v[selected_half, 65535·msb, 65535·msb,
+65535·msb]`. -/
 
 namespace SP1Clean.LoadHalfSail
 
@@ -172,9 +169,8 @@ theorem correct_load_half_native
     EStateM.Result.map, execute_LOAD, hpc_get, hse,
     LeanRV64D.Functions.xlen_bytes, Sail.assert, PreSail.assert, hread, hext]
 
-/-- **End-to-end composition.** From the `LoadHalf` chip + decode + register/PC reads + the two selected
-memory bytes, a width-2 Sail `LOAD` (sign-extended for `LH`, zero-extended for `LHU`) agrees with the SP1
-chip emulation writing `#v[selected_half, 65535·msb, 65535·msb, 65535·msb]` to `rd`. -/
+/-- End-to-end: from chip + decode + register/PC reads + selected memory bytes, Sail's `LH`/`LHU`
+agrees with the SP1 chip emulation. -/
 theorem lh_chip_reaches_sail
     (input : LoadHalfChip.Inputs (ZMod p))
     (rs1_idx rd_idx : BitVec 5) (imm : BitVec 12) (pc : BitVec 64)
@@ -228,10 +224,8 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **LoadHalf's `ChipKind` registration** (LH / LHU). Straight-line `view`, I-type adapter, gating
-selector `is_real = is_lh + is_lhu`, rd write-back the sign/zero-extended half
-`#v[selected_half, 65535·msb, 65535·msb, 65535·msb]`, opcode `30·is_lh + 33·is_lhu`. `sailEquiv` carries
-the 2-byte alignment hypothesis; `reaches_sail` is `lh_chip_reaches_sail`. -/
+/-- `ChipKind` registration for LoadHalf (LH / LHU, opcodes 30 / 33). `sailEquiv` carries the
+2-byte alignment hypothesis. -/
 def kind : Soundness.ChipKind p where
   name := "LoadHalf"
   Inputs := LoadHalfChip.Inputs

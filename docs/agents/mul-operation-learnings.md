@@ -125,43 +125,30 @@ interval_cases k <;>
 `set_option linter.unusedSimpArgs false in` because the shared full-`simp` arg list is unused on the
 `k = 0` column.
 
-## 11. Demoting the three composed `U16MSBOperation`s
+## 11. Three composed `U16MSBOperation`s — structure and proof patterns
 
-The FormalAssertion demotion (`../architecture.md` "Assertion vs `FormalCircuit`") demoted
-`U16MSBOperation` to a witnessless `FormalAssertion`. Mul **stays a `FormalCircuit`** (it has genuine
-aux columns — carry, `b_lower`/`c_lower` — that its semantic `Spec` does *not* pin), so only its
-*composition* of the three sign-bit MSBs changed. The 165-line proven soundness body was preserved
-verbatim. Specifics that bit:
+`MulOperation` composes three `U16MSBOperation` `FormalAssertion`s (one for each of `b`, `c`,
+`product`). Mul **stays a `FormalCircuit`** (it has genuine aux columns — carry, `b_lower`/`c_lower` —
+that its semantic `Spec` does *not* pin); only the composition of the three sign-bit MSBs uses the
+assertion interface. Each MSB is witnessed via `witnessVector 1` and constrained via `assertion
+U16MSBOperation.circuit`. Key technical facts:
 
-- **Swap `subcircuit` for witness+`assertion`.** Each `let X_msb ← subcircuit U16MSBOperation.circuit a`
-  became `let X_msb ← witnessVector 1 (fun env => #v[U16MSBOperation.populate_msb (env a)]); assertion
-  U16MSBOperation.circuit ⟨a, X_msb[0], 1⟩`. Gate `1`, ungated (`mult = -1` pure receive → no padding
-  requirement). Use `X_msb[0]` where the old code read `X.msb`; bind `let bm/cm/pm : Expression _ :=
-  X_msb[0]` first or the downstream `(… - 1) * X_msb[0] === 0` defaults its `1` to `ℕ`.
-- **Offset-safety (why soundness survived untouched).** The three MSBs sit *after* every column the
-  soundness body references — it reads only carry `i₀+k` and product `i₀+16+k`. Placing the
-  `witnessVector`s at the offsets the old subcircuits occupied kept every `env.get` index identical, so
-  the 16 chain bullets (§10) needed **zero** edits. *Always* re-place a demoted sub-op at its old first
-  column.
-- **`mulSemantics_of_raw`'s `hmsb` param.** Changed from `U16MSBOperation.Spec …` to the bit-equality
-  directly (`cols.product_msb.msb = if (product[2] + product[3]*256).val ≥ 32768 then 1 else 0`) — the
-  assertion no longer *produces* the Spec as an output, so the core lemma takes the raw bit fact and the
+- **Offset-safety.** The three MSBs sit *after* every column the soundness body references — it reads only
+  carry `i₀+k` and product `i₀+16+k`. The `witnessVector`s occupy the same offsets as the old subcircuits,
+  so all `env.get` indices are identical and the 16 chain bullets (§10) require no edits. *Always* place a
+  demoted sub-op at its old first column.
+- **`mulSemantics_of_raw`'s `hmsb` param** takes the raw bit-equality
+  (`cols.product_msb.msb = if (product[2] + product[3]*256).val ≥ 32768 then 1 else 0`) directly; the
   soundness site supplies it from the gated sub-Spec.
-- **Gated `Assumptions` at the three sites.** `hpm hass` → `hpm ⟨fun _ => hass, Or.inr rfl⟩ rfl`:
-  `U16MSBOperation.Assumptions` is now `(is_real = 1 → a.val < 2^16) ∧ is_real ∈ {0,1}` (gated — see
-  `proof-patterns.md`), and the trailing `rfl` discharges the `is_real = 1 →` gate on its `Spec`.
-- **Elaborated fields time out on the huge `main`** — fixes, all in the instance:
-  - Keep `U16MSBOperation.circuit` in the `localLength_eq` / `subcircuitsConsistent` simp sets.
-  - `channelsLawful := by simp only [circuit_norm, main, U16toU8OperationSafe.circuit,
-    U16MSBOperation.circuit, U16MSBOperation.elaborated, Gadgets.ToBits.rangeCheck]` — **`simp only`**,
-    not `simp` (which times out), and `Gadgets.ToBits.rangeCheck` is needed to reduce the 32 rangeCheck
-    subs' `channelsWithRequirements field unit = []`.
-  - Bump the instance to `set_option maxHeartbeats 40000000 in`.
-  - The op now emits the byte channel through the MSB pulls → declare `channelsWith{Guarantees,
-    Requirements} := [byteChannel.toRaw]` + the three `@[circuit_norm]` rfl-lemmas.
+- **Gated `Assumptions` at the three sites.** `U16MSBOperation.Assumptions` is
+  `(is_real = 1 → a.val < 2^16) ∧ is_real ∈ {0,1}` (gated — see `proof-patterns.md`).
+- **Elaborated-field simp set.** Keep `U16MSBOperation.circuit` in `localLength_eq` /
+  `subcircuitsConsistent`; use `simp only` (not `simp`) for `channelsLawful`, including
+  `Gadgets.ToBits.rangeCheck` to reduce the 32 rangeCheck subcircuits'
+  `channelsWithRequirements field unit = []`. Set `maxHeartbeats 40000000` on the instance. Declare
+  `channelsWith{Guarantees,Requirements} := [byteChannel.toRaw]` + the three `@[circuit_norm]` rfl-lemmas.
 - **Soundness channel-requirement tail.** `circuit_proof_start` collapses each MSB's `[] ∨ Assumptions`
-  disjunct (channels now `≠ []`) down to the bare `Assumptions`; `and_intros` then splits each into
-  `(is_real = 1 → bound)` + `is_real ∈ {0,1}`. Close all of it with:
+  disjunct; `and_intros` splits into `(is_real = 1 → bound)` + `is_real ∈ {0,1}`:
   ```lean
   and_intros <;> first
     | exact Or.inl rfl | exact Or.inr rfl
@@ -169,7 +156,7 @@ verbatim. Specifics that bit:
                       | (rw [byte_compose_val pb2 pb3 rfl]; omega))
   ```
 
-## 11. Completeness — the concrete-witness path (no converse lemma)
+## 12. Completeness — the concrete-witness path (no converse lemma)
 
 Because `main` witnesses **concrete** `schoolCarry`/`schoolProduct` columns (definitionally
 `MulCarryChain.carry`/`product (cpNat (extStream …))`), completeness discharges every constraint
@@ -199,7 +186,7 @@ rangeChecks `⟨trivial, by simpa only [Gadgets.ToBits.rangeCheck] using hcarry_
 witnesses (`simpa using hsg_w 0/1`); sign bools via msb bit-ness (`populate_msb` of a `<2^16` value is
 `0/1` — close with `simp`, **not** `ring` → info-note).
 
-## 11.5. The working completeness chain-gate tactic (k = 0..15)
+## 12.5. The working completeness chain-gate tactic (k = 0..15)
 
 The 16 chain gates `case ch0..ch15` close with one uniform recipe (the mirror image of the soundness
 chain step §10). Per gate `k`, goal `env.get (i₀+16+k) = <inline byte expr> + carry terms`:
@@ -235,7 +222,7 @@ The theorem carries `set_option linter.unusedSimpArgs false in` because low-`k` 
 the shared `eb*/ec*` (and `Finset.sum_range_succ` at `k=0`) unused. `colSum_eq_cpNat`'s middle four
 args (`lower lower' s s'`) are left as `_` — inferred from `hbl`/`hcl`/`hsb`/`hsc`.
 
-## 12. MulChip composition — the `sum = 1` channel-tail trap (option A)
+## 13. MulChip composition — the `sum = 1` channel-tail trap (option A)
 
 `MulChip` composes `MulOperation.circuit` as a `subcircuit`. The chip soundness's channel-requirement
 tail asks for `MulOperation.Assumptions` **unconditionally**, but that originally included `sum = 1`,

@@ -21,11 +21,11 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 set_option debug.skipKernelTC true in
 omit [Fact (Nat.Prime p)] in
-/-- **Goal-shape conversion for SRL, lifted to dodge the `2^64` kernel deep-recursion** (the documented
-landmine: `BitVec.toNat_ushiftRight` at `BitVec 64` plants `2^64` via `BitVec.ushiftRight`'s body, which
-trips the kernel re-check — see `sp1-lean` PROOF_PATTERNS §3). Lifting isolates the trigger to this lemma,
-and `debug.skipKernelTC` skips its kernel re-check (the documented axiom-clean escape: `#print axioms`
-shows the standard set, the option only removes a re-verification layer for the known `2^64` shape).
+/-- **Goal-shape conversion for SRL, lifted to dodge the `2^64` kernel deep-recursion.**
+`BitVec.toNat_ushiftRight` at `BitVec 64` plants `2^64` via `BitVec.ushiftRight`'s body, tripping
+the kernel re-check. Lifting isolates the trigger to this lemma, and `debug.skipKernelTC` skips its
+kernel re-check (`#print axioms` still shows the standard set — the option only removes the
+re-verification layer for the known `2^64` shape).
 Reduces the `RV64.srl` Spec equality to the Nat division form the `srl_close_su16_*` lemmas produce, with
 the shift count already normalised to `rs2[0].val % 64`. -/
 lemma srl_div_to_bitvec (W rs1 rs2 : Word (ZMod p)) (h_rs2U : Word.isU64 rs2)

@@ -9,11 +9,10 @@ The SP1 emulation of a shift-left row is opcode-agnostic (`sp1_sl`: write `nextP
 result register `rd`); the RISC-V Sail spec differs by variant — `spec_sll` (`rop.SLL`, the 64-bit
 logical left shift) vs `spec_sllw` (`ropw.SLLW`, the low-32 left shift sign-extended to 64).
 
-`correct_sll_native`/`correct_sllw_native` route the chip's semantic RV64 `sll`/`sllw` facts straight
-into the Sail `SLL`/`SLLW`, through the `execute_RTYPE_pure_sll = RV64.sll` / `execute_RTYPEW_pure_sllw
-= RV64.sllw` Sail-side identities (mirrors `LtChip/Bridge.lean`'s `execute_RTYPE_pure_slt`). The
-`ChipKind`'s `sailEquiv` is the **flag-dispatched** conjunction (`is_sll = 1 → SLL-equation` ∧
-`is_sllw = 1 → SLLW-equation`), and `shiftleft_chip_reaches_sail` proves both from the chip `Spec`. -/
+`correct_sll_native`/`correct_sllw_native` route the chip's RV64 `sll`/`sllw` facts into the Sail
+`SLL`/`SLLW` via `execute_RTYPE_pure_sll = RV64.sll` / `execute_RTYPEW_pure_sllw = RV64.sllw`. The
+`ChipKind`'s `sailEquiv` is the flag-dispatched conjunction (`is_sll = 1 → SLL` ∧ `is_sllw = 1 →
+SLLW`); `shiftleft_chip_reaches_sail` proves both from the chip `Spec`. -/
 
 namespace SP1Clean.ShiftLeftSail
 
@@ -94,8 +93,7 @@ theorem correct_sllw_native
     h_pc, h_rs1, h_rs2, h_sllw]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- End-to-end: a real `ShiftLeft` chip row reaches the RISC-V Sail shift-left, flag-dispatched — the
-SLL/SLLW identities flow from the chip `Spec` into `correct_sll_native`/`correct_sllw_native`. -/
+/-- End-to-end: from the chip `Spec`, the SLL/SLLW Sail identities hold. -/
 theorem shiftleft_chip_reaches_sail
     (input : ShiftLeftChip.Inputs (ZMod p)) (cols : Extracted.ShiftLeftCols (ZMod p))
     (data : ProverData (ZMod p))
@@ -126,11 +124,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **The `ShiftLeft` `ChipKind` registration** — the SLL/SLLW row's entry into the heterogeneous
-trace + soundness capstone. `view` projects the immediate-capable `ALUTypeReader` adapter through the
-reader-agnostic `cols.adapter.toAdapterView`; `rdWrite` is the shift result word `cols.a`; the
-Program-bus opcode is `is_sll·6 + is_sllw·21`; `sailEquiv` is the flag-dispatched SLL/SLLW conjunction;
-`reaches_sail` is `shiftleft_chip_reaches_sail`. -/
+/-- `ChipKind` registration for ShiftLeft (SLL/SLLW). -/
 def kind : Soundness.ChipKind p where
   name := "ShiftLeft"
   Inputs := ShiftLeftChip.Inputs

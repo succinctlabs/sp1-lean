@@ -48,8 +48,8 @@ theorem isZero_interactions_faithful (a : ZMod p) (cols : Extracted.IsZeroOperat
     SP1Clean.IsZeroOperation.InteractSpec]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- Transitional combined anchor (`asserts ∧ interactions ↔ RawSpec = AssertSpec`) — kept for the
-not-yet-migrated `IsZeroWord`/`IsEqualWord` composed anchors; removed during rollout. -/
+/-- Combined anchor (`asserts ∧ interactions ↔ RawSpec = AssertSpec`). Composed by
+`IsZeroWord`/`IsEqualWord`. -/
 theorem isZero_constraints_faithful (a : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
     (List.Forall (· = 0) (Extracted.IsZeroOperation.asserts a cols 1) ∧
       List.Forall Interaction.toProp (Extracted.IsZeroOperation.interactions a cols 1)) ↔

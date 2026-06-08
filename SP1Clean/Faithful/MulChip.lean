@@ -4,20 +4,16 @@ import SP1Clean.Chips.MulChip.Formal
 import SP1Clean.Foundations.SP1Constraint
 import SP1Clean.Extracted.MulChip
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (Mul) — skeleton
+/-! # Faithfulness anchor — `MulChip` constraints → native `AssertSpec`/`InteractSpec`
 
-Anchors the native `MulChip`'s two structural specs (`AssertSpec` / `InteractSpec`) to **SP1's `Mul`
-chip constraint definition** (`Extracted/MulChip.lean`: a composed `MulOperation ++ CPUState ++
+Anchors the native `MulChip`'s two structural specs (`AssertSpec` / `InteractSpec`) to SP1's `Mul`
+chip constraint definition (`Extracted/MulChip.lean`: a composed `MulOperation ++ CPUState ++
 RTypeReader` prefix plus the inline variant-flag booleans `E5,E7,E9,E11,E13,E15` and the `op_a_0`
-zeroing flag; the chip's *own* interactions tail is empty).
+zeroing flag; the chip's own interactions tail is empty). Two anchor theorems, one per extracted list.
 
-Following the two-list split (per `Faithful/AddOperation.lean`'s `add_asserts_faithful` /
-`add_interactions_faithful`), there are two anchor theorems — one per extracted list. The assertion half
-is stated as the **forward** (soundness) direction (the extracted constraints entail the structural
-spec), left as a skeleton `sorry`; the full `↔` form — peeling the composed `MulOperation`/`CPUState`/
-`RTypeReader` sub-lists via `forall_append`/their own anchors — is the deferred fill-in. The interaction
-half is trivial (SP1's `MulCols.interactions` own tail is empty, `InteractSpec := True`), so it needs no
-`sorry`; the operation-level byte ranges are anchored in `MulOperation`'s own faithfulness work. -/
+The assertion half anchors the forward (`→`) direction only; the full `↔` is future work. The
+interaction half is trivial: `MulCols.interactions` own tail is empty (`InteractSpec := True`);
+operation-level byte ranges are anchored in `MulOperation`'s own faithfulness work. -/
 
 namespace SP1Clean.Faithful
 

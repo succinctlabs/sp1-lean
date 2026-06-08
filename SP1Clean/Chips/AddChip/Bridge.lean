@@ -3,23 +3,12 @@ import SP1Clean.Foundations.Word
 import SP1Clean.Chips.AddChip.Formal
 import SP1Clean.Soundness.ChipRow
 
-/-! # Native Sail bridge for Add (+ end-to-end composition)
+/-! # Native Sail bridge for Add (+ `ChipKind` registration)
 
-`correct_add_native` proves that the RISC-V Sail execution of `ADD`
-(`spec_add`, calling LeanRV64D's `execute_RTYPE`) agrees with the SP1 chip's
-emulation (`sp1_add`: write `nextPC = pc + 4` and the result register), given:
-
-* the chip's **semantic** fact `a_val = op_b + op_c` (= `AddChip.circuit`'s `Spec`),
-* and the register/PC read facts (the analog of the legacy `state_cstrs.initialState`
-  — in the full system supplied by the reader bus + memory consistency).
-
-`add_chip_reaches_sail` then composes the verified `AddChip.Spec` straight into the
-bridge: a real Add chip row reaches the RISC-V Sail spec with **zero** `_root_.Add.*` /
-`AddOperation.*` / SP1Chips dependency anywhere in the chain. The add identity flows
-from the gadget/chip `Spec`, not from `AddOperation.spec` or `_root_.Add.correct_add`.
-
-(`AddSailBridge.lean` + `AddEndToEnd.lean` merged: the reusable Sail-bridge primitive
-and its chip-`Spec` composition are tiny and tightly coupled, so they live together.) -/
+`correct_add_native` proves the RISC-V Sail `ADD` execution agrees with the SP1 chip emulation
+given the chip's semantic fact `a_val = op_b + op_c` and the register/PC reads.
+`add_chip_reaches_sail` composes `AddChip.Spec` into the bridge; `AddChip.kind` registers Add
+rows in the heterogeneous trace and soundness capstone. -/
 
 namespace SP1Clean.AddSail
 
@@ -84,11 +73,8 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **Add's `ChipKind` registration** — the single value that enters Add rows into the heterogeneous
-trace (`Soundness/ChipRow.lean`) and the soundness capstone. The five projections are exactly the old
-`ChipRow.add` match bodies; `sailEquiv` is the old `MachineSoundness` `.add` arm; `reaches_sail` is
-`add_chip_reaches_sail` applied verbatim (its `input.is_real = 1` hypothesis is defeq to the field's
-`(view inp cols).is_real = 1`). Adding a chip is now exactly this ~12-line block — no central edit. -/
+/-- **Add's `ChipKind` registration** — enters Add rows into the heterogeneous trace and the
+soundness capstone. `sailEquiv`/`reaches_sail` route to `add_chip_reaches_sail`. -/
 def kind : Soundness.ChipKind p where
   name := "Add"
   Inputs := AddChip.Inputs

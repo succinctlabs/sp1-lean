@@ -4,16 +4,10 @@ import SP1Clean.Operations.AddwOperation.Extracted
 
 /-! # `AddwOperation` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 
-SP1's `AddwOperation::eval` as a Clean `FormalAssertion` that **composes `U16MSBOperation`** as a true
-Clean `assertion` on the high result limb `value[1]`, pulls the two limb ranges from the byte bus, and
-asserts the two gated carries — witnessing nothing. Soundness routes through `RawSpec`'s
-`addwSemantics_of_carries` (feeding the sub-assertion's `Spec` as the sign bit); completeness routes
-through the converse `carries_of_addwSemantics` (reconstructing the sub-assertion's `Spec` from the
-semantic add Spec).
-
-`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle: the `Extracted`
-`main` imports `U16MSBOperation.Formal` for `.circuit`, and `Spec` references `U16MSBOperation`-adjacent
-machinery. -/
+SP1's `AddwOperation::eval` as a Clean `FormalAssertion`. Composes `U16MSBOperation` on the high
+result limb `value[1]`, pulls two limb ranges from the byte bus, asserts the two gated carries.
+Soundness routes through `addwSemantics_of_carries`; completeness through `carries_of_addwSemantics`.
+`Spec`/`spec_populate` live here (not in `Specs.Operation`) to avoid an import cycle. -/
 
 namespace SP1Clean.AddwOperation
 
@@ -30,11 +24,8 @@ lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   Word.isU64 input.a ∧ Word.isU64 input.b ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
-/-- Semantic contract: the sign bit `msb`'s booleanness holds **unconditionally** (the composed
-`U16MSBOperation` asserts it ungated), and on a real row (`is_real`-gated) the reconstructed result is
-the 64-bit sign extension of the low-32 add. On padding (`is_real = 0`) the latter is vacuous. `Inputs`
-(the `eval` params verbatim — the result column struct nested as `cols`) is the generated `Extracted`;
-the witnessed `value`/`msb` are threaded in by the composing `AddwChip` (via `populate`). -/
+/-- `msb` booleanness holds unconditionally (the composed `U16MSBOperation` asserts it ungated).
+On a real row the result is the 64-bit sign extension of the low-32 add. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   (input.cols.msb.msb = 0 ∨ input.cols.msb.msb = 1) ∧
   (input.is_real = 1 →

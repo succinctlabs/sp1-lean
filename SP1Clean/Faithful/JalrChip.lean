@@ -25,7 +25,7 @@ The interaction half (`jalrcols_interactions_faithful`) is proved directly: the 
 fragments discharge via `add_interactions_faithful`, the `CPUState` fragment via
 `cpustate_interactions_faithful`, and the `ITypeReader` segment unfolds inline (as the assert proof does)
 to its two operands' timestamp byte bounds; the trailing `Range((add_operation.value[0] - lsb)/4, 14)`
-alignment send becomes the jump-target alignment bound. Both halves are `sorry`-free. -/
+alignment send becomes the jump-target alignment bound. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

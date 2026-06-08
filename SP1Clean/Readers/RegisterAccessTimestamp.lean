@@ -28,7 +28,7 @@ the channel's `Guarantees = ByteRowSpec` of the message *for free* (the in-circu
 which the proof projects through `byteRowSpec_range`/`byteRowSpec_u8range`. Gating stays in the message
 (`is_real·value`): on `is_real = 1` the real bound, on `is_real = 0` the vacuous zero-row. Because a pull
 can't carry a gated multiplicity (Clean fires `Guarantees` only at `mult = -1`), the byte-op correctness
-is now *assumed* from the channel — discharged at the ensemble/balance level (the absent `ByteChip`
+is *assumed* from the channel — discharged at the ensemble/balance level (the absent `ByteChip`
 provider), threaded as `Soundness/ByteConsistency.lean`'s `TraceByteLink`, exactly as the State bus
 threads `TraceStateLink`. See `docs/bus-model.md` §5.
 
@@ -56,8 +56,8 @@ omit [Fact p.Prime] in
 /-- `16 < p`, needed so the `Range` width column `16` round-trips through `byteRowSpec_range`. -/
 lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 
-/-- The `cols` block (`prev_low`, `diff_low_limb`) is now an **input** (the composing chip witnesses it),
-so `main` witnesses nothing and imposes the two `is_real`-gated byte checks over `input.cols.*`: a 16-bit
+/-- The `cols` block (`prev_low`, `diff_low_limb`) is an **input** (the composing chip witnesses it);
+`main` witnesses nothing and imposes the two `is_real`-gated byte checks over `input.cols.*`: a 16-bit
 `Range` on `diff_low_limb` and a `U8Range` (`< 256`) on the scaled high part `(clk_target - prev_low - 1 -
 diff) * 65536⁻¹`. Each is a `byteChannel.gatedReceive` (mult `-is_real`, **raw** value — `toRawGated`),
 handing soundness the `ByteRowSpec` guarantee on real rows; on padding (`mult = 0`) it owes nothing. -/

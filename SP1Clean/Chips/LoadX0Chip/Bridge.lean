@@ -390,11 +390,8 @@ theorem correct_loadX0_ld
   loadX0_w8 true rs1_idx imm reg_val data₀ data₁ data₂ data₃ data₄ data₅ data₆ data₇ pc s hs hconfig
     h_pc h_rs1 h_aligned h_fits h_hi h_lo hmem₀ hmem₁ hmem₂ hmem₃ hmem₄ hmem₅ hmem₆ hmem₇
 
-/-- **End-to-end composition for LoadX0.** A selector-gated 7-way conjunction: for whichever load opcode
-is active (its selector `= 1`), the matching RISC-V Sail `LOAD`-into-`x0` agrees with the SP1 emulation
-`sp1_loadX0` (advance `nextPC`, discard the read). Each conjunct quantifies that opcode's own
-alignment/fits/range facts and selected memory bytes, and is discharged by the matching
-`correct_loadX0_<op>`. The capstone-facing wrapper for `LoadX0Chip.kind`. -/
+/-- End-to-end: for whichever of the 7 load opcodes is active, the Sail `LOAD`-into-`x0` agrees
+with `sp1_loadX0` (advance `nextPC`, discard the read). -/
 theorem loadX0_chip_reaches_sail
     (rs1 : BitVec 5) (imm : BitVec 12) (pc reg_val : BitVec 64)
     (s : SailState) (hs : SailState.isInitialized s) (hconfig : SailState.isValidMemConfig s hs)
@@ -495,11 +492,8 @@ open SP1Clean.SailMem
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **LoadX0's `ChipKind` registration** — loads whose destination is `x0` (read discarded). Straight-line
-`view`, I-type adapter, gating selector `is_real` (the sum of the seven opcode flags), opcode the weighted
-selector sum `opcodeVal`; the loaded word is discarded so the rd write-back is the zero word. `sailEquiv`
-quantifies the PC/rs1 reads and is the input-independent 7-way per-opcode correctness conjunction (each
-`spec_loadX0_<op>` reduces to `sp1_loadX0`); `reaches_sail` is `loadX0_chip_reaches_sail`. -/
+/-- `ChipKind` registration for LoadX0 (all seven load opcodes into `x0`). The loaded word is
+discarded (rd = x0); `sailEquiv` is the 7-way per-opcode correctness conjunction. -/
 def kind : Soundness.ChipKind p where
   name := "LoadX0"
   Inputs := LoadX0Chip.Inputs

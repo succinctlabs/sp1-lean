@@ -2,17 +2,12 @@ import SP1Clean.Soundness.GatedVm.Defs
 
 /-! # `GatedVm.toFormalEnsemble` — packaging a gated VM into a Clean `FormalEnsemble`
 
-The abstract soundness-packaging layer. It takes the per-witness soundness obligation — *from the
-ensemble `Statement` (per-table constraints + balanced channels) plus the public-input assumptions,
-conclude the spec* — and repackages it as a Clean `Air.Flat.FormalEnsemble` (whose `soundness` is the
-`Ensemble.Soundness` form quantifying over the public input with the witness existentially hidden).
-
-This mirrors Clean's `SoundVmEnsemble.toFormal` (`Clean/Air/Vm.lean`), but stays **gated-multiplicity
-agnostic**: it imposes nothing about how the witness's channels balance or how the spec is derived —
-that is supplied by the caller (the SP1 instance, `Soundness/SP1GatedVm.lean`), which derives the
-cross-row content from the gated State-bus balance *alone* (the Eulerian `exists_trail`, via
-`gatedExecution_of_specs_and_balance`). The packaging itself is a pure repackaging — sorry-free, no new
-trust. -/
+Takes the per-witness soundness obligation — *from the ensemble `Statement` (per-table constraints +
+balanced channels) plus the public-input assumptions, conclude the spec* — and repackages it as a Clean
+`Air.Flat.FormalEnsemble`. The packaging is gated-multiplicity agnostic: it imposes nothing about how the
+witness's channels balance or how the spec is derived — that is supplied by the caller
+(`Soundness/SP1GatedVm.lean`), which derives the cross-row content from the gated State-bus balance alone
+via `gatedExecution_of_specs_and_balance`. Sorry-free; no new trust. -/
 
 namespace SP1Clean.Soundness
 

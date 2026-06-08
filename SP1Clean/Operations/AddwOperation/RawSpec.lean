@@ -4,14 +4,11 @@ import SP1Clean.Extracted.AddwOperation
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.IntervalCases
 
-/-! # `AddwOperation` — the arithmetic core (`RawSpec` + the sign-extension keystones)
+/-! # `AddwOperation` — the arithmetic core (`RawSpec` + carry-chain lemmas)
 
-The carry-bool + low-limb-range form `RawSpec` (two-limb add chain, against the witnessed low limbs
-`cols.value[0]`, `cols.value[1]`), the forward `addwSemantics_of_carries` theorem the gadget's soundness
-routes through, and the converse `carries_of_addwSemantics` its completeness routes through — re-deriving
-the two-limb carry chain natively and applying the `toBitVec64_signExtend_word` keystone. The witnessed
-circuit (`populate` + `main`/`elaborated`) and its `FormalAssertion` contract live in the sibling
-`Elaborated`/`Formal` modules. Mirrors `sp1/crates/core/machine/src/operations/addw.rs`. -/
+Two-limb carry-bool + range form `RawSpec`; `addwSemantics_of_carries` (forward) and
+`carries_of_addwSemantics` (backward) are the soundness/completeness keystones, applying
+`toBitVec64_signExtend_word`. Faithful to `sp1/crates/core/machine/src/operations/addw.rs`. -/
 
 namespace SP1Clean.AddwOperation
 

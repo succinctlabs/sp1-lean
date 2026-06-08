@@ -4,21 +4,14 @@ import SP1Clean.Chips.BitwiseChip.Formal
 import SP1Clean.Foundations.SP1Constraint
 import SP1Clean.Extracted.BitwiseChip
 
-/-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (Bitwise) — skeleton
+/-! # Faithfulness anchor — `BitwiseChip` constraints → native `AssertSpec`/`InteractSpec`
 
-Anchors the native `BitwiseChip`'s two structural specs (`AssertSpec` / `InteractSpec`) to **SP1's
-`Bitwise` chip constraint definition** (`Extracted/BitwiseChip.lean`: a composed `BitwiseU16Operation
-++ CPUState ++ ALUTypeReader` prefix plus the inline opcode-flag booleans `E3,E5,E7,E9` and the
-`op_a_0` zeroing flag; the chip's *own* interactions tail is empty).
-
-Following the two-list split (per `Faithful/MulChip.lean`'s `mul_asserts_faithful` /
-`mul_interactions_faithful`), there are two anchor theorems — one per extracted list. The assertion
-half is stated as the **forward** (soundness) direction (the extracted constraints entail the
-structural spec), left as a skeleton `sorry`; the full `↔` form — peeling the composed
-`BitwiseU16Operation`/`CPUState`/`ALUTypeReader` sub-lists via `forall_append`/their own anchors — is
-the deferred fill-in. The interaction half is trivial (SP1's `BitwiseCols.interactions` own tail is
-empty, `InteractSpec := True`), so it needs no `sorry`; the operation-level byte ranges are anchored
-in `BitwiseU16Operation`'s own faithfulness work. -/
+Anchors the native `BitwiseChip`'s structural specs to SP1's `Bitwise` chip constraint definition
+(`Extracted/BitwiseChip.lean`: `BitwiseU16Operation ++ CPUState ++ ALUTypeReader` prefix plus the
+four inline opcode-flag booleans and the `op_a_0` flag). Two anchor theorems — one per extracted
+list. The assertion half anchors the forward (`→`) direction only; the full `↔` is future work.
+The interaction half is trivial: `BitwiseCols.interactions` own tail is empty (`InteractSpec := True`);
+the operation-level byte ranges are anchored in `BitwiseU16Operation`'s own faithfulness work. -/
 
 namespace SP1Clean.Faithful
 
@@ -28,9 +21,8 @@ open scoped SP1Clean.ConstraintCoe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **Faithfulness anchor — assertion half (skeleton).** SP1's `Bitwise` chip `asserts` list entails
-the native chip's `AssertSpec` (the three opcode-flag booleans + their sum-bound + the `op_a_0`
-flag). -/
+/-- **Faithfulness anchor — assertion half (`→`).** SP1's `Bitwise` chip `asserts` list entails
+the native chip's `AssertSpec` (the four opcode-flag booleans, their sum-bound, and `op_a_0`). -/
 theorem bitwiseChip_asserts_faithful (cols : Extracted.BitwiseCols (ZMod p)) :
     List.Forall (· = 0) (Extracted.BitwiseCols.asserts cols) →
       SP1Clean.BitwiseChip.AssertSpec cols := by

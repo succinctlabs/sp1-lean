@@ -2,17 +2,12 @@ import SP1Clean.Soundness.ChipRegistry
 
 /-! # The all-chips trace — one row of every wired chip
 
-A concrete heterogeneous `List (ChipRow p)` interleaving **one row of every capstone-wired chip** (the 24
-of `ChipRegistry.allChipKinds`). That this trace type-checks at all is the payoff of the `ChipKind`
-refactor + the reader-agnostic `Trace.AdapterView`: ALU / R-type / I-type / J-type / memory rows — with
-different `Inputs`/`Cols` types and different readers — all coexist in one `List (ChipRow p)` and ride the
-shared bus layer.
+A concrete heterogeneous `List (ChipRow p)` interleaving one row of every capstone-wired chip (the 24 in
+`allChipsTrace`). ALU / R-type / I-type / J-type / memory rows — with different `Inputs`/`Cols` types and
+different readers — all coexist in one `List (ChipRow p)` and ride the shared bus layer.
 
 The gated whole-program capstone is instantiated on this trace in `Soundness/GatedVm/Bridge.lean`
-(`gatedExecution_allChips`), deriving the execution trail from the State-bus balance. (The earlier bespoke
-`TraceValid` all-chips acceptance test — and the per-chip `traceValid_*_mixed` examples — were retired
-together with the bespoke `MachineSoundness`/`MachineConsistency` capstone, which the gated path
-supersedes; the parity record lives in git history.) -/
+(`gatedExecution_allChips`), deriving the execution trail from the State-bus balance. -/
 
 namespace SP1Clean.Soundness
 

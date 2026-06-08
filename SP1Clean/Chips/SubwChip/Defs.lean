@@ -11,18 +11,14 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # The SUBW chip row as a `GeneralFormalCircuit`, output = the extracted column struct
 
-Migrated onto the **reader/bus pattern** (direct mirror of `Chips/SubChip.lean`): composes
-`Readers.CPUState.circuit`, the witnessed `SubwOperation.circuit`, and `Readers.RTypeReader.circuit` as
-Clean subcircuits/assertions, gates the row with `is_real`, and **returns the extracted `Extracted.SubwCols`
-struct**. So a SUBW row now emits the same four buses (State, Byte, Memory, Program) and slots into the
-heterogeneous trace alongside Add/Sub.
+Composes `Readers.CPUState.circuit`, the witnessed `SubwOperation.circuit`, and
+`Readers.RTypeReader.circuit` as Clean subcircuits/assertions, gates `is_real`, and returns the
+extracted `SubwCols` struct (emitting all four buses).
 
-SUBW is a W-instruction: the gadget's result is a **2-limb value + a sign bit** (`subw_operation.value`,
-`subw_operation.msb.msb`), and the 64-bit `op_a` write value the reader carries is the sign-extended word
-`[v0, v1, msb·65535, msb·65535]` (= `SubwOperation.resultWord`). SUBW's adapter is the register
-`RTypeReader` (SP1's `SubwCols.adapter : RTypeReader`, unlike `AddwCols`'s `ALUTypeReader`); the Program-bus
-opcode is `20`. SUBW is **not commutative**, so the order `op_b_val - op_c_val` (= `rX(rs1) - rX(rs2)`) is
-load-bearing and must match the Sail bridge's `execute_RTYPEW rs2 rs1 rd .SUBW`. -/
+W-instruction: result is 2 limbs + sign bit (`subw_operation.value`/`subw_operation.msb.msb`); the
+64-bit `op_a` write is the sign-extended word `[v0, v1, msb·65535, msb·65535]`. Adapter is the
+`RTypeReader` (unlike ADDW's `ALUTypeReader`); Program-bus opcode `20`. SUBW is **not commutative**:
+operand order `op_b_val - op_c_val` must match `execute_RTYPEW rs2 rs1 rd .SUBW`. -/
 
 namespace SP1Clean.SubwChip
 
@@ -60,9 +56,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (SubwCols) (ZMod 
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs SubwCols main where
   channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.RTypeReader.circuit, SubwOperation.circuit]
-  -- The chip witnesses only the 2 result limbs + 1 sign bit now (via `populate`); `SubwOperation` is a
-  -- `FormalAssertion` (its U16MSB/byte constraints are bus pulls). The readers are `assertion`s
-  -- (`localLength 0`), the binary gate adds 0.
+  -- 2 result limbs + 1 sign bit; readers are `assertion`s (`localLength 0`).
   localLength _ := 3
   channelsWithGuarantees := [byteChannel.toRawGated]
   channelsWithRequirements :=

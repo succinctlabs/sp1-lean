@@ -11,19 +11,14 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 import Mathlib.Tactic.IntervalCases
 import Mathlib.Tactic.LinearCombination
 
-/-! # Witnessed `BitwiseU16Operation` as a Clean-native `FormalCircuit`
+/-! # `BitwiseU16Operation` as a Clean-native `FormalCircuit`
 
-The Bitwise (AND/OR/XOR) analog of `Operations/AddOperation.lean`. Inputs two operand
-words `b`, `c` (four 16-bit limbs each) and an `opcode` (AND=0, OR=1, XOR=2); witnesses
-the eight low bytes of `b`/`c` and the eight result bytes; emits one `ByteXorTable`
-lookup per byte whose third argument is an **opcode-selected** combination of the byte
-and result (mirroring Clean's `And8`/`Or8`/`Xor64` XOR-identity algebra, unified across
-the three ops by Lagrange selectors in `opcode`). The `Spec` is **semantic** — the
-reassembled result word's `toBitVec64` is the AND/OR/XOR of the operands' — proved via
-the native `reassemble_byteOp` keystone (no SP1Operations borrow, no SP1 ByteOpcode bus).
-
-Faithful to SP1's `BitwiseU16Operation` (`operations/bitwise_u16.rs`): one operation,
-one `opcode`, byte-decomposition + per-byte ops + limb reassembly. -/
+AND/OR/XOR over two operand words (four 16-bit limbs each) and an `opcode` (AND=0, OR=1,
+XOR=2). Witnesses the eight low bytes of `b`/`c` and the eight result bytes; emits one
+`ByteXorTable` lookup per byte whose third argument is the opcode-selected combination
+unified across all three ops by Lagrange selectors. The `Spec` is semantic — the
+reassembled result's `toBitVec64` is the AND/OR/XOR of the operands' — proved via
+`reassemble_byteOp`. Faithful to SP1's `operations/bitwise_u16.rs`. -/
 
 namespace SP1Clean.BitwiseU16Operation
 
@@ -179,11 +174,6 @@ lemma or_of_rel {x y z : ZMod p} (hx : x.val < 256) (hy : y.val < 256)
   rw [two_mul_val] at two_or
   omega
 
--- DONE (all three opcodes). Per case: extraction (`circuit_proof_start` +
--- `simp [circuit_norm, ByteXorTable]`) → 3-way opcode split → Lagrange-selector collapse
--- (`hand_sel`/`hor_sel`/`hxor_sel`) → eight per-byte `byteOp` facts (`and_of_rel`/`or_of_rel`
--- /lookup) → `reassemble_byteOp` + `toBitVec64_asm8` ×3 (operand byte split is the field
--- identity `256⁻¹·256 = 1`; result bytes `env.get (i₀+8+k)`) → `bitOp64_{zero,one,two}`.
 set_option maxHeartbeats 2000000 in
 theorem soundness : Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

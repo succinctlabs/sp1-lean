@@ -5,17 +5,9 @@ import SP1Clean.Soundness.ChipRow
 
 /-! # Native Sail bridge for U-type (`LUI` / `AUIPC`) (+ `ChipKind` registration)
 
-`correct_utype_{lui,auipc}_native` prove the RISC-V Sail execution of a U-type op (`spec_utype`, calling
-LeanRV64D's `execute_UTYPE`) agrees with the SP1 chip emulation (`sp1_utype`: write `nextPC = pc + 4` and the
-result register `rd`), given the chip's **semantic** fact — the committed result word's 64-bit value is
-`RV64.lui imm` (LUI) or `RV64.auipc imm pc` (AUIPC), i.e. exactly the Sail `off` / `pc + off` (the Sail
-`sign_extend (imm ++ 0#12)` is definitionally `RV64.lui imm`). Unlike JAL/JALR there is **no**
-`jump_to`/alignment, so both are fully `sorry`-free.
-
-`utype_chip_reaches_sail_{lui,auipc}` compose the verified `UTypeChip.Spec`'s flag-gated `RV64.lui`/`RV64.auipc`
-conjuncts straight into the bridge; `UTypeChip.kind` enters U-type rows into the heterogeneous trace
-(`Soundness/ChipRow.lean`). The 20-bit immediate `imm` is the column-derived `UTypeChip.immOf`, so `sailEquiv`
-needs only the PC read, the committed-pc reassembly, and `op_a_0 = 0` (`rd ≠ x0`). -/
+`correct_utype_{lui,auipc}_native` prove `execute_UTYPE ≡ sp1_utype` given the chip's semantic fact (the
+committed result is `RV64.lui imm` / `RV64.auipc imm pc`). The Sail `sign_extend (imm ++ 0#12)` is
+definitionally `RV64.lui imm`. The 20-bit immediate `imm` is the column-derived `UTypeChip.immOf`. -/
 
 namespace SP1Clean.UTypeSail
 
@@ -100,12 +92,9 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- **U-type's `ChipKind` registration** — enters LUI/AUIPC rows into the heterogeneous trace and the
-soundness capstone. `view` threads the straight-line `next_pc = pc + 4`, the J-type adapter
-(`JTypeReader.toAdapterView`, `imm_b = imm_c = 1`), and the flag-selected Program-bus opcode
-`is_auipc·48 + (1-is_auipc)·49`. U-type is multi-variant, so `sailEquiv` is the `is_auipc`-dispatched
-LUI/AUIPC conjunction (the 20-bit immediate is the column-derived `immOf`) and `reaches_sail` dispatches to
-`utype_chip_reaches_sail_{lui,auipc}`. Every bridge lemma is sorry-free, so this `kind` is axiom-clean. -/
+/-- U-type's `ChipKind` registration. `view` threads straight-line `next_pc`, J-type adapter, opcode
+`is_auipc·48 + (1-is_auipc)·49`. `sailEquiv` is the `is_auipc`-dispatched LUI/AUIPC conjunction;
+`reaches_sail` dispatches to `utype_chip_reaches_sail_{lui,auipc}`. -/
 def kind : Soundness.ChipKind p where
   name := "UType"
   Inputs := UTypeChip.Inputs

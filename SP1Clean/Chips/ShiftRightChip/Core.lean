@@ -2,14 +2,12 @@ import SP1Clean.Foundations.Word
 import SP1Clean.Operations.ShiftBounds
 import Mathlib.Tactic
 
-/-! # ShiftRight native arithmetic — the SRL math layer (ported)
+/-! # ShiftRight native arithmetic — the SRL math layer
 
-The pure-arithmetic core of SP1's `ShiftRight` proof, ported from
-`sp1-lean/SP1Chips/ShiftRight/Common.lean`. Every lemma is stated against bare `ZMod p`
-+ `SP1Clean.Word.toBitVec64` (layout-agnostic), so it ports nearly verbatim — the
-only adaptations are the namespace and the local `val_N` field-constant helpers below.
+Pure-arithmetic lemmas for SP1's `ShiftRight` proof, stated against bare `ZMod p`
++ `SP1Clean.Word.toBitVec64` (layout-agnostic). Local `val_N` field-constant helpers are defined below.
 
-This file carries the **SRL** chain: `is_mod_64`, `cancel_mul_65536(_zero)`, `cb_sum_val_eq`,
+Carries the **SRL** chain: `is_mod_64`, `cancel_mul_65536(_zero)`, `cb_sum_val_eq`,
 `bool_mul_65535_lt`, the four `srl_within_byte_shift*` division identities, and the four
 `srl_close_su16_*_case` wrappers (`(toBitVec64 limb_result).toNat = (toBitVec64 b).toNat / 2^shamt`).
 The SRA/SRLW/SRAW chains (needing the `HWord` 32-bit half-word and the sign-fill identities) follow. -/
@@ -18,10 +16,9 @@ namespace SP1Clean.ShiftRightMath
 open SP1Clean
 open SP1Clean.ShiftBounds
 
--- Heavy `nlinarith`/`omega`/`linear_combination` Nat-arithmetic proofs (ported from sp1-lean's
--- `Common.lean`, originally at `maxHeartbeats 100000000`). The repeated per-limb `.val`/bound
--- `nlinarith` goals are now factored into `ShiftBounds`, so the remaining work fits a far lower
--- ceiling; the SRA/SRLW dispatch chains are the heaviest users left.
+-- Heavy `nlinarith`/`omega`/`linear_combination` Nat-arithmetic proofs.
+-- Repeated per-limb `.val`/bound `nlinarith` goals live in `ShiftBounds`;
+-- the SRA/SRLW dispatch chains are the heaviest users left.
 set_option maxHeartbeats 8000000
 -- Some ported close-lemma signatures keep hypotheses (e.g. `h_v_val`) for interface uniformity
 -- across the byte-shift cases even where a given case's proof does not consume them.

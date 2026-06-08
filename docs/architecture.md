@@ -55,10 +55,10 @@ For an operation `<Op>` (e.g. `Add`, `BitwiseU16`):
    run through — closing the loop back to the SP1 source of truth.
 
    **Interaction half — semantic → syntactic (in-progress conversion goal).** The *asserts* half above is
-   already structural. The *interactions* half historically used a **semantic** interpreter
-   `Interaction.toProp` (`Extracted/ExtractionDSL.lean`): it maps a byte send to `mult ≠ 0 → op.constrain …`
-   and **every** non-byte interaction (state/memory/program, all receives) to `True`. That collapses the
-   non-byte buses entirely and reasons about *meaning* rather than *interaction modeling*. The replacement —
+   already structural. The *interactions* half retains a **semantic** interpreter `Interaction.toProp`
+   (`Extracted/ExtractionDSL.lean`) as a compat bridge: it maps a byte send to `mult ≠ 0 → op.constrain …`
+   and **every** non-byte interaction (state/memory/program, all receives) to `True`, collapsing the
+   non-byte buses. The replacement —
    the **syntactic interaction bridge** (`Faithful/ExtractedInteractionModel.lean`) — proves the circuit's
    *emitted* interaction list and SP1's extracted oracle project, through `Extracted.Interaction.toAccess` /
    `AbstractInteraction.toAccess`, to the **same `LookupAccess` list** `(kind, table, argvals, signedmult)`:
@@ -198,9 +198,8 @@ witnessing. Defer it until an op's completeness is actually proven (Mul's now is
 > ROM rows being validly decoded — `ProgramRowSpec` — plus `isConsistentBalanced`)*, isolating the residual
 > to exactly the preprocessing/commitment trust of the ROM content (or a real decode Air whose range checks
 > would bottom out one level down at the Byte bus; the Byte bus is the exact analog). (The bespoke `Soundness/MachineConsistency.lean`
-> machine-closure `traceLinks_of_machineBalance`, which discharged both bus links from one machine-level
-> balance, was retired 2026-06-05 with the bespoke `TraceValid` capstone; the gated capstone
-> `Soundness/GatedVm/` derives the execution trail from the State-bus balance alone.) The Byte bus is
+> machine-closure `traceLinks_of_machineBalance` was retired with the bespoke `TraceValid` capstone; the
+> gated capstone `Soundness/GatedVm/` derives the execution trail from the State-bus balance alone.) The Byte bus is
 > received by two preprocessed chips (`ByteChip` ⊕
 > `RangeChip`, no separate `Range` kind). **`emitted = projection`:** the hand-written
 > `*Lookups` are *theorems* equal to the actual emissions for State, Program, and Memory

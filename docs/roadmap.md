@@ -8,7 +8,7 @@ Two orthogonal axes of remaining work, consolidated from the former coverage and
   shrinking the trust base, and tightening the model toward SP1's real machine.
 
 For what is *already proven* and the full trust boundary, see [`release-audit.md`](release-audit.md). For the
-machine-checked axiom set, see [`agents/axiom-ledger.md`](agents/axiom-ledger.md).
+machine-checked axiom set, see [`snapshots/axiom-ledger.md`](snapshots/axiom-ledger.md).
 
 Legend: `[ ]` open · `[~]` partial · `[x]` done.
 

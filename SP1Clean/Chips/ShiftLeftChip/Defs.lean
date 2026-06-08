@@ -10,25 +10,19 @@ import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Skeleton — the `ShiftLeft` chip row as a `GeneralFormalCircuit` (spec surface)
+/-! # The `ShiftLeft` chip row as a `GeneralFormalCircuit`
 
-`ShiftLeft` (SLL / SLLW) ported as a chip-level `GeneralFormalCircuit`. Unlike Add/Sub there is **no**
-operation-level extraction for the shifts — SP1's shift logic (the six shift-amount bits `c_bits`, the
-`v_01/v_012/v_0123` power encodings, the `shift_u16` byte-shift one-hot selector, the
-`lower_limb`/`higher_limb` bit-split, the `limb_result` reassembly, and the SLLW MSB sign-extension) is
-inlined into `Extracted/ShiftLeftChip.lean`'s `asserts`/`interactions`. So this is a chip skeleton, not
-the four-artifact gadget chain.
+`SLL`/`SLLW`: SP1's shift logic (the six shift-amount bits `c_bits`, the `v_01/v_012/v_0123` power
+encodings, the `shift_u16` byte-shift one-hot selector, the `lower_limb`/`higher_limb` bit-split, the
+`limb_result` reassembly, and the SLLW MSB sign-extension) is inlined into
+`Extracted/ShiftLeftChip.lean`'s `asserts`/`interactions` — no separate operation-level extraction.
 
-Following the **two-distinct-spec** discipline (per `Operations/AddOperation/RawSpec.lean`), the
-structural meaning of SP1's two extracted constraint lists is split into `AssertSpec` (the assertZero
-list) and `InteractSpec` (the byte-range interactions). The semantic, `is_real`/flag-gated `Spec` (the
-RV64 `sll`/`sllw` identity) lives in `Specs/Chip.lean`. `Faithful/ShiftLeftChip.lean` anchors the two
-structural specs to SP1's extracted lists.
+`AssertSpec` / `InteractSpec` capture the structural meaning of SP1's two extracted constraint lists;
+the semantic, flag-gated `Spec` (RV64 `sll`/`sllw` identity) is in `Specs/Chip.lean`.
+`Faithful/ShiftLeftChip.lean` anchors both structural specs to SP1's extracted lists.
 
-Skeleton status: `AssertSpec`/`InteractSpec`/`Spec`/`main`/`elaborated`/`circuit` are real and build; the
-`main` body composes the `CPUState`/`ALUTypeReader`/`U16MSBOperation` sub-circuits, witnesses the shift
-column block, and gates `is_real` — the ~50 inline shift assertions (fully transcribed in `AssertSpec`)
-and the soundness/completeness proofs are deferred (`sorry`). -/
+`main` composes `CPUState`/`ALUTypeReader`/`U16MSBOperation` sub-circuits, witnesses the shift column
+block, and gates `is_real`. Soundness is proved; completeness is a deferred `sorry`. -/
 
 namespace SP1Clean.ShiftLeftChip
 

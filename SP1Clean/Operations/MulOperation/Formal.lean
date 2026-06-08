@@ -76,8 +76,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     hsdb, hsdc, himpb, himpc, hch0, hch1, hch2, hch3, hch4, hch5, hch6, hch7, hch8, hch9, hch10,
     hch11, hch12, hch13, hch14, hch15⟩ := h_holds
   refine ⟨?_spec, ?_tail⟩
-  · -- the structural `Spec`: 5 ungated facts (sign-extend defs `hsdb`/`hsdc`, the three MSB bools from
-    -- the `U16MSB` sub-`Spec`s) then the `is_real`-gated body (the under-`hr` proof, unchanged).
+  · -- structural `Spec`: 5 ungated facts (sign-extend defs + 3 MSB booleans) then the gated body.
     refine ⟨hsdb, hsdc,
       (hbm ⟨fun h => by
         rw [show Expression.eval env input_var_b[3] = input_b[3] from by rw [← hib, Vector.getElem_map]]
@@ -199,8 +198,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       have := (hbm ⟨fun _ => by rw [eb3]; exact hbU3, Or.inr hr⟩).2 hr; rw [eb3] at this; exact this
     have hc_msb : input_cols_c_msb = if input_c[3].val ≥ 32768 then 1 else 0 := by
       have := (hcm ⟨fun _ => by rw [ec3]; exact hcU3, Or.inr hr⟩).2 hr; rw [ec3] at this; exact this
-    -- the structural `Spec` 7-tuple: the raw schoolbook form (`?_`, the `RawSpec` below) plus the
-    -- byte decompositions and MSB facts already assembled above.
     refine ⟨?_, hb_low, hc_low, hb_msb, hc_msb, hmsb_bool, hmsb⟩
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · intro k hk
@@ -297,9 +294,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       rw [hsdc]; rcases hmh_b with h | h <;> rw [h]
       · left; ring
       · rw [one_mul, hc_msb]; split <;> simp
-  · -- the channel-requirement tail: the 2 `U16toU8` + 3 `U16MSB` subcircuit `Assumptions` (gated
-    -- `isU64`/bounds + the binary gate), then the 24 byte-pull padding requirements (vacuous for a
-    -- binary `is_real` via `binary_gate_req_vacuous`).
+  · -- channel-requirement tail: 2 U16toU8 + 3 U16MSB Assumptions; 24 byte-pull padding reqs vacuous.
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
     · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩
     · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩
@@ -426,7 +421,6 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have h16p : (16 : ℕ) < p := by
     have h := Fact.out (p := 2 ^ 24 < p); have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
     omega
-  -- eval bridges (eval of a `Var`-column element = the corresponding `ZMod` column value)
   have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
   have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
   have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib, Vector.getElem_map]
@@ -528,13 +522,12 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       ⟨(h_gated (neg_inj.mp hneg)).1.2.1 12 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 13 (by norm_num)⟩
   · exact fun hneg => (byteRowSpec_u8range_pair _ _).mpr
       ⟨(h_gated (neg_inj.mp hneg)).1.2.1 14 (by norm_num), (h_gated (neg_inj.mp hneg)).1.2.1 15 (by norm_num)⟩
-  -- 4 sign-extend asserts (the two definitions are the ungated `Spec` facts; the two implications
-  -- follow from those + the MSB booleanities)
+  -- 4 sign-extend asserts
   · exact h_bsd
   · exact h_csd
   · rw [h_bsd]; rcases h_bmb with h | h <;> rw [h] <;> simp
   · rw [h_csd]; rcases h_cmb with h | h <;> rw [h] <;> simp
-  -- 16 `is_real`-gated schoolbook carry-chain product equations (the chain gate, in reverse)
+  -- 16 `is_real`-gated schoolbook carry-chain product equations
   · rcases hir_bin with h | h
     · simp [h]
     · have hchain := (h_gated h).1.1 0 (by norm_num)

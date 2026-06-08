@@ -23,9 +23,9 @@ multiplexer). The `is_real` binary gate, the fourth-limb `0 = is_auipc·0`, and 
 padding gate are vacuous.
 
 So under `is_real = 1 ∧ op_a_0 = 0` (the `rd ≠ x0` rows), SP1's generated UType constraint lists mean
-**exactly**: the `AddOperation` carry-bool + range spec on the committed columns, the `is_auipc`
+exactly: the `AddOperation` carry-bool + range spec on the committed columns, the `is_auipc`
 multiplexer that selects the PC addend, the CPUState clock-range bounds, and the JTypeReader timestamp
-byte bounds. Both halves are `sorry`-free, reusing the axiom-clean fragment anchors. -/
+byte bounds. Composed from axiom-clean fragment anchors. -/
 
 namespace SP1Clean.Faithful
 

@@ -12,10 +12,7 @@ namespace SP1Clean.U16MSBOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The native witness assignment, **field-generic** over `ZMod p`: the high bit of `a` (`= a.val / 2^15`).
-This is SP1's `eval_msb` witness ported to Lean — the bit extraction (`.val`, `/ 32768`) is intrinsically
-over ℕ, but never escapes the `ZMod p` domain/codomain. The **composing operation** (`AddwOperation`/
-`SubwOperation`, …) threads it in (this gadget witnesses nothing). -/
+/-- SP1's `eval_msb` witness: the high bit of `a` (`a.val / 2^15`). -/
 def populate_msb (a : ZMod p) : ZMod p := ((a.val / 32768 : ℕ) : ZMod p)
 
 omit [Fact (2 ^ 17 < p)] in
@@ -31,9 +28,8 @@ theorem populate_msb_bool {a : ZMod p} (ha : a.val < 2 ^ 16) :
     rw [this, Nat.cast_zero]
 
 omit [Fact (2 ^ 17 < p)] in
-/-- The witnessed `msb = populate_msb a` satisfies the gadget `Spec` for any `is_real`. This is the
-witness-reconstruction the composing operation uses to discharge the `assertion U16MSBOperation.circuit`'s
-completeness obligation. -/
+/-- `populate_msb a` satisfies the gadget `Spec` for any `is_real`. The composing operation uses this
+to discharge its assertion obligation. -/
 theorem spec_populate {a : ZMod p} (ha : a.val < 2 ^ 16) (is_real : ZMod p) :
     Spec (⟨a, ⟨populate_msb a⟩, is_real⟩ : Inputs (ZMod p)) := by
   refine ⟨populate_msb_bool ha, ?_⟩

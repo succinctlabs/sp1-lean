@@ -11,22 +11,10 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # The `Addi` chip row as a `GeneralFormalCircuit`
 
-The RISC-V `ADDI` (register-operand + immediate add) ported as a chip-level `GeneralFormalCircuit`. The
-direct I-type analogue of `Chips/AddChip.lean`: it composes the **same** witnessed `AddOperation` gadget,
-but over the **I-type** register adapter — the second summand is the adapter's *immediate* word
-`op_c_imm` (threaded in as `input.op_c_val`), not a register read, so the reader sub-circuit is
-`Readers.ITypeReader.circuit` (`Extracted/AddiChip.lean` calls `ITypeReader.asserts … opcode=1 …`).
-
-Per `Extracted/AddiChip.lean` the chip's *own* asserts (everything past the composed
-`AddOperation`/`CPUState`/`ITypeReader` sub-lists) reduce to just the `is_real` binary gate and
-`op_a_0 = 0` (`AssertSpec`); the chip's *own* interactions tail is **empty**, so `InteractSpec := True`.
-The semantic, `is_real`-gated `Spec` (the RV64 `add` identity on `cols.add_operation.value`, single
-variant — `ADDI` has no flag split) lives in `Specs/Chip.lean`. `Faithful/AddiChip.lean` anchors the two
-structural specs to SP1's extracted lists.
-
-The `main` body composes the `CPUState`/`AddOperation`/`ITypeReader` sub-circuits (mirroring `AddChip.main`,
-opcode `1`), witnesses the result word via `AddOperation.populate`, and gates `is_real`. Soundness and
-completeness are fully proven (ported from `AddChip`), reusing the axiom-clean `AddOperation` gadget. -/
+`ADDI`: the `AddOperation` gadget over an I-type adapter (second summand is the immediate `op_c_imm`,
+not a register read); reader is `Readers.ITypeReader.circuit` with opcode `1`.
+The `is_real`-gated semantic `Spec` (RV64 `add` identity on `cols.add_operation.value`) lives in
+`Specs/Chip.lean`; soundness and completeness are fully proven. -/
 
 namespace SP1Clean.AddiChip
 
@@ -49,12 +37,9 @@ def AssertSpec (cols : AddiCols (ZMod p)) : Prop :=
 is trivial. -/
 def InteractSpec (_cols : AddiCols (ZMod p)) : Prop := True
 
-/-- Compose the threaded `CPUState`/`ITypeReader` reader blocks and the witnessed `AddOperation` gadget
-as Clean sub-circuits (mirroring `AddChip.main`), **witness** the ALU result word `value` via
-`AddOperation.populate` over the register operand `op_b_val` and the immediate `op_c_val`, gate `is_real`,
-and assemble the extracted `AddiCols` struct. The `ITypeReader` carries `ADDI`'s opcode `1` and the four
-`op_a_write_value` limbs `value[0..3]`. (The `AddChip` proofs are the direct template — swap `RTypeReader`
-→ `ITypeReader`, opcode `0` → `1`, and the reader `Spec` accordingly.) -/
+/-- Compose the `CPUState`/`AddOperation`/`ITypeReader` sub-circuits, witness the ALU result word via
+`AddOperation.populate`, gate `is_real`, and assemble the extracted `AddiCols` struct. The `ITypeReader`
+carries opcode `1` and the four `op_a_write_value` limbs. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AddiCols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
@@ -72,9 +57,6 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AddiCols (ZMod p)
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddiCols main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit]
-  -- The chip witnesses only the 4 result limbs (via `populate`); `AddOperation` is a `FormalAssertion`
-  -- whose limb range checks are byte-bus pulls, and `CPUState`/`ITypeReader` are `assertion`s over the
-  -- threaded `input.state`/`input.adapter` blocks (`localLength 0` each). The binary gate adds none.
   localLength _ := 4
   channelsWithGuarantees := [byteChannel.toRawGated]
   channelsWithRequirements :=

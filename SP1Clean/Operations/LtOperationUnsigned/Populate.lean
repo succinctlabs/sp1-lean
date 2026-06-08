@@ -39,11 +39,8 @@ def notEqInvWitness (b cc : Word (ZMod p)) : Vector (ZMod p) 1 :=
   else if b[1] ≠ cc[1] then #v[(b[1] - cc[1])⁻¹] else if b[0] ≠ cc[0] then #v[(b[0] - cc[0])⁻¹]
   else (#v[0] : Vector (ZMod p) 1)
 
-/-- The fully witnessed `LtOperationUnsigned` column struct (SP1's `populate_unsigned`): the one-hot
-flags, comparison limbs, and non-equality inverse at the most-significant differing limb, plus the
-composed `U16CompareOperation` bit on the selected limb pair. A composing circuit witnesses the whole
-block with this single call (e.g. `LtOperationSigned` threads its sign-adjusted limbs here), instead of
-duplicating the per-column witness logic. -/
+/-- Fully witnessed `LtOperationUnsigned` column struct (SP1's `populate_unsigned`): one-hot flags,
+comparison limbs, non-equality inverse, and the composed `U16CompareOperation` bit. -/
 def populate (b cc : Word (ZMod p)) : Extracted.LtOperationUnsigned (ZMod p) :=
   let cl := comparisonLimbsWitness b cc
   let f := flagsWitness b cc

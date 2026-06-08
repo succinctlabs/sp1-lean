@@ -3,10 +3,10 @@ import Clean.Circuit.Subcircuit
 
 /-! # Recovering a subcircuit's interactions on a channel it does not declare
 
-The missing piece for the Memory/Program "emitted = projection" theorems (`docs/bus-model.md` §6): a
-composed reader like `Readers/RTypeReader.lean` emits its Memory/Program interactions *directly* in `main`,
-but also composes byte-only `RegisterAccessCols` subcircuits. To recover `interactionsWith memoryChannel`
-over `main`, those subcircuits must provably contribute **nothing** to the Memory bus.
+For the Memory/Program "emitted = projection" theorems (`docs/bus-model.md` §6): a composed reader like
+`Readers/RTypeReader.lean` emits its Memory/Program interactions *directly* in `main`, but also composes
+byte-only `RegisterAccessCols` subcircuits. To recover `interactionsWith memoryChannel` over `main`,
+those subcircuits must provably contribute **nothing** to the Memory bus.
 
 Clean's `interactionsWith_subcircuit` reduces a subcircuit to the *filtered flattened* interactions, and
 `Subcircuit.ChannelsLawful` (available via every `ElaboratedCircuit`'s `subcircuitChannelsLawful`) records

@@ -1,11 +1,6 @@
 import SP1Clean.Chips.LtChip.Defs
 
-/-! # `SP1Clean.LtChip` — contract: `Assumptions` / soundness / completeness / `circuit`
-
-Split from the monolithic chip file: `main` + the `ElaboratedCircuit` instance live in the
-sibling `Defs` module, the Sail bridge (where present) in `Bridge`. This module holds the
-prover/verifier `Assumptions`, any local `Spec`/helper lemmas, the soundness/completeness
-proofs, and the bundled `circuit`. -/
+/-! # `SP1Clean.LtChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
 namespace SP1Clean.LtChip
 
@@ -20,10 +15,9 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness (mirrors `LtuChip.ProverAssumptions`, ALU adapter): operand
-`isU64`s, the `is_real` binary selector, the `op_a_0 = 0` flag, `imm_c = 0` (SLT/SLTU are
-register-register), the CPUState clock bounds, and the three timestamp `Spec`s (op_c gated by
-`is_real - imm_c`). -/
+/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`,
+`imm_c = 0` (SLT/SLTU are register-register), CPUState clock bounds, three timestamp `Spec`s
+(op_c gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
     (_ : ProverHint (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
@@ -91,16 +85,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_sltu_bool := bool_of_mul_pred h_sltu_bin
   have h_lt_spec := h_lt ⟨ha, hb, h_slt_bool⟩
   simp only [LtOperationSigned.circuit, LtOperationSigned.Spec] at h_lt_spec
-  -- the gadget `Spec` now also exposes a flags-equality conjunct (used by BRANCH, not by `Lt`);
-  -- keep only the compare-`bit` equation here.
+  -- `LtOperationSigned.Spec` also exposes a flags-equality conjunct (used by BRANCH); keep only the
+  -- compare-`bit` equation here.
   replace h_lt_spec := h_lt_spec.1
   refine ⟨⟨h_adapter h_bin, h_bin, fun hr => ⟨fun hslt => ?_, fun hsltu => ?_⟩⟩,
     Or.inr h_bin, Or.inr ⟨ha, hb, h_slt_bool⟩, Or.inr h_bin⟩
-  · -- signed branch: `is_slt = 1 ⇒ is_signed = 1`, so the gadget bit is the signed compare
+  · -- `is_slt = 1` ⇒ `is_signed = 1`, so the gadget bit is the signed compare
     rw [hslt] at h_lt_spec
     simp only [if_true] at h_lt_spec
     simp only [resultWord, LtOperationSigned.circuit, rv64_slt_eq, toBitVec64_bitWord _ _ h_lt_spec]
-  · -- unsigned branch: `is_sltu = 1` with the sum-bound + booleans forces `is_slt = 0`
+  · -- `is_sltu = 1` with the sum-bound + booleans forces `is_slt = 0`
     have h_slt0 : env.get i₀ = 0 := by
       rcases h_slt_bool with h0 | h1
       · exact h0

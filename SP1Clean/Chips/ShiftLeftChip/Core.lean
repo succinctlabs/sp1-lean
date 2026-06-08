@@ -7,14 +7,10 @@ import Mathlib.Tactic.IntervalCases
 
 /-! # Native shift-left arithmetic core
 
-The pure field/`ℕ`-arithmetic re-derivation that bridges SP1's `ShiftLeft` limb/byte decomposition to the
-`BitVec` left shift, stated over **loose `Word`/`ZMod p` field variables** (not a structured `cols`, so the
-chip soundness can feed them the evaluated column expressions). This is the native re-derivation of
-`../sp1-lean/SP1Chips/ShiftLeft/Common.lean` — same `Word.toBitVec64` API, same `Fact (2 ^ 17 < p)` field
-bound. The keystone is that after field-dividing the per-limb bit-split by `v0123` (invertible), every term
-is `< 2 ^ 17`, so the `ℕ`-lift needs no stronger field bound.
-
-Used by `Chips/ShiftLeftChip.lean`'s soundness. -/
+Pure field/`ℕ`-arithmetic lemmas bridging SP1's `ShiftLeft` limb/byte decomposition to the `BitVec`
+left shift, stated over loose `Word`/`ZMod p` variables (not a structured `cols`). The keystone:
+after field-dividing the per-limb bit-split by `v0123` (invertible), every term is `< 2 ^ 17`, so
+the `ℕ`-lift needs no stronger field bound. Used by `ShiftLeftChip`'s soundness. -/
 
 namespace SP1Clean.ShiftLeftCore
 

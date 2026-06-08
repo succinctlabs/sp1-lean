@@ -8,8 +8,8 @@ accept it) to the extent the per-chip proofs already support it, with an eye on 
 
 **What is proven.** Each wired chip is a Clean `GeneralFormalCircuit` carrying a `completeness` field — for
 valid prover inputs the constraint system is satisfiable, i.e. *an accepting row exists*. That proof is
-**sorry-free for 20 of the 24 wired chips** (`completeChipNames`); `ShiftLeft`, `ShiftRight`, `Branch`, and
-`Mul` still have a `sorry` completeness (`DivRem` is unwired). `completeChipNames` is registered
+**sorry-free for 21 of the 25 wired chips** (`completeChipNames`); `ShiftLeft`, `ShiftRight`, `Mul`,
+and `DivRem` still carry a `sorry` completeness. `completeChipNames` is registered
 here, tied to `Coverage.wiredNames` by decidable guards, and every entry is cross-checked against the
 actual `<Chip>.completeness` theorem (so this file breaks if one regresses or is renamed).
 
@@ -30,22 +30,22 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- The wired chips whose Clean circuit `completeness` is **sorry-free** — for valid prover inputs the
 prover can always produce an accepting row. This is `Coverage.wiredNames` minus the four whose
-`completeness` is still `sorry` (`ShiftLeft`, `ShiftRight`, `Branch`, `Mul`). -/
+`completeness` is still `sorry` (`ShiftLeft`, `ShiftRight`, `Mul`, `DivRem`). -/
 def completeChipNames : List String :=
-  ["Add", "Addi", "Addw", "Sub", "Subw", "Bitwise", "Lt", "Jal", "Jalr", "UType",
+  ["Add", "Addi", "Addw", "Sub", "Subw", "Bitwise", "Lt", "Jal", "Jalr", "Branch", "UType",
    "LoadByte", "LoadHalf", "LoadWord", "LoadDouble", "LoadX0",
    "StoreByte", "StoreHalf", "StoreWord", "StoreDouble", "AluX0"]
 
-theorem completeChipNames_length : completeChipNames.length = 20 := rfl
+theorem completeChipNames_length : completeChipNames.length = 21 := rfl
 
 /-- Every complete chip is wired. -/
 theorem completeChipNames_sub_wired : ∀ nm ∈ completeChipNames, nm ∈ wiredNames := by decide
 
-/-- The wired chips **without** a completeness proof are exactly `ShiftLeft`, `ShiftRight`, `Branch`, `Mul`,
-`DivRem` (their `completeness` is still `sorry`); the partition is honest. -/
+/-- The wired chips whose `completeness` still carries a `sorry`: `ShiftLeft`, `ShiftRight`, `Mul`,
+`DivRem`; the partition is honest. -/
 theorem incomplete_wired_names :
     wiredNames.filter (fun nm => !completeChipNames.contains nm)
-      = ["ShiftLeft", "ShiftRight", "Branch", "Mul", "DivRem"] := by
+      = ["ShiftLeft", "ShiftRight", "Mul", "DivRem"] := by
   decide
 
 /-- **Cross-check that every name in `completeChipNames` is backed by a real, in-scope chip `completeness`
@@ -55,7 +55,7 @@ example : True := by
   have _ := @AddChip.completeness; have _ := @AddiChip.completeness; have _ := @AddwChip.completeness
   have _ := @SubChip.completeness; have _ := @SubwChip.completeness; have _ := @BitwiseChip.completeness
   have _ := @LtChip.completeness; have _ := @JalChip.completeness; have _ := @JalrChip.completeness
-  have _ := @UTypeChip.completeness
+  have _ := @BranchChip.completeness; have _ := @UTypeChip.completeness
   have _ := @LoadByteChip.completeness; have _ := @LoadHalfChip.completeness
   have _ := @LoadWordChip.completeness; have _ := @LoadDoubleChip.completeness
   have _ := @LoadX0Chip.completeness
