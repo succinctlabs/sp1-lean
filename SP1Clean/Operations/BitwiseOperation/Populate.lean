@@ -1,5 +1,6 @@
 import SP1Clean.Specs.Operation
 import SP1Clean.Foundations.Bitwise
+import SP1Clean.Operations.BitwiseOperation.RawSpec
 import SP1Clean.Operations.BitwiseOperation.Extracted
 
 /-! # `BitwiseOperation` — `populate` (the witness generator)
@@ -23,5 +24,27 @@ def populate (a b : Vector (ZMod p) 8) (opcode : ZMod p) : Extracted.BitwiseOper
       ((byteOp opcode.val a[5].val b[5].val : ℕ) : ZMod p),
       ((byteOp opcode.val a[6].val b[6].val : ℕ) : ZMod p),
       ((byteOp opcode.val a[7].val b[7].val : ℕ) : ZMod p)]⟩
+
+set_option maxHeartbeats 2000000 in
+/-- The witnessed result bytes `populate a b opcode` satisfy the gadget `Spec` for any `is_real`, given
+the operand bytes are genuine bytes and the opcode is one of AND/OR/XOR. The composing
+`BitwiseU16Operation` uses this to discharge its `assertion BitwiseOperation.circuit` prover obligation. -/
+theorem spec_populate {a b : Vector (ZMod p) 8} {opcode : ZMod p}
+    (hbytes : ∀ i : Fin 8, a[(i : ℕ)].val < 256 ∧ b[(i : ℕ)].val < 256) (_hopcode : opcode.val < 3)
+    (is_real : ZMod p) :
+    Spec (⟨a, b, populate a b opcode, opcode, is_real⟩ : Inputs (ZMod p)) := by
+  have hp : 2 ^ 17 < p := Fact.out
+  have hb256 : (256 : ℕ) < p := by omega
+  intro _
+  have hres : ∀ i : Fin 8,
+      (populate a b opcode).result[(i : ℕ)].val
+        = byteOp opcode.val a[(i : ℕ)].val b[(i : ℕ)].val := by
+    intro i
+    have hi := hbytes i
+    fin_cases i <;>
+      simp only [populate, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+        List.getElem_cons_succ] <;>
+      exact ZMod.val_natCast_of_lt (lt_trans (byteOp_lt256 _ _ _ hi.1 hi.2) hb256)
+  exact ⟨hbytes, bitwise_of_byteOp (a := a) (b := b) hres⟩
 
 end SP1Clean.BitwiseOperation

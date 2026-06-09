@@ -273,7 +273,9 @@ theorem divrem_chip_reaches_sail
     (cols.is_remuw = 1 →
         (spec_remuw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
           = (sp1_divrem (.Regidx rd_idx) pc cols.a).run s) := by
-  obtain ⟨h_div, h_divu, h_rem, h_remu, h_divw, h_remw, h_divuw, h_remuw⟩ := h_chip h_real
+  -- `DivRemChip.Spec` is now `RTypeReader.Spec ∧ is_real-binary ∧ (is_real = 1 → 8 flag conjuncts)`;
+  -- the arithmetic the bridge needs is the third conjunct.
+  obtain ⟨h_div, h_divu, h_rem, h_remu, h_divw, h_remw, h_divuw, h_remuw⟩ := h_chip.2.2 h_real
   refine ⟨fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_,
     fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_⟩
   · exact correct_div_native input.op_b_val input.op_c_val cols.a

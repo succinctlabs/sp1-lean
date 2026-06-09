@@ -65,25 +65,49 @@ theorem result_semantic {input : Inputs (ZMod p)} (h_assum : Assumptions input)
   exact mulSemantics_of_raw hbU hcU hmul_b hmh_b hmhu_b hmhsu_b hmw_b hsum hb_low hc_low
     hmsb_bool hmsb hb_msb hc_msb h_raw
 
+/-- Bridge from the op5 `MSB` byte guarantee (`msb` is the byte-MSB of `hi = (x-lo)/256`) plus the
+`U16toU8` decomposition (`x = lo + hi·256`) to the limb-MSB form `msb = if x.val ≥ 32768 then 1 else 0`. -/
+private lemma msb_eq_of_op5 {x lo msb : ZMod p}
+    (hlo : lo.val < 256) (hhi : ((x - lo) * 256⁻¹).val < 256)
+    (hreass : x = lo + (x - lo) * 256⁻¹ * 256)
+    (hbool : msb = 0 ∨ msb = 1) (hiff : msb = 1 ↔ 128 ≤ ((x - lo) * 256⁻¹).val) :
+    msb = if x.val ≥ 32768 then 1 else 0 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+  have hxval : x.val = lo.val + ((x - lo) * 256⁻¹).val * 256 := byte_compose_val hlo hhi hreass
+  have key : (32768 ≤ x.val) ↔ (128 ≤ ((x - lo) * 256⁻¹).val) := by omega
+  rcases hbool with h0 | h1
+  · subst h0; rw [if_neg (fun hx => zero_ne_one (hiff.mpr (key.mp hx)))]
+  · subst h1; rw [if_pos (key.mpr (hiff.mp rfl))]
+
+/-- Reverse of `msb_eq_of_op5` (for completeness): recover the op5 `MSB` byte-row content. -/
+private lemma op5_iff_of_msb_eq {x lo msb : ZMod p}
+    (hlo : lo.val < 256) (hhi : ((x - lo) * 256⁻¹).val < 256)
+    (hreass : x = lo + (x - lo) * 256⁻¹ * 256)
+    (hmsb : msb = if x.val ≥ 32768 then 1 else 0) :
+    (msb = 0 ∨ msb = 1) ∧ (msb = 1 ↔ 128 ≤ ((x - lo) * 256⁻¹).val) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+  have hxval : x.val = lo.val + ((x - lo) * 256⁻¹).val * 256 := byte_compose_val hlo hhi hreass
+  have key : (32768 ≤ x.val) ↔ (128 ≤ ((x - lo) * 256⁻¹).val) := by omega
+  rw [hmsb]; split
+  · rename_i h; exact ⟨Or.inr rfl, iff_of_true rfl (key.mp h)⟩
+  · rename_i h; exact ⟨Or.inl rfl, iff_of_false zero_ne_one (fun hc => h (key.mpr hc))⟩
+
 set_option maxHeartbeats 40000000 in
 set_option linter.unusedSimpArgs false in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨habc_imp, hir_bin, hmw_real, hmul_b, hmh_b, hmhu_b, hmhsu_b, hmw_b, hsum⟩ := h_assumptions
   obtain ⟨hib, hic, _hicols, hir, _him_mul, _him_mulh, _him_mulhu, _him_mulhsu, _him_mulw⟩ := h_input
-  obtain ⟨hA, hB, hbm, hcm, hpm, hcF0, hcF1, hcF2, hcF3, hcF4, hcF5, hcF6, hcF7, hcF8, hcF9, hcF10,
+  obtain ⟨hA, hB, hpm, hb_bool, hc_bool, hb5, hc5, hcF0, hcF1, hcF2, hcF3, hcF4, hcF5, hcF6, hcF7, hcF8, hcF9, hcF10,
     hcF11, hcF12, hcF13, hcF14, hcF15, hpG0, hpG1, hpG2, hpG3, hpG4, hpG5, hpG6, hpG7,
     hsdb, hsdc, himpb, himpc, hch0, hch1, hch2, hch3, hch4, hch5, hch6, hch7, hch8, hch9, hch10,
     hch11, hch12, hch13, hch14, hch15⟩ := h_holds
   refine ⟨?_spec, ?_tail⟩
   · -- structural `Spec`: 5 ungated facts (sign-extend defs + 3 MSB booleans) then the gated body.
+    -- `b_msb`/`c_msb` booleanity from the ungated `b_msb*(b_msb-1)=0` asserts (SP1 `assert_bool`).
     refine ⟨hsdb, hsdc,
-      (hbm ⟨fun h => by
-        rw [show Expression.eval env input_var_b[3] = input_b[3] from by rw [← hib, Vector.getElem_map]]
-        exact (Word.lt_cases_of_isU64 (habc_imp h).1).2.2.2, hir_bin⟩).1,
-      (hcm ⟨fun h => by
-        rw [show Expression.eval env input_var_c[3] = input_c[3] from by rw [← hic, Vector.getElem_map]]
-        exact (Word.lt_cases_of_isU64 (habc_imp h).2).2.2.2, hir_bin⟩).1,
+      bool_of_mul_pred hb_bool,
+      bool_of_mul_pred hc_bool,
       (hpm ⟨fun hmw => by
         obtain ⟨_, eprod_eq, _, _, _, _, _, _, _⟩ := _hicols
         have hr1 : input_is_real = 1 := hmw_real hmw
@@ -105,7 +129,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     have h16p : (16 : ℕ) < p := by
       have h := Fact.out (p := 2 ^ 24 < p); have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
       omega
-    obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, _, _, _, _, _⟩ := _hicols
+    obtain ⟨ecar_eq, eprod_eq, ebl_eq, ecl_eq, ebm_eq, ecm_eq, _, _, _⟩ := _hicols
     have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib, Vector.getElem_map]
     have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib, Vector.getElem_map]
     have eb2 : Expression.eval env input_var_b[2] = input_b[2] := by rw [← hib, Vector.getElem_map]
@@ -195,9 +219,17 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
         if (input_cols_product[2] + input_cols_product[3] * 256).val ≥ 32768 then 1 else 0 := by
       intro h; have := hpmspec.2 h; rw [ep2, ep3] at this; exact this
     have hb_msb : input_cols_b_msb = if input_b[3].val ≥ 32768 then 1 else 0 := by
-      have := (hbm ⟨fun _ => by rw [eb3]; exact hbU3, Or.inr hr⟩).2 hr; rw [eb3] at this; exact this
+      obtain ⟨hlo3, hhi3, hreass3⟩ := hb_low 3
+      dsimp only at hlo3 hhi3 hreass3
+      have hg := (byteRowSpec_msb _ _).mp (hb5 hneg)
+      simp only [circuit_norm, eb3, ebl3, ebm_eq, ← sub_eq_add_neg] at hg
+      exact msb_eq_of_op5 hlo3 hhi3 hreass3 hg.2.1 hg.2.2
     have hc_msb : input_cols_c_msb = if input_c[3].val ≥ 32768 then 1 else 0 := by
-      have := (hcm ⟨fun _ => by rw [ec3]; exact hcU3, Or.inr hr⟩).2 hr; rw [ec3] at this; exact this
+      obtain ⟨hlo3, hhi3, hreass3⟩ := hc_low 3
+      dsimp only at hlo3 hhi3 hreass3
+      have hg := (byteRowSpec_msb _ _).mp (hc5 hneg)
+      simp only [circuit_norm, ec3, ecl3, ecm_eq, ← sub_eq_add_neg] at hg
+      exact msb_eq_of_op5 hlo3 hhi3 hreass3 hg.2.1 hg.2.2
     refine ⟨?_, hb_low, hc_low, hb_msb, hc_msb, hmsb_bool, hmsb⟩
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · intro k hk
@@ -276,8 +308,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
         first | exact cb0 | exact cb1 | exact cb2 | exact cb3 | exact cb4 | exact cb5 | exact cb6 | exact cb7 | exact cb8 | exact cb9 | exact cb10 | exact cb11 | exact cb12 | exact cb13 | exact cb14 | exact cb15
     · exact hsdb
     · exact hsdc
-    · have h := (hbm ⟨fun _ => by rw [eb3]; exact hbU3, Or.inr hr⟩).1; exact h
-    · have h := (hcm ⟨fun _ => by rw [ec3]; exact hcU3, Or.inr hr⟩).1; exact h
+    · exact bool_of_mul_pred hb_bool
+    · exact bool_of_mul_pred hc_bool
     · show input_cols_b_sign_extend = 0 ∨ input_cols_b_sign_extend = 1
       have hims : input_is_mulh + input_is_mulhsu = 0 ∨ input_is_mulh + input_is_mulhsu = 1 := by
         rcases hmh_b with h | h
@@ -294,16 +326,10 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       rw [hsdc]; rcases hmh_b with h | h <;> rw [h]
       · left; ring
       · rw [one_mul, hc_msb]; split <;> simp
-  · -- channel-requirement tail: 2 U16toU8 + 3 U16MSB Assumptions; 24 byte-pull padding reqs vacuous.
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · -- channel-requirement tail: 2 U16toU8 + 1 U16MSB(product) Assumptions; op5 + 24 byte-pull reqs vacuous.
+    refine ⟨?_, ?_, ?_, ?_⟩
     · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩
     · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩
-    · refine Or.inr ⟨fun h => ?_, hir_bin⟩
-      have e : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib, Vector.getElem_map]
-      rw [e]; exact (Word.lt_cases_of_isU64 (habc_imp h).1).2.2.2
-    · refine Or.inr ⟨fun h => ?_, hir_bin⟩
-      have e : Expression.eval env input_var_c[3] = input_c[3] := by rw [← hic, Vector.getElem_map]
-      rw [e]; exact (Word.lt_cases_of_isU64 (habc_imp h).2).2.2.2
     · -- the `product_msb` U16MSB is gated on `is_mulw`; under `is_mulw = 1` we get `is_real = 1`
       -- (`hmw_real`), so the `is_real`-gated byte pull (`hpG1`) ranges `product[2]`/`product[3]`.
       refine Or.inr ⟨fun h => ?_, hmw_b⟩
@@ -475,19 +501,37 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     ecl3] at *
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
     ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    ?_, ?_⟩
-  -- 5 subcircuit `⟨Assumptions, Spec⟩` obligations
+    ?_, ?_, ?_, ?_⟩
+  -- 3 subcircuit `⟨Assumptions, Spec⟩`: U16toU8(b), U16toU8(c), U16MSB(product)
   · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩, fun h => (h_gated h).2.1⟩
   · exact ⟨⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩, fun h => (h_gated h).2.2.1⟩
-  · exact ⟨⟨fun h => (Word.lt_cases_of_isU64 (habc_imp h).1).2.2.2, hir_bin⟩,
-      ⟨h_bmb, fun h => (h_gated h).2.2.2.1⟩⟩
-  · exact ⟨⟨fun h => (Word.lt_cases_of_isU64 (habc_imp h).2).2.2.2, hir_bin⟩,
-      ⟨h_cmb, fun h => (h_gated h).2.2.2.2.1⟩⟩
   · refine ⟨⟨fun hmw => ?_, hmw_b⟩, ⟨h_pmb, fun hmw => (h_gated (hmw_real hmw)).2.2.2.2.2.2 hmw⟩⟩
     have hr1 : input_is_real = 1 := hmw_real hmw
     have pb2 : input_cols_product[2].val < 2 ^ 8 := (h_gated hr1).1.2.1 2 (by norm_num)
     have pb3 : input_cols_product[3].val < 2 ^ 8 := (h_gated hr1).1.2.1 3 (by norm_num)
     rw [byte_compose_val pb2 pb3 rfl]; omega
+  -- 2 ungated `b_msb`/`c_msb` booleanity asserts (from the Spec's ungated bool)
+  · simp only [id_eq]; rcases h_bmb with h | h <;> rw [h] <;> ring
+  · simp only [id_eq]; rcases h_cmb with h | h <;> rw [h] <;> ring
+  -- 2 op5 `MSB` byte sends: provide the `MSB` byte-row guarantee on a real row
+  · refine fun hneg => ?_
+    have hr1 : input_is_real = 1 := neg_inj.mp hneg
+    obtain ⟨hlo3, hhi3, hreass3⟩ := (h_gated hr1).2.1 3
+    dsimp only at hlo3 hhi3 hreass3
+    obtain ⟨hbool, hiff⟩ := op5_iff_of_msb_eq hlo3 hhi3 hreass3 (h_gated hr1).2.2.2.1
+    simp only [sub_eq_add_neg] at hhi3 hiff
+    have hmlt : input_cols_b_msb.val < 256 := by
+      rcases hbool with h | h <;> rw [h] <;> (first | rw [ZMod.val_zero] | rw [ZMod.val_one]) <;> norm_num
+    exact (byteRowSpec_msb _ _).mpr ⟨⟨hmlt, hhi3⟩, hbool, hiff⟩
+  · refine fun hneg => ?_
+    have hr1 : input_is_real = 1 := neg_inj.mp hneg
+    obtain ⟨hlo3, hhi3, hreass3⟩ := (h_gated hr1).2.2.1 3
+    dsimp only at hlo3 hhi3 hreass3
+    obtain ⟨hbool, hiff⟩ := op5_iff_of_msb_eq hlo3 hhi3 hreass3 (h_gated hr1).2.2.2.2.1
+    simp only [sub_eq_add_neg] at hhi3 hiff
+    have hmlt : input_cols_c_msb.val < 256 := by
+      rcases hbool with h | h <;> rw [h] <;> (first | rw [ZMod.val_zero] | rw [ZMod.val_one]) <;> norm_num
+    exact (byteRowSpec_msb _ _).mpr ⟨⟨hmlt, hhi3⟩, hbool, hiff⟩
   -- 16 carry `slice_range_check_u16` byte pulls
   · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 0 (by norm_num))
   · exact fun hneg => (byteRowSpec_range _ h16p).mpr ((h_gated (neg_inj.mp hneg)).1.2.2.1 1 (by norm_num))

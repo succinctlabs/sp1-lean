@@ -191,22 +191,24 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [nextPcWord, pcWord, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     exact hav
   · intro hr1
-    have h_lt_spec := h_lt ⟨hrs1U, hrs2U, h_sig_bin⟩
-    simp only [LtOperationSigned.circuit, LtOperationSigned.Spec] at h_lt_spec
+    have h_lt_spec := LtOperationSigned.result_semantic hrs1U hrs2U hr1
+      (h_lt ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩)
     obtain ⟨h_bit, h_eqf, -⟩ := h_lt_spec
+    -- `result_semantic` returns the bit/flags through the (unreduced) `Inputs`-constructor projections;
+    -- `circuit_norm` reduces them to the `env.get`/`mapRange` form that `h_isbr`/the `Decision` lemma use.
+    simp only [circuit_norm] at h_bit h_eqf
     rw [hrs1eq, hrs2eq] at h_bit h_eqf
-    simp only [Vector.getElem_map] at h_eqf
     -- `simp only [id_eq]` strips the `id (ZMod p)` field-type wrapper off the gate so it unifies
     -- with the `Decision` lemma's plain-`ZMod p` equation (the `id` blocks `linear_combination`'s
     -- ring synthesis — see PROOF_PATTERNS).
     rw [hr1, one_mul] at h_isbr
-    simp only [id_eq, LtOperationSigned.circuit] at h_isbr
+    simp only [id_eq] at h_isbr
     have hone : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3)
         + env.get (i₀ + 4) + env.get (i₀ + 5) = 1 := by rw [← h_realsum]; exact hr1
     simp only [rs1Word, rs2Word]
     exact branch_conditions_of_decision_eq h_rs1U h_rs2U hbeq hbne hblt hbge hbltu hbgeu hisbr hone
       h_bit h_eqf (by simp only [branchDecision]; linear_combination h_isbr)
-  · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_sig_bin⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
+  · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
       Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin, ?_, byte_pad _, byte_pad _⟩
     · -- AddOp2 gate `is_real - is_branching` is binary: on padding `is_branching = 0` from `h_pad`.
       rcases h_bin with h0 | h1
@@ -219,6 +221,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         · right; rw [h1, hb0]; simp
         · left; rw [h1, hb1]; simp
     · exact binary_gate_req_vacuous h_bin _
+
+set_option linter.unusedSectionVars false in
+/-- A length-4 `#v` of pointwise evaluations folds to the `Vector.map` of the evaluator. -/
+private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
+    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
+        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
+  ext k hk
+  interval_cases k <;> simp [Vector.getElem_map]
 
 set_option maxHeartbeats 4000000 in
 /-- Completeness via honest `ProverHint` flag witnesses (`hintFlags`/`hintBranching`). The six-way
@@ -315,17 +325,30 @@ theorem completeness :
       haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
       rw [hl, hg, ZMod.val_one] at h_onehot
       omega
-  have h_lt_asm : LtOperationSigned.circuit.Assumptions
-      ⟨#v[Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[0],
-          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[1],
-          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[2],
-          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[3]],
-        #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
-          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
-          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
-          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]],
-        env.get (i₀ + 2) + env.get (i₀ + 3)⟩ :=
-    ⟨hrs1U, hrs2U, h_sig_bin⟩
+  -- the `(is_real-1)·is_signed` gate: real rows kill `(is_real-1)`; on padding the six binary flags
+  -- sum to `is_real = 0`, so each is `0` and `is_blt + is_bge = 0`.
+  have hbg_gate : (input_is_real - 1) * (env.get (i₀ + 2) + env.get (i₀ + 3)) = 0 := by
+    rcases h_bin with h | h
+    · haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+      have hp : 2 ^ 17 < p := Fact.out
+      have hsum0 : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3)
+          + env.get (i₀ + 4) + env.get (i₀ + 5) = 0 := hsumreal.trans h
+      have e : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) + env.get (i₀ + 3)
+            + env.get (i₀ + 4) + env.get (i₀ + 5)
+          = (((env.get i₀).val + (env.get (i₀ + 1)).val + (env.get (i₀ + 2)).val
+            + (env.get (i₀ + 3)).val + (env.get (i₀ + 4)).val + (env.get (i₀ + 5)).val : ℕ) : ZMod p) := by
+        push_cast [ZMod.natCast_zmod_val]; ring
+      rw [e] at hsum0
+      have b0 := val_of_bool fb0; have b1 := val_of_bool fb1; have b2 := val_of_bool fb2
+      have b3 := val_of_bool fb3; have b4 := val_of_bool fb4; have b5 := val_of_bool fb5
+      have hvsum : (env.get i₀).val + (env.get (i₀ + 1)).val + (env.get (i₀ + 2)).val
+          + (env.get (i₀ + 3)).val + (env.get (i₀ + 4)).val + (env.get (i₀ + 5)).val = 0 := by
+        have := congrArg ZMod.val hsum0
+        rwa [ZMod.val_natCast_of_lt (by omega), ZMod.val_zero] at this
+      have h2 : env.get (i₀ + 2) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+      have h3 : env.get (i₀ + 3) = 0 := (ZMod.val_eq_zero _).mp (by omega)
+      rw [h, h2, h3]; ring
+    · rw [h]; ring
   have hbv : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + 6 + 1 + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
@@ -403,7 +426,42 @@ theorem completeness :
     have h := he_np ⟨2, by omega⟩
     simp only [List.getElem_cons_succ, List.getElem_cons_zero] at h
     rw [he_br, hbt2, hft2] at h; exact h
-  refine ⟨h_lt_asm, ?_, ?_, ?_, ?_, ?_, ?_, hsumreal.symm, hsumbin, ?_, ?_, ?_,
+  -- The composed `LtOperationSigned` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns
+  -- (offset `i₀+18 = i₀+6+1+4+4+3`); reused for both the obligation and the decision readout.
+  have h_lt_spec : LtOperationSigned.circuit.Spec
+      ⟨#v[Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[0],
+          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[1],
+          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[2],
+          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[3]],
+        #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
+          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
+          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
+          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]],
+        ⟨⟨⟨env.get (i₀ + 6 + 1 + 4 + 4 + 3)⟩,
+            Vector.map (Expression.eval env.toEnvironment)
+              (Vector.mapRange 4 fun i => var { index := i₀ + 6 + 1 + 4 + 4 + 3 + 1 + i }),
+            env.get (i₀ + 6 + 1 + 4 + 4 + 3 + 1 + 4),
+            Vector.map (Expression.eval env.toEnvironment)
+              (Vector.mapRange 2 fun i => var { index := i₀ + 6 + 1 + 4 + 4 + 3 + 1 + 4 + 1 + i })⟩,
+          ⟨env.get (i₀ + 6 + 1 + 4 + 4 + 3 + 8)⟩, ⟨env.get (i₀ + 6 + 1 + 4 + 4 + 3 + 8 + 1)⟩⟩,
+        env.get (i₀ + 2) + env.get (i₀ + 3), input_is_real⟩ := by
+    convert LtOperationSigned.spec_populate
+      (b := #v[Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[0],
+          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[1],
+          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[2],
+          Expression.eval env.toEnvironment input_var_adapter_op_a_memory_prev_value[3]])
+      (cc := #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],
+          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[1],
+          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
+          Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]])
+      (is_signed := env.get (i₀ + 2) + env.get (i₀ + 3)) (is_real := input_is_real)
+      hrs1U hrs2U h_sig_bin h_bin hbg_gate using 2
+    refine (ProvableType.ext_iff _ _).mpr (fun i hi => ?_)
+    refine Eq.trans ?_
+      ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 6 + 1 + 4 + 4 + 3) i hi).trans
+        (he_lt ⟨i, hi⟩))
+    simp [circuit_norm]
+  refine ⟨⟨⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, h_lt_spec⟩, ?_, ?_, ?_, ?_, ?_, ?_, hsumreal.symm, hsumbin, ?_, ?_, ?_,
     ⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨ha1U, h_imm⟩, brb⟩, ?_⟩, ?_, ⟨⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩, ?_⟩, ?_,
     ?_, ?_, ?_, ⟨h_bin, h_it⟩, ?_, ?_, ?_⟩
   · rcases fb0 with h | h <;> rw [h] <;> simp
@@ -418,11 +476,9 @@ theorem completeness :
     rcases h_bin with h | h
     · rw [h]; simp
     · rw [h, one_mul]
-      have h_lt_spec := he_lt h_lt_asm
-      simp only [LtOperationSigned.circuit, LtOperationSigned.Spec] at h_lt_spec
-      obtain ⟨h_bit, h_eqf, h_eqbin⟩ := h_lt_spec
+      obtain ⟨h_bit, h_eqf, h_eqbin⟩ := LtOperationSigned.result_semantic hrs1U hrs2U h h_lt_spec
+      simp only [circuit_norm] at h_bit h_eqf h_eqbin
       rw [hrs1eq, hrs2eq] at h_bit h_eqf
-      simp only [Vector.getElem_map] at h_eqf h_eqbin
       have hdec := h_dec h
       simp only [rs1WordInput, rs2WordInput] at hdec h_rs1U h_rs2U
       rw [← he_br, ← hg0, ← hg1, ← hg2, ← hg3, ← hg4, ← hg5] at hdec
@@ -432,7 +488,6 @@ theorem completeness :
       have key := branch_decision_eq_of_conditions h_rs1U h_rs2U fb0 fb1 fb2 fb3 fb4 fb5 brb hone
         h_bit h_eqf h_eqbin hd0 hd1 hd2 hd3 hd4 hd5
       simp only [branchDecision] at key
-      simp only [LtOperationSigned.circuit]
       linear_combination key
   · rcases h_bin with h | h
     · have hbr0 : env.get (i₀ + 6) = 0 := by rw [he_br]; exact h_brpad h

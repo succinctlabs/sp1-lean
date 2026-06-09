@@ -79,11 +79,18 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVector 3 (fun _ => (#v[0, 0, 0] : Vector (ZMod p) 3))
   let is_xor := flags[0]; let is_or := flags[1]; let is_and := flags[2]
-  let bw_op ← subcircuit BitwiseU16Operation.circuit
-    ⟨input.op_b_val, input.op_c_val, is_xor * 2 + is_or * 1 + is_and * 0⟩
-  let bLow ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let cLow ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let r := bw_op.result
+  let byteOpcode : Expression (ZMod p) := is_xor * 2 + is_or * 1 + is_and * 0
+  -- The chip witnesses the `BitwiseU16Operation` column struct (the two `U16toU8` low-byte blocks +
+  -- the eight result bytes) via `populate`, then composes `BitwiseU16Operation.circuit` as a Clean
+  -- `assertion` (it is a `FormalAssertion`, witnessing nothing of its own).
+  let bw_cols ← ProvableType.witness (fun env =>
+    BitwiseU16Operation.populate
+      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
+      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
+      (env byteOpcode))
+  assertion BitwiseU16Operation.circuit
+    ⟨input.op_b_val, input.op_c_val, bw_cols, byteOpcode, input.is_real⟩
+  let r := bw_cols.bitwise_operation.result
   assertion Readers.ALUTypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
@@ -95,18 +102,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod
   is_and * (is_and - 1) === 0
   (is_xor + is_or + is_and) * ((is_xor + is_or + is_and) - 1) === 0
   input.adapter.op_a_0 === 0
-  return ⟨input.state, input.adapter,
-          ⟨fromElements bLow, fromElements cLow, bw_op⟩, is_xor, is_or, is_and⟩
+  return ⟨input.state, input.adapter, bw_cols, is_xor, is_or, is_and⟩
 
 set_option maxHeartbeats 1000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
   channelsLawful := by
     simp [circuit_norm, main, BitwiseU16Operation.circuit, Readers.ALUTypeReader.circuit,
       Readers.CPUState.circuit]
-  -- witnesses the three flags (3) + the `BitwiseU16Operation` block (16) + the `b_low`/`c_low`
-  -- column blocks (4 + 4); the two readers are `assertion`s (`localLength 0`) over the threaded
-  -- `state`/`adapter` inputs. 3 + 16 + 4 + 4 = 27.
-  localLength _ := 27
+  -- witnesses the three flags (3) + the `BitwiseU16Operation` column struct (`b_low_bytes` 4 +
+  -- `c_low_bytes` 4 + `bitwise_operation.result` 8 = 16); `BitwiseU16Operation` and the two readers
+  -- are `assertion`s (`localLength 0`). 3 + 16 = 19.
+  localLength _ := 19
   channelsWithGuarantees := [byteChannel.toRawGated]
   channelsWithRequirements :=
     [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]

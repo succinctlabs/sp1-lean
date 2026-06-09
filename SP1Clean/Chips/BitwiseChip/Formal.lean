@@ -91,17 +91,37 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_or_bool := bool_of_mul_pred h_or_bin
   have h_and_bool := bool_of_mul_pred h_and_bin
   have hoh := one_hot3 h_xor_bool h_or_bool h_and_bool h_sum
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  -- the byte opcode `is_xor·2 + is_or·1` lands in `{0,1,2}` (one-hot), so it is `< 3` — the operand
+  -- range part of the composed `BitwiseU16Operation.circuit`'s `Assumptions`.
+  have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 := by
+    have key : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0
+        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1
+        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
+      rcases h_xor_bool with hx | hx
+      · rcases h_or_bool with ho | ho
+        · exact Or.inl (by rw [hx, ho]; ring)
+        · exact Or.inr (Or.inl (by rw [hx, ho]; ring))
+      · obtain ⟨ho, _⟩ := hoh.1 hx
+        exact Or.inr (Or.inr (by rw [hx, ho]; ring))
+    rcases key with h | h | h <;> rw [h]
+    · rw [ZMod.val_zero]; omega
+    · rw [ZMod.val_one]; omega
+    · rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast,
+        ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega : 2 < p)]; omega
   -- once the active flag forces the others to 0, the byte opcode reduces to a literal
-  refine ⟨⟨h_bin, fun _hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩⟩,
-    Or.inr h_bin, Or.inl rfl, Or.inr h_bin⟩
+  refine ⟨⟨h_bin, fun hr => ⟨fun hand => ?_, fun hor => ?_, fun hxor => ?_⟩⟩,
+    Or.inr h_bin, Or.inr ⟨ha, hb, hop3, h_bin⟩, Or.inr h_bin⟩
   · obtain ⟨hx0, ho0⟩ := hoh.2.2 hand
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0 := by
       rw [hx0, ho0]; ring
-    exact (h_bw ⟨ha, hb, by rw [hopc, ZMod.val_zero]; omega⟩).1 hopc
+    exact (BitwiseU16Operation.result_semantic _ hr
+      (h_bw ⟨ha, hb, by rw [hopc, ZMod.val_zero]; omega, h_bin⟩)).1 hopc
   · obtain ⟨hx0, _ha0⟩ := hoh.2.1 hor
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1 := by
       rw [hx0, hor]; ring
-    exact (h_bw ⟨ha, hb, by rw [hopc, ZMod.val_one]; omega⟩).2.1 hopc
+    exact (BitwiseU16Operation.result_semantic _ hr
+      (h_bw ⟨ha, hb, by rw [hopc, ZMod.val_one]; omega, h_bin⟩)).2.1 hopc
   · obtain ⟨ho0, _ha0⟩ := hoh.1 hxor
     have hopc : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
       rw [hxor, ho0]; ring
@@ -109,19 +129,44 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast,
         ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega : 2 < p)]
       omega
-    exact (h_bw ⟨ha, hb, by rw [hopc]; exact h2⟩).2.2 hopc
+    exact (BitwiseU16Operation.result_semantic _ hr
+      (h_bw ⟨ha, hb, by rw [hopc]; exact h2, h_bin⟩)).2.2 hopc
 
+set_option linter.unusedSectionVars false in
+/-- A length-4 `#v` of pointwise evaluations is the `Vector.map` of the evaluator — lets the witness
+hint's `populate` operands (written `#v[env op_b_val[k]]` by the generator) be rewritten to the
+`Vector.map eval …` form that `h_input` provides. -/
+private lemma vec4_eval (e : Environment (ZMod p)) (v : Vector (Expression (ZMod p)) 4) :
+    (#v[Expression.eval e v[0], Expression.eval e v[1], Expression.eval e v[2],
+        Expression.eval e v[3]] : Vector (ZMod p) 4) = Vector.map (Expression.eval e) v := by
+  ext k hk
+  interval_cases k <;> simp [Vector.getElem_map]
+
+set_option maxHeartbeats 8000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   obtain ⟨ha, hb, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c⟩ := h_assumptions
-  obtain ⟨h_env_flags, -⟩ := h_env
+  obtain ⟨h_env_flags, h_env_cols⟩ := h_env
   have hflag0 : env.get i₀ = 0 := by simpa using h_env_flags 0
   have hflag1 : env.get (i₀ + 1) = 0 := by simpa using h_env_flags 1
   have hflag2 : env.get (i₀ + 2) = 0 := by simpa using h_env_flags 2
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
+  -- The witness hint computed `populate` at the *eval-of-var* operands; `h_input` identifies those with
+  -- the value-form operands, normalising the hint's `populate` to match `spec_populate`.
+  have hpvb : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_b_memory_prev_value
+      = input_adapter_op_b_memory_prev_value := h_input.2.2.2.2.2.2.1.1
+  have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_memory_prev_value
+      = input_adapter_op_c_memory_prev_value := h_input.2.2.2.2.2.2.2.2.1.1
+  simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hpvb, hpvc] at h_env_cols
+  have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 := by
+    rw [show env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0 from by
+      rw [hflag0, hflag1, hflag2]; ring, ZMod.val_zero]; omega
   refine ⟨⟨hbin, h_cpu⟩,
-    ⟨ha, hb, (by simp only [hflag0, hflag1, zero_mul, mul_zero, add_zero, ZMod.val_zero]; norm_num)⟩,
+    ⟨⟨ha, hb,
+        by simp only [hflag0, hflag1, zero_mul, mul_zero, add_zero, ZMod.val_zero]; norm_num, hbin⟩,
+      ?_⟩,
     ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
@@ -132,6 +177,19 @@ theorem completeness :
     by rw [hflag2]; simp,
     by rw [hflag0, hflag1, hflag2]; simp,
     hop_a_0⟩
+  -- The composed `BitwiseU16Operation` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns:
+  -- `spec_populate` once the witnessed column struct equals `populate …`. Each of its 16 cells is
+  -- `env.get (i₀+3+k)`, which the (normalised) witness hint pins to `(toElements (populate …))[k]`.
+  convert BitwiseU16Operation.spec_populate (b := input_adapter_op_b_memory_prev_value)
+    (c := input_adapter_op_c_memory_prev_value)
+    (opcode := env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0) ha hb hop3 input_is_real
+    using 2
+  refine (ProvableType.ext_iff _ _).mpr (fun i hi => ?_)
+  refine Eq.trans ?_
+    ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 3) i hi).trans (h_env_cols ⟨i, hi⟩))
+  -- `W` and `eval (ProvableStruct.varFromOffset …)` both circuit_norm-normalise to the same per-field
+  -- struct, so the two `toElements` getElems coincide.
+  simp [circuit_norm]
 
 /-- The Bitwise chip row as a `GeneralFormalCircuit`: flag-gated RV64 `and`/`or`/`xor` semantic contract,
 composing the witnessed `BitwiseU16Operation` gadget and the immediate-capable register reader; output is

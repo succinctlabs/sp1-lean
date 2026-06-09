@@ -9,6 +9,7 @@ import SP1Clean.Chips.DivRemChip.Soundness.Rem
 import SP1Clean.Chips.DivRemChip.Soundness.Remu
 import SP1Clean.Chips.DivRemChip.Soundness.Remuw
 import SP1Clean.Chips.DivRemChip.Soundness.Remw
+import SP1Clean.Chips.DivRemChip.Soundness.Reader
 
 /-! # `SP1Clean.DivRemChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
@@ -48,7 +49,12 @@ every variant, reused here from `SoundDiv`). `circuit_proof_start_core` only int
 `simp`), so the sub-theorems' raw `h_holds`/`h_input`/`h_assumptions` binders match directly. -/
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start_core
-  refine ⟨fun hr => ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+  -- The reader sub-`Spec` + `is_real`-binary come from `SoundReader` (its `.1` is the two-conjunct
+  -- `RTypeReader.Spec ∧ binary`); the eight flag-gated arithmetic conjuncts and the shared `Req` tail come
+  -- from the per-variant files as before.
+  refine ⟨⟨(SoundReader.soundness i₀ env input_var input h_input h_assumptions h_holds).1.1,
+      (SoundReader.soundness i₀ env input_var input h_input h_assumptions h_holds).1.2,
+      fun hr => ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩, ?_⟩
   · exact (SoundDiv.soundness   i₀ env input_var input h_input h_assumptions h_holds).1 hr
   · exact (SoundDivu.soundness  i₀ env input_var input h_input h_assumptions h_holds).1 hr
   · exact (SoundRem.soundness   i₀ env input_var input h_input h_assumptions h_holds).1 hr

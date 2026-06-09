@@ -14,17 +14,18 @@ open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operand bytes are genuine bytes; opcode is one of AND/OR/XOR; `is_real` is binary (the last
-discharged by the composing operation's gate — it clears each gated receive's padding requirement
-via `binary_gate_req_vacuous`). -/
+/-- Opcode is one of AND/OR/XOR; `is_real` is binary (the latter discharged by the composing
+operation's gate — it clears each gated receive's padding requirement via `binary_gate_req_vacuous`).
+The operand byte bounds are **not** preconditions: the byte table guarantees them on every fired send,
+so soundness exports them through `Spec` (and completeness reads them back from `Spec`), letting a
+composing operation feed free byte columns without range-checking them itself. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
-  (∀ i : Fin 8, input.a[i].val < 256 ∧ input.b[i].val < 256) ∧ input.opcode.val < 3 ∧
-    (input.is_real = 0 ∨ input.is_real = 1)
+  input.opcode.val < 3 ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
 set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨hbytes, hopcode, hbin⟩ := h_assumptions
+  obtain ⟨hopcode, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have ea0 : Expression.eval env input_var_a[0] = input_a[0] := by rw [← hia]; simp only [Vector.getElem_map]
   have ea1 : Expression.eval env input_var_a[1] = input_a[1] := by rw [← hia]; simp only [Vector.getElem_map]
@@ -59,22 +60,29 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     have hneg : -input_is_real = -1 := by rw [h1]
     have R0 := hg0 hneg; have R1 := hg1 hneg; have R2 := hg2 hneg; have R3 := hg3 hneg
     have R4 := hg4 hneg; have R5 := hg5 hneg; have R6 := hg6 hneg; have R7 := hg7 hneg
-    refine bitwise_of_byteOp (a := input_a) (b := input_b) (fun i => ?_)
-    fin_cases i
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R0).2
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R1).2
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R2).2
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R3).2
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R4).2
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R5).2
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R6).2
-    · simpa using ((byteRowSpec_byteOp _ _ _ hopcode).mp R7).2
+    -- The byte table guarantees each fired send's operands are bytes and `result = byteOp`.
+    have H : ∀ i : Fin 8,
+        (input_cols_result[(i : ℕ)].val < 256 ∧ input_a[(i : ℕ)].val < 256 ∧ input_b[(i : ℕ)].val < 256) ∧
+          input_cols_result[(i : ℕ)].val
+            = byteOp input_opcode.val input_a[(i : ℕ)].val input_b[(i : ℕ)].val := by
+      intro i
+      fin_cases i
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R0
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R1
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R2
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R3
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R4
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R5
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R6
+      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R7
+    exact ⟨fun i => ⟨(H i).1.2.1, (H i).1.2.2⟩,
+      bitwise_of_byteOp (a := input_a) (b := input_b) (fun i => (H i).2)⟩
   all_goals exact binary_gate_req_vacuous hbin _
 
 set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨hbytes, hopcode, hbin⟩ := h_assumptions
+  obtain ⟨hopcode, hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have hp : 2 ^ 17 < p := Fact.out
   haveI : NeZero p := ⟨by omega⟩
@@ -105,8 +113,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have key : input_is_real = 1 → ∀ i : Fin 8,
       ByteRowSpec (⟨input_opcode, input_cols_result[↑i], input_a[↑i], input_b[↑i]⟩ : ByteRow (ZMod p)) := by
     intro hr1 i
-    obtain ⟨hand, hor, hxor⟩ := h_spec hr1
-    have hb := hbytes i
+    obtain ⟨hb_bounds, hand, hor, hxor⟩ := h_spec hr1
+    have hb := hb_bounds i
     have hcast : ((input_opcode.val : ℕ) : ZMod p) = input_opcode := ZMod.natCast_zmod_val _
     have hres : input_cols_result[↑i].val = byteOp input_opcode.val input_a[↑i].val input_b[↑i].val := by
       rcases (show input_opcode.val = 0 ∨ input_opcode.val = 1 ∨ input_opcode.val = 2 from by omega)

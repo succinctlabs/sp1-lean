@@ -92,18 +92,21 @@ namespace SP1Clean.U16toU8OperationUnsafe
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The four 16-bit input limbs to split. -/
+/-- The four 16-bit input limbs to split, plus the low-byte column struct (a chip-owned input,
+faithful to SP1's `eval_u16_to_u8_unsafe(_, u16_values, cols)`, which witnesses nothing). -/
 structure Inputs (F : Type) where
   u16_values : fields 4 F
+  cols : Extracted.U16toU8Operation F
 deriving ProvableStruct
 
-/-- Semantic contract: the witnessed low/high split reassembles each limb (the unsafe op's only
-content — `256 * ((u - low) * 256⁻¹) = u - low`, so `low + 256 * high = u`). -/
-def Spec (input : Inputs (ZMod p)) (cols : Extracted.U16toU8Operation (ZMod p)) : Prop :=
-  input.u16_values[0] = cols.low_bytes[0] + (input.u16_values[0] - cols.low_bytes[0]) * 256⁻¹ * 256 ∧
-  input.u16_values[1] = cols.low_bytes[1] + (input.u16_values[1] - cols.low_bytes[1]) * 256⁻¹ * 256 ∧
-  input.u16_values[2] = cols.low_bytes[2] + (input.u16_values[2] - cols.low_bytes[2]) * 256⁻¹ * 256 ∧
-  input.u16_values[3] = cols.low_bytes[3] + (input.u16_values[3] - cols.low_bytes[3]) * 256⁻¹ * 256
+/-- Semantic contract: the low/high split reassembles each limb (the unsafe op's only content —
+`256 * ((u - low) * 256⁻¹) = u - low`, so `low + 256 * high = u`). Holds unconditionally — the op
+emits no constraints. -/
+def Spec (input : Inputs (ZMod p)) : Prop :=
+  input.u16_values[0] = input.cols.low_bytes[0] + (input.u16_values[0] - input.cols.low_bytes[0]) * 256⁻¹ * 256 ∧
+  input.u16_values[1] = input.cols.low_bytes[1] + (input.u16_values[1] - input.cols.low_bytes[1]) * 256⁻¹ * 256 ∧
+  input.u16_values[2] = input.cols.low_bytes[2] + (input.u16_values[2] - input.cols.low_bytes[2]) * 256⁻¹ * 256 ∧
+  input.u16_values[3] = input.cols.low_bytes[3] + (input.u16_values[3] - input.cols.low_bytes[3]) * 256⁻¹ * 256
 
 end SP1Clean.U16toU8OperationUnsafe
 
@@ -222,87 +225,37 @@ def resultWord (cols : Extracted.SubwOperation (ZMod p)) : Word (ZMod p) :=
 
 end SP1Clean.SubwOperation
 
-namespace SP1Clean.LtOperationSigned
-
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
-
-/-- The two operand words and the mode selector. -/
-structure Inputs (F : Type) where
-  b : fields 4 F
-  cc : fields 4 F
-  is_signed : F
-deriving ProvableStruct
-
-/-- Semantic contract: the comparison `bit` is the signed-less-than indicator when `is_signed = 1`
-(comparing the two-complement `toInt` of the 64-bit words) and the unsigned-less-than indicator
-otherwise. -/
-def Spec (input : Inputs (ZMod p)) (cols : Extracted.LtOperationSigned (ZMod p)) : Prop :=
-  (cols.result.u16_compare_operation.bit =
-    if (if input.is_signed = 1
-        then (Word.toBitVec64 input.b).toInt < (Word.toBitVec64 input.cc).toInt
-        else Word.toNat input.b < Word.toNat input.cc)
-      then 1 else 0) ∧
-  (input.is_signed = 0 →
-    ((cols.result.u16_flags[0] + cols.result.u16_flags[1] + cols.result.u16_flags[2]
-        + cols.result.u16_flags[3] = 0)
-      ↔ Word.toBitVec64 input.b = Word.toBitVec64 input.cc)) ∧
-  (input.is_signed = 0 →
-    (cols.result.u16_flags[0] + cols.result.u16_flags[1] + cols.result.u16_flags[2]
-        + cols.result.u16_flags[3] = 0 ∨
-     cols.result.u16_flags[0] + cols.result.u16_flags[1] + cols.result.u16_flags[2]
-        + cols.result.u16_flags[3] = 1))
-
-end SP1Clean.LtOperationSigned
+-- `LtOperationSigned`'s `Inputs`/`Spec` live in `Operations/LtOperationSigned/`: the auto-generated
+-- `Extracted.lean` owns the 5-field `Inputs` (`b`/`cc`/`cols`/`is_signed`/`is_real`), and `Formal.lean`
+-- owns the structural `Spec` + the semantic `result_semantic` readout (the contract the chips consume).
+-- It lives there (not here) to avoid an import cycle — the generated `main` imports the sub-ops' `.Formal`
+-- for `.circuit` (same reasoning as the IsZero*/Addw/BitwiseU16 chains).
 
 namespace SP1Clean.BitwiseOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Semantic, `is_real`- and opcode-gated contract: on a real row each result byte is the bitwise
-AND/OR/XOR of the operand bytes (as 8-bit values). On padding (`is_real = 0`) it is vacuous — the
-gadget's gated byte-bus pulls impose nothing there. `Inputs` (the `eval` params verbatim — the result
-column struct nested as `cols`) is the generated `Operations.BitwiseOperation.Extracted`; the result
-bytes are `input.cols.result`, threaded in by the composing operation. -/
+AND/OR/XOR of the operand bytes (as 8-bit values), **and the operand bytes are genuine bytes** — the
+byte table guarantees `a[i], b[i] < 256` for every fired send, so soundness exports those bounds and a
+composing operation (e.g. `BitwiseU16Operation`) can consume them without having to range-check the
+free byte columns itself. On padding (`is_real = 0`) it is vacuous — the gadget's gated byte-bus pulls
+impose nothing there. `Inputs` (the `eval` params verbatim — the result column struct nested as `cols`)
+is the generated `Operations.BitwiseOperation.Extracted`; the result bytes are `input.cols.result`,
+threaded in by the composing operation. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   input.is_real = 1 →
+    (∀ i : Fin 8, input.a[i].val < 256 ∧ input.b[i].val < 256) ∧
     (input.opcode = 0 → ∀ i : Fin 8, input.cols.result[i].val = input.a[i].val &&& input.b[i].val) ∧
     (input.opcode = 1 → ∀ i : Fin 8, input.cols.result[i].val = input.a[i].val ||| input.b[i].val) ∧
     (input.opcode = 2 → ∀ i : Fin 8, input.cols.result[i].val = input.a[i].val ^^^ input.b[i].val)
 
 end SP1Clean.BitwiseOperation
 
-namespace SP1Clean.BitwiseU16Operation
-
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-local instance neZero_spec : NeZero p := ⟨(Fact.out : p.Prime).pos.ne'⟩
-
-/-- The two operand words plus the opcode selector (AND=0, OR=1, XOR=2). The byte
-decompositions and result are witnessed internally. -/
-structure Inputs (F : Type) where
-  b : fields 4 F
-  c : fields 4 F
-  opcode : F
-deriving ProvableStruct
-
-/-- Reassemble the eight result bytes into a four-limb word. -/
-def resultWord (r : Vector (ZMod p) 8) : Word (ZMod p) :=
-  #v[r[0] + r[1] * 256, r[2] + r[3] * 256, r[4] + r[5] * 256, r[6] + r[7] * 256]
-
-/-- Semantic, opcode-gated contract: the reassembled result is the AND/OR/XOR of the
-operands as 64-bit values. -/
-def Spec (input : Inputs (ZMod p)) (cols : Extracted.BitwiseOperation (ZMod p)) : Prop :=
-  (input.opcode = 0 →
-    Word.toBitVec64 (resultWord cols.result)
-      = Word.toBitVec64 input.b &&& Word.toBitVec64 input.c) ∧
-  (input.opcode = 1 →
-    Word.toBitVec64 (resultWord cols.result)
-      = Word.toBitVec64 input.b ||| Word.toBitVec64 input.c) ∧
-  (input.opcode = 2 →
-    Word.toBitVec64 (resultWord cols.result)
-      = Word.toBitVec64 input.b ^^^ Word.toBitVec64 input.c)
-
-end SP1Clean.BitwiseU16Operation
+-- `BitwiseU16Operation`'s `Inputs`/`Spec`/`resultWord`/`decompBytes` live in
+-- `Operations/BitwiseU16Operation.lean`: the composed `FormalAssertion` imports `BitwiseOperation.Formal`
+-- for `.circuit`, and its `Spec` is literally the composed `BitwiseOperation.Spec` on the two `U16toU8`
+-- byte decompositions (same reasoning as the IsZero* / Addw chains above).
 
 namespace SP1Clean.MulOperation
 

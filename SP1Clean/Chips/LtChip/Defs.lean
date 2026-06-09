@@ -1,5 +1,6 @@
 import SP1Clean.Specs.Chip
-import SP1Clean.Operations.LtOperationSigned
+import SP1Clean.Operations.LtOperationSigned.Formal
+import SP1Clean.Operations.LtOperationSigned.Populate
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.ALUTypeReader
 import SP1Clean.Foundations.Channels
@@ -73,17 +74,25 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) 
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
   let flags ← witnessVector 2 (fun _ => (#v[0, 0] : Vector (ZMod p) 2))
   let is_slt := flags[0]; let is_sltu := flags[1]
-  let lt_op ← subcircuit LtOperationSigned.circuit ⟨input.op_b_val, input.op_c_val, is_slt⟩
+  -- The chip witnesses the `LtOperationSigned` column struct (the unsigned compare block + the two
+  -- sign-bit columns) via `populate`, then composes `LtOperationSigned.circuit` as a Clean `assertion`
+  -- (it is a `FormalAssertion`, witnessing nothing of its own; `is_signed := is_slt`).
+  let lt_cols ← ProvableType.witness (fun env =>
+    LtOperationSigned.populate
+      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
+      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
+      (env is_slt) (env input.is_real))
+  assertion LtOperationSigned.circuit ⟨input.op_b_val, input.op_c_val, lt_cols, is_slt, input.is_real⟩
   assertion Readers.ALUTypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
      is_slt * 9 + is_sltu * 10,
-     lt_op.result.u16_compare_operation.bit, 0, 0, 0⟩
+     lt_cols.result.u16_compare_operation.bit, 0, 0, 0⟩
   input.is_real * (input.is_real - 1) === 0
   is_slt * (is_slt - 1) === 0
   is_sltu * (is_sltu - 1) === 0
   (is_slt + is_sltu) * ((is_slt + is_sltu) - 1) === 0
-  return ⟨input.state, input.adapter, is_slt, is_sltu, lt_op⟩
+  return ⟨input.state, input.adapter, is_slt, is_sltu, lt_cols⟩
 
 set_option maxHeartbeats 1000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where

@@ -591,3 +591,24 @@ attribute [circuit_norm]
   List.cons_subset List.mem_cons List.cons_ne_nil List.not_mem_nil List.Subset.refl or_false and_self
 
 end SP1Clean.Channels
+
+namespace SP1Clean
+open Circuit
+
+/-- The `i`-th element of `toElements` of the eval of a `ProvableStruct`'s `varFromOffset` is just the
+env value at `off + i` — via `eval_varFromOffset` (`= fromElements (mapRange (env.get ·))`) +
+`toElements_fromElements` + `getElem_mapRange`, sidestepping the per-field `toElements` concatenation.
+
+`ProvableType.witness` emits its output column var as `ProvableStruct.varFromOffset α off`, so this
+matches a `populate`-witnessed column struct after `circuit_norm` normalisation: in a chip completeness
+proof, `ext_iff` reduces `<witnessed cols> = populate …` to per-cell equalities, each of which this lemma
+turns into `env.get (off + i)`, which the witness hint (`UsesLocalWitnessesCompleteness`) pins to
+`(toElements (populate …))[i]`. Used by `BitwiseChip`; reusable for `MulChip`/`DivRemChip`. -/
+lemma getElem_toElements_eval_varFromOffset {F : Type} [Field F] {α : TypeMap} [ProvableStruct α]
+    (e : Environment F) (off i : ℕ) (hi : i < size α) :
+    (toElements (Eval.eval e (ProvableStruct.varFromOffset α off : α (Expression F))))[i]
+      = e.get (off + i) := by
+  rw [← ProvableStruct.varFromOffset_eq_varFromOffset, ProvableType.eval_varFromOffset,
+    ProvableType.toElements_fromElements, Vector.getElem_mapRange]
+
+end SP1Clean

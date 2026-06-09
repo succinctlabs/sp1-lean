@@ -1,7 +1,11 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Operations.IsZeroWordOperation.RawSpec
+import SP1Clean.Operations.IsZeroWordOperation.Extracted
 import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Foundations.InteractionProjection
+import SP1Clean.Foundations.InteractionRecovery
+import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsZeroWordOperation
 import SP1Clean.Faithful.IsZeroOperation
 
@@ -47,5 +51,28 @@ theorem isZeroWord_constraints_faithful (a : Word (ZMod p))
     isZero_constraints_faithful, isZero_constraints_faithful]
   simp only [List.Forall, IsZeroWordOperation.RawSpec, one_mul,
     bool_iff, sub_self, true_and, and_true, and_assoc]
+
+open SP1Clean.Channels (byteChannel)
+open SP1Clean.InteractionRecovery
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **Faithfulness anchor — interaction half, SYNTACTIC.** `IsZeroWordOperation` composes four
+`IsZeroOperation` subcircuits (each emits nothing) plus `assertZero` gates; its `main` emits no byte
+interactions, matching SP1's empty extracted `interactions` (the four composed `IsZero` lists are each `[]`). -/
+theorem isZeroWord_interactions_faithful_syntactic
+    (env : Environment (ZMod p)) (input : Var SP1Clean.IsZeroWordOperation.Inputs (ZMod p)) (offset : ℕ)
+    (a : Word (ZMod p)) (is_real : ZMod p) (cols : Extracted.IsZeroWordOperation (ZMod p)) :
+    (Extracted.IsZeroWordOperation.interactions a cols is_real).map Extracted.Interaction.toAccess
+      = (((SP1Clean.IsZeroWordOperation.main input).operations offset).interactionsWith
+          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+  have heqZ := fun (n : ℕ) (inp : Var SP1Clean.IsZeroOperation.Inputs (ZMod p)) =>
+    filter_interactions_formalAssertion_eq_nil SP1Clean.IsZeroOperation.circuit byteChannel.toRawGated
+      (n := n) inp List.not_mem_nil List.not_mem_nil
+  have heqEq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
+    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRawGated
+      (n := n) inp List.not_mem_nil List.not_mem_nil
+  simp only [SP1Clean.IsZeroWordOperation.main, circuit_norm, heqZ, heqEq,
+    Extracted.IsZeroWordOperation.interactions, Extracted.IsZeroOperation.interactions,
+    List.map_nil, List.append_nil]
 
 end SP1Clean.Faithful

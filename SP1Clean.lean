@@ -31,6 +31,7 @@ import SP1Clean.Chips.DivRemChip.Soundness.Rem
 import SP1Clean.Chips.DivRemChip.Soundness.Remu
 import SP1Clean.Chips.DivRemChip.Soundness.Remuw
 import SP1Clean.Chips.DivRemChip.Soundness.Remw
+import SP1Clean.Chips.DivRemChip.Soundness.Reader
 import SP1Clean.Chips.JalChip.Bridge
 import SP1Clean.Chips.JalChip.Defs
 import SP1Clean.Chips.JalChip.Formal
@@ -185,6 +186,7 @@ import SP1Clean.Faithful.LtChip
 import SP1Clean.Faithful.LtOperationSigned
 import SP1Clean.Faithful.LtOperationUnsigned
 import SP1Clean.Faithful.MulChip
+import SP1Clean.Faithful.MulOperation
 import SP1Clean.Faithful.RTypeReader
 import SP1Clean.Faithful.ShiftLeftChip
 import SP1Clean.Faithful.ShiftRightChip
@@ -246,7 +248,10 @@ import SP1Clean.Operations.IsZeroWordOperation.Extracted
 import SP1Clean.Operations.IsZeroWordOperation.Formal
 import SP1Clean.Operations.IsZeroWordOperation.Populate
 import SP1Clean.Operations.IsZeroWordOperation.RawSpec
-import SP1Clean.Operations.LtOperationSigned
+import SP1Clean.Operations.LtOperationSigned.Extracted
+import SP1Clean.Operations.LtOperationSigned.Formal
+import SP1Clean.Operations.LtOperationSigned.Populate
+import SP1Clean.Operations.LtOperationSigned.RawSpec
 import SP1Clean.Operations.LtOperationUnsigned.Extracted
 import SP1Clean.Operations.LtOperationUnsigned.Formal
 import SP1Clean.Operations.LtOperationUnsigned.Populate

@@ -24,7 +24,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   circuit_proof_start
   obtain ⟨hbU, hcU⟩ := h_assumptions
   obtain ⟨_hcpu, h_mulop, ha0, ha1, ha2, ha3, gb_mul, gb_mulh, gb_mulhu, gb_mulhsu, gb_mulw,
-    gb_sum, hopa0, _hadapter, h_gate⟩ := h_holds
+    gb_sum, hopa0, hadapter, h_gate⟩ := h_holds
   have bmul := bool_of_mul_pred gb_mul
   have bmulh := bool_of_mul_pred gb_mulh
   have bmulhu := bool_of_mul_pred gb_mulhu
@@ -38,7 +38,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inr (Or.inr (Or.inr (Or.inr hmw))))
   -- `MulOperation.Assumptions` (operands `isU64` when active; flag binaries; `is_mulw → is_real`; sum-bound).
   have h_spec := h_mulop ⟨fun _ => ⟨hbU, hcU⟩, bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩
-  refine ⟨fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩, Or.inr h_bin,
+  refine ⟨⟨hadapter h_bin, h_bin, fun hr => ⟨?_, ?_, ?_, ?_, ?_⟩⟩, Or.inr h_bin,
     Or.inr ⟨fun _ => ⟨hbU, hcU⟩, bsum, h_mw, bmul, bmulh, bmulhu, bmulhsu, bmulw, bsum⟩, Or.inr h_bin⟩
   · intro h1
     have hsum1 := MulOperation.sum_eq_one bmul bmulh bmulhu bmulhsu bmulw bsum (Or.inl h1)

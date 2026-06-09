@@ -408,14 +408,27 @@ lemma rv64_mulw_eq (x y : BitVec 64) :
     Nat.shiftRight_zero, Nat.reduceAdd, Nat.reduceSub]
   rw [Nat.mod_mod_of_dvd _ ⟨2 ^ 32, by norm_num⟩, ← Nat.mul_mod]
 
-/-- Semantic, `is_real`-gated, **flag-gated** contract with five variant conjuncts: on real rows the
-result column `cols.a` is the RV64 multiply selected by the committed flag (`cols.is_mul → RV64.mul`,
-the low-64 product; `cols.is_mulh → RV64.mulh`, signed×signed high 64; `cols.is_mulhu → RV64.mulhu`,
-unsigned×unsigned high 64; `cols.is_mulhsu → RV64.mulhsu`, signed×unsigned high 64; `cols.is_mulw →
-RV64.mulw`, low-32 product sign-extended to 64). Operand order matches the RV64 signature
-`f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`. Vacuous on padding. -/
+/-- Semantic contract, composed from the sub-circuits' own `Spec`s (as `AddChip`). Three conjuncts: the
+`RTypeReader` reader sub-`Spec` on the `state`/`adapter` blocks (the register reads/write, gated by the
+flag-weighted R-type opcode `is_mul·11 + is_mulh·12 + is_mulhu·13 + is_mulhsu·14 + is_mulw·24` and the
+result `cols.a` as the `op_a` write value), the *proven* `is_real`-binary fact, and the `is_real`-gated,
+**flag-gated** arithmetic with five variant conjuncts: on real rows the result column `cols.a` is the RV64
+multiply selected by the committed flag (`cols.is_mul → RV64.mul`, the low-64 product; `cols.is_mulh →
+RV64.mulh`, signed×signed high 64; `cols.is_mulhu → RV64.mulhu`, unsigned×unsigned high 64; `cols.is_mulhsu
+→ RV64.mulhsu`, signed×unsigned high 64; `cols.is_mulw → RV64.mulw`, low-32 product sign-extended to 64).
+Operand order matches the RV64 signature `f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`.
+Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : MulCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  input.is_real = 1 →
+  Readers.RTypeReader.Spec
+    { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
+      clk_high := cols.state.clk_high,
+      clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+      pc := cols.state.pc,
+      opcode := cols.is_mul * 11 + cols.is_mulh * 12 + cols.is_mulhu * 13 + cols.is_mulhsu * 14
+        + cols.is_mulw * 24,
+      wv0 := cols.a[0], wv1 := cols.a[1], wv2 := cols.a[2], wv3 := cols.a[3] } ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_real = 1 →
     (cols.is_mul = 1 →
       Word.toBitVec64 cols.a = RV64.mul (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
     (cols.is_mulh = 1 →
@@ -425,7 +438,7 @@ def Spec (input : Inputs (ZMod p)) (cols : MulCols (ZMod p)) (_ : ProverData (ZM
     (cols.is_mulhsu = 1 →
       Word.toBitVec64 cols.a = RV64.mulhsu (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
     (cols.is_mulw = 1 →
-      Word.toBitVec64 cols.a = RV64.mulw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
+      Word.toBitVec64 cols.a = RV64.mulw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
 
 end SP1Clean.MulChip
 
@@ -446,17 +459,28 @@ structure Inputs (F : Type) where
   adapter : Extracted.RTypeReader F
 deriving ProvableStruct
 
-/-- Semantic, `is_real`-gated, **flag-gated** contract with eight variant conjuncts: on real rows the
+/-- Semantic contract, composed from the sub-circuits' own `Spec`s (as `MulChip`). Three conjuncts: the
+`RTypeReader` reader sub-`Spec` on the `state`/`adapter` blocks (the register reads/write, gated by the
+flag-weighted R-type opcode and the result `cols.a` as the `op_a` write value), the *proven* `is_real`-binary
+fact, and the `is_real`-gated, **flag-gated** arithmetic with eight variant conjuncts: on real rows the
 result column `cols.a` is the RV64 divide/remainder selected by the committed flag (`cols.is_div →
 RV64.div`, signed 64-bit quotient; `cols.is_divu → RV64.divu`, unsigned; `cols.is_rem → RV64.rem`,
 signed remainder; `cols.is_remu → RV64.remu`, unsigned; and the four `*w` word variants `divw`/`remw`/
 `divuw`/`remuw`, 32-bit operated then sign-extended to 64). Operand order matches the RV64 signature
 `f rs2_val rs1_val` with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`. Vacuous on padding.
 
-The threaded reader sub-`Spec`s and per-flag overflow/divide-by-zero side conditions
-(SP1's `DivRemCols.eval`) are not yet folded in. -/
+The per-flag overflow/divide-by-zero side conditions (SP1's `DivRemCols.eval`) are not yet folded in. -/
 def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  input.is_real = 1 →
+  Readers.RTypeReader.Spec
+    { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
+      clk_high := cols.state.clk_high,
+      clk_low := cols.state.clk_0_16 + cols.state.clk_16_24 * 65536,
+      pc := cols.state.pc,
+      opcode := cols.is_divu * 16 + cols.is_remu * 18 + cols.is_div * 15 + cols.is_rem * 17
+        + cols.is_divw * 25 + cols.is_remw * 27 + cols.is_divuw * 26 + cols.is_remuw * 28,
+      wv0 := cols.a[0], wv1 := cols.a[1], wv2 := cols.a[2], wv3 := cols.a[3] } ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (input.is_real = 1 →
     (cols.is_div = 1 →
       Word.toBitVec64 cols.a = RV64.div (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
     (cols.is_divu = 1 →
@@ -472,7 +496,7 @@ def Spec (input : Inputs (ZMod p)) (cols : DivRemCols (ZMod p)) (_ : ProverData 
     (cols.is_divuw = 1 →
       Word.toBitVec64 cols.a = RV64.divuw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)) ∧
     (cols.is_remuw = 1 →
-      Word.toBitVec64 cols.a = RV64.remuw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val))
+      Word.toBitVec64 cols.a = RV64.remuw (Word.toBitVec64 input.op_c_val) (Word.toBitVec64 input.op_b_val)))
 
 end SP1Clean.DivRemChip
 

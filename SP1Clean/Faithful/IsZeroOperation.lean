@@ -1,7 +1,11 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Operations.IsZeroOperation.RawSpec
+import SP1Clean.Operations.IsZeroOperation.Extracted
 import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Foundations.InteractionProjection
+import SP1Clean.Foundations.InteractionRecovery
+import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsZeroOperation
 
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (IsZero)
@@ -57,5 +61,24 @@ theorem isZero_constraints_faithful (a : ZMod p) (cols : Extracted.IsZeroOperati
   rw [isZero_asserts_faithful, isZero_interactions_faithful]
   simp only [SP1Clean.IsZeroOperation.InteractSpec, SP1Clean.IsZeroOperation.AssertSpec,
     SP1Clean.IsZeroOperation.RawSpec, and_true]
+
+open SP1Clean.Channels (byteChannel)
+open SP1Clean.InteractionRecovery
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **Faithfulness anchor — interaction half, SYNTACTIC.** `IsZeroOperation` is a pure `assertZero` gadget:
+its `main` emits no byte interactions, matching SP1's empty extracted `interactions` list — both `toAccess`
+images are `[]`. -/
+theorem isZero_interactions_faithful_syntactic
+    (env : Environment (ZMod p)) (input : Var SP1Clean.IsZeroOperation.Inputs (ZMod p)) (offset : ℕ)
+    (a is_real : ZMod p) (cols : Extracted.IsZeroOperation (ZMod p)) :
+    (Extracted.IsZeroOperation.interactions a cols is_real).map Extracted.Interaction.toAccess
+      = (((SP1Clean.IsZeroOperation.main input).operations offset).interactionsWith
+          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+  have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
+    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRawGated
+      (n := n) inp List.not_mem_nil List.not_mem_nil
+  simp only [SP1Clean.IsZeroOperation.main, circuit_norm, heq, Extracted.IsZeroOperation.interactions,
+    List.map_nil, List.append_nil]
 
 end SP1Clean.Faithful

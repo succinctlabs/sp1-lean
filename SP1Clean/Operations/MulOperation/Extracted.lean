@@ -20,9 +20,18 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let is_real := input.is_real
   assertion U16toU8OperationSafe.circuit ⟨input.b, cols.b_lower_byte, is_real⟩
   assertion U16toU8OperationSafe.circuit ⟨input.c, cols.c_lower_byte, is_real⟩
-  assertion U16MSBOperation.circuit ⟨input.b[3], ⟨cols.b_msb⟩, is_real⟩
-  assertion U16MSBOperation.circuit ⟨input.c[3], ⟨cols.c_msb⟩, is_real⟩
   assertion U16MSBOperation.circuit ⟨cols.product[2] + cols.product[3] * 256, cols.product_msb, input.is_mulw⟩
+  -- `b_msb`/`c_msb`: SP1 (`mul.rs`) asserts booleanity **unconditionally** (`assert_bool`) and pins the
+  -- byte-MSB semantics via an `is_real`-gated `MSB`(opcode 5) byte send on the high decomposition byte
+  -- `E7 = (b[3]-low[3])/256`. (The old `U16MSBOperation` gadget conflated both into one `Range` send.)
+  cols.b_msb * (cols.b_msb - 1) === 0
+  cols.c_msb * (cols.c_msb - 1) === 0
+  byteChannel.gatedReceive is_real
+    (⟨5, cols.b_msb, (input.b[3] - cols.b_lower_byte.low_bytes[3]) * Expression.const ((256 : ZMod p)⁻¹), 0⟩
+      : ByteRow (Expression (ZMod p)))
+  byteChannel.gatedReceive is_real
+    (⟨5, cols.c_msb, (input.c[3] - cols.c_lower_byte.low_bytes[3]) * Expression.const ((256 : ZMod p)⁻¹), 0⟩
+      : ByteRow (Expression (ZMod p)))
   byteChannel.gatedReceive is_real (⟨6, cols.carry[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.gatedReceive is_real (⟨6, cols.carry[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   byteChannel.gatedReceive is_real (⟨6, cols.carry[2], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))

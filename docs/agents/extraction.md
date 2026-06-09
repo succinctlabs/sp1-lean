@@ -111,9 +111,19 @@ struct, its `main : Var Inputs → Circuit Unit` do-block, and the `ElaboratedCi
 `@[circuit_norm]` rfl-lemmas — instead of the two flat lists. `update_extracted.py` writes this to
 `SP1Clean/Operations/<Op>/Extracted.lean` — the auto-generated member of the op's four-file
 directory (alongside the hand-written `Populate.lean`, `RawSpec.lean`, `Formal.lean`) — for every op
-in its `CIRCUIT_OPERATIONS` registry (currently `AddOperation`, `SubOperation`, `U16MSBOperation`,
-`U16CompareOperation`). The shared `Extracted/<Op>.lean` (column struct + `asserts`/`interactions`)
-still lives in `Extracted/`; only the circuit form moved into the per-op directory.
+in its `CIRCUIT_OPERATIONS` registry (`AddOperation`, `SubOperation`, `U16CompareOperation`,
+`U16MSBOperation`, `BitwiseOperation`, the `IsZero`/`IsZeroWord`/`IsEqualWord` chain, `AddwOperation`,
+`SubwOperation`, `AddrAddOperation`, `LtOperationUnsigned`, `LtOperationSigned`). The shared
+`Extracted/<Op>.lean` (column struct + `asserts`/`interactions`) still lives in `Extracted/`; only the
+circuit form moved into the per-op directory.
+
+When an op composes **≥2 sub-circuits** (`LtOperationSigned`: two `U16MSBOperation` + one
+`LtOperationUnsigned`), the nested `a ++ (b ++ c)` channel-list `⊆` goal does not close by the
+`channelsLawful` *default* tactic, so the compiler emits an explicit
+`channelsLawful := by simp [circuit_norm, main, <each sub>.circuit]` (unfolding the composed
+`.circuit`s locally — never as global `@[circuit_norm]` lemmas, which would collapse the
+`channelsWithRequirements = [] ∨ Assumptions` soundness requirement-tails of *every* composing chip).
+A 0- or 1-sub op omits the field (the default closes it).
 
 ```lean
 structure Inputs (F : Type) where           -- the `eval` params verbatim …

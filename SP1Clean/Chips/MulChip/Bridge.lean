@@ -191,7 +191,9 @@ theorem mul_chip_reaches_sail
     (cols.is_mulw = 1 →
         (spec_mulw (.Regidx rs2_idx) (.Regidx rs1_idx) (.Regidx rd_idx)).run s
           = (sp1_mul (.Regidx rd_idx) pc cols.a).run s) := by
-  obtain ⟨h_mul, h_mulh, h_mulhu, h_mulhsu, h_mulw⟩ := h_chip h_real
+  -- `MulChip.Spec` is now `RTypeReader.Spec ∧ is_real-binary ∧ (is_real = 1 → 5 flag conjuncts)`;
+  -- the arithmetic the bridge needs is the third conjunct.
+  obtain ⟨h_mul, h_mulh, h_mulhu, h_mulhsu, h_mulw⟩ := h_chip.2.2 h_real
   refine ⟨fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_, fun h => ?_⟩
   · exact correct_mul_native input.op_b_val input.op_c_val cols.a
       rs1_idx rs2_idx rd_idx pc s h_pc h_rs1 h_rs2 (h_mul h)

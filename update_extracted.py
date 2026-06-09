@@ -131,6 +131,10 @@ CIRCUIT_OPERATIONS: List[str] = [
     # most-significant differing limb pair; the flag/limb-selection constraints carry no byte pulls of
     # their own (all byte-bus activity lives inside the composed `U16CompareOperation`).
     "LtOperationUnsigned",
+    # Signed/unsigned word less-than: composes two `U16MSBOperation.circuit` (`assertion`, gated by
+    # `is_signed`) on the high limbs + one `LtOperationUnsigned.circuit` (`assertion`, free `is_real`) on
+    # the sign-adjusted words; the own tail is the five selector/gate asserts, no byte pulls of its own.
+    "LtOperationSigned",
 ]
 
 # Chip modules → `Extracted/<chip>Chip.lean` (column struct `<chip>Cols` + composed constraints).

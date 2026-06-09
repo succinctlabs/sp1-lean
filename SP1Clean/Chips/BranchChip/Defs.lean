@@ -1,6 +1,7 @@
 import SP1Clean.Specs.Chip
 import SP1Clean.Operations.AddOperation.Formal
-import SP1Clean.Operations.LtOperationSigned
+import SP1Clean.Operations.LtOperationSigned.Formal
+import SP1Clean.Operations.LtOperationSigned.Populate
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.ITypeReaderImmutable
 import SP1Clean.Foundations.Channels
@@ -92,7 +93,18 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
     #v[br * env branch_value[0] + (re - br) * env fall_value[0],
        br * env branch_value[1] + (re - br) * env fall_value[1],
        br * env branch_value[2] + (re - br) * env fall_value[2]])
-  let cmp ← subcircuit LtOperationSigned.circuit ⟨rs1WordV, rs2WordV, is_blt + is_bge⟩
+  -- The chip witnesses the `LtOperationSigned` column block (unsigned compare + two sign bits) via
+  -- `populate` (`is_signed := is_blt + is_bge`), placed at the same offset the old subcircuit occupied,
+  -- then composes `LtOperationSigned.circuit` as a Clean `assertion` (a `FormalAssertion`).
+  let lt_cols ← ProvableType.witness (fun env =>
+    LtOperationSigned.populate
+      #v[env input.adapter.op_a_memory.prev_value[0], env input.adapter.op_a_memory.prev_value[1],
+         env input.adapter.op_a_memory.prev_value[2], env input.adapter.op_a_memory.prev_value[3]]
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env (is_blt + is_bge)) (env input.is_real))
+  let cmp := lt_cols
+  assertion LtOperationSigned.circuit ⟨rs1WordV, rs2WordV, lt_cols, is_blt + is_bge, input.is_real⟩
   is_beq * (is_beq - 1) === 0
   is_bne * (is_bne - 1) === 0
   is_blt * (is_blt - 1) === 0
