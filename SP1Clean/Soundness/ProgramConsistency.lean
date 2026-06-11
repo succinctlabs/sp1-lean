@@ -207,7 +207,7 @@ theorem programLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
   -- `toAccess` the lone emit (the kernel matches the `_root_.emitted` form `circuit_norm` leaves),
   -- then bind to `programLookups` via the realisation hypotheses
-  simp only [toAccess_emitted_program]
+  simp only [toAccess_pushIf_program]
   simp [circuit_norm, signedVal_is_real hp2 h_real, programLookups, programAccess,
     h_it, h_p0, h_p1, h_p2, h_oc, h_oa, h_ob, h_ob1, h_ob2, h_ob3, h_immb,
     h_oct, h_oc1, h_oc2, h_oc3, h_immc, h_oa0, ZMod.val_zero]

@@ -114,7 +114,7 @@ def main (input : Var Inputs (ZMod p)) :
   -- `Extracted/AddressOperation.lean`), not a `ToBits` bit-decomposition: the offset decomposition
   -- `(value[0] - 4·b₂ - 2·b₁ - b₀)/8 < 2^13` as a `byteChannel` `Range` receive (mult `1` — the gadget
   -- runs at `is_real = 1`, like the composed `AddrAddOperation` assertion's sends).
-  byteChannel.gatedReceive 1
+  byteChannel.pullIf 1
     (⟨6, (value[0] - 4 * input.offset_bit2 - 2 * input.offset_bit1 - input.offset_bit0) * (8 : ZMod p)⁻¹,
        Expression.const ((13 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   return ⟨⟨value⟩, inv[0]⟩
@@ -125,8 +125,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Extracted.AddressOperati
   localLength _ := 3 + 1
   output _ i0 := ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩
   -- byte-bus channels propagated from the AddrAddOperation assertion.
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
@@ -140,11 +140,11 @@ set_option linter.unusedSectionVars false in
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees
-      : List (RawChannel (ZMod p))) = [byteChannel.toRawGated] := rfl
+      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements
-      : List (RawChannel (ZMod p))) = [byteChannel.toRawGated] := rfl
+      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 
 set_option maxHeartbeats 4000000 in
 theorem soundness : Soundness (ZMod p) main Assumptions Spec := by

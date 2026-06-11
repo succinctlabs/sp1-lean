@@ -68,19 +68,19 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   output _ _ := ()
   -- the composed timestamp sub-assertion's two checks are gated receives (mult `-is_real`):
   -- `byteChannel` is in BOTH the guarantee and the requirement list.
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
 
 -- Expose the declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
 -- `RTypeReader`'s `channelsLawful` / `circuit_proof_start` is discharged automatically.
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees
-      : List (RawChannel (ZMod p))) = [byteChannel.toRawGated] := rfl
+      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements
-      : List (RawChannel (ZMod p))) = [byteChannel.toRawGated] := rfl
+      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -109,9 +109,6 @@ def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness }
-
--- The emitted=projection helpers for the Memory/Program buses do not apply here: the Memory bus is the
--- *asymmetric* `memoryChannel.toRawGatedAsym memorySendReq`, so `memoryChannel.toRaw`-form lemmas do not apply.
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

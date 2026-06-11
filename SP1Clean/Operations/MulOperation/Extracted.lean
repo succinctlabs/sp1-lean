@@ -28,36 +28,36 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   -- `E7 = (b[3]-low[3])/256`. (The old `U16MSBOperation` gadget conflated both into one `Range` send.)
   cols.b_msb * (cols.b_msb - 1) === 0
   cols.c_msb * (cols.c_msb - 1) === 0
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨5, cols.b_msb, (input.b[3] - cols.b_lower_byte.low_bytes[3]) * Expression.const ((256 : ZMod p)⁻¹), 0⟩
       : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨5, cols.c_msb, (input.c[3] - cols.c_lower_byte.low_bytes[3]) * Expression.const ((256 : ZMod p)⁻¹), 0⟩
       : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[2], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[3], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[4], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[5], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[6], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[7], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[8], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[9], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[10], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[11], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[12], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[13], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[14], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.carry[15], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[0], cols.product[1]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[2], cols.product[3]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[4], cols.product[5]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[6], cols.product[7]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[8], cols.product[9]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[10], cols.product[11]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[12], cols.product[13]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨3, 0, cols.product[14], cols.product[15]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[2], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[3], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[4], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[5], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[6], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[7], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[8], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[9], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[10], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[11], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[12], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[13], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[14], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.carry[15], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[0], cols.product[1]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[2], cols.product[3]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[4], cols.product[5]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[6], cols.product[7]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[8], cols.product[9]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[10], cols.product[11]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[12], cols.product[13]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨3, 0, cols.product[14], cols.product[15]⟩ : ByteRow (Expression (ZMod p)))
   cols.b_sign_extend === (input.is_mulh + input.is_mulhsu) * cols.b_msb
   cols.c_sign_extend === input.is_mulh * cols.c_msb
   cols.b_sign_extend * (cols.b_msb - 1) === 0
@@ -83,8 +83,8 @@ set_option maxHeartbeats 40000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
   localLength_eq := by
     simp +arith [circuit_norm, main, U16toU8OperationSafe.circuit, U16MSBOperation.circuit]
   subcircuitsConsistent := by
@@ -96,11 +96,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl

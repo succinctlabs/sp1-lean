@@ -58,8 +58,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let E14 := E12 * E13
   let E15 := is_real * E14
   assertion U16MSBOperation.circuit ⟨cols.value[1], { msb := cols.msb.msb }, is_real⟩
-  byteChannel.gatedReceive is_real (⟨6, cols.value[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨6, cols.value[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.value[0], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨6, cols.value[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   E1 === 0
   E8 === 0
   E15 === 0
@@ -67,17 +67,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl

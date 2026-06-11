@@ -56,8 +56,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var (AddCols) (ZMod p
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddCols main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]
   localLength _ := 4
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.AddChip

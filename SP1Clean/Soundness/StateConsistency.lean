@@ -10,12 +10,12 @@ emission → bus data → trace consistency). Each row's CPUState fragment contr
 interactions (`Extracted/CPUState.lean`):
 
 - `receive (.state clk_high clk_low pc) is_real` and
-- `send (.state clk_high (clk_low + 8) next_pc) is_real`.
+- `send (.state clk_high (clk_low + clk_inc) next_pc) is_real`.
 
 Each row projects to a signed pair of `LookupAccess` contributions (`stateLookups`, receive negative /
 send positive, both `is_real`-gated) feeding `Foundations/InteractionBus.lean`, and to a `StateAccess`
 record whose adjacent-pair consistency is the **PC chain** `pcChainProp` (`a.next_pc = b.pc`, clock
-advances by 8).
+advances by the row's `clk_inc` — 8 for every current chip).
 
 ## Honest scope
 
@@ -33,58 +33,65 @@ open SP1Clean.LookupAccessList
 variable {p : ℕ}
 
 /-- Per-row state-bus record: clock components (`clk_high`, recombined `clk_low`), current `pc`, the
-row's claimed `next_pc`, and the `is_real` gate. -/
+row's claimed `next_pc`, the per-row clock advance `clk_inc`, and the `is_real` gate. -/
 structure StateAccess (F : Type) where
   clk_high : F
   clk_low : F
   pc : Vector F 3
   next_pc : Vector F 3
+  /-- The per-row clock advance — 8 for every current chip; syscall rows advance by 256 (SP1 syscall
+  semantics), consumed by the future ECALL/HALT chip (W5). -/
+  clk_inc : F
   is_real : F
 
 /-- State-access projection for a row: `next_pc` is the row's committed transition target (the chip
 supplies `#v[pc[0]+4, pc[1], pc[2]]` for a straight-line chip, a data-dependent target for control
 flow), `clk_low` recombines the 16-bit clock split, `is_real` is the committed selector. Mirrors
-`Extracted/CPUState.lean`'s call shape (`clk_increment = 8`). -/
+`Extracted/CPUState.lean`'s call shape. `clk_inc := 8` because all 25 current chips advance the clock
+by 8; when a `RowView`-level increment lands with the ECALL/HALT chip (W5, syscall rows advance by
+256), this projection changes to read it from the row. -/
 def stateAccess (r : Trace.RowView (ZMod p)) : StateAccess (ZMod p) :=
   { clk_high := r.state.clk_high,
     clk_low := r.state.clk_0_16 + r.state.clk_16_24 * 65536,
     pc := r.state.pc,
     next_pc := r.next_pc,
+    clk_inc := 8,
     is_real := r.is_real }
 
 /-- The two signed State-bus contributions an Add row emits: `receive` at the current `(clk, pc)`
-with `-is_real`, `send` at `(clk + 8, next_pc)` with `+is_real`. On padding rows (`is_real = 0`) both
-multiplicities vanish (`stateLookups_padding`). -/
+with `-is_real`, `send` at `(clk + clk_inc, next_pc)` with `+is_real`. On padding rows (`is_real = 0`)
+both multiplicities vanish (`stateLookups_padding`). -/
 def stateLookups (r : Trace.RowView (ZMod p)) : LookupAccessList :=
   let sa := stateAccess r
   [ (.State, "SP1State",
       [sa.clk_high.val, sa.clk_low.val, sa.pc[0].val, sa.pc[1].val, sa.pc[2].val],
       -(sa.is_real.val : ℤ)),
     (.State, "SP1State",
-      [sa.clk_high.val, (sa.clk_low + 8).val,
+      [sa.clk_high.val, (sa.clk_low + sa.clk_inc).val,
         sa.next_pc[0].val, sa.next_pc[1].val, sa.next_pc[2].val],
       (sa.is_real.val : ℤ)) ]
 
 /-- The PC-chain predicate: every adjacent pair of *real* rows agrees on the PC handoff
-(`a.next_pc = b.pc`) and the encoded clock advances by exactly `clkIncrement`. Padding pairs are
-vacuous. -/
-def pcChainProp (clkIncrement : ZMod p) : List (StateAccess (ZMod p)) → Prop
+(`a.next_pc = b.pc`) and the encoded clock advances by exactly the leading row's `clk_inc` (8 for
+every current chip; per-access so a future mixed-increment trace — syscall rows advance by 256 —
+type-checks). Padding pairs are vacuous. -/
+def pcChainProp : List (StateAccess (ZMod p)) → Prop
   | [] => True
   | [_] => True
   | a :: b :: rest =>
       (a.is_real ≠ 0 ∧ b.is_real ≠ 0 →
         a.next_pc = b.pc ∧
-        a.clk_high * (2 ^ 24 : ZMod p) + a.clk_low + clkIncrement =
+        a.clk_high * (2 ^ 24 : ZMod p) + a.clk_low + a.clk_inc =
           b.clk_high * (2 ^ 24 : ZMod p) + b.clk_low) ∧
-      pcChainProp clkIncrement (b :: rest)
+      pcChainProp (b :: rest)
 
 /-- Aggregate the trace into its per-row state-access list, in chronological order. -/
 def aggregateStateAccesses (rows : List (Trace.RowView (ZMod p))) : List (StateAccess (ZMod p)) :=
   rows.map stateAccess
 
 /-- Trace-shape State-bus invariant: the aggregated accesses satisfy the PC chain. -/
-structure TraceStateValid (rows : List (Trace.RowView (ZMod p))) (clkIncrement : ZMod p) : Prop where
-  chain_holds : pcChainProp clkIncrement (aggregateStateAccesses rows)
+structure TraceStateValid (rows : List (Trace.RowView (ZMod p))) : Prop where
+  chain_holds : pcChainProp (aggregateStateAccesses rows)
 
 /-- State-bus boundary: the first row's `pc` equals the verifier-committed `initial_pc`, the last
 row's `next_pc` equals `final_pc`. These tie the on-chain PC chain to externally visible state. -/
@@ -94,24 +101,24 @@ structure TraceStateBoundary (rows : List (Trace.RowView (ZMod p)))
   final_match : (rows.getLast?).map (fun r => (stateAccess r).next_pc) = some final_pc
 
 /-- The aggregated accesses satisfy the PC chain under `TraceStateValid` (direct projection). -/
-theorem aggregateStateAccesses_pcChain (rows : List (Trace.RowView (ZMod p))) (clkIncrement : ZMod p)
-    (h : TraceStateValid rows clkIncrement) :
-    pcChainProp clkIncrement (aggregateStateAccesses rows) :=
+theorem aggregateStateAccesses_pcChain (rows : List (Trace.RowView (ZMod p)))
+    (h : TraceStateValid rows) :
+    pcChainProp (aggregateStateAccesses rows) :=
   h.chain_holds
 
 /-- **The crux (threaded; residual named).** The per-adjacent-pair PC handoff + clock advance.
 `state_successor_of_balance` derives, from the balanced State bus via `balanced_pos_has_neg`, that every
-real row's `(clk+8, next_pc)` send key is cancelled by some real row's `(clk, pc)` receive — a `+8`
-PC-handoff successor *exists*. The residual gap to `pcChainProp` is pinning that successor to the
-*adjacent* list position: `clkInjective` (uniqueness) + the clock-advance side condition `TraceClkAdvance`
-(stated as `pcChain_of_balance_and_clkInj`). Until that adjacency induction is closed, the chain is
-threaded as an honest assumption. -/
-def TraceStateLink (rows : List (Trace.RowView (ZMod p))) (clkIncrement : ZMod p) : Prop :=
-  pcChainProp clkIncrement (aggregateStateAccesses rows)
+real row's `(clk+clk_inc, next_pc)` send key is cancelled by some real row's `(clk, pc)` receive — a
+`clk_inc` PC-handoff successor *exists*. The residual gap to `pcChainProp` is pinning that successor to
+the *adjacent* list position: `clkInjective` (uniqueness) + the clock-advance side condition
+`TraceClkAdvance` (stated as `pcChain_of_balance_and_clkInj`). Until that adjacency induction is closed,
+the chain is threaded as an honest assumption. -/
+def TraceStateLink (rows : List (Trace.RowView (ZMod p))) : Prop :=
+  pcChainProp (aggregateStateAccesses rows)
 
 /-- Discharge of `TraceStateValid` from the threaded state link (a re-bundling). -/
-theorem traceStateValid_of_stateLink (rows : List (Trace.RowView (ZMod p))) (clkIncrement : ZMod p)
-    (h_link : TraceStateLink rows clkIncrement) : TraceStateValid rows clkIncrement :=
+theorem traceStateValid_of_stateLink (rows : List (Trace.RowView (ZMod p)))
+    (h_link : TraceStateLink rows) : TraceStateValid rows :=
   ⟨h_link⟩
 
 /-- **Gating is real.** A padding row (`is_real = 0`) contributes zero to *every* State-bus key: both
@@ -125,26 +132,40 @@ theorem stateLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_r
   simp only [stateLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, hz, neg_zero,
     ite_self, add_zero]
 
+/-- **Gated multiplicities are `{-1, 0, 1}`.** For a binary `is_real` row, both `stateLookups`
+contributions carry multiplicity `±is_real.val ∈ {-1, 0, 1}` — the multiplicity bound the field → ℤ
+balance translation (`isConsistentBalanced_of_intCast_zero`, `GatedVm/BalanceMod.lean`) consumes. -/
+theorem stateLookups_mult_binary (hp : 2 < p) (r : Trace.RowView (ZMod p))
+    (h_real : r.is_real = 0 ∨ r.is_real = 1) :
+    ∀ a ∈ stateLookups r, multOf a = -1 ∨ multOf a = 0 ∨ multOf a = 1 := by
+  intro a ha
+  have hv := val_of_binary hp h_real
+  simp only [stateLookups, List.mem_cons, List.not_mem_nil, or_false] at ha
+  rcases ha with rfl | rfl <;>
+    · simp only [multOf, stateAccess]
+      omega
+
 /-- **Successor exists (from State balance).** On a balanced State bus, every real row `a`'s `send` key
-`(clk_high, clk_low+8, next_pc)` is cancelled by the `receive` of some real row `b` — so `b`'s current
-`(clk_high, clk_low, pc)` equals `a`'s claimed `(clk_high, clk_low+8, next_pc)` as field values
-(val-injectivity). The closed-bus, order-sensitive analogue of `byteAccessValid_of_balance`: per real row it
-derives that a `+8` PC-handoff successor *exists* in the trace. Pinning that successor to the *adjacent* row
-— i.e. `pcChainProp` — additionally needs whole-trace clock injectivity (`clkInjective`); this lemma is the
-provable membership-style half. The clock conclusion stays at `ZMod p` level (one `ZMod.val_injective`), so
-no `2^24 < p` bound is needed and `+8` wraparound is irrelevant. -/
+`(clk_high, clk_low+clk_inc, next_pc)` is cancelled by the `receive` of some real row `b` — so `b`'s
+current `(clk_high, clk_low, pc)` equals `a`'s claimed `(clk_high, clk_low+clk_inc, next_pc)` as field
+values (val-injectivity). The closed-bus, order-sensitive analogue of `byteAccessValid_of_balance`: per
+real row it derives that a `clk_inc` PC-handoff successor *exists* in the trace. Pinning that successor
+to the *adjacent* row — i.e. `pcChainProp` — additionally needs whole-trace clock injectivity
+(`clkInjective`); this lemma is the provable membership-style half. The clock conclusion stays at
+`ZMod p` level (one `ZMod.val_injective`), so no `2^24 < p` bound is needed and `+clk_inc` wraparound is
+irrelevant. -/
 theorem state_successor_of_balance [NeZero p]
     (rows : List (Trace.RowView (ZMod p)))
     (h_bal : isConsistentBalanced (aggregateChipRows rows stateLookups))
     (a : Trace.RowView (ZMod p)) (ha : a ∈ rows) (h_real : a.is_real ≠ 0) :
     ∃ b ∈ rows, b.is_real ≠ 0 ∧
       b.state.clk_high = a.state.clk_high ∧
-      (stateAccess b).clk_low = (stateAccess a).clk_low + 8 ∧
+      (stateAccess b).clk_low = (stateAccess a).clk_low + (stateAccess a).clk_inc ∧
       (stateAccess b).pc = (stateAccess a).next_pc := by
   -- `a`'s send contribution (the 2nd element of `stateLookups a`), a strictly-positive bus entry
   set send : LookupAccess :=
     (.State, "SP1State",
-      [(stateAccess a).clk_high.val, ((stateAccess a).clk_low + 8).val,
+      [(stateAccess a).clk_high.val, ((stateAccess a).clk_low + (stateAccess a).clk_inc).val,
         (stateAccess a).next_pc[0].val, (stateAccess a).next_pc[1].val, (stateAccess a).next_pc[2].val],
       ((stateAccess a).is_real.val : ℤ)) with hsend
   have h_send_mem : send ∈ aggregateChipRows rows stateLookups :=
@@ -189,40 +210,43 @@ def clkInjective (accs : List (StateAccess (ZMod p))) : Prop :=
 /-! ## The PC chain from balance
 
 `state_successor_of_balance` is the order-insensitive half: from the balanced State bus it derives that
-every real row's `(clk+8, next_pc)` send key is matched by *some* real row's `(clk, pc)` receive — a `+8`
-PC-handoff successor *exists*. Below the adjacency gap is closed: with whole-trace clock injectivity
-(`clkInjective`) and the **clock-advance** side condition (`TraceClkAdvance`, consecutive real rows'
-encoded clocks differ by exactly `8`), the successor is pinned to the *adjacent* row, yielding the full
-`pcChainProp`. The bus balance supplies the **PC-handoff** half (`a.next_pc = b.pc`); the **clock-advance**
-half is assumed as `TraceClkAdvance` (enforced by the state chip's own `clk_low + 8` constraint, not by
-the bus — a future clock-link pass discharges it from per-row Specs). -/
+every real row's `(clk+clk_inc, next_pc)` send key is matched by *some* real row's `(clk, pc)` receive —
+a `clk_inc` PC-handoff successor *exists*. Below the adjacency gap is closed: with whole-trace clock
+injectivity (`clkInjective`) and the **clock-advance** side condition (`TraceClkAdvance`, consecutive
+real rows' encoded clocks differ by exactly the leading row's `clk_inc`), the successor is pinned to the
+*adjacent* row, yielding the full `pcChainProp`. The bus balance supplies the **PC-handoff** half
+(`a.next_pc = b.pc`); the **clock-advance** half is assumed as `TraceClkAdvance` (enforced by the state
+chip's own `clk_low + clk_inc` constraint, not by the bus — a future clock-link pass discharges it from
+per-row Specs). -/
 
 /-- The per-adjacent-pair relation `pcChainProp` recurses on (the first conjunct of its `a :: b :: rest`
-case): for real rows, the PC handoff `a.next_pc = b.pc` and the encoded-clock advance by `clkIncrement`. -/
-def pcStep (clkIncrement : ZMod p) (a b : StateAccess (ZMod p)) : Prop :=
+case): for real rows, the PC handoff `a.next_pc = b.pc` and the encoded-clock advance by the leading
+row's `clk_inc`. -/
+def pcStep (a b : StateAccess (ZMod p)) : Prop :=
   a.is_real ≠ 0 ∧ b.is_real ≠ 0 →
     a.next_pc = b.pc ∧
-    a.clk_high * (2 ^ 24 : ZMod p) + a.clk_low + clkIncrement =
+    a.clk_high * (2 ^ 24 : ZMod p) + a.clk_low + a.clk_inc =
       b.clk_high * (2 ^ 24 : ZMod p) + b.clk_low
 
-/-- The clock-advance-only relation: for real rows, the encoded clock advances by `clkIncrement`. The
-clock half of `pcStep`, isolated so it can be assumed as a standalone trace-shape side condition. -/
-def clkStep (clkIncrement : ZMod p) (a b : StateAccess (ZMod p)) : Prop :=
+/-- The clock-advance-only relation: for real rows, the encoded clock advances by the leading row's
+`clk_inc`. The clock half of `pcStep`, isolated so it can be assumed as a standalone trace-shape side
+condition. -/
+def clkStep (a b : StateAccess (ZMod p)) : Prop :=
   a.is_real ≠ 0 ∧ b.is_real ≠ 0 →
-    a.clk_high * (2 ^ 24 : ZMod p) + a.clk_low + clkIncrement =
+    a.clk_high * (2 ^ 24 : ZMod p) + a.clk_low + a.clk_inc =
       b.clk_high * (2 ^ 24 : ZMod p) + b.clk_low
 
 /-- **Clock-advance trace-shape side condition.** Adjacent real rows' encoded clocks differ by exactly
-`clkIncrement`. Enforced by the state chip's `clk_low + clkIncrement` constraint (a future pass discharges it
-from per-row Specs); the residual that — with `clkInjective` — upgrades the existential
+the leading row's `clk_inc`. Enforced by the state chip's `clk_low + clk_inc` constraint (a future pass
+discharges it from per-row Specs); the residual that — with `clkInjective` — upgrades the existential
 `state_successor_of_balance` to the adjacent `pcChainProp`. -/
-def TraceClkAdvance (clkIncrement : ZMod p) (accs : List (StateAccess (ZMod p))) : Prop :=
-  List.IsChain (clkStep clkIncrement) accs
+def TraceClkAdvance (accs : List (StateAccess (ZMod p))) : Prop :=
+  List.IsChain clkStep accs
 
 /-- `pcChainProp` is exactly the `List.IsChain` of its per-pair relation `pcStep` — so the adjacency
 characterization `List.isChain_iff_getElem` applies. -/
-theorem pcChainProp_iff_isChain (clkIncrement : ZMod p) (l : List (StateAccess (ZMod p))) :
-    pcChainProp clkIncrement l ↔ List.IsChain (pcStep clkIncrement) l := by
+theorem pcChainProp_iff_isChain (l : List (StateAccess (ZMod p))) :
+    pcChainProp l ↔ List.IsChain pcStep l := by
   induction l with
   | nil => exact ⟨fun _ => List.isChain_nil, fun _ => trivial⟩
   | cons a t IH =>
@@ -248,22 +272,23 @@ theorem clkInjective_getElem {rows : List (Trace.RowView (ZMod p))}
 
 /-- **Adjacent PC handoff from balance.** For adjacent real rows `i, i+1`, the balanced State bus + clock
 injectivity + the clock-advance side condition force `next_pc(i) = pc(i+1)`. *Proof:*
-`state_successor_of_balance` gives a real row `b'` with `clk(b') = clk(i)+8 ∧ pc(b') = next_pc(i)`;
-`TraceClkAdvance` gives `clk(i+1) = clk(i)+8`; `clkInjective` forces `b' = rows[i+1]`; transport the PC eq. -/
+`state_successor_of_balance` gives a real row `b'` with `clk(b') = clk(i)+clk_inc(i) ∧ pc(b') = next_pc(i)`;
+`TraceClkAdvance` gives `clk(i+1) = clk(i)+clk_inc(i)`; `clkInjective` forces `b' = rows[i+1]`; transport
+the PC eq. -/
 theorem state_adjacent_pc_handoff [NeZero p]
     (rows : List (Trace.RowView (ZMod p)))
     (h_bal : isConsistentBalanced (aggregateChipRows rows stateLookups))
     (h_inj : clkInjective (aggregateStateAccesses rows))
-    (h_clk : TraceClkAdvance 8 (aggregateStateAccesses rows))
+    (h_clk : TraceClkAdvance (aggregateStateAccesses rows))
     {i : ℕ} (hi1 : i + 1 < rows.length)
     (h_areal : (rows[i]'(by omega)).is_real ≠ 0)
     (h_breal : (rows[i + 1]'hi1).is_real ≠ 0) :
     (stateAccess (rows[i]'(by omega))).next_pc = (stateAccess (rows[i + 1]'hi1)).pc := by
   have hi : i < rows.length := by omega
-  -- the `+8` successor that exists by balance
+  -- the `clk_inc` successor that exists by balance
   obtain ⟨b', hb'_mem, hb'_real, hb'_ch, hb'_cl, hb'_pc⟩ :=
     state_successor_of_balance rows h_bal (rows[i]'hi) (List.getElem_mem hi) h_areal
-  -- clock-advance at the adjacent pair: clk(i) + 8 = clk(i+1)
+  -- clock-advance at the adjacent pair: clk(i) + clk_inc(i) = clk(i+1)
   have hlen : (aggregateStateAccesses rows).length = rows.length := by simp [aggregateStateAccesses]
   have h_step := (List.isChain_iff_getElem.mp h_clk) i (by rw [hlen]; omega)
   simp only [aggregateStateAccesses, List.getElem_map] at h_step
@@ -284,7 +309,7 @@ theorem state_adjacent_pc_handoff [NeZero p]
   have hpc_eq : (stateAccess (rows[i + 1]'hi1)).pc = (stateAccess (rows[i + 1]'hk)).pc := rfl
   rw [hpc_eq, hk_eq, hb'_pc]
 
-/-- **The PC chain from balance.** Discharges `pcChainProp 8` — and hence
+/-- **The PC chain from balance.** Discharges `pcChainProp` — and hence
 `TraceStateLink` — from the balanced State bus + clock injectivity + the clock-advance side condition. The
 adjacency induction over `List.isChain_iff_getElem` keeps the *full* `rows`/`h_bal`/`h_inj` fixed (peeling a
 row would break balance, which `balanced_pos_has_neg` matches against the whole trace): each adjacent pair's
@@ -293,8 +318,8 @@ theorem pcChain_of_balance_and_clkInj [NeZero p]
     (rows : List (Trace.RowView (ZMod p)))
     (h_bal : isConsistentBalanced (aggregateChipRows rows stateLookups))
     (h_inj : clkInjective (aggregateStateAccesses rows))
-    (h_clk : TraceClkAdvance 8 (aggregateStateAccesses rows)) :
-    pcChainProp 8 (aggregateStateAccesses rows) := by
+    (h_clk : TraceClkAdvance (aggregateStateAccesses rows)) :
+    pcChainProp (aggregateStateAccesses rows) := by
   have hlen : (aggregateStateAccesses rows).length = rows.length := by simp [aggregateStateAccesses]
   rw [pcChainProp_iff_isChain, List.isChain_iff_getElem]
   intro i hi
@@ -338,18 +363,19 @@ theorem stateLookups_eq_emitted [Fact p.Prime] [Fact (2 ^ 17 < p)]
     (h_clk : Expression.eval env input_var.clk_inc = 8) :
     stateLookups r =
       (((Readers.CPUState.main (p := p) input_var).operations offset).interactionsWith
-          stateChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          stateChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   -- recover the two State interactions from `main` (unfold + `circuit_norm`; the
-  -- `byteChannel.toRawGated ≠ stateChannel.toRawGated` distinctness lemmas filter out the byte pulls).
-  simp only [Readers.CPUState.main, circuit_norm]
-  -- `hk` is the gated kernel `toAccess_emittedGated_state`; it `rw`s against the recovered interactions.
+  -- `byteChannel.toRaw ≠ stateChannel.toRaw` distinctness lemma filters out the byte pulls).
+  simp only [Readers.CPUState.main, circuit_norm,
+    Channels.byteChannel_eq_stateChannel_false, if_false]
+  -- `hk` is the gated kernel `toAccess_pushIf_state`; it `rw`s against the recovered interactions.
   have hk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (stateChannel.emittedGated m s) =
+      AbstractInteraction.toAccess env ((pushIf (channel := stateChannel) m s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
-    fun m s => toAccess_emittedGated_state env m s
+    fun m s => toAccess_pushIf_state env m s
   simp only [hk]
   -- `cols`/`next_pc`/`clk_inc` are reader *inputs*; their evals are pinned by the binding hypotheses
   -- (`h_*`/`h_np*`/`h_clk`); `circuit_norm` distributes `eval` over the `clk_low` sum (+ `clk_inc`).

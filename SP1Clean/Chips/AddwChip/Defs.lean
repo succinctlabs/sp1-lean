@@ -57,8 +57,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AddwCols main where
   channelsLawful := by simp [circuit_norm, main, AddwOperation.circuit, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit]
   -- 2 result limbs + 1 sign bit; readers are `assertion`s (`localLength 0`).
   localLength _ := 3
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.AddwChip

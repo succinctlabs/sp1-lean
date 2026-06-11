@@ -23,7 +23,7 @@ future chip. Keep these files axiom-clean.
 ### 1. `Operations/<Op>Operation.lean` — witnessed gadget
 - Namespace `SP1Clean.<Op>Operation`. Variable block `{p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]`.
 - `main`: witness the result limbs/bytes; impose byte/range checks as **`byteChannel` pulls**
-  (`byteChannel.gatedReceive input.is_real ⟨opcode, is_real * value, width, 0⟩`, `Foundations/Channels.lean`)
+  (`byteChannel.pullIf input.is_real ⟨opcode, is_real * value, width, 0⟩`, `Foundations/Channels.lean`)
   — the single shared byte foundation, faithful to SP1's `send_byte`. The legacy local-column
   `Gadgets.ToBits.rangeCheck` / `ByteXorTable` + opcode-selected Lagrange pattern is **superseded** (kept
   only in `BitwiseU16Operation`, which can't compose the byte-level op — FormalCircuit duality). See

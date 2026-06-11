@@ -303,11 +303,13 @@ import SP1Clean.Soundness.GatedVm.SailDispatch
 import SP1Clean.Soundness.GatedVm.StateBridge
 import SP1Clean.Soundness.InstructionTrace
 import SP1Clean.Soundness.MemoryConsistency
+import SP1Clean.Soundness.MemoryIsU64
 import SP1Clean.Soundness.Opcode
 import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Soundness.SP1GatedVm
 import SP1Clean.Soundness.StateConsistency
+import SP1Clean.Soundness.TargetVm
 import SP1Clean.Specs.Chip
 import SP1Clean.Specs.Operation
 import SP1Clean.Specs.Reader

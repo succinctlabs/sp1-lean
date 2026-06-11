@@ -23,7 +23,7 @@ U8-range-checked via an inline `ByteOpcode.U8Range` pair) and its sign bit `msb`
 `#v[selected_byte + 65280·msb, 65535·msb, 65535·msb, 65535·msb]` (the byte sign-extends *within* limb 0).
 
 Unlike `LoadWord`/`LoadHalf` (which compose `U16MSBOperation` as a sub-gadget), SP1 inlines the byte-bus
-lookups, so this chip emits them directly via `byteChannel.gatedReceive` (witnessing nothing). -/
+lookups, so this chip emits them directly via `byteChannel.pullIf` (witnessing nothing). -/
 
 namespace SP1Clean.LoadByteChip
 
@@ -72,9 +72,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LoadByteColumns (
       input.state.clk_0_16 + input.state.clk_16_24 * 65536,
       addr_op.addr_operation.value[0], addr_op.addr_operation.value[1], addr_op.addr_operation.value[2],
       input.memory_access.prev_value, is_real⟩
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨3, 0, input.selected_limb_low_byte, high⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive input.is_lb
+  byteChannel.pullIf input.is_lb
     (⟨5, input.msb, input.selected_byte, 0⟩ : ByteRow (Expression (ZMod p)))
   assertion Readers.ITypeReader.circuit
     ⟨input.adapter, is_real, is_real, input.state.clk_high,
@@ -110,9 +110,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadByteColumns main whe
       input.memory_access, input.offset_bit, input.selected_limb, input.selected_limb_low_byte,
       input.selected_byte, input.msb, input.is_lb, input.is_lbu⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the (LB-gated) sign-bit
 fact, the four limb-selection equations, the byte-mux equation, the `op_a != x0` flag, the `is_lbu·msb`

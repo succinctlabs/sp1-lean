@@ -9,7 +9,7 @@ namespace SP1Clean.LoadByteChip
 
 open Circuit
 open Extracted (LoadByteColumns)
-open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -104,19 +104,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_addr_spec := h_addr h_addr_as
   simp only [eob0, eob1, eob2] at h_addr_spec
   have h_it := h_itype h_bin
-  -- the byte-padding requirement for an inline gated receive on a non-real row.
-  have pad_u8 : ¬-(input_is_lb + input_is_lbu) = -1 → ¬-(input_is_lb + input_is_lbu) = 0 →
-      byteChannel.Guarantees (⟨3, 0, input_selected_limb_low_byte,
-        (input_selected_limb + -input_selected_limb_low_byte) * (256 : ZMod p)⁻¹⟩
-          : ByteRow (ZMod p)) env.data :=
-    binary_gate_req_vacuous h_bin _
-  have pad_msb : ¬-input_is_lb = -1 → ¬-input_is_lb = 0 →
-      byteChannel.Guarantees (⟨5, input_msb, input_selected_byte, 0⟩ : ByteRow (ZMod p)) env.data :=
-    binary_gate_req_vacuous h_lb_bin _
   refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
       fun h1 => ⟨(h_u8 h1).1, (h_u8 h1).2, h_byte_lt h1⟩, h_msb_fact,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, hmux_eq, h_op_a_0, h_msbgate, h_lb_bin, h_lbu_bin, h_bin⟩,
-    Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, pad_u8, pad_msb, Or.inr h_bin⟩
+    Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
 
 /-- Prover-side row well-formedness: the address facts + selector binaries + `op_a_0 = 0` + the byte
 value bounds + the sign-bit fact + the limb-selection / byte-mux equations + the reader `Spec`s. -/
@@ -211,11 +202,11 @@ theorem completeness :
   · simp only [epc0, epc1, epc2]; exact h_cpu
   · exact hbin
   · exact h_mem
-  · -- U8Range-pair receive obligation (real row); value is raw (`toRawGated`).
+  · -- U8Range-pair receive obligation (real row); value is raw (`toRaw` (gated post-#398)).
     intro _
     simp only [byteChannel]; rw [← sub_eq_add_neg]
     exact (byteRowSpec_u8range_pair _ _).mpr ⟨hlo_pa, hhi_pa⟩
-  · -- MSB receive obligation (real LB row); value is raw (`toRawGated`).
+  · -- MSB receive obligation (real LB row); value is raw (`toRaw` (gated post-#398)).
     intro _
     simp only [byteChannel]
     exact (byteRowSpec_msb _ _).mpr ⟨⟨h_msb_lt, hbyte_pa⟩, h_msb_bin, h_msb_iff⟩

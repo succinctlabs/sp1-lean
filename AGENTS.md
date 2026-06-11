@@ -81,7 +81,11 @@ Mirror-rust layout under `SP1Clean/`:
   routing table mirroring SP1's `tracing.rs`/`RiscvAir`), `InstructionTrace.lean` (instruction-sequence →
   `ChipRow`-sequence map, mirroring `ExecutionRecord`/`generate_trace`), and `Completeness.lean`
   (partial-VM-completeness scaffold). The bespoke `MachineSoundness`/`MachineConsistency` `TraceValid`
-  capstone was retired 2026-06-05 — the gated path is the sole capstone.
+  capstone was retired 2026-06-05 — the gated path is the sole capstone. `TargetVm.lean` is the
+  **target machine-level theorem** (`Target.sp1_target_execution`: trail → real `try_step` Sail chain
+  from a loaded `GuestProgram` to the halting ECALL, walk induction proved; the open gaps are the
+  named `TargetObligations` seams, mapped to roadmap W-items). Audit harness: `scripts/run_audit.sh`
+  (pins + sorry gates + the `#print axioms` census via `scripts/gen_axiom_probe.py`).
 - Top-level `Trace.lean` (the reader-agnostic `RowView`/`AdapterView` row-view infra the bus layer reads),
   `Comparison.lean` (the worked-example findings doc — read it for the full design rationale),
   `Step0Smoke.lean`. Lake auto-globs subdir modules; the root index is `SP1Clean.lean` — **wire every

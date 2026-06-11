@@ -133,7 +133,7 @@ These keep every chip uniform and each `Spec` auditable on its own. Violations a
 3. **Variant flags live in the `cols` column struct, read from `cols` in the `Spec`** — never duplicated
    as `Inputs` fields. (`main` witnesses them; the flag-sum gate binds `is_real = Σ flags`.)
 4. **Range checks go through the byte bus, not `Gadgets.ToBits.rangeCheck`.** A width-`n` range check is a
-   `byteChannel.gatedReceive <gate> (⟨6, value, n, 0⟩ : ByteRow …)` (`ByteOpcode 6 = Range`), matching
+   `byteChannel.pullIf <gate> (⟨6, value, n, 0⟩ : ByteRow …)` (`ByteOpcode 6 = Range`), matching
    SP1's extracted `Range(n)` send. Soundness consumes the `byteChannel.Guarantees`/`ByteRowSpec`
    guarantee (via `byteRowSpec_range`); completeness proves it the same way. (AddressOperation's offset
    check uses this; `Gadgets.ToBits.rangeCheck` bit-decomposition is *not* faithful to SP1.)

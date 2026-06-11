@@ -19,7 +19,7 @@ decomposition of the four limbs. `Faithful/U16toU8OperationSafe.lean` anchors `R
 namespace SP1Clean.U16toU8OperationSafe
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -91,30 +91,30 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let u16_values := input.u16_values
   let cols := input.cols
   let is_real := input.is_real
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨3, 0, cols.low_bytes[0], (u16_values[0] - cols.low_bytes[0]) * (256 : ZMod p)⁻¹⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨3, 0, cols.low_bytes[1], (u16_values[1] - cols.low_bytes[1]) * (256 : ZMod p)⁻¹⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨3, 0, cols.low_bytes[2], (u16_values[2] - cols.low_bytes[2]) * (256 : ZMod p)⁻¹⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨3, 0, cols.low_bytes[3], (u16_values[3] - cols.low_bytes[3]) * (256 : ZMod p)⁻¹⟩ : ByteRow (Expression (ZMod p)))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
@@ -145,7 +145,7 @@ theorem spec_populate {u16_values : Word (ZMod p)}
 set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨_himp, hbin⟩ := h_assumptions
+  obtain ⟨_himp, _hbin⟩ := h_assumptions
   obtain ⟨hiu, hicols, _⟩ := h_input
   have e8 : (2 : ℕ) ^ 8 = 256 := by norm_num
   have ea0 : Expression.eval env input_var_u16_values[0] = input_u16_values[0] := by rw [← hiu]; simp only [Vector.getElem_map]
@@ -158,21 +158,17 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have el3 : Expression.eval env input_var_cols_low_bytes[3] = input_cols_low_bytes[3] := by rw [← hicols]; simp only [Vector.getElem_map]
   simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, el0, el1, el2, el3] at h_holds ⊢
   obtain ⟨hr0, hr1, hr2, hr3⟩ := h_holds
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · intro hr1eq
-    have hneg : -input_is_real = -1 := by rw [hr1eq]
-    have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
-    rw [byteRowSpec_u8range_pair, e8, ← sub_eq_add_neg] at R0 R1 R2 R3
-    intro i
-    fin_cases i
-    · exact ⟨R0.1, R0.2, reassemble _ _⟩
-    · exact ⟨R1.1, R1.2, reassemble _ _⟩
-    · exact ⟨R2.1, R2.2, reassemble _ _⟩
-    · exact ⟨R3.1, R3.2, reassemble _ _⟩
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
+  -- post-#398 the byte receives owe no padding requirement, so the goal is exactly `Spec`.
+  intro hr1eq
+  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
+  rw [byteRowSpec_u8range_pair, e8, ← sub_eq_add_neg] at R0 R1 R2 R3
+  intro i
+  fin_cases i
+  · exact ⟨R0.1, R0.2, reassemble _ _⟩
+  · exact ⟨R1.1, R1.2, reassemble _ _⟩
+  · exact ⟨R2.1, R2.2, reassemble _ _⟩
+  · exact ⟨R3.1, R3.2, reassemble _ _⟩
 
 set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by

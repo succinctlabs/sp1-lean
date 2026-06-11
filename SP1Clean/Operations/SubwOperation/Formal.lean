@@ -11,7 +11,7 @@ result limb, pulls two limb ranges from the byte bus, asserts the two gated borr
 namespace SP1Clean.SubwOperation
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -63,28 +63,27 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     rw [← c16] at R1
     show input_cols_value[1].val < 2 ^ 16
     exact (byteRowSpec_range _ h16p).mp R1
-  refine ⟨⟨(h_msb h_msb_as).1, ?_⟩, Or.inr h_msb_as, ?_, ?_⟩
-  · intro hr1eq
-    have hneg : -input_is_real = -1 := by rw [hr1eq]
-    have R0 := hr0 hneg; have R1 := hr1 hneg
-    rw [← c16] at R0 R1
-    rw [hr1eq, one_mul] at hgc0 hgc1
-    refine subwSemantics_of_carries ha hb ?_ ((h_msb h_msb_as).2 hr1eq)
-    simp only [RawSpec, Nat.cast_ofNat, sub_eq_add_neg]
-    -- The auto-extracted `main` spells the borrow constant as `65536 + -1`; `RawSpec` uses `65535`.
-    -- They agree in `ZMod p` (ring numeral normalization), so bridge each carry bool with
-    -- `linear_combination` rather than a syntactic `refine`/`rw`.
-    refine ⟨?_, ?_, ?_, ?_⟩
-    · rcases bool_of_mul_pred hgc0 with h | h
-      · exact Or.inl (by linear_combination h)
-      · exact Or.inr (by linear_combination h)
-    · rcases bool_of_mul_pred hgc1 with h | h
-      · exact Or.inl (by linear_combination h)
-      · exact Or.inr (by linear_combination h)
-    · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R0
-    · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R1
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
+  -- post-#398 the two byte receives owe no padding requirement.
+  refine ⟨⟨(h_msb h_msb_as).1, ?_⟩, Or.inr h_msb_as⟩
+  intro hr1eq
+  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have R0 := hr0 hneg; have R1 := hr1 hneg
+  rw [← c16] at R0 R1
+  rw [hr1eq, one_mul] at hgc0 hgc1
+  refine subwSemantics_of_carries ha hb ?_ ((h_msb h_msb_as).2 hr1eq)
+  simp only [RawSpec, Nat.cast_ofNat, sub_eq_add_neg]
+  -- The auto-extracted `main` spells the borrow constant as `65536 + -1`; `RawSpec` uses `65535`.
+  -- They agree in `ZMod p` (ring numeral normalization), so bridge each carry bool with
+  -- `linear_combination` rather than a syntactic `refine`/`rw`.
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rcases bool_of_mul_pred hgc0 with h | h
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr (by linear_combination h)
+  · rcases bool_of_mul_pred hgc1 with h | h
+    · exact Or.inl (by linear_combination h)
+    · exact Or.inr (by linear_combination h)
+  · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R0
+  · rw [← h65536]; exact (byteRowSpec_range _ h16p).mp R1
 
 set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by

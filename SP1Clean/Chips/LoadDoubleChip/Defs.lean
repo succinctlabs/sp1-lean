@@ -88,9 +88,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadDoubleColumns main w
       ⟨varFromOffset Extracted.AddrAddOperation i0, var ⟨i0 + 3⟩⟩,
       input.memory_access, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit]
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s. The `AddressOperation` address identity,
 the `MemoryAccess` timestamp monotonicity, the `ITypeReader` adapter facts (which carry the load meaning —

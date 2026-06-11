@@ -80,9 +80,9 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var StoreByteColumns 
   assertion Readers.ITypeReaderImmutable.circuit
     ⟨input.adapter, is_real, is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 36⟩
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨3, 0, input.register_low_byte, regHigh⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real
+  byteChannel.pullIf is_real
     (⟨3, 0, input.mem_limb_low_byte, memHigh⟩ : ByteRow (Expression (ZMod p)))
   -- mem_limb selection: the old value's `offset_bit[1..2]`-selected limb.
   (input.mem_limb - input.memory_access.prev_value[0])
@@ -123,9 +123,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs StoreByteColumns main wh
       input.memory_access, input.offset_bit, input.mem_limb, input.mem_limb_low_byte,
       input.register_low_byte, input.increment, input.store_value, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit, Readers.MemoryAccess.circuit]
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 /-- Semantic contract. The spine sub-`Spec`s, the (real-row-gated) byte bounds, the mem-limb selection,
 the increment identity, the read-modify-write equations, and the `is_real` binary. -/

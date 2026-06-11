@@ -88,20 +88,20 @@ theorem subcols_state_interactions_faithful_syntactic
     (h_p0 : Expression.eval env input.state.pc[0] = cols.state.pc[0])
     (h_p1 : Expression.eval env input.state.pc[1] = cols.state.pc[1])
     (h_p2 : Expression.eval env input.state.pc[2] = cols.state.pc[2]) :
-    (((SubChip.main input).operations offset).interactionsWith stateChannel.toRawGated).map
+    (((SubChip.main input).operations offset).interactionsWith stateChannel.toRaw).map
         (AbstractInteraction.toAccess env)
       = ((Extracted.SubCols.interactions cols).map Extracted.Interaction.toAccess).filter
           (fun a => a.1 = InteractionKind.State) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hsk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (stateChannel.emittedGated m s) =
+      AbstractInteraction.toAccess env ((pushIf (channel := stateChannel) m s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
-    fun m s => toAccess_emittedGated_state env m s
+    fun m s => toAccess_pushIf_state env m s
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) stateChannel.toRawGated
+    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) stateChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
   -- descend the chip into its three sub-readers; the `Add`/`RTypeReader` byte/mem/program emits drop under
   -- the `State` filter (channel distinctness), leaving CPUState's two State interactions.
@@ -119,12 +119,6 @@ theorem subcols_state_interactions_faithful_syntactic
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
     h_ir, h_ch, h_c0, h_c1, h_p0, h_p1, h_p2]
-  -- residual: RTypeReader's Memory/Program emits drop under the State filter (distinct channel names).
-  refine ⟨fun h => ?_, fun h => ?_⟩
-  · exact absurd (congrArg RawChannel.name h)
-      (by simp [Channel.toRaw_name, Channel.toRawGated_name, programChannel, stateChannel])
-  · exact absurd (congrArg RawChannel.name h)
-      (by simp [Channel.toRaw_name, Channel.toRawGated_name, memoryChannel, stateChannel])
 
 set_option maxHeartbeats 4000000 in
 set_option linter.unusedSimpArgs false in
@@ -156,17 +150,14 @@ theorem subcols_program_interactions_faithful_syntactic
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_emitted_program, heq]
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pushIf_program, heq]
   -- only RTypeReader's Program emit survives the `Program` filter; close via the kernel + bindings + the
   -- opcode coercion (`Opcode.ofNat 0 = 0`), then drop the byte/state/memory residual by channel name.
-  simp [circuit_norm, toAccess_emitted_program, Gadgets.Equality.main,
+  simp [circuit_norm, toAccess_pushIf_program, Gadgets.Equality.main,
     Extracted.SubCols.interactions, Extracted.SubOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, Opcode.ofNat, ConstraintCoe.coe_eq_val,
     h_ir, h_p0, h_p1, h_p2, h_oa, h_ob, h_oc, h_oa0]
-  -- residual: CPUState's State emit drops under the Program filter (distinct channel names).
-  exact fun h => absurd (congrArg RawChannel.name h)
-    (by simp [Channel.toRaw_name, Channel.toRawGated_name, stateChannel, programChannel])
 
 set_option maxHeartbeats 4000000 in
 set_option linter.unusedSimpArgs false in
@@ -222,8 +213,8 @@ theorem subcols_memory_interactions_faithful_syntactic
     Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,
     SP1Clean.SubOperation.circuit, SP1Clean.SubOperation.main,
-    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_emitted_memory, heq]
-  simp [circuit_norm, toAccess_emitted_memory, Gadgets.Equality.main,
+    circuit_norm, FormalAssertion.toSubcircuit_interactions, toAccess_pushIf_memory, heq]
+  simp [circuit_norm, toAccess_pushIf_memory, Gadgets.Equality.main,
     Extracted.SubCols.interactions, Extracted.SubOperation.interactions,
     Extracted.CPUState.interactions, Extracted.RTypeReader.interactions,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -231,9 +222,6 @@ theorem subcols_memory_interactions_faithful_syntactic
     h_wv0, h_wv1, h_wv2, h_wv3, h_pl_a, h_pv_a0, h_pv_a1, h_pv_a2, h_pv_a3,
     h_pl_b, h_pv_b0, h_pv_b1, h_pv_b2, h_pv_b3,
     h_pl_c, h_pv_c0, h_pv_c1, h_pv_c2, h_pv_c3]
-  -- residual: CPUState's State emit drops under the Memory filter (distinct channel names).
-  exact fun h => absurd (congrArg RawChannel.name h)
-    (by simp [Channel.toRaw_name, Channel.toRawGated_name, stateChannel, memoryChannel])
 
 set_option maxHeartbeats 4000000 in
 set_option linter.unusedSimpArgs false in
@@ -266,7 +254,7 @@ theorem subcols_byte_interactions_faithful_syntactic
     (h_dl_c : Expression.eval env input.adapter.op_c_memory.access_timestamp.diff_low_limb =
       cols.adapter.op_c_memory.access_timestamp.diff_low_limb) :
     List.Perm
-      ((((SubChip.main input).operations offset).interactionsWith byteChannel.toRawGated).map
+      ((((SubChip.main input).operations offset).interactionsWith byteChannel.toRaw).map
         (AbstractInteraction.toAccess env))
       (((Extracted.SubCols.interactions cols).map Extracted.Interaction.toAccess).filter
           (fun a => a.1 = InteractionKind.Byte)) := by
@@ -278,14 +266,14 @@ theorem subcols_byte_interactions_faithful_syntactic
     have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRawGated
+    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [SubChip.main, Readers.CPUState.circuit, Readers.CPUState.main,
     Readers.RTypeReader.circuit, Readers.RTypeReader.main,
@@ -355,9 +343,9 @@ theorem subcols_interactions_faithful_syntactic
     (h_pv_c2 : Expression.eval env input.adapter.op_c_memory.prev_value[2] = cols.adapter.op_c_memory.prev_value[2])
     (h_pv_c3 : Expression.eval env input.adapter.op_c_memory.prev_value[3] = cols.adapter.op_c_memory.prev_value[3]) :
     List.Perm
-      (((((SubChip.main input).operations offset).interactionsWith stateChannel.toRawGated).map
+      (((((SubChip.main input).operations offset).interactionsWith stateChannel.toRaw).map
           (AbstractInteraction.toAccess env)) ++
-        ((((SubChip.main input).operations offset).interactionsWith byteChannel.toRawGated).map
+        ((((SubChip.main input).operations offset).interactionsWith byteChannel.toRaw).map
           (AbstractInteraction.toAccess env)) ++
         ((((SubChip.main input).operations offset).interactionsWith memoryChannel.toRaw).map
           (AbstractInteraction.toAccess env)) ++

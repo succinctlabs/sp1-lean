@@ -102,18 +102,18 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- the simp route proves the same goal ~100× cheaper (see compile-profile findings 2026-06-10).
   localLength_eq := by intros; simp +arith [circuit_norm, main, RegisterAccessCols.circuit]
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -131,7 +131,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, h_immc, h_immbin, i0, i1, i2, i3, z0, z1, z2, z3⟩ := h_holds
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin, h_immc, bool_of_mul_pred h_immbin, ?_,
       h_rac_a h_assumptions, h_rac_b h_assumptions, h_rac_c (bool_of_mul_pred h_immbin)⟩,
-    Or.inr h_assumptions, Or.inr h_assumptions, Or.inr (bool_of_mul_pred h_immbin), fun _ => bool_of_mul_pred hbin⟩
+    Or.inr h_assumptions, Or.inr h_assumptions, Or.inr (bool_of_mul_pred h_immbin), fun _ _ => bool_of_mul_pred hbin⟩
   -- the four immediate gates: bridge `input_cols_op_c[i]` / `…prev_value[i]` (value-level) to the
   -- `Expression.eval env …[i]` form `h_holds` carries, via the `h_input` Word equalities + `getElem_map`.
   have hoc := h_input.1.2.2.2.2.2.1

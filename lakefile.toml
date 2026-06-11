@@ -16,10 +16,12 @@ name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"
 rev = "v4.28.0"
 
+# Clean PR #398 head (fix-zero-multiplicity-channels): native gated channels.
+# Re-pin to main once the PR merges (roadmap W9).
 [[require]]
 name = "Clean"
 git = "https://github.com/Verified-zkEVM/clean"
-rev = "main"
+rev = "292b9cc369be11baf816926a4bd5a697c01b1dcc"
 
 [[require]]
 name = "LeanRV64D"

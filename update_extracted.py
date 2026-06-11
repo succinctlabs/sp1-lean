@@ -167,6 +167,11 @@ STRUCT_OWNERSHIP: Dict[str, str] = {
 }
 
 DEFAULT_SP1_DIR = "../sp1"
+# The SP1 commit the checked-in `Extracted/`/`WitnessTests/` files were generated from
+# (`dtumad/clean-native`, v6.2.2-20-g9d249b8d4). `main()` refuses to extract from a different
+# checkout unless `SP1_ALLOW_UNPINNED=1` is set — bump this constant together with the
+# regenerated files so the extraction provenance is always recorded in-repo.
+SP1_PINNED_COMMIT = "9d249b8d4fb7d00156bf77f5d295d1dbcaaf4136"
 EXTRACTED_DIR = os.path.join("SP1Clean", "Extracted")
 WITNESS_DIR = os.path.join("SP1Clean", "WitnessTests")
 
@@ -413,6 +418,45 @@ def render(operation: str, import_modules: Sequence[str], body: str) -> str:
     return _header(import_modules, doc) + "\n" + body + "\n\n" + FOOTER
 
 
+# Ops whose `channelsLawful` the Clean default tactic cannot close (composed sub-assertion channel
+# lists need unfolding); the normalizer injects the override since the emitter never produces one.
+CHANNELS_LAWFUL_OVERRIDES: Dict[str, str] = {
+    "LtOperationSigned":
+        "  channelsLawful := by\n"
+        "    simp [circuit_norm, main, LtOperationUnsigned.circuit, U16MSBOperation.circuit]\n",
+}
+
+
+def _normalize_circuit_api(operation: str, body: str) -> str:
+    """Post-process the compiler's circuit-form output onto the pinned Clean API (closes the
+    release-audit TB-9 reproducibility gap). The `sp1-constraint-compiler` at the SP1 pin emits
+
+    1. an `ElaboratedCircuit` instance with `name`/`main` **fields** — an API from a transient window
+       of Clean main (`60665ed0`, later reworked); the pinned Clean (PR #398 head) takes `main` as a
+       class *parameter* and has no `name` field;
+    2. `channelsWith*_eq` rfl-lemmas in bare `(ElaboratedCircuit.<field> Inputs unit : …)` form, which
+       does not elaborate against the parameterized instance; and
+    3. the pre-#398 custom gating names (`byteChannel.gatedReceive`/`byteChannel.toRawGated`), which
+       the W9 migration replaced with the upstream primitives (`pullIf` / gated `toRaw`).
+    """
+    body = body.replace(
+        "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where\n"
+        f"  name := \"SP1CleanNative.{operation}\"\n"
+        "  main := main\n",
+        "instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where\n"
+        + CHANNELS_LAWFUL_OVERRIDES.get(operation, ""))
+    for which in ("channelsWithGuarantees", "channelsWithRequirements"):
+        body = body.replace(
+            f"    (ElaboratedCircuit.{which} Inputs unit : List (RawChannel (ZMod p)))",
+            f"    ((elaborated (p := p)).{which} : List (RawChannel (ZMod p)))")
+    body = body.replace("byteChannel.gatedReceive", "byteChannel.pullIf")
+    body = body.replace("byteChannel.toRawGated", "byteChannel.toRaw")
+    # A bare numeral seeding an accumulator chain (`let E16 := 0 + cols…`) fails to elaborate (the
+    # `0`'s type can't be synthesized bottom-up inside the un-ascribed `let`); pin it explicitly.
+    body = body.replace(":= 0 + ", ":= (0 : Expression (ZMod p)) + ")
+    return body
+
+
 def render_circuit(operation: str, body: str) -> str:
     """Wrap an operation's `--format lean-circuit` body (the `Inputs` + `main` + `ElaboratedCircuit`)
     in the clean-native circuit-module header/footer. Written to `Operations/<op>/Extracted.lean` (the
@@ -421,7 +465,7 @@ def render_circuit(operation: str, body: str) -> str:
     Clean's circuit machinery, opens `Extracted` so the bare `cols` struct type resolves, and binds
     the `variable {p}` field block the `main`/`ElaboratedCircuit` need. The `namespace
     SP1Clean.<op>` is independent of the file path, so this body is location-agnostic."""
-    body = body.strip()
+    body = _normalize_circuit_api(operation, body.strip())
     doc = (
         f"/-! # AUTO-GENERATED circuit form — do not edit by hand.\n\n"
         f"SP1's `{operation}::eval` as a Clean `Circuit`: the `Inputs` struct (the `eval` params\n"
@@ -440,20 +484,20 @@ def render_circuit(operation: str, body: str) -> str:
     # bus-carrying sub (e.g. `LtOperationUnsigned` composing `U16CompareOperation`) is emitted with an
     # empty channel list, and Clean's `channelsLawful` then fails (the sub's `byteChannel` pull is live
     # in `main` but undeclared). Detect a bus-carrying sub from its already-emitted `Extracted.lean` and
-    # promote the parent's channel lists + rfl-lemmas to `[byteChannel.toRawGated]`.
-    if "byteChannel.toRawGated" not in body:
+    # promote the parent's channel lists + rfl-lemmas to `[byteChannel.toRaw]`.
+    if "byteChannel.toRaw" not in body:
         for s in sub_circuits:
             sub_path = os.path.join("SP1Clean", "Operations", s, "Extracted.lean")
             try:
                 with open(sub_path, encoding="utf-8") as f:
                     sub_text = f.read()
-                if "byteChannel.toRawGated" in sub_text:
+                if "byteChannel.toRaw" in sub_text:
                     body = (body
                             .replace("channelsWithGuarantees := []",
-                                     "channelsWithGuarantees := [byteChannel.toRawGated]")
+                                     "channelsWithGuarantees := [byteChannel.toRaw]")
                             .replace("channelsWithRequirements := []",
-                                     "channelsWithRequirements := [byteChannel.toRawGated]")
-                            .replace("= [] := rfl", "= [byteChannel.toRawGated] := rfl"))
+                                     "channelsWithRequirements := [byteChannel.toRaw]")
+                            .replace("= [] := rfl", "= [byteChannel.toRaw] := rfl"))
                     break
             except FileNotFoundError:
                 pass
@@ -588,6 +632,19 @@ def _write(out_path: str, content: str) -> None:
 
 def main() -> None:
     sp1_dir = os.environ.get("SP1_DIR", DEFAULT_SP1_DIR)
+
+    head = subprocess.run(["git", "-C", sp1_dir, "rev-parse", "HEAD"],
+                          capture_output=True, text=True)
+    actual = head.stdout.strip() if head.returncode == 0 else "<not a git checkout>"
+    if actual != SP1_PINNED_COMMIT:
+        msg = (f"SP1 checkout at {sp1_dir} is {actual}, but Extracted/ was generated from "
+               f"pinned {SP1_PINNED_COMMIT}.")
+        if os.environ.get("SP1_ALLOW_UNPINNED") == "1":
+            print(f"WARNING: {msg} Proceeding (SP1_ALLOW_UNPINNED=1) — update SP1_PINNED_COMMIT "
+                  f"when committing the regenerated files.")
+        else:
+            raise SystemExit(f"{msg} Set SP1_ALLOW_UNPINNED=1 to extract anyway.")
+
     os.makedirs(EXTRACTED_DIR, exist_ok=True)
 
     # `EXTRACT_ONLY=Name1,Name2,…` restricts this run to a subset of OPERATIONS/CHIPS/

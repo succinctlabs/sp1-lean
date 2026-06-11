@@ -68,17 +68,17 @@ theorem u16tou8safe_interactions_faithful_syntactic
     (Extracted.U16toU8OperationSafe.interactions u16_values cols is_real).map
         Extracted.Interaction.toAccess
       = (((SP1Clean.U16toU8OperationSafe.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have h3 : (3 : ZMod p).val = 3 := by
     have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   simp only [SP1Clean.U16toU8OperationSafe.main, circuit_norm, hk,
     Extracted.U16toU8OperationSafe.interactions, Extracted.Interaction.toAccess_byte,
     ByteOpcode.ofNat_three, ByteOpcode.idx, ZMod.val_zero,

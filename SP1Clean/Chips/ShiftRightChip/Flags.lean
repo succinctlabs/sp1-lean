@@ -5,7 +5,7 @@ import SP1Clean.Foundations.Channels
 The ShiftRight chip dispatches a single row across four RV64 variants (SRL/SRA/SRLW/SRAW) selected by
 four binary flags whose four-way sum is itself binary. The soundness proof repeatedly needs the
 field-arithmetic consequences of that one-hot/co-one-hot structure (`single_flag`, `srlw_sraw_gate`,
-`pair_flag`), plus the byte-range pull discharges (`byteReqPad`, `byteRowSpec_range_val`).
+`pair_flag`), plus the byte-range pull reader (`byteRowSpec_range_val`).
 
 All of these are stated over **plain `ZMod p` field elements** / a single byte-table row — no
 `Environment`/circuit context — so the case analysis is elaborated **once, in a small context** instead
@@ -18,16 +18,6 @@ open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
-omit [Fact (2 ^ 17 < p)] in
-/-- A byte-range pull's padding requirement on the `toRawGated` channel: the gate `s` is binary, so the
-two requirement antecedents `-s ≠ -1` (⟹ `s ≠ 1`) and `-s ≠ 0` (⟹ `s ≠ 0`) are jointly contradictory —
-the value is passed **raw** (no `s * v` fold) and padding owes nothing. Discharges each of the nine
-`InteractSpec` byte pulls' `Channel.gatedReceive` requirements (`binary_gate_req_vacuous`). -/
-lemma byteReqPad {s v w : ZMod p} {data : ProverData (ZMod p)}
-    (hs : s * (s + -1) = 0) :
-    ¬ -s = -1 → ¬ -s = 0 → byteChannel.Guarantees (⟨6, v, w, 0⟩ : ByteRow (ZMod p)) data :=
-  Channels.binary_gate_req_vacuous (bool_of_mul_pred hs) _
 
 /-- Extract the `Range` bound `x.val < 2 ^ w.val` from a byte-table membership `⟨6, x, w, 0⟩` with a
 **symbolic** width column `w` (the general-width form of `byteRowSpec_range`, whose `w` is a `Nat` cast).

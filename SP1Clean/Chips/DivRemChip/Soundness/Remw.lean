@@ -663,7 +663,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       intro hr
       have hrneg' : -input_is_real = -1 := by rw [hr]
       simp only [circuit_norm] at e48 e49 e51 e54 e59 e61 e64 e69
-      simp only [neg_zero, add_zero] at e51 e61
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       · rw [show env.get (i₀ + 8) = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1+4)
             from by linear_combination e48]
@@ -680,7 +679,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       intro hr
       have hrneg' : -input_is_real = -1 := by rw [hr]
       simp only [circuit_norm] at e70 e71 e73 e76 e81 e83 e86 e91
-      simp only [neg_zero, add_zero] at e73 e83
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       · rw [show env.get (B + 7+8+8+11+11+11+4+4)
             = env.get (B + 7+8+8+11+11+11+4+4+4+4+4+4+3+2+4+1+1) from by linear_combination e70]
@@ -772,14 +770,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
               from by linear_combination h302]
           exact isU16_of_byteRowSpec (hb_absc3 hrneg')
     refine ⟨?mulLo, ?mulHi, ?eqb, ?eqc, ?eqb2, ?eqc2, ?isc0, ?addc, ?addr, ?lt,
-      ?msb0, ?msb1, ?msb2, ?msb3, ?msb4, ?msb5, ?msb6, ?cpu, ?rtype, ?own,
-      ?b0, ?b1, ?b2, ?b3, ?b4, ?b5, ?b6, ?b7, ?b8, ?b9, ?b10, ?b11, ?b12, ?b13, ?b14, ?b15,
-      ?b16, ?b17, ?b18, ?b19, ?b20, ?b21, ?b22, ?b23, ?b24, ?b25, ?b26, ?b27, ?b28, ?b29, ?b30, ?b31,
-      ?b32, ?b33⟩
-    case b0 | b1 | b2 | b3 | b4 | b5 | b6 | b7 | b8 | b9 | b10 | b11 | b12 | b13 | b14 | b15
-      | b16 | b17 | b18 | b19 | b20 | b21 | b22 | b23 | b24 | b25 | b26 | b27 | b28 | b29 | b30 | b31 =>
-        exact Channels.binary_gate_req_vacuous hbin _
-    case b32 | b33 => exact Channels.binary_gate_req_vacuous he2 _
+      ?msb0, ?msb1, ?msb2, ?msb3, ?msb4, ?msb5, ?msb6, ?cpu, ?rtype, ?own⟩
     case own => simp only [circuit_norm, assertZeros, forAllNoOffset_map_assert]
     case eqb => exact Or.inl rfl
     case eqc => exact Or.inl rfl

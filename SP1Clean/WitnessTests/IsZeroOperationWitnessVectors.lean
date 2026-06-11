@@ -16,6 +16,8 @@ open SP1Clean
 
 set_option linter.all false  -- auto-generated: skip linters
 
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 64000 in
 /-- 47 conformance vectors for `IsZeroOperation` (`(a_field, inverse, result)`). -/
 def IsZeroOperationWitnessVectors : List (ℕ × ℕ × ℕ) := [
   (0, 0, 1),

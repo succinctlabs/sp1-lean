@@ -43,8 +43,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     h_w0, h_w1, h_w2, h_w3, h_w4, h_w5,
     h_opa0,
     h_byte0, h_byte1, h_byte2, h_byte3, h_byte4, h_byte5, h_byte6, h_byte7, h_byte8⟩ := h_holds
-  refine ⟨?spec, ?cpuA, ?msb1A, ?msb2A, ?msb3A, ?aluA,
-    ?byteR0, ?byteR1, ?byteR2, ?byteR3, ?byteR4, ?byteR5, ?byteR6, ?byteR7, ?byteR8⟩
+  -- post-#398 the nine byte receives owe no padding requirement.
+  refine ⟨?spec, ?cpuA, ?msb1A, ?msb2A, ?msb3A, ?aluA⟩
   case spec =>
       intro hreal hsraw
       -- `is_sraw = 1` forces the other three variant flags to 0 (single-op selection).
@@ -659,17 +659,5 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           have hh := h_w3; rw [hsrlw, h_sraw0, su1o, h_bmsb0] at hh
           simp only [id_eq] at hh ⊢; linear_combination hh
         rw [ha1, ZMod.val_zero]; omega
-  -- The nine byte-pull requirements fire only off a genuine receive (`-sum ≠ -1`); since `sum` is binary
-  -- (the variant flag-sum gate `h_sum_b`), that forces `sum = 0`, the folded value `sum * v = 0`, and the
-  -- padding row `(Range, 0, w, 0)` is in the byte table (`0 < 2^w.val`).
-  case byteR0 => exact byteReqPad h_sum_b
-  case byteR1 => exact byteReqPad h_sum_b
-  case byteR2 => exact byteReqPad h_sum_b
-  case byteR3 => exact byteReqPad h_sum_b
-  case byteR4 => exact byteReqPad h_sum_b
-  case byteR5 => exact byteReqPad h_sum_b
-  case byteR6 => exact byteReqPad h_sum_b
-  case byteR7 => exact byteReqPad h_sum_b
-  case byteR8 => exact byteReqPad h_sum_b
 
 end SP1Clean.ShiftRightChip.SoundSraw

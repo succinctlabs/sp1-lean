@@ -65,7 +65,7 @@ witnessing. Template: `Operations/{AddOperation,SubOperation,AddwOperation,SubwO
 - **`Inputs`** gains the result/witness columns + `is_real` (e.g. `⟨a, b, value, is_real⟩`); `Spec` is
   `is_real = 1 → <semantic eq>` (gated); `Assumptions` gains `(is_real = 0 ∨ is_real = 1)`.
 - **`main` witnesses nothing** (`localLength 0`): each range check becomes a gated byte pull
-  `byteChannel.gatedReceive input.is_real ⟨6, input.is_real * value[i], const 16, 0⟩`, each assert is
+  `byteChannel.pullIf input.is_real ⟨6, input.is_real * value[i], const 16, 0⟩`, each assert is
   `is_real`-gated (`input.is_real * (cᵢ * (cᵢ - 1)) === 0`).
 - **`elaborated`**: `localLength 0`, `output _ _ := ()`, `channelsWith{Guarantees,Requirements} :=
   [byteChannel.toRaw]`, plus the three `@[circuit_norm]` rfl-lemmas (`channelsWith*_eq`, `localLength_eq`).
@@ -484,7 +484,7 @@ Goal: prove a hand-written trace-level projection (`Soundness/*Consistency.lean`
 `memoryLookups`, `programLookups`) equals the `toAccess`-image of what the circuit *actually emits* on that
 channel — turning the projection from a parallel shadow into a derived theorem. **State, Program, and Memory
 are DONE** (`stateLookups_eq_emitted`, `programLookups_eq_emitted`, `memoryLookups_eq_emitted`, all
-axiom-clean). **Only Byte remains** (its emits are *carried by* the `RAC ⊃ RAT` subcircuits + `gatedReceive`
+axiom-clean). **Only Byte remains** (its emits are *carried by* the `RAC ⊃ RAT` subcircuits + `pullIf`
 form — a recovery-*through*-nesting, not the drop-based recovery below).
 
 Two foundations files: `Foundations/InteractionProjection.lean` (`AbstractInteraction.toAccess env`,
@@ -525,7 +525,7 @@ blows up at `whnf` for the bigger structs.
 **Byte (deferred — the different case; see `../architecture.md` §"Interaction half" and `../roadmap.md`).**
 Byte's emits are *the content* of the `RAC ⊃ RAT` subcircuits (they
 don't drop), so recovery must *recover* their emits through two levels of nesting (the State
-`exposedChannels` route composed through nesting), plus a `gatedReceive` kernel (mult `-is_real`,
+`exposedChannels` route composed through nesting), plus a `pullIf` kernel (mult `-is_real`,
 value-folded `is_real*value`). First the **byte faithfulness cleanup** removed the divergent reader byte
 checks (CPUState's 4 `pc`, `RegisterAccessCols`'s 4 `prev_value`) SP1 has no analog of — so the readers now
 emit exactly `ByteConsistency.byteRows`'s 8 checks, which is what makes byte `eq_emitted` well-posed.

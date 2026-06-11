@@ -13,13 +13,12 @@ carries `msb`'s booleanness **unconditionally** (SP1's `eval_msb` asserts it ung
 namespace SP1Clean.U16MSBOperation
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- `a` is a genuine 16-bit value on a real row (gated), and `is_real` is binary (the latter
-discharged by the composing operation's gate — it lets soundness clear the gated receive's padding
-requirement via `binary_gate_req_vacuous`). `msb`'s booleanness is carried by the `Spec`, not here,
+discharged by the composing operation's gate). `msb`'s booleanness is carried by the `Spec`, not here,
 since SP1's `eval_msb` asserts it ungated (so it must hold on padding too, where the `Spec`'s high-bit
 equation is vacuous). -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
@@ -28,20 +27,20 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hbin⟩ := h_assumptions
+  obtain ⟨ha, _hbin⟩ := h_assumptions
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
   obtain ⟨hr, _hbool, hgc⟩ := h_holds
-  refine ⟨⟨bool_of_mul_pred hgc, ?_⟩, ?_⟩
-  · intro hr1eq
-    have hav := ha hr1eq
-    have hneg : -input_is_real = -1 := by rw [hr1eq]
-    have R := hr hneg
-    rw [← c16] at R
-    refine msb_of_raw hav ?_
-    simp only [RawSpec, sub_eq_add_neg]
-    exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
-  · exact binary_gate_req_vacuous hbin _
+  -- post-#398 the byte receive owes no padding requirement, so the goal is exactly `Spec`.
+  refine ⟨bool_of_mul_pred hgc, ?_⟩
+  intro hr1eq
+  have hav := ha hr1eq
+  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have R := hr hneg
+  rw [← c16] at R
+  refine msb_of_raw hav ?_
+  simp only [RawSpec, sub_eq_add_neg]
+  exact ⟨bool_of_mul_pred hgc, (byteRowSpec_range _ h16p).mp R⟩
 
 set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by

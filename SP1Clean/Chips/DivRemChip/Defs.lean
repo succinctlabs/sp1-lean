@@ -279,43 +279,43 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   let e147 : Expression (ZMod p) := c_times_quotient[6] + rn - carry[6] * (65536 : Expression (ZMod p)) + carry[5]
   let e151 : Expression (ZMod p) := c_times_quotient[7] + rn - carry[7] * (65536 : Expression (ZMod p)) + carry[6]
   let g := input.is_real
-  byteChannel.gatedReceive g (⟨6, e123, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, e127, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, e131, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, e135, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, e139, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, e143, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, e147, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, e151, 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_c[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_c[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_c[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_c[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_remainder[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_remainder[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, abs_remainder[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, quotient[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, quotient[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, quotient[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, remainder[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, remainder[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, remainder[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[4], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[5], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[6], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive g (⟨6, c_times_quotient[7], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e123, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e127, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e131, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e135, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e139, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e143, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e147, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, e151, 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_c[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_c[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_c[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_c[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_remainder[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_remainder[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, abs_remainder[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, quotient[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, quotient[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, quotient[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, remainder[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, remainder[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, remainder[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[0], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[2], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[3], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[4], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[5], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[6], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf g (⟨6, c_times_quotient[7], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   -- Two extra `e2`-gated u16 range checks on `remainder[1]`/`quotient[1]`: the word-variant MSB
   -- gadgets need `< 2^16` even on padding word rows (`is_real = 0`, word flag set), where the main
   -- `is_real`-gated checks are off. SP1's `eval_msb` relies on the operand's own gated range check instead.
-  byteChannel.gatedReceive e2 (⟨6, remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive e2 (⟨6, quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf e2 (⟨6, remainder[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf e2 (⟨6, quotient[1], 16, 0⟩ : ByteRow (Expression (ZMod p)))
   return cols
 
 set_option maxHeartbeats 16000000 in
@@ -324,9 +324,10 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs DivRemCols main where
   localLength _ := 209
   localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]; try omega
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
+  -- the ~30 upstream `pullIf` unfold/refolds put this past simp's default step budget post-#398
+  channelsLawful := by simp (maxSteps := 1000000) [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
 
 end SP1Clean.DivRemChip

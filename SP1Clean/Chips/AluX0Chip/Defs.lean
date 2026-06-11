@@ -52,7 +52,7 @@ reader is the committed `opcode` column. Assembles the extracted `AluX0Cols`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var AluX0Cols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  byteChannel.gatedReceive input.is_real (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf input.is_real (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
   assertion Readers.ALUTypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
       input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, input.opcode⟩
@@ -69,9 +69,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs AluX0Cols main where
   localLength_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
   output input _ := ⟨input.state, input.adapter, input.opcode, input.is_real⟩
   output_eq := by intro input n; simp only [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.CPUState.circuit, Readers.ALUTypeReaderImmutable.circuit]
 
 /-- Semantic contract, composed from the sub-circuit `Spec`s. The `ALUTypeReaderImmutable` adapter facts

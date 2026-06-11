@@ -42,29 +42,29 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
   let opcode := input.opcode
   let is_real := input.is_real
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[0], a[0], b[0]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[1], a[1], b[1]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[2], a[2], b[2]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[3], a[3], b[3]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[4], a[4], b[4]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[5], a[5], b[5]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[6], a[6], b[6]⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive is_real (⟨opcode, cols.result[7], a[7], b[7]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[0], a[0], b[0]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[1], a[1], b[1]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[2], a[2], b[2]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[3], a[3], b[3]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[4], a[4], b[4]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[5], a[5], b[5]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[6], a[6], b[6]⟩ : ByteRow (Expression (ZMod p)))
+  byteChannel.pullIf is_real (⟨opcode, cols.result[7], a[7], b[7]⟩ : ByteRow (Expression (ZMod p)))
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl

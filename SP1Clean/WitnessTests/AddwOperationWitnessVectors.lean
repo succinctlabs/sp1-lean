@@ -16,6 +16,8 @@ open SP1Clean
 
 set_option linter.all false  -- auto-generated: skip linters
 
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 64000 in
 /-- 132 conformance vectors for `AddwOperation` (`(a_limbs, b_limbs, value, msb)`). -/
 def AddwOperationWitnessVectors : List (Vector ℕ 4 × Vector ℕ 4 × Vector ℕ 2 × ℕ) := [
   (#v[0, 0, 0, 0], #v[0, 0, 0, 0], #v[0, 0], 0),

@@ -10,12 +10,12 @@ Soundness routes through `RawSpec.bitwise_of_byteOp`. -/
 namespace SP1Clean.BitwiseOperation
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Opcode is one of AND/OR/XOR; `is_real` is binary (the latter discharged by the composing
-operation's gate — it clears each gated receive's padding requirement via `binary_gate_req_vacuous`).
+operation's gate).
 The operand byte bounds are **not** preconditions: the byte table guarantees them on every fired send,
 so soundness exports them through `Spec` (and completeness reads them back from `Spec`), letting a
 composing operation feed free byte columns without range-checking them itself. -/
@@ -25,7 +25,7 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 2000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨hopcode, hbin⟩ := h_assumptions
+  obtain ⟨hopcode, _hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hir, _, _⟩ := h_input
   have ea0 : Expression.eval env input_var_a[0] = input_a[0] := by rw [← hia]; simp only [Vector.getElem_map]
   have ea1 : Expression.eval env input_var_a[1] = input_a[1] := by rw [← hia]; simp only [Vector.getElem_map]
@@ -55,29 +55,28 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
     eb0, eb1, eb2, eb3, eb4, eb5, eb6, eb7,
     er0, er1, er2, er3, er4, er5, er6, er7] at h_holds ⊢
   obtain ⟨hg0, hg1, hg2, hg3, hg4, hg5, hg6, hg7⟩ := h_holds
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro h1
-    have hneg : -input_is_real = -1 := by rw [h1]
-    have R0 := hg0 hneg; have R1 := hg1 hneg; have R2 := hg2 hneg; have R3 := hg3 hneg
-    have R4 := hg4 hneg; have R5 := hg5 hneg; have R6 := hg6 hneg; have R7 := hg7 hneg
-    -- The byte table guarantees each fired send's operands are bytes and `result = byteOp`.
-    have H : ∀ i : Fin 8,
-        (input_cols_result[(i : ℕ)].val < 256 ∧ input_a[(i : ℕ)].val < 256 ∧ input_b[(i : ℕ)].val < 256) ∧
-          input_cols_result[(i : ℕ)].val
-            = byteOp input_opcode.val input_a[(i : ℕ)].val input_b[(i : ℕ)].val := by
-      intro i
-      fin_cases i
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R0
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R1
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R2
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R3
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R4
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R5
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R6
-      · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R7
-    exact ⟨fun i => ⟨(H i).1.2.1, (H i).1.2.2⟩,
-      bitwise_of_byteOp (a := input_a) (b := input_b) (fun i => (H i).2)⟩
-  all_goals exact binary_gate_req_vacuous hbin _
+  -- post-#398 the byte receives owe no padding requirement, so the goal is exactly `Spec`.
+  intro h1
+  have hneg : -input_is_real = -1 := by rw [h1]
+  have R0 := hg0 hneg; have R1 := hg1 hneg; have R2 := hg2 hneg; have R3 := hg3 hneg
+  have R4 := hg4 hneg; have R5 := hg5 hneg; have R6 := hg6 hneg; have R7 := hg7 hneg
+  -- The byte table guarantees each fired send's operands are bytes and `result = byteOp`.
+  have H : ∀ i : Fin 8,
+      (input_cols_result[(i : ℕ)].val < 256 ∧ input_a[(i : ℕ)].val < 256 ∧ input_b[(i : ℕ)].val < 256) ∧
+        input_cols_result[(i : ℕ)].val
+          = byteOp input_opcode.val input_a[(i : ℕ)].val input_b[(i : ℕ)].val := by
+    intro i
+    fin_cases i
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R0
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R1
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R2
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R3
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R4
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R5
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R6
+    · exact (byteRowSpec_byteOp _ _ _ hopcode).mp R7
+  exact ⟨fun i => ⟨(H i).1.2.1, (H i).1.2.2⟩,
+    bitwise_of_byteOp (a := input_a) (b := input_b) (fun i => (H i).2)⟩
 
 set_option maxHeartbeats 2000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by

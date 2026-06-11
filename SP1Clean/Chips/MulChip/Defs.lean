@@ -18,7 +18,7 @@ gated by the flag-sum `is_real = is_mul + … + is_mulw` (`alu/mul/mod.rs:234`).
 
 The chip's own `AssertSpec` tail is the five variant-flag booleans, their sum-bound, and `op_a_0 = 0`;
 `InteractSpec` is `True` — all byte-range pulls live inside `MulOperation`. Carries `Fact (2^24 < p)`
-(the `MulOperation` column-sum bound). Soundness is proved; completeness is a deferred `sorry`. -/
+(the `MulOperation` column-sum bound). Soundness and completeness are proven. -/
 
 namespace SP1Clean.MulChip
 
@@ -114,19 +114,19 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs MulCols main where
   localLength _ := 54
   localLength_eq := by simp +arith [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]
   subcircuitsConsistent := by simp only [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]; try omega
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 54 := rfl

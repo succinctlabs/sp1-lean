@@ -67,6 +67,25 @@ lemma signedVal_neg_is_real (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨
     rw [if_neg (by omega), Nat.cast_sub (show 1 ≤ p by omega)]
     push_cast; ring
 
+/-- `signedVal` is a **section** of the canonical projection `ℤ → ZMod p`: casting the centered
+representative back recovers the element. This is what lets Clean's *field* channel balance be read as
+a `mod p` statement about the native ℤ multiplicities (`GatedVm/BalanceMod.lean`). -/
+lemma intCast_signedVal (x : ZMod p) : ((signedVal x : ℤ) : ZMod p) = x := by
+  have hval : ((x.val : ℤ) : ZMod p) = x := by
+    rw [Int.cast_natCast, ZMod.natCast_val, ZMod.cast_id]
+  unfold signedVal
+  split
+  · exact hval
+  · rw [Int.cast_sub, hval, Int.cast_natCast, ZMod.natCast_self, sub_zero]
+
+omit [NeZero p] in
+/-- Evaluate one **evaluated** interaction (Clean's heterogeneous `Interaction F` — what an
+`EnsembleWitness`'s tables carry after `AbstractInteraction.eval`) to its trace-level `LookupAccess`:
+the evaluated counterpart of `AbstractInteraction.toAccess`. Bus kind from the channel `name`, the
+table `name`, the message val-projected, and the centered signed multiplicity. -/
+def Interaction.toAccess (i : Interaction (ZMod p)) : LookupAccess :=
+  (kindOf i.channel.name, i.channel.name, i.msg.toList.map ZMod.val, signedVal i.mult)
+
 variable [Fact p.Prime]
 
 /-- Evaluate one emitted interaction to its trace-level `LookupAccess`: the bus kind from the channel
@@ -81,51 +100,35 @@ noncomputable def AbstractInteraction.toAccess (env : Environment (ZMod p))
 open SP1Clean.Channels (stateChannel StateMsg)
 
 omit [NeZero p] in
-/-- **Kernel of the State "emitted = projection".** The `toAccess`-image of an emitted `stateChannel`
-message is exactly the `stateLookups`-style `LookupAccess`: bus `.State`, table `"SP1State"`, the five
-message fields val-projected, and the signed multiplicity. This is the per-interaction computation the
-`stateLookups_eq_emitted` derived theorem maps over the recovered `interactionsWith` list. -/
-lemma toAccess_emitted_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
+/-- **Kernel of the State "emitted = projection".** The `toAccess`-image of a pushed `stateChannel`
+message (post-#398 `circuit_norm` normal form: `pushIf`) is exactly the `stateLookups`-style
+`LookupAccess`: bus `.State`, table `"SP1State"`, the five message fields val-projected, and the signed
+multiplicity. This is the per-interaction computation the `stateLookups_eq_emitted` derived theorem maps
+over the recovered `interactionsWith` list. -/
+lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (stateChannel.emitted mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushIf (channel := stateChannel) mult msg).toRaw =
       (InteractionKind.State, "SP1State",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val],
         signedVal (Expression.eval env mult)) := by
-  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, Channel.emitted, emitted,
+  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushIf,
     Channel.toRaw, kindOf, stateChannel, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
-
-omit [NeZero p] in
-/-- The `toRawGated` analog of `toAccess_emitted_state`: a **gated** emit projects to the same
-`LookupAccess` (`toAccess` reads only `.channel.name`/`.msg`/`.mult`, all identical between
-`(stateChannel.emitted …).toRaw` and `stateChannel.emittedGated …` — the gating lives only in the
-obligation, not the projection). What `stateLookups_eq_emitted` maps over since `CPUState`
-emits via `emitGated`. -/
-lemma toAccess_emittedGated_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
-    (msg : StateMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (stateChannel.emittedGated mult msg) =
-      (InteractionKind.State, "SP1State",
-        [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
-         (Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
-         (Expression.eval env msg.pc2).val],
-        signedVal (Expression.eval env mult)) := by
-  simp [AbstractInteraction.toAccess, Channel.emittedGated, Channel.toRawGated, kindOf, stateChannel,
-    toElements, toComponents, components, ProvableStruct.componentsToElements]
 
 open SP1Clean.Channels (memoryChannel MemoryMsg programChannel ProgramMsg)
 
 omit [NeZero p] in
-/-- **Kernel of the Memory "emitted = projection".** The `toAccess`-image of an emitted `memoryChannel`
-message (a plain `Channel.emit`, default `toRaw`) is the 9-field `memoryLookups`-style `LookupAccess`:
-bus `.Memory`, table `"SP1Memory"`, the nine fields val-projected, and the signed multiplicity. The
-`toElements` unfold is done with `simp only` (deterministic, linear) — plain `simp` over the full set
-blows up at `whnf` for the 9/16-field structs; the trailing `simp` only normalizes the resulting
-`Vector.cast`/`++`/`map`/`toList` chain. -/
-lemma toAccess_emitted_memory (env : Environment (ZMod p)) (mult : Expression (ZMod p))
+/-- **Kernel of the Memory "emitted = projection".** The `toAccess`-image of a pushed `memoryChannel`
+message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` normal form: `pushIf`) is the
+9-field `memoryLookups`-style `LookupAccess`: bus `.Memory`, table `"SP1Memory"`, the nine fields
+val-projected, and the signed multiplicity. The `toElements` unfold is done with `simp only`
+(deterministic, linear) — plain `simp` over the full set blows up at `whnf` for the 9/16-field structs;
+the trailing `simp` only normalizes the resulting `Vector.cast`/`++`/`map`/`toList` chain. -/
+lemma toAccess_pushIf_memory (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : MemoryMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (emitted (channel := memoryChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushIf (channel := memoryChannel) mult msg).toRaw =
       (InteractionKind.Memory, "SP1Memory",
         [(Expression.eval env msg.clk_high).val, (Expression.eval env msg.clk_low).val,
          (Expression.eval env msg.addr0).val, (Expression.eval env msg.addr1).val,
@@ -133,18 +136,19 @@ lemma toAccess_emitted_memory (env : Environment (ZMod p)) (mult : Expression (Z
          (Expression.eval env msg.v1).val, (Expression.eval env msg.v2).val,
          (Expression.eval env msg.v3).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, emitted,
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushIf,
     Channel.toRaw, kindOf, memoryChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
   simp
 
 omit [NeZero p] in
-/-- **Kernel of the Program "emitted = projection".** The `toAccess`-image of an emitted `programChannel`
-message (a plain `Channel.emit`, default `toRaw`) is the 16-field `programLookups`-style `LookupAccess`:
-bus `.Program`, table `"SP1Program"`, the sixteen fields val-projected, and the signed multiplicity. -/
-lemma toAccess_emitted_program (env : Environment (ZMod p)) (mult : Expression (ZMod p))
+/-- **Kernel of the Program "emitted = projection".** The `toAccess`-image of a pushed `programChannel`
+message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` normal form: `pushIf`) is the
+16-field `programLookups`-style `LookupAccess`: bus `.Program`, table `"SP1Program"`, the sixteen fields
+val-projected, and the signed multiplicity. -/
+lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : ProgramMsg (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (emitted (channel := programChannel) mult msg).toRaw =
+    AbstractInteraction.toAccess env (pushIf (channel := programChannel) mult msg).toRaw =
       (InteractionKind.Program, "SP1Program",
         [(Expression.eval env msg.pc0).val, (Expression.eval env msg.pc1).val,
          (Expression.eval env msg.pc2).val, (Expression.eval env msg.opcode).val,
@@ -155,7 +159,7 @@ lemma toAccess_emitted_program (env : Environment (ZMod p)) (mult : Expression (
          (Expression.eval env msg.op_c3).val, (Expression.eval env msg.op_a_0).val,
          (Expression.eval env msg.imm_b).val, (Expression.eval env msg.imm_c).val],
         signedVal (Expression.eval env mult)) := by
-  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, emitted,
+  simp only [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pushIf,
     Channel.toRaw, kindOf, programChannel, if_true, toElements, toComponents, components,
     ProvableStruct.componentsToElements]
   simp
@@ -163,19 +167,19 @@ lemma toAccess_emitted_program (env : Environment (ZMod p)) (mult : Expression (
 open SP1Clean.Channels (byteChannel)
 
 omit [NeZero p] in
-/-- **Kernel of the Byte "received = projection".** The `toAccess`-image of a `byteChannel.receivedGated`
-(a gated byte *pull*, multiplicity `-gate` on `byteChannel.toRawGated`, what `gatedReceive` emits) is the
-`byteSend`-style `LookupAccess`: bus `.Byte`, table `"SP1Byte"`, the four `ByteRow` fields val-projected,
-and the signed multiplicity `signedVal (eval env (-gate))`. The `receivedGated`/`byteChannel`/`ByteRow`
-analog of `toAccess_emittedGated_state`. -/
-lemma toAccess_receivedGated_byte (env : Environment (ZMod p)) (gate : Expression (ZMod p))
+/-- **Kernel of the Byte "received = projection".** The `toAccess`-image of a pulled `byteChannel` row
+(a gated byte *pull*, multiplicity `-gate`; post-#398 `circuit_norm` normal form: `pullIf`, what
+`Channel.pullIf` emits) is the `byteSend`-style `LookupAccess`: bus `.Byte`, table `"SP1Byte"`, the
+four `ByteRow` fields val-projected, and the signed multiplicity `signedVal (eval env (-gate))`. The
+`pullIf`/`byteChannel`/`ByteRow` analog of `toAccess_pushIf_state`. -/
+lemma toAccess_pullIf_byte (env : Environment (ZMod p)) (gate : Expression (ZMod p))
     (msg : ByteRow (Expression (ZMod p))) :
-    AbstractInteraction.toAccess env (byteChannel.receivedGated gate msg) =
+    AbstractInteraction.toAccess env (pullIf (channel := byteChannel) gate msg).toRaw =
       (InteractionKind.Byte, "SP1Byte",
         [(Expression.eval env msg.opcode).val, (Expression.eval env msg.a).val,
          (Expression.eval env msg.b).val, (Expression.eval env msg.c).val],
         signedVal (Expression.eval env (-gate))) := by
-  simp [AbstractInteraction.toAccess, Channel.receivedGated, Channel.toRawGated, kindOf, byteChannel,
-    toElements, toComponents, components, ProvableStruct.componentsToElements]
+  simp [AbstractInteraction.toAccess, ChannelInteraction.toRaw, pullIf, Channel.toRaw, kindOf,
+    byteChannel, toElements, toComponents, components, ProvableStruct.componentsToElements]
 
 end SP1Clean

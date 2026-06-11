@@ -77,7 +77,7 @@ theorem ltUnsigned_interactions_faithful_syntactic
     (Extracted.LtOperationUnsigned.interactions b cc cols is_real).map
         Extracted.Interaction.toAccess
       = (((SP1Clean.LtOperationUnsigned.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   -- LHS: the oracle is `U16Compare.interactions cl0 cl1 ⟨bit⟩ is_real ++ []`.
   simp only [Extracted.LtOperationUnsigned.interactions, List.append_nil]
   -- RHS: descend the chip into the single `U16Compare` subcircuit; the thirteen `=== 0` gates are
