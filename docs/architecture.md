@@ -93,21 +93,10 @@ For an operation `<Op>` (e.g. `Add`, `BitwiseU16`):
 
 Each new module's import goes into the root `SP1Clean.lean`.
 
-## Witness generation, trace generation, and the circuit language (`TraceGenTests/`)
+## Trace Generation (`TraceGenTests/`)
 
-Two related questions an SP1 developer will ask, and where this project stands on each:
-
-**Is witness generation part of the language that defines a circuit, or an extra tool bolted on for
-completeness?** In Clean it is part of the language: a chip's `main` interleaves constraints with
-`.witness m (fun env => …)` operations, so one program elaborates to both the constraint system and
-the witness generator — there is no second artifact to drift (contrast SP1 Rust, where `eval` and
-`populate` are separate hand-written functions per chip that nothing ties together). In this repo the
-witness closures call the same per-op `populate` functions the conformance layer checks (e.g.
-`AddChip.main`'s `witnessVector` calls `AddOperation.populate`), and historically they were
-*exercised* only by completeness proofs. The trace layer below also **executes** them.
-
-**Can trace gen be written in a more compiler-like way?** Yes — demonstrated here by deriving SP1's
-`generate_trace` from the circuit definition. `TraceGenTests/TraceGenerator.lean` (axiom-clean,
+Partially deriving SP1's `generate_trace` from the circuit definition.
+`TraceGenTests/TraceGenerator.lean` (axiom-clean,
 generic): `circuitTraceRow` seeds Clean's `FlatOperation.dynamicWitnesses` env-threading fold with
 one row's input column values, runs `main`'s own witness closures in emission order, then evaluates
 `main`'s **output struct** under the final environment — the output layout *is* the row layout, so
