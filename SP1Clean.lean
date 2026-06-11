@@ -207,6 +207,7 @@ import SP1Clean.Foundations.Bitwise
 import SP1Clean.Foundations.ByteTable
 import SP1Clean.Foundations.Channels
 import SP1Clean.Foundations.ChipAir
+import SP1Clean.Foundations.GetElemFastPath
 import SP1Clean.Foundations.HWord
 import SP1Clean.Foundations.InteractionBus
 import SP1Clean.Foundations.InteractionProjection

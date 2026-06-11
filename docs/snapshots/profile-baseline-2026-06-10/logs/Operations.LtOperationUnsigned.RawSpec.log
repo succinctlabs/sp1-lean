@@ -1,0 +1,51 @@
+import took 988ms
+interpretation of Mathlib.Tactic.Tauto._aux_Mathlib_Tactic_Tauto___elabRules_Mathlib_Tactic_Tauto_tauto_1._boxed took 144ms
+interpretation of Mathlib.Tactic.Tauto._aux_Mathlib_Tactic_Tauto___elabRules_Mathlib_Tactic_Tauto_tauto_1._boxed took 655ms
+interpretation of Mathlib.Tactic.Tauto._aux_Mathlib_Tactic_Tauto___elabRules_Mathlib_Tactic_Tauto_tauto_1._boxed took 1.64s
+interpretation of Mathlib.Tactic.Tauto._aux_Mathlib_Tactic_Tauto___elabRules_Mathlib_Tactic_Tauto_tauto_1._boxed took 2.16s
+interpretation of Mathlib.Tactic.Tauto._aux_Mathlib_Tactic_Tauto___elabRules_Mathlib_Tactic_Tauto_tauto_1._boxed took 4.29s
+instantiate metavars took 133ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 52.1ms
+instantiate metavars took 236ms
+elaboration took 66.7ms
+type checking took 57.2ms
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 87.5ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 262ms
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 90.6ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 83.1ms
+linting took 121ms
+instantiate metavars took 78ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 114ms
+instantiate metavars took 178ms
+type checking took 52.9ms
+type checking took 66.8ms
+type checking took 51.1ms
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 63.7ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 182ms
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 61ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 55.4ms
+linting took 85.5ms
+cumulative profiling times:
+	attribute application 0.232ms
+	compilation (IR) 52.9ms
+	compilation (LCNF base) 54.3ms
+	compilation (LCNF mono) 27.4ms
+	congr simp thm 15.4ms
+	dsimp 1.48s
+	elaboration 281ms
+	fix level params 3.78ms
+	import 988ms
+	initialization 29.9ms
+	instantiate metavars 626ms
+	interpretation 10.9s
+	let-to-have transformation 1.88ms
+	linting 331ms
+	norm_num 32.1ms
+	parsing 17.5ms
+	process pre-definitions 86.3ms
+	ring 419ms
+	share common exprs 52.3ms
+	simp 520ms
+	tactic execution 33.6s
+	type checking 921ms
+	typeclass inference 10.7s

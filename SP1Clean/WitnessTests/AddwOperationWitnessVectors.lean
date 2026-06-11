@@ -14,6 +14,8 @@ check lives in `SP1Clean/WitnessTests/AddwOperationWitness.lean`. Regenerate wit
 namespace SP1Clean.WitnessTests
 open SP1Clean
 
+set_option linter.all false  -- auto-generated: skip linters
+
 /-- 132 conformance vectors for `AddwOperation` (`(a_limbs, b_limbs, value, msb)`). -/
 def AddwOperationWitnessVectors : List (Vector ℕ 4 × Vector ℕ 4 × Vector ℕ 2 × ℕ) := [
   (#v[0, 0, 0, 0], #v[0, 0, 0, 0], #v[0, 0], 0),

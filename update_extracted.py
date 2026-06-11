@@ -176,6 +176,12 @@ import Clean.Utils.Tactics.ProvableStructDeriving"""
 
 FOOTER = "end SP1Clean.Extracted\n"
 
+# Auto-generated modules pay a real per-declaration linter-interpretation tax (mathlib/batteries
+# TacticAnalysis, UnusedTactic, UnreachableTactic, UnnecessarySeqFocus, …) for warnings nobody
+# reads — the files are regenerated, never hand-edited. `linter.all` is core's master switch;
+# it must be set per file (the package-level `-D` form is rejected, see lakefile.toml).
+LINTERS_OFF = "set_option linter.all false  -- auto-generated: skip linters"
+
 _STRUCT_RE = re.compile(r"^\s*structure\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.MULTILINE)
 
 
@@ -383,6 +389,7 @@ def _header(import_modules: Sequence[str], doc: str) -> str:
     return (
         COMMON_IMPORTS + "\n" + reuse_imports + "\n"
         + doc + "\n\n"
+        + LINTERS_OFF + "\n\n"
         + "namespace SP1Clean.Extracted\nopen SP1Clean\n"
     )
 
@@ -465,6 +472,7 @@ def render_circuit(operation: str, body: str) -> str:
         "import Clean.Gadgets.Equality\n"
         "import Clean.Utils.Tactics.ProvableStructDeriving\n\n"
         + doc + "\n\n"
+        + LINTERS_OFF + "\n\n"
         + f"namespace SP1Clean.{operation}\n\n"
         + "open Circuit\n"
         + "open SP1Clean.Channels (byteChannel)\n"
@@ -559,6 +567,7 @@ def render_witness_vectors(operation: str, data: dict) -> str:
         "import SP1Clean.Foundations.Word\n\n"
         + doc + "\n\n"
         + "namespace SP1Clean.WitnessTests\nopen SP1Clean\n\n"
+        + LINTERS_OFF + "\n\n"
         + "set_option maxHeartbeats 4000000 in\n"
         + "set_option maxRecDepth 64000 in\n"
         + f"/-- {len(vectors)} conformance vectors for `{operation}` (`{tuple_desc}`). -/\n"

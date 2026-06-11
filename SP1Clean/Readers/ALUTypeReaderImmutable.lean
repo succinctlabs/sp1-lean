@@ -87,10 +87,11 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
       cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1],
       cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
 
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 4000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
+  -- the `localLength_eq` default (`by intros; rfl`) whnf-unfolds all of `main` (~15s on this main);
+  -- the simp route proves the same goal ~100× cheaper (see compile-profile findings 2026-06-10).
+  localLength_eq := by intros; simp +arith [circuit_norm, main, RegisterAccessCols.circuit]
   output _ _ := ()
   channelsWithGuarantees := [byteChannel.toRawGated]
   channelsWithRequirements := [byteChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]

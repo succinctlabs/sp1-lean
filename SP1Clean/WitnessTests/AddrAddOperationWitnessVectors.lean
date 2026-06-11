@@ -14,6 +14,8 @@ check lives in `SP1Clean/WitnessTests/AddrAddOperationWitness.lean`. Regenerate 
 namespace SP1Clean.WitnessTests
 open SP1Clean
 
+set_option linter.all false  -- auto-generated: skip linters
+
 /-- 120 conformance vectors for `AddrAddOperation` (`(a_limbs, b_limbs, value)`). -/
 def AddrAddOperationWitnessVectors : List (Vector ℕ 4 × Vector ℕ 4 × Vector ℕ 3) := [
   (#v[0, 0, 0, 0], #v[0, 0, 0, 0], #v[0, 0, 0]),

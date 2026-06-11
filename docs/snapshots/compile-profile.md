@@ -2,15 +2,27 @@
 
 # Compile-time profile — SP1Clean
 
-Per-module wall-clock elaboration profile of the whole library, with per-tactic attribution for the
-worst offenders and the common threads behind them. Measured June 2026 (Lean v4.28.0, warm olean cache).
+Per-module wall-clock elaboration profile, with per-tactic attribution for the worst offenders and
+the common threads behind them. Measured **2026-06-10** (Lean v4.28.0, warm olean cache, branch
+`full-clean-dsl-implementation`), **after** the get_elem fast-path / linter / `localLength_eq`
+optimization batch landed that same day. The pre-fix baseline, per-module delta table, probe
+evidence, and drafted upstream reports live in `docs/snapshots/profile-baseline-2026-06-10/`
+(`findings.md` is the diagnosis writeup).
 
-> Re-run `scripts/profile_compile.sh` to refresh.
+**Headline: the 2026-06-10 batch cut isolated elaboration of the swept set in half — 3422s → 1689s
+(−50.7%), no regression beyond ±2% noise.** The three fixes, by measured leverage:
 
-The ShiftRight/ShiftLeft nlinarith goals are factored into `Operations/ShiftBounds.lean` (proved once,
-applied by `exact`), and the `Faithful/` `tauto` outliers use `itauto`. Post-optimization baselines:
-ShiftRightMath 44s, ShiftLeftCore 32s, AddressOperation 9s, LtOperationUnsigned 6s, LtOperationSigned 4s.
-The figures in the offender tables below are from the pre-optimization profiler snapshot.
+1. **`v[i]` index-bound `decide` fast path** (`Foundations/GetElemFastPath.lean`, one `macro_rules`
+   line): every `v[i]` elaboration was paying ~11 `rw/dsimp … at *` context traversals inside Std's
+   slice `get_elem_tactic_extensible` rule — ~0.34s per `[i]` under a fat proof context, ~0.8s per
+   `have`. This single fix produced most of the −50%: medium chip Formal files −70%, generated
+   `Extracted/` files −87…93% (their `#v[…][k]` projection chains were this, not "monolithic term
+   elaboration"), `BranchChip.Formal` −77%, `OwnAsserts` −92%.
+2. **`set_option linter.all false` on the 76 auto-generated modules** (~1.6s/file linter
+   interpretation tax; emitted by the `update_extracted.py` templates).
+3. **`localLength_eq := by intros; simp +arith […]`** on the two ALU readers — the silent
+   `by intros; rfl` field default whnf-unfolds all of `main` (334k heartbeats ≈ 15.5s each; the simp
+   route is 109× cheaper). Both readers now fit the **default** heartbeat/recdepth budgets.
 
 ## How to re-run
 
@@ -18,6 +30,7 @@ The figures in the offender tables below are from the pre-optimization profiler 
 scripts/profile_compile.sh            # whole library (warm-builds first, then sweeps)
 SKIP_BUILD=1 scripts/profile_compile.sh            # cache already warm
 SKIP_BUILD=1 scripts/profile_compile.sh Operations/  # scope to one subdir
+EXCLUDE_RE='Chips/DivRemChip/Soundness/' scripts/profile_compile.sh Chips/  # skip the conjuncts
 ```
 
 Outputs land in `build/profile/`:
@@ -30,118 +43,105 @@ Outputs land in `build/profile/`:
 
 After one warm `lake build`, each module is re-elaborated in isolation with
 `lake env lean -Dprofiler=true -Dprofiler.threshold=50 <file>`. Every dependency loads from its cached
-`.olean`, so the timing isolates **that one file's** elaboration. Read the numbers with three caveats:
+`.olean`, so the timing isolates **that one file's** elaboration. Caveats:
 
-1. **Import tax is a sweep artifact.** Each isolated run re-pays ~0.8s to load imports (~**195s total**,
-   ~12% of the sweep). In a real parallel `lake build` that cost is shared/amortized. It dominates the
-   cheap files but is <1% of the expensive ones — so the **ranking of expensive files is accurate**, but
-   absolute seconds for sub-3s files are mostly fixed tax, not real work.
-2. **Profiler sums over-count.** `-Dprofiler` lines are nested/cumulative (a child tactic's time rolls up
-   into its parent), so summing all `took` lines exceeds wall-clock (MulOperation: ~510s of lines vs 163s
-   wall). The per-category percentages below are **dominance signals among leaf tactics**, not an additive
-   budget.
-3. **`lake env lean` exits 0 even on a stack overflow.** The script records exit codes explicitly; this
-   run had **0 nonzero exits** across all 220 modules.
+1. **Import tax is a sweep artifact** (~1s/file, shared in a real parallel build). It dominates the
+   cheap files; the ranking of expensive files is accurate.
+2. **Profiler sums over-count** (nested/cumulative) — per-category numbers are dominance signals,
+   not an additive budget.
+3. **`lake env lean` exits 0 even on a stack overflow** — the script records exit codes; this run
+   had **0 nonzero exits** across all 260 modules.
+4. **The nine `Chips/DivRemChip/Soundness/*.lean` conjuncts are excluded** (each is 18–33 min to
+   elaborate in isolation); their costs are taken from `lake build` logs instead — see below.
 
-## Headline numbers
+## Headline numbers (post-fix sweep)
 
-- **220 modules, ~1640s total** (sequential, isolated). Mean 7.5s, **median 2.4s**, p95 25.7s, max 163s.
-- Heavily skewed: **139/220 modules elaborate in <3s** (≈ import + linter floor). The top 13 files
-  account for **~890s — more than half the whole sweep.**
-- The known Mul baseline reproduces (163s, top of the list, rw-dominated) — the method is sound.
+- **260 modules, ~1689s total** (sequential, isolated; excludes the DivRem conjuncts).
+  Mean 6.5s, **median 2.7s**, p95 28.3s, **max 118s** (was max 462s).
+- 156/260 modules elaborate in <3s (≈ import floor).
+- Generated modules (`Extracted/`, `Operations/*/Extracted`, witness vectors): **245.6s across 77
+  files — was 1178.8s.**
 
-### Time by subsystem
+### Time by subsystem (vs pre-fix baseline)
 
-| Subsystem | Time | Files | Note |
-| --- | ---: | ---: | --- |
-| `Operations/` | 527s | 34 | the gadgets — nlinarith & rw-on-big-goals heavy |
-| `Chips/` | 486s | 42 | chip soundness — simp & rw heavy |
-| `Extracted/` | 334s | 55 | auto-gen constraint mirror — pure term elaboration + linter tax, no hand proofs |
-| `Faithful/` | 178s | 53 | constraint anchors — mostly cheap, two `tauto` outliers |
-| `Foundations/` | 50s | 15 | |
-| `Readers/` | 36s | 9 | |
-| `Soundness/` | 16s | 7 | |
-| `Specs/` | 9s | 3 | |
+| Subsystem | Time | was | Files |
+| --- | ---: | ---: | ---: |
+| `Chips/` (excl. DivRem conjuncts) | 1041s | 1598s | 95 |
+| `Operations/` | 285s | 553s | 62 |
+| `Extracted/` | 146s | 1013s | 50 |
+| `Foundations/` | 91s | 90s | 16 |
+| `WitnessTests/` | 85s | 88s | 27 |
+| `Readers/` | 40s | 81s | 10 |
 
-## Top 25 offenders
+### DivRem soundness conjuncts (from `lake build` logs, ≤5-way-parallel — contention-inflated)
 
-| # | Time | Module | Lines | maxHB count | max HB | Dominant cost |
-| ---: | ---: | --- | ---: | ---: | ---: | --- |
-| 1 | 163s | `Operations.MulOperation` | 1929 | 8 | 40M | rw + type-checking + omega on giant goals |
-| 2 | ~104s | `Chips.BranchChip` | 540 | 2 | 8M | `circuit_proof_start` whnf + setup bridges (six-way decision dispatch extracted to `Chips.BranchChip.Decision`, which compiles at default HB in ~3.5s) |
-| 3 | 128s | `Chips.ShiftRightChip` | 2090 | 3 | 16M | simp + instantiate-metavars |
-| 4 | 110s | `Operations.ShiftRightMath` | 2292 | 2 | 100M | **nlinarith/linarith** (114 calls) |
-| 5 | 75s | `Extracted.MulOperation` | 609 | 2 | 8M | elaboration of monolithic extracted term + linter tax |
-| 6 | 49s | `Operations.ShiftLeftCore` | 1649 | 16 | 4M | **nlinarith/linarith** (78 calls) |
-| 7 | 49s | `Chips.ShiftLeftChip` | 693 | 2 | 4M | simp |
-| 8 | 39s | `Extracted.ShiftRightChip` | 382 | 2 | 8M | elaboration of extracted term + linter tax |
-| 9 | 37s | `Faithful.AddressOperation` | 62 | 1 | 4M | **one `tauto` = 16.4s** |
-| 10 | 30s | `Operations.BitwiseU16Operation` | 632 | 2 | 2M | bvDecide + simp |
-| 11 | 29s | `Extracted.ShiftLeftChip` | 309 | 2 | 8M | elaboration of extracted term + linter tax |
-| 12 | 26s | `Operations.LtOperationSigned` | 388 | 4 | 4M | rw (rewriteSeq) + obtain |
-| 13 | 23s | `Operations.LtOperationUnsigned` | 569 | 7 | 4M | rw (rewriteSeq) + tauto |
-| 14 | 18s | `Faithful.LtOperationUnsigned` | 56 | 1 | 4M | (see thread D — small file, heavy tactic) |
-| 15 | 15s | `Chips.StoreByteChip` | 387 | 2 | 16M | |
-| 16 | 14s | `Operations.ShiftRightDispatch` | 1593 | 12 | 1M | |
-| 17 | 14s | `Readers.ALUTypeReader` | 186 | 1 | 4M | |
-| 18 | 13s | `Chips.JalrChip` | 375 | 2 | 2M | |
-| 19 | 13s | `Foundations.SailWrap` | 450 | 1 | 10M | |
-| 20 | 13s | `Faithful.LtOperationSigned` | 63 | 1 | 8M | |
-| 21 | 12s | `Operations.AddrAddOperation` | 286 | 3 | 16M | |
-| 22 | 12s | `Chips.LoadByteChip` | 379 | 2 | 16M | |
-| 23 | 12s | `Extracted.BranchChip` | 212 | 2 | 8M | |
-| 24 | 11s | `Operations.SubOperation.RawSpec` | 176 | 2 | 16M | |
-| 25 | 11s | `Chips.LoadHalfChip` | 368 | 2 | 16M | |
+Rem 1997s, Div 1849s, Remu 1706s, Divu 1651s, Divw 1535s, Divuw 1494s, Remw 1256s, Remuw 1090s,
+Reader 720s — **~3.7 CPU-hours, the library's dominant remaining cost.** (Pre-fix sum of the same
+seven measured files was ~15% higher.) Probe-measured: `circuit_proof_start` is only ~90s of each;
+the rest is per-conjunct omega/bitvec/carry proof bodies at 128M maxHeartbeats.
 
-## Common threads
+## Top offenders (post-fix)
 
-Ranked by aggregate cost across the library.
+| # | Time | Module | Note |
+| ---: | ---: | --- | --- |
+| 1 | 118s | `Chips.DivRemChip.Defs` | instance-field simps + **kernel type-checking** (~40s) — next target |
+| 2 | 81s | `Chips.ShiftRightChip.Soundness.Sra` | conjunct proof body |
+| 3 | 73s | `Chips.ShiftRightChip.Soundness.Sraw` | conjunct proof body |
+| 4 | 73s | `Chips.ShiftRightChip.Soundness.Srl` | conjunct proof body |
+| 5 | 69s | `Chips.ShiftRightChip.Soundness.Srlw` | conjunct proof body |
+| 6 | 45s | `Chips.ShiftRightChip.Core` | arithmetic lemma farm |
+| 7 | 45s | `Chips.ShiftLeftChip.Soundness.Sll` | conjunct proof body |
+| 8 | 41s | `Chips.ShiftLeftChip.Soundness.Sllw` | conjunct proof body |
+| 9 | 41s | `Operations.MulOperation.RawSpec` | |
+| 10 | 40s | `Operations.MulOperation.Formal` | was 121s (−67%) |
+| 11 | 37s | `Chips.ShiftRightChip.Dispatch` | |
+| 12 | 31s | `Extracted.DivRemChip` | **was 462s (−93%)** |
+| 13 | 29s | `Chips.ShiftLeftChip.Core` | |
+| 14 | 28s | `Chips.ShiftRightChip.Defs` | was 60s |
+| 15 | 27s | `Operations.LtOperationUnsigned.RawSpec` | |
+| 16 | 27s | `Foundations.SailWrap` | 232 mathlib-style simp calls — not Clean-related |
+| 17 | 25s | `Chips.DivRemChip.Formal` | |
+| 18 | 23s | `Foundations.Register` | mathlib-style — not Clean-related |
+| 19 | 23s | `WitnessTests.MulOperationWitnessVectors` | `native_decide` anchor data |
+| 20 | 21s | `Chips.BranchChip.Formal` | was 95s (−77%) |
 
-### A. Proof tactics on monolithic constraint goals (the dominant theme)
-Mul, Branch, Shift, and Lt all build one enormous goal (inline schoolbook columns / dispatch fan-out)
-and then pay for it inside whatever tactic touches it — `rw`/`rewriteSeq` (Mul 130s cumulative, Branch
-112s, Lt), `simp` (ShiftRightChip 34s, ShiftLeftChip 20s), `omega` + `type checking` + `typeclass
-inference of CharP` (Mul). The tactic varies; the root cause is the same **giant-goal** shape first
-documented for Mul in `mul-operation-learnings.md`. This is now confirmed to span the whole ALU
-cluster, not just Mul.
+## What the 2026-06-10 diagnosis established (kill-list of myths)
 
-### B. `nlinarith`/`linarith` is the single most concentrated hot spot
-`Operations/ShiftRightMath` (110s) and `Operations/ShiftLeftCore` (49s) spend **~45% of profiled time in
-nlinarith** — 114 and 78 nlinarith invocations respectively, individual calls running 1–7s and climbing
-as the goal grows. Two files, ~**460s of cumulative nlinarith**. This is the highest-leverage single
-target: replacing/▸ pre-shaping these `nlinarith` goals (explicit lemmas, `omega` where linear, smaller
-sub-goals) would move the needle more than any other change.
+Full evidence: `profile-baseline-2026-06-10/findings.md`. In brief:
 
-### C. Fixed per-file tax: import + mathlib/batteries linters
-Every file pays ~0.8s import **and** a recurring **linter-interpretation tax** — `TacticAnalysis`,
-`UnusedTactic`, `UnreachableTactic`, `UnnecessarySeqFocus` each interpret per declaration (~0.1–0.6s/file;
-on `Extracted.MulOperation` the linters + linting were the *heaviest* lines after import). For the 139
-sub-3s files this tax **is** essentially their whole cost. Import (~195s) is a sweep artifact, but the
-linter interpretation is paid in real builds too — disabling these linters for the auto-generated
-`Extracted/` tree (which contains no hand proofs to lint) is low-risk, library-wide savings.
+- **`circuit_proof_start` / bind-chain normalization is NOT the bottleneck** — 6k–32k heartbeats on
+  medium chips (~10% of file cost), 320k (~90s) even on DivRem's `main`, the repo's biggest. A
+  once-per-chip "normalized ops" lemma (main_ops_eq) would save only ~13 min across DivRem's nine
+  files — parked (`scratch/design-main-ops-eq-divrem.md` at the measurement commit).
+- **The dominant medium-chip cost was `v[i]` elaboration**, fixed by the decide fast path.
+- **`ElaboratedCircuit` field defaults can silently cost seconds**: `localLength_eq`'s `rfl` default
+  whnf-unfolds `main`; the `channelsLawful` default outright fails on channel-heavy mains. Watch for
+  this on every new chip with a non-trivial `main` (hand-write the simp-route `localLength_eq`).
+- The old threads C/E ("linter tax" / "Extracted monolithic terms") are **resolved** — E was mostly
+  the `v[i]` tax in disguise.
 
-### D. Small files, heavy single tactics — size does *not* predict time
-`Faithful/AddressOperation` is **62 lines but 37s — one `tauto` call alone is 16.4s**;
-`Faithful/LtOperationUnsigned` is 56 lines / 18s. Conversely `Specs/Chip` (604 lines) is cheap. Line
-count correlates weakly with elaboration time; the **dominant-tactic choice** dominates. The `tauto`
-outliers are the cheapest wins available — a targeted replacement reclaims ~16s from one call.
+## Where to optimize next (by leverage)
 
-### E. `Extracted/` mirror cost — elaboration of monolithic generated terms
-The auto-generated constraint definitions cost ~**140s+ across `Extracted.MulOperation` (75s),
-`Extracted.ShiftRightChip` (39s), `Extracted.ShiftLeftChip` (29s)** despite containing no hand proofs —
-pure elaboration of one huge term plus the linter tax (thread C). Splitting the generated definitions
-(or generating them in a form Lean elaborates incrementally) in `sp1-constraint-compiler` would cut this.
-
-## Where to optimize first (by leverage)
-
-1. **Giant-goal shape in Mul/Branch/Shift/Lt** (thread A) — the structural fix (avoid building one
-   monolithic goal) attacks the top 4 offenders at once. Largest absolute prize, largest effort. *Open.*
-2. **Disable linters on `Extracted/`** (threads C+E) — library-wide, low-risk. *Open.*
-3. (`nlinarith` in ShiftRightMath + ShiftLeftCore (thread B) — factored into `Operations/ShiftBounds.lean`.)
-4. (`tauto` outliers (thread D) — replaced with `itauto` in the three `Faithful/` files.)
+1. **DivRem conjunct proof bodies** (~3.7 CPU-h): the omega/carry work in heavy contexts. Known
+   pattern from the files' own comments: extract minimal-context pure-ℕ lemmas so omega certificates
+   shrink. Large effort, largest prize. *Open.*
+2. **`Chips.DivRemChip.Defs` (118s)**: instance-field `simp` proofs 20s+ each plus ~40s kernel
+   type-checking — investigate proof-term size of the field proofs (`share common exprs` lines).
+   *Open.*
+3. **ShiftRight/Left conjunct bodies** (~70–81s each) — same family as (1). *Open.*
+4. **maxHeartbeats ratcheting**: post-fix, ceilings everywhere are loose (e.g. 16M-HB files now run
+   in seconds). Mechanical sweep with `#count_heartbeats`, restores regression-alarm value. *Open.*
+5. **Upstream filings** (`profile-baseline-2026-06-10/upstream-notes.md`): lean4/Std slice-rule
+   `at *` report; Clean `localLength_eq`/`channelsLawful` default reports. *Drafted, not filed.*
+6. `Foundations.SailWrap` / `Foundations.Register` (~50s combined): mathlib-style simp-heavy proofs,
+   independent of Clean. *Open, low priority.*
 
 ## Verification of this run
 
-- Coverage: `summary.tsv` has **220 rows == `find SP1Clean -name '*.lean' | wc -l`**; no module dropped.
-- Failures: **0 nonzero exits** (none silently misread as fast).
-- Method sanity: MulOperation lands #1 at 163s, `rw`-dominated — reproduces the known ~180s baseline.
+- Coverage: 260 modules swept, 0 nonzero exits; DivRem conjuncts excluded by `EXCLUDE_RE` (costs
+  recorded from build logs).
+- Post-fix gate: `lake build SP1Clean` green (3630 jobs), only the five pre-existing `sorry`
+  warnings (ShiftLeft/ShiftRight/Mul/DivRem `Formal`, `SP1GatedVm`), 0 new warnings, 0 `info:` notes.
+- Axiom audit: representative headline theorems (StoreByte soundness/completeness + bridge, both ALU
+  readers, Jalr, DivRem soundness, `correct_add_native`) all match the axiom ledger — no `sorryAx`,
+  no new axioms from the decide-based proofs.

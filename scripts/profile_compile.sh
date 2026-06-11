@@ -19,6 +19,8 @@
 #
 # Env:
 #   SKIP_BUILD=1   skip the warm `lake build` (use when the cache is already warm).
+#   EXCLUDE_RE=…   optional grep -E pattern of module paths to skip (e.g. the DivRemChip/Soundness
+#                  conjuncts, ~25–40 min EACH to elaborate — take their cost from a build log instead).
 #
 # Outputs (under build/profile/):
 #   <module>.log     full -Dprofiler stdout+stderr for each module
@@ -58,6 +60,9 @@ LISTFILE="$(mktemp)"
 find SP1Clean -name '*.lean' | sort > "$LISTFILE"
 if [ -n "$PREFIX" ]; then
   grep "^SP1Clean/$PREFIX" "$LISTFILE" > "$LISTFILE.f" && mv "$LISTFILE.f" "$LISTFILE"
+fi
+if [ -n "${EXCLUDE_RE:-}" ]; then
+  grep -Ev "$EXCLUDE_RE" "$LISTFILE" > "$LISTFILE.f" && mv "$LISTFILE.f" "$LISTFILE"
 fi
 TOTAL="$(wc -l < "$LISTFILE" | tr -d ' ')"
 

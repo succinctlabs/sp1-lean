@@ -13,6 +13,8 @@ constraints (reusing the U16CompareOperation, LtOperationUnsigned, U16MSBOperati
 with `SP1_DIR=… python3 update_extracted.py`; the faithfulness anchor lives under
 `SP1Clean/Faithful/`. -/
 
+set_option linter.all false  -- auto-generated: skip linters
+
 namespace SP1Clean.Extracted
 open SP1Clean
 

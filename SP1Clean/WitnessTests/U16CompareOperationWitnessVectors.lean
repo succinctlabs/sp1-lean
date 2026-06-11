@@ -14,6 +14,8 @@ check lives in `SP1Clean/WitnessTests/U16CompareOperationWitness.lean`. Regenera
 namespace SP1Clean.WitnessTests
 open SP1Clean
 
+set_option linter.all false  -- auto-generated: skip linters
+
 /-- 126 conformance vectors for `U16CompareOperation` (`(b, c, bit)`). -/
 def U16CompareOperationWitnessVectors : List (ℕ × ℕ × ℕ) := [
   (0, 0, 0),

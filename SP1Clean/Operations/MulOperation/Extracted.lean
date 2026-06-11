@@ -2,6 +2,8 @@ import SP1Clean.Operations.MulOperation.RawSpec
 
 /-! # `MulOperation` circuit form — `main` + `elaborated` (SP1's `eval`). -/
 
+set_option linter.all false  -- auto-generated: skip linters
+
 namespace SP1Clean.MulOperation
 
 open Circuit

@@ -14,6 +14,8 @@ check lives in `SP1Clean/WitnessTests/LtOperationUnsignedWitness.lean`. Regenera
 namespace SP1Clean.WitnessTests
 open SP1Clean
 
+set_option linter.all false  -- auto-generated: skip linters
+
 /-- 132 conformance vectors for `LtOperationUnsigned` (`(b_limbs, cc_limbs, comparison_limbs, u16_flags, not_eq_inv)`). -/
 def LtOperationUnsignedWitnessVectors : List (Vector ℕ 4 × Vector ℕ 4 × Vector ℕ 2 × Vector ℕ 4 × ℕ) := [
   (#v[0, 0, 0, 0], #v[0, 0, 0, 0], #v[0, 0], #v[0, 0, 0, 0], 0),

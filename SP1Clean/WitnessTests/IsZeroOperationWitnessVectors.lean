@@ -14,6 +14,8 @@ check lives in `SP1Clean/WitnessTests/IsZeroOperationWitness.lean`. Regenerate w
 namespace SP1Clean.WitnessTests
 open SP1Clean
 
+set_option linter.all false  -- auto-generated: skip linters
+
 /-- 47 conformance vectors for `IsZeroOperation` (`(a_field, inverse, result)`). -/
 def IsZeroOperationWitnessVectors : List (ℕ × ℕ × ℕ) := [
   (0, 0, 1),

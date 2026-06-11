@@ -16,6 +16,8 @@ struct plus the chip's composed-operation constraints, reusing the CPUState, RTy
 column-struct module(s) (imported above, not re-emitted). Regenerate with
 `SP1_DIR=… python3 update_extracted.py`. -/
 
+set_option linter.all false  -- auto-generated: skip linters
+
 namespace SP1Clean.Extracted
 open SP1Clean
 

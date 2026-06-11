@@ -1,0 +1,353 @@
+import took 1.42s
+attribute application took 447ms
+grind took 687ms
+type checking took 76.2ms
+grind took 1.95s
+type checking took 86.2ms
+simp took 693ms
+simp took 483ms
+simp took 434ms
+simp took 333ms
+aesop took 62.7ms
+simp took 1.09s
+simp took 561ms
+simp took 596ms
+simp took 185ms
+simp took 212ms
+simp took 133ms
+simp took 185ms
+simp took 346ms
+interpretation of Aesop.BuiltinRules.assumption._boxed took 199ms
+simp took 83.6ms
+typeclass inference of Nonempty took 69.1ms
+simp took 181ms
+simp took 89.1ms
+typeclass inference of Nonempty took 70.4ms
+simp took 110ms
+aesop took 153ms
+simp took 1.68s
+simp took 878ms
+simp took 594ms
+simp took 164ms
+simp took 406ms
+simp took 141ms
+simp took 97ms
+simp took 99.5ms
+simp took 97.5ms
+simp took 98.4ms
+simp took 97.2ms
+simp took 114ms
+simp took 177ms
+simp took 79.9ms
+simp took 77.4ms
+simp took 139ms
+simp took 131ms
+simp took 66.3ms
+simp took 62.1ms
+simp took 115ms
+simp took 115ms
+simp took 117ms
+simp took 59.7ms
+simp took 111ms
+simp took 101ms
+simp took 164ms
+simp took 60.4ms
+simp took 249ms
+simp took 58.6ms
+simp took 150ms
+simp took 58.7ms
+simp took 151ms
+simp took 73.2ms
+simp took 66.2ms
+simp took 4.91s
+simp took 2.39s
+simp took 2.37s
+simp took 4.03s
+aesop took 244ms
+simp took 523ms
+simp took 345ms
+simp took 333ms
+simp took 293ms
+simp took 448ms
+simp took 311ms
+simp took 258ms
+simp took 196ms
+simp took 88.6ms
+simp took 724ms
+simp took 2.21s
+simp took 1.99s
+simp took 1.06s
+simp took 488ms
+simp took 215ms
+simp took 214ms
+simp took 5.03s
+simp took 2.39s
+simp took 2.4s
+simp took 4.26s
+aesop took 65.9ms
+tactic execution of Lean.Parser.Tactic.eqRefl took 149ms
+tactic execution of Lean.Parser.Tactic.applyRfl took 154ms
+simp took 59.5ms
+aesop took 59ms
+typeclass inference of Nonempty took 147ms
+typeclass inference of Nonempty took 184ms
+simp took 417ms
+typeclass inference of Nonempty took 356ms
+simp took 180ms
+typeclass inference of Nonempty took 215ms
+simp took 297ms
+typeclass inference of Nonempty took 194ms
+simp took 166ms
+typeclass inference of Nonempty took 190ms
+simp took 89.1ms
+typeclass inference of Nonempty took 199ms
+simp took 87.9ms
+simp took 71.3ms
+aesop took 165ms
+elaboration took 69.9ms
+typeclass inference of Nonempty took 170ms
+typeclass inference of Nonempty took 194ms
+simp took 534ms
+typeclass inference of Nonempty took 303ms
+simp took 284ms
+typeclass inference of Nonempty took 197ms
+simp took 241ms
+typeclass inference of Nonempty took 197ms
+simp took 167ms
+typeclass inference of Nonempty took 196ms
+simp took 87.9ms
+typeclass inference of Nonempty took 263ms
+simp took 119ms
+simp took 64.5ms
+simp took 55.5ms
+simp took 73.9ms
+simp took 52.8ms
+aesop took 253ms
+typeclass inference of Nonempty took 156ms
+simp took 239ms
+typeclass inference of Nonempty took 181ms
+simp took 93.5ms
+typeclass inference of Nonempty took 193ms
+typeclass inference of Nonempty took 315ms
+typeclass inference of Nonempty took 221ms
+typeclass inference of Nonempty took 220ms
+simp took 999ms
+typeclass inference of Nonempty took 212ms
+simp took 99.5ms
+typeclass inference of Nonempty took 270ms
+simp took 312ms
+typeclass inference of Nonempty took 201ms
+simp took 103ms
+typeclass inference of Nonempty took 184ms
+simp took 286ms
+typeclass inference of Nonempty took 177ms
+simp took 97.7ms
+aesop took 51.7ms
+interpretation of Lean.Elab.Tactic._aux_Mathlib_Tactic_FinCases___elabRules_Lean_Elab_Tactic_finCases_1._boxed took 917ms
+tactic execution of Lean.Elab.Tactic.finCases took 63.5ms
+simp took 79.7ms
+tactic execution of Lean.Parser.Tactic.simp took 962ms
+simp took 291ms
+simp took 266ms
+simp took 292ms
+simp took 310ms
+simp took 255ms
+simp took 259ms
+simp took 269ms
+simp took 243ms
+simp took 233ms
+simp took 128ms
+simp took 191ms
+simp took 193ms
+simp took 189ms
+simp took 184ms
+simp took 188ms
+simp took 166ms
+simp took 159ms
+simp took 159ms
+simp took 155ms
+simp took 156ms
+simp took 157ms
+simp took 156ms
+simp took 158ms
+simp took 156ms
+simp took 156ms
+simp took 158ms
+simp took 157ms
+simp took 161ms
+simp took 159ms
+simp took 159ms
+simp took 159ms
+tactic execution of Lean.Parser.Tactic.allGoals took 106ms
+instantiate metavars took 504ms
+simp took 97.5ms
+simp took 97.5ms
+type checking took 407ms
+aesop took 51.4ms
+typeclass inference of LawfulBEq took 61ms
+simp took 64.4ms
+simp took 57.1ms
+simp took 56.9ms
+tactic execution of Lean.Parser.Tactic.simp took 808ms
+interpretation of Lean.Elab.Tactic._aux_Mathlib_Tactic_FinCases___elabRules_Lean_Elab_Tactic_finCases_1._boxed took 764ms
+simp took 80.5ms
+simp took 74.4ms
+simp took 76.6ms
+simp took 77.5ms
+simp took 81.3ms
+simp took 81.7ms
+simp took 85.5ms
+simp took 73.8ms
+simp took 144ms
+simp took 157ms
+simp took 147ms
+simp took 98.4ms
+simp took 99.5ms
+simp took 101ms
+simp took 102ms
+simp took 108ms
+simp took 117ms
+simp took 62ms
+simp took 53ms
+simp took 51.2ms
+simp took 51.5ms
+simp took 52.3ms
+simp took 53ms
+simp took 51.7ms
+simp took 50.1ms
+simp took 54.2ms
+simp took 50.6ms
+tactic execution of Lean.Parser.Tactic.allGoals took 68.2ms
+instantiate metavars took 669ms
+simp took 97.5ms
+simp took 97.5ms
+type checking took 328ms
+simp took 137ms
+interpretation of Lean.Elab.Tactic._aux_Mathlib_Tactic_FinCases___elabRules_Lean_Elab_Tactic_finCases_1._boxed took 837ms
+simp took 54.3ms
+simp took 54.1ms
+simp took 68.6ms
+simp took 73ms
+simp took 90.9ms
+simp took 67.7ms
+simp took 61.3ms
+simp took 64.7ms
+simp took 64ms
+simp took 67.2ms
+simp took 70.6ms
+simp took 67.9ms
+simp took 71.7ms
+simp took 70.3ms
+simp took 71.5ms
+simp took 73.3ms
+simp took 75.7ms
+simp took 86.5ms
+simp took 94.2ms
+simp took 125ms
+simp took 185ms
+simp took 146ms
+simp took 91.1ms
+simp took 88.8ms
+simp took 93.1ms
+simp took 93.2ms
+simp took 93.4ms
+simp took 95.1ms
+simp took 96.7ms
+simp took 97.4ms
+simp took 93.5ms
+tactic execution of Lean.Parser.Tactic.allGoals took 127ms
+instantiate metavars took 1.21s
+type checking took 342ms
+typeclass inference of LawfulBEq took 61.3ms
+simp took 85.7ms
+simp took 355ms
+typeclass inference of Nonempty took 198ms
+typeclass inference of Nonempty took 149ms
+typeclass inference of Nonempty took 152ms
+simp took 552ms
+typeclass inference of Nonempty took 209ms
+simp took 238ms
+typeclass inference of Nonempty took 241ms
+simp took 264ms
+typeclass inference of Nonempty took 355ms
+typeclass inference of Nonempty took 176ms
+simp took 605ms
+aesop took 63.7ms
+typeclass inference of Nonempty took 191ms
+typeclass inference of Nonempty took 271ms
+typeclass inference of Nonempty took 247ms
+simp took 684ms
+typeclass inference of Nonempty took 221ms
+simp took 253ms
+typeclass inference of Nonempty took 190ms
+simp took 194ms
+typeclass inference of Nonempty took 110ms
+typeclass inference of Nonempty took 106ms
+simp took 265ms
+typeclass inference of Nonempty took 75.5ms
+typeclass inference of Nonempty took 75.2ms
+simp took 343ms
+typeclass inference of Nonempty took 73.6ms
+simp took 119ms
+typeclass inference of Nonempty took 73.3ms
+simp took 116ms
+simp took 152ms
+aesop took 87.8ms
+simp took 1.81s
+simp took 412ms
+simp took 390ms
+simp took 533ms
+aesop took 51.8ms
+simp took 69.3ms
+tactic execution of Lean.Parser.Tactic.simpAll took 68.6ms
+simp took 241ms
+simp took 92ms
+simp took 78.3ms
+simp took 83.8ms
+simp took 118ms
+simp took 116ms
+simp took 114ms
+simp took 110ms
+simp took 104ms
+simp took 225ms
+simp took 156ms
+simp took 117ms
+simp took 104ms
+simp took 106ms
+tactic execution of Lean.Parser.Tactic.bvDecide took 159ms
+tactic execution of Lean.Parser.Tactic.bvDecide took 86.4ms
+simp took 167ms
+cumulative profiling times:
+	aesop 1.7s
+	attribute application 487ms
+	blocked (unaccounted) 20.6s
+	compilation (IR) 38.8ms
+	compilation (LCNF base) 54.9ms
+	compilation (LCNF mono) 37.9ms
+	congr simp thm 207ms
+	dsimp 1.11ms
+	elaboration 772ms
+	fix level params 11.5ms
+	grind 2.63s
+	grind ac 0.173ms
+	grind canon 74.2ms
+	grind cutsat 1.85ms
+	grind ematch 75.3ms
+	grind linarith 0.0584ms
+	grind mark subsingleton 10.1ms
+	grind ring 0.645ms
+	grind simp 214ms
+	grind typeclass inference 123ms
+	import 1.42s
+	initialization 29.7ms
+	instantiate metavars 2.39s
+	interpretation 3.91s
+	let-to-have transformation 61.6ms
+	linting 66.5ms
+	parsing 44.5ms
+	process pre-definitions 112ms
+	share common exprs 80.3ms
+	simp 79s
+	tactic execution 4.77s
+	type checking 1.58s
+	typeclass inference 15.3s
