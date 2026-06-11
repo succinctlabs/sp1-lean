@@ -185,7 +185,7 @@ theorem mulOp_interactions_faithful_syntactic [Fact (2 ^ 24 < p)]
     (Extracted.MulOperation.interactions a b c cols is_real is_real is_real is_mulw is_real is_real).map
         Extracted.Interaction.toAccess
       = (((SP1Clean.MulOperation.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have h3 : (3 : ZMod p).val = 3 := by
     have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 24 < p); omega
     exact ZMod.val_natCast_of_lt h
@@ -199,12 +199,12 @@ theorem mulOp_interactions_faithful_syntactic [Fact (2 ^ 24 < p)]
     have h : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 24 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   -- `value[7]` (the high decomposition byte the op5 `MSB` send pins) is `(·[3]-low[3])·256⁻¹`;
   -- precompute it so the inline simp never unfolds the (irreducible, heavy) `value`.
   have hvb : (Extracted.U16toU8OperationSafe.value #v[b[0], b[1], b[2], b[3]]

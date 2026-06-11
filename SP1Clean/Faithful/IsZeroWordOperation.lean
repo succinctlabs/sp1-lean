@@ -64,12 +64,12 @@ theorem isZeroWord_interactions_faithful_syntactic
     (a : Word (ZMod p)) (is_real : ZMod p) (cols : Extracted.IsZeroWordOperation (ZMod p)) :
     (Extracted.IsZeroWordOperation.interactions a cols is_real).map Extracted.Interaction.toAccess
       = (((SP1Clean.IsZeroWordOperation.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have heqZ := fun (n : ℕ) (inp : Var SP1Clean.IsZeroOperation.Inputs (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil SP1Clean.IsZeroOperation.circuit byteChannel.toRawGated
+    filter_interactions_formalAssertion_eq_nil SP1Clean.IsZeroOperation.circuit byteChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
   have heqEq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRawGated
+    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [SP1Clean.IsZeroWordOperation.main, circuit_norm, heqZ, heqEq,
     Extracted.IsZeroWordOperation.interactions, Extracted.IsZeroOperation.interactions,

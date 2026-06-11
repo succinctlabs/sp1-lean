@@ -7,7 +7,11 @@ environment, relevant when touching deps, imports, or the Sail side.
 
 - `lean-toolchain`: `leanprover/lean4:v4.28.0`.
 - mathlib: `v4.28.0` (public).
-- Clean: `github.com/Verified-zkEVM/clean @ main` (public, **non-fork**).
+- Clean: `github.com/Verified-zkEVM/clean @ 292b9cc3` (public, **non-fork**) — the head of
+  [PR #398](https://github.com/Verified-zkEVM/clean/pull/398) (native gated channels), pinned by SHA
+  while the PR is in review (W9, 2026-06-10). **Re-pin to the merge commit once it lands on `main`**;
+  that re-pin also picks up `d25bba8d` ("Avoid Fin fold lemma clash with Batteries"), which likely
+  retires the import-narrowing workaround below — re-test the collision then.
 - Sail: two `github.com/succinctlabs/*` deps pinned to the **`dtumad/clean-native`** branch —
   `sail-riscv-lean` (the generated `LeanRV64D` model) and `riscv-lean` (the `RISCV` ISA fns) — which
   transitively pull the `rems-project/lean-sail @ v4` runtime. Each carries its own 4.28 `lean-toolchain`.

@@ -6,7 +6,7 @@ namespace SP1Clean.JalChip
 
 open Circuit
 open Extracted (JalColumns)
-open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -82,7 +82,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
-  refine ⟨⟨h_jt, h_bin, ?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨⟨h_jt, h_bin, ?_, ?_⟩, ?_, ?_, ?_, ?_⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩ hr1).2
     rw [ha1eq] at this
@@ -96,7 +96,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · exact Or.inr ⟨fun _ => ⟨ha1U, h_imm⟩, h_bin⟩
   · exact Or.inr ⟨fun _ => ⟨ha1U, h4U⟩, h_gate2⟩
   · exact Or.inr h_bin
-  · exact binary_gate_req_vacuous h_bin _
 
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by

@@ -34,7 +34,7 @@ for how the model is structured.
   gates; channel distinctness drops the other bus's emits). `toAccess` kernels in
   `Foundations/InteractionProjection.lean` are stated on `_root_.emitted` (the form `circuit_norm` leaves).
   Only the **Byte** `eq_emitted` remains — it needs a *recovery through* (not drop of) the byte-carrying
-  `RAC ⊃ RAT` subcircuits + a `gatedReceive` kernel (the nested-recovery direction).
+  `RAC ⊃ RAT` subcircuits + a `pullIf` kernel (the nested-recovery direction).
   - **Real 48-bit addresses (memory chips, done, axiom-clean).** The register memory bus above is
     `addr1 = addr2 = 0`. The `LoadDouble`/`StoreDouble` chips exercise the Memory bus at a **real 3-limb
     address** (`AddressOperation.value`) via the `Readers/MemoryAccess` block; `Soundness/MemoryConsistency.lean`
@@ -51,7 +51,7 @@ for how the model is structured.
   from the writer). The readers now emit *exactly* SP1's 8 byte checks per Add row (CPUState 2 clk + 3×RAT 2
   timestamps) = `ByteConsistency.byteRows`. So the "ungated `byteChannel.pull` Range checks on pc /
   prev_value" described in §5 are **not divergences** (they were the same class as the deleted index range-checks).
-- **Channel `Guarantees`:** byte/range = `ByteRowSpec` (load-bearing, `gatedReceive`); State/Memory =
+- **Channel `Guarantees`:** byte/range = `ByteRowSpec` (load-bearing, `pullIf`); State/Memory =
   `True`; Program = `ProgramMsg.Spec` (the locally-send-provable R-type shape + `op_a_0` binary; the richer
   decode facts are *received*, on `ProgramChip.ProgramRowSpec`). So the `<Msg>.Spec` enrichment
   is settled: rich facts live on the **receive** side (the provider predicates), not forced onto sends.
@@ -398,9 +398,9 @@ mult `-1`, so the consumer must sit on the `-1` side and the provider (`ByteChip
 documented, not a soundness gap. The one thing that cannot be matched is SP1's *positive* consumer
 multiplicity: taking a fact *in* requires the `-1` side.
 
-### Gating: the genuine `is_real`-gated receive (`Channel.gatedReceive`)
+### Gating: the genuine `is_real`-gated receive (`Channel.pullIf`)
 
-A receive *can* be genuinely `is_real`-gated — **`Channel.gatedReceive channel is_real msg`**
+A receive *can* be genuinely `is_real`-gated — **`channel.pullIf is_real msg`**
 (`Foundations/Channels.lean`) has multiplicity `-is_real`: `-1` on real rows (fires the guarantee), `0` on
 padding (no bus contribution, exactly matching SP1's `send_byte` multiplicity). The subtlety is that
 Clean's `Requirements` clause fires whenever mult `≠ -1`, so on padding's mult `0` you must *prove*
@@ -439,7 +439,7 @@ threaded balance.
 
 | Bus | receiver | in-circuit | `Guarantees` |
 |---|---|---|---|
-| **Byte / Range** | preprocessed static table | consumers **`gatedReceive`** (mult `-is_real`, value-folded; needs `is_real ∈ {0,1}`), `ByteChip` pushes | **`ByteRowSpec`** (Bitwise/Add consume it) |
+| **Byte / Range** | preprocessed static table | consumers **`pullIf`** (mult `-is_real`, value-folded; needs `is_real ∈ {0,1}`), `ByteChip` pushes | **`ByteRowSpec`** (Bitwise/Add consume it) |
 | **State / Memory / Program** | dynamic chip / argument | **emit** (multiplicity-gated `±is_real`) | **`True`** now; per-row well-formedness (e.g. memory `isU64`) added when value-threading lands |
 
 Cross-row meaning (`Trace*Link`) is threaded for all four; the lone machine-level assumption is

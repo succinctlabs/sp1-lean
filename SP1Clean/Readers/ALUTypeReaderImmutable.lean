@@ -87,23 +87,24 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
       cols.op_c_memory.prev_value[0], cols.op_c_memory.prev_value[1],
       cols.op_c_memory.prev_value[2], cols.op_c_memory.prev_value[3]⟩ : MemoryMsg (Expression (ZMod p)))
 
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 4000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
+  -- the `localLength_eq` default (`by intros; rfl`) whnf-unfolds all of `main` (~15s on this main);
+  -- the simp route proves the same goal ~100× cheaper (see compile-profile findings 2026-06-10).
+  localLength_eq := by intros; simp +arith [circuit_norm, main, RegisterAccessCols.circuit]
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -135,7 +136,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have hpv := h_input.1.2.2.2.2.2.2.1.1
   refine ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin, h_immc, bool_of_mul_pred h_immbin, ?_,
       h_rac_a h_assumptions, h_rac_b h_assumptions, h_rac_c (bool_of_mul_pred h_immbin)⟩,
-    Or.inr h_assumptions, Or.inr h_assumptions, Or.inr (bool_of_mul_pred h_immbin), fun _ => bool_of_mul_pred hbin⟩
+    Or.inr h_assumptions, Or.inr h_assumptions, Or.inr (bool_of_mul_pred h_immbin), fun _ _ => bool_of_mul_pred hbin⟩
   rw [← hoc, ← hpv]; simp only [Vector.getElem_map]; exact ⟨i0, i1, i2, i3⟩
 
 set_option maxHeartbeats 4000000 in

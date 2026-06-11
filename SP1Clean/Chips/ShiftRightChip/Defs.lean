@@ -264,23 +264,23 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (Z
   let bitShift : Expression (ZMod p) := b0 * 1 + b1 * 2 + b2 * 4 + b3 * 8
   let shamt : Expression (ZMod p) := bitShift + b4 * 16 + b5 * 32
   let e84 : Expression (ZMod p) := (input.adapter.op_c_memory.prev_value[0] - shamt) * (64 : ZMod p)⁻¹
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, e84, Expression.const ((10 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, lower_limb[0], bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, higher_limb[0], 16 - bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, lower_limb[1], bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, higher_limb[1], 16 - bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, lower_limb[2], bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, higher_limb[2], 16 - bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, lower_limb[3], bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive gate
+  byteChannel.pullIf gate
     (⟨6, higher_limb[3], 16 - bitShift, 0⟩ : ByteRow (Expression (ZMod p)))
   return ⟨input.state, input.adapter, a, ⟨b_msb[0]⟩, ⟨srw_msb[0]⟩, c_bits, sra_msb_v0123[0],
     v[0], v[1], v[2], lower_limb, higher_limb, limb_result, shift_u16,
@@ -293,19 +293,19 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs ShiftRightCols main wher
   localLength _ := 37
   localLength_eq := by simp +arith [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]
   subcircuitsConsistent := by simp only [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]; try omega
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, Readers.ALUTypeReader.circuit, Readers.CPUState.circuit, U16MSBOperation.circuit]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 37 := rfl

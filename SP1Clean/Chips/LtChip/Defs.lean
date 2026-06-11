@@ -100,8 +100,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LtCols main where
   -- witnesses the two flags (2) + the `LtOperationSigned` block (1 + 1 + 8 = 10); the two readers are
   -- `assertion`s (`localLength 0`) over the threaded `state`/`adapter` inputs. 2 + 10 = 12.
   localLength _ := 12
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.LtChip

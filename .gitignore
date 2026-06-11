@@ -1,5 +1,7 @@
 build/*
 build.log
+scratch/
 
 .lake/*
 .claude/*
+__pycache__/

@@ -71,17 +71,17 @@ theorem addw_interactions_faithful_syntactic
     (Extracted.AddwOperation.interactions a b cols is_real).map
         Extracted.Interaction.toAccess
       = (((SP1Clean.AddwOperation.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have h6 : (6 : ZMod p).val = 6 := by
     have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   -- LHS: oracle = `U16MSB.interactions value[1] ⟨msb⟩ is_real ++ [v0 byte, v1 byte]`.
   simp only [Extracted.AddwOperation.interactions, List.map_append]
   -- RHS: descend; the U16MSB sub byte ++ the two inline pulls (the `=== 0` gates emit nothing).

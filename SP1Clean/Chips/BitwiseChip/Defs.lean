@@ -113,8 +113,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BitwiseCols main where
   -- `c_low_bytes` 4 + `bitwise_operation.result` 8 = 16); `BitwiseU16Operation` and the two readers
   -- are `assertion`s (`localLength 0`). 3 + 16 = 19.
   localLength _ := 19
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.BitwiseChip

@@ -73,17 +73,17 @@ theorem subw_interactions_faithful_syntactic
     (Extracted.SubwOperation.interactions a b cols is_real).map
         Extracted.Interaction.toAccess
       = (((SP1Clean.SubwOperation.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have h6 : (6 : ZMod p).val = 6 := by
     have h : (6 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   simp only [Extracted.SubwOperation.interactions, List.map_append]
   simp only [SP1Clean.SubwOperation.main, circuit_norm,
     FormalAssertion.toSubcircuit_interactions, SP1Clean.U16MSBOperation.circuit,

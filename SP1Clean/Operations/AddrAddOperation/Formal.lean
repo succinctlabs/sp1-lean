@@ -13,15 +13,14 @@ conjunct. The arithmetic core lives in `RawSpec`, the auto-generated circuit (`m
 namespace SP1Clean.AddrAddOperation
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Operand words fit in 64 bits; their 64-bit-truncated sum keeps only 48 bits (the address-fits
 side condition — without it the high carry `c3 = (a[3]+b[3]+c2)·65536⁻¹` is input-determined and need
 not land in `{0,1}`; soundness does not use it, completeness needs it for the `c3` boolean); and
-`is_real` is binary (discharged by the composing chip's gate — it clears each gated receive's padding
-requirement via `binary_gate_req_vacuous`). -/
+`is_real` is binary (discharged by the composing chip's gate). -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
   Word.isU64 input.a ∧ Word.isU64 input.b ∧
     ((Word.toNat input.a + Word.toNat input.b) % 2 ^ 64 < 2 ^ 48) ∧
@@ -30,7 +29,7 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨ha, hb, _hfit, hbin⟩ := h_assumptions
+  obtain ⟨ha, hb, _hfit, _hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -45,26 +44,23 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have ev0 : Expression.eval env input_var_cols_value[0] = input_cols_value[0] := by rw [← hiv]; simp only [Vector.getElem_map]
   have ev1 : Expression.eval env input_var_cols_value[1] = input_cols_value[1] := by rw [← hiv]; simp only [Vector.getElem_map]
   have ev2 : Expression.eval env input_var_cols_value[2] = input_cols_value[2] := by rw [← hiv]; simp only [Vector.getElem_map]
-  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3, ev0, ev1, ev2,
-    neg_zero, add_zero] at h_holds ⊢
+  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3, ev0, ev1, ev2]
+    at h_holds ⊢
   obtain ⟨hr0, hr1, hr2, _hbool, hgc0, hgc1, hgc2, hgc3⟩ := h_holds
-  refine ⟨?_, ?_, ?_, ?_⟩
-  · intro hr1eq
-    have hneg : -input_is_real = -1 := by rw [hr1eq]
-    have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg
-    rw [← c16] at R0 R1 R2
-    rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
-    have Rb0 := (byteRowSpec_range _ h16p).mp R0
-    have Rb1 := (byteRowSpec_range _ h16p).mp R1
-    have Rb2 := (byteRowSpec_range _ h16p).mp R2
-    refine ⟨addrAddSemantics_of_carries (cols := ⟨input_cols_value⟩) ha hb ?_, Rb0, Rb1, Rb2⟩
-    simp only [RawSpec, sub_eq_add_neg]
-    exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2,
-      bool_of_mul_pred hgc3, by rw [← h65536]; exact Rb0, by rw [← h65536]; exact Rb1,
-      by rw [← h65536]; exact Rb2⟩
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
+  -- post-#398 the byte receives owe no padding requirement, so the goal is exactly `Spec`.
+  intro hr1eq
+  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg
+  rw [← c16] at R0 R1 R2
+  rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
+  have Rb0 := (byteRowSpec_range _ h16p).mp R0
+  have Rb1 := (byteRowSpec_range _ h16p).mp R1
+  have Rb2 := (byteRowSpec_range _ h16p).mp R2
+  refine ⟨addrAddSemantics_of_carries (cols := ⟨input_cols_value⟩) ha hb ?_, Rb0, Rb1, Rb2⟩
+  simp only [RawSpec, sub_eq_add_neg]
+  exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2,
+    bool_of_mul_pred hgc3, by rw [← h65536]; exact Rb0, by rw [← h65536]; exact Rb1,
+    by rw [← h65536]; exact Rb2⟩
 
 set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -83,8 +79,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   have ev0 : Expression.eval env.toEnvironment input_var_cols_value[0] = input_cols_value[0] := by rw [← hiv]; simp only [Vector.getElem_map]
   have ev1 : Expression.eval env.toEnvironment input_var_cols_value[1] = input_cols_value[1] := by rw [← hiv]; simp only [Vector.getElem_map]
   have ev2 : Expression.eval env.toEnvironment input_var_cols_value[2] = input_cols_value[2] := by rw [← hiv]; simp only [Vector.getElem_map]
-  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3, ev0, ev1, ev2,
-    neg_zero, add_zero]
+  simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3, ev0, ev1, ev2]
   refine ⟨?_, ?_, ?_, ?_⟩
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg

@@ -69,7 +69,7 @@ theorem bitwise_interactions_faithful_syntactic
     (Extracted.BitwiseOperation.interactions a b cols opcode is_real).map
         Extracted.Interaction.toAccess
       = (((SP1Clean.BitwiseOperation.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   have hidx : (ByteOpcode.ofNat opcode.val).idx = opcode.val := by
     have : opcode.val = 0 ∨ opcode.val = 1 ∨ opcode.val = 2 := by omega
     rcases this with h | h | h <;> rw [h] <;> rfl
@@ -80,12 +80,12 @@ theorem bitwise_interactions_faithful_syntactic
   have er : ∀ (i : ℕ) (hi : i < 8), Expression.eval env input.cols.result[i] = cols.result[i] :=
     fun i hi => by rw [← h_r, Vector.getElem_map]
   have hk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   simp only [SP1Clean.BitwiseOperation.main, circuit_norm, hk,
     Extracted.BitwiseOperation.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess_byte, ConstraintCoe.coe_eq_val, hidx,

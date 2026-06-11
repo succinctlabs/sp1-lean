@@ -118,8 +118,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   -- `byteChannel` (from the composed `RegisterAccessCols` timestamp checks) gives guarantees + a (padding)
   -- requirement, so it is in BOTH lists. The Memory + Program buses are plain gated `emit`s (requirements-only,
   -- `Guarantees := True` for memory ⇒ trivial; `ProgramMsg.Spec` for program).
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
   channelsLawful := by simp [circuit_norm, main, RegisterAccessCols.circuit]
 
 -- Expose this reader's own declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the
@@ -127,11 +127,11 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw] := rfl
+      = [byteChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -150,7 +150,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   obtain ⟨h_rac_a, h_rac_b, h_rac_c, hbin, z0, z1, z2, z3⟩ := h_holds
   exact ⟨⟨⟨z0, z1, z2, z3⟩, bool_of_mul_pred hbin,
       h_rac_a h_assumptions, h_rac_b h_assumptions, h_rac_c h_assumptions⟩,
-    Or.inr h_assumptions, Or.inr h_assumptions, Or.inr h_assumptions, fun _ => bool_of_mul_pred hbin⟩
+    Or.inr h_assumptions, Or.inr h_assumptions, Or.inr h_assumptions, fun _ _ => bool_of_mul_pred hbin⟩
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

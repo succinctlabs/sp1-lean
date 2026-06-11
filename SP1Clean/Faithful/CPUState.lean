@@ -103,19 +103,19 @@ theorem cpustate_interactions_faithful_syntactic
     have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hbk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   have hsk : ∀ (m : Expression (ZMod p)) (s : StateMsg (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (stateChannel.emittedGated m s) =
+      AbstractInteraction.toAccess env ((pushIf (channel := stateChannel) m s).toRaw) =
         (InteractionKind.State, "SP1State",
           [(Expression.eval env s.clk_high).val, (Expression.eval env s.clk_low).val,
            (Expression.eval env s.pc0).val, (Expression.eval env s.pc1).val,
            (Expression.eval env s.pc2).val], signedVal (Expression.eval env m)) :=
-    fun m s => toAccess_emittedGated_state env m s
+    fun m s => toAccess_pushIf_state env m s
   simp only [Readers.CPUState.main, circuit_norm, hbk, hsk,
     Extracted.CPUState.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,
@@ -138,7 +138,7 @@ theorem cpustate_byte_interactions_faithful_syntactic
     (h_ir : Expression.eval env input.is_real = is_real)
     (h_c0 : Expression.eval env input.cols.clk_0_16 = cols.clk_0_16)
     (h_c1 : Expression.eval env input.cols.clk_16_24 = cols.clk_16_24) :
-    (((Readers.CPUState.main input).operations offset).interactionsWith byteChannel.toRawGated).map
+    (((Readers.CPUState.main input).operations offset).interactionsWith byteChannel.toRaw).map
         (AbstractInteraction.toAccess env)
       = ((Extracted.CPUState.interactions cols next_pc clk_inc is_real).map
           Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Byte) := by
@@ -150,12 +150,12 @@ theorem cpustate_byte_interactions_faithful_syntactic
     have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hbk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   simp [Readers.CPUState.main, circuit_norm, hbk,
     Extracted.CPUState.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign,

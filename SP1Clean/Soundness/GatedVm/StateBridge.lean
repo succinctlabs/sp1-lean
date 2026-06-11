@@ -25,11 +25,13 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def rcvKey (sa : StateAccess (ZMod p)) : LookupKey :=
   (InteractionKind.State, "SP1State", [sa.clk_high.val, sa.clk_low.val, sa.pc[0].val, sa.pc[1].val, sa.pc[2].val])
 
-/-- The state-bus **send** key: the next state `(clk+8, next_pc)` — the second entry of `stateLookups`
-(a `+is_real` send). -/
+/-- The state-bus **send** key: the next state `(clk+clk_inc, next_pc)` — the second entry of
+`stateLookups` (a `+is_real` send). `clk_inc` is the access's per-row clock advance (8 for every current
+chip; 256 on the future ECALL/HALT chip's syscall rows). -/
 def sndKey (sa : StateAccess (ZMod p)) : LookupKey :=
   (InteractionKind.State, "SP1State",
-    [sa.clk_high.val, (sa.clk_low + 8).val, sa.next_pc[0].val, sa.next_pc[1].val, sa.next_pc[2].val])
+    [sa.clk_high.val, (sa.clk_low + sa.clk_inc).val,
+      sa.next_pc[0].val, sa.next_pc[1].val, sa.next_pc[2].val])
 
 /-- The directed edge a row contributes to the state multigraph: `current → next`. -/
 def stateEdge (sa : StateAccess (ZMod p)) : LookupKey × LookupKey := (rcvKey sa, sndKey sa)

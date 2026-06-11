@@ -15,14 +15,18 @@ initial/final machine state, there is a valid RISC-V-Sail execution trail from `
 with every real instruction Sail-correct.
 
 **Trust boundary / residue.** The `soundness` *assembly* is sorry-free: it threads the two ensemble
-prerequisites into the gated capstone. The remaining bridge from the Clean ensemble `Statement` to those
-prerequisites is the single isolated premise `sp1_gatedExecution_prereqs` (`sorry`), which bundles the
-project's checklist §B5 residue:
-* (a) the Clean `BalancedInteractions` → native `isConsistentBalanced` State-bus translation (via
-  `isConsistentBalanced_of_intCast_zero` + `stateLookups_eq_emitted` + the verifier boundary), and
-* (b)+(c) the 22-chip witness → `ChipRow` decode + per-table `Component.weakSoundness` + each chip's
-  `isU64` operand-`Assumptions` recovery from the memory-bus balance.
-Closing it yields a fully axiom-clean `sp1FormalEnsemble` with no further structural work. -/
+prerequisites into the gated capstone. The bridge from the Clean ensemble `Statement` to those
+prerequisites, `sp1_gatedExecution_prereqs`, is itself now a **proven** assembly of two named pieces:
+* (a) **proven (W1a)** — `sp1_state_balance_of_balancedInteractions`: the Clean `BalancedInteractions`
+  → native `isConsistentBalanced` State-bus translation, via the generic `toAccess` adapter
+  `isConsistentBalanced_of_balancedInteractions` (`GatedVm/BalanceMod.lean`) + the native
+  `{-1, 0, 1}` multiplicity bound (`stateLookups_mult_binary`);
+* (b)+(c) **the seam (W1b/W1c, the sole residual `sorry`)** — `sp1_witness_decode`: the 25-chip
+  witness → `ChipRow` decode bundle `SP1WitnessDecode`, carrying per-table `Component.weakSoundness`,
+  each chip's `isU64` operand-`Assumptions` recovery from the memory-bus balance, the binary gating,
+  and the State-bus decode correspondence (`stateLookups_eq_emitted` lifted over the table flatMap +
+  the verifier boundary) that (a) consumes.
+Closing the seam yields a fully axiom-clean `sp1FormalEnsemble` with no further structural work. -/
 
 namespace SP1Clean.Soundness
 
@@ -76,16 +80,16 @@ assumes; a `.empty` verifier would omit them. The emits add no witness cells, so
 `Spec` is `True` (the meaning is carried by the trace-level balance, not a per-row guarantee). -/
 @[circuit_norm]
 def sp1VerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit := do
-  Channels.stateChannel.emitGated (1 : Expression (ZMod p))
+  Channels.stateChannel.emit (1 : Expression (ZMod p))
     ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩
-  Channels.stateChannel.emitGated (-1 : Expression (ZMod p))
+  Channels.stateChannel.emit (-1 : Expression (ZMod p))
     ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩
 
 instance sp1VerifierElaborated : ElaboratedCircuit (ZMod p) SP1PublicIO unit sp1VerifierMain where
   localLength _ := 0
   output _ _ := ()
   channelsWithGuarantees := []
-  channelsWithRequirements := [Channels.stateChannel.toRawGated]
+  channelsWithRequirements := [Channels.stateChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1Verifier_channelsWithGuarantees_eq :
@@ -93,12 +97,11 @@ set_option linter.unusedSectionVars false in
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1Verifier_channelsWithRequirements_eq :
     ((sp1VerifierElaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [Channels.stateChannel.toRawGated] := rfl
+      = [Channels.stateChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1Verifier_localLength_eq (x : Var SP1PublicIO (ZMod p)) :
     (sp1VerifierElaborated (p := p)).localLength x = 0 := rfl
 
-omit [Fact (2 ^ 24 < p)] in
 theorem sp1Verifier_soundness :
     GeneralFormalCircuit.Soundness (Output := unit) (ZMod p) sp1VerifierMain
       (fun _ _ => True) (fun _ _ _ => True) := by
@@ -107,7 +110,6 @@ theorem sp1Verifier_soundness :
   circuit_proof_start
   simp only [circuit_norm, Channels.stateChannel, Channels.StateMsg.Spec]
 
-omit [Fact (2 ^ 24 < p)] in
 theorem sp1Verifier_completeness :
     GeneralFormalCircuit.Completeness (Output := unit) (ZMod p) sp1VerifierMain
       (fun _ _ _ => True) (fun _ _ _ => True) := by
@@ -124,36 +126,43 @@ def sp1Verifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
 
 /-! ## The SP1 machine as a gated VM -/
 
-/-- The 24 capstone-wired chips, each a `GeneralFormalCircuit` wrapped as a Clean AIR `Component`
-(`⟨chip.circuit⟩`). Order mirrors `Soundness/AllChips.lean`'s `allChipsTrace`. `DivRem` is not included
-here (unlike `ChipRegistry.allChipKinds`, which lists all 25). `Mul`'s `circuit` carries a completeness
-`sorry` (like ShiftLeft/ShiftRight/Branch), but the ensemble soundness consumes only each `Component`'s
-constraints/channels, never its `completeness` proof — so it does not enter the capstone axioms. -/
+/-- The 25 capstone-wired chips, each a `GeneralFormalCircuit` wrapped as a Clean AIR `Component`
+(`⟨chip.circuit⟩`). Order mirrors `ChipRegistry.allChipKinds`. The `Mul`/`ShiftLeft`/`ShiftRight`/
+`DivRem` `circuit`s carry completeness `sorry`s; the ensemble *soundness proof* consumes only each
+`Component`'s constraints/channels, never its `completeness` field — but note that `#print axioms`
+is structural, so the embedded fields still surface `sorryAx` on this `def` (and everything built
+from it) until the four completeness holes close. -/
 def sp1Tables : List (Component (ZMod p)) :=
   [⟨AddChip.circuit⟩, ⟨AddiChip.circuit⟩, ⟨AddwChip.circuit⟩, ⟨SubChip.circuit⟩, ⟨SubwChip.circuit⟩,
    ⟨BitwiseChip.circuit⟩, ⟨LtChip.circuit⟩, ⟨ShiftLeftChip.circuit⟩, ⟨ShiftRightChip.circuit⟩,
    ⟨JalChip.circuit⟩, ⟨JalrChip.circuit⟩, ⟨BranchChip.circuit⟩, ⟨UTypeChip.circuit⟩,
    ⟨LoadByteChip.circuit⟩, ⟨LoadHalfChip.circuit⟩, ⟨LoadWordChip.circuit⟩, ⟨LoadDoubleChip.circuit⟩,
    ⟨LoadX0Chip.circuit⟩, ⟨StoreByteChip.circuit⟩, ⟨StoreHalfChip.circuit⟩, ⟨StoreWordChip.circuit⟩,
-   ⟨StoreDoubleChip.circuit⟩, ⟨MulChip.circuit⟩, ⟨AluX0Chip.circuit⟩]
+   ⟨StoreDoubleChip.circuit⟩, ⟨MulChip.circuit⟩, ⟨DivRemChip.circuit⟩, ⟨AluX0Chip.circuit⟩]
 
-/-- **The SP1 machine as a `GatedVm`.** The typed State channel (the VM main channel), the 24 chip
+/-- Regression guard: the capstone-wired table count matches `allChipKinds_length` (25). A chip is
+fully wired only when it appears in **both** `allChipKinds` and `sp1Tables` — this `rfl` plus
+`allChipKinds_length` keeps the two lists from drifting apart silently (as happened when `DivRem`
+was registered but not wired, 2026-06). -/
+theorem sp1Tables_length : (sp1Tables (p := p)).length = 25 := rfl
+
+/-- **The SP1 machine as a `GatedVm`.** The typed State channel (the VM main channel), the 25 chip
 tables, the remaining three buses (Byte/Program/Memory in gated raw form), and the constant-`±1` boundary
 `sp1Verifier`. Its `toEnsemble.channels` is the four-channel list
-`[stateChannel, byteChannel, programChannel, memoryChannel].toRawGated` (the same model the chips emit
+`[stateChannel, byteChannel, programChannel, memoryChannel].toRaw` (the same model the chips emit
 on). -/
 def sp1GatedVm : GatedVm (ZMod p) SP1PublicIO where
   stateChannel := Channels.stateChannel
   tables := sp1Tables
   busChannels :=
-    [Channels.byteChannel.toRawGated, Channels.programChannel.toRawGated,
-     Channels.memoryChannel.toRawGated]
+    [Channels.byteChannel.toRaw, Channels.programChannel.toRaw,
+     Channels.memoryChannel.toRaw]
   verifier := sp1Verifier
   verifier_length_zero := fun _ => rfl
 
 /-- Scaffold ensemble assumptions — `True`. The chip operand `isU64` assumptions are not expressible on
-`SP1PublicIO`; they are recovered per-witness from the memory-bus balance inside
-`sp1_gatedExecution_prereqs`. -/
+`SP1PublicIO`; they are recovered per-witness from the memory-bus balance inside the decode seam
+`sp1_witness_decode` (W1c). -/
 def sp1Assumptions : SP1PublicIO (ZMod p) → Prop := fun _ => True
 
 /-- **The meaningful SP1 spec.** Over the public initial/final state, there is a heterogeneous trace
@@ -163,20 +172,99 @@ between the public endpoints. -/
 def sp1Spec : SP1PublicIO (ZMod p) → Prop := fun pi =>
   ∃ rows : List (ChipRow p), GatedExecution rows (initEntryOf pi) (finalEntryOf pi)
 
-/-- **The witness → gated-capstone bridge (the sole residual `sorry`).** From the ensemble `Statement`'s
-per-table constraints and balanced channels, the heterogeneous trace decoded from the witness satisfies
-the three hypotheses of `gatedExecution_of_specs_and_balance`: per-row chip `Spec`s, binary `is_real`
-gating, and the gated State-bus balance with the public genesis/finalization boundary.
+/-! ## The capstone premise, split: the decode seam (W1b/W1c) + the proven balance translation (W1a)
 
-This is the project's checklist §B5 residue, bundled:
-* (a) `witness.BalancedChannels` → `isConsistentBalanced (… ++ boundary)` — the Clean
-  `BalancedInteractions` (over evaluated `Interaction (ZMod p)` per `Array`) → native
-  `isConsistentBalanced` (over `LookupKey`) translation, via `isConsistentBalanced_of_intCast_zero`
-  (`BalanceMod.lean`) + `stateLookups_eq_emitted` lifted over the table flatMap + the verifier's two
-  `emitGated ±1` boundary interactions under `toAccess`;
-* (b)+(c) `witness.Constraints` → per-row `chipSpec` — the 24-chip `witness.tables ↔ List (ChipRow p)`
-  decode (`same_circuits` + `valueFromOffset`), per-table `Component.weakSoundness`, and each chip's
-  `isU64` operand `Assumptions` recovered from the memory-bus balance. -/
+`sp1_gatedExecution_prereqs` used to be one monolithic `sorry`. It is now a **proven** assembly of
+* `sp1_witness_decode` — the **W1b/W1c decode seam**, the sole remaining `sorry`: the 25-table
+  witness → `ChipRow` decode bundle `SP1WitnessDecode`, and
+* `sp1_state_balance_of_balancedInteractions` — **W1a, proven, axiom-clean**: Clean
+  `BalancedInteractions` on the State channel ⇒ native `isConsistentBalanced` of the decoded access
+  list, through the generic adapter in `GatedVm/BalanceMod.lean`. -/
+
+/-- **The witness → trace decode bundle (the W1b/W1c seam).** Everything about a constraint-satisfying,
+channel-balanced witness that requires *decoding the 25 tables into `ChipRow`s*:
+
+* `rows`/`data` — the heterogeneous trace decoded from `witness.tables` (`same_circuits` +
+  `valueFromOffset`) and the shared prover data;
+* `spec_holds` — per-row chip `Spec`, from per-table `Component.weakSoundness` under
+  `witness.Constraints`, with each chip's `isU64` operand `Assumptions` recovered from the memory-bus
+  balance (`Soundness/MemoryIsU64.lean`, W1c);
+* `is_real_binary` — binary gating, from each chip's `is_real · (is_real − 1) = 0` constraint;
+* `state_accesses_perm` — the **decode correspondence** the proven balance translation consumes: the
+  native State-bus access list (the per-row `stateLookups` aggregate plus the public `±1` boundary) is
+  a permutation of the `Interaction.toAccess`-image of the witness's Clean-side State-channel
+  interactions. Per row this is `stateLookups_eq_emitted` (`Soundness/StateConsistency.lean`) lifted
+  over the 25-table flatMap, plus the verifier's two `Channel.emit ±1` boundary interactions
+  (`sp1VerifierMain`); a permutation because the witness lists the verifier's interactions first.
+
+(A one-constructor `Prop` inductive, Exists-style, because the bundle carries data (`rows`/`data`)
+alongside the proofs; consume it with `obtain ⟨rows, data, h_spec, hbin, h_corr⟩`.) -/
+inductive SP1WitnessDecode (witness : EnsembleWitness (sp1GatedVm (p := p)).toEnsemble) : Prop where
+  | mk
+    (rows : List (ChipRow p))
+    (data : ProverData (ZMod p))
+    (spec_holds : ∀ r ∈ rows, r.chipSpec data)
+    (is_real_binary : ∀ r ∈ rows.map ChipRow.view, r.is_real = 0 ∨ r.is_real = 1)
+    (state_accesses_perm :
+      (aggregateChipRows (rows.map ChipRow.view) stateLookups
+        ++ [(InteractionKind.State, "SP1State", initEntryOf witness.publicInput, (1 : ℤ)),
+            (InteractionKind.State, "SP1State", finalEntryOf witness.publicInput, (-1 : ℤ))]).Perm
+        ((witness.interactionsWith Channels.stateChannel.toRaw).map Interaction.toAccess))
+
+/-- **The decode seam (roadmap W1b + W1c; the sole residual `sorry`).** From the ensemble `Statement`'s
+per-table constraints and balanced channels, decode the witness into `SP1WitnessDecode`: the 25-table
+`witness.tables ↔ List (ChipRow p)` decode (`same_circuits` + `valueFromOffset`), per-table
+`Component.weakSoundness` for `spec_holds` (with the `isU64` operand `Assumptions` recovered from the
+memory-bus balance), the binary gating, and the per-row `stateLookups_eq_emitted` correspondence lifted
+over the table flatMap (+ the verifier boundary). -/
+theorem sp1_witness_decode (witness : EnsembleWitness (sp1GatedVm (p := p)).toEnsemble)
+    (hC : witness.Constraints) (hB : witness.BalancedChannels) :
+    SP1WitnessDecode witness := by
+  sorry
+
+/-- **W1a, proven: Clean State-channel balance ⇒ native gated State-bus balance.** From Clean's
+`BalancedInteractions` over the (single-channel) State interactions — one instantiation of
+`witness.BalancedChannels` — and the decode correspondence (`SP1WitnessDecode.state_accesses_perm`),
+conclude the native `isConsistentBalanced` of the decoded access list: exactly the `h_bal` hypothesis
+of `gatedExecution_of_specs_and_balance`. The field → ℤ core is
+`isConsistentBalanced_of_balancedInteractions` (`GatedVm/BalanceMod.lean`); the `{-1, 0, 1}`
+multiplicity bound is native — `±is_real.val` with `is_real` binary (`stateLookups_mult_binary`) plus
+the constant-`±1` boundary. Axiom-clean (clean-3). -/
+theorem sp1_state_balance_of_balancedInteractions
+    (pi : SP1PublicIO (ZMod p)) (rows : List (ChipRow p))
+    (hbin : ∀ r ∈ rows.map ChipRow.view, r.is_real = 0 ∨ r.is_real = 1)
+    (interactions : List (Interaction (ZMod p)))
+    (h_channel : ∀ i ∈ interactions, i.channel = Channels.stateChannel.toRaw)
+    (h_balanced : BalancedInteractions interactions)
+    (h_perm : (aggregateChipRows (rows.map ChipRow.view) stateLookups
+        ++ [(InteractionKind.State, "SP1State", initEntryOf pi, (1 : ℤ)),
+            (InteractionKind.State, "SP1State", finalEntryOf pi, (-1 : ℤ))]).Perm
+        (interactions.map Interaction.toAccess)) :
+    isConsistentBalanced (aggregateChipRows (rows.map ChipRow.view) stateLookups
+        ++ [(InteractionKind.State, "SP1State", initEntryOf pi, (1 : ℤ)),
+            (InteractionKind.State, "SP1State", finalEntryOf pi, (-1 : ℤ))]) := by
+  refine isConsistentBalanced_of_balancedInteractions _ interactions
+    Channels.stateChannel.toRaw h_channel h_perm h_balanced ?_
+  intro a ha
+  rcases List.mem_append.mp ha with ha | ha
+  · -- chip-row contributions carry `±is_real.val` with `is_real` binary
+    obtain ⟨v, hv, hav⟩ := List.mem_flatMap.mp ha
+    have hp : 2 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+    exact stateLookups_mult_binary hp v (hbin v hv) a hav
+  · -- the two constant-`±1` boundary entries
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+    rcases ha with rfl | rfl
+    · right; right; rfl
+    · left; rfl
+
+/-- **The witness → gated-capstone bridge (assembled; `sorry`-free given the decode seam).** From the
+ensemble `Statement`'s per-table constraints and balanced channels, the heterogeneous trace decoded
+from the witness satisfies the three hypotheses of `gatedExecution_of_specs_and_balance`: per-row chip
+`Spec`s, binary `is_real` gating, and the gated State-bus balance with the public
+genesis/finalization boundary. Assembly: the W1b/W1c seam `sp1_witness_decode` supplies rows/data,
+`chipSpec`s, gating, and the State-bus decode correspondence; the proven W1a translation
+`sp1_state_balance_of_balancedInteractions` turns `witness.BalancedChannels` — instantiated at the
+State channel, the head of the ensemble's channel list — into the native gated balance. -/
 theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1GatedVm (p := p)).toEnsemble)
     (hC : witness.Constraints) (hB : witness.BalancedChannels) :
     ∃ (rows : List (ChipRow p)) (data : ProverData (ZMod p)),
@@ -185,11 +273,20 @@ theorem sp1_gatedExecution_prereqs (witness : EnsembleWitness (sp1GatedVm (p := 
       isConsistentBalanced (aggregateChipRows (rows.map ChipRow.view) stateLookups
         ++ [(InteractionKind.State, "SP1State", initEntryOf witness.publicInput, (1 : ℤ)),
             (InteractionKind.State, "SP1State", finalEntryOf witness.publicInput, (-1 : ℤ))]) := by
-  sorry
+  obtain ⟨rows, data, h_spec, hbin, h_corr⟩ := sp1_witness_decode witness hC hB
+  -- instantiate the balanced channels at the State channel (the ensemble channel-list head)
+  have h_balanced : BalancedInteractions
+      (witness.interactionsWith Channels.stateChannel.toRaw) := by
+    have h := (hB Channels.stateChannel.toRaw (List.mem_cons_self ..)).1
+    rwa [EnsembleWitness.interactionsWith_allTablesWitness] at h
+  exact ⟨rows, data, h_spec, hbin,
+    sp1_state_balance_of_balancedInteractions witness.publicInput rows hbin _
+      (fun i hi => EnsembleWitness.channel_eq_of_mem_interactionsWith hi) h_balanced h_corr⟩
 
 /-- **SP1 as a Clean `FormalEnsemble`** — the final whole-machine soundness object. Its `soundness` is the
-**sorry-free** assembly of the gated capstone `gatedExecution_of_specs_and_balance` with the single
-isolated prerequisite `sp1_gatedExecution_prereqs`. -/
+**sorry-free** assembly of the gated capstone `gatedExecution_of_specs_and_balance` with
+`sp1_gatedExecution_prereqs` — itself proven, modulo the single isolated decode seam
+`sp1_witness_decode`. -/
 def sp1FormalEnsemble : FormalEnsemble (ZMod p) SP1PublicIO :=
   (sp1GatedVm (p := p)).toFormalEnsemble sp1Assumptions sp1Spec (by
     intro witness _hA hC hB

@@ -14,6 +14,8 @@ check lives in `SP1Clean/WitnessTests/BitwiseOperationWitness.lean`. Regenerate 
 namespace SP1Clean.WitnessTests
 open SP1Clean
 
+set_option linter.all false  -- auto-generated: skip linters
+
 /-- 396 conformance vectors for `BitwiseOperation` (`(b_bytes, c_bytes, opcode, result)`). -/
 def BitwiseOperationWitnessVectors : List (Vector ℕ 8 × Vector ℕ 8 × ℕ × Vector ℕ 8) := [
   (#v[0, 0, 0, 0, 0, 0, 0, 0], #v[0, 0, 0, 0, 0, 0, 0, 0], 0, #v[0, 0, 0, 0, 0, 0, 0, 0]),

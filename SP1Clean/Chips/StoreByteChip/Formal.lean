@@ -9,7 +9,7 @@ namespace SP1Clean.StoreByteChip
 
 open Circuit
 open Extracted (StoreByteColumns)
-open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -100,9 +100,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       fun h1 => ⟨(h_bytes h1).1, (h_bytes h1).2.1, (h_bytes h1).2.2.1, (h_bytes h1).2.2.2⟩,
       ⟨hsel0, hsel1, hsel2, hsel3⟩, sub_eq_zero.mp hincr,
       ⟨sub_eq_zero.mp hr0, sub_eq_zero.mp hr1, sub_eq_zero.mp hr2, sub_eq_zero.mp hr3⟩, h_bin⟩,
-    Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin, ?_, ?_⟩
-  · exact binary_gate_req_vacuous h_bin _
-  · exact binary_gate_req_vacuous h_bin _
+    Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
 
 /-- Prover-side row well-formedness. -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=

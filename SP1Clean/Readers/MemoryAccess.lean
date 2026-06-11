@@ -27,7 +27,7 @@ The bus's cross-row meaning (offline-memory, last-write-wins) is the trace level
 namespace SP1Clean.Readers.MemoryAccess
 
 open Circuit
-open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -85,10 +85,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   input.is_real * ((ts.compare_low * (input.clk_low + 1) + (1 - ts.compare_low) * input.clk_high
       - (ts.compare_low * ts.prev_low + (1 - ts.compare_low) * ts.prev_high) - 1)
     - (ts.diff_low_limb + ts.diff_high_limb * 65536)) === 0
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨6, ts.diff_low_limb, Expression.const ((16 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨3, 0, ts.diff_high_limb, 0⟩ : ByteRow (Expression (ZMod p)))
   memoryChannel.emit input.is_real
     (⟨ts.prev_high, ts.prev_low, input.addr0, input.addr1, input.addr2,
@@ -102,17 +102,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated, memoryChannel.toRaw]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw, memoryChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated, memoryChannel.toRaw] := rfl
+      = [byteChannel.toRaw, memoryChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
@@ -125,23 +125,19 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel, memoryChannel] at h_holds ⊢
   obtain ⟨a1, a2, a3, b4, b5⟩ := h_holds
-  refine ⟨?_, ?_, ?_⟩
-  · -- the `Spec` body, on a real row (`is_real = 1`)
-    intro hr1
-    rw [hr1, one_mul] at a1 a2 a3
-    have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
-    have hb5 := b5 (by rw [hr1])
-    -- strip the `id (ZMod p)` `ProvableType` carrier off the `Spec` body so `ring`/`sub_eq_add_neg`
-    -- resolve (the `id` carrier, à la `LtOperationUnsigned`; `docs/agents/mul-operation-learnings.md` §1).
-    simp only [id] at *
-    refine ⟨bool_of_mul_pred a1, ?_, ?_, (byteRowSpec_range _ h16p).mp hb4, ?_⟩
-    · rw [sub_eq_add_neg]; exact a2
-    · simp only [selCur, selPrev]; linear_combination a3
-    · exact ((byteRowSpec_u8range_pair _ _).mp hb5).1
-  · -- byte padding requirement on `diff_low`: vacuous for the binary gate (`toRawGated`, raw value)
-    exact binary_gate_req_vacuous h_assumptions _
-  · -- byte padding requirement on `diff_high`: vacuous
-    exact binary_gate_req_vacuous h_assumptions _
+  -- the `Spec` body, on a real row (`is_real = 1`); post-#398 the byte receives owe no padding
+  -- requirement, so the Spec implication is the only goal.
+  intro hr1
+  rw [hr1, one_mul] at a1 a2 a3
+  have hb4 := b4 (by rw [hr1]); rw [← c16] at hb4
+  have hb5 := b5 (by rw [hr1])
+  -- strip the `id (ZMod p)` `ProvableType` carrier off the `Spec` body so `ring`/`sub_eq_add_neg`
+  -- resolve (the `id` carrier, à la `LtOperationUnsigned`; `docs/agents/mul-operation-learnings.md` §1).
+  simp only [id] at *
+  refine ⟨bool_of_mul_pred a1, ?_, ?_, (byteRowSpec_range _ h16p).mp hb4, ?_⟩
+  · rw [sub_eq_add_neg]; exact a2
+  · simp only [selCur, selPrev]; linear_combination a3
+  · exact ((byteRowSpec_u8range_pair _ _).mp hb5).1
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

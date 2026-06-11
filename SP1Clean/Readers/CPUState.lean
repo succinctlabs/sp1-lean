@@ -33,7 +33,7 @@ stays at the trace level (`Soundness/StateConsistency.lean`). -/
 namespace SP1Clean.Readers.CPUState
 
 open Circuit
-open SP1Clean.Channels (stateChannel byteChannel StateMsg binary_gate_req_vacuous)
+open SP1Clean.Channels (stateChannel byteChannel StateMsg)
 
 variable {p : ℕ} [Fact p.Prime]
 
@@ -49,59 +49,56 @@ lemma hn13 [Fact (2 ^ 17 < p)] : 2 ^ 13 < p := by
 
 /-- The `cols` block is an **input** (the composing chip witnesses it), so `main` witnesses nothing and
 imposes the two `is_real`-gated clock byte checks (`byteChannel` gated receives, mult `-is_real`, **raw**
-value — `toRawGated`, padding owes nothing) plus the two State-bus interactions — `receive` the
+value — `toRaw` (gated post-#398), padding owes nothing) plus the two State-bus interactions — `receive` the
 current `(clk, cols.pc)` with `-is_real`, `send` the next `(clk + clk_inc, next_pc)` with `+is_real`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨6, (cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹, Expression.const ((13 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨3, 0, cols.clk_16_24, 0⟩ : ByteRow (Expression (ZMod p)))
   let clk_low := cols.clk_0_16 + cols.clk_16_24 * 65536
-  stateChannel.emitGated (-input.is_real) ⟨cols.clk_high, clk_low, cols.pc[0], cols.pc[1], cols.pc[2]⟩
-  stateChannel.emitGated input.is_real
+  stateChannel.emit (-input.is_real) ⟨cols.clk_high, clk_low, cols.pc[0], cols.pc[1], cols.pc[2]⟩
+  stateChannel.emit input.is_real
     ⟨cols.clk_high, clk_low + input.clk_inc, input.next_pc[0], input.next_pc[1], input.next_pc[2]⟩
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated, stateChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw, stateChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     (elaborated (p := p)).channelsWithGuarantees
-      = ([byteChannel.toRawGated] : List (RawChannel (ZMod p))) := rfl
+      = ([byteChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     (elaborated (p := p)).channelsWithRequirements
-      = ([byteChannel.toRawGated, stateChannel.toRawGated] : List (RawChannel (ZMod p))) := rfl
+      = ([byteChannel.toRaw, stateChannel.toRaw] : List (RawChannel (ZMod p))) := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
-/-- `is_real` is binary — the precondition for the genuinely `is_real`-gated byte receives (it lets
-soundness discharge each gated receive's padding requirement via `binary_gate_req_vacuous`). Discharged by the
-composing chip's `is_real * (is_real - 1) = 0` gate. -/
+/-- `is_real` is binary — the precondition for the genuinely `is_real`-gated byte receives.
+Discharged by the composing chip's `is_real * (is_real - 1) = 0` gate. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
 
 theorem soundness [Fact (2 ^ 17 < p)] : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   have h13p : (13 : ℕ) < p := lt_trans (Nat.lt_two_pow_self) hn13
   simp only [circuit_norm, byteChannel, stateChannel, StateMsg.Spec] at h_holds ⊢
-  refine ⟨?_, ?_⟩
-  · -- `Spec`: `is_real = 1 → clk bounds`, derived from the byte-pull guarantees (fire at `mult = -1`).
-    intro hr1
-    have hneg : -input_is_real = -1 := by rw [hr1]
-    have hb1 := h_holds.1 hneg
-    have hb2 := h_holds.2 hneg
-    refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp hb2).1⟩
-    rw [sub_eq_add_neg, Nat.cast_ofNat]
-    exact hb1
-  · -- the requirements: the two byte padding requirements are vacuous (`mult ∈ {0,-1}` for the binary
-    -- gate, so `toRawGated` fires nothing); the State emit requirements are trivial (`Guarantees := True`).
-    exact ⟨binary_gate_req_vacuous h_assumptions _, binary_gate_req_vacuous h_assumptions _⟩
+  -- `Spec`: `is_real = 1 → clk bounds`, derived from the byte-pull guarantees (fire at `mult = -1`).
+  -- Post-#398 the receives owe no padding requirement and the State emit requirements are trivial
+  -- (`Guarantees := True`), so the Spec implication is the only goal.
+  intro hr1
+  have hneg : -input_is_real = -1 := by rw [hr1]
+  have hb1 := h_holds.1 hneg
+  have hb2 := h_holds.2 hneg
+  refine ⟨(byteRowSpec_range _ h13p).mp ?_, ((byteRowSpec_u8range_pair _ _).mp hb2).1⟩
+  rw [sub_eq_add_neg, Nat.cast_ofNat]
+  exact hb1
 
 theorem completeness [Fact (2 ^ 17 < p)] : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start

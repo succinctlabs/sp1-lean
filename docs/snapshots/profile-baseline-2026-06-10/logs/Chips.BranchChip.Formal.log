@@ -1,0 +1,625 @@
+import took 1.01s
+simp took 155ms
+tactic execution of tacticDecompose_provable_struct took 304ms
+simp took 57.2ms
+simp took 95.1ms
+tactic execution of tacticDecompose_provable_struct took 335ms
+simp took 59.3ms
+simp took 91.6ms
+tactic execution of tacticDecompose_provable_struct took 566ms
+simp took 80.1ms
+simp took 79.1ms
+tactic execution of tacticDecompose_provable_struct took 315ms
+tactic execution of tacticDecompose_provable_struct took 301ms
+simp took 1.84s
+simp took 1.94s
+tactic execution of Lean.Parser.Tactic.obtain took 888ms
+tactic execution of Lean.Parser.Tactic.obtain took 59.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 99.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 109ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 98.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 109ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 108ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 98.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 110ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 111ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 111ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 113ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 98.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 99.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 112ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 99.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 99.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 109ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 108ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 108ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 105ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 106ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 100ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 101ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 102ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 104ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 107ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 111ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 103ms
+tactic execution of Lean.Parser.Tactic.omega took 61.5ms
+tactic execution of Lean.Parser.Tactic.contradiction took 54.6ms
+tactic execution of Lean.Parser.Tactic.contradiction took 54ms
+tactic execution of Lean.Parser.Tactic.contradiction took 55.4ms
+tactic execution of Lean.Parser.Tactic.contradiction took 53.7ms
+tactic execution of Lean.Parser.Tactic.refine took 76.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 84.7ms
+instantiate metavars took 5.88s
+share common exprs took 200ms
+process pre-definitions took 139ms
+elaboration took 241ms
+type checking took 1.15s
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 102ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 292ms
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 95.5ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 85.4ms
+linting took 81.4ms
+simp took 79.7ms
+simp took 51.6ms
+simp took 50.6ms
+simp took 54.3ms
+simp took 54ms
+simp took 52.9ms
+simp took 51.1ms
+simp took 1.26s
+simp took 1.93s
+tactic execution of Lean.Parser.Tactic.obtain took 142ms
+tactic execution of Lean.Parser.Tactic.obtain took 54.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 51.3ms
+tactic execution of Lean.Parser.Tactic.refine took 51.5ms
+tactic execution of Lean.Parser.Tactic.refine took 55.4ms
+tactic execution of Lean.Parser.Tactic.refine took 60.2ms
+tactic execution of Lean.Parser.Tactic.refine took 60.7ms
+tactic execution of Lean.Parser.Tactic.refine took 61.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 53.4ms
+tactic execution of Lean.Parser.Tactic.refine took 72ms
+tactic execution of Lean.Parser.Tactic.refine took 72.1ms
+tactic execution of Lean.Parser.Tactic.refine took 75.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 61.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 53.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 58.3ms
+tactic execution of Lean.Parser.Tactic.refine took 77.5ms
+tactic execution of Lean.Parser.Tactic.refine took 66.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 74ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 74.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 74.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 74.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.9ms
+tactic execution of Lean.Parser.Tactic.refine took 135ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 73.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 73ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 73.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.refine took 141ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 73.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 73ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 76.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 73.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69ms
+tactic execution of Lean.Parser.Tactic.refine took 145ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.4ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 72.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 67ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.5ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 70.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.8ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.3ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 71.7ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 73.2ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 68.9ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.1ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.6ms
+tactic execution of Lean.Parser.Tactic.rewriteSeq took 69.2ms
+tactic execution of Lean.Parser.Tactic.refine took 164ms
+interpretation of Mathlib.Tactic._aux_Mathlib_Tactic_Convert___elabRules_Mathlib_Tactic_convert_1._boxed took 1.34s
+simp took 508ms
+simp took 53.6ms
+tactic execution of Lean.Parser.Tactic.obtain took 78.3ms
+tactic execution of Lean.Parser.Tactic.simp took 62ms
+instantiate metavars took 5.3s
+share common exprs took 150ms
+process pre-definitions took 119ms
+elaboration took 287ms
+type checking took 1.04s
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 330ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 1.01s
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 310ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 289ms
+linting took 279ms
+simp took 1.79s
+type checking took 403ms
+cumulative profiling times:
+	attribute application 0.2ms
+	compilation (IR) 61.9ms
+	compilation (LCNF base) 96.9ms
+	compilation (LCNF mono) 34.6ms
+	congr simp thm 60.8ms
+	dsimp 4.74s
+	elaboration 655ms
+	fix level params 29.4ms
+	import 1.01s
+	initialization 31.2ms
+	instantiate metavars 11.2s
+	interpretation 4.36s
+	let-to-have transformation 2.53ms
+	linting 390ms
+	norm_num 9.64ms
+	parsing 22.1ms
+	process pre-definitions 307ms
+	ring 92ms
+	share common exprs 369ms
+	simp 11.7s
+	tactic execution 88.2s
+	type checking 2.8s
+	typeclass inference 20.6s

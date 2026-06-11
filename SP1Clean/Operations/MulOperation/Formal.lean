@@ -8,7 +8,7 @@ import SP1Clean.Foundations.ByteTable
 namespace SP1Clean.MulOperation
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
@@ -326,8 +326,9 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       rw [hsdc]; rcases hmh_b with h | h <;> rw [h]
       · left; ring
       · rw [one_mul, hc_msb]; split <;> simp
-  · -- channel-requirement tail: 2 U16toU8 + 1 U16MSB(product) Assumptions; op5 + 24 byte-pull reqs vacuous.
-    refine ⟨?_, ?_, ?_, ?_⟩
+  · -- channel-requirement tail: 2 U16toU8 + 1 U16MSB(product) Assumptions (post-#398 the op5 + 24
+    -- gated byte pulls owe no padding requirement).
+    refine ⟨?_, ?_, ?_⟩
     · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).1, hir_bin⟩
     · exact Or.inr ⟨fun h => Word.lt_cases_of_isU64 (habc_imp h).2, hir_bin⟩
     · -- the `product_msb` U16MSB is gated on `is_mulw`; under `is_mulw = 1` we get `is_real = 1`
@@ -344,7 +345,6 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
       have pb3 : input_cols_product[3].val < 2 ^ 8 := by
         rw [← ep3]; exact ((byteRowSpec_u8range_pair _ _).mp (hpG1 (by rw [hr1]))).2
       rw [ep2, ep3, byte_compose_val pb2 pb3 rfl]; omega
-    · and_intros <;> exact binary_gate_req_vacuous hir_bin _
 
 /-- Byte-value bridge: the `k`-th byte of the `ZMod`-level sign/zero-extended operand equals the `ℕ`
 byte stream `extStream` at `k` (used by the witnessed `schoolProduct`/`schoolCarry`). Bytes `0..7` are
@@ -435,6 +435,205 @@ lemma extStream_le (l0 l1 l2 l3 sgn : ℕ) (hl0 : l0 < 2 ^ 16) (hl1 : l1 < 2 ^ 1
 lemma extStream_eq_zero (l0 l1 l2 l3 sgn i : ℕ) (h : 16 ≤ i) :
     extStream l0 l1 l2 l3 sgn i = 0 := by
   unfold extStream; rw [List.getD_eq_default _ _ (by simp; omega)]
+
+set_option maxHeartbeats 4000000 in
+/-- `populate b c is_mulh is_mulhsu is_mulw` satisfies the structural `Spec` for any `is_real` and any
+boolean variant flags with a `{0,1}`-bounded sum (mirroring `Assumptions`). The composing chip uses
+this to discharge its `MulOperation` assertion obligation in completeness. -/
+theorem spec_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
+    (is_mul is_mulh is_mulhu is_mulhsu is_mulw is_real : ZMod p)
+    (hmul : is_mul = 0 ∨ is_mul = 1) (hmh : is_mulh = 0 ∨ is_mulh = 1)
+    (hmhu : is_mulhu = 0 ∨ is_mulhu = 1) (hmhsu : is_mulhsu = 0 ∨ is_mulhsu = 1)
+    (hmw : is_mulw = 0 ∨ is_mulw = 1)
+    (hsum : is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 0 ∨
+            is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1) :
+    Spec (⟨b, c, populate b c is_mulh is_mulhsu is_mulw,
+      is_real, is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩ : Inputs (ZMod p)) := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+  have hp : 2 ^ 24 < p := Fact.out
+  have hp_lit : 16777216 < p := by
+    have e : (2 : ℕ) ^ 24 = 16777216 := by norm_num
+    omega
+  have e16 : (2 : ℕ) ^ 16 = 65536 := by norm_num
+  obtain ⟨hbU0, hbU1, hbU2, hbU3⟩ := Word.lt_cases_of_isU64 hb
+  obtain ⟨hcU0, hcU1, hcU2, hcU3⟩ := Word.lt_cases_of_isU64 hc
+  -- `is_mulh + is_mulhsu` is boolean (`hsum` excludes both signed flags set at once).
+  have hims : is_mulh + is_mulhsu = 0 ∨ is_mulh + is_mulhsu = 1 := by
+    rcases hmh with h | h
+    · rcases hmhsu with h2 | h2 <;> rw [h, h2] <;> simp
+    · have hs1 := sum_eq_one hmul (Or.inr h) hmhu hmhsu hmw hsum (Or.inr (Or.inl h))
+      have hs' : is_mulh + is_mul + is_mulhu + is_mulhsu + is_mulw = 1 := by
+        linear_combination hs1
+      obtain ⟨_, _, h2, _⟩ := rest_zero hmul hmhu hmhsu hmw h hs'
+      rw [h, h2]; simp
+  -- the two MSB witnesses are boolean
+  have hmsb_b := U16MSBOperation.populate_msb_bool (p := p) hbU3
+  have hmsb_c := U16MSBOperation.populate_msb_bool (p := p) hcU3
+  -- the two sign-extend selectors are boolean
+  have hbs_bool : (is_mulh + is_mulhsu) * U16MSBOperation.populate_msb b[3] = 0 ∨
+      (is_mulh + is_mulhsu) * U16MSBOperation.populate_msb b[3] = 1 := by
+    rcases hims with h | h
+    · rw [h, zero_mul]; exact Or.inl rfl
+    · rw [h, one_mul]; exact hmsb_b
+  have hcs_bool : is_mulh * U16MSBOperation.populate_msb c[3] = 0 ∨
+      is_mulh * U16MSBOperation.populate_msb c[3] = 1 := by
+    rcases hmh with h | h
+    · rw [h, zero_mul]; exact Or.inl rfl
+    · rw [h, one_mul]; exact hmsb_c
+  -- field↔ℕ sign-fill correspondence: the `ZMod` sign-extend selector's value is the `ℕ`-level
+  -- `bsgn`/`csgn` that the witnessed `schoolProduct`/`schoolCarry` consume.
+  have hbsv : ((is_mulh + is_mulhsu) * U16MSBOperation.populate_msb b[3]).val
+      = (is_mulh.val + is_mulhsu.val) * (b[3].val / 32768 % 2) := by
+    rcases hmh with h1 | h1 <;> rcases hmhsu with h2 | h2
+    · rw [h1, h2]; simp
+    · rw [h1, h2, zero_add, one_mul, ZMod.val_zero, ZMod.val_one,
+        U16MSBOperation.populate_msb, ZMod.val_natCast_of_lt (by omega)]
+      omega
+    · rw [h1, h2, add_zero, one_mul, ZMod.val_one, ZMod.val_zero,
+        U16MSBOperation.populate_msb, ZMod.val_natCast_of_lt (by omega)]
+      omega
+    · exfalso
+      rw [h1, h2] at hims
+      have h2cast : (1 : ZMod p) + 1 = ((2 : ℕ) : ZMod p) := by norm_num
+      rw [h2cast] at hims
+      have hv2 : ((2 : ℕ) : ZMod p).val = 2 := ZMod.val_natCast_of_lt (by omega)
+      rcases hims with h | h
+      · have := congrArg ZMod.val h; rw [hv2, ZMod.val_zero] at this; omega
+      · have := congrArg ZMod.val h; rw [hv2, ZMod.val_one] at this; omega
+  have hcsv : (is_mulh * U16MSBOperation.populate_msb c[3]).val
+      = is_mulh.val * (c[3].val / 32768 % 2) := by
+    rcases hmh with h1 | h1
+    · rw [h1]; simp
+    · rw [h1, one_mul, ZMod.val_one, one_mul,
+        U16MSBOperation.populate_msb, ZMod.val_natCast_of_lt (by omega)]
+      omega
+  -- the witnessed `U16toU8` decompositions
+  have hbdec : U16toU8OperationSafe.DecompSpec b (U16toU8OperationSafe.populate b) :=
+    U16toU8OperationSafe.spec_populate hbU0 hbU1 hbU2 hbU3 1 rfl
+  have hcdec : U16toU8OperationSafe.DecompSpec c (U16toU8OperationSafe.populate c) :=
+    U16toU8OperationSafe.spec_populate hcU0 hcU1 hcU2 hcU3 1 rfl
+  -- byte-stream bounds: each `extStream` entry is a byte and vanishes past index 15, so the
+  -- convolution meets `cpBound` at every limb.
+  have hbsgn_le : (is_mulh.val + is_mulhsu.val) * (b[3].val / 32768 % 2) ≤ 1 := by
+    rw [← hbsv]
+    rcases hbs_bool with h | h <;> rw [h]
+    · simp
+    · rw [ZMod.val_one]
+  have hcsgn_le : is_mulh.val * (c[3].val / 32768 % 2) ≤ 1 := by
+    rw [← hcsv]
+    rcases hcs_bool with h | h <;> rw [h]
+    · simp
+    · rw [ZMod.val_one]
+  have hbS_le : ∀ i, extStream b[0].val b[1].val b[2].val b[3].val
+      ((is_mulh.val + is_mulhsu.val) * (b[3].val / 32768 % 2)) i ≤ 255 :=
+    extStream_le _ _ _ _ _ hbU0 hbU1 hbU2 hbU3 hbsgn_le
+  have hcS_le : ∀ i, extStream c[0].val c[1].val c[2].val c[3].val
+      (is_mulh.val * (c[3].val / 32768 % 2)) i ≤ 255 :=
+    extStream_le _ _ _ _ _ hcU0 hcU1 hcU2 hcU3 hcsgn_le
+  have hcp_le : ∀ k, MulCarryChain.cpNat
+      (extStream b[0].val b[1].val b[2].val b[3].val
+        ((is_mulh.val + is_mulhsu.val) * (b[3].val / 32768 % 2)))
+      (extStream c[0].val c[1].val c[2].val c[3].val
+        (is_mulh.val * (c[3].val / 32768 % 2))) k ≤ MulCarryChain.cpBound :=
+    MulCarryChain.cpNat_le_cpBound_total _ _ hbS_le hcS_le
+      (fun i hi => extStream_eq_zero _ _ _ _ _ i hi)
+  -- pin the witnessed product/carry columns to the abstract carry chain
+  have hprodv : ∀ (k : ℕ), k < 16 → productVal (populate b c is_mulh is_mulhsu is_mulw) k
+      = ((MulCarryChain.product (MulCarryChain.cpNat
+            (extStream b[0].val b[1].val b[2].val b[3].val
+              ((is_mulh.val + is_mulhsu.val) * (b[3].val / 32768 % 2)))
+            (extStream c[0].val c[1].val c[2].val c[3].val
+              (is_mulh.val * (c[3].val / 32768 % 2)))) k : ℕ) : ZMod p) := by
+    intro k hk
+    simp only [productVal, dif_pos hk, populate, Vector.getElem_ofFn, schoolProduct]
+  have hcarryv : ∀ (k : ℕ), k < 16 → carryVal (populate b c is_mulh is_mulhsu is_mulw) k
+      = ((MulCarryChain.carry (MulCarryChain.cpNat
+            (extStream b[0].val b[1].val b[2].val b[3].val
+              ((is_mulh.val + is_mulhsu.val) * (b[3].val / 32768 % 2)))
+            (extStream c[0].val c[1].val c[2].val c[3].val
+              (is_mulh.val * (c[3].val / 32768 % 2)))) k : ℕ) : ZMod p) := by
+    intro k hk
+    simp only [carryVal, dif_pos hk, populate, Vector.getElem_ofFn, schoolCarry]
+  -- ranges
+  have hprod_lt : ∀ k : ℕ, k < 16 →
+      (productVal (populate b c is_mulh is_mulhsu is_mulw) k).val < 256 := by
+    intro k hk
+    rw [hprodv k hk, MulCarryChain.product_val _ (by omega) k]
+    exact MulCarryChain.product_lt _ k
+  have hcarry_lt : ∀ k : ℕ, k < 16 →
+      (carryVal (populate b c is_mulh is_mulhsu is_mulw) k).val < 2 ^ 16 := by
+    intro k hk
+    rw [hcarryv k hk, MulCarryChain.carry_val _ hcp_le (by omega) k]
+    have := MulCarryChain.carry_lt _ hcp_le k
+    omega
+  -- the schoolbook column over the witnessed byte decomposition is the cast `ℕ` convolution
+  have hcolsum : ∀ (k : ℕ), k < 16 →
+      colSum (extendedBytes b (U16toU8OperationSafe.populate b)
+            ((is_mulh + is_mulhsu) * U16MSBOperation.populate_msb b[3]))
+          (extendedBytes c (U16toU8OperationSafe.populate c)
+            (is_mulh * U16MSBOperation.populate_msb c[3])) k
+        = ((MulCarryChain.cpNat
+            (extStream b[0].val b[1].val b[2].val b[3].val
+              ((is_mulh.val + is_mulhsu.val) * (b[3].val / 32768 % 2)))
+            (extStream c[0].val c[1].val c[2].val c[3].val
+              (is_mulh.val * (c[3].val / 32768 % 2))) k : ℕ) : ZMod p) := by
+    intro k hk
+    rw [colSum_eq_cpNat b c _ _ _ _ hbdec hcdec hbs_bool hcs_bool k hk, hbsv, hcsv]
+  -- the carry-chain gate equations
+  have hchain : ∀ (k : ℕ), k < 16 →
+      productVal (populate b c is_mulh is_mulhsu is_mulw) k
+        = colSum (extendedBytes b (U16toU8OperationSafe.populate b)
+              ((is_mulh + is_mulhsu) * U16MSBOperation.populate_msb b[3]))
+            (extendedBytes c (U16toU8OperationSafe.populate c)
+              (is_mulh * U16MSBOperation.populate_msb c[3])) k
+          + (if k = 0 then 0 else carryVal (populate b c is_mulh is_mulhsu is_mulw) (k - 1))
+          - carryVal (populate b c is_mulh is_mulhsu is_mulw) k * 256 := by
+    intro k hk
+    rw [hprodv k hk, hcolsum k hk]
+    rcases k with _ | k'
+    · rw [hcarryv 0 hk, if_pos rfl, add_zero]
+      exact MulCarryChain.gate_zero _
+    · have hk' : k' < 16 := by omega
+      rw [hcarryv (k' + 1) hk, if_neg (Nat.succ_ne_zero k'), Nat.add_sub_cancel, hcarryv k' hk']
+      exact MulCarryChain.gate_succ _ k'
+  -- `product_msb`: boolean unconditionally, and the limb-MSB form under `is_mulw = 1`
+  have hpm_msb_eq : (populate b c is_mulh is_mulhsu is_mulw).product_msb.msb
+      = if is_mulw = 1 then U16MSBOperation.populate_msb
+          ((populate b c is_mulh is_mulhsu is_mulw).product[2]
+            + (populate b c is_mulh is_mulhsu is_mulw).product[3] * 256)
+        else 0 := rfl
+  have hpm_arg_lt : ((populate b c is_mulh is_mulhsu is_mulw).product[2]
+      + (populate b c is_mulh is_mulhsu is_mulw).product[3] * 256).val < 2 ^ 16 := by
+    have h2 := hprod_lt 2 (by norm_num)
+    have h3 := hprod_lt 3 (by norm_num)
+    have e2 : productVal (populate b c is_mulh is_mulhsu is_mulw) 2
+        = (populate b c is_mulh is_mulhsu is_mulw).product[2] := dif_pos (by norm_num)
+    have e3 : productVal (populate b c is_mulh is_mulhsu is_mulw) 3
+        = (populate b c is_mulh is_mulhsu is_mulw).product[3] := dif_pos (by norm_num)
+    rw [e2] at h2; rw [e3] at h3
+    rw [byte_compose_val h2 h3 rfl]
+    omega
+  have hpm_bool : (populate b c is_mulh is_mulhsu is_mulw).product_msb.msb = 0 ∨
+      (populate b c is_mulh is_mulhsu is_mulw).product_msb.msb = 1 := by
+    rw [hpm_msb_eq]
+    split_ifs with hw
+    · exact U16MSBOperation.populate_msb_bool hpm_arg_lt
+    · exact Or.inl rfl
+  -- assemble the `Spec`
+  refine ⟨rfl, rfl, hmsb_b, hmsb_c, hpm_bool, fun _ =>
+    ⟨⟨hchain, hprod_lt, hcarry_lt, rfl, rfl, hmsb_b, hmsb_c, hbs_bool, hcs_bool⟩,
+     hbdec, hcdec,
+     (U16MSBOperation.spec_populate hbU3 1).2 rfl,
+     (U16MSBOperation.spec_populate hcU3 1).2 rfl,
+     hpm_bool, fun hw => ?_⟩⟩
+  show (if is_mulw = 1 then U16MSBOperation.populate_msb
+          ((populate b c is_mulh is_mulhsu is_mulw).product[2]
+            + (populate b c is_mulh is_mulhsu is_mulw).product[3] * 256)
+        else 0)
+      = if ((populate b c is_mulh is_mulhsu is_mulw).product[2]
+            + (populate b c is_mulh is_mulhsu is_mulw).product[3] * 256).val ≥ 32768 then 1 else 0
+  rw [if_pos hw]
+  exact (U16MSBOperation.spec_populate hpm_arg_lt 1).2 rfl
 
 set_option maxHeartbeats 40000000 in
 set_option linter.unusedSimpArgs false in

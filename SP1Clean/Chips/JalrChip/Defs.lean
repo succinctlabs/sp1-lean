@@ -89,7 +89,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 47,
      op_a_value[0], op_a_value[1], op_a_value[2], op_a_value[3]⟩
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨6, ((add_value[0] - lsb) * (4 : ZMod p)⁻¹),
       Expression.const ((14 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   input.is_real * (input.is_real - 1) === 0
@@ -99,8 +99,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main where
   channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit]
   -- 2 × 4-limb add results + 1 lsb scalar.
   localLength _ := 9
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 end SP1Clean.JalrChip

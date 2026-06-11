@@ -11,13 +11,12 @@ witness in `Populate`. -/
 namespace SP1Clean.AddOperation
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- On a real row (`is_real = 1`) the operand words fit in 64 bits, and `is_real` is binary (the latter
-discharged by the composing chip's `is_real * (is_real - 1) = 0` gate — it lets soundness clear each
-gated receive's padding requirement via `binary_gate_req_vacuous`). The `isU64` precondition is **gated
+discharged by the composing chip's `is_real * (is_real - 1) = 0` gate). The `isU64` precondition is **gated
 on `is_real`**: a padding row owes nothing, so a chip feeding a *witnessed* operand (whose range check
 is itself `is_real`-gated, e.g. DivRem's `abs_remainder`) can still discharge this assumption. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop :=
@@ -26,7 +25,7 @@ def Assumptions (input : Inputs (ZMod p)) : Prop :=
 set_option maxHeartbeats 1000000 in
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
-  obtain ⟨hab_imp, hbin⟩ := h_assumptions
+  obtain ⟨hab_imp, _hbin⟩ := h_assumptions
   obtain ⟨hia, hib, hiv, _⟩ := h_input
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   have h65536 : (2 : ℕ) ^ 16 = 65536 := by norm_num
@@ -46,27 +45,21 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   simp only [circuit_norm, byteChannel, ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3, ev0, ev1, ev2, ev3]
     at h_holds ⊢
   obtain ⟨hr0, hr1, hr2, hr3, _hbool, hgc0, hgc1, hgc2, hgc3⟩ := h_holds
-  -- `circuit_norm` already discharged the carry asserts' (empty) requirements, so the goal is exactly
-  -- `Spec` + the four byte padding requirements.
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · intro hr1eq
-    obtain ⟨ha, hb⟩ := hab_imp hr1eq
-    have hneg : -input_is_real = -1 := by rw [hr1eq]
-    have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
-    rw [← c16] at R0 R1 R2 R3
-    rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
-    refine addSemantics_of_carries ha hb ?_ ?_
-    · simp only [AssertSpec, sub_eq_add_neg]
-      exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2, bool_of_mul_pred hgc3⟩
-    · simp only [InteractSpec]
-      rw [← h65536]
-      exact ⟨(byteRowSpec_range _ h16p).mp R0, (byteRowSpec_range _ h16p).mp R1,
-        (byteRowSpec_range _ h16p).mp R2, (byteRowSpec_range _ h16p).mp R3⟩
-  -- four byte padding requirements are vacuous for a binary `is_real`.
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
-  · exact binary_gate_req_vacuous hbin _
+  -- `circuit_norm` already discharged the carry asserts' (empty) requirements, and post-#398 the byte
+  -- receives owe no padding requirement — the goal is exactly `Spec`.
+  intro hr1eq
+  obtain ⟨ha, hb⟩ := hab_imp hr1eq
+  have hneg : -input_is_real = -1 := by rw [hr1eq]
+  have R0 := hr0 hneg; have R1 := hr1 hneg; have R2 := hr2 hneg; have R3 := hr3 hneg
+  rw [← c16] at R0 R1 R2 R3
+  rw [hr1eq, one_mul] at hgc0 hgc1 hgc2 hgc3
+  refine addSemantics_of_carries ha hb ?_ ?_
+  · simp only [AssertSpec, sub_eq_add_neg]
+    exact ⟨bool_of_mul_pred hgc0, bool_of_mul_pred hgc1, bool_of_mul_pred hgc2, bool_of_mul_pred hgc3⟩
+  · simp only [InteractSpec]
+    rw [← h65536]
+    exact ⟨(byteRowSpec_range _ h16p).mp R0, (byteRowSpec_range _ h16p).mp R1,
+      (byteRowSpec_range _ h16p).mp R2, (byteRowSpec_range _ h16p).mp R3⟩
 
 set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by

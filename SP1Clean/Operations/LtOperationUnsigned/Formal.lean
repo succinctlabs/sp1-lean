@@ -191,7 +191,7 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   exact ⟨⟨bool_of_mul_pred hE6, bool_of_mul_pred hE8, bool_of_mul_pred hE10, bool_of_mul_pred hE12,
       bool_of_mul_pred hE14, by linear_combination hE19, by linear_combination hE27,
       by linear_combination hE35, by linear_combination hE43, by linear_combination hE48,
-      by linear_combination hE49, by linear_combination hE54, hbitbool, hbitord⟩, Or.inr hCmpAs⟩
+      by linear_combination hE49, by linear_combination -hE54, hbitbool, hbitord⟩, Or.inr hCmpAs⟩
 
 set_option maxHeartbeats 4000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
@@ -222,7 +222,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
     rw [hir1] at hs3 hs2 hs1 hs0 hinv
     simp only [Selectors]
     exact ⟨hf0, hf1, hf2, hf3, hsum, by linear_combination hs3, by linear_combination hs2,
-      by linear_combination hs1, by linear_combination hs0, hcl0eq, hcl1eq, by linear_combination hinv⟩
+      by linear_combination hs1, by linear_combination hs0, hcl0eq, hcl1eq, by linear_combination -hinv⟩
   have hCmpAs : U16CompareOperation.circuit.Assumptions
       ⟨input_cols_comparison_limbs[0], input_cols_comparison_limbs[1],
         ⟨input_cols_u16_compare_operation_bit⟩, input_is_real⟩ :=
@@ -245,7 +245,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · linear_combination hs0
   · linear_combination hcl0eq
   · linear_combination hcl1eq
-  · linear_combination hinv
+  · linear_combination -hinv
 
 /-- SP1's `LtOperationUnsigned::eval` as a Clean-native `FormalAssertion`: composes
 `U16CompareOperation` as a sub-assertion, witnessing nothing. -/

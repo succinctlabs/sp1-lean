@@ -113,7 +113,7 @@ theorem alutypereader_program_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
-  simp only [toAccess_emitted_program]
+  simp only [toAccess_pushIf_program]
   simp only [Extracted.ALUTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
   simp [circuit_norm, Opcode.ofNat, ConstraintCoe.coe_eq_val,
@@ -172,7 +172,7 @@ theorem alutypereader_memory_interactions_faithful_syntactic
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_emitted_memory]
+  simp only [toAccess_pushIf_memory]
   simp only [Extracted.ALUTypeReader.interactions, List.map_cons, List.map_nil,
     Extracted.Interaction.toAccess, Extracted.Dir.sign, List.filter_cons]
   simp [circuit_norm, h_ir, h_ch, h_cl, h_oa, h_ob, h_oc0, h_imm,
@@ -206,7 +206,7 @@ theorem alutypereader_byte_interactions_faithful_syntactic
     (h_dl_c : Expression.eval env input.cols.op_c_memory.access_timestamp.diff_low_limb =
       cols.op_c_memory.access_timestamp.diff_low_limb) :
     (((Readers.ALUTypeReader.main input).operations offset).interactionsWith
-        byteChannel.toRawGated).map (AbstractInteraction.toAccess env)
+        byteChannel.toRaw).map (AbstractInteraction.toAccess env)
       = ((Extracted.ALUTypeReader.interactions clk_high clk_low pc opcode op_a_write_value cols is_real
           is_trusted).map Extracted.Interaction.toAccess).filter (fun a => a.1 = InteractionKind.Byte) := by
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -217,14 +217,14 @@ theorem alutypereader_byte_interactions_faithful_syntactic
     have h : (3 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
     exact ZMod.val_natCast_of_lt h
   have hbk : ∀ (g : Expression (ZMod p)) (s : ByteRow (Expression (ZMod p))),
-      AbstractInteraction.toAccess env (byteChannel.receivedGated g s) =
+      AbstractInteraction.toAccess env ((pullIf (channel := byteChannel) g s).toRaw) =
         (InteractionKind.Byte, "SP1Byte",
           [(Expression.eval env s.opcode).val, (Expression.eval env s.a).val,
            (Expression.eval env s.b).val, (Expression.eval env s.c).val],
           signedVal (Expression.eval env (-g))) :=
-    fun g s => toAccess_receivedGated_byte env g s
+    fun g s => toAccess_pullIf_byte env g s
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
-    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRawGated
+    filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) byteChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.ALUTypeReader.main, Readers.RegisterAccessCols.circuit, Readers.RegisterAccessCols.main,
     Readers.RegisterAccessTimestamp.circuit, Readers.RegisterAccessTimestamp.main,

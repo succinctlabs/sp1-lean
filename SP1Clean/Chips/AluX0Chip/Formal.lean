@@ -9,7 +9,7 @@ namespace SP1Clean.AluX0Chip
 
 open Circuit
 open Extracted (AluX0Cols)
-open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -43,9 +43,9 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have h_bin : input_is_real = 0 ∨ input_is_real = 1 := bool_of_mul_pred h_gate
   simp only [← sub_eq_add_neg] at h_oa1 h_oa2
   simp only [isReal, clkLow, opcodeVal]
-  -- the per-emitter channel-requirement tail: CPUState / byte-pull (vacuous on the binary gate) / reader.
+  -- the per-emitter channel-requirement tail: CPUState / reader (the gated byte pull owes no requirement).
   exact ⟨⟨h_reader h_bin, h_bin, h_oa1, h_oa2⟩,
-    Or.inr h_bin, binary_gate_req_vacuous h_bin _, Or.inr h_bin⟩
+    Or.inr h_bin, Or.inr h_bin⟩
 
 /-- Honest prover-side row well-formedness: `is_real` binary, the two `op_a_0` forcing gates, the
 CPUState clock bounds + the immutable-ALU-reader contract, and the dynamic opcode in ALU range

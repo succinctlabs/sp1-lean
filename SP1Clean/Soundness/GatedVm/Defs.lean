@@ -27,7 +27,7 @@ variable {PublicIO : TypeMap} [ProvableType PublicIO]
 /-- A gated VM machine description: a typed **state channel** (the VM "main channel"), the component
 `tables`, the remaining `busChannels` (memory/program/byte, already in `RawChannel` form), and a
 boundary `verifier` exposing the public initial/final state. The state channel is exposed gated
-(`toRawGated`) in `toEnsemble`; the tables emit `±is_real` on it (genesis/finalization use constant
+(`toRaw` (gated post-#398)) in `toEnsemble`; the tables emit `±is_real` on it (genesis/finalization use constant
 `mult = 1`, which is just `is_real = 1` on an always-real boundary row). -/
 structure GatedVm (F : Type) [Field F] [DecidableEq F]
     (PublicIO : TypeMap) [ProvableType PublicIO] where
@@ -47,19 +47,19 @@ structure GatedVm (F : Type) [Field F] [DecidableEq F]
 instance (vm : GatedVm F PublicIO) : ProvableType vm.StateMessage := vm.provableState
 
 /-- The plain Clean `Air.Flat.Ensemble` underlying a `GatedVm`: the state channel **gated**
-(`toRawGated`) followed by the other buses, the component tables, and the boundary verifier. We build on
+(`toRaw` (gated post-#398)) followed by the other buses, the component tables, and the boundary verifier. We build on
 the *plain* ensemble (whose `BalancedChannels`/`Statement` are multiplicity-general), not Clean's
 constant-`±1` `VmTables.toEnsemble`. -/
 def GatedVm.toEnsemble (vm : GatedVm F PublicIO) : Ensemble F PublicIO where
   tables := vm.tables
-  channels := vm.stateChannel.toRawGated :: vm.busChannels
+  channels := vm.stateChannel.toRaw :: vm.busChannels
   verifier := vm.verifier
   verifier_length_zero := vm.verifier_length_zero
 
 @[circuit_norm] lemma GatedVm.toEnsemble_tables (vm : GatedVm F PublicIO) :
     vm.toEnsemble.tables = vm.tables := rfl
 @[circuit_norm] lemma GatedVm.toEnsemble_channels (vm : GatedVm F PublicIO) :
-    vm.toEnsemble.channels = vm.stateChannel.toRawGated :: vm.busChannels := rfl
+    vm.toEnsemble.channels = vm.stateChannel.toRaw :: vm.busChannels := rfl
 @[circuit_norm] lemma GatedVm.toEnsemble_verifier (vm : GatedVm F PublicIO) :
     vm.toEnsemble.verifier = vm.verifier := rfl
 

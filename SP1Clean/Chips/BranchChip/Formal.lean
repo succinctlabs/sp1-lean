@@ -7,7 +7,7 @@ namespace SP1Clean.BranchChip
 
 open Circuit
 open Extracted (BranchColumns)
-open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
@@ -138,9 +138,6 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
       rw [hl, hg, ZMod.val_one] at h_onehot
       omega
-  have byte_pad : ∀ x : ZMod p, ¬ -input_is_real = -1 → ¬ -input_is_real = 0 →
-      byteChannel.Guarantees (⟨6, x, ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (ZMod p)) env.data :=
-    fun x => binary_gate_req_vacuous h_bin _
   refine ⟨⟨?_, h_bin, ⟨hbeq, hbne, hblt, hbge, hbltu, hbgeu, hisbr⟩, ?_, ?_, ?_⟩, ?_⟩
   · exact h_itype h_bin
   · intro hr1 hbr1
@@ -209,18 +206,17 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     exact branch_conditions_of_decision_eq h_rs1U h_rs2U hbeq hbne hblt hbge hbltu hbgeu hisbr hone
       h_bit h_eqf (by simp only [branchDecision]; linear_combination h_isbr)
   · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
-      Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin, ?_, byte_pad _, byte_pad _⟩
-    · -- AddOp2 gate `is_real - is_branching` is binary: on padding `is_branching = 0` from `h_pad`.
-      rcases h_bin with h0 | h1
-      · have hbr0 : env.get (i₀ + 6) = 0 := by
-          have hh : (input_is_real + -1) * env.get (i₀ + 6) = 0 := h_pad
-          rw [h0] at hh
-          linear_combination -hh
-        left; rw [h0, hbr0]; simp
-      · rcases hisbr with hb0 | hb1
-        · right; rw [h1, hb0]; simp
-        · left; rw [h1, hb1]; simp
-    · exact binary_gate_req_vacuous h_bin _
+      Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin⟩
+    -- AddOp2 gate `is_real - is_branching` is binary: on padding `is_branching = 0` from `h_pad`.
+    rcases h_bin with h0 | h1
+    · have hbr0 : env.get (i₀ + 6) = 0 := by
+        have hh : (input_is_real + -1) * env.get (i₀ + 6) = 0 := h_pad
+        rw [h0] at hh
+        linear_combination -hh
+      left; rw [h0, hbr0]; simp
+    · rcases hisbr with hb0 | hb1
+      · right; rw [h1, hb0]; simp
+      · left; rw [h1, hb1]; simp
 
 set_option linter.unusedSectionVars false in
 /-- A length-4 `#v` of pointwise evaluations folds to the `Vector.map` of the evaluator. -/

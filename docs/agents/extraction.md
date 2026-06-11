@@ -135,7 +135,7 @@ deriving ProvableStruct
 
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   …                                          -- the `let Eᵢ` SSA chain, then
-  byteChannel.gatedReceive is_real ⟨6, is_real * cols.value[0], …⟩   -- byte send → gated pull (value folded)
+  byteChannel.pullIf is_real ⟨6, is_real * cols.value[0], …⟩   -- byte send → gated pull (value folded)
   E1 === 0                                   -- each AssertZero → `=== 0`  (E1 = the `is_real` boolean gate)
   …
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where …
@@ -146,7 +146,7 @@ soundness/completeness (`Operations/<Op>/Formal.lean`) run against SP1's constra
 construction** — there is no longer a hand-written `main` that a `Faithful/<Op>.lean` anchor must
 reconcile against the extracted lists. The compiler-side translation bakes in the Clean conventions:
 the field-generic `: F` becomes `ZMod p`, an `AssertZero` becomes `<e> === 0`, and a byte `send_byte`
-becomes a `byteChannel.gatedReceive` (a *pull* of the preprocessed `ByteChip`, the value folded
+becomes a `byteChannel.pullIf` (a *pull* of the preprocessed `ByteChip`, the value folded
 `gate * value`). The `main` includes SP1's `is_real` boolean gate (`is_real * (is_real - 1) = 0`),
 which the older hand-written gadgets dropped to a chip `Assumptions`.
 

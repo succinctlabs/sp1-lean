@@ -259,14 +259,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       hll0 hhl0 hll1 hhl1 hll2 hhl2 hll3 hhl3
       hp00 hp01 hp02 hp03 hp10 hp11 hp12 hp13 hp20 hp21 hp22 hp23 hp30 hp31 hp32 hp33
   · -- Channel-requirement tail: the three sub-assertion `Assumptions` (each the gate/flag binary fact,
-    -- except the U16MSB `a1 < 2^16` operand range which is part of the deferred SLLW argument) then the
-    -- nine `byteChannel` gated receives. On a padding row the gate `is_sll + is_sllw` is `0` (binary via
-    -- `E2`), so each folded value is `0` and the `Range` row `⟨6, 0, width, 0⟩` is in the byte table for
-    -- any width (`0 < 2 ^ width.val`).
+    -- except the U16MSB `a1 < 2^16` operand range which is part of the deferred SLLW argument);
+    -- post-#398 the nine `byteChannel` gated receives owe no padding requirement.
     simp only [id_eq] at *
-    refine ⟨Or.inr (bool_of_mul_pred _hrealbin), Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
-      Or.inr (bool_of_mul_pred _hE2), ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-    -- the 9 byte padding requirements are vacuous for the binary gate (`toRawGated`, raw values).
-    all_goals exact Channels.binary_gate_req_vacuous (bool_of_mul_pred _hE2) _
+    exact ⟨Or.inr (bool_of_mul_pred _hrealbin), Or.inr ⟨a1_bound_cond, bool_of_mul_pred _hE6⟩,
+      Or.inr (bool_of_mul_pred _hE2)⟩
 
 end SP1Clean.ShiftLeftChip.SoundSll

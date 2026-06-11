@@ -1,0 +1,39 @@
+import took 974ms
+elaboration took 85.6ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 83.6ms
+tactic execution of Lean.Parser.Tactic.eqRefl took 15.5s
+simp took 656ms
+type checking took 197ms
+simp took 155ms
+simp took 564ms
+simp took 605ms
+instantiate metavars took 340ms
+type checking took 232ms
+simp took 202ms
+simp took 79.2ms
+simp took 558ms
+instantiate metavars took 303ms
+type checking took 220ms
+simp took 214ms
+cumulative profiling times:
+	attribute application 1.49ms
+	compilation (IR) 20ms
+	compilation (LCNF base) 57.4ms
+	compilation (LCNF mono) 14.8ms
+	congr simp thm 27.3ms
+	dsimp 58.6ms
+	elaboration 177ms
+	fix level params 5.18ms
+	import 974ms
+	initialization 30.5ms
+	instantiate metavars 646ms
+	interpretation 401ms
+	let-to-have transformation 3.41ms
+	linting 41.7ms
+	parsing 6.29ms
+	process pre-definitions 66.1ms
+	share common exprs 39.8ms
+	simp 3.92s
+	tactic execution 17.1s
+	type checking 712ms
+	typeclass inference 955ms

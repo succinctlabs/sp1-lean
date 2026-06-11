@@ -18,6 +18,8 @@ lean-circuit`). This *is* the faithful artifact the gadget's soundness/completen
 against — no separate `asserts`/`interactions` bridge. Regenerate with
 `SP1_DIR=… python3 update_extracted.py`. -/
 
+set_option linter.all false  -- auto-generated: skip linters
+
 namespace SP1Clean.IsZeroOperation
 
 open Circuit

@@ -218,7 +218,7 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.RTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.programChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_emitted_memory]
+  simp only [toAccess_pushIf_memory]
   simp [circuit_norm, signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real,
     memoryLookups, rowClkLow, h_ir, h_ch, h_cl, h_oa, h_ob, h_immb, h_oc, h_imm, sub_zero, mul_one,
     h_wv0, h_wv1, h_wv2, h_wv3,
@@ -319,13 +319,13 @@ theorem memAccessLookups_eq_emitted (env : Environment (ZMod p)) (offset : ℕ)
     have h2 : (2 : ℕ) < 2 ^ 17 := by norm_num
     omega
   -- the three `=== 0` timestamp gates compile to `Gadgets.Equality.circuit id` subcircuits, which emit
-  -- nothing on `memoryChannel`; the two `byteChannel.gatedReceive`s are filtered by channel-distinctness.
+  -- nothing on `memoryChannel`; the two `byteChannel.pullIf`s are filtered by channel-distinctness.
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
     filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) memoryChannel.toRaw
       (n := n) inp List.not_mem_nil List.not_mem_nil
   simp only [Readers.MemoryAccess.main, circuit_norm, heq,
     SP1Clean.Channels.byteChannel_eq_memoryChannel_false, if_false]
-  simp only [toAccess_emitted_memory]
+  simp only [toAccess_pushIf_memory]
   simp [circuit_norm, signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real,
     memAccessLookups, h_ir, h_ch, h_cl, h_a0, h_a1, h_a2, h_ph, h_pl,
     h_pv0, h_pv1, h_pv2, h_pv3, h_nv0, h_nv1, h_nv2, h_nv3]

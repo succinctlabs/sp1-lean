@@ -14,13 +14,13 @@ non-byte interaction to `True` and reasons about `op.constrain`/`< 65536`).
 
 ## Sign convention (the one modeling gap the syntactic comparison surfaces)
 
-Clean models the byte lookup as a **pull** — `byteChannel.gatedReceive is_real` → `receivedGated`, with
-multiplicity `-is_real` on `byteChannel.toRawGated` (`Operations/AddOperation/Extracted.lean`). SP1's
+Clean models the byte lookup as a **pull** — `byteChannel.pullIf is_real` → `pullIf`, with
+multiplicity `-is_real` on `byteChannel.toRaw` (`Operations/AddOperation/Extracted.lean`). SP1's
 `send_byte` is the dual **source** endpoint (`Extracted/AddOperation.lean`: `⟨.send, .byte 6 v 16 0,
 is_real⟩`). Same physical lookup, opposite source/sink convention — so the `.byte` arm records the
 **sink** sign `signedVal (-mult)`, matching Clean's pull, while the message tuple `[op.idx, a, b, c]`
 already matches field-for-field. The dynamic buses (State/Memory/Program) use the natural `Dir.sign`
-(`emitGated`/`emittedGated` send `+mult`, receive `-mult`) — byte is the sole *pull* bus
+(`pushIf` send `+mult`, receive `-mult`) — byte is the sole *pull* bus
 (`Foundations/Channels.lean` `byteChannel` docstring), hence its hardcoded `-mult`. -/
 
 namespace SP1Clean.Extracted

@@ -111,9 +111,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs LoadHalfColumns main whe
       input.memory_access, input.offset_bit, input.selected_half, ⟨input.msb⟩,
       input.is_lh, input.is_lhu⟩
   output_eq := by intro input n; simp only [circuit_norm, main, AddressOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit, Readers.MemoryAccess.circuit, U16MSBOperation.circuit]
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 /-- Semantic contract, composed from the sub-circuits' `Spec`s plus the four offset-selection equations,
 the `op_a != x0` flag, the `is_lhu·msb` zero-extension gate, and the `is_lh`/`is_lhu`/`is_real` binaries. -/

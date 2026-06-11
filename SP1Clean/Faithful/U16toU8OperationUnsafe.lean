@@ -47,7 +47,7 @@ theorem u16tou8unsafe_interactions_faithful_syntactic
     (u16_values : Vector (ZMod p) 4) (cols : Extracted.U16toU8Operation (ZMod p)) :
     (Extracted.U16toU8OperationUnsafe.interactions u16_values cols).map Extracted.Interaction.toAccess
       = (((SP1Clean.U16toU8OperationUnsafe.main input).operations offset).interactionsWith
-          byteChannel.toRawGated).map (AbstractInteraction.toAccess env) := by
+          byteChannel.toRaw).map (AbstractInteraction.toAccess env) := by
   simp only [SP1Clean.U16toU8OperationUnsafe.main, circuit_norm,
     Extracted.U16toU8OperationUnsafe.interactions, List.map_nil]
 

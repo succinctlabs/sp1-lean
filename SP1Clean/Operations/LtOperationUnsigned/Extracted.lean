@@ -19,6 +19,8 @@ lean-circuit`). This *is* the faithful artifact the gadget's soundness/completen
 against — no separate `asserts`/`interactions` bridge. Regenerate with
 `SP1_DIR=… python3 update_extracted.py`. -/
 
+set_option linter.all false  -- auto-generated: skip linters
+
 namespace SP1Clean.LtOperationUnsigned
 
 open Circuit
@@ -39,61 +41,61 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cc := input.cc
   let cols := input.cols
   let is_real := input.is_real
-  let E0 : Expression (ZMod p) := is_real - 1
-  let E1 : Expression (ZMod p) := is_real * E0
-  let E2 : Expression (ZMod p) := cols.u16_flags[0] + cols.u16_flags[1]
-  let E3 : Expression (ZMod p) := E2 + cols.u16_flags[2]
-  let E4 : Expression (ZMod p) := E3 + cols.u16_flags[3]
-  let E5 : Expression (ZMod p) := cols.u16_flags[0] - 1
-  let E6 : Expression (ZMod p) := cols.u16_flags[0] * E5
-  let E7 : Expression (ZMod p) := cols.u16_flags[1] - 1
-  let E8 : Expression (ZMod p) := cols.u16_flags[1] * E7
-  let E9 : Expression (ZMod p) := cols.u16_flags[2] - 1
-  let E10 : Expression (ZMod p) := cols.u16_flags[2] * E9
-  let E11 : Expression (ZMod p) := cols.u16_flags[3] - 1
-  let E12 : Expression (ZMod p) := cols.u16_flags[3] * E11
-  let E13 : Expression (ZMod p) := E4 - 1
-  let E14 : Expression (ZMod p) := E4 * E13
-  let E15 : Expression (ZMod p) := 1 - E4
-  let E16 : Expression (ZMod p) := cols.u16_flags[3]
-  let E17 : Expression (ZMod p) := is_real - E16
-  let E18 : Expression (ZMod p) := b[3] - cc[3]
-  let E19 : Expression (ZMod p) := E17 * E18
-  let E20 : Expression (ZMod p) := b[3] * cols.u16_flags[3]
-  let E21 : Expression (ZMod p) := E20
-  let E22 : Expression (ZMod p) := cc[3] * cols.u16_flags[3]
-  let E23 : Expression (ZMod p) := E22
-  let E24 : Expression (ZMod p) := E16 + cols.u16_flags[2]
-  let E25 : Expression (ZMod p) := is_real - E24
-  let E26 : Expression (ZMod p) := b[2] - cc[2]
-  let E27 : Expression (ZMod p) := E25 * E26
-  let E28 : Expression (ZMod p) := b[2] * cols.u16_flags[2]
-  let E29 : Expression (ZMod p) := E21 + E28
-  let E30 : Expression (ZMod p) := cc[2] * cols.u16_flags[2]
-  let E31 : Expression (ZMod p) := E23 + E30
-  let E32 : Expression (ZMod p) := E24 + cols.u16_flags[1]
-  let E33 : Expression (ZMod p) := is_real - E32
-  let E34 : Expression (ZMod p) := b[1] - cc[1]
-  let E35 : Expression (ZMod p) := E33 * E34
-  let E36 : Expression (ZMod p) := b[1] * cols.u16_flags[1]
-  let E37 : Expression (ZMod p) := E29 + E36
-  let E38 : Expression (ZMod p) := cc[1] * cols.u16_flags[1]
-  let E39 : Expression (ZMod p) := E31 + E38
-  let E40 : Expression (ZMod p) := E32 + cols.u16_flags[0]
-  let E41 : Expression (ZMod p) := is_real - E40
-  let E42 : Expression (ZMod p) := b[0] - cc[0]
-  let E43 : Expression (ZMod p) := E41 * E42
-  let E44 : Expression (ZMod p) := b[0] * cols.u16_flags[0]
-  let E45 : Expression (ZMod p) := E37 + E44
-  let E46 : Expression (ZMod p) := cc[0] * cols.u16_flags[0]
-  let E47 : Expression (ZMod p) := E39 + E46
-  let E48 : Expression (ZMod p) := E45 - cols.comparison_limbs[0]
-  let E49 : Expression (ZMod p) := E47 - cols.comparison_limbs[1]
-  let E50 : Expression (ZMod p) := E15 - 1
-  let E51 : Expression (ZMod p) := cols.comparison_limbs[0] - cols.comparison_limbs[1]
-  let E52 : Expression (ZMod p) := cols.not_eq_inv * E51
-  let E53 : Expression (ZMod p) := E52 - is_real
-  let E54 : Expression (ZMod p) := E50 * E53
+  let E0 := is_real - 1
+  let E1 := is_real * E0
+  let E2 := cols.u16_flags[0] + cols.u16_flags[1]
+  let E3 := E2 + cols.u16_flags[2]
+  let E4 := E3 + cols.u16_flags[3]
+  let E5 := cols.u16_flags[0] - 1
+  let E6 := cols.u16_flags[0] * E5
+  let E7 := cols.u16_flags[1] - 1
+  let E8 := cols.u16_flags[1] * E7
+  let E9 := cols.u16_flags[2] - 1
+  let E10 := cols.u16_flags[2] * E9
+  let E11 := cols.u16_flags[3] - 1
+  let E12 := cols.u16_flags[3] * E11
+  let E13 := E4 - 1
+  let E14 := E4 * E13
+  let E15 := 1 - E4
+  let E16 := (0 : Expression (ZMod p)) + cols.u16_flags[3]
+  let E17 := is_real - E16
+  let E18 := b[3] - cc[3]
+  let E19 := E17 * E18
+  let E20 := b[3] * cols.u16_flags[3]
+  let E21 := (0 : Expression (ZMod p)) + E20
+  let E22 := cc[3] * cols.u16_flags[3]
+  let E23 := (0 : Expression (ZMod p)) + E22
+  let E24 := E16 + cols.u16_flags[2]
+  let E25 := is_real - E24
+  let E26 := b[2] - cc[2]
+  let E27 := E25 * E26
+  let E28 := b[2] * cols.u16_flags[2]
+  let E29 := E21 + E28
+  let E30 := cc[2] * cols.u16_flags[2]
+  let E31 := E23 + E30
+  let E32 := E24 + cols.u16_flags[1]
+  let E33 := is_real - E32
+  let E34 := b[1] - cc[1]
+  let E35 := E33 * E34
+  let E36 := b[1] * cols.u16_flags[1]
+  let E37 := E29 + E36
+  let E38 := cc[1] * cols.u16_flags[1]
+  let E39 := E31 + E38
+  let E40 := E32 + cols.u16_flags[0]
+  let E41 := is_real - E40
+  let E42 := b[0] - cc[0]
+  let E43 := E41 * E42
+  let E44 := b[0] * cols.u16_flags[0]
+  let E45 := E37 + E44
+  let E46 := cc[0] * cols.u16_flags[0]
+  let E47 := E39 + E46
+  let E48 := E45 - cols.comparison_limbs[0]
+  let E49 := E47 - cols.comparison_limbs[1]
+  let E50 := E15 - 1
+  let E51 := cols.comparison_limbs[0] - cols.comparison_limbs[1]
+  let E52 := cols.not_eq_inv * E51
+  let E53 := E52 - is_real
+  let E54 := E50 * E53
   assertion U16CompareOperation.circuit ⟨cols.comparison_limbs[0], cols.comparison_limbs[1], { bit := cols.u16_compare_operation.bit }, is_real⟩
   E1 === 0
   E6 === 0
@@ -112,17 +114,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements : List (RawChannel (ZMod p)))
-      = [byteChannel.toRawGated] := rfl
+      = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl

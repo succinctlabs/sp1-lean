@@ -137,13 +137,13 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BranchColumns (ZM
   assertion Readers.ITypeReaderImmutable.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, opcode⟩
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨6, (next_pc[0] * (4 : ZMod p)⁻¹), Expression.const ((14 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨6, next_pc[1], Expression.const ((16 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨6, next_pc[2], Expression.const ((16 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
   return ⟨input.state, input.adapter, next_pc,
@@ -156,9 +156,9 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs BranchColumns main where
   localLength _ := 18 + 10
   localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, LtOperationSigned.circuit, Readers.CPUState.circuit, Readers.ITypeReaderImmutable.circuit]; try omega
-  channelsWithGuarantees := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
   channelsWithRequirements :=
-    [byteChannel.toRawGated, stateChannel.toRawGated, memoryChannel.toRaw, programChannel.toRaw]
+    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
 
 /-- The taken target word the chip witnesses for `branch_value` (`pc + op_c_imm`, base-2^16). -/
 def branchTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=

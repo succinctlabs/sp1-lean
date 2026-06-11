@@ -44,7 +44,7 @@ black box, à la `Clean/Gadgets/Keccak/KeccakRound.lean`). -/
 namespace SP1Clean.Readers.RegisterAccessTimestamp
 
 open Circuit
-open SP1Clean.Channels (byteChannel binary_gate_req_vacuous)
+open SP1Clean.Channels (byteChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
@@ -59,14 +59,14 @@ lemma h16p : (16 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 /-- The `cols` block (`prev_low`, `diff_low_limb`) is an **input** (the composing chip witnesses it);
 `main` witnesses nothing and imposes the two `is_real`-gated byte checks over `input.cols.*`: a 16-bit
 `Range` on `diff_low_limb` and a `U8Range` (`< 256`) on the scaled high part `(clk_target - prev_low - 1 -
-diff) * 65536⁻¹`. Each is a `byteChannel.gatedReceive` (mult `-is_real`, **raw** value — `toRawGated`),
+diff) * 65536⁻¹`. Each is a `byteChannel.pullIf` (mult `-is_real`, **raw** value — `toRaw` (gated post-#398)),
 handing soundness the `ByteRowSpec` guarantee on real rows; on padding (`mult = 0`) it owes nothing. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   let cols := input.cols
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨6, cols.diff_low_limb, Expression.const ((16 : ℕ) : ZMod p), 0⟩ :
       ByteRow (Expression (ZMod p)))
-  byteChannel.gatedReceive input.is_real
+  byteChannel.pullIf input.is_real
     (⟨3, 0, (input.clk_target - cols.prev_low - 1 - cols.diff_low_limb) *
       (65536 : ZMod p)⁻¹, 0⟩ : ByteRow (Expression (ZMod p)))
 
@@ -75,45 +75,42 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   output _ _ := ()
   -- the two timestamp byte checks are gated receives (mult `-is_real`): they give the `ByteRowSpec`
   -- guarantee on real rows AND impose a padding requirement, so `byteChannel` is in BOTH lists.
-  channelsWithGuarantees := [byteChannel.toRawGated]
-  channelsWithRequirements := [byteChannel.toRawGated]
+  channelsWithGuarantees := [byteChannel.toRaw]
+  channelsWithRequirements := [byteChannel.toRaw]
 
 -- Expose the declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
 -- `RegisterAccessCols` reader's `channelsLawful` / `circuit_proof_start` is discharged automatically.
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees
-      : List (RawChannel (ZMod p))) = [byteChannel.toRawGated] := rfl
+      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithRequirements_eq :
     ((elaborated (p := p)).channelsWithRequirements
-      : List (RawChannel (ZMod p))) = [byteChannel.toRawGated] := rfl
+      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength x = 0 := rfl
 
 
-/-- `is_real` is binary — the precondition for the genuinely `is_real`-gated byte receives (lets soundness
-discharge each gated receive's padding requirement via `binary_gate_req_vacuous`). Discharged by the chip's gate. -/
+/-- `is_real` is binary — the precondition for the genuinely `is_real`-gated byte receives.
+Discharged by the chip's gate. -/
 def Assumptions (input : Inputs (ZMod p)) : Prop := input.is_real = 0 ∨ input.is_real = 1
 
 theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := by
-  -- `Spec` = the two byte bounds (`is_real`-gated), derived from the gated-receive guarantees (which fire at
-  -- `mult = -1`, i.e. `is_real = 1`); the padding requirements come from `binary_gate_req_vacuous`.
+  -- `Spec` = the two byte bounds (`is_real`-gated), derived from the gated-receive guarantees (which fire
+  -- at `mult = -1`, i.e. `is_real = 1`); post-#398 a receive owes no padding requirement at all.
   circuit_proof_start
   have c16 : ((16 : ℕ) : ZMod p) = (16 : ZMod p) := by norm_cast
   simp only [circuit_norm, byteChannel] at h_holds ⊢
-  refine ⟨?_, ?_, ?_⟩
-  · intro hr1
-    have hneg : -input_is_real = -1 := by rw [hr1]
-    have hb1 := h_holds.1 hneg
-    have hb2 := h_holds.2 hneg
-    rw [← c16] at hb1
-    refine ⟨(byteRowSpec_range _ h16p).mp hb1, ?_⟩
-    simp only [sub_eq_add_neg]
-    exact ((byteRowSpec_u8range_pair _ _).mp hb2).1
-  · exact binary_gate_req_vacuous h_assumptions _
-  · exact binary_gate_req_vacuous h_assumptions _
+  intro hr1
+  have hneg : -input_is_real = -1 := by rw [hr1]
+  have hb1 := h_holds.1 hneg
+  have hb2 := h_holds.2 hneg
+  rw [← c16] at hb1
+  refine ⟨(byteRowSpec_range _ h16p).mp hb1, ?_⟩
+  simp only [sub_eq_add_neg]
+  exact ((byteRowSpec_u8range_pair _ _).mp hb2).1
 
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   -- The two byte pulls' completeness obligation (their `ByteRowSpec` guarantee) only fires on real rows
