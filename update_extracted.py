@@ -102,6 +102,36 @@ WITNESS_SCHEMA: Dict[str, List[str]] = {
                      "b_sign_extend", "c_sign_extend"],
 }
 
+# Chips with a **whole-trace** dumper in the `witness_vectors` binary (`--chip <name>`) → an extra
+# `TraceGenTests/<name>ChipTraceVectors.lean` (the event battery + the full padded matrix from
+# SP1's real `generate_trace`) plus a hand-written `TraceGenTests/<name>ChipTraceWitness.lean`
+# anchor that re-derives every row from the chip's own circuit (`TraceGenerator.lean` +
+# `EventPopulate.lean`) and checks the matrices match. Value = (expected row width — a layout-drift
+# tripwire; the dumper also asserts it, reader kind — picks the dumped record type and the Lean
+# event mirror: "RType" → `AluEventRec`, "ALUType" → `AluTypeEventRec`).
+TRACE_CHIPS: Dict[str, Tuple[int, str]] = {
+    "Add": (33, "RType"),
+    "Sub": (33, "RType"),
+    "Subw": (32, "RType"),
+    "Mul": (82, "RType"),
+    "Addw": (36, "ALUType"),
+    "Bitwise": (51, "ALUType"),
+    "Lt": (44, "ALUType"),
+}
+
+# Ordered JSON keys of one dumped event, per reader kind = the field order of Lean's
+# `AluEventRec` / `AluTypeEventRec` (`TraceGenTests/EventPopulate.lean`).
+TRACE_EVENT_KEYS: Dict[str, List[str]] = {
+    "RType": [
+        "clk", "pc", "a", "b", "c", "opA", "opB", "opC",
+        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC",
+    ],
+    "ALUType": [
+        "clk", "pc", "a", "b", "c", "opA", "opB", "opC", "immC",
+        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC",
+    ],
+}
+
 # Operation modules emitted ALSO as the Clean-native **circuit form** (`Inputs` + `main` +
 # `ElaboratedCircuit`) → an extra `Extracted/<name>Circuit.lean`. Only pure-assertion, byte-bus
 # **leaf** operations (Rust `eval` returns `Shape::Unit`, composes no sub-ops) qualify: the emitted
@@ -174,6 +204,7 @@ DEFAULT_SP1_DIR = "../sp1"
 SP1_PINNED_COMMIT = "9d249b8d4fb7d00156bf77f5d295d1dbcaaf4136"
 EXTRACTED_DIR = os.path.join("SP1Clean", "Extracted")
 WITNESS_DIR = os.path.join("SP1Clean", "WitnessTests")
+TRACEGEN_DIR = os.path.join("SP1Clean", "TraceGenTests")
 
 COMMON_IMPORTS = """import SP1Clean.Foundations.Word
 import SP1Clean.Extracted.ExtractionDSL
@@ -621,6 +652,64 @@ def render_witness_vectors(operation: str, data: dict) -> str:
     )
 
 
+def run_trace_vectors(sp1_dir: str, chip: str) -> dict:
+    """Run the `witness_vectors` binary in `--chip` (whole-trace) mode and return its JSON."""
+    cmd = ["cargo", "run", "-q", "-p", "sp1-constraint-compiler", "--bin", "witness_vectors",
+           "--", "--chip", chip]
+    result = subprocess.run(cmd, cwd=sp1_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"witness_vectors --chip failed for {chip}:\n{result.stderr}")
+    return json.loads(result.stdout)
+
+
+def render_trace_vectors(chip: str, width: int, kind: str, data: dict) -> str:
+    """Render one chip's whole-trace conformance battery: the event list (as `AluEventRec` /
+    `AluTypeEventRec` anonymous-constructor literals, field order = `TRACE_EVENT_KEYS[kind]`), the
+    padded height, and the full row-major matrix from SP1's real `generate_trace` (canonical ℕ per
+    cell)."""
+    if data["width"] != width:
+        raise RuntimeError(f"{chip}: dumped width {data['width']} != expected {width}")
+    rows = data["rows"]
+    if data["height"] != len(rows) or any(len(r) != width for r in rows):
+        raise RuntimeError(f"{chip}: dumped matrix shape is inconsistent")
+    events = data["events"]
+    event_keys = TRACE_EVENT_KEYS[kind]
+    event_type = "AluEventRec" if kind == "RType" else "AluTypeEventRec"
+    record_type = "RTypeRecord" if kind == "RType" else "ALUTypeRecord"
+    event_rows = [
+        "  ⟨" + ", ".join(str(e[k]) for k in event_keys) + "⟩,"
+        for e in events
+    ]
+    matrix_rows = ["  " + _vec_lean(r) + "," for r in rows]
+    doc = (
+        f"/-! # AUTO-GENERATED — do not edit by hand.\n\n"
+        f"Whole-trace conformance battery for SP1's `{chip}Chip`, dumped from the **real**\n"
+        f"`MachineAir::generate_trace` by `update_extracted.py` (the `witness_vectors` binary,\n"
+        f"`--chip {chip}`): the deterministic event battery and the full padded {width}-column\n"
+        f"row-major matrix (including SP1's zero padding rows). The anchor\n"
+        f"`SP1Clean/TraceGenTests/{chip}ChipTraceWitness.lean` re-derives every row from the\n"
+        f"chip's own circuit (`TraceGenerator.lean`) and checks the matrices match. Regenerate\n"
+        f"with `SP1_DIR=… python3 update_extracted.py`. -/"
+    )
+    return (
+        "import SP1Clean.TraceGenTests.EventPopulate\n\n"
+        + doc + "\n\n"
+        + "namespace SP1Clean.TraceGenTests\nopen SP1Clean\n\n"
+        + LINTERS_OFF + "\n\n"
+        + f"/-- The {len(events)} dumped `(AluEvent, {record_type})` battery rows. -/\n"
+        + f"def {chip}ChipTraceEvents : List {event_type} := [\n"
+        + "\n".join(event_rows) + "\n]\n\n"
+        + f"/-- The padded trace height SP1 chose (`next_multiple_of_32`). -/\n"
+        + f"def {chip}ChipTraceHeight : ℕ := {data['height']}\n\n"
+        + "set_option maxHeartbeats 4000000 in\n"
+        + "set_option maxRecDepth 64000 in\n"
+        + f"/-- SP1's real `generate_trace` output: {data['height']} × {width}, canonical values. -/\n"
+        + f"def {chip}ChipTraceRows : List (Vector ℕ {width}) := [\n"
+        + "\n".join(matrix_rows) + "\n]\n\n"
+        + "end SP1Clean.TraceGenTests\n"
+    )
+
+
 def _write(out_path: str, content: str) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
@@ -654,13 +743,15 @@ def main() -> None:
     only = os.environ.get("EXTRACT_ONLY")
     if only:
         wanted = {name.strip() for name in only.split(",") if name.strip()}
-        global OPERATIONS, CHIPS, WITNESS_OPERATIONS, CIRCUIT_OPERATIONS
+        global OPERATIONS, CHIPS, WITNESS_OPERATIONS, CIRCUIT_OPERATIONS, TRACE_CHIPS
         OPERATIONS = [o for o in OPERATIONS if o in wanted]
         CHIPS = [c for c in CHIPS if c in wanted]
         WITNESS_OPERATIONS = [o for o in WITNESS_OPERATIONS if o in wanted]
         CIRCUIT_OPERATIONS = [o for o in CIRCUIT_OPERATIONS if o in wanted]
+        TRACE_CHIPS = {c: w for c, w in TRACE_CHIPS.items() if f"{c}Trace" in wanted}
         print(f"EXTRACT_ONLY → operations={OPERATIONS}, chips={CHIPS}, "
-              f"witness={WITNESS_OPERATIONS}, circuit={CIRCUIT_OPERATIONS}")
+              f"witness={WITNESS_OPERATIONS}, circuit={CIRCUIT_OPERATIONS}, "
+              f"trace={list(TRACE_CHIPS)}")
 
     # 1. Discovery pass: which structs does each module emit with no reuse? Tolerate per-target
     #    compiler failures (e.g. a chip whose `<Chip>Cols` shape isn't yet composed in the
@@ -720,6 +811,20 @@ def main() -> None:
             data = run_witness_vectors(sp1_dir, op)
             _write(os.path.join(WITNESS_DIR, f"{op}WitnessVectors.lean"),
                    render_witness_vectors(op, data))
+            written += 1
+        except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
+            print(f"  ✗ Error: {e}")
+
+    # 2d. Whole-trace pass: dump the real-`generate_trace` conformance battery for the chips in
+    #     `TRACE_CHIPS` (the `--chip` mode of the same binary). Best-effort per chip. Under
+    #     `EXTRACT_ONLY`, select these with `<Chip>Trace` (e.g. `AddTrace`) so they don't collide
+    #     with the `CHIPS` constraint-extraction entries of the same name.
+    for chip, (width, kind) in TRACE_CHIPS.items():
+        print(f"Processing trace vectors for {chip}Chip")
+        try:
+            data = run_trace_vectors(sp1_dir, chip)
+            _write(os.path.join(TRACEGEN_DIR, f"{chip}ChipTraceVectors.lean"),
+                   render_trace_vectors(chip, width, kind, data))
             written += 1
         except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
             print(f"  ✗ Error: {e}")
