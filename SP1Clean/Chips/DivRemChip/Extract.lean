@@ -355,4 +355,42 @@ lemma comp_limb_isU16 {s5 s6 s7 qc q msb : ZMod p}
       have := (CharP.cast_eq_zero_iff (ZMod p) p 2).mp h2
       exact absurd (Nat.le_of_dvd (by norm_num) this) (by omega)
 
+/-- Operand-column `isU64` for the word-truncated/sign-extended operands `b`/`c`: the low two limbs equal the
+raw register read (so `isU64` of the read bounds them), and the high two limbs are `read·(1-e2) + sign·e2·65535`
+— the read on 64-bit rows (`e2 = 0`), the sign/zero fill `∈ {0, 65535}` on word rows (`e2 = 1`, `sign` binary).
+Every limb is `< 2^16`. -/
+lemma operand_isU64 {w : Word (ZMod p)} {r0 r1 r2 r3 e2 s : ZMod p}
+    (h0 : w[0] = r0) (h1 : w[1] = r1)
+    (h2 : w[2] = r2 * (1 - e2) + s * e2 * 65535) (h3 : w[3] = r3 * (1 - e2) + s * e2 * 65535)
+    (hr0 : r0.val < 2 ^ 16) (hr1 : r1.val < 2 ^ 16) (hr2 : r2.val < 2 ^ 16) (hr3 : r3.val < 2 ^ 16)
+    (he2 : e2 = 0 ∨ e2 = 1) (hs : s = 0 ∨ s = 1) : Word.isU64 w := by
+  apply Word.isU64_of_cases
+  · rw [h0]; exact hr0
+  · rw [h1]; exact hr1
+  · rw [h2]; rcases he2 with he | he <;> rw [he]
+    · simpa using hr2
+    · rcases hs with hs' | hs' <;> rw [hs'] <;>
+        simp only [sub_self, mul_zero, zero_mul, one_mul, mul_one, zero_add, add_zero,
+          ZMod.val_zero, val_65535_zmod_p] <;> norm_num
+  · rw [h3]; rcases he2 with he | he <;> rw [he]
+    · simpa using hr3
+    · rcases hs with hs' | hs' <;> rw [hs'] <;>
+        simp only [sub_self, mul_zero, zero_mul, one_mul, mul_one, zero_add, add_zero,
+          ZMod.val_zero, val_65535_zmod_p] <;> norm_num
+
+set_option linter.unusedSectionVars false in
+/-- The low 32 bits of `toBitVec64 w` depend only on limbs 0,1 — the lever for the `*w` read-lift: the
+operand and the raw read agree on limbs 0,1 (E20/E22/E21/E23), and `RV64.*w` use only `extractLsb 31 0`. -/
+lemma toBitVec64_extractLsb [NeZero p] {w w' : Word (ZMod p)} (hw : w.isU64) (hw' : w'.isU64)
+    (h0 : w[0] = w'[0]) (h1 : w[1] = w'[1]) :
+    BitVec.extractLsb 31 0 (Word.toBitVec64 w) = BitVec.extractLsb 31 0 (Word.toBitVec64 w') := by
+  simp only [BitVec.extractLsb, BitVec.extractLsb']
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reduceSub, Nat.reduceAdd,
+    Word.toBitVec64_toNat hw, Word.toBitVec64_toNat hw', Word.toNat_def, h0, h1]
+  have key : ∀ a b c : ℕ, (a + b * 2 ^ 32 + c * 2 ^ 48) % 2 ^ 32 = a % 2 ^ 32 := fun a b c => by
+    rw [show a + b * 2 ^ 32 + c * 2 ^ 48 = a + (b + c * 2 ^ 16) * 2 ^ 32 by ring,
+        Nat.add_mul_mod_self_right]
+  simp only [key]
+
 end SP1Clean.DivRemChip

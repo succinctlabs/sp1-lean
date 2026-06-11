@@ -53,13 +53,23 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     e357, e359, e367, eopa0⟩ := h_own
   refine ⟨?_spec, ?_tail⟩
   · intro hr
+    -- alias the witnessed operand columns `b`/`c` (i₀+16..19, i₀+20..23) under the old names (local to
+    -- `?_spec`). `input_op_b_val`/`input_op_c_val` now mean the *operands*; the read is the adapter value.
+    set input_op_b_val : Word (ZMod p) :=
+      Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + 4 + i }) with hbdef
+    set input_op_c_val : Word (ZMod p) :=
+      Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + 4 + 4 + i }) with hcdef
+    set input_var_op_b_val : Vector (Expression (ZMod p)) 4 :=
+      Vector.mapRange 4 (fun i => var { index := i₀ + 8 + 4 + 4 + i }) with hvbdef
+    set input_var_op_c_val : Vector (Expression (ZMod p)) 4 :=
+      Vector.mapRange 4 (fun i => var { index := i₀ + 8 + 4 + 4 + 4 + i }) with hvcdef
     simp only [circuit_norm] at e325 e327 e329 e331 e333 e335 e337 e339 e367
     have bd := bool_of_mul_pred e325; have bdu := bool_of_mul_pred e327
     have br := bool_of_mul_pred e329; have bru := bool_of_mul_pred e331
     have bdw := bool_of_mul_pred e333; have brw := bool_of_mul_pred e335
     have bduw := bool_of_mul_pred e337; have bruw := bool_of_mul_pred e339
     have hvalsum := flags_val_sum bd bdu br bru bdw brw bduw bruw (by linear_combination -e367)
-    -- sign-filled word operands/comp), routed to `cols.a = remainder` (sign-extended low-32).
+    -- word operands/comp), routed to `cols.a = quotient` (sign-extended low-32).
     intro hflag
     have hdw : (env.get (i₀ + 5)).val = 1 := by rw [hflag]; exact ZMod.val_one p
     have hz_div : env.get i₀ = 0 := (ZMod.val_eq_zero _).mp (by omega)
@@ -69,18 +79,107 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have hz_divw : env.get (i₀ + 4) = 0 := (ZMod.val_eq_zero _).mp (by omega)
     have hz_divuw : env.get (i₀ + 6) = 0 := (ZMod.val_eq_zero _).mp (by omega)
     have hz_remuw : env.get (i₀ + 7) = 0 := (ZMod.val_eq_zero _).mp (by omega)
-    set B := i₀ + 8 + 4 + 4 + 45 + 45 with hBdef
-    obtain ⟨h_ob, h_oc, h_oir, -⟩ := h_input
+    set B := i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 with hBdef
+    obtain ⟨h_oir, -, -, -, -, -, ⟨h_ob, -, -⟩, -, ⟨h_oc, -, -⟩⟩ := h_input
     have hrneg' : -input_is_real = -1 := by rw [hr]
-    have hbb0 : Expression.eval env input_var_op_b_val[0] = input_op_b_val[0] := by rw [← h_ob]; simp [Vector.getElem_map]
-    have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by rw [← h_ob]; simp [Vector.getElem_map]
-    have hbb2 : Expression.eval env input_var_op_b_val[2] = input_op_b_val[2] := by rw [← h_ob]; simp [Vector.getElem_map]
-    have hbb3 : Expression.eval env input_var_op_b_val[3] = input_op_b_val[3] := by rw [← h_ob]; simp [Vector.getElem_map]
-    have hcc0 : Expression.eval env input_var_op_c_val[0] = input_op_c_val[0] := by rw [← h_oc]; simp [Vector.getElem_map]
-    have hcc1 : Expression.eval env input_var_op_c_val[1] = input_op_c_val[1] := by rw [← h_oc]; simp [Vector.getElem_map]
-    have hcc2 : Expression.eval env input_var_op_c_val[2] = input_op_c_val[2] := by rw [← h_oc]; simp [Vector.getElem_map]
-    have hcc3 : Expression.eval env input_var_op_c_val[3] = input_op_c_val[3] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have he2g : env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7) = 1 := by
+      rw [hflag, hz_divw, hz_divuw, hz_remuw]; ring
+    -- operand bridges (`eval(operand_var[i]) = operand[i]`) — the witnessed columns.
+    have hbb0 : Expression.eval env input_var_op_b_val[0] = input_op_b_val[0] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
+    have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
+    have hbb2 : Expression.eval env input_var_op_b_val[2] = input_op_b_val[2] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
+    have hbb3 : Expression.eval env input_var_op_b_val[3] = input_op_b_val[3] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
+    have hcc0 : Expression.eval env input_var_op_c_val[0] = input_op_c_val[0] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
+    have hcc1 : Expression.eval env input_var_op_c_val[1] = input_op_c_val[1] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
+    have hcc2 : Expression.eval env input_var_op_c_val[2] = input_op_c_val[2] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
+    have hcc3 : Expression.eval env input_var_op_c_val[3] = input_op_c_val[3] := by
+      simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange]
     have hir1 : Expression.eval env input_var_is_real = 1 := by rw [h_oir]; exact hr
+    -- adapter-read bridges (`eval(read_var[i]) = read[i]`), for the operand↔read limb equalities.
+    have hb0r : Expression.eval env input_var_adapter_op_b_memory_prev_value[0]
+        = input_adapter_op_b_memory_prev_value[0] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hb1r : Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
+        = input_adapter_op_b_memory_prev_value[1] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hb2r : Expression.eval env input_var_adapter_op_b_memory_prev_value[2]
+        = input_adapter_op_b_memory_prev_value[2] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hb3r : Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
+        = input_adapter_op_b_memory_prev_value[3] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hc0r : Expression.eval env input_var_adapter_op_c_memory_prev_value[0]
+        = input_adapter_op_c_memory_prev_value[0] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hc1r : Expression.eval env input_var_adapter_op_c_memory_prev_value[1]
+        = input_adapter_op_c_memory_prev_value[1] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hc2r : Expression.eval env input_var_adapter_op_c_memory_prev_value[2]
+        = input_adapter_op_c_memory_prev_value[2] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hc3r : Expression.eval env input_var_adapter_op_c_memory_prev_value[3]
+        = input_adapter_op_c_memory_prev_value[3] := by rw [← h_oc]; simp [Vector.getElem_map]
+    -- normalized copies of the operand↔read constraints E20-E47.
+    have e20s := e20; have e21s := e21; have e22s := e22; have e23s := e23
+    have e29s := e29; have e35s := e35; have e41s := e41; have e47s := e47
+    simp only [hbdef, hcdef, hvbdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange,
+      circuit_norm] at e20s e21s e22s e23s e29s e35s e41s e47s
+    -- operand low limbs equal the reads (E20/E22, E21/E23) — for the read-lift truncation at the close.
+    have hb0op : input_op_b_val[0] = input_adapter_op_b_memory_prev_value[0] := by
+      simp only [hbdef, hvbdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+      rw [← hb0r]; linear_combination -e20s
+    have hb1op : input_op_b_val[1] = input_adapter_op_b_memory_prev_value[1] := by
+      simp only [hbdef, hvbdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+      rw [← hb1r]; linear_combination -e22s
+    have hc0op : input_op_c_val[0] = input_adapter_op_c_memory_prev_value[0] := by
+      simp only [hcdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+      rw [← hc0r]; linear_combination -e21s
+    have hc1op : input_op_c_val[1] = input_adapter_op_c_memory_prev_value[1] := by
+      simp only [hcdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+      rw [← hc1r]; linear_combination -e23s
+    -- `is_real_not_word` (E13) binarity ⇒ `irnw` gate binary, feeding the `b_neg`/`c_neg` binaries.
+    have h13t := e13; simp only [circuit_norm] at h13t; rw [h_oir] at h13t
+    have hirnw : env.get (B + 4) = 0 ∨ env.get (B + 4) = 1 := by
+      left; rw [hr, he2g] at h13t; linear_combination h13t
+    have hE10 := group_binary4 bd br bdw brw (by omega)
+    -- operand `isU64` (shadows the top read-`isU64`): low limbs = read; high limbs the `e2=1` sign-fill
+    -- (E29/E41, E35/E47) with `b_neg`/`c_neg` binary (E15/E19 = msb·E10, the `U16MSB` gadget + E10).
+    have hbU : Word.isU64 input_op_b_val := by
+      obtain ⟨hbr0, hbr1, hbr2, hbr3⟩ := Word.lt_cases_of_isU64 h_assumptions.1
+      refine operand_isU64
+        (e2 := env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7))
+        (s := env.get (B + 1)) hb0op hb1op ?_ ?_ hbr0 hbr1 hbr2 hbr3 (Or.inr he2g) ?_
+      · simp only [hbdef, hvbdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hb2r]; linear_combination e29s
+      · simp only [hbdef, hvbdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hb3r]; linear_combination e41s
+      · have hbmsb := (h_msb0 ⟨fun _ => by rw [hb3r]; exact (Word.lt_cases_of_isU64 h_assumptions.1).2.2.2,
+          hirnw⟩).1
+        simp only [circuit_norm] at hbmsb
+        have h15 := e15; simp only [circuit_norm] at h15
+        rcases hbmsb with hm | hm <;> rcases hE10 with hE | hE <;>
+          simp only [hm, hE, mul_zero, zero_mul, mul_one, one_mul, sub_zero] at h15 <;>
+          first
+            | exact Or.inl (by linear_combination -h15)
+            | exact Or.inr (by linear_combination -h15)
+    have hcU : Word.isU64 input_op_c_val := by
+      obtain ⟨hcr0, hcr1, hcr2, hcr3⟩ := Word.lt_cases_of_isU64 h_assumptions.2
+      refine operand_isU64
+        (e2 := env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7))
+        (s := env.get (B + 6)) hc0op hc1op ?_ ?_ hcr0 hcr1 hcr2 hcr3 (Or.inr he2g) ?_
+      · simp only [hcdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hc2r]; linear_combination e35s
+      · simp only [hcdef, hvcdef, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hc3r]; linear_combination e47s
+      · have hcmsb := (h_msb1 ⟨fun _ => by rw [hc3r]; exact (Word.lt_cases_of_isU64 h_assumptions.2).2.2.2,
+          hirnw⟩).1
+        simp only [circuit_norm] at hcmsb
+        have h19 := e19; simp only [circuit_norm] at h19
+        rcases hcmsb with hm | hm <;> rcases hE10 with hE | hE <;>
+          simp only [hm, hE, mul_zero, zero_mul, mul_one, one_mul, sub_zero] at h19 <;>
+          first
+            | exact Or.inl (by linear_combination -h19)
+            | exact Or.inr (by linear_combination -h19)
     -- the signed-32 identity on the `quotient_comp` column (= `quotient` for 32-bit, via E48/E49).
     have hremw_id : BitVec.signExtend 64 (BitVec.extractLsb 31 0 (Word.toBitVec64 (#v[env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4),
           env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1), env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 2),
@@ -634,9 +733,23 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       rw [word_eq_signExtend_lo haU ha2sf ha3sf,
           extractLsb_lo_congr haU hrcompU' (by simp only [circuit_norm, Nat.add_zero]; exact ha0)
             (by simp only [circuit_norm, Nat.add_zero]; exact ha1)]
-    rw [hbridge]; exact hremw_id
-  · obtain ⟨h_ob, h_oc, h_oir, -⟩ := h_input
-    set B := i₀ + 8 + 4 + 4 + 45 + 45 with hBdef
+    rw [hbridge]
+    -- read-lift: `RV64.remw` truncates to the low 32 bits (`extractLsb 31 0`), and the operand and the
+    -- raw read agree there (limbs 0,1 via E20/E22, E21/E23), so the operand identity gives the read identity.
+    rw [show RV64.remw (Word.toBitVec64 input_op_c_val) (Word.toBitVec64 input_op_b_val)
+          = RV64.remw (Word.toBitVec64 input_adapter_op_c_memory_prev_value)
+            (Word.toBitVec64 input_adapter_op_b_memory_prev_value) from by
+        unfold RV64.remw
+        rw [toBitVec64_extractLsb hcU h_assumptions.2 hc0op hc1op,
+            toBitVec64_extractLsb hbU h_assumptions.1 hb0op hb1op]] at hremw_id
+    exact hremw_id
+  · obtain ⟨h_oir, -, -, -, -, -, ⟨h_ob, -, -⟩, -, ⟨h_oc, -, -⟩⟩ := h_input
+    set B := i₀ + 8 + 4 + 4 + 4 + 4 + 45 + 45 with hBdef
+    -- the arithmetic operand `c` (witnessed column at `i₀+20..23`), distinct from the read; the IsZeroWord
+    -- gadget tests *this* for the divide-by-zero split.
+    set cop : Word (ZMod p) :=
+        Vector.map (Expression.eval env) (Vector.mapRange 4 fun i => var { index := i₀ + 8 + 4 + 4 + 4 + i })
+      with hcop
     have hbin : input_is_real = 0 ∨ input_is_real = 1 := by
       have h := e355; simp only [circuit_norm] at h; rw [h_oir] at h; exact bool_of_mul_pred h
     simp only [circuit_norm] at e325 e327 e329 e331 e333 e335 e337 e339 e367
@@ -706,14 +819,14 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       apply Word.isU64_of_cases <;> simp only [circuit_norm, Nat.add_zero]
       exacts [isU16_of_byteRowSpec (hb_absr0 hrneg'), isU16_of_byteRowSpec (hb_absr1 hrneg'),
         isU16_of_byteRowSpec (hb_absr2 hrneg'), isU16_of_byteRowSpec (hb_absr3 hrneg')]
-    have hbb1 : Expression.eval env input_var_op_b_val[1] = input_op_b_val[1] := by
-      rw [← h_ob]; simp [Vector.getElem_map]
-    have hcc1 : Expression.eval env input_var_op_c_val[1] = input_op_c_val[1] := by
-      rw [← h_oc]; simp [Vector.getElem_map]
-    have hbb3 : Expression.eval env input_var_op_b_val[3] = input_op_b_val[3] := by
-      rw [← h_ob]; simp [Vector.getElem_map]
-    have hcc3 : Expression.eval env input_var_op_c_val[3] = input_op_c_val[3] := by
-      rw [← h_oc]; simp [Vector.getElem_map]
+    have hbb1 : Expression.eval env input_var_adapter_op_b_memory_prev_value[1]
+        = input_adapter_op_b_memory_prev_value[1] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hcc1 : Expression.eval env input_var_adapter_op_c_memory_prev_value[1]
+        = input_adapter_op_c_memory_prev_value[1] := by rw [← h_oc]; simp [Vector.getElem_map]
+    have hbb3 : Expression.eval env input_var_adapter_op_b_memory_prev_value[3]
+        = input_adapter_op_b_memory_prev_value[3] := by rw [← h_ob]; simp [Vector.getElem_map]
+    have hcc3 : Expression.eval env input_var_adapter_op_c_memory_prev_value[3]
+        = input_adapter_op_c_memory_prev_value[3] := by rw [← h_oc]; simp [Vector.getElem_map]
     -- `is_real_not_word` (E13 = `is_real * (1 - e2)`): binary, and `= 1 → is_real = 1 ∧ e2 = 0`.
     have h13t := e13; simp only [circuit_norm] at h13t; rw [h_oir] at h13t
     have hirnw : env.get (B + 4) = 0 ∨ env.get (B + 4) = 1 := by
@@ -741,8 +854,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       simp only [circuit_norm] at h299 h300 h301 h302
       rw [iszeroword_result_proj] at h299 h300 h301 h302
       simp only [Vector.getElem_mapRange, circuit_norm] at h299 h300 h301 h302
-      by_cases hcz : input_op_c_val[0] = 0 ∧ input_op_c_val[1] = 0 ∧ input_op_c_val[2] = 0
-          ∧ input_op_c_val[3] = 0
+      by_cases hcz : cop[0] = 0 ∧ cop[1] = 0 ∧ cop[2] = 0
+          ∧ cop[3] = 0
       · rw [if_pos hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
         simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
           Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
@@ -771,6 +884,41 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         · rw [show env.get (B + 7+8+8+11+11+11+4+4+4 + 3) = env.get (B + 7+8+8+11+11+11 + 3)
               from by linear_combination h302]
           exact isU16_of_byteRowSpec (hb_absc3 hrneg')
+    -- `isU64` of the operand `c` (= `cop`), distinct from `isU64` of the read (`hcU`), feeding the
+    -- `MulOperation`/`AddOperation` Assumptions (`mulLo`/`mulHi`/`addc`). Low limbs equal the read (E21/E23,
+    -- bounded by `hcU`); high limbs are `read·(1-E2) + c_neg·E2·65535` (E35/E47) — closed by the verified
+    -- `operand_isU64` helper (`Extract.lean`) given `he2` + `c_neg` binary (E19: `c_neg = c_msb·E10`, the
+    -- `U16MSB` gadget binary, `E10` from the mutually-exclusive flags). TODO: discharge via `operand_isU64`.
+    have hcU_op : Word.isU64 cop := by
+      obtain ⟨hcr0, hcr1, hcr2, hcr3⟩ := Word.lt_cases_of_isU64 hcU
+      have hcc0 : Expression.eval env input_var_adapter_op_c_memory_prev_value[0]
+          = input_adapter_op_c_memory_prev_value[0] := by rw [← h_oc]; simp [Vector.getElem_map]
+      have hcc2 : Expression.eval env input_var_adapter_op_c_memory_prev_value[2]
+          = input_adapter_op_c_memory_prev_value[2] := by rw [← h_oc]; simp [Vector.getElem_map]
+      simp only [circuit_norm] at e21 e23 e35 e47
+      refine operand_isU64
+        (e2 := env.get (i₀ + 4) + env.get (i₀ + 5) + env.get (i₀ + 6) + env.get (i₀ + 7))
+        (s := env.get (B + 6)) ?_ ?_ ?_ ?_ hcr0 hcr1 hcr2 hcr3 he2 ?_
+      · simp only [hcop, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hcc0]; linear_combination -e21
+      · simp only [hcop, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hcc1]; linear_combination -e23
+      · simp only [hcop, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hcc2]; linear_combination e35
+      · simp only [hcop, Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+        rw [← hcc3]; linear_combination e47
+      · -- `c_neg = c_msb.msb * E10` (E19) binary: `c_msb` binary from the `U16MSB` gadget (@ `irnw`,
+        -- via `hirnw` — unconditional), `E10 = is_div+is_rem+is_divw+is_remw ∈ {0,1}` (disjoint flags).
+        have hcmsb := (h_msb1 ⟨fun _ => by rw [hcc3]; exact (Word.lt_cases_of_isU64 hcU).2.2.2,
+          hirnw⟩).1
+        simp only [circuit_norm] at hcmsb
+        have hE10 := group_binary4 bd br bdw brw (by omega)
+        have h19 := e19; simp only [circuit_norm] at h19
+        rcases hcmsb with hm | hm <;> rcases hE10 with hE | hE <;>
+          simp only [hm, hE, mul_zero, zero_mul, mul_one, one_mul, sub_zero] at h19 <;>
+          first
+            | exact Or.inl (by linear_combination -h19)
+            | exact Or.inr (by linear_combination -h19)
     refine ⟨?mulLo, ?mulHi, ?eqb, ?eqc, ?eqb2, ?eqc2, ?isc0, ?addc, ?addr, ?lt,
       ?msb0, ?msb1, ?msb2, ?msb3, ?msb4, ?msb5, ?msb6, ?cpu, ?rtype, ?own,
       ?b0, ?b1, ?b2, ?b3, ?b4, ?b5, ?b6, ?b7, ?b8, ?b9, ?b10, ?b11, ?b12, ?b13, ?b14, ?b15,
@@ -789,10 +937,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     case cpu => exact Or.inr hbin
     case rtype => exact Or.inr hbin
     case mulLo =>
-      exact Or.inr ⟨fun hr => ⟨hqcU hr, hcU⟩, hbin, fun h => (zero_ne_one h).elim, hbin,
+      exact Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, hbin,
         Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl, by rcases hbin with h | h <;> simp [h]⟩
     case mulHi =>
-      refine Or.inr ⟨fun hr => ⟨hqcU hr, hcU⟩, hbin, fun h => (zero_ne_one h).elim, Or.inl rfl,
+      refine Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, Or.inl rfl,
         group_binary2 bd br (by omega), group_binary2 bdu bru (by omega), Or.inl rfl, Or.inl rfl, ?_⟩
       rcases group_binary4 bd br bdu bru (by omega) with h | h
       · exact Or.inl (by linear_combination h)
@@ -805,7 +953,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           · exfalso; rw [h_oir, h, mul_zero, neg_zero, add_zero] at h286
             exact zero_ne_one (h286.symm.trans hace)
           · exact h
-        exact ⟨hcU, habscU hr⟩
+        exact ⟨hcU_op, habscU hr⟩
       · have h := e357; simp only [circuit_norm] at h; exact bool_of_mul_pred h
     case addr =>
       refine Or.inr ⟨fun hrae => ?_, ?_⟩
@@ -834,8 +982,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
         rcases hbin with h | h
         · left; rw [h] at h305; linear_combination -h305
         · have hsem := IsZeroWordOperation.result_semantic (h_isc0 (Or.inr h)) h
-          by_cases hcz : input_op_c_val[0] = 0 ∧ input_op_c_val[1] = 0 ∧ input_op_c_val[2] = 0
-              ∧ input_op_c_val[3] = 0
+          by_cases hcz : cop[0] = 0 ∧ cop[1] = 0 ∧ cop[2] = 0
+              ∧ cop[3] = 0
           · left
             rw [if_pos hcz] at hsem; dsimp only at hsem; rw [field_fromElements_one] at hsem
             simp only [Vector.getElem_cast, Vector.getElem_take, Vector.getElem_drop,
@@ -847,19 +995,12 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
               Vector.getElem_mapRange, Nat.reduceAdd, circuit_norm] at hsem
             rw [h, hsem] at h305; linear_combination -h305
     case msb0 =>
-      refine Or.inr ⟨fun hirnwg => ?_, hirnw⟩
-      obtain ⟨hr, he2z⟩ := hirnw_imp hirnwg
-      have h41 := e41; simp only [circuit_norm] at h41; rw [he2z] at h41
-      rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[3] = input_op_b_val[3]
-          from by rw [← hbb3]; linear_combination -h41]
-      exact (Word.lt_cases_of_isU64 hbU).2.2.2
+      -- the U16MSB gadget tests the raw read `bpv[3]`, bounded directly by `isU64 (read)`.
+      refine Or.inr ⟨fun _ => ?_, hirnw⟩
+      rw [hbb3]; exact (Word.lt_cases_of_isU64 hbU).2.2.2
     case msb1 =>
-      refine Or.inr ⟨fun hirnwg => ?_, hirnw⟩
-      obtain ⟨hr, he2z⟩ := hirnw_imp hirnwg
-      have h47 := e47; simp only [circuit_norm] at h47; rw [he2z] at h47
-      rw [show Expression.eval env input_var_adapter_op_c_memory_prev_value[3] = input_op_c_val[3]
-          from by rw [← hcc3]; linear_combination -h47]
-      exact (Word.lt_cases_of_isU64 hcU).2.2.2
+      refine Or.inr ⟨fun _ => ?_, hirnw⟩
+      rw [hcc3]; exact (Word.lt_cases_of_isU64 hcU).2.2.2
     case msb2 =>
       refine Or.inr ⟨fun hirnwg => ?_, hirnw⟩
       obtain ⟨hr, -⟩ := hirnw_imp hirnwg
@@ -867,16 +1008,10 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       exact isU16_of_byteRowSpec (hb_r3 hrneg')
     case msb3 =>
       refine Or.inr ⟨fun _ => ?_, he2⟩
-      have h22 := e22; simp only [circuit_norm] at h22
-      rw [show Expression.eval env input_var_adapter_op_b_memory_prev_value[1] = input_op_b_val[1]
-          from by rw [← hbb1]; linear_combination h22]
-      exact (Word.lt_cases_of_isU64 hbU).2.1
+      rw [hbb1]; exact (Word.lt_cases_of_isU64 hbU).2.1
     case msb4 =>
       refine Or.inr ⟨fun _ => ?_, he2⟩
-      have h23 := e23; simp only [circuit_norm] at h23
-      rw [show Expression.eval env input_var_adapter_op_c_memory_prev_value[1] = input_op_c_val[1]
-          from by rw [← hcc1]; linear_combination h23]
-      exact (Word.lt_cases_of_isU64 hcU).2.1
+      rw [hcc1]; exact (Word.lt_cases_of_isU64 hcU).2.1
     case msb5 =>
       exact Or.inr ⟨fun he2g => isU16_of_byteRowSpec (hb_e2r1 (by linear_combination -he2g)), he2⟩
     case msb6 =>

@@ -129,6 +129,14 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   let is_divw := flags[4]; let is_remw := flags[5]; let is_divuw := flags[6]; let is_remuw := flags[7]
   let quotient_comp ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
   let a ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  -- The arithmetic **operands** `b`/`c` — committed columns distinct from the raw register reads
+  -- (`adapter.op_b/c_memory.prev_value`). The chip's own-asserts E20–E47 tie them to the reads: equal to the
+  -- read for the 64-bit variants, the sign/zero-extension of the low 32 bits for the W-variants (`b[i] =
+  -- read[i]·(1-isword) + b_neg·isword·0xFFFF`). Witnessed here (before the `MulOperation`s, which multiply by
+  -- `c`); populated as the raw read (exact for the 64-bit variants — the W-variant extension is a deferred
+  -- completeness concern). Soundness does not depend on the populate value (E20–E47 pin the columns).
+  let b ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  let c ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
   -- (1,2) The two `c_times_quotient` products of `quotient_comp × c`. Witness each `MulOperation`
   -- column struct via `populate`, then compose as a Clean `assertion` gated by `is_real`
   -- (`divrem/mod.rs:721`). `mul_lower` = low product (`is_mul = is_real`); `mul_upper` = high product
@@ -137,17 +145,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   let mul_lower ← ProvableType.witness (fun env =>
     MulOperation.populate
       #v[env quotient_comp[0], env quotient_comp[1], env quotient_comp[2], env quotient_comp[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
+      #v[env c[0], env c[1], env c[2], env c[3]]
       0 0 0)
   let mul_upper ← ProvableType.witness (fun env =>
     MulOperation.populate
       #v[env quotient_comp[0], env quotient_comp[1], env quotient_comp[2], env quotient_comp[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
+      #v[env c[0], env c[1], env c[2], env c[3]]
       (env is_div + env is_rem) 0 0)
   assertion MulOperation.circuit
-    ⟨quotient_comp, input.op_c_val, mul_lower, input.is_real, input.is_real, 0, 0, 0, 0⟩
+    ⟨quotient_comp, c, mul_lower, input.is_real, input.is_real, 0, 0, 0, 0⟩
   assertion MulOperation.circuit
-    ⟨quotient_comp, input.op_c_val, mul_upper, input.is_real, 0, is_div + is_rem, is_divu + is_remu, 0, 0⟩
+    ⟨quotient_comp, c, mul_upper, input.is_real, 0, is_div + is_rem, is_divu + is_remu, 0, 0⟩
   -- (3-7) The two `IsEqualWordOperation` overflow checks (`is_overflow_b` vs `i64::MIN`,
   -- `is_overflow_c` vs `-1`), each asserted twice — full-word @ `is_real_not_word`, low-half @ `E2`
   -- (word-variant gate) — and `IsZeroWordOperation` on `c`. Nested cols witnessed flat via
@@ -197,7 +205,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
     ⟨#v[cpv[0], cpv[1], 0, 0], #v[65535, 65535, 0, 0],
      fromElements (F := Expression (ZMod p)) w_ovc, e2⟩
   assertion IsZeroWordOperation.circuit
-    ⟨input.op_c_val, fromElements (F := Expression (ZMod p)) w_is_c_0, input.is_real⟩
+    ⟨c, fromElements (F := Expression (ZMod p)) w_is_c_0, input.is_real⟩
   -- (8-10) Two `AddOperation` two's-complement negations (`|c|`, `|remainder|`), and
   -- `LtOperationUnsigned` (`|remainder| < max(|c|,1)`). `LtOperationUnsigned` witnesses its comparison
   -- columns here via `populate_*`, then is composed as a Clean `assertion` gated by
@@ -211,7 +219,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   let misc ← witnessVector 3 (fun _ => .replicate 3 0)
   let abs_c_alu_event := misc[0]; let abs_rem_alu_event := misc[1]
   let remainder_check_multiplicity := misc[2]
-  assertion AddOperation.circuit ⟨input.op_c_val, abs_c, ⟨w_cneg⟩, abs_c_alu_event⟩
+  assertion AddOperation.circuit ⟨c, abs_c, ⟨w_cneg⟩, abs_c_alu_event⟩
   assertion AddOperation.circuit ⟨remainder_comp, abs_remainder, ⟨w_rneg⟩, abs_rem_alu_event⟩
   let cl ← witnessVector 2 (fun env =>
     LtOperationUnsigned.comparisonLimbsWitness
@@ -255,7 +263,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
      a[0], a[1], a[2], a[3]⟩
   -- Assemble `DivRemCols`, then emit the chip's own assertZero constraints (`E13…E367`, `op_a_0`, incl.
   -- the binary gates like `is_real·(is_real-1)` = E355) via `ownAsserts`.
-  let cols : Var DivRemCols (ZMod p) := ⟨input.state, input.adapter, a, input.op_b_val, input.op_c_val,
+  let cols : Var DivRemCols (ZMod p) := ⟨input.state, input.adapter, a, b, c,
     quotient, quotient_comp, remainder_comp, remainder, abs_remainder, abs_c,
     max_abs_c_or_1, c_times_quotient, mul_lower, mul_upper, ⟨w_cneg⟩, ⟨w_rneg⟩, lt_out,
     carry, fromElements (F := Expression (ZMod p)) w_is_c_0,
@@ -320,8 +328,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
 
 set_option maxHeartbeats 16000000 in
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs DivRemCols main where
-  -- MulOperation FormalAssertions witness 45 cols each; total: 209.
-  localLength _ := 209
+  -- MulOperation FormalAssertions witness 45 cols each; + the `b`/`c` operand columns (4 each); total: 217.
+  localLength _ := 217
   localLength_eq := by simp +arith [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]
   subcircuitsConsistent := by simp only [circuit_norm, main, AddOperation.circuit, IsEqualWordOperation.circuit, IsZeroWordOperation.circuit, LtOperationUnsigned.circuit, MulOperation.circuit, Readers.CPUState.circuit, Readers.RTypeReader.circuit, U16MSBOperation.circuit, assertZeros]; try omega
   channelsWithGuarantees := [byteChannel.toRawGated]
