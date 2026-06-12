@@ -2,43 +2,39 @@ import SP1Clean.Chips.BitwiseChip.Defs
 import SP1Clean.TraceGenTests.TraceGenerator
 import SP1Clean.TraceGenTests.BitwiseChipTraceVectors
 
-/-! # Whole-trace conformance anchor for `BitwiseChip` (scoped: AND only, masked flags).
+/-! # Whole-trace conformance anchor for `BitwiseChip` — hint-driven flags, unmasked.
 
-Same derivation as `AddChipTraceWitness` on the byte-lookup chip: every row is rebuilt from
-`BitwiseChip.main`'s own witness closures (the three variant flags and the 16-column
-`BitwiseU16Operation` struct via its `populate` — the two low-byte decompositions plus the eight
-result bytes), with `EventPopulate.aluTypeEventInputs` mirroring the `ALUTypeReader` event → input
-extraction (register-`c` AND events).
-
-**Scope gap (deliberate, the Mul/Lt pattern):** the chip witnesses its three variant flags as
-constant zeros (`Chips/BitwiseChip/Defs.lean`, the `flags` `witnessVector`; completeness relies on
-that padding shape), so the derived flag columns cannot match SP1's real one-hot rows — and the
-gadget's `byte_opcode = is_xor·2 + is_or·1` evaluates to `0` = **AND**. The dump therefore
-contains only AND events (whose real `byte_opcode` is also `0`, making the witnessed 16-column
-block identical on both sides), and the comparison masks the three flag columns `48–50` via
-`bitwiseCheckedRanges`. Hint-driven flags would close the gap (the same follow-up as MulChip);
-everything else — state, adapter, and the whole bitwise block — is checked cell-for-cell. -/
+Every row is rebuilt from `BitwiseChip.main`'s own witness closures (the `"bitwise_flags"` hint
+flags and the 16-column `BitwiseU16Operation` struct via `BitwiseU16Operation.populate` at the
+flag-weighted byte opcode) plus the output-struct layout, with `bitwiseHint` building the
+per-event flag `ProverHint` from the dumped executor opcode (XOR = 3, OR = 4, AND = 5 — the same
+discriminants the circuit's reader opcode expression uses). The battery cycles **all three
+variants** (register-`c`) and the comparison is **unmasked** (all 51 columns) — closing the
+former masked-flags scope gap. -/
 
 namespace SP1Clean.TraceGenTests
 
 open SP1Clean
 
-/-- `BitwiseCols` checked ranges: everything except the three variant flags `[48, 51)`
-(see the module doc). -/
-def bitwiseCheckedRanges : List (ℕ × ℕ) := [(0, 48)]
+/-- Per-event flag hint: the `"bitwise_flags"` one-hot from the dumped executor opcode. -/
+def bitwiseHint (op : ℕ) : ProverHint (ZMod SP1Prime) := fun key n =>
+  match key, n with
+  | "bitwise_flags", 3 =>
+    #[#v[if op = 3 then 1 else 0, if op = 4 then 1 else 0, if op = 5 then 1 else 0]]
+  | _, _ => #[]
 
-/-- The `BitwiseChip` trace derived from the circuit: one `circuitTraceRow` per dumped event, zero
-padding to SP1's height. -/
+/-- The `BitwiseChip` trace derived from the circuit: one `circuitTraceRow` per dumped event (flag
+hint from the event's opcode), zero padding to SP1's height. -/
 def bitwiseChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
     (fun e =>
-      circuitTraceRow BitwiseChip.Inputs (BitwiseChip.main (p := SP1Prime)) (aluTypeEventInputs e))
+      circuitTraceRow BitwiseChip.Inputs (BitwiseChip.main (p := SP1Prime))
+        (aluTypeOpEventInputs e) (bitwiseHint e.opcode))
     BitwiseChipTraceEvents BitwiseChipTraceHeight 51
 
 theorem bitwisechip_trace_conforms :
-    (bitwiseChipDerivedTrace.map (keepCols bitwiseCheckedRanges) ==
-      BitwiseChipTraceRows.map
-        (fun r => keepCols bitwiseCheckedRanges (r.toList.map toField))) = true := by
+    (bitwiseChipDerivedTrace
+      == BitwiseChipTraceRows.map (fun r => r.toList.map toField)) = true := by
   native_decide
 
 end SP1Clean.TraceGenTests

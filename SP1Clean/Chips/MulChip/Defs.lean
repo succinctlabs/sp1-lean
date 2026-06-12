@@ -30,6 +30,12 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
+/-- The five honest variant flags (`is_mul`, `is_mulh`, `is_mulhu`, `is_mulhsu`, `is_mulw`) the
+prover supplies via the `"mul_flags"` hint key (one-hot for the active variant, all-zero on
+padding). Falls back to all-zero when the key is absent. -/
+def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 5 :=
+  ((h "mul_flags" 5)[0]?).getD #v[0, 0, 0, 0, 0]
+
 /-- The literal meaning of SP1's `MulCols.asserts` own (inline) assertZero tail
 (`Extracted/MulChip.lean` `E5,E7,E9,E11,E13,E15,op_a_0`): the five variant-flag booleans (in SP1's
 extraction order), the flag-sum boolean, and `op_a_0 = 0`. The schoolbook arithmetic belongs to
@@ -55,7 +61,7 @@ Witnesses result word `a` and the five variant flags; gates `is_real`; assembles
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var MulCols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVector 5 (fun _ => (#v[0, 0, 0, 0, 0] : Vector (ZMod p) 5))
+  let flags ← witnessVector 5 (fun env => hintFlags env.hint)
   let is_mul := flags[0]; let is_mulh := flags[1]; let is_mulhu := flags[2]
   let is_mulhsu := flags[3]; let is_mulw := flags[4]
   -- The chip witnesses the `MulOperation` column struct via `populate` (conformance-checked in

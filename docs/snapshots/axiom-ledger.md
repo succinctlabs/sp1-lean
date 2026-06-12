@@ -27,23 +27,24 @@
 | + Sail (control flow) | 9 | Jal/Jalr/Branch bridges + `kind`s: + `sys_enable…` only |
 | + Sail (aggregates) | 6 | `allChipKinds(_length)`, `gatedExecution_allChips`, `coverage_kinds_eq_registry`, `coverage_length`, `routeOf_reaches_sail` — the union footprint of all 25 `kind`s |
 | + `oRB`/`tC` + `sorryAx` | 7 | the capstone chain: `sp1_witness_decode` (the decode-seam premise) and its consumer `sp1_gatedExecution_prereqs` (now a proven assembly, sorried only via the seam), and — via the **embedded completeness fields** of the chip `circuit`s, see note — `sp1Tables`, `sp1Tables_length`, `sp1GatedVm`, `sp1FormalEnsemble`, `sp1_machine_soundness` |
-| baseline + `sorryAx` | 3 | `ShiftLeftChip/ShiftRightChip/DivRemChip.completeness` |
+| baseline + `sorryAx` | 1 | `DivRemChip.completeness` |
 | `propext` only / none | 4 | the `by decide` coverage guards (`covered_iff_routed`, `reachable_subset_wired`, `wired_subset_reachable`); `sp1Assumptions` |
 | baseline + full Sail surface | 1 | **`Target.sp1_target_execution`** — the target machine-level theorem: **no `sorryAx`, no `bv_decide`**; the ~76 platform axioms enter through the `try_step` statement |
 | ditto + `oRB`/`tC` + `sorryAx` | 1 | `Target.sp1_target_soundness` — routes through `sp1_machine_soundness`, inheriting its chain |
 
 **The embedded-completeness note (TB-10).** `sp1Tables` wires each chip as `⟨chip.circuit⟩`, and a
-`GeneralFormalCircuit` *contains* its `completeness` proof as a field — so the three completeness
-`sorry`s surface on the whole capstone chain under `#print axioms` even though the ensemble soundness
-proof never consumes them. Closing the three (roadmap B1) plus the decode seam (W1b/W1c) is what makes
-`sp1_machine_soundness`'s census clean. Conversely `sp1_machine_soundness` does **not** carry the
+`GeneralFormalCircuit` *contains* its `completeness` proof as a field — so the remaining `DivRem`
+completeness `sorry` surfaces on the whole capstone chain under `#print axioms` even though the
+ensemble soundness proof never consumes it. (`ShiftLeft`/`ShiftRight` completeness were closed
+2026-06-12 — honest hint-driven `Populate` witness closures.) Closing DivRem plus the decode seam
+(W1b/W1c) is what makes `sp1_machine_soundness`'s census clean. Conversely `sp1_machine_soundness` does **not** carry the
 Sail-model axioms today — its proof threads the abstract premise, not the concrete chip dispatch;
 closing W1 wires the 25 `kind`s (and their Sail footprint, as in `gatedExecution_allChips`) through.
 
-## Complete `sorryAx` carrier set (11, all gated by the harness)
+## Complete `sorryAx` carrier set (9, all gated by the harness)
 
-Direct holes: `ShiftLeftChip.completeness`, `ShiftRightChip.completeness`,
-`DivRemChip.completeness`, `Soundness.sp1_witness_decode` (the decode seam). Structural inheritors:
+Direct holes: `DivRemChip.completeness`, `Soundness.sp1_witness_decode` (the decode seam).
+Structural inheritors:
 `sp1_gatedExecution_prereqs` (proven assembly over the seam), `sp1Tables(_length)`, `sp1GatedVm`,
 `sp1FormalEnsemble`, `sp1_machine_soundness`, `Target.sp1_target_soundness`. **No soundness theorem,
 no bridge, no faithfulness anchor, and not `Target.sp1_target_execution` carries `sorryAx`.** No
@@ -52,7 +53,7 @@ no bridge, no faithfulness anchor, and not `Target.sp1_target_execution` carries
 ## Reproduce
 
 ```bash
-lake build SP1Clean        # green; the only warnings are the four known sorries
+lake build SP1Clean        # green; the only warnings are the two known sorries
 scripts/run_audit.sh       # pins + inventory gates + the 314-probe census + the sorryAx gate
 ```
 

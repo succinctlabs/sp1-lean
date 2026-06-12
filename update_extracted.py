@@ -108,19 +108,24 @@ WITNESS_SCHEMA: Dict[str, List[str]] = {
 # anchor that re-derives every row from the chip's own circuit (`TraceGenerator.lean` +
 # `EventPopulate.lean`) and checks the matrices match. Value = (expected row width — a layout-drift
 # tripwire; the dumper also asserts it, reader kind — picks the dumped record type and the Lean
-# event mirror: "RType" → `AluEventRec`, "ALUType" → `AluTypeEventRec`).
+# event mirror: "RType" → `AluEventRec`, "ALUType" → `AluTypeEventRec`; the `*Op` variants append
+# the executor opcode discriminant — `AluEventOpRec` / `AluTypeOpEventRec` — for the hint-driven
+# chips whose Lean anchors build the per-event flag `ProverHint` from it).
 TRACE_CHIPS: Dict[str, Tuple[int, str]] = {
     "Add": (33, "RType"),
     "Sub": (33, "RType"),
     "Subw": (32, "RType"),
-    "Mul": (82, "RType"),
+    "Mul": (82, "RTypeOp"),
     "Addw": (36, "ALUType"),
-    "Bitwise": (51, "ALUType"),
-    "Lt": (44, "ALUType"),
+    "Bitwise": (51, "ALUTypeOp"),
+    "Lt": (44, "ALUTypeOp"),
+    "ShiftLeft": (65, "ALUTypeOp"),
+    "ShiftRight": (69, "ALUTypeOp"),
 }
 
 # Ordered JSON keys of one dumped event, per reader kind = the field order of Lean's
-# `AluEventRec` / `AluTypeEventRec` (`TraceGenTests/EventPopulate.lean`).
+# `AluEventRec` / `AluTypeEventRec` / `AluEventOpRec` / `AluTypeOpEventRec`
+# (`TraceGenTests/EventPopulate.lean`).
 TRACE_EVENT_KEYS: Dict[str, List[str]] = {
     "RType": [
         "clk", "pc", "a", "b", "c", "opA", "opB", "opC",
@@ -130,6 +135,22 @@ TRACE_EVENT_KEYS: Dict[str, List[str]] = {
         "clk", "pc", "a", "b", "c", "opA", "opB", "opC", "immC",
         "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC",
     ],
+    "RTypeOp": [
+        "clk", "pc", "a", "b", "c", "opA", "opB", "opC",
+        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC", "opcode",
+    ],
+    "ALUTypeOp": [
+        "clk", "pc", "a", "b", "c", "opA", "opB", "opC", "immC",
+        "tsA", "prevTsA", "prevA", "tsB", "prevTsB", "tsC", "prevTsC", "opcode",
+    ],
+}
+
+# Reader kind → (Lean event mirror struct, dumped Rust record type for the doc string).
+TRACE_EVENT_TYPES: Dict[str, Tuple[str, str]] = {
+    "RType": ("AluEventRec", "RTypeRecord"),
+    "ALUType": ("AluTypeEventRec", "ALUTypeRecord"),
+    "RTypeOp": ("AluEventOpRec", "RTypeRecord"),
+    "ALUTypeOp": ("AluTypeOpEventRec", "ALUTypeRecord"),
 }
 
 # Operation modules emitted ALSO as the Clean-native **circuit form** (`Inputs` + `main` +
@@ -674,8 +695,7 @@ def render_trace_vectors(chip: str, width: int, kind: str, data: dict) -> str:
         raise RuntimeError(f"{chip}: dumped matrix shape is inconsistent")
     events = data["events"]
     event_keys = TRACE_EVENT_KEYS[kind]
-    event_type = "AluEventRec" if kind == "RType" else "AluTypeEventRec"
-    record_type = "RTypeRecord" if kind == "RType" else "ALUTypeRecord"
+    event_type, record_type = TRACE_EVENT_TYPES[kind]
     event_rows = [
         "  ⟨" + ", ".join(str(e[k]) for k in event_keys) + "⟩,"
         for e in events

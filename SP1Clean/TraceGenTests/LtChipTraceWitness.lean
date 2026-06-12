@@ -2,47 +2,37 @@ import SP1Clean.Chips.LtChip.Defs
 import SP1Clean.TraceGenTests.TraceGenerator
 import SP1Clean.TraceGenTests.LtChipTraceVectors
 
-/-! # Whole-trace conformance anchor for `LtChip` (scoped: SLTU immediate-`c`, masked flags).
+/-! # Whole-trace conformance anchor for `LtChip` — hint-driven flags, unmasked.
 
-Same derivation as `AddChipTraceWitness` on the compare chip: every row is rebuilt from
-`LtChip.main`'s own witness closures (the two variant flags and the 10-column `LtOperationSigned`
-struct via its `populate` — the unsigned-compare block plus the two sign-bit columns), with
-`EventPopulate.aluTypeEventInputs` mirroring the `ALUTypeReader` event → input extraction.
-
-**Scope gaps (deliberate, the Mul/Bitwise pattern):**
-
-1. the chip witnesses `is_slt`/`is_sltu` as constant zeros (`Chips/LtChip/Defs.lean`, the `flags`
-   `witnessVector`), so the derived flag columns cannot match SP1's one-hot rows — and the
-   gadget's mode selector `is_signed := is_slt` evaluates to `0` = **unsigned**. The dump
-   therefore contains only SLTU events (whose real `is_signed` is also false, making the witnessed
-   compare block identical on both sides — both sign-bit columns zero), and the comparison masks
-   the two flag columns `32–33` via `ltCheckedRanges`;
-2. the events are **immediate-`c`** (the executor's SLTIU shape): `LtChip`'s compare operand is
-   `adapter.op_c` (`Inputs.op_c_val`), which on register-`c` rows is the register-index word
-   rather than the read value — on immediate rows `op_c` *is* the operand value on both sides.
-
-Hint-driven flags would close gap 1 (the same follow-up as MulChip); everything else — state,
-adapter (including the immediate `op_c` block), and the whole compare block — is checked
-cell-for-cell. -/
+Every row is rebuilt from `LtChip.main`'s own witness closures (the `"lt_flags"` hint flags and
+the `LtOperationSigned` column block via `LtOperationSigned.populate` at `is_signed = is_slt`)
+plus the output-struct layout, with `ltHint` building the per-event flag `ProverHint` from the
+dumped executor opcode (SLT = 9, SLTU = 10). The battery cycles **both variants**, immediate-`c`
+rows only (on register-`c` rows the chip's compare operand `adapter.op_c` is the register-index
+word rather than the read value — a documented adapter-projection scope gap, independent of the
+flags), and the comparison is **unmasked** (all 44 columns). -/
 
 namespace SP1Clean.TraceGenTests
 
 open SP1Clean
 
-/-- `LtCols` checked ranges: state+adapter `[0, 32)` and `lt_operation` `[34, 44)`; the masked
-remainder is the two variant flags `[32, 34)` (see the module doc). -/
-def ltCheckedRanges : List (ℕ × ℕ) := [(0, 32), (34, 44)]
+/-- Per-event flag hint: the `"lt_flags"` one-hot from the dumped executor opcode. -/
+def ltHint (op : ℕ) : ProverHint (ZMod SP1Prime) := fun key n =>
+  match key, n with
+  | "lt_flags", 2 => #[#v[if op = 9 then 1 else 0, if op = 10 then 1 else 0]]
+  | _, _ => #[]
 
-/-- The `LtChip` trace derived from the circuit: one `circuitTraceRow` per dumped event, zero
-padding to SP1's height. -/
+/-- The `LtChip` trace derived from the circuit: one `circuitTraceRow` per dumped event (flag
+hint from the event's opcode), zero padding to SP1's height. -/
 def ltChipDerivedTrace : List (List (ZMod SP1Prime)) :=
   generateTrace
-    (fun e => circuitTraceRow LtChip.Inputs (LtChip.main (p := SP1Prime)) (aluTypeEventInputs e))
+    (fun e =>
+      circuitTraceRow LtChip.Inputs (LtChip.main (p := SP1Prime))
+        (aluTypeOpEventInputs e) (ltHint e.opcode))
     LtChipTraceEvents LtChipTraceHeight 44
 
 theorem ltchip_trace_conforms :
-    (ltChipDerivedTrace.map (keepCols ltCheckedRanges) ==
-      LtChipTraceRows.map (fun r => keepCols ltCheckedRanges (r.toList.map toField))) = true := by
+    (ltChipDerivedTrace == LtChipTraceRows.map (fun r => r.toList.map toField)) = true := by
   native_decide
 
 end SP1Clean.TraceGenTests

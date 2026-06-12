@@ -46,14 +46,16 @@ def circuitTraceRow (Input : TypeMap) [ProvableType Input] {Output : TypeMap} [P
   (toElements out).toList.map (Expression.eval env.toEnvironment)
 
 /-- Assemble a whole trace matrix from a per-event row generator: derived rows for the real events,
-then all-zero rows up to `height` — mirroring SP1's `generate_trace`, which zero-fills padding. -/
-def generateTrace {α : Type} (rowGen : α → List F) (events : List α) (height width : ℕ) :
-    List (List F) :=
-  events.map rowGen ++ List.replicate (height - events.length) (List.replicate width 0)
+then `padRow` repeated up to `height`. The default all-zero `padRow` mirrors SP1's plain zero-filled
+padding; chips with a non-zero `padded_row_template` (the shift chips set the ungated `v_*` power
+columns on padding) pass the zero-input derived row instead. -/
+def generateTrace {α : Type} (rowGen : α → List F) (events : List α) (height width : ℕ)
+    (padRow : List F := List.replicate width 0) : List (List F) :=
+  events.map rowGen ++ List.replicate (height - events.length) padRow
 
-/-- Project a row onto the kept `[lo, hi)` column ranges. The masked anchors (chips whose variant
-flags are witnessed as constant zeros, so the flag columns cannot conform) compare
-`keepCols`-projected matrices; the keep list doubles as the per-chip column-mapping artifact. -/
+/-- Project a row onto the kept `[lo, hi)` column ranges. Historically used by masked anchors
+(chips whose variant flags were witnessed as constant zeros); all current anchors compare
+unmasked, but the projector is kept for scoping future partial coverage. -/
 def keepCols {α : Type} (keep : List (ℕ × ℕ)) (row : List α) : List α :=
   keep.flatMap fun (lo, hi) => (row.drop lo).take (hi - lo)
 

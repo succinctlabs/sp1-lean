@@ -115,22 +115,26 @@ formulas pointwise.
 scaffold), deliberately independent of `WitnessTests/` — the older per-operation `populate`
 conformance layer, kept as a temporary operation-level bridge.
 
-Status (7 chips, 44 events + 20 padding rows each):
+Status (9 chips, 44 events + 20 padding rows each, **all unmasked** — every column of every
+covered chip is compared cell-for-cell):
 
-- **Unmasked, cell-for-cell**: `AddChip` (33 cols), `SubChip` (33), `SubwChip` (32 — the
-  W-result value/msb witness pair), `AddwChip` (36 — the first `ALUTypeReader` adapter trace,
+- Fixed-witness chips: `AddChip` (33 cols), `SubChip` (33), `SubwChip` (32 — the W-result
+  value/msb witness pair), `AddwChip` (36 — the first `ALUTypeReader` adapter trace,
   register-`c` events).
-- **Masked variant flags** (the chips witness their selector flags as constant zeros and
-  completeness relies on that, so flag-dependent columns can't match real one-hot rows):
-  `MulChip` (82; MUL/MULHU events only, masks `a` 28–31 + flags 77–81), `BitwiseChip` (51; AND
-  events only — zero flags make `byte_opcode = 0` = AND — masks flags 48–50), `LtChip` (44; SLTU
-  **immediate-`c`** events — `LtChip`'s compare operand is `adapter.op_c`, which on register rows
-  is the register-index word — masks flags 32–33). Each anchor's keep-list (`<chip>CheckedRanges`)
-  doubles as the column-mapping artifact.
+- **Hint-driven-flag chips** (the variant selector flags are witnessed from a per-chip
+  `ProverHint` key — `"mul_flags"`/`"bitwise_flags"`/`"lt_flags"`/`"shift_left_flags"`/
+  `"shift_right_flags"` — and the anchor builds the per-event hint from the dumped executor
+  opcode, the `*Op` event kinds): `MulChip` (82; all five variants), `BitwiseChip` (51;
+  XOR/OR/AND), `LtChip` (44; SLT/SLTU, **immediate-`c`** events — `LtChip`'s compare operand is
+  `adapter.op_c`, which on register rows is the register-index word, a scoped adapter-projection
+  gap independent of the flags), `ShiftLeftChip` (65; SLL/SLLW × register/immediate, the shift
+  amount swept over every byte/bit shift), `ShiftRightChip` (69; SRL/SRA/SRLW/SRAW ×
+  register/immediate). The shift chips pad with SP1's non-zero `padded_row_template`
+  (`v_* = 1/1/1` resp. `16/256/65536`), reproduced by the circuits' own zero-input/empty-hint
+  derived row (`generateTrace`'s `padRow` parameter).
 
-Follow-up to close the masked gaps: hint-driven flag witnesses (`env.hint`) + a
-`ProverAssumptions`-pinned one-hot hint + the per-chip completeness rework — which would also
-unlock MULH/MULHSU/MULW, OR/XOR, and SLT rows. Reasoning hook for later: under
+The former masked-flags scope gap is closed: the five flag chips' completeness proofs are stated
+against the same hint-driven closures the anchors test. Reasoning hook for later: under
 `Circuit.ComputableWitnesses`, the derived environment agrees with `Operations.localWitnesses` at
 the fixpoint env (`Circuit.proverEnvironment_usesLocalWitnesses`), the bridge from this sampled
 conformance to the chips' completeness theorems.
@@ -203,7 +207,7 @@ SP1Clean/
 │                   WitnessConformance                           temporary op-level bridge; `native_decide`)
 ├── TraceGenTests/  TraceGenerator, EventPopulate,              (full-trace chip testing — the circuit-as-
 │                   Conformance,                                  trace-generator layer, see § above;
-│                   <Chip>TraceWitness(+Vectors)                  self-contained, 7 chips covered)
+│                   <Chip>TraceWitness(+Vectors)                  self-contained, 9 chips covered)
 ├── Soundness/      {State,Byte,Program,Memory}Consistency,     (trace-level bus consistency;
 │                   ChipRow (`ChipKind`+`name`), ChipRegistry,    GatedVm/ + SP1GatedVm = the gated
 │                   GatedVm/, SP1GatedVm,                         whole-machine capstone;

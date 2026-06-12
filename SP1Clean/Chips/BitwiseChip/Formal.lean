@@ -19,13 +19,20 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`,
+/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, the honest
+`"bitwise_flags"` hint (each flag binary, one-hot, the sum = `is_real`), `op_a_0 = 0`,
 `imm_c = 0` (register-register ops), CPUState clock bounds, three timestamp `Spec`s
 (op_c gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop :=
+    (hint : ProverHint (ZMod p)) : Prop :=
+  let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧ (f[2] = 0 ∨ f[2] = 1) ∧
+  input.is_real = f[0] + f[1] + f[2] ∧
+  (f[0] = 1 → f[1] = 0 ∧ f[2] = 0) ∧
+  (f[1] = 1 → f[0] = 0 ∧ f[2] = 0) ∧
+  (f[2] = 1 → f[0] = 0 ∧ f[1] = 0) ∧
   input.adapter.op_a_0 = 0 ∧ input.adapter.imm_c = 0 ∧
   Readers.CPUState.Spec
     { cols := input.state, next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
@@ -147,11 +154,22 @@ theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
   haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  obtain ⟨ha, hb, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+  obtain ⟨ha, hb, hbin, hf0, hf1, hf2, hsum, hone0, hone1, hone2, hop_a_0, himm, h_cpu,
+    hrac_a, hrac_b, hrac_c⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_cols⟩ := h_env
-  have hflag0 : env.get i₀ = 0 := by simpa using h_env_flags 0
-  have hflag1 : env.get (i₀ + 1) = 0 := by simpa using h_env_flags 1
-  have hflag2 : env.get (i₀ + 2) = 0 := by simpa using h_env_flags 2
+  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
+  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
+  have hflag2 : env.get (i₀ + 2) = (hintFlags env.hint)[2] := by simpa using h_env_flags 2
+  have hf0' : env.get i₀ = 0 ∨ env.get i₀ = 1 := by rw [hflag0]; exact hf0
+  have hf1' : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := by rw [hflag1]; exact hf1
+  have hf2' : env.get (i₀ + 2) = 0 ∨ env.get (i₀ + 2) = 1 := by rw [hflag2]; exact hf2
+  have hsumc : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) = input_is_real := by
+    rw [hflag0, hflag1, hflag2]; exact hsum.symm
+  have hsum01' : env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) = 0
+      ∨ env.get i₀ + env.get (i₀ + 1) + env.get (i₀ + 2) = 1 := by
+    rw [hsumc]; exact hbin
+  have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x + -1) = 0 := by
+    rintro x (h | h) <;> rw [h] <;> simp
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   -- The witness hint computed `populate` at the *eval-of-var* operands; `h_input` identifies those with
   -- the value-form operands, normalising the hint's `populate` to match `spec_populate`.
@@ -161,21 +179,33 @@ theorem completeness :
       = input_adapter_op_c_memory_prev_value := h_input.2.2.2.2.2.2.2.2.1.1
   simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hpvb, hpvc] at h_env_cols
   have hop3 : (env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0).val < 3 := by
-    rw [show env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0 from by
-      rw [hflag0, hflag1, hflag2]; ring, ZMod.val_zero]; omega
+    have key : env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 0
+        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 1
+        ∨ env.get i₀ * 2 + env.get (i₀ + 1) * 1 + env.get (i₀ + 2) * 0 = 2 := by
+      rw [hflag0, hflag1, hflag2]
+      rcases hf0 with hx | hx
+      · rcases hf1 with ho | ho
+        · exact Or.inl (by rw [hx, ho]; ring)
+        · exact Or.inr (Or.inl (by rw [hx, ho]; ring))
+      · obtain ⟨ho, -⟩ := hone0 hx
+        exact Or.inr (Or.inr (by rw [hx, ho]; ring))
+    rcases key with h | h | h <;> rw [h]
+    · rw [ZMod.val_zero]; omega
+    · rw [ZMod.val_one]; omega
+    · rw [show (2 : ZMod p) = ((2 : ℕ) : ZMod p) by norm_cast,
+        ZMod.val_natCast_of_lt (by have := Fact.out (p := 2 ^ 17 < p); omega : 2 < p)]; omega
   refine ⟨⟨hbin, h_cpu⟩,
-    ⟨⟨ha, hb,
-        by simp only [hflag0, hflag1, zero_mul, mul_zero, add_zero, ZMod.val_zero]; norm_num, hbin⟩,
+    ⟨⟨ha, hb, hop3, hbin⟩,
       ?_⟩,
     ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
       hrac_a, hrac_b, hrac_c⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
-    by rw [hflag0]; simp,
-    by rw [hflag1]; simp,
-    by rw [hflag2]; simp,
-    by rw [hflag0, hflag1, hflag2]; simp,
+    hbool _ hf0',
+    hbool _ hf1',
+    hbool _ hf2',
+    hbool _ hsum01',
     hop_a_0⟩
   -- The composed `BitwiseU16Operation` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns:
   -- `spec_populate` once the witnessed column struct equals `populate …`. Each of its 16 cells is

@@ -66,12 +66,14 @@ import SP1Clean.Chips.AluX0Chip.Formal
 import SP1Clean.Chips.ProgramChip
 import SP1Clean.Chips.ShiftLeftChip.Bridge
 import SP1Clean.Chips.ShiftLeftChip.Core
+import SP1Clean.Chips.ShiftLeftChip.Populate
 import SP1Clean.Chips.ShiftLeftChip.Defs
 import SP1Clean.Chips.ShiftLeftChip.Soundness.Sll
 import SP1Clean.Chips.ShiftLeftChip.Soundness.Sllw
 import SP1Clean.Chips.ShiftLeftChip.Formal
 import SP1Clean.Chips.ShiftRightChip.Bridge
 import SP1Clean.Chips.ShiftRightChip.Core
+import SP1Clean.Chips.ShiftRightChip.Populate
 import SP1Clean.Chips.ShiftRightChip.Defs
 import SP1Clean.Chips.ShiftRightChip.Dispatch
 import SP1Clean.Chips.ShiftRightChip.Flags
@@ -326,6 +328,10 @@ import SP1Clean.TraceGenTests.LtChipTraceVectors
 import SP1Clean.TraceGenTests.LtChipTraceWitness
 import SP1Clean.TraceGenTests.MulChipTraceVectors
 import SP1Clean.TraceGenTests.MulChipTraceWitness
+import SP1Clean.TraceGenTests.ShiftLeftChipTraceVectors
+import SP1Clean.TraceGenTests.ShiftLeftChipTraceWitness
+import SP1Clean.TraceGenTests.ShiftRightChipTraceVectors
+import SP1Clean.TraceGenTests.ShiftRightChipTraceWitness
 import SP1Clean.TraceGenTests.SubChipTraceVectors
 import SP1Clean.TraceGenTests.SubChipTraceWitness
 import SP1Clean.TraceGenTests.SubwChipTraceVectors

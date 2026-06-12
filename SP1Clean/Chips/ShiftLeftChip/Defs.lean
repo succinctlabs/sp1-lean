@@ -1,5 +1,6 @@
 import SP1Clean.Specs.Chip
 import SP1Clean.Chips.ShiftLeftChip.Core
+import SP1Clean.Chips.ShiftLeftChip.Populate
 import SP1Clean.Operations.U16MSBOperation.Formal
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.ALUTypeReader
@@ -22,7 +23,8 @@ the semantic, flag-gated `Spec` (RV64 `sll`/`sllw` identity) is in `Specs/Chip.l
 `Faithful/ShiftLeftChip.lean` anchors both structural specs to SP1's extracted lists.
 
 `main` composes `CPUState`/`ALUTypeReader`/`U16MSBOperation` sub-circuits, witnesses the shift column
-block, and gates `is_real`. Soundness is proved; completeness is a deferred `sorry`. -/
+block honestly (the `Populate` closures, flags via the `"shift_left_flags"` `ProverHint`), and gates
+`is_real`. -/
 
 namespace SP1Clean.ShiftLeftChip
 
@@ -135,29 +137,52 @@ def InteractSpec (cols : ShiftLeftCols (ZMod p)) : Prop :=
 
 set_option maxHeartbeats 4000000 in
 /-- Compose the threaded `CPUState`/`ALUTypeReader` reader blocks and the `U16MSBOperation` (`sllw_msb`)
-gadget as Clean sub-assertions, **witness** the shift column block (the result `a`, the `c_bits`, the
-`v_*` powers, the `shift_u16` selector, the `lower/higher_limb`/`limb_result` words, the `sllw_msb`),
-thread the variant flags from `Inputs`, gate `is_real` (`= is_sll + is_sllw`), emit the inline shift
+gadget as Clean sub-assertions, **witness** the shift column block honestly (the result `a`, the
+`c_bits`, the `v_*` powers, the `shift_u16` selector, the `lower/higher_limb`/`limb_result` words, the
+`sllw_msb` — the `Populate` closures, ported from SP1's `event_to_row`; the variant flags come from the
+`"shift_left_flags"` `ProverHint`), gate `is_real` (`= is_sll + is_sllw`), emit the inline shift
 assertZero constraints (`AssertSpec`) and the nine `gate`-gated byte-range pulls (`InteractSpec`), and
-assemble the extracted `ShiftLeftCols` struct. (The witness generators are still placeholder zeros — a
-faithful `populate` is only needed for completeness, which is deferred; soundness ranges over every
-satisfying assignment regardless of the generators.) -/
+assemble the extracted `ShiftLeftCols` struct. (Soundness ranges over every satisfying assignment
+regardless of the generators; the generators carry completeness and the `TraceGenTests` conformance.) -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftLeftCols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  -- The shift column block + the variant flags are **witnessed columns** (placeholder-zero generators —
-  -- a faithful `populate` is only needed for the deferred completeness; soundness ranges over every
-  -- satisfying assignment regardless). The three variant flags (`is_sll`/`is_sllw`/`is_sllw_imm`) are
-  -- witnessed **last** (offsets `i₀+30..32`) so they are committed `cols` columns, not `Inputs` fields.
-  let a ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let c_bits ← witnessVector 6 (fun _ => (#v[0, 0, 0, 0, 0, 0] : Vector (ZMod p) 6))
-  let v ← witnessVector 3 (fun _ => (#v[0, 0, 0] : Vector (ZMod p) 3))
-  let shift_u16 ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let lower_limb ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let higher_limb ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let limb_result ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let sllw_msb ← witnessVector 1 (fun _ => (#v[0] : Vector (ZMod p) 1))
-  let flags ← witnessVector 3 (fun _ => (#v[0, 0, 0] : Vector (ZMod p) 3))
+  -- The shift column block + the variant flags are **witnessed columns** (honest `Populate` closures
+  -- over the adapter operand columns + the flag hint). The three variant flags
+  -- (`is_sll`/`is_sllw`/`is_sllw_imm`) are witnessed **last** (offsets `i₀+30..32`) so they are
+  -- committed `cols` columns, not `Inputs` fields.
+  let a ← witnessVector 4 (fun env =>
+    populateA
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
+  let c_bits ← witnessVector 6 (fun env => cBits (env input.adapter.op_c_memory.prev_value[0]))
+  let v ← witnessVector 3 (fun env => vPowers (env input.adapter.op_c_memory.prev_value[0]))
+  let shift_u16 ← witnessVector 4 (fun env =>
+    shiftU16 (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
+  let lower_limb ← witnessVector 4 (fun env =>
+    lowerLimb
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]))
+  let higher_limb ← witnessVector 4 (fun env =>
+    higherLimb
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]))
+  let limb_result ← witnessVector 4 (fun env =>
+    limbResult
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]))
+  let sllw_msb ← witnessVector 1 (fun env =>
+    #v[sllwMsb
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)])
+  let flags ← witnessVector 3 (fun env =>
+    #v[(hintFlags env.hint)[0], (hintFlags env.hint)[1],
+       (hintFlags env.hint)[1] * env input.adapter.imm_c])
   let is_sll := flags[0]; let is_sllw := flags[1]; let is_sllw_imm := flags[2]
   let gate := is_sll + is_sllw
   assertion U16MSBOperation.circuit ⟨a[1], ⟨sllw_msb[0]⟩, is_sllw⟩

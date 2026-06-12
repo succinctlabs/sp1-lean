@@ -78,6 +78,58 @@ structure AluTypeEventRec where
   tsC : ℕ
   prevTsC : ℕ
 
+/-- As `AluEventRec`, plus the executor `opcode` discriminant (last, matching the `"RTypeOp"`
+dumper kind) — the hint-driven chips' anchors build the per-event variant-flag `ProverHint` from
+it; the input columns ignore it. -/
+structure AluEventOpRec where
+  clk : ℕ
+  pc : ℕ
+  a : ℕ
+  b : ℕ
+  c : ℕ
+  opA : ℕ
+  opB : ℕ
+  opC : ℕ
+  tsA : ℕ
+  prevTsA : ℕ
+  prevA : ℕ
+  tsB : ℕ
+  prevTsB : ℕ
+  tsC : ℕ
+  prevTsC : ℕ
+  opcode : ℕ
+
+/-- As `AluTypeEventRec`, plus the executor `opcode` discriminant (last, matching the
+`"ALUTypeOp"` dumper kind). -/
+structure AluTypeOpEventRec where
+  clk : ℕ
+  pc : ℕ
+  a : ℕ
+  b : ℕ
+  c : ℕ
+  opA : ℕ
+  opB : ℕ
+  opC : ℕ
+  immC : ℕ
+  tsA : ℕ
+  prevTsA : ℕ
+  prevA : ℕ
+  tsB : ℕ
+  prevTsB : ℕ
+  tsC : ℕ
+  prevTsC : ℕ
+  opcode : ℕ
+
+/-- Forget the opcode (the input columns are opcode-independent; only the hint reads it). -/
+def AluEventOpRec.toAluEventRec (e : AluEventOpRec) : AluEventRec :=
+  ⟨e.clk, e.pc, e.a, e.b, e.c, e.opA, e.opB, e.opC,
+   e.tsA, e.prevTsA, e.prevA, e.tsB, e.prevTsB, e.tsC, e.prevTsC⟩
+
+/-- Forget the opcode (the input columns are opcode-independent; only the hint reads it). -/
+def AluTypeOpEventRec.toAluTypeEventRec (e : AluTypeOpEventRec) : AluTypeEventRec :=
+  ⟨e.clk, e.pc, e.a, e.b, e.c, e.opA, e.opB, e.opC, e.immC,
+   e.tsA, e.prevTsA, e.prevA, e.tsB, e.prevTsB, e.tsC, e.prevTsC⟩
+
 variable {F : Type} [Field F]
 
 /-- A u64 value as its four canonical u16 limbs (little-endian), cast into the field. -/
@@ -125,5 +177,13 @@ def rTypeEventInputs (e : AluEventRec) : List F :=
 (Addw/Bitwise/Lt: `is_real = 1` ++ state ++ adapter), in `ProvableStruct` flattening order. -/
 def aluTypeEventInputs (e : AluTypeEventRec) : List F :=
   (1 : F) :: (cpuStatePopulate e.clk e.pc ++ aluTypeReaderPopulate e)
+
+/-- `rTypeEventInputs` on an opcode-carrying event (the opcode feeds only the hint). -/
+def rTypeOpEventInputs (e : AluEventOpRec) : List F :=
+  rTypeEventInputs e.toAluEventRec
+
+/-- `aluTypeEventInputs` on an opcode-carrying event (the opcode feeds only the hint). -/
+def aluTypeOpEventInputs (e : AluTypeOpEventRec) : List F :=
+  aluTypeEventInputs e.toAluTypeEventRec
 
 end SP1Clean.TraceGenTests

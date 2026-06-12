@@ -290,6 +290,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.TraceGenTests.bitwisechip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.ltchip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.mulchip_trace_conforms
+#print axioms SP1Clean.TraceGenTests.shiftleftchip_trace_conforms
+#print axioms SP1Clean.TraceGenTests.shiftrightchip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.subchip_trace_conforms
 #print axioms SP1Clean.TraceGenTests.subwchip_trace_conforms
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_intCast_zero

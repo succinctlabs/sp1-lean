@@ -1,6 +1,7 @@
 import SP1Clean.Specs.Chip
 import SP1Clean.Operations.U16MSBOperation.Formal
 import SP1Clean.Chips.ShiftRightChip.Core
+import SP1Clean.Chips.ShiftRightChip.Populate
 import SP1Clean.Chips.ShiftRightChip.Dispatch
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.ALUTypeReader
@@ -23,7 +24,7 @@ the semantic flag-gated RV64 `srl`/`sra`/`srlw`/`sraw` `Spec` is in `Specs/Chip.
 `Faithful/ShiftRightChip.lean` anchors both structural specs.
 
 `main` composes the readers + three `U16MSBOperation` gadgets + the witnessed column block + the
-`is_real` gate. Soundness is proved; completeness is a deferred `sorry`. -/
+`is_real` gate. Soundness and completeness are proven (honest `Populate` witness closures). -/
 
 namespace SP1Clean.ShiftRightChip
 
@@ -151,17 +152,50 @@ assertions (`AssertSpec`) and the nine byte-range pulls (`InteractSpec`), and as
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var ShiftRightCols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let a ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let b_msb ← witnessVector 1 (fun _ => (#v[0] : Vector (ZMod p) 1))
-  let srw_msb ← witnessVector 1 (fun _ => (#v[0] : Vector (ZMod p) 1))
-  let c_bits ← witnessVector 6 (fun _ => (#v[0, 0, 0, 0, 0, 0] : Vector (ZMod p) 6))
-  let sra_msb_v0123 ← witnessVector 1 (fun _ => (#v[0] : Vector (ZMod p) 1))
-  let v ← witnessVector 3 (fun _ => (#v[0, 0, 0] : Vector (ZMod p) 3))
-  let lower_limb ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let higher_limb ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let limb_result ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let shift_u16 ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let flags ← witnessVector 5 (fun _ => (#v[0, 0, 0, 0, 0] : Vector (ZMod p) 5))
+  let a ← witnessVector 4 (fun env =>
+    populateA
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
+  let b_msb ← witnessVector 1 (fun env =>
+    #v[bMsb
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (hintFlags env.hint)])
+  let srw_msb ← witnessVector 1 (fun env =>
+    #v[srwMsb
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)])
+  let c_bits ← witnessVector 6 (fun env =>
+    ShiftLeftChip.cBits (env input.adapter.op_c_memory.prev_value[0]))
+  let sra_msb_v0123 ← witnessVector 1 (fun env =>
+    #v[sraMsbV0123
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)])
+  let v ← witnessVector 3 (fun env => vPowersInv (env input.adapter.op_c_memory.prev_value[0]))
+  let lower_limb ← witnessVector 4 (fun env =>
+    lowerLimb
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
+  let higher_limb ← witnessVector 4 (fun env =>
+    higherLimb
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
+  let limb_result ← witnessVector 4 (fun env =>
+    limbResult
+      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
+         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
+      (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
+  let shift_u16 ← witnessVector 4 (fun env =>
+    shiftU16 (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint))
+  let flags ← witnessVector 5 (fun env =>
+    #v[(hintFlags env.hint)[0], (hintFlags env.hint)[1], (hintFlags env.hint)[2],
+       (hintFlags env.hint)[3],
+       ((hintFlags env.hint)[2] + (hintFlags env.hint)[3]) * env input.adapter.imm_c])
   let is_srl := flags[0]; let is_sra := flags[1]; let is_srlw := flags[2]
   let is_sraw := flags[3]; let is_w_imm := flags[4]
   assertion U16MSBOperation.circuit ⟨input.adapter.op_b_memory.prev_value[3], ⟨b_msb[0]⟩, is_sra⟩

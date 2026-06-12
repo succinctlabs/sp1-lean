@@ -15,13 +15,18 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
 
-/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`,
-`imm_c = 0` (SLT/SLTU are register-register), CPUState clock bounds, three timestamp `Spec`s
+/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, the honest `"lt_flags"`
+hint (each flag binary, the sum = `is_real`, `is_slt` only on real rows), `op_a_0 = 0`,
+`imm_c = 0` (register-register rows), CPUState clock bounds, three timestamp `Spec`s
 (op_c gated by `is_real - imm_c`). -/
 def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop :=
+    (hint : ProverHint (ZMod p)) : Prop :=
+  let f := hintFlags hint
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
   (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧
+  input.is_real = f[0] + f[1] ∧
+  (f[0] = 1 → input.is_real = 1) ∧
   input.adapter.op_a_0 = 0 ∧ input.adapter.imm_c = 0 ∧
   Readers.CPUState.Spec
     { cols := input.state, next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
@@ -132,21 +137,28 @@ set_option maxHeartbeats 4000000 in
 theorem completeness :
     GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
   circuit_proof_start
-  obtain ⟨ha, hb, hbin, hop_a_0, himm, h_cpu, hrac_a, hrac_b, hrac_c⟩ := h_assumptions
+  obtain ⟨ha, hb, hbin, hf0, hf1, hsum, hslt_real, hop_a_0, himm, h_cpu,
+    hrac_a, hrac_b, hrac_c⟩ := h_assumptions
   obtain ⟨h_env_flags, h_env_cols⟩ := h_env
-  have hflag0 : env.get i₀ = 0 := by simpa using h_env_flags 0
-  have hflag1 : env.get (i₀ + 1) = 0 := by simpa using h_env_flags 1
+  have hflag0 : env.get i₀ = (hintFlags env.hint)[0] := by simpa using h_env_flags 0
+  have hflag1 : env.get (i₀ + 1) = (hintFlags env.hint)[1] := by simpa using h_env_flags 1
+  have hf0' : env.get i₀ = 0 ∨ env.get i₀ = 1 := by rw [hflag0]; exact hf0
+  have hf1' : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := by rw [hflag1]; exact hf1
+  have hsum01' : env.get i₀ + env.get (i₀ + 1) = 0 ∨ env.get i₀ + env.get (i₀ + 1) = 1 := by
+    rw [hflag0, hflag1, ← hsum]; exact hbin
+  have hbool : ∀ x : ZMod p, x = 0 ∨ x = 1 → x * (x + -1) = 0 := by
+    rintro x (h | h) <;> rw [h] <;> simp
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [hop_a_0, zero_mul]
   refine ⟨⟨hbin, h_cpu⟩,
-    ⟨⟨ha, hb, hbin, Or.inl hflag0⟩, ?_⟩,
+    ⟨⟨ha, hb, hbin, hf0'⟩, ?_⟩,
     ⟨hbin, ⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0,
       by rw [himm, mul_zero], by rw [himm, sub_zero]; exact hbin,
       ⟨by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul], by rw [himm, zero_mul]⟩,
       hrac_a, hrac_b, hrac_c⟩,
     by rcases hbin with h | h <;> rw [h] <;> simp,
-    by rw [hflag0]; simp,
-    by rw [hflag1]; simp,
-    by rw [hflag0, hflag1]; simp⟩
+    hbool _ hf0',
+    hbool _ hf1',
+    hbool _ hsum01'⟩
   -- The composed `LtOperationSigned` `FormalAssertion`'s `Spec` at the witnessed `populate`d columns:
   -- `spec_populate` once the witnessed column struct equals `populate …` (each cell is `env.get (i₀+2+k)`,
   -- pinned by the normalised witness hint to `(toElements (populate …))[k]`).
@@ -155,9 +167,15 @@ theorem completeness :
   have hpvc : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c
       = input_adapter_op_c := h_input.2.2.2.2.2.2.2.1
   simp only [Inputs.op_b_val, Inputs.op_c_val, vec4_eval, hpvb, hpvc] at h_env_cols
+  have hgate : (input_is_real - 1) * env.get i₀ = 0 := by
+    rw [hflag0]
+    rcases hf0 with h | h
+    · rw [h, mul_zero]
+    · rw [hslt_real h, h]
+      simp
   convert LtOperationSigned.spec_populate (b := input_adapter_op_b_memory_prev_value)
     (cc := input_adapter_op_c) (is_signed := env.get i₀) (is_real := input_is_real)
-    ha hb (Or.inl hflag0) hbin (by rw [hflag0, mul_zero]) using 2
+    ha hb hf0' hbin hgate using 2
   refine (ProvableType.ext_iff _ _).mpr (fun i hi => ?_)
   refine Eq.trans ?_
     ((getElem_toElements_eval_varFromOffset env.toEnvironment (i₀ + 2) i hi).trans (h_env_cols ⟨i, hi⟩))

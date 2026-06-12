@@ -66,9 +66,15 @@ the composed `BitwiseU16Operation` sub-list, anchored at the operation level. So
 interaction meaning is trivial. -/
 def InteractSpec (_cols : BitwiseCols (ZMod p)) : Prop := True
 
+/-- The three honest variant flags (`is_xor`, `is_or`, `is_and`) the prover supplies via the
+`"bitwise_flags"` hint key (one-hot for the active variant, all-zero on padding). -/
+def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 3 :=
+  ((h "bitwise_flags" 3)[0]?).getD #v[0, 0, 0]
+
 /-- Compose `Readers.CPUState.circuit` (forms `next_pc = [pc[0]+4, …]`, `clk_inc = 8`), **witness** the
-three variant flags `is_xor`/`is_or`/`is_and`, compose the witnessed `BitwiseU16Operation` gadget
-(`subcircuit`, fed the SP1 `byte_opcode = is_xor·2 + is_or·1 + is_and·0`), and `Readers.ALUTypeReader.circuit`
+three variant flags `is_xor`/`is_or`/`is_and` (from the `"bitwise_flags"` `ProverHint`), compose the
+witnessed `BitwiseU16Operation` gadget (`subcircuit`, fed the SP1
+`byte_opcode = is_xor·2 + is_or·1 + is_and·0`), and `Readers.ALUTypeReader.circuit`
 (`cpu_opcode = is_xor·3 + is_or·4 + is_and·5`; the `rd` write value is the reassembled result word's four
 limbs), gate `is_real`, emit the three flag booleans + their sum-bound + the `op_a_0` zeroing (`AssertSpec`,
 SP1's `builder.assert_zero(op_a_0)`), and assemble the extracted `BitwiseCols` struct. The `b_low_bytes`/
@@ -77,7 +83,7 @@ copies; these struct fields are not read by the `Spec`). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var BitwiseCols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVector 3 (fun _ => (#v[0, 0, 0] : Vector (ZMod p) 3))
+  let flags ← witnessVector 3 (fun env => hintFlags env.hint)
   let is_xor := flags[0]; let is_or := flags[1]; let is_and := flags[2]
   let byteOpcode : Expression (ZMod p) := is_xor * 2 + is_or * 1 + is_and * 0
   -- The chip witnesses the `BitwiseU16Operation` column struct (the two `U16toU8` low-byte blocks +

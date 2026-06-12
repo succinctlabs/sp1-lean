@@ -63,6 +63,11 @@ core) in the low limb, zeros above. -/
 def resultWord (cols : LtCols (ZMod p)) : Word (ZMod p) :=
   #v[cols.lt_operation.result.u16_compare_operation.bit, 0, 0, 0]
 
+/-- The two honest variant flags (`is_slt`, `is_sltu`) the prover supplies via the `"lt_flags"`
+hint key (one-hot for the active variant, all-zero on padding). -/
+def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 2 :=
+  ((h "lt_flags" 2)[0]?).getD #v[0, 0]
+
 /-- Compose `Readers.CPUState.circuit` (forms `next_pc = [pc[0]+4, …]`, `clk_inc = 8`), **witness** the
 two variant flags `is_slt`/`is_sltu`, compose the witnessed `LtOperationSigned` gadget (`subcircuit`, the
 `is_signed := is_slt` mode selector), and `Readers.ALUTypeReader.circuit` (opcode `is_slt·9 + is_sltu·10`;
@@ -72,7 +77,7 @@ and assemble the extracted `LtCols` struct. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var LtCols (ZMod p)) := do
   assertion Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVector 2 (fun _ => (#v[0, 0] : Vector (ZMod p) 2))
+  let flags ← witnessVector 2 (fun env => hintFlags env.hint)
   let is_slt := flags[0]; let is_sltu := flags[1]
   -- The chip witnesses the `LtOperationSigned` column struct (the unsigned compare block + the two
   -- sign-bit columns) via `populate`, then composes `LtOperationSigned.circuit` as a Clean `assertion`
