@@ -75,8 +75,11 @@ Mirror-rust layout under `SP1Clean/`:
   `Contracts/` holds the per-reader/operation/chip `Inputs` + semantic `Spec`s (`Readers.lean`,
   `Operations.lean`, `Chips.lean` — the former `Specs/`) and the lifted chip `Assumptions`/`ProverAssumptions`
   (`ChipAssumptions.lean`, currently the ALU chips Add/Addi/Addw/Sub/Subw). `ProverSpec` is uniformly
-  `fun _ _ _ => True` (inline in each `circuit` bundle). `FormalModel/Trace/` (trace/guest-program
-  statements) is a planned addition.
+  `fun _ _ _ => True` (inline in each `circuit` bundle). `Trace/GuestProgram.lean` holds the guest-program
+  execution model (`GuestProgram`, `IsInitialState`, `SailStep`/`SailChain`, `SP1Halted`, `exitOf`) — the
+  SailState-level "guest programs" statements (they depend only on `Model/`). The trace *arguments* that
+  consume them (`TargetObligations`, the `sp1_target_execution` theorem, the `Opcode→chip` routing, `Emits`)
+  reference `ChipRow` (a Soundness-layer type), so they cannot move below `Soundness/` and stay there.
 - **`Native/`** — the "implemented native in Lean" pillar (circuit construction): `Native/Chips/<Op>Chip/Defs.lean`
   (each chip's `main` + `ElaboratedCircuit`), `Native/Operations/<Op>/{Populate,RawSpec}.lean` (witness +
   native arithmetic core) + flat ops (`BitwiseU16Operation.lean`, `AddressOperation.lean`, …), and
@@ -128,8 +131,9 @@ the ALU chips' `Assumptions`/`ProverAssumptions`), the `Native/`+`Proofs/` five-
 (3633 jobs), audit clean (314 probes, `sorryAx` confined to the known 4-sorry debt). Planned (approved
 plan, not yet done): lifting the remaining chips' `Assumptions` onto the audit surface (helper-dependent
 chips Jal/Jalr/Branch/DivRem/ShiftLeft/ShiftRight + split-`Spec` Lt/Bitwise keep theirs in their proof
-files); and surfacing the trace/guest-program statements in `FormalModel/Trace/` (bisecting them out of
-`Soundness/{TargetVm,Coverage,InstructionTrace}` is delicate def/theorem surgery — the last open phase).
+files). The guest-program execution model was surfaced in `FormalModel/Trace/GuestProgram.lean` (Phase 5);
+the trace *arguments* (TargetObligations / target theorem / routing / Emits) are `ChipRow`-dependent and so
+remain in `Soundness/` — their natural layer — rather than being forced below it.
 The bespoke `Soundness/GatedVm/` → Clean `VmTables` migration (roadmap W11) was investigated and **deferred**
 — Clean's VM engine yields verifier-guarantees with no explicit execution walk, while SP1's spec is a
 balance-derived `GatedExecution` with an Eulerian trail, so re-basing adds obligations without removing the
