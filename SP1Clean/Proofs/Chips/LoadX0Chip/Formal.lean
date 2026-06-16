@@ -1,0 +1,173 @@
+import SP1Clean.Native.Chips.LoadX0Chip.Defs
+
+/-! # `SP1Clean.LoadX0Chip` — `Assumptions` / soundness / completeness / `circuit`
+
+`Assumptions`, soundness, completeness, and the bundled `circuit`. (`main` + `ElaboratedCircuit`
+in `Defs`; Sail bridge in `Bridge`.) -/
+
+namespace SP1Clean.LoadX0Chip
+
+open Circuit
+open Extracted (LoadX0Columns)
+open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Operands are 64-bit values; the load targets a non-reserved, in-range address. The offset bits are
+bits 0–2 of the address and boolean (alignment per width is enforced in-circuit by the alignment gates,
+not assumed). -/
+def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
+  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
+    (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
+    2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
+    input.offset_bit[0].val + 2 * input.offset_bit[1].val + 4 * input.offset_bit[2].val
+      = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
+    (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
+    (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
+    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1)
+
+set_option maxHeartbeats 16000000 in
+theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
+  circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
+  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2⟩ := h_assumptions
+  obtain ⟨_h_cpu, h_addr, h_mem, h_itype, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, h_gate,
+    h_al2, h_al1, h_al0, h_oa1, h_oa2⟩ := h_holds
+  have h_bin := bool_of_mul_pred h_gate
+  -- eval→value bridge for the offset bits (the only nested vector field the gates reference in value form).
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, hmap_ob⟩ := h_input
+  have eob0 : Expression.eval env input_var_offset_bit[0] = input_offset_bit[0] := by
+    rw [← hmap_ob]; simp only [Vector.getElem_map]
+  have eob1 : Expression.eval env input_var_offset_bit[1] = input_offset_bit[1] := by
+    rw [← hmap_ob]; simp only [Vector.getElem_map]
+  have eob2 : Expression.eval env input_var_offset_bit[2] = input_offset_bit[2] := by
+    rw [← hmap_ob]; simp only [Vector.getElem_map]
+  -- the `AddressOperation` Assumptions (eval form).
+  have hob0' : Expression.eval env input_var_offset_bit[0] = 0
+      ∨ Expression.eval env input_var_offset_bit[0] = 1 := by rw [eob0]; exact hob0
+  have hob1' : Expression.eval env input_var_offset_bit[1] = 0
+      ∨ Expression.eval env input_var_offset_bit[1] = 1 := by rw [eob1]; exact hob1
+  have hob2' : Expression.eval env input_var_offset_bit[2] = 0
+      ∨ Expression.eval env input_var_offset_bit[2] = 1 := by rw [eob2]; exact hob2
+  have h_off' : (Expression.eval env input_var_offset_bit[0]).val
+        + 2 * (Expression.eval env input_var_offset_bit[1]).val
+        + 4 * (Expression.eval env input_var_offset_bit[2]).val
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
+    rw [eob0, eob1, eob2]; exact h_off
+  have h_addr_as : AddressOperation.circuit.Assumptions
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env input_var_offset_bit[0],
+          Expression.eval env input_var_offset_bit[1], Expression.eval env input_var_offset_bit[2]⟩
+        : AddressOperation.Inputs (ZMod p)) :=
+    ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+  have h_addr_spec := h_addr h_addr_as
+  simp only [eob0, eob1, eob2] at h_addr_spec
+  have h_it := h_itype h_bin
+  -- the alignment gates, in value form.
+  simp only [eob0, eob1, eob2] at h_al0 h_al1 h_al2
+  simp only [← sub_eq_add_neg] at h_oa1 h_oa2
+  simp only [isReal, opcodeVal]
+  refine ⟨⟨h_addr_spec, h_mem h_bin, h_it,
+      bool_of_mul_pred h_b0, bool_of_mul_pred h_b1, bool_of_mul_pred h_b2, bool_of_mul_pred h_b3,
+      bool_of_mul_pred h_b4, bool_of_mul_pred h_b5, bool_of_mul_pred h_b6,
+      h_bin, h_al2, h_al1, h_al0, h_oa1, h_oa2⟩, ?_⟩
+  -- the per-subcircuit channel-requirement tail (`channels = [] ∨ <sub>.Assumptions`).
+  exact ⟨Or.inr h_bin, Or.inr h_addr_as, Or.inr h_bin, Or.inr h_bin⟩
+
+/-- Prover-side row well-formedness: operand `isU64`s + address facts + selector binaries + alignment
+equations + the `op_a_0` forcing facts + the reader/CPUState/MemoryAccess `Spec`s. -/
+def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) (_ : ProverHint (ZMod p)) : Prop :=
+  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_imm ∧
+    (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 64 < 2 ^ 48 ∧
+    2 ^ 16 ≤ (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 ∧
+    input.offset_bit[0].val + 2 * input.offset_bit[1].val + 4 * input.offset_bit[2].val
+      = (Word.toNat input.op_b_val + Word.toNat input.op_c_imm) % 2 ^ 48 % 8 ∧
+    (input.offset_bit[0] = 0 ∨ input.offset_bit[0] = 1) ∧
+    (input.offset_bit[1] = 0 ∨ input.offset_bit[1] = 1) ∧
+    (input.offset_bit[2] = 0 ∨ input.offset_bit[2] = 1) ∧
+    (input.is_lb = 0 ∨ input.is_lb = 1) ∧ (input.is_lbu = 0 ∨ input.is_lbu = 1) ∧
+    (input.is_lh = 0 ∨ input.is_lh = 1) ∧ (input.is_lhu = 0 ∨ input.is_lhu = 1) ∧
+    (input.is_lw = 0 ∨ input.is_lw = 1) ∧ (input.is_lwu = 0 ∨ input.is_lwu = 1) ∧
+    (input.is_ld = 0 ∨ input.is_ld = 1) ∧
+    (isReal input = 0 ∨ isReal input = 1) ∧
+    input.is_ld * input.offset_bit[2] = 0 ∧
+    (input.is_lw + input.is_lwu + input.is_ld) * input.offset_bit[1] = 0 ∧
+    (input.is_lh + input.is_lhu + input.is_lw + input.is_lwu + input.is_ld) * input.offset_bit[0] = 0 ∧
+    isReal input * (input.adapter.op_a_0 - 1) = 0 ∧
+    (isReal input - 1) * input.adapter.op_a_0 = 0 ∧
+    Readers.CPUState.Spec
+      ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, isReal input⟩ ∧
+    Readers.MemoryAccess.Spec
+      ⟨input.memory_access, input.state.clk_high, clkLow input.state, 0, 0, 0,
+        input.memory_access.prev_value, isReal input⟩ ∧
+    Readers.ITypeReaderImmutable.Spec
+      ⟨input.adapter, isReal input, isReal input, input.state.clk_high, clkLow input.state,
+        input.state.pc, opcodeVal input⟩
+
+set_option maxHeartbeats 16000000 in
+theorem completeness :
+    GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
+  circuit_proof_start
+  simp only [Inputs.op_b_val, Inputs.op_c_imm] at h_assumptions ⊢
+  simp only [isReal, opcodeVal] at h_assumptions
+  obtain ⟨ha, hb, hfit, h_ge, h_off, hob0, hob1, hob2, h_b0, h_b1, h_b2, h_b3, h_b4, h_b5, h_b6, hbin,
+    h_al2, h_al1, h_al0, h_oa1, h_oa2, h_cpu, h_mem, h_it⟩ := h_assumptions
+  simp only [sub_eq_add_neg] at h_oa1 h_oa2
+  obtain ⟨_, _, _, _, _, _, _, ⟨_, _, _, hmap_pc⟩, _, _, hmap_ob⟩ := h_input
+  have epc0 : Expression.eval env.toEnvironment input_var_state_pc[0] = input_state_pc[0] := by
+    rw [← hmap_pc]; simp only [Vector.getElem_map]
+  have epc1 : Expression.eval env.toEnvironment input_var_state_pc[1] = input_state_pc[1] := by
+    rw [← hmap_pc]; simp only [Vector.getElem_map]
+  have epc2 : Expression.eval env.toEnvironment input_var_state_pc[2] = input_state_pc[2] := by
+    rw [← hmap_pc]; simp only [Vector.getElem_map]
+  have eob0 : Expression.eval env.toEnvironment input_var_offset_bit[0]
+      = input_offset_bit[0] := by rw [← hmap_ob]; simp only [Vector.getElem_map]
+  have eob1 : Expression.eval env.toEnvironment input_var_offset_bit[1]
+      = input_offset_bit[1] := by rw [← hmap_ob]; simp only [Vector.getElem_map]
+  have eob2 : Expression.eval env.toEnvironment input_var_offset_bit[2]
+      = input_offset_bit[2] := by rw [← hmap_ob]; simp only [Vector.getElem_map]
+  have hob0' : Expression.eval env.toEnvironment input_var_offset_bit[0] = 0
+      ∨ Expression.eval env.toEnvironment input_var_offset_bit[0] = 1 := by rw [eob0]; exact hob0
+  have hob1' : Expression.eval env.toEnvironment input_var_offset_bit[1] = 0
+      ∨ Expression.eval env.toEnvironment input_var_offset_bit[1] = 1 := by rw [eob1]; exact hob1
+  have hob2' : Expression.eval env.toEnvironment input_var_offset_bit[2] = 0
+      ∨ Expression.eval env.toEnvironment input_var_offset_bit[2] = 1 := by rw [eob2]; exact hob2
+  have h_off' : (Expression.eval env.toEnvironment input_var_offset_bit[0]).val
+        + 2 * (Expression.eval env.toEnvironment input_var_offset_bit[1]).val
+        + 4 * (Expression.eval env.toEnvironment input_var_offset_bit[2]).val
+      = (Word.toNat input_adapter_op_b_memory_prev_value + Word.toNat input_adapter_op_c_imm) % 2 ^ 48 % 8 := by
+    rw [eob0, eob1, eob2]; exact h_off
+  have h_addr_as : AddressOperation.circuit.Assumptions
+      (⟨input_adapter_op_b_memory_prev_value, input_adapter_op_c_imm, Expression.eval env.toEnvironment input_var_offset_bit[0],
+          Expression.eval env.toEnvironment input_var_offset_bit[1],
+          Expression.eval env.toEnvironment input_var_offset_bit[2]⟩ : AddressOperation.Inputs (ZMod p)) :=
+    ⟨ha, hb, hfit, hob0', hob1', hob2', h_ge, h_off'⟩
+  refine ⟨⟨?_, ?_⟩, h_addr_as, ⟨?_, ?_⟩, ⟨?_, ?_⟩,
+    ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact hbin
+  · simp only [epc0, epc1, epc2]; exact h_cpu
+  · exact hbin
+  · exact h_mem
+  · exact hbin
+  · exact h_it
+  · rcases h_b0 with h | h <;> rw [h] <;> simp
+  · rcases h_b1 with h | h <;> rw [h] <;> simp
+  · rcases h_b2 with h | h <;> rw [h] <;> simp
+  · rcases h_b3 with h | h <;> rw [h] <;> simp
+  · rcases h_b4 with h | h <;> rw [h] <;> simp
+  · rcases h_b5 with h | h <;> rw [h] <;> simp
+  · rcases h_b6 with h | h <;> rw [h] <;> simp
+  · rcases hbin with h | h <;> rw [h] <;> simp
+  · simp only [eob2]; exact h_al2
+  · simp only [eob1]; exact h_al1
+  · simp only [eob0]; exact h_al0
+  · exact h_oa1
+  · exact h_oa2
+
+/-- The `LoadX0` chip row as a `GeneralFormalCircuit`; output is the extracted `LoadX0Columns`. -/
+def circuit : GeneralFormalCircuit (ZMod p) Inputs LoadX0Columns :=
+  { main, elaborated,
+    Assumptions := Assumptions, Spec := Spec,
+    ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
+    soundness := soundness, completeness := completeness }
+
+end SP1Clean.LoadX0Chip

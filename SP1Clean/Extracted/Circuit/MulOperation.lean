@@ -1,4 +1,4 @@
-import SP1Clean.Operations.MulOperation.RawSpec
+import SP1Clean.Native.Operations.MulOperation.RawSpec
 
 /-! # `MulOperation` circuit form — `main` + `elaborated` (SP1's `eval`). -/
 

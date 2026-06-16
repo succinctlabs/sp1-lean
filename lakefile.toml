@@ -58,3 +58,13 @@ globs = ["SP1Clean.Extracted.+"]
 [[lean_lib]]
 name = "SP1FormalModel"
 globs = ["SP1Clean.FormalModel.+"]
+
+[[lean_lib]]
+name = "SP1Native"
+globs = ["SP1Clean.Native.+"]
+
+# The proof pillar: the sound/complete proofs (Proofs/), the faithfulness anchors (Faithful/),
+# and the whole-machine/trace layer (Soundness/).
+[[lean_lib]]
+name = "SP1Proofs"
+globs = ["SP1Clean.Proofs.+", "SP1Clean.Faithful.+", "SP1Clean.Soundness.+"]

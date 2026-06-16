@@ -5,7 +5,7 @@ import SP1Clean.Extracted.AddwChip
 import SP1Clean.Faithful.Addw
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.ALUTypeReader
-import SP1Clean.Chips.AddwChip.Defs
+import SP1Clean.Native.Chips.AddwChip.Defs
 
 /-! # Chip-level faithfulness anchor — SP1's whole `Addw` chip constraint list ↔ the combined spec
 

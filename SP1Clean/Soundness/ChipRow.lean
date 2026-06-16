@@ -1,4 +1,4 @@
-import SP1Clean.Trace
+import SP1Clean.Soundness.RowView
 import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 

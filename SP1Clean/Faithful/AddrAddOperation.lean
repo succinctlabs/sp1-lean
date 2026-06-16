@@ -1,6 +1,6 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Operations.AddrAddOperation.RawSpec
+import SP1Clean.Native.Operations.AddrAddOperation.RawSpec
 import SP1Clean.Extracted.Circuit.AddrAddOperation
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection

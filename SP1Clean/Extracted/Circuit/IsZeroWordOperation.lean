@@ -2,7 +2,7 @@ import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
 import SP1Clean.Extracted.IsZeroWordOperation
-import SP1Clean.Operations.IsZeroOperation.Formal
+import SP1Clean.Proofs.Operations.IsZeroOperation.Formal
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel

@@ -502,7 +502,7 @@ def render_circuit(operation: str, body: str) -> str:
             except FileNotFoundError:
                 pass
     sub_imports = "".join(
-        f"import SP1Clean.Operations.{s}.Formal\n" for s in sub_circuits
+        f"import SP1Clean.Proofs.Operations.{s}.Formal\n" for s in sub_circuits
     )
     header = (
         "import SP1Clean.Math.Word\n"

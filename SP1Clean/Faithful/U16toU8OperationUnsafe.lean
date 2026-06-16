@@ -1,6 +1,6 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Operations.U16toU8OperationUnsafe
+import SP1Clean.Native.Operations.U16toU8OperationUnsafe
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery

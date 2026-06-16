@@ -2,7 +2,7 @@ import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
 import SP1Clean.Extracted.LtOperationUnsigned
-import SP1Clean.Operations.U16CompareOperation.Formal
+import SP1Clean.Proofs.Operations.U16CompareOperation.Formal
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel

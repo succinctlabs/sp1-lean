@@ -19,11 +19,11 @@ OUT = ROOT / "scripts" / "axiom_probe.lean"
 
 # (glob, declaration-name regex) → collect matching theorems/defs with their namespace.
 TARGETS = [
-    ("SP1Clean/Chips/*/Formal.lean", r"theorem\s+(soundness|completeness)\b"),
-    ("SP1Clean/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
-    ("SP1Clean/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
+    ("SP1Clean/Proofs/Chips/*/Formal.lean", r"theorem\s+(soundness|completeness)\b"),
+    ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
+    ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
     ("SP1Clean/Faithful/*.lean", r"theorem\s+(\w*faithful\w*)\b"),
-    ("SP1Clean/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
+    ("SP1Clean/Proofs/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
     ("SP1Clean/Soundness/GatedVm/*.lean",
      r"theorem\s+(exists_trail|chipRows_step_sound|state_trail_of_balance|"
      r"gatedExecution_of_specs_and_balance|gatedExecution_allChips|"

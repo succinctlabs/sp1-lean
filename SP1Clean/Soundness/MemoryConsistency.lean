@@ -1,9 +1,9 @@
-import SP1Clean.Trace
-import SP1Clean.Readers.RTypeReader
+import SP1Clean.Soundness.RowView
+import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Model.InteractionBus
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.InteractionRecovery
-import SP1Clean.Readers.MemoryAccess
+import SP1Clean.Native.Readers.MemoryAccess
 import Clean.Utils.OfflineMemory
 
 /-! # Trace-level Memory-bus (register read/write) consistency

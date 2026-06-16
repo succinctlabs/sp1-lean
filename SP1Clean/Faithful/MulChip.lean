@@ -1,6 +1,6 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Chips.MulChip.Formal
+import SP1Clean.Proofs.Chips.MulChip.Formal
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Extracted.MulChip
 

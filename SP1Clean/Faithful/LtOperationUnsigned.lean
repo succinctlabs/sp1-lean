@@ -1,6 +1,6 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Operations.LtOperationUnsigned.RawSpec
+import SP1Clean.Native.Operations.LtOperationUnsigned.RawSpec
 import SP1Clean.Extracted.Circuit.LtOperationUnsigned
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
