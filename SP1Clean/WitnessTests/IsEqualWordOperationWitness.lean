@@ -1,4 +1,4 @@
-import SP1Clean.WitnessTests.IsEqualWordOperationWitnessVectors
+import SP1Clean.Extracted.WitnessVectors.IsEqualWordOperation
 import SP1Clean.Operations.IsEqualWordOperation.Populate
 import SP1Clean.WitnessTests.WitnessConformance
 

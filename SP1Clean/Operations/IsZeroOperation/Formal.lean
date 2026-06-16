@@ -1,6 +1,6 @@
 import SP1Clean.Operations.IsZeroOperation.RawSpec
 import SP1Clean.Operations.IsZeroOperation.Populate
-import SP1Clean.Operations.IsZeroOperation.Extracted
+import SP1Clean.Extracted.Circuit.IsZeroOperation
 
 /-! # `IsZeroOperation` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 

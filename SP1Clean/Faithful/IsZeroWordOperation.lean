@@ -1,10 +1,10 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Operations.IsZeroWordOperation.RawSpec
-import SP1Clean.Operations.IsZeroWordOperation.Extracted
-import SP1Clean.Foundations.SP1Constraint
-import SP1Clean.Foundations.InteractionProjection
-import SP1Clean.Foundations.InteractionRecovery
+import SP1Clean.Extracted.Circuit.IsZeroWordOperation
+import SP1Clean.Model.SP1Constraint
+import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsZeroWordOperation
 import SP1Clean.Faithful.IsZeroOperation

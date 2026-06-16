@@ -1,4 +1,4 @@
-import SP1Clean.Specs.Chip
+import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Operations.MulOperation
 import SP1Clean.Operations.IsEqualWordOperation.Formal
 import SP1Clean.Operations.IsZeroWordOperation.Formal
@@ -8,7 +8,7 @@ import SP1Clean.Operations.LtOperationUnsigned.Formal
 import SP1Clean.Chips.DivRemChip.OwnAsserts
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.RTypeReader
-import SP1Clean.Foundations.Channels
+import SP1Clean.Model.Channels
 import SP1Clean.Extracted.DivRemChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit

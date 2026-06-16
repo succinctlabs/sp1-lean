@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 import SP1Clean.Operations.IsZeroWordOperation.RawSpec
 import SP1Clean.Extracted.IsEqualWordOperation
 

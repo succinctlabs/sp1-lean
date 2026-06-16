@@ -1,5 +1,5 @@
-import SP1Clean.Foundations.SailWrap
-import SP1Clean.Foundations.Word
+import SP1Clean.Model.SailWrap
+import SP1Clean.Math.Word
 import SP1Clean.Chips.ShiftRightChip.Formal
 import SP1Clean.Soundness.ChipRow
 import RISCV.ForLean

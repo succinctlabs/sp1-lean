@@ -1,7 +1,7 @@
-import SP1Clean.Specs.Operation
-import SP1Clean.Foundations.Word
-import SP1Clean.Foundations.Channels
-import SP1Clean.Foundations.MulCarryChain
+import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Math.Word
+import SP1Clean.Model.Channels
+import SP1Clean.Math.MulCarryChain
 import SP1Clean.Operations.U16MSBOperation.Formal
 import SP1Clean.Operations.U16toU8OperationSafe
 import SP1Clean.Extracted.MulOperation

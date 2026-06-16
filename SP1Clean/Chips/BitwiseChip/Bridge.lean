@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.SailWrap
+import SP1Clean.Model.SailWrap
 import SP1Clean.Operations.BitwiseU16Operation
 import SP1Clean.Chips.BitwiseChip.Formal
 import SP1Clean.Soundness.ChipRow

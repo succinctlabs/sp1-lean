@@ -1,5 +1,5 @@
-import SP1Clean.Foundations.ByteTable
-import SP1Clean.Foundations.InteractionBus
+import SP1Clean.Model.ByteTable
+import SP1Clean.Model.InteractionBus
 
 /-! # The `ByteChip` receiver — discharging byte membership from bus balance
 

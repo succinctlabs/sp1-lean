@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Chips.BitwiseChip.Formal
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Extracted.BitwiseChip
 
 /-! # Faithfulness anchor — `BitwiseChip` constraints → native `AssertSpec`/`InteractSpec`

@@ -1,5 +1,5 @@
-import SP1Clean.Specs.Operation
-import SP1Clean.Foundations.Bitwise
+import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Math.Bitwise
 import SP1Clean.Operations.BitwiseOperation.Formal
 import SP1Clean.Operations.BitwiseOperation.Populate
 import SP1Clean.Operations.U16toU8OperationSafe

@@ -1,10 +1,10 @@
 import Mathlib.Tactic
 import SP1Clean.Operations.BitwiseOperation.RawSpec
-import SP1Clean.Operations.BitwiseOperation.Extracted
+import SP1Clean.Extracted.Circuit.BitwiseOperation
 import SP1Clean.Faithful.BitwiseU16Operation
-import SP1Clean.Foundations.Bitwise
-import SP1Clean.Foundations.InteractionProjection
-import SP1Clean.Foundations.InteractionRecovery
+import SP1Clean.Math.Bitwise
+import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.BitwiseOperation
 

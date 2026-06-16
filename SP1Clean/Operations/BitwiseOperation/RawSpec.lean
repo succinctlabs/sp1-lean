@@ -1,5 +1,5 @@
-import SP1Clean.Foundations.Word
-import SP1Clean.Foundations.Bitwise
+import SP1Clean.Math.Word
+import SP1Clean.Math.Bitwise
 import SP1Clean.Extracted.BitwiseOperation
 
 /-! # `BitwiseOperation` — the arithmetic core (`AssertSpec` / `InteractSpec` + the byteOp lemma)

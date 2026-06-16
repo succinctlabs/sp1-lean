@@ -1,4 +1,4 @@
-import SP1Clean.WitnessTests.AddrAddOperationWitnessVectors
+import SP1Clean.Extracted.WitnessVectors.AddrAddOperation
 import SP1Clean.Operations.AddrAddOperation.Populate
 import SP1Clean.WitnessTests.WitnessConformance
 

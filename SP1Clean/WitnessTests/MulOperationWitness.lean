@@ -1,5 +1,5 @@
 import SP1Clean.Operations.MulOperation
-import SP1Clean.WitnessTests.MulOperationWitnessVectors
+import SP1Clean.Extracted.WitnessVectors.MulOperation
 import SP1Clean.WitnessTests.WitnessConformance
 
 /-! # Witness-generation conformance anchor for `MulOperation`.

@@ -1,6 +1,6 @@
-import SP1Clean.Foundations.Word
-import SP1Clean.Foundations.ByteTable
-import SP1Clean.Foundations.Channels
+import SP1Clean.Math.Word
+import SP1Clean.Model.ByteTable
+import SP1Clean.Model.Channels
 import SP1Clean.Extracted.LoadByteChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit

@@ -1,8 +1,8 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Operations.MulOperation.RawSpec
-import SP1Clean.Foundations.SP1Constraint
-import SP1Clean.Foundations.InteractionProjection
+import SP1Clean.Model.SP1Constraint
+import SP1Clean.Model.InteractionProjection
 import SP1Clean.Extracted.MulOperation
 
 /-! # Faithfulness anchor — `MulOperation` interactions ↔ native `InteractSpec`
@@ -106,9 +106,9 @@ inline byte pulls, vs 2-3 for Add/Sub/Addw where the same shape is cheap. The se
 `mulOp_interactions_faithful` above already covers interaction-faithfulness in the meantime.
 
 To enable it: uncomment this block AND restore these imports at the top of the file —
-  import SP1Clean.Foundations.InteractionRecovery
+  import SP1Clean.Model.InteractionRecovery
   import SP1Clean.Faithful.ExtractedInteractionModel
-  import SP1Clean.Operations.MulOperation.Extracted
+  import SP1Clean.Extracted.Circuit.MulOperation
   import SP1Clean.Faithful.U16toU8OperationSafe
   import SP1Clean.Faithful.U16MSBOperation
 Speed notes baked into the proof (do not "simplify"): the op5 high-byte products (`eob_v`/`eoc_v`) go in as

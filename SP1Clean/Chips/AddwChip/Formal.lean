@@ -1,8 +1,10 @@
 import SP1Clean.Chips.AddwChip.Defs
+import SP1Clean.FormalModel.Contracts.ChipAssumptions
 
 /-! # `SP1Clean.AddwChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
-`Spec` (ALUTypeReader.Spec ∧ binary ∧ gated `RV64.addw`) in `Specs/Chip.lean`. -/
+`Spec` (ALUTypeReader.Spec ∧ binary ∧ gated `RV64.addw`) + `Assumptions`/`ProverAssumptions` in
+`FormalModel/Contracts/`. -/
 
 namespace SP1Clean.AddwChip
 
@@ -12,29 +14,8 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operands are 64-bit values (true on real and zero-padded rows). `is_real`-binary is proven by
-soundness from the in-circuit gate; only completeness needs it as a precondition. -/
-def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
-
-/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`,
-`imm_c = 0` (register-register op), CPUState clock bounds, and three timestamp `Spec`s
-(op_c gated by `is_real - imm_c`). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop :=
-  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
-  (input.is_real = 0 ∨ input.is_real = 1) ∧
-  input.adapter.op_a_0 = 0 ∧ input.adapter.imm_c = 0 ∧
-  Readers.CPUState.Spec
-    { cols := input.state, next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
-      clk_inc := 8, is_real := input.is_real } ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_a_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_b_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_c_memory, input.is_real - input.adapter.imm_c,
-      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
+/- `Assumptions` / `ProverAssumptions` are on the audit surface in
+`FormalModel/Contracts/ChipAssumptions.lean` (same `SP1Clean.AddwChip` namespace). -/
 
 set_option maxRecDepth 4000 in
 set_option maxHeartbeats 2000000 in

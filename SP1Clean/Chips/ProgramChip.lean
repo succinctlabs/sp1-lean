@@ -1,6 +1,6 @@
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Foundations.InteractionBus
-import SP1Clean.Foundations.Word
+import SP1Clean.Model.InteractionBus
+import SP1Clean.Math.Word
 
 /-! # The `ProgramChip` receiver — discharging instruction-fetch membership from bus balance
 

@@ -1,4 +1,4 @@
-import SP1Clean.WitnessTests.U16CompareOperationWitnessVectors
+import SP1Clean.Extracted.WitnessVectors.U16CompareOperation
 import SP1Clean.Operations.U16CompareOperation.Populate
 import SP1Clean.WitnessTests.WitnessConformance
 

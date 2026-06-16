@@ -1,8 +1,8 @@
-import SP1Clean.Specs.Operation
-import SP1Clean.Foundations.Word
-import SP1Clean.Foundations.Bitwise
-import SP1Clean.Foundations.Channels
-import SP1Clean.Foundations.ByteTable
+import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Math.Word
+import SP1Clean.Math.Bitwise
+import SP1Clean.Model.Channels
+import SP1Clean.Model.ByteTable
 import SP1Clean.Extracted.U16toU8OperationSafe
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit

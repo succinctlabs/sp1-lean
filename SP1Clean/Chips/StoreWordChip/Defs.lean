@@ -1,9 +1,9 @@
-import SP1Clean.Specs.Chip
+import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Operations.AddressOperation
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.ITypeReaderImmutable
 import SP1Clean.Readers.MemoryAccess
-import SP1Clean.Foundations.Channels
+import SP1Clean.Model.Channels
 import SP1Clean.Extracted.StoreWordChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit

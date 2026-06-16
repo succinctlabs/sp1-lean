@@ -1,6 +1,6 @@
-import SP1Clean.Foundations.SailMemory
-import SP1Clean.Foundations.SailWrap
-import SP1Clean.Foundations.Word
+import SP1Clean.Model.SailMemory
+import SP1Clean.Model.SailWrap
+import SP1Clean.Math.Word
 import SP1Clean.Chips.StoreWordChip.Formal
 import SP1Clean.Soundness.ChipRow
 

@@ -1,4 +1,5 @@
 import SP1Clean.Chips.AddiChip.Defs
+import SP1Clean.FormalModel.Contracts.ChipAssumptions
 
 /-! # `SP1Clean.AddiChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -10,26 +11,8 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operands are 64-bit values (the register source and the immediate, both `isU64` on real and
-zero-padded rows). -/
-def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
-
-/-- Prover-side row well-formedness: operand `isU64`s, `is_real` binary, `op_a_0 = 0`, CPUState clock
-bounds, and the two register-access timestamp bounds (op_a write `clk_low + 4`, op_b read `clk_low + 3`;
-no op_c access — it is the immediate). -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop :=
-  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
-  (input.is_real = 0 ∨ input.is_real = 1) ∧
-  input.adapter.op_a_0 = 0 ∧
-  Readers.CPUState.Spec
-    { cols := input.state, next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
-      clk_inc := 8, is_real := input.is_real } ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_a_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_b_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩
+/-- `Assumptions` / `ProverAssumptions` are on the audit surface in
+`FormalModel/Contracts/ChipAssumptions.lean` (same `SP1Clean.AddiChip` namespace). -/
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   circuit_proof_start [Spec]

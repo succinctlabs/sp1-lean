@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.Channels
+import SP1Clean.Model.Channels
 import Clean.Air.FlatEnsemble
 
 /-! # `GatedVm` — a gated, clk-ordered VM ensemble (the data layer)

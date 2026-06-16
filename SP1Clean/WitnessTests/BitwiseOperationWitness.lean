@@ -1,4 +1,4 @@
-import SP1Clean.WitnessTests.BitwiseOperationWitnessVectors
+import SP1Clean.Extracted.WitnessVectors.BitwiseOperation
 import SP1Clean.Operations.BitwiseOperation.Populate
 import SP1Clean.WitnessTests.WitnessConformance
 

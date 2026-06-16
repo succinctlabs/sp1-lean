@@ -1,6 +1,6 @@
 import SP1Clean.Operations.LtOperationSigned.RawSpec
 import SP1Clean.Operations.LtOperationSigned.Populate
-import SP1Clean.Operations.LtOperationSigned.Extracted
+import SP1Clean.Extracted.Circuit.LtOperationSigned
 import SP1Clean.Operations.LtOperationUnsigned.Formal
 import SP1Clean.Operations.U16MSBOperation.Formal
 

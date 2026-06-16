@@ -1,5 +1,5 @@
-import SP1Clean.Specs.Operation
-import SP1Clean.Operations.U16MSBOperation.Extracted
+import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Extracted.Circuit.U16MSBOperation
 
 /-! # `U16MSBOperation` — `populate` (the witness generator)
 

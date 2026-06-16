@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.IntervalCases
 

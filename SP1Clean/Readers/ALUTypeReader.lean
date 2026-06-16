@@ -1,6 +1,6 @@
-import SP1Clean.Specs.Reader
-import SP1Clean.Foundations.Word
-import SP1Clean.Foundations.Channels
+import SP1Clean.FormalModel.Contracts.Readers
+import SP1Clean.Math.Word
+import SP1Clean.Model.Channels
 import SP1Clean.Readers.RegisterAccessCols
 import SP1Clean.Extracted.ALUTypeReader
 import Clean.Circuit.Basic

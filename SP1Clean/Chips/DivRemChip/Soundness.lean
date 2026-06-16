@@ -1,5 +1,5 @@
 import SP1Clean.Chips.DivRemChip.Math
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 
 /-! # `DivRemChip` — soundness bridge lemmas
 

@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 import RISCV.Instructions
 import Mathlib.Tactic.Linarith
 

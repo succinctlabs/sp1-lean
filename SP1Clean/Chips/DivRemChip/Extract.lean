@@ -2,8 +2,8 @@ import SP1Clean.Chips.DivRemChip.Soundness
 import SP1Clean.Operations.MulOperation
 import SP1Clean.Operations.IsZeroWordOperation.Formal
 import SP1Clean.Operations.IsEqualWordOperation.Formal
-import SP1Clean.Foundations.ByteTable
-import SP1Clean.Foundations.Channels
+import SP1Clean.Model.ByteTable
+import SP1Clean.Model.Channels
 
 /-! # `DivRemChip` — constraint-extraction helpers
 

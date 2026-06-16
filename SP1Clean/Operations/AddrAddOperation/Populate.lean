@@ -1,5 +1,5 @@
-import SP1Clean.Specs.Operation
-import SP1Clean.Foundations.Word
+import SP1Clean.FormalModel.Contracts.Operations
+import SP1Clean.Math.Word
 import SP1Clean.Extracted.AddrAddOperation
 import Clean.Utils.Tactics.ProvableStructDeriving
 

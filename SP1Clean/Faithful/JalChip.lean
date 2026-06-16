@@ -1,6 +1,6 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Extracted.JalChip
 import SP1Clean.Faithful.AddOperation

@@ -1,6 +1,6 @@
-import SP1Clean.Foundations.Word
-import SP1Clean.Foundations.HWord
-import SP1Clean.Foundations.Bitwise
+import SP1Clean.Math.Word
+import SP1Clean.Math.HWord
+import SP1Clean.Math.Bitwise
 import SP1Clean.Operations.ShiftBounds
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.IntervalCases

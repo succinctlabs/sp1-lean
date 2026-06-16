@@ -1,4 +1,5 @@
 import SP1Clean.Chips.AddChip.Defs
+import SP1Clean.FormalModel.Contracts.ChipAssumptions
 
 /-! # `SP1Clean.AddChip` — contract: `Assumptions` / soundness / completeness / `circuit` -/
 
@@ -10,31 +11,8 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- Operands are 64-bit values (true on real and zero-padded rows). `is_real`-binary is NOT assumed
-here — soundness *proves* it from the in-circuit binary gate (it lives in the `Spec`); only completeness
-needs it as a prover precondition (see `ProverAssumptions`). -/
-def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
-  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
-
-/-- The prover-side row well-formedness, with the reader column blocks as *threaded inputs*: the
-operand `isU64`s, the `is_real` binary selector, the `op_a_0 = 0` flag (real Add rows write a non-`x0`
-destination — the restriction the `op_a_0` flag imposes), and the
-`is_real`-gated CPUState clock bounds + per-operand register-access timestamp bounds (the verifier commits a
-well-formed clock/timestamp row). Soundness never assumes these — it derives the bounds from the byte bus. -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop :=
-  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
-  (input.is_real = 0 ∨ input.is_real = 1) ∧
-  input.adapter.op_a_0 = 0 ∧
-  Readers.CPUState.Spec
-    { cols := input.state, next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
-      clk_inc := 8, is_real := input.is_real } ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_a_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_b_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
-  Readers.RegisterAccessCols.Spec
-    ⟨input.adapter.op_c_memory, input.is_real, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
+/-- `Assumptions` / `ProverAssumptions` are on the audit surface in
+`FormalModel/Contracts/ChipAssumptions.lean` (same `SP1Clean.AddChip` namespace). -/
 
 theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spec := by
   -- The `Spec` is the inlined R-type-with-readers contract; `circuit_proof_start` unfolds it,

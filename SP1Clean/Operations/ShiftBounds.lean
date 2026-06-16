@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 import Mathlib.Tactic
 
 /-! # Shared `.val`-bridge and bound lemmas for the shift within-byte proofs

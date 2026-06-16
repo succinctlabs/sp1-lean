@@ -1,8 +1,8 @@
 import SP1Clean.Trace
 import SP1Clean.Readers.RTypeReader
-import SP1Clean.Foundations.InteractionBus
-import SP1Clean.Foundations.InteractionProjection
-import SP1Clean.Foundations.InteractionRecovery
+import SP1Clean.Model.InteractionBus
+import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Readers.MemoryAccess
 import Clean.Utils.OfflineMemory
 

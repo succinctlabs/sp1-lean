@@ -1,6 +1,6 @@
 import SP1Clean.Trace
-import SP1Clean.Foundations.InteractionBus
-import SP1Clean.Foundations.ByteTable
+import SP1Clean.Model.InteractionBus
+import SP1Clean.Model.ByteTable
 import SP1Clean.Chips.ByteChip
 
 /-! # Trace-level Byte-bus consistency

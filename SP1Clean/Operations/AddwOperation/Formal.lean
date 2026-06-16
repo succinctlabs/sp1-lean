@@ -1,6 +1,6 @@
 import SP1Clean.Operations.AddwOperation.RawSpec
 import SP1Clean.Operations.AddwOperation.Populate
-import SP1Clean.Operations.AddwOperation.Extracted
+import SP1Clean.Extracted.Circuit.AddwOperation
 
 /-! # `AddwOperation` — the `FormalAssertion` (Spec / soundness / completeness / contract)
 

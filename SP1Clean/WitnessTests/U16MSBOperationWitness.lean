@@ -1,4 +1,4 @@
-import SP1Clean.WitnessTests.U16MSBOperationWitnessVectors
+import SP1Clean.Extracted.WitnessVectors.U16MSBOperation
 import SP1Clean.Operations.U16MSBOperation.Populate
 import SP1Clean.WitnessTests.WitnessConformance
 

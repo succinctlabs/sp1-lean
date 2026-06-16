@@ -1,7 +1,7 @@
-import SP1Clean.Specs.Reader
-import SP1Clean.Foundations.Word
-import SP1Clean.Foundations.ByteTable
-import SP1Clean.Foundations.Channels
+import SP1Clean.FormalModel.Contracts.Readers
+import SP1Clean.Math.Word
+import SP1Clean.Model.ByteTable
+import SP1Clean.Model.Channels
 import SP1Clean.Extracted.RTypeReader
 import SP1Clean.Readers.RegisterAccessTimestamp
 import Clean.Circuit.Basic

@@ -173,9 +173,9 @@ DEFAULT_SP1_DIR = "../sp1"
 # regenerated files so the extraction provenance is always recorded in-repo.
 SP1_PINNED_COMMIT = "9d249b8d4fb7d00156bf77f5d295d1dbcaaf4136"
 EXTRACTED_DIR = os.path.join("SP1Clean", "Extracted")
-WITNESS_DIR = os.path.join("SP1Clean", "WitnessTests")
+WITNESS_DIR = os.path.join("SP1Clean", "Extracted", "WitnessVectors")
 
-COMMON_IMPORTS = """import SP1Clean.Foundations.Word
+COMMON_IMPORTS = """import SP1Clean.Math.Word
 import SP1Clean.Extracted.ExtractionDSL
 import Clean.Utils.Tactics.ProvableStructDeriving"""
 
@@ -487,7 +487,7 @@ def render_circuit(operation: str, body: str) -> str:
     # promote the parent's channel lists + rfl-lemmas to `[byteChannel.toRaw]`.
     if "byteChannel.toRaw" not in body:
         for s in sub_circuits:
-            sub_path = os.path.join("SP1Clean", "Operations", s, "Extracted.lean")
+            sub_path = os.path.join("SP1Clean", "Extracted", "Circuit", f"{s}.lean")
             try:
                 with open(sub_path, encoding="utf-8") as f:
                     sub_text = f.read()
@@ -505,9 +505,9 @@ def render_circuit(operation: str, body: str) -> str:
         f"import SP1Clean.Operations.{s}.Formal\n" for s in sub_circuits
     )
     header = (
-        "import SP1Clean.Foundations.Word\n"
-        "import SP1Clean.Foundations.Channels\n"
-        "import SP1Clean.Foundations.ByteTable\n"
+        "import SP1Clean.Math.Word\n"
+        "import SP1Clean.Model.Channels\n"
+        "import SP1Clean.Model.ByteTable\n"
         f"import SP1Clean.Extracted.{operation}\n"
         + sub_imports
         + "import Clean.Circuit.Basic\n"
@@ -608,7 +608,7 @@ def render_witness_vectors(operation: str, data: dict) -> str:
         f"`SP1_DIR=… python3 update_extracted.py`. -/"
     )
     return (
-        "import SP1Clean.Foundations.Word\n\n"
+        "import SP1Clean.Math.Word\n\n"
         + doc + "\n\n"
         + "namespace SP1Clean.WitnessTests\nopen SP1Clean\n\n"
         + LINTERS_OFF + "\n\n"
@@ -718,7 +718,7 @@ def main() -> None:
         print(f"Processing witness vectors for {op}")
         try:
             data = run_witness_vectors(sp1_dir, op)
-            _write(os.path.join(WITNESS_DIR, f"{op}WitnessVectors.lean"),
+            _write(os.path.join(WITNESS_DIR, f"{op}.lean"),
                    render_witness_vectors(op, data))
             written += 1
         except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest
@@ -734,7 +734,7 @@ def main() -> None:
         print(f"Processing circuit form for {op}")
         try:
             body = run_constraint_compiler(sp1_dir, operation=op, fmt="lean-circuit")
-            _write(os.path.join("SP1Clean", "Operations", op, "Extracted.lean"),
+            _write(os.path.join("SP1Clean", "Extracted", "Circuit", f"{op}.lean"),
                    render_circuit(op, body))
             written += 1
         except Exception as e:  # noqa: BLE001 — best-effort, continue with the rest

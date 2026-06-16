@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 import SP1Clean.Extracted.LtOperationSigned
 import SP1Clean.Operations.LtOperationUnsigned.RawSpec
 import SP1Clean.Operations.U16MSBOperation.RawSpec

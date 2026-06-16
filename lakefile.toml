@@ -33,5 +33,28 @@ name = "RISCV"
 git = "https://github.com/succinctlabs/riscv-lean"
 rev = "dtumad/clean-native"
 
+# Umbrella library — root module `SP1Clean.lean` imports every module; `lake build` (the default
+# target) builds everything through it. Package-level `moreLeanArgs`/`[leanOptions]` above apply to
+# all libraries, so the layer libraries below inherit `--tstack`/heartbeats with no duplication.
 [[lean_lib]]
 name = "SP1Clean"
+
+# Layer build-targets (select modules by submodule glob; module names stay `SP1Clean.*`, so these add
+# no import churn). They make each pillar independently buildable — `lake build SP1Extracted`, etc.
+# NOTE: isolation is by convention, not enforced — Lake does not forbid cross-layer imports within one
+# package. The `Native`/`Proofs` pillar libraries are added once those directories land.
+[[lean_lib]]
+name = "SP1Math"
+globs = ["SP1Clean.Math.+"]
+
+[[lean_lib]]
+name = "SP1Model"
+globs = ["SP1Clean.Model.+"]
+
+[[lean_lib]]
+name = "SP1Extracted"
+globs = ["SP1Clean.Extracted.+"]
+
+[[lean_lib]]
+name = "SP1FormalModel"
+globs = ["SP1Clean.FormalModel.+"]

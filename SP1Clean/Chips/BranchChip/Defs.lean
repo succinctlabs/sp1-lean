@@ -1,11 +1,11 @@
-import SP1Clean.Specs.Chip
+import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Operations.AddOperation.Formal
 import SP1Clean.Operations.LtOperationSigned.Formal
 import SP1Clean.Operations.LtOperationSigned.Populate
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.ITypeReaderImmutable
-import SP1Clean.Foundations.Channels
-import SP1Clean.Foundations.ByteTable
+import SP1Clean.Model.Channels
+import SP1Clean.Model.ByteTable
 import SP1Clean.Extracted.BranchChip
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit

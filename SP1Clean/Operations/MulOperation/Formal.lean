@@ -1,7 +1,7 @@
 import SP1Clean.Operations.MulOperation.RawSpec
 import SP1Clean.Operations.MulOperation.Populate
-import SP1Clean.Operations.MulOperation.Extracted
-import SP1Clean.Foundations.ByteTable
+import SP1Clean.Extracted.Circuit.MulOperation
+import SP1Clean.Model.ByteTable
 
 /-! # `MulOperation` contract — `Assumptions` / soundness / completeness / `circuit`. -/
 
