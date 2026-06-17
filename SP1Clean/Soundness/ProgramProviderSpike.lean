@@ -48,16 +48,29 @@ def romContributions (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod
   rom.map (fun row => romAccess row (mult row))
 
 omit [NeZero p] in
-/-- **The provider is constructed, not assumed.** A ROM all of whose rows are validly decoded
-(`ProgramRowSpec`) yields a `ProgramProvider ProgramRowSpec`: every contribution sits at the key of a valid
-row (itself). Discharges the `ProgramProvider` hypothesis `programConsistent_of_balance` requires. -/
-theorem programProvider_of_validRom (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
-    (h : ∀ row ∈ rom, ProgramRowSpec row) :
-    ProgramProvider (p := p) ProgramRowSpec (romContributions rom mult) := by
+/-- **The provider is constructed, not assumed (arbitrary validity predicate).** A ROM all of whose
+rows satisfy an arbitrary predicate `P` yields a `ProgramProvider P`: every contribution sits at the key
+of a valid row (itself). `programConsistent_of_balance` is already generic over `P`, so this is the only
+generalization the W3 discharge needs — it instantiates `P` at `Decode.decodedInROM prog` (each committed
+row is the decode of the guest ROM). The `ProgramRowSpec` instance below is the original spike case. -/
+theorem programProvider_of_valid {P : ProgramRow (ZMod p) → Prop}
+    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
+    (h : ∀ row ∈ rom, P row) :
+    ProgramProvider (p := p) P (romContributions rom mult) := by
   intro b hb
   simp only [romContributions, List.mem_map] at hb
   obtain ⟨row, hrow, rfl⟩ := hb
   exact ⟨row, h row hrow, keyOf_romAccess row (mult row)⟩
+
+omit [NeZero p] in
+/-- **The provider is constructed, not assumed.** A ROM all of whose rows are validly decoded
+(`ProgramRowSpec`) yields a `ProgramProvider ProgramRowSpec`: the `P := ProgramRowSpec` case of
+`programProvider_of_valid`. Discharges the `ProgramProvider` hypothesis `programConsistent_of_balance`
+requires. -/
+theorem programProvider_of_validRom (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
+    (h : ∀ row ∈ rom, ProgramRowSpec row) :
+    ProgramProvider (p := p) ProgramRowSpec (romContributions rom mult) :=
+  programProvider_of_valid rom mult h
 
 /-- **End-to-end: `TraceProgramLink` from ROM-validity + balance, no provider assumption.** Feeding the
 constructed provider into `programConsistent_of_balance` discharges the instruction-fetch membership link

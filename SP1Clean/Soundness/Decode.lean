@@ -1,5 +1,6 @@
 import SP1Clean.Soundness.TargetVm
 import SP1Clean.Soundness.ProgramConsistency
+import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Soundness.Opcode
 
 /-! # W3 — the decode half of `OperandsBound` (trusted Program path)
@@ -27,10 +28,12 @@ namespace SP1Clean.Soundness.Target
 
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.ProgramChip (ProgramRow)
+open SP1Clean.LookupAccessList (isConsistentBalanced aggregateChipRows)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-! ## The decode projection: LeanRV64D `instruction` → committed Program-bus columns -/
 
@@ -378,6 +381,46 @@ theorem decode_bound (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
     interval_cases j <;> simp
   obtain ⟨ii, s', hrun, hproj⟩ := hdec s hcfg
   exact ⟨ii, s', hrun, by rw [hpcvec] at hproj; exact hproj⟩
+
+/-! ## The balance-level decode discharge (removing the threaded link) — W3 deliverable B -/
+
+/-- **The decode half of `bound`, from Program-bus balance — no threaded link.** Given a decoded program
+ROM (`rom`, each row the decode of the guest ROM, `decodedInROM`) and a balanced Program bus, every real
+walk row satisfies `DecodeOperandsBound`. Composes the constructed provider (`programProvider_of_valid` at
+`P := decodedInROM prog`) with `programConsistent_of_balance` (which discharges the membership link
+`decode_bound` threads as `h_link`). So the residuals are exactly (a) the per-instruction `decodedInROM`
+facts — W3 deliverable A, the `ext_decode` reduction shared with W7 — and (b) the lone LogUp/GKR
+`isConsistentBalanced` fact, matching how `traceProgramLink_of_validRom_and_balance` discharges the
+`ProgramRowSpec` link. -/
+theorem decode_bound_of_balance (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
+    {rows : List (ChipRow p)} {path : List (Trace.RowView (ZMod p))}
+    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
+    (h_decoded : ∀ row ∈ rom, decodedInROM prog row)
+    (h_bal : isConsistentBalanced
+      (aggregateChipRows (rows.map ChipRow.view) programLookups ++ romContributions rom mult))
+    (hw : WalkOf pi rows path) {i : ℕ} (hi : i < path.length) (s : SailState) :
+    DecodeOperandsBound prog (path[i]'hi) s :=
+  decode_bound prog
+    (traceProgramValid_of_programLink _ _
+      (programConsistent_of_balance _ (romContributions rom mult) (decodedInROM prog)
+        (programProvider_of_valid rom mult h_decoded) h_bal))
+    hw hi s
+
+/-- **The `TargetObligations.bound`-shaped decode statement, discharged from Program-bus balance.** The
+balance-level twin of `decode_targetBound`: the `bound` field for `OperandsBound := DecodeOperandsBound prog`
+with the threaded `h_link` replaced by the decoded ROM + balance. Feed this as the `bound` field when
+assembling `TargetObligations` at the W3-discharged decode predicate. -/
+theorem decode_targetBound_of_balance (prog : GuestProgram) (pi : SP1TargetPublicIO (ZMod p))
+    (rows : List (ChipRow p))
+    (rom : List (ProgramRow (ZMod p))) (mult : ProgramRow (ZMod p) → ℤ)
+    (h_decoded : ∀ row ∈ rom, decodedInROM prog row)
+    (h_bal : isConsistentBalanced
+      (aggregateChipRows (rows.map ChipRow.view) programLookups ++ romContributions rom mult)) :
+    ∀ s0 path, IsInitialState prog s0 → WalkOf pi.toLegacy rows path →
+      ∀ i (hi : i < path.length) s, RefinesAt prog s0 path i s →
+        DecodeOperandsBound prog (path[i]'hi) s := by
+  intro s0 path _h0 hw i hi s _href
+  exact decode_bound_of_balance prog rom mult h_decoded h_bal hw hi s
 
 /-! ## Wiring the decode predicate into `TargetObligations` -/
 
