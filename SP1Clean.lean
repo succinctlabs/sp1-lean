@@ -216,6 +216,7 @@ import SP1Clean.Math.Misc
 import SP1Clean.Math.MulCarryChain
 import SP1Clean.Model.Register
 import SP1Clean.Model.SP1Constraint
+import SP1Clean.Model.SailDecode
 import SP1Clean.Model.SailMemory
 import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word

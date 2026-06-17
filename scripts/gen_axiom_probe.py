@@ -38,6 +38,8 @@ TARGETS = [
     ("SP1Clean/Soundness/Decode.lean",
      r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM|"
      r"targetObligations_of_decode)\b"),
+    ("SP1Clean/Model/SailDecode.lean",
+     r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")
