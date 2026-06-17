@@ -35,6 +35,9 @@ TARGETS = [
      r"theorem\s+(coverage_kinds_eq_registry|coverage_length|covered_iff_routed|"
      r"wired_subset_reachable|reachable_subset_wired|routeOf_reaches_sail)\b"),
     ("SP1Clean/Soundness/TargetVm.lean", r"theorem\s+(sp1_target\w*)\b"),
+    ("SP1Clean/Soundness/Decode.lean",
+     r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM|"
+     r"targetObligations_of_decode)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")

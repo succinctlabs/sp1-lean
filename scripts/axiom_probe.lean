@@ -317,3 +317,10 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.routeOf_reaches_sail
 #print axioms SP1Clean.Soundness.Target.sp1_target_execution
 #print axioms SP1Clean.Soundness.Target.sp1_target_soundness
+#print axioms SP1Clean.Soundness.Target.instrToProgramRow_rtype
+#print axioms SP1Clean.Soundness.Target.instrToProgramRow_itype
+#print axioms SP1Clean.Soundness.Target.DecodeOperandsBound
+#print axioms SP1Clean.Soundness.Target.decodedInROM
+#print axioms SP1Clean.Soundness.Target.decode_bound
+#print axioms SP1Clean.Soundness.Target.decode_targetBound
+#print axioms SP1Clean.Soundness.Target.targetObligations_of_decode
