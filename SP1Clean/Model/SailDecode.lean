@@ -25,7 +25,16 @@ branch. Each branch's discharge is a *small* `simp` (one guard block), so no exp
 but the monadic *computation* still reads those CSRs, so the reduction needs `s.isInitialized` (CSRs
 present) **and** `cur_privilege = Machine` (so the `match cur_privilege` resolves) — i.e. exactly the
 `SailConfigured` "machine mode" residue. `decode_ADD_example` below proves the reduction for a concrete
-ADD against the real decoder, axiom-clean modulo the Sail model's own axioms. -/
+ADD against the real decoder, axiom-clean modulo the Sail model's own axioms.
+
+**Scope note (concrete is enough).** The decode reduction is only ever applied to *concrete* instruction
+words: in the non-vacuity witness (a concrete `GuestProgram`), `RomLoaded` ties the fetched word to a
+concrete `prog.rom` entry, so both the W3 `decodedInROM` discharge and the W7 decode stage decode
+concrete words — the `decode_ADD_example` recipe (re-run per opcode with the matching literal +
+instruction) covers them. A *symbolic*-register `ext_decode_RTYPE` would need `bv_decide` per cascade
+branch (the `decide := true` discharger cannot rule out a branch when the register fields are symbolic),
+which is costly and unnecessary for this scope, so it is deliberately not pursued; the general `∀ prog`
+statement instead keeps `decodedInROM` a trusted decode-chip assumption (cf. `ProgramRowSpec`). -/
 
 namespace SP1Clean.SailDecode
 
