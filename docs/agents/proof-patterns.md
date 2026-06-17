@@ -74,7 +74,7 @@ witnessing. Template: `Operations/{AddOperation,SubOperation,AddwOperation,SubwO
 - **Soundness**: byte ranges from the pull `Guarantees` (`byteRowSpec_range`), carry-bools from the gated
   asserts (`bool_of_mul_pred`), fed to `<sem>_of_<raw>`; plus a byte *padding requirement* per receive
   (`intro h; rw [gate_zero_of_ne hbin h, zero_mul, ← c16]; exact (byteRowSpec_range 0 h16p).mpr (by simp)`).
-- **Chip side** (`Chips/AddChip.lean`): `let value ← witnessVector n (fun env => <Op>.populate …)`;
+- **Chip side** (`Proofs/Chips/AddChip.lean`): `let value ← witnessVector n (fun env => <Op>.populate …)`;
   `assertion <Op>.circuit ⟨…, value, is_real⟩`. Soundness feeds the op's `Assumptions`
   (`(h_op ⟨ha,hb,h_bin⟩ hr).2`); the channel tail gains `Or.inr ⟨ha, hb, h_bin⟩`. Completeness reconstructs
   per-limb `#v[eval input_var[i]]_i = input_word` (`Vector.ext; interval_cases i`), then `rw [hval]; exact
@@ -85,7 +85,7 @@ witnessing. Template: `Operations/{AddOperation,SubOperation,AddwOperation,SubwO
 When a demoted op (Addw/Subw) composes another (U16MSB) as a sub-`assertion`, its **completeness** must
 reconstruct the sub's `Spec` from its own semantic `Spec`. That needs the *converse* of the forward keystone:
 `carries_of_addwSemantics : … → toBitVec64 (resultWord) = signExtend(…) → RawSpec ∧ (msb = if … then 1 else 0)`
-(`Operations/AddwOperation/RawSpec.lean`). **Landmine:** make `M := (m*65535).val` an *opaque* variable via
+(`Native/Operations/AddwOperation/RawSpec.lean`). **Landmine:** make `M := (m*65535).val` an *opaque* variable via
 `obtain ⟨M, hMdef⟩ : ∃ M, (m*65535).val = M := ⟨_, rfl⟩` — a `set`/`let` lets the kernel reduce `(m*65535).val`
 through `ZMod`'s `Nat.rec` multiply → "**(kernel) deep recursion detected**". (Symbolic `2^48`/`2^64` in
 `omega` are *fine*; the recursion was *only* the unfolded `M`.) The msb falls out by
@@ -106,7 +106,7 @@ Lt/Mul keep witnessing their aux columns (FormalCircuit) but swap `subcircuit U1
 (gate `1`, ungated — `mult = -1` pure receive, no padding requirement); use `w[0]` for the old `.msb`.
 **Place the `witnessVector` at the same offset the old subcircuit's first column occupied** so
 offset-dependent proofs survive (LtUnsigned/Mul soundness reference only columns *before* the U16X). The op
-now emits byteChannel → declare `[byteChannel.toRaw]` + the rfl-lemmas + import `Foundations.Channels`. **Bind
+now emits byteChannel → declare `[byteChannel.toRaw]` + the rfl-lemmas + import `Model.Channels`. **Bind
 `let bm : Expression _ := w[0]`** before using it — `(is_signed - 1) * w[0] === 0` otherwise defaults the `1`
 to `ℕ` (`HSub (Expression _) ℕ` synth failure).
 
@@ -114,8 +114,8 @@ to `ℕ` (`HSub (Expression _) ℕ` synth failure).
 
 `ShiftRight`/`ShiftLeft` have **no operation gadget** — SP1 inlines the limb decomposition of the register
 read into the chip asserts, so the chip is a skeleton (asserts + byte pulls in `main`, semantic `Spec` in
-`Specs/Chip.lean`). The native arithmetic is ported verbatim from sp1-lean `ShiftRight/Common.lean` into
-`Operations/ShiftRightMath.lean` (the `srl/sra/srlw/sraw_close_su16_*_case` lemmas + `is_mod_64`,
+`FormalModel/Contracts/Chips.lean`). The native arithmetic is ported verbatim from sp1-lean `ShiftRight/Common.lean` into
+`Native/Operations/ShiftRightMath.lean` (the `srl/sra/srlw/sraw_close_su16_*_case` lemmas + `is_mod_64`,
 `cancel_mul_65536`, the `srl_within_byte_shift*` division identities, a local `HWord`). Port landmines: the
 early lemmas rely on a section `variable [Fact (Nat.Prime p)] [Fact (2^17<p)]` + a `local instance : NeZero
 p`; file-level `set_option maxHeartbeats 100000000` + `linter.unusedVariables false`; sed range-extraction
@@ -143,7 +143,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   exponents while the asserts/byte-pulls use ZMod literals (`N`, `cb_i * 2`); bridge each with `push_cast;
   ring` / a one-shot `have hXY : … = … := by push_cast; ring; rw [hXY]`. `norm_num at h` *distributes*
   negations (breaking later `rw` matches) — use a targeted `rw [show (2:ℕ)^10 = 1024 from by norm_num]`.
-- **Stage A (shared prerequisites) shape** (`Chips/ShiftRightChip.lean` `soundness` SRL bullet): `set`
+- **Stage A (shared prerequisites) shape** (`Proofs/Chips/ShiftRightChip.lean` `soundness` SRL bullet): `set`
   column aliases with the **exact** `env.get (i₀+4+1+1+…)` forms (Lean does not reduce the index
   arithmetic) + `clear_value`; `single_flag` (one flag = 1 ⇒ others 0, via a `ZMod.val_add_of_lt` chain);
   `b_msb = 0` ⇒ no sign fill; an `hbyte_fact` extractor folding `sum*v → v` (on the real row `sum = 1`) +
@@ -208,7 +208,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   soundness/`completeness` collapse to one `exact (…).mp`/`linear_combination (…).mpr` call apiece. State the
   lemma conclusions **verbatim** in the chip `Spec`'s shape (incl. `Word.toBitVec64`/`.slt`/`.ult` forms) so
   the call sites need no goal-bridging. `BranchChip` did this (16M→8M soundness, 16M→4M completeness, ~540-line
-  `Formal` + a 3.5 s `Decision`); cf. the `Operations/ShiftBounds.lean` `nlinarith` dedup. The `id (ZMod p)`
+  `Formal` + a 3.5 s `Decision`); cf. the `Native/Operations/ShiftBounds.lean` `nlinarith` dedup. The `id (ZMod p)`
   field-carrier landmine bites at the seam: `simp only [id_eq] at <gate-hyp>` to strip it before feeding the
   loose-`ZMod p` lemma (see the `id_eq` note above).
 - **`maxHeartbeats` floors.** `toBitVec64`/`asm8` rw chains are whnf-heavy: `set_option maxHeartbeats 2000000 in`
@@ -240,15 +240,15 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   such lemma args **explicit** and pass positionally.
 - **`linear_combination` / `interval_cases`** need explicit `import Mathlib.Tactic.LinearCombination` /
   `Mathlib.Tactic.IntervalCases`.
-- **`limb_lift` (`Foundations/Word.lean`) takes 5 explicit value args first:**
+- **`limb_lift` (`Math/Word.lean`) takes 5 explicit value args first:**
   `limb_lift _ _ _ _ _ ha hb hv hc_in hc_out h_eq`.
 - **W-instruction sign extension — reuse `Word.toBitVec64_signExtend_word`, don't re-derive.** For a 32→64
   sign-extended result word `#v[v0, v1, m·65535, m·65535]` (SLLW, ADDW, SUBW), the native
   `Word.toBitVec64_signExtend_word R X m …` closes `Word.toBitVec64 R = X.signExtend 64` given `m = if
   R[1].val ≥ 32768 then 1 else 0` and `X.toNat = R[0].val + R[1].val·2^16`. The `m`-form is exactly what
-  `U16MSBOperation.Spec` hands you, so the SLLW subcase lemmas (`Operations/ShiftLeftCore.sllw_subcase_cb4_*`)
+  `U16MSBOperation.Spec` hands you, so the SLLW subcase lemmas (`Native/Operations/ShiftLeftCore.sllw_subcase_cb4_*`)
   skip sp1-lean's `HWord.sign_extend_32_to_64_msb` / `sllw_a2_a3_eq_msb_byte` entirely. The new
-  `Foundations/HWord.lean` then only needs `isU32`/`toBitVec32`/`toBitVec32_toNat`.
+  `Math/HWord.lean` then only needs `isU32`/`toBitVec32`/`toBitVec32_toNat`.
 - **SLLW shift amount is 5 bits, not 6.** `RV64.sllw` masks `rs2` to bits 4-0 (`is_mod_64`'s `%64` result
   projects to `%32` via `c0_mod32_of_mod64`, splitting `cbsum6 = cbsum5 + cb5·32`); and with `is_sll = 0` the
   byte-shift `cb4 + cb5·2·is_sll` collapses to `cb4` ⇒ **2-way** dispatch (vs SLL's 4). Bridge `RV64.sllw` to
@@ -258,7 +258,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   surfaces as `X·c - a = 0`; to prove `a = X·c` you need **`linear_combination -hgate`** (coefficient −1),
   not `linear_combination hgate` (which leaves `2a − 2X·c ≠ 0` and "ring expressions not equal").
 
-### Chip / reader composition (`Chips/`, `Readers/`)
+### Chip / reader composition (`Chips/`, `Native/Readers/`)
 
 - **Struct-output `FormalCircuit` completeness — witness via `fromElements #v[…]`, not the struct literal.**
   A reader/gadget whose `Output` is a *nested* `ProvableStruct` (e.g. `Extracted.RTypeReader`: 22 cols across
@@ -274,7 +274,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   offset-assoc gaps by defeq. **For a *deeply*-nested struct (`Extracted.RTypeReader`'s 22 cols) prefer
   the next entry — factor it into composed sub-circuits so no single circuit witnesses the whole tower at
   all; the `fromElements` form stays the tool for a circuit that must witness a *modest* multi-field
-  struct directly (e.g. `Readers/RegisterAccessTimestamp.lean`'s 2-col block).**
+  struct directly (e.g. `Native/Readers/RegisterAccessTimestamp.lean`'s 2-col block).**
 - **`simp [circuit_norm]`, not `simp only`, when the goal carries a witnessed-block projection tower.** If a goal
   reduces to `Expression.eval env (fromElements (Vector.cast … (mapRange n …).drop … .take …))`, `circuit_norm`
   has *no* rewrite for the `cast/drop/take/mapRange` tower, so `simp only [circuit_norm]` makes no progress and the
@@ -300,7 +300,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   hclk13, …⟩` makes the elaborator bridge that gap by raw `whnf` (slow → wants a heartbeat bump). A cheap
   `simp [circuit_norm] at hclk13 hclk8` normalizes both to `env.get …` first, so `refine ⟨…, hclk13, hclk8⟩`
   matches by `rfl`. Same root cause as the `simp only`/`whnf` finding above — pushing unnormalized terms into a
-  defeq check. See `Chips/AddChip.lean`.
+  defeq check. See `Proofs/Chips/AddChip.lean`.
 - **Compose a chip `Spec` from its sub-circuits' `Spec`s (direct sub-calls), don't restate them inline.**
   Mirror sp1-lean's `SP1Chips` `allHold_constraints_iff` shape: the chip `Spec` is a conjunction of
   `<Reader>.Spec <reader-input-rebuilt-from-cols> cols.<block>` sub-calls (ungated — the readers' range checks
@@ -309,7 +309,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   conjunct *directly* (no per-bound `circuit_norm`), which is both cleaner and far cheaper than inlining the
   reader's bounds (an inlined "wide" spec is what historically timed out). Reconstruct the reader's cross-block
   inputs from the chip columns in the `Spec` (e.g. `clk_low := cols.state.clk_0_16 + cols.state.clk_16_24*65536`,
-  `wv* := cols.add_operation.value[i]`). See `Chips/AddChip.lean`.
+  `wv* := cols.add_operation.value[i]`). See `Proofs/Chips/AddChip.lean`.
 - **Gate a reader's byte/range checks by `is_real` so padding rows are vacuous — range-check `is_real * value`.**
   SP1 sends each byte lookup with multiplicity `is_real`, so on padding (`is_real = 0`) the check isn't
   enforced and a real zero-padding row (all columns 0) is accepted. We don't model the byte bus (we use
@@ -322,10 +322,10 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   `RTypeReader` only the timestamp **byte** checks are `is_real`-gated; the `op_a_0 * wv` **zeroing gates are
   unconditional** (SP1 emits bare `assertZero`). And a pure arithmetic gadget like `AddOperation` needs *no*
   gating — a zero row already satisfies `0 = 0+0`; it's specifically the readers' byte checks that break on
-  zeros. See `Readers/{CPUState,RTypeReader}.lean`.
+  zeros. See `Native/Readers/{CPUState,RTypeReader}.lean`.
 - **`is_real`-binary is *proven*, not assumed — split it across `Assumptions`/`ProverAssumptions`.** The chip
   emits the binary gate `is_real * (is_real - 1) === 0`, so soundness derives `is_real = 0 ∨ is_real = 1` from
-  the gate hypothesis via `bool_of_mul_pred` (`Foundations/Word.lean`; it wants the `x * (x + -1) = 0` form,
+  the gate hypothesis via `bool_of_mul_pred` (`Math/Word.lean`; it wants the `x * (x + -1) = 0` form,
   which is exactly the eval'd gate) and puts it in the `Spec`. Drop it from the (soundness) `Assumptions`. Only
   *completeness* still needs it as a precondition — keep it in `ProverAssumptions` (the prover commits to a
   boolean selector). This is the point of `GeneralFormalCircuit`'s decoupled Assumptions/ProverAssumptions.
@@ -348,8 +348,8 @@ composed sub-circuits**, exactly how `Clean/Gadgets/Keccak/KeccakRound.lean` pro
 plain `circuit_proof_start`.
 
 - **Factor each sub-struct into its own `FormalCircuit` that fills its own witness-gen obligations; compose
-  them as `subcircuit`s.** One file per block (`Readers/RegisterAccessTimestamp.lean` ⊂
-  `Readers/RegisterAccessCols.lean` ⊂ `Readers/RTypeReader.lean`). The parent witnesses only its *own* scalar
+  them as `subcircuit`s.** One file per block (`Native/Readers/RegisterAccessTimestamp.lean` ⊂
+  `Native/Readers/RegisterAccessCols.lean` ⊂ `Native/Readers/RTypeReader.lean`). The parent witnesses only its *own* scalar
   columns and `subcircuit <Block>.circuit ⟨…⟩` per nested block, then `return ⟨…⟩` assembling the output from
   the scalars and the sub-circuit outputs. Because each block is a sub-circuit *output* (an opaque
   `varFromOffset`), no nested struct literal is ever witnessed, so `circuit_norm` treats each block as a
@@ -364,9 +364,9 @@ plain `circuit_proof_start`.
   composition → `(deterministic) timeout at whnf (200000 heartbeats)`, which then cascades to `Unknown
   identifier 'elaborated'` at `def circuit := { elaborated with … }`. Omit it: the default `output :=
   (main).output offset` is the assembled struct of sub-circuit outputs and `output_eq` is `rfl` with no
-  unfolding (`Readers/RegisterAccessCols.lean`, `Readers/RTypeReader.lean`, `Chips/AddChip.lean`). Set
+  unfolding (`Native/Readers/RegisterAccessCols.lean`, `Native/Readers/RTypeReader.lean`, `Proofs/Chips/AddChip.lean`). Set
   `output` explicitly **only** for a *leaf* circuit whose `main` has no sub-circuits — there `varFromOffset`
-  is right and cheap (`Readers/RegisterAccessTimestamp.lean`).
+  is right and cheap (`Native/Readers/RegisterAccessTimestamp.lean`).
 - **Emit a struct-input-projected byte check as an inline `Circuit.lookup ByteTable ⟨…⟩`, not a
   `byteRangeCheck`/`byteRangeCheckBits` `FormalAssertion` sub-circuit.** When the lookup argument flows from a
   *struct field* of the input (`input.clk_target` into the `U8Range`/`Range` argument), composing the
@@ -376,7 +376,7 @@ plain `circuit_proof_start`.
   semantically identical (membership in the same `ByteTable`) and closes at the default floor. Soundness:
   `simp only [circuit_norm, ByteTable] at h_holds` turns each lookup into a `ByteRowSpec` fact; convert via
   `byteRowSpec_range`/`byteRowSpec_u8range`. The `FormalAssertion` wrappers stay fine when the arg is the
-  *whole* bare input (`Readers/CPUState.lean`'s clock checks). Related: a `FormalAssertion`'s predicate
+  *whole* bare input (`Native/Readers/CPUState.lean`'s clock checks). Related: a `FormalAssertion`'s predicate
   *preconditions* belong in its internal `Assumptions`, not threaded in as extra inputs.
 - **Soundness/completeness shapes for a reader composing N sub-circuits.** After `circuit_proof_start`,
   `h_holds` is the N sub-circuit results (`Assumptions → Spec`, `Assumptions = True` so use `h_ trivial`)
@@ -390,7 +390,7 @@ plain `circuit_proof_start`.
   *Completeness* is the opposite: `circuit_norm` yields a *flat* conjunction of the sub-circuits' `True`
   assumptions and this circuit's gate obligations (e.g. `env.get(op_a_0) * wv = 0`), so a flat
   `refine ⟨trivial, …, ?_, ?_⟩` fits; pull a witnessed-`0` column out as the k-th conjunct of `h_env`
-  (`obtain ⟨_, _, h0, -⟩ := h_env`) and close each gate with `rw [h0, zero_mul]`. See `Readers/RTypeReader.lean`.
+  (`obtain ⟨_, _, h0, -⟩ := h_env`) and close each gate with `rw [h0, zero_mul]`. See `Native/Readers/RTypeReader.lean`.
   (For *channel*-emitting readers the tails carry real `Guarantees` content — see `../bus-model.md` §3 for
   that boilerplate; `Channel` is the faithful way to model the State/Byte/Program/Memory interactions.)
 
@@ -404,9 +404,9 @@ the right `rfl`-lemmas — **not** to override the field with a bespoke `:= by �
 writing an explicit field proof, treat it as a smell: the missing piece is a `circuit_norm` lemma, and
 once it exists the field can be **omitted** so the default tactic resolves the goal. The
 *only* manual `ElaboratedCircuit` field proofs left in the project are the deferred skeletons in
-`Operations/LtOperationUnsigned.lean` and `Operations/AddressOperation.lean` (`localLength_eq`/`output_eq
-:= by sorry`, WIP) plus one explicit `channelsLawful` in `Operations/LtOperationSigned.lean` — everything
-else, including every reader and `Chips/AddChip.lean`, omits all four fields.
+`Native/Operations/LtOperationUnsigned.lean` and `Native/Operations/AddressOperation.lean` (`localLength_eq`/`output_eq
+:= by sorry`, WIP) plus one explicit `channelsLawful` in `Native/Operations/LtOperationSigned.lean` — everything
+else, including every reader and `Proofs/Chips/AddChip.lean`, omits all four fields.
 
 The recipe that gets you there:
 
@@ -416,7 +416,7 @@ The recipe that gets you there:
    clashes). Prefix each with `set_option linter.unusedSectionVars false in` (the `Fact` prime/bound
    instances are in scope but unused in a `rfl` lemma; `omit` errors on the ones whose projection still
    needs the field instance, so the `set_option` form is the robust choice). Example
-   (`Readers/CPUState.lean`):
+   (`Native/Readers/CPUState.lean`):
    ```lean
    set_option linter.unusedSectionVars false in
    @[circuit_norm] lemma channelsWithGuarantees_eq :
@@ -437,7 +437,7 @@ The recipe that gets you there:
    So **also expose `circuit.localLength` as an `@[circuit_norm]` rfl-lemma**, named `circuit_localLength`,
    placed right after `def circuit` (it can't sit beside `localLength_eq`, because `circuit` is defined
    later — in `Formal.lean` for split ops). Every op/reader that is ever composed as a sub-circuit carries
-   one (example `Operations/MulOperation.lean`):
+   one (example `Native/Operations/MulOperation.lean`):
    ```lean
    set_option linter.unusedSectionVars false in
    @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
@@ -445,13 +445,13 @@ The recipe that gets you there:
    ```
    With these in `circuit_norm`, subcircuit offsets reduce to numerals *inside `circuit_proof_start`* for
    every chip, keeping the manipulated terms small. (This globalized a per-chip workaround that used to
-   re-declare the eight `<Op>.circuit.localLength` values locally inside `Chips/DivRemChip/Formal.lean`.)
+   re-declare the eight `<Op>.circuit.localLength` values locally inside `Proofs/Chips/DivRemChip/Formal.lean`.)
    Corollary: strengthening `circuit_norm` this way can make a previously-needed manual
    `simp only [<Sub>.circuit, circuit_norm]` in a sub-op's *own* proof report `` `simp` made no progress``
    or flag a now-unused simp arg — that's the lemma working; drop the redundant step (as in
-   `Operations/LtOperationSigned.lean`).
+   `Native/Operations/LtOperationSigned.lean`).
 2. **The generic list/propositional closers are tagged `circuit_norm` once**, in
-   `Foundations/Channels.lean` (conceptually they belong with Clean's `channels_lawful` default, but that
+   `Model/Channels.lean` (conceptually they belong with Clean's `channels_lawful` default, but that
    is a pinned dep we don't edit): `List.cons_subset List.mem_cons List.cons_ne_nil List.not_mem_nil
    List.Subset.refl or_false and_self`. With these, the residual `⊆`/`∈` `channelsLawful` goal reduces to
    `True` and the default tactic finishes.
@@ -476,7 +476,7 @@ first
   | exact ⟨trivial, Or.inl rfl, Or.inl rfl⟩
   | (refine ⟨?_, ?_, ?_⟩ <;> first | trivial | exact Or.inl rfl | exact Or.inr h_as | exact Or.inr trivial)
 ```
-See `Chips/AddChip.lean` and `Readers/RegisterAccessCols.lean` for the worked examples.
+See `Proofs/Chips/AddChip.lean` and `Native/Readers/RegisterAccessCols.lean` for the worked examples.
 
 ## "emitted = projection": `<b>Lookups_eq_emitted` (proving a trace projection IS the emission)
 
@@ -487,9 +487,9 @@ are DONE** (`stateLookups_eq_emitted`, `programLookups_eq_emitted`, `memoryLooku
 axiom-clean). **Only Byte remains** (its emits are *carried by* the `RAC ⊃ RAT` subcircuits + `pullIf`
 form — a recovery-*through*-nesting, not the drop-based recovery below).
 
-Two foundations files: `Foundations/InteractionProjection.lean` (`AbstractInteraction.toAccess env`,
+Two foundations files: `Model/InteractionProjection.lean` (`AbstractInteraction.toAccess env`,
 `signedVal` = the centered representative for `-is_real`-valued mults, and the per-channel
-`toAccess_emitted_<msg>` kernels) and `Foundations/InteractionRecovery.lean` (the subcircuit-drop toolkit).
+`toAccess_emitted_<msg>` kernels) and `Model/InteractionRecovery.lean` (the subcircuit-drop toolkit).
 
 **Kernel form (critical).** `Channel.emit` produces `_root_.emitted`, and `circuit_norm` unfolds the
 `@[circuit_norm] Channel.emitted` def to it — so the `toAccess_emitted_<msg>` kernels are stated on
@@ -532,12 +532,12 @@ emit exactly `ByteConsistency.byteRows`'s 8 checks, which is what makes byte `eq
 
 ## `ChipAir` / `Machine` (the cross-chip bus aggregate)
 
-`Foundations/ChipAir.lean`: `ChipAir {name, perRow : Row → LookupAccessList, included}`, `Machine := List
+`Model/ChipAir.lean`: `ChipAir {name, perRow : Row → LookupAccessList, included}`, `Machine := List
 (ChipAir Row)`, `Machine.busAggregate`/`busBalance` over the *computable* `InteractionBus`
 core (never `noncomputable interactionsWith`). `multiplicitySum_busAggregate_cons` decomposes a machine's
 per-key sum into per-chip sums. (The bespoke per-bus `ChipAir`s + `Machine` that drove the retired
 `TraceValid` capstone lived in `Soundness/MachineConsistency.lean`, removed 2026-06-05; the surviving
-statement-layer infra is `Foundations/ChipAir.lean`, and the live cross-chip argument is the gated
+statement-layer infra is `Model/ChipAir.lean`, and the live cross-chip argument is the gated
 `Soundness/GatedVm/` path.) **Gotcha:** `Machine` is an `abbrev` for `List`, so `m.busAggregate`
 dot-notation resolves to `List.busAggregate` — call `Machine.busAggregate m` explicitly. Statement layer
 only: it makes Σsends = Σreceives expressible; it does not derive the per-bus meaning (those stay threaded).

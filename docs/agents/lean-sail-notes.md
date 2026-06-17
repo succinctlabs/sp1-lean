@@ -48,7 +48,7 @@ side's full `import Mathlib` (which reaches `Batteries.Data.Fin.Fold` through th
 a genuine upstream Clean-main bug (absent on the succinctlabs/4.29 combo, which instead has the broken
 `Table.Inductive`).
 
-**Fix.** Narrow the Sail-side files (`Foundations/Misc.lean`, `Register.lean`, `SailWrap.lean`, and the
+**Fix.** Narrow the Sail-side files (`Math/Misc.lean`, `Register.lean`, `SailWrap.lean`, and the
 `Faithful/*` anchors) to **only** `import Mathlib.Tactic` + `Mathlib.Data.ZMod.Basic` + `Std.Data.ExtDHashMap`
 — none of which reach `Batteries.Data.Fin.Fold`. `Clean.Circuit.Basic` + full Mathlib never clash; only the
 wider Clean gadget surface does. With the narrowing, the unified `lake build SP1Clean` is 0/0 with both
@@ -61,7 +61,7 @@ pull a wider Mathlib import back in.
 ## Sail facts that survive (reusable)
 
 - `SailM` and `SailState` come from `LeanRV64D` (`SailState = PreSail.SequentialState RegisterType
-  Sail.trivialChoiceSource`). `Register` / `bitVecToRegidxVal` were ported into `Foundations/Register.lean`.
+  Sail.trivialChoiceSource`). `Register` / `bitVecToRegidxVal` were ported into `Model/Register.lean`.
 - `readReg`/`writeReg` are `PreSail.readReg`/`PreSail.writeReg` (namespace **`PreSail`**, not `Sail`), tagged
   `@[simp_sail]`. `Sail.run_readReg` will **not** fire — unfold `PreSail.readReg, PreSail.writeReg` in `simp`
   instead (the `run_rX_bits`/`run_wX_bits` lemmas do fire).
@@ -69,10 +69,10 @@ pull a wider Mathlib import back in.
   `execute_RTYPE_pure x y rop.AND = x &&& y` (and OR/XOR) by `rfl`. The PC is modeled as `BitVec 64` (no limb
   arithmetic) in the bridges.
 
-## Sail memory model (read + write — `Foundations/SailMemory.lean`)
+## Sail memory model (read + write — `Model/SailMemory.lean`)
 
 The memory chips (`LoadDouble`/`StoreDouble`) need the Sail RAM semantics, not just register/PC. These were
-**ported natively** from `../sp1-lean`'s `SP1Foundations/MemChecks.lean` into `Foundations/SailMemory.lean`
+**ported natively** from `../sp1-lean`'s `SP1Foundations/MemChecks.lean` into `Model/SailMemory.lean`
 (namespace `SP1Clean.SailMem`), against the **shared** `LeanRV64D` model — the dense Sail-monad `simp`
 sets transfer almost verbatim. What's there:
 

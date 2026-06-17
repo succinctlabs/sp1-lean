@@ -24,10 +24,10 @@ All `sorry`s are **completeness/liveness** (or the one capstone-packaging premis
 gates on exactly this set.) `MulChip.completeness` was closed 2026-06-10 via
 `MulOperation.spec_populate` (the witnessed `populate` columns satisfy the structural `Spec`).
 
-1. `ShiftLeftChip.completeness` — `Chips/ShiftLeftChip/Formal.lean` — honest `populate`-style witness +
+1. `ShiftLeftChip.completeness` — `Proofs/Chips/ShiftLeftChip/Formal.lean` — honest `populate`-style witness +
    `ProverHint` opcode threading (the `BranchChip.completeness` recipe).
-2. `ShiftRightChip.completeness` — `Chips/ShiftRightChip/Formal.lean` — same shape as ShiftLeft.
-3. `DivRemChip.completeness` — `Chips/DivRemChip/Formal.lean` — soundness landed (axiom-clean); only
+2. `ShiftRightChip.completeness` — `Proofs/Chips/ShiftRightChip/Formal.lean` — same shape as ShiftLeft.
+3. `DivRemChip.completeness` — `Proofs/Chips/DivRemChip/Formal.lean` — soundness landed (axiom-clean); only
    completeness remains.
 4. `sp1_witness_decode` — `Soundness/SP1GatedVm.lean` — the single isolated capstone premise: the
    witness → `ChipRow` decode seam (`SP1WitnessDecode`, = **W1b/W1c** below); a packaging premise, not
@@ -162,7 +162,7 @@ remaining `sorry` in `Soundness/SP1GatedVm.lean`) with the proven W1a balance tr
   `intCast_multiplicitySum_map_toAccess` (`GatedVm/BalanceMod.lean`; same-channel `toAccess` keys
   separate exactly on the message by `ZMod.val`/`Array.toList` injectivity, so each `LookupKey` ℤ-sum
   casts to one Clean `balanceOf`), `Interaction.toAccess`/`intCast_signedVal`
-  (`Foundations/InteractionProjection.lean`), the native `{-1, 0, 1}` bound
+  (`Model/InteractionProjection.lean`), the native `{-1, 0, 1}` bound
   `stateLookups_mult_binary` (`Soundness/StateConsistency.lean`), and the landed
   `isConsistentBalanced_of_intCast_zero`. *Notes: upstream's gated counting lemmas
   (`balanceOf_eq_mult_countP_of_mult_or_zero`, `exists_push_of_pull`, `activeInteractions`) turned
@@ -183,7 +183,7 @@ remaining `sorry` in `Soundness/SP1GatedVm.lean`) with the proven W1a balance tr
 ### W8 — logUp/GKR packaging (M–L, after W1)
 
 Replace the assumed balance with one named `axiom logupGkrSound` ("a verifying GKR+PCS transcript ⟹
-fingerprinted cumulative sum = 0") in `Foundations/InteractionBus.lean`, and prove the non-crypto half
+fingerprinted cumulative sum = 0") in `Model/InteractionBus.lean`, and prove the non-crypto half
 (fingerprinted-sum-zero ⟹ send/receive multiset equality, LogUp/Schwartz–Zippel). **Done when** the
 TCB cites one crypto axiom instead of "balance assumed."
 
@@ -194,7 +194,7 @@ Landed by pinning Clean to the **open PR's head SHA**
 `292b9cc369be11baf816926a4bd5a697c01b1dcc`, 13 commits ahead / 0 behind the old `main` pin, same 4.28
 toolchain) rather than waiting for the merge. Upstream `Channel.toRaw` is now gated on zero
 multiplicity and receives owe no `Requirements` at all, so the whole custom layer in
-`Foundations/Channels.lean` (`toRawGated`/`gatedReceive`/`emitGated`/`receivedGated`/`emittedGated` +
+`Model/Channels.lean` (`toRawGated`/`gatedReceive`/`emitGated`/`receivedGated`/`emittedGated` +
 projections + `binary_gate_req_vacuous`; the asymmetric family turned out to be dead code) is deleted
 in favor of `Channel.pullIf`/`Channel.emit`/gated `toRaw`. Side effect worth knowing: pre-W9,
 `sp1GatedVm.busChannels` listed `toRawGated` records while the readers emitted on `toRaw` — records
