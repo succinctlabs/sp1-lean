@@ -59,6 +59,44 @@ theorem value_targetBound {prog : GuestProgram} {s0 : SailState}
   exact ⟨fun idx himmb hidx => (href.frame idx).trans (hb idx himmb hidx),
          fun idx himmc hidx => (href.frame idx).trans (hc idx himmc hidx)⟩
 
+/-! ## Toward discharging `TraceValueBinding`: the walk-order = clk-order bridge
+
+`TraceValueBinding` reconciles two buses: `replayVal` ranges over the **walk position** order (State bus),
+while the Memory-bus value chain (`memEvent_prevValue_eq_writer`) ranges over the **clk** order. The bridge
+is that the `WalkOf` trail is **clk-monotonic** — `walk_clk_monotone` below: each consecutive pair advances
+the state-bus clock by the leading row's `clk_inc` (`sndKey`'s clk slot = the next row's `rcvKey` clk slot).
+The remaining discharge of `TraceValueBinding` composes this with (i) the memory event timestamps being the
+row clocks (`rowClkLow`), (ii) the Memory-bus value chain (`traceMemoryValid_of_genesis_and_balance` +
+`memEvent_prevValue_eq_writer`: a read returns the most-recent earlier write, read-backs preserving it), and
+(iii) the genesis alignment (`s0`'s initial registers = 0 = the init chip's genesis value). -/
+
+/-- The clk a state-bus **receive** key carries (the row's current clock). -/
+def rcvClkOf (sa : StateAccess (ZMod p)) : ℕ := sa.clk_low.val
+
+/-- The clk a state-bus **send** key carries (the row's committed next clock, `clk + clk_inc`). -/
+def sndClkOf (sa : StateAccess (ZMod p)) : ℕ := (sa.clk_low + sa.clk_inc).val
+
+omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+/-- A state-bus send/receive handoff (`sndKey sa = rcvKey sb`) advances the clock: `sb`'s receive clock is
+`sa`'s send clock `clk + clk_inc` — the clk twin of `sndPc_eq_rcvPc`. -/
+lemma sndClk_eq_rcvClk {sa sb : StateAccess (ZMod p)} (h : sndKey sa = rcvKey sb) :
+    sndClkOf sa = rcvClkOf sb := by
+  have h2 := congrArg (fun k => k.2.2) h
+  simp only [sndKey, rcvKey, List.cons.injEq, and_true] at h2
+  exact h2.2.1
+
+/-- **The walk is clk-monotonic.** Consecutive rows of the `WalkOf` trail advance the state-bus clock:
+position `i`'s committed next clock (`sndClkOf = clk + clk_inc`) is position `i+1`'s current clock
+(`rcvClkOf = clk`). This is the walk-order = clk-order fact the `TraceValueBinding` discharge rides — the
+walk visits rows in increasing clock order, matching the order the Memory-bus value chain reads them. -/
+lemma walk_clk_monotone {pi : SP1PublicIO (ZMod p)} {rows : List (ChipRow p)}
+    {path : List (Trace.RowView (ZMod p))} (hw : WalkOf pi rows path)
+    (i : ℕ) (hi : i + 1 < path.length) :
+    sndClkOf (stateAccess (path[i]'(by omega))) = rcvClkOf (stateAccess (path[i + 1]'hi)) := by
+  have h := isWalk_chain hw.1 i hi
+  simp only [stateEdge] at h
+  exact sndClk_eq_rcvClk h
+
 /-! ## The concrete decode∧value `OperandsBound` -/
 
 /-- **The concrete `OperandsBound`**: decode (W3, indices = decode of the fetched word) ∧ value (W2,

@@ -343,5 +343,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.memBalanceHyps_of_genesis
 #print axioms SP1Clean.Soundness.Target.ValueOperandsBound
 #print axioms SP1Clean.Soundness.Target.value_targetBound
+#print axioms SP1Clean.Soundness.Target.sndClk_eq_rcvClk
+#print axioms SP1Clean.Soundness.Target.walk_clk_monotone
 #print axioms SP1Clean.Soundness.Target.operandsBound_full_targetBound
 #print axioms SP1Clean.Soundness.Target.targetObligations_full

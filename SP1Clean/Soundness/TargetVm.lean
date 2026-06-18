@@ -118,7 +118,7 @@ private lemma isWalk_head {α V : Type} {edge : α → V × V} {src snk : V} {pa
   | nil => simp at h
   | cons x rest => exact hw.1
 
-private lemma isWalk_chain {α V : Type} {edge : α → V × V} :
+lemma isWalk_chain {α V : Type} {edge : α → V × V} :
     ∀ {path : List α} {src snk : V}, GatedVm.IsWalk edge src snk path →
       ∀ i (h : i + 1 < path.length), (edge (path[i]'(by omega))).2 = (edge (path[i + 1]'h)).1 := by
   intro path
