@@ -1,4 +1,8 @@
 import SP1Clean.Chips.DivRemChip.Defs
+import SP1Clean.Chips.DivRemChip.Populate.Bounds
+import SP1Clean.Chips.DivRemChip.Populate.Glue
+import SP1Clean.Chips.DivRemChip.Populate.Shapes
+import SP1Clean.Chips.DivRemChip.Populate.Euclid
 import SP1Clean.Chips.DivRemChip.Soundness
 import SP1Clean.Chips.DivRemChip.Assembly
 import SP1Clean.Chips.DivRemChip.Soundness.Div
@@ -10,6 +14,7 @@ import SP1Clean.Chips.DivRemChip.Soundness.Remu
 import SP1Clean.Chips.DivRemChip.Soundness.Remuw
 import SP1Clean.Chips.DivRemChip.Soundness.Remw
 import SP1Clean.Chips.DivRemChip.Soundness.Reader
+import SP1Clean.Chips.DivRemChip.Completeness.Driver
 
 /-! # `SP1Clean.DivRemChip` — contract: `Assumptions` / soundness / completeness / `circuit`
 
@@ -21,7 +26,7 @@ the soundness/completeness proofs, and the bundled `circuit`.
 **Status.** The semantic `Spec` (the flag-gated RV64 `div`/`rem`/… identities on `cols.a`,
 `Specs/Chip.lean`) is real and **soundness is proved** — assembled here from the eight per-conjunct
 `Soundness/<Op>.lean` files (each its own `GeneralFormalCircuit.Soundness`, split out so the heavy
-per-variant proofs compile in parallel). Completeness remains a deferred `sorry`. -/
+per-variant proofs compile in parallel). Completeness lives in `Completeness/Driver.lean` (`completeness_driver`). -/
 
 namespace SP1Clean.DivRemChip
 
@@ -33,12 +38,6 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
-
-/-- Prover-side row well-formedness: the operand `isU64`s plus the `is_real` binary selector. (The
-threaded reader-block `Spec`s would be added here when completeness is filled in.) -/
-def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
-    (_ : ProverHint (ZMod p)) : Prop :=
-  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧ (input.is_real = 0 ∨ input.is_real = 1)
 
 set_option maxHeartbeats 4000000 in
 /-- Soundness: the flag-gated RV64 `div`/`divu`/`rem`/`remu`/`divw`/`remw`/`divuw`/`remuw` identities on
@@ -65,21 +64,16 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   · exact (SoundRemuw.soundness i₀ env input_var input h_input h_assumptions h_holds).1 hr
   · exact (SoundDiv.soundness   i₀ env input_var input h_input h_assumptions h_holds).2
 
-/-- Completeness — deferred skeleton `sorry`. -/
-theorem completeness :
-    GeneralFormalCircuit.Completeness (ZMod p) main ProverAssumptions (fun _ _ _ => True) := by
-  sorry
-
 -- `main` composes the giant `MulOperation` subcircuit twice, so bundling `{ main, elaborated }` whnfs
 -- a large term — above the default heartbeat budget (cf. the `elaborated` instance in `Defs`).
 set_option maxHeartbeats 16000000 in
 /-- The `DivRem` chip row as a `GeneralFormalCircuit`: flag-gated RV64 `div`/`divu`/`rem`/`remu`/`divw`/
-`remw`/`divuw`/`remuw` semantic contract on the extracted `DivRemCols` column struct. Soundness is
-proved; completeness is a deferred `sorry`. -/
+`remw`/`divuw`/`remuw` semantic contract on the extracted `DivRemCols` column struct. Soundness and
+completeness are both proved (completeness via `completeness_driver`). -/
 def circuit : GeneralFormalCircuit (ZMod p) Inputs DivRemCols :=
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     ProverAssumptions := ProverAssumptions, ProverSpec := fun _ _ _ => True,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness_driver }
 
 end SP1Clean.DivRemChip

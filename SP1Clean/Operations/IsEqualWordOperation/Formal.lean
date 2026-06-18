@@ -90,6 +90,23 @@ theorem result_semantic {input : Inputs (ZMod p)} (h : Spec input) (hr : input.i
     List.getElem_cons_succ, sub_eq_zero] at hz
   exact hz
 
+omit [Fact (2 ^ 17 < p)] in
+/-- `Spec` at the all-zero column struct with the gate off (`is_real = 0`) — the inactive-row
+discharge for composing chips whose populate leaves the struct zero (`DivRemChip`'s
+`is_overflow_b`/`is_overflow_c` on padding rows). The operands are arbitrary. -/
+theorem spec_zero (a b : Word (ZMod p)) {is_real : ZMod p} (hr : is_real = 0) :
+    Spec (⟨a, b, ⟨IsZeroWordOperation.zeroCols⟩, is_real⟩ : Inputs (ZMod p)) :=
+  IsZeroWordOperation.spec_zero _ hr
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `Spec` with the gate off (`is_real = 0`) holds at the populate of **any** word pair — the
+shared-struct discharge for a composing chip whose one witnessed struct serves two
+differently-gated assertions with different operand words (`DivRemChip`'s `is_overflow_b/c`:
+full-word @ `is_real_not_word` vs truncated @ the word-variant gate). -/
+theorem spec_populate_offGate (a b w w' : Word (ZMod p)) {is_real : ZMod p} (hr : is_real = 0) :
+    Spec (⟨a, b, populate w w', is_real⟩ : Inputs (ZMod p)) :=
+  IsZeroWordOperation.spec_populate_offGate _ _ hr
+
 /-- SP1's `IsEqualWordOperation::eval` as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,

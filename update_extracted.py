@@ -116,6 +116,7 @@ TRACE_CHIPS: Dict[str, Tuple[int, str]] = {
     "Sub": (33, "RType"),
     "Subw": (32, "RType"),
     "Mul": (82, "RTypeOp"),
+    "DivRem": (246, "RTypeOp"),
     "Addw": (36, "ALUType"),
     "Bitwise": (51, "ALUTypeOp"),
     "Lt": (44, "ALUTypeOp"),

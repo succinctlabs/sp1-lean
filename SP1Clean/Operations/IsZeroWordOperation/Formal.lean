@@ -101,6 +101,42 @@ theorem result_semantic {input : Inputs (ZMod p)} (h : Spec input) (hr : input.i
   obtain ⟨_, hf, hs, hS0, hS1, hS2, hS3, hg⟩ := h
   exact result_collapse (hS0 hr).1 (hS1 hr).1 (hS2 hr).1 (hS3 hr).1 hf hs (hg hr)
 
+omit [Fact (2 ^ 17 < p)] in
+/-- The populated `result` is boolean for **any** source word (a product of per-limb `0/1`
+indicators) — the ungated structural fact `spec_populate_offGate` needs. -/
+theorem populate_result_bool (w : Word (ZMod p)) :
+    (populate w).result = 0 ∨ (populate w).result = 1 := by
+  simp only [populate, IsZeroOperation.populate]
+  by_cases h0 : w[0] = 0 <;> by_cases h1 : w[1] = 0 <;> by_cases h2 : w[2] = 0 <;>
+    by_cases h3 : w[3] = 0 <;> simp [h0, h1, h2, h3]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `Spec` with the gate off (`is_real = 0`) holds at the populate of **any** word `w` — not just
+the operand `a`. A composing chip can share one witnessed struct between two differently-gated
+assertions with different operand words (`DivRemChip`'s `is_overflow_b/c`: full-word @
+`is_real_not_word` vs truncated @ the word-variant gate); the off-gate assertion only needs the
+ungated structural conjuncts, which `populate` satisfies regardless of its source word. -/
+theorem spec_populate_offGate (a w : Word (ZMod p)) {is_real : ZMod p} (hr : is_real = 0) :
+    Spec (⟨a, populate w, is_real⟩ : Inputs (ZMod p)) :=
+  ⟨populate_result_bool w, rfl, rfl,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one⟩
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `Spec` at the all-zero column struct with the gate off (`is_real = 0`) — the inactive-row
+discharge for composing chips whose populate leaves the struct zero. The operand is arbitrary. -/
+theorem spec_zero (a : Word (ZMod p)) {is_real : ZMod p} (hr : is_real = 0) :
+    Spec (⟨a, zeroCols, is_real⟩ : Inputs (ZMod p)) :=
+  ⟨Or.inl rfl, (mul_zero 0).symm, (mul_zero 0).symm,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one⟩
+
 /-- SP1's `IsZeroWordOperation::eval` as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
   { main, elaborated,

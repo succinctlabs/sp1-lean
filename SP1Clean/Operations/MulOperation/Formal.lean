@@ -868,6 +868,36 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
       simp [productVal, carryVal, byteAt, extendedBytes, Vector.getElem_map, Vector.getElem_mapRange] at hchain
       rw [h, one_mul]; linear_combination hchain
 
+set_option linter.unusedSectionVars false in
+/-- `Spec` holds at the all-zero column struct whenever the gate is off (`is_real = 0`) — the
+inactive-row discharge for composing chips whose populate leaves the struct zero (`DivRemChip`'s
+`c_times_quotient_upper` on word rows and padding rows). The variant flags are arbitrary. -/
+theorem spec_zero (b c : Word (ZMod p)) (is_mul is_mulh is_mulhu is_mulhsu is_mulw : ZMod p)
+    {is_real : ZMod p} (hr : is_real = 0) :
+    Spec (⟨b, c, zeroCols, is_real, is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩
+      : Inputs (ZMod p)) :=
+  ⟨(mul_zero _).symm, (mul_zero _).symm, Or.inl rfl, Or.inl rfl, Or.inl rfl,
+    fun h1 => absurd (hr.symm.trans h1) zero_ne_one⟩
+
+/-- Semantic readout at the `populate`d columns on an active row: `spec_populate` +
+`result_semantic` packaged for composing chips — the value-level bridge from the witnessed product
+struct to the `BitVec` product slices (`DivRemChip`'s `c_times_quotient` glue). -/
+theorem semantic_populate {b c : Word (ZMod p)} (hb : b.isU64) (hc : c.isU64)
+    (is_mul is_mulh is_mulhu is_mulhsu is_mulw : ZMod p)
+    (hmul : is_mul = 0 ∨ is_mul = 1) (hmh : is_mulh = 0 ∨ is_mulh = 1)
+    (hmhu : is_mulhu = 0 ∨ is_mulhu = 1) (hmhsu : is_mulhsu = 0 ∨ is_mulhsu = 1)
+    (hmw : is_mulw = 0 ∨ is_mulw = 1)
+    (hsum : is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 0 ∨
+            is_mul + is_mulh + is_mulhu + is_mulhsu + is_mulw = 1) :
+    SemanticSpec
+      (⟨b, c, populate b c is_mulh is_mulhsu is_mulw, 1,
+        is_mul, is_mulh, is_mulhu, is_mulhsu, is_mulw⟩ : Inputs (ZMod p))
+      (populate b c is_mulh is_mulhsu is_mulw) :=
+  result_semantic
+    ⟨fun _ => ⟨hb, hc⟩, Or.inr rfl, fun _ => rfl, hmul, hmh, hmhu, hmhsu, hmw, hsum⟩
+    (spec_populate hb hc is_mul is_mulh is_mulhu is_mulhsu is_mulw 1
+      hmul hmh hmhu hmhsu hmw hsum) rfl
+
 /-- SP1's `MulOperation::eval` as a Clean-native `FormalAssertion`: `is_real`-gated multiply-family
 constraints over the `populate`d product/carry columns; no fresh witnesses. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=

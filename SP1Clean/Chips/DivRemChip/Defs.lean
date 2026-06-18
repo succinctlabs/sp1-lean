@@ -6,6 +6,7 @@ import SP1Clean.Operations.AddOperation.Formal
 import SP1Clean.Operations.U16MSBOperation.Formal
 import SP1Clean.Operations.LtOperationUnsigned.Formal
 import SP1Clean.Chips.DivRemChip.OwnAsserts
+import SP1Clean.Chips.DivRemChip.Populate
 import SP1Clean.Readers.CPUState
 import SP1Clean.Readers.RTypeReader
 import SP1Clean.Foundations.Channels
@@ -43,6 +44,40 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 import it without a cycle. -/
 def Assumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val
+
+/-- Prover-side row well-formedness: the register-read `isU64`s, the `is_real` binary selector, the
+honest `"div_rem_flags"` hint (each flag binary, the sum `= 1` **unconditionally** — E367 is ungated,
+and SP1's padding rows carry `is_divu = 1`), the **padding pin** (an `is_real = 0` row is exactly
+SP1's "0 divided by 1" template: zero `b` read, `c` read `= Word(1)`, the `is_divu` flag — this is
+what makes the ungated lower glue and the flag-gated shape asserts dischargeable off-gate),
+`op_a_0 = 0`, the CPUState clock bounds, and the three register-access timestamp `Spec`s (mirrors
+`MulChip.ProverAssumptions` — R-type, no immediate machinery). Lives in `Defs` (not `Formal`) so the
+`Completeness/` split files can import it without a cycle. -/
+def ProverAssumptions (input : Inputs (ZMod p)) (_ : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) : Prop :=
+  let f := hintFlags hint
+  Word.isU64 input.op_b_val ∧ Word.isU64 input.op_c_val ∧
+  (input.is_real = 0 ∨ input.is_real = 1) ∧
+  (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧ (f[2] = 0 ∨ f[2] = 1) ∧ (f[3] = 0 ∨ f[3] = 1) ∧
+  (f[4] = 0 ∨ f[4] = 1) ∧ (f[5] = 0 ∨ f[5] = 1) ∧ (f[6] = 0 ∨ f[6] = 1) ∧ (f[7] = 0 ∨ f[7] = 1) ∧
+  f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1 ∧
+  (input.is_real = 0 →
+    input.op_b_val = #v[0, 0, 0, 0] ∧ input.op_c_val = #v[1, 0, 0, 0] ∧
+    f = #v[0, 1, 0, 0, 0, 0, 0, 0]) ∧
+  input.adapter.op_a_0 = 0 ∧
+  Readers.CPUState.Spec
+    { cols := input.state,
+      next_pc := #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]],
+      clk_inc := 8, is_real := input.is_real } ∧
+  Readers.RegisterAccessCols.Spec
+    ⟨input.adapter.op_a_memory, input.is_real,
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4⟩ ∧
+  Readers.RegisterAccessCols.Spec
+    ⟨input.adapter.op_b_memory, input.is_real,
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 3⟩ ∧
+  Readers.RegisterAccessCols.Spec
+    ⟨input.adapter.op_c_memory, input.is_real,
+      input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 2⟩
 
 /-- All-zero `fromElements` placeholder for any column block. -/
 @[irreducible] def zc {α : TypeMap} [ProvableType α] : Var α (ZMod p) :=
@@ -124,51 +159,74 @@ high-64, gated `is_mulh = is_div + is_rem` signed / `is_mulhu = is_divu + is_rem
 `LtOperationUnsigned`, seven `U16MSBOperation` sign-bit gadgets, the `CPUState`/`RTypeReader` readers,
 the chip's own `=== 0` asserts (`ownAsserts`), and the byte-range tail. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod p)) := do
-  let flags ← witnessVector 8 (fun _ => (#v[0, 0, 0, 0, 0, 0, 0, 0] : Vector (ZMod p) 8))
+  let bpv := input.adapter.op_b_memory.prev_value
+  let cpv := input.adapter.op_c_memory.prev_value
+  -- The honest variant flags from the `"div_rem_flags"` `ProverHint` (one-hot on real rows;
+  -- the key's absence defaults to the `is_divu = 1` padding template — `Populate.hintFlags`).
+  let flags ← witnessVector 8 (fun env => hintFlags env.hint)
   let is_div := flags[0]; let is_divu := flags[1]; let is_rem := flags[2]; let is_remu := flags[3]
   let is_divw := flags[4]; let is_remw := flags[5]; let is_divuw := flags[6]; let is_remuw := flags[7]
-  let quotient_comp ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let a ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
+  let quotient_comp ← witnessVector 4 (fun env =>
+    populateQuotComp #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let a ← witnessVector 4 (fun env =>
+    populateA #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   -- The arithmetic **operands** `b`/`c` — committed columns distinct from the raw register reads
   -- (`adapter.op_b/c_memory.prev_value`). The chip's own-asserts E20–E47 tie them to the reads: equal to the
   -- read for the 64-bit variants, the sign/zero-extension of the low 32 bits for the W-variants (`b[i] =
   -- read[i]·(1-isword) + b_neg·isword·0xFFFF`). Witnessed here (before the `MulOperation`s, which multiply by
-  -- `c`); populated as the raw read (exact for the 64-bit variants — the W-variant extension is a deferred
-  -- completeness concern). Soundness does not depend on the populate value (E20–E47 pin the columns).
-  let b ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  let c ← witnessVector 4 (fun _ => (#v[0, 0, 0, 0] : Vector (ZMod p) 4))
-  -- (1,2) The two `c_times_quotient` products of `quotient_comp × c`. Witness each `MulOperation`
-  -- column struct via `populate`, then compose as a Clean `assertion` gated by `is_real`
-  -- (`divrem/mod.rs:721`). `mul_lower` = low product (`is_mul = is_real`); `mul_upper` = high product
-  -- (`is_mulh = is_div + is_rem`, `is_mulhu = is_divu + is_remu`). Both have `is_mulw = 0`, so
-  -- `is_mulw → is_real` is vacuous; the `isU64 quotient_comp` precondition is vacuous on padding rows.
+  -- `c`); populated honestly (`bComp`/`cComp` compute the flag-dependent extension). Soundness does not
+  -- depend on the populate value (E20–E47 pin the columns).
+  let b ← witnessVector 4 (fun env =>
+    bComp #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint))
+  let c ← witnessVector 4 (fun env =>
+    cComp #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  -- (1,2) The two `c_times_quotient` product structs of `quotient_comp × c`, witnessed via the
+  -- gated populates (`mul_lower` on real rows only; `mul_upper` only on the 64-bit variants —
+  -- SP1's word rows and padding leave them all-zero). The `assertion`s composing them are emitted
+  -- below, after the `scal` block, so the upper gate can reference the witnessed
+  -- `is_real_not_word` column (witness ops emit no constraints, so the `h_holds` conjunct order
+  -- is unchanged).
   let mul_lower ← ProvableType.witness (fun env =>
-    MulOperation.populate
-      #v[env quotient_comp[0], env quotient_comp[1], env quotient_comp[2], env quotient_comp[3]]
-      #v[env c[0], env c[1], env c[2], env c[3]]
-      0 0 0)
+    populateMulLower (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   let mul_upper ← ProvableType.witness (fun env =>
-    MulOperation.populate
-      #v[env quotient_comp[0], env quotient_comp[1], env quotient_comp[2], env quotient_comp[3]]
-      #v[env c[0], env c[1], env c[2], env c[3]]
-      (env is_div + env is_rem) 0 0)
-  assertion MulOperation.circuit
-    ⟨quotient_comp, c, mul_lower, input.is_real, input.is_real, 0, 0, 0, 0⟩
-  assertion MulOperation.circuit
-    ⟨quotient_comp, c, mul_upper, input.is_real, 0, is_div + is_rem, is_divu + is_remu, 0, 0⟩
+    populateMulUpper (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   -- (3-7) The two `IsEqualWordOperation` overflow checks (`is_overflow_b` vs `i64::MIN`,
   -- `is_overflow_c` vs `-1`), each asserted twice — full-word @ `is_real_not_word`, low-half @ `E2`
   -- (word-variant gate) — and `IsZeroWordOperation` on `c`. Nested cols witnessed flat via
   -- `fromElements (F := …)`. `E2` = word-variant flag sum; `irnw` = `is_real_not_word = is_real·(1-E2)`.
   let e2 := is_divw + is_remw + is_divuw + is_remuw
-  -- witnessed scalar sign/gate columns + the `c_times_quotient`/`carry` byte vectors (placeholder
-  -- values; pinned by the own-asserts `E13/E15/…` and the carry chain `E121…E151`).
-  let scal ← witnessVector 7 (fun _ => .replicate 7 0)
+  -- witnessed scalar sign/gate columns + the `c_times_quotient`/`carry` u16-limb vectors, all
+  -- honestly populated (`populateScal`/`populateCtq`/`populateCarry`); the own-asserts
+  -- `E13/E15/…` and the carry chain `E121…E151` pin them.
+  let scal ← witnessVector 7 (fun env =>
+    populateScal (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   let is_overflow := scal[0]; let b_neg := scal[1]; let b_neg_not_overflow := scal[2]
   let b_not_neg_not_overflow := scal[3]; let is_real_not_word := scal[4]
   let rem_neg := scal[5]; let c_neg := scal[6]
-  let c_times_quotient ← witnessVector 8 (fun _ => .replicate 8 0)
-  let carry ← witnessVector 8 (fun _ => .replicate 8 0)
+  let c_times_quotient ← witnessVector 8 (fun env =>
+    populateCtq #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let carry ← witnessVector 8 (fun env =>
+    populateCarry #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  -- (1,2 cont.) The two `MulOperation` `assertion`s (`divrem/mod.rs:721`): `mul_lower` = low
+  -- product, gate + `is_mul` = `is_real`; `mul_upper` = high product, gate = the witnessed
+  -- `is_real_not_word` (SP1 passes `is_real_not_word` as the upper Mul's multiplicity — on word
+  -- rows the struct is all-zero and its product constraints must be off), `is_mulh = is_div +
+  -- is_rem`, `is_mulhu = is_divu + is_remu`. Both have `is_mulw = 0`, so `is_mulw → is_real` is
+  -- vacuous; the `isU64 quotient_comp` precondition is vacuous on padding rows.
+  assertion MulOperation.circuit
+    ⟨quotient_comp, c, mul_lower, input.is_real, input.is_real, 0, 0, 0, 0⟩
+  assertion MulOperation.circuit
+    ⟨quotient_comp, c, mul_upper, is_real_not_word, 0, is_div + is_rem, is_divu + is_remu, 0, 0⟩
   -- Link `c_times_quotient` to the two `MulOperation` gadgets' product bytes: the low 64 (limbs 0..3)
   -- to `mul_lower`'s bytes 0..7, the high 64 (limbs 4..7) to `mul_upper`'s bytes 8..15. SP1 expresses
   -- this by passing `c_times_quotient` as the Mul *result slot*; our native `MulOperation` reconstructs
@@ -176,22 +234,30 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   -- the two Mul `Spec`s are dangling and the Euclidean identity `c_times_quotient = quotient_comp · c`
   -- is underivable. (Each glue is an `assertZero`, contributing 0 to `localLength`.) `mul_lower`'s
   -- `resultWord` is unconditionally its bytes 0..7 (its high flags are 0); `mul_upper`'s is bytes 8..15
-  -- on the 64-bit variants (`is_mulh`/`is_mulhu` set).
+  -- on the 64-bit variants (`is_mulh`/`is_mulhu` set). The **upper** glue is gated by the 64-bit flag
+  -- sum (mirroring SP1's `is_mulh + is_mulhu` result-tie gates): on the signed-word rows
+  -- `c_times_quotient[4..7]` carries the sign-extension limbs of the 128-bit product while `mul_upper`
+  -- is all-zero, so an unconditional tie would be unsatisfiable by the honest witness.
   let c256 : Expression (ZMod p) := 256
+  let g64 := is_div + is_divu + is_rem + is_remu
   c_times_quotient[0] === mul_lower.product[0] + mul_lower.product[1] * c256
   c_times_quotient[1] === mul_lower.product[2] + mul_lower.product[3] * c256
   c_times_quotient[2] === mul_lower.product[4] + mul_lower.product[5] * c256
   c_times_quotient[3] === mul_lower.product[6] + mul_lower.product[7] * c256
-  c_times_quotient[4] === mul_upper.product[8] + mul_upper.product[9] * c256
-  c_times_quotient[5] === mul_upper.product[10] + mul_upper.product[11] * c256
-  c_times_quotient[6] === mul_upper.product[12] + mul_upper.product[13] * c256
-  c_times_quotient[7] === mul_upper.product[14] + mul_upper.product[15] * c256
+  g64 * (c_times_quotient[4] - (mul_upper.product[8] + mul_upper.product[9] * c256)) === 0
+  g64 * (c_times_quotient[5] - (mul_upper.product[10] + mul_upper.product[11] * c256)) === 0
+  g64 * (c_times_quotient[6] - (mul_upper.product[12] + mul_upper.product[13] * c256)) === 0
+  g64 * (c_times_quotient[7] - (mul_upper.product[14] + mul_upper.product[15] * c256)) === 0
   let irnw := is_real_not_word
-  let bpv := input.adapter.op_b_memory.prev_value
-  let cpv := input.adapter.op_c_memory.prev_value
-  let w_ovb ← witnessVector 11 (fun _ => .replicate 11 0)
-  let w_ovc ← witnessVector 11 (fun _ => .replicate 11 0)
-  let w_is_c_0 ← witnessVector 11 (fun _ => .replicate 11 0)
+  let w_ovb ← witnessVector 11 (fun env =>
+    ProvableType.toElements (ovbWitness (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint)))
+  let w_ovc ← witnessVector 11 (fun env =>
+    ProvableType.toElements (ovcWitness (env input.is_real)
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)))
+  let w_is_c_0 ← witnessVector 11 (fun env =>
+    ProvableType.toElements (isC0Witness
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)))
   assertion IsEqualWordOperation.circuit
     ⟨#v[bpv[0], bpv[1], bpv[2], bpv[3]], #v[0, 0, 0, 32768],
      fromElements (F := Expression (ZMod p)) w_ovb, irnw⟩
@@ -210,41 +276,68 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var DivRemCols (ZMod 
   -- `LtOperationUnsigned` (`|remainder| < max(|c|,1)`). `LtOperationUnsigned` witnesses its comparison
   -- columns here via `populate_*`, then is composed as a Clean `assertion` gated by
   -- `remainder_check_multiplicity` (`is_real·(1 − is_c_0)`).
-  let abs_c ← witnessVector 4 (fun _ => .replicate 4 0)
-  let abs_remainder ← witnessVector 4 (fun _ => .replicate 4 0)
-  let remainder_comp ← witnessVector 4 (fun _ => .replicate 4 0)
-  let max_abs_c_or_1 ← witnessVector 4 (fun _ => .replicate 4 0)
-  let w_cneg ← witnessVector 4 (fun _ => .replicate 4 0)
-  let w_rneg ← witnessVector 4 (fun _ => .replicate 4 0)
-  let misc ← witnessVector 3 (fun _ => .replicate 3 0)
+  let abs_c ← witnessVector 4 (fun env =>
+    populateAbsC #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let abs_remainder ← witnessVector 4 (fun env =>
+    populateAbsRem #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let remainder_comp ← witnessVector 4 (fun env =>
+    populateRemComp #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let max_abs_c_or_1 ← witnessVector 4 (fun env =>
+    populateMaxAbsCOr1 #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let w_cneg ← witnessVector 4 (fun env =>
+    wCnegWitness (env input.is_real)
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let w_rneg ← witnessVector 4 (fun env =>
+    wRnegWitness (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let misc ← witnessVector 3 (fun env =>
+    populateMisc (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   let abs_c_alu_event := misc[0]; let abs_rem_alu_event := misc[1]
   let remainder_check_multiplicity := misc[2]
   assertion AddOperation.circuit ⟨c, abs_c, ⟨w_cneg⟩, abs_c_alu_event⟩
   assertion AddOperation.circuit ⟨remainder_comp, abs_remainder, ⟨w_rneg⟩, abs_rem_alu_event⟩
   let cl ← witnessVector 2 (fun env =>
-    LtOperationUnsigned.comparisonLimbsWitness
-      #v[env abs_remainder[0], env abs_remainder[1], env abs_remainder[2], env abs_remainder[3]]
-      #v[env max_abs_c_or_1[0], env max_abs_c_or_1[1], env max_abs_c_or_1[2], env max_abs_c_or_1[3]])
+    ltClWitness (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   let f ← witnessVector 4 (fun env =>
-    LtOperationUnsigned.flagsWitness
-      #v[env abs_remainder[0], env abs_remainder[1], env abs_remainder[2], env abs_remainder[3]]
-      #v[env max_abs_c_or_1[0], env max_abs_c_or_1[1], env max_abs_c_or_1[2], env max_abs_c_or_1[3]])
+    ltFlagsWitness (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   let not_eq_inv ← witnessVector 1 (fun env =>
-    LtOperationUnsigned.notEqInvWitness
-      #v[env abs_remainder[0], env abs_remainder[1], env abs_remainder[2], env abs_remainder[3]]
-      #v[env max_abs_c_or_1[0], env max_abs_c_or_1[1], env max_abs_c_or_1[2], env max_abs_c_or_1[3]])
-  let bit ← witnessVector 1 (fun env => #v[U16CompareOperation.populate_bit (env cl[0]) (env cl[1])])
+    ltNotEqInvWitness (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let bit ← witnessVector 1 (fun env =>
+    ltBitWitness (env input.is_real)
+      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
   let lt_out : Var Extracted.LtOperationUnsigned (ZMod p) := ⟨⟨bit[0]⟩, f, not_eq_inv[0], cl⟩
   assertion LtOperationUnsigned.circuit
     ⟨abs_remainder, max_abs_c_or_1, lt_out, remainder_check_multiplicity⟩
   -- (11-17) Seven `U16MSBOperation` sign-bit extractions — b/c/remainder high u16 (@ `irnw`),
   -- b/c/remainder/quotient low-half-high u16 (@ `E2`).
-  let remainder ← witnessVector 4 (fun _ => .replicate 4 0)
-  let quotient ← witnessVector 4 (fun _ => .replicate 4 0)
-  let w_bmsb ← witnessVector 1 (fun _ => .replicate 1 0)
-  let w_cmsb ← witnessVector 1 (fun _ => .replicate 1 0)
-  let w_remmsb ← witnessVector 1 (fun _ => .replicate 1 0)
-  let w_quotmsb ← witnessVector 1 (fun _ => .replicate 1 0)
+  let remainder ← witnessVector 4 (fun env =>
+    populateRemainder #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let quotient ← witnessVector 4 (fun env =>
+    populateQuotient #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let w_bmsb ← witnessVector 1 (fun env =>
+    #v[bMsbCell #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint)])
+  let w_cmsb ← witnessVector 1 (fun env =>
+    #v[cMsbCell #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)])
+  let w_remmsb ← witnessVector 1 (fun env =>
+    #v[remMsbCell #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)])
+  let w_quotmsb ← witnessVector 1 (fun env =>
+    #v[quotMsbCell #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
+      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)])
   assertion U16MSBOperation.circuit ⟨bpv[3], ⟨w_bmsb[0]⟩, irnw⟩
   assertion U16MSBOperation.circuit ⟨cpv[3], ⟨w_cmsb[0]⟩, irnw⟩
   assertion U16MSBOperation.circuit ⟨remainder[3], ⟨w_remmsb[0]⟩, irnw⟩

@@ -466,11 +466,18 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
             (by simpa only [Vector.getElem_map] using h_ctq1)
             (by simpa only [Vector.getElem_map] using h_ctq2)
             (by simpa only [Vector.getElem_map] using h_ctq3)
-          have hhi := rwhi_product_signed h_mul_hi hqU hcU hr hihm1 hihmu0
-            (by simpa only [Vector.getElem_map] using h_ctq4)
-            (by simpa only [Vector.getElem_map] using h_ctq5)
-            (by simpa only [Vector.getElem_map] using h_ctq6)
-            (by simpa only [Vector.getElem_map] using h_ctq7)
+          -- de-gate the four upper glue equalities (the 64-bit flag sum is `1` on a REM row), then
+          -- feed the upper-Mul form (gate = the witnessed `is_real_not_word`, pinned `1` by `hirnw`).
+          have h_ctq4' := h_ctq4; have h_ctq5' := h_ctq5
+          have h_ctq6' := h_ctq6; have h_ctq7' := h_ctq7
+          rw [hz_div, hz_divu, hflag, hz_remu] at h_ctq4' h_ctq5' h_ctq6' h_ctq7'
+          simp only [add_zero, zero_add, one_mul, ← sub_eq_add_neg, sub_eq_zero]
+            at h_ctq4' h_ctq5' h_ctq6' h_ctq7'
+          have hhi := rwhi_product_signed h_mul_hi hqU hcU hirnw hihm1 hihmu0
+            (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq4')
+            (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq5')
+            (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq6')
+            (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq7')
           -- the signed Euclidean identity (`b.toInt = quotient·c + remc`).
           have hid := euclid_identity_signed (b := input_op_b_val) (c := input_op_c_val)
             (quotient := Vector.map (Expression.eval env)
@@ -938,7 +945,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       exact Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, hbin,
         Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl, by rcases hbin with h | h <;> simp [h]⟩
     case mulHi =>
-      refine Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, Or.inl rfl,
+      refine Or.inr ⟨fun hr => ⟨hqcU (hirnw_imp hr).1, hcU_op⟩, hirnw,
+        fun h => (zero_ne_one h).elim, Or.inl rfl,
         group_binary2 bd br (by omega), group_binary2 bdu bru (by omega), Or.inl rfl, Or.inl rfl, ?_⟩
       rcases group_binary4 bd br bdu bru (by omega) with h | h
       · exact Or.inl (by linear_combination h)

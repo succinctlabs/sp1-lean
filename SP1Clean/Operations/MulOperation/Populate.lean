@@ -49,5 +49,13 @@ def populate (b c : Word (ZMod p)) (is_mulh is_mulhsu is_mulw : ZMod p) :
       else 0⟩,
     b_sign_extend := (is_mulh + is_mulhsu) * b_msb, c_sign_extend := is_mulh * c_msb }
 
+/-- The all-zero column struct — the witness on rows where the gadget is inactive and SP1 leaves
+the struct unpopulated (`DivRemChip`'s `c_times_quotient_upper` on word rows; padding rows).
+`spec_zero` (in `Formal`) discharges the composed assertion's obligation at this value. -/
+def zeroCols : Extracted.MulOperation (ZMod p) :=
+  { carry := .replicate 16 0, product := .replicate 16 0,
+    b_lower_byte := ⟨.replicate 4 0⟩, c_lower_byte := ⟨.replicate 4 0⟩,
+    b_msb := 0, c_msb := 0, product_msb := ⟨0⟩,
+    b_sign_extend := 0, c_sign_extend := 0 }
 
 end SP1Clean.MulOperation

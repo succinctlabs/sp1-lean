@@ -225,11 +225,22 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       (by simpa only [Vector.getElem_map] using h_ctq1)
       (by simpa only [Vector.getElem_map] using h_ctq2)
       (by simpa only [Vector.getElem_map] using h_ctq3)
-    have hhi := rwhi_product_unsigned h_mul_hi hqU hcU hr hihm0 hihmu1
-      (by simpa only [Vector.getElem_map] using h_ctq4)
-      (by simpa only [Vector.getElem_map] using h_ctq5)
-      (by simpa only [Vector.getElem_map] using h_ctq6)
-      (by simpa only [Vector.getElem_map] using h_ctq7)
+    -- `is_real_not_word = 1` (E13, word flags zero), the upper-Mul gate; then de-gate the four
+    -- upper glue equalities (the 64-bit flag sum is `1` on a REMU row).
+    have hirnw : env.get (B + 4) = 1 := by
+      have h := e13; simp only [circuit_norm] at h
+      rw [hz_divw, hz_remw, hz_divuw, hz_remuw, h_oir, hr] at h
+      linear_combination h
+    have h_ctq4' := h_ctq4; have h_ctq5' := h_ctq5
+    have h_ctq6' := h_ctq6; have h_ctq7' := h_ctq7
+    rw [hz_div, hz_divu, hz_rem, hflag] at h_ctq4' h_ctq5' h_ctq6' h_ctq7'
+    simp only [add_zero, zero_add, one_mul, ← sub_eq_add_neg, sub_eq_zero]
+      at h_ctq4' h_ctq5' h_ctq6' h_ctq7'
+    have hhi := rwhi_product_unsigned h_mul_hi hqU hcU hirnw hihm0 hihmu1
+      (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq4')
+      (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq5')
+      (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq6')
+      (by simpa only [circuit_norm, Vector.getElem_mapRange] using h_ctq7')
     have hcl0 : env.get (B + 7) + env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4)
         = input_op_b_val[0] + env.get (B + 7 + 8) * 65536 := by rw [← hbb0]; exact hL0
     have hcl1 : env.get (B + 7 + 1) + env.get (B + 7 + 8 + 8 + 11 + 11 + 11 + 4 + 4 + 1)
@@ -619,7 +630,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       exact Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, hbin,
         Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl, by rcases hbin with h | h <;> simp [h]⟩
     case mulHi =>
-      refine Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, Or.inl rfl,
+      refine Or.inr ⟨fun hr => ⟨hqcU (hirnw_imp hr).1, hcU_op⟩, hirnw,
+        fun h => (zero_ne_one h).elim, Or.inl rfl,
         group_binary2 bd br (by omega), group_binary2 bdu bru (by omega), Or.inl rfl, Or.inl rfl, ?_⟩
       rcases group_binary4 bd br bdu bru (by omega) with h | h
       · exact Or.inl (by linear_combination h)

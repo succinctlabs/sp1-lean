@@ -39,6 +39,13 @@ def notEqInvWitness (b cc : Word (ZMod p)) : Vector (ZMod p) 1 :=
   else if b[1] ≠ cc[1] then #v[(b[1] - cc[1])⁻¹] else if b[0] ≠ cc[0] then #v[(b[0] - cc[0])⁻¹]
   else (#v[0] : Vector (ZMod p) 1)
 
+/-- The all-zero column struct — the witness on rows where the gadget is inactive and SP1 leaves
+the struct unpopulated (`DivRemChip`'s `remainder_lt_operation` when the remainder-check
+multiplicity is `0`). `spec_zero` (in `Formal`) discharges the composed assertion's obligation at
+this value. -/
+def zeroCols : Extracted.LtOperationUnsigned (ZMod p) :=
+  ⟨⟨0⟩, #v[0, 0, 0, 0], 0, #v[0, 0]⟩
+
 /-- Fully witnessed `LtOperationUnsigned` column struct (SP1's `populate_unsigned`): one-hot flags,
 comparison limbs, non-equality inverse, and the composed `U16CompareOperation` bit. -/
 def populate (b cc : Word (ZMod p)) : Extracted.LtOperationUnsigned (ZMod p) :=

@@ -930,7 +930,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       exact Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, hbin,
         Or.inl rfl, Or.inl rfl, Or.inl rfl, Or.inl rfl, by rcases hbin with h | h <;> simp [h]⟩
     case mulHi =>
-      refine Or.inr ⟨fun hr => ⟨hqcU hr, hcU_op⟩, hbin, fun h => (zero_ne_one h).elim, Or.inl rfl,
+      refine Or.inr ⟨fun hr => ⟨hqcU (hirnw_imp hr).1, hcU_op⟩, hirnw,
+        fun h => (zero_ne_one h).elim, Or.inl rfl,
         group_binary2 bd br (by omega), group_binary2 bdu bru (by omega), Or.inl rfl, Or.inl rfl, ?_⟩
       rcases group_binary4 bd br bdu bru (by omega) with h | h
       · exact Or.inl (by linear_combination h)

@@ -247,6 +247,15 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · linear_combination hcl1eq
   · linear_combination -hinv
 
+set_option linter.unusedSectionVars false in
+/-- `Spec` at the all-zero column struct with the gate off (`is_real = 0`) — the inactive-row
+discharge for composing chips whose populate leaves the struct zero (`DivRemChip`'s
+`remainder_lt_operation` when the remainder-check multiplicity is `0`). Operands arbitrary. -/
+theorem spec_zero (b cc : Word (ZMod p)) {is_real : ZMod p} (hr : is_real = 0) :
+    Spec (⟨b, cc, zeroCols, is_real⟩ : Inputs (ZMod p)) := by
+  subst hr
+  simp [Spec, zeroCols]
+
 /-- SP1's `LtOperationUnsigned::eval` as a Clean-native `FormalAssertion`: composes
 `U16CompareOperation` as a sub-assertion, witnessing nothing. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=

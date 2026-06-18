@@ -27,8 +27,11 @@ gates on exactly this set.) `MulChip.completeness` was closed 2026-06-10 via
 1. `ShiftLeftChip.completeness` — `Chips/ShiftLeftChip/Formal.lean` — honest `populate`-style witness +
    `ProverHint` opcode threading (the `BranchChip.completeness` recipe).
 2. `ShiftRightChip.completeness` — `Chips/ShiftRightChip/Formal.lean` — same shape as ShiftLeft.
-3. `DivRemChip.completeness` — `Chips/DivRemChip/Formal.lean` — soundness landed (axiom-clean); only
-   completeness remains.
+3. `DivRemChip.completeness` — **CLOSED 2026-06-18** (axiom-clean), via `completeness_driver` in
+   `Chips/DivRemChip/Completeness/Driver.lean`. The 13 nested `IsEqualWord`/`IsZero` cols pins were
+   unblocked by *selective non-decomposition* — `attribute [local circuit_norm ↓ 100000]
+   ProvableType.eval_fromElements` keeps those sub-op cols folded so `circuit_proof_start` never explodes
+   them into the intractable nested record (see `docs/agents/proof-patterns.md`). Heartbeats 256M → 64M.
 4. `sp1_witness_decode` — `Soundness/SP1GatedVm.lean` — the single isolated capstone premise: the
    witness → `ChipRow` decode seam (`SP1WitnessDecode`, = **W1b/W1c** below); a packaging premise, not
    a chip debt. (`sp1_gatedExecution_prereqs` itself is now a *proven* assembly of this seam with the

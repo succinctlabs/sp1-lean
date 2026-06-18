@@ -23,6 +23,12 @@ def populate (a : Word (ZMod p)) : Extracted.IsZeroWordOperation (ZMod p) :=
   let sh := l2.result * l3.result
   ⟨l0, l1, l2, l3, fh, sh, fh * sh⟩
 
+/-- The all-zero column struct — the witness on rows where the gadget is inactive and SP1 leaves
+the struct unpopulated (gated `IsZeroWord`/`IsEqualWord` composition on padding rows). `spec_zero`
+(in `Formal`) discharges the composed assertion's obligation at this value. -/
+def zeroCols : Extracted.IsZeroWordOperation (ZMod p) :=
+  ⟨⟨0, 0⟩, ⟨0, 0⟩, ⟨0, 0⟩, ⟨0, 0⟩, 0, 0, 0⟩
+
 /-- Vector form of the witness, used only for the conformance check in
 `WitnessTests/IsZeroWordOperationWitness.lean`. Returns
 `(limb inverses, limb results, first_half, second_half, result)`. -/

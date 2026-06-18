@@ -55,6 +55,44 @@ the Operations layer (that wall is a chip-layer phenomenon; see the memory note)
   equalities) — not the Spec. Discharge subcircuit `Assumptions` (= `True`) with `trivial` and the gluing
   gates from the honest witnesses.
 
+## Keeping a nested sub-op's `cols` folded through `circuit_proof_start` (completeness)
+
+When a chip composes a **deeply-nested** sub-op via `assertion … ⟨…, fromElements w, …⟩` (e.g.
+`DivRemChip`'s `IsEqualWordOperation`/`IsZeroWordOperation` overflow flags — `is_diff_zero → 4×
+is_zero_limb → {inverse, result}`), `circuit_proof_start`'s goal `simp only [circuit_norm]` rewrites the
+sub-op `cols = eval (fromElements w)` via `ProvableType.eval_eq_eval` (`@[circuit_norm ↓ high]`, prio
+10000) — pushing `eval` through the struct into a **deeply-nested record** whose `toElements` is
+intractable (a `circuit_norm` fixed point that can't be re-folded; `getElem_toElements_eval_varFromOffset`,
+`exact`, `rw`, `convert`, `interval_cases <;> simp` all whnf-time-out — flat `MulOperation` cols are fine,
+the nesting is the killer). The sub-circuit `Spec` obligation then can't be discharged.
+
+**Fix — selective non-decomposition (NOT struct-flattening, NOT brute force).** Bump
+`ProvableType.eval_fromElements` (`eval (fromElements xs) = fromElements (xs.map env)`; exists in Clean's
+`Provable.lean`, **un-tagged**) to top `circuit_norm` priority in the proof file:
+
+```lean
+attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements
+```
+
+It intercepts `eval (fromElements w)` and keeps it **flat** (`fromElements (w.map env)`) before
+`eval_eq_eval` can decompose it; then `eval_eq_eval` can't fire (the head is no longer `eval`). Each
+nested-cols pin closes with `intro i hi; simp only [ProvableType.toElements_fromElements,
+Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]`.
+
+- **Priority must be *strictly* > 10000.** At a `↓ high` tie `eval_eq_eval` wins the *outer* struct and
+  `eval_fromElements` only rewrites the leaves → the cols is still the nested record (symptom: N
+  "unsolved goals", one per pin, each ~70 kB).
+- **It's selective for free.** Only cols passed as a literal `fromElements w` match; a sub-op composed
+  with a `ProvableType.witness` result (`varFromOffset` form) or a struct literal (`{value := …}`,
+  `{msb := …}`) does **not** — so `Mul`/`Add`/`Lt`/`U16MSB` are untouched. Keep the attribute `local`.
+- **Diagnosis tool** (the full `circuit_proof_start` goal is a ~69 kB decomposed term that times out the
+  30 s LSP): in a throwaway theorem, `circuit_proof_start_core; dsimp only [main]` then `lean_goal` — core
+  is just `intro`s and `dsimp` is definitional, both LSP-cheap, and the goal shows the cols still folded as
+  `cols := fromElements w`, revealing the form + which sub-ops use it.
+
+This closed `DivRemChip.completeness` axiom-clean and let its `maxHeartbeats` drop 256M → 64M (the nested
+decomposition was the whole cost).
+
 ## The `FormalAssertion` + `populate` demotion (generalizing the Add worked example)
 
 For ops whose witnessed columns are **pinned by the semantic `Spec`** (see `../architecture.md`
