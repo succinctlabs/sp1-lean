@@ -75,6 +75,6 @@ theorem isInitialState_nonvacuous : ∃ s0, IsInitialState emptyProgram s0 :=
      pc := cfgState_pc 0
      romLoaded := by intro a w hf; simp [emptyProgram, GuestProgram.fetchWord] at hf
      imageLoaded := by intro av hav; simp [emptyProgram] at hav
-     configured := cfgState_priv 0 }⟩
+     configured := ⟨cfgState_init 0, cfgState_priv 0⟩ }⟩
 
 end SP1Clean.Soundness.Target

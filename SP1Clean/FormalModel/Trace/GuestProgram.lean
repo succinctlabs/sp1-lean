@@ -48,14 +48,16 @@ def RomLoaded (prog : GuestProgram) (s : SailState) : Prop :=
   ∀ a w, prog.fetchWord a = some w →
     ∀ i : Fin 4, s.mem.get? (a.toNat + i) = some (w.extractLsb' (8 * i) 8)
 
-/-- **[W7 seam]** The platform-configuration residue of a runnable initial state — machine mode, no
-enabled interrupts, bare address translation, hart active, RVC off, … Currently pins **machine mode**
-(`cur_privilege = Machine`), the residue the decode reduction needs (`Model/SailDecode.lean`: the
-Zicfilp/forward-CFI decode branch reads privilege-dependent CSRs, so the decoder only reduces once
-`cur_privilege` is resolved). Strengthened incrementally as the `try_step` reduction (W7) discovers the
-remaining pins it needs. -/
+/-- **[W7 seam]** The state residue a runnable initial state needs for the `try_step` reduction —
+every register initialized + machine mode (no enabled interrupts, bare address translation, hart active,
+RVC off, … added incrementally as W7 discovers them). The two current pins are exactly what the decode
+reduction (`Model/SailDecode.lean`) consumes: `isInitialized` (the Zicfilp/forward-CFI decode branch
+reads privilege-dependent CSRs, which must be present) and `cur_privilege = Machine` (so the
+`match cur_privilege` in that branch resolves). `isInitialized` here is redundant with
+`IsInitialState.initialized`/`RefinesAt.init`; it is folded in so `SailConfigured s` alone suffices to
+decode `s` (used by `DecodeOperandsBound`/`decodedInROM`, which only carry `SailConfigured`). -/
 def SailConfigured (s : SailState) : Prop :=
-  s.regs.get? Register.cur_privilege = some Privilege.Machine
+  s.isInitialized ∧ s.regs.get? Register.cur_privilege = some Privilege.Machine
 
 /-- A Sail state that "loads" the guest program: a *relation*, not a constructed state, so everything
 the execution doesn't touch stays quantified. ELF ingestion (W6b) produces a `GuestProgram` and a
