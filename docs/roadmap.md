@@ -174,12 +174,18 @@ decode ∧ value`, `operandsBound_full_targetBound` (full `bound`, both halves),
 (the full `TargetObligations` at the concrete `OperandsBound`, `bound` discharged, `lift`/`halt` the W7/W5
 seams — the Phase-7 glue entry point).
 
-**Remaining value-half (the cross-bus residual `TraceValueBinding`):** prove committed operand value =
-exact-replay value `replayVal`, via the Memory bus (`memEvent_prevValue_eq_writer` /
-`traceMemoryValid_of_genesis_and_balance`) + the **walk-order = clk-order bridge** (the `WalkOf` trail is
-clk-monotonic — each `stateEdge` advances clk — so walk position order = memory clk order). Sub-item
-**W2b (L):** thread real load/store data addresses into `Trace.RowView` (the §8.4 gap) and strengthen
-`RowEffect`'s ROM clause to full store-replay memory.
+**Walk-clk bridge landed (`ValueBound.lean`):** `walk_clk_monotone` — consecutive `WalkOf` rows advance
+the state-bus clock (`sndClkOf path[i] = rcvClkOf path[i+1]`), i.e. the walk visits rows in increasing clk
+order = the order the Memory-bus value chain reads them (`sndClk_eq_rcvClk` is the clk twin of
+`sndPc_eq_rcvPc`; `isWalk_chain` was exposed for it).
+
+**Remaining `TraceValueBinding` discharge:** compose `walk_clk_monotone` with (i) the memory event
+timestamps = row clocks (`rowClkLow`), (ii) the Memory-bus value chain (`memEvent_prevValue_eq_writer` /
+`traceMemoryValid_of_genesis_and_balance`: a read returns the most-recent earlier write, read-backs
+preserving it), and (iii) the genesis alignment (`s0`'s initial registers = 0 = the init chip's genesis) —
+the induction relating `replayVal`'s walk recursion to the memory event chain. Sub-item **W2b (L):** thread
+real load/store data addresses into `Trace.RowView` (the §8.4 gap) and strengthen `RowEffect`'s ROM clause
+to full store-replay memory.
 
 ### W5 — the ECALL/HALT chip (M–L)
 
