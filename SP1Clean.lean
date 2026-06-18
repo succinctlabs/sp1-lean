@@ -305,6 +305,7 @@ import SP1Clean.Soundness.GatedVm.SailDispatch
 import SP1Clean.Soundness.GatedVm.StateBridge
 import SP1Clean.Soundness.InstructionTrace
 import SP1Clean.Soundness.MemoryConsistency
+import SP1Clean.Soundness.MemoryGlobal
 import SP1Clean.Soundness.MemoryIsU64
 import SP1Clean.Soundness.Opcode
 import SP1Clean.Soundness.ProgramConsistency

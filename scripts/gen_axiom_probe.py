@@ -42,6 +42,8 @@ TARGETS = [
      r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),
     ("SP1Clean/FormalModel/Trace/Witness.lean",
      r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_\w+|mem_fullRegs)\b"),
+    ("SP1Clean/Soundness/MemoryGlobal.lean",
+     r"theorem\s+(memProviderGenesis_of_contributions|traceMemoryValid_of_genesis_and_balance)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")
