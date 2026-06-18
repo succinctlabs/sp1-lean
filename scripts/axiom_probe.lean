@@ -337,3 +337,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.isInitialState_nonvacuous
 #print axioms SP1Clean.Soundness.memProviderGenesis_of_contributions
 #print axioms SP1Clean.Soundness.traceMemoryValid_of_genesis_and_balance
+#print axioms SP1Clean.Soundness.operand_a_isU64_of_memBalance
+#print axioms SP1Clean.Soundness.operand_b_isU64_of_memBalance
+#print axioms SP1Clean.Soundness.operand_c_isU64_of_memBalance
+#print axioms SP1Clean.Soundness.memBalanceHyps_of_genesis

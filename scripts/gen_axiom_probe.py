@@ -44,6 +44,8 @@ TARGETS = [
      r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_\w+|mem_fullRegs)\b"),
     ("SP1Clean/Soundness/MemoryGlobal.lean",
      r"theorem\s+(memProviderGenesis_of_contributions|traceMemoryValid_of_genesis_and_balance)\b"),
+    ("SP1Clean/Soundness/MemoryIsU64.lean",
+     r"(?:theorem|def)\s+(memBalanceHyps_of_genesis|operand_\w+_isU64_of_memBalance)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")
