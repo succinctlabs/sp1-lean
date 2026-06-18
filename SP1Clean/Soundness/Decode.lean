@@ -2,6 +2,7 @@ import SP1Clean.Soundness.TargetVm
 import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Soundness.Opcode
+import SP1Clean.Model.SailDecode
 
 /-! # W3 — the decode half of `OperandsBound` (trusted Program path)
 
@@ -462,5 +463,48 @@ def targetObligations_of_decode (prog : GuestProgram) (pi : SP1TargetPublicIO (Z
   lift := h_lift
   halt_nonempty := h_halt_nonempty
   halt := h_halt
+
+/-! ## W3-A end-to-end: `decodedInROM` for a concrete instruction, via the real Sail decoder
+
+The decode chain closed against the official decoder: a one-instruction guest program (ADD at pc 0),
+the committed Program-bus row it decodes to, and a proof that `decodedInROM` holds — composing
+`SailDecode.decode_ADD_example` (the `ext_decode` reduction) with `instrToProgramRow_rtype` (the
+projection to committed columns). The `SailConfigured s` precondition of `decodedInROM` supplies exactly
+the `isInitialized` + machine-mode residue the decode reduction consumes. This is the per-concrete-word
+shape `decode_bound_of_balance` consumes (`∀ row ∈ rom, decodedInROM prog row`) — for a fixed program
+each row is discharged this way. -/
+
+/-- A one-instruction guest program: `ADD x1, x2, x3` (`0x003100B3`) at pc 0. -/
+def addProgram : GuestProgram :=
+  ⟨[(0#64, 0x003100B3#32)], 0, [], by simp,
+   by intro a ha; simp only [List.map_cons, List.map_nil, List.mem_singleton] at ha; subst ha; simp⟩
+
+/-- The committed Program-bus row the ADD decodes to — the `instrToProgramRow` projection at pc 0
+(`op_a = rd = x1`, `op_b[0] = rs1 = x2`, `op_c[0] = rs2 = x3`, opcode `ADD`). -/
+def addRow : ProgramRow (ZMod p) :=
+  { pc0 := 0, pc1 := 0, pc2 := 0,
+    opcode := ((ropToOpcode rop.ADD).toNat : ZMod p),
+    op_a := regidxVal (regidx.Regidx 1#5),
+    op_b := #v[regidxVal (regidx.Regidx 2#5), 0, 0, 0],
+    imm_b := 0,
+    op_c := #v[regidxVal (regidx.Regidx 3#5), 0, 0, 0],
+    op_a_0 := if regidxVal (p := p) (regidx.Regidx 1#5) = 0 then 1 else 0,
+    imm_c := 0 }
+
+set_option maxRecDepth 10000 in
+omit [Fact (2 ^ 24 < p)] in
+/-- **W3-A closed for a concrete instruction.** The committed `addRow` is the decode of `addProgram`'s
+ROM word at its pc, against the official Sail `ext_decode` — `decodedInROM` holds, axiom-clean modulo the
+Sail model's decoder axioms. -/
+theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
+  refine ⟨0x003100B3#32, ?_, ?_⟩
+  · show addProgram.fetchWord (pcBitsOfRow (addRow (p := p))) = some _
+    have hpc : pcBitsOfRow (addRow (p := p)) = 0#64 := by
+      simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero]; rfl
+    rw [hpc]; rfl
+  · intro s hcfg
+    refine ⟨.RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), s,
+      SP1Clean.SailDecode.decode_ADD_example s hcfg.1 hcfg.2, ?_⟩
+    rw [instrToProgramRow_rtype]; rfl
 
 end SP1Clean.Soundness.Target

@@ -36,7 +36,7 @@ TARGETS = [
      r"wired_subset_reachable|reachable_subset_wired|routeOf_reaches_sail)\b"),
     ("SP1Clean/Soundness/TargetVm.lean", r"theorem\s+(sp1_target\w*)\b"),
     ("SP1Clean/Soundness/Decode.lean",
-     r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM|"
+     r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM\w*|"
      r"targetObligations_of_decode)\b"),
     ("SP1Clean/Model/SailDecode.lean",
      r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),

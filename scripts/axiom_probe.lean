@@ -326,6 +326,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.decode_targetBound_of_balance
 #print axioms SP1Clean.Soundness.Target.decode_targetBound
 #print axioms SP1Clean.Soundness.Target.targetObligations_of_decode
+#print axioms SP1Clean.Soundness.Target.decodedInROM_addRow
 #print axioms SP1Clean.SailDecode.run_bind_ok_none
 #print axioms SP1Clean.SailDecode.run_bind_ok_some
 #print axioms SP1Clean.SailDecode.decode_ADD_example
