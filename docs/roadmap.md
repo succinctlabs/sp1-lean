@@ -22,8 +22,10 @@ new headline theorem axiom-clean modulo the Sail model's own decoder axioms; the
 proved for a concrete instruction. **W6b** non-vacuity witness done (`FormalModel/Trace/Witness.lean`).
 **W4a** MemoryGlobalInit provider constructed (`Soundness/MemoryGlobal.lean`). **W2+W7** exact-replay
 keystone done — `RefinesAt`/`RowEffect` strengthened to exact replay / strict write, `chain_to_refines`
-re-proved. `SailConfigured` strengthened to `isInitialized ∧ machine mode`. Remaining on the critical path:
-the W2 value-half cross-bus binding, W5 HALT, W7's `try_step` reduction, glue.
+re-proved — and the **W2 value-half assembled** (`ValueBound.lean`: `ValueOperandsBound`, the concrete
+`OperandsBound = decode ∧ value`, and `targetObligations_full` with `bound` discharged). `SailConfigured`
+strengthened to `isInitialized ∧ machine mode`. Remaining on the critical path: discharge the W2 cross-bus
+residual `TraceValueBinding`, W5 HALT, W7's `try_step` reduction, glue.
 
 ---
 
@@ -165,12 +167,19 @@ frame-disjunction to **exact replay**; `RowEffect.regs` strengthened to the **st
 `sp1_target_execution` re-proved green, no new axioms. So W2's exact-replay and W7's `RowEffect` shape land
 together as designed.
 
-**Remaining value-half of `bound` (deep, cross-bus):** prove committed operand value = live register value
-= `replayVal`, via the Memory bus (`memEvent_prevValue_eq_writer`) + the **walk-order = clk-order bridge**
-(the `WalkOf` trail is clk-monotonic — each `stateEdge` advances clk — so walk position order = memory clk
-order), then define `ValueOperandsBound` and combine with `decode_targetBound`. Sub-item **W2b (L):** thread
-real load/store data addresses into `Trace.RowView` (the §8.4 gap) and strengthen `RowEffect`'s ROM clause
-to full store-replay memory.
+**Value-half assembled (`Soundness/ValueBound.lean`):** `ValueOperandsBound` (live registers = committed
+`op_b`/`op_c` `prev_value` columns); `value_targetBound` proves the value half of `bound` by composing the
+exact-replay invariant (`RefinesAt.frame`) with the cross-bus link (axiom-clean); `OperandsBound_full =
+decode ∧ value`, `operandsBound_full_targetBound` (full `bound`, both halves), and `targetObligations_full`
+(the full `TargetObligations` at the concrete `OperandsBound`, `bound` discharged, `lift`/`halt` the W7/W5
+seams — the Phase-7 glue entry point).
+
+**Remaining value-half (the cross-bus residual `TraceValueBinding`):** prove committed operand value =
+exact-replay value `replayVal`, via the Memory bus (`memEvent_prevValue_eq_writer` /
+`traceMemoryValid_of_genesis_and_balance`) + the **walk-order = clk-order bridge** (the `WalkOf` trail is
+clk-monotonic — each `stateEdge` advances clk — so walk position order = memory clk order). Sub-item
+**W2b (L):** thread real load/store data addresses into `Trace.RowView` (the §8.4 gap) and strengthen
+`RowEffect`'s ROM clause to full store-replay memory.
 
 ### W5 — the ECALL/HALT chip (M–L)
 
