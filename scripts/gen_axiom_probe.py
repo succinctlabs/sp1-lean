@@ -40,6 +40,8 @@ TARGETS = [
      r"targetObligations_of_decode)\b"),
     ("SP1Clean/Model/SailDecode.lean",
      r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),
+    ("SP1Clean/FormalModel/Trace/Witness.lean",
+     r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_\w+|mem_fullRegs)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")

@@ -315,6 +315,7 @@ import SP1Clean.Soundness.TargetVm
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
 import SP1Clean.FormalModel.Trace.GuestProgram
+import SP1Clean.FormalModel.Trace.Witness
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Soundness.RowView

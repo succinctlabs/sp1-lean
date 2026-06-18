@@ -329,3 +329,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.SailDecode.run_bind_ok_none
 #print axioms SP1Clean.SailDecode.run_bind_ok_some
 #print axioms SP1Clean.SailDecode.decode_ADD_example
+#print axioms SP1Clean.Soundness.Target.mem_fullRegs
+#print axioms SP1Clean.Soundness.Target.cfgState_init
+#print axioms SP1Clean.Soundness.Target.cfgState_pc
+#print axioms SP1Clean.Soundness.Target.cfgState_priv
+#print axioms SP1Clean.Soundness.Target.isInitialState_nonvacuous
