@@ -295,6 +295,7 @@ import SP1Clean.Soundness.ChipRow
 import SP1Clean.Soundness.Completeness
 import SP1Clean.Soundness.Coverage
 import SP1Clean.Soundness.Decode
+import SP1Clean.Soundness.ValueBound
 import SP1Clean.Soundness.GatedVm.BalanceMod
 import SP1Clean.Soundness.GatedVm.Bridge
 import SP1Clean.Soundness.GatedVm.Capstone

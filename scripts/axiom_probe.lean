@@ -341,3 +341,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.operand_b_isU64_of_memBalance
 #print axioms SP1Clean.Soundness.operand_c_isU64_of_memBalance
 #print axioms SP1Clean.Soundness.memBalanceHyps_of_genesis
+#print axioms SP1Clean.Soundness.Target.ValueOperandsBound
+#print axioms SP1Clean.Soundness.Target.value_targetBound
+#print axioms SP1Clean.Soundness.Target.operandsBound_full_targetBound
+#print axioms SP1Clean.Soundness.Target.targetObligations_full

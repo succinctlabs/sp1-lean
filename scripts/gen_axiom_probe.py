@@ -46,6 +46,9 @@ TARGETS = [
      r"theorem\s+(memProviderGenesis_of_contributions|traceMemoryValid_of_genesis_and_balance)\b"),
     ("SP1Clean/Soundness/MemoryIsU64.lean",
      r"(?:theorem|def)\s+(memBalanceHyps_of_genesis|operand_\w+_isU64_of_memBalance)\b"),
+    ("SP1Clean/Soundness/ValueBound.lean",
+     r"(?:theorem|def)\s+(value_targetBound|operandsBound_full_targetBound|targetObligations_full|"
+     r"ValueOperandsBound)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")
