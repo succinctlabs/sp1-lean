@@ -49,10 +49,13 @@ def RomLoaded (prog : GuestProgram) (s : SailState) : Prop :=
     ∀ i : Fin 4, s.mem.get? (a.toNat + i) = some (w.extractLsb' (8 * i) 8)
 
 /-- **[W7 seam]** The platform-configuration residue of a runnable initial state — machine mode, no
-enabled interrupts, bare address translation, hart active, RVC off, … Populated incrementally as the
-`try_step` reduction (W7) discovers exactly which Sail registers it needs pinned; currently the empty
-conjunction, so the obligation it represents lives entirely in `TargetObligations.lift`. -/
-def SailConfigured (_s : SailState) : Prop := True
+enabled interrupts, bare address translation, hart active, RVC off, … Currently pins **machine mode**
+(`cur_privilege = Machine`), the residue the decode reduction needs (`Model/SailDecode.lean`: the
+Zicfilp/forward-CFI decode branch reads privilege-dependent CSRs, so the decoder only reduces once
+`cur_privilege` is resolved). Strengthened incrementally as the `try_step` reduction (W7) discovers the
+remaining pins it needs. -/
+def SailConfigured (s : SailState) : Prop :=
+  s.regs.get? Register.cur_privilege = some Privilege.Machine
 
 /-- A Sail state that "loads" the guest program: a *relation*, not a constructed state, so everything
 the execution doesn't touch stays quantified. ELF ingestion (W6b) produces a `GuestProgram` and a
