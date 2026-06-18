@@ -8,13 +8,15 @@ Guidance for AI agents working in this repository (`sp1-clean-native`).
 A **Clean-native, semantically-specified** formal verification of SP1's RISC-V chips, built fresh in
 Lean 4.28 on the **public** Clean DSL. For each operation we build a chain of four artifacts:
 
-1. a **witnessed `FormalCircuit` gadget** (`Operations/<Op>.lean`) with a *semantic* spec
+1. a **witnessed `FormalCircuit` gadget** (`Native/Operations/<Op>/{Populate,RawSpec}.lean` — or a flat
+   `Native/Operations/<Op>.lean` — plus `Proofs/Operations/<Op>/Formal.lean`) with a *semantic* spec
    (e.g. `Word.toBitVec64 value = Word.toBitVec64 a + Word.toBitVec64 b`), whose arithmetic is
    **re-derived natively** in-project;
-2. a **`GeneralFormalCircuit` chip** (`Chips/<Op>Chip/`, split `Defs.lean` (`main` + `ElaboratedCircuit`)
-   + `Formal.lean` (`Assumptions`/`Spec`/soundness/completeness/`circuit`)) that composes the gadget as a
-   true Clean `subcircuit` plus an `is_real` selector gate, exposing one semantic, gated `Spec`;
-3. a **native Sail bridge** (`Chips/<Op>Chip/Bridge.lean`) proving the chip's `Spec` reaches the RISC-V Sail
+2. a **`GeneralFormalCircuit` chip** (`Native/Chips/<Op>Chip/Defs.lean` = `main` + `ElaboratedCircuit`,
+   `Proofs/Chips/<Op>Chip/Formal.lean` = soundness/completeness/`circuit`; the `Spec`/`Assumptions` live on
+   the audit surface `FormalModel/Contracts/`) that composes the gadget as a true Clean `subcircuit` plus an
+   `is_real` selector gate, exposing one semantic, gated `Spec`;
+3. a **native Sail bridge** (`Proofs/Chips/<Op>Chip/Bridge.lean`) proving the chip's `Spec` reaches the RISC-V Sail
    spec (`correct_<op>_native`);
 4. a **faithfulness anchor** (`Faithful/<Op>.lean`) proving SP1's operation constraint list is exactly the
    gadget's `RawSpec`. The *asserts* half is structural; the *interactions* half is mid-conversion from the
@@ -27,7 +29,7 @@ Lean 4.28 on the **public** Clean DSL. For each operation we build a chain of fo
 This project is **independent** of `sp1-lean`. It does **not** import `SP1Foundations`/`SP1Operations`/
 `SP1Chips`/`SP1Clean` (those are 4.29 oleans — cross-toolchain), does **not** use `update_constraints.py` or
 the constraint compiler, and does **not** use the legacy structural `correct_*` / `SailBridge` /
-`fromMain`/`toMain` pattern. Needed foundations are re-created here (`Foundations/`). The goal: every headline
+`fromMain`/`toMain` pattern. Needed foundations are re-created here (`Math/` + `Model/`). The goal: every headline
 theorem is **axiom-clean** — `#print axioms` shows only `[propext, Classical.choice, Quot.sound]`, no `sorryAx`.
 
 The SP1 Rust source (the extraction/spec oracle, read-only reference) lives in a sibling `sp1` checkout
@@ -38,7 +40,7 @@ The SP1 Rust source (the extraction/spec oracle, read-only reference) lives in a
 
 - Full build: `lake build SP1Clean` (the default target). Passing = **0 errors AND 0 warnings**, and
   **no stray `info:` notes** — leave the build output clean (see the `ring` note below).
-- Single file: `lake env lean SP1Clean/Chips/AddChip/Formal.lean` (builds deps from cache, then elaborates).
+- Single file: `lake env lean SP1Clean/Proofs/Chips/AddChip/Formal.lean` (builds deps from cache, then elaborates).
   ⚠️ `lake env lean <file>` **exits 0 even on a Lean stack overflow**, and a stale cached olean can make
   downstream checks pass falsely — **always finish a phase with `lake build SP1Clean`**.
 - **Build concurrency.** Elaboration is heavy (full build is ~1800+ jobs across Clean + mathlib + Sail; the
@@ -160,8 +162,9 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 1. **Compose true Clean subcircuits, not inline constraints.** A chip's `main` calls
    `subcircuit <SubOp>.circuit ⟨…⟩`; a gadget that uses another gadget composes it the same way. Never inline a
    sub-operation's constraints.
-2. **One `main`, one `Spec` per file.** Each `Operations/<Op>.lean` and `Chips/<Op>Chip/` exposes exactly
-   one `main` and one `Spec` (plus the `circuit` glue), and references sub-operation Specs *by direct field
+2. **One `main`, one `Spec` per file.** Each `Native/Operations/<Op>` and `Native/Chips/<Op>Chip/Defs.lean`
+   exposes exactly one `main`, with one `Spec` (in `FormalModel/Contracts/`) plus the `circuit` glue (in
+   `Proofs/`), and references sub-operation Specs *by direct field
    application*, never by re-wrapping low-level constraints.
 3. **Specs are semantic, not structural.** The `Spec` states what the row *means* (a `toBitVec64` equation,
    `is_real`-gated), not a restatement of the constraint list. No `InlinedSpec` / `inlinedSpec_iff_spec`
@@ -196,7 +199,7 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   exposes its `channelsWithGuarantees`/`channelsWithRequirements`/`localLength` as `@[circuit_norm]`
   `rfl`-lemmas (`channelsWith*_eq`/`localLength_eq`, each behind `set_option linter.unusedSectionVars
   false in`) right after its `elaborated` instance; the generic list/prop closers are tagged `circuit_norm`
-  once in `Foundations/Channels.lean`. A missing default-tactic close means a missing `circuit_norm` lemma,
+  once in `Model/Channels.lean`. A missing default-tactic close means a missing `circuit_norm` lemma,
   not a reason to hand-write the field. These lemmas also tidy `circuit_proof_start`; mind the soundness
   requirement-tail caveat. Full recipe: `docs/agents/proof-patterns.md` "ElaboratedCircuit field obligations".
 - Full landmine list + the witnessed-`FormalCircuit` recipe: `docs/agents/proof-patterns.md`.

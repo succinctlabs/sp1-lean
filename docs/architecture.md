@@ -16,7 +16,8 @@ are scale-out.
 
 For an operation `<Op>` (e.g. `Add`, `BitwiseU16`):
 
-1. **`Operations/<Op>.lean` — witnessed `FormalCircuit` gadget.**
+1. **`Native/Operations/<Op>/` (`Populate`/`RawSpec`, or a flat `Native/Operations/<Op>.lean`) +
+   `Proofs/Operations/<Op>/Formal.lean` — witnessed `FormalCircuit` gadget.**
    Inputs the operand words; **witnesses** the result word (its base-2^16 limbs / bytes); range-checks each
    limb with Clean's native `Gadgets.ToBits.rangeCheck` (or a proven Clean table like `ByteXorTable` for
    bitwise); asserts the operation's relation. Its `Inputs` struct and **semantic** `Spec`
@@ -26,8 +27,9 @@ For an operation `<Op>` (e.g. `Add`, `BitwiseU16`):
    sp1-lean's `spec`/`spec_inv`) prove `RawSpec ↔ semantic`. **soundness + completeness** both close
    natively — no `SP1Operations` borrow.
 
-2. **`Chips/<Op>Chip/` — `GeneralFormalCircuit` chip** (split `Defs.lean` = `main` + `ElaboratedCircuit`;
-   `Formal.lean` = `Assumptions`/`Spec`/soundness/completeness/`circuit`)**.**
+2. **`Native/Chips/<Op>Chip/Defs.lean` + `Proofs/Chips/<Op>Chip/Formal.lean` — `GeneralFormalCircuit` chip**
+   (`Defs.lean` = `main` + `ElaboratedCircuit`; `Formal.lean` = soundness/completeness/`circuit`; the
+   `Assumptions`/`Spec` live on the audit surface `FormalModel/Contracts/`)**.**
    `main` composes the gadget **and the readers** as `subcircuit`s — each returning its extracted column
    struct — assembling the chip's `Extracted.<Chip>Cols` output directly from their outputs (no
    `witnessVector`/`fromElements`), and gates the row with the `is_real` binary selector
@@ -41,7 +43,7 @@ For an operation `<Op>` (e.g. `Add`, `BitwiseU16`):
    lives only in the latter. See `Proofs/Chips/AddChip/` for the canonical shape, and `agents/proof-patterns.md`
    for the composed-spec / proven-`is_real`-binary / no-heartbeat-bump patterns.
 
-3. **`Chips/<Op>Chip/Bridge.lean` — native Sail bridge.**
+3. **`Proofs/Chips/<Op>Chip/Bridge.lean` — native Sail bridge.**
    Defines `spec_<op>` (the RISC-V Sail execution) and `sp1_<op>` (the chip's emulation), and proves
    `correct_<op>_native : spec_<op> ≡ sp1_<op>`, **sourcing the operation identity from the chip's semantic
    `Spec`** (not from `_root_.<Op>.*`). Then `<op>_chip_reaches_sail` composes chip → Sail in one module.
@@ -147,7 +149,7 @@ conformance to the chips' completeness theorems.
 
 The `Inputs` structs and semantic `Spec`s for **every** circuit are consolidated into a three-file
 `FormalModel/Contracts/` sequence (`Reader → Operation → Chip`, each importing the previous), so the whole spec surface
-is auditable in one place and depends only on `Foundations/` + `Extracted/` (never on the proof files):
+is auditable in one place and depends only on `Math/`/`Model/` + `Extracted/` (never on the proof files):
 
 - **`FormalModel/Contracts/Readers.lean`** — the reader `Inputs`/`Spec`s (`CPUState`, `RTypeReader`, `RegisterAccessCols`,
   `RegisterAccessTimestamp`).
@@ -179,7 +181,7 @@ These keep every chip uniform and each `Spec` auditable on its own. Violations a
 2. **Each `Spec` is self-contained in `FormalModel/Contracts/Chips.lean`.** No shared chip-spec *builder* (the old
    `RTypeChipSpec` was inlined per chip and deleted) — a reader audits one `Spec` without chasing a
    shared abstraction. The `Spec`, its `Inputs`, and the helper defs the `Spec` *directly* references
-   live together in `FormalModel/Contracts/Chips.lean`; helpers used only by `main`/`Defs` live in `Chips/<Op>Chip/Defs.lean`.
+   live together in `FormalModel/Contracts/Chips.lean`; helpers used only by `main`/`Defs` live in `Native/Chips/<Op>Chip/Defs.lean`.
 3. **Variant flags live in the `cols` column struct, read from `cols` in the `Spec`** — never duplicated
    as `Inputs` fields. (`main` witnesses them; the flag-sum gate binds `is_real = Σ flags`.)
 4. **Range checks go through the byte bus, not `Gadgets.ToBits.rangeCheck`.** A width-`n` range check is a
@@ -464,7 +466,7 @@ directions, all axiom-clean:
   `MemoryAccess` + the I-type adapter, soundness + completeness axiom-clean.
 - **Sail bridges** — `Model/SailMemory.lean` ports the Sail width-8 memory **read *and* write** model
   (`run_vmem_read_of_width_8'` / `run_vmem_write_of_width_8`, with the SP1 PMA / `isValidMemConfig` /
-  alignment infra) natively against the shared `LeanRV64D` model; `Chips/{LoadDouble,StoreDouble}Bridge.lean`
+  alignment infra) natively against the shared `LeanRV64D` model; `Proofs/Chips/{LoadDouble,StoreDouble}Chip/Bridge.lean`
   prove `correct_{load,store}_double_native` (`spec ≡ sp1`) and `{ld,sd}_chip_reaches_sail`. Axiom profile:
   the base trio + the `LeanRV64D` platform constants + bv_decide's pair (no `sorryAx`).
 - **Faithfulness** — `Faithful/{ITypeReader,ITypeReaderImmutable,LoadDouble,StoreDouble}.lean` anchor the

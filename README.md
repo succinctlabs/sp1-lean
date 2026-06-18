@@ -126,11 +126,11 @@ Tests the witness generators for most operations against explicit vectors genera
 Each operation is verified through a short chain of artifacts that together link SP1's Rust, the Clean
 circuit, and the RISC-V ISA:
 
-1. **Gadget** (`Operations/<Op>.lean`) — the Clean circuit for the operation, with a spec describing the
-   result it computes on 64-bit words.
-2. **Chip** (`Chips/<Op>Chip/Defs.lean` + `Formal.lean`) — composes the gadget with the register/instruction
-   *readers* and an `is_real` selector, matching the shape of one of SP1's chips.
-3. **Sail bridge** (`Chips/<Op>Chip/Bridge.lean`) — proves the chip's result matches the RISC-V ISA, as
+1. **Gadget** (`Native/Operations/<Op>/` + `Proofs/Operations/<Op>/Formal.lean`) — the Clean circuit for the
+   operation, with a spec describing the result it computes on 64-bit words.
+2. **Chip** (`Native/Chips/<Op>Chip/Defs.lean` + `Proofs/Chips/<Op>Chip/Formal.lean`) — composes the gadget
+   with the register/instruction *readers* and an `is_real` selector, matching the shape of one of SP1's chips.
+3. **Sail bridge** (`Proofs/Chips/<Op>Chip/Bridge.lean`) — proves the chip's result matches the RISC-V ISA, as
    defined by the Sail model.
 4. **Faithfulness anchor** (`Faithful/<Op>.lean`) — proves the constraints used above are exactly those SP1
    emits, drawn from a Rust-extracted copy of SP1's constraints under `Extracted/`.

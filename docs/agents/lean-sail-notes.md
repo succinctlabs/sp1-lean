@@ -91,7 +91,7 @@ instead of sp1-lean's `run_readReg_of_isInitialized`; `run_vmem_write_of_width_8
 re-extracts the data argument). The target lakefile does not disable `linter.unusedSimpArgs`, so the ported
 simp lists were trimmed.
 
-The bridges (`Chips/{LoadDouble,StoreDouble}Bridge.lean`) take the register reads + the memory bytes + the
+The bridges (`Proofs/Chips/{LoadDouble,StoreDouble}Chip/Bridge.lean`) take the register reads + the memory bytes + the
 alignment/fits/range facts as **hypotheses** (the `AddBridge` philosophy — the bus supplies them), so
 `correct_{load,store}_double_native` is `(spec).run s = (sp1).run s`. The `execute_STORE` Sail signature is
 `execute_STORE imm rs2 rs1 width` (**rs2 before rs1** — the stored-value register first). Axiom profile = the

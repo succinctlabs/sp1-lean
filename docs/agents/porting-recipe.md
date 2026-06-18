@@ -20,7 +20,10 @@ If the op needs a helper not yet in `Math/` or `Model/` (a reassembly lemma, a b
 `val_256_*`), add it to `Math/Word.lean` or `Math/Bitwise.lean` first — it's shared by every
 future chip. Keep these files axiom-clean.
 
-### 1. `Operations/<Op>Operation.lean` — witnessed gadget
+### 1. `Native/Operations/<Op>/` + `Proofs/Operations/<Op>/Formal.lean` — witnessed gadget
+(witness/`RawSpec` core in `Native/Operations/<Op>/{Populate,RawSpec}.lean` — or a flat
+`Native/Operations/<Op>.lean`; the semantic `Spec` in `FormalModel/Contracts/Operations.lean`; the
+`FormalAssertion`/`FormalCircuit` soundness+completeness in `Proofs/Operations/<Op>/Formal.lean`.)
 - Namespace `SP1Clean.<Op>Operation`. Variable block `{p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]`.
 - `main`: witness the result limbs/bytes; impose byte/range checks as **`byteChannel` pulls**
   (`byteChannel.pullIf input.is_real ⟨opcode, is_real * value, width, 0⟩`, `Model/Channels.lean`)
@@ -32,9 +35,11 @@ future chip. Keep these files axiom-clean.
   `soundness`, `completeness`, and `circuit : FormalCircuit`.
 - Verify: `#print axioms <Op>Operation.circuit` is clean.
 
-### 2. `Chips/<Op>Chip/{Defs,Formal}.lean` — `GeneralFormalCircuit`
-(`Defs.lean` holds the `Inputs` struct, `main`, and the `ElaboratedCircuit` instance; `Formal.lean` imports
-`Defs` and holds `Assumptions`/`ProverAssumptions`/local `Spec`/helper lemmas/soundness/completeness/`circuit`.)
+### 2. `Native/Chips/<Op>Chip/Defs.lean` + `Proofs/Chips/<Op>Chip/Formal.lean` — `GeneralFormalCircuit`
+(`Native/.../Defs.lean` holds the `main` and the `ElaboratedCircuit` instance; the `Inputs` struct + semantic
+`Spec` (+ ALU-chip `Assumptions`/`ProverAssumptions`) live on the audit surface `FormalModel/Contracts/`;
+`Proofs/.../Formal.lean` imports `Defs` and holds the helper lemmas/soundness/completeness/`circuit`. The 3
+entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` instead of `Native/`.)
 - `Inputs` struct (`deriving ProvableStruct`) — the committed `state` (`Extracted.CPUState`) and `adapter`
   reader blocks as **threaded inputs**, operand words + `is_real` (+ `opcode` if multi-variant).
 - `main` composes **three** subcircuits — `Readers.CPUState.circuit`, the `<Op>Operation` gadget, and the
@@ -62,8 +67,8 @@ future chip. Keep these files axiom-clean.
   + the `RTypeChipSpec` soundness recipe), or `Proofs/Chips/BitwiseChip.lean` for a witnessing `FormalCircuit`
   gadget (`subcircuit <Op>Operation.circuit` returning the gadget output directly).
 
-### 3. `Chips/<Op>Chip/Bridge.lean` — native Sail bridge
-(imports `Chips/<Op>Chip/Formal`.)
+### 3. `Proofs/Chips/<Op>Chip/Bridge.lean` — native Sail bridge
+(imports `Proofs/Chips/<Op>Chip/Formal`.)
 - Narrowed imports (see LEAN_SAIL_NOTES — `Mathlib.Tactic` + `Mathlib.Data.ZMod.Basic` + `Std.Data.ExtDHashMap`).
 - `spec_<op>` (RISC-V Sail execution via `SailWrap`), `sp1_<op>` (writes
   `toBitVec64 (<Op>Operation.resultWord …)`), and `correct_<op>_native` sourcing the identity from the chip's

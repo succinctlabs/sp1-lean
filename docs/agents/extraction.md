@@ -96,7 +96,7 @@ field-generic types is intentionally destructive to the prior `Fin KB` text outp
   `byteOp`); other opcodes are `True` stubs until exercised. A **scoped**
   `CoeHead (ZMod p) ℕ` instance + `coe_eq_val` simp lemma live under
   `SP1Clean.ConstraintCoe` (activated only by `open scoped …`), so the coercion never
-  leaks into the heavy arithmetic proofs in `Operations/`/`Chips/`.
+  leaks into the heavy arithmetic proofs in `Native/Operations/`/`Proofs/`.
 - **`Extracted/<Op>.lean`** — generated; never hand-edit. Field-generic; carries the struct +
   `@[irreducible] constraints`.
 - **`Faithful/<Op>.lean`** — the anchor theorem only. Imports the shared datatype + the
@@ -142,7 +142,7 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit where …
 ```
 
 **Why this matters.** The emitted `main` *is* the extracted artifact, so the gadget's
-soundness/completeness (`Operations/<Op>/Formal.lean`) run against SP1's constraints **by
+soundness/completeness (`Proofs/Operations/<Op>/Formal.lean`) run against SP1's constraints **by
 construction** — there is no longer a hand-written `main` that a `Faithful/<Op>.lean` anchor must
 reconcile against the extracted lists. The compiler-side translation bakes in the Clean conventions:
 the field-generic `: F` becomes `ZMod p`, an `AssertZero` becomes `<e> === 0`, and a byte `send_byte`
@@ -150,10 +150,10 @@ becomes a `byteChannel.pullIf` (a *pull* of the preprocessed `ByteChip`, the val
 `gate * value`). The `main` includes SP1's `is_real` boolean gate (`is_real * (is_real - 1) = 0`),
 which the older hand-written gadgets dropped to a chip `Assumptions`.
 
-**Migration shape** (per converted op): the generated `Operations/<Op>/Extracted.lean` owns
+**Migration shape** (per converted op): the generated `Extracted/Circuit/<Op>.lean` owns
 `Inputs`/`main`/`elaborated`; `FormalModel/Contracts/Operations.lean` drops the flat `Inputs` and imports the generated
-module (the `Spec` reads `input.cols.value`); `Operations/<Op>/Formal.lean` runs its proofs against the
-generated `main`; the hand-written `populate`/`spec_populate` live in `Operations/<Op>/Populate.lean`; and
+module (the `Spec` reads `input.cols.value`); `Proofs/Operations/<Op>/Formal.lean` runs its proofs against the
+generated `main`; the hand-written `populate`/`spec_populate` live in `Native/Operations/<Op>/Populate.lean`; and
 each composing chip wraps the witnessed result word in the `cols` struct
 (`assertion <Op>.circuit ⟨…, { value := value }, …⟩`). The op-level `Faithful/<Op>.lean` bridge and
 the flat `Extracted/<Op>.{asserts,interactions}` defs **stay** — they remain load-bearing for the
@@ -211,4 +211,4 @@ exactly one struct. The faithfulness anchor for a composed op splits the list at
 - Chip-level `asserts`/`interactions` are now generated and consumed (see *Adding a new chip* above; the
   native readers + CPU-state are in place). The remaining tooling gap is the `--format lean-circuit` chip
   form (the `Inputs` + `main` + `ElaboratedCircuit` shape) — currently operation-only; chips compose their
-  sub-circuits by hand in `Chips/<Op>Chip/Defs.lean`.
+  sub-circuits by hand in `Native/Chips/<Op>Chip/Defs.lean`.

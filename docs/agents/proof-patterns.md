@@ -1,12 +1,13 @@
 # Proof patterns & landmines
 
-Concrete, build-verified patterns for the witnessed-`FormalCircuit` gadgets in `Operations/`.
+Concrete, build-verified patterns for the witnessed-`FormalCircuit` gadgets in `Native/Operations/`
+(+ their proofs in `Proofs/Operations/`).
 Reference templates: `AddOperation.lean` (carry chain), `IsZeroOperation.lean` (tiny witness
 gadget), `BitwiseU16Operation.lean` (byte/opcode), `IsZeroWordOperation.lean` (composed subcircuits).
 
 ## The witnessed-`FormalCircuit` recipe
 
-Each `Operations/<Op>.lean` exposes, in order:
+Each gadget (`Native/Operations/<Op>/` + `Proofs/Operations/<Op>/Formal.lean`) exposes, in order:
 
 1. **`RawSpec`** — the literal meaning of SP1's extracted constraint list at `is_real = 1` (carry-bool +
    range form, or per-byte form, or a composition of sub-gadget `RawSpec`s). Anchored to the extracted
@@ -97,8 +98,10 @@ decomposition was the whole cost).
 
 For ops whose witnessed columns are **pinned by the semantic `Spec`** (see `../architecture.md`
 "Assertion vs `FormalCircuit`"), the op is a *witnessless* `FormalAssertion` and the **chip** owns the
-witnessing. Template: `Operations/{AddOperation,SubOperation,AddwOperation,SubwOperation}/` (3-file split
-`RawSpec`/`Elaborated`/`Formal`) and `Operations/{U16MSBOperation,U16CompareOperation}.lean` (single file).
+witnessing. Template: `Native/Operations/{AddOperation,SubOperation,AddwOperation,SubwOperation}/`
+(`Populate`/`RawSpec`; circuit form in `Extracted/Circuit/<Op>.lean`, proofs in
+`Proofs/Operations/<Op>/Formal.lean`) and `Native/Operations/{U16MSBOperation,U16CompareOperation}.lean`
+(single file, proofs in `Proofs/Operations/<Op>/Formal.lean`).
 
 - **`Inputs`** gains the result/witness columns + `is_real` (e.g. `⟨a, b, value, is_real⟩`); `Spec` is
   `is_real = 1 → <semantic eq>` (gated); `Assumptions` gains `(is_real = 0 ∨ is_real = 1)`.
@@ -213,7 +216,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
 
 ## Landmines
 
-### Gadget-level (arithmetic, `Operations/`)
+### Gadget-level (arithmetic, `Native/Operations/` + `Proofs/Operations/`)
 
 - **`circuit_proof_start` must be the FIRST tactic** in soundness/completeness. Any
   `haveI`/`set_option`/`have hp` goes *after* it, or it errors "can only be used on Soundness/Completeness"
@@ -241,7 +244,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   one-hot opcode dispatch: soundness derives `flag=1 → (br=1 ↔ cond)` from `br = decision`, completeness the
   converse), don't inline it twice under the giant `circuit_proof_start` goal — there each `omega`/
   `linear_combination`/`simp` drags the whole chip context and the proof needs a 16M-heartbeat ceiling. Lift
-  it to two directional lemmas over **loose `ZMod p` field variables** in a `Chips/<Op>Chip/Decision.lean`
+  it to two directional lemmas over **loose `ZMod p` field variables** in a `Proofs/Chips/<Op>Chip/Decision.lean`
   sibling (imported by `Formal`): they elaborate at the **default** heartbeat ceiling (small context), and
   soundness/`completeness` collapse to one `exact (…).mp`/`linear_combination (…).mpr` call apiece. State the
   lemma conclusions **verbatim** in the chip `Spec`'s shape (incl. `Word.toBitVec64`/`.slt`/`.ult` forms) so
@@ -368,7 +371,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   *completeness* still needs it as a precondition — keep it in `ProverAssumptions` (the prover commits to a
   boolean selector). This is the point of `GeneralFormalCircuit`'s decoupled Assumptions/ProverAssumptions.
 - **A `maxHeartbeats` bump in a *simple* proof is a code smell, not a fix.** Genuine arithmetic (the
-  `toBitVec64`/`asm8`/carry-chain rw towers in `Operations/`) legitimately needs `2_000_000`–`16_000_000`. But a
+  `toBitVec64`/`asm8`/carry-chain rw towers in `Native/Operations/`) legitimately needs `2_000_000`–`16_000_000`. But a
   *structural/compositional* proof — a chip threading subcircuit Specs, an `ElaboratedCircuit` instance, a reader
   range-check — that only passes with a bump is almost always brute-forcing a `whnf`/defeq blowup that a cheap
   normalization removes. Before bumping such a proof, find the unnormalized term and fix it: prefer the default
