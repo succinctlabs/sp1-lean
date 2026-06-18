@@ -1,6 +1,6 @@
 import SP1Clean.Extracted.ExtractionDSL
-import SP1Clean.Foundations.InteractionProjection
-import SP1Clean.Foundations.ByteTable
+import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.ByteTable
 
 /-! # Syntactic projection of the EXTRACTED interaction ADT to `LookupAccess`
 

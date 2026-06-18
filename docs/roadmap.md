@@ -15,23 +15,40 @@ For the machine-checked axiom inventory, run `scripts/run_audit.sh` (snapshot:
 
 Legend: `[ ]` open · `[~]` partial · `[x]` done. Effort: S < M < L < XL.
 
+**Progress snapshot (2026-06-17).** A sweep down the critical path landed (build green throughout, every
+new headline theorem axiom-clean modulo the Sail model's own decoder axioms; the 4-`sorry` debt unchanged):
+**W3** closed end-to-end on the concrete-program path — the *real* `noncomputable` Sail decoder is reduced
+(`Model/SailDecode.lean`), the decode bound is discharged from Program-bus balance, and `decodedInROM` is
+proved for a concrete instruction. **W6b** non-vacuity witness done (`FormalModel/Trace/Witness.lean`).
+**W4a** MemoryGlobalInit provider constructed (`Soundness/MemoryGlobal.lean`). **W2+W7** exact-replay
+keystone done — `RefinesAt`/`RowEffect` strengthened to exact replay / strict write, `chain_to_refines`
+re-proved — and the **W2 value-half assembled** (`ValueBound.lean`: `ValueOperandsBound`, the concrete
+`OperandsBound = decode ∧ value`, and `targetObligations_full` with `bound` discharged). `SailConfigured`
+strengthened to `isInitialized ∧ machine mode`. Remaining on the critical path: discharge the W2 cross-bus
+residual `TraceValueBinding`, W5 HALT, W7's `try_step` reduction, glue.
+
 ---
 
-## The project debt at a glance — four `sorry`s
+## The project debt at a glance — one `sorry`
 
-All `sorry`s are **completeness/liveness** (or the one capstone-packaging premise). Soundness is
-`sorry`-free. (Line numbers drift; the declaration names are the stable handles — `scripts/run_audit.sh`
-gates on exactly this set.) `MulChip.completeness` was closed 2026-06-10 via
-`MulOperation.spec_populate` (the witnessed `populate` columns satisfy the structural `Spec`).
+The chip completeness debts (ShiftLeft/ShiftRight/DivRem) are now **all closed** (axiom-clean); the
+**sole** remaining `sorry` is the capstone-packaging premise (item 4 below). Soundness is `sorry`-free.
+(Line numbers drift; the declaration names are the stable handles — `scripts/run_audit.sh` gates on
+exactly this set.) `MulChip.completeness` was closed 2026-06-10 via `MulOperation.spec_populate` (the
+witnessed `populate` columns satisfy the structural `Spec`); items 1–3 below record the now-closed
+ShiftLeft/ShiftRight/DivRem completeness work.
 
-1. `ShiftLeftChip.completeness` — `Chips/ShiftLeftChip/Formal.lean` — honest `populate`-style witness +
-   `ProverHint` opcode threading (the `BranchChip.completeness` recipe).
-2. `ShiftRightChip.completeness` — `Chips/ShiftRightChip/Formal.lean` — same shape as ShiftLeft.
-3. `DivRemChip.completeness` — **CLOSED 2026-06-18** (axiom-clean), via `completeness_driver` in
-   `Chips/DivRemChip/Completeness/Driver.lean`. The 13 nested `IsEqualWord`/`IsZero` cols pins were
-   unblocked by *selective non-decomposition* — `attribute [local circuit_norm ↓ 100000]
-   ProvableType.eval_fromElements` keeps those sub-op cols folded so `circuit_proof_start` never explodes
-   them into the intractable nested record (see `docs/agents/proof-patterns.md`). Heartbeats 256M → 64M.
+1. `ShiftLeftChip.completeness` — `Proofs/Chips/ShiftLeftChip/Formal.lean` — **CLOSED 2026-06-12**
+   (axiom-clean), honest `populate`-style witness + `ProverHint` opcode threading (the
+   `BranchChip.completeness` recipe).
+2. `ShiftRightChip.completeness` — `Proofs/Chips/ShiftRightChip/Formal.lean` — **CLOSED 2026-06-12**
+   (axiom-clean), same hint-`populate` recipe as ShiftLeft.
+3. `DivRemChip.completeness` — `Proofs/Chips/DivRemChip/Formal.lean` — **CLOSED 2026-06-18** (axiom-clean),
+   via `completeness_driver` in `Proofs/Chips/DivRemChip/Completeness/Driver.lean`. The 13 nested
+   `IsEqualWord`/`IsZero` cols pins were unblocked by *selective non-decomposition* —
+   `attribute [local circuit_norm ↓ 100000] ProvableType.eval_fromElements` keeps those sub-op cols folded
+   so `circuit_proof_start` never explodes them into the intractable nested record (see
+   `docs/agents/proof-patterns.md`). Heartbeats 256M → 64M.
 4. `sp1_witness_decode` — `Soundness/SP1GatedVm.lean` — the single isolated capstone premise: the
    witness → `ChipRow` decode seam (`SP1WitnessDecode`, = **W1b/W1c** below); a packaging premise, not
    a chip debt. (`sp1_gatedExecution_prereqs` itself is now a *proven* assembly of this seam with the
@@ -73,10 +90,13 @@ therefore also what makes the *capstone chain's* census clean (together with ite
                 W4b multi-shard ShardComposition (XL) [post-target]
 ```
 
-**Critical path:** W3 → W4a → W2 → W5 → glue. **W7 runs fully in parallel** and becomes the critical
-path if the Sail `translateAddr`/fetch reduction in machine mode is heavier than expected. **W1 is on
-the path of the axiom-clean end-to-end claim but not of the named-hypothesis target theorem** — it
-merges at the very end (`sp1_target_soundness` inherits its closure automatically).
+**Critical path:** W3 → W4a → W2 → W5 → glue (W3 + W4a substantially done, W2's exact-replay keystone
+done — see the progress snapshot; the live front is the **W2 value-half ↔ W5 ↔ W7 `try_step` reduction**).
+**W7 runs fully in parallel** and becomes the critical path if the Sail `translateAddr`/fetch reduction in
+machine mode is heavier than expected — note its decode stage is already reduced (`Model/SailDecode.lean`),
+and its `RowEffect` target shape (strict write) is now fixed by the W2+W7 keystone. **W1 is on the path of
+the axiom-clean end-to-end claim but not of the named-hypothesis target theorem** — it merges at the very
+end (`sp1_target_soundness` inherits its closure automatically).
 
 **Clean PR #398 exposure: resolved (2026-06-10).** W9 landed by pinning Clean to the open PR's head
 SHA (`292b9cc3`, 13 commits ahead / 0 behind the old pin) rather than waiting for the merge — the
@@ -99,34 +119,81 @@ the merge commit when the PR lands on `main`.
 ### W6 — the guest program
 
 - [x] **W6a** `GuestProgram` (encoded ROM primary, decode is a theorem target) — in the skeleton.
-- [ ] **W6b** ELF → `GuestProgram` ingestion (mirror SP1's `Program::from_elf`,
-  `../sp1 crates/core/executor/src/program.rs`) + one concrete witness `IsInitialState` state proving
-  the target theorem non-vacuous. Off the critical path; do alongside W3.
+- [~] **W6b** **non-vacuity witness done (2026-06-17, `FormalModel/Trace/Witness.lean`, axiom-clean):**
+  `isInitialState_nonvacuous : ∃ s0, IsInitialState emptyProgram s0`, so the target theorem's hypothesis
+  is not vacuous. Reusable machinery: `Fintype Register` (derived), `configuredState pc` +
+  `cfgState_init`/`pc`/`priv` (a state with every register present, PC pinned, machine mode). **Remaining
+  (deferred, lower value):** ELF → `GuestProgram` byte ingestion (mirror SP1's `Program::from_elf`,
+  `../sp1 crates/core/executor/src/program.rs`) + a richer (non-empty) witness ROM (reuses
+  `configuredState` + `mem` content + `romLoaded` byte proofs; `BitVec 64` `rom_*` proofs need `bv_decide`).
 
-### W3 — InstructionDecode/InstructionFetch chips → the decode half of `OperandsBound` (L)
+### W3 — InstructionDecode/InstructionFetch → the decode half of `OperandsBound` `[~]` (closed end-to-end on the concrete-program path, 2026-06-17)
 
-Model SP1's `InstructionDecode`/`InstructionFetch` chips (`RiscvAir` variants; the program-bus
-producers) and build the project `decode` on LeanRV64D's own decoder (so fetch-decode coherence with
-`try_step` is by construction). Deliverable: the decode component of the concrete `OperandsBound`
-predicate — each real row's operand *indices*/immediates are the decode of `prog.fetchWord` at its pc —
-replacing the universally-quantified indices inside today's `sailEquiv`.
+Build the project `decode` on LeanRV64D's own decoder (so fetch-decode coherence with `try_step` is by
+construction); the decode component of `OperandsBound` is each real row's operand indices/immediates being
+the decode of `prog.fetchWord` at its pc. **Landed:**
+- `Soundness/Decode.lean` — `instrToProgramRow` (all opcode families), `DecodeOperandsBound`/`decodedInROM`,
+  and `decode_bound_of_balance`/`decode_targetBound_of_balance` (the decode half of `bound` from a
+  **constructed** `ProgramProvider (decodedInROM prog)` + Program-bus balance, no threaded `h_link`; the
+  generalization `programProvider_of_valid` is in `ProgramProviderSpike.lean`).
+- `Model/SailDecode.lean` — the **real `noncomputable` Sail decoder reduced**: `decode_ADD_example` proves
+  `(ext_decode 0x003100B3).run s = .ok (RTYPE …) s` via a lazy branch-skip walk (`run_bind_ok_none`/`_some`
+  + a clean-stop `refine`-walk), under `SailConfigured` (= `isInitialized ∧ machine mode`).
+- `Decode.lean` `decodedInROM_addRow` — composes the two into the W3 obligation for a concrete ADD.
+
+**Remaining:** a symbolic-register `ext_decode_RTYPE` is **out of scope** (would need `bv_decide` per
+cascade branch; decode is only ever applied to *concrete* ROM words, so the per-opcode recipe suffices for
+the witness program). The general `∀ prog` case keeps `decodedInROM` a trusted decode-chip assumption
+(cf. `ProgramRowSpec`).
 
 ### W4 — the memory-infrastructure chips
 
-- [ ] **W4a (single-shard slice, L):** `MemoryGlobalInit`/`MemoryGlobalFinal` for one shard — the
-  initial register-file/memory image as bus producers, pinning what `RefinesAt`'s frame currently
-  leaves at `s0`. Prerequisite for W2's replay precision and W5's halt-row register facts.
+- [~] **W4a (single-shard slice, L):** **MemoryGlobalInit provider constructed (2026-06-17,
+  `Soundness/MemoryGlobal.lean`, axiom-clean)** — the Memory-bus analog of `ProgramProviderSpike`.
+  `memGenesisContributions` (one entry per address at value 0, genesis timestamp `t0`) +
+  `memProviderGenesis_of_contributions` discharges the threaded `MemProviderGenesis`;
+  `traceMemoryValid_of_genesis_and_balance` derives `TraceMemoryValid` from the constructed provider +
+  ordering side conditions + balance (residual: `t0` below all real clocks). `memBalanceHyps_of_genesis`
+  (`MemoryIsU64.lean`) lifts the operand isU64/value facts onto the same provider. **Remaining:**
+  `MemoryGlobalFinal` + binding the genesis value / final image to a concrete `prog.memImage` / boundary
+  (the per-address *value* — W2's replay precision).
 - [ ] **W4b (multi-shard, XL, post-target):** `ShardBoundary` (pc/clk chaining, init/final memory
   boundary, cumulative-sum carry), `MemoryLocal`/`MemoryBump`/`StateBump`, `machineValid_of_shards`.
   SP1's full memory argument is fundamentally multi-shard; the target theorem is single-shard first.
 
-### W2 — operand/register binding from the memory-bus balance (XL; the long pole)
+### W2 — operand/register binding from the memory-bus balance (XL; the long pole) `[~]` exact-replay keystone landed (2026-06-17)
 
 Derive, from the memory-bus balance + the register adapters' `prev_value` columns, that each row's
 committed operand *value* columns equal the live register/memory values at its walk position — i.e.
 prove `TargetObligations.bound` for the concrete `OperandsBound` and strengthen `RefinesAt`'s register
-frame to exact replay. Sub-item **W2b (L):** thread real load/store data addresses into
-`Trace.RowView` (the §8.4 gap) and strengthen `RowEffect`'s ROM clause to full store-replay memory.
+frame to exact replay.
+
+**Keystone DONE (commit, `Soundness/TargetVm.lean`):** the exact-replay surgery on the *proved* capstone —
+`replayVal` (most-recent `op_a` write over the path prefix); `RefinesAt.frame` strengthened from a
+frame-disjunction to **exact replay**; `RowEffect.regs` strengthened to the **strict write** form
+(`s'=rdWrite` at `op_a`, `s'=s` elsewhere — what W7's `wX_bits rd` produces); `chain_to_refines` /
+`sp1_target_execution` re-proved green, no new axioms. So W2's exact-replay and W7's `RowEffect` shape land
+together as designed.
+
+**Value-half assembled (`Soundness/ValueBound.lean`):** `ValueOperandsBound` (live registers = committed
+`op_b`/`op_c` `prev_value` columns); `value_targetBound` proves the value half of `bound` by composing the
+exact-replay invariant (`RefinesAt.frame`) with the cross-bus link (axiom-clean); `OperandsBound_full =
+decode ∧ value`, `operandsBound_full_targetBound` (full `bound`, both halves), and `targetObligations_full`
+(the full `TargetObligations` at the concrete `OperandsBound`, `bound` discharged, `lift`/`halt` the W7/W5
+seams — the Phase-7 glue entry point).
+
+**Walk-clk bridge landed (`ValueBound.lean`):** `walk_clk_monotone` — consecutive `WalkOf` rows advance
+the state-bus clock (`sndClkOf path[i] = rcvClkOf path[i+1]`), i.e. the walk visits rows in increasing clk
+order = the order the Memory-bus value chain reads them (`sndClk_eq_rcvClk` is the clk twin of
+`sndPc_eq_rcvPc`; `isWalk_chain` was exposed for it).
+
+**Remaining `TraceValueBinding` discharge:** compose `walk_clk_monotone` with (i) the memory event
+timestamps = row clocks (`rowClkLow`), (ii) the Memory-bus value chain (`memEvent_prevValue_eq_writer` /
+`traceMemoryValid_of_genesis_and_balance`: a read returns the most-recent earlier write, read-backs
+preserving it), and (iii) the genesis alignment (`s0`'s initial registers = 0 = the init chip's genesis) —
+the induction relating `replayVal`'s walk recursion to the memory event chain. Sub-item **W2b (L):** thread
+real load/store data addresses into `Trace.RowView` (the §8.4 gap) and strengthen `RowEffect`'s ROM clause
+to full store-replay memory.
 
 ### W5 — the ECALL/HALT chip (M–L)
 
@@ -142,15 +209,18 @@ type-checks. The chip itself remains open. Deliverables: `TargetObligations.halt
 `SP1GatedVm.lean`), ECALL routing in `Coverage.lean` (today ECALL/EBREAK/UNIMP are the 3 uncovered
 opcodes of 53), and pointing `stateAccess`'s `clk_inc` projection at a `RowView`-level increment.
 
-### W7 — the `try_step` step-lift (XL; parallel track)
+### W7 — the `try_step` step-lift (XL; parallel track) `[~]` decode stage + RowEffect shape landed
 
 Per chip kind: in a state satisfying `RefinesAt` + the concrete `OperandsBound`, reduce
 `(try_step 0 false).run s` — interrupt check, fetch (vs `RomLoaded`), decode (vs W3's decoder),
 execute (vs the existing `correct_*_native` bridges), PC commit — to `.ok _ s'` with
-`RowEffect r s s'`. Populate `SailConfigured` with exactly the register pins the reduction needs
-(machine mode, no enabled interrupts, bare translation, hart active, …). Risk: the address-translation
-reduction; if heavy, this becomes the critical path. The existing per-chip `sailEquiv` bridges are the
-execute-stage evidence — no `Bridge.lean` changes expected.
+`RowEffect r s s'`. **Already in place (2026-06-17):** the **decode stage** is reduced
+(`Model/SailDecode.lean`: `run_bind_ok_none`/`_some` + the branch-skip walk reduce the real `ext_decode`);
+`SailConfigured` is populated to `isInitialized ∧ machine mode` (the two pins the decode reduction needs;
+more added as fetch/execute discover them); and the **`RowEffect` target shape is now fixed** (the strict
+write form from the W2+W7 keystone — `wX_bits rd` produces exactly it). Remaining: fetch + execute (vs the
+per-chip `sailEquiv`/`correct_*_native` bridges, no `Bridge.lean` changes expected) + PC commit, per chip
+kind. Risk: the address-translation reduction; if heavy, this becomes the critical path.
 
 ### W1 — close `sp1_gatedExecution_prereqs` (§B5 residue; XL, independent track)
 
@@ -165,7 +235,7 @@ remaining `sorry` in `Soundness/SP1GatedVm.lean`) with the proven W1a balance tr
   `intCast_multiplicitySum_map_toAccess` (`GatedVm/BalanceMod.lean`; same-channel `toAccess` keys
   separate exactly on the message by `ZMod.val`/`Array.toList` injectivity, so each `LookupKey` ℤ-sum
   casts to one Clean `balanceOf`), `Interaction.toAccess`/`intCast_signedVal`
-  (`Foundations/InteractionProjection.lean`), the native `{-1, 0, 1}` bound
+  (`Model/InteractionProjection.lean`), the native `{-1, 0, 1}` bound
   `stateLookups_mult_binary` (`Soundness/StateConsistency.lean`), and the landed
   `isConsistentBalanced_of_intCast_zero`. *Notes: upstream's gated counting lemmas
   (`balanceOf_eq_mult_countP_of_mult_or_zero`, `exists_push_of_pull`, `activeInteractions`) turned
@@ -186,7 +256,7 @@ remaining `sorry` in `Soundness/SP1GatedVm.lean`) with the proven W1a balance tr
 ### W8 — logUp/GKR packaging (M–L, after W1)
 
 Replace the assumed balance with one named `axiom logupGkrSound` ("a verifying GKR+PCS transcript ⟹
-fingerprinted cumulative sum = 0") in `Foundations/InteractionBus.lean`, and prove the non-crypto half
+fingerprinted cumulative sum = 0") in `Model/InteractionBus.lean`, and prove the non-crypto half
 (fingerprinted-sum-zero ⟹ send/receive multiset equality, LogUp/Schwartz–Zippel). **Done when** the
 TCB cites one crypto axiom instead of "balance assumed."
 
@@ -197,7 +267,7 @@ Landed by pinning Clean to the **open PR's head SHA**
 `292b9cc369be11baf816926a4bd5a697c01b1dcc`, 13 commits ahead / 0 behind the old `main` pin, same 4.28
 toolchain) rather than waiting for the merge. Upstream `Channel.toRaw` is now gated on zero
 multiplicity and receives owe no `Requirements` at all, so the whole custom layer in
-`Foundations/Channels.lean` (`toRawGated`/`gatedReceive`/`emitGated`/`receivedGated`/`emittedGated` +
+`Model/Channels.lean` (`toRawGated`/`gatedReceive`/`emitGated`/`receivedGated`/`emittedGated` +
 projections + `binary_gate_req_vacuous`; the asymmetric family turned out to be dead code) is deleted
 in favor of `Channel.pullIf`/`Channel.emit`/gated `toRaw`. Side effect worth knowing: pre-W9,
 `sp1GatedVm.busChannels` listed `toRawGated` records while the readers emitted on `toRaw` — records

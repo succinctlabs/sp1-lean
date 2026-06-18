@@ -233,7 +233,7 @@ inside each gated `Spec` conjunct, recover `sum = 1` from the active flag via `s
 `main` witnesses `a` and asserts it equals the flag-weighted product slice `aSelector`; soundness uses
 `aSelector_eq_resultWord` (collapse via `rest_zero`) then the five `rv64_mul*_eq` BitVec bridges. **Build
 trap:** `lake env lean MulChip` loads `MulOperation`'s *olean* — after editing `MulOperation` you must
-`lake build SP1Clean.Operations.MulOperation` before checking `MulChip`, else stale signatures
+`lake build SP1Clean.Native.Operations.MulOperation` before checking `MulChip`, else stale signatures
 cause spurious mismatches. `bv_decide` in the bridges adds `Lean.ofReduceBool`/`trustCompiler` (accepted).
 
 ## Tooling notes

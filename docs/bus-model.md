@@ -11,13 +11,13 @@ for how the model is structured.
 
 - **Receiver chips + cross-chip closure (axiom-clean).** The three "secondary divergences" of
   §1 are addressed:
-  - **Byte/Program receivers as predicate models.** `Chips/ByteChip.lean` (`ByteProvider`, every entry at
-    a valid `ByteRowSpec` key; `byteRow_eq_of_key` — the key determines the row) and `Chips/ProgramChip.lean`
+  - **Byte/Program receivers as predicate models.** `Proofs/Chips/ByteChip.lean` (`ByteProvider`, every entry at
+    a valid `ByteRowSpec` key; `byteRow_eq_of_key` — the key determines the row) and `Proofs/Chips/ProgramChip.lean`
     (`ProgramProvider inROM`, `ProgramRowSpec` = register indices `< 32` + pc bounds + `op_a_0` binary — the
     *received* decode facts). `Soundness/{Byte,Program}Consistency.lean`'s `byteAccessValid_of_balance` /
     `programConsistent_of_balance` discharge `Trace{Byte,Program}Link` from *(provider + `isConsistentBalanced`)*
     via `InteractionBus.provider_touches_pos_send` (a positive real send must be cancelled by the provider).
-  - **`RangeChip` split** (`Chips/ByteChip.lean`): SP1 receives the Byte bus with *two* preprocessed chips
+  - **`RangeChip` split** (`Proofs/Chips/ByteChip.lean`): SP1 receives the Byte bus with *two* preprocessed chips
     (`ByteChip` non-`Range` ⊕ `RangeChip` opcode-6), both via `receive_byte` — there is **no** separate
     `Range` `InteractionKind`. Modeled as `ByteOpRowSpec`/`RangeRowSpec` + `byteProvider_of_split`.
   - **Machine closure** (bespoke `Soundness/MachineConsistency.lean`'s `traceLinks_of_machineBalance`
@@ -29,15 +29,15 @@ for how the model is structured.
 - **"emitted = projection".** State (the worked example), **Program** (`programLookups_eq_emitted`), **Memory**
   (`memoryLookups_eq_emitted`) are **done, axiom-clean** — the `*Lookups` are now *theorems* equal to the
   `toAccess`-image of the actual reader emissions, recovered through the composed `RTypeReader` by the
-  toolkit in `Foundations/InteractionRecovery.lean` (`interactionsWith_main_eq_nil` drops the byte-only
+  toolkit in `Model/InteractionRecovery.lean` (`interactionsWith_main_eq_nil` drops the byte-only
   `RegisterAccessCols` subcircuits; `filter_interactions_formalAssertion_eq_nil` drops the `op_a_0` `===`
   gates; channel distinctness drops the other bus's emits). `toAccess` kernels in
-  `Foundations/InteractionProjection.lean` are stated on `_root_.emitted` (the form `circuit_norm` leaves).
+  `Model/InteractionProjection.lean` are stated on `_root_.emitted` (the form `circuit_norm` leaves).
   Only the **Byte** `eq_emitted` remains — it needs a *recovery through* (not drop of) the byte-carrying
   `RAC ⊃ RAT` subcircuits + a `pullIf` kernel (the nested-recovery direction).
   - **Real 48-bit addresses (memory chips, done, axiom-clean).** The register memory bus above is
     `addr1 = addr2 = 0`. The `LoadDouble`/`StoreDouble` chips exercise the Memory bus at a **real 3-limb
-    address** (`AddressOperation.value`) via the `Readers/MemoryAccess` block; `Soundness/MemoryConsistency.lean`
+    address** (`AddressOperation.value`) via the `Native/Readers/MemoryAccess` block; `Soundness/MemoryConsistency.lean`
     projects it with `memAccessLookups` (send prior `+is_real` / receive new `−is_real`) + `memAccessEvent`
     (the offline event at the recombined `addr0+addr1·2^16+addr2·2^32`, read for a load / write for a store),
     with `memAccessLookups_padding` and `memAccessLookups_eq_emitted` (same `heq`/channel-distinctness recovery
@@ -62,12 +62,12 @@ for how the model is structured.
 > (in-circuit emission vs. trace-level `*Lookups`); §1 motivates why it matters.
 
 **(a) In-circuit — what actually constrains the prover.** The readers
-(`Readers/CPUState.lean`, `Readers/RTypeReader.lean`) emit only `is_real`-gated
-`Gadgets.ToBits.rangeCheck`s and `assertZero`s; `Chips/AddChip.lean` composes them as
+(`Native/Readers/CPUState.lean`, `Native/Readers/RTypeReader.lean`) emit only `is_real`-gated
+`Gadgets.ToBits.rangeCheck`s and `assertZero`s; `Proofs/Chips/AddChip.lean` composes them as
 `subcircuit`s plus the `is_real` binary gate. There are **zero** Clean `Channel`/`interact`
 operations anywhere under `SP1Clean/` — the circuit does not emit any bus interaction.
 
-**(b) Trace-level — the multiset/LogUp argument.** `Foundations/InteractionBus.lean` is an
+**(b) Trace-level — the multiset/LogUp argument.** `Model/InteractionBus.lean` is an
 axiom-clean signed-multiset core: `InteractionKind` (State/Byte/Program/Memory), `LookupAccess =
 InteractionKind × String × List ℕ × ℤ`, `multiplicitySum`, `isConsistentBalanced ⇔ Online`
 (permutation-invariant). Per-bus modules `Soundness/{State,Program,Memory}Consistency.lean` each
@@ -92,7 +92,7 @@ Three secondary divergences all follow from this one root:
   `send_byte(op, a, b, c, mult)` into the Byte bus, whose receiver is the **preprocessed** ByteChip
   (256×256 = 65536 rows; ops AND/OR/XOR/U8Range/LTU/MSB), which receives with **count**
   multiplicities (`sp1/crates/core/machine/src/bytes/{air.rs,trace.rs,mod.rs}`). Our direct
-  `rangeCheck` is an acknowledged divergence (`Operations/AddOperation.lean` range-checks the four
+  `rangeCheck` is an acknowledged divergence (`Native/Operations/AddOperation.lean` range-checks the four
   result limbs directly instead of sending Byte interactions).
 - **No `MachineAir` analog.** SP1's machine collects every chip's `sends()`/`receives()` and runs
   one batched LogUp/GKR permutation argument so that, per bus, Σsends = Σreceives
@@ -135,7 +135,7 @@ Clean already provides first-class machinery that maps almost 1:1 to the upstrea
 - **`Table` / `StaticTable { length, row, index, Spec, contains_iff }` + `Table.fromStatic`**
   (`Lookup.lean:18,125,151`), and the `Circuit.lookup table entry` combinator (`Basic.lean:124`).
   This is SP1's preprocessed ByteChip. **Already exercised in this repo:** `BitwiseU16Operation`
-  does byte ops via Clean's proven `ByteXorTable` + `lookup` (`Operations/BitwiseU16Operation.lean`).
+  does byte ops via Clean's proven `ByteXorTable` + `lookup` (`Native/Operations/BitwiseU16Operation.lean`).
 - **Recover-emitted API:** `Operations.interactionsWith (channel)` (`Operations.lean:434`,
   `noncomputable`) and `ElaboratedCircuit.interactionsWith_eq_of_mem_exposedChannels`
   (`Basic.lean:561`) — the kernel of an "emitted = projection" proof: a circuit that declares a
@@ -143,7 +143,7 @@ Clean already provides first-class machinery that maps almost 1:1 to the upstrea
 
 ### Cost of the channel approach
 
-A channel-emitting reader (a copy of `Readers/CPUState.lean` that emits a State `Channel.push` +
+A channel-emitting reader (a copy of `Native/Readers/CPUState.lean` that emits a State `Channel.push` +
 `Channel.pull`) builds with **zero diagnostics**, is **axiom-clean**
 (`lean_verify` = `[propext, Classical.choice, Quot.sound]` on `soundness`/`completeness`/`circuit`,
 no `sorryAx`), and closes at the **existing `2000000` heartbeat floor** (no bump). So the `Channel`
@@ -164,7 +164,7 @@ proofs:
   `exact ⟨Or.inl rfl, Or.inl rfl⟩` (the `rangeCheck` subcircuits expose no channels, so each
   conjunct's `… = [] ∨ …` left disjunct is `rfl`; the channel reqs are `1 ≠ -1 → True`).
   **Completeness is unchanged** from the channel-free reader — its witness proof is verbatim
-  `Readers/CPUState.lean`. Channels that carry the bus's semantic content in `Guarantees` make
+  `Native/Readers/CPUState.lean`. Channels that carry the bus's semantic content in `Guarantees` make
   the soundness Requirements tail load-bearing instead of `rfl`.
 - `Operations.interactionsWith` is `noncomputable` — keep any def derived from it out of `decide`.
 
@@ -178,7 +178,7 @@ are the reference templates for the channel layer.
 The circuit literally emits the bus, exactly as SP1 does:
 
 1. Buses (State/Program/Memory) are Clean `Channel`s; byte ops go through a `StaticTable` ByteChip
-   reached by a Byte `Channel`. Readers/operations `push`/`pull` with `mult = is_real` (or a count).
+   reached by a Byte `Channel`. Native/Readers/operations `push`/`pull` with `mult = is_real` (or a count).
 2. The hand-written `*Lookups` become **theorems** — derived from `interactionsWith` via
    `interactionsWith_eq_of_mem_exposedChannels` — so the trace-level multiset argument is about what
    the circuit *actually emits*, not a shadow.
@@ -191,13 +191,13 @@ The circuit literally emits the bus, exactly as SP1 does:
 The components below build up the in-circuit bus, each axiom-clean
 (`#print axioms` = `{propext, Classical.choice, Quot.sound}`, no `sorryAx`).
 
-- **Channel feasibility.** A channel-emitting copy of `Readers/CPUState.lean` established that a
+- **Channel feasibility.** A channel-emitting copy of `Native/Readers/CPUState.lean` established that a
   `Channel.push`/`pull` closes axiom-clean at the existing heartbeat floor inside the reader recipe.
   *(Outcome recorded in §3 above.)*
-- **State channel in the reader + chip.** `Foundations/Channels.lean` holds
-  the shared `stateChannel`; `Readers/CPUState.lean` now emits the State `push`/`pull` (declaring
+- **State channel in the reader + chip.** `Model/Channels.lean` holds
+  the shared `stateChannel`; `Native/Readers/CPUState.lean` now emits the State `push`/`pull` (declaring
   `channelsWith{Guarantees,Requirements} := [stateChannel.toRaw]`, soundness Requirements tail closed
-  by `Or.inl rfl`); `Chips/AddChip.lean` composes that channel-emitting subcircuit — its
+  by `Or.inl rfl`); `Proofs/Chips/AddChip.lean` composes that channel-emitting subcircuit — its
   soundness/completeness proofs are **unchanged**, only `channelsLawful` + the chip's channel
   declarations were added. The `channelsLawful` recipe when one of several subcircuits emits a
   channel: `simp only [main, circuit_norm, <emitting-sub>.circuit, <emitting-sub>.elaborated]` (do
@@ -206,27 +206,27 @@ The components below build up the in-circuit bus, each axiom-clean
   `exact ⟨List.Subset.refl _, List.Subset.refl _⟩` for the residual
   subset goals (the non-emitting subs' channel lists are the class-default `[]`). Both files
   axiom-clean.
-- **Static byte table.** `Foundations/ByteTable.lean`: `ByteTable : Table` whose
+- **Static byte table.** `Model/ByteTable.lean`: `ByteTable : Table` whose
   membership is the **defining predicate** `ByteRowSpec` (some `ByteOpcode` whose `idx` matches the
   opcode column and whose `constrain` semantics hold) — *not* an enumeration of the `7 * 2^16` rows
   (the `decide`-blowup is sidestepped exactly as Clean's own `ByteXorTable` sidesteps it: `Contains`
-  is a predicate, `Soundness`/`Completeness` the class defaults). `Foundations/Channels.lean` gains
+  is a predicate, `Soundness`/`Completeness` the class defaults). `Model/Channels.lean` gains
   `byteChannel` whose **`Guarantees` is load-bearing** — it *is* `ByteRowSpec`, so a `pull` yields
   byte-op correctness. A consumer demonstrator is included: `byteRangeCheck`, a `FormalAssertion`
   drop-in for `Gadgets.ToBits.rangeCheck 8` that asserts `x.val < 256` via `lookup ByteTable
   ⟨U8Range, x, 0, 0⟩` (SP1's `send_byte(U8Range, …)`), with `byteRowSpec_u8range` the membership
   characterization (`cast_eq_three` pins the opcode via `0..6` distinct mod `p`). All axiom-clean.
 - **Byte channel in the readers.** Both readers reach the byte table through
-  `byteChannel` instead of a `ByteTable` lookup: `Readers/CPUState.lean` (2 clock checks) and
-  `Readers/RegisterAccessTimestamp.lean` (2 timestamp checks/operand, composed ×3 through
+  `byteChannel` instead of a `ByteTable` lookup: `Native/Readers/CPUState.lean` (2 clock checks) and
+  `Native/Readers/RegisterAccessTimestamp.lean` (2 timestamp checks/operand, composed ×3 through
   `RTypeReader`) `byteChannel.pull ⟨op, is_real·value, width, 0⟩`, propagated through
-  `Chips/AddChip.lean`; `Soundness/ByteConsistency.lean` is the trace-level projection
+  `Proofs/Chips/AddChip.lean`; `Soundness/ByteConsistency.lean` is the trace-level projection
   (`byteLookups` + `byteAccessValid` + threaded `TraceByteLink` + `byteLookups_padding`), parallel to
   `StateConsistency`. The dead `byteRangeCheck`/`byteRangeCheckBits` `FormalAssertion` lookup wrappers
   were removed; `ByteTable`/`ByteRowSpec` + the membership lemmas stay (the channel's `Guarantees` *is*
   `ByteRowSpec`). **The send/receive direction:** the *consumer* **pulls** (`mult = -1`, gets
   the `ByteRowSpec` guarantee), and the provider side **pushes** — the coherent endpoint is a native
-  `Chips/ByteChip.lean` that `push`es the table with count multiplicities and proves each row valid.
+  `Proofs/Chips/ByteChip.lean` that `push`es the table with count multiplicities and proves each row valid.
   **Impedance mismatch:** Clean fires `Guarantees` only at `mult = -1`, so a pull can't carry
   the gated `is_real` multiplicity — gating stays in the message (`is_real·value`), and byte-op
   correctness becomes *assumed from the bus* (discharged by the `ByteChip` + balance, threaded as
@@ -236,13 +236,13 @@ The components below build up the in-circuit bus, each axiom-clean
   faithfulness (SP1 puts the value in `b`; the readers use `a` — pre-existing, flagged in
   `agents/proof-patterns.md`). `AddOperation`'s own limb range-checks are *not* yet on the byte bus.
 - **Memory + Program channels; "emitted = projection".**
-  **All four buses emit in-circuit.** `Foundations/Channels.lean` gains `memoryChannel` (`MemoryMsg`
+  **All four buses emit in-circuit.** `Model/Channels.lean` gains `memoryChannel` (`MemoryMsg`
   = the arity-9 tuple `(clk_high, clk_low, addr0, addr1, addr2, v0, v1, v2, v3)`) and `programChannel`
   (`ProgramMsg` = the arity-16 instruction-fetch tuple `(pc0..2, opcode, op_a, op_b0..3, op_c0..3,
   op_a_0, imm_b, imm_c)`), both with `Guarantees := True` (the cross-row meaning — offline-memory
   / ROM-membership — is the trace level: `Soundness/{Memory,Program}Consistency.lean`'s
   `Trace{Memory,Program}Link`). (The `<Msg>.Spec` enrichment of those guarantees is discussed below.)
-  `Readers/RTypeReader.lean` `emit`s the six per-row
+  `Native/Readers/RTypeReader.lean` `emit`s the six per-row
   register interactions (op_a `rd` write, op_b/op_c `rs1`/`rs2` reads; send prior-state / receive
   new-state) **and** the one instruction-fetch send, threading new inputs from the chip's `state` block
   (`clk_high`, `pc`) plus the `is_trusted`/`opcode` selectors.
@@ -252,21 +252,21 @@ The components below build up the in-circuit bus, each axiom-clean
   `mult 0` (aligning with the proven `*_padding` lemmas) and the eventual "emitted = projection" theorem
   becomes a near-syntactic match. The `emit`s are `assumeGuarantees = false` ⇒ `memoryChannel`/
   `programChannel` land only in `channelsWithRequirements` (`RTypeReader`, propagated to
-  `Chips/AddChip.lean`); with `Guarantees := True` every soundness/`channelsLawful` obligation is
+  `Proofs/Chips/AddChip.lean`); with `Guarantees := True` every soundness/`channelsLawful` obligation is
   trivial, axiom-clean, no heartbeat bump.
   **"emitted = projection".** State, Program, and Memory are recovered (axiom-clean) via the
-  `Foundations/InteractionRecovery.lean` toolkit; only Byte remains (see §0 for the current state). The
+  `Model/InteractionRecovery.lean` toolkit; only Byte remains (see §0 for the current state). The
   per-channel recoveries:
   - **State:** `Soundness/StateConsistency.lean`'s `stateLookups_eq_emitted` proves
     `stateLookups r = (interactionsWith stateChannel.toRaw (CPUState's ops)).map (AbstractInteraction.toAccess
     env)` — so `stateLookups` is now a *derived* projection of the actual emission, recovered from
     `CPUState`'s `exposedChannels` via `ElaboratedCircuit.interactionsWith_eq_of_mem_exposedChannels`, not a
-    hand-written shadow. The bridge is `Foundations/InteractionProjection.lean` (`AbstractInteraction.toAccess`
+    hand-written shadow. The bridge is `Model/InteractionProjection.lean` (`AbstractInteraction.toAccess`
     + `signedVal` centered-representative + the `toAccess_emitted_state` kernel). Parameterised by an `env` +
     honest per-column row-realises-circuit hypotheses. Full recipe in `agents/proof-patterns.md`.
   - **Memory/Program (composition):** unlike `CPUState` (no subcircuits),
     `RTypeReader` composes three `RegisterAccessCols` (+ `Gadgets.Equality` `===` gadgets), so the recovery
-    must flatten subcircuits. The supporting infrastructure (axiom-clean): `Foundations/Channels.lean`'s `interactionsWith_subcircuit_formal`
+    must flatten subcircuits. The supporting infrastructure (axiom-clean): `Model/Channels.lean`'s `interactionsWith_subcircuit_formal`
     (keeps the `interactionsWith` fold through a `FormalCircuit` subcircuit) + channel-distinctness
     `*_eq_*_false` lemmas + `Register{AccessTimestamp,AccessCols}` `interactionsWith_{memory,program}_eq`
     bottom-up lemmas (in `circuit.main` form). The remaining recovery threads these through the
@@ -284,8 +284,7 @@ The components below build up the in-circuit bus, each axiom-clean
   enrichment mechanism is as follows.
 
   The State/Memory/Program channels'
-  `Guarantees` carried a named `<Msg>.Spec` predicate (`Foundations/
-  Channels.lean`), mirroring `byteChannel`'s `ByteRowSpec`.
+  `Guarantees` carried a named `<Msg>.Spec` predicate (`Model/Channels.lean`), mirroring `byteChannel`'s `ByteRowSpec`.
   - `MemoryMsg.Spec` = `addr1 = 0 ∧ addr2 = 0 ∧ Word.isU64 value` (register-access shape + valid u64).
   - `ProgramMsg.Spec` = R-type shape (the operand high-limbs + `imm_b`/`imm_c` are `0`) ∧ `op_a < 32` ∧
     `op_b0, op_c0 < 2^16` ∧ `op_a_0 ∈ {0,1}`.
@@ -301,7 +300,7 @@ The components below build up the in-circuit bus, each axiom-clean
   `CPUState`). Ungated, **not** `is_real`-gated, is the right (and faithful) choice: SP1's program lookup
   that proves these is itself unconditional `mult = 1`, and the witnessed-`0` padding satisfies every
   bound. The op_a **write** value's `isU64` can't come from a pull (it's the `wv` *input*), so
-  `RTypeReader.Assumptions := isU64 wv`, discharged by `Chips/AddChip.lean` from `AddOperation.Spec.1`
+  `RTypeReader.Assumptions := isU64 wv`, discharged by `Proofs/Chips/AddChip.lean` from `AddOperation.Spec.1`
   (its result is already range-checked — no redundant re-check, faithful to SP1's "the ALU op owns its
   write-value range").
 
@@ -317,7 +316,7 @@ The components below build up the in-circuit bus, each axiom-clean
      the **memory** bus as three *separate* messages, keyed by the program opcode. That relation is
      inherently cross-bus/cross-message; it lives at the **chip Spec** (`AddChip.Spec`'s `toBitVec64
      cols.add_operation.value = toBitVec64 op_b_val + toBitVec64 op_c_val`) + the **bridge to Sail**
-     (`Chips/AddBridge.lean`'s `correct_add_native`), and is glued to the buses only at the trace/ensemble
+     (`Proofs/Chips/AddBridge.lean`'s `correct_add_native`), and is glued to the buses only at the trace/ensemble
      level (LogUp balance + offline-memory + per-chip arithmetic specs). That is the correct altitude.
 
   So the program channel's *natural* enrichment ceiling is **static instruction-decode well-formedness**
@@ -343,14 +342,14 @@ The components below build up the in-circuit bus, each axiom-clean
   `isU64 #v[eval pv[0..3]]`: bridge per-limb with `Word.lt_cases_of_isU64` + `rw [Vector.getElem_map]` +
   `Word.isU64_of_cases` (prefer the targeted `getElem_map` rewrite over `simpa`, which is whnf-expensive —
   it blew `AddChip` soundness's 200k budget; it now carries `set_option maxHeartbeats 400000`).
-- **`MachineAir` record (axiom-clean).** `Foundations/ChipAir.lean`:
+- **`MachineAir` record (axiom-clean).** `Model/ChipAir.lean`:
   `structure ChipAir {name, perRow : Row → LookupAccessList, included}`, `Machine := List (ChipAir Row)`,
   `Machine.busAggregate` (flatMap included chips' `aggregateChipRows`), `Machine.busBalance` (the aggregate
   `isConsistentBalanced` — SP1's cross-chip Σsends = Σreceives, *expressed* not derived), with
   `busAggregate_cons`/`_nil` + `multiplicitySum_busAggregate_cons` (per-chip key-sum decomposition). Built on
   the computable `InteractionBus` core (`aggregateChipRows`/`multiplicitySum`/`isConsistentBalanced`), never
   the `noncomputable interactionsWith`. (The per-bus `ChipAir` examples from the bespoke `MachineConsistency.lean` were retired with that capstone;
-  the `ChipAir` foundation in `Foundations/ChipAir.lean` remains.) Receiver chips
+  the `ChipAir` foundation in `Model/ChipAir.lean` remains.) Receiver chips
   (`ByteChip` provider, ROM, memory argument) append to the `Machine`. `InteractionScope`
   (multi-shard) is deferred. **Gotcha:** `Machine` is an `abbrev` for `List`, so `m.busAggregate` dot-notation
   resolves to `List.busAggregate` (error) — call `Machine.busAggregate m` explicitly.
@@ -401,7 +400,7 @@ multiplicity: taking a fact *in* requires the `-1` side.
 ### Gating: the genuine `is_real`-gated receive (`Channel.pullIf`)
 
 A receive *can* be genuinely `is_real`-gated — **`channel.pullIf is_real msg`**
-(`Foundations/Channels.lean`) has multiplicity `-is_real`: `-1` on real rows (fires the guarantee), `0` on
+(`Model/Channels.lean`) has multiplicity `-is_real`: `-1` on real rows (fires the guarantee), `0` on
 padding (no bus contribution, exactly matching SP1's `send_byte` multiplicity). The subtlety is that
 Clean's `Requirements` clause fires whenever mult `≠ -1`, so on padding's mult `0` you must *prove*
 `Guarantees msg` — which SP1's pure balance never asks. Two ingredients discharge it:

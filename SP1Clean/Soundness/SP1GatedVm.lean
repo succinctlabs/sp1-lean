@@ -2,7 +2,7 @@ import SP1Clean.Soundness.ChipRegistry
 import SP1Clean.Soundness.GatedVm.Capstone
 import SP1Clean.Soundness.GatedVm.Formal
 import SP1Clean.Soundness.GatedVm.BalanceMod
-import SP1Clean.Foundations.InteractionProjection
+import SP1Clean.Model.InteractionProjection
 import Clean.Air.FlatEnsemble
 
 /-! # SP1 as a Clean `FormalEnsemble` — the final, gated whole-machine ensemble

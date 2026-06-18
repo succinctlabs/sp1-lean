@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Chips.ShiftRightChip.Formal
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Proofs.Chips.ShiftRightChip.Formal
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Extracted.ShiftRightChip
 
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (ShiftRight)

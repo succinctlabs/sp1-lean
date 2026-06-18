@@ -1,6 +1,6 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 import SP1Clean.Extracted.ExtractionDSL
 import SP1Clean.Faithful.CPUState
 

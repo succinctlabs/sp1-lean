@@ -1,11 +1,11 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Extracted.SubwChip
 import SP1Clean.Faithful.Subw
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.RTypeReader
-import SP1Clean.Chips.SubwChip.Defs
+import SP1Clean.Native.Chips.SubwChip.Defs
 
 /-! # Chip-level faithfulness anchor — SP1's whole `Subw` chip constraint list ↔ the combined spec
 

@@ -1,5 +1,5 @@
-import SP1Clean.Chips.AddChip.Formal
-import SP1Clean.Trace
+import SP1Clean.Proofs.Chips.AddChip.Formal
+import SP1Clean.Soundness.RowView
 
 /-! # Native-semantic vs structural verification — the Add operation, head to head
 

@@ -1,4 +1,5 @@
 import SP1Clean.Soundness.MemoryConsistency
+import SP1Clean.Soundness.MemoryGlobal
 
 /-! # Trace-level `isU64` operand recovery from the Memory-bus balance (W1c)
 
@@ -292,5 +293,27 @@ theorem operand_c_isU64_of_memBalance [NeZero p] {rows : List (Trace.RowView (ZM
     Word.isU64 r.adapter.op_c_memory.prev_value :=
   (eventsAt_values_isU64 h (opCEvent r).addr.val _
     (mem_eventsAt_self (opCEvent_mem_memEventsFiltered hr h_real h_immc))).1
+
+/-- **W2/W1c: the operand-recovery hypotheses ride the constructed MemoryGlobalInit provider.** Assemble
+`MemBalanceHyps` at the W4a genesis contributions (`memGenesisContributions`) — so every operand fact
+above (`operand_{a,b,c}_isU64_of_memBalance`, `eventsAt_values_isU64`, the limb value chain) holds with
+**no standalone `MemProviderGenesis` assumption**: the genesis side is discharged by
+`memProviderGenesis_of_contributions`, leaving only the structural ordering/range side conditions + the
+`t0`-below-all residue + the balanced Memory bus. The value twin of
+`traceMemoryValid_of_genesis_and_balance`; the operand-binding entry point W2 builds on. -/
+def memBalanceHyps_of_genesis [NeZero p] (rows : List (Trace.RowView (ZMod p)))
+    (clkHigh t0 : ℕ) (addrs : List ℕ) (mult : ℕ → ℤ)
+    (hwf : ∀ r ∈ rows, MemRowWellFormed r)
+    (h_clk : TraceMemClkValid rows)
+    (h_prev : memPrevLink rows)
+    (h_prevlt : ∀ e ∈ memEventsFiltered rows, e.prevTs < e.clk.val)
+    (h_t0 : ∀ e ∈ memEventsFiltered rows, t0 ≠ e.clk.val)
+    (h_writeU64 : ∀ r ∈ rows, r.is_real ≠ 0 → Word.isU64 r.rdWrite)
+    (h_bal : isConsistentBalanced
+      (aggregateChipRows rows memoryLookups ++ memGenesisContributions clkHigh t0 addrs mult)) :
+    MemBalanceHyps rows (memGenesisContributions clkHigh t0 addrs mult) :=
+  { wellFormed := hwf, clk := h_clk, prevLink := h_prev, prevLt := h_prevlt,
+    genesis := memProviderGenesis_of_contributions rows clkHigh t0 addrs mult h_t0,
+    balanced := h_bal, writeU64 := h_writeU64 }
 
 end SP1Clean.Soundness

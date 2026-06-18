@@ -1,12 +1,12 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Extracted.AddChip
 import SP1Clean.Faithful.AddOperation
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.RTypeReader
-import SP1Clean.Chips.AddChip.Defs
+import SP1Clean.Native.Chips.AddChip.Defs
 
 /-! # Chip-level faithfulness anchor — SP1's whole `Add` chip constraint list ↔ the combined spec
 

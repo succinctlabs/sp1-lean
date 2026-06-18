@@ -13,7 +13,7 @@ Lean directly — so there is **no** Python post-processing of the constraint te
 sp1-constraint-compiler  --→  update_extracted.py  --→  SP1Clean/Extracted/<Op>.lean
    (rust, field-generic)        (wrap + write)            (struct + @[irreducible] constraints)
                                                                   ↑ imported by
-                                                          Foundations/SP1Constraint.lean (shared datatype)
+                                                          Model/SP1Constraint.lean (shared datatype)
                                                           Faithful/<Op>.lean (anchor theorem)
 ```
 
@@ -55,7 +55,7 @@ end AddOperation
 ```
 
 `update_extracted.py` sandwiches this between a fixed header (imports of
-`SP1Clean.Foundations.Word` + `…SP1Constraint`, `namespace SP1Clean.Extracted`,
+`SP1Clean.Math.Word` + `…SP1Constraint`, `namespace SP1Clean.Extracted`,
 `open SP1Clean`) and footer, giving e.g. `SP1Clean.Extracted.AddOperation.constraints`.
 
 ### Rust changes that made this possible
@@ -89,7 +89,7 @@ field-generic types is intentionally destructive to the prior `Fin KB` text outp
 
 ## The Lean side
 
-- **`Foundations/SP1Constraint.lean`** — the single, shared port of SP1's constraint datatype
+- **`Model/SP1Constraint.lean`** — the single, shared port of SP1's constraint datatype
   (`ByteOpcode` + `ofNat`, `AirInteraction`, `Interaction`, `SP1Constraints`, `allHold`,
   `allHold_append`), co-designed to match the emitted surface syntax. `ByteOpcode.constrain` gives the real
   meaning for `Range` (byte range checks, used by Add) and AND/OR/XOR (used by Bitwise, via
@@ -151,7 +151,7 @@ becomes a `byteChannel.pullIf` (a *pull* of the preprocessed `ByteChip`, the val
 which the older hand-written gadgets dropped to a chip `Assumptions`.
 
 **Migration shape** (per converted op): the generated `Operations/<Op>/Extracted.lean` owns
-`Inputs`/`main`/`elaborated`; `Specs/Operation.lean` drops the flat `Inputs` and imports the generated
+`Inputs`/`main`/`elaborated`; `FormalModel/Contracts/Operations.lean` drops the flat `Inputs` and imports the generated
 module (the `Spec` reads `input.cols.value`); `Operations/<Op>/Formal.lean` runs its proofs against the
 generated `main`; the hand-written `populate`/`spec_populate` live in `Operations/<Op>/Populate.lean`; and
 each composing chip wraps the witnessed result word in the `cols` struct
@@ -165,7 +165,7 @@ not-yet-migrated **chip-level** faithfulness (`Faithful/<Chip>Chip.lean`, which 
 
 1. Add `("<Chip>", "<Op>")` to `CONSTRAINTS_LIST` in `update_extracted.py` and run it.
 2. If `<Op>` emits a `ByteOpcode` not yet modelled, add its real meaning to
-   `ByteOpcode.constrain` in `Foundations/SP1Constraint.lean` (replace the `True` stub).
+   `ByteOpcode.constrain` in `Model/SP1Constraint.lean` (replace the `True` stub).
 3. Wire `SP1Clean.Extracted.<Op>` into the root index `SP1Clean.lean`.
 4. Write `Faithful/<Op>.lean` anchoring `Extracted.<Op>.constraints` to the gadget's spec.
 

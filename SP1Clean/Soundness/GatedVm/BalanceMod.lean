@@ -1,5 +1,5 @@
-import SP1Clean.Foundations.InteractionBus
-import SP1Clean.Foundations.InteractionProjection
+import SP1Clean.Model.InteractionBus
+import SP1Clean.Model.InteractionProjection
 import Clean.Air.Balance
 import Mathlib.Data.ZMod.Basic
 

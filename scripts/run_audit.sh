@@ -24,13 +24,12 @@ echo "LeanRV64D: $(git -C .lake/packages/LeanRV64D rev-parse HEAD 2>/dev/null ||
 echo
 echo "== A2 sorry inventory (gate: exactly the known-debt set) =="
 # The known direct `sorry` proof-holes. Update this list (and the docs) when one is closed.
-expected_sorries="SP1Clean/Chips/DivRemChip/Formal.lean
-SP1Clean/Soundness/SP1GatedVm.lean"
+expected_sorries="SP1Clean/Soundness/SP1GatedVm.lean"
 sorry_re='(^[[:space:]]*sorry[[:space:]]*$)|(:=[[:space:]]*sorry)|(=>[[:space:]]*sorry)'
 actual=$(grep -rlE "$sorry_re" SP1Clean --include='*.lean' | sort)
 grep -rnE "$sorry_re" SP1Clean --include='*.lean'
 if [ "$actual" = "$(echo "$expected_sorries" | sort)" ]; then
-  echo "PASS: sorry files = expected 2"
+  echo "PASS: sorry files = expected 1"
 else
   echo "FAIL: sorry inventory drifted from the documented set"; fail=1
 fi

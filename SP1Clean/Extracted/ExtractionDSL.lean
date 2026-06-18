@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Model.SP1Constraint
 
 /-! # Extraction DSL — the bus-interaction vocabulary the extracted constraints speak.
 

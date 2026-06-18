@@ -1,7 +1,7 @@
-import SP1Clean.Trace
-import SP1Clean.Foundations.InteractionBus
-import SP1Clean.Foundations.InteractionProjection
-import SP1Clean.Readers.CPUState
+import SP1Clean.Soundness.RowView
+import SP1Clean.Model.InteractionBus
+import SP1Clean.Model.InteractionProjection
+import SP1Clean.Native.Readers.CPUState
 
 /-! # Trace-level State-bus (PC-chain) consistency
 

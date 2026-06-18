@@ -1,10 +1,10 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Operations.U16MSBOperation.Formal
-import SP1Clean.Operations.U16MSBOperation.Extracted
-import SP1Clean.Foundations.SP1Constraint
-import SP1Clean.Foundations.InteractionProjection
-import SP1Clean.Foundations.InteractionRecovery
+import SP1Clean.Proofs.Operations.U16MSBOperation.Formal
+import SP1Clean.Extracted.Circuit.U16MSBOperation
+import SP1Clean.Model.SP1Constraint
+import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.U16MSBOperation
 
