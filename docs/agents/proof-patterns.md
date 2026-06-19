@@ -168,14 +168,21 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   .prev_value` by `rs2 := adapter.op_c_memory.prev_value` (like `BranchChip`), and `Assumptions` bound
   `isU64` of *those reads* — otherwise the operand is disconnected from everything the circuit constrains
   and soundness is unprovable. (Contrast Add/Lt, which pass `op_b_val` *into* an operation gadget.)
-- **Kernel `2^64` deep-recursion → lift the conversion + `skipKernelTC`.** `BitVec.toNat_ushiftRight` at
-  `BitVec 64` plants `2^64` (via `BitVec.ushiftRight`'s `@[expose]` body), tripping the kernel re-check even
-  under `lake build`'s `--tstack`. The split-into-bare-`rw` (sp1-lean PROOF_PATTERNS §3 #8) was **not**
-  enough here. Fix: lift the `toBitVec64 cols.a = RV64.srl rs2 rs1 ⟸ (toBitVec64 cols.a).toNat = rs1.toNat
-  / 2^(c0.val%64)` conversion into a `private` helper (`srl_div_to_bitvec`) so the trigger is isolated, and
-  put `set_option debug.skipKernelTC true in` on it (the doc-acknowledged **axiom-clean** escape — only
-  skips re-verifying the known `2^64` shape). Lemma name is `BitVec.extractLsb'_toNat` (not
-  `toNat_extractLsb'`); `extractLsb 5 0 = extractLsb' 0 6`, `.toNat = x.toNat % 2^6`.
+- **Kernel `2^64` deep-recursion → abstract-`BitVec` bridge, NOT `skipKernelTC`.** `BitVec.toNat_ushiftRight`
+  at `BitVec 64` plants `2^64` (via `BitVec.ushiftRight`'s `@[expose]` body); reduced **over a concrete
+  `Word`-derived `BitVec 64`** it deep-recurses the kernel re-check even under `lake build`'s `--tstack`. The
+  split-into-bare-`rw` (sp1-lean PROOF_PATTERNS §3 #8) was **not** enough. The kernel-clean fix (mirrors
+  `ShiftLeftChip`'s `sll_rv64_eq`, no `skipKernelTC`): isolate the `RV64.srl`/`sra` `.toNat` unfold into a
+  helper over **abstract `BitVec 64` args** (`ShiftRightChip/Math.lean` `srl_toNat`/`sra_toNat_{false,true}` :
+  `(RV64.srl c b).toNat = b.toNat / 2^(c.toNat % 64)`), where the `2^64` body is kernel-checked once over
+  variables. The `_div_to_bitvec` wrapper then only does `apply BitVec.eq_of_toNat_eq; rw [srl_toNat, hsh]`
+  with `hsh : (toBitVec64 rs2).toNat % 64 = rs2[0].val % 64` proved the clean `ShiftLeft` way
+  (`Word.toBitVec64_toNat` + `Word.toNat_def` + `show (2:ℕ)^N = <literal>` masks + `omega`) — so it never
+  re-unfolds a shift over a `Word` value. For a non-shift `BitVec 64` msb/extract (`low32_msb_eq_b1`), mirror
+  `toBitVec64_msb_eq_b3_ge`: a `rw` chain (not `simp only`) + mask **every** `2^N` (incl. `2^48`) to a literal.
+  (Was `set_option debug.skipKernelTC true in` — removed 2026-06-18; the option is the last-resort escape, not
+  the recipe.) Lemma name is `BitVec.extractLsb'_toNat` (not `toNat_extractLsb'`); `extractLsb 5 0 =
+  extractLsb' 0 6`, `.toNat = x.toNat % 2^6`.
 - **`simp only [id_eq]` before `linear_combination`/`ring` over field elements.** Clean wraps field
   elements as `id (ZMod p)`, which blocks `ring`'s instance synthesis (`IsRightCancelAdd (id (ZMod p))`).
   `clear_value` does **not** fix it; `simp only [id_eq] at h ⊢` does (the `BranchChip` L510 pattern).
@@ -211,7 +218,8 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   case-split on `op_b[3].val ≥ 32768` (BitVec msb via `ShiftRightMath.toBitVec64_msb_eq_b3_ge`). The msb=0
   arm reuses the SRL dispatch (`sra_div_to_bitvec_false` → `srl_close`); the msb=1 arm uses
   `sra_div_to_bitvec_true` → `sra_close_su16_*_case` with `sraFill = 65536 − v0123`. Both conversion
-  helpers carry `skipKernelTC` (the `2^64` trigger). SRLW/SRAW are the 32-bit (2-limb `HWord`) analogs,
+  helpers route through the abstract-`BitVec` bridges `sra_toNat_{false,true}` (kernel-clean, no
+  `skipKernelTC` — see the `2^64` bullet above). SRLW/SRAW are the 32-bit (2-limb `HWord`) analogs,
   `signExtend 64`-packaged via `toBitVec64_signExtend_word`.
 
 ## Landmines
