@@ -1,4 +1,5 @@
 import SP1Clean.Soundness.SP1GatedVm
+import SP1Clean.FormalModel.Trace.GuestProgram
 
 /-! # The target machine-level theorem — a real Sail execution chain from a loaded guest program
 
@@ -50,96 +51,6 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-! ## The guest program
-
-The Lean shadow of SP1's `Program` (`../sp1 crates/core/executor/src/program.rs`), prover-only fields
-dropped: an encoded instruction ROM (pc ↦ 32-bit instruction word), the entry point, and the initial
-byte-granular memory image. The *encoding* is primary — the Sail machine fetches encodings, the chips
-consume decoded operands, so "the decode is correct" (W3) is a theorem target, not a definition. -/
-structure GuestProgram where
-  /-- pc ↦ encoded instruction word. -/
-  rom : List (BitVec 64 × BitVec 32)
-  /-- The entry point (`pc_start`). -/
-  pc_start : BitVec 64
-  /-- The initial data image, byte-granular (address ↦ byte). -/
-  memImage : List (BitVec 64 × BitVec 8)
-  rom_nodup : (rom.map Prod.fst).Nodup
-  rom_aligned : ∀ a ∈ rom.map Prod.fst, a.toNat % 4 = 0
-
-/-- The instruction word at `a`, if `a` is a ROM address. -/
-def GuestProgram.fetchWord (prog : GuestProgram) (a : BitVec 64) : Option (BitVec 32) :=
-  (prog.rom.find? (·.1 == a)).map Prod.snd
-
-/-- The ROM's bytes are present in Sail memory, little-endian — the layout `fetch`/`mem_read` reads. -/
-def RomLoaded (prog : GuestProgram) (s : SailState) : Prop :=
-  ∀ a w, prog.fetchWord a = some w →
-    ∀ i : Fin 4, s.mem.get? (a.toNat + i) = some (w.extractLsb' (8 * i) 8)
-
-/-- **[W7 seam]** The platform-configuration residue of a runnable initial state — machine mode, no
-enabled interrupts, bare address translation, hart active, RVC off, … Populated incrementally as the
-`try_step` reduction (W7) discovers exactly which Sail registers it needs pinned; currently the empty
-conjunction, so the obligation it represents lives entirely in `TargetObligations.lift`. -/
-def SailConfigured (_s : SailState) : Prop := True
-
-/-- A Sail state that "loads" the guest program: a *relation*, not a constructed state, so everything
-the execution doesn't touch stays quantified. ELF ingestion (W6b) produces a `GuestProgram` and a
-concrete witness state. -/
-structure IsInitialState (prog : GuestProgram) (s : SailState) : Prop where
-  initialized : s.isInitialized
-  pc : s.regs.get? Register.PC = some prog.pc_start
-  romLoaded : RomLoaded prog s
-  imageLoaded : ∀ av ∈ prog.memImage, s.mem.get? av.1.toNat = some av.2
-  configured : SailConfigured s
-
-/-! ## The real Sail multi-step chain
-
-`SailM = EStateM …` over `SequentialState` (memory lives *inside* the state, the choice source is
-trivial), so `try_step` is deterministic: the chain below is relational, but each state has at most one
-successor. `try_step` is the topmost upstream entry point — interrupt dispatch, fetch, decode, execute,
-PC commit — so nothing of the interpreter is bypassed. -/
-
-/-- One real interpreter step: `try_step` runs to completion (no trap-out of the model). -/
-def SailStep (s s' : SailState) : Prop :=
-  ∃ b : Bool, (try_step 0 false).run s = .ok b s'
-
-/-- An `n`-step Sail execution chain. -/
-inductive SailChain : ℕ → SailState → SailState → Prop
-  | refl (s : SailState) : SailChain 0 s s
-  | step {n : ℕ} {s s' s'' : SailState} :
-      SailStep s s' → SailChain n s' s'' → SailChain (n + 1) s s''
-
-theorem SailChain.snoc : ∀ {n : ℕ} {a b : SailState}, SailChain n a b →
-    ∀ {c : SailState}, SailStep b c → SailChain (n + 1) a c := by
-  intro n a b h
-  induction h with
-  | refl s => exact fun hs => .step hs (.refl _)
-  | step h1 _ ih => exact fun hs => .step h1 (ih hs)
-
-/-! ## Halting (SP1 execution-environment semantics, observed not simulated)
-
-SP1's `ECALL` is not RISC-V privileged `ECALL`: Sail's `execute_ECALL` traps to an M-mode handler,
-SP1's reads the syscall id from `t0`/x5 (HALT = 0), the exit code from `a0`/x10, and stops with
-`next_pc = [HALT_PC, 0, 0]`. The honest claim against the *unmodified* Sail model is therefore: the
-chain stops one step **before** the halting `ECALL`, in a state about to execute it with the committed
-exit code in `a0`. The walk still carries the halt row's transition to the committed final key. -/
-
-/-- The RV64 `ECALL` encoding. -/
-def ECALL_ENC : BitVec 32 := 0x00000073#32
-
-/-- `SyscallCode::HALT` (read from `t0`/x5). -/
-def HALT_SYSCALL : BitVec 64 := 0
-
-/-- The committed exit code as the 64-bit value SP1 reads from `a0`/x10. -/
-def exitOf (exit_code : ZMod p) : BitVec 64 := BitVec.ofNat 64 exit_code.val
-
-/-- "About to execute the halting ECALL": the PC points at an `ECALL` encoding in the program ROM,
-`t0` holds `HALT`, and `a0` holds the exit code. -/
-def SP1Halted (prog : GuestProgram) (exit : BitVec 64) (s : SailState) : Prop :=
-  ∃ pc : BitVec 64,
-    s.regs.get? Register.PC = some pc ∧
-    prog.fetchWord pc = some ECALL_ENC ∧
-    s.get_reg? 5#5 = some HALT_SYSCALL ∧
-    s.get_reg? 10#5 = some exit
 
 /-! ## The extended public IO: `exit_code`
 
@@ -207,7 +118,7 @@ private lemma isWalk_head {α V : Type} {edge : α → V × V} {src snk : V} {pa
   | nil => simp at h
   | cons x rest => exact hw.1
 
-private lemma isWalk_chain {α V : Type} {edge : α → V × V} :
+lemma isWalk_chain {α V : Type} {edge : α → V × V} :
     ∀ {path : List α} {src snk : V}, GatedVm.IsWalk edge src snk path →
       ∀ i (h : i + 1 < path.length), (edge (path[i]'(by omega))).2 = (edge (path[i + 1]'h)).1 := by
   intro path
@@ -227,10 +138,25 @@ private lemma isWalk_chain {α V : Type} {edge : α → V × V} :
 
 /-! ## The refinement invariant and the per-row effect -/
 
+/-- **The exact-replay value (W2).** The value register `idx` holds after replaying the first `i` walk
+rows from `s0`: the committed write (`rdWrite`) of the **most-recent** earlier row whose `op_a`
+destination is `idx`, or `s0`'s value if none wrote it. The exact-value refinement of the old frame
+disjunction — `RefinesAt.frame` now pins each register to this, so a row's committed operand columns
+(read-back register values) can be tied to the live Sail registers (W2's operand binding). -/
+def replayVal (s0 : SailState) (path : List (Trace.RowView (ZMod p))) (idx : BitVec 5) :
+    ℕ → Option (BitVec 64)
+  | 0 => s0.get_reg? idx
+  | i + 1 =>
+    if hi : i < path.length then
+      if (idx.toNat : ZMod p) = (path[i]'hi).adapter.op_a then
+        some (Word.toBitVec64 (path[i]'hi).rdWrite)
+      else replayVal s0 path idx i
+    else replayVal s0 path idx i
+
 /-- The simulation invariant at walk position `i`: the state's PC is the next row's committed pc, the
-program ROM is intact, the platform configuration persists, and every register either still holds its
-initial value or was written (`op_a`) by an earlier walk row. The register clause is a *frame*, not a
-replay — the exact-value strengthening arrives with W2's operand binding. -/
+program ROM is intact, the platform configuration persists, and every register holds its **exact replay
+value** (`replayVal`: the most-recent earlier `op_a` write, or `s0`'s value). The register clause is now
+an exact replay, not a frame (W2's operand-binding strengthening). -/
 structure RefinesAt (prog : GuestProgram) (s0 : SailState)
     (path : List (Trace.RowView (ZMod p))) (i : ℕ) (s : SailState) : Prop where
   pc : ∀ (h : i < path.length),
@@ -238,21 +164,21 @@ structure RefinesAt (prog : GuestProgram) (s0 : SailState)
   rom : RomLoaded prog s
   init : s.isInitialized
   cfg : SailConfigured s
-  frame : ∀ idx : BitVec 5, s.get_reg? idx = s0.get_reg? idx ∨
-    ∃ j, ∃ (_ : j < i) (hj : j < path.length),
-      (idx.toNat : ZMod p) = (path[j]'hj).adapter.op_a
+  frame : ∀ idx : BitVec 5, s.get_reg? idx = replayVal s0 path idx i
 
 /-- The committed effect of one row, as a relation between the pre- and post-states of its interpreter
-step: the PC moves to the row's committed `next_pc`; the register file changes at most at the row's
-`op_a` destination (and there holds the committed write value); ROM, initialization, and configuration
-persist. Deliberately *relational* — `try_step` also touches bookkeeping registers (`minstret`,
-`hart_state`, …) the trace doesn't commit. -/
+step: the PC moves to the row's committed `next_pc`; the register file is **exactly** `s` except at the
+row's `op_a` destination, where it becomes the committed write value `rdWrite`; ROM, initialization, and
+configuration persist. The register clause is the exact-write form (W7's `wX_bits rd` produces it) the
+exact replay needs — `try_step` may also touch bookkeeping registers (`minstret`, `hart_state`, …) the
+trace doesn't commit, but those are outside the `BitVec 5` register file. -/
 structure RowEffect (prog : GuestProgram) (r : Trace.RowView (ZMod p))
     (s s' : SailState) : Prop where
   pc : s'.regs.get? Register.PC = some (sndPcOf (stateAccess r))
-  regs : ∀ idx : BitVec 5, s'.get_reg? idx = s.get_reg? idx ∨
-    ((idx.toNat : ZMod p) = r.adapter.op_a ∧
-      s'.get_reg? idx = some (Word.toBitVec64 r.rdWrite))
+  regs : (∀ idx : BitVec 5, (idx.toNat : ZMod p) = r.adapter.op_a →
+            s'.get_reg? idx = some (Word.toBitVec64 r.rdWrite)) ∧
+         (∀ idx : BitVec 5, ¬ (idx.toNat : ZMod p) = r.adapter.op_a →
+            s'.get_reg? idx = s.get_reg? idx)
   rom : RomLoaded prog s → RomLoaded prog s'
   init : s.isInitialized → s'.isInitialized
   cfg : SailConfigured s → SailConfigured s'
@@ -308,7 +234,7 @@ private theorem chain_to_refines
   induction i with
   | zero =>
     intro hi
-    refine ⟨s0, .refl s0, ?_, h0.romLoaded, h0.initialized, h0.configured, fun idx => Or.inl rfl⟩
+    refine ⟨s0, .refl s0, ?_, h0.romLoaded, h0.initialized, h0.configured, fun idx => rfl⟩
     intro h
     have hhead := isWalk_head hw.1 h
     have hpc : rcvPcOf (stateAccess (path[0]'h))
@@ -329,11 +255,10 @@ private theorem chain_to_refines
       congr 1
       exact sndPc_eq_rcvPc (isWalk_chain hw.1 i hi)
     · intro idx
-      rcases heff.regs idx with he | ⟨ha, _⟩
-      · rcases href.frame idx with h0' | ⟨j, hj, hj', hja⟩
-        · exact Or.inl (he.trans h0')
-        · exact Or.inr ⟨j, by omega, hj', hja⟩
-      · exact Or.inr ⟨i, by omega, hi', ha⟩
+      have hi' : i < path.length := by omega
+      by_cases hcond : (idx.toNat : ZMod p) = (path[i]'hi').adapter.op_a
+      · rw [heff.regs.1 idx hcond, replayVal, dif_pos hi', if_pos hcond]
+      · rw [heff.regs.2 idx hcond, href.frame idx, replayVal, dif_pos hi', if_neg hcond]
 
 /-- **The target machine-level theorem (skeleton form).** Given the gated execution certificate over
 the committed boundary, the entry-point tie, and the named obligations, the official Sail interpreter,

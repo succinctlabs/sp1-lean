@@ -1,5 +1,5 @@
-import SP1Clean.Foundations.Bitwise
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Math.Bitwise
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Extracted.BitwiseOperation
 import Mathlib.Tactic
 import Mathlib.Tactic.IntervalCases

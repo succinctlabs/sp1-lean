@@ -1,4 +1,4 @@
-import SP1Clean.Foundations.Word
+import SP1Clean.Math.Word
 import SP1Clean.Extracted.ExtractionDSL
 import Clean.Utils.Tactics.ProvableStructDeriving
 import SP1Clean.Extracted.RTypeReader

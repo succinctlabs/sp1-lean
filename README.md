@@ -48,46 +48,52 @@ things: SP1's Rust constraints, the Clean circuit, and the RISC-V ISA.
 All Lean sources live under `SP1Clean/`, with a mirror-of-SP1 layout. The root index
 `SP1Clean.lean` wires up every module's import.
 
-### `Specs/`
+### `FormalModel/Contracts/`
 The input structs and specifications, stated against the RV64 ISA functions — what each reader, operation,
 and chip is expected to compute.
-- `Reader.lean` — reader-circuit specs (CPU state, R-type reader, register-access columns/timestamps).
-- `Operation.lean` — operation-level specs.
-- `Chip.lean` — chip-row specs as `GeneralFormalCircuit`s.
+- `Contracts/Readers.lean` — reader-circuit specs (CPU state, R-type reader, register-access columns/timestamps).
+- `Contracts/Operations.lean` — operation-level specs.
+- `Contracts/Chips.lean` — chip-row `Inputs` + semantic `Spec`s; `Contracts/ChipAssumptions.lean` adds the ALU chips' `Assumptions`/`ProverAssumptions`.
+- `Trace/GuestProgram.lean` — the guest-program execution model (`GuestProgram`, `IsInitialState`, `SailChain`, `SP1Halted`).
 
-### `Foundations/`
-The shared building blocks the rest of the project relies on. Like SP1, everything works over a prime field.
+### `Math/`
+General math with no SP1/Sail dependencies (the upstreaming candidate). Everything works over a prime field.
 - `Word.lean` — a `Word` as four little-endian 16-bit limbs, plus reassembly into a 64-bit value.
 - `Bitwise.lean` — byte-level AND/OR/XOR.
-- `ByteTable.lean` — the static byte-lookup table (SP1's preprocessed `ByteChip`).
+- `MulCarryChain.lean` — multiplication carry-chain utilities.
+- `HWord.lean`, `GetElemFastPath.lean`, `Misc.lean` — half-word lemmas, a vector-access shim, misc lemmas.
+
+### `Model/`
+The SP1 substrate — Sail wrappers and the lookup-bus model.
+- `Register.lean`, `SailWrap.lean`, `SailMemory.lean` — register state, Sail monad wrappers, and the Sail memory model.
 - `Channels.lean`, `ChipAir.lean`, `InteractionBus.lean`, `InteractionProjection.lean`,
   `InteractionRecovery.lean` — the model of the lookup buses chips use to talk to each other.
-- `MulCarryChain.lean` — multiplication carry-chain utilities.
-- `Register.lean`, `SailWrap.lean` — register-state and Sail wrappers for the instruction subset in scope.
+- `ByteTable.lean` — the static byte-lookup table (SP1's preprocessed `ByteChip`).
 - `SP1Constraint.lean` — shared SP1 opcode datatypes (`ByteOpcode`, `Opcode`).
-- `Misc.lean` — miscellaneous lemmas.
 
-### `Operations/`
-The Clean circuit gadgets, one per ALU operation, each proved to compute the right 64-bit result: Add, Addw,
-Sub, Subw, Mul, Bitwise, BitwiseU16, Lt (signed/unsigned), U16Compare, U16MSB, U16toU8 (safe/unsafe),
-IsZero, IsZeroWord, IsEqualWord, Address, AddrAdd. Some are a single file; the ones that have been split into
-a subdirectory (`AddOperation/`, `SubOperation/`, `AddwOperation/`, `SubwOperation/`) separate the raw
-constraint form (`RawSpec.lean`), the circuit wiring (`Elaborated.lean`), and the result-level proof
-(`Formal.lean`).
+### `Native/Operations/` + `Proofs/Operations/`
+The Clean circuit gadgets, one per operation (Add, Addw, Sub, Subw, Mul, Bitwise, BitwiseU16, Lt, U16Compare,
+U16MSB, U16toU8, IsZero(Word), IsEqualWord, Address, AddrAdd), each proved to compute the right 64-bit result.
+A structured op `<Op>/` is split across pillars: the witness + native arithmetic core
+(`Native/Operations/<Op>/{Populate,RawSpec}.lean`), the `FormalAssertion` proof
+(`Proofs/Operations/<Op>/Formal.lean`), and the auto-generated `eval` circuit (`Extracted/Circuit/<Op>.lean`).
+Single-file (flat) ops live in `Native/Operations/`.
 
-### `Readers/`
+### `Native/Readers/`
 Register-adapter reader circuits that validate register reads/writes and instruction fetches per row:
 `CPUState.lean`, `RTypeReader.lean`, `ALUTypeReader.lean`, `RegisterAccessCols.lean`,
 `RegisterAccessTimestamp.lean`.
 
-### `Chips/`
-The chips: each composes the reader circuits, an operation gadget, and an `is_real` selector. Every chip
-is a directory `<Op>Chip/` split into `Defs.lean` (the `main` circuit + `Assumptions` + `ElaboratedCircuit`), `Formal.lean`
-(soundness/completeness/`FormalCircuit`), and `Bridge.lean` (the Sail bridge). The ALU,
-control-flow, and memory chips are all here — Add/Addi/Addw/Sub/Subw, Bitwise, Lt, Mul, DivRem,
-ShiftLeft/ShiftRight, AluX0, Branch, Jal/Jalr, UType, and the Load*/Store*/LoadX0 memory chips — alongside
-the flat receiver-infra files `ByteChip.lean`, `ProgramChip.lean`, and `MemoryProvider.lean`. Soundness is
-proved and `sorry`-free throughout; a few completeness proofs are still deferred skeletons.
+### `Native/Chips/` + `Proofs/Chips/`
+The chips: each composes the reader circuits, an operation gadget, and an `is_real` selector. A chip
+`<Op>Chip/` is split across pillars — the `main` circuit (`Native/Chips/<Op>Chip/Defs.lean`) and the
+soundness/completeness proofs + Sail bridge (`Proofs/Chips/<Op>Chip/{Formal,Bridge}.lean`); the `Spec` lives
+in `FormalModel/Contracts/Chips.lean`. The ALU, control-flow, and memory chips are all here —
+Add/Addi/Addw/Sub/Subw, Bitwise, Lt, Mul, DivRem, ShiftLeft/ShiftRight, AluX0, Branch, Jal/Jalr, UType, and
+the Load*/Store*/LoadX0 memory chips — alongside the flat receiver-infra files `Proofs/Chips/ByteChip.lean`,
+`ProgramChip.lean`, and `MemoryProvider.lean`. (The 3 entangled complex chips DivRem/ShiftLeft/ShiftRight
+keep their `Defs` in `Proofs/Chips/` too.) Soundness is proved and `sorry`-free throughout; a few
+completeness proofs are still deferred skeletons.
 
 ### `Faithful/`
 The faithfulness layer: proofs that the constraints used in the chip proofs are exactly those SP1 emits,
@@ -110,20 +116,21 @@ Trace-level consistency properties and the whole-machine capstone.
 - `GatedVm/` + `SP1GatedVm.lean` — the execution capstone (`sp1_machine_soundness`), the final
   Clean `FormalEnsemble`.
 
-### `WitnessTests/`
-Tests the witness generations for most of the operations against explicit vectors generated by SP1.
-Only shows conformance on test cases, doesn't directly prove witness generation faithful.
+### `Proofs/WitnessTests/` (+ `Extracted/WitnessVectors/`)
+Tests the witness generators for most operations against explicit vectors generated by SP1. The hand-written
+`native_decide` anchors (`<Op>Witness.lean`) live in `Proofs/WitnessTests/`; the auto-generated vectors live in
+`Extracted/WitnessVectors/`. Shows conformance on test cases; doesn't directly prove witness generation faithful.
 
 ## How a proof connects to SP1
 
 Each operation is verified through a short chain of artifacts that together link SP1's Rust, the Clean
 circuit, and the RISC-V ISA:
 
-1. **Gadget** (`Operations/<Op>.lean`) — the Clean circuit for the operation, with a spec describing the
-   result it computes on 64-bit words.
-2. **Chip** (`Chips/<Op>Chip/Defs.lean` + `Formal.lean`) — composes the gadget with the register/instruction
-   *readers* and an `is_real` selector, matching the shape of one of SP1's chips.
-3. **Sail bridge** (`Chips/<Op>Chip/Bridge.lean`) — proves the chip's result matches the RISC-V ISA, as
+1. **Gadget** (`Native/Operations/<Op>/` + `Proofs/Operations/<Op>/Formal.lean`) — the Clean circuit for the
+   operation, with a spec describing the result it computes on 64-bit words.
+2. **Chip** (`Native/Chips/<Op>Chip/Defs.lean` + `Proofs/Chips/<Op>Chip/Formal.lean`) — composes the gadget
+   with the register/instruction *readers* and an `is_real` selector, matching the shape of one of SP1's chips.
+3. **Sail bridge** (`Proofs/Chips/<Op>Chip/Bridge.lean`) — proves the chip's result matches the RISC-V ISA, as
    defined by the Sail model.
 4. **Faithfulness anchor** (`Faithful/<Op>.lean`) — proves the constraints used above are exactly those SP1
    emits, drawn from a Rust-extracted copy of SP1's constraints under `Extracted/`.

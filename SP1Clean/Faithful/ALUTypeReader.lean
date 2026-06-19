@@ -1,10 +1,10 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Foundations.SP1Constraint
-import SP1Clean.Foundations.InteractionProjection
-import SP1Clean.Foundations.InteractionRecovery
+import SP1Clean.Model.SP1Constraint
+import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
-import SP1Clean.Readers.ALUTypeReader
+import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Extracted.ALUTypeReader
 
 /-! # Faithfulness anchor — SP1's `ALUTypeReader` constraint fragment ↔ the native reader spec

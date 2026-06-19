@@ -19,11 +19,12 @@ OUT = ROOT / "scripts" / "axiom_probe.lean"
 
 # (glob, declaration-name regex) → collect matching theorems/defs with their namespace.
 TARGETS = [
-    ("SP1Clean/Chips/*/Formal.lean", r"theorem\s+(soundness|completeness)\b"),
-    ("SP1Clean/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
-    ("SP1Clean/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
+    ("SP1Clean/Proofs/Chips/*/Formal.lean", r"theorem\s+(soundness|completeness)\b"),
+    ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"theorem\s+(correct_\w+|\w*reaches_sail\w*)\b"),
+    ("SP1Clean/Proofs/Chips/*/Bridge.lean", r"def\s+(kind)\b"),
     ("SP1Clean/Faithful/*.lean", r"theorem\s+(\w*faithful\w*)\b"),
-    ("SP1Clean/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
+    ("SP1Clean/Proofs/WitnessTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
+    ("SP1Clean/Proofs/TraceGenTests/*.lean", r"theorem\s+(\w*conforms\w*)\b"),
     ("SP1Clean/Soundness/GatedVm/*.lean",
      r"theorem\s+(exists_trail|chipRows_step_sound|state_trail_of_balance|"
      r"gatedExecution_of_specs_and_balance|gatedExecution_allChips|"
@@ -35,6 +36,20 @@ TARGETS = [
      r"theorem\s+(coverage_kinds_eq_registry|coverage_length|covered_iff_routed|"
      r"wired_subset_reachable|reachable_subset_wired|routeOf_reaches_sail)\b"),
     ("SP1Clean/Soundness/TargetVm.lean", r"theorem\s+(sp1_target\w*)\b"),
+    ("SP1Clean/Soundness/Decode.lean",
+     r"(?:theorem|def)\s+(decode_\w+|instrToProgramRow_\w+|DecodeOperandsBound|decodedInROM\w*|"
+     r"targetObligations_of_decode)\b"),
+    ("SP1Clean/Model/SailDecode.lean",
+     r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),
+    ("SP1Clean/FormalModel/Trace/Witness.lean",
+     r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_\w+|mem_fullRegs)\b"),
+    ("SP1Clean/Soundness/MemoryGlobal.lean",
+     r"theorem\s+(memProviderGenesis_of_contributions|traceMemoryValid_of_genesis_and_balance)\b"),
+    ("SP1Clean/Soundness/MemoryIsU64.lean",
+     r"(?:theorem|def)\s+(memBalanceHyps_of_genesis|operand_\w+_isU64_of_memBalance)\b"),
+    ("SP1Clean/Soundness/ValueBound.lean",
+     r"(?:theorem|def|lemma)\s+(value_targetBound|operandsBound_full_targetBound|targetObligations_full|"
+     r"ValueOperandsBound|walk_clk_monotone|sndClk_eq_rcvClk)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")

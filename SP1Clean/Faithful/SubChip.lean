@@ -1,9 +1,9 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Extracted.SubChip
-import SP1Clean.Chips.SubChip.Defs
+import SP1Clean.Native.Chips.SubChip.Defs
 import SP1Clean.Faithful.Sub
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.RTypeReader

@@ -24,15 +24,12 @@ echo "LeanRV64D: $(git -C .lake/packages/LeanRV64D rev-parse HEAD 2>/dev/null ||
 echo
 echo "== A2 sorry inventory (gate: exactly the known-debt set) =="
 # The known direct `sorry` proof-holes. Update this list (and the docs) when one is closed.
-expected_sorries="SP1Clean/Chips/ShiftLeftChip/Formal.lean
-SP1Clean/Chips/ShiftRightChip/Formal.lean
-SP1Clean/Chips/DivRemChip/Formal.lean
-SP1Clean/Soundness/SP1GatedVm.lean"
+expected_sorries="SP1Clean/Soundness/SP1GatedVm.lean"
 sorry_re='(^[[:space:]]*sorry[[:space:]]*$)|(:=[[:space:]]*sorry)|(=>[[:space:]]*sorry)'
 actual=$(grep -rlE "$sorry_re" SP1Clean --include='*.lean' | sort)
 grep -rnE "$sorry_re" SP1Clean --include='*.lean'
 if [ "$actual" = "$(echo "$expected_sorries" | sort)" ]; then
-  echo "PASS: sorry files = expected 4"
+  echo "PASS: sorry files = expected 1"
 else
   echo "FAIL: sorry inventory drifted from the documented set"; fail=1
 fi
@@ -65,15 +62,14 @@ import re, sys
 text = open(sys.argv[1]).read()
 entries = re.findall(r"'([\w.]+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)", text, re.S)
 print(f"census entries: {len(entries)}")
-# Declarations allowed to (transitively) carry sorryAx: the three completeness holes, the
+# Declarations allowed to (transitively) carry sorryAx: the DivRem completeness hole, the
 # decode seam `sp1_witness_decode` (the sorried W1b/W1c premise; `sp1_gatedExecution_prereqs`
 # is now a proven assembly that consumes it), and the capstone chain that embeds them
 # (sp1Tables bundles the chip `circuit` structures whose completeness fields are sorried;
 # the soundness proofs never consume those fields, but #print axioms is structural and
 # cannot see that).
 allowed = {
-    "SP1Clean.ShiftLeftChip.completeness",
-    "SP1Clean.ShiftRightChip.completeness", "SP1Clean.DivRemChip.completeness",
+    "SP1Clean.DivRemChip.completeness",
     "SP1Clean.Soundness.sp1_witness_decode",
     "SP1Clean.Soundness.sp1_gatedExecution_prereqs",
     "SP1Clean.Soundness.sp1Tables", "SP1Clean.Soundness.sp1Tables_length",

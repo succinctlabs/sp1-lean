@@ -1,7 +1,7 @@
 import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
-import SP1Clean.Operations.AddressOperation
-import SP1Clean.Foundations.SP1Constraint
+import SP1Clean.Native.Operations.AddressOperation
+import SP1Clean.Model.SP1Constraint
 import SP1Clean.Extracted.AddressOperation
 
 /-! # Faithfulness anchor to the SP1 (Rust-extraction) constraints (Address)
