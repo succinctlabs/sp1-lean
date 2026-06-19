@@ -32,6 +32,7 @@ import SP1Clean.Proofs.Chips.DivRemChip.Soundness.Remu
 import SP1Clean.Proofs.Chips.DivRemChip.Soundness.Remuw
 import SP1Clean.Proofs.Chips.DivRemChip.Soundness.Remw
 import SP1Clean.Proofs.Chips.DivRemChip.Soundness.Reader
+import SP1Clean.Proofs.Chips.DivRemChip.Soundness.Tail
 import SP1Clean.Proofs.Chips.DivRemChip.Populate
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Abs
 import SP1Clean.Proofs.Chips.DivRemChip.Populate.Bounds
