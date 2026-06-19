@@ -120,11 +120,41 @@ Full evidence: `profile-baseline-2026-06-10/findings.md`. In brief:
 - The old threads C/E ("linter tax" / "Extracted monolithic terms") are **resolved** — E was mostly
   the `v[i]` tax in disguise.
 
+## Addendum 2026-06-19 — the numbers above are STALE (pre-pillar-refactor); partial re-measure + DivRem tail dedup
+
+This snapshot predates the pillar refactor (merged 2026-06-18) and was contention-inflated. Two of
+its "next targets" were re-measured in isolation (`lake env lean -Dprofiler=true`, warm cache) and
+came out very differently — **do not trust the absolute seconds above without re-running
+`scripts/profile_compile.sh`.**
+
+- **`Chips.DivRemChip.Defs` is NOT 118s — it is ~37–40s in isolation** (3 instance-field simps
+  ≈ 21s total: 9.99s `channelsLawful` + 7.13s + 3.95s; type-checking ≈ 10.6s). Target #2 below is
+  largely obsolete; the only lever left is sharing the one `main` unfold across the 3 field proofs
+  (the parked `main_ops_eq`), worth ~14s — marginal.
+- **DivRem soundness conjunct cost is dominated by the Mul product-glue, NOT omega/carry.** Profiling
+  a spec-only conjunct (after the tail dedup below): the `linear_combination`/`omega` bridges are
+  negligible; ~167s is **4 `simpa … using h_ctq_k` product-glue calls (37–44s each)** establishing
+  `r_k = cols.product[2k] + cols.product[2k+1]·256` against the witnessed 16-element `mul_lower`/
+  `mul_upper` product vectors, plus `instantiate metavars` 41s and the two big `obtain`s (~25s).
+  **This cost is term-intrinsic** — swapping the heavy `circuit_norm` simp set for the minimal
+  `[Vector.getElem_map, getElem_mapRange]` built green with **zero speedup** (274→274s). The
+  "minimal-context pure-ℕ lemma" lever (target #1) does NOT apply; reducing it needs deeper
+  restructuring of how the Mul product columns are reduced. Open, harder than billed.
+
+**Landed 2026-06-18/19 (compile-time campaign, commit f0e6f82+):** the shared `Operations.Requirements`
+"tail" of the 9 DivRem soundness conjuncts (byte-identical 265 lines, re-elaborated 9× at 128M HB) is
+now proved **once** in `Proofs/Chips/DivRemChip/Soundness/Tail.lean` (`requirements_holds` +
+`SpecObligation`/`soundness_of_specObligation` combinator + `spec_proof_start` elab). Each conjunct
+delegates; `lake build SP1Clean` green (3676 jobs), axiom-clean. The same shared-obligation structure
+was **verified** in the ShiftRight conjuncts (the `cpuA/msb1A/msb2A/msb3A/aluA` block is byte-identical,
+236 lines, across Srl/Sra/Srlw/Sraw) — Phase 3 (apply the same dedup) is viable but a smaller prize.
+
 ## Where to optimize next (by leverage)
 
 1. **DivRem conjunct proof bodies** (~3.7 CPU-h): the omega/carry work in heavy contexts. Known
    pattern from the files' own comments: extract minimal-context pure-ℕ lemmas so omega certificates
-   shrink. Large effort, largest prize. *Open.*
+   shrink. Large effort, largest prize. *Open.* **(See 2026-06-19 addendum: re-measured — the cost is
+   the Mul product-glue `simpa`, term-intrinsic, not omega; this lever does not apply.)*
 2. **`Chips.DivRemChip.Defs` (118s)**: instance-field `simp` proofs 20s+ each plus ~40s kernel
    type-checking — investigate proof-term size of the field proofs (`share common exprs` lines).
    *Open.*
