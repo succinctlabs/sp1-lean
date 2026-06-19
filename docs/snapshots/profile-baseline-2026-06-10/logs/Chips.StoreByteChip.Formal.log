@@ -1,0 +1,56 @@
+import took 982ms
+simp took 183ms
+simp took 724ms
+simp took 764ms
+tactic execution of Lean.Parser.Tactic.obtain took 92.1ms
+tactic execution of Lean.Parser.Tactic.obtain took 57ms
+tactic execution of Lean.Parser.Tactic.refine took 101ms
+instantiate metavars took 2.01s
+share common exprs took 67.4ms
+process pre-definitions took 55.3ms
+elaboration took 115ms
+type checking took 521ms
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 126ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 407ms
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 123ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 116ms
+linting took 107ms
+elaboration took 74.5ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 108ms
+simp took 185ms
+simp took 171ms
+simp took 680ms
+tactic execution of Lean.Parser.Tactic.obtain took 144ms
+tactic execution of Lean.Parser.Tactic.obtain took 58.6ms
+instantiate metavars took 1.88s
+elaboration took 114ms
+type checking took 448ms
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 134ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 408ms
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 124ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 115ms
+linting took 114ms
+simp took 149ms
+cumulative profiling times:
+	attribute application 0.0671ms
+	compilation (IR) 39.7ms
+	compilation (LCNF base) 75.8ms
+	compilation (LCNF mono) 23.1ms
+	congr simp thm 35.5ms
+	dsimp 1.4s
+	elaboration 339ms
+	fix level params 13.9ms
+	import 982ms
+	initialization 29.3ms
+	instantiate metavars 3.88s
+	interpretation 2.04s
+	let-to-have transformation 0.117ms
+	linting 276ms
+	norm_num 2.37ms
+	parsing 10.5ms
+	process pre-definitions 122ms
+	share common exprs 115ms
+	simp 3.75s
+	tactic execution 21.1s
+	type checking 1.1s
+	typeclass inference 12.1s

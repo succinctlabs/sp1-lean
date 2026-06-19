@@ -1,0 +1,54 @@
+import took 985ms
+simp took 174ms
+dsimp took 85.6ms
+simp took 700ms
+simp took 723ms
+tactic execution of Lean.Parser.Tactic.obtain took 88.7ms
+tactic execution of Lean.Parser.Tactic.refine took 97.8ms
+instantiate metavars took 1.81s
+share common exprs took 65.3ms
+process pre-definitions took 50ms
+elaboration took 98.4ms
+type checking took 489ms
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 92.3ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 288ms
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 91.2ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 83.9ms
+linting took 76.7ms
+elaboration took 50.6ms
+simp took 247ms
+simp took 165ms
+simp took 646ms
+tactic execution of Lean.Parser.Tactic.obtain took 155ms
+instantiate metavars took 1.65s
+elaboration took 89ms
+type checking took 399ms
+interpretation of _private.Mathlib.Tactic.Linter.UnusedTactic.0.Mathlib.Linter.UnusedTactic.unusedTacticLinter._lam_0._boxed took 110ms
+interpretation of Mathlib.TacticAnalysis.tacticAnalysis._lam_0._boxed took 327ms
+interpretation of Batteries.Linter.UnreachableTactic.unreachableTacticLinter._lam_0._boxed took 93.3ms
+interpretation of Batteries.Linter.UnnecessarySeqFocus.unnecessarySeqFocusLinter._lam_1._boxed took 85.7ms
+linting took 91ms
+simp took 150ms
+cumulative profiling times:
+	attribute application 0.0575ms
+	compilation (IR) 33.3ms
+	compilation (LCNF base) 74ms
+	compilation (LCNF mono) 20.1ms
+	congr simp thm 33.1ms
+	dsimp 1.04s
+	elaboration 269ms
+	fix level params 12.1ms
+	import 985ms
+	initialization 28.7ms
+	instantiate metavars 3.46s
+	interpretation 1.52s
+	let-to-have transformation 0.11ms
+	linting 193ms
+	norm_num 1.33ms
+	parsing 8.32ms
+	process pre-definitions 107ms
+	share common exprs 113ms
+	simp 3.64s
+	tactic execution 15.3s
+	type checking 1.04s
+	typeclass inference 8.68s

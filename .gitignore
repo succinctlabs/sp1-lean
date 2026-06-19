@@ -1,6 +1,7 @@
-/.lake
-/.claude
-.env
-.env.fish
+build/*
+build.log
+scratch/
 
-.DS_Store
+.lake/*
+.claude/*
+__pycache__/

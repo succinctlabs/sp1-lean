@@ -1,0 +1,66 @@
+From b31e9dd1fc04ecfabe1e39beddfc934321a870d8 Mon Sep 17 00:00:00 2001
+From: Devon Tuma <dtumad@gmail.com>
+Date: Wed, 10 Jun 2026 18:23:49 -0500
+Subject: [PATCH 1/2] decide fast path for v[i] index-bound goals
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Core's polymorphic-range get_elem_tactic_extensible rule (tried first) runs
+~11 `... at *` context traversals plus omega for every `v[i]` bound goal —
+~0.34s for `1 < 4` inside a large soundness context, ~0.8s per index-dense
+`have`. A decide-first rule closes literal bounds context-blind in ~26
+heartbeats and falls through on non-literal ones (~300hb); done/assumption
+still run first, so hypothesis-supplied proofs keep winning (lean4#6999).
+
+Measured downstream (sp1-clean-native, 260-module sweep): -50.7% total
+isolated elaboration, with v[i]-dense generated files up to -93%.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+---
+ Clean/Circuit/SimpGadget.lean    |  1 +
+ Clean/Utils/GetElemFastPath.lean | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+)
+ create mode 100644 Clean/Utils/GetElemFastPath.lean
+
+diff --git a/Clean/Circuit/SimpGadget.lean b/Clean/Circuit/SimpGadget.lean
+index 81df73ef..b0068ac8 100644
+--- a/Clean/Circuit/SimpGadget.lean
++++ b/Clean/Circuit/SimpGadget.lean
+@@ -2,6 +2,7 @@ import Mathlib.Init
+ import Lean.Meta.Tactic.Simp.SimpTheorems
+ import Lean.Meta.Tactic.Simp.RegisterCommand
+ import Lean.LabelAttribute
++import Clean.Utils.GetElemFastPath
+ 
+ register_simp_attr circuit_norm
+ register_simp_attr explicit_circuit_norm
+diff --git a/Clean/Utils/GetElemFastPath.lean b/Clean/Utils/GetElemFastPath.lean
+new file mode 100644
+index 00000000..49c0e684
+--- /dev/null
++++ b/Clean/Utils/GetElemFastPath.lean
+@@ -0,0 +1,20 @@
++/-! # `v[i]` index-bound fast path
++
++Every `v[i]` elaborates its bound side-goal with `get_elem_tactic` =
++`first | done | assumption | get_elem_tactic_extensible | fail`. The extensible rule tried first
++(macro_rules run in reverse registration order) is core's polymorphic-range support
++(`Init.Data.Range.Polymorphic.GetElemTactic`), which runs nine `try rw [Std.R??.mem_iff] at *`
++passes, a `dsimp … at *`, a slice-size `simp`, and `omega` — every one of them O(local context).
++
++Inside circuit soundness/completeness proofs the context carries dozens of hypotheses holding
++whole-circuit terms, and a bound goal as trivial as `1 < 4` costs ~0.34s — paid at every `v[i]`
++occurrence, ~0.8s per `have` in index-dense proofs (measured downstream in sp1-clean-native:
++eight one-line bridge `have`s cost 175k heartbeats; 3k with this rule registered).
++
++`decide` is context-blind: literal bounds (the overwhelmingly common case in circuit code) close
++by kernel `Nat.decLt` reduction in ~26 heartbeats with no extra axioms; non-literal bounds fail
++through to the standard rules in ~300. Registering it here — after core/batteries/mathlib in the
++import graph, hence tried first; still after `done`/`assumption`, preserving the
++proof-term-is-the-hypothesis unification behavior (lean4#6999 note in `get_elem_tactic`). -/
++
++macro_rules | `(tactic| get_elem_tactic_extensible) => `(tactic| decide)
+-- 
+2.43.0
+
