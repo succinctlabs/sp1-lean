@@ -99,7 +99,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     rcases h_bin with h | h
     · rw [h, h_pad h]; simp
     · rcases h_op_a_0 with h0 | h0 <;> rw [h, h0] <;> simp
-  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩,
+  refine ⟨⟨h_it, h_bin, h_lsb, ?_, ?_, ?_⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩,
     Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩, Or.inr h_bin⟩
   · intro hr1
     have := (h_add1 ⟨fun _ => ⟨hrs1U, h_imm⟩, h_bin⟩ hr1).2
@@ -110,6 +110,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     have := (h_add2 ⟨fun _ => ⟨hpcU, h4U⟩, h_gate2⟩ hg1).2
     rw [hpceq] at this
     simpa only [pcWord] using this
+  · -- 4-byte alignment of the cleared low limb, from the (otherwise-unused) byte-range pull `h_align`:
+    -- `((add_value[0] - lsb) · 4⁻¹).val < 2^14 ⇒ (add_value[0] - lsb).val % 4 = 0`.
+    intro hr1
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have hguar := h_align (by rw [hr1])
+    simp only [byteChannel] at hguar
+    rw [← c14] at hguar
+    rw [sub_eq_add_neg]
+    exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
 
 set_option maxHeartbeats 2000000 in
 theorem completeness :

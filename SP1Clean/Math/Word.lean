@@ -58,6 +58,19 @@ lemma toBitVec64_toNat [NeZero p] {w : Word (ZMod p)} (hw : w.isU64) :
   have := lt_cases_of_isU64 hw
   omega
 
+/-- The 64-bit value's residue mod 4 is the low limb's residue mod 4 (the higher limbs all carry a
+factor `2^16`, hence `4 ∣`). No `isU64` hypothesis needed: `2^64` is itself a multiple of 4, so the
+`BitVec.ofNat` wrap-around drops out. Used by the JALR/Jal/Branch alignment bridges to lift the
+in-circuit low-limb divisibility to the committed `next_pc` word. -/
+lemma toBitVec64_toNat_mod_four [NeZero p] (w : Word (ZMod p)) :
+    w.toBitVec64.toNat % 4 = w[0].val % 4 := by
+  simp only [toBitVec64, BitVec.toNat_ofNat, toNat,
+    show (2 : ℕ) ^ 16 = 65536 from by norm_num,
+    show (2 : ℕ) ^ 32 = 4294967296 from by norm_num,
+    show (2 : ℕ) ^ 48 = 281474976710656 from by norm_num]
+  rw [Nat.mod_mod_of_dvd _ (show (4 : ℕ) ∣ 2 ^ 64 from by norm_num)]
+  omega
+
 /-- The 128-bit zero-extension of a (64-bit) word's value. Used for the `MULH*`
 high-half product specs, where the schoolbook 16-byte product is the full 128-bit
 product of the (sign/zero-extended) operands. -/
@@ -87,6 +100,29 @@ lemma val_65536_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (65536 : ZMod p) ≠ 0 
     (2 : ZMod p).val = 2 := by
   have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   exact ZMod.val_natCast_of_lt (show (2 : ℕ) < p by omega)
+
+@[simp] lemma val_4_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
+    (4 : ZMod p).val = 4 := by
+  have : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  exact ZMod.val_natCast_of_lt (show (4 : ℕ) < p by omega)
+
+lemma val_4_ne_zero [NeZero p] [Fact (2 ^ 17 < p)] : (4 : ZMod p) ≠ 0 := by
+  have h : (4 : ZMod p).val = 4 := val_4_zmod_p
+  intro hz; rw [hz] at h; simp at h
+
+/-- The reverse of `U16toU8OperationSafe.high_byte_lt` for the `÷4` alignment check: if `x · 4⁻¹` is a
+14-bit value (the in-circuit `Range` byte-lookup), then `x` is divisible by 4. Since `x · 4⁻¹ < 2^14`
+gives `x = (x · 4⁻¹) · 4` with `(x · 4⁻¹).val · 4 < 2^16 < p` (no wrap), `x.val = (x · 4⁻¹).val · 4`. -/
+lemma val_mod_four_of_mul_inv_four_lt [Fact p.Prime] [Fact (2 ^ 17 < p)] {x : ZMod p}
+    (h : (x * (4 : ZMod p)⁻¹).val < 2 ^ 14) : x.val % 4 = 0 := by
+  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
+  have hp : (131072 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  rw [show (2 : ℕ) ^ 14 = 16384 from by norm_num] at h
+  have h41 : (4 : ZMod p)⁻¹ * 4 = 1 := inv_mul_cancel₀ val_4_ne_zero
+  have hxval : x.val = (x * (4 : ZMod p)⁻¹).val * 4 := by
+    conv_lhs => rw [show x = (x * (4 : ZMod p)⁻¹) * 4 by rw [mul_assoc, h41, mul_one]]
+    rw [ZMod.val_mul, val_4_zmod_p, Nat.mod_eq_of_lt (by omega)]
+  rw [hxval]; omega
 
 @[simp] lemma val_65535_zmod_p [NeZero p] [Fact (2 ^ 17 < p)] :
     (65535 : ZMod p).val = 65535 := by

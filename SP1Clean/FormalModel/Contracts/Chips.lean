@@ -640,7 +640,10 @@ def pcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
 (`op_c_imm` is the sign-extended 12-bit immediate — the `BitVec 12` ↔ word relation is a received decode
 fact, supplied at the Sail bridge), the `lsb` witness is binary, and — when `rd ≠ x0` (`op_a_0 = 0`) — the
 link-address write `op_a_operation.value = pc + 4`. The committed next_pc is the LSB-cleared
-`nextPcWord`. Vacuous on padding. -/
+`nextPcWord`. The final conjunct records that this cleared low limb (`add_operation.value[0] - lsb`)
+is divisible by 4 — i.e. the jump target is 4-byte aligned — forced by the in-circuit alignment
+`Range` byte-lookup (`(value[0] - lsb) · 4⁻¹ < 2^14`); the Sail bridge lifts it to the whole word.
+Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : JalrColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ITypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
@@ -656,7 +659,8 @@ def Spec (input : Inputs (ZMod p)) (cols : JalrColumns (ZMod p)) (_ : ProverData
       = Word.toBitVec64 (rs1Word cols) + Word.toBitVec64 cols.adapter.op_c_imm) ∧
   (input.is_real = 1 → cols.adapter.op_a_0 = 0 →
     Word.toBitVec64 cols.op_a_operation.value
-      = Word.toBitVec64 (pcWord cols) + Word.toBitVec64 (#v[4, 0, 0, 0] : Word (ZMod p)))
+      = Word.toBitVec64 (pcWord cols) + Word.toBitVec64 (#v[4, 0, 0, 0] : Word (ZMod p))) ∧
+  (input.is_real = 1 → (cols.add_operation.value[0] - cols.lsb).val % 4 = 0)
 
 end SP1Clean.JalrChip
 
