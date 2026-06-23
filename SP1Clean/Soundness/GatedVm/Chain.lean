@@ -67,8 +67,6 @@ lemma balanced_erase {E : Multiset α} {e : α} (he : e ∈ E) (edge : α → V 
       = (indeg (E.erase e) edge v : ℤ) + (if (edge e).2 = v then 1 else 0) := by
     simp only [indeg]; exact_mod_cast card_filter_erase he (fun a => (edge a).2 = v)
   have hv := h v
-  -- the erased edge `e = src → (edge e).2`, so its source-indicator is `v = src` and its
-  -- target-indicator is `v = (edge e).2`
   have e1 : (if (edge e).1 = v then (1 : ℤ) else 0) = (if v = src then 1 else 0) := by
     rcases eq_or_ne v src with hc | hc
     · rw [if_pos (h1.trans hc.symm), if_pos hc]
@@ -79,8 +77,6 @@ lemma balanced_erase {E : Multiset α} {e : α} (he : e ∈ E) (edge : α → V 
     · rw [if_neg (fun hh => hc hh.symm), if_neg hc]
   rw [e1] at ho
   rw [e2] at hi
-  show (outdeg (E.erase e) edge v : ℤ) - indeg (E.erase e) edge v
-      = (if v = (edge e).2 then 1 else 0) - (if v = snk then 1 else 0)
   linarith [ho, hi, hv]
 
 /-- **Balance ⇒ trail (the Eulerian core).** From degree balance alone — no clock injectivity, no
@@ -94,15 +90,13 @@ theorem exists_trail (edge : α → V × V) (E : Multiset α) :
     intro src snk h
     by_cases hss : src = snk
     · exact ⟨[], hss, by simp⟩
-    · -- the source has an outgoing edge
-      have hsrc := h src
+    · have hsrc := h src
       rw [if_pos rfl, if_neg hss] at hsrc
       have hpos : 0 < outdeg E edge src := by omega
       simp only [outdeg] at hpos
       obtain ⟨e, he_filter⟩ := Multiset.exists_mem_of_ne_zero (Multiset.card_pos.mp hpos)
       rw [Multiset.mem_filter] at he_filter
       obtain ⟨he_mem, he1⟩ := he_filter
-      -- erase it; the remainder is balanced with the source shifted to `(edge e).2`
       have hbal' : Balanced (E.erase e) edge (edge e).2 snk := balanced_erase he_mem edge h he1
       have hlt : E.erase e < E := by
         conv_rhs => rw [← Multiset.cons_erase he_mem]
@@ -110,8 +104,7 @@ theorem exists_trail (edge : α → V × V) (E : Multiset α) :
       obtain ⟨path', hwalk', hsub'⟩ := IH (E.erase e) hlt (edge e).2 snk hbal'
       refine ⟨e :: path', ⟨he1, hwalk'⟩, ?_⟩
       have hle : (e ::ₘ (↑path' : Multiset α)) ≤ e ::ₘ E.erase e := Multiset.cons_le_cons e hsub'
-      rw [Multiset.cons_erase he_mem] at hle
-      exact hle
+      rwa [Multiset.cons_erase he_mem] at hle
 
 end GatedVm
 

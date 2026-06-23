@@ -26,9 +26,8 @@ Sail spec (for any Sail state honouring that row's register/PC/memory reads, qua
 `sailEquiv`). Dispatched generically through `r.kind.reaches_sail`. -/
 theorem chipRows_step_sound (rows : List (ChipRow p)) (data : ProverData (ZMod p))
     (h_spec : ∀ r ∈ rows, r.chipSpec data) :
-    ∀ r ∈ rows, r.is_real = 1 → ∀ s : SailState, r.sailEquiv s := by
-  intro r hr h_real s
-  exact r.kind.reaches_sail r.inputs r.cols data s h_real (h_spec r hr)
+    ∀ r ∈ rows, r.is_real = 1 → ∀ s : SailState, r.sailEquiv s :=
+  fun r hr h_real s => r.kind.reaches_sail r.inputs r.cols data s h_real (h_spec r hr)
 
 /-- Single-row form (the dispatch on one row), handy when the spec quantifies rows from a trail. -/
 theorem chipRow_sailEquiv (r : ChipRow p) (data : ProverData (ZMod p))
