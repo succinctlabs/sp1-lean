@@ -97,8 +97,7 @@ private theorem multiplicitySum_eq_zero_of_multOf {l : LookupAccessList} (k : Lo
   simp only [multiplicitySum]
   apply List.sum_eq_zero
   intro x hx
-  simp only [List.mem_map] at hx
-  obtain ⟨a, ha, rfl⟩ := hx
+  obtain ⟨a, ha, rfl⟩ := List.mem_map.1 hx
   exact h a (List.mem_of_mem_filter ha)
 
 omit [NeZero p] in
@@ -130,11 +129,10 @@ theorem byteAccessValid_of_balance [Fact (1 < p)]
     TraceByteLink rows := by
   intro r hr h_real row h_row_mem
   set a := byteSend r.is_real row with ha_def
-  have ha_mem : a ∈ aggregateChipRows rows byteLookups := by
-    refine List.mem_flatMap.mpr ⟨r, hr, ?_⟩
-    exact List.mem_map.mpr ⟨row, h_row_mem, rfl⟩
+  have ha_mem : a ∈ aggregateChipRows rows byteLookups :=
+    List.mem_flatMap.mpr ⟨r, hr, List.mem_map.mpr ⟨row, h_row_mem, rfl⟩⟩
   have h_pos : 0 < multOf a := by
-    rw [ha_def]; simp only [byteSend, multOf, h_real, ZMod.val_one]; norm_num
+    simp only [ha_def, byteSend, multOf, h_real, ZMod.val_one]; norm_num
   have h_nonneg : ∀ b ∈ aggregateChipRows rows byteLookups, 0 ≤ multOf b := by
     intro b hb
     obtain ⟨r', _, hb'⟩ := List.mem_flatMap.mp hb

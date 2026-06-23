@@ -21,7 +21,7 @@ namespace SP1Clean.Soundness
 -- stronger bound with the project-standard `Fact (2 ^ 17 < p)` derived locally.
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
+local instance : Fact (2 ^ 17 < p) := ⟨lt_of_le_of_lt (by norm_num) (Fact.out (p := 2 ^ 24 < p))⟩
 
 /-! ## The decoded instruction -/
 
