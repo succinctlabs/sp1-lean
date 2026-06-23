@@ -32,10 +32,7 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 /-- `(0 : ZMod p) ≠ 1` (since `2^17 < p`). -/
 lemma zero_ne_one' : (0 : ZMod p) ≠ 1 := by
   haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-  intro h
-  have := congrArg ZMod.val h
-  rw [ZMod.val_zero, ZMod.val_one] at this
-  exact absurd this (by norm_num)
+  exact zero_ne_one
 
 /-- The `ℕ`-value of a binary field element (`0` or `1`). -/
 lemma val_of_bool {b : ZMod p} (h : b = 0 ∨ b = 1) : b.val = 0 ∨ b.val = 1 := by
@@ -184,8 +181,7 @@ lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
     have e5 := zero_of _ hb5 (by omega)
     have hsig0 : b2 + b3 = 0 := by rw [e2, e3]; simp
     rw [hf, e1, e2, e3, e4, e5] at hbrdec
-    have heq := h_eqf hsig0
-    refine Iff.trans ?_ heq
+    refine Iff.trans ?_ (h_eqf hsig0)
     constructor
     · intro hib; linear_combination hbrdec - hib
     · intro hF; linear_combination hbrdec - hF
@@ -196,8 +192,7 @@ lemma branch_conditions_of_decision_eq {rs1 rs2 : Word (ZMod p)}
     have e5 := zero_of _ hb5 (by omega)
     have hsig0 : b2 + b3 = 0 := by rw [e2, e3]; simp
     rw [hf, e0, e2, e3, e4, e5] at hbrdec
-    have heq := h_eqf hsig0
-    refine Iff.trans ?_ (not_congr heq)
+    refine Iff.trans ?_ (not_congr (h_eqf hsig0))
     constructor
     · intro hib hF; exact zero_ne_one' (by linear_combination -hbrdec + hib - hF)
     · intro hF; rcases hbr with h0 | h1
@@ -308,9 +303,8 @@ lemma branch_decision_eq_of_conditions {rs1 rs2 : Word (ZMod p)}
             simp only [eq_false hsigne] at h_bit
             have hiff := (hd4 hf4).trans (ult_true_iff _ _)
             rw [Word.toBitVec64_toNat hrs1U, Word.toBitVec64_toNat hrs2U] at hiff
-            have hbreq := (bool_eq_ite_of_iff hbr hiff).trans h_bit.symm
             rw [e0, e1, e2, e3, hf4, e5]
-            linear_combination hbreq
+            linear_combination (bool_eq_ite_of_iff hbr hiff).trans h_bit.symm
         · -- BGE (`b3 = 1`): `br = 1 - bit`, `is_signed = 1`.
           have v1 : b3.val = 1 := by rw [hf3]; simp [ZMod.val_one]
           have e0 := zero_of _ (show b0.val = 0 by omega)

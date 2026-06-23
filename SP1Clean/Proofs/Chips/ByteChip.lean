@@ -53,8 +53,7 @@ theorem byteRowSpec_of_provider {row : ByteRow (ZMod p)} {prov : LookupAccessLis
     (hk : keyOf b = byteRowKey row) : ByteRowSpec row := by
   obtain ⟨row', h_spec, h_key⟩ := h_prov b hb
   rw [hk] at h_key
-  rw [byteRow_eq_of_key h_key]
-  exact h_spec
+  rwa [byteRow_eq_of_key h_key]
 
 /-! ## The `Range` vs `Byte` receiver split (two preprocessed chips, one Byte bus)
 
