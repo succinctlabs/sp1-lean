@@ -356,32 +356,26 @@ theorem decode_bound (prog : GuestProgram) {pi : SP1PublicIO (ZMod p)}
     (hw : WalkOf pi rows path) {i : ℕ} (hi : i < path.length) (s : SailState) :
     DecodeOperandsBound prog (path[i]'hi) s := by
   intro hcfg w hfetch
-  set r := path[i]'hi with hr_def
-  have hr_path : r ∈ path := List.getElem_mem hi
-  -- the walk row is a real row of the trace
+  set r := path[i]'hi
   have hmem : r ∈ realRowEdges (rows.map ChipRow.view) :=
-    Multiset.mem_of_le hw.2 (Multiset.mem_coe.mpr hr_path)
+    Multiset.mem_of_le hw.2 (Multiset.mem_coe.mpr (List.getElem_mem hi))
   rw [realRowEdges, Multiset.mem_filter] at hmem
   obtain ⟨hr_coe, h_real⟩ := hmem
-  have hr_rows : r ∈ rows.map ChipRow.view := Multiset.mem_coe.mp hr_coe
-  -- its committed program columns lie in the decoded ROM
   have ha_mem : programAccess r ∈ aggregateProgramAccesses (rows.map ChipRow.view) := by
-    simp only [aggregateProgramAccesses]; exact List.mem_map_of_mem hr_rows
+    simp only [aggregateProgramAccesses]; exact List.mem_map_of_mem (Multiset.mem_coe.mp hr_coe)
   have h_real' : (programAccess r).is_real ≠ 0 := by
     simpa only [programAccess, stateAccess] using h_real
   obtain ⟨w₀, hfetch₀, hdec⟩ := h_link.rom_holds (programAccess r) ha_mem h_real'
-  -- the fetched words agree (same pc key)
   have hpc : pcBitsOfRow (programAccess r).toRow = rcvPcOf (stateAccess r) := by
     simp only [pcBitsOfRow, rcvPcOf, programAccess, ProgramAccess.toRow, stateAccess]
   rw [hpc, hfetch] at hfetch₀
   obtain rfl : w = w₀ := Option.some.inj hfetch₀
-  -- the pc vectors agree, so the projection's target is the committed row
   have hpcvec : rowPcVec (programAccess r).toRow = r.state.pc := by
     simp only [rowPcVec, programAccess, ProgramAccess.toRow]
-    apply Vector.ext; intro j hj
+    ext j hj
     interval_cases j <;> simp
-  obtain ⟨ii, s', hrun, hproj⟩ := hdec s hcfg
-  exact ⟨ii, s', hrun, by rw [hpcvec] at hproj; exact hproj⟩
+  rw [hpcvec] at hdec
+  exact hdec s hcfg
 
 /-! ## The balance-level decode discharge (removing the threaded link) — W3 deliverable B -/
 
@@ -477,7 +471,7 @@ each row is discharged this way. -/
 /-- A one-instruction guest program: `ADD x1, x2, x3` (`0x003100B3`) at pc 0. -/
 def addProgram : GuestProgram :=
   ⟨[(0#64, 0x003100B3#32)], 0, [], by simp,
-   by intro a ha; simp only [List.map_cons, List.map_nil, List.mem_singleton] at ha; subst ha; simp⟩
+   by simp⟩
 
 /-- The committed Program-bus row the ADD decodes to — the `instrToProgramRow` projection at pc 0
 (`op_a = rd = x1`, `op_b[0] = rs1 = x2`, `op_c[0] = rs2 = x3`, opcode `ADD`). -/
@@ -498,10 +492,7 @@ ROM word at its pc, against the official Sail `ext_decode` — `decodedInROM` ho
 Sail model's decoder axioms. -/
 theorem decodedInROM_addRow : decodedInROM addProgram (addRow (p := p)) := by
   refine ⟨0x003100B3#32, ?_, ?_⟩
-  · show addProgram.fetchWord (pcBitsOfRow (addRow (p := p))) = some _
-    have hpc : pcBitsOfRow (addRow (p := p)) = 0#64 := by
-      simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero]; rfl
-    rw [hpc]; rfl
+  · simp only [pcBitsOfRow, addRow, pcBitsOfVals, ZMod.val_zero]; rfl
   · intro s hcfg
     refine ⟨.RTYPE (regidx.Regidx 3#5, regidx.Regidx 2#5, regidx.Regidx 1#5, rop.ADD), s,
       SP1Clean.SailDecode.decode_ADD_example s hcfg.1 hcfg.2, ?_⟩

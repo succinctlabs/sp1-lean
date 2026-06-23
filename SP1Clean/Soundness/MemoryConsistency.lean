@@ -29,6 +29,15 @@ open SP1Clean.LookupAccessList
 
 variable {p : ℕ}
 
+private theorem two_lt_p_aux [Fact (2 ^ 17 < p)] : 2 < p :=
+  lt_of_lt_of_le (by norm_num) (Fact.out (p := 2 ^ 17 < p)).le
+
+/-- A nonzero `ZMod p` element has strictly-positive `ℤ`-cast value — the multiplicity-positivity
+workhorse for the Memory-bus send contributions. -/
+private theorem valCast_pos_aux [NeZero p] {x : ZMod p} (hx : x ≠ 0) : 0 < (x.val : ℤ) := by
+  have : x.val ≠ 0 := fun hv => hx (ZMod.val_injective p (by rw [ZMod.val_zero]; exact hv))
+  omega
+
 /-- The recombined low clock for a row (`clk_0_16 + clk_16_24 * 2^16`), matching `Extracted/AddChip`'s
 CS2 `clk_low` argument. -/
 def rowClkLow (r : Trace.RowView (ZMod p)) : ZMod p :=
@@ -203,10 +212,7 @@ theorem memoryLookups_eq_emitted (r : Trace.RowView (ZMod p)) (env : Environment
     memoryLookups r =
       (((Readers.RTypeReader.main input).operations offset).interactionsWith
           memoryChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  have hp2 : 2 < p := by
-    have h := Fact.out (p := 2 ^ 17 < p)
-    have h2 : (2 : ℕ) < 2 ^ 17 := by norm_num
-    omega
+  have hp2 : 2 < p := two_lt_p_aux
   -- The three `RegisterAccessCols` sub-assertions emit only `byteChannel`, and the five `op_a_0` Equality
   -- gates emit nothing — so their `memoryChannel` filter is empty (`filter_interactions_formalAssertion_eq_nil`).
   have hrac := fun (n : ℕ) (inp : Var Readers.RegisterAccessCols.Inputs (ZMod p)) =>
@@ -314,10 +320,7 @@ theorem memAccessLookups_eq_emitted (env : Environment (ZMod p)) (offset : ℕ)
     memAccessLookups mem clk_high clk_low addr0 addr1 addr2 new_value is_real =
       (((Readers.MemoryAccess.main input).operations offset).interactionsWith
           memoryChannel.toRaw).map (AbstractInteraction.toAccess env) := by
-  have hp2 : 2 < p := by
-    have h := Fact.out (p := 2 ^ 17 < p)
-    have h2 : (2 : ℕ) < 2 ^ 17 := by norm_num
-    omega
+  have hp2 : 2 < p := two_lt_p_aux
   -- the three `=== 0` timestamp gates compile to `Gadgets.Equality.circuit id` subcircuits, which emit
   -- nothing on `memoryChannel`; the two `byteChannel.pullIf`s are filtered by channel-distinctness.
   have heq := fun (n : ℕ) (inp : Var (ProvablePair id id) (ZMod p)) =>
@@ -518,10 +521,7 @@ theorem mem_opA_read_send_matched [NeZero p]
       (r.is_real.val : ℤ)) with hsend
   have h_send_mem : send ∈ aggregateChipRows rows memoryLookups ++ memProv :=
     List.mem_append_left _ (List.mem_flatMap.mpr ⟨r, hr, by rw [hsend]; simp [memoryLookups]⟩)
-  have hvne : (r.is_real.val : ℤ) ≠ 0 := by
-    have : r.is_real.val ≠ 0 := fun hv => h_real (ZMod.val_injective p (by rw [ZMod.val_zero]; exact hv))
-    exact_mod_cast this
-  have hpos : 0 < multOf send := by rw [hsend]; simp only [multOf]; omega
+  have hpos : 0 < multOf send := by rw [hsend]; simpa only [multOf] using valCast_pos_aux h_real
   obtain ⟨b, hb, hbk, hbneg⟩ :=
     balanced_pos_has_neg (aggregateChipRows rows memoryLookups ++ memProv) (keyOf send)
       h_bal send h_send_mem rfl hpos
@@ -566,11 +566,6 @@ theorem memEvent_send_pos_in_bus [NeZero p] (rows : List (Trace.RowView (ZMod p)
   obtain ⟨r, hr, he⟩ := he
   rw [List.mem_reverse] at hr
   simp only [aggregateChipRows]
-  -- helper: turn `is_real ≠ 0` (from the gate) into `0 < is_real.val`
-  have valpos : ∀ x : ZMod p, x ≠ 0 → 0 < ((x.val : ℤ)) := by
-    intro x hx
-    have hxv : x.val ≠ 0 := fun hv => hx (ZMod.val_injective p (by rw [ZMod.val_zero]; exact hv))
-    omega
   rw [rowMemEventsGated] at he
   by_cases hreal : r.is_real = 0
   · rw [if_pos hreal] at he; exact absurd he List.not_mem_nil
@@ -584,7 +579,7 @@ theorem memEvent_send_pos_in_bus [NeZero p] (rows : List (Trace.RowView (ZMod p)
         (r.is_real.val : ℤ)),
       List.mem_flatMap.mpr ⟨r, hr, by simp [memoryLookups]⟩, ?_, ?_⟩
     · simp [keyOf, memEvent_sendKey, opAEvent]
-    · simp only [multOf]; exact valpos _ hreal
+    · simp only [multOf]; exact valCast_pos_aux hreal
   rw [List.mem_append] at he
   rcases he with he | he
   · -- op_b: present only when imm_b = 0
@@ -598,7 +593,7 @@ theorem memEvent_send_pos_in_bus [NeZero p] (rows : List (Trace.RowView (ZMod p)
           ((r.is_real * (1 - r.adapter.imm_b)).val : ℤ)),
         List.mem_flatMap.mpr ⟨r, hr, by simp [memoryLookups]⟩, ?_, ?_⟩
       · simp [keyOf, memEvent_sendKey, opBEvent]
-      · simp only [multOf, himmb, sub_zero, mul_one]; exact valpos _ hreal
+      · simp only [multOf, himmb, sub_zero, mul_one]; exact valCast_pos_aux hreal
     · rw [if_neg himmb] at he; exact absurd he List.not_mem_nil
   · -- op_c: present only when imm_c = 0
     by_cases himmc : r.adapter.imm_c = 0
@@ -611,7 +606,7 @@ theorem memEvent_send_pos_in_bus [NeZero p] (rows : List (Trace.RowView (ZMod p)
           ((r.is_real * (1 - r.adapter.imm_c)).val : ℤ)),
         List.mem_flatMap.mpr ⟨r, hr, by simp [memoryLookups]⟩, ?_, ?_⟩
       · simp [keyOf, memEvent_sendKey, opCEvent]
-      · simp only [multOf, himmc, sub_zero, mul_one]; exact valpos _ hreal
+      · simp only [multOf, himmc, sub_zero, mul_one]; exact valCast_pos_aux hreal
     · rw [if_neg himmc] at he; exact absurd he List.not_mem_nil
 
 /-- **Negative entry is a receive.** A strictly-negative `memoryLookups r` entry (under per-row
