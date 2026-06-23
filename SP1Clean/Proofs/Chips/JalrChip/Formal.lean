@@ -72,12 +72,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       Expression.eval env input_var_adapter_op_b_memory_prev_value[2],
       Expression.eval env input_var_adapter_op_b_memory_prev_value[3]] : Word (ZMod p)) :=
     hrs1eq ▸ h_rs1U
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have epc : ∀ i (hi : i < 3), Expression.eval env input_var_state_pc[i] = input_state_pc[i] :=
     fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have hpceq : (#v[Expression.eval env input_var_state_pc[0], Expression.eval env input_var_state_pc[1],
@@ -153,12 +148,7 @@ theorem completeness :
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p))
       = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
     rw [epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have hval1 : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[0],

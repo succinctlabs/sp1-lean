@@ -83,6 +83,15 @@ lemma toBitVec128_toNat [NeZero p] {w : Word (ZMod p)} (hw : w.isU64) :
   have := lt_cases_of_isU64 hw
   rw [Nat.mod_eq_of_lt (by omega)]
 
+/-- The constant word `#v[4,0,0,0]` (the "+4" PC increment used by Jal/Jalr/Branch) is a valid u64. -/
+lemma isU64_four [NeZero p] [Fact (2 ^ 17 < p)] :
+    isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
+  have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
+  refine isU64_of_cases ?_ ?_ ?_ ?_ <;>
+    simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+      List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
+      ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+
 end Word
 
 /-! ## Field constants (`ZMod p`, `Fact (2 ^ 17 < p)`) -/

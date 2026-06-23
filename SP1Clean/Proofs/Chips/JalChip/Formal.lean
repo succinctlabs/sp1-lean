@@ -66,13 +66,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have ha1U : Word.isU64 (#v[Expression.eval env input_var_state_pc[0],
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := ha1eq ▸ h_pcU
-  -- `#v[4,0,0,0]` is a 64-bit word.
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   -- the link gate `is_real - op_a_0` is binary on every row (real: `op_a_0` binary; padding: `op_a_0 = 0`).
   -- `is_real - op_a_0` is binary: on real rows from `op_a_0 ∈ {0,1}`, on padding from `h_pad`.
   have h_gate2 : input_is_real + -input_adapter_op_a_0 = 0 ∨ input_is_real + -input_adapter_op_a_0 = 1 := by
@@ -116,12 +110,7 @@ theorem completeness :
   have ha1U : Word.isU64 (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p)) := ha1eq ▸ h_pcU
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have hb1eq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_b_imm[0],
       Expression.eval env.toEnvironment input_var_adapter_op_b_imm[1],
       Expression.eval env.toEnvironment input_var_adapter_op_b_imm[2],

@@ -120,12 +120,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   have hpcU : Word.isU64 (#v[Expression.eval env input_var_state_pc[0],
       Expression.eval env input_var_state_pc[1], Expression.eval env input_var_state_pc[2], 0]
         : Word (ZMod p)) := hpceq ▸ h_pcU
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have h_onehot := one_hot6 hbeq hbne hblt hbge hbltu hbgeu h_sumbin
   have h_sig_bin : env.get (i₀ + 2) + env.get (i₀ + 3) = 0 ∨ env.get (i₀ + 2) + env.get (i₀ + 3) = 1 := by
     rcases hblt with hl | hl <;> rcases hbge with hg | hg
@@ -259,12 +254,7 @@ theorem completeness :
   have ha1U : Word.isU64 (#v[Expression.eval env.toEnvironment input_var_state_pc[0],
       Expression.eval env.toEnvironment input_var_state_pc[1],
       Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p)) := ha1eq ▸ h_pcU
-  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := by
-    have h4lt : (4 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
-    refine Word.isU64_of_cases ?_ ?_ ?_ ?_ <;>
-      simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
-        List.getElem_cons_succ, show (4 : ZMod p) = ((4 : ℕ) : ZMod p) from by norm_cast,
-        ZMod.val_natCast_of_lt h4lt, ZMod.val_zero] <;> norm_num
+  have h4U : Word.isU64 (#v[(4 : ZMod p), 0, 0, 0] : Word (ZMod p)) := Word.isU64_four
   have hcimm : Vector.map (Expression.eval env.toEnvironment) input_var_adapter_op_c_imm
       = input_adapter_op_c_imm := h_input.2.2.2.2.2.2.2
   have hcimmeq : (#v[Expression.eval env.toEnvironment input_var_adapter_op_c_imm[0],
