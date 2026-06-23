@@ -534,6 +534,54 @@ first
 ```
 See `Proofs/Chips/AddChip.lean` and `Native/Readers/RegisterAccessCols.lean` for the worked examples.
 
+## Compile-time / performance landmines
+
+The compile-time profile lives in `docs/snapshots/compile-profile.md` (regenerate with
+`scripts/profile_compile.sh`). These are the durable, still-true lessons behind it — apply them when
+adding a chip or chasing a slow file. The broad attribute/macro wins have already been harvested
+(below); remaining cost is term-intrinsic in the DivRem/Shift/Mul heavies, so new slowness almost
+always means a *local* regression against one of these.
+
+- **The `v[i]` index-bound tax — already fixed by the `decide` fast path.** Every `v[i]` elaborates
+  an `i < n` bound side-goal; in Lean 4.28's Std the slice-support `get_elem_tactic_extensible` rule
+  does ~11 full-context traversals (`rw … at *`, `dsimp … at *`, a slice `simp`) per index — ~0.34s
+  for `1 < 4` inside a hypothesis-heavy soundness proof, paid in every `have` type. `Math/GetElemFastPath.lean`
+  registers one `macro_rules | get_elem_tactic_extensible => decide` line *above* Std's (so it's tried
+  first among the extensible rules, still after `done`/`assumption`): literal bounds close by kernel
+  `Nat.decLt` in ~26 heartbeats, non-literals fall through. This single line halved the swept set when
+  it landed; **don't regress it** (e.g. by importing a module that re-shadows the rule below Std's). If
+  a `have`-dense proof suddenly slows, suspect the fast path isn't in scope.
+
+- **`circuit_proof_start` / bind-chain normalization is NOT the bottleneck — don't chase it.**
+  Measured at 6k–32k heartbeats on medium chips, ~320k (~90s) even on DivRem's `main` (the repo's
+  biggest). The once-per-chip `main_ops_eq` lemma would save ~4% — not worth it. Slow soundness files
+  are slow in their *proof body* (the arithmetic / product-glue `simpa`s), not in the start tactic.
+
+- **`ElaboratedCircuit` `localLength_eq`'s `rfl` default whnf-unfolds `main` — seconds on a big main.**
+  On a 17-op `main` the default `rfl` costs ~15s; `channelsLawful`'s default fails outright on
+  channel-heavy mains. Hand-write the simp-route `localLength_eq` (and the `channelsWith*_eq` /
+  `circuit_localLength` rfl-lemmas) on every chip with a non-trivial `main` so the defaults stay cheap
+  — see the "ElaboratedCircuit field obligations" section above for the full recipe. Chips with small
+  mains (2–5 ops) can keep the `rfl` default; it's cheap there.
+
+- **`set_option linter.all false` on the generated `Extracted/` modules removes the linter tax.** The
+  ~76 auto-gen modules carry it in their headers; keep it when regenerating (the linter passes over the
+  monolithic generated terms were a measurable chunk of their cost).
+
+- **Shared-tail dedup for many-conjunct soundness proofs (the DivRem pattern).** When N conjunct files
+  each prove `GeneralFormalCircuit.Soundness` over the *same* `main`, they each re-elaborate the
+  byte-identical post-instruction "requirements tail" (readers + `is_real` + channel obligations) at a
+  high `maxHeartbeats` — N× the same work. Extract it once: a `requirements_holds` lemma proving the
+  tail with **raw** (un-`circuit_proof_start`'d) binders, a `SpecObligation Spec` wrapper, and a
+  `soundness_of_specObligation` that reassembles a full `Soundness` from a per-conjunct `SpecObligation`
+  plus the shared tail. Each conjunct then proves only its chip-specific `Spec` via a `spec_proof_start`
+  elab tactic (mirrors `circuit_proof_start`'s setup but unfolds `SpecObligation`, so it does *less*
+  work). See `Proofs/Chips/DivRemChip/Soundness/Tail.lean`. **Landmine:** `requirements_holds` must be
+  applied *by-term* on raw binders — after `circuit_proof_start` the decomposed context (destroyed
+  `input_var` binders, consumed `h_holds`) no longer matches, which is exactly why the tail lemma takes
+  raw binders and the `SpecObligation` indirection exists. The ShiftRight/ShiftLeft conjuncts share an
+  analogous `cpuA/msb*/aluA` block that is a candidate for the same treatment.
+
 ## "emitted = projection": `<b>Lookups_eq_emitted` (proving a trace projection IS the emission)
 
 Goal: prove a hand-written trace-level projection (`Soundness/*Consistency.lean`'s `stateLookups`,
