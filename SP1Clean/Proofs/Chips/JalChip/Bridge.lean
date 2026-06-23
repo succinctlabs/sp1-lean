@@ -43,7 +43,7 @@ theorem correct_jal_native
     (spec_jal imm (.Regidx rd)).run s
       = (sp1_jal (.Regidx rd) pc next_pc_word op_a_word).run s := by
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -54,9 +54,6 @@ theorem correct_jal_native
     rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
   have hsp_pc : sp.regs.get Register.PC (hsp_init _) = pc := by
     rw [key Register.PC (hs _) (hsp_init _) (by decide)]; exact hpc_get
-  have hsp_npc : sp.regs.get Register.nextPC (hsp_init _) = pc + 4#64 := by
-    show (s.regs.insert Register.nextPC (pc + 4#64)).get Register.nextPC _ = _
-    rw [Std.ExtDHashMap.get_insert]; simp
   have htgt4 : Word.toBitVec64 next_pc_word % 4#64 = 0 := by
     apply BitVec.eq_of_toNat_eq; rw [BitVec.toNat_umod]; simpa using h_align
   have hjump : EStateM.run (jump_to (pc + sign_extend (m := 64) imm)) sp
@@ -82,7 +79,7 @@ theorem correct_jal_native_x0
     (spec_jal imm (.Regidx 0#5)).run s
       = (sp1_jal (.Regidx 0#5) pc next_pc_word op_a_word).run s := by
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -93,9 +90,6 @@ theorem correct_jal_native_x0
     rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
   have hsp_pc : sp.regs.get Register.PC (hsp_init _) = pc := by
     rw [key Register.PC (hs _) (hsp_init _) (by decide)]; exact hpc_get
-  have hsp_npc : sp.regs.get Register.nextPC (hsp_init _) = pc + 4#64 := by
-    show (s.regs.insert Register.nextPC (pc + 4#64)).get Register.nextPC _ = _
-    rw [Std.ExtDHashMap.get_insert]; simp
   have htgt4 : Word.toBitVec64 next_pc_word % 4#64 = 0 := by
     apply BitVec.eq_of_toNat_eq; rw [BitVec.toNat_umod]; simpa using h_align
   have hjump : EStateM.run (jump_to (pc + sign_extend (m := 64) imm)) sp

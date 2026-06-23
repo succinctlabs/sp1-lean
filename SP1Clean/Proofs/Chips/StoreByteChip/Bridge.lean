@@ -47,7 +47,7 @@ theorem correct_store_byte_native
           (Sail.BitVec.extractLsb stored 7 0)).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -81,10 +81,6 @@ theorem correct_store_byte_native
   have hwrite := run_vmem_write_of_width_1 rs1_idx reg_val (BitVec.signExtend 64 imm)
     (Sail.BitVec.extractLsb stored 7 0) sp hsp_init hsp_rs1 h_align' hsp_config h_does_fit h_in_range
   simp only [hmem_eq] at hwrite
-  have hrx2 : rX_bits (regidx.Regidx rs2_idx) sp = .ok stored sp := by
-    have h := @run_rX_bits rs2_idx sp
-    simp only [EStateM.run] at h
-    rw [h, hsp_rs2]
   have hsp1 : (sp1_sb pc (reg_val + BitVec.signExtend 64 imm)
         (Sail.BitVec.extractLsb stored 7 0)).run s
       = .ok RETIRE_SUCCESS { sp with mem :=
