@@ -196,7 +196,9 @@ any new carrier fails CI for the audit script.
 
 `scripts/run_audit.sh` (checked in — the predecessor document's "re-create the harness as needed" gap
 is closed): pins → green `lake build SP1Clean` (3630 jobs; the only warnings are the four known
-`sorry`s) → text inventory with gates → `scripts/gen_axiom_probe.py` (namespace-tracking declaration
+`sorry`s) → text inventory with gates (sorry-set, no `axiom` declarations, and the no-`skipKernelTC`
+guard `scripts/check_no_skipkerneltc.sh` — also a standalone CI `guards` job) →
+`scripts/gen_axiom_probe.py` (namespace-tracking declaration
 scanner; self-checking — a wrong FQN fails elaboration) → `lake env lean scripts/axiom_probe.lean` →
 bucket + gate. Extraction currency: `SP1_DIR=../sp1 python3 update_extracted.py && git diff
 --exit-code SP1Clean/Extracted` (the witness vectors regenerate in the same run and re-verify on the

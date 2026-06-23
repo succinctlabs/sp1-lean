@@ -41,6 +41,14 @@ if grep -rnE '^[[:space:]]*axiom[[:space:]]' SP1Clean --include='*.lean'; then
 else
   echo "PASS: no axiom declarations"
 fi
+
+echo
+echo "== A2 skipKernelTC guard (gate: none in SP1Clean/) =="
+if scripts/check_no_skipkerneltc.sh; then
+  echo "PASS: no skipKernelTC usage"
+else
+  echo "FAIL: skipKernelTC reintroduced (see above)"; fail=1
+fi
 echo "native_decide occurrences (disclosed, witness battery + Sail memory bridges):"
 grep -rn 'native_decide' SP1Clean --include='*.lean' | wc -l
 
