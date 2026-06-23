@@ -533,7 +533,10 @@ def pcWord (cols : JalColumns (ZMod p)) : Word (ZMod p) :=
 `is_real`-gated jump/link semantics. On a real row: the jump target `add_operation.value = pc + op_b_imm`
 (`op_b_imm` is the sign-extended 21-bit immediate — the actual `BitVec 21` ↔ word relation is a received
 decode fact, supplied at the Sail bridge), and — when `rd ≠ x0` (`op_a_0 = 0`) — the link-address write
-`op_a_operation.value = pc + 4`. Vacuous on padding. -/
+`op_a_operation.value = pc + 4`. The final conjunct records that the jump target's low limb
+(`add_operation.value[0]`) is divisible by 4 — i.e. the target is 4-byte aligned — forced by the
+in-circuit alignment `Range` byte-lookup (`value[0] · 4⁻¹ < 2^14`); the Sail bridge lifts it to the whole
+word (so alignment is no longer an assumed bridge precondition). Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : JalColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.JTypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
@@ -548,7 +551,8 @@ def Spec (input : Inputs (ZMod p)) (cols : JalColumns (ZMod p)) (_ : ProverData 
       = Word.toBitVec64 (pcWord cols) + Word.toBitVec64 cols.adapter.op_b_imm) ∧
   (input.is_real = 1 → cols.adapter.op_a_0 = 0 →
     Word.toBitVec64 cols.op_a_operation.value
-      = Word.toBitVec64 (pcWord cols) + Word.toBitVec64 (#v[4, 0, 0, 0] : Word (ZMod p)))
+      = Word.toBitVec64 (pcWord cols) + Word.toBitVec64 (#v[4, 0, 0, 0] : Word (ZMod p))) ∧
+  (input.is_real = 1 → (cols.add_operation.value[0]).val % 4 = 0)
 
 end SP1Clean.JalChip
 
@@ -633,6 +637,14 @@ operand of the link `AddOperation` (`pc + 4 = link`). -/
 def pcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
   #v[cols.state.pc[0], cols.state.pc[1], cols.state.pc[2], 0]
 
+/-- The committed, **LSB-cleared** next-pc word the chip feeds `CPUState` — the jump target
+`add_operation.value` with its low bit removed (`value[0] - lsb`), faithful to RISC-V JALR's
+`(rs1 + imm) & ~1` and the Sail `BitVec.update target 0 0#1`. Named by the `Spec`'s LSB-clearing
+conjunct and the Sail bridge. -/
+def nextPcWord (cols : JalrColumns (ZMod p)) : Word (ZMod p) :=
+  #v[cols.add_operation.value[0] - cols.lsb, cols.add_operation.value[1],
+     cols.add_operation.value[2], 0]
+
 /-- Semantic contract for the JALR row, composed from the I-type reader sub-`Spec` plus the
 `is_real`-gated jump/link semantics. On a real row: the jump target `add_operation.value = rs1 + op_c_imm`
 (`op_c_imm` is the sign-extended 12-bit immediate — the `BitVec 12` ↔ word relation is a received decode
@@ -641,7 +653,9 @@ link-address write `op_a_operation.value = pc + 4`. The committed next_pc is the
 `nextPcWord`. The final conjunct records that this cleared low limb (`add_operation.value[0] - lsb`)
 is divisible by 4 — i.e. the jump target is 4-byte aligned — forced by the in-circuit alignment
 `Range` byte-lookup (`(value[0] - lsb) · 4⁻¹ < 2^14`); the Sail bridge lifts it to the whole word.
-Vacuous on padding. -/
+The final conjunct exposes the **LSB-clearing relation** itself — the committed `nextPcWord` is the
+jump target with bit 0 cleared (`~~~1#64 &&&`, the Sail-free form of `BitVec.update _ 0 0#1`) — so the
+Sail bridge *derives* it from this `Spec` rather than assuming it. Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : JalrColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ITypeReader.Spec
     { cols := cols.adapter, is_real := input.is_real, is_trusted := input.is_real,
@@ -658,7 +672,9 @@ def Spec (input : Inputs (ZMod p)) (cols : JalrColumns (ZMod p)) (_ : ProverData
   (input.is_real = 1 → cols.adapter.op_a_0 = 0 →
     Word.toBitVec64 cols.op_a_operation.value
       = Word.toBitVec64 (pcWord cols) + Word.toBitVec64 (#v[4, 0, 0, 0] : Word (ZMod p))) ∧
-  (input.is_real = 1 → (cols.add_operation.value[0] - cols.lsb).val % 4 = 0)
+  (input.is_real = 1 → (cols.add_operation.value[0] - cols.lsb).val % 4 = 0) ∧
+  (input.is_real = 1 →
+    Word.toBitVec64 (nextPcWord cols) = ~~~(1#64) &&& Word.toBitVec64 cols.add_operation.value)
 
 end SP1Clean.JalrChip
 
@@ -718,7 +734,10 @@ flag-dispatched decision relating `is_branching` to the RISC-V condition on rs1/
 skeletal `LtOperationSigned`). On a real row:
 - if `is_branching = 1`, `next_pc = pc + op_c_imm` (the sign-extended offset is a received decode fact,
   supplied at the Sail bridge); if `is_branching = 0`, `next_pc = pc + 4`;
-- and `is_branching` is taken iff the opcode's condition holds (`BEQ ↔ rs1 = rs2`, `BLT ↔ rs1 <ₛ rs2`, …).
+- and `is_branching` is taken iff the opcode's condition holds (`BEQ ↔ rs1 = rs2`, `BLT ↔ rs1 <ₛ rs2`, …);
+- and the branch target's low limb (`next_pc[0]`) is divisible by 4 — i.e. the target is 4-byte aligned —
+  forced by the in-circuit alignment `Range` byte-lookup (`next_pc[0] · 4⁻¹ < 2^14`); the Sail bridge lifts
+  it to the whole word (so alignment is no longer an assumed bridge precondition).
 Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : BranchColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ITypeReaderImmutable.Spec
@@ -750,6 +769,7 @@ def Spec (input : Inputs (ZMod p)) (cols : BranchColumns (ZMod p)) (_ : ProverDa
         (Word.toBitVec64 (rs1Word cols)).ult (Word.toBitVec64 (rs2Word cols)) = true)) ∧
     (cols.is_bgeu = 1 →
       (cols.is_branching = 1 ↔
-        (Word.toBitVec64 (rs1Word cols)).ult (Word.toBitVec64 (rs2Word cols)) = false)))
+        (Word.toBitVec64 (rs1Word cols)).ult (Word.toBitVec64 (rs2Word cols)) = false))) ∧
+  (input.is_real = 1 → (cols.next_pc[0]).val % 4 = 0)
 
 end SP1Clean.BranchChip

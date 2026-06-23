@@ -133,7 +133,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
       haveI : Fact (1 < p) := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
       rw [hl, hg, ZMod.val_one] at h_onehot
       omega
-  refine ⟨⟨?_, h_bin, ⟨hbeq, hbne, hblt, hbge, hbltu, hbgeu, hisbr⟩, ?_, ?_, ?_⟩, ?_⟩
+  refine ⟨⟨?_, h_bin, ⟨hbeq, hbne, hblt, hbge, hbltu, hbgeu, hisbr⟩, ?_, ?_, ?_, ?_⟩, ?_⟩
   · exact h_itype h_bin
   · intro hr1 hbr1
     have hav := (h_add1 ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩ hbr1).2
@@ -200,6 +200,15 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
     simp only [rs1Word, rs2Word]
     exact branch_conditions_of_decision_eq h_rs1U h_rs2U hbeq hbne hblt hbge hbltu hbgeu hisbr hone
       h_bit h_eqf (by simp only [branchDecision]; linear_combination h_isbr)
+  · -- 4-byte alignment of the branch target's low limb, from the in-circuit `÷4` byte-range pull
+    -- `h_byte1` (`(next_pc[0] · 4⁻¹).val < 2^14 ⇒ next_pc[0].val % 4 = 0`). Lifted to the whole word
+    -- at the Sail bridge. Mirrors `JalChip.soundness`.
+    intro hr1
+    have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := by norm_cast
+    have hguar := h_byte1 (by rw [hr1])
+    simp only [byteChannel] at hguar
+    rw [← c14] at hguar
+    exact val_mod_four_of_mul_inv_four_lt ((byteRowSpec_range _ h14p).mp hguar)
   · refine ⟨Or.inr ⟨hrs1U, hrs2U, h_bin, h_sig_bin⟩, Or.inr h_bin, Or.inr ⟨fun _ => ⟨hpcU, h_imm⟩, hisbr⟩,
       Or.inr ⟨fun _ => ⟨hpcU, h4U⟩, ?_⟩, Or.inr h_bin⟩
     -- AddOp2 gate `is_real - is_branching` is binary: on padding `is_branching = 0` from `h_pad`.
