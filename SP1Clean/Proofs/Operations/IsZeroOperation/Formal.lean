@@ -34,10 +34,8 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   intro hr1
   simp only [circuit_norm, hr1, one_mul] at h_holds
   obtain ⟨h_eq, h_bool, h_mul⟩ := h_holds
-  have hA : AssertSpec input_a ⟨input_cols_inverse, input_cols_result⟩ := by
-    refine ⟨?_, bool_of_mul_pred h_bool, h_mul⟩
-    show (1 : ZMod p) - input_cols_inverse * input_a - input_cols_result = 0
-    simp only [sub_eq_add_neg]; exact h_eq
+  have hA : AssertSpec input_a ⟨input_cols_inverse, input_cols_result⟩ :=
+    ⟨by simpa [sub_eq_add_neg] using h_eq, bool_of_mul_pred h_bool, h_mul⟩
   exact ⟨isZero_of_assert hA, fun ha => inverse_of_assert hA ha⟩
 
 omit [Fact (2 ^ 17 < p)] in
@@ -49,8 +47,7 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
   · obtain ⟨hres, hinv⟩ := h_spec h1
     simp only [circuit_norm, h1, one_mul]
     refine ⟨?_, ?_, ?_⟩
-    · -- 1 - inverse*a - result = 0
-      by_cases ha : input_a = 0
+    · by_cases ha : input_a = 0
       · simp [hres, ha]
       · rw [hres, if_neg ha, hinv ha]; simp
     · rw [hres]; by_cases ha : input_a = 0 <;> simp [ha]
@@ -63,9 +60,9 @@ theorem spec_populate (a is_real : ZMod p) :
     Spec (⟨a, populate a, is_real⟩ : Inputs (ZMod p)) := by
   intro _
   by_cases ha : a = 0
-  · subst ha; refine ⟨by simp [populate], ?_⟩; intro hne; exact absurd rfl hne
-  · refine ⟨by simp [populate, ha], ?_⟩
-    intro _; simp only [populate, if_neg ha]; exact inv_mul_cancel₀ ha
+  · subst ha; exact ⟨by simp [populate], fun hne => absurd rfl hne⟩
+  · refine ⟨by simp [populate, ha], fun _ => ?_⟩
+    simp only [populate, if_neg ha]; exact inv_mul_cancel₀ ha
 
 /-- SP1's `IsZeroOperation::eval` as a Clean-native `FormalAssertion`. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=

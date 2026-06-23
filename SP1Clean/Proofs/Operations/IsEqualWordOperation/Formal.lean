@@ -37,38 +37,19 @@ theorem soundness : FormalAssertion.Soundness (ZMod p) main Assumptions Spec := 
   circuit_proof_start
   obtain ⟨hsub, _hbool⟩ := h_holds
   obtain ⟨hia, hib, -⟩ := h_input
-  have ea0 : Expression.eval env input_var_a[0] = input_a[0] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea1 : Expression.eval env input_var_a[1] = input_a[1] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea2 : Expression.eval env input_var_a[2] = input_a[2] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea3 : Expression.eval env input_var_a[3] = input_a[3] := by rw [← hia]; simp [Vector.getElem_map]
-  have eb0 : Expression.eval env input_var_b[0] = input_b[0] := by rw [← hib]; simp [Vector.getElem_map]
-  have eb1 : Expression.eval env input_var_b[1] = input_b[1] := by rw [← hib]; simp [Vector.getElem_map]
-  have eb2 : Expression.eval env input_var_b[2] = input_b[2] := by rw [← hib]; simp [Vector.getElem_map]
-  have eb3 : Expression.eval env input_var_b[3] = input_b[3] := by rw [← hib]; simp [Vector.getElem_map]
   have S := hsub h_assumptions
-  simp only [ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3] at S
   refine ⟨?_, Or.inl rfl⟩
-  simp only [diff, sub_eq_add_neg]
-  exact S
+  simpa only [diff, ← hia, ← hib, Vector.getElem_map, sub_eq_add_neg] using S
 
 omit [Fact (2 ^ 17 < p)] in
 set_option maxHeartbeats 1000000 in
 theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Spec := by
   circuit_proof_start
   obtain ⟨hia, hib, -⟩ := h_input
-  have ea0 : Expression.eval env.toEnvironment input_var_a[0] = input_a[0] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea1 : Expression.eval env.toEnvironment input_var_a[1] = input_a[1] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea2 : Expression.eval env.toEnvironment input_var_a[2] = input_a[2] := by rw [← hia]; simp [Vector.getElem_map]
-  have ea3 : Expression.eval env.toEnvironment input_var_a[3] = input_a[3] := by rw [← hia]; simp [Vector.getElem_map]
-  have eb0 : Expression.eval env.toEnvironment input_var_b[0] = input_b[0] := by rw [← hib]; simp [Vector.getElem_map]
-  have eb1 : Expression.eval env.toEnvironment input_var_b[1] = input_b[1] := by rw [← hib]; simp [Vector.getElem_map]
-  have eb2 : Expression.eval env.toEnvironment input_var_b[2] = input_b[2] := by rw [← hib]; simp [Vector.getElem_map]
-  have eb3 : Expression.eval env.toEnvironment input_var_b[3] = input_b[3] := by rw [← hib]; simp [Vector.getElem_map]
   refine ⟨⟨h_assumptions, ?_⟩, ?_⟩
-  · simp only [ea0, ea1, ea2, ea3, eb0, eb1, eb2, eb3]
-    have hs := h_spec
+  · have hs := h_spec
     simp only [diff, sub_eq_add_neg] at hs
-    exact hs
+    simpa only [← hia, ← hib, Vector.getElem_map] using hs
   · rcases h_assumptions with h | h <;> simp [h]
 
 omit [Fact (2 ^ 17 < p)] in
