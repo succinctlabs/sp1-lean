@@ -736,7 +736,10 @@ flag-dispatched decision relating `is_branching` to the RISC-V condition on rs1/
 skeletal `LtOperationSigned`). On a real row:
 - if `is_branching = 1`, `next_pc = pc + op_c_imm` (the sign-extended offset is a received decode fact,
   supplied at the Sail bridge); if `is_branching = 0`, `next_pc = pc + 4`;
-- and `is_branching` is taken iff the opcode's condition holds (`BEQ ↔ rs1 = rs2`, `BLT ↔ rs1 <ₛ rs2`, …).
+- and `is_branching` is taken iff the opcode's condition holds (`BEQ ↔ rs1 = rs2`, `BLT ↔ rs1 <ₛ rs2`, …);
+- and the branch target's low limb (`next_pc[0]`) is divisible by 4 — i.e. the target is 4-byte aligned —
+  forced by the in-circuit alignment `Range` byte-lookup (`next_pc[0] · 4⁻¹ < 2^14`); the Sail bridge lifts
+  it to the whole word (so alignment is no longer an assumed bridge precondition).
 Vacuous on padding. -/
 def Spec (input : Inputs (ZMod p)) (cols : BranchColumns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   Readers.ITypeReaderImmutable.Spec
@@ -768,6 +771,7 @@ def Spec (input : Inputs (ZMod p)) (cols : BranchColumns (ZMod p)) (_ : ProverDa
         (Word.toBitVec64 (rs1Word cols)).ult (Word.toBitVec64 (rs2Word cols)) = true)) ∧
     (cols.is_bgeu = 1 →
       (cols.is_branching = 1 ↔
-        (Word.toBitVec64 (rs1Word cols)).ult (Word.toBitVec64 (rs2Word cols)) = false)))
+        (Word.toBitVec64 (rs1Word cols)).ult (Word.toBitVec64 (rs2Word cols)) = false))) ∧
+  (input.is_real = 1 → (cols.next_pc[0]).val % 4 = 0)
 
 end SP1Clean.BranchChip
