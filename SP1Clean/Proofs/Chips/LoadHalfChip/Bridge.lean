@@ -31,8 +31,7 @@ private lemma toNat_concat_half_bytes [NeZero p] (h : ZMod p) (hh : h.val < 6553
   have h_decomp : h.val % 256 + (h.val >>> 8) * 256 = h.val := by
     rw [Nat.shiftRight_eq_div_pow]; omega
   simp only [BitVec.toNat_append, BitVec.toNat_ofNat, show (2 ^ 8 : ℕ) = 256 from rfl]
-  rw [Nat.mod_eq_of_lt h_hi]
-  rw [show h.val >>> 8 <<< 8 ||| h.val % 256 = h.val by
+  rw [Nat.mod_eq_of_lt h_hi, show h.val >>> 8 <<< 8 ||| h.val % 256 = h.val by
     rw [← Nat.shiftLeft_add_eq_or_of_lt (i := 8) (by omega), Nat.shiftLeft_eq]; omega]
 
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
@@ -88,7 +87,7 @@ private lemma signExtend64_ofNat16_concat_of_ge_32768 [NeZero p]
   simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
   have hp : 131072 < p := by have := Fact.out (p := 2 ^ 17 < p); omega
   have h65535 : (65535 : ZMod p).val = 65535 := by
-    rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) from by norm_cast, ZMod.val_natCast,
+    rw [show (65535 : ZMod p) = ((65535 : ℕ) : ZMod p) by norm_cast, ZMod.val_natCast,
       Nat.mod_eq_of_lt (by omega)]
   rw [h65535]
   omega
@@ -128,7 +127,7 @@ theorem correct_load_half_native
     (spec_lh imm rs1_idx rd_idx is_unsigned).run s = (sp1_lh rd_idx pc val64).run s := by
   have hse : (sign_extend imm : BitVec 64) = BitVec.signExtend 64 imm := by simp [sign_extend]
   have hpc_get : s.regs.get Register.PC (hs _) = pc := by
-    rw [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc; exact h_pc
+    rwa [Std.ExtDHashMap.get?_eq_some_get (hs _), Option.some_inj] at h_pc
   set sp : SailState := { s with regs := s.regs.insert Register.nextPC (pc + 4#64) } with hsp
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
@@ -141,26 +140,26 @@ theorem correct_load_half_native
       show (s.regs.insert Register.nextPC (pc + 4#64)).get reg _ = _
       rw [Std.ExtDHashMap.get_insert]; simp [Ne.symm hne]
     exact
-      { h_cur_privilege := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hcp
-        h_mprv_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmprv
-        h_mseccfg_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hmsec
-        h_htif_disabled := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hhtif
-        h_pma_regions := by rw [key _ (hs _) (hsp_init _) (by decide)]; exact hpma }
+      { h_cur_privilege := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mprv_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
-    rw [hsp, SailState.get_reg?_insert_nextPC]; exact h_rs1
+    rwa [hsp, SailState.get_reg?_insert_nextPC]
   have hadd : (reg_val + BitVec.signExtend 64 imm).toNat
       = reg_val.toNat + (BitVec.signExtend 64 imm).toNat := by
     rw [BitVec.toNat_add, Nat.mod_eq_of_lt]; omega
   have hm₀ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat]?
-      = some data₀ := by rw [hmem_eq, ← hadd]; exact hmem₀
+      = some data₀ := by rwa [hmem_eq, ← hadd]
   have hm₁ : sp.mem[reg_val.toNat + (BitVec.signExtend 64 imm).toNat + 1]?
-      = some data₁ := by rw [hmem_eq, ← hadd]; exact hmem₁
+      = some data₁ := by rwa [hmem_eq, ← hadd]
   have h_align' : is_aligned_vaddr (virtaddr.Virtaddr (reg_val + BitVec.signExtend 64 imm)) 2 = true := by
-    rw [is_aligned_vaddr_iff_mod, hadd]; exact h_aligned
+    rwa [is_aligned_vaddr_iff_mod, hadd]
   have h_in_range :
       range_subset (zero_extend (BitVec.addInt (reg_val + BitVec.signExtend 64 imm) 0))
         (to_bits 2) (2#64 ^ 16) (2#64 ^ 48 - 2#64 ^ 16) = true :=
-    range_subset_sp1_pma _ 2 (by omega) h_lo (by rw [hadd]; exact h_hi)
+    range_subset_sp1_pma _ 2 (by omega) h_lo (by rwa [hadd])
   have hread := run_vmem_read_of_width_2' rs1_idx reg_val (BitVec.signExtend 64 imm)
     data₀ data₁ sp hsp_init hsp_rs1 h_align' hsp_config h_fits h_in_range hm₀ hm₁
   simp only at hread
