@@ -86,10 +86,9 @@ theorem addressSemantics_of_raw {input : Inputs (ZMod p)}
     Word.isU64_of_cases (hcc 0) (hcc 1) (hcc 2) (hcc 3)
   have h_sum := AddrAddOperation.addrAddSemantics_of_carries hbW hccW h_aa_raw
   refine ⟨?_, hob0, hob1, hob2⟩
-  rw [show Word.toNat #v[input.b[0], input.b[1], input.b[2], input.b[3]] = Word.toNat input.b from rfl,
+  rwa [show Word.toNat #v[input.b[0], input.b[1], input.b[2], input.b[3]] = Word.toNat input.b from rfl,
       show Word.toNat #v[input.cc[0], input.cc[1], input.cc[2], input.cc[3]] = Word.toNat input.cc from rfl]
     at h_sum
-  exact h_sum
 
 /-! ## The witnessed `FormalCircuit`
 
